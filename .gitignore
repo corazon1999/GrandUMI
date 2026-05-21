@@ -1,0 +1,61 @@
+# =========================
+# Node.js / npm / Next.js
+# =========================
+node_modules/
+.next/
+.vercel/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+
+# =========================
+# Unity 客户端（整体不传，由作者单独建仓或网盘同步）
+# =========================
+OPCGPro/
+
+# Unity 崩溃 / 性能分析输出（万一以后传 OPCGPro 时也用得上）
+sysinfo.txt
+*.stackdump
+crashlytics-build.properties
+
+# =========================
+# .NET 服务端生成物
+# =========================
+服务端WebSocket/bin/
+服务端WebSocket/obj/
+*.user
+*.suo
+
+# =========================
+# 大型资源（不传 git，由作者通过网盘/U盘单独发送，或朋友自行跑 download_cards.mjs 生成）
+# =========================
+CardImages/
+CardImages_test/
+opcgpro-web/public/sprites/
+
+# =========================
+# IDE / 操作系统
+# =========================
+.vs/
+.vscode/
+.idea/
+*.swp
+*.tmp
+Thumbs.db
+.DS_Store
+
+# =========================
+# 工具本地配置（不传协作者）
+# =========================
+.claude/
+
+# =========================
+# 环境变量与本地密钥
+# =========================
+.env
+.env.local
+.env.*.local
+*.pem

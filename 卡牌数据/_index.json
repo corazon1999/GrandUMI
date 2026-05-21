@@ -1,0 +1,262 @@
+[
+  {
+    "set": "EB01",
+    "count": 116,
+    "file": "EB01.json"
+  },
+  {
+    "set": "EB02",
+    "count": 97,
+    "file": "EB02.json"
+  },
+  {
+    "set": "EB03",
+    "count": 90,
+    "file": "EB03.json"
+  },
+  {
+    "set": "EB04",
+    "count": 83,
+    "file": "EB04.json"
+  },
+  {
+    "set": "OP01",
+    "count": 251,
+    "file": "OP01.json"
+  },
+  {
+    "set": "OP02",
+    "count": 213,
+    "file": "OP02.json"
+  },
+  {
+    "set": "OP03",
+    "count": 243,
+    "file": "OP03.json"
+  },
+  {
+    "set": "OP04",
+    "count": 202,
+    "file": "OP04.json"
+  },
+  {
+    "set": "OP05",
+    "count": 268,
+    "file": "OP05.json"
+  },
+  {
+    "set": "OP06",
+    "count": 267,
+    "file": "OP06.json"
+  },
+  {
+    "set": "OP07",
+    "count": 214,
+    "file": "OP07.json"
+  },
+  {
+    "set": "OP08",
+    "count": 178,
+    "file": "OP08.json"
+  },
+  {
+    "set": "OP09",
+    "count": 253,
+    "file": "OP09.json"
+  },
+  {
+    "set": "OP10",
+    "count": 184,
+    "file": "OP10.json"
+  },
+  {
+    "set": "OP11",
+    "count": 171,
+    "file": "OP11.json"
+  },
+  {
+    "set": "OP12",
+    "count": 182,
+    "file": "OP12.json"
+  },
+  {
+    "set": "OP13",
+    "count": 188,
+    "file": "OP13.json"
+  },
+  {
+    "set": "OP14",
+    "count": 158,
+    "file": "OP14.json"
+  },
+  {
+    "set": "OP15",
+    "count": 242,
+    "file": "OP15.json"
+  },
+  {
+    "set": "P",
+    "count": 197,
+    "file": "P.json"
+  },
+  {
+    "set": "PRB01",
+    "count": 2,
+    "file": "PRB01.json"
+  },
+  {
+    "set": "PRB02",
+    "count": 38,
+    "file": "PRB02.json"
+  },
+  {
+    "set": "ST01",
+    "count": 63,
+    "file": "ST01.json"
+  },
+  {
+    "set": "ST02",
+    "count": 31,
+    "file": "ST02.json"
+  },
+  {
+    "set": "ST03",
+    "count": 46,
+    "file": "ST03.json"
+  },
+  {
+    "set": "ST04",
+    "count": 40,
+    "file": "ST04.json"
+  },
+  {
+    "set": "ST05",
+    "count": 20,
+    "file": "ST05.json"
+  },
+  {
+    "set": "ST06",
+    "count": 31,
+    "file": "ST06.json"
+  },
+  {
+    "set": "ST07",
+    "count": 23,
+    "file": "ST07.json"
+  },
+  {
+    "set": "ST08",
+    "count": 16,
+    "file": "ST08.json"
+  },
+  {
+    "set": "ST09",
+    "count": 19,
+    "file": "ST09.json"
+  },
+  {
+    "set": "ST10",
+    "count": 34,
+    "file": "ST10.json"
+  },
+  {
+    "set": "ST11",
+    "count": 5,
+    "file": "ST11.json"
+  },
+  {
+    "set": "ST12",
+    "count": 26,
+    "file": "ST12.json"
+  },
+  {
+    "set": "ST13",
+    "count": 55,
+    "file": "ST13.json"
+  },
+  {
+    "set": "ST14",
+    "count": 28,
+    "file": "ST14.json"
+  },
+  {
+    "set": "ST15",
+    "count": 6,
+    "file": "ST15.json"
+  },
+  {
+    "set": "ST16",
+    "count": 11,
+    "file": "ST16.json"
+  },
+  {
+    "set": "ST17",
+    "count": 12,
+    "file": "ST17.json"
+  },
+  {
+    "set": "ST18",
+    "count": 13,
+    "file": "ST18.json"
+  },
+  {
+    "set": "ST19",
+    "count": 5,
+    "file": "ST19.json"
+  },
+  {
+    "set": "ST20",
+    "count": 4,
+    "file": "ST20.json"
+  },
+  {
+    "set": "ST21",
+    "count": 45,
+    "file": "ST21.json"
+  },
+  {
+    "set": "ST22",
+    "count": 33,
+    "file": "ST22.json"
+  },
+  {
+    "set": "ST23",
+    "count": 5,
+    "file": "ST23.json"
+  },
+  {
+    "set": "ST24",
+    "count": 5,
+    "file": "ST24.json"
+  },
+  {
+    "set": "ST25",
+    "count": 5,
+    "file": "ST25.json"
+  },
+  {
+    "set": "ST26",
+    "count": 7,
+    "file": "ST26.json"
+  },
+  {
+    "set": "ST27",
+    "count": 5,
+    "file": "ST27.json"
+  },
+  {
+    "set": "ST28",
+    "count": 5,
+    "file": "ST28.json"
+  },
+  {
+    "set": "ST29",
+    "count": 31,
+    "file": "ST29.json"
+  },
+  {
+    "set": "ST30",
+    "count": 34,
+    "file": "ST30.json"
+  }
+]

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  /* 六色对应：炎=红 风=绿 水=蓝 暗=紫 地=黑 光=黄 */
+  --color-card-red:    #ef4444;
+  --color-card-green:  #22c55e;
+  --color-card-blue:   #3b82f6;
+  --color-card-purple: #8b5cf6;
+  --color-card-black:  #6b7280;
+  --color-card-yellow: #eab308;
+}
+
+:root {
+  --background: #030712;
+  --foreground: #f9fafb;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+}

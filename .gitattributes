@@ -1,0 +1,44 @@
+# Git LFS 跟踪规则
+# ===================
+# 大型二进制资源走 LFS，避免主仓库膨胀
+
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+
+# 跨平台行尾归一化
+* text=auto eol=lf
+
+# Windows 批处理 / PowerShell 强制 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制（不做行尾转换）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.7z binary
+*.flac binary
+*.ogg binary
+*.mp3 binary
+*.wav binary
+*.dll binary
+*.exe binary
+*.so binary
+*.dylib binary
+
+# Unity 资源（避免被误判为文本）
+*.unity binary
+*.prefab binary
+*.asset binary
+*.fbx binary
+*.anim binary
+*.controller binary
+*.mat binary
+*.physicMaterial binary
+*.physicMaterial2D binary

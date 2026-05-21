@@ -1,0 +1,138 @@
+"use client";
+
+import type { CardData } from "@/types/card";
+import Modal from "@/components/ui/Modal";
+import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
+
+interface Props {
+  card: CardData | null;
+  onClose: () => void;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  Leader:    "领航",
+  Character: "角色",
+  Stage:     "舞台",
+  Event:     "事件",
+};
+
+export default function CardInfoPanel({ card, onClose }: Props) {
+  if (!card) return null;
+
+  const displayColor = toDisplayColor(card.color);
+  const primary      = primaryDisplayColor(card.color);
+  const colorStyle   = COLOR_STYLES[primary];
+
+  return (
+    <Modal open={!!card} onClose={onClose} title={card.name}>
+      <div className="flex gap-4">
+        {/* 卡图 */}
+        <div className="w-32 h-44 rounded-lg overflow-hidden shrink-0 bg-gray-800 relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={card.sprite ?? "/sprites/CardBack.png"}
+            alt={card.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+          />
+          {/* 颜色条 */}
+          {colorStyle && (
+            <div className={`absolute bottom-0 left-0 right-0 h-1 ${colorStyle.bg}`} />
+          )}
+        </div>
+
+        {/* 卡片信息 */}
+        <div className="flex flex-col gap-2 text-sm min-w-0">
+          {/* 编号 + 颜色 + 类型 */}
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="text-orange-400 font-bold text-xs">{card.number}</span>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${colorStyle?.bg ?? "bg-gray-700"} text-white`}>
+              {displayColor}
+            </span>
+            <span className="text-gray-400 text-xs">
+              {TYPE_LABELS[card.type] ?? card.type}
+            </span>
+          </div>
+
+          {/* 稀有度 + 角标 */}
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {card.rarity && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                card.rarity === 'L'   ? 'bg-yellow-500 text-black' :
+                card.rarity === 'SR'  ? 'bg-pink-500 text-white' :
+                card.rarity === 'R'   ? 'bg-sky-500 text-white' :
+                card.rarity === 'UC'  ? 'bg-gray-500 text-white' :
+                card.rarity === 'U'   ? 'bg-gray-500 text-white' :
+                card.rarity === 'C'   ? 'bg-gray-700 text-gray-300' :
+                card.rarity === 'SEC' ? 'bg-red-600 text-white' :
+                card.rarity === 'P'   ? 'bg-emerald-500 text-white' :
+                'bg-gray-700 text-white'
+              }`}>
+                {card.rarity === 'L' ? '领袖' :
+                 card.rarity === 'SR' ? '超稀有' :
+                 card.rarity === 'R' ? '稀有' :
+                 card.rarity === 'UC' ? '罕见' :
+                card.rarity === 'U' ? '罕见' :
+                 card.rarity === 'C' ? '普通' :
+                 card.rarity === 'SEC' ? '隐藏稀有' :
+                 card.rarity === 'P' ? '宣传' : card.rarity}
+              </span>
+            )}
+            {card.subscript > 0 && (
+              <span className="text-yellow-400 text-xs font-bold">角标 {card.subscript}</span>
+            )}
+          </div>
+
+          {/* 属性 */}
+          {card.property && (
+            <p className="text-gray-400 text-xs">
+              属性 <span className="text-white">{card.property}</span>
+            </p>
+          )}
+
+          {/* 威力 */}
+          {card.power > 0 && (
+            <p className="text-xs">
+              <span className="text-gray-400 mr-1">威力</span>
+              <span className="text-white font-bold">{card.power.toLocaleString()}</span>
+            </p>
+          )}
+
+          {/* 费用 */}
+          {card.cost > 0 && (
+            <p className="text-xs">
+              <span className="text-gray-400 mr-1">费用</span>
+              <span className="text-white font-bold">{card.cost}</span>
+            </p>
+          )}
+
+          {/* 反击 */}
+          {card.counter > 0 && (
+            <p className="text-xs">
+              <span className="text-gray-400 mr-1">反击</span>
+              <span className="text-white font-bold">+{card.counter}</span>
+            </p>
+          )}
+
+          {/* 关键词 */}
+          {card.keyWords.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {card.keyWords.map((k) => (
+                <span key={k} className="text-[10px] bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded">
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 效果文本 */}
+          {card.effectText && (
+            <p className="text-gray-300 text-[11px] leading-relaxed max-w-52">
+              {card.effectText}
+            </p>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
