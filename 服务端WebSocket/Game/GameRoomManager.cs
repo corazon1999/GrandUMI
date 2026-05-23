@@ -64,11 +64,8 @@ public static class GameRoomManager
             foreach (var sid in entry.Spectators)
                 WebSocketBridge.Send(sid, payload);
         };
-        var replayPath = ReplayRecorder.Open(roomId);
+        ReplayRecorder.Open(roomId);
         engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
-
-        var entry0 = (RoomEntry?)null;
-        _ = replayPath;
 
         _rooms[roomId] = entry;
         _sessionRoom[p0Sid] = roomId;

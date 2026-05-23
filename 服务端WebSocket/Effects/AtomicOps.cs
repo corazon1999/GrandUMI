@@ -184,4 +184,252 @@ public static class AtomicOps
         // 剩余的放卡组底部（顺序由调用方控制，目前简化为原顺序）
         p.Deck.AddRange(top);
     }
+
+    // ─── A 阶段 P0 新增原子 ────────────────────────────────────────────────
+
+    /// <summary>从咚!!卡组追加 N 张咚到费用区，活跃或休息状态</summary>
+    public static int RefreshDonFromDeck(PlayerState p, int n, DonState state = DonState.Active)
+    {
+        int added = 0;
+        for (int i = 0; i < n && p.DonDeck.Count > 0 && p.CostArea.Count < 10; i++)
+        {
+            var d = p.DonDeck[0]; p.DonDeck.RemoveAt(0);
+            d.State = state;
+            d.AttachedToCardId = null;
+            p.CostArea.Add(d);
+            added++;
+        }
+        return added;
+    }
+
+    /// <summary>把场上的卡放回持有者的卡组最下方（先归还附着咚 + 清临时状态）</summary>
+    public static void ReturnFieldToDeckBottom(GameState s, int ownerIdx, CardInstance card)
+    {
+        var p = s.Players[ownerIdx];
+        foreach (var d in p.CostArea)
+        {
+            if (d.State == DonState.Attached && d.AttachedToCardId == card.Id)
+            {
+                d.State = DonState.Rest;
+                d.AttachedToCardId = null;
+            }
+        }
+        p.Characters.Remove(card);
+        if (p.StageCard == card) p.StageCard = null;
+        ResetCardEphemeralState(card);
+        p.Deck.Add(card);
+    }
+
+    /// <summary>把手牌的卡放回卡组最下方</summary>
+    public static void ReturnHandToDeckBottom(PlayerState p, CardInstance card)
+    {
+        if (!p.Hand.Remove(card)) return;
+        ResetCardEphemeralState(card);
+        p.Deck.Add(card);
+    }
+
+    /// <summary>把废弃区的卡放回卡组最下方</summary>
+    public static void ReturnTrashToDeckBottom(PlayerState p, CardInstance card)
+    {
+        if (!p.Trash.Remove(card)) return;
+        ResetCardEphemeralState(card);
+        p.Deck.Add(card);
+    }
+
+    /// <summary>从废弃区免费登场（restState=true 时以休息状态登场）</summary>
+    public static void PlayFromTrashFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    {
+        var p = s.Players[playerIdx];
+        if (!p.Trash.Remove(card)) return;
+        if (card.Info.Kind == CardKind.Character)
+        {
+            if (p.Characters.Count >= 5)
+            {
+                var sacrifice = p.Characters[0];
+                p.Characters.RemoveAt(0);
+                p.Trash.Add(sacrifice);
+            }
+            ResetCardEphemeralState(card);
+            card.TurnPlayed = s.TurnCount;
+            card.IsTapped = restState;
+            p.Characters.Add(card);
+        }
+        else if (card.Info.Kind == CardKind.Stage)
+        {
+            if (p.StageCard is not null) p.Trash.Add(p.StageCard);
+            ResetCardEphemeralState(card);
+            p.StageCard = card;
+        }
+    }
+
+    /// <summary>把废弃区的卡加入手牌</summary>
+    public static void TrashToHand(PlayerState p, CardInstance card)
+    {
+        if (!p.Trash.Remove(card)) return;
+        ResetCardEphemeralState(card);
+        p.Hand.Add(card);
+    }
+
+    /// <summary>把力量本回合"变为"绝对值（不是 ±delta）。实现方式：相对当前总力量算出 delta，写 PowerModThisTurn</summary>
+    public static void SetPowerThisTurn(CardInstance c, int absoluteValue, int donAttached, bool ownerTurn)
+    {
+        int current = c.CurrentPower(donAttached, ownerTurn);
+        c.PowerModThisTurn += absoluteValue - current;
+    }
+
+    /// <summary>让对手丢弃 N 张手牌（由对手自己 Prompt 选择）。0 张直接返回</summary>
+    public static async Task OpponentDiscardChosen(GameEngine engine, int opponentIdx, int n)
+    {
+        var opp = engine.State.Players[opponentIdx];
+        int actual = Math.Min(n, opp.Hand.Count);
+        if (actual <= 0) return;
+        var chosen = await engine.Prompts.ChooseCards(opponentIdx, "OwnHandDiscard",
+            $"丢弃 {actual} 张手牌",
+            opp.Hand.Select(c => c.Id.ToString()).ToList(), actual, actual);
+        if (chosen.Count == 0)
+        {
+            // 超时未选 → 自动从头丢
+            for (int i = 0; i < actual; i++)
+                if (opp.Hand.Count > 0) DiscardHand(opp, opp.Hand[0]);
+            return;
+        }
+        foreach (var cid in chosen)
+        {
+            var card = opp.Hand.FirstOrDefault(c => c.Id.ToString() == cid);
+            if (card is not null) DiscardHand(opp, card);
+        }
+    }
+
+    /// <summary>清除卡的临时状态（区域间移动时调用）</summary>
+    private static void ResetCardEphemeralState(CardInstance c)
+    {
+        c.IsTapped = false;
+        c.PowerModThisTurn = 0;
+        c.PowerModThisBattle = 0;
+        c.PowerModPersistent = 0;
+        c.GainedKeywords.Clear();
+        c.CannotActivateNextReset = false;
+        c.OncePerTurnUsedKeys.Clear();
+        c.TurnPlayed = 0;
+        c.CostModThisTurn = 0;
+        c.CostModPersistent = 0;
+        c.OriginalPowerOverride = null;
+        c.IsEffectsNullified = false;
+        c.Restrictions.Clear();
+    }
+
+    // ─── B 阶段 P1 新增原子 ────────────────────────────────────────────────
+
+    /// <summary>范围 buff：对某方场上所有符合 filter 的卡，加本回合力量 delta</summary>
+    public static int AddPowerToAllThisTurn(GameState s, int sideIdx, Func<CardInstance, bool> filter, int delta, bool includeLeader = true)
+    {
+        var p = s.Players[sideIdx];
+        int affected = 0;
+        if (includeLeader && filter(p.Leader)) { p.Leader.PowerModThisTurn += delta; affected++; }
+        foreach (var c in p.Characters)
+            if (filter(c)) { c.PowerModThisTurn += delta; affected++; }
+        return affected;
+    }
+
+    /// <summary>主动从卡组顶部加 n 张到生命区最上方</summary>
+    public static int AddLifeFromDeckTop(PlayerState p, int n)
+    {
+        int added = 0;
+        for (int i = 0; i < n && p.Deck.Count > 0; i++)
+        {
+            var top = p.Deck[0]; p.Deck.RemoveAt(0);
+            p.LifeArea.Insert(0, top);
+            added++;
+        }
+        return added;
+    }
+
+    /// <summary>把场上一张角色卡放到生命区（最上方）：归还附着咚 + 清临时态 + 入生命区</summary>
+    public static void MoveCharToLife(GameState s, int ownerIdx, CardInstance card, bool toTop = true)
+    {
+        var p = s.Players[ownerIdx];
+        foreach (var d in p.CostArea)
+        {
+            if (d.State == DonState.Attached && d.AttachedToCardId == card.Id)
+            {
+                d.State = DonState.Rest;
+                d.AttachedToCardId = null;
+            }
+        }
+        p.Characters.Remove(card);
+        if (p.StageCard == card) p.StageCard = null;
+        ResetCardEphemeralState(card);
+        if (toTop) p.LifeArea.Insert(0, card);
+        else       p.LifeArea.Add(card);
+    }
+
+    /// <summary>看卡组顶 k 张并自由排序放回（顶或底）。order = 重新组合后的卡 Id 顺序</summary>
+    public static void ReorderTopK(PlayerState p, IReadOnlyList<Guid> order, bool toBottom)
+    {
+        var ids = new HashSet<Guid>(order);
+        var lookup = p.Deck.Take(ids.Count).ToDictionary(c => c.Id, c => c);
+        if (lookup.Count == 0) return;
+        for (int i = 0; i < lookup.Count; i++) p.Deck.RemoveAt(0);
+        var reordered = order.Where(g => lookup.ContainsKey(g)).Select(g => lookup[g]).ToList();
+        if (toBottom) p.Deck.AddRange(reordered);
+        else
+        {
+            for (int i = reordered.Count - 1; i >= 0; i--) p.Deck.Insert(0, reordered[i]);
+        }
+    }
+
+    /// <summary>检索卡组：按 filter 取所有符合的卡，让玩家选 1 张加入手牌，洗牌</summary>
+    public static async Task<CardInstance?> SearchDeck(GameEngine engine, int playerIdx, Func<CardInstance, bool> filter, string prompt = "从卡组选 1 张加入手牌")
+    {
+        var p = engine.State.Players[playerIdx];
+        var candidates = p.Deck.Where(filter).ToList();
+        if (candidates.Count == 0)
+        {
+            Shuffle(p.Deck);
+            return null;
+        }
+        var chosen = await engine.Prompts.ChooseCards(playerIdx, "SearchDeck", prompt,
+            candidates.Select(c => c.Id.ToString()).ToList(), 0, 1);
+        CardInstance? picked = null;
+        if (chosen.Count > 0)
+        {
+            picked = candidates.First(c => c.Id.ToString() == chosen[0]);
+            p.Deck.Remove(picked);
+            p.Hand.Add(picked);
+        }
+        Shuffle(p.Deck);
+        return picked;
+    }
+
+    /// <summary>给卡加费用修正</summary>
+    public static void AddCostModifier(CardInstance c, int delta, KeywordDuration duration)
+    {
+        if (duration == KeywordDuration.UntilNextOpponentEndPhase) c.CostModPersistent += delta;
+        else c.CostModThisTurn += delta;
+    }
+
+    /// <summary>无效化一张卡的所有效果</summary>
+    public static void NullifyEffects(CardInstance c, KeywordDuration duration)
+    {
+        c.IsEffectsNullified = true;
+        // 简化：不区分 duration（统一在 EnterEndPhase 清理）
+        _ = duration;
+    }
+
+    /// <summary>给卡加限制（CannotAttack 等）</summary>
+    public static void AddRestriction(CardInstance c, RestrictionKind kind, KeywordDuration duration)
+    {
+        c.Restrictions.Add(new CardRestriction { Kind = kind, Duration = duration });
+    }
+
+    /// <summary>洗牌（Fisher–Yates）</summary>
+    private static readonly Random _rng = new();
+    public static void Shuffle<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = _rng.Next(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
 }

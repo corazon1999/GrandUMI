@@ -9,7 +9,8 @@ public enum EffectTrigger
     OnAttackDeclare,        // 【攻击时】
     OnOppAttackDeclare,     // 【对方的攻击时】
     OnBlockDeclare,         // 【阻挡时】
-    OnKO,                   // 【K.O.时】
+    PreKO,                  // KO 前置换钩子（让"改为...不被 KO"效果有机会取消本次 KO）
+    OnKO,                   // 【K.O.时】（在卡进入废弃区后）
     OnDamageToLeader,       // 给对方领袖造成伤害时
     OnLifeRevealTrigger,    // 生命牌触发
     OnTurnStart,            // 回合开始时

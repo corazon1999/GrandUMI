@@ -14,7 +14,7 @@ import type { CardData } from "@/types/card";
 // Legacy40:
 //   - 历史 40 张本地卡组，仅用于浏览/旧卡组兼容，不可用于网络对战。
 
-export type DeckFormat = "OP15-Only" | "Legacy40";
+export type DeckFormat = "OP15-Only" | "OP16-Only" | "OP15-OP16" | "Legacy40";
 
 interface FormatRule {
   mainSize: number;
@@ -29,6 +29,18 @@ export const FORMAT_RULES: Record<DeckFormat, FormatRule> = {
     leaderSetWhitelist: ["OP15"],
     mainSetWhitelist: ["OP15"],
     label: "OP15 限定（50 张）",
+  },
+  "OP16-Only": {
+    mainSize: 50,
+    leaderSetWhitelist: ["OP16"],
+    mainSetWhitelist: ["OP16"],
+    label: "OP16 限定（50 张）",
+  },
+  "OP15-OP16": {
+    mainSize: 50,
+    leaderSetWhitelist: ["OP15", "OP16"],
+    mainSetWhitelist: ["OP15", "OP16"],
+    label: "OP15+OP16 联合（50 张）",
   },
   "Legacy40": {
     mainSize: 40,

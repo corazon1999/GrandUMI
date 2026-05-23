@@ -16,9 +16,9 @@ Console.WriteLine("╚═══════════════════�
 var cardDataPath = ResolveCardDataPath();
 CardDatabase.LoadFrom(cardDataPath);
 
-// 加载效果 DSL 定义
-var dslPath = ResolveDslPath();
-GrandUMI.Effects.Dsl.DslInterpreter.Load(dslPath);
+// 加载效果 DSL 定义（整个 Definitions 目录下所有 *.json）
+var dslDir = ResolveDslDir();
+GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(dslDir);
 
 WebSocketBridge.Start(port);
 
@@ -49,15 +49,14 @@ static string ResolveCardDataPath()
     return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "卡牌数据"));
 }
 
-static string ResolveDslPath()
+static string ResolveDslDir()
 {
-    // 服务端项目根目录下的 Effects/Definitions/OP15.json
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir is not null)
     {
-        var candidate = Path.Combine(dir.FullName, "Effects", "Definitions", "OP15.json");
-        if (File.Exists(candidate)) return candidate;
+        var candidate = Path.Combine(dir.FullName, "Effects", "Definitions");
+        if (Directory.Exists(candidate)) return candidate;
         dir = dir.Parent;
     }
-    return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Effects", "Definitions", "OP15.json"));
+    return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Effects", "Definitions"));
 }

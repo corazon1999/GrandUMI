@@ -4,11 +4,27 @@ namespace GrandUMI.Game.Validation;
 
 /// <summary>
 /// 卡组合法性校验
-/// 当前格式：OP15-Only（官方 50 张 + 仅限 OP15 卡池）
+///
+/// 支持的格式（FormatRules）：
+///   OP15-Only:   领航/主卡组仅限 OP15，50 张
+///   OP16-Only:   领航/主卡组仅限 OP16，50 张
+///   OP15-OP16:   领航/主卡组限 OP15 或 OP16，50 张（最新两弹联合）
 /// </summary>
 public static class DeckValidator
 {
     public const string FormatOp15Only = "OP15-Only";
+    public const string FormatOp16Only = "OP16-Only";
+    public const string FormatOp15Op16 = "OP15-OP16";
+
+    /// <summary>格式规则：白名单卡集 + 主卡组张数 + 同名上限</summary>
+    private record FormatRule(string Name, string[] AllowedSets, int MainSize, int CopyLimit);
+
+    private static readonly Dictionary<string, FormatRule> Rules = new()
+    {
+        [FormatOp15Only] = new(FormatOp15Only, new[] { "OP15" },         50, 4),
+        [FormatOp16Only] = new(FormatOp16Only, new[] { "OP16" },         50, 4),
+        [FormatOp15Op16] = new(FormatOp15Op16, new[] { "OP15", "OP16" }, 50, 4),
+    };
 
     public record Result(bool Ok, string? Reason, string? LeaderNumber);
 
@@ -21,6 +37,9 @@ public static class DeckValidator
     {
         if (string.IsNullOrWhiteSpace(deckRaw))
             return new(false, "卡组为空", null);
+
+        if (!Rules.TryGetValue(format, out var rule))
+            return new(false, $"未知卡组格式：{format}", null);
 
         var lines = deckRaw
             .Replace("\r\n", "\n")
@@ -40,34 +59,31 @@ public static class DeckValidator
             return new(false, $"指定的领航卡 {leaderNum} 不是领航类型", null);
 
         var mainCards = lines.Skip(1).ToArray();
-
-        // 按格式分支
-        return format switch
-        {
-            FormatOp15Only => ValidateOp15Only(leader, mainCards),
-            _              => new(false, $"未知卡组格式：{format}", leaderNum),
-        };
+        return ValidateAgainstRule(leader, mainCards, rule);
     }
 
-    private static Result ValidateOp15Only(CardInfo leader, string[] mainCards)
+    private static Result ValidateAgainstRule(CardInfo leader, string[] mainCards, FormatRule rule)
     {
-        // 1. 领航必须是 OP15
-        if (leader.SetCode != "OP15")
-            return new(false, $"OP15-Only 格式：领航必须来自 OP15（当前 {leader.SetCode}）", leader.Number);
+        var allowed = rule.AllowedSets;
+        var setList = string.Join("/", allowed);
 
-        // 2. 主卡组必须 50 张
-        if (mainCards.Length != 50)
-            return new(false, $"OP15-Only 格式：主卡组必须 50 张（当前 {mainCards.Length}）", leader.Number);
+        // 1. 领航必须来自白名单卡集
+        if (!allowed.Contains(leader.SetCode))
+            return new(false, $"{rule.Name} 格式：领航必须来自 {setList}（当前 {leader.SetCode}）", leader.Number);
 
-        // 3. 同名卡 ≤ 4 张
+        // 2. 主卡组张数
+        if (mainCards.Length != rule.MainSize)
+            return new(false, $"{rule.Name} 格式：主卡组必须 {rule.MainSize} 张（当前 {mainCards.Length}）", leader.Number);
+
+        // 3. 同名上限
         var counts = new Dictionary<string, int>();
         foreach (var n in mainCards)
             counts[n] = counts.GetValueOrDefault(n, 0) + 1;
         foreach (var (num, cnt) in counts)
-            if (cnt > 4)
-                return new(false, $"同名卡超过 4 张：{num} × {cnt}", leader.Number);
+            if (cnt > rule.CopyLimit)
+                return new(false, $"同名卡超过 {rule.CopyLimit} 张：{num} × {cnt}", leader.Number);
 
-        // 4. 每张卡都必须来自 OP15 且颜色与领航相容
+        // 4. 每张卡：存在 + 非领航 + 卡集白名单 + 颜色与领航相容
         foreach (var num in counts.Keys)
         {
             var card = CardDatabase.Get(num);
@@ -75,8 +91,8 @@ public static class DeckValidator
                 return new(false, $"卡牌不存在：{num}", leader.Number);
             if (card.Kind == CardKind.Leader)
                 return new(false, $"主卡组不能包含领航卡：{num}", leader.Number);
-            if (card.SetCode != "OP15")
-                return new(false, $"OP15-Only 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
+            if (!allowed.Contains(card.SetCode))
+                return new(false, $"{rule.Name} 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
             if (!card.SharesColorWith(leader))
                 return new(false, $"颜色不符：{num}（{card.Color}）与领航（{leader.Color}）无共同颜色", leader.Number);
         }

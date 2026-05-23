@@ -1,4 +1,5 @@
 using GrandUMI.Effects;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI.Game;
 
@@ -14,11 +15,25 @@ public static class LifeRevealManager
 {
     /// <summary>
     /// 领袖受到 damage 点伤害（异步，因为可能触发 prompt 等待玩家响应）
+    ///
+    /// 【流放】处理：若攻击者带【流放】关键字，生命牌直接进废弃区，不发动触发；
+    /// 反信息泄露弹窗也跳过（因为对手知道你攻击者有【流放】，无法泄露）。
     /// </summary>
     public static async Task DealDamageToLeader(GameEngine engine, int targetPlayerIdx, int damage)
     {
         var s = engine.State;
         var p = s.Players[targetPlayerIdx];
+
+        // 判断本次攻击者是否带【流放】
+        bool exile = false;
+        if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == targetPlayerIdx)
+        {
+            var atk = s.Players[b.AttackerPlayerIndex];
+            var attacker = atk.Leader.Id == b.AttackerCardId ? atk.Leader
+                : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
+            if (attacker is not null && ActionValidator.HasKeyword(attacker, "流放"))
+                exile = true;
+        }
 
         for (int i = 0; i < damage; i++)
         {
@@ -35,6 +50,13 @@ public static class LifeRevealManager
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
 
+            if (exile)
+            {
+                // 【流放】：直接进废弃区，不触发触发效果，不弹窗
+                p.Trash.Add(top);
+                continue;
+            }
+
             bool hasTrigger = !string.IsNullOrEmpty(top.Info.Trigger);
             bool forcePrompt = p.AlwaysPromptOnLifeReveal;
 
@@ -43,7 +65,7 @@ public static class LifeRevealManager
                 bool useTrigger = await engine.Prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
                 if (useTrigger && hasTrigger)
                 {
-                    // 发动触发：卡牌进废弃区（除非有【流放】），效果用 OnLifeRevealTrigger 触发
+                    // 发动触发：卡牌进废弃区，效果用 OnLifeRevealTrigger 触发
                     p.Trash.Add(top);
                     await EffectRuntime.Resolve(s, targetPlayerIdx, top,
                         EffectTrigger.OnLifeRevealTrigger, engine.Prompts);

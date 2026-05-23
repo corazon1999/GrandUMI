@@ -35,13 +35,63 @@ public class CardInstance
     /// <summary>本回合"每回合1次"效果是否已用</summary>
     public HashSet<string> OncePerTurnUsedKeys { get; } = new();
 
+    // ── B 阶段 P1 新增字段 ──────────────────────────────────────────────
+
+    /// <summary>本回合费用修正（在手牌时影响打出费用 / 在场上影响 KO 判定）</summary>
+    public int CostModThisTurn { get; set; }
+
+    /// <summary>持续费用修正（直到效果失效）</summary>
+    public int CostModPersistent { get; set; }
+
+    /// <summary>原本力量修正（"原本的力量变为 X"）</summary>
+    public int? OriginalPowerOverride { get; set; }
+
+    /// <summary>效果是否被无效化（OnXxx 触发被跳过）</summary>
+    public bool IsEffectsNullified { get; set; }
+
+    /// <summary>临时限制（CannotAttack/CannotBeKOd/CannotBeBlocker/CannotBeChosen）</summary>
+    public List<CardRestriction> Restrictions { get; } = new();
+
+    /// <summary>卡名替身（"卡牌名也视为 X"），过滤 nameEquals 时同时匹配主名与别名</summary>
+    public List<string> NameAliases { get; } = new();
+
+    public bool MatchesName(string name)
+        => Info.Name == name || NameAliases.Contains(name);
+
+    /// <summary>当前费用（含修正，不低于 0）</summary>
+    public int CurrentCost()
+    {
+        int v = Info.Cost + CostModThisTurn + CostModPersistent;
+        return v < 0 ? 0 : v;
+    }
+
+    public bool HasRestriction(RestrictionKind kind)
+    {
+        foreach (var r in Restrictions) if (r.Kind == kind) return true;
+        return false;
+    }
+
     /// <summary>当前总力量（含修正，可为负）</summary>
     public int CurrentPower(int donAttachedCount, bool ownerTurn)
     {
-        int baseP = Info.Power;
+        int baseP = OriginalPowerOverride ?? Info.Power;
         int donBonus = ownerTurn ? donAttachedCount * 1000 : 0;
         return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent;
     }
+}
+
+public enum RestrictionKind
+{
+    CannotAttack,
+    CannotBeKOd,
+    CannotBeBlocker,
+    CannotBeChosen,
+}
+
+public class CardRestriction
+{
+    public required RestrictionKind Kind { get; init; }
+    public required KeywordDuration Duration { get; init; }
 }
 
 public class TemporaryKeyword

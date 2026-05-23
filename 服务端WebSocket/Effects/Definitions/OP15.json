@@ -1,257 +1,728 @@
 {
+  "OP15-002": {
+    "_name": "路西",
+    "_matcher": "启动主要每回合1次抽 N",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
   "OP15-004": {
     "_name": "海猫",
-    "triggers": [{
-      "on": "OnEnterField",
-      "if": { "leaderPowerNotMoreThan": 0 },
-      "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "选择对方最多 1 张角色 力量 -3000" },
-        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -3000 }
-      ]
-    }]
+    "_matcher": "登场时给对方角色力量 -N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -3000
+          }
+        ]
+      }
+    ]
   },
-  "OP15-005": {
-    "_name": "卡巴奇",
-    "triggers": [{
-      "on": "OnAttackDeclare",
-      "if": { "donAttachedGteOpponent": 1 },
-      "then": [{ "op": "AddPowerThisTurn", "target": "self", "delta": 2000 }]
-    }]
+  "OP15-007": {
+    "_name": "阿金",
+    "_matcher": "登场时从手牌登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCharacter",
+            "max": 1,
+            "as": "$c"
+          }
+        ],
+        "_doc": "需 PlayFromHand 原子（filter cost ≤5）"
+      }
+    ]
   },
-  "OP15-015": {
-    "_name": "日熊",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "选择对方 1 张角色赋予休息咚" },
-        { "op": "AttachDon", "target": "$tgt", "n": 1, "from": "rest" },
-        { "op": "Choose", "prompt": "OpponentCharacterWithDon", "max": 1, "as": "$tgt2", "text": "对方最多 1 张被赋予咚的角色 力量 -1000" },
-        { "op": "AddPowerThisTurn", "target": "$tgt2", "delta": -1000 }
-      ]
-    }]
-  },
-  "OP15-027": {
-    "_name": "杰拉基尔·米霍克",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OpponentCharacterWithDon", "max": 1, "as": "$tgt", "text": "将对方最多 1 张被赋予咚的角色转休息" },
-        { "op": "Rest", "target": "$tgt" }
-      ]
-    }]
-  },
-  "OP15-032": {
-    "_name": "布鲁克",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张卡牌转休息" },
-        { "op": "Rest", "target": "$tgt" }
-      ]
-    }]
-  },
-  "OP15-036": {
-    "_name": "龙马",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张费用不高于 4 的休息角色 KO" },
-        { "op": "KO", "target": "$tgt" }
-      ]
-    }, {
-      "on": "OnAttackDeclare",
-      "then": [
-        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张费用不高于 4 的休息角色 KO" },
-        { "op": "KO", "target": "$tgt" }
-      ]
-    }]
-  },
-  "OP15-040": {
-    "_name": "维奥拉",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "ReturnDonToDeck", "n": 0 }
-      ]
-    }]
-  },
-  "OP15-045": {
-    "_name": "蔡义",
-    "triggers": [{
-      "on": "OnEnterField",
-      "if": { "trashEventCountGte": 1 },
-      "then": [
-        { "op": "Draw", "n": 2 }
-      ]
-    }]
-  },
-  "OP15-074": {
-    "_name": "放电",
-    "main": {
-      "then": [
-        { "op": "ReturnDonToDeck", "n": 1 },
-        { "op": "Draw", "n": 1 }
-      ]
-    }
-  },
-  "OP15-076": {
-    "_name": "雷兽",
-    "main": {
-      "then": [
-        { "op": "ReturnDonToDeck", "n": 1 },
-        { "op": "Draw", "n": 1 },
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张角色 力量 -1000" },
-        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -1000 }
-      ]
-    }
-  },
-  "OP15-077": {
-    "_name": "雷龙",
-    "main": {
-      "then": [
-        { "op": "ReturnDonToDeck", "n": 1 },
-        { "op": "Draw", "n": 1 },
-        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张休息角色 在下个对方重置阶段不会转活跃" },
-        { "op": "PreventActivateNextReset", "target": "$tgt" }
-      ]
-    }
-  },
-  "OP15-078": {
-    "_name": "万雷",
-    "main": {
-      "then": [
-        { "op": "ReturnDonToDeck", "n": 2 },
-        { "op": "Draw", "n": 1 },
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张力量不高于 5000 的角色转休息" },
-        { "op": "Rest", "target": "$tgt" }
-      ]
-    }
+  "OP15-012": {
+    "_name": "巴奇",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
   },
   "OP15-019": {
-    "_name": "防护罩 蛮牛突进",
+    "_name": "防护罩  蛮牛突进",
+    "_matcher": "事件【主要】我方领袖 +N",
     "main": {
       "then": [
-        { "op": "Draw", "n": 1 },
-        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 1000 }
+        {
+          "op": "AddPowerThisTurn",
+          "target": "selfLeader",
+          "delta": 1000
+        }
       ]
     },
     "trigger": [
-      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt" },
-      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -4000 }
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": -4000
+      }
     ]
   },
-  "OP15-021": {
-    "_name": "好好看着哦!艾斯!",
+  "OP15-020": {
+    "_name": "火拳",
+    "_matcher": "事件【主要】对方角色 -N",
     "main": {
       "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt" },
-        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -3000 }
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -8000
+        }
+      ]
+    }
+  },
+  "OP15-026": {
+    "_name": "强高",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP15-027": {
+    "_name": "杰拉基尔·米霍克",
+    "_matcher": "登场时将对方角色转休息",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-032": {
+    "_name": "布鲁克",
+    "_matcher": "启动主要将角色转活跃",
+    "activated": {
+      "oncePerTurn": false,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Activate",
+          "target": "$tgt"
+        }
       ]
     }
   },
   "OP15-037": {
     "_name": "是强是弱只用结果来说话。",
+    "_matcher": "【触发】抽 N",
     "trigger": [
-      { "op": "Draw", "n": 1 }
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP15-038": {
+    "_name": "这是命令。谁都不许违抗我!!",
+    "_matcher": "【反击】本次战斗中我方 +N",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP15-040": {
+    "_name": "维奥拉",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP15-041": {
+    "_name": "欧隆布斯",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-045": {
+    "_name": "蔡义",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-048": {
+    "_name": "青椒",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-053": {
+    "_name": "莉贝卡",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
     ]
   },
   "OP15-056": {
     "_name": "『燃烧之果』，我吃可以吗？",
-    "main": {
-      "then": [
-        { "op": "Draw", "n": 2 },
-        { "op": "GiveKeyword", "target": "selfLeader", "keyword": "双重攻击", "duration": "ThisTurn" },
-        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 3000 }
-      ]
-    },
+    "_matcher": "【触发】抽 N",
     "trigger": [
-      { "op": "Draw", "n": 2 }
+      {
+        "op": "Draw",
+        "n": 2
+      }
     ]
   },
-  "OP15-095": {
-    "_name": "橡皮橡皮暴风雨",
+  "OP15-057": {
+    "_name": "德莱斯罗兹王国",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-061": {
+    "_name": "欧姆",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-063": {
+    "_name": "涅槃",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-066": {
+    "_name": "阿悟",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-067": {
+    "_name": "修罗",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-074": {
+    "_name": "放电",
+    "_matcher": "启动主要 咚-N 抽 1",
     "main": {
-      "if": { "trashCountGte": 15 },
+      "cost": {
+        "donReturn": 1
+      },
       "then": [
-        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 3000 }
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP15-075": {
+    "_name": "神之制裁",
+    "_matcher": "【反击】本次战斗中我方 +N",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP15-076": {
+    "_name": "雷兽",
+    "_matcher": "启动主要 咚-N 抽 1",
+    "main": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP15-077": {
+    "_name": "雷龙",
+    "_matcher": "启动主要 咚-N 抽 1",
+    "main": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
       ]
     }
   },
-  "OP15-007": {
-    "_name": "阿金",
-    "triggers": [{
-      "on": "OnEnterField",
-      "if": { "leaderHasKeyword": "东海" },
-      "then": [
-        { "op": "Draw", "n": 1 }
-      ]
-    }]
-  },
-  "OP15-026": {
-    "_name": "强高",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Draw", "n": 1 }
-      ]
-    }]
-  },
-  "OP15-033": {
-    "_name": "霍迪·琼斯",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Activate", "target": "selfLeader" }
-      ]
-    }]
-  },
-  "OP15-034": {
-    "_name": "尤奇",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "as": "$tgt", "text": "我方最多 1 张布鲁克 力量 +2000" },
-        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": 2000 }
-      ]
-    }]
-  },
-  "OP15-047": {
-    "_name": "山智",
-    "triggers": [{
-      "on": "OnEnterField",
-      "then": [
-        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "as": "$tgt", "text": "我方最多 1 张角色 获得 不可阻挡" },
-        { "op": "GiveKeyword", "target": "$tgt", "keyword": "不可阻挡", "duration": "ThisTurn" }
-      ]
-    }]
-  },
-  "OP15-046": {
-    "_name": "萨波",
-    "triggers": [{
-      "on": "OnEnterField",
-      "if": { "leaderHasKeyword": "德莱斯罗兹" },
-      "then": [
-        { "op": "Draw", "n": 1 }
-      ]
-    }]
-  },
-  "OP15-055": {
-    "_name": "请放心攀登使用吧!!路飞前辈!!!",
+  "OP15-078": {
+    "_name": "万雷",
+    "_matcher": "启动主要 咚-N 抽 1",
     "main": {
+      "cost": {
+        "donReturn": 2
+      },
       "then": [
-        { "op": "Draw", "n": 2 }
+        {
+          "op": "Draw",
+          "n": 1
+        }
       ]
-    }
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 1000
+      }
+    ]
   },
-  "OP15-054": {
-    "_name": "坚决不让给别人的啦!这可是『那小子』的遗物。",
-    "main": {
-      "then": [
-        { "op": "Draw", "n": 2 }
-      ]
-    }
+  "OP15-084": {
+    "_name": "豪格巴克医生",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
   },
-  "OP15-095_alt": {
-    "_doc": "更多 OP15 卡 DSL 在 M5 中按需补充"
+  "OP15-086": {
+    "_name": "奈美",
+    "_matcher": "登场时从废弃区登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c"
+          }
+        ],
+        "_doc": "从废弃区选 1 张费用 ≤7 的角色登场"
+      }
+    ]
+  },
+  "OP15-087": {
+    "_name": "妮古·罗宾",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-088": {
+    "_name": "宇宙对接6",
+    "_matcher": "登场时从废弃区登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c"
+          }
+        ],
+        "_doc": "从废弃区选 1 张费用 ≤2 的角色登场"
+      }
+    ]
+  },
+  "OP15-100": {
+    "_name": "螳螂",
+    "_matcher": "登场时 KO 对方低费用角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "text": "选择对方费用 ≤6 的角色 KO"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-101": {
+    "_name": "卡尔加拉",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP15-103": {
+    "_name": "捷宝",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP15-104": {
+    "_name": "柯妮丝",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  },
+  "OP15-106": {
+    "_name": "章鱼气球",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP15-108": {
+    "_name": "奈美",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP15-112": {
+    "_name": "拉琪",
+    "_matcher": "登场时从手牌登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCharacter",
+            "max": 1,
+            "as": "$c"
+          }
+        ],
+        "_doc": "需 PlayFromHand 原子（filter cost ≤3）"
+      }
+    ]
+  },
+  "OP15-115": {
+    "_name": "冲击贝",
+    "_matcher": "【触发】KO 对方角色",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP15-118": {
+    "_name": "艾尼路",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
   }
 }

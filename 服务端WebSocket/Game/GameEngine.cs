@@ -78,7 +78,7 @@ public class GameEngine
             case "EndTurn":        HandleEndTurn(playerIndex); break;
             case "Surrender":      HandleSurrender(playerIndex); break;
             case "PromptResponse": HandlePromptResponse(playerIndex, data); break;
-            // M3 起: UseEffect
+            case "UseEffect":      HandleUseEffect(playerIndex, data); break;
             default:
                 SendError(playerIndex, $"未知动作: {action}");
                 break;
@@ -165,21 +165,45 @@ public class GameEngine
         BattleEngine.StartAttack(State, attackerId, targetIsLeader, targetId);
         Broadcast("Attack", new { attacker = attackerStr, targetIsLeader, targetId = targetId?.ToString() });
 
-        // 若防守方场上没有【阻挡者】，直接跳过 Block 步骤
-        var def = State.Players[1 - playerIndex];
-        if (!def.Characters.Any(c => !c.IsTapped && ActionValidator.HasKeyword(c, "阻挡者")))
-        {
-            BattleEngine.PassBlock(State);
-            Broadcast("AutoPassBlock");
-        }
+        // 异步推进战斗：触发【攻击时】→ 判断 Block → 判断 Counter → 伤害结算
+        _ = AdvanceBattleAfterAttackDeclareAsync(playerIndex);
+    }
 
-        // 若防守方场上没有【反击】资源（手牌中带 counter 值或反击事件），直接进入伤害
-        var canCounter = def.Hand.Any(c => c.Info.Counter > 0 || c.Info.EffectText.Contains("【反击】"));
+    private async Task AdvanceBattleAfterAttackDeclareAsync(int attackerIdx)
+    {
+        try
+        {
+            await BattleEngine.TriggerAttackDeclareAsync(State, Prompts);
+            if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+
+            // 若防守方无可用【阻挡者】（攻击者带【不可阻挡】也跳过 Block）
+            var def = State.Players[1 - attackerIdx];
+            var atk = State.Players[attackerIdx];
+            var attackerCard = atk.Leader.Id == State.CurrentBattle.AttackerCardId ? atk.Leader
+                : atk.Characters.FirstOrDefault(c => c.Id == State.CurrentBattle.AttackerCardId);
+            bool attackerUnblockable = attackerCard is not null && ActionValidator.HasKeyword(attackerCard, "不可阻挡");
+            bool hasBlocker = !attackerUnblockable && def.Characters.Any(c => !c.IsTapped && ActionValidator.HasKeyword(c, "阻挡者"));
+            if (!hasBlocker)
+            {
+                BattleEngine.PassBlock(State);
+                Broadcast("AutoPassBlock");
+                await AdvanceBattleAfterBlockAsync();
+            }
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[Battle] AttackDeclare 异常: {ex.Message}"); }
+    }
+
+    private async Task AdvanceBattleAfterBlockAsync()
+    {
+        if (State.CurrentBattle is null) return;
+        var defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
+        var def = State.Players[defenderIdx];
+        bool canCounter = def.Hand.Any(c => c.Info.Counter > 0 || c.Info.EffectText.Contains("【反击】"));
         if (!canCounter)
         {
-            int leaderDamage = BattleEngine.PassCounter(State);
+            BattleEngine.PassCounter(State);
             Broadcast("ResolveBattle");
-            _ = ResolveLeaderDamageAsync(State.CurrentBattle?.DefenderPlayerIndex ?? -1, leaderDamage);
+            await ResolveBattleDamageAsync(defenderIdx);
         }
     }
 
@@ -191,15 +215,18 @@ public class GameEngine
         if (!v.Ok) { SendError(playerIndex, v.Reason!); return; }
         BattleEngine.DeclareBlocker(State, blockerId);
         Broadcast("DeclareBlocker", new { blocker = blockerId.ToString() });
-        // 进入反击步骤前的判定（同上 PassBlock 后的逻辑）
-        var def = State.Players[playerIndex];
-        var canCounter = def.Hand.Any(c => c.Info.Counter > 0 || c.Info.EffectText.Contains("【反击】"));
-        if (!canCounter)
+        _ = AdvanceBattleAfterDeclareBlockerAsync();
+    }
+
+    private async Task AdvanceBattleAfterDeclareBlockerAsync()
+    {
+        try
         {
-            int leaderDamage = BattleEngine.PassCounter(State);
-            Broadcast("ResolveBattle");
-            _ = ResolveLeaderDamageAsync(State.CurrentBattle?.DefenderPlayerIndex ?? -1, leaderDamage);
+            await BattleEngine.TriggerBlockDeclareAsync(State, Prompts);
+            if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+            await AdvanceBattleAfterBlockAsync();
         }
+        catch (Exception ex) { Console.Error.WriteLine($"[Battle] BlockDeclare 异常: {ex.Message}"); }
     }
 
     private void HandlePassBlock(int playerIndex)
@@ -209,15 +236,7 @@ public class GameEngine
         if (State.CurrentBattle.DefenderPlayerIndex != playerIndex) { SendError(playerIndex, "不是防守方"); return; }
         BattleEngine.PassBlock(State);
         Broadcast("PassBlock");
-        // 触发反击步骤判定
-        var def = State.Players[playerIndex];
-        var canCounter = def.Hand.Any(c => c.Info.Counter > 0 || c.Info.EffectText.Contains("【反击】"));
-        if (!canCounter)
-        {
-            int leaderDamage = BattleEngine.PassCounter(State);
-            Broadcast("ResolveBattle");
-            _ = ResolveLeaderDamageAsync(State.CurrentBattle?.DefenderPlayerIndex ?? -1, leaderDamage);
-        }
+        _ = AdvanceBattleAfterBlockAsync();
     }
 
     private void HandlePlayCounter(int playerIndex, JsonElement data)
@@ -258,27 +277,33 @@ public class GameEngine
         if (State.CurrentBattle.DefenderPlayerIndex != playerIndex)
         { SendError(playerIndex, "不是防守方"); return; }
         int defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
-        int leaderDamage = BattleEngine.PassCounter(State);
+        BattleEngine.PassCounter(State);
         Broadcast("ResolveBattle");
-        _ = ResolveLeaderDamageAsync(defenderIdx, leaderDamage);
+        _ = ResolveBattleDamageAsync(defenderIdx);
     }
 
-    private async Task ResolveLeaderDamageAsync(int defenderIdx, int leaderDamage)
+    /// <summary>异步伤害结算：BattleEngine.ResolveDamageAsync（含 PreKO 拦截）+ 生命牌触发 + EndBattle</summary>
+    private async Task ResolveBattleDamageAsync(int defenderIdx)
     {
         try
         {
+            int leaderDamage = await BattleEngine.ResolveDamageAsync(State, Prompts);
             if (leaderDamage > 0 && defenderIdx >= 0)
-            {
                 await LifeRevealManager.DealDamageToLeader(this, defenderIdx, leaderDamage);
-            }
             BattleEngine.EndBattle(State);
             Broadcast("BattleEnd");
-            if (State.IsGameOver) Broadcast("DuelOver", new { winner = State.WinnerIndex, reason = State.GameOverReason });
+            CheckGameOver();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[Battle] 异步伤害处理异常: {ex.Message}");
         }
+    }
+
+    private void CheckGameOver()
+    {
+        if (State.IsGameOver)
+            Broadcast("DuelOver", new { winner = State.WinnerIndex, reason = State.GameOverReason });
     }
 
     public void BroadcastInitialState()
@@ -344,6 +369,40 @@ public class GameEngine
         else
         {
             Broadcast("MulliganUpdate");
+        }
+    }
+
+    // ── Use Effect（启动主要） ────────────────────────────────────────────
+
+    private void HandleUseEffect(int playerIndex, JsonElement data)
+    {
+        if (!data.TryGetProperty("sourceId", out var sid) || sid.ValueKind != JsonValueKind.String)
+        { SendError(playerIndex, "缺少 sourceId"); return; }
+        if (!Guid.TryParse(sid.GetString(), out var sourceId)) { SendError(playerIndex, "sourceId 非法"); return; }
+
+        var v = ActionValidator.CanUseEffect(State, playerIndex, sourceId);
+        if (!v.Ok) { SendError(playerIndex, v.Reason!); return; }
+
+        var me = State.Players[playerIndex];
+        CardInstance? source = me.Leader.Id == sourceId ? me.Leader
+            : me.Characters.FirstOrDefault(c => c.Id == sourceId)
+              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
+        if (source is null) { SendError(playerIndex, "效果来源不存在"); return; }
+
+        _ = ResolveActivatedAsync(playerIndex, source);
+    }
+
+    private async Task ResolveActivatedAsync(int playerIndex, CardInstance source)
+    {
+        try
+        {
+            await EffectRuntime.Resolve(State, playerIndex, source, EffectTrigger.ActivatedMain, Prompts);
+            Broadcast("UseEffect", new { source = source.Id.ToString(), card = source.Info.Number });
+            CheckGameOver();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[UseEffect] {source.Info.Number} 异常: {ex.Message}");
         }
     }
 

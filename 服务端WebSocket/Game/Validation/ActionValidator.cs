@@ -68,6 +68,7 @@ public static class ActionValidator
             attacker = ch;
         }
         if (attacker.IsTapped) return Fail("攻击者已休息");
+        if (attacker.HasRestriction(RestrictionKind.CannotAttack)) return Fail("此角色本回合无法攻击");
 
         // 新登场角色当回合不能攻击（除非有【速攻】）
         if (attacker != me.Leader && attacker.TurnPlayed == s.TurnCount
@@ -91,6 +92,19 @@ public static class ActionValidator
     {
         if (c.Info.EffectText.Contains($"【{kw}】")) return true;
         return c.GainedKeywords.Any(k => k.Keyword == kw);
+    }
+
+    public static Result CanUseEffect(GameState s, int playerIdx, Guid sourceId)
+    {
+        if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
+        if (s.Phase != Phase.Main)            return Fail("只能在主要阶段使用启动效果");
+        if (s.CurrentBattle is not null)      return Fail("战斗中不能使用启动效果");
+        var me = s.Players[playerIdx];
+        bool found = me.Leader.Id == sourceId
+                  || me.Characters.Any(c => c.Id == sourceId)
+                  || me.StageCard?.Id == sourceId;
+        if (!found) return Fail("效果来源不在你场上");
+        return OkResult;
     }
 
     public static Result CanDeclareBlocker(GameState s, int playerIdx, Guid blockerId)

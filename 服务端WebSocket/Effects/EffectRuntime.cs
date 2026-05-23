@@ -47,6 +47,7 @@ public static class EffectRuntime
             Source = source,
             Trigger = trigger,
             Prompts = prompts,
+            Engine = (prompts as PromptSystem)?.Engine,
         };
         if (payload is not null)
             foreach (var (k, v) in payload) ctx.Vars[k] = v;
@@ -88,6 +89,7 @@ public static class EffectRuntime
     /// <summary>简单文本匹配判断卡牌是否含某触发时机的效果</summary>
     public static bool HasEffectForTrigger(CardInstance c, EffectTrigger t)
     {
+        if (c.IsEffectsNullified) return false;
         var text = c.Info.EffectText ?? "";
         return t switch
         {
@@ -96,6 +98,7 @@ public static class EffectRuntime
             EffectTrigger.OnOppAttackDeclare  => text.Contains("【对方的攻击时】"),
             EffectTrigger.OnBlockDeclare      => text.Contains("【阻挡时】"),
             EffectTrigger.OnKO                => text.Contains("【K.O.时】") || text.Contains("【KO时】"),
+            EffectTrigger.PreKO               => text.Contains("不会被KO") || text.Contains("不会被K.O.") || text.Contains("将要被KO的场合") || text.Contains("将要被K.O.的场合") || text.Contains("将要被KO时") || text.Contains("被KO的场合"),
             EffectTrigger.OnMyTurnEnd         => text.Contains("【我方的回合结束时】"),
             EffectTrigger.OnOppTurnEnd        => text.Contains("【对方的回合结束时】"),
             EffectTrigger.ActivatedMain       => text.Contains("【启动主要】"),

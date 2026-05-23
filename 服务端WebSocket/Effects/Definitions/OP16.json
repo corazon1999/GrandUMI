@@ -1,0 +1,730 @@
+{
+  "OP16-002": {
+    "_name": "伊佐",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-003": {
+    "_name": "爱德华·纽哥特",
+    "_matcher": "登场时给对方角色力量 -N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -6000
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-007": {
+    "_name": "乔兹",
+    "_matcher": "登场时给对方角色力量 -N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-011": {
+    "_name": "比斯塔",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-020": {
+    "_name": "不怕死的就跟我来吧!!",
+    "_matcher": "事件【主要】抽 N",
+    "main": {
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP16-021": {
+    "_name": "莫比·迪克号",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-026": {
+    "_name": "安普里奥·伊万科夫",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-034": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-045": {
+    "_name": "克洛克达尔",
+    "_matcher": "登场时从手牌登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCharacter",
+            "max": 1,
+            "as": "$c"
+          }
+        ],
+        "_doc": "需 PlayFromHand 原子（filter cost ≤2）"
+      }
+    ]
+  },
+  "OP16-048": {
+    "_name": "巴奇",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-049": {
+    "_name": "波特夹斯·D·艾斯",
+    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP16-050": {
+    "_name": "密斯·奥利布",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-051": {
+    "_name": "毛奇&卡巴奇",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-054": {
+    "_name": "Mr.1(达兹·波涅斯)",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-055": {
+    "_name": "Mr.2·盆·岁末(本萨姆)",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-056": {
+    "_name": "Mr.3(加尔迪诺)",
+    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Draw",
+          "n": 2
+        }
+      ]
+    }
+  },
+  "OP16-057": {
+    "_name": "我们的救世主!!巴奇船长!!",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  },
+  "OP16-058": {
+    "_name": "犯人们发起暴动了……",
+    "_matcher": "【反击】本次战斗中我方 +N",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP16-064": {
+    "_name": "可比",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-065": {
+    "_name": "萨卡斯基",
+    "_matcher": "登场时给对方角色力量 -N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -6000
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-067": {
+    "_name": "阿鹤(海军)",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-068": {
+    "_name": "特拉法尔加·罗",
+    "_matcher": "登场时从咚卡组追加 1 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-070": {
+    "_name": "堂吉诃德·罗西南德",
+    "_matcher": "登场时从咚卡组追加 1 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-071": {
+    "_name": "波头之仁王",
+    "_matcher": "登场时从咚卡组追加 1 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-072": {
+    "_name": "汉尼拔",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-073": {
+    "_name": "波尔萨利诺",
+    "_matcher": "登场时从咚卡组追加 1 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-075": {
+    "_name": "蒙奇·D·戈普",
+    "_matcher": "登场时从咚卡组追加 1 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-078": {
+    "_name": "玛丽弗德",
+    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-082": {
+    "_name": "锦卫门",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-083": {
+    "_name": "光月御殿",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-087": {
+    "_name": "阿忍",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-089": {
+    "_name": "杰拉基尔·米霍克",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-090": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-091": {
+    "_name": "奈美",
+    "_matcher": "登场时查看卡组顶 N 张",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ],
+        "_doc": "精确实现需要从卡组顶 4 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP16-092": {
+    "_name": "妮古·罗宾",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-093": {
+    "_name": "巴索罗缪·大熊",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-097": {
+    "_name": "大和",
+    "_matcher": "登场时把废弃区角色加入手牌",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "as": "$c"
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-098": {
+    "_name": "大和",
+    "_matcher": "登场时抽 N",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-102": {
+    "_name": "阿瓦罗·匹萨罗",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-103": {
+    "_name": "旺·奥加",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-104": {
+    "_name": "卡特琳·蝶美",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP16-106": {
+    "_name": "圣胡安·恶狼",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-108": {
+    "_name": "希流",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  },
+  "OP16-109": {
+    "_name": "毒Q",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-110": {
+    "_name": "巴斯克·乔特",
+    "_matcher": "KO时抽 N",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-116": {
+    "_name": "啧哈哈哈哈哈哈!!",
+    "_matcher": "【触发】抽 N",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  }
+}

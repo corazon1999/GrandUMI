@@ -1,19 +1,24 @@
 using GrandUMI.Cards;
+using GrandUMI.Effects;
 
 namespace GrandUMI.Game.PhaseFlow;
 
 /// <summary>
 /// 战斗 5 步骤：Attack → Block → Counter → Damage → BattleEnd
+///
+/// 异步版本：所有可能触发效果的操作走 async，以便 EffectRuntime/Prompt 串接玩家选择。
 /// </summary>
 public static class BattleEngine
 {
-    /// <summary>攻击宣言</summary>
+    /// <summary>
+    /// 攻击宣言（同步部分）：横置攻击者 + 写入 BattleContext + 进入 BattleAttack 阶段
+    /// 触发【攻击时】/【对方的攻击时】由调用者通过 TriggerAttackDeclareAsync 异步处理
+    /// </summary>
     public static void StartAttack(GameState s, Guid attackerId, bool targetIsLeader, Guid? targetId)
     {
         var atkPlayer = s.CurrentTurnPlayer;
         var defPlayer = 1 - atkPlayer;
 
-        // 攻击者横置（领袖或角色）
         var me = s.Players[atkPlayer];
         CardInstance attacker = (me.Leader.Id == attackerId) ? me.Leader
             : me.Characters.First(c => c.Id == attackerId);
@@ -28,18 +33,24 @@ public static class BattleEngine
             TargetCardId = targetIsLeader ? null : targetId,
         };
         s.Phase = Phase.BattleAttack;
-        // M3 起：触发【攻击时】/【对方的攻击时】效果
-        // 现在直接进入 Block 步骤
+    }
+
+    /// <summary>触发【攻击时】+【对方的攻击时】效果（按回合玩家优先顺序），完成后进入 BattleBlock</summary>
+    public static async Task TriggerAttackDeclareAsync(GameState s, IPromptService prompts)
+    {
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAttackDeclare, prompts);
+        if (s.IsGameOver) return;
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnOppAttackDeclare, prompts);
+        if (s.IsGameOver) return;
         s.Phase = Phase.BattleBlock;
     }
 
-    /// <summary>防守方宣言阻挡者</summary>
+    /// <summary>防守方宣言阻挡者（同步） + 触发【阻挡时】（异步）</summary>
     public static void DeclareBlocker(GameState s, Guid blockerId)
     {
         var b = s.CurrentBattle!;
         b.BlockerDeclared = true;
         b.ReplacedByBlockerCardId = blockerId;
-        // 阻挡者会变为新的目标，原目标释放，阻挡者横置
         var defender = s.Players[b.DefenderPlayerIndex];
         var blocker = defender.Characters.First(c => c.Id == blockerId);
         blocker.IsTapped = true;
@@ -48,28 +59,30 @@ public static class BattleEngine
         s.Phase = Phase.BattleCounter;
     }
 
-    /// <summary>防守方放弃阻挡</summary>
+    public static async Task TriggerBlockDeclareAsync(GameState s, IPromptService prompts)
+    {
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnBlockDeclare, prompts);
+    }
+
     public static void PassBlock(GameState s)
     {
         s.Phase = Phase.BattleCounter;
     }
 
-    /// <summary>反击：手牌中的反击事件加力量；图标反击（角色卡counter+N）</summary>
     public static void ApplyCounter(GameState s, int defenderIdx, int counterValue)
     {
         var b = s.CurrentBattle!;
         b.DefenderBattleBonus += counterValue;
     }
 
-    /// <summary>防守方放弃反击 → 进入伤害步骤（同步部分），返回需异步处理的领袖伤害量</summary>
-    public static int PassCounter(GameState s)
+    /// <summary>防守方放弃反击 → 进入伤害步骤</summary>
+    public static void PassCounter(GameState s)
     {
         s.Phase = Phase.BattleDamage;
-        return ResolveDamageSync(s);
     }
 
-    /// <summary>同步部分伤害结算 + 标记需要造成的领袖伤害（由 GameEngine 异步处理生命牌触发）</summary>
-    public static int ResolveDamageSync(GameState s)
+    /// <summary>异步伤害结算：角色 KO 走 KOCardAsync（可被 PreKO 拦截），领袖伤害量返回给调用方处理生命牌</summary>
+    public static async Task<int> ResolveDamageAsync(GameState s, IPromptService prompts)
     {
         var b = s.CurrentBattle!;
         var atk = s.Players[b.AttackerPlayerIndex];
@@ -77,14 +90,14 @@ public static class BattleEngine
 
         var attacker = atk.Leader.Id == b.AttackerCardId ? atk.Leader
             : atk.Characters.First(c => c.Id == b.AttackerCardId);
-        int attackerPower = attacker.CurrentPower(atk.AttachedDonCount(attacker.Id), ownerTurn: true) + b.AttackerBattleBonus;
+        int attackerPower = s.CurrentPowerOf(b.AttackerPlayerIndex, attacker) + b.AttackerBattleBonus;
 
         bool attackerWins;
         int leaderDamage = 0;
 
         if (b.TargetIsLeader)
         {
-            int defenderPower = def.Leader.CurrentPower(def.AttachedDonCount(def.Leader.Id), ownerTurn: false) + b.DefenderBattleBonus;
+            int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, def.Leader) + b.DefenderBattleBonus;
             attackerWins = attackerPower >= defenderPower;
             if (attackerWins)
                 leaderDamage = Validation.ActionValidator.HasKeyword(attacker, "双重攻击") ? 2 : 1;
@@ -92,21 +105,21 @@ public static class BattleEngine
         else
         {
             var target = def.Characters.First(c => c.Id == b.TargetCardId);
-            int defenderPower = target.CurrentPower(def.AttachedDonCount(target.Id), ownerTurn: false) + b.DefenderBattleBonus;
+            int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, target) + b.DefenderBattleBonus;
             attackerWins = attackerPower >= defenderPower;
-            if (attackerWins) KOCard(s, b.DefenderPlayerIndex, target);
+            if (attackerWins)
+                await KOCardAsync(s, b.DefenderPlayerIndex, target, prompts);
         }
         return leaderDamage;
     }
 
+    /// <summary>战斗结束：清临时修正 + 关键字 + 切回主要阶段</summary>
     public static void EndBattle(GameState s)
     {
-        // 清除战斗内的临时修正
         foreach (var p in s.Players)
         {
             foreach (var c in p.Characters) { c.PowerModThisBattle = 0; }
             p.Leader.PowerModThisBattle = 0;
-            // 战斗结束时关键字清理
             foreach (var c in p.Characters) c.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisBattle);
             p.Leader.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisBattle);
         }
@@ -114,11 +127,28 @@ public static class BattleEngine
         s.Phase = Phase.Main;
     }
 
-    /// <summary>把一张角色 KO（场上 → 废弃区），归还其附着的咚</summary>
-    public static void KOCard(GameState s, int ownerIdx, CardInstance card)
+    /// <summary>
+    /// 异步 KO 流程：
+    ///   1. 触发 PreKO（"将要被 KO 的场合改为..." 置换效果可调 state.MarkPreventKO）
+    ///   2. 若 PreventKOCardIds 含此卡 → 取消 KO（卡留场上），清除标记
+    ///   3. 否则归还附着咚 + 进废弃区 + 触发 OnKO
+    /// </summary>
+    public static async Task<bool> KOCardAsync(GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
+        // PreKO 触发：仅本卡的效果有机会拦截（缩小范围避免误触发其他卡）
+        s.PreventKOCardIds.Remove(card.Id);
+        if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.PreKO))
+        {
+            await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.PreKO, prompts);
+        }
+        if (s.PreventKOCardIds.Contains(card.Id))
+        {
+            s.PreventKOCardIds.Remove(card.Id);
+            return false; // KO 被取消
+        }
+
+        // 实际 KO：归还附着咚 + 进废弃区
         var p = s.Players[ownerIdx];
-        // 归还附着咚 → 休息状态放回费用区
         foreach (var d in p.CostArea)
         {
             if (d.State == DonState.Attached && d.AttachedToCardId == card.Id)
@@ -129,6 +159,25 @@ public static class BattleEngine
         }
         p.Characters.Remove(card);
         p.Trash.Add(card);
-        // M3 起：触发【KO时】效果
+
+        // OnKO：卡已进入废弃区，但效果在"原场上位置"上发动
+        await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
+        return true;
+    }
+
+    /// <summary>同步 KO（保留供内部不会被置换的场景：满员废弃、放回手牌前不需走 KO 等）</summary>
+    public static void KOCard(GameState s, int ownerIdx, CardInstance card)
+    {
+        var p = s.Players[ownerIdx];
+        foreach (var d in p.CostArea)
+        {
+            if (d.State == DonState.Attached && d.AttachedToCardId == card.Id)
+            {
+                d.State = DonState.Rest;
+                d.AttachedToCardId = null;
+            }
+        }
+        p.Characters.Remove(card);
+        p.Trash.Add(card);
     }
 }

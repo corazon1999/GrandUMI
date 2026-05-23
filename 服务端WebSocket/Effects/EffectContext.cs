@@ -14,6 +14,9 @@ public class EffectContext
     public Dictionary<string, object?> Vars { get; init; } = new(); // DSL 变量绑定 / 手写卡自由用
     public List<GameEvent> Events   { get; init; } = new();
     public required IPromptService Prompts { get; init; }
+
+    /// <summary>引擎引用，DSL 中某些 op（如 OpponentDiscard）需要发起对手 Prompt</summary>
+    public GameEngine? Engine { get; init; }
 }
 
 public class GameEvent

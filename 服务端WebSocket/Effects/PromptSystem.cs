@@ -12,6 +12,8 @@ public class PromptSystem : IPromptService
     private readonly GameEngine _engine;
     private readonly Dictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
 
+    public GameEngine Engine => _engine;
+
     public PromptSystem(GameEngine engine) { _engine = engine; }
 
     public async Task<List<string>> ChooseCards(int playerIdx, string kind, string text,

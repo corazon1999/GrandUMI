@@ -76,24 +76,48 @@ public static class TurnEngine
     public static void EnterEndPhase(GameState state)
     {
         state.Phase = Phase.End;
-        // 清除本回合内的修正/期限关键字
+        // 清除本回合内的修正 + 期限关键字（含"直到下个对方的结束阶段结束时为止"）
         foreach (var p in state.Players)
         {
             foreach (var c in p.Characters)
             {
-                c.PowerModThisTurn   = 0;
-                c.PowerModThisBattle = 0;
-                c.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisTurn || k.Duration == KeywordDuration.ThisBattle);
-                c.OncePerTurnUsedKeys.Clear();
+                ClearTurnScopedState(c);
             }
-            p.Leader.PowerModThisTurn   = 0;
-            p.Leader.PowerModThisBattle = 0;
-            p.Leader.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisTurn || k.Duration == KeywordDuration.ThisBattle);
-            p.Leader.OncePerTurnUsedKeys.Clear();
+            ClearTurnScopedState(p.Leader);
             p.TurnOnceUsed.Clear();
         }
-        // "直到下个对方的结束阶段结束时为止"在非回合玩家的结束阶段失效（即对方刚结束时）
-        // 由具体效果脚本注册到 PendingExpiry，这里 M1 暂不实现复杂期限
+        // 清除来源已不在场上的 ContinuousEffect（防止僵尸效果）
+        state.ContinuousEffects.RemoveAll(eff => !IsSourceCardOnField(state, eff.SourceCardId));
+    }
+
+    private static void ClearTurnScopedState(CardInstance c)
+    {
+        c.PowerModThisTurn = 0;
+        c.PowerModThisBattle = 0;
+        c.CostModThisTurn = 0;
+        c.OriginalPowerOverride = null;
+        c.IsEffectsNullified = false;
+        c.GainedKeywords.RemoveAll(k =>
+            k.Duration == KeywordDuration.ThisTurn ||
+            k.Duration == KeywordDuration.ThisBattle ||
+            k.Duration == KeywordDuration.UntilNextOpponentEndPhase);
+        c.Restrictions.RemoveAll(r =>
+            r.Duration == KeywordDuration.ThisTurn ||
+            r.Duration == KeywordDuration.ThisBattle ||
+            r.Duration == KeywordDuration.UntilNextOpponentEndPhase);
+        c.OncePerTurnUsedKeys.Clear();
+    }
+
+    private static bool IsSourceCardOnField(GameState s, string sourceId)
+    {
+        if (!Guid.TryParse(sourceId, out var gid)) return false;
+        foreach (var p in s.Players)
+        {
+            if (p.Leader.Id == gid) return true;
+            if (p.StageCard?.Id == gid) return true;
+            foreach (var c in p.Characters) if (c.Id == gid) return true;
+        }
+        return false;
     }
 
     /// <summary>由主要阶段宣言结束回合时调用：执行结束阶段，然后切到对方的 Reset</summary>

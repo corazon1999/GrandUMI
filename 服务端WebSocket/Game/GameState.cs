@@ -34,6 +34,40 @@ public class GameState
     /// <summary>序号（每次状态变化 +1，便于客户端识别快照新旧）</summary>
     public int Tick { get; set; }
 
+    /// <summary>
+    /// PreKO 触发期间共享的"已拦截 KO"集合。
+    /// BattleEngine.KOCardAsync 开始前清空，触发 PreKO 后检查；
+    /// 置换效果脚本通过 ctx.State.PreventKO(card) 写入。
+    /// </summary>
+    public HashSet<Guid> PreventKOCardIds { get; } = new();
+
+    public void MarkPreventKO(Guid cardId) => PreventKOCardIds.Add(cardId);
+
+    /// <summary>永续效果列表（来源卡离场时由 ContinuousEffectRegistry 清理）</summary>
+    public List<ContinuousEffect> ContinuousEffects { get; } = new();
+
+    /// <summary>评估指定卡当前从 ContinuousEffects 获得的总力量加成</summary>
+    public int ContinuousPowerBonus(int sideIdx, CardInstance card)
+    {
+        int sum = 0;
+        foreach (var eff in ContinuousEffects)
+        {
+            if (!eff.Predicate(this, sideIdx, card)) continue;
+            sum += eff.PowerDelta;
+        }
+        return sum;
+    }
+
+    /// <summary>统一计算某张卡当前力量：基础 + 咚 + 临时修正 + 永续修正</summary>
+    public int CurrentPowerOf(int sideIdx, CardInstance card)
+    {
+        var p = Players[sideIdx];
+        int donCount = p.AttachedDonCount(card.Id);
+        bool ownerTurn = CurrentTurnPlayer == sideIdx;
+        int basePower = card.CurrentPower(donCount, ownerTurn);
+        return basePower + ContinuousPowerBonus(sideIdx, card);
+    }
+
     /// <summary>双方都完成 Mulligan 后此值变 true，进入第一回合</summary>
     public bool MulliganBothDone => Players[0].MulliganDone && Players[1].MulliganDone;
 
