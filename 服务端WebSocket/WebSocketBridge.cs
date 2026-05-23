@@ -3,6 +3,8 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using GrandUMI.Game;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI;
 
@@ -124,12 +126,9 @@ public static class WebSocketBridge
         if (session.Account is not null) AccountIndex.TryRemove(session.Account, out _);
         if (session.IsMatching) RebuildMatchQueue(session);
         if (session.CurrentRoomCode is not null) PendingRooms.TryRemove(session.CurrentRoomCode, out _);
-        // 通知对局中的对手
-        if (GameOpponent.TryRemove(session.SessionId, out var oppSid))
-        {
-            GameOpponent.TryRemove(oppSid, out _);
-            Send(oppSid, new { proto = "MsgDuelOver", IsWin = true, Description = "对手断开连接" });
-        }
+        // 对局中的玩家断开 → 进入 90s 宽限期（M1）
+        GameOpponent.TryRemove(session.SessionId, out _);
+        GameRoomManager.OnPlayerDisconnect(session.SessionId);
         Log($"断开 {session.SessionId} ({session.Account ?? "未登录"})");
     }
 
@@ -165,7 +164,10 @@ public static class WebSocketBridge
             case "MsgChatMsg":     OnChatMsg(session, msg);      break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
+            case "MsgPromptResponse": OnPromptResponse(session, msg); break;
+            case "MsgUpdateSettings": OnUpdateSettings(session, msg); break;
             case "MsgRequestState": OnRequestState(session);     break;
+            case "MsgSpectateRoom": OnSpectateRoom(session, msg); break;
             default: LogWarn($"未知协议: {proto}"); break;
         }
     }
@@ -202,6 +204,10 @@ public static class WebSocketBridge
         Send(s.SessionId, new { proto = "MsgLogin", account, name, result = ok,
                                 logStr = ok ? "登录成功" : "账号或密码错误" });
         Log($"登录 {(ok ? "✅" : "❌")} {account}");
+
+        // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复
+        if (ok && GameRoomManager.TryReclaim(s.SessionId, account))
+            Log($"断线重连成功 {account}");
     }
 
     private static void OnAddAccount(WsSession s, Dictionary<string, JsonElement> msg)
@@ -220,9 +226,18 @@ public static class WebSocketBridge
 
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false }); return; }
+        if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "请先登录" }); return; }
 
-        s.Deck       = Str(msg, "deck") ?? "";
+        var deck = Str(msg, "deck") ?? "";
+        var v    = DeckValidator.Validate(deck);
+        if (!v.Ok)
+        {
+            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = $"卡组不合法: {v.Reason}" });
+            Log($"匹配拒绝 {s.Account}: {v.Reason}");
+            return;
+        }
+
+        s.Deck       = deck;
         s.IsMatching = true;
         MatchQueue.Enqueue(s);
         Send(s.SessionId, new { proto = "MsgEnterMatch", result = true });
@@ -260,11 +275,26 @@ public static class WebSocketBridge
             Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?" });
             Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?" });
 
-            // 开始游戏
-            Send(p1.SessionId, new { proto = "MsgGameStart", MainDeck = deck1,
-                                     EnemyDeck = deck2, IsFirst = p1First });
-            Send(p2.SessionId, new { proto = "MsgGameStart", MainDeck = deck2,
-                                     EnemyDeck = deck1, IsFirst = !p1First });
+            // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
+            Send(p1.SessionId, new { proto = "MsgGameStart", IsFirst = p1First });
+            Send(p2.SessionId, new { proto = "MsgGameStart", IsFirst = !p1First });
+
+            // 创建引擎并广播首份快照
+            try
+            {
+                GameRoomManager.CreateRoom(
+                    p1.SessionId, p1.Account ?? "?", deck1,
+                    p2.SessionId, p2.Account ?? "?", deck2,
+                    p0First: p1First,
+                    p0AlwaysPrompt: p1.AlwaysPromptOnLifeReveal,
+                    p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal);
+            }
+            catch (Exception ex)
+            {
+                LogErr($"创建房间失败: {ex.Message}");
+                Send(p1.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+                Send(p2.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+            }
 
             p1.IsMatching = false;
             p2.IsMatching = false;
@@ -303,7 +333,15 @@ public static class WebSocketBridge
             return;
         }
 
-        s.Deck = Str(msg, "deck") ?? "";
+        var deck = Str(msg, "deck") ?? "";
+        var v    = DeckValidator.Validate(deck);
+        if (!v.Ok)
+        {
+            Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = $"卡组不合法: {v.Reason}" });
+            Log($"创建房间拒绝 {s.Account}: {v.Reason}");
+            return;
+        }
+        s.Deck = deck;
 
         // 如果已在房间中则先退出旧房间
         if (s.CurrentRoomCode is not null)
@@ -328,7 +366,16 @@ public static class WebSocketBridge
         }
 
         var code = Str(msg, "roomCode")?.ToUpperInvariant() ?? "";
-        s.Deck   = Str(msg, "deck") ?? "";
+        var deck = Str(msg, "deck") ?? "";
+
+        var v = DeckValidator.Validate(deck);
+        if (!v.Ok)
+        {
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = $"卡组不合法: {v.Reason}" });
+            Log($"加入房间拒绝 {s.Account}: {v.Reason}");
+            return;
+        }
+        s.Deck = deck;
 
         if (!PendingRooms.TryRemove(code, out var host))
         {
@@ -361,11 +408,25 @@ public static class WebSocketBridge
         Send(s.SessionId, new { proto = "MsgJoinRoom", result = true,
             opponentName = host.PlayerName ?? "?" });
 
-        // 开始游戏
-        Send(host.SessionId, new { proto = "MsgGameStart", MainDeck = deck1,
-            EnemyDeck = deck2, IsFirst = hostFirst });
-        Send(s.SessionId, new { proto = "MsgGameStart", MainDeck = deck2,
-            EnemyDeck = deck1, IsFirst = !hostFirst });
+        // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
+        Send(host.SessionId, new { proto = "MsgGameStart", IsFirst = hostFirst });
+        Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = !hostFirst });
+
+        try
+        {
+            GameRoomManager.CreateRoom(
+                host.SessionId, host.Account ?? "?", deck1,
+                s.SessionId,    s.Account    ?? "?", deck2,
+                p0First: hostFirst,
+                p0AlwaysPrompt: host.AlwaysPromptOnLifeReveal,
+                p1AlwaysPrompt: s.AlwaysPromptOnLifeReveal);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"创建房间失败: {ex.Message}");
+            Send(host.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+            Send(s.SessionId,    new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+        }
 
         Log($"房间对战: {host.Account} vs {s.Account} code={code}");
     }
@@ -405,50 +466,51 @@ public static class WebSocketBridge
     // ── Sprint 3: 游戏动作与状态同步 ────────────────────────────────────────
 
     /// <summary>
-    /// MsgGameAction — 客户端游戏动作（新协议，替代 MsgTransmit 字符串透传）
-    /// 当前阶段：服务器不验证游戏规则，仅转发给对手
-    /// 后续阶段：服务器验证动作合法性 → 自行结算 → BroadcastGameState 推送权威状态
+    /// MsgGameAction — 客户端游戏动作 → 由权威 GameEngine 结算
     /// </summary>
     private static void OnGameAction(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        var opponentSid = GetOpponentSid(s.SessionId);
-        if (opponentSid is null)
-        {
-            Send(s.SessionId, new { proto = "MsgGameAction", error = "无对局对手" });
-            return;
-        }
-
         var action = Str(msg, "action") ?? "";
-        // 转发动作给对手（当前阶段仅做消息中继）
-        // TODO: 后续实现服务器端验证与结算
-        Send(opponentSid, new
-        {
-            proto = "MsgGameAction",
-            action,
-            data = msg.TryGetValue("data", out var d) ? d : default,
-        });
-        Log($"GameAction {s.Account} → 对手: {action}");
+        var data   = msg.TryGetValue("data", out var d) ? d : default;
+        GameRoomManager.HandleAction(s.SessionId, action, data);
+        Log($"GameAction {s.Account ?? "?"} action={action}");
     }
 
     /// <summary>
-    /// MsgRequestState — 客户端重连后请求完整游戏状态快照
-    /// 当前阶段：通知对手重连，由对手客户端发送当前状态
-    /// 后续阶段：服务器缓存房间状态，直接回复 MsgGameState
+    /// MsgRequestState — 客户端重连后请求完整游戏状态快照（服务端权威）
     /// </summary>
     private static void OnRequestState(WsSession s)
     {
-        var opponentSid = GetOpponentSid(s.SessionId);
-        if (opponentSid is null)
-        {
-            Send(s.SessionId, new { proto = "MsgDuelOver", IsWin = false,
-                Description = "对局已结束，无法恢复" });
-            return;
-        }
+        GameRoomManager.HandleRequestState(s.SessionId);
+        Log($"RequestState {s.Account ?? "?"}");
+    }
 
-        // 通知对手：对方已重连，请重新发送当前状态
-        Send(opponentSid, new { proto = "MsgPlayerReconnected" });
-        Send(s.SessionId, new { proto = "MsgPlayerReconnected" });
-        Log($"RequestState {s.Account} → 对手重连通知已发送");
+    /// <summary>MsgSpectateRoom — 加入观战</summary>
+    private static void OnSpectateRoom(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var roomId = Str(msg, "roomId") ?? "";
+        GameRoomManager.AddSpectator(roomId, s.SessionId);
+    }
+
+    /// <summary>MsgPromptResponse — 玩家响应服务端 prompt</summary>
+    private static void OnPromptResponse(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var data = JsonSerializer.SerializeToElement(msg);
+        GameRoomManager.HandleAction(s.SessionId, "PromptResponse", data);
+    }
+
+    /// <summary>MsgUpdateSettings — 同步玩家设置到服务端（防触发信息泄露等）</summary>
+    private static void OnUpdateSettings(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        bool alwaysPrompt = Bool(msg, "alwaysPromptOnLifeReveal");
+        s.AlwaysPromptOnLifeReveal = alwaysPrompt;
+        // 若已在对局中，把设置同步到 PlayerState
+        var room = GameRoomManager.GetRoomBySession(s.SessionId);
+        if (room is not null)
+        {
+            int idx = Array.IndexOf(room.PlayerSessionIds, s.SessionId);
+            if (idx >= 0) room.Engine.State.Players[idx].AlwaysPromptOnLifeReveal = alwaysPrompt;
+        }
     }
 
     // ── 聊天 ────────────────────────────────────────────────────────────────

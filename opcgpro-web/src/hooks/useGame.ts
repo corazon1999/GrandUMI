@@ -8,35 +8,13 @@ export function useGame() {
   const game = useGameStore();
   const battle = useBattleStore();
 
-  // 出牌
-  const playCard = (handIndex: number) => {
-    GameRequest.playCard(handIndex);
-  };
-
-  // 宣言攻击
-  const declareAttack = (attackerIndex: number, targetIndex: number) => {
-    GameRequest.attack(attackerIndex, targetIndex);
-    battle.setAttacker(attackerIndex);
-    battle.setDefender(targetIndex);
-    battle.setPhase("Attack");
-  };
-
-  // 结束回合
-  const endTurn = () => {
-    GameRequest.endTurn();
-  };
-
-  // 投降
-  const surrender = () => {
-    GameRequest.surrender();
-  };
-
   return {
     ...game,
     battle,
-    endTurn,
-    playCard,
-    declareAttack,
-    surrender,
+    playCard:       (handIndex: number) => GameRequest.playCard(handIndex),
+    declareAttack:  (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>
+                       GameRequest.attack(attackerId, target),
+    endTurn:        () => GameRequest.endTurn(),
+    surrender:      () => GameRequest.surrender(),
   };
 }

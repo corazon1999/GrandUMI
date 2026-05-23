@@ -1,0 +1,257 @@
+{
+  "OP15-004": {
+    "_name": "海猫",
+    "triggers": [{
+      "on": "OnEnterField",
+      "if": { "leaderPowerNotMoreThan": 0 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "选择对方最多 1 张角色 力量 -3000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -3000 }
+      ]
+    }]
+  },
+  "OP15-005": {
+    "_name": "卡巴奇",
+    "triggers": [{
+      "on": "OnAttackDeclare",
+      "if": { "donAttachedGteOpponent": 1 },
+      "then": [{ "op": "AddPowerThisTurn", "target": "self", "delta": 2000 }]
+    }]
+  },
+  "OP15-015": {
+    "_name": "日熊",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "选择对方 1 张角色赋予休息咚" },
+        { "op": "AttachDon", "target": "$tgt", "n": 1, "from": "rest" },
+        { "op": "Choose", "prompt": "OpponentCharacterWithDon", "max": 1, "as": "$tgt2", "text": "对方最多 1 张被赋予咚的角色 力量 -1000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt2", "delta": -1000 }
+      ]
+    }]
+  },
+  "OP15-027": {
+    "_name": "杰拉基尔·米霍克",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacterWithDon", "max": 1, "as": "$tgt", "text": "将对方最多 1 张被赋予咚的角色转休息" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    }]
+  },
+  "OP15-032": {
+    "_name": "布鲁克",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张卡牌转休息" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    }]
+  },
+  "OP15-036": {
+    "_name": "龙马",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张费用不高于 4 的休息角色 KO" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }, {
+      "on": "OnAttackDeclare",
+      "then": [
+        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "将对方 1 张费用不高于 4 的休息角色 KO" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }]
+  },
+  "OP15-040": {
+    "_name": "维奥拉",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "ReturnDonToDeck", "n": 0 }
+      ]
+    }]
+  },
+  "OP15-045": {
+    "_name": "蔡义",
+    "triggers": [{
+      "on": "OnEnterField",
+      "if": { "trashEventCountGte": 1 },
+      "then": [
+        { "op": "Draw", "n": 2 }
+      ]
+    }]
+  },
+  "OP15-074": {
+    "_name": "放电",
+    "main": {
+      "then": [
+        { "op": "ReturnDonToDeck", "n": 1 },
+        { "op": "Draw", "n": 1 }
+      ]
+    }
+  },
+  "OP15-076": {
+    "_name": "雷兽",
+    "main": {
+      "then": [
+        { "op": "ReturnDonToDeck", "n": 1 },
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张角色 力量 -1000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -1000 }
+      ]
+    }
+  },
+  "OP15-077": {
+    "_name": "雷龙",
+    "main": {
+      "then": [
+        { "op": "ReturnDonToDeck", "n": 1 },
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张休息角色 在下个对方重置阶段不会转活跃" },
+        { "op": "PreventActivateNextReset", "target": "$tgt" }
+      ]
+    }
+  },
+  "OP15-078": {
+    "_name": "万雷",
+    "main": {
+      "then": [
+        { "op": "ReturnDonToDeck", "n": 2 },
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt", "text": "对方最多 1 张力量不高于 5000 的角色转休息" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    }
+  },
+  "OP15-019": {
+    "_name": "防护罩 蛮牛突进",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 1000 }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt" },
+      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -4000 }
+    ]
+  },
+  "OP15-021": {
+    "_name": "好好看着哦!艾斯!",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "as": "$tgt" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -3000 }
+      ]
+    }
+  },
+  "OP15-037": {
+    "_name": "是强是弱只用结果来说话。",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "OP15-056": {
+    "_name": "『燃烧之果』，我吃可以吗？",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 2 },
+        { "op": "GiveKeyword", "target": "selfLeader", "keyword": "双重攻击", "duration": "ThisTurn" },
+        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 3000 }
+      ]
+    },
+    "trigger": [
+      { "op": "Draw", "n": 2 }
+    ]
+  },
+  "OP15-095": {
+    "_name": "橡皮橡皮暴风雨",
+    "main": {
+      "if": { "trashCountGte": 15 },
+      "then": [
+        { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 3000 }
+      ]
+    }
+  },
+  "OP15-007": {
+    "_name": "阿金",
+    "triggers": [{
+      "on": "OnEnterField",
+      "if": { "leaderHasKeyword": "东海" },
+      "then": [
+        { "op": "Draw", "n": 1 }
+      ]
+    }]
+  },
+  "OP15-026": {
+    "_name": "强高",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Draw", "n": 1 }
+      ]
+    }]
+  },
+  "OP15-033": {
+    "_name": "霍迪·琼斯",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Activate", "target": "selfLeader" }
+      ]
+    }]
+  },
+  "OP15-034": {
+    "_name": "尤奇",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "as": "$tgt", "text": "我方最多 1 张布鲁克 力量 +2000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": 2000 }
+      ]
+    }]
+  },
+  "OP15-047": {
+    "_name": "山智",
+    "triggers": [{
+      "on": "OnEnterField",
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "as": "$tgt", "text": "我方最多 1 张角色 获得 不可阻挡" },
+        { "op": "GiveKeyword", "target": "$tgt", "keyword": "不可阻挡", "duration": "ThisTurn" }
+      ]
+    }]
+  },
+  "OP15-046": {
+    "_name": "萨波",
+    "triggers": [{
+      "on": "OnEnterField",
+      "if": { "leaderHasKeyword": "德莱斯罗兹" },
+      "then": [
+        { "op": "Draw", "n": 1 }
+      ]
+    }]
+  },
+  "OP15-055": {
+    "_name": "请放心攀登使用吧!!路飞前辈!!!",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 2 }
+      ]
+    }
+  },
+  "OP15-054": {
+    "_name": "坚决不让给别人的啦!这可是『那小子』的遗物。",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 2 }
+      ]
+    }
+  },
+  "OP15-095_alt": {
+    "_doc": "更多 OP15 卡 DSL 在 M5 中按需补充"
+  }
+}

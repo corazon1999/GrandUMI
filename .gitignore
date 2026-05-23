@@ -34,7 +34,17 @@ crashlytics-build.properties
 # =========================
 CardImages/
 CardImages_test/
+CardImages*.zip
 opcgpro-web/public/sprites/
+# Junction 指向 CardImages，朋友克隆后需自行用 mklink /J 重建
+opcgpro-web/public/cards/
+
+# =========================
+# 对战回放（每局自动生成，体积大且无协作价值）
+# =========================
+服务端WebSocket/Replays/
+服务端WebSocket.Tests/bin/
+服务端WebSocket.Tests/obj/
 
 # =========================
 # IDE / 操作系统

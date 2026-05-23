@@ -7,8 +7,7 @@ interface Props {
 }
 
 export default function LifeArea({ side }: Props) {
-  const life = useGameStore((s) => s[side].life);
-  const count = life.length;
+  const count = useGameStore((s) => (side === "my" ? s.my?.lifeCount : s.opponent?.lifeCount) ?? 0);
 
   return (
     <div className="flex flex-col items-center gap-1">

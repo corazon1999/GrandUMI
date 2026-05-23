@@ -1,26 +1,22 @@
 /**
  * GameProtocol.ts — 游戏协议接收层
- * 对应 C# GameProtocol.cs（ProtocolManager 的游戏部分）
  *
- * 架构原则（重构方案 §5.6）：
- *   只负责接收服务器消息并转发给 store，无任何本地结算逻辑
- *   唯一写入入口：MsgGameState → gameStore.syncFromServer()
+ * 服务器是权威结算端，客户端只是镜像。所有游戏状态变化都通过 MsgGameState 推送。
+ * 这里只负责把 MsgGameState 灌进 gameStore，把通知类消息抛给 eventBus。
  */
 
 import { eventBus } from "./eventBus";
+import { GameRequest } from "./GameRequest";
 import type {
   MsgBase,
-  MsgGameStart,
-  MsgShuffle,
-  MsgTransmit,
-  MsgDuelOver,
   MsgGameState,
   MsgPlayerDisconnected,
   MsgPlayerReconnected,
+  MsgDuelOver,
+  MsgActionRejected,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
-import { GameRequest } from "./GameRequest";
 
 let registered = false;
 
@@ -30,147 +26,40 @@ export function registerGameProtocols() {
 
   eventBus.on("message", (msg: MsgBase) => {
     switch (msg.proto) {
-      case "MsgGameStart":
-        // MsgGameStart 由 HomeProtocol 处理场景跳转，此处不重复处理
-        break;
-
-      case "MsgShuffle":
-        handleShuffle(msg as MsgShuffle);
-        break;
-
-      // ── 当前协议（MsgTransmit 字符串透传）───────────────────────────
-      case "MsgTransmit":
-        handleTransmit(msg as MsgTransmit);
-        break;
-
-      // ── 新服务端结算协议 ─────────────────────────────────────────────
       case "MsgGameState":
-        handleGameState(msg as MsgGameState);
+        useGameStore.getState().syncFromServer(msg as MsgGameState);
+        break;
+
+      case "MsgActionRejected":
+        useGameStore.getState().setPending(false);
+        eventBus.emit("actionRejected", { reason: (msg as MsgActionRejected).reason });
+        console.warn("[GameProtocol] action rejected:", (msg as MsgActionRejected).reason);
         break;
 
       case "MsgPlayerDisconnected":
-        handlePlayerDisconnected(msg as MsgPlayerDisconnected);
+        eventBus.emit("opponentDisconnected", {
+          gracePeriodSeconds: (msg as MsgPlayerDisconnected).gracePeriodSeconds,
+        });
         break;
 
       case "MsgPlayerReconnected":
-        handlePlayerReconnected(msg as MsgPlayerReconnected);
+        eventBus.emit("opponentReconnected");
         break;
 
-      // ── 游戏结束 ─────────────────────────────────────────────────────
       case "MsgDuelOver":
-        handleDuelOver(msg as MsgDuelOver);
+        useGameStore.getState().setPending(false);
+        useNetStore.getState().setMatchState("idle");
+        useNetStore.getState().setOpponentName("");
+        eventBus.emit("duelOver", {
+          isWin: (msg as MsgDuelOver).IsWin,
+          description: (msg as MsgDuelOver).Description,
+        });
         break;
     }
   });
-}
 
-// ── 处理器实现 ──────────────────────────────────────────────────────────
-
-function handleShuffle(msg: MsgShuffle) {
-  if (msg.MainDeck && typeof window !== "undefined") {
-    sessionStorage.setItem("shuffledDeck", msg.MainDeck);
-  }
-}
-
-/**
- * MsgTransmit — 游戏操作透传（当前协议，兼容模式）
- * C#: AcceptManager.Instance.GetRequest(msg.Msg)
- * Msg 是 RequestManager 序列化的操作字符串，格式: "ActionName^param1^param2^..."
- *
- * TODO: 待服务器全面切换到 MsgGameState 后移除此分支
- */
-function handleTransmit(msg: MsgTransmit) {
-  if (!msg.Msg) return;
-
-  // 换牌完成同步
-  if (msg.Msg === "ReDrawFinish") {
-    useGameStore.getState().setOpponentMulliganDone();
-    console.debug("[GameProtocol] 对手换牌完成");
-    return;
-  }
-
-  // 解析操作字符串（格式: "ActionName^param1^param2^..."）
-  const action = msg.Msg.split("^")[0];
-
-  // 对手结束回合 → 本地切换回合
-  if (action === "EndTurn") {
-    useGameStore.getState().nextTurn();
-    // 若现在是我的回合且不是第一轮（双方首轮均不抽牌），抽一张牌
-    const s = useGameStore.getState();
-    if (s.currentTurn && s.turnCount >= 3) {
-      GameRequest.drawForTurn();
-    }
-    console.debug("[GameProtocol] 对手结束回合");
-    return;
-  }
-
-  // 对手出牌
-  if (action === "AppearFromHand") {
-    useGameStore.getState().executeAction(msg.Msg, true);
-    console.debug("[GameProtocol] 对手出牌:", msg.Msg.slice(0, 80));
-    return;
-  }
-
-  // 对手抽牌
-  if (action === "Draw") {
-    useGameStore.getState().executeAction(msg.Msg, true);
-    console.debug("[GameProtocol] 对手抽牌:", msg.Msg.slice(0, 40));
-    return;
-  }
-
-  // 对手附加咚
-  if (action === "AddDong") {
-    useGameStore.getState().executeAction(msg.Msg, true);
-    console.debug("[GameProtocol] 对手附加咚:", msg.Msg.slice(0, 50));
-    return;
-  }
-
-  // 其余操作通过 eventBus 分发给 AcceptManager 兼容层
-  eventBus.emit("gameAction" as never, msg.Msg as never);
-  console.debug("[GameProtocol] MsgTransmit:", msg.Msg.slice(0, 80));
-}
-
-/**
- * MsgGameState — 服务器权威游戏快照（新协议，重构方案目标态）
- *
- * 数据流：
- *   服务器结算完成 → BroadcastGameState → MsgGameState
- *   → gameStore.syncFromServer() → immer 逐字段赋值 → UI 重渲染
- *   → lastAction 字段触发对应动画
- */
-function handleGameState(msg: MsgGameState) {
-  useGameStore.getState().syncFromServer(msg);
-}
-
-/**
- * MsgPlayerDisconnected — 对手断线通知
- * 服务器宽限期 90 秒，前端显示倒计时横幅
- */
-function handlePlayerDisconnected(msg: MsgPlayerDisconnected) {
-  eventBus.emit("opponentDisconnected" as never, {
-    gracePeriodSeconds: msg.gracePeriodSeconds,
-  } as never);
-}
-
-/**
- * MsgPlayerReconnected — 对手重连通知
- */
-function handlePlayerReconnected(_msg: MsgPlayerReconnected) {
-  eventBus.emit("opponentReconnected" as never);
-}
-
-/**
- * MsgDuelOver — 游戏结束
- */
-function handleDuelOver(msg: MsgDuelOver) {
-  useGameStore.getState().setGameOver(true);
-  useNetStore.getState().setMatchState("idle");
-  useNetStore.getState().setOpponentName("");
-  eventBus.emit("duelOver" as never, {
-    isWin: msg.IsWin,
-    description: msg.Description,
-  } as never);
-  console.log(
-    `[GameProtocol] 游戏结束 — ${msg.IsWin ? "胜利" : "失败"}: ${msg.Description}`,
-  );
+  // 重连后自动请求完整快照
+  eventBus.on("reconnected", () => {
+    GameRequest.requestState();
+  });
 }

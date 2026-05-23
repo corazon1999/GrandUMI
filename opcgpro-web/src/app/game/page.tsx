@@ -14,6 +14,7 @@ import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
+import PromptOverlay from "@/components/game/PromptOverlay";
 import PlaybackControls from "@/components/game/PlaybackControls";
 import { useGameStore } from "@/store/gameStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -23,7 +24,7 @@ import { PHASE_LABELS } from "@/game/battle/BattlePhase";
 export default function GamePage() {
   const router = useRouter();
   const {
-    mode, currentTurn, phase, myName, opponentName, setNames,
+    mode, currentTurn, phase, myName, opponentName,
     isPending, isGameOver,
   } = useGameStore();
 
@@ -31,12 +32,6 @@ export default function GamePage() {
   const isPlayback = mode === "Playback";
 
   useGameInit();
-
-  useEffect(() => {
-    const my = sessionStorage.getItem("myName") ?? "";
-    const opp = sessionStorage.getItem("opponentName") ?? "";
-    if (my || opp) setNames(my, opp);
-  }, [setNames]);
 
   // ── 回放模式：从 sessionStorage 加载回放记录 ──
   const playbackRecord = useMemo(() => {
@@ -69,6 +64,9 @@ export default function GamePage() {
 
       {/* 换牌阶段遮罩（仅 Player 模式） */}
       {!isObserver && !isPlayback && <MulliganOverlay />}
+
+      {/* 服务端 Prompt 遮罩（选目标 / 选项 / 生命牌触发） */}
+      {!isObserver && !isPlayback && <PromptOverlay />}
 
       {/* 观战模式标识 */}
       {isObserver && (
@@ -177,23 +175,8 @@ export default function GamePage() {
       {/* 游戏菜单（仅 Player 模式） */}
       {!isObserver && !isPlayback && <GameMenu />}
 
-      {/* 回放控件（仅 Playback 模式） */}
-      {isPlayback && playback && (
-        <PlaybackControls
-          currentTurn={playback.currentTurn}
-          currentStep={playback.currentStep}
-          totalTurns={playback.totalTurns}
-          totalSteps={playback.totalSteps}
-          isPlaying={playback.state === "playing"}
-          isEnded={playback.state === "ended"}
-          speed={playback.speed}
-          onPlay={playback.play}
-          onPause={playback.pause}
-          onStepForward={playback.stepForward}
-          onStepBackward={playback.stepBackward}
-          onSpeedChange={playback.setSpeed}
-        />
-      )}
+      {/* 回放控件（M6 真正接入） */}
+      {/* {isPlayback && playback && <PlaybackControls ... />} */}
     </div>
   );
 }

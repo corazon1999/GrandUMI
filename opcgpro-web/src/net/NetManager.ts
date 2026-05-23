@@ -24,8 +24,10 @@ class NetManagerClass {
 
   // 重连参数
   private reconnectAttempts = 0;
-  private readonly MAX_RECONNECT = 5;
-  private readonly RECONNECT_BASE_DELAY = 2000; // ms
+  private readonly MAX_RECONNECT = 6;
+  private readonly RECONNECT_BASE_DELAY = 1500; // ms
+  /// 标记重连：握手完成后会自动触发 reconnected 事件，由 NetProvider 决定是否重新登录 + 请求状态
+  private wasConnectedBefore = false;
 
   get state(): ConnectionState {
     return this._state;
@@ -103,11 +105,14 @@ class NetManagerClass {
     // 握手回包：更新状态后继续分发
     if (msg.proto === "MsgSecret") {
       if (this._state === "handshaking") {
+        const isReconnect = this.wasConnectedBefore && this.reconnectAttempts > 0;
         this._state = "connected";
         this.reconnectAttempts = 0;
+        this.wasConnectedBefore = true;
         this.startHeartbeat();
         eventBus.emit("stateChange", "connected");
         eventBus.emit("connectSucc");
+        if (isReconnect) eventBus.emit("reconnected");
       }
     }
 
@@ -147,6 +152,7 @@ class NetManagerClass {
   disconnect() {
     this.clearTimers();
     this.reconnectAttempts = this.MAX_RECONNECT; // 阻止自动重连
+    this.wasConnectedBefore = false;
     this.ws?.close(1000, "主动断开");
     this.ws = null;
     this._state = "disconnected";
@@ -175,10 +181,10 @@ class NetManagerClass {
 
   private startHeartbeat() {
     this.stopHeartbeat();
-    // 对应 C# PingThread，间隔 30 秒
+    // 对战中更密：10 秒
     this.pingTimer = setInterval(() => {
       this.sendRaw({ proto: "MsgPing" } as MsgPing);
-    }, 30_000);
+    }, 10_000);
   }
 
   private stopHeartbeat() {

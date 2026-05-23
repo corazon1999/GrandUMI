@@ -6,42 +6,48 @@ import { getCard, loadCardSet } from "@/data/CardLoader";
 import { CARD_SET_PATHS } from "@/data/cardSets";
 
 /**
- * 游戏对局初始化 hook
- * 对应 C# Deck.LoadMyDeck() → Leader.Init() → Life.InitLife() → Deck.SelfInit()
+ * 游戏对局初始化（新架构）
  *
- * 流程：
- *   1. 从 sessionStorage 读取双方卡组字符串（由 handleGameStart 写入）
- *   2. 提取卡号中的卡集前缀，按需加载卡集数据
- *   3. 调用 gameStore.initFromDecks() 完成领航卡/生命/手牌/卡组初始化
+ * 服务器是状态权威源。客户端只需要：
+ *   1. 等首份 MsgGameState 到达（my != null）
+ *   2. 按需懒加载卡集 JSON（用于显示卡面信息）
+ *
+ * 返回 true 表示可以显示对战界面
  */
 export function useGameInit() {
   const [ready, setReady] = useState(false);
-  const isGameOver = useGameStore((s) => s.isGameOver);
-  const leader = useGameStore((s) => s.my.leader);
+  const my = useGameStore((s) => s.my);
+  const opp = useGameStore((s) => s.opponent);
 
   useEffect(() => {
-    if (isGameOver || leader) return;
+    if (!my || !opp) return;
 
-    const myDeck = sessionStorage.getItem("myDeck") ?? "";
-    const enemyDeck = sessionStorage.getItem("enemyDeck") ?? "";
-    if (!myDeck || !enemyDeck) return;
+    // 收集快照中出现的卡号，按需加载对应卡集
+    const allNums = [
+      my.leaderNumber, opp.leaderNumber,
+      ...my.handCardNumbers,
+      ...my.fieldCards.map((c) => c.number),
+      ...opp.fieldCards.map((c) => c.number),
+      ...my.trashNumbers, ...opp.trashNumbers,
+      my.stageNumber, opp.stageNumber,
+    ].filter((n): n is string => !!n);
 
-    const isFirst = sessionStorage.getItem("isFirst") === "1";
-
-    const allNums = [...myDeck.split("\n"), ...enemyDeck.split("\n")].filter(Boolean);
-    const prefixes = new Set(allNums.map((n) => n.split("-")[0]));
-    const toLoad = [...prefixes].filter((p) => p in CARD_SET_PATHS && !getCard(allNums.find((n) => n.startsWith(p))!));
-
-    const init = async () => {
-      if (toLoad.length > 0) {
-        await Promise.all(toLoad.map((p) => loadCardSet(p).catch(() => {})));
+    const missing = new Set<string>();
+    for (const n of allNums) {
+      if (!getCard(n)) {
+        const setCode = n.split("-")[0];
+        if (setCode in CARD_SET_PATHS) missing.add(setCode);
       }
-      useGameStore.getState().initFromDecks(myDeck, enemyDeck, isFirst);
-      setReady(true);
-    };
+    }
 
-    init();
-  }, [isGameOver, leader]);
+    if (missing.size === 0) {
+      setReady(true);
+      return;
+    }
+
+    Promise.all([...missing].map((p) => loadCardSet(p).catch(() => {})))
+      .then(() => setReady(true));
+  }, [my, opp]);
 
   return ready;
 }

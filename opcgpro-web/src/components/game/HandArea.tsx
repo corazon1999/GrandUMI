@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
+import { getCard } from "@/data/CardLoader";
 
 interface Props {
   side: "my" | "opponent";
@@ -11,17 +12,23 @@ interface Props {
 }
 
 export default function HandArea({ side, hidden = false }: Props) {
-  const cards = useGameStore((s) => s[side].hand.cards);
-  const canChoose = useGameStore((s) => s[side].hand.canChoose);
+  const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const currentTurn = useGameStore((s) => s.currentTurn);
   const isPending = useGameStore((s) => s.isPending);
   const selectedHandIndex = useGameStore((s) => s.selectedHandIndex);
   const setSelectedHand = useGameStore((s) => s.setSelectedHand);
   const { cardSize } = useResponsive();
 
+  if (!player) return <div className="min-h-24" />;
+
+  // 己方：用卡号查 CardData；对手：仅占位牌背
+  const cards = side === "my"
+    ? player.handCardNumbers.map((n) => getCard(n) ?? null)
+    : Array.from({ length: player.handCount }, () => null);
+
   const handleClick = (i: number) => {
     if (hidden || isPending) return;
-    if (side === "my" && !canChoose && !currentTurn) return;
+    if (side !== "my" || !currentTurn) return;
     setSelectedHand(selectedHandIndex === i ? null : i);
   };
 
@@ -39,7 +46,7 @@ export default function HandArea({ side, hidden = false }: Props) {
             <CardItem
               card={card}
               isSelected={!hidden && selectedHandIndex === i}
-              faceDown={hidden}
+              faceDown={hidden || card === null}
               onClick={() => handleClick(i)}
               size={cardSize}
             />

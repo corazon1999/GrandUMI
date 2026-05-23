@@ -12,7 +12,6 @@ export default function GameMenu() {
   const isPending = useGameStore((s) => s.isPending);
   const selectedHandIndex = useGameStore((s) => s.selectedHandIndex);
   const endTurn = useBattleStore((s) => s.endTurn);
-  const playSelectedCard = useBattleStore((s) => s.playSelectedCard);
 
   const handleSurrender = () => {
     setOpen(false);
@@ -20,7 +19,8 @@ export default function GameMenu() {
   };
 
   const handlePlayCard = () => {
-    playSelectedCard();
+    if (selectedHandIndex === null) return;
+    GameRequest.playCard(selectedHandIndex);
   };
 
   return (

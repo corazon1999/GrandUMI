@@ -8,7 +8,10 @@ interface Props {
 
 /** 简化版费用显示（仅对手方使用），己方用 DonArea */
 export default function CostArea({ side }: Props) {
-  const { active, rest, max } = useGameStore((s) => s[side].cost);
+  const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
+  const active = player?.costActive ?? 0;
+  const rest = player?.costRest ?? 0;
+  const max = active + rest + (player?.costAttached ?? 0);
 
   return (
     <div className="flex items-center gap-1.5 text-xs">

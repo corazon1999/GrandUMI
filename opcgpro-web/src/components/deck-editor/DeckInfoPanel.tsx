@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { useDeckStore, type DeckEntry } from "@/store/deckStore";
+import { useDeckStore, FORMAT_RULES, type DeckEntry, type DeckFormat } from "@/store/deckStore";
 import { saveDeck, loadAllDecks, loadDeck, deleteDeck, type SavedDeck } from "@/data/DeckMapper";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
@@ -15,7 +15,7 @@ type SaveState = "idle" | "saved" | "error";
 
 export default function DeckInfoPanel() {
   const router = useRouter();
-  const { leader, entries, totalCards, isValid, removeCard, clearDeck, setLeader, notice, clearNotice } =
+  const { format, leader, entries, totalCards, isValid, removeCard, clearDeck, setLeader, setFormat, getMainSize, notice, clearNotice } =
     useDeckStore();
   const [deckName, setDeckName]     = useState("我的卡组");
   const [saveState, setSaveState]   = useState<SaveState>("idle");
@@ -90,7 +90,8 @@ export default function DeckInfoPanel() {
     setHover(null);
   }, []);
 
-  const remaining = 40 - total;
+  const mainSize = getMainSize();
+  const remaining = mainSize - total;
 
   return (
     <div className="flex flex-col h-full">
@@ -206,6 +207,29 @@ export default function DeckInfoPanel() {
           />
         </div>
 
+        {/* 对战格式切换 */}
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 text-[10px] shrink-0">格式</span>
+            <div className="flex flex-1 gap-1">
+              {(Object.keys(FORMAT_RULES) as DeckFormat[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFormat(f)}
+                  className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                    format === f
+                      ? "bg-orange-500 text-white"
+                      : "bg-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                  title={FORMAT_RULES[f].label}
+                >
+                  {f === "OP15-Only" ? "OP15·50" : "旧·40"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* 领航卡 */}
         <div className="px-3 pb-3">
           <div className="flex items-center gap-2">
@@ -257,15 +281,15 @@ export default function DeckInfoPanel() {
           <div className={`h-1.5 flex-1 rounded-full overflow-hidden bg-gray-800`}>
             <div
               className={`h-full rounded-full transition-all ${
-                total === 40 ? "bg-green-500" : total > 40 ? "bg-red-500" : "bg-orange-500"
+                total === mainSize ? "bg-green-500" : total > mainSize ? "bg-red-500" : "bg-orange-500"
               }`}
-              style={{ width: `${Math.min(100, (total / 40) * 100)}%` }}
+              style={{ width: `${Math.min(100, (total / mainSize) * 100)}%` }}
             />
           </div>
           <span className={`text-xs font-bold shrink-0 ${
-            total === 40 ? "text-green-400" : total > 40 ? "text-red-400" : "text-gray-400"
+            total === mainSize ? "text-green-400" : total > mainSize ? "text-red-400" : "text-gray-400"
           }`}>
-            {total}/40
+            {total}/{mainSize}
           </span>
           {remaining > 0 && (
             <span className="text-gray-600 text-[10px] shrink-0">还差{remaining}张</span>
@@ -318,7 +342,7 @@ export default function DeckInfoPanel() {
               ? "保存失败"
               : isValid()
                 ? "保存卡组"
-                : `还需 ${!leader ? "选择领航卡" : `${remaining}张卡`}`}
+                : `还需 ${!leader ? "选择领航卡" : remaining > 0 ? `${remaining}张卡` : `减少${-remaining}张卡`}`}
         </button>
       </div>
     </div>

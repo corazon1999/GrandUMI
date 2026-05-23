@@ -1,55 +1,36 @@
 "use client";
 
-import { useMemo } from "react";
 import { useGameStore } from "@/store/gameStore";
 import DonCardItem from "./DonCardItem";
-import type { DonCard, DonState } from "@/types/game";
 
 interface Props {
   side: "my" | "opponent";
 }
 
 export default function DonArea({ side }: Props) {
-  const donCards = useGameStore((s) => s[side].cost.donCards);
+  const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const currentTurn = useGameStore((s) => s.currentTurn);
   const isPending = useGameStore((s) => s.isPending);
-  const selectedDonId = useGameStore((s) => s.selectedDonId);
+  const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
   const setSelectedDon = useGameStore((s) => s.setSelectedDon);
+
+  if (!player) return null;
 
   const isMy = side === "my";
   const canInteract = isMy && currentTurn && !isPending;
-
-  // 按状态分组咚卡
-  const groups = useMemo(() => {
-    const result: Record<DonState, DonCard[]> = {
-      deck: [],
-      active: [],
-      rest: [],
-      attached: [],
-    };
-    for (const don of donCards) {
-      result[don.state].push(don);
-    }
-    return result;
-  }, [donCards]);
-
-  const handleDonClick = (don: DonCard) => {
-    if (!canInteract || don.state !== "active") return;
-    setSelectedDon(don.id);
-  };
+  const deckCount     = player.donDeckCount;
+  const activeCount   = player.costActive;
+  const restCount     = player.costRest;
+  const attachedCount = player.costAttached;
 
   return (
     <div className="flex items-center gap-3 px-2 py-1">
-      {/* 咚!!卡组（牌背堆叠） */}
+      {/* 咚!!卡组 */}
       <div className="relative">
         <div className="flex -space-x-3">
-          {groups.deck.length > 0 ? (
-            groups.deck.map((don, i) => (
-              <div
-                key={don.id}
-                className="relative"
-                style={{ zIndex: groups.deck.length - i }}
-              >
+          {deckCount > 0 ? (
+            Array.from({ length: Math.min(deckCount, 5) }).map((_, i) => (
+              <div key={i} className="relative" style={{ zIndex: deckCount - i }}>
                 <DonCardItem state="deck" size="sm" disabled />
               </div>
             ))
@@ -58,44 +39,49 @@ export default function DonArea({ side }: Props) {
           )}
         </div>
         <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-gray-600 text-[9px]">
-          {groups.deck.length}
+          {deckCount}
         </span>
       </div>
 
       <div className="w-px h-8 bg-gray-700" />
 
-      {/* 活跃咚（可点击附着） */}
+      {/* 活跃咚 */}
       <div className="relative">
         <div className="flex flex-wrap gap-0.5">
-          {groups.active.map((don) => (
+          {Array.from({ length: activeCount }).map((_, i) => (
             <DonCardItem
-              key={don.id}
+              key={`a${i}`}
               state="active"
               size="sm"
-              isSelected={selectedDonId === don.id}
-              onClick={() => handleDonClick(don)}
+              isSelected={selectedDonIndex === i}
+              onClick={canInteract ? () => setSelectedDon(selectedDonIndex === i ? null : i) : undefined}
               disabled={!canInteract}
             />
           ))}
         </div>
         <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-yellow-500 text-[9px] font-bold">
-          {groups.active.length}
+          {activeCount}
         </span>
       </div>
 
       <div className="w-px h-8 bg-gray-700" />
 
-      {/* 休息咚（横置显示） */}
+      {/* 休息咚 */}
       <div className="relative">
         <div className="flex flex-wrap gap-0.5">
-          {groups.rest.map((don) => (
-            <DonCardItem key={don.id} state="rest" size="sm" disabled />
+          {Array.from({ length: restCount }).map((_, i) => (
+            <DonCardItem key={`r${i}`} state="rest" size="sm" disabled />
           ))}
         </div>
         <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-gray-500 text-[9px]">
-          {groups.rest.length}
+          {restCount}
         </span>
       </div>
+
+      <div className="w-px h-8 bg-gray-700" />
+
+      {/* 附着中咚（统计数字） */}
+      <div className="text-gray-400 text-[10px]">附×{attachedCount}</div>
     </div>
   );
 }

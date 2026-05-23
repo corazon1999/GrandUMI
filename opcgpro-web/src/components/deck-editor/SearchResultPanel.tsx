@@ -4,7 +4,7 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
 import { getAllCachedCards } from "@/data/CardLoader";
-import { useDeckStore } from "@/store/deckStore";
+import { useDeckStore, FORMAT_RULES } from "@/store/deckStore";
 import type { CardData } from "@/types/card";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
 import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPreview";
@@ -16,7 +16,7 @@ const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { searchQuery, filterColor, filterType, filterProperty, filterRarity, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
+  const { format, searchQuery, filterColor, filterType, filterProperty, filterRarity, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -35,7 +35,14 @@ export default function SearchResultPanel() {
 
   const results = useMemo(() => {
     const all = getAllCachedCards();
+    const rule = FORMAT_RULES[format];
+    const whitelist = isLeaderMode ? rule.leaderSetWhitelist : rule.mainSetWhitelist;
     return all.filter((card) => {
+      // 格式卡集白名单过滤（OP15-Only 模式下只显示 OP15 卡）
+      if (whitelist) {
+        const setCode = card.number.split("-")[0];
+        if (!whitelist.includes(setCode)) return false;
+      }
       if (isLeaderMode && card.type !== "Leader") return false;
       if (!isLeaderMode && card.type === "Leader") return false;
       if (filterColor && !card.color.includes(filterColor)) return false;
@@ -53,7 +60,7 @@ export default function SearchResultPanel() {
       }
       return true;
     });
-  }, [searchQuery, filterColor, filterType, filterProperty, filterRarity, isLeaderMode]);
+  }, [format, searchQuery, filterColor, filterType, filterProperty, filterRarity, isLeaderMode]);
 
   // 虚拟网格列表
   const {

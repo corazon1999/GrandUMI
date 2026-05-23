@@ -1,97 +1,55 @@
 /**
- * battleStore.ts — 战斗交互状态
- * 对应 C# BattleManager.cs 的 UI 交互部分
+ * battleStore.ts — 战斗交互的纯本地状态
  *
- * 架构原则（重构方案 §5.7）：
- *   只管理"选谁攻击谁"的 UI 交互状态
- *   所有操作最终调用 GameRequest 发送服务器，不在本地结算
+ * 不参与结算。所有最终动作通过 GameRequest 发到服务端，由服务端 BattleEngine 推进战斗。
  */
 
 import { create } from "zustand";
 import type { BattlePhase } from "@/types/game";
 import { GameRequest } from "@/net/GameRequest";
-import { useGameStore } from "./gameStore";
 
 interface BattleStore {
-  // 战斗阶段（同步自服务器）
-  phase: BattlePhase;
-  // 攻击者/防御者索引
-  attackerIndex: number | null;
-  defenderIndex: number | null;
-  // 是否正在选择攻击目标
+  // 暂态：选了攻击者后等待选目标
   isSelectingTarget: boolean;
-  // 是否正在处理效果
-  isResolvingEffect: boolean;
+  attackerId: string | null;
 
-  // ── 基本 setter ──────────────────────────────────────────────────────
-  setPhase: (phase: BattlePhase) => void;
-  setAttacker: (index: number | null) => void;
-  setDefender: (index: number | null) => void;
-  setResolvingEffect: (v: boolean) => void;
+  startAttack:         (attackerId: string) => void;
+  confirmAttackTarget: (target: { isLeader: true } | { isLeader: false; cardId: string }) => void;
+  cancelAttack:        () => void;
+  endTurn:             () => void;
 
-  // ── 攻击交互流程（调用 GameRequest 发送服务器）───────────────────────
-  /** 选择己方攻击者，进入选目标模式 */
-  startAttack: (attackerIndex: number) => void;
-  /** 确认攻击目标（对方角色索引或领航卡 'leader'） */
-  confirmAttackTarget: (target: number | "leader") => void;
-  /** 取消攻击 */
-  cancelAttack: () => void;
+  // 兼容旧 API
+  phase: BattlePhase;
+  setPhase: (p: BattlePhase) => void;
+  setAttacker: (id: string | null) => void;
+  setDefender: (id: string | null) => void;
+  defenderId: string | null;
 
-  // ── 快捷操作 ─────────────────────────────────────────────────────────
-  /** 打出当前选中的手牌 */
-  playSelectedCard: () => void;
-  /** 结束当前回合 */
-  endTurn: () => void;
-
-  // 重置
   reset: () => void;
 }
 
 export const useBattleStore = create<BattleStore>((set, get) => ({
-  phase: "Main",
-  attackerIndex: null,
-  defenderIndex: null,
   isSelectingTarget: false,
-  isResolvingEffect: false,
+  attackerId: null,
+  phase: "Main",
+  defenderId: null,
 
-  setPhase: (phase) => set({ phase }),
-  setAttacker: (index) => set({ attackerIndex: index }),
-  setDefender: (index) => set({ defenderIndex: index }),
-  setResolvingEffect: (v) => set({ isResolvingEffect: v }),
-
-  // ── 攻击交互流程 ─────────────────────────────────────────────────────
-
-  startAttack: (attackerIndex) =>
-    set({ isSelectingTarget: true, attackerIndex }),
+  startAttack: (attackerId) => set({ isSelectingTarget: true, attackerId }),
 
   confirmAttackTarget: (target) => {
-    const { attackerIndex } = get();
-    if (attackerIndex === null) return;
-    GameRequest.attack(attackerIndex, target);
-    set({ isSelectingTarget: false, attackerIndex: null });
+    const { attackerId } = get();
+    if (!attackerId) return;
+    GameRequest.attack(attackerId, target);
+    set({ isSelectingTarget: false, attackerId: null });
   },
 
-  cancelAttack: () =>
-    set({ isSelectingTarget: false, attackerIndex: null }),
+  cancelAttack: () => set({ isSelectingTarget: false, attackerId: null }),
 
-  // ── 快捷操作 ─────────────────────────────────────────────────────────
+  endTurn: () => GameRequest.endTurn(),
 
-  playSelectedCard: () => {
-    const { selectedHandIndex } = useGameStore.getState();
-    if (selectedHandIndex === null) return;
-    GameRequest.playCard(selectedHandIndex);
-  },
+  setPhase: (p) => set({ phase: p }),
+  setAttacker: (id) => set({ attackerId: id }),
+  setDefender: (id) => set({ defenderId: id }),
 
-  endTurn: () => {
-    GameRequest.endTurn();
-  },
-
-  reset: () =>
-    set({
-      phase: "Main",
-      attackerIndex: null,
-      defenderIndex: null,
-      isSelectingTarget: false,
-      isResolvingEffect: false,
-    }),
+  reset: () => set({ isSelectingTarget: false, attackerId: null, defenderId: null, phase: "Main" }),
 }));

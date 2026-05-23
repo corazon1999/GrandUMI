@@ -175,48 +175,120 @@ export interface MsgChatMsg extends MsgBase {
 
 // ── Sprint 3: 服务端结算游戏协议 ─────────────────────────────────────────
 
-/** 客户端可发送的游戏动作类型 */
+/** 客户端可发送的游戏动作类型（服务端权威结算） */
 export type GameActionType =
-  | "DrawCard"
-  | "PlayCard"
-  | "Attack"
-  | "Block"
-  | "Counter"
-  | "UseEffect"
-  | "EndTurn"
-  | "ConfirmDamage"
-  | "Surrender";
+  | "Mulligan"          // { redraw: boolean }
+  | "PlayCard"          // { handIndex: number, freeCost?: boolean }
+  | "AttachDon"         // { targetId: "leader" | cardId, count: number }
+  | "Attack"            // { attackerId: cardId | "leader", targetIsLeader: boolean, targetId?: cardId }
+  | "DeclareBlocker"    // { blockerId: cardId }
+  | "PassBlock"         // {}
+  | "PlayCounter"       // { handIndex: number } 或 { fieldCardId, useCounterIcon: true }
+  | "PassCounter"       // {}
+  | "UseEffect"         // { sourceId, effectKey, ... }
+  | "EndTurn"           // {}
+  | "ConfirmDamage"     // {}
+  | "Surrender";        // {}
 
-/** 服务器推送的场地卡快照（仅含必要字段，客户端用 number 查完整数据） */
+/** 服务器推送的场地卡快照 */
 export interface FieldCardSnapshot {
-  number: string;       // 卡号，客户端 getCard(number) 查完整数据
-  isTapped: boolean;    // 是否横置
-  powerBuff: number;    // 威力修正
+  id: string;
+  number: string;
+  isTapped: boolean;
+  powerCurrent: number;
+  attachedDon: number;
+  gainedKeywords: string[];
+  cannotActivateNextReset: boolean;
+  turnPlayed: number;
 }
 
-/** 服务器推送的单方玩家快照 */
+/** 服务器推送的单方玩家快照（已按视角脱敏） */
 export interface PlayerSnapshot {
-  handCardNumbers: string[];  // 己方手牌卡号列表（对手只有 handCount）
-  handCount: number;          // 对手手牌数量（只显示牌背）
+  name: string;
+  handCardNumbers: string[];  // 仅自己有内容
+  handCount: number;
   fieldCards: FieldCardSnapshot[];
+  stageNumber: string | null;
+  stageId: string | null;
+  trashNumbers: string[];
   deckCount: number;
   lifeCount: number;
+  lifeNumbers: string[];      // 始终为空，由 Prompt 单独公开
+  leaderId: string;
+  leaderNumber: string;
+  leaderTapped: boolean;
+  leaderPower: number;
+  leaderAttachedDon: number;
   costActive: number;
-  costMax: number;
-  leaderNumber: string | null;
-  stageNumber: string | null;
+  costRest: number;
+  costAttached: number;
+  donDeckCount: number;
+  hasReDraw: boolean;
+  mulliganDone: boolean;
+}
+
+/** 服务器推送的 prompt 信息 */
+export interface PromptSnapshot {
+  promptId: string;
+  kind: string;
+  text: string;
+  validChoices: string[];
+  minChoose: number;
+  maxChoose: number;
+  extra: Record<string, unknown>;
+}
+
+/** 服务器推送的战斗信息 */
+export interface BattleSnapshot {
+  attackerPlayer: number;
+  attackerCardId: string;
+  targetIsLeader: boolean;
+  targetCardId: string | null;
+  blockerCardId: string | null;
+  attackerBonus: number;
+  defenderBonus: number;
 }
 
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
+  tick: number;
   my: PlayerSnapshot;
   opponent: PlayerSnapshot;
-  phase: string;            // BattlePhase 字符串
-  currentTurn: boolean;     // 是否当前玩家的回合
+  phase: string;
+  currentTurn: boolean;
   turnCount: number;
-  lastAction: string;       // 触发动画标识 "PlayCard" / "Attack" / "Damage"
-  actionPayload: string;    // JSON 字符串，动画参数（目标位置、卡号等）
+  firstPlayer: number;
+  mulliganBothDone: boolean;
+  isGameOver: boolean;
+  winnerIsMe: boolean;
+  gameOverReason: string;
+  viewerKind: "player" | "spectator";
+  lastAction: string;
+  actionPayload: string;
+  pendingPrompt: PromptSnapshot | null;
+  battle: BattleSnapshot | null;
+}
+
+/** 客户端 → 服务器：响应 Prompt */
+export interface MsgPromptResponse extends MsgBase {
+  proto: "MsgPromptResponse";
+  promptId: string;
+  chosen: string[];   // 卡 ID 列表，长度 ∈ [minChoose, maxChoose]
+}
+
+/** 客户端 → 服务器：申请观战 */
+export interface MsgSpectateRoom extends MsgBase {
+  proto: "MsgSpectateRoom";
+  roomId: string;
+  result?: boolean;
+  logStr?: string;
+}
+
+/** 服务端 → 客户端：动作被拒绝（不发对手） */
+export interface MsgActionRejected extends MsgBase {
+  proto: "MsgActionRejected";
+  reason: string;
 }
 
 /** 客户端 → 服务器：游戏动作请求 */
@@ -264,6 +336,9 @@ export type AnyMsg =
   | MsgDuelOver
   | MsgGameState
   | MsgGameAction
+  | MsgPromptResponse
+  | MsgSpectateRoom
+  | MsgActionRejected
   | MsgRequestState
   | MsgPlayerDisconnected
   | MsgPlayerReconnected
