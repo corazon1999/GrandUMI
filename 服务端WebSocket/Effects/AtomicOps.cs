@@ -385,7 +385,7 @@ public static class AtomicOps
         var candidates = p.Deck.Where(filter).ToList();
         if (candidates.Count == 0)
         {
-            Shuffle(p.Deck);
+            engine.ShuffleDeck(p, playerIdx, "search_deck_no_candidate");
             return null;
         }
         var chosen = await engine.Prompts.ChooseCards(playerIdx, "SearchDeck", prompt,
@@ -397,7 +397,7 @@ public static class AtomicOps
             p.Deck.Remove(picked);
             p.Hand.Add(picked);
         }
-        Shuffle(p.Deck);
+        engine.ShuffleDeck(p, playerIdx, "search_deck");
         return picked;
     }
 

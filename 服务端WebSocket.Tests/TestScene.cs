@@ -16,7 +16,7 @@ public class TestScene
         EnsureCardDbLoaded();
         var leader0 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
         var leader1 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
-        var state = new GameState { RoomId = "test-room", FirstPlayer = 0 };
+        var state = new GameState { RoomId = "test-room", FirstPlayer = 0, RngSeed = 1 };
         state.Players[0] = new PlayerState
         {
             SessionId = "s0", AccountName = "p0",

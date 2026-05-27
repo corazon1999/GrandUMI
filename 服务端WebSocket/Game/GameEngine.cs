@@ -3,6 +3,7 @@ using GrandUMI.Effects;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace GrandUMI.Game;
@@ -17,7 +18,13 @@ public class GameEngine
     public Action<int, object>? OnSendToPlayer { get; set; }   // (playerIndex, payload)
     public Action<object>?      OnBroadcast    { get; set; }   // 双方都收到
     public Action<object>?      OnReplay       { get; set; }   // 写入回放
+    public Action<string, int?, object?>? OnMatchLog { get; set; }
     public Action<int, object>? OnSendToSpectators { get; set; } // 观战推送（spectator 视角）
+    private string? _activeAction;
+    private int? _activeActor;
+    private bool _activeActionRejected;
+    private readonly Random _rng;
+    private readonly List<(string Kind, int? Actor, object? Payload)> _pendingMatchLogs = new();
 
     /// <summary>
     /// 用双方 deck 字符串构造引擎（已通过 DeckValidator 校验）
@@ -25,8 +32,13 @@ public class GameEngine
     /// </summary>
     public GameEngine(string roomId, (string sessionId, string accountName, string deckRaw) p0,
                                        (string sessionId, string accountName, string deckRaw) p1,
-                                       int firstPlayer)
+                                       int firstPlayer,
+                                       int? rngSeed = null)
     {
+        var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
+        _rng = new Random(seed);
+        State = new GameState { RoomId = roomId, FirstPlayer = firstPlayer, RngSeed = seed };
+
         var p0Cards = ParseDeck(p0.deckRaw, out var p0Leader);
         var p1Cards = ParseDeck(p1.deckRaw, out var p1Leader);
 
@@ -38,7 +50,7 @@ public class GameEngine
         };
         player0.Deck.AddRange(p0Cards);
         InitDonDeck(player0);
-        InitLifeAndHand(player0);
+        InitLifeAndHand(player0, 0);
 
         var player1 = new PlayerState
         {
@@ -48,9 +60,8 @@ public class GameEngine
         };
         player1.Deck.AddRange(p1Cards);
         InitDonDeck(player1);
-        InitLifeAndHand(player1);
+        InitLifeAndHand(player1, 1);
 
-        State = new GameState { RoomId = roomId, FirstPlayer = firstPlayer };
         State.Players[0] = player0;
         State.Players[1] = player1;
         State.CurrentTurnPlayer = firstPlayer;
@@ -64,6 +75,10 @@ public class GameEngine
     public void HandleAction(int playerIndex, string action, JsonElement data)
     {
         if (State.IsGameOver) return;
+
+        _activeAction = action;
+        _activeActor = playerIndex;
+        _activeActionRejected = false;
 
         switch (action)
         {
@@ -83,6 +98,12 @@ public class GameEngine
                 SendError(playerIndex, $"未知动作: {action}");
                 break;
         }
+
+        if (!_activeActionRejected)
+            RecordMatchLog("player_action_accepted", playerIndex, new { action });
+
+        _activeAction = null;
+        _activeActor = null;
     }
 
     // ── 出牌 ───────────────────────────────────────────────────────────────
@@ -312,8 +333,11 @@ public class GameEngine
         // 给双方各自发一份脱敏快照
         OnSendToPlayer?.Invoke(0, StateSnapshotBuilder.Build(State, 0, "GameStart"));
         OnSendToPlayer?.Invoke(1, StateSnapshotBuilder.Build(State, 1, "GameStart"));
-        OnSendToSpectators?.Invoke(-1, StateSnapshotBuilder.Build(State, -1, "GameStart"));
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = StateSnapshotBuilder.Build(State, -1, "GameStart") });
+        var publicSnapshot = StateSnapshotBuilder.Build(State, -1, "GameStart");
+        OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = publicSnapshot });
+        RecordMatchLog("public_snapshot", -1, publicSnapshot);
+        RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
     }
 
     public void Broadcast(string lastAction, object? payload = null)
@@ -321,13 +345,40 @@ public class GameEngine
         State.Tick++;
         OnSendToPlayer?.Invoke(0, StateSnapshotBuilder.Build(State, 0, lastAction, payload));
         OnSendToPlayer?.Invoke(1, StateSnapshotBuilder.Build(State, 1, lastAction, payload));
-        OnSendToSpectators?.Invoke(-1, StateSnapshotBuilder.Build(State, -1, lastAction, payload));
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = StateSnapshotBuilder.Build(State, -1, lastAction, payload) });
+        var publicSnapshot = StateSnapshotBuilder.Build(State, -1, lastAction, payload);
+        OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = publicSnapshot });
+        RecordMatchLog("public_snapshot", -1, publicSnapshot);
+        RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
     }
 
     private void SendError(int playerIndex, string reason)
     {
+        _activeActionRejected = true;
+        RecordMatchLog("player_action_rejected", _activeActor ?? playerIndex, new
+        {
+            action = _activeAction ?? "",
+            reason,
+        });
         OnSendToPlayer?.Invoke(playerIndex, new { proto = "MsgActionRejected", reason });
+    }
+
+    public void RecordMatchLog(string kind, int? actor, object? payload)
+    {
+        if (OnMatchLog is null)
+        {
+            _pendingMatchLogs.Add((kind, actor, payload));
+            return;
+        }
+        OnMatchLog.Invoke(kind, actor, payload);
+    }
+
+    public void FlushPendingMatchLogs()
+    {
+        if (OnMatchLog is null || _pendingMatchLogs.Count == 0) return;
+        foreach (var (kind, actor, payload) in _pendingMatchLogs)
+            OnMatchLog.Invoke(kind, actor, payload);
+        _pendingMatchLogs.Clear();
     }
 
     // ── Mulligan ─────────────────────────────────────────────────────────
@@ -350,7 +401,7 @@ public class GameEngine
             var hand = new List<CardInstance>(p.Hand);
             p.Hand.Clear();
             p.Deck.AddRange(hand);
-            Shuffle(p.Deck);
+            ShuffleDeck(p, playerIndex, "mulligan_redraw");
             for (int i = 0; i < 5 && p.Deck.Count > 0; i++)
             {
                 var top = p.Deck[0];
@@ -474,9 +525,9 @@ public class GameEngine
             p.DonDeck.Add(new DonCard());
     }
 
-    private static void InitLifeAndHand(PlayerState p)
+    private void InitLifeAndHand(PlayerState p, int playerIndex)
     {
-        Shuffle(p.Deck);
+        ShuffleDeck(p, playerIndex, "initial_setup");
         // 生命数 = 领航 cost 字段
         int lifeCount = p.Leader.Info.Cost > 0 ? p.Leader.Info.Cost : 5;
         for (int i = 0; i < lifeCount && p.Deck.Count > 0; i++)
@@ -492,13 +543,35 @@ public class GameEngine
         }
     }
 
-    private static readonly Random Rng = new();
-    public static void Shuffle<T>(List<T> list)
+    public void ShuffleDeck(PlayerState player, int playerIndex, string reason)
+    {
+        var before = player.Deck.Select(SnapshotRandomCard).ToArray();
+        Shuffle(player.Deck);
+        var after = player.Deck.Select(SnapshotRandomCard).ToArray();
+        var randomSeq = ++State.RandomSeq;
+        RecordMatchLog("random_event", playerIndex, new
+        {
+            randomSeq,
+            type = "shuffle",
+            zone = "deck",
+            reason,
+            playerIndex,
+            rngSeed = State.RngSeed,
+            count = player.Deck.Count,
+            beforeOrder = before,
+            afterOrder = after,
+        });
+    }
+
+    private void Shuffle<T>(List<T> list)
     {
         for (int i = list.Count - 1; i > 0; i--)
         {
-            int j = Rng.Next(i + 1);
+            int j = _rng.Next(i + 1);
             (list[i], list[j]) = (list[j], list[i]);
         }
     }
+
+    private static object SnapshotRandomCard(CardInstance card)
+        => new { id = card.Id.ToString(), number = card.Info.Number };
 }
