@@ -18,9 +18,9 @@ interface Props {
 }
 
 const sizes = {
-  sm: "w-14 h-20",
-  md: "w-20 h-28",
-  lg: "w-28 h-40",
+  sm: "w-[4.5rem] h-[6.3rem]",
+  md: "w-[6rem] h-[8.4rem]",
+  lg: "w-[8rem] h-[11.2rem]",
 };
 
 export default function CardItem({
@@ -42,16 +42,15 @@ export default function CardItem({
     <motion.div
       className={clsx(
         sizes[size],
-        "relative rounded-lg overflow-hidden cursor-pointer shrink-0",
-        "border-2 transition-colors",
-        "transform-gpu backface-hidden",
+        "relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl shadow-black/35",
+        "transform-gpu backface-hidden transition-colors",
         isSelected
-          ? "border-yellow-400 shadow-lg shadow-yellow-400/40"
-          : "border-gray-700 hover:border-gray-500"
+          ? "border-yellow-300 shadow-yellow-300/40"
+          : "border-slate-500/70 hover:border-slate-200",
       )}
       animate={{
         rotate: isTapped ? 90 : 0,
-        y: isSelected ? -10 : 0,
+        y: isSelected ? -12 : 0,
         scale: isSelected ? 1.05 : 1,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
@@ -59,8 +58,8 @@ export default function CardItem({
       whileHover={!isSelected ? { scale: 1.03 } : {}}
     >
       {showFaceDown ? (
-        <div className="w-full h-full bg-gradient-to-br from-blue-900 to-blue-950 flex items-center justify-center">
-          <span className="text-blue-400 text-xs font-bold">CARD</span>
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-sky-950 via-blue-950 to-slate-950 ring-1 ring-inset ring-sky-300/20">
+          <span className="text-xs font-black tracking-normal text-sky-300">CARD</span>
         </div>
       ) : (
         <>
@@ -68,31 +67,30 @@ export default function CardItem({
             src={imgSrc}
             alt={card!.name}
             fill
-            sizes="160px"
+            sizes="180px"
             className="object-cover"
             draggable={false}
             onError={() => setImgSrc("/sprites/CardBack.png")}
           />
-          <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 pb-0.5 text-xs font-bold">
-            <span className="bg-black/70 text-white px-1 rounded text-[10px]">
+          <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-1.5 pb-1 pt-6 text-xs font-bold">
+            <span className="rounded bg-black/85 px-1.5 text-[11px] text-white ring-1 ring-white/15">
               {card!.cost}
             </span>
-            <div className="flex items-center gap-0.5">
-              {/* 咚标记 */}
+            <div className="flex items-center gap-1">
               {attachedDonCount > 0 && (
-                <span className="bg-yellow-500/80 text-black px-0.5 rounded text-[9px] font-bold leading-tight">
-                  咚×{attachedDonCount}
+                <span className="rounded bg-yellow-300 px-1 text-[10px] font-black leading-tight text-black">
+                  DONx{attachedDonCount}
                 </span>
               )}
               {card!.power > 0 && (
                 <span
                   className={clsx(
-                    "bg-black/70 px-1 rounded text-[10px]",
+                    "rounded bg-black/85 px-1.5 text-[11px] ring-1 ring-white/15",
                     powerBuff + attachedDonCount * 1000 > 0
-                      ? "text-green-400"
+                      ? "text-green-300"
                       : powerBuff < 0
-                        ? "text-red-400"
-                        : "text-white"
+                        ? "text-red-300"
+                        : "text-white",
                   )}
                 >
                   {displayPower.toLocaleString()}
