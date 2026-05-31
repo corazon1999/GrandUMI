@@ -95,10 +95,10 @@ public static class DslInterpreter
             }
         }
         // 2. activated: 启动主要效果（M3 通过 UseEffect 入口触发）
-        // 3. main: 事件主要
+        // 3. main: 事件主要（支持 cost 节）
         if (ctx.Trigger == EffectTrigger.EventMain && def.TryGetProperty("main", out var main))
         {
-            if (CheckCondition(main, ctx) && main.TryGetProperty("then", out var then))
+            if (CheckCondition(main, ctx) && await PayActivationCost(main, ctx) && main.TryGetProperty("then", out var then))
                 await RunSteps(then, ctx);
         }
         // 4. trigger: 生命牌触发

@@ -14,7 +14,7 @@ import type { CardData } from "@/types/card";
 // Legacy40:
 //   - 历史 40 张本地卡组，仅用于浏览/旧卡组兼容，不可用于网络对战。
 
-export type DeckFormat = "OP15-Only" | "OP16-Only" | "OP15-OP16" | "Legacy40";
+export type DeckFormat = "Unrestricted" | "OP15-Only" | "OP16-Only";
 
 interface FormatRule {
   mainSize: number;
@@ -24,6 +24,12 @@ interface FormatRule {
 }
 
 export const FORMAT_RULES: Record<DeckFormat, FormatRule> = {
+  "Unrestricted": {
+    mainSize: 50,
+    leaderSetWhitelist: null,
+    mainSetWhitelist: null,
+    label: "无限制（50 张，任选卡集）",
+  },
   "OP15-Only": {
     mainSize: 50,
     leaderSetWhitelist: ["OP15"],
@@ -35,18 +41,6 @@ export const FORMAT_RULES: Record<DeckFormat, FormatRule> = {
     leaderSetWhitelist: ["OP16"],
     mainSetWhitelist: ["OP16"],
     label: "OP16 限定（50 张）",
-  },
-  "OP15-OP16": {
-    mainSize: 50,
-    leaderSetWhitelist: ["OP15", "OP16"],
-    mainSetWhitelist: ["OP15", "OP16"],
-    label: "OP15+OP16 联合（50 张）",
-  },
-  "Legacy40": {
-    mainSize: 40,
-    leaderSetWhitelist: null,
-    mainSetWhitelist: null,
-    label: "旧版 40 张（仅本地）",
   },
 };
 
@@ -91,9 +85,10 @@ function loadGridCols(): number {
 }
 
 function loadFormat(): DeckFormat {
-  if (typeof window === "undefined") return "OP15-Only";
+  if (typeof window === "undefined") return "Unrestricted";
   const v = localStorage.getItem(FORMAT_KEY);
-  return v === "Legacy40" ? "Legacy40" : "OP15-Only";
+  if (v === "OP15-Only" || v === "OP16-Only" || v === "Unrestricted") return v;
+  return "Unrestricted";   // OP15-OP16 / Legacy40 等旧值回退
 }
 
 export interface DeckNotice {
@@ -111,6 +106,8 @@ interface DeckStore {
   filterType: string;
   filterProperty: string;
   filterRarity: string;
+  filterSets: string[];        // 弹数（卡集）筛选，空数组 = 显示全部
+  filterShowSub1: boolean;     // 是否显示角标=1 的卡（默认 false 隐藏）
   gridColumns: number;
 
   setFormat: (f: DeckFormat) => void;
@@ -123,6 +120,9 @@ interface DeckStore {
   setFilterType: (type: string) => void;
   setFilterProperty: (p: string) => void;
   setFilterRarity: (r: string) => void;
+  toggleFilterSet: (set: string) => void;
+  clearFilterSets: () => void;
+  setFilterShowSub1: (v: boolean) => void;
   setGridColumns: (n: number) => void;
   clearDeck: () => void;
 
@@ -144,7 +144,7 @@ function isCardAllowedInFormat(card: CardData, format: DeckFormat, isLeader: boo
 }
 
 export const useDeckStore = create<DeckStore>((set, get) => ({
-  format: typeof window !== "undefined" ? loadFormat() : "OP15-Only",
+  format: typeof window !== "undefined" ? loadFormat() : "Unrestricted",
   leader: null,
   entries: [],
   notice: null,
@@ -153,6 +153,8 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   filterType: "",
   filterProperty: "",
   filterRarity: "",
+  filterSets: [],
+  filterShowSub1: false,
   gridColumns: 8,
 
   setFormat: (f) => {
@@ -270,6 +272,14 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   setFilterType: (type) => set({ filterType: type }),
   setFilterProperty: (p) => set({ filterProperty: p }),
   setFilterRarity: (r) => set({ filterRarity: r }),
+  toggleFilterSet: (set_) =>
+    set((s) => ({
+      filterSets: s.filterSets.includes(set_)
+        ? s.filterSets.filter((x) => x !== set_)
+        : [...s.filterSets, set_],
+    })),
+  clearFilterSets: () => set({ filterSets: [] }),
+  setFilterShowSub1: (v) => set({ filterShowSub1: v }),
   setGridColumns: (n) => {
     const clamped = Math.min(MAX_COLS, Math.max(MIN_COLS, n));
     if (typeof window !== "undefined")

@@ -22,15 +22,11 @@ export default function FieldArea({ side }: Props) {
   const confirmAttackTarget = useBattleStore((s) => s.confirmAttackTarget);
   const { cardSize } = useResponsive();
 
-  if (!player) return <div className="min-h-28" />;
-
-  const characterCards = player.fieldCards;
-  const stageCardNumber = player.stageNumber;
+  if (!player) return <div className="h-full min-h-0" />;
 
   const handleCardClick = (cardId: string) => {
     if (isPending) return;
 
-    // 选目标攻击中：点击对方角色 = 确认攻击目标
     if (isSelectingTarget && side === "opponent") {
       confirmAttackTarget({ isLeader: false, cardId });
       return;
@@ -40,75 +36,55 @@ export default function FieldArea({ side }: Props) {
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 px-4 py-2 min-h-28">
-      {/* 舞台卡槽 */}
-      <div className={`${cardSize === "sm" ? "w-14 h-20" : "w-20 h-28"} rounded-lg border border-dashed border-gray-700 flex items-center justify-center shrink-0`}>
-        {stageCardNumber ? (
-          <CardItem card={getCard(stageCardNumber) ?? null} size={cardSize} />
-        ) : (
-          <span className="text-gray-700 text-[10px]">舞台</span>
-        )}
-      </div>
+    <div className="flex h-full min-h-0 min-w-0 items-center justify-center gap-3 overflow-x-auto overflow-y-hidden rounded-md border border-sky-200/15 bg-black/15 px-4 py-1 shadow-inner shadow-black/30">
+      {player.fieldCards.map((fc) => {
+        const cardData = getCard(fc.number) ?? null;
+        const attachedCount = fc.attachedDon;
 
-      <div className="w-px h-20 bg-gray-700 shrink-0" />
-
-      {/* 角色卡区域 */}
-      <div className="flex items-end gap-2 overflow-x-auto flex-1">
-        {characterCards.map((fc) => {
-          const cardData = getCard(fc.number) ?? null;
-          const attachedCount = fc.attachedDon;
-          return (
-            <div key={fc.id} className="relative flex flex-col items-center">
-              {attachedCount > 0 && (
-                <div className="relative mb-0.5">
-                  {Array.from({ length: Math.min(attachedCount, 6) }).map((_, j) => (
-                    <div
-                      key={j}
-                      className="relative"
-                      style={{ zIndex: j, marginBottom: j < attachedCount - 1 ? "-20px" : "0" }}
-                    >
-                      <DonCardItem state="attached" size="sm" disabled />
-                    </div>
-                  ))}
-                  {attachedCount > 6 && (
-                    <span className="absolute -top-1 -right-2 text-yellow-500 text-[9px] font-bold">
-                      +{attachedCount - 6}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="relative">
-                <CardItem
-                  card={cardData}
-                  isSelected={
-                    selectedFieldId === fc.id ||
-                    (isSelectingTarget && side === "opponent" && !isPending)
-                  }
-                  isTapped={fc.isTapped}
-                  powerBuff={fc.powerCurrent - (cardData?.power ?? 0) - attachedCount * 1000}
-                  attachedDonCount={attachedCount}
-                  size={cardSize}
-                  onClick={() => handleCardClick(fc.id)}
-                />
-                {isSelectingTarget && side === "opponent" && !isPending && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-                )}
-                {selectedDonIndex !== null && side === "my" && !isPending && (
-                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-400 rounded-full animate-pulse shadow-lg shadow-yellow-400/50 flex items-center justify-center">
-                    <span className="text-black text-[8px] font-bold">+</span>
-                  </div>
+        return (
+          <div key={fc.id} className="relative flex h-full min-h-0 shrink-0 items-center">
+            {attachedCount > 0 && (
+              <div className="absolute -left-4 top-1 z-10">
+                <DonCardItem state="attached" size={cardSize === "lg" ? "md" : "sm"} disabled />
+                {attachedCount > 1 && (
+                  <span className="absolute -right-2 -top-2 rounded bg-slate-950 px-1 text-[10px] font-black text-yellow-300">
+                    {attachedCount}
+                  </span>
                 )}
               </div>
+            )}
+
+            <div className="relative">
+              <CardItem
+                card={cardData}
+                isSelected={
+                  selectedFieldId === fc.id ||
+                  (isSelectingTarget && side === "opponent" && !isPending)
+                }
+                isTapped={fc.isTapped}
+                powerBuff={fc.powerCurrent - (cardData?.power ?? 0) - attachedCount * 1000}
+                attachedDonCount={attachedCount}
+                size={cardSize}
+                onClick={() => handleCardClick(fc.id)}
+              />
+              {isSelectingTarget && side === "opponent" && !isPending && (
+                <div className="absolute -right-2 -top-2 h-5 w-5 animate-pulse rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
+              )}
+              {selectedDonIndex !== null && side === "my" && !isPending && (
+                <div className="absolute -left-2 -top-2 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
+                  <span className="text-[10px] font-black text-black">+</span>
+                </div>
+              )}
             </div>
-          );
-        })}
-        {characterCards.length === 0 && (
-          <span className="text-gray-700 text-xs">
-            {side === "my" ? "我方场地" : "对手场地"}
-          </span>
-        )}
-      </div>
+          </div>
+        );
+      })}
+
+      {player.fieldCards.length === 0 && (
+        <span className="text-xs font-semibold text-slate-600">
+          {side === "my" ? "角色区" : "对手角色区"}
+        </span>
+      )}
     </div>
   );
 }
