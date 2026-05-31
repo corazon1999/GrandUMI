@@ -19,9 +19,8 @@ export default function HandArea({ side, hidden = false }: Props) {
   const setSelectedHand = useGameStore((s) => s.setSelectedHand);
   const { cardSize } = useResponsive();
 
-  if (!player) return <div className="min-h-24" />;
+  if (!player) return <div className="min-h-20" />;
 
-  // 己方：用卡号查 CardData；对手：仅占位牌背
   const cards = side === "my"
     ? player.handCardNumbers.map((n) => getCard(n) ?? null)
     : Array.from({ length: player.handCount }, () => null);
@@ -33,15 +32,16 @@ export default function HandArea({ side, hidden = false }: Props) {
   };
 
   return (
-    <div className="flex items-end justify-center gap-1 px-2 py-1 min-h-24 overflow-x-auto">
+    <div className="flex min-h-24 items-end justify-center gap-2 overflow-x-auto px-3 py-1 lg:min-h-32">
       <AnimatePresence>
         {cards.map((card, i) => (
           <motion.div
             key={`${card?.number ?? "back"}-${i}`}
-            initial={{ y: 50, opacity: 0 }}
+            initial={{ y: side === "my" ? 36 : -24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -30, opacity: 0 }}
+            exit={{ y: side === "my" ? -24 : 24, opacity: 0 }}
             transition={{ delay: i * 0.04, type: "spring", stiffness: 200 }}
+            className={side === "my" ? "-mx-1 lg:-mx-1.5" : "-mx-2 lg:-mx-3"}
           >
             <CardItem
               card={card}
@@ -55,7 +55,7 @@ export default function HandArea({ side, hidden = false }: Props) {
       </AnimatePresence>
 
       {cards.length === 0 && (
-        <span className="text-gray-700 text-xs">
+        <span className="text-xs text-gray-700">
           {hidden ? "对手手牌" : "手牌为空"}
         </span>
       )}

@@ -25,33 +25,31 @@ export default function GameMenu() {
 
   return (
     <>
-      {/* 出牌按钮：选中手牌且是我的回合时显示 */}
       {currentTurn && selectedHandIndex !== null && (
         <button
           onClick={handlePlayCard}
           disabled={isPending}
-          className="absolute bottom-24 right-3 bg-blue-500 hover:bg-blue-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors shadow-lg"
+          className="absolute bottom-20 right-3 rounded-md bg-blue-500 px-5 py-2 text-sm font-bold text-white shadow-lg transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-gray-600"
         >
           出牌
         </button>
       )}
 
-      {/* 回合结束按钮 */}
       {currentTurn && (
         <button
           onClick={endTurn}
           disabled={isPending}
-          className="absolute bottom-36 right-3 bg-orange-500 hover:bg-orange-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors shadow-lg"
+          className="absolute bottom-3 right-3 rounded-md bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-600"
         >
           结束回合
         </button>
       )}
 
-      {/* 菜单按钮 */}
       <button
         onClick={() => setOpen(true)}
         disabled={isPending}
-        className="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-400 rounded-lg text-lg leading-none transition-colors"
+        className="absolute right-4 top-4 h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+        aria-label="打开游戏菜单"
       >
         ≡
       </button>
@@ -60,13 +58,13 @@ export default function GameMenu() {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => setOpen(false)}
-            className="w-full py-2 text-sm text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            className="w-full rounded-lg bg-gray-700 py-2 text-sm text-white transition-colors hover:bg-gray-600"
           >
             继续游戏
           </button>
           <button
             onClick={handleSurrender}
-            className="w-full py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+            className="w-full rounded-lg py-2 text-sm text-red-400 transition-colors hover:bg-gray-700"
           >
             投降
           </button>
