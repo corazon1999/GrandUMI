@@ -7,6 +7,12 @@ public class GameState
 {
     public required string RoomId { get; init; }
 
+    /// <summary>Per-match RNG seed used for deterministic replay.</summary>
+    public required int RngSeed { get; init; }
+
+    /// <summary>Monotonic random event sequence within this match.</summary>
+    public int RandomSeq { get; set; }
+
     /// <summary>双方玩家。约定 0 = 房主/匹配 P1，1 = 加入者/匹配 P2</summary>
     public PlayerState[] Players { get; } = new PlayerState[2];
 

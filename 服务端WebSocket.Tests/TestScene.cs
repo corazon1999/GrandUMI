@@ -16,6 +16,9 @@ public class TestScene
     public static TestScene New(string? myLeaderNumber = null, string? oppLeaderNumber = null)
     {
         EnsureCardDbLoaded();
+        var leader0 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
+        var leader1 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
+        var state = new GameState { RoomId = "test-room", FirstPlayer = 0, RngSeed = 1 };
         EnsureDslLoaded();
         var leader0 = myLeaderNumber is not null
             ? CardDatabase.Get(myLeaderNumber)!

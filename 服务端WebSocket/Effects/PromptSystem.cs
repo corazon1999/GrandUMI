@@ -32,6 +32,17 @@ public class PromptSystem : IPromptService
             PromptText = text,
             Extra = extra ?? new(),
         };
+        _engine.RecordMatchLog("prompt_created", playerIdx, new
+        {
+            promptId,
+            playerIndex = playerIdx,
+            kind,
+            text,
+            validChoices,
+            minChoose = min,
+            maxChoose = max,
+            extra = extra ?? new(),
+        });
         _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
 
         var tcs = new TaskCompletionSource<PromptAnswer>();
@@ -44,6 +55,7 @@ public class PromptSystem : IPromptService
             {
                 _pending.Remove(promptId);
                 _engine.State.PendingPrompt = null;
+                _engine.RecordMatchLog("prompt_timeout", playerIdx, new { promptId });
                 _engine.Broadcast("PromptTimeout", new { promptId });
                 return new List<string>();  // 超时视为不选
             }
@@ -91,6 +103,12 @@ public class PromptSystem : IPromptService
     public void Resolve(string promptId, IReadOnlyList<string> chosen)
     {
         if (!_pending.TryGetValue(promptId, out var tcs)) return;
+        var actor = _engine.State.PendingPrompt?.PlayerIndex;
+        _engine.RecordMatchLog("prompt_response", actor, new
+        {
+            promptId,
+            chosen = chosen.ToArray(),
+        });
         tcs.TrySetResult(new PromptAnswer(chosen.ToList()));
     }
 

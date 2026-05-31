@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 
 namespace GrandUMI.Game;
@@ -28,6 +29,7 @@ public static class GameRoomManager
         public List<string> Spectators { get; } = new();
         public DateTime CreatedAt { get; } = DateTime.UtcNow;
         public string? ReplayPath { get; set; }
+        public string? MatchLogPath { get; set; }
     }
 
     /// <summary>双方匹配/房间码成功后创建房间</summary>
@@ -64,8 +66,24 @@ public static class GameRoomManager
             foreach (var sid in entry.Spectators)
                 WebSocketBridge.Send(sid, payload);
         };
-        ReplayRecorder.Open(roomId);
+        entry.ReplayPath = ReplayRecorder.Open(roomId);
+        entry.MatchLogPath = MatchLogRecorder.Open(roomId);
         engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
+        engine.OnMatchLog = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
+
+        engine.RecordMatchLog("match_start", -1, new
+        {
+            players = new[]
+            {
+                new { index = 0, accountName = p0Account, deckRaw = p0Deck },
+                new { index = 1, accountName = p1Account, deckRaw = p1Deck },
+            },
+            firstPlayer = p0First ? 0 : 1,
+            rngSeed = engine.State.RngSeed,
+            rulesVersion = "opcg-grandumi-v1",
+            cardDbVersion = "local-card-json",
+        });
+        engine.FlushPendingMatchLogs();
 
         _rooms[roomId] = entry;
         _sessionRoom[p0Sid] = roomId;
@@ -98,6 +116,11 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "观战者不能操作" });
             return;
         }
+        room.Engine.RecordMatchLog("player_action_requested", idx, new
+        {
+            action,
+            data,
+        });
         room.Engine.HandleAction(idx, action, data);
         if (room.Engine.State.IsGameOver)
         {
@@ -220,7 +243,15 @@ public static class GameRoomManager
         {
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators)        _sessionRoom.TryRemove(sid, out _);
+            r.Engine.RecordMatchLog("match_end", -1, new
+            {
+                winnerIndex = r.Engine.State.WinnerIndex,
+                reason = r.Engine.State.GameOverReason,
+                turnCount = r.Engine.State.TurnCount,
+                finalTick = r.Engine.State.Tick,
+            });
             ReplayRecorder.Close(roomId);
+            MatchLogRecorder.Close(roomId);
         }
     }
 }

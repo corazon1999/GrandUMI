@@ -513,7 +513,10 @@ public static class DslInterpreter
                     break;
                 }
             case "ShuffleDeck":
-                AtomicOps.Shuffle(me.Deck);
+                if (ctx.Engine is not null)
+                    ctx.Engine.ShuffleDeck(me, ctx.OwnerIndex, "dsl_shuffle_deck");
+                else
+                    AtomicOps.Shuffle(me.Deck);
                 break;
             case "RevealLifeFaceUp":
                 // 将我方/对方生命牌正面化（暂未在 PlayerState 中区分朝向，作为占位）
