@@ -223,7 +223,7 @@ export default function DeckInfoPanel() {
                   }`}
                   title={FORMAT_RULES[f].label}
                 >
-                  {f === "OP15-Only" ? "OP15" : f === "OP16-Only" ? "OP16" : f === "OP15-OP16" ? "联合" : "旧·40"}
+                  {f === "Unrestricted" ? "自由" : f === "OP15-Only" ? "OP15" : "OP16"}
                 </button>
               ))}
             </div>

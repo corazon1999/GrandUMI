@@ -19,19 +19,30 @@ const RARITIES    = ["", "L", "SR", "R", "UC", "C", "SEC", "P"];
 const COL_PRESETS = [4, 5, 6, 7, 8, 9, 10, 12];
 
 
+// 按弹数筛选用的卡集列表（与 cardSets.ts 同步；新卡集发售时手动追加）
+const SET_GROUPS: { label: string; sets: string[] }[] = [
+  { label: "OP 主弹", sets: ["OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10","OP11","OP12","OP13","OP14","OP15","OP16"] },
+  { label: "ST 起始", sets: ["ST01","ST02","ST03","ST04","ST05","ST06","ST07","ST08","ST09","ST10","ST11","ST12","ST13","ST14","ST15","ST16","ST17","ST18","ST19","ST20","ST21","ST22","ST23","ST24","ST25","ST26","ST27","ST28","ST29","ST30"] },
+  { label: "EB/PRB", sets: ["EB01","EB02","EB03","EB04","PRB01","PRB02"] },
+  { label: "P/其他", sets: ["P","OPD","TY01"] },
+];
+
 export default function SearchPanel() {
   const {
     searchQuery, filterColor, filterType, filterProperty, filterRarity,
+    filterSets, filterShowSub1,
     gridColumns,
     setSearchQuery, setFilterColor, setFilterType, setFilterProperty, setFilterRarity,
+    toggleFilterSet, clearFilterSets, setFilterShowSub1,
     setGridColumns,
   } = useDeckStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [setGroupExpanded, setSetGroupExpanded] = useState<number | null>(null);
 
   const isLeaderMode        = filterType === "Leader";
   const activeDisplayColor  = COLOR_DATA_TO_DISPLAY[filterColor] ?? "";
-  const hasFilter           = !!(searchQuery || filterColor || filterType || filterProperty || filterRarity);
+  const hasFilter           = !!(searchQuery || filterColor || filterType || filterProperty || filterRarity || filterSets.length > 0 || filterShowSub1);
 
   return (
     <div className="flex flex-col h-full">
@@ -149,10 +160,71 @@ export default function SearchPanel() {
             </div>
           </div>
 
+          {/* 弹数筛选（按组展开，多选） */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <label className="text-gray-500 text-[10px]">弹数</label>
+              {filterSets.length > 0 && (
+                <button onClick={clearFilterSets}
+                  className="text-gray-600 hover:text-orange-400 text-[9px]">清空</button>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              {SET_GROUPS.map((g, gi) => {
+                const isOpen = setGroupExpanded === gi;
+                const selectedInGroup = g.sets.filter((s) => filterSets.includes(s)).length;
+                return (
+                  <div key={g.label} className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setSetGroupExpanded(isOpen ? null : gi)}
+                      className={`w-full text-left px-2 py-1 rounded text-[10px] font-bold transition-colors flex items-center justify-between ${
+                        selectedInGroup > 0
+                          ? "bg-gray-800 text-orange-300"
+                          : "bg-gray-800 text-gray-400 hover:text-white"
+                      }`}>
+                      <span>{g.label} {selectedInGroup > 0 && `(${selectedInGroup})`}</span>
+                      <span className="text-gray-600">{isOpen ? "▾" : "▸"}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="flex flex-wrap gap-0.5 pl-1">
+                        {g.sets.map((s) => (
+                          <button key={s} onClick={() => toggleFilterSet(s)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
+                              filterSets.includes(s)
+                                ? "bg-orange-500 text-white"
+                                : "bg-gray-700 text-gray-400 hover:text-white"
+                            }`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 角标=1 切换（默认隐藏，按下显示） */}
+          <button
+            onClick={() => setFilterShowSub1(!filterShowSub1)}
+            className={`w-full py-1.5 rounded-lg text-[10px] font-bold transition-colors border ${
+              filterShowSub1
+                ? "bg-blue-600/40 text-blue-200 border-blue-600"
+                : "bg-gray-800 text-gray-500 border-gray-700 hover:text-white"
+            }`}
+            title="角标=1 通常是旧环境/早期版本卡，默认隐藏"
+          >
+            {filterShowSub1 ? "✓ 显示角标 1 卡" : "已隐藏角标 1 卡"}
+          </button>
+
           {/* 清除筛选 */}
           {hasFilter && (
             <button
-              onClick={() => { setSearchQuery(""); setFilterColor(""); setFilterType(""); setFilterProperty(""); setFilterRarity(""); }}
+              onClick={() => {
+                setSearchQuery(""); setFilterColor(""); setFilterType(""); setFilterProperty(""); setFilterRarity("");
+                clearFilterSets(); setFilterShowSub1(false);
+              }}
               className="text-gray-600 hover:text-white text-[10px] transition-colors text-center"
             >
               清除筛选

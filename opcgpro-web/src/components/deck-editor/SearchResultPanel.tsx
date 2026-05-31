@@ -16,7 +16,7 @@ const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { format, searchQuery, filterColor, filterType, filterProperty, filterRarity, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
+  const { format, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -38,11 +38,13 @@ export default function SearchResultPanel() {
     const rule = FORMAT_RULES[format];
     const whitelist = isLeaderMode ? rule.leaderSetWhitelist : rule.mainSetWhitelist;
     return all.filter((card) => {
-      // 格式卡集白名单过滤（OP15-Only 模式下只显示 OP15 卡）
-      if (whitelist) {
-        const setCode = card.number.split("-")[0];
-        if (!whitelist.includes(setCode)) return false;
-      }
+      const setCode = card.number.split("-")[0];
+      // 格式卡集白名单过滤（Unrestricted 时为 null = 不限）
+      if (whitelist && !whitelist.includes(setCode)) return false;
+      // 用户手动选的弹数筛选（多选；空数组 = 不过滤）
+      if (filterSets.length > 0 && !filterSets.includes(setCode)) return false;
+      // 角标=1 默认隐藏（旧环境/早期版本）
+      if (!filterShowSub1 && card.subscript === 1) return false;
       if (isLeaderMode && card.type !== "Leader") return false;
       if (!isLeaderMode && card.type === "Leader") return false;
       if (filterColor && !card.color.includes(filterColor)) return false;
@@ -60,7 +62,7 @@ export default function SearchResultPanel() {
       }
       return true;
     });
-  }, [format, searchQuery, filterColor, filterType, filterProperty, filterRarity, isLeaderMode]);
+  }, [format, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterSets, filterShowSub1, isLeaderMode]);
 
   // 虚拟网格列表
   const {
