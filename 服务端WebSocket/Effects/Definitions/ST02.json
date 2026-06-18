@@ -1,0 +1,96 @@
+{
+  "ST02-001": {
+    "_name": "尤斯塔斯·基德（领袖）",
+    "_note": "【启动主要】【每回合1次】③+弃1手牌：将此领袖转为活跃状态。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "restActiveDon": 3, "handDiscard": 1 },
+      "then": [
+        { "op": "Activate", "target": "selfLeader" }
+      ]
+    }
+  },
+  "ST02-005": {
+    "_name": "基拉",
+    "_note": "【登场时】KO 对方最多1张休息且费用≤3 的角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张休息且费用≤3 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST02-007": {
+    "_name": "杰丽·邦妮",
+    "_note": "【启动主要】横置1咚+横置自身：确认卡组顶5张，公开≤1张《超新星》入手，余放回卡组底。",
+    "activated": {
+      "cost": { "restSelf": true, "restActiveDon": 1 },
+      "then": [
+        { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keyword": "超新星" } }
+      ]
+    }
+  },
+  "ST02-009": {
+    "_name": "特拉法尔加·罗",
+    "_note": "【登场时】将我方最多1张休息且费用≤5《超新星》或《心脏海盗团》角色转为活跃（候选未限休息，选已活跃者无效，近似）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "anyOf": [ { "keyword": "超新星" }, { "keyword": "心脏海盗团" } ], "originalCostLte": 5 }, "text": "将我方最多1张费用≤5《超新星/心脏海盗团》角色转为活跃" },
+          { "op": "Activate", "target": "$t" }
+        ]
+      }
+    ]
+  },
+  "ST02-013": {
+    "_name": "尤斯塔斯·基德（角色）",
+    "_note": "【咚×1】【我方的回合结束时】将此角色转为活跃状态。",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Activate", "target": "self" }
+        ]
+      }
+    ]
+  },
+  "ST02-015": {
+    "_name": "手术刀",
+    "_note": "【反击】我方最多1张领袖或角色+2000，之后我方最多1张咚转活跃；【触发】我方最多2张咚转活跃。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
+      { "op": "ActiveOwnDon", "n": 1 }
+    ],
+    "trigger": [
+      { "op": "ActiveOwnDon", "n": 2 }
+    ]
+  },
+  "ST02-016": {
+    "_name": "相斥",
+    "_note": "【反击】我方最多1张领袖或角色+4000，之后我方最多1张咚转活跃。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 },
+      { "op": "ActiveOwnDon", "n": 1 }
+    ]
+  },
+  "ST02-017": {
+    "_name": "稻草备手刀",
+    "_note": "【主要】将对方最多1张角色转休息；【触发】手牌中最多1张费用≤2《超新星》登场。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "将对方最多1张角色转为休息状态" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    },
+    "trigger": [
+      { "op": "PlayCharFromHand", "filter": { "keyword": "超新星", "originalCostLte": 2 }, "text": "手牌中最多1张费用≤2《超新星》角色登场" }
+    ]
+  }
+}

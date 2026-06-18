@@ -23,7 +23,7 @@ public class OP15_001_Krieg : IScriptedEffect
         var opp = s.Players[1 - ctx.OwnerIndex];
 
         // 每回合 1 次锁
-        const string key = "OP15-001-MainOncePerTurn";
+        var key = "OP15-001-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 赋予条件：自身被赋予 >= 1 张咚

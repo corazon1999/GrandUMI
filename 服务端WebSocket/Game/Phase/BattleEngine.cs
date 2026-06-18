@@ -35,12 +35,32 @@ public static class BattleEngine
         s.Phase = Phase.BattleAttack;
     }
 
+    /// <summary>GM 调试：不依赖当前回合玩家，强制由 attackerIdx 发起攻击（其余流程与正常攻击一致）。</summary>
+    public static void StartAttackForced(GameState s, int attackerIdx, Guid attackerId, bool targetIsLeader, Guid? targetId)
+    {
+        var me = s.Players[attackerIdx];
+        CardInstance attacker = (me.Leader.Id == attackerId) ? me.Leader
+            : me.Characters.First(c => c.Id == attackerId);
+        attacker.IsTapped = true;
+
+        s.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = attackerIdx,
+            DefenderPlayerIndex = 1 - attackerIdx,
+            AttackerCardId = attackerId,
+            TargetIsLeader = targetIsLeader,
+            TargetCardId = targetIsLeader ? null : targetId,
+        };
+        s.Phase = Phase.BattleAttack;
+    }
+
     /// <summary>触发【攻击时】+【对方的攻击时】效果（按回合玩家优先顺序），完成后进入 BattleBlock</summary>
     public static async Task TriggerAttackDeclareAsync(GameState s, IPromptService prompts)
     {
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAttackDeclare, prompts);
         if (s.IsGameOver) return;
-        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnOppAttackDeclare, prompts);
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnOppAttackDeclare, prompts,
+            new Dictionary<string, object?> { ["AttackerIdx"] = s.CurrentBattle!.AttackerPlayerIndex });
         if (s.IsGameOver) return;
         s.Phase = Phase.BattleBlock;
     }
@@ -72,7 +92,14 @@ public static class BattleEngine
     public static void ApplyCounter(GameState s, int defenderIdx, int counterValue)
     {
         var b = s.CurrentBattle!;
-        b.DefenderBattleBonus += counterValue;
+        var def = s.Players[b.DefenderPlayerIndex];
+        // 反击值加到"当前被攻击目标"卡上的【本次战斗】力量修正，使卡面战力同步显示；
+        // EndBattle 会清除 PowerModThisBattle，即实现"直到战斗结束"后自动移除。
+        CardInstance? target = b.TargetIsLeader
+            ? def.Leader
+            : def.Characters.FirstOrDefault(c => c.Id == b.TargetCardId);
+        if (target is null) return;
+        target.PowerModThisBattle += counterValue;
     }
 
     /// <summary>防守方放弃反击 → 进入伤害步骤</summary>
@@ -100,7 +127,7 @@ public static class BattleEngine
             int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, def.Leader) + b.DefenderBattleBonus;
             attackerWins = attackerPower >= defenderPower;
             if (attackerWins)
-                leaderDamage = Validation.ActionValidator.HasKeyword(attacker, "双重攻击") ? 2 : 1;
+                leaderDamage = Validation.ActionValidator.HasKeyword(s, attacker, "双重攻击") ? 2 : 1;
         }
         else
         {
@@ -116,6 +143,15 @@ public static class BattleEngine
     /// <summary>战斗结束：清临时修正 + 关键字 + 切回主要阶段</summary>
     public static void EndBattle(GameState s)
     {
+        // OP12-020：与对方角色战斗后，带此标记的攻击者转为活跃
+        var b = s.CurrentBattle;
+        if (b is not null && !b.TargetIsLeader)
+        {
+            var atkP = s.Players[b.AttackerPlayerIndex];
+            var atkCard = atkP.Leader.Id == b.AttackerCardId ? atkP.Leader
+                : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
+            if (atkCard is not null && atkCard.ReactivateAfterBattleThisTurn) atkCard.IsTapped = false;
+        }
         foreach (var p in s.Players)
         {
             foreach (var c in p.Characters) { c.PowerModThisBattle = 0; }
@@ -146,6 +182,21 @@ public static class BattleEngine
             s.PreventKOCardIds.Remove(card.Id);
             return false; // KO 被取消
         }
+        // 守护者：他卡"将要被KO时改为…代替被KO/使其不被KO"置换效果
+        var guardSide = s.Players[ownerIdx];
+        var guardians = new List<CardInstance> { guardSide.Leader };
+        guardians.AddRange(guardSide.Characters);
+        if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
+        foreach (var g in guardians.ToList())
+        {
+            if (g.Id == card.Id) continue;
+            if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
+            await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
+                new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
+            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
+        }
+        // 持续"战斗中不会被KO"保护
+        if (s.IsKoGuarded(card, "battle")) return false;
 
         // 实际 KO：归还附着咚 + 进废弃区
         var p = s.Players[ownerIdx];
@@ -162,6 +213,17 @@ public static class BattleEngine
 
         // OnKO：卡已进入废弃区，但效果在"原场上位置"上发动
         await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
+        // 任意角色被KO（战斗）：场上他卡可据此反应（如 EB01-047 拉布 / OP01-061 / OP04-086）。
+        // 战斗 KO 不在效果上下文内（无 ambient），NotifyWatcher 会被丢弃，故直接 TriggerEvent 立即派发。
+        // 携带 attackerId 供"通过此角色战斗KO对方"类效果判定（CurrentBattle 此刻仍未清场）。
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAnyCharKOd, prompts,
+            new Dictionary<string, object?>
+            {
+                ["cardId"] = card.Id.ToString(),
+                ["owner"] = ownerIdx,
+                ["reason"] = "battle",
+                ["attackerId"] = s.CurrentBattle?.AttackerCardId.ToString(),
+            });
         return true;
     }
 

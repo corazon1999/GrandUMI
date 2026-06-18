@@ -1,0 +1,99 @@
+{
+  "ST09-002": {
+    "_name": "雨月天妇罗",
+    "_note": "【触发（生命）】将对方最多1张费用≤2 角色转休息，并将此卡牌加入手牌。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 2 }, "text": "将对方最多1张费用≤2 角色转为休息状态" },
+      { "op": "Rest", "target": "$tgt" },
+      { "op": "TrashToHand", "target": "self" }
+    ]
+  },
+  "ST09-005": {
+    "_name": "光月御殿",
+    "_note": "【KO时】弃2手牌：将我方卡组顶最多1张加入生命区顶（【咚×1】双重攻击持续部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "cost": { "handDiscard": 2 },
+        "then": [
+          { "op": "AddLifeFromDeck", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST09-007": {
+    "_name": "阿忍",
+    "_note": "【阻挡者】+【阻挡时】生命顶入手：本次战斗此角色力量+4000。",
+    "triggers": [
+      {
+        "on": "OnBlockDeclare",
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "AddPowerThisBattle", "target": "self", "delta": 4000 }
+        ]
+      }
+    ]
+  },
+  "ST09-008": {
+    "_name": "霜月牛丸",
+    "_note": "【咚×1】【攻击时】生命顶入手：手牌中最多1张费用≤4《和之国》角色登场（原文限黄色，DSL 无颜色过滤，近似）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "PlayCharFromHand", "filter": { "keyword": "和之国", "originalCostLte": 4 }, "text": "手牌中最多1张费用≤4《和之国》角色登场" }
+        ]
+      }
+    ]
+  },
+  "ST09-009": {
+    "_name": "风月饭团",
+    "_note": "【触发（生命）】KO 对方最多1张费用≤1 角色，并将此卡牌加入手牌。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 1 }, "text": "KO 对方最多1张费用≤1 的角色" },
+      { "op": "KO", "target": "$tgt" },
+      { "op": "TrashToHand", "target": "self" }
+    ]
+  },
+  "ST09-012": {
+    "_name": "大和（3费角色）",
+    "_note": "【攻击时】生命顶入手：直到下个我方回合开始，此角色力量+2000（用 AddPowerPersistent）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "AddPowerPersistent", "target": "self", "delta": 2000 }
+        ]
+      }
+    ]
+  },
+  "ST09-014": {
+    "_name": "鸣镝",
+    "_note": "【反击】生命≤2 时本回合对方最多1张领袖或角色-3000；【触发】弃2手牌：卡组顶最多1张入生命顶。",
+    "counter": {
+      "if": { "ownLifeCountLte": 2 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张领袖或角色力量-3000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -3000 }
+      ]
+    },
+    "trigger": [
+      { "op": "DiscardOwnChosen", "n": 2 },
+      { "op": "AddLifeFromDeck", "n": 1 }
+    ]
+  },
+  "ST09-015": {
+    "_name": "雷鸣八卦",
+    "_note": "【反击】我方最多1张领袖或角色+4000（原文后半“生命≤2则将对方费用≤3角色置入其生命”因反击数组无条件分支已略去）；【触发】抽1张。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "ST03-001": {
+    "_name": "克洛克达尔（领袖）",
+    "_note": "【启动主要】【每回合1次】咚-4：将最多1张费用≤5的角色放回手牌（DSL 无双方通用候选，取对方角色，近似）。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "donReturn": 4 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将最多1张费用≤5 的角色放回手牌" },
+        { "op": "BounceToHand", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST03-003": {
+    "_name": "克洛克达尔（角色）",
+    "_note": "【咚×1】【阻挡时】将最多1张费用≤2 的角色放回卡组底（近似取对方角色）。",
+    "triggers": [
+      {
+        "on": "OnBlockDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 2 }, "text": "将最多1张费用≤2 的角色放回卡组最下方" },
+          { "op": "ReturnToDeckBottom", "target": "$tgt", "from": "field" }
+        ]
+      }
+    ]
+  },
+  "ST03-004": {
+    "_name": "月光·莫利亚",
+    "_note": "【登场时】我方废弃区最多1张“莫利亚”以外费用≤4《王下七武海/恐怖之船海盗团》角色加入手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OwnTrashCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "anyOf": [ { "keyword": "王下七武海" }, { "keyword": "恐怖之船海盗团" } ], "originalCostLte": 4, "excludeName": "月光·莫利亚" }, "text": "废弃区最多1张费用≤4《王下七武海/恐怖之船海盗团》角色加入手牌" },
+          { "op": "TrashToHand", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST03-005": {
+    "_name": "杰拉基尔·米霍克",
+    "_note": "【咚×1】【攻击时】抽2张，丢弃2张手牌。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Draw", "n": 2 },
+          { "op": "DiscardOwnChosen", "n": 2 }
+        ]
+      }
+    ]
+  },
+  "ST03-009": {
+    "_name": "堂吉诃德·多弗拉门戈",
+    "_note": "【登场时】将最多1张费用≤7 的角色放回手牌（近似取对方角色）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 7 }, "text": "将最多1张费用≤7 的角色放回手牌" },
+          { "op": "BounceToHand", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST03-014": {
+    "_name": "马歇尔·D·提奇",
+    "_note": "【登场时】将最多1张费用≤3 的角色放回手牌（近似取对方角色）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "将最多1张费用≤3 的角色放回手牌" },
+          { "op": "BounceToHand", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST03-015": {
+    "_name": "沙尘暴",
+    "_note": "【主要】将最多1张费用≤7 的角色放回手牌；【触发】同。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 7 }, "text": "将最多1张费用≤7 的角色放回手牌" },
+        { "op": "BounceToHand", "target": "$tgt" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 7 }, "text": "将最多1张费用≤7 的角色放回手牌" },
+      { "op": "BounceToHand", "target": "$tgt" }
+    ]
+  },
+  "ST03-016": {
+    "_name": "压力炮",
+    "_note": "【反击】将最多1张费用≤3 的角色放回手牌；【触发】同。",
+    "counter": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "将最多1张费用≤3 的角色放回手牌" },
+      { "op": "BounceToHand", "target": "$tgt" }
+    ],
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "将最多1张费用≤3 的角色放回手牌" },
+      { "op": "BounceToHand", "target": "$tgt" }
+    ]
+  },
+  "ST03-017": {
+    "_name": "颓靡甜风",
+    "_note": "【反击】我方最多1张领袖或角色+4000（原文“之后手牌≤3则抽1”因反击数组无条件分支，已略去抽牌部分）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+    ]
+  }
+}

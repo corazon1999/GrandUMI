@@ -2,14 +2,17 @@
   {
     "number": "ST26-001",
     "name": "面条假面",
-    "color": "暗",
+    "color": "紫",
     "type": "角色",
     "property": "打",
     "power": "9000",
     "cost": "7",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectText": "我方场上存在原本的力量为7000或更高的角色“山五郎”或“山智”的场合，手牌中的此卡牌费用-5。【登场时】将我方所有的“山五郎”和“山智”放回其持有者的手牌。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -21,14 +24,19 @@
   {
     "number": "ST26-002",
     "name": "托尼托尼·乔巴",
-    "color": "暗",
+    "color": "紫",
     "type": "角色",
     "property": "知",
     "power": "4000",
     "cost": "3",
     "keyWords": "动物/草帽一伙",
     "counter": "1000",
-    "effectText": "【阻挡者】（对方攻击后，可以将此卡牌转为休息状态，并将攻击对象改为此卡牌）【登场时】咚!!-2（可以将我方场上指定数量的咚!!放回咚!!卡组）：将对方最多1张费用不高于1的角色或最多1张咚!!转为休息状态。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -40,14 +48,17 @@
   {
     "number": "ST26-003",
     "name": "妮古·罗宾",
-    "color": "暗",
+    "color": "紫",
     "type": "角色",
     "property": "打",
     "power": "4000",
     "cost": "3",
     "keyWords": "草帽一伙",
     "counter": "2000",
-    "effectText": "【登场时】咚!!-2（可以将我方场上指定数量的咚!!放回咚!!卡组）：从咚!!卡组中追加最多1张活跃状态的咚!!。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,
@@ -59,14 +70,17 @@
   {
     "number": "ST26-004",
     "name": "弗兰奇将军",
-    "color": "暗",
+    "color": "紫",
     "type": "角色",
     "property": "射",
     "power": "10000",
     "cost": "8",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectText": "【登场时】咚!!-2（可以将我方场上指定数量的咚!!放回咚!!卡组）：本回合中，对方最多2张角色力量-2000。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -78,14 +92,18 @@
   {
     "number": "ST26-005",
     "name": "蒙奇·D·路飞",
-    "color": "暗",
+    "color": "紫",
     "type": "角色",
     "property": "打",
     "power": "7000",
     "cost": "6",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectText": "【登场时】/【攻击时】咚!!-2（可以将我方场上指定数量的咚!!放回咚!!卡组）：我方领袖为多种颜色且对方场上存在5张或更多咚!!的场合，直到下个对方的结束阶段结束时为止，我方拥有《草帽一伙》特征的领袖原本的力量变为7000。",
+    "effectTags": [
+      "OnEnterField",
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,

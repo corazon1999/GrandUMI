@@ -1,0 +1,99 @@
+{
+  "ST29-001": {
+    "_name": "蒙奇·D·路飞（领袖）",
+    "_note": "【攻击时】我方生命≤2 时抽1张并丢弃1张手牌。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "ownLifeCountLte": 2 },
+        "then": [
+          { "op": "Draw", "n": 1 },
+          { "op": "DiscardOwnChosen", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST29-003": {
+    "_name": "卡古",
+    "_note": "【触发（生命）】KO 对方最多1张费用≤3 角色（“我方生命≤对方生命时+1000”持续部分由 C# 实现）。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST29-004": {
+    "_name": "山智",
+    "_note": "【登场时】确认卡组顶4张，公开≤1张《草帽一伙》入手，余放回底。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 4, "max": 1, "restTo": "bottom", "match": { "keyword": "草帽一伙" } }
+        ]
+      }
+    ]
+  },
+  "ST29-007": {
+    "_name": "托尼托尼·乔巴",
+    "_note": "【触发（生命）】本回合我方最多1张“蒙奇·D·路飞”+2000（【KO时】“生命入手→手牌入生命”部分由 C# 实现）。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "nameEquals": "蒙奇·D·路飞" }, "text": "本回合我方最多1张“蒙奇·D·路飞”+2000" },
+      { "op": "AddPowerThisTurn", "target": "$t", "delta": 2000 }
+    ]
+  },
+  "ST29-012": {
+    "_name": "蒙奇·D·路飞（1费）",
+    "_note": "【启动主要】【每回合1次】赋予我方1张“蒙奇·D·路飞”最多1张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "nameEquals": "蒙奇·D·路飞" }, "text": "赋予我方1张“蒙奇·D·路飞”最多1张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  },
+  "ST29-014": {
+    "_name": "罗罗诺亚·佐罗",
+    "_note": "【启动主要】【每回合1次】弃1张带【触发】的手牌：抽1张，赋予我方1张领袖或角色最多1张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "handDiscard": 1 },
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  },
+  "ST29-015": {
+    "_name": "温度 半熟爆裂踢",
+    "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“生命≤1则对方-2000”因反击数组无条件分支已略去）；【触发】抽1张。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "ST29-016": {
+    "_name": "黄猿!!我们比起2年前 可要强上100倍!",
+    "_note": "【主要】本回合我方领袖“蒙奇·D·路飞”获得【不可阻挡】；【反击】本次战斗我方领袖+3000。",
+    "main": {
+      "then": [
+        { "op": "GiveKeyword", "target": "selfLeader", "keyword": "不可阻挡" }
+      ]
+    },
+    "counter": [
+      { "op": "AddPowerThisBattle", "target": "selfLeader", "delta": 3000 }
+    ]
+  },
+  "ST29-017": {
+    "_name": "死·狮子挽歌",
+    "_note": "【反击】我方最多1张领袖或角色+4000（原文后半“生命≤2则KO对方费用≤3”因反击数组无条件分支已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+    ]
+  }
+}

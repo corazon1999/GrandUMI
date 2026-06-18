@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { loadAllDecks, deleteDeck, type SavedDeck } from "@/data/DeckMapper";
+import { getSpriteMap } from "@/data/DeckMapper";
 import { useNetStore } from "@/store/netStore";
 import Link from "next/link";
 
@@ -31,6 +32,12 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
       leaderName: saved.leaderName,
       cards: cardsStr,
     });
+
+    // 将异画映射写入 sessionStorage，供对局初始化时还原
+    const spriteMap = getSpriteMap(name);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("grandumi_spriteMap", JSON.stringify(spriteMap));
+    }
   };
 
   useEffect(() => {
@@ -68,12 +75,20 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
     <div className="p-4 flex flex-col gap-3 h-full">
       <div className="flex items-center justify-between">
         <h2 className="text-white font-bold text-lg">我的卡组</h2>
-        <Link
-          href="/deck-editor"
-          className="bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold px-4 py-1.5 rounded-lg transition-colors"
-        >
-          编辑卡组
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/deck-editor?new=1"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 py-1.5 rounded-lg transition-colors"
+          >
+            + 新建卡组
+          </Link>
+          <Link
+            href="/deck-editor"
+            className="bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold px-4 py-1.5 rounded-lg transition-colors"
+          >
+            编辑卡组
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto flex flex-col gap-2">

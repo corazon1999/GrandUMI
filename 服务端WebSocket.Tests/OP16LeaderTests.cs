@@ -139,8 +139,11 @@ public class OP16LeaderTests
 
         await EffectRuntime.Resolve(s, 0, s.Players[0].Leader, EffectTrigger.ActivatedMain, mock);
 
-        // 主断言：8 张活跃咚放回咚卡组，3 张大将登场
-        Assert.True(s.Players[0].DonDeck.Count >= donDeckBefore + 8);
+        // 主断言：3 张大将登场。
+        // 批次1修复（卡效登场的角色现在会触发各自【登场时】）后，被领袖效果登场的大将会发动登场时：
+        //   OP16-063 库赞 拉2咚(休息)、OP16-073 波尔萨利诺 拉2咚(1活跃+1休息) → 放回的 8 张被回拉 4 张，净 +4。
+        Assert.True(s.Players[0].DonDeck.Count >= donDeckBefore + 4,
+            $"DonDeck={s.Players[0].DonDeck.Count}, before={donDeckBefore}");
         Assert.Contains(kuzan, s.Players[0].Characters);
         Assert.Contains(saka,  s.Players[0].Characters);
         Assert.Contains(bors,  s.Players[0].Characters);

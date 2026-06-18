@@ -1,5 +1,5 @@
 export type CardType = "Leader" | "Character" | "Stage" | "Event";
-export type CardColor = "炎" | "风" | "水" | "暗" | "地" | "光" | string;
+export type CardColor = "红" | "绿" | "蓝" | "紫" | "黑" | "黄" | string;
 export type CardProperty = "斩" | "打" | "射" | "智" | "特";
 
 export interface CardData {
@@ -12,9 +12,11 @@ export interface CardData {
   cost: number;
   keyWords: string[];
   counter: number;
-  effectText: string;
+  effectTags: string[];   // 触发时机枚举名（如 "OnEnterField"），替代旧的卡面原文
+  abilities: string[];    // 能力关键字（阻挡者/速攻/双重攻击/…）
   effectEvent: string;
   sprite?: string;
+  image?: string;      // 原始图源 URL（windoent），本地缩略图/原图缺失时回退
   sprites: string[];   // 所有版本（正画在 [0]，异画依次排后）
   rarity: string;      // 稀有度: L/R/UC/C/SR/SEC/P
   subscript: number;   // 角标属性

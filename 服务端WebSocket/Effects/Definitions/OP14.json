@@ -1,0 +1,1433 @@
+{
+  "OP14-005": {
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP14-006": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "selfPowerGte": 5000
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-010": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "kind": "Character",
+              "keyword": "超新星",
+              "originalPowerLte": 2000,
+              "excludeName": "巴基尔·霍金斯"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-012": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "selfPowerGte": 5000
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AttachDon",
+            "target": "$tgt",
+            "n": 2,
+            "from": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-013": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "kind": "Character",
+              "keyword": "超新星",
+              "excludeName": "蒙奇·D·路飞"
+            }
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-014": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "超新星"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCharacter",
+            "max": 1,
+            "min": 0,
+            "text": "选择手牌中最多1张力量不高于2000的红色角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-015": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-016": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-018": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP14-019": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "match": {
+            "kind": "Character",
+            "keyword": "草帽一伙"
+          }
+        }
+      ]
+    }
+  },
+  "OP14-022": {
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-023": {
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-024": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 3
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-025": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "克洛"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCostLe6",
+            "max": 1,
+            "min": 0,
+            "text": "选择手牌中最多1张费用不高于6且拥有《东海》特征的角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-031": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe8",
+            "max": 2,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-037": {
+    "main": {
+      "cost": {
+        "restActiveDon": 3
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentRestingCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-038": {
+    "main": {
+      "cost": {
+        "restActiveDon": 2
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe7",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-039": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "杰拉基尔·米霍克"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "leaderNameEquals": "杰拉基尔·米霍克"
+        },
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-042": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "鱼人族"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "match": {
+              "originalCostGte": 2
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-043": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCostLe3",
+            "max": 1,
+            "min": 0,
+            "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》或《人鱼族》特征的角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-044": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 1,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "白胡子海盗团"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-046": {
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 2000
+        }
+      ]
+    }
+  },
+  "OP14-047": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCostLe3",
+            "max": 1,
+            "min": 0,
+            "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》或《人鱼族》特征的角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-048": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-050": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "鱼人族"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-051": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-052": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHandCostLe6",
+            "max": 1,
+            "min": 0,
+            "text": "丢弃3张手牌后，将手牌中最多1张费用不高于6且拥有《因佩尔地狱》特征的角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-054": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "鱼人族"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 3
+          }
+        ]
+      },
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "DiscardOwnChosen",
+            "n": 5
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-057": {
+    "main": {
+      "then": [
+        {
+          "op": "AddPowerAll",
+          "delta": 1000,
+          "filter": {
+            "keyword": "鱼人族"
+          }
+        }
+      ]
+    }
+  },
+  "OP14-058": {
+    "main": {
+      "cost": {
+        "restActiveDon": 3
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnHandCostLe3",
+          "max": 1,
+          "min": 0,
+          "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》特征的角色登场",
+          "as": "$c"
+        },
+        {
+          "op": "PlayFromHandFree",
+          "target": "$c"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Draw",
+        "n": 1
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-062": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "ReturnDonToDeck",
+            "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-064": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-065": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "ReturnDonToDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-067": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          },
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "堂吉诃德海盗团"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-071": {
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "leaderHasKeyword": "堂吉诃德海盗团"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-072": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "ReturnDonToDeck",
+            "n": 1
+          },
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-074": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "堂吉诃德海盗团"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          },
+          {
+            "op": "RefreshDon",
+            "n": 2,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-075": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-076": {
+    "main": {
+      "cost": {
+        "restActiveDon": 2
+      },
+      "if": {
+        "leaderHasKeyword": "堂吉诃德海盗团"
+      },
+      "then": [
+        {
+          "op": "RefreshDon",
+          "n": 1,
+          "state": "rest"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-077": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP14-078": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 2000
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "selfLeader",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP14-081": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-083": {
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe0",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -3000
+        }
+      ]
+    }
+  },
+  "OP14-084": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "巴洛克工作室"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "text": "选择废弃区中最多1张费用不高于4且拥有《巴洛克工作室》特征的角色登场",
+            "as": "$c1",
+            "filter": {
+              "keyword": "巴洛克工作室"
+            }
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c1"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe1",
+            "max": 1,
+            "min": 0,
+            "text": "选择废弃区中最多1张费用为1且拥有《巴洛克工作室》特征的角色登场",
+            "as": "$c2",
+            "filter": {
+              "keyword": "巴洛克工作室"
+            }
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c2"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-085": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-087": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "巴洛克工作室"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "keyword": "巴洛克工作室",
+              "excludeName": "Miss.情人节(美琪塔)"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-088": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "巴洛克工作室"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-089": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnTrashCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "text": "选择废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色休息登场",
+        "as": "$c"
+      },
+      {
+        "op": "PlayFromTrash",
+        "target": "$c",
+        "rest": true
+      }
+    ]
+  },
+  "OP14-090": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe0",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-091": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe5",
+            "max": 1,
+            "min": 0,
+            "text": "选择手牌或废弃区中最多1张费用不高于5且拥有《巴洛克工作室》特征的角色（非Mr.2）登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-093": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe8",
+            "max": 1,
+            "min": 0,
+            "text": "选择废弃区中最多1张费用不高于8且拥有《巴洛克工作室》特征的角色",
+            "as": "$c",
+            "filter": {
+              "keyword": "巴洛克工作室"
+            }
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-094": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-097": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "trash",
+          "match": {
+            "keyword": "恐怖之船海盗团",
+            "excludeName": "赶快让我成为海盗王吧!!"
+          }
+        }
+      ]
+    }
+  },
+  "OP14-099": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "trash",
+          "match": {
+            "keyword": "巴洛克工作室",
+            "excludeName": "不服气吗？"
+          }
+        }
+      ]
+    }
+  },
+  "OP14-100": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "match": {
+              "keyword": "恐怖之船海盗团"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-107": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppLifeCountLte": 3
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-108": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderColorCountGte": 2,
+          "oppLifeCountLte": 3
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe7",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-110": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "text": "选择废弃区中最多1张（非豪格巴克医生）费用不高于4且拥有触发效果的角色登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-111": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddRestriction",
+            "target": "$tgt",
+            "kind": "CannotAttack",
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddRestriction",
+            "target": "$tgt",
+            "kind": "CannotAttack",
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-113": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "九蛇海盗团"
+            }
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-114": {
+    "_name": "阿兰",
+    "_note": "【启动主要】【每回合1次】赋予我方1张《九蛇海盗团》领袖或角色最多1张休息状态的咚!!",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "九蛇海盗团"
+          }
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP14-115": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "isOppTurn": true
+        },
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-116": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 2000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OwnHandCostLe4",
+        "max": 1,
+        "min": 0,
+        "text": "选择手牌中最多1张费用不高于4且拥有《亚马逊·百合》或《九蛇海盗团》特征的角色登场",
+        "as": "$c"
+      },
+      {
+        "op": "PlayFromHandFree",
+        "target": "$c"
+      }
+    ]
+  },
+  "OP14-117": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-118": {
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP14-119": {
+    "triggers": [
+      {
+        "on": "OnOppAttackDeclare",
+        "then": [
+          {
+            "op": "AddPowerThisBattle",
+            "target": "selfLeader",
+            "delta": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-120": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe9",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddRestriction",
+            "target": "$tgt",
+            "kind": "CannotAttack",
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      }
+    ]
+  }
+}

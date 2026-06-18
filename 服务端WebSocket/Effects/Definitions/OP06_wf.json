@@ -1,0 +1,1236 @@
+{
+  "OP06-004": {
+    "_name": "",
+    "_matcher": "登场时从手牌按卡名莉莉康乃馨登场最多1张角色，映射为PlayCharFromHand+nameEquals过滤。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "莉莉康乃馨"
+            },
+            "text": "将我方手牌中最多1张莉莉康乃馨登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-007": {
+    "_name": "",
+    "_matcher": "登场时KO对方1张力量≤10000的角色，Choose对方角色+originalPowerLte:10000过滤后KO。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "filter": {
+              "originalPowerLte": 10000
+            },
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-013": {
+    "_name": "",
+    "_matcher": "登场时确认卡组顶3张公开1张FILM加手牌余者放底，trigger为同效；用LookTopReveal并excludeName排除自身卡名。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "FILM",
+              "excludeName": "蒙奇·D·路飞"
+            }
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 3,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "keyword": "FILM",
+          "excludeName": "蒙奇·D·路飞"
+        }
+      }
+    ]
+  },
+  "OP06-016": {
+    "_name": "",
+    "_matcher": "启动主要使对方1张角色本回合力量-3000；放回卡组底的成本无对应cost键，按惯例忽略成本只实现收益。",
+    "_src": "wf-dsl",
+    "activated": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -3000
+        }
+      ]
+    }
+  },
+  "OP06-017": {
+    "_name": "",
+    "_matcher": "主要/反击均以生命顶入手为成本，使我方1张领袖或角色力量+3000(反击用本次战斗)。",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "lifeToHand": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP06-019": {
+    "_name": "",
+    "_matcher": "主要KO对方1张力量≤5000角色，触发KO对方1张力量≤4000角色。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "originalPowerLte": 5000
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "as": "$tgt",
+        "filter": {
+          "originalPowerLte": 4000
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP06-022": {
+    "_name": "",
+    "_matcher": "双重攻击为纯关键词忽略；启动主要每回合1次，对方生命≤3时给我方1张角色贴2张休息咚。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 2,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP06-024": {
+    "_name": "",
+    "_matcher": "登场时领袖含新鱼人海盗团时，从手牌登场1张费用≤4且鱼人族角色，之后生命顶1张入手。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "新鱼人海盗团"
+        },
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "鱼人族",
+              "originalCostLte": 4
+            }
+          },
+          {
+            "op": "LifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-025": {
+    "_name": "",
+    "_matcher": "登场时确认卡组顶4张，公开1张鱼人族或人鱼族(排除凯米自身)加入手牌，其余放回卡组底。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "鱼人族"
+                },
+                {
+                  "keyword": "人鱼族"
+                }
+              ],
+              "excludeName": "凯米"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-027": {
+    "_name": "",
+    "_matcher": "KO时横置对方1张费用≤3的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 3
+            }
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-028": {
+    "_name": "",
+    "_matcher": "攻击时(被贴咚≥1且领袖含新鱼人海盗团):活跃1张咚、自身+1000、生命顶入手",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1,
+          "leaderHasKeyword": "新鱼人海盗团"
+        },
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 1
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 1000
+          },
+          {
+            "op": "LifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-029": {
+    "_name": "",
+    "_matcher": "攻击时每回合1次(被贴咚≥1且领袖含新鱼人海盗团):活跃自身、自身+1000、生命顶入手(oncePerTurn 在 triggers 中无法声明,按惯例尽量表达收益)",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1,
+          "leaderHasKeyword": "新鱼人海盗团"
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 1000
+          },
+          {
+            "op": "LifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-031": {
+    "_name": "",
+    "_matcher": "触发:从手牌登场1张费用≤3且具鱼人族/人鱼族特征的角色",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": {
+          "anyOf": [
+            {
+              "keyword": "鱼人族"
+            },
+            {
+              "keyword": "人鱼族"
+            }
+          ],
+          "originalCostLte": 3
+        },
+        "text": "从手牌登场1张费用≤3且拥有鱼人族或人鱼族特征的角色"
+      }
+    ]
+  },
+  "OP06-033": {
+    "_name": "",
+    "_matcher": "登场时KO对方1张休息状态角色;触发节无法表达可选成本(弃鱼人族牌/废弃方舟诺亚),按惯例仅实现收益部分,忽略成本",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-034": {
+    "_name": "",
+    "_matcher": "启动主要每回合1次:横置对方1张费用≤4角色、自身+1000、生命顶入手",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "originalCostLte": 4
+          }
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "self",
+          "delta": 1000
+        },
+        {
+          "op": "LifeToHand"
+        }
+      ]
+    }
+  },
+  "OP06-036": {
+    "_name": "",
+    "_matcher": "登场时/KO时:KO对方1张休息状态且费用≤4的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 4
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 4
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-040": {
+    "_name": "",
+    "_matcher": "【主要】与【触发】均为：KO对方最多2张休息且费用≤3的角色。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentRestingCharacter",
+          "max": 2,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "originalCostLte": 3
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentRestingCharacter",
+        "max": 2,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalCostLte": 3
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP06-043": {
+    "_name": "",
+    "_matcher": "【启动主要】每回合1次：弃1手牌(cost)并将1张≤2角色放回卡组底，本角色+3000；阻挡者为关键词。注：放回角色按惯例从我方场上选取。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "handDiscard": 1
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacterCostLe2",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "originalCostLte": 2
+          }
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$tgt",
+          "from": "field"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "self",
+          "delta": 3000
+        }
+      ]
+    }
+  },
+  "OP06-045": {
+    "_name": "",
+    "_matcher": "【登场时】抽2张，再将我方2张手牌放回卡组最下方。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnHand",
+            "max": 2,
+            "min": 2,
+            "as": "$tgt"
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$tgt",
+            "from": "hand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-050": {
+    "_name": "",
+    "_matcher": "登场时确认卡组顶5张、公开1张排除塔希米的海军特征卡加入手牌，其余放回卡组底。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "海军",
+              "excludeName": "塔希米"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-053": {
+    "_name": "",
+    "_matcher": "KO时将最多1张费用≤2的角色放回卡组底（以对方角色为实际目标）。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$tgt",
+            "from": "field"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-056": {
+    "_name": "",
+    "_matcher": "主要：将对方最多1张费用≤2与最多1张费用≤1的角色放回卡组底；触发同主要效果。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe2",
+          "max": 1,
+          "min": 0,
+          "as": "$t1"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$t1",
+          "from": "field"
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe1",
+          "max": 1,
+          "min": 0,
+          "as": "$t2"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$t2",
+          "from": "field"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe2",
+        "max": 1,
+        "min": 0,
+        "as": "$t1"
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$t1",
+        "from": "field"
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe1",
+        "max": 1,
+        "min": 0,
+        "as": "$t2"
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$t2",
+        "from": "field"
+      }
+    ]
+  },
+  "OP06-058": {
+    "_name": "",
+    "_matcher": "主要：将最多2张费用≤6的角色放回卡组底（实际目标对方角色）；触发：将最多1张费用≤5的角色放回卡组底。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe6",
+          "max": 1,
+          "min": 0,
+          "as": "$t1"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$t1",
+          "from": "field"
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe6",
+          "max": 1,
+          "min": 0,
+          "as": "$t2"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$t2",
+          "from": "field"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe5",
+        "max": 1,
+        "min": 0,
+        "as": "$t1"
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$t1",
+        "from": "field"
+      }
+    ]
+  },
+  "OP06-059": {
+    "_name": "",
+    "_matcher": "反击：我方最多1张领袖或角色+1000并抽1张（已实现）；【触发】查看卡组顶5张并自选重排放回顶/底属\"查看并重排\"机制无对应 op，未在 DSL 中实现。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 1000
+      },
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP06-071": {
+    "_name": "",
+    "_matcher": "登场时若领袖含《FILM》，从废弃区选最多2张《FILM》费用≤4角色加入手牌(可选咚成本按惯例忽略)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "FILM"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 2,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "keyword": "FILM",
+              "originalCostLte": 4,
+              "kind": "Character"
+            },
+            "text": "将我方废弃区中最多2张《FILM》费用≤4的角色加入手牌"
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-073": {
+    "_name": "",
+    "_matcher": "登场时若我方场上咚数≥8，抽1张并自选弃1张手牌(阻挡者为纯关键词不写入)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "selfDonTotalGte": 8
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-075": {
+    "_name": "",
+    "_matcher": "登场时(忽略可选咚成本)把对方最多2张费用≤2角色转休息，用两次Choose分别横置。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$t1"
+          },
+          {
+            "op": "Rest",
+            "target": "$t1"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$t2"
+          },
+          {
+            "op": "Rest",
+            "target": "$t2"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-077": {
+    "_name": "",
+    "_matcher": "主要在我方咚≤对方咚时把对方最多1张费用≤5角色放回卡组底，触发把对方最多1张费用≤4角色放回卡组底。注：『我方咚不多于对方咚』用selfDonTotalLte近似(无双方咚比较键)。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "selfDonTotalLte": 0
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe5",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$tgt",
+          "from": "field"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$tgt",
+        "from": "field"
+      }
+    ]
+  },
+  "OP06-078": {
+    "_name": "",
+    "_matcher": "主要确认顶5张公开1张含GERMA特征(排除自身GERMA 66)加手牌余者放回底；触发抽1。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "keywordContains": "GERMA",
+            "excludeName": "GERMA 66"
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP06-079": {
+    "_name": "",
+    "_matcher": "舞台启动主要(弃1手牌+横置自身)确认顶3张公开1张含GERMA特征加手牌余者放回底。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "handDiscard": 1,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "keywordContains": "GERMA"
+          }
+        }
+      ]
+    }
+  },
+  "OP06-081": {
+    "_name": "",
+    "_matcher": "登场时(忽略可选『废弃区2张放回卡组底』成本)KO对方最多1张费用≤2角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-082": {
+    "_name": "",
+    "_matcher": "登场时/KO时领袖含恐怖之船海盗团时抽2弃2，分两个触发节实现。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "恐怖之船海盗团"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "恐怖之船海盗团"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-084": {
+    "_name": "",
+    "_matcher": "【KO时】我方最多1张领袖或角色本回合+1000",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "as": "$t"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$t",
+            "delta": 1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-089": {
+    "_name": "",
+    "_matcher": "【登场时】/【KO时】卡组顶3张弃废弃区",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-090": {
+    "_name": "",
+    "_matcher": "【登场时】将废弃区中≤1张除自身外的恐怖之船海盗团卡牌加入手牌(可选成本：放回2张废弃区到卡组底，无法表达故忽略成本)",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "as": "$t",
+            "filter": {
+              "keyword": "恐怖之船海盗团",
+              "excludeName": "豪格巴克医生"
+            }
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$t"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-091": {
+    "_name": "",
+    "_matcher": "【登场时】领袖含恐怖之船海盗团时卡组顶5张弃废弃区",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "恐怖之船海盗团"
+        },
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 5
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-097": {
+    "_name": "",
+    "_matcher": "主要与触发均为：对方弃1张手牌。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "OpponentDiscard",
+          "n": 1
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "OpponentDiscard",
+        "n": 1
+      }
+    ]
+  },
+  "OP06-098": {
+    "_name": "",
+    "_matcher": "启动主要(横置自身)：领袖含恐怖之船海盗团时，从废弃区休息登场1张费用≤2该特征角色；可选的咚转休息附加成本按惯例忽略。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "恐怖之船海盗团"
+      },
+      "then": [
+        {
+          "op": "PlayCharFromTrash",
+          "rest": true,
+          "filter": {
+            "keyword": "恐怖之船海盗团",
+            "originalCostLte": 2
+          },
+          "text": "将废弃区1张费用≤2的《恐怖之船海盗团》角色以休息状态登场"
+        }
+      ]
+    }
+  },
+  "OP06-104": {
+    "_name": "",
+    "_matcher": "KO时若对方生命≤3，卡组顶1张置入生命顶；生命牌触发同样置入1张(原触发为登场，此处保守按收益表达置生命)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "oppLifeCountLte": 3
+        },
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "AddLifeFromDeck",
+        "n": 1
+      }
+    ]
+  },
+  "OP06-107": {
+    "_name": "",
+    "_matcher": "登场时将≤1张'光月桃之助'以外的《和之国》角色置入生命(顶/底选择按 MoveCharToLife 默认实现)；阻挡者为纯关键词不另写。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "keyword": "和之国",
+              "excludeName": "光月桃之助"
+            },
+            "text": "选择1张'光月桃之助'以外的《和之国》角色"
+          },
+          {
+            "op": "MoveCharToLife",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-108": {
+    "_name": "",
+    "_matcher": "生命【触发】：选我方1张含《和之国》特征的领袖或角色本回合力量+2000",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t",
+        "filter": {
+          "keyword": "和之国"
+        }
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP06-114": {
+    "_name": "",
+    "_matcher": "【登场时】确认卡组顶5张、公开≤1张『神之岛』或《山迪亚战士》加手牌、其余放回底；可选舞台成本按惯例忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "神之岛"
+                },
+                {
+                  "keyword": "山迪亚战士"
+                }
+              ],
+              "excludeName": "瓦帕"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP06-115": {
+    "_name": "",
+    "_matcher": "【反击】我方1张领袖或角色本次战斗+3000(可选弃牌成本忽略)；【触发】卡组顶1张入生命后弃1张手牌（生命为0条件按惯例近似省略，核心收益为入生命+弃牌）",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 3000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "AddLifeFromDeck",
+        "n": 1
+      },
+      {
+        "op": "DiscardOwnChosen",
+        "n": 1
+      }
+    ]
+  }
+}

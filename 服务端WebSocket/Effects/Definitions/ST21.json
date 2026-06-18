@@ -1,0 +1,130 @@
+{
+  "ST21-001": {
+    "_name": "蒙奇·D·路飞（领袖）",
+    "_note": "【咚×1】【启动主要】【每回合1次】赋予我方1张角色最多2张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张角色最多2张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 2, "from": "rest" }
+      ]
+    }
+  },
+  "ST21-003": {
+    "_name": "山智",
+    "_note": "【登场时】选我方最多1张力量≥6000《草帽一伙》角色，本回合其攻击时对方不能发动【阻挡者】（=赋予【不可阻挡】本回合）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙", "originalPowerGte": 6000 }, "text": "本回合该角色攻击时对方不能发动【阻挡者】" },
+          { "op": "GiveKeyword", "target": "$t", "keyword": "不可阻挡" }
+        ]
+      }
+    ]
+  },
+  "ST21-004": {
+    "_name": "杰丽·邦妮",
+    "_note": "【咚×2】【KO时】抽1张。",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": { "donAttachedGte": 2 },
+        "then": [ { "op": "Draw", "n": 1 } ]
+      }
+    ]
+  },
+  "ST21-009": {
+    "_name": "奈美",
+    "_note": "【启动主要】【每回合1次】赋予我方1张《草帽一伙》领袖或角色最多2张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "赋予我方1张《草帽一伙》领袖或角色最多2张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 2, "from": "rest" }
+      ]
+    }
+  },
+  "ST21-010": {
+    "_name": "蒙奇·D·路飞（4费角色）",
+    "_note": "【咚×2】【攻击时】KO 对方最多1张力量≤4000 角色。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 2 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST21-012": {
+    "_name": "布鲁克",
+    "_note": "【攻击时】赋予我方1张领袖或角色最多2张休息咚。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多2张休息咚" },
+          { "op": "AttachDon", "target": "$t", "n": 2, "from": "rest" }
+        ]
+      }
+    ]
+  },
+  "ST21-014": {
+    "_name": "蒙奇·D·路飞（5费角色）",
+    "_note": "【速攻】+【攻击时】赋予我方1张领袖或角色最多1张休息咚。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+          { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+        ]
+      }
+    ]
+  },
+  "ST21-015": {
+    "_name": "罗罗诺亚·佐罗",
+    "_note": "【KO时】将手牌中最多1张“佐罗”以外力量≤6000 红色角色登场（【咚×2】速攻持续部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          { "op": "PlayCharFromHand", "filter": { "color": "红", "originalPowerLte": 6000, "excludeName": "罗罗诺亚·佐罗" }, "text": "手牌中最多1张“佐罗”以外力量≤6000 红色角色登场" }
+        ]
+      }
+    ]
+  },
+  "ST21-016": {
+    "_name": "橡皮橡皮白鞭",
+    "_note": "【主要】我方最多1张领袖或角色+1000，之后本回合对方最多1张力量≤4000 角色无法发动【阻挡者】；【触发】KO 对方最多1张力量≤4000 角色。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色+1000" },
+        { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "本回合对方最多1张力量≤4000 角色无法发动【阻挡者】" },
+        { "op": "AddRestriction", "target": "$tgt", "kind": "CannotBeBlocker" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST21-017": {
+    "_name": "橡皮橡皮鼹鼠枪",
+    "_note": "【主要】本回合对方最多1张角色力量-5000（原文“之后我方有力量≥6000角色则KO对方力量≤2000”因 then 无条件分支已略去）；【触发】同主要。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-5000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-5000" },
+      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 }
+    ]
+  }
+}

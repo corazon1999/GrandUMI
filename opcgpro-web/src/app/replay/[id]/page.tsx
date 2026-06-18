@@ -1,51 +1,156 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import GameBoard from "@/components/game/GameBoard";
+import PlaybackControls from "@/components/game/PlaybackControls";
 import { useGameStore } from "@/store/gameStore";
+import { useGameInit } from "@/hooks/useGameInit";
+import { getSnapshots } from "@/data/matchHistoryDB";
+import type { MsgGameState } from "@/types/net";
+import type { PlaybackSpeed } from "@/types/playback";
+
+// 单帧基准时长（1x），按倍速缩放
+const STEP_MS = 900;
 
 /**
- * 回放页面（M6）
+ * 回放页（路线二）
  *
- * 通过 fetch 拉取服务端 Replays/{date}/{id}.jsonl
- * 逐 tick 应用 MsgGameState 类型行，按时间轴播放。
- *
- * 当前 M6 仅提供数据流框架；UI 播放控件复用 PlaybackControls。
+ * 从浏览器本地 IndexedDB 读取该局的 MsgGameState 快照流，
+ * 逐帧调用 gameStore.syncFromServer 驱动共享的 GameBoard 渲染，
+ * 配合 PlaybackControls 做播放/暂停/步进/倍速。
  */
 export default function ReplayPage() {
   const params = useParams();
-  const id = params?.id;
-  const [steps, setSteps] = useState<unknown[]>([]);
-  const [idx, setIdx] = useState(0);
+  const router = useRouter();
+  const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
 
+  const [snapshots, setSnapshots] = useState<MsgGameState[] | null>(null);
+  const [idx, setIdx] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+
+  // 进入回放模式驱动 GameBoard 的只读分支；卸载时复位，避免污染后续真实对局
+  useGameInit();
+
+  useEffect(() => {
+    // 进入前清空上一局残留状态（含操作日志），再切回放模式
+    useGameStore.getState().resetGame();
+    useGameStore.getState().setMode("Playback");
+    return () => {
+      useGameStore.getState().resetGame();
+      useGameStore.getState().setMode("Player");
+    };
+  }, []);
+
+  // 加载快照
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/replay/${id}`)
-      .then((r) => r.ok ? r.text() : Promise.reject(new Error("not found")))
-      .then((text) => {
-        const lines = text.split("\n").filter(Boolean);
-        const items = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-        setSteps(items as unknown[]);
+    let alive = true;
+    getSnapshots(decodeURIComponent(id))
+      .then((s) => {
+        if (!alive) return;
+        setSnapshots(s ?? []);
+        if (s && s.length > 0) {
+          useGameStore.getState().syncFromServer(s[0]);
+          setPlaying(true);
+        }
       })
-      .catch(() => setSteps([]));
+      .catch(() => alive && setSnapshots([]));
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
-  useEffect(() => {
-    if (idx >= steps.length) return;
-    const step = steps[idx] as { kind: string; snapshot?: object };
-    if (step.kind === "state" && step.snapshot) {
-      useGameStore.getState().syncFromServer(step.snapshot as never);
-    }
-  }, [idx, steps]);
+  const total = snapshots?.length ?? 0;
+  const lastIdx = Math.max(0, total - 1);
+  const isEnded = total > 0 && idx >= lastIdx;
 
-  if (!id) return <div className="text-white">无效的回放 ID</div>;
-  if (steps.length === 0) return <div className="text-white p-6">加载中…</div>;
+  // 应用当前帧
+  useEffect(() => {
+    if (!snapshots || snapshots.length === 0) return;
+    const clamped = Math.min(idx, snapshots.length - 1);
+    useGameStore.getState().syncFromServer(snapshots[clamped]);
+  }, [idx, snapshots]);
+
+  // 自动播放定时器
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!playing || !snapshots || snapshots.length === 0) return;
+    if (idx >= snapshots.length - 1) {
+      setPlaying(false);
+      return;
+    }
+    timerRef.current = setTimeout(() => setIdx((i) => i + 1), STEP_MS / speed);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [playing, idx, speed, snapshots]);
+
+  const totalTurns = useMemo(() => {
+    if (!snapshots || snapshots.length === 0) return 0;
+    return snapshots.reduce((m, s) => Math.max(m, s.turnCount ?? 0), 0);
+  }, [snapshots]);
+  const currentTurn = snapshots?.[Math.min(idx, lastIdx)]?.turnCount ?? 0;
+
+  const handlePlay = () => {
+    if (isEnded) {
+      setIdx(0);
+      setPlaying(true);
+    } else {
+      setPlaying(true);
+    }
+  };
+
+  if (!id) {
+    return <div className="flex h-screen items-center justify-center bg-[#07111f] text-white">无效的回放 ID</div>;
+  }
+  if (snapshots === null) {
+    return <div className="flex h-screen items-center justify-center bg-[#07111f] text-white">加载中…</div>;
+  }
+  if (snapshots.length === 0) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#07111f] text-white">
+        <p>未找到该回放数据（可能已被清理或在其它设备录制）</p>
+        <button
+          onClick={() => router.push("/home")}
+          className="rounded-lg bg-orange-500 px-5 py-2 transition-colors hover:bg-orange-400"
+        >
+          返回大厅
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-xl flex items-center gap-3 z-50">
-      <button onClick={() => setIdx(Math.max(0, idx - 1))} className="px-2">⏮</button>
-      <span>{idx + 1} / {steps.length}</span>
-      <button onClick={() => setIdx(Math.min(steps.length - 1, idx + 1))} className="px-2">⏭</button>
+    <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
+      {/* 顶部返回与标识 */}
+      <button
+        onClick={() => router.push("/home")}
+        className="absolute left-4 top-4 z-30 rounded-full bg-gray-800/80 px-3 py-1 text-xs text-white backdrop-blur-sm transition-colors hover:bg-gray-700"
+      >
+        ← 返回大厅
+      </button>
+      <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-green-600/80 px-3 py-1 text-xs text-white">
+        回放模式
+      </div>
+
+      <GameBoard isObserver={false} isPlayback />
+
+      <PlaybackControls
+        currentTurn={currentTurn}
+        currentStep={idx}
+        totalTurns={totalTurns}
+        totalSteps={lastIdx}
+        isPlaying={playing}
+        isEnded={isEnded}
+        speed={speed}
+        onPlay={handlePlay}
+        onPause={() => setPlaying(false)}
+        onStepForward={() => setIdx((i) => Math.min(lastIdx, i + 1))}
+        onStepBackward={() => setIdx((i) => Math.max(0, i - 1))}
+        onSpeedChange={setSpeed}
+      />
     </div>
   );
 }

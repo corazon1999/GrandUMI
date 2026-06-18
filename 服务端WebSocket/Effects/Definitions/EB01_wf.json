@@ -1,0 +1,678 @@
+{
+  "EB01-003": {
+    "_name": "基德＆基拉",
+    "_matcher": "速攻为关键词，主动效果映射【攻击时】对方生命≤2则本角色本回合+2000。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "oppLifeCountLte": 2
+        },
+        "then": [
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-006": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "阻挡者为关键词，主动效果映射【咚!!×2】(自身被贴咚≥2)【攻击时】对方1张角色本回合-3000。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 2
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -3000
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-007": {
+    "_name": "大和",
+    "_matcher": "【启动主要】【每回合1次】给我方1张领袖或角色贴最多1张休息状态咚(AttachDon from rest)。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$t",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "EB01-009": {
+    "_name": "少啰唆！！！跟我走吧！！！",
+    "_matcher": "事件【反击】确认卡组顶5张，将其中≤1张费用≤3且《动物》特征角色登场，其余放回底；用 LookTopReveal 表达。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "LookTopReveal",
+        "count": 5,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "keyword": "动物",
+          "kind": "Character",
+          "originalCostLte": 3
+        }
+      }
+    ]
+  },
+  "EB01-010": {
+    "_name": "你怎么可能……打赢我呀！！！",
+    "_matcher": "【反击】KO对方原本力量≤6000角色用 Choose+filter.originalPowerLte 实现；生命【触发】KO原本力量≤5000角色同理",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalPowerLte": 6000
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalPowerLte": 5000
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "EB01-013": {
+    "_name": "光月日和",
+    "_matcher": "启动主要弃自身→从手牌按 filter(和之国/费用≤5/排除光月日和)免费登场角色，之后抽1",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": {
+            "keyword": "和之国",
+            "originalCostLte": 5,
+            "excludeName": "光月日和"
+          },
+          "text": "登场手牌中费用≤5且拥有《和之国》特征的角色(光月日和除外)"
+        },
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "EB01-015": {
+    "_name": "打碟人·阿保",
+    "_matcher": "登场时将对方≤2费角色转休息，用 Choose OpponentCharacterCostLe2 + Rest",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-016": {
+    "_name": "瓶豪",
+    "_matcher": "启动主要横置自身→KO对方休息状态且费用≤1角色，用 OpponentRestingCharacter + filter.originalCostLte:1",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentRestingCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "originalCostLte": 1
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "EB01-019": {
+    "_name": "白线盾",
+    "_matcher": "反击：我方1张领袖或角色本次战斗+4000，并确认卡组顶3张公开1张堂吉诃德海盗团角色加手牌、其余放回底",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 4000
+      },
+      {
+        "op": "LookTopReveal",
+        "count": 3,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "keyword": "堂吉诃德海盗团",
+          "kind": "Character",
+          "excludeName": "白线盾"
+        }
+      }
+    ]
+  },
+  "EB01-022": {
+    "_name": "闪电",
+    "_matcher": "我方回合结束时手牌≤2张则抽2张",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "selfHandCountLte": 2
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-023": {
+    "_name": "爱德华·维布鲁",
+    "_matcher": "登场时抽1张卡",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-027": {
+    "_name": "Mr.1(达兹•波涅斯)",
+    "_matcher": "实现登场时抽2弃1；前半‘废弃区每2张事件力量+1000’为持续静态修正，按惯例忽略由 C# 处理",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-031": {
+    "_name": "佳妮法",
+    "_matcher": "登场时领袖含七水之城，从废弃区取≤2张费用≤4角色加入手牌(triggers不支持咚-1成本，忽略可选成本)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "七水之城"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe4",
+            "max": 2,
+            "min": 0,
+            "as": "$t",
+            "text": "将废弃区最多2张费用≤4的角色加入手牌"
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$t"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-034": {
+    "_name": "Ms.星期三",
+    "_matcher": "对方攻击时领袖含巴洛克工作室，从咚卡组补1张活跃咚(阻挡者为纯关键词不单列；triggers不支持咚-1成本，忽略可选成本)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnOppAttackDeclare",
+        "if": {
+          "leaderHasKeyword": "巴洛克工作室"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-035": {
+    "_name": "Ms.星期一",
+    "_matcher": "登场时领袖含巴洛克工作室，本回合给我方最多1张领袖或角色+1000(触发节为咚-1登场自身，无需DSL)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "巴洛克工作室"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$t"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$t",
+            "delta": 1000
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-036": {
+    "_name": "米诺吉娃娃",
+    "_matcher": "KO时领袖含因佩尔地狱，从咚卡组补1张休息咚(速攻为纯关键词不单列)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "因佩尔地狱"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-039": {
+    "_name": "降三世 引奈落",
+    "_matcher": "【主要】以咚!!-1为成本KO对方费用≤8角色；【触发】从咚卡组补1张活跃咚。",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe8",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "EB01-042": {
+    "_name": "斯嘉丽",
+    "_matcher": "自身进废弃为成本，从手牌休息登场1张费用≤3德莱斯罗兹角色(排除自身名)，之后对方1张角色本回合费用-2。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": {
+            "keyword": "德莱斯罗兹",
+            "originalCostLte": 3,
+            "excludeName": "斯嘉丽"
+          },
+          "rest": true,
+          "text": "从手牌登场1张费用≤3的德莱斯罗兹角色(休息)"
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -2,
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "EB01-044": {
+    "_name": "芬克弗里德",
+    "_matcher": "横置自身为成本，本回合我方1张名为「斯巴达姆」的角色力量+3000。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$t",
+          "filter": {
+            "nameEquals": "斯巴达姆"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    }
+  },
+  "EB01-046": {
+    "_name": "布鲁克",
+    "_matcher": "【登场时】/【攻击时】对方1角色费用-1，再选费用为0的对方角色KO，登场与攻击两节均映射",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$c"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$c",
+            "delta": -1,
+            "duration": "ThisTurn"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe0",
+            "max": 1,
+            "min": 0,
+            "as": "$k"
+          },
+          {
+            "op": "KO",
+            "target": "$k"
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$c"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$c",
+            "delta": -1,
+            "duration": "ThisTurn"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe0",
+            "max": 1,
+            "min": 0,
+            "as": "$k"
+          },
+          {
+            "op": "KO",
+            "target": "$k"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-048": {
+    "_name": "拉布",
+    "_matcher": "【启动主要】横置自身：对方1张角色本回合费用-4",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -4,
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "EB01-049": {
+    "_name": "T彭",
+    "_matcher": "【登场时】KO对方1张费用≤2的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-050": {
+    "_name": "想活下去！！！",
+    "_matcher": "【反击】废弃区≥30张时卡组顶1张置入生命顶，条件用 ownTrashCountGte 表达（反击放在 counter 节）",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "AddLifeFromDeck",
+        "n": 1
+      }
+    ],
+    "main": {
+      "if": {
+        "ownTrashCountGte": 30
+      },
+      "then": [
+        {
+          "op": "AddLifeFromDeck",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "EB01-051": {
+    "_name": "指枪",
+    "_matcher": "【主要】卡组顶2张废弃后KO对方费用≤5角色；【触发】发动同样的主要效果",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "millTop": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe5",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe5",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "EB01-054": {
+    "_name": "甘·福尔",
+    "_matcher": "登场时对方生命≤1则KO对方1张费用≤3角色；阻挡者为纯关键词另行处理",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppLifeCountLte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "EB01-056": {
+    "_name": "夏洛特·弗朗蓓",
+    "_matcher": "登场时抽1；可选的『生命顶/底入手』成本在triggers无法表达，按惯例只实现抽牌收益",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  }
+}

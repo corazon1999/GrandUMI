@@ -7,9 +7,11 @@ interface Props {
   onClose?: () => void;
   title?: string;
   children: React.ReactNode;
+  /** 弹窗最大宽度类名,默认 max-w-2xl */
+  maxWidthClass?: string;
 }
 
-export default function Modal({ open, onClose, title, children }: Props) {
+export default function Modal({ open, onClose, title, children, maxWidthClass = "max-w-2xl" }: Props) {
   return (
     <AnimatePresence>
       {open && (
@@ -24,7 +26,7 @@ export default function Modal({ open, onClose, title, children }: Props) {
             onClick={onClose}
           />
           <motion.div
-            className="relative bg-gray-900 border border-gray-700 rounded-xl p-6 min-w-80 max-w-lg shadow-2xl z-10"
+            className={`relative bg-gray-900 border border-gray-700 rounded-xl p-6 min-w-80 ${maxWidthClass} shadow-2xl z-10`}
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}

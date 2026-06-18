@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useNet } from "@/hooks/useNet";
 import { useNetStore } from "@/store/netStore";
+import MessageBox from "@/components/ui/MessageBox";
 
 export default function NetProvider({ children }: { children: ReactNode }) {
   useNet();
@@ -17,5 +18,10 @@ export default function NetProvider({ children }: { children: ReactNode }) {
     }
   }, [navigateTo, router]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <MessageBox />
+    </>
+  );
 }

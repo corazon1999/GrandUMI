@@ -2,266 +2,372 @@
   {
     "set": "EB01",
     "count": 116,
-    "file": "EB01.json"
+    "file": "EB01.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "EB02",
     "count": 97,
-    "file": "EB02.json"
+    "file": "EB02.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "EB03",
     "count": 90,
-    "file": "EB03.json"
+    "file": "EB03.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "EB04",
     "count": 83,
-    "file": "EB04.json"
+    "file": "EB04.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP01",
     "count": 251,
-    "file": "OP01.json"
+    "file": "OP01.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP02",
     "count": 213,
-    "file": "OP02.json"
+    "file": "OP02.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP03",
     "count": 243,
-    "file": "OP03.json"
+    "file": "OP03.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP04",
     "count": 202,
-    "file": "OP04.json"
+    "file": "OP04.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP05",
     "count": 268,
-    "file": "OP05.json"
+    "file": "OP05.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP06",
     "count": 267,
-    "file": "OP06.json"
+    "file": "OP06.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP07",
     "count": 214,
-    "file": "OP07.json"
+    "file": "OP07.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP08",
     "count": 178,
-    "file": "OP08.json"
+    "file": "OP08.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP09",
     "count": 253,
-    "file": "OP09.json"
+    "file": "OP09.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP10",
     "count": 184,
-    "file": "OP10.json"
+    "file": "OP10.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP11",
     "count": 171,
-    "file": "OP11.json"
+    "file": "OP11.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP12",
     "count": 182,
-    "file": "OP12.json"
+    "file": "OP12.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP13",
     "count": 188,
-    "file": "OP13.json"
+    "file": "OP13.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP14",
     "count": 158,
-    "file": "OP14.json"
+    "file": "OP14.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP15",
     "count": 242,
-    "file": "OP15.json"
+    "file": "OP15.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "OP16",
     "count": 119,
-    "file": "OP16.json"
+    "file": "OP16.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "P",
     "count": 197,
-    "file": "P.json"
+    "file": "P.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "PRB01",
     "count": 2,
-    "file": "PRB01.json"
+    "file": "PRB01.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "PRB02",
     "count": 38,
-    "file": "PRB02.json"
+    "file": "PRB02.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST01",
     "count": 63,
-    "file": "ST01.json"
+    "file": "ST01.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST02",
     "count": 31,
-    "file": "ST02.json"
+    "file": "ST02.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST03",
     "count": 46,
-    "file": "ST03.json"
+    "file": "ST03.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST04",
     "count": 40,
-    "file": "ST04.json"
+    "file": "ST04.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST05",
     "count": 20,
-    "file": "ST05.json"
+    "file": "ST05.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST06",
     "count": 31,
-    "file": "ST06.json"
+    "file": "ST06.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST07",
     "count": 23,
-    "file": "ST07.json"
+    "file": "ST07.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST08",
     "count": 16,
-    "file": "ST08.json"
+    "file": "ST08.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST09",
     "count": 19,
-    "file": "ST09.json"
+    "file": "ST09.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST10",
     "count": 34,
-    "file": "ST10.json"
+    "file": "ST10.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST11",
     "count": 5,
-    "file": "ST11.json"
+    "file": "ST11.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST12",
     "count": 26,
-    "file": "ST12.json"
+    "file": "ST12.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST13",
     "count": 55,
-    "file": "ST13.json"
+    "file": "ST13.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST14",
     "count": 28,
-    "file": "ST14.json"
+    "file": "ST14.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST15",
     "count": 6,
-    "file": "ST15.json"
+    "file": "ST15.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST16",
     "count": 11,
-    "file": "ST16.json"
+    "file": "ST16.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST17",
     "count": 12,
-    "file": "ST17.json"
+    "file": "ST17.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST18",
     "count": 13,
-    "file": "ST18.json"
+    "file": "ST18.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST19",
     "count": 5,
-    "file": "ST19.json"
+    "file": "ST19.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST20",
     "count": 4,
-    "file": "ST20.json"
+    "file": "ST20.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST21",
     "count": 45,
-    "file": "ST21.json"
+    "file": "ST21.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST22",
     "count": 33,
-    "file": "ST22.json"
+    "file": "ST22.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST23",
     "count": 5,
-    "file": "ST23.json"
+    "file": "ST23.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST24",
     "count": 5,
-    "file": "ST24.json"
+    "file": "ST24.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST25",
     "count": 5,
-    "file": "ST25.json"
+    "file": "ST25.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST26",
     "count": 7,
-    "file": "ST26.json"
+    "file": "ST26.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST27",
     "count": 5,
-    "file": "ST27.json"
+    "file": "ST27.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST28",
     "count": 5,
-    "file": "ST28.json"
+    "file": "ST28.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST29",
     "count": 31,
-    "file": "ST29.json"
+    "file": "ST29.json",
+    "effectTags": [],
+    "abilities": []
   },
   {
     "set": "ST30",
     "count": 34,
-    "file": "ST30.json"
+    "file": "ST30.json",
+    "effectTags": [],
+    "abilities": []
   }
 ]

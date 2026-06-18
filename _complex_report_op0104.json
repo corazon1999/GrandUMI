@@ -1,0 +1,1257 @@
+[
+  {
+    "number": "OP01-001",
+    "name": "罗罗诺亚·佐罗",
+    "status": "complex",
+    "reason": "纯持续/静态修正:【我方的回合中】我方全体角色力量+1000(咚条件光环),无事件触发,需C#脚本"
+  },
+  {
+    "number": "OP01-002",
+    "name": "特拉法尔加・罗",
+    "status": "complex",
+    "reason": "登场卡需与被退回角色'颜色不同'且费用≤5,filter无颜色键也无法引用前一目标颜色,无法表达"
+  },
+  {
+    "number": "OP01-004",
+    "name": "撒谎布",
+    "status": "complex",
+    "reason": "'当对方发动事件时抽1'依赖对方打出事件的触发节,触发枚举无此项,无法表达"
+  },
+  {
+    "number": "OP01-005",
+    "name": "乌塔",
+    "status": "complex",
+    "reason": "登场时从废弃区取'红色'角色加手牌,filter无颜色键,'红色'限制无法精确表达"
+  },
+  {
+    "number": "OP01-008",
+    "name": "凯文迪修",
+    "status": "complex",
+    "reason": "登场时可选成本'将1张生命入手'与收益'获得速攻'强耦合,触发节不支持cost,仅实现收益会失真"
+  },
+  {
+    "number": "OP01-009",
+    "name": "凯罗特",
+    "status": "complex",
+    "reason": "【触发】此卡牌登场(从生命区直接登场自身),无对应op机制,无法表达"
+  },
+  {
+    "number": "OP01-014",
+    "name": "甚平",
+    "status": "complex",
+    "reason": "阻挡时从手牌登场红色角色，filter无颜色键，无法表达'红色'限定"
+  },
+  {
+    "number": "OP01-019",
+    "name": "巴尔托洛梅奥",
+    "status": "complex",
+    "reason": "对方回合中此角色力量+3000，为纯持续/静态修正且无事件触发"
+  },
+  {
+    "number": "OP01-021",
+    "name": "弗兰奇",
+    "status": "complex",
+    "reason": "效果为改变攻击目标(可攻击对方活跃角色),属未列出的攻击目标机制,无对应 op,判 complex。"
+  },
+  {
+    "number": "OP01-031",
+    "name": "光月御殿",
+    "status": "complex",
+    "reason": "成本要求丢弃的必须是带《和之国》特征的手牌，cost.handDiscard 无法按特征过滤，且该过滤成本与结果强耦合，判 complex。"
+  },
+  {
+    "number": "OP01-032",
+    "name": "阿修罗童子",
+    "status": "complex",
+    "reason": "纯持续/静态修正:对方有≥2休息角色时本角色力量+2000，无事件触发，需 C# 脚本。"
+  },
+  {
+    "number": "OP01-037",
+    "name": "河松",
+    "status": "complex",
+    "reason": "【触发】此卡牌登场:从生命区打出自身的机制无对应 op,判 complex。"
+  },
+  {
+    "number": "OP01-044",
+    "name": "夏齐",
+    "status": "complex",
+    "reason": "登场时条件「我方场上不存在特定名称佩金」无对应 if 条件键可表达"
+  },
+  {
+    "number": "OP01-050",
+    "name": "佩金",
+    "status": "complex",
+    "reason": "登场时条件「我方场上不存在特定名称夏齐」无对应 if 条件键可表达"
+  },
+  {
+    "number": "OP01-051",
+    "name": "尤斯塔斯·基德",
+    "status": "complex",
+    "reason": "含持续限制「对方的回合中此卡休息时对方不能攻击本卡以外的角色」，该攻击目标限制机制无对应 op/condition，无法用 DSL 表达，整卡判 complex。"
+  },
+  {
+    "number": "OP01-061",
+    "name": "盖德",
+    "status": "complex",
+    "reason": "「我方回合中当对方角色被 KO 时」属对方角色被 KO 的持续触发，触发枚举仅有自身 OnKO，无法表达对方角色被 KO 的事件，判 complex。"
+  },
+  {
+    "number": "OP01-062",
+    "name": "克洛克达尔",
+    "status": "complex",
+    "reason": "领袖效果依赖「我方发动事件时」事件触发节(无 OnEventPlay 枚举),且需追踪「本回合是否已通过此领袖效果抽过牌」的特殊一次性状态,DSL 无法表达。"
+  },
+  {
+    "number": "OP01-063",
+    "name": "阿龙",
+    "status": "complex",
+    "reason": "需公开对方手牌并判断「是否为事件卡」再据此让对方生命入卡组底,涉及公开手牌后的条件联动,DSL 无此机制。"
+  },
+  {
+    "number": "OP01-064",
+    "name": "爱比达",
+    "status": "complex",
+    "reason": "【攻击时】触发节不支持 cost,而弃1张手牌的成本与回手结果强耦合,无法用 triggers 表达。"
+  },
+  {
+    "number": "OP01-067",
+    "name": "克洛克达尔",
+    "status": "complex",
+    "reason": "【流放】为纯关键词,核心效果「我方手牌中的蓝色事件费用-1」为纯静态减费,属手牌静态减费通道,需 C# 脚本。"
+  },
+  {
+    "number": "OP01-068",
+    "name": "月光·莫利亚",
+    "status": "complex",
+    "reason": "【我方的回合中】手牌≥5时本角色持续获得【双重攻击】,为条件性持续/静态修正,无事件触发,需 C# 脚本。"
+  },
+  {
+    "number": "OP01-069",
+    "name": "凯撒·库朗",
+    "status": "complex",
+    "reason": "【KO时】从卡组按名称「史姆丽」登场角色,DSL 无「从卡组登场指定卡」的 op(PlayChar 仅支持手牌/废弃区),需 C# 脚本。"
+  },
+  {
+    "number": "OP01-070",
+    "name": "杰拉基尔·米霍克",
+    "status": "complex",
+    "reason": "登场时将「任意1张费用≤7的角色」(己方或对方均可)放卡组底,prompt 仅有 Opponent*/Own* 分项,无「任意角色费用≤7」取值,无法精确表达。"
+  },
+  {
+    "number": "OP01-071",
+    "name": "甚平",
+    "status": "complex",
+    "reason": "登场时将「任意1张费用≤3的角色」(己方或对方均可)放卡组底,prompt 无「任意角色」取值;且【触发】为此卡自身登场的特殊机制,无法表达。"
+  },
+  {
+    "number": "OP01-072",
+    "name": "史姆丽",
+    "status": "complex",
+    "reason": "持续/动态力量修正(我方回合中每张手牌力量+1000，需贴咚激活)，无事件触发节，属纯静态/持续修正，须C#脚本。"
+  },
+  {
+    "number": "OP01-073",
+    "name": "堂吉诃德·多弗拉门戈",
+    "status": "complex",
+    "reason": "【登场时】确认卡组顶5张并自选顺序重排放顶或底，属查看并重排机制，op列表未提供该原语。"
+  },
+  {
+    "number": "OP01-077",
+    "name": "佩罗娜",
+    "status": "complex",
+    "reason": "【登场时】确认卡组顶5张并自选顺序重排放顶或底，属查看并重排机制，无对应op原语。"
+  },
+  {
+    "number": "OP01-082",
+    "name": "莫奈",
+    "status": "complex",
+    "reason": "trigger 仅为【触发】将此卡登场，需要从生命区把自身打到场上的机制，无对应 op 可表达"
+  },
+  {
+    "number": "OP01-083",
+    "name": "Mr.1(达兹·波涅斯)",
+    "status": "complex",
+    "reason": "纯持续/静态修正：我方回合中按废弃区事件数量条件性力量+1000，无事件触发，需 C# 脚本"
+  },
+  {
+    "number": "OP01-086",
+    "name": "超绞线鞭击",
+    "status": "complex",
+    "reason": "【反击】后段需将活跃状态且费用≤3的任意（持有者两方）角色放回手牌；filter 无活跃状态键、prompt 无『任意一方角色』取值，trigger 同理无法表达"
+  },
+  {
+    "number": "OP01-088",
+    "name": "沙漠宝刀",
+    "status": "complex",
+    "reason": "【反击】后段需确认卡组顶3张自选排列放最上或最下（查看并重排机制），无对应 op，无法表达"
+  },
+  {
+    "number": "OP01-089",
+    "name": "弯月形沙丘",
+    "status": "complex",
+    "reason": "【反击】将任意（持有者两方）费用≤5角色放回手牌，prompt 无『任意一方角色』取值，无法精确表达"
+  },
+  {
+    "number": "OP01-091",
+    "name": "烬",
+    "status": "complex",
+    "reason": "纯持续/静态修正：我方回合中场上10张咚时对方全体角色力量-1000，无事件触发，需 C# 脚本"
+  },
+  {
+    "number": "OP01-094",
+    "name": "盖德",
+    "status": "complex",
+    "reason": "需将此角色以外的所有角色（敌我双方全体）KO，没有「全体KO/KO除自身外全部」的 op，无法用单目标 KO 表达。"
+  },
+  {
+    "number": "OP01-099",
+    "name": "黑炭蝉丸",
+    "status": "complex",
+    "reason": "纯持续效果：我方其他《黑炭家》角色不会在战斗中被KO，属静态修正，需 C# 脚本实现。"
+  },
+  {
+    "number": "OP01-104",
+    "name": "斯皮德",
+    "status": "complex",
+    "reason": "【触发】此卡牌登场=从生命作为该卡登场，缺少对应自身登场 op，无法用 DSL 表达。"
+  },
+  {
+    "number": "OP01-105",
+    "name": "保皇",
+    "status": "complex",
+    "reason": "【登场时】公开对方2张手牌，无公开对方手牌的 op 可用。"
+  },
+  {
+    "number": "OP01-109",
+    "name": "福兹·弗",
+    "status": "complex",
+    "reason": "【我方回合中】场上咚≥8时本角色力量+1000，属纯持续/静态修正且需条件判定，无事件触发。"
+  },
+  {
+    "number": "OP01-112",
+    "name": "佩吉旺",
+    "status": "complex",
+    "reason": "「本回合此角色可以攻击对方处于活跃状态的角色」属于改变攻击合法目标规则的特殊一次性状态，op 列表中无对应机制，无法用 DSL 表达。"
+  },
+  {
+    "number": "OP01-116",
+    "name": "人造恶魔果实SMILE",
+    "status": "complex",
+    "reason": "确认卡组顶5张并将其中符合条件的角色直接登场，再把剩余卡按自选顺序放回卡组底——「看卡组顶若干张并从中登场」的机制 op 列表中没有（LookTopReveal 只能加手牌），无法用 DSL 表达。"
+  },
+  {
+    "number": "OP01-120",
+    "name": "杰克斯",
+    "status": "complex",
+    "reason": "【攻击时】本次战斗中对方力量≤2000的角色不能发动【阻挡者】——需对「对方力量≤2000的全体角色」批量施加 CannotBeBlocker 限制，AddRestriction 仅作用于单个 $tgt 且无按力量批量过滤的机制，无法用 DSL 表达（速攻为纯关键词）。"
+  },
+  {
+    "number": "OP02-002",
+    "name": "蒙奇·D·戈普",
+    "status": "complex",
+    "reason": "触发时机是【我方的回合中赋予咚!!时】，无对应触发枚举(无 OnDonAttach)，且为持续型费用减免，无法用 DSL 表达"
+  },
+  {
+    "number": "OP02-004",
+    "name": "爱德华·纽哥特",
+    "status": "complex",
+    "reason": "登场时『直到下个我方回合开始的领袖力量+2000』duration不在列表，且『本回合无法将生命卡加入手牌』为未列出的一次性限制机制，整卡判 complex"
+  },
+  {
+    "number": "OP02-008",
+    "name": "乔兹",
+    "status": "complex",
+    "reason": "在满足条件场合下获得【速攻】属于纯持续/静态条件型关键词赋予，无事件触发，判 complex"
+  },
+  {
+    "number": "OP02-014",
+    "name": "霍怀迪贝",
+    "status": "complex",
+    "reason": "「也可以攻击对方活跃状态的角色」属于改变可攻击目标的特殊机制，op 列表无对应原语，需 C# 脚本。"
+  },
+  {
+    "number": "OP02-015",
+    "name": "卷乃",
+    "status": "complex",
+    "reason": "需选「费用为1的红色角色」，filter 无颜色键也无精确等于费用1的取值，无法精确表达，判 complex。"
+  },
+  {
+    "number": "OP02-016",
+    "name": "马古拉",
+    "status": "complex",
+    "reason": "同 OP02-015，需限定「费用为1的红色角色」，filter 缺颜色键，无法精确表达。"
+  },
+  {
+    "number": "OP02-018",
+    "name": "马尔高",
+    "status": "complex",
+    "reason": "【KO时】带可选弃牌成本且与「丢弃白胡子卡」强耦合，triggers 不支持 cost，又涉及废弃区休息登场自身的条件联动，判 complex。"
+  },
+  {
+    "number": "OP02-019",
+    "name": "拉克约",
+    "status": "complex",
+    "reason": "【我方的回合中】对全体白胡子角色+1000，属纯持续/静态修正，无事件触发，判 complex。"
+  },
+  {
+    "number": "OP02-023",
+    "name": "虽然是个傻儿子，我也还是爱你啊......",
+    "status": "complex",
+    "reason": "主要「本回合无法通过效果将生命加入手牌」属未列出的特殊限制机制，op 无对应原语，判 complex。"
+  },
+  {
+    "number": "OP02-024",
+    "name": "莫比·迪克号",
+    "status": "complex",
+    "reason": "【我方的回合中】对指定名称及白胡子角色条件性+2000，属纯持续/静态修正且按名称指定，判 complex。"
+  },
+  {
+    "number": "OP02-025",
+    "name": "锦卫门",
+    "status": "complex",
+    "reason": "启动主要施加的是延迟减费效果(本回合下次从手牌登场费用≥3的《和之国》角色减费1),属于未列出的延迟登场打折机制,DSL无法表达。"
+  },
+  {
+    "number": "OP02-026",
+    "name": "山智",
+    "status": "complex",
+    "reason": "触发条件为'登场原本没有效果的角色时',此种以登场卡牌属性为条件的触发不在触发枚举内,无法表达。"
+  },
+  {
+    "number": "OP02-027",
+    "name": "犬岚",
+    "status": "complex",
+    "reason": "纯持续/静态保护效果(咚全休息时不因对方效果离场),无事件触发,需C#脚本。"
+  },
+  {
+    "number": "OP02-031",
+    "name": "光月时",
+    "status": "complex",
+    "reason": "条件性持续静态地获得【阻挡者】关键词(场上存在'光月御殿'时),属纯持续修正,需C#脚本。"
+  },
+  {
+    "number": "OP02-035",
+    "name": "特拉法尔加·罗",
+    "status": "complex",
+    "reason": "启动主要的成本包含'将此角色放回持有者手牌',此种自身回手作为成本不在cost键列表内,与PlayCharFromHand收益强耦合,无法表达。"
+  },
+  {
+    "number": "OP02-045",
+    "name": "三刀流 鬼斩",
+    "status": "complex",
+    "reason": "反击+6000可表达，但「之后将原本没有效果的角色登场」涉及 filter 无法表达的“原本没有效果”判定，且属“之后”连锁分句，整体判 complex。"
+  },
+  {
+    "number": "OP02-046",
+    "name": "恶魔风脚 野兽肉踢",
+    "status": "complex",
+    "reason": "主要KO可表达，但【触发】「登场原本没有效果的角色」中“原本没有效果”无对应 filter 键无法表达，整卡判 complex。"
+  },
+  {
+    "number": "OP02-050",
+    "name": "闪电",
+    "status": "complex",
+    "reason": "手牌不多于1张时力量+2000属于无事件触发的条件性静态加成，无法用DSL表达；阻挡者为纯关键词"
+  },
+  {
+    "number": "OP02-051",
+    "name": "安普里奥·伊万科夫",
+    "status": "complex",
+    "reason": "抽卡直到手牌变为3张属于不固定张数的抽卡机制，Draw只支持固定n，无法表达"
+  },
+  {
+    "number": "OP02-052",
+    "name": "卡巴奇",
+    "status": "complex",
+    "reason": "条件为场上存在名为毛奇的角色，if条件键无按名称判定场上某角色存在的机制"
+  },
+  {
+    "number": "OP02-056",
+    "name": "堂吉诃德·多弗拉门戈",
+    "status": "complex",
+    "reason": "确认卡组顶3张并自选排序放回顶/底属于查看并重排机制，无对应op；攻击时弃手牌将对方角色放回卡组底也需复合判定"
+  },
+  {
+    "number": "OP02-061",
+    "name": "莫里",
+    "status": "complex",
+    "reason": "禁止对方发动费用≤5角色的阻挡者效果，无对应op机制可表达"
+  },
+  {
+    "number": "OP02-062",
+    "name": "蒙奇·D·路飞",
+    "status": "complex",
+    "reason": "登场时/攻击时的弃2张手牌成本与放回角色结果强耦合，且触发节不支持cost；双重攻击赋予可表达但整体需C#"
+  },
+  {
+    "number": "OP02-063",
+    "name": "Mr.1(达兹·波涅斯)",
+    "status": "complex",
+    "reason": "登场时从废弃区取「蓝色」事件，filter 无颜色键，无法用 kind/cost 精确表达颜色限定。"
+  },
+  {
+    "number": "OP02-064",
+    "name": "Mr.2·盆·岁末(本萨姆)",
+    "status": "complex",
+    "reason": "攻击时含可选弃牌成本+将角色放回卡组底，且「本次战斗结束时将此角色放回卡组底」涉及延迟连锁判定，无法表达。"
+  },
+  {
+    "number": "OP02-065",
+    "name": "Mr.3(加尔迪诺)",
+    "status": "complex",
+    "reason": "我方回合结束时带可丢手牌成本将自身活跃，triggers 不支持 cost 且为可选成本，无法表达。"
+  },
+  {
+    "number": "OP02-069",
+    "name": "DEATH WINK",
+    "status": "complex",
+    "reason": "反击「抽取卡牌直到手牌变为2张」为动态张数抽牌，Draw 需固定 n，无法表达。"
+  },
+  {
+    "number": "OP02-071",
+    "name": "麦哲伦",
+    "status": "complex",
+    "reason": "「咚放回咚卡组时」触发时机不在触发枚举内，无法表达。"
+  },
+  {
+    "number": "OP02-072",
+    "name": "泽法",
+    "status": "complex",
+    "reason": "攻击时带咚-4成本(与KO结果强耦合)，triggers 不支持 cost，无法表达。"
+  },
+  {
+    "number": "OP02-074",
+    "name": "侯斯",
+    "status": "complex",
+    "reason": "纯持续/静态修正:按指定卡名给我方‘蓝猩’持续赋予【阻挡者】,无事件触发且需按名称针对特定卡,DSL无法表达"
+  },
+  {
+    "number": "OP02-085",
+    "name": "麦哲伦",
+    "status": "complex",
+    "reason": "效果让对方将其场上的咚!!放回咚!!卡组(减少对方咚),无对应op(ReturnDonToDeck仅作用于我方咚),机制未列出"
+  },
+  {
+    "number": "OP02-093",
+    "name": "斯摩格",
+    "status": "complex",
+    "reason": "「之后」需判定场上是否存在费用0角色再给领袖+1000，属无法表达的连锁条件判定"
+  },
+  {
+    "number": "OP02-094",
+    "name": "伊斯卡",
+    "status": "complex",
+    "reason": "「通过战斗KO对方角色时转活跃」依赖本卡作为攻击方造成KO的事件，触发枚举无对应"
+  },
+  {
+    "number": "OP02-095",
+    "name": "鬼蜘蛛",
+    "status": "complex",
+    "reason": "「场上存在费用0角色时获得【流放】」为静态条件赋予未列出的关键词机制"
+  },
+  {
+    "number": "OP02-100",
+    "name": "强高",
+    "status": "complex",
+    "reason": "纯持续/静态修正:场上存在特定名称『赫波迪』时此角色不被战斗KO,既属按名称的存在条件(无对应if键)又属静态战斗免疫,无法用DSL表达"
+  },
+  {
+    "number": "OP02-101",
+    "name": "草莓",
+    "status": "complex",
+    "reason": "【攻击时】使对方≤5费角色无法发动【阻挡者】效果,属未列出的禁用对方阻挡机制,无对应op"
+  },
+  {
+    "number": "OP02-102",
+    "name": "斯摩格",
+    "status": "complex",
+    "reason": "含『不会因效果被KO』静态免疫,且【攻击时】条件『场上存在费用为0的角色』无对应if键,无法用DSL表达"
+  },
+  {
+    "number": "OP02-110",
+    "name": "日奈",
+    "status": "complex",
+    "reason": "【阻挡时】使对方≤6费角色本回合无法攻击,『无法攻击』限制kind未在规范列出,无法确定可表达,判complex"
+  },
+  {
+    "number": "OP02-111",
+    "name": "赫波迪",
+    "status": "complex",
+    "reason": "【攻击时】条件为『我方场上存在特定名称强高』,无对应按名称存在的if条件键,无法用DSL表达"
+  },
+  {
+    "number": "OP02-113",
+    "name": "希路麦波",
+    "status": "complex",
+    "reason": "攻击时费用-2可表达，但‘之后场上存在费用为0角色则力量+2000’需检测场上是否存在0费角色的条件，if 条件键无此项，无法表达；触发为此卡登场亦特殊"
+  },
+  {
+    "number": "OP02-114",
+    "name": "波尔萨利诺",
+    "status": "complex",
+    "reason": "纯持续/静态效果：对方回合中不被效果KO且力量+1000，无事件触发，需C#脚本"
+  },
+  {
+    "number": "OP02-118",
+    "name": "八尺琼勾玉",
+    "status": "complex",
+    "reason": "反击部分(弃1手牌选我方角色本次战斗不被KO)可表达，但【触发】为‘KO对方费用≤3的舞台’，prompt 无按费用筛选对方舞台的取值，无法完整表达，整卡判complex"
+  },
+  {
+    "number": "OP02-120",
+    "name": "乌塔",
+    "status": "complex",
+    "reason": "登场时咚-2效果为‘直到下个我方回合开始时全体领袖角色+1000’，为跨回合持续加成，AddPowerAll仅本回合无该duration，无法表达"
+  },
+  {
+    "number": "OP02-121",
+    "name": "库赞",
+    "status": "complex",
+    "reason": "登场时KO对方0费角色可表达，但核心【我方回合中对方全体角色费用-5】为纯持续静态修正，无事件触发，需C#脚本，整卡判complex"
+  },
+  {
+    "number": "OP03-001",
+    "name": "波特夹斯·D·艾斯",
+    "status": "complex",
+    "reason": "攻击或被攻击时可丢弃任意张数事件/舞台卡，按丢弃张数动态决定+1000的次数，属于无固定数量的按量加成连锁，DSL 无法表达。"
+  },
+  {
+    "number": "OP03-002",
+    "name": "艾狄欧",
+    "status": "complex",
+    "reason": "需对对方所有力量≤2000的角色批量施加【阻挡者】不能发动的限制，AddRestriction 仅单目标($tgt)，无法按 filter 批量施加。"
+  },
+  {
+    "number": "OP03-004",
+    "name": "克里埃尔",
+    "status": "complex",
+    "reason": "「登场回合无法攻击领袖」为静态限制、【咚×1】获得速攻为持续静态修正，均无事件触发，属纯静态机制。"
+  },
+  {
+    "number": "OP03-005",
+    "name": "沙奇",
+    "status": "complex",
+    "reason": "「之后当本回合结束时将此角色放入废弃」是与+2000强耦合的延迟连锁，无对应延迟到回合结束自毁的 op，无法表达。"
+  },
+  {
+    "number": "OP03-008",
+    "name": "巴奇",
+    "status": "complex",
+    "reason": "「不会被斩属性KO」为持续静态机制无法表达；登场检索限定为「红色事件」，filter 无颜色键无法精确表达颜色限定。"
+  },
+  {
+    "number": "OP03-012",
+    "name": "马歇尔·D·提奇",
+    "status": "complex",
+    "reason": "攻击时代价为「将力量≥4000的红色角色放入废弃」与抽1及+1000强耦合，且红色限定 filter 无颜色键，无法精确表达。"
+  },
+  {
+    "number": "OP03-013",
+    "name": "马尔高",
+    "status": "complex",
+    "reason": "登场时KO可表达，但【KO时】需以「丢弃手牌事件」为成本从废弃区横置登场此角色自身（特定名称登场+触发节带成本耦合），DSL 无法表达，整卡判 complex。"
+  },
+  {
+    "number": "OP03-015",
+    "name": "莉姆",
+    "status": "complex",
+    "reason": "【阻挡者】为关键词；核心效果是【对方的回合中】此角色被KO时令对方1张领袖/角色力量-2000，属于「自身被KO作为触发源」且限对方回合，触发枚举 OnKO 无法区分被KO主体且不带回合条件键，无法精确表达，判 complex。"
+  },
+  {
+    "number": "OP03-016",
+    "name": "炎帝",
+    "status": "complex",
+    "reason": "【主要】含「领袖为艾斯时KO对方≤8000角色」可部分表达，但同时令我方领袖本回合获得【双重攻击】并力量+3000、且「此卡伤害变为2」属于无法表达的伤害修正机制，整卡判 complex。"
+  },
+  {
+    "number": "OP03-020",
+    "name": "STRIKER",
+    "status": "complex",
+    "reason": "【启动主要】检索可用 LookTopReveal 表达，但附带「我方领袖为艾斯」的限定，DSL 无 leaderNameEquals 之外条件可表，且 activated 节确支持 if+cost；不过名称限定 leaderNameEquals 仅以中文官方译名比对存在不确定，且检索条件耦合特定领袖，稳妥判 complex。"
+  },
+  {
+    "number": "OP03-021",
+    "name": "克洛",
+    "status": "complex",
+    "reason": "【启动主要】成本需「将我方2张《东海》特征角色转为休息」属未列出的特定成本（restActiveDon 仅横置咚，无法横置指定特征角色），且效果含活跃自身领袖，整体无法表达，判 complex。"
+  },
+  {
+    "number": "OP03-022",
+    "name": "阿龙",
+    "status": "complex",
+    "reason": "【咚‼×2】为登场前置的贴咚激活条件，叠加【攻击时】以横置1咚为成本登场手牌≤4费且带【触发】角色；触发节不支持 cost、且 filter 无「拥有触发效果」键，无法表达，判 complex。"
+  },
+  {
+    "number": "OP03-025",
+    "name": "克里克",
+    "status": "complex",
+    "reason": "登场时『弃1手牌』成本与KO结果强耦合(可选弃牌才能KO)，triggers不支持cost；且【咚×1】获得双重攻击属于贴咚联动的持续/静态加成，DSL均无法表达"
+  },
+  {
+    "number": "OP03-027",
+    "name": "暹罗猫",
+    "status": "complex",
+    "reason": "包含『我方场上不存在花斑猫』的条件判定及按名称从手牌登场特定卡的多步联动，if条件键与DSL均无法表达该场上不存在判定"
+  },
+  {
+    "number": "OP03-028",
+    "name": "强高",
+    "status": "complex",
+    "reason": "登场时『选择以下1项』的模式二选一机制，DSL无对应的多项选择op"
+  },
+  {
+    "number": "OP03-030",
+    "name": "奈美",
+    "status": "complex",
+    "reason": "检索需同时满足『绿色』+『东海』特征，match/filter无颜色过滤键，无法表达绿色约束"
+  },
+  {
+    "number": "OP03-032",
+    "name": "巴奇",
+    "status": "complex",
+    "reason": "『与属性(斩)卡牌战斗中不被KO』为针对特定属性的持续防KO静态效果，DSL无对应机制"
+  },
+  {
+    "number": "OP03-037",
+    "name": "铁齿功",
+    "status": "complex",
+    "reason": "触发要将手牌中拥有【触发】效果的角色登场,『拥有触发效果』无法用 filter 表达"
+  },
+  {
+    "number": "OP03-040",
+    "name": "奈美",
+    "status": "complex",
+    "reason": "卡组0张改判胜利为未列出的特殊胜利机制;且『攻击给予生命伤害时』触发未在触发枚举中"
+  },
+  {
+    "number": "OP03-041",
+    "name": "撒谎布",
+    "status": "complex",
+    "reason": "『攻击给予对方生命伤害时』触发未在触发枚举中(OnAttackDeclare为攻击宣言而非造成伤害)"
+  },
+  {
+    "number": "OP03-043",
+    "name": "盖蒙",
+    "status": "complex",
+    "reason": "『给予对方生命伤害时』触发未在触发枚举中"
+  },
+  {
+    "number": "OP03-045",
+    "name": "加尔根",
+    "status": "complex",
+    "reason": "【对方的回合中】卡组≤20时力量+3000为纯持续静态修正,无事件触发"
+  },
+  {
+    "number": "OP03-046",
+    "name": "健藏",
+    "status": "complex",
+    "reason": "纯持续静态修正:【对方的回合中】卡组≤20时本角色力量+3000,无事件触发,需C#脚本;阻挡者为纯关键词"
+  },
+  {
+    "number": "OP03-047",
+    "name": "卓夫",
+    "status": "complex",
+    "reason": "咚×1当攻击给予对方生命伤害时的触发无对应触发枚举(无OnDealDamage),且与咚条件耦合无法表达,整卡判complex"
+  },
+  {
+    "number": "OP03-051",
+    "name": "贝鲁梅尔",
+    "status": "complex",
+    "reason": "含咚×1攻击给予生命伤害时弃7张,无对应触发枚举且与咚条件耦合,整卡判complex"
+  },
+  {
+    "number": "OP03-053",
+    "name": "约撒&强尼",
+    "status": "complex",
+    "reason": "纯持续静态修正:咚×1且卡组≤20时本角色力量+2000,无事件触发,需C#脚本"
+  },
+  {
+    "number": "OP03-057",
+    "name": "三・千・世・界",
+    "status": "complex",
+    "reason": "「将费用≤5/≤3的角色放回卡组底」目标为敌我任意一方的角色，prompt 取值无敌我通用的「按费用筛选任意角色」选项，无法精确表达目标范围。"
+  },
+  {
+    "number": "OP03-058",
+    "name": "阿斯巴古",
+    "status": "complex",
+    "reason": "领袖含「此领袖无法攻击」纯静态限制(无对应触发与限制op),且启动主要为「按名称/特征从手牌登场特定角色」联动成本,整体需 C# 脚本。"
+  },
+  {
+    "number": "OP03-059",
+    "name": "卡古",
+    "status": "complex",
+    "reason": "【攻击时】带咚!!-1成本(triggers 不支持 cost),且授予的【流放】关键词不在 op/keyword 列表中。"
+  },
+  {
+    "number": "OP03-060",
+    "name": "佳妮法",
+    "status": "complex",
+    "reason": "【攻击时】带咚!!-1成本,triggers 触发节不支持 cost,无法表达。"
+  },
+  {
+    "number": "OP03-063",
+    "name": "赞巴",
+    "status": "complex",
+    "reason": "【登场时】带咚!!-1成本,triggers 触发节不支持 cost,无法表达(阻挡者为纯关键词)。"
+  },
+  {
+    "number": "OP03-066",
+    "name": "巴利",
+    "status": "complex",
+    "reason": "【登场时】带➁(横置2咚)成本,triggers 触发节不支持 cost,无法表达。"
+  },
+  {
+    "number": "OP03-070",
+    "name": "蒙奇·D·路飞",
+    "status": "complex",
+    "reason": "登场时需弃1张费用5角色作为可选成本才能获得速攻，成本与收益强耦合且triggers不支持cost，无法表达"
+  },
+  {
+    "number": "OP03-075",
+    "name": "卡雷拉公司",
+    "status": "complex",
+    "reason": "启动主要条件为领袖名等于阿斯巴古，但该领袖名无法用if可用键(leaderNameEquals存在但需领袖具体名匹配，且本卡条件依赖特定领袖名+启动成本横置舞台)；leaderNameEquals判定不确定，谨慎判complex"
+  },
+  {
+    "number": "OP03-076",
+    "name": "罗布·鲁兹",
+    "status": "complex",
+    "reason": "需监听对方角色被KO的事件并使本领袖活跃，缺少对应触发枚举与机制，且为每回合1次弃牌联动，无法用现有DSL表达"
+  },
+  {
+    "number": "OP03-077",
+    "name": "夏洛特·玲玲",
+    "status": "complex",
+    "reason": "攻击时需被贴2咚为前置且支付②横置费用区咚+弃1手牌作为强耦合成本才入生命，triggers不支持cost，无法表达"
+  },
+  {
+    "number": "OP03-079",
+    "name": "维尔高",
+    "status": "complex",
+    "reason": "【咚!!×1】此角色战斗中不被KO 为持续/静态修正，无对应 op"
+  },
+  {
+    "number": "OP03-080",
+    "name": "卡古",
+    "status": "complex",
+    "reason": "【登场时】可选成本(把废弃区2张含<CP>卡放回卡组底)与 KO 结果强耦合，triggers 不支持 cost，无法表达"
+  },
+  {
+    "number": "OP03-083",
+    "name": "哥奇",
+    "status": "complex",
+    "reason": "【登场时】确认卡组顶5张并自选最多2张置入废弃区、其余放回底，无对应‘自选数张丢废弃’的 op"
+  },
+  {
+    "number": "OP03-086",
+    "name": "斯巴达姆",
+    "status": "complex",
+    "reason": "登场条件‘领袖特征包含<CP>’需子串匹配，但 leaderHasKeyword/leaderHasProperty 均为精确匹配，无法表达 CP9 等含<CP>领袖"
+  },
+  {
+    "number": "OP03-088",
+    "name": "猫头鹰",
+    "status": "complex",
+    "reason": "‘此角色不会因效果而被KO’为持续/静态修正，无对应 op(仅余阻挡者关键词)"
+  },
+  {
+    "number": "OP03-091",
+    "name": "希路麦波",
+    "status": "complex",
+    "reason": "‘原本没有效果的角色’这一筛选条件 filter 无法表达"
+  },
+  {
+    "number": "OP03-092",
+    "name": "罗布·鲁兹",
+    "status": "complex",
+    "reason": "【登场时】可选成本(自选废弃区2张含CP特征卡放回卡组底)与结果(获得速攻)强耦合，而triggers不支持cost节，该成本-收益绑定无法用DSL表达。"
+  },
+  {
+    "number": "OP03-093",
+    "name": "瓦杰",
+    "status": "complex",
+    "reason": "【登场时】成本(丢弃1张手牌)与KO结果强耦合，triggers不支持cost节，无法表达此成本绑定的可选效果。"
+  },
+  {
+    "number": "OP03-094",
+    "name": "空气开门",
+    "status": "complex",
+    "reason": "确认卡组顶5张并将符合条件的角色直接登场(而非加手牌)、剩余入废弃，LookTopReveal只能加手牌、无对应登场op；触发的从废弃区登场指定颜色角色也无filter机制，整体超出现有op。"
+  },
+  {
+    "number": "OP03-095",
+    "name": "肥皂羊",
+    "status": "complex",
+    "reason": "【主要】对方最多2张角色各费用-2需选多目标分别施加费用修正，AddCostMod为单target且无多选语义，无法表达。"
+  },
+  {
+    "number": "OP03-098",
+    "name": "艾尼爱斯·司法岛",
+    "status": "complex",
+    "reason": "【启动主要】对方最多1张角色费用-2需对单选角色施加费用修正，但AddCostMod无filter选目标语义且需配合Choose得到目标后施加，现有AddCostMod未提供从$tgt取目标的减费表达，整体属持续/费用修正机制，判complex。"
+  },
+  {
+    "number": "OP03-099",
+    "name": "夏洛特·卡塔库栗",
+    "status": "complex",
+    "reason": "【攻击时】确认我方或对方生命区顶1张并放回生命顶或底(重排生命)属未列出的查看并重排机制，无对应op。"
+  },
+  {
+    "number": "OP03-102",
+    "name": "山智",
+    "status": "complex",
+    "reason": "【攻击时】可选成本(生命顶/底1张入手)与结果(卡组顶1张入生命顶)强耦合，triggers不支持cost且生命顶/底选择无对应op。"
+  },
+  {
+    "number": "OP03-104",
+    "name": "夏莉",
+    "status": "complex",
+    "reason": "【登场时】确认我方或对方生命区顶1张并放回生命顶或底属查看并重排生命的机制，无对应op；【阻挡者】为关键词。"
+  },
+  {
+    "number": "OP03-105",
+    "name": "夏洛特·烤箱",
+    "status": "complex",
+    "reason": "【攻击时】带成本(丢弃1张拥有【触发】效果的手牌)，triggers 不支持 cost，且成本与+3000收益强耦合、需按‘是否拥有触发效果’筛选手牌，无对应 filter 键，判 complex。"
+  },
+  {
+    "number": "OP03-108",
+    "name": "夏洛特·克力架",
+    "status": "complex",
+    "reason": "持续/静态条件加成(生命少于对方时获得【双重攻击】+力量1000)，属纯持续修正；trigger 为丢弃手牌登场带成本，均无法用 DSL 表达，判 complex。"
+  },
+  {
+    "number": "OP03-110",
+    "name": "夏洛特·果昔",
+    "status": "complex",
+    "reason": "【攻击时】+2000 与‘将生命顶或底1张入手’成本强耦合，而 triggers 不支持 cost，判 complex。"
+  },
+  {
+    "number": "OP03-114",
+    "name": "夏洛特·玲玲",
+    "status": "complex",
+    "reason": "‘之后将对方生命区最上方1张放置到废弃区’无对应 op(无法弃置对方生命顶)，判 complex。"
+  },
+  {
+    "number": "OP03-117",
+    "name": "拿破仑",
+    "status": "complex",
+    "reason": "需对指定名称『夏洛特·玲玲』给力量+1000且持续到下个我方回合开始的跨回合持续修正，DSL无法表达该持续duration"
+  },
+  {
+    "number": "OP03-119",
+    "name": "斩・切・麻糬",
+    "status": "invalid->complex",
+    "reason": "OP03-119: 未知条件 \"selfLifeCountLte\"",
+    "effectText": ""
+  },
+  {
+    "number": "OP03-120",
+    "name": "热海温泉",
+    "status": "complex",
+    "reason": "需将对方生命区最上方卡牌放置到废弃区(对方生命弃顶机制)，DSL无对应op，仅有OppLifeToHand将对方生命入手不符合"
+  },
+  {
+    "number": "OP03-123",
+    "name": "夏洛特·卡塔库栗",
+    "status": "complex",
+    "reason": "登场时将1张费用≤8角色正面朝上置入持有者生命区最上方或最下方，需选择放生命顶/底且面朝上的机制，MoveCharToLife仅支持置入生命顶无法表达上/下选项"
+  },
+  {
+    "number": "OP04-004",
+    "name": "卡鲁",
+    "status": "complex",
+    "reason": "需给我方所有阿拉巴斯坦王国角色各贴1张休息咚,AttachDon仅能单目标,无群体贴咚op"
+  },
+  {
+    "number": "OP04-005",
+    "name": "功夫海牛",
+    "status": "complex",
+    "reason": "条件性静态获得阻挡者(场上存在另一张同名功夫海牛时),纯持续/静态修正无事件触发"
+  },
+  {
+    "number": "OP04-006",
+    "name": "空扎",
+    "status": "complex",
+    "reason": "增益持续'直到下个我方回合开始'超出本回合,AddPowerThisTurn无法表达该持续时长;且代价'领袖-5000'为非标准成本"
+  },
+  {
+    "number": "OP04-009",
+    "name": "超级快跑鸭部队",
+    "status": "complex",
+    "reason": "效果为'本回合结束时将自身放回手牌'的延迟触发,无对应op表达回合结束延迟退手牌;且代价为非标准的领袖-5000成本"
+  },
+  {
+    "number": "OP04-011",
+    "name": "奈美",
+    "status": "complex",
+    "reason": "公开卡组顶1张并据其力量条件给自身加力量再放回底，属查看顶卡条件联动机制，LookTopReveal 只能加手牌无法表达此条件性自增益"
+  },
+  {
+    "number": "OP04-012",
+    "name": "奈菲特·可不拉",
+    "status": "complex",
+    "reason": "【我方的回合中】对其他阿拉巴斯坦王国角色全体+1000，纯持续静态修正且无事件触发"
+  },
+  {
+    "number": "OP04-013",
+    "name": "佩鲁",
+    "status": "complex",
+    "reason": "KO对方力量(当前值)不高于4000的角色，filter 仅有 originalPowerLte 无法表达当前力量阈值，拿不准判 complex"
+  },
+  {
+    "number": "OP04-014",
+    "name": "蒙奇·D·路飞",
+    "status": "complex",
+    "reason": "【流放】为给伤害时该卡入废弃而非触发，属规范未列出的特殊机制"
+  },
+  {
+    "number": "OP04-017",
+    "name": "甜蜜之击",
+    "status": "complex",
+    "reason": "【反击】对方-2000后『之后我方领袖活跃则再-1000』，条件列表无『我方领袖活跃』键，属之后分句的无法表达连锁判定"
+  },
+  {
+    "number": "OP04-020",
+    "name": "一生",
+    "status": "complex",
+    "reason": "含【我方的回合中】对方所有角色费用-1的纯持续静态修正(无事件触发)，需 C# 脚本，整卡判 complex"
+  },
+  {
+    "number": "OP04-021",
+    "name": "维奥拉",
+    "status": "complex",
+    "reason": "效果是将对方咚!!转为休息，无对应 op(Rest 只能针对角色/领袖，无横置对方咚的原语);且 OnOppAttackDeclare 触发节自带支付2咚成本，触发节不支持 cost。"
+  },
+  {
+    "number": "OP04-024",
+    "name": "糖糖",
+    "status": "complex",
+    "reason": "【对方的回合中】【每回合1次】当对方登场角色时触发的横置效果,无\"对方登场角色时\"触发枚举,无法用 DSL 表达;含两个能力其一不可表达。"
+  },
+  {
+    "number": "OP04-025",
+    "name": "乔拉",
+    "status": "complex",
+    "reason": "OnOppAttackDeclare 触发自带支付2咚的激活成本,触发节不支持 cost,成本与发动强耦合。"
+  },
+  {
+    "number": "OP04-026",
+    "name": "赛诺尔·平克",
+    "status": "complex",
+    "reason": "OnAttackDeclare 触发自带支付1咚成本(触发节不支持 cost),且含\"之后当本回合结束时活跃咚\"的延迟连锁,均无法表达。"
+  },
+  {
+    "number": "OP04-028",
+    "name": "迪亚曼蒂",
+    "status": "complex",
+    "reason": "活跃自身的条件是\"我方场上有≥2张活跃状态咚!!\",if 条件键中无\"活跃咚数量≥N\"项,无法表达。"
+  },
+  {
+    "number": "OP04-030",
+    "name": "托雷波尔",
+    "status": "complex",
+    "reason": "含两个能力:【登场时】KO对方休息且费用≤5角色可表达,但【对方攻击时】②自带支付2咚的激活成本(触发节不支持 cost),整卡含不可表达能力故判 complex。"
+  },
+  {
+    "number": "OP04-031",
+    "name": "堂吉诃德·多弗拉门戈",
+    "status": "complex",
+    "reason": "效果是让对方休息角色在下个重置阶段不转活跃，属于跨阶段的「禁止活跃」标记机制，op 列表中没有对应原语。"
+  },
+  {
+    "number": "OP04-032",
+    "name": "Baby 5",
+    "status": "complex",
+    "reason": "【我方的回合结束时】触发节不支持 cost，而本卡的「将此角色放置废弃区」是与活跃咚收益强耦合的牺牲成本，无法在 triggers 中表达。"
+  },
+  {
+    "number": "OP04-033",
+    "name": "马赫维斯",
+    "status": "complex",
+    "reason": "登场时休息部分可表达，但「之后，当本回合结束时活跃1张咚」是登记延迟到回合结束触发的连锁，DSL 无法表达此延迟挂载机制。"
+  },
+  {
+    "number": "OP04-034",
+    "name": "拉奥·G",
+    "status": "complex",
+    "reason": "条件为「场上存在3张或更多处于活跃状态的咚」，if 条件键中没有「活跃咚数量」判定（selfDonTotalGte 统计的是总咚非活跃咚），无法准确表达。"
+  },
+  {
+    "number": "OP04-037",
+    "name": "羽击线",
+    "status": "complex",
+    "reason": "反击效果带「领袖含《堂吉诃德海盗团》特征」前置条件，但 counter 节是无条件 op 列表，不支持 if，无法表达该领袖特征判定。"
+  },
+  {
+    "number": "OP04-040",
+    "name": "昆因",
+    "status": "complex",
+    "reason": "触发条件「生命牌与手牌合计张数≤4」无对应 if 条件键，且「场上有8费角色时改为将牌顶置入生命代替抽牌」是二选一替代抽牌机制，均无法用 DSL 表达。"
+  },
+  {
+    "number": "OP04-042",
+    "name": "一本松",
+    "status": "complex",
+    "reason": "需对'拥有属性（斩）的角色'施加力量+3000，属性(斩)是attribute非特征/费用/力量，filter无对应键无法表达"
+  },
+  {
+    "number": "OP04-043",
+    "name": "润媞",
+    "status": "complex",
+    "reason": "将费用≤2角色'放回其持有者的手牌或卡组最下方'由持有者二选一，hand/deck分支选择无法用单一op表达"
+  },
+  {
+    "number": "OP04-047",
+    "name": "冰鬼",
+    "status": "complex",
+    "reason": "战斗结束时(无对应触发枚举)将与之战斗的对方费用≤5角色放回卡组底，需战斗结束钩子及对手角色引用，无法表达"
+  },
+  {
+    "number": "OP04-048",
+    "name": "笹木",
+    "status": "complex",
+    "reason": "将全部手牌放回卡组洗牌后抽取相同张数，无对应op机制(手牌整体回库并按数量动态抽牌)"
+  },
+  {
+    "number": "OP04-053",
+    "name": "佩吉旺",
+    "status": "complex",
+    "reason": "触发时机为我方发动事件时，无对应 on 触发枚举(OnPlayEvent类)，无法表达"
+  },
+  {
+    "number": "OP04-055",
+    "name": "瘟疫弹",
+    "status": "complex",
+    "reason": "成本需按名称弃\"冰鬼\"并放回费用≤4角色，且结果为按名称从废弃区登场\"冰鬼\"，成本与结果强耦合且按名称登场无法用filter精确表达"
+  },
+  {
+    "number": "OP04-058",
+    "name": "克洛克达尔",
+    "status": "complex",
+    "reason": "对方回合中每回合1次，咚因我方效果被放回咚卡组时补咚，触发时机为咚回卡组事件无对应on枚举，纯被动联动机制"
+  },
+  {
+    "number": "OP04-059",
+    "name": "阿斯巴古",
+    "status": "complex",
+    "reason": "对方攻击时带咚-1成本(triggers不支持cost)，且条件领袖含七水之城本回合获得阻挡者，成本与触发耦合无法表达"
+  },
+  {
+    "number": "OP04-060",
+    "name": "克洛克达尔",
+    "status": "complex",
+    "reason": "登场时带咚-2成本(triggers不支持cost)，且含对方攻击时带咚-1成本的第二段效果，成本与触发强耦合无法表达"
+  },
+  {
+    "number": "OP04-063",
+    "name": "弗兰奇",
+    "status": "complex",
+    "reason": "【对方攻击时】带咚!!-1成本及【每回合1次】，触发节(triggers)不支持 cost 与 oncePerTurn，成本与发动强耦合，无法用 DSL 表达。"
+  },
+  {
+    "number": "OP04-064",
+    "name": "Ms.全周日",
+    "status": "complex",
+    "reason": "登场补咚后再以'之后'按场上咚数量(≥6)条件抽牌，涉及补咚后再判定的连锁顺序，DSL 无法可靠表达该先后联动。"
+  },
+  {
+    "number": "OP04-065",
+    "name": "Ms.黄金周(玛丽安奴)",
+    "status": "complex",
+    "reason": "使对方角色'无法攻击'的限制(CannotAttack)未在 AddRestriction 的 kind 列表中，无法表达。"
+  },
+  {
+    "number": "OP04-068",
+    "name": "横纲",
+    "status": "complex",
+    "reason": "【对方攻击时】带咚!!-1成本将对方角色放回手牌，触发节不支持 cost，成本与发动强耦合，无法表达。"
+  },
+  {
+    "number": "OP04-069",
+    "name": "Mr.2·盆·岁末(本萨姆)",
+    "status": "complex",
+    "reason": "【对方攻击时】带咚!!-1成本，且需将自身原本力量设为与攻击者相同(动态取攻击者力量)，无对应 op 且触发节不支持 cost。"
+  },
+  {
+    "number": "OP04-070",
+    "name": "Mr.3(加尔迪诺)",
+    "status": "complex",
+    "reason": "【对方攻击时】带咚!!-1成本及【每回合1次】，触发节不支持 cost 与 oncePerTurn，成本与发动强耦合，无法表达。"
+  },
+  {
+    "number": "OP04-071",
+    "name": "Mr.4(贝布)",
+    "status": "complex",
+    "reason": "【对方攻击时】带可选咚成本，且核心是『将攻击对象改为此卡牌』改变攻击目标的机制，未在op列表中，无法用DSL表达。"
+  },
+  {
+    "number": "OP04-072",
+    "name": "Mr.5(杰姆)",
+    "status": "complex",
+    "reason": "【对方攻击时】触发节，但带【每回合1次】+咚-2+横置自身的强耦合成本(KO效果依赖支付成本),triggers不支持cost与oncePerTurn,无法表达。"
+  },
+  {
+    "number": "OP04-073",
+    "name": "Mr.13&Ms.星期五",
+    "status": "complex",
+    "reason": "【启动主要】成本为『将此角色和另1张巴洛克工作室角色放置废弃区』,cost键无『额外废弃一张指定特征角色』选项,成本与登场强相关,无法表达。"
+  },
+  {
+    "number": "OP04-080",
+    "name": "盖茨",
+    "status": "complex",
+    "reason": "【登场时】赋予我方德莱斯罗兹角色『可以攻击活跃状态角色』,该攻击规则修改机制未在op/keyword列表中,无法表达。"
+  },
+  {
+    "number": "OP04-081",
+    "name": "凯文迪修",
+    "status": "complex",
+    "reason": "含『咚×1可攻击活跃角色』静态攻击规则修改,且【攻击时】成本为横置我方领袖(restLeader不在cost键中),两处机制均无法表达。"
+  },
+  {
+    "number": "OP04-083",
+    "name": "萨波",
+    "status": "complex",
+    "reason": "【登场时】使我方所有角色直到下回合不会因效果被KO,属持续特殊免KO状态,DSL无对应机制;与后续抽弃为同一登场时效果,整体判complex"
+  },
+  {
+    "number": "OP04-084",
+    "name": "斯图西",
+    "status": "complex",
+    "reason": "确认卡组顶3张并从中将符合条件的角色直接登场(再把剩余弃掉),DSL无从卡组顶登场角色的op(LookTopReveal只能加入手牌),无法表达"
+  },
+  {
+    "number": "OP04-086",
+    "name": "青椒",
+    "status": "complex",
+    "reason": "触发条件为「此角色通过战斗将对方角色KO时」,DSL的OnKO仅表示本卡被KO时,无对应「本卡战斗击杀对方」的触发枚举,无法表达"
+  },
+  {
+    "number": "OP04-088",
+    "name": "海尔丁",
+    "status": "complex",
+    "reason": "【启动主要】成本为「将我方1张领袖转为休息状态」,cost成本节无横置领袖的键(仅restSelf横置自身),成本无法表达且为激活前置,判complex"
+  },
+  {
+    "number": "OP04-090",
+    "name": "蒙奇·D·路飞",
+    "status": "complex",
+    "reason": "「可攻击活跃状态角色」为改变攻击目标规则、「7张废弃区卡放回卡组底+下回合不活跃」涉及自选顺序回底与跳过活跃的特殊状态,均无对应op,判complex"
+  },
+  {
+    "number": "OP04-093",
+    "name": "橡皮橡皮大猿王枪",
+    "status": "complex",
+    "reason": "主要给角色+6000后，按废弃区≥15条件单独让该角色获得双重攻击；op 无法逐条带 if 条件，第二分句的条件化关键词赋予无法用 DSL 表达。"
+  },
+  {
+    "number": "OP04-094",
+    "name": "雷霆 破坏剑",
+    "status": "complex",
+    "reason": "主要的可选 KO 目标费用上限随废弃区≥15在 Le4/Le6 间切换(需按条件切换 prompt)；触发又含'转休息领袖'成本与 KO 强耦合，均无法用 DSL 表达。"
+  },
+  {
+    "number": "OP04-095",
+    "name": "防护～～～～～～盾!",
+    "status": "complex",
+    "reason": "反击为 op 数组不支持 if，而'之后若废弃区≥15再+2000'是条件化追加，无法在 counter 中按条件分支表达。"
+  },
+  {
+    "number": "OP04-096",
+    "name": "斗牛竞技场",
+    "status": "complex",
+    "reason": "舞台的纯持续/静态效果(登场回合可攻击角色),无事件触发,属 complex。"
+  },
+  {
+    "number": "OP04-098",
+    "name": "阿户子",
+    "status": "complex",
+    "reason": "登场时可选成本为'丢弃2张含和之国特征手牌',触发节不支持 cost,且该具名成本与结果强耦合,无法用 DSL 表达。"
+  },
+  {
+    "number": "OP04-099",
+    "name": "阿玲",
+    "status": "complex",
+    "reason": "主体为'卡名视为夏洛特·玲玲'的规则改名(未列出机制);触发的'此卡牌登场'即从生命区将自身登场也无对应 op。"
+  },
+  {
+    "number": "OP04-100",
+    "name": "卡彭·班吉",
+    "status": "complex",
+    "reason": "触发让对方1张领袖或角色本回合'无法攻击',AddRestriction 无 CannotAttack 类限制,机制未在规范列出。"
+  },
+  {
+    "number": "OP04-102",
+    "name": "锦卫门",
+    "status": "complex",
+    "reason": "成本为可选费用区咚转休息且数量可变，并需将生命区最上方或最下方1张入手(顶/底选择DSL无法表达)，成本与活跃结果耦合，无对应op。"
+  },
+  {
+    "number": "OP04-105",
+    "name": "夏洛特·阿曼朵",
+    "status": "complex",
+    "reason": "成本需弃掉手牌中拥有【触发】效果的卡牌，filter无法表达\"拥有触发效果\"这一属性。"
+  },
+  {
+    "number": "OP04-106",
+    "name": "夏洛特·巴巴洛亚",
+    "status": "complex",
+    "reason": "咚×1的纯持续/静态力量修正(生命少于对方时+1000)，无事件触发。"
+  },
+  {
+    "number": "OP04-108",
+    "name": "夏洛特·莫斯卡特",
+    "status": "complex",
+    "reason": "咚×1获得【流放】，属未列出的特殊机制，无对应op。"
+  },
+  {
+    "number": "OP04-110",
+    "name": "庞德",
+    "status": "complex",
+    "reason": "【KO时】将对方≤3费角色正面朝上放入对方生命区最上/最下方，DSL无\"对方角色入对方生命且顶底选择\"的op。"
+  },
+  {
+    "number": "OP04-111",
+    "name": "赫拉",
+    "status": "complex",
+    "reason": "成本为废弃自身以外1张《Homies》角色并横置自身(需选牌的复合成本)，cost节无法表达选定废弃指定特征角色。"
+  },
+  {
+    "number": "OP04-112",
+    "name": "大和",
+    "status": "complex",
+    "reason": "【登场时】KO 对方费用『不高于双方生命合计张数』的角色,该费用阈值为动态值,prompt 仅有固定 CostLe0..Le9,无法表达动态阈值;后半段我方生命≤1时卡组顶入生命也需联动,整体判 complex。"
+  },
+  {
+    "number": "OP04-113",
+    "name": "拉比安",
+    "status": "complex",
+    "reason": "trigger『此卡牌登场』指从生命牌触发后将自身登场,op 列表无『从生命登场自身』机制,无法表达。"
+  },
+  {
+    "number": "OP04-116",
+    "name": "恶魔风脚 颊肉Shoot",
+    "status": "complex",
+    "reason": "【反击】+6000可表达,但『之后,双方生命合计≤4时 KO 对方费用≤2角色』为条件分支,counter 节为无条件 op 列表,无法表达该条件连锁,整体判 complex。"
+  },
+  {
+    "number": "OP04-117",
+    "name": "天上之火",
+    "status": "complex",
+    "reason": "【主要】将对方角色正面朝上加入『对方生命区』顶或底,无对应 op(MoveCharToLife 仅置入我方生命),无法表达。"
+  },
+  {
+    "number": "OP04-118",
+    "name": "奈菲特·薇薇",
+    "status": "complex",
+    "reason": "纯持续/静态修正:让此角色以外我方所有费用≥3的红色角色获得速攻,无事件触发,需 C# 脚本。"
+  },
+  {
+    "number": "OP04-119",
+    "name": "堂吉诃德·罗西南德",
+    "status": "complex",
+    "reason": "【对方的回合中】此角色休息时我方活跃且原费用5角色不被效果 KO,为持续静态保护效果,无对应 op/触发机制;【登场时】可选成本登场绿色5费角色亦需联动,整体判 complex。"
+  }
+]

@@ -1,0 +1,105 @@
+{
+  "ST13-004": {
+    "_name": "爱德华·纽哥特",
+    "_note": "【登场时】将我方卡组顶1张加入生命区顶（原文后半“确认全部生命挑1张置卡组顶并重排”无 scry op 已略去）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "AddLifeFromDeck", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST13-006": {
+    "_name": "加利·达丹",
+    "_note": "【阻挡者】+【登场时】将手牌中各最多1张费用2的“萨波/波特夹斯·D·艾斯/蒙奇·D·路飞”登场。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "PlayCharFromHand", "filter": { "nameEquals": "萨波", "originalCostGte": 2, "originalCostLte": 2 }, "text": "费用2“萨波”登场" },
+          { "op": "PlayCharFromHand", "filter": { "nameEquals": "波特夹斯·D·艾斯", "originalCostGte": 2, "originalCostLte": 2 }, "text": "费用2“波特夹斯·D·艾斯”登场" },
+          { "op": "PlayCharFromHand", "filter": { "nameEquals": "蒙奇·D·路飞", "originalCostGte": 2, "originalCostLte": 2 }, "text": "费用2“蒙奇·D·路飞”登场" }
+        ]
+      }
+    ]
+  },
+  "ST13-008": {
+    "_name": "萨波（5费）",
+    "_note": "【登场时】生命顶入手（原文为置废弃，DSL 以 lifeToHand 近似支付1张生命）：KO 对方最多1张费用≤5 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST13-011": {
+    "_name": "波特夹斯·D·艾斯（5费）",
+    "_note": "【登场时】我方生命≤2 时，此角色获得【速攻】。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "ownLifeCountLte": 2 },
+        "then": [
+          { "op": "GiveKeyword", "target": "self", "keyword": "速攻" }
+        ]
+      }
+    ]
+  },
+  "ST13-013": {
+    "_name": "蒙奇·D·戈普",
+    "_note": "【登场时】确认卡组顶5张，公开≤1张费用≤5的“萨波/波特夹斯·D·艾斯/蒙奇·D·路飞”入手，余放回底。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+        ]
+      }
+    ]
+  },
+  "ST13-015": {
+    "_name": "蒙奇·D·路飞（5费）",
+    "_note": "【启动主要】【每回合1次】直到下个我方回合开始此角色+2000（原文后半“生命≥1则抽1并弃生命顶”无弃生命 op，已略去抽牌/弃生命部分）。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "AddPowerPersistent", "target": "self", "delta": 2000 }
+      ]
+    }
+  },
+  "ST13-017": {
+    "_name": "火焰龙王",
+    "_note": "【反击】我方最多1张领袖或角色+4000（原文后半“确认全部生命重排”无 scry op 已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+    ]
+  },
+  "ST13-018": {
+    "_name": "橡皮橡皮JET枪",
+    "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“生命0则抽1”因反击数组无条件分支已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+    ]
+  },
+  "ST13-019": {
+    "_name": "三兄弟的羁绊",
+    "_note": "【主要】确认卡组顶5张，公开≤1张费用≤5的“萨波/波特夹斯·D·艾斯/蒙奇·D·路飞”入手，余放回底；【触发】同。",
+    "main": {
+      "then": [
+        { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+      ]
+    },
+    "trigger": [
+      { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+    ]
+  }
+}

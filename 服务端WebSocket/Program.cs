@@ -20,6 +20,9 @@ CardDatabase.LoadFrom(cardDataPath);
 var dslDir = ResolveDslDir();
 GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(dslDir);
 
+// 重启恢复：把 TTL 内未结束的 PvP 对局重放重建回内存（须在卡库/DSL 加载之后、开监听之前）
+await GrandUMI.Game.GameRoomManager.RestoreAll();
+
 WebSocketBridge.Start(port);
 
 // 等待 Ctrl+C

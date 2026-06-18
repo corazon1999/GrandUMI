@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useDeckStore } from "@/store/deckStore";
 import {
   COLOR_DISPLAY_NAMES,
-  COLOR_DISPLAY_TO_DATA,
-  COLOR_DATA_TO_DISPLAY,
   COLOR_STYLES,
 } from "@/lib/colorMap";
 
@@ -16,6 +14,7 @@ const TYPE_LABELS: Record<string, string> = {
   Character: "角色", Stage: "场地", Event: "事件",
 };
 const RARITIES    = ["", "L", "SR", "R", "UC", "C", "SEC", "P"];
+const COSTS       = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const COL_PRESETS = [4, 5, 6, 7, 8, 9, 10, 12];
 
 
@@ -24,15 +23,16 @@ const SET_GROUPS: { label: string; sets: string[] }[] = [
   { label: "OP 主弹", sets: ["OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10","OP11","OP12","OP13","OP14","OP15","OP16"] },
   { label: "ST 起始", sets: ["ST01","ST02","ST03","ST04","ST05","ST06","ST07","ST08","ST09","ST10","ST11","ST12","ST13","ST14","ST15","ST16","ST17","ST18","ST19","ST20","ST21","ST22","ST23","ST24","ST25","ST26","ST27","ST28","ST29","ST30"] },
   { label: "EB/PRB", sets: ["EB01","EB02","EB03","EB04","PRB01","PRB02"] },
-  { label: "P/其他", sets: ["P","OPD","TY01"] },
+  { label: "P/其他", sets: ["P"] },
 ];
 
 export default function SearchPanel() {
   const {
-    searchQuery, filterColor, filterType, filterProperty, filterRarity,
+    leader,
+    searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost,
     filterSets, filterShowSub1,
     gridColumns,
-    setSearchQuery, setFilterColor, setFilterType, setFilterProperty, setFilterRarity,
+    setSearchQuery, setFilterColor, setFilterType, setFilterProperty, setFilterRarity, setFilterCost,
     toggleFilterSet, clearFilterSets, setFilterShowSub1,
     setGridColumns,
   } = useDeckStore();
@@ -41,8 +41,17 @@ export default function SearchPanel() {
   const [setGroupExpanded, setSetGroupExpanded] = useState<number | null>(null);
 
   const isLeaderMode        = filterType === "Leader";
-  const activeDisplayColor  = COLOR_DATA_TO_DISPLAY[filterColor] ?? "";
-  const hasFilter           = !!(searchQuery || filterColor || filterType || filterProperty || filterRarity || filterSets.length > 0 || filterShowSub1);
+  // 数据层颜色已统一为标准色，filterColor 直接即显示色
+  const activeDisplayColor  = filterColor;
+  const hasFilter           = !!(searchQuery || filterColor || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1);
+
+  // 已选领航且非领航模式时，颜色筛选收缩为领航拥有的颜色（双色剩 2、单色剩 1）；否则显示全部 6 色
+  const leaderDataColors    = leader && !isLeaderMode ? leader.color.split("/") : null;
+  const visibleColorNames   = leaderDataColors
+    ? COLOR_DISPLAY_NAMES.filter((name) => leaderDataColors.includes(name))
+    : COLOR_DISPLAY_NAMES;
+  // 单色领航时「全部」与该色等价，隐藏以免冗余
+  const showAllColorBtn     = !(leaderDataColors && leaderDataColors.length === 1);
 
   return (
     <div className="flex flex-col h-full">
@@ -97,16 +106,18 @@ export default function SearchPanel() {
           <div className="flex flex-col gap-1">
             <label className="text-gray-500 text-[10px]">颜色</label>
             <div className="flex flex-wrap gap-1">
-              <button onClick={() => setFilterColor("")}
-                className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                  filterColor === ""
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-800 text-gray-400 hover:text-white"
-                }`}>
-                全部
-              </button>
-              {COLOR_DISPLAY_NAMES.map((name) => {
-                const dataValue = COLOR_DISPLAY_TO_DATA[name];
+              {showAllColorBtn && (
+                <button onClick={() => setFilterColor("")}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
+                    filterColor === ""
+                      ? "bg-orange-500 text-white"
+                      : "bg-gray-800 text-gray-400 hover:text-white"
+                  }`}>
+                  全部
+                </button>
+              )}
+              {visibleColorNames.map((name) => {
+                const dataValue = name;
                 const styles    = COLOR_STYLES[name];
                 const isActive  = activeDisplayColor === name;
                 return (
@@ -139,6 +150,33 @@ export default function SearchPanel() {
               ))}
             </div>
           </div>
+
+          {/* 费用（领航卡无费用，仅普通模式显示） */}
+          {!isLeaderMode && (
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-500 text-[10px]">费用</label>
+              <div className="flex flex-wrap gap-1">
+                <button onClick={() => setFilterCost(null)}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
+                    filterCost === null
+                      ? "bg-orange-500 text-white"
+                      : "bg-gray-800 text-gray-400 hover:text-white"
+                  }`}>
+                  全部
+                </button>
+                {COSTS.map((c) => (
+                  <button key={c} onClick={() => setFilterCost(c)}
+                    className={`w-6 py-0.5 rounded text-[10px] transition-colors ${
+                      filterCost === c
+                        ? "bg-orange-500 text-white"
+                        : "bg-gray-800 text-gray-400 hover:text-white"
+                    }`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 稀有度 */}
           <div className="flex flex-col gap-1">
@@ -222,7 +260,7 @@ export default function SearchPanel() {
           {hasFilter && (
             <button
               onClick={() => {
-                setSearchQuery(""); setFilterColor(""); setFilterType(""); setFilterProperty(""); setFilterRarity("");
+                setSearchQuery(""); setFilterColor(""); setFilterType(""); setFilterProperty(""); setFilterRarity(""); setFilterCost(null);
                 clearFilterSets(); setFilterShowSub1(false);
               }}
               className="text-gray-600 hover:text-white text-[10px] transition-colors text-center"

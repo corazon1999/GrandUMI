@@ -131,13 +131,16 @@ public class CardEffectTests
     [Fact]
     public async Task OP15_019_HuLianBangCun_EventMain_GivesLeaderPlus1000()
     {
-        var s = TestScene.New().Build();
+        // 卡组备 1 张供新增的【主要】"抽1"步骤；空卡组抽牌会触发败北，RunSteps 遇 IsGameOver 提前中止
+        var s = TestScene.New().MyDeckTop("OP15-050").Build();
         int powerBefore = s.Players[0].Leader.PowerModThisTurn;
+        int handBefore = s.Players[0].Hand.Count;
 
         var card = new CardInstance { Info = CardDatabase.Get("OP15-019")! };
         await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, new MockPromptService());
 
         Assert.Equal(powerBefore + 1000, s.Players[0].Leader.PowerModThisTurn);
+        Assert.Equal(handBefore + 1, s.Players[0].Hand.Count); // 【主要】抽 1
     }
 }
 

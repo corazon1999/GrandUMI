@@ -1,0 +1,37 @@
+{
+  "ST15-002": {
+    "_name": "爱德华·纽哥特",
+    "_note": "【登场时】赋予我方1张领袖或角色最多1张休息咚；【启动主要】横置自身：KO 对方最多1张力量≤5000 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+          { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 5000 }, "text": "KO 对方最多1张力量≤5000 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST15-004": {
+    "_name": "萨奇",
+    "_note": "【登场时】领袖含《白胡子海盗团》则对方最多1张角色本回合-2000，之后我方生命顶1张入手。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "白胡子海盗团" },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "对方最多1张角色本回合力量-2000" },
+          { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -2000 },
+          { "op": "LifeToHand" }
+        ]
+      }
+    ]
+  }
+}

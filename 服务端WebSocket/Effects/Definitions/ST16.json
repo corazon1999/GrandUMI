@@ -1,0 +1,27 @@
+{
+  "ST16-001": {
+    "_name": "乌塔",
+    "_note": "【阻挡者】+【启动主要】【每回合1次】弃1手牌（原文限《FILM》，近似）：赋予我方1张领袖或角色最多1张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "handDiscard": 1 },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  },
+  "ST16-004": {
+    "_name": "杰克斯",
+    "_note": "【登场时】KO 对方最多1张处于休息状态的角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "KO 对方最多1张休息状态的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  }
+}

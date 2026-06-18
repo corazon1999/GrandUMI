@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* 六色对应：炎=红 风=绿 水=蓝 暗=紫 地=黑 光=黄 */
+  /* 卡牌六色 */
   --color-card-red:    #ef4444;
   --color-card-green:  #22c55e;
   --color-card-blue:   #3b82f6;
@@ -20,4 +20,70 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
+}
+
+/* ===== 阻挡者「能量护盾」特效 ===== */
+
+/*
+ * 用可动画的角度变量旋转 conic 渐变（而非 transform 旋转整层，
+ * 否则带 mask 的矩形边框环会被一起转歪）。
+ */
+@property --blocker-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* 亮弧沿卡片四边顺时针流动 */
+@keyframes blocker-rotate {
+  to {
+    --blocker-angle: 360deg;
+  }
+}
+
+/* 打底辉光的强弱呼吸 */
+@keyframes blocker-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/*
+ * 旋转流光边框：铺满卡面的层，conic 渐变里只有一小段青→白亮弧，
+ * 用 mask 的 content-box exclude 技巧只保留约 2px 的边框环，
+ * 再让渐变角度缓慢旋转 —— 亮弧便沿边框流动，像护盾在充能。
+ */
+.blocker-aura {
+  background: conic-gradient(
+    from var(--blocker-angle),
+    transparent 0deg,
+    transparent 250deg,
+    rgba(34, 211, 238, 0.25) 290deg,
+    rgba(103, 232, 249, 0.95) 332deg,
+    #ffffff 346deg,
+    rgba(103, 232, 249, 0.95) 352deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 2px;
+  animation: blocker-rotate 3.5s linear infinite;
+}
+
+/* 打底常驻辉光：始终发亮的青色护盾内光，叠加呼吸 */
+.blocker-glow {
+  box-shadow:
+    inset 0 0 10px rgba(34, 211, 238, 0.55),
+    inset 0 0 2px rgba(165, 243, 252, 0.9);
+  animation: blocker-breathe 2.4s ease-in-out infinite;
 }

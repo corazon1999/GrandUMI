@@ -1,0 +1,55 @@
+{
+  "ST23-002": {
+    "_name": "杰克斯（9费）",
+    "_note": "【登场时】领袖含《红发海盗团》或为“乌塔”时，直到下个对方结束阶段我方领袖+2000（“对方有原力量≥8000角色时手牌费用-3”由 C# HandStaticCost 实现）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "红发海盗团" },
+        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 2000 } ]
+      },
+      {
+        "on": "OnEnterField",
+        "if": { "leaderNameEquals": "乌塔" },
+        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 2000 } ]
+      }
+    ]
+  },
+  "ST23-003": {
+    "_name": "本·贝克曼",
+    "_note": "【登场时】弃1手牌：领袖含《红发海盗团》时，KO 对方最多1张原本力量≤4000 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "红发海盗团" },
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张原本力量≤4000 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST23-004": {
+    "_name": "蒙奇·D·路飞（1费）",
+    "_note": "【启动主要】横置1咚+横置自身：本回合对方最多1张角色力量-1000。",
+    "activated": {
+      "cost": { "restActiveDon": 1, "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-1000" },
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -1000 }
+      ]
+    }
+  },
+  "ST23-005": {
+    "_name": "耶稣布",
+    "_note": "【启动主要】【每回合1次】赋予我方1张领袖或角色最多1张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  }
+}

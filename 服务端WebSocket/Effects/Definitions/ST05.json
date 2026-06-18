@@ -1,0 +1,117 @@
+{
+  "ST05-001": {
+    "_name": "杰克斯（领袖）",
+    "_note": "【启动主要】【每回合1次】咚-3：本回合我方所有《FILM》角色力量+2000。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "donReturn": 3 },
+      "then": [
+        { "op": "AddPowerAll", "side": "own", "delta": 2000, "excludeLeader": true, "filter": { "keyword": "FILM" } }
+      ]
+    }
+  },
+  "ST05-002": {
+    "_name": "艾恩",
+    "_note": "【登场时】从咚卡组追加1张休息状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "RefreshDon", "n": 1, "state": "rest" }
+        ]
+      }
+    ]
+  },
+  "ST05-004": {
+    "_name": "乌塔",
+    "_note": "【阻挡者】+【阻挡时】咚-1：将对方最多1张费用≤5 角色转休息。",
+    "triggers": [
+      {
+        "on": "OnBlockDeclare",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将对方最多1张费用≤5 的角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST05-005": {
+    "_name": "卡丽娜",
+    "_note": "【启动主要】【每回合1次】横置自身+弃1手牌（原文限弃《FILM》牌，DSL 弃牌不限特征，近似）：对方咚不少于我方时追加2张休息咚（原文为“多于”，selfDonNotMoreThanOpp 含相等，近似）。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "restSelf": true, "handDiscard": 1 },
+      "if": { "selfDonNotMoreThanOpp": true },
+      "then": [
+        { "op": "RefreshDon", "n": 2, "state": "rest" }
+      ]
+    }
+  },
+  "ST05-006": {
+    "_name": "吉尔德·德索罗",
+    "_note": "【攻击时】咚-2：抽2张。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "cost": { "donReturn": 2 },
+        "then": [
+          { "op": "Draw", "n": 2 }
+        ]
+      }
+    ]
+  },
+  "ST05-011": {
+    "_name": "道格拉斯·巴雷特",
+    "_note": "【启动主要】【每回合1次】咚-4：将对方最多2张费用≤6 角色转休息，本回合此角色获得【双重攻击】（两次单选近似“最多2张”）。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "donReturn": 4 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$a", "filter": { "originalCostLte": 6 }, "text": "将对方角色转休息（1/2）" },
+        { "op": "Rest", "target": "$a" },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$b", "filter": { "originalCostLte": 6 }, "text": "将对方角色转休息（2/2）" },
+        { "op": "Rest", "target": "$b" },
+        { "op": "GiveKeyword", "target": "self", "keyword": "双重攻击" }
+      ]
+    }
+  },
+  "ST05-014": {
+    "_name": "布埃纳·费斯塔",
+    "_note": "【登场时】确认卡组顶5张，公开≤1张“费斯塔”以外《FILM》卡入手，余放回卡组底。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keyword": "FILM", "excludeName": "布埃纳·费斯塔" } }
+        ]
+      }
+    ]
+  },
+  "ST05-016": {
+    "_name": "狮子威“御所地卷”",
+    "_note": "【主要】咚-2：KO 对方最多1张费用≤5 角色；【触发】追加1张活跃咚。",
+    "main": {
+      "cost": { "donReturn": 2 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    },
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
+  },
+  "ST05-017": {
+    "_name": "铠甲合体",
+    "_note": "【反击】我方最多1张《FILM》领袖或角色+4000，且为角色时本回合不被KO；【触发】追加1张活跃咚。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "FILM" }, "text": "本次战斗我方最多1张《FILM》领袖或角色+4000且不被KO" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 },
+      { "op": "MarkPreventKO", "target": "$t" }
+    ],
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
+  }
+}

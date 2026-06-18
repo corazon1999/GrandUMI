@@ -14,10 +14,13 @@ public class OP16_001_Ace : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        const string key = "OP16-001-MainOncePerTurn";
+        var key = "OP16-001-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        var candidates = me.Characters.Where(c =>
+        // 原文「我方 1 张力量≥8000 的…」含领袖自身（艾斯 keyWords 含「白胡子海盗团」），故候选池纳入领袖
+        var pool = new List<CardInstance> { me.Leader };
+        pool.AddRange(me.Characters);
+        var candidates = pool.Where(c =>
             c.Info.Power >= 8000 &&
             (c.MatchesName("蒙奇·D·路飞") || c.Info.HasKeyword("白胡子海盗团"))
         ).ToList();

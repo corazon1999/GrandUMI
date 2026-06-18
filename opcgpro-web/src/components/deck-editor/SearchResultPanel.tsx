@@ -4,10 +4,11 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
 import { getAllCachedCards } from "@/data/CardLoader";
-import { useDeckStore, FORMAT_RULES } from "@/store/deckStore";
+import { useDeckStore, FORMAT_RULES, compareCards, UNLIMITED_COPY_CARDS, colorMatch } from "@/store/deckStore";
 import type { CardData } from "@/types/card";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
 import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPreview";
+import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 
 const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪烁）
@@ -16,7 +17,7 @@ const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { format, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
+  const { format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -37,7 +38,7 @@ export default function SearchResultPanel() {
     const all = getAllCachedCards();
     const rule = FORMAT_RULES[format];
     const whitelist = isLeaderMode ? rule.leaderSetWhitelist : rule.mainSetWhitelist;
-    return all.filter((card) => {
+    return all.filter((card) => {  // filter 返回新数组，下方 sort 不会污染缓存原数组
       const setCode = card.number.split("-")[0];
       // 格式卡集白名单过滤（Unrestricted 时为 null = 不限）
       if (whitelist && !whitelist.includes(setCode)) return false;
@@ -47,22 +48,24 @@ export default function SearchResultPanel() {
       if (!filterShowSub1 && card.subscript === 1) return false;
       if (isLeaderMode && card.type !== "Leader") return false;
       if (!isLeaderMode && card.type === "Leader") return false;
+      // 已选领航时，结果只显示领航色可入卡组的牌（即便处于「全部」）
+      if (!isLeaderMode && leader && !colorMatch(leader.color, card.color)) return false;
       if (filterColor && !card.color.includes(filterColor)) return false;
       if (filterProperty && card.property !== filterProperty) return false;
       if (filterRarity && card.rarity !== filterRarity) return false;
+      if (filterCost !== null && card.cost !== filterCost) return false;
       if (!isLeaderMode && filterType && card.type !== filterType) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (
           !card.name.toLowerCase().includes(q) &&
           !card.number.toLowerCase().includes(q) &&
-          !card.keyWords.some((k) => k.toLowerCase().includes(q)) &&
-          !card.effectText.toLowerCase().includes(q)
+          !card.keyWords.some((k) => k.toLowerCase().includes(q))
         ) return false;
       }
       return true;
-    });
-  }, [format, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterSets, filterShowSub1, isLeaderMode]);
+    }).sort(compareCards);
+  }, [format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
 
   // 虚拟网格列表
   const {
@@ -188,14 +191,16 @@ interface CardGridItemProps {
 function CardGridItem({
   card, deckCount, isLeaderMode, onClick, onRightClick, onMouseEnter, onMouseLeave, onSpriteChange,
 }: CardGridItemProps) {
-  const isFull    = !isLeaderMode && deckCount >= 4;
+  const isFull    = !isLeaderMode && deckCount >= 4 && !UNLIMITED_COPY_CARDS.has(card.number);
   const hasInDeck = deckCount > 0;
 
   const sprites   = card.sprites?.length ? card.sprites : [card.sprite ?? "/sprites/CardBack.png"];
   const hasAlts   = sprites.length > 1;
   const [spriteIdx, setSpriteIdx] = useState(sprites.length - 1);
   const [imgFailed, setImgFailed] = useState(false);
-  const currentSrc = imgFailed ? "/sprites/CardBack.png" : (sprites[spriteIdx] ?? "/sprites/CardBack.png");
+  const rawSrc = sprites[spriteIdx] ?? "/sprites/CardBack.png";
+  // 默认用缩略图;加载失败(缺缩略图)回退原图
+  const currentSrc = imgFailed ? (card.image ?? rawSrc) : thumbSrc(rawSrc);
 
   // 初始化时同步默认异画的 sprite 到 card 对象，确保添加卡牌时使用正确的异画
   useEffect(() => {

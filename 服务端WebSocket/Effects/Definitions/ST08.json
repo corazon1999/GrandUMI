@@ -1,0 +1,78 @@
+{
+  "ST08-002": {
+    "_name": "乌塔",
+    "_note": "【启动主要】横置自身：本回合对方最多1张角色费用-2（“与领袖战斗不被KO”持续部分由 C# 实现）。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-2" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -2 }
+      ]
+    }
+  },
+  "ST08-004": {
+    "_name": "可比",
+    "_note": "【启动主要】横置自身：KO 对方最多1张费用≤2 角色。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 2 }, "text": "KO 对方最多1张费用≤2 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST08-006": {
+    "_name": "白星",
+    "_note": "【阻挡者】+【登场时】本回合对方最多1张角色费用-4。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-4" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -4 }
+        ]
+      }
+    ]
+  },
+  "ST08-008": {
+    "_name": "日熊",
+    "_note": "【登场时】本回合对方最多1张角色费用-2。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-2" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -2 }
+        ]
+      }
+    ]
+  },
+  "ST08-014": {
+    "_name": "橡皮橡皮钟",
+    "_note": "【主要】生命顶入手：本回合对方最多1张角色费用-7；【触发】废弃区最多1张费用≤2角色入手（原文限“黑色”，DSL 无颜色过滤，近似）。",
+    "main": {
+      "cost": { "lifeToHand": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-7" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -7 }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnTrashCharacter", "max": 1, "min": 0, "as": "$c", "filter": { "originalCostLte": 2 }, "text": "废弃区最多1张费用≤2 角色加入手牌" },
+      { "op": "TrashToHand", "target": "$c" }
+    ]
+  },
+  "ST08-015": {
+    "_name": "橡皮橡皮枪",
+    "_note": "【主要】KO 对方最多1张费用≤2 角色；【触发】抽1张。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 2 }, "text": "KO 对方最多1张费用≤2 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    },
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  }
+}

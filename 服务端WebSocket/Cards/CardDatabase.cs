@@ -10,11 +10,27 @@ public static class CardDatabase
 {
     private static readonly Dictionary<string, CardInfo> _byNumber = new();
     private static readonly Dictionary<string, List<CardInfo>> _bySet = new();
+    private static readonly object _loadLock = new();
+    private static bool _loaded;
 
     public static int Count => _byNumber.Count;
 
-    /// <summary>启动时调用，从指定目录加载所有卡集</summary>
+    /// <summary>
+    /// 加载所有卡集。幂等且线程安全：首次加载后重复调用直接返回。
+    /// （生产启动只调一次；多处/并发调用如单测，靠此保证不会并发写同一字典而损坏。）
+    /// </summary>
     public static void LoadFrom(string cardDataRoot)
+    {
+        if (_loaded) return;
+        lock (_loadLock)
+        {
+            if (_loaded) return;
+            LoadFromCore(cardDataRoot);
+            _loaded = true;
+        }
+    }
+
+    private static void LoadFromCore(string cardDataRoot)
     {
         if (!Directory.Exists(cardDataRoot))
             throw new DirectoryNotFoundException($"卡牌数据目录不存在: {cardDataRoot}");
@@ -78,7 +94,8 @@ public static class CardDatabase
         public string? cost        { get; set; }
         public string? keyWords    { get; set; }
         public string? counter     { get; set; }
-        public string? effectText  { get; set; }
+        public string[]? effectTags { get; set; }
+        public string[]? abilities { get; set; }
         public string? trigger     { get; set; }
         public string? rarity      { get; set; }
     }
@@ -89,7 +106,8 @@ public static class CardDatabase
 
         int.TryParse(r.power,   out int power);
         int.TryParse(r.cost,    out int cost);
-        int.TryParse(r.counter, out int counter);
+        // counter 字段可能是 "反击+1000" 这类带文字前缀的格式，需抽取数字（与客户端解析一致）
+        int counter = ParseCounterValue(r.counter);
 
         var keywords = string.IsNullOrEmpty(r.keyWords)
             ? Array.Empty<string>()
@@ -115,9 +133,18 @@ public static class CardDatabase
             Cost       = cost,
             Keywords   = keywords,
             Counter    = counter,
-            EffectText = r.effectText ?? "",
+            EffectTags = r.effectTags ?? Array.Empty<string>(),
+            Abilities  = r.abilities ?? Array.Empty<string>(),
             Trigger    = r.trigger ?? "",
             Rarity     = r.rarity ?? "",
         };
+    }
+
+    /// <summary>解析反击值：兼容 "1000"、"+1000"、"反击+1000" 等格式，抽取首个数字串</summary>
+    private static int ParseCounterValue(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return 0;
+        var m = System.Text.RegularExpressions.Regex.Match(raw, @"\d+");
+        return m.Success ? int.Parse(m.Value) : 0;
     }
 }

@@ -106,3 +106,9 @@ qq-bug-bot/feedback.db
 opcg_app.js
 文档/frontend-design-references/
 文档/OP 综合规则 V1.2.0.pdf
+
+# =========================
+# 带官方卡面原文(effectText)的本地参考快照：仅供开发时对照写卡效，绝不入库
+# 入库的 卡牌数据/ 已剥离 effectText；有原文的这份不入库
+# =========================
+卡牌数据_含原文/

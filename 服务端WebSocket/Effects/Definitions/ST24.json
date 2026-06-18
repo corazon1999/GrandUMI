@@ -1,0 +1,73 @@
+{
+  "ST24-001": {
+    "_name": "卡彭·班吉",
+    "_note": "【阻挡者】+【登场时】我方场上有≥6张休息状态卡牌时，抽1张并丢弃1张手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "ownRestedCardCountGte": 6 },
+        "then": [
+          { "op": "Draw", "n": 1 },
+          { "op": "DiscardOwnChosen", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST24-002": {
+    "_name": "基德＆基拉",
+    "_note": "【登场时】确认卡组顶5张公开≤1张《超新星》入手余放回底；【对方的攻击时】自身入废弃：将我方最多1张咚转活跃。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keyword": "超新星" } }
+        ]
+      },
+      {
+        "on": "OnOppAttackDeclare",
+        "cost": { "selfToTrash": true },
+        "then": [
+          { "op": "ActiveOwnDon", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST24-003": {
+    "_name": "巴基尔·霍金斯",
+    "_note": "【我方的回合结束时】将我方最多1张咚转为活跃状态。",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [ { "op": "ActiveOwnDon", "n": 1 } ]
+      }
+    ]
+  },
+  "ST24-004": {
+    "_name": "罗&贝宝",
+    "_note": "【登场时】将对方最多1张角色转休息，且其下个对方重置阶段不活跃（原文后半“对方≥2休息角色则领袖+2000”因 then 无条件分支已略去）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "将对方最多1张角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" },
+          { "op": "PreventActivateNextReset", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST24-005": {
+    "_name": "X·德雷克",
+    "_note": "【登场时】领袖含《超新星》时，将对方最多1张费用≤5 角色转休息（原文后半“本回合结束时活跃1咚”因无延迟触发通道已略去）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "超新星" },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将对方最多1张费用≤5 角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  }
+}

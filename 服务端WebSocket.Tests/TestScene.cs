@@ -16,9 +16,6 @@ public class TestScene
     public static TestScene New(string? myLeaderNumber = null, string? oppLeaderNumber = null)
     {
         EnsureCardDbLoaded();
-        var leader0 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
-        var leader1 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
-        var state = new GameState { RoomId = "test-room", FirstPlayer = 0, RngSeed = 1 };
         EnsureDslLoaded();
         var leader0 = myLeaderNumber is not null
             ? CardDatabase.Get(myLeaderNumber)!
@@ -26,7 +23,7 @@ public class TestScene
         var leader1 = oppLeaderNumber is not null
             ? CardDatabase.Get(oppLeaderNumber)!
             : CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
-        var state = new GameState { RoomId = "test-room", FirstPlayer = 0 };
+        var state = new GameState { RoomId = "test-room", FirstPlayer = 0, RngSeed = 1 };
         state.Players[0] = new PlayerState
         {
             SessionId = "s0", AccountName = "p0",
@@ -85,7 +82,7 @@ public class TestScene
             : CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
         var leader1 = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Leader);
 
-        var s = new GameState { RoomId = "smoke", FirstPlayer = 0 };
+        var s = new GameState { RoomId = "smoke", FirstPlayer = 0, RngSeed = 1 };
         s.Players[0] = new PlayerState { SessionId = "s0", AccountName = "p0", Leader = new CardInstance { Info = leader0 } };
         s.Players[1] = new PlayerState { SessionId = "s1", AccountName = "p1", Leader = new CardInstance { Info = leader1 } };
         s.CurrentTurnPlayer = 0;

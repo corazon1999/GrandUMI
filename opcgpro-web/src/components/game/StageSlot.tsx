@@ -17,17 +17,32 @@ const slotSizes = {
 
 export default function StageSlot({ side }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
+  const isPending = useGameStore((s) => s.isPending);
+  const selectedFieldId = useGameStore((s) => s.selectedFieldId);
+  const setSelectedField = useGameStore((s) => s.setSelectedField);
   const { cardSize } = useResponsive();
   const stageNumber = player?.stageNumber ?? null;
+  const stageId = player?.stageId ?? null;
+  const stageTapped = player?.stageTapped ?? false;
   const dimensions = slotSizes[cardSize];
+
+  // 仅己方舞台卡可被选中（用于发动【启动主要】）
+  const clickable = side === "my" && !!stageId && !isPending;
+  const handleClick = () => {
+    if (!clickable || !stageId) return;
+    setSelectedField(selectedFieldId === stageId ? null : stageId);
+  };
 
   return (
     <div className={`${dimensions} relative flex items-center justify-center rounded-md border border-dashed border-sky-200/25 bg-black/20 shadow-inner shadow-black/30`}>
-      <span className="absolute left-2 top-2 z-10 text-[11px] font-semibold text-slate-200 drop-shadow">
-        场地
-      </span>
       {stageNumber ? (
-        <CardItem card={getCard(stageNumber) ?? null} size={cardSize} />
+        <CardItem
+          card={getCard(stageNumber) ?? null}
+          size={cardSize}
+          isSelected={selectedFieldId === stageId}
+          isTapped={stageTapped}
+          onClick={clickable ? handleClick : undefined}
+        />
       ) : (
         <span className="text-xs font-black text-slate-600">STAGE</span>
       )}

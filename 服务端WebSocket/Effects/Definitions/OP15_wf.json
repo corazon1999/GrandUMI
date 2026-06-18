@@ -1,0 +1,463 @@
+{
+  "OP15-011": {
+    "_name": "帕鲁",
+    "_matcher": "实现【KO时】我方领袖含《东海》时 KO 对方1张原本力量≤6000的角色；对方回合中获得阻挡者且力量+2000的纯持续修正无法表达，已忽略该持续部分。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "东海"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 6000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-018": {
+    "_name": "毛奇",
+    "_matcher": "【攻击时】KO 对方1张被赋予咚!!且力量≤3000的角色：用 OpponentCharacterWithDon 限定被贴咚目标，filter originalPowerLte:3000 近似力量上限。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterWithDon",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 3000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-034": {
+    "_name": "尤奇",
+    "_matcher": "登场时选我方1张\"布鲁克\"本回合力量+2000。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "as": "$t",
+            "filter": {
+              "nameEquals": "布鲁克"
+            }
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$t",
+            "delta": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-036": {
+    "_name": "龙马",
+    "_matcher": "登场时/攻击时各 KO 对方1张休息且费用≤4的角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 4
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 4
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-043": {
+    "_name": "凯利·凡克",
+    "_matcher": "登场时从手牌免费登场最多1张\"波比·凡克\"。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "波比·凡克"
+            },
+            "text": "将我方手牌中最多1张\"波比·凡克\"登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-044": {
+    "_name": "克尔拉",
+    "_matcher": "KO时确认卡组顶3张、公开≤1张德莱斯罗兹事件加手牌、其余放回卡组底(阻挡者为纯关键词)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "kind": "Event",
+              "keyword": "德莱斯罗兹"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-047": {
+    "_name": "山智",
+    "_matcher": "登场时使我方1张角色本回合获得不可阻挡(阻挡者为纯关键词)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "as": "$t"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "$t",
+            "keyword": "不可阻挡",
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-060": {
+    "_name": "艾尼路",
+    "_matcher": "实现【启动主要】咚-1自身获得阻挡者并弃1张手牌；前半段持续(不会因对方效果离场、力量+2000)属静态修正未实现。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "GiveKeyword",
+          "target": "self",
+          "keyword": "阻挡者",
+          "duration": "UntilNextOpponentEndPhase"
+        },
+        {
+          "op": "DiscardOwnChosen",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP15-073": {
+    "_name": "耶摩",
+    "_matcher": "【登场时】从手牌登场≤1张费用1的\"神兵\"或费用1《神官》角色；【阻挡者】为纯关键词由系统处理。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "originalCostGte": 1,
+              "originalCostLte": 1,
+              "anyOf": [
+                {
+                  "nameEquals": "神兵"
+                },
+                {
+                  "keyword": "神官"
+                }
+              ]
+            },
+            "text": "将手牌中最多1张费用为1的“神兵”或费用为1的《神官》角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-079": {
+    "_name": "阿布萨罗姆",
+    "_matcher": "【KO时】从废弃区选≤1张《恐怖之船海盗团》加手牌；【触发】复用同一KO时效果。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrash",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "keyword": "恐怖之船海盗团"
+            },
+            "text": "将废弃区中最多1张《恐怖之船海盗团》卡牌加入手牌"
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnTrash",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "keyword": "恐怖之船海盗团"
+        },
+        "text": "将废弃区中最多1张《恐怖之船海盗团》卡牌加入手牌"
+      },
+      {
+        "op": "TrashToHand",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP15-082": {
+    "_name": "夏洛特·罗拉",
+    "_matcher": "登场时卡组顶3张废弃;KO时将费用≤8的角色从废弃区入手。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "kind": "Character",
+              "originalCostLte": 8
+            }
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-095": {
+    "_name": "橡皮橡皮暴风雨",
+    "_matcher": "主要(忽略转休咚成本):废弃≥15时草帽一伙领袖或角色+3000;反击:废弃≥15时领袖或角色本战斗+4000(条件应在反击判定,惯例忽略)。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "ownTrashCountGte": 15
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "草帽一伙"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 3000
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP15-111": {
+    "_name": "蒙布朗·诺兰度",
+    "_matcher": "攻击时(需自身被贴咚≥1)选我方1张卡尔加拉赋予速攻；【咚!!×1】用 donAttachedGte:1 表达",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "nameEquals": "卡尔加拉"
+            }
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "$tgt",
+            "keyword": "速攻",
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-116": {
+    "_name": "橡皮橡皮 黄金回旋弹",
+    "_matcher": "主要(领袖含草帽一伙):生命顶入手再卡组顶1张入生命并弃1手牌(用LifeToHand近似生命顶入废弃);反击我方领袖本次战斗+4000",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderHasKeyword": "草帽一伙"
+      },
+      "then": [
+        {
+          "op": "LifeToHand"
+        },
+        {
+          "op": "AddLifeFromDeck",
+          "n": 1
+        },
+        {
+          "op": "DiscardOwnChosen",
+          "n": 1
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP15-085": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "登场时卡组顶3张废弃;启动主要弃自身,领袖含草帽一伙时将废弃区草帽一伙角色(除乔巴自身)入手。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "if": {
+        "leaderHasKeyword": "草帽一伙"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnTrashCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "草帽一伙",
+            "excludeName": "托尼托尼·乔巴"
+          }
+        },
+        {
+          "op": "TrashToHand",
+          "target": "$tgt"
+        }
+      ]
+    }
+  }
+}

@@ -17,7 +17,7 @@ public class OP15_054_Lebecca : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        if (me.Leader.Info.Name != "路西") return;
+        if (!me.Leader.Info.NameIs("路西")) return;
 
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
             "选择 1 项",

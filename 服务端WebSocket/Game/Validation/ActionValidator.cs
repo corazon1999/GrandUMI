@@ -29,9 +29,12 @@ public static class ActionValidator
         if (handIndex < 0 || handIndex >= p.Hand.Count) return Fail("手牌索引非法");
         var card = p.Hand[handIndex].Info;
         if (card.Kind == CardKind.Leader)     return Fail("领航不能从手牌出");
-        if (p.ActiveDonCount < card.Cost)     return Fail($"费用不足，需要 {card.Cost}");
-        if (card.Kind == CardKind.Character && p.Characters.Count >= 5)
-            return Fail("角色区已满（5）"); // 满员规则：实际可以替换，先简单拒绝
+        if (card.Kind == CardKind.Character && s.NoPlayCharacterThisTurn.Contains(playerIdx))
+            return Fail("本回合无法登场角色卡牌");
+        int effCost = s.HandPlayCost(playerIdx, p.Hand[handIndex]);
+        if (p.ActiveDonCount < effCost)       return Fail($"费用不足，需要 {effCost}");
+        // 角色区满员（≥5）不再拒绝：登场时由玩家选择 1 张己方角色废弃后再登场
+        // （见 GameEngine.PlayCharacterWithOverflowAsync）
         return OkResult;
     }
 
@@ -69,10 +72,17 @@ public static class ActionValidator
         }
         if (attacker.IsTapped) return Fail("攻击者已休息");
         if (attacker.HasRestriction(RestrictionKind.CannotAttack)) return Fail("此角色本回合无法攻击");
+        // 条件性静态禁攻（持续效果，按当前场况实时判定；被效果无效化时本回合解除）
+        if (!attacker.IsEffectsNullified && s.HasContinuousRestriction(attacker, RestrictionKind.CannotAttack))
+            return Fail("此角色当前无法攻击");
+        // 永久"此角色无法攻击"被动（被效果无效化时本回合解除，如 OP06-083）
+        if (Array.IndexOf(attacker.Info.Abilities, "此角色无法攻击") >= 0 && !attacker.IsEffectsNullified)
+            return Fail("此角色无法攻击");
 
-        // 新登场角色当回合不能攻击（除非有【速攻】）
+        // 新登场角色当回合不能攻击（除非有【速攻】；或"登场回合可攻击角色"且本次目标为角色——OP04-096）
         if (attacker != me.Leader && attacker.TurnPlayed == s.TurnCount
-            && !HasKeyword(attacker, "速攻"))
+            && !HasKeyword(s, attacker, "速攻")
+            && !(HasKeyword(s, attacker, "登场回合可攻击角色") && !targetIsLeader))
             return Fail("新登场角色无法攻击");
 
         // 目标：对方领袖或对方休息状态角色
@@ -84,14 +94,19 @@ public static class ActionValidator
         if (targetId is null) return Fail("未指定目标");
         var target = op.Characters.FirstOrDefault(c => c.Id == targetId.Value);
         if (target is null) return Fail("目标不在对方场上");
-        if (!target.IsTapped) return Fail("不能攻击活跃状态的角色");
+        // 通常只能攻击休息状态角色；带"可攻击活跃"授予的攻击者可攻击活跃角色
+        if (!target.IsTapped && !HasKeyword(s, attacker, "可攻击活跃")) return Fail("不能攻击活跃状态的角色");
+        // 按费用禁攻（OP12-020：本回合此领袖无法攻击对方原本费用≤N角色）
+        if (attacker.NoAttackCostLeThisTurn > 0 && target.Info.Cost <= attacker.NoAttackCostLeThisTurn)
+            return Fail($"本回合无法攻击原本费用≤{attacker.NoAttackCostLeThisTurn}的角色");
         return OkResult;
     }
 
-    public static bool HasKeyword(CardInstance c, string kw)
+    public static bool HasKeyword(GameState s, CardInstance c, string kw)
     {
-        if (c.Info.EffectText.Contains($"【{kw}】")) return true;
-        return c.GainedKeywords.Any(k => k.Keyword == kw);
+        if (Array.IndexOf(c.Info.Abilities, kw) >= 0) return true;
+        if (c.GainedKeywords.Any(k => k.Keyword == kw)) return true;
+        return s.HasContinuousKeyword(c, kw);
     }
 
     public static Result CanUseEffect(GameState s, int playerIdx, Guid sourceId)
@@ -118,13 +133,14 @@ public static class ActionValidator
         var card = me.Characters.FirstOrDefault(c => c.Id == blockerId);
         if (card is null)              return Fail("阻挡者不在你场上");
         if (card.IsTapped)             return Fail("阻挡者必须为活跃状态");
-        if (!HasKeyword(card, "阻挡者")) return Fail("该角色没有【阻挡者】效果");
+        if (!HasKeyword(s, card, "阻挡者")) return Fail("该角色没有【阻挡者】效果");
+        if (card.HasRestriction(RestrictionKind.CannotBeBlocker)) return Fail("该角色本回合不能发动【阻挡者】");
 
         // 不可阻挡 keyword 检查
         var atk = s.Players[1 - playerIdx];
         var attackerCard = atk.Characters.FirstOrDefault(c => c.Id == s.CurrentBattle.AttackerCardId)
                            ?? (atk.Leader.Id == s.CurrentBattle.AttackerCardId ? atk.Leader : null);
-        if (attackerCard is not null && HasKeyword(attackerCard, "不可阻挡"))
+        if (attackerCard is not null && HasKeyword(s, attackerCard, "不可阻挡"))
             return Fail("攻击者具有【不可阻挡】");
 
         return OkResult;

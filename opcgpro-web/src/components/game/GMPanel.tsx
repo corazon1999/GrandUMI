@@ -1,0 +1,269 @@
+"use client";
+
+/**
+ * GMPanel — GM 调试面板
+ *
+ * 按 T 切换显隐（焦点在输入框时不触发切换）。
+ * 第一功能：输入卡牌编号（如 OP01-001）加一张到自己手牌。
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { GameRequest } from "@/net/GameRequest";
+
+export default function GMPanel({ showButton = false }: { showButton?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [donCount, setDonCount] = useState("9");
+  const [summonNumber, setSummonNumber] = useState("");
+  const [summonTarget, setSummonTarget] = useState<"self" | "opponent">("self");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const summonInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "t" && e.key !== "T") return;
+      // 焦点在输入框/文本域时不抢按键
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) return;
+      e.preventDefault();
+      setOpen((v) => !v);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // 打开时自动聚焦输入框
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  function submit() {
+    const num = cardNumber.trim().toUpperCase();
+    if (!num) return;
+    GameRequest.debugAddCard(num);
+    inputRef.current?.focus();
+  }
+
+  function submitDon() {
+    const n = parseInt(donCount, 10);
+    GameRequest.debugAddDon(Number.isFinite(n) && n > 0 ? n : 1);
+  }
+
+  function refreshDon() {
+    GameRequest.debugRefreshDon();
+  }
+
+  function submitSummon() {
+    const num = summonNumber.trim().toUpperCase();
+    if (!num) return;
+    GameRequest.debugSummon(num, summonTarget);
+    // 不清空输入框，便于连续召唤同一张；保持焦点
+    summonInputRef.current?.focus();
+  }
+
+  function koAll(target: "self" | "opponent") {
+    GameRequest.debugKoAll(target);
+  }
+
+  function restAll(target: "self" | "opponent") {
+    GameRequest.debugRestAll(target);
+  }
+
+  function leaderAttack() {
+    GameRequest.debugLeaderAttack();
+  }
+
+  return (
+    <>
+      {/* 单人测试专用：左上角浮动 GM 按钮（移动端无 T 键时唤出面板） */}
+      {showButton && !open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed left-4 top-4 z-50 rounded-md border border-amber-400/50 bg-amber-500/90 px-3 py-1.5 text-xs font-black text-slate-950 shadow-lg transition-colors hover:bg-amber-400"
+          aria-label="打开 GM 调试面板"
+        >
+          GM
+        </button>
+      )}
+
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed right-4 top-4 z-50 flex max-h-[calc(100dvh-2rem)] w-72 flex-col rounded-lg border border-amber-400/40 bg-slate-950/95 shadow-2xl shadow-black/50"
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 24 }}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+            <h2 className="text-sm font-black text-amber-300">GM 调试面板</h2>
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded px-2 py-0.5 text-xs text-slate-400 transition-colors hover:text-white"
+            >
+              关闭 (T)
+            </button>
+          </div>
+
+          {/* 内容区：随 GM 指令增多可上下滚动，避免底部指令被裁掉无法点击 */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <label className="block text-xs font-bold text-slate-300">加牌到手牌</label>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              ref={inputRef}
+              value={cardNumber}
+              onChange={(e) => setCardNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+              placeholder="例：OP01-001"
+              className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none"
+            />
+            <button
+              onClick={submit}
+              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              添加
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            输入卡牌编号后回车或点"添加"，可连续加牌。
+          </p>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">加咚（活跃）</label>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={donCount}
+              onChange={(e) => setDonCount(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitDon();
+              }}
+              className="w-20 min-w-0 rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+            />
+            <button
+              onClick={submitDon}
+              className="flex-1 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              加咚
+            </button>
+          </div>
+          <button
+            onClick={refreshDon}
+            className="mt-1.5 w-full rounded bg-sky-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-sky-500"
+          >
+            刷新咚（全部回费用区并竖直）
+          </button>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">打出到场上</label>
+          <div className="mt-1.5 flex gap-1 rounded border border-slate-600 bg-slate-900 p-0.5">
+            <button
+              onClick={() => setSummonTarget("self")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+                summonTarget === "self"
+                  ? "bg-amber-500 text-slate-950"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              我方场上
+            </button>
+            <button
+              onClick={() => setSummonTarget("opponent")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+                summonTarget === "opponent"
+                  ? "bg-amber-500 text-slate-950"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              对方场上
+            </button>
+          </div>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              ref={summonInputRef}
+              value={summonNumber}
+              onChange={(e) => setSummonNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitSummon();
+              }}
+              placeholder="例：OP01-025"
+              className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none"
+            />
+            <button
+              onClick={submitSummon}
+              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              打出
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            角色/舞台打出到场上，不扣费；己方卡牌会执行【登场时】效果（摆到对方场仅布置、不触发）。
+          </p>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">KO 场上角色</label>
+          <div className="mt-1.5 flex gap-2">
+            <button
+              onClick={() => koAll("self")}
+              className="flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
+            >
+              KO 我方全部
+            </button>
+            <button
+              onClick={() => koAll("opponent")}
+              className="flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
+            >
+              KO 对方全部
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            KO 该方场上全部角色（不含领航/舞台），会触发【K.O.时】等效果。
+          </p>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">横置场上角色</label>
+          <div className="mt-1.5 flex gap-2">
+            <button
+              onClick={() => restAll("self")}
+              className="flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
+            >
+              横置我方全部
+            </button>
+            <button
+              onClick={() => restAll("opponent")}
+              className="flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
+            >
+              横置对方全部
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            将该方场上全部角色转为横置（休息）状态，不含领航/舞台，不触发横置相关效果。
+          </p>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">对手领袖攻击</label>
+          <button
+            onClick={leaderAttack}
+            className="mt-1.5 w-full rounded bg-purple-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-purple-500"
+          >
+            对手领袖攻击我方领袖
+          </button>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            由对手领袖向我方领袖发起一次完整攻击，可正常宣告【阻挡者】/【反击】并结算领袖伤害。对手领袖会横置。
+          </p>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
+  );
+}

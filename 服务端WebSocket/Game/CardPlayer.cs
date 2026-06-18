@@ -14,7 +14,11 @@ public static class CardPlayer
         var p = s.Players[playerIdx];
         var card = p.Hand[handIndex];
         var info = card.Info;
-        int cost = info.Cost;
+        int cost = s.HandPlayCost(playerIdx, card);   // 含持续费用光环（如"从手牌登场X角色费用-1"）
+
+        // 消费一次性"下次登场减费"（OP02-025）：cost 已含其额度，此处移除该次性折扣
+        var oneShot = s.OneShotPlayDiscounts.FirstOrDefault(x => x.Matches(playerIdx, card));
+        if (oneShot is not null) s.OneShotPlayDiscounts.Remove(oneShot);
 
         // 支付费用：活跃咚 → 休息咚
         PayCost(p, cost);

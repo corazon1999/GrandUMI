@@ -1,0 +1,13 @@
+{
+  "ST20-001": {
+    "_name": "夏洛特·卡塔库栗",
+    "_note": "【阻挡者】+【启动主要】【每回合1次】赋予我方1张领袖或角色最多1张休息咚（原文成本“翻生命顶正面”无对应通道已略去）。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "ST04-002": {
+    "_name": "润媞",
+    "_note": "【登场时】咚-1：手牌中最多1张费用≤4“佩吉旺”登场（咚-1 为可选成本，引擎自动支付）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "PlayCharFromHand", "filter": { "nameEquals": "佩吉旺", "originalCostLte": 4 }, "text": "手牌中最多1张费用≤4“佩吉旺”登场" }
+        ]
+      }
+    ]
+  },
+  "ST04-003": {
+    "_name": "盖德（角色）",
+    "_note": "【登场时】咚-5：KO 对方最多1张费用≤6 角色，本回合此角色获得【速攻】。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 5 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 6 }, "text": "KO 对方最多1张费用≤6 的角色" },
+          { "op": "KO", "target": "$tgt" },
+          { "op": "GiveKeyword", "target": "self", "keyword": "速攻" }
+        ]
+      }
+    ]
+  },
+  "ST04-004": {
+    "_name": "烬",
+    "_note": "【登场时】咚-1：KO 对方最多1张费用≤4 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "KO 对方最多1张费用≤4 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST04-005": {
+    "_name": "昆因",
+    "_note": "【阻挡者】+【登场时】咚-1：抽2张，丢弃1张手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "Draw", "n": 2 },
+          { "op": "DiscardOwnChosen", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST04-006": {
+    "_name": "笹木",
+    "_note": "【登场时】咚-1：抽1张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "Draw", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST04-008": {
+    "_name": "杰克",
+    "_note": "【登场时】弃1手牌：从咚卡组追加1张活跃状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "RefreshDon", "n": 1, "state": "active" }
+        ]
+      }
+    ]
+  },
+  "ST04-010": {
+    "_name": "福兹·弗",
+    "_note": "【登场时】咚-1：KO 对方最多1张费用≤3 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST04-014": {
+    "_name": "大看板“灾害”",
+    "_note": "【主要】抽1张，从咚卡组追加1张活跃状态的咚；【触发】同。",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "RefreshDon", "n": 1, "state": "active" }
+      ]
+    },
+    "trigger": [
+      { "op": "Draw", "n": 1 },
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
+  },
+  "ST04-015": {
+    "_name": "无赖男炸弹",
+    "_note": "【主要】KO 对方最多1张费用≤6 角色，并追加1张活跃咚；【触发】追加1张活跃咚。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 6 }, "text": "KO 对方最多1张费用≤6 的角色" },
+        { "op": "KO", "target": "$tgt" },
+        { "op": "RefreshDon", "n": 1, "state": "active" }
+      ]
+    },
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
+  },
+  "ST04-016": {
+    "_name": "热息",
+    "_note": "【反击】咚-1：本次战斗我方最多1张领袖或角色力量+4000。",
+    "counter": {
+      "cost": { "donReturn": 1 },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+        { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+      ]
+    }
+  },
+  "ST04-017": {
+    "_name": "鬼之岛（舞台）",
+    "_note": "【启动主要】横置此舞台：我方领袖含《百兽海盗团》时，从咚卡组追加1张休息状态的咚。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "if": { "leaderHasKeyword": "百兽海盗团" },
+      "then": [
+        { "op": "RefreshDon", "n": 1, "state": "rest" }
+      ]
+    }
+  }
+}

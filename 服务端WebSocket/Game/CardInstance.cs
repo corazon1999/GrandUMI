@@ -8,7 +8,7 @@ namespace GrandUMI.Game;
 /// </summary>
 public class CardInstance
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = DeterministicId.Next();
     public required CardInfo Info { get; init; }
 
     /// <summary>是否横置（领航/角色）</summary>
@@ -28,6 +28,9 @@ public class CardInstance
 
     /// <summary>是否被标记"下个我方重置阶段不会转活跃"</summary>
     public bool CannotActivateNextReset { get; set; }
+
+    /// <summary>该卡在生命区时是否正面朝上（默认背面 false；【翻至正面朝上】类效果置 true，离开生命区时重置）</summary>
+    public bool IsLifeFaceUp { get; set; }
 
     /// <summary>登场回合编号（用于速攻判断：新登场角色当回合不能攻击除非有速攻）</summary>
     public int TurnPlayed { get; set; }
@@ -51,6 +54,12 @@ public class CardInstance
 
     /// <summary>临时限制（CannotAttack/CannotBeKOd/CannotBeBlocker/CannotBeChosen）</summary>
     public List<CardRestriction> Restrictions { get; } = new();
+
+    /// <summary>本回合无法攻击对方"原本费用 ≤ 此值"的角色（0=无限制，OP12-020）</summary>
+    public int NoAttackCostLeThisTurn { get; set; }
+
+    /// <summary>本回合中此卡与对方角色战斗后转为活跃状态（OP12-020）</summary>
+    public bool ReactivateAfterBattleThisTurn { get; set; }
 
     /// <summary>卡名替身（"卡牌名也视为 X"），过滤 nameEquals 时同时匹配主名与别名</summary>
     public List<string> NameAliases { get; } = new();
@@ -86,6 +95,7 @@ public enum RestrictionKind
     CannotBeKOd,
     CannotBeBlocker,
     CannotBeChosen,
+    CannotBeRested,   // 无法被(效果)转为休息状态
 }
 
 public class CardRestriction

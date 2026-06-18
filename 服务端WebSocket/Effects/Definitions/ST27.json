@@ -1,0 +1,79 @@
+{
+  "ST27-001": {
+    "_name": "阿瓦罗·匹萨罗",
+    "_note": "【启动主要】【每回合1次】领袖含《黑胡子海盗团》时本回合此角色+4000（原文成本“横置我方哈奇诺斯”无对应通道已略去）；【KO时】抽1张。",
+    "activated": {
+      "oncePerTurn": true,
+      "if": { "leaderHasKeyword": "黑胡子海盗团" },
+      "then": [
+        { "op": "AddPowerThisTurn", "target": "self", "delta": 4000 }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [ { "op": "Draw", "n": 1 } ]
+      }
+    ]
+  },
+  "ST27-002": {
+    "_name": "卡特琳·蝶美",
+    "_note": "【启动主要】自身入废弃：领袖含《黑胡子海盗团》时本回合对方最多1张角色费用-1；【KO时】抽1张。",
+    "activated": {
+      "cost": { "selfToTrash": true },
+      "if": { "leaderHasKeyword": "黑胡子海盗团" },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-1" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -1 }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [ { "op": "Draw", "n": 1 } ]
+      }
+    ]
+  },
+  "ST27-003": {
+    "_name": "库赞",
+    "_note": "【阻挡者】+【KO时】将我方废弃区中最多1张费用≤5《黑胡子海盗团》角色以休息状态登场。",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          { "op": "PlayCharFromTrash", "filter": { "keyword": "黑胡子海盗团", "originalCostLte": 5 }, "rest": true, "text": "废弃区最多1张费用≤5《黑胡子海盗团》角色以休息状态登场" }
+        ]
+      }
+    ]
+  },
+  "ST27-004": {
+    "_name": "圣胡安·恶狼",
+    "_note": "【登场时】丢弃我方1张手牌（“领袖黑胡子时获得阻挡者且每4张废弃费用+1”持续部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [ { "op": "DiscardOwnChosen", "n": 1 } ]
+      }
+    ]
+  },
+  "ST27-005": {
+    "_name": "马歇尔·D·提奇",
+    "_note": "【启动主要】横置自身：KO 最多1张费用≤3 角色（近似取对方角色）；【KO时】将废弃区最多1张黑色卡牌加入手牌。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 最多1张费用≤3 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          { "op": "Choose", "prompt": "OwnTrash", "max": 1, "min": 0, "as": "$c", "filter": { "color": "黑" }, "text": "将废弃区最多1张黑色卡牌加入手牌" },
+          { "op": "TrashToHand", "target": "$c" }
+        ]
+      }
+    ]
+  }
+}

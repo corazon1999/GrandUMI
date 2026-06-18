@@ -1,0 +1,1247 @@
+[
+  {
+    "batch": "OP05-cs-0",
+    "results": [
+      {
+        "number": "OP05-003",
+        "status": "scripted",
+        "file": "OP05_003_Shanks.cs",
+        "reason": "条件持续获得【速攻】(我方场上存在此卡以外力量≥7000角色)用 ContinuousEffect.GrantKeyword + Predicate 实现，力量取 CurrentPowerOf，OnEnterField 注册。"
+      },
+      {
+        "number": "OP05-062",
+        "status": "scripted",
+        "file": "OP05_062_Anamu.cs",
+        "reason": "条件持续获得【阻挡者】(我方场上10张咚!!)用 GrantKeyword + Predicate(TotalDonInCostArea>=10)实现。"
+      },
+      {
+        "number": "OP05-070",
+        "status": "scripted",
+        "file": "OP05_070_Franky.cs",
+        "reason": "【咚!!×1】咚成本由引擎处理；条件持续【速攻】(被赋予咚≥1且场上咚≥8)用 GrantKeyword + Predicate 实现。"
+      },
+      {
+        "number": "OP05-086",
+        "status": "scripted",
+        "file": "OP05_086_NefeltariVivi.cs",
+        "reason": "条件持续获得【阻挡者】(废弃区≥10张)用 GrantKeyword + Predicate(Trash.Count>=10)实现。"
+      },
+      {
+        "number": "OP05-100",
+        "status": "complex",
+        "file": "",
+        "reason": "将要离开场上时以生命牌置入废弃区替代、使此角色不离场——置换型(使其不离场)且适用于效果KO/任意离场，引擎仅 OnAllyWillBeKOd 处理战斗KO、PreKO 无法表达该生命成本置换守护，规范十七章明确此类置换守护仍判 complex。"
+      },
+      {
+        "number": "OP05-109",
+        "status": "complex",
+        "file": "",
+        "reason": "【每回合1次】当发动【触发】时抽2弃2——对任意【触发】被发动的元触发，EffectTrigger 无此事件钩子(OnLifeRevealTrigger 仅本卡自身生命触发)，引擎无对应派发通道。"
+      }
+    ]
+  },
+  {
+    "batch": "OP06-cs-0",
+    "results": [
+      {
+        "number": "OP06-002",
+        "status": "scripted",
+        "file": "OP06_002_Flash.cs",
+        "reason": "条件性持续获得【流放】(力量≥7000时)：注册 ContinuousEffect.GrantKeyword=\"流放\"，谓词限本卡且 CurrentPowerOf≥7000。"
+      },
+      {
+        "number": "OP06-010",
+        "status": "scripted",
+        "file": "OP06_010_DouglasBullet.cs",
+        "reason": "条件性持续获得【阻挡者】(我方领袖含《FILM》时)：注册 GrantKeyword=\"阻挡者\"，谓词限本卡且领袖 HasKeyword(FILM)。"
+      },
+      {
+        "number": "OP06-012",
+        "status": "scripted",
+        "file": "OP06_012_KingdomOfBears.cs",
+        "reason": "条件性战斗中不被KO(对方场上有原力≥6000领袖/角色时)：注册 KoGuard=\"battle\"，谓词限本卡且对方领袖/角色 Info.Power≥6000。"
+      },
+      {
+        "number": "OP06-052",
+        "status": "scripted",
+        "file": "OP06_052_Tokitoki.cs",
+        "reason": "【咚!!×1】手牌≤4时战斗中不被KO：注册 KoGuard=\"battle\"，谓词限本卡且 AttachedDonCount≥1 且手牌≤4。"
+      },
+      {
+        "number": "OP06-054",
+        "status": "scripted",
+        "file": "OP06_054_Borsalino.cs",
+        "reason": "条件性持续获得【阻挡者】(手牌≤5时)：注册 GrantKeyword=\"阻挡者\"，谓词限本卡且我方手牌≤5。"
+      },
+      {
+        "number": "OP06-067",
+        "status": "scripted",
+        "file": "OP06_067_VinsmokeYonji.cs",
+        "reason": "我方咚数≤对方咚数时力量+1000(PowerDelta 条件谓词)＋常驻【阻挡者】(GrantKeyword 无条件)，两条 ContinuousEffect。咚数取 TotalDonInCostArea。"
+      },
+      {
+        "number": "OP06-072",
+        "status": "scripted",
+        "file": "OP06_072_Cosette.cs",
+        "reason": "条件性持续获得【阻挡者】(领袖含《GERMA 66》且我方咚数≤对方咚数-2时)：注册 GrantKeyword=\"阻挡者\"。"
+      },
+      {
+        "number": "OP06-088",
+        "status": "scripted",
+        "file": "OP06_088_Sai.cs",
+        "reason": "条件性持续力量+2000(领袖含《德莱斯罗兹》且领袖活跃!IsTapped时)：注册 PowerDelta=2000。"
+      },
+      {
+        "number": "OP06-113",
+        "status": "scripted",
+        "file": "OP06_113_Raki.cs",
+        "reason": "条件性持续获得【阻挡者】(场上存在拉奇以外的《山迪亚战士》角色时)：注册 GrantKeyword=\"阻挡者\"，谓词遍历 Characters。"
+      }
+    ]
+  },
+  {
+    "batch": "OP07-cs-0",
+    "results": [
+      {
+        "number": "OP07-008",
+        "status": "scripted",
+        "file": "OP07_008_Tanaka.cs",
+        "reason": "【触发】此卡牌登场用 OnLifeRevealTrigger + PlayFromTrashFree(生命触发后已入废弃);【阻挡者】为纯关键词由引擎处理。"
+      },
+      {
+        "number": "OP07-023",
+        "status": "scripted",
+        "file": "OP07_023_Caribou.cs",
+        "reason": "休息咚≥6 时自身+1000 用 ContinuousEffect.PowerDelta+Predicate(RestDonCount>=6);【阻挡者】纯关键词。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP07-029",
+        "status": "scripted",
+        "file": "OP07_029_Hawkins.cs",
+        "reason": "条件赋予【阻挡者】用 GrantKeyword+Predicate(领袖含超新星);【每回合1次】因对方效果将离场改为横置对方1角色不离场用 OnAllyWillBeKOd(KOReason=effect)+RestCard+MarkPreventKO。已补全KO守护部分。"
+      },
+      {
+        "number": "OP07-030",
+        "status": "scripted",
+        "file": "OP07_030_Pappag.cs",
+        "reason": "场上有凯米时条件赋予【阻挡者】用 ContinuousEffect.GrantKeyword+Predicate。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP07-033",
+        "status": "scripted",
+        "file": "OP07_033_Luffy.cs",
+        "reason": "≥3角色时我方路飞以外费用≤3角色不会因对方效果被KO用 ContinuousEffect.KoGuard=effect+Predicate(CurrentCostOf<=3)。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP07-042",
+        "status": "scripted",
+        "file": "OP07_042_Moria.cs",
+        "reason": "【每回合1次】领袖含王下七武海且自身因对方效果将离场时,改为将我方其他角色放回卡组底使自身不离场:OnAllyWillBeKOd(KOReason=effect)+ReturnFieldToDeckBottom+MarkPreventKO。"
+      },
+      {
+        "number": "OP07-064",
+        "status": "scripted",
+        "file": "HandStaticCost.cs",
+        "reason": "我方咚比对方少≥2时手牌中此卡费用-3已在专用 HandStaticCost 通道实现(case OP07-064);【阻挡者】为纯关键词由引擎处理。无需单独 .cs。"
+      },
+      {
+        "number": "OP07-069",
+        "status": "scripted",
+        "file": "OP07_069_Tsukemono.cs",
+        "reason": "我方咚不多于对方时我方酱菜以外福克斯海盗团角色不会因对方效果被KO用 ContinuousEffect.KoGuard=effect+Predicate。文件已存在且实现正确。"
+      }
+    ]
+  },
+  {
+    "batch": "OP08-cs-0",
+    "results": [
+      {
+        "number": "OP08-013",
+        "status": "scripted",
+        "file": "OP08_013_Robson.cs",
+        "reason": "【咚!!×2】此角色获得【速攻】——条件性持续赋予关键词。已用 ContinuousEffect.GrantKeyword=\"速攻\"，Predicate 限本卡自身且 AttachedDonCount(selfId)>=2，OnEnterField 注册。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP08-029",
+        "status": "scripted",
+        "file": "OP08_029_Pomz.cs",
+        "reason": "自身活跃时，我方非扁姆兹、费用≤3、《纯毛族》角色不会因效果被KO——光环型持续防KO。已用 ContinuousEffect.KoGuard=\"effect\"，Predicate 校验来源活跃(!self.IsTapped)、card.Id!=selfId、HasKeyword(纯毛族)、CurrentCostOf<=3，OnEnterField 注册。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP08-045",
+        "status": "complex",
+        "file": "",
+        "reason": "「将要被KO的场合，或因对方效果将要离开场上的场合，改为放废弃并抽1张以代替」——置换守护。OnAllyWillBeKOd 仅在 BattleEngine 战斗KO时派发；而本卡核心子句『因对方效果将要离开场上』(退回手牌/放回卡组等效果离场)以及效果KO的置换守护引擎无通道(规范十七节明确：效果KO/离场的置换守护暂判 complex)，故无法实现。"
+      },
+      {
+        "number": "OP08-093",
+        "status": "scripted",
+        "file": "OP08_093_XDrake.cs",
+        "reason": "【咚!!×1】此角色费用+2——条件性持续费用修正。已用 ContinuousEffect.CostDelta=2，Predicate 限本卡自身且 AttachedDonCount(selfId)>=1，OnEnterField 注册。文件已存在且实现正确。"
+      },
+      {
+        "number": "OP08-114",
+        "status": "scripted",
+        "file": "OP08_114_SHawk.cs",
+        "reason": "【咚!!×1】生命少于对方时，对斩属性卡战斗中不被KO且力量+2000——条件持续加成+防KO。已注册两条 ContinuousEffect：PowerDelta=2000；KoGuard=\"battle\" 并在 Predicate 内读 s.CurrentBattle 校验攻击者 Info.Property==\"斩\"。基础条件 AttachedDonCount>=1 且 LifeCount<对方。文件已存在且实现正确。"
+      }
+    ]
+  },
+  {
+    "batch": "OP09-cs-0",
+    "results": [
+      {
+        "number": "OP09-004",
+        "status": "scripted",
+        "file": "OP09_004_Shanks.cs",
+        "reason": "对方所有角色力量-1000 用 ContinuousEffect PowerDelta=-1000 (Side=1, Predicate恒真) 注册，OnEnterField 时机；速攻为关键词由引擎处理。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-012",
+        "status": "scripted",
+        "file": "OP09_012_Monster.cs",
+        "reason": "邦克·庞奇将被KO时改为自身进废弃使其免KO，用 Wave5 OnAllyWillBeKOd 置换守护(victim名为邦克·庞奇且非自身→KO自身+MarkPreventKO)。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-017",
+        "status": "scripted",
+        "file": "OP09_017_Wire.cs",
+        "reason": "条件性赋予自身速攻(咚×1且领袖含基德海盗团且力量≥7000)用 ContinuousEffect.GrantKeyword=速攻 + Predicate。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-025",
+        "status": "scripted",
+        "file": "OP09_025_Crocodile.cs",
+        "reason": "领袖含时光旅诗时此卡战斗中不被KO，用 ContinuousEffect.KoGuard=battle + Predicate(近似不区分对手是否领袖)。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-045",
+        "status": "scripted",
+        "file": "OP09_045_Kabaji.cs",
+        "reason": "场上存在巴奇/毛奇时战斗中不被KO，用 ContinuousEffect.KoGuard=battle + Predicate。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-086",
+        "status": "scripted",
+        "file": "OP09_086_JesusBurgess.cs",
+        "reason": "不会因效果被KO用 KoGuard=effect；领袖含黑胡子海盗团时废弃区每4张+1000用阶梯式多条 ContinuousEffect.PowerDelta=1000(threshold=4k)。脚本已存在且正确。"
+      },
+      {
+        "number": "OP09-118",
+        "status": "scripted",
+        "file": "OP09_118_GolDRoger.cs",
+        "reason": "对方发动阻挡者时若任一方生命为0则获胜，用 Wave5 OnOppBlocker watcher(判blockerOwner!=owner且任一LifeCount==0→设WinnerIndex)；速攻为关键词。脚本已存在且正确。"
+      }
+    ]
+  },
+  {
+    "batch": "OP10-cs-0",
+    "results": [
+      {
+        "number": "OP10-032",
+        "status": "complex",
+        "file": "",
+        "reason": "他卡置换离场守护：我方其他绿色角色因对方效果将离场时改为横置自身使其不离场。引擎仅 OnCharLeaveField 事后派发，无『他卡将离场前由守护卡置换为横置使其不离场』的拦截通道，规范十四/十七明确此类置换型他卡守护判 complex。"
+      },
+      {
+        "number": "OP10-034",
+        "status": "scripted",
+        "file": "OP10_034_Franky.cs",
+        "reason": "战斗KO置换守护，OnAllyWillBeKOd 派发；限自身、每回合1次，置换成本为将生命区最上方1张入手后 MarkPreventKO 取消本次KO。"
+      },
+      {
+        "number": "OP10-049",
+        "status": "complex",
+        "file": "",
+        "reason": "他卡置换离场守护：我方其他原费≤7角色因对方效果将离场时改为放回手牌使其不离场。同 OP10-032，引擎无离场前置换拦截通道，判 complex。"
+      },
+      {
+        "number": "OP10-053",
+        "status": "scripted",
+        "file": "OP10_053_Bian.cs",
+        "reason": "条件性持续关键词，ContinuousEffect.GrantKeyword=阻挡者，OnEnterField 注册；Predicate 限自身且我方场上存在另一张《东踏踏族》角色。"
+      },
+      {
+        "number": "OP10-074",
+        "status": "complex",
+        "file": "",
+        "reason": "因对方『效果』将被KO时改为横置2张活跃咚使其不被KO。OnAllyWillBeKOd 仅在战斗KO时派发，效果KO的置换守护引擎暂无派发通道（规范290明确），判 complex。"
+      },
+      {
+        "number": "OP10-085",
+        "status": "scripted",
+        "file": "OP10_085_JesusBurgess.cs",
+        "reason": "条件性持续关键词，ContinuousEffect.GrantKeyword=速攻；Predicate 限自身、贴咚≥1 且我方废弃区≥8张。"
+      },
+      {
+        "number": "OP10-094",
+        "status": "scripted",
+        "file": "OP10_094_Ryuma.cs",
+        "reason": "咚光环持续关键词，ContinuousEffect.GrantKeyword=双重攻击；Predicate 限自身、被赋予咚≥1。"
+      },
+      {
+        "number": "OP10-104",
+        "status": "scripted",
+        "file": "OP10_104_Caribou.cs",
+        "reason": "条件性持续防KO，ContinuousEffect.KoGuard=battle；Predicate 限自身、贴咚≥1、领袖含《超新星》、对方生命≥3。"
+      },
+      {
+        "number": "OP10-108",
+        "status": "scripted",
+        "file": "OP10_108_DJGappa.cs",
+        "reason": "条件性持续关键词，ContinuousEffect.GrantKeyword=阻挡者；Predicate 限自身且我方场上存在另一张《超新星》光色角色。"
+      }
+    ]
+  },
+  {
+    "batch": "OP11-cs-0",
+    "results": [
+      {
+        "number": "OP11-001",
+        "status": "scripted",
+        "file": "OP11_001_Coby.cs",
+        "reason": "领袖永续(OnGameStart)注册 ContinuousEffect.GrantKeyword=\"速攻\" 授予我方含《利刃》特征角色登场回合即可攻击。后半段「《海军》角色因对方效果将离场时改为废弃3张放回卡组底以代替离场」为他卡离场置换守护，引擎无对应通道，本脚本不实现该段（已在注释说明）。"
+      },
+      {
+        "number": "OP11-005",
+        "status": "scripted",
+        "file": "OP11_005_Smoker.cs",
+        "reason": "已存在脚本：OnEnterField 注册条件性 KoGuard=\"effect\"，谓词限自身且贴咚≥1。KoGuard 谓词无法获知KO来源角色属性，故「没有属性(特)角色的效果」来源限定简化为贴咚≥1时不因任意效果被KO。【阻挡者】由引擎处理。"
+      },
+      {
+        "number": "OP11-024",
+        "status": "complex",
+        "file": "",
+        "reason": "触发为「当此角色因对方效果被KO时」——受害者自身的效果KO无可用钩子：OnEnterTrash 仅在枚举中定义、引擎从未派发；OnAnyCharKOd watcher 不会派发给已进废弃区的被KO卡自身(EB01-047 注释明确)。无法触发，且后续含「丢手牌+咚转休息」可选代价与「那样做的场合登场」多步联动，判 complex。"
+      },
+      {
+        "number": "OP11-027",
+        "status": "scripted",
+        "file": "OP11_027_Hyouzou.cs",
+        "reason": "OnEnterField 注册条件性 ContinuousEffect.GrantKeyword=\"速攻\"，谓词限自身且我方领袖名含\"白星\"——领袖为白星时此角色登场回合可攻击角色(即速攻)。"
+      },
+      {
+        "number": "OP11-046",
+        "status": "scripted",
+        "file": "OP11_046_VinsmokeYonji.cs",
+        "reason": "已存在脚本：OnEnterField 注册两条 ContinuousEffect——KoGuard=\"effect\" 与 GrantRestriction=CannotBeRested，谓词均限自身且我方场上角色全部含〈GERMA〉特征。「对方效果」来源限定无法在持续谓词区分，简化为不因任意效果被KO/被休息。【阻挡者】由引擎处理。"
+      },
+      {
+        "number": "OP11-057",
+        "status": "scripted",
+        "file": "OP11_057_Pedro.cs",
+        "reason": "已存在脚本：OnEnterField 注册条件性 ContinuousEffect.GrantKeyword=\"阻挡者\"，谓词限自身且我方手牌≤4。"
+      },
+      {
+        "number": "OP11-058",
+        "status": "scripted",
+        "file": "OP11_058_MonkeyDLuffy.cs",
+        "reason": "已存在脚本：OnEnterField 注册条件性 ContinuousEffect.GrantRestriction=CannotAttack，谓词限自身且我方手牌≥5。【阻挡者】由引擎处理。"
+      },
+      {
+        "number": "OP11-065",
+        "status": "scripted",
+        "file": "OP11_065_CharlotteAnana.cs",
+        "reason": "已存在脚本：OnEnterField 注册条件性 ContinuousEffect.GrantKeyword=\"阻挡者\"，谓词限自身且我方场上存在《大妈海盗团》特征的暗(紫)色他角色。"
+      },
+      {
+        "number": "OP11-088",
+        "status": "scripted",
+        "file": "OP11_088_Shoun.cs",
+        "reason": "已存在脚本：OnOppAttackDeclare 时读 CurrentBattle.AttackerCardId 取对方攻击角色，若其 Property 含\"斩\"则 ConfirmOptional 后 AddPowerThisBattle(+5000)，【每回合1次】用 TurnOnceUsed 去重。【阻挡者】由引擎处理。"
+      },
+      {
+        "number": "OP11-096",
+        "status": "scripted",
+        "file": "OP11_096_Ripper.cs",
+        "reason": "已存在脚本：OnEnterField 注册条件性 ContinuousEffect.GrantKeyword=\"阻挡者\"，谓词限自身且我方场上存在《海军》特征的地(黑)色他角色(排除\"利帕\")。"
+      }
+    ]
+  },
+  {
+    "batch": "OP11-cs-10",
+    "results": [
+      {
+        "number": "OP11-101",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场置换守护：需在我方其它《超新星》角色因对方效果将要离场(KO/退回/放回卡组等)时拦截，改为正面朝下置入生命区顶以代替离场。规范明确仅战斗KO的 OnAllyWillBeKOd 可置换，效果KO/离场的置换守护及『放置/置换为生命区顶代替离场』暂无引擎通道(置换型他卡仍判 complex)。OnCharLeaveField 在卡已离场后才派发，无法拦截改向，故无法实现。"
+      }
+    ]
+  },
+  {
+    "batch": "OP13-cs-0",
+    "results": [
+      {
+        "number": "OP13-003",
+        "status": "complex",
+        "file": "",
+        "reason": "核心机制是改变咚!!放置目标(将咚!!阶段将要放置的咚赋予领袖),引擎无修改咚放置目标的通道。条件式领袖力量-2000虽可用ContinuousEffect实现,但主效果无法表达,整卡判complex。"
+      },
+      {
+        "number": "OP13-004",
+        "status": "scripted",
+        "file": "OP13_004_Sabo.cs",
+        "reason": "已存在且正确:两条纯持续力量修正(生命≥4领袖-1000;【咚!!×1】且存在费用≥8角色时领袖+全体角色+1000)均用ContinuousEffect于OnGameStart注册。编译通过。"
+      },
+      {
+        "number": "OP13-008",
+        "status": "scripted",
+        "file": "OP13_008_Ivankov.cs",
+        "reason": "已存在且正确:OnAllyWillBeKOd守护者,判KOReason==effect且对方为发起方,守护《革命军》角色,置换成本为自身入废弃(归还附着咚)+MarkPreventKO。编译通过。"
+      },
+      {
+        "number": "OP13-009",
+        "status": "scripted",
+        "file": "OP13_009_Dadan.cs",
+        "reason": "已存在且正确:条件式持续赋予【双重攻击】,用ContinuousEffect.GrantKeyword于OnEnterField注册,Predicate判场上存在自身以外的《山贼》角色。编译通过。"
+      },
+      {
+        "number": "OP13-017",
+        "status": "complex",
+        "file": "",
+        "reason": "他卡置换型守护(我方《革命军》角色因对方效果将要离场时改为力量-2000使其不离场)。OnAllyWillBeKOd仅战斗KO派发,效果驱动的离场/KO置换守护引擎暂无通道(规范十七章注明),判complex。"
+      },
+      {
+        "number": "OP13-046",
+        "status": "scripted",
+        "file": "OP13_046_Vista.cs",
+        "reason": "新写:【双重攻击】由引擎按关键词处理。【每回合1次】自身将要被KO时用PreKO钩子置换,丢弃1张〈白胡子海盗团〉手牌+MarkPreventKO取消本次KO。'因对方效果将要离场'分支(非KO离场)无自身置换钩子,文档化未实现。编译通过。"
+      },
+      {
+        "number": "OP13-047",
+        "status": "scripted",
+        "file": "OP13_047_Vista.cs",
+        "reason": "已存在且正确:OnAllyWillBeKOd守护者,守护含〈白胡子海盗团〉的我方角色,自身入废弃代替被KO+MarkPreventKO。编译通过。"
+      },
+      {
+        "number": "OP13-060",
+        "status": "scripted",
+        "file": "OP13_060_Tentsukitokei.cs",
+        "reason": "已存在且正确:OnAllyWillBeKOd守护者,守护含〈罗杰海盗团〉的我方角色,自身入废弃代替被KO+MarkPreventKO。编译通过。"
+      },
+      {
+        "number": "OP13-078",
+        "status": "scripted",
+        "file": "OP13_078_OroJackson.cs",
+        "reason": "已存在且正确:OnCharLeaveField watcher,我方〈罗杰海盗团〉角色因对方效果离场时,每回合1次RefreshDonFromDeck追加1张休息咚。编译通过。"
+      },
+      {
+        "number": "OP13-112",
+        "status": "scripted",
+        "file": "OP13_112_Vegapunk.cs",
+        "reason": "已存在且正确:条件式持续赋予【阻挡者】,用ContinuousEffect.GrantKeyword于OnEnterField注册,Predicate判我方被赋予中(Attached)的咚合计≥2。编译通过。"
+      }
+    ]
+  },
+  {
+    "batch": "OP14-cs-0",
+    "results": [
+      {
+        "number": "OP14-003",
+        "status": "complex",
+        "file": "",
+        "reason": "防KO条件依赖KO来源(对方原力量≤5000角色的效果),KoGuard的Predicate只能看到被保护卡自身,看不到KO来源,这种选择性免疫引擎无通道。"
+      },
+      {
+        "number": "OP14-004",
+        "status": "scripted",
+        "file": "OP14_004_Cavendish.cs",
+        "reason": "自身力量≥5000时获得【速攻】,已用ContinuousEffect.GrantKeyword=速攻注册(OnEnterField),Predicate限本卡且CurrentPowerOf≥5000。文件已存在且编译通过。"
+      },
+      {
+        "number": "OP14-011",
+        "status": "scripted",
+        "file": "OP14_011_Bartolomeo.cs",
+        "reason": "贴咚×2时获得【阻挡者】,已用ContinuousEffect.GrantKeyword=阻挡者注册,Predicate判AttachedDonCount≥2。文件已存在且编译通过。"
+      },
+      {
+        "number": "OP14-056",
+        "status": "complex",
+        "file": "",
+        "reason": "触发时机'当我方手牌因效果被丢弃时'EffectTrigger无对应钩子(规范十三/十四仍列为complex);'无法攻击'由引擎按卡面自动禁攻无需脚本,故该卡唯一可脚本部分无通道。"
+      },
+      {
+        "number": "OP14-070",
+        "status": "scripted",
+        "file": "OP14_070_Buffalo.cs",
+        "reason": "用OnCharRested watcher监听本卡因效果被横置(近似'对方角色效果'=对方回合中),ConfirmOptional后ReturnDonToDeck(1)放回咚再ActivateCard转活跃。文件已存在且编译通过。"
+      },
+      {
+        "number": "OP14-086",
+        "status": "scripted",
+        "file": "OP14_086_MissDoublefinger.cs",
+        "reason": "废弃区≥7时自身力量+1000且〈巴洛克工作室〉角色费用+2,用两条ContinuousEffect(PowerDelta+1000限自身、CostDelta+2过滤巴洛克工作室),Predicate判Trash.Count>=7。文件已存在且编译通过。"
+      },
+      {
+        "number": "OP14-106",
+        "status": "scripted",
+        "file": "OP14_106_Salome.cs",
+        "reason": "【触发】此卡牌登场:OnLifeRevealTrigger时从废弃区PlayFromTrashFree登场;【阻挡者】纯关键词由引擎处理。文件已存在且编译通过。"
+      }
+    ]
+  },
+  {
+    "batch": "OP15-cs-0",
+    "results": [
+      {
+        "number": "OP15-006",
+        "status": "scripted",
+        "file": "OP15_006_Cavendish.cs",
+        "reason": "持续静态：废弃区事件≥4张时自身+2000。OnEnterField 注册 ContinuousEffect.PowerDelta=2000，Predicate 判 Trash 中 Kind==Event 计数≥4 且仅作用本卡。编译通过。"
+      },
+      {
+        "number": "OP15-009",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场救援：原本力量≤7000角色因对方效果将离场时，改为领袖力量-2000使其不离场。引擎仅有战斗KO的 OnAllyWillBeKOd 守护，效果离场的置换守护无对应 watcher 通道（规范十四/十五/十七节明确仍判 complex）。"
+      },
+      {
+        "number": "OP15-013",
+        "status": "complex",
+        "file": "",
+        "reason": "领袖力量≤0时手牌中此卡费用-2 已由 HandStaticCost.Delta 通道实现(case OP15-013)；【阻挡者】为纯关键词由引擎处理。无需独立脚本文件，故不输出 .cs。"
+      },
+      {
+        "number": "OP15-035",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场救援：原本力量≤7000角色因对方效果将离场时，改为休息我方2张牌使其不离场。效果离场的置换守护无 watcher 通道（OnAllyWillBeKOd 仅限战斗KO），规范明确判 complex。"
+      },
+      {
+        "number": "OP15-050",
+        "status": "scripted",
+        "file": "OP15_050_BobbyFunk.cs",
+        "reason": "持续条件：我方场上存在“凯利·凡克”时自身+3000。OnEnterField 注册 ContinuousEffect.PowerDelta=3000，Predicate 用 Characters.Any(MatchesName)。编译通过。"
+      },
+      {
+        "number": "OP15-052",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场救援：原本力量≤7000角色因对方效果将离场时，改为将我方1张角色放回卡组底使其不离场。效果离场置换守护无 watcher 通道，规范明确判 complex。"
+      },
+      {
+        "number": "OP15-068",
+        "status": "scripted",
+        "file": "OP15_068_DivineSoldier.cs",
+        "reason": "条件持续关键词：我方咚≤6张时此角色获得【阻挡者】。OnEnterField 注册 ContinuousEffect.GrantKeyword=\"阻挡者\"，Predicate 判 TotalDonInCostArea<=6 且仅本卡。编译通过。"
+      },
+      {
+        "number": "OP15-069",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场救援：原本力量≤7000角色因对方效果将离场时，改为将1张咚放回咚卡组使其不离场。效果离场的置换守护无 watcher 通道，规范明确判 complex。"
+      },
+      {
+        "number": "OP15-090",
+        "status": "complex",
+        "file": "",
+        "reason": "替代离场救援：原本力量≤7000角色因对方效果将离场时，改为弃1张手牌使其不离场。效果离场的置换守护无 watcher 通道（OnAllyWillBeKOd 仅战斗KO），规范明确判 complex。"
+      },
+      {
+        "number": "OP15-092",
+        "status": "scripted",
+        "file": "OP15_092_MonkeyDLuffy.cs",
+        "reason": "多段废弃区分段持续修正：≥10张自身原本力量变9000(PowerDelta=9000-7000)且费用+10(CostDelta=10)；≥20张对方回合我方领袖原本力量变7000(PowerDelta=7000-领袖卡面，Predicate限对方回合)；≥30张自身+1000。四条 ContinuousEffect 共用 SourceCardId。编译通过。"
+      }
+    ]
+  },
+  {
+    "batch": "OP15-cs-10",
+    "results": [
+      {
+        "number": "OP15-094",
+        "status": "complex",
+        "file": "",
+        "reason": "核心为「我方此角色以外的草帽角色因对方效果将要离开场上时，可改为将此角色置入废弃区使其不离场」——监听他卡的离场并以成本置换阻止其离场。引擎仅有 LeaveGuard(被动自身防离场、无成本/无置换) 与 OnAllyWillBeKOd(仅战斗KO派发)，无「他卡因效果将要离场」的置换守护通道(规范十七章明列：效果KO/离场的置换守护、置换型他卡使其不离场暂判 complex)。【阻挡者】为纯关键词由引擎处理。"
+      },
+      {
+        "number": "OP15-105",
+        "status": "complex",
+        "file": "",
+        "reason": "「我方原本力量≤7000角色因对方效果将要离开场上时，可改为将生命区顶1张入手使其不离场」——同为监听他卡因效果离场并以成本置换阻止离场。引擎无对应 watcher/通道(LeaveGuard 仅被动自身防离场、无成本无置换；OnAllyWillBeKOd 仅战斗KO)，规范明列此类置换守护暂判 complex。"
+      },
+      {
+        "number": "OP15-119",
+        "status": "scripted",
+        "file": "OP15_119_Luffy.cs",
+        "reason": "三段均可实现且脚本已存在并正确：1) 6张以上咚条件持续获得【速攻】用 ContinuousEffect.GrantKeyword + Predicate(TotalDonInCostArea>=6)；2) 对方发动事件/阻挡者反应触发用 OnOppEventPlayed/OnOppBlocker watcher(Wave3/Wave5)；3) 公开生命顶1张(BroadcastReveal)按其费用×1000 AddPowerThisTurn 本回合加力量。语法与规范一致，using/namespace/类名/AtomicOps 签名均正确。"
+      }
+    ]
+  },
+  {
+    "batch": "OP16-cs-0",
+    "results": [
+      {
+        "number": "OP16-005",
+        "status": "complex",
+        "file": "",
+        "reason": "唯一非关键词效果为「条件满足时手牌中此卡费用-3」，属手牌静态减费修正，已走 Effects/HandStaticCost.cs 通道(case OP16-005 已实现)，非 ContinuousEffect 也非任何 IScriptedEffect 触发时机，无可写脚本的触发节；另带纯关键词【阻挡者】由引擎处理。"
+      },
+      {
+        "number": "OP16-024",
+        "status": "scripted",
+        "file": "OP16_024_Kuzan.cs",
+        "reason": "「因对方的效果而被KO时休息对方最多1张角色」。已用 OnKO 触发，按 ctx.State.KOReason==\"effect\" 且 KOActingSide==对方判定『因对方的效果』，再 ChooseCards 选对方角色 RestCard。【阻挡者】关键词引擎处理。文件已存在且通过编译。"
+      },
+      {
+        "number": "OP16-027",
+        "status": "scripted",
+        "file": "OP16_027_Jinbe.cs",
+        "reason": "「【咚!!×1】此角色力量+2000」为依据被赋予咚数量的持续力量修正。已用 OnEnterField 注册 ContinuousEffect，PowerDelta=2000，Predicate 限本卡且 AttachedDonCount(selfId)>=1。文件已存在且通过编译。"
+      },
+      {
+        "number": "OP16-033",
+        "status": "scripted",
+        "file": "OP16_033_Mole.cs",
+        "reason": "「将要被KO时可改为休息我方2张卡牌使此角色不被KO」。已用 PreKO 触发：可选支付成本(休息领袖/角色共2张活跃卡)后 MarkPreventKO 取消本次KO；成本不足则不发动。【不可阻挡】关键词引擎处理。文件已存在且通过编译。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-0",
+    "results": [
+      {
+        "number": "P-001",
+        "status": "scripted",
+        "file": "P_001_Luffy.cs",
+        "reason": "【咚!!×2】获得【速攻】：已用 ContinuousEffect.GrantKeyword 注册(OnEnterField，Predicate 判 AttachedDonCount>=2)。文件已存在且实现正确，编译通过。"
+      },
+      {
+        "number": "P-002",
+        "status": "scripted",
+        "file": "P_002_AdventureFeeling.cs",
+        "reason": "本轮新写。将剩余手牌逐张 ReturnHandToDeckBottom 并记张数 n，ShuffleDeck 切洗，再 Draw n 张。EventMain+OnLifeRevealTrigger 双时机。编译通过。"
+      },
+      {
+        "number": "P-003",
+        "status": "scripted",
+        "file": "P_003_Kid.cs",
+        "reason": "【咚!!×2】获得【双重攻击】：用 ContinuousEffect.GrantKeyword 注册(同 P-001 模式)。文件已存在，实现正确。"
+      },
+      {
+        "number": "P-004",
+        "status": "scripted",
+        "file": "P_004_Crocodile.cs",
+        "reason": "【咚!!×1】获得【阻挡者】：用 ContinuousEffect.GrantKeyword 注册。文件已存在，实现正确。"
+      },
+      {
+        "number": "P-005",
+        "status": "scripted",
+        "file": "P_005_Kaido.cs",
+        "reason": "【启动主要】咚!!-2 本回合获得【流放】：ConfirmOptional+ReturnDonToDeck(2)+GiveKeyword(流放,ThisTurn)。流放已被引擎消费可赋予。文件已存在。"
+      },
+      {
+        "number": "P-006",
+        "status": "scripted",
+        "file": "P_006_Luffy.cs",
+        "reason": "【咚!!×2】【我方的回合中】力量+2000：纯持续力量修正，ContinuousEffect.PowerDelta 注册。文件已存在。"
+      },
+      {
+        "number": "P-007",
+        "status": "scripted",
+        "file": "P_007_Luffy.cs",
+        "reason": "【咚!!×1】与属性(打)战斗中不被KO：ContinuousEffect.KoGuard=\"battle\"，Predicate 查 CurrentBattle 攻击者 Property==打 且 咚>=1。文件已存在。"
+      },
+      {
+        "number": "P-011",
+        "status": "scripted",
+        "file": "P_011_Uta.cs",
+        "reason": "【启动主要】【每回合1次】咚!!×1：原本没有效果角色+2000。「原本没有效果」=EffectTags 与 Abilities 均为空。文件已存在，实现正确。"
+      },
+      {
+        "number": "P-013",
+        "status": "scripted",
+        "file": "P_013_Gordon.cs",
+        "reason": "【启动主要】放回卡组底：对方1张角色-3000。ConfirmOptional+ReturnFieldToDeckBottom 成本+AddPowerThisTurn(-3000)。文件已存在。"
+      },
+      {
+        "number": "P-014",
+        "status": "scripted",
+        "file": "P_014_Coby.cs",
+        "reason": "【触发】此卡牌登场：OnLifeRevealTrigger 走 PlayFromTrashFree 自废弃/生命登场。关键词【阻挡者】由引擎处理。文件已存在。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-10",
+    "results": [
+      {
+        "number": "P-024",
+        "status": "scripted",
+        "file": "P_024_PirateKing.cs",
+        "reason": "【主要】结算瞬间按当前角色数快照一次性 AddPowerThisTurn(领袖 +角色数×1000)；【触发】用 OnLifeRevealTrigger 选最多1张领袖/角色+1000。动态加成用快照实现，无需 complex。"
+      },
+      {
+        "number": "P-025",
+        "status": "scripted",
+        "file": "P_025_Smoker.cs",
+        "reason": "ContinuousEffect.KoGuard=\"battle\" 仅作用自身；Predicate 判【咚!!×1】(AttachedDonCount>=1)且通过 CurrentBattle 找到对战另一方角色、其 Property 为空(无属性)时防战斗KO。"
+      },
+      {
+        "number": "P-027",
+        "status": "scripted",
+        "file": "P_027_FrankyGeneral.cs",
+        "reason": "ContinuousEffect PowerDelta=1000，Scope=我方角色 Filter 原本力量≤3000，Predicate 仅对方回合中生效；名称视同『弗兰奇』用 NameAliases。"
+      },
+      {
+        "number": "P-029",
+        "status": "scripted",
+        "file": "P_029_Bartolomeo.cs",
+        "reason": "OnMyTurnEnd，ConfirmOptional 可选成本横置自身(RestCard)，再选最多1张非『巴尔托洛梅奥』且《FILM》的休息角色 ActivateCard。"
+      },
+      {
+        "number": "P-030",
+        "status": "scripted",
+        "file": "P_030_Jinbe.cs",
+        "reason": "OnKO，将双方费用≤3(CurrentCostOf)角色合并为一个选择列表(extra.choiceCards)，选定后按所属方 ReturnFieldToDeckBottom 放回各自卡组底。"
+      },
+      {
+        "number": "P-032",
+        "status": "scripted",
+        "file": "P_032_Sengoku.cs",
+        "reason": "ContinuousEffect.CostDelta=-2，Scope=对方角色，Predicate 判我方回合中且【咚!!×1】(AttachedDonCount>=1)。"
+      },
+      {
+        "number": "P-033",
+        "status": "scripted",
+        "file": "P_033_Luffy.cs",
+        "reason": "ActivatedMain，ConfirmOptional 后成本 ReturnFieldToDeckBottom 自身放回卡组底，再 Draw 1。"
+      },
+      {
+        "number": "P-034",
+        "status": "scripted",
+        "file": "P_034_Sanji.cs",
+        "reason": "ContinuousEffect PowerDelta=2000 仅作用自身，Predicate 判我方回合中、【咚!!×1】、我方生命≤2。"
+      },
+      {
+        "number": "P-035",
+        "status": "scripted",
+        "file": "P_035_Luffy.cs",
+        "reason": "OnAttackDeclare，判【咚!!×1】后 ConfirmOptional+ChooseCards 丢弃1张手牌(DiscardHand)为成本，再 KO 对方最多1张费用0(CurrentCostOf==0)角色。"
+      },
+      {
+        "number": "P-036",
+        "status": "scripted",
+        "file": "P_036_Luffy.cs",
+        "reason": "OnAttackDeclare，ConfirmOptional 后玩家选生命顶/底(ChooseOption)1张入手为成本，此角色 +1000，并可选最多1张领袖 +1000(AddPowerThisTurn)。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-20",
+    "results": [
+      {
+        "number": "P-038",
+        "status": "scripted",
+        "file": "P_038_Law.cs",
+        "reason": "已存在且正确：【登场时】ConfirmOptional 后 RestCard 横置我方领袖为成本，再 ChooseCards 选对方费用≤1角色 KO。编译通过。"
+      },
+      {
+        "number": "P-039",
+        "status": "scripted",
+        "file": "P_039_Bellamy.cs",
+        "reason": "已存在且正确：【流放】为关键词由引擎处理；【咚!!×2】生命0时+2000 用 ContinuousEffect PowerDelta(谓词 AttachedDonCount≥2 且 LifeCount==0)。编译通过。"
+      },
+      {
+        "number": "P-040",
+        "status": "scripted",
+        "file": "P_040_Kaido.cs",
+        "reason": "已存在且正确：对方咚区合计≥10时不会被KO，用 ContinuousEffect KoGuard=\"any\"+谓词 TotalDonInCostArea>=10。编译通过。"
+      },
+      {
+        "number": "P-043",
+        "status": "scripted",
+        "file": "P_043_Luffy.cs",
+        "reason": "已存在且正确：【登场时】双方场上费用≤3角色为候选(传 choiceCards)，选中后按所属方 BounceToHand 退回各自持有者手牌。编译通过。"
+      },
+      {
+        "number": "P-044",
+        "status": "scripted",
+        "file": "P_044_Sabo.cs",
+        "reason": "已存在且正确：【咚!!×1】手牌≤4时+2000 用 ContinuousEffect PowerDelta(谓词 AttachedDonCount≥1 且 Hand.Count<=4)。编译通过。"
+      },
+      {
+        "number": "P-046",
+        "status": "scripted",
+        "file": "P_046_Yamato.cs",
+        "reason": "已存在且正确：【登场时】ConfirmOptional 后 ReturnHandToDeckBottom 全部手牌并 Draw 等量(自选顺序简化为原序)。编译通过。"
+      },
+      {
+        "number": "P-048",
+        "status": "scripted",
+        "file": "P_048_Arlong.cs",
+        "reason": "已存在且正确：【咚!!×1】【攻击时】生命≥4时，向对方发 prompt 选1张手牌 ReturnHandToDeckBottom 放底。编译通过。"
+      },
+      {
+        "number": "P-049",
+        "status": "scripted",
+        "file": "P_049_Usopp.cs",
+        "reason": "已存在且正确：【登场时】ChooseOption 选放顶/底，逐张 ChooseCards 取自选顺序后 ReorderTopK 一次放置。编译通过。"
+      },
+      {
+        "number": "P-050",
+        "status": "scripted",
+        "file": "P_050_Sanji.cs",
+        "reason": "已存在且正确：【阻挡者】为关键词；【咚!!×1】【我方回合中】手牌≤3时+4000 用 ContinuousEffect PowerDelta(谓词含 CurrentTurnPlayer==owner)。编译通过。"
+      },
+      {
+        "number": "P-051",
+        "status": "scripted",
+        "file": "P_051_Shanks.cs",
+        "reason": "已存在且正确：【攻击时】ChooseCards(0..手牌数)弃任意张，逐张 DiscardHand 并 AddPowerThisBattle(1000×张数)。编译通过。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-30",
+    "results": [
+      {
+        "number": "P-052",
+        "status": "scripted",
+        "file": "P_052_Mihawk.cs",
+        "reason": "已存在且正确实现：ContinuousEffect.KoGuard=\"battle\"，谓词在 BattleEngine 评估时读 CurrentBattle 取攻击者，要求贴咚≥1且攻击者属性含「斩」时不被KO。"
+      },
+      {
+        "number": "P-054",
+        "status": "scripted",
+        "file": "P_054_Garp.cs",
+        "reason": "已存在且正确实现（卡名罗马音差异，CardNumber=P-054）：KoGuard=\"battle\"，条件为攻击者属性含「打」且贴咚≥1。"
+      },
+      {
+        "number": "P-055",
+        "status": "scripted",
+        "file": "P_055_Luffy.cs",
+        "reason": "已存在且正确实现：【登场时】ConfirmOptional+丢弃我方2张手牌为成本，再向对方发 ChooseCards 让其选1张角色用 ReturnFieldToDeckBottom 放回卡组底。"
+      },
+      {
+        "number": "P-056",
+        "status": "scripted",
+        "file": "P_056_Zoro.cs",
+        "reason": "已存在且正确实现：【登场时】横置2张活跃咚为成本，再用 CurrentCostOf 取双方当前费用≤5角色，ChooseCards 选最多1张 BounceToHand 退回手牌。"
+      },
+      {
+        "number": "P-065",
+        "status": "scripted",
+        "file": "P_065_Chopper.cs",
+        "reason": "已存在且正确实现：【攻击时】对方有当前费用0角色时注册 ContinuousEffect.PowerDelta=2000，Predicate 用 baseTurn 限定至下个我方回合开始（TurnCount<=baseTurn+1），实现跨回合持续。"
+      },
+      {
+        "number": "P-066",
+        "status": "scripted",
+        "file": "P_066_BoaHancock.cs",
+        "reason": "持续静态力量修正，用 ContinuousEffect.PowerDelta=1000，Scope.Filter 限《九蛇海盗团》我方角色，Predicate 限我方回合中且手牌≤5。OnEnterField 注册。"
+      },
+      {
+        "number": "P-067",
+        "status": "scripted",
+        "file": "P_067_EustassKid.cs",
+        "reason": "强制改攻击目标：OnOppAttackDeclare 时若本卡 IsTapped 则把 CurrentBattle 目标重定向到本卡自身（TargetIsLeader=false,TargetCardId=self.Id），实现「休息时对方只能攻击本角色」。"
+      },
+      {
+        "number": "P-068",
+        "status": "scripted",
+        "file": "P_068_Sanji.cs",
+        "reason": "【启动主要】ConfirmOptional+成本将自身从 Characters 移入 Trash（并清理本卡持续效果），效果用 ReorderTopK 确认顶5张自选顺序放顶/底。"
+      },
+      {
+        "number": "P-071",
+        "status": "scripted",
+        "file": "P_071_Marco.cs",
+        "reason": "【KO时】此时自身已在废弃区；ConfirmOptional 后用 AtomicOps.TrashToHand(me,self) 将自身从废弃区加入手牌。"
+      },
+      {
+        "number": "P-073",
+        "status": "scripted",
+        "file": "P_073_Sabo.cs",
+        "reason": "【启动主要】【每回合1次】TurnOnceUsed 去重，成本由 ChooseOption 选生命顶/底1张入手（LifeArea[0] 或 [^1]），收益 AddPowerThisTurn(self,1000)。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-40",
+    "results": [
+      {
+        "number": "P-074",
+        "status": "scripted",
+        "file": "P_074_Ace.cs",
+        "reason": "【启动主要】成本自身放回手牌(BounceToHand)+确认顶5张二选一放顶/底(ReorderTopK)。脚本已存在且正确，编译通过。"
+      },
+      {
+        "number": "P-075",
+        "status": "scripted",
+        "file": "P_075_Luffy.cs",
+        "reason": "【登场时】赋予休息咚(AttachDonFromCost)+【攻击时】条件'我方场上有费用≥8角色'则抽1弃1(Draw/DiscardHand)。双时机分支实现。"
+      },
+      {
+        "number": "P-076",
+        "status": "scripted",
+        "file": "P_076_Sakazuki.cs",
+        "reason": "领航【启动主要】【每回合1次】按特征(《海军》)过滤弃手牌为成本→对方1角色本回合费用-1，用ContinuousEffect.CostDelta(TurnCount锁本回合)。"
+      },
+      {
+        "number": "P-077",
+        "status": "scripted",
+        "file": "P_077_Nami.cs",
+        "reason": "OnDonReturnedToDeck watcher，payload count≥2触发，每回合1次→RefreshDonFromDeck追加休息咚+ActivateCard激活紫色舞台。"
+      },
+      {
+        "number": "P-078",
+        "status": "scripted",
+        "file": "P_078_Idio.cs",
+        "reason": "纯持续条件力量：我方≥2张休息《时光旅诗》角色时自身+1000，ContinuousEffect.PowerDelta+Predicate(OnEnterField注册)。"
+      },
+      {
+        "number": "P-079",
+        "status": "scripted",
+        "file": "P_079_Lim.cs",
+        "reason": "【阻挡者】由引擎处理；【我方的回合结束时】(OnMyTurnEnd)条件≥2张休息《时光旅诗》角色则ActivateCard激活自身。"
+      },
+      {
+        "number": "P-081",
+        "status": "scripted",
+        "file": "P_081_Mihawk.cs",
+        "reason": "【启动主要】成本自身放回手牌(BounceToHand)，条件我方≥3张《十字公会》蓝色角色→登场手牌中费用5的《十字公会》角色(PlayFromHandFree)。"
+      },
+      {
+        "number": "P-082",
+        "status": "scripted",
+        "file": "P_082_Crocodile.cs",
+        "reason": "【我方的回合中】【登场时】领袖含《十字公会》OR含＜巴洛克工作室＞(HasKeyword取OR)→将对方力量≤2000角色放回卡组底(ReturnFieldToDeckBottom)。"
+      },
+      {
+        "number": "P-083",
+        "status": "scripted",
+        "file": "P_083_Jacks.cs",
+        "reason": "【咚!!×1】(AttachedDonCount≥1)【攻击时】弃角色手牌为成本→对方1角色本回合力量-1000(AddPowerThisTurn)后抽1(Draw)。"
+      },
+      {
+        "number": "P-084",
+        "status": "scripted",
+        "file": "P_084_Buggy.cs",
+        "reason": "此角色无法攻击由引擎Abilities处理；领袖为巴奇时所有费用3/4角色无法攻击用ContinuousEffect.GrantRestriction=CannotAttack(双方,谓词判Cost)；【登场时】登场费用≤6《十字公会》角色。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-50",
+    "results": [
+      {
+        "number": "P-085",
+        "status": "scripted",
+        "file": "P_085_JewelryBonney.cs",
+        "reason": "【登场时】条件(领袖《超新星》且我方生命≤对方生命)满足时，用 MoveCharToLife(对方owner, toTop) 把对方≤4费角色置入对方生命区，顶/底由 ChooseOption 选择。MoveCharToLife 支持 ownerIdx 为对方与 toTop 参数，可表达。"
+      },
+      {
+        "number": "P-086",
+        "status": "scripted",
+        "file": "P_086_TrafalgarLaw.cs",
+        "reason": "领袖【启动主要】【每回合1次】(TurnOnceUsed去重)：成本咚-3(ReturnDonToDeck)+可选将我方力量≥3000角色放回卡组底(CurrentPowerOf判定+ReturnFieldToDeckBottom)，再从手牌登场≤4费《心脏海盗团》角色(PlayFromHandFree)。"
+      },
+      {
+        "number": "P-088",
+        "status": "scripted",
+        "file": "P_088_TrafalgarLaw.cs",
+        "reason": "生命【触发】OnLifeRevealTrigger：条件(领袖《超新星》且双方生命合计≤5)满足时，本卡已在废弃区，用 PlayFromTrashFree 将自身登场(参照 OP01-009 凯罗特写法)。"
+      },
+      {
+        "number": "P-090",
+        "status": "scripted",
+        "file": "P_090_CharlotteSmoothie.cs",
+        "reason": "OnKO 触发+限【对方的回合中】(CurrentTurnPlayer!=Owner)：成本咚-1，登场费用≤动态值(opp.TotalDonInCostArea 对方场上咚张数)、排除同名、含《大妈海盗团》的手牌角色。动态费用上限在脚本内即时计算。"
+      },
+      {
+        "number": "P-091",
+        "status": "scripted",
+        "file": "P_091_Shirahoshi.cs",
+        "reason": "【登场时】从手牌登场≤5费《海王类/鱼人岛》角色(PlayFromHandFree)；【启动主要】横置自身(RestCard)后将1张登场当回合的《海王类》角色 TurnPlayed 置0 解除召唤眩晕使其本回合可攻击。简化点已注明(解除后亦可攻击领袖)。"
+      },
+      {
+        "number": "P-092",
+        "status": "scripted",
+        "file": "P_092_Koby.cs",
+        "reason": "【对方回合中】力量-3000用 ContinuousEffect(PowerDelta=-3000, Predicate限对方回合,仅自身)于 OnEnterField 注册；【攻击时】领袖《海军》时『领袖原本力量变为7000』用 ContinuousEffect(PowerDelta=7000-领袖卡面力量, 作用我方领袖, TurnCount限有效期近似『直到下个对方回合结束』)。"
+      },
+      {
+        "number": "P-093",
+        "status": "scripted",
+        "file": "P_093_TrafalgarLaw.cs",
+        "reason": "【阻挡者】关键词由引擎处理；【登场时】条件『我方场上咚张数≤对方场上咚张数』= me.TotalDonInCostArea≤opp.TotalDonInCostArea，满足时 RefreshDonFromDeck(1, Rest) 追加1张休息咚。"
+      },
+      {
+        "number": "P-095",
+        "status": "scripted",
+        "file": "P_095_Sanji.cs",
+        "reason": "【对方的攻击时】OnOppAttackDeclare+【每回合1次】(TurnOnceUsed)：成本弃1张事件(ChooseCards选事件+DiscardHand)，收益选我方1张领袖/角色 AddPowerThisBattle(+2000)。"
+      },
+      {
+        "number": "P-097",
+        "status": "scripted",
+        "file": "P_097_Shanks.cs",
+        "reason": "【登场时】/【攻击时】(两触发)『本回合对方无法发动【阻挡者】』= 对对方所有角色 AddRestriction(CannotBeBlocker, ThisTurn)。"
+      },
+      {
+        "number": "P-098",
+        "status": "scripted",
+        "file": "P_098_Buggy.cs",
+        "reason": "【阻挡者】关键词由引擎处理；【登场时】条件『我方场上不存在5张费用≥5角色』= 费用≥5角色数<5 时，用 ReturnFieldToDeckBottom 将自身放回卡组底。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-60",
+    "results": [
+      {
+        "number": "P-099",
+        "status": "scripted",
+        "file": "P_099_Luffy.cs",
+        "reason": "【攻击时】OnAttackDeclare：可选成本咚!!-10(ReturnDonToDeck 10张，足额才执行)后 ActivateCard 将此角色转活跃。"
+      },
+      {
+        "number": "P-100",
+        "status": "scripted",
+        "file": "P_100_Teach.cs",
+        "reason": "【攻击时】注册 ContinuousEffect.NullifyEffect=true(Side=1 含领袖与角色)，Predicate 用 TurnCount==baseTurn 限定本回合，实现对方全体本回合效果无效。"
+      },
+      {
+        "number": "P-103",
+        "status": "scripted",
+        "file": "P_103_Ace.cs",
+        "reason": "【登场时】Draw2 后 ChooseCards 选2张手牌，ChooseOption 选放卡组顶/底(手动 Insert/AddRange，顶部按选择顺序)，之后可选给领袖1张休息咚。"
+      },
+      {
+        "number": "P-104",
+        "status": "scripted",
+        "file": "P_104_Jack.cs",
+        "reason": "持续防离场用 ContinuousEffect.LeaveGuard=\"effect\"，Predicate 判任一方费用区咚>=10且为自身，近似「因对方效果离场」守护。"
+      },
+      {
+        "number": "P-105",
+        "status": "scripted",
+        "file": "P_105_Sabo.cs",
+        "reason": "持续条件：领袖含《革命军》时自身 GrantKeyword=阻挡者 + CostDelta=4；【登场时】可选将生命顶/底1张入手(ChooseOption)后给1张领袖/角色休息咚。"
+      },
+      {
+        "number": "P-106",
+        "status": "scripted",
+        "file": "P_106_Luffy.cs",
+        "reason": "【我方回合结束时】OnMyTurnEnd：将横置《艾格赫德》角色 ActivateCard。生命翻正面成本引擎无通道，按惯例 ConfirmOptional 门控并简化(不实际翻面)，仅实现收益；【触发】字段由触发数据独立处理。"
+      },
+      {
+        "number": "P-107",
+        "status": "scripted",
+        "file": "P_107_Roger.cs",
+        "reason": "【登场时】任一方咚>=10时注册 ContinuousEffect.PowerDelta=2000 作用我方领袖，Predicate 用 TurnCount<=baseTurn+1 近似「直到下个对方结束阶段结束」。"
+      },
+      {
+        "number": "P-109",
+        "status": "scripted",
+        "file": "P_109_Ace.cs",
+        "reason": "【阻挡者】关键词由引擎处理；【登场时】LookTopReveal 展示卡组顶3张，ChooseOption 决定整体放顶/底(自选顺序简化为原序)，之后给1张领袖/角色休息咚。"
+      },
+      {
+        "number": "P-111",
+        "status": "complex",
+        "file": "",
+        "reason": "每回合1次置换型守护：我方《草帽一伙》角色因对方效果将要离场时，改为休息1张咚使其不离场。OnAllyWillBeKOd 仅战斗KO派发，引擎对「因效果离场」的他卡置换守护(横置咚代替离场)暂无通道(Wave5 明确仍判 complex)。"
+      },
+      {
+        "number": "P-113",
+        "status": "scripted",
+        "file": "P_113_Bonney.cs",
+        "reason": "【咚!!×2】【对方回合中】注册两条 ContinuousEffect(GrantKeyword=阻挡者 + PowerDelta=2000)，Predicate 判自身 AttachedDonCount>=2 且 CurrentTurnPlayer!=owner。"
+      }
+    ]
+  },
+  {
+    "batch": "P-cs-70",
+    "results": [
+      {
+        "number": "P-114",
+        "status": "scripted",
+        "file": "P_114_Zoro.cs",
+        "reason": "【我方回合结束时】存在活跃咚时将自身转活跃：OnMyTurnEnd 触发，me.ActiveDonCount>0 判活跃咚存在，AtomicOps.ActivateCard(self)。阻挡者为关键词由引擎处理。"
+      },
+      {
+        "number": "P-115",
+        "status": "scripted",
+        "file": "P_115_BoaHancock.cs",
+        "reason": "OnEnterField 赋予领袖/角色1张休息咚(AttachDonFromCost DonState.Rest)；OnLifeRevealTrigger 从手牌登场力量≤5000且ColorList含光且Trigger非空的角色(PlayFromHandFree)。"
+      },
+      {
+        "number": "P-117",
+        "status": "complex",
+        "file": "",
+        "reason": "领袖效果含构筑规则限制(只能放入《东海》卡)与胜负条件反转(卡组0张不败反胜)，均为引擎未列机制；【咚!!×1】攻击给伤时削顶为持续条件触发，无对应钩子。"
+      },
+      {
+        "number": "P-118",
+        "status": "scripted",
+        "file": "P_118_Lilith.cs",
+        "reason": "OnEnterField 领袖含《艾格赫德》时，从手牌登场费用≤5且(HasKeyword(艾格赫德)||Trigger非空)的角色，PlayFromHandFree。"
+      }
+    ]
+  },
+  {
+    "batch": "PRB01-cs-0",
+    "results": [
+      {
+        "number": "PRB01-001",
+        "status": "scripted",
+        "file": "PRB01_001_Sanji.cs",
+        "reason": "领航卡【启动主要】【每回合1次】：本回合给我方最多1张费用≤8且无【登场时】效果的角色赋予【速攻】。用 ActivatedMain 时机 + TurnOnceUsed 去重实现每回合1次；『没有【登场时】效果』判定为角色 EffectTags 不含 \"OnEnterField\"（与引擎 DSL noEnterFieldEffect 过滤键一致），费用用 ctx.State.CurrentCostOf 取当前费用；ConfirmOptional 询问后 ChooseCards(0,1) 选目标，AtomicOps.GiveKeyword(tgt, \"速攻\", KeywordDuration.ThisTurn) 临时赋予。wfReason 称 DSL 无『无登场时效果』过滤键，但 C# 可直接判 EffectTags，故可脚本化。文件已存在且 dotnet build 0 错误通过。"
+      }
+    ]
+  },
+  {
+    "batch": "PRB02-cs-0",
+    "results": [
+      {
+        "number": "PRB02-002",
+        "status": "scripted",
+        "file": "PRB02_002_TrafalgarLaw.cs",
+        "reason": "PreKO 钩子实现「将要被KO时改为本回合力量-2000并 MarkPreventKO 取消KO」置换(每回合1次)，OnAttackDeclare 实现【攻击时】对方最多1张角色力量-2000。仅非KO离场分支(退回/放回卡组)无统一前置钩子未覆盖，核心可脚本化。"
+      },
+      {
+        "number": "PRB02-005",
+        "status": "complex",
+        "file": "",
+        "reason": "【登场时】为延迟触发：登记到「下个对方主要阶段开始时」再令对方将1张活跃咚转休息。引擎无延迟到对方主要阶段的任务通道，且无横置对方活跃咚的接口(don.CannotActivateNextReset 仅作用重置阶段)。无对应通道。"
+      },
+      {
+        "number": "PRB02-006",
+        "status": "complex",
+        "file": "",
+        "reason": "「此角色将要因对方效果转为休息时，改为横置我方其他1张角色使本角色不横置」属于转休息的前置置换。OnCharRested 为事后 watcher 而非前置置换钩子，引擎无 pre-rest 置换通道。"
+      },
+      {
+        "number": "PRB02-014",
+        "status": "scripted",
+        "file": "HandStaticCost.cs",
+        "reason": "「我方废弃区≥15张时手牌中此卡费用-3」走专用手牌静态减费通道，已在 Effects/HandStaticCost.cs 注册 case \"PRB02-014\" (me.Trash.Count>=15 ? -3 : 0)。【阻挡者】为纯关键词由引擎处理，无需独立脚本。"
+      },
+      {
+        "number": "PRB02-017",
+        "status": "scripted",
+        "file": "PRB02_017_BoaHancock.cs",
+        "reason": "【登场时】可选：丢弃1张拥有【触发】(Info.Trigger 非空)的手牌为成本，二选一对「对方休息领袖」或「对方最多1张非路飞角色」施加 RestrictionKind.CannotAttack + KeywordDuration.UntilNextOpponentEndPhase。trigger 字段【触发】KO 由引擎独立处理。"
+      }
+    ]
+  },
+  {
+    "batch": "ST01-cs-0",
+    "results": [
+      {
+        "number": "ST01-004",
+        "status": "scripted",
+        "file": "ST01_004_Sanji.cs",
+        "reason": "【咚!!×2】此角色获得【速攻】：用 ContinuousEffect.GrantKeyword=\"速攻\" + Predicate 按 AttachedDonCount(selfId)>=2 条件授予，OnEnterField 注册，离场由引擎清理。文件已存在且实现正确，无需改动。"
+      }
+    ]
+  },
+  {
+    "batch": "ST03-cs-0",
+    "results": [
+      {
+        "number": "ST03-013",
+        "status": "scripted",
+        "file": "ST03_013_BoaHancock.cs",
+        "reason": "【阻挡者】为纯关键词由引擎处理；trigger『此卡牌登场』走 OnLifeRevealTrigger 生命触发自登场，与 OP04-113 拉比安/OP01-071 甚平同款写法——生命牌已被引擎放入废弃区，脚本用 AtomicOps.PlayFromTrashFree 从废弃区登场。完全可脚本化，wfReason 判 complex 有误。"
+      }
+    ]
+  },
+  {
+    "batch": "ST05-cs-0",
+    "results": [
+      {
+        "number": "ST05-009",
+        "status": "scripted",
+        "file": "ST05_009_Scarlet.cs",
+        "reason": "【触发】此卡牌登场。生命触发 OnLifeRevealTrigger 时该卡已被 LifeRevealManager 移入废弃区，用 AtomicOps.PlayFromTrashFree 从废弃区登场到角色区即实现'此卡牌登场'。"
+      }
+    ]
+  },
+  {
+    "batch": "ST07-cs-0",
+    "results": [
+      {
+        "number": "ST07-007",
+        "status": "scripted",
+        "file": "ST07_007_CharlotteBrulee.cs",
+        "reason": "【阻挡者】为纯关键词由引擎处理；【触发】此卡牌登场用 OnLifeRevealTrigger 实现——生命触发流程已将本卡放入废弃区，判 me.Trash.Contains(self) 后用 AtomicOps.PlayFromTrashFree 自登场，与范例 OP01-009 凯罗特同模式。"
+      }
+    ]
+  },
+  {
+    "batch": "ST08-cs-0",
+    "results": [
+      {
+        "number": "ST08-007",
+        "status": "scripted",
+        "file": "ST08_007_NefertariVivi.cs",
+        "reason": "关键词【阻挡者】由引擎自动处理；【触发】「此卡牌登场」用 OnLifeRevealTrigger 实现。生命牌触发发动时引擎已将本卡移入废弃区，故用 AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source) 免费登场，与卡面一致。参照 ST_FromLife.cs/ST_LifeScry.cs 写法。wfReason 的 complex 判定过于保守。"
+      }
+    ]
+  },
+  {
+    "batch": "ST12-cs-0",
+    "results": [
+      {
+        "number": "ST12-014",
+        "status": "scripted",
+        "file": "ST12_014_Dival.cs",
+        "reason": "【阻挡者】为纯关键词由引擎处理；【登场时】确认卡组顶3张自选顺序排列放回顶/底，用 AtomicOps.ReorderTopK 实现：ChooseCards 按选择先后定序、ChooseOption 选顶/底，未选满则按原序补齐保证全部放回。"
+      }
+    ]
+  },
+  {
+    "batch": "ST17-cs-0",
+    "results": [
+      {
+        "number": "ST17-001",
+        "status": "scripted",
+        "file": "ST17_001_Crocodile.cs",
+        "reason": "【登场时】公开卡组顶1张(BroadcastReveal)，判该牌是否含《王下七武海》特征(HasKeyword)，满足则 Draw 2 并用 ChooseCards 选1张手牌移除后 Insert(0)放回卡组顶。均为规范内 API，可实现。"
+      }
+    ]
+  },
+  {
+    "batch": "ST22-cs-0",
+    "results": [
+      {
+        "number": "ST22-001",
+        "status": "scripted",
+        "file": "ST22_001_Ace_Newgate.cs",
+        "reason": "启动主要+每回合1次：ConfirmOptional后从手牌选1张含〈白胡子海盗团〉特征的卡公开(BroadcastReveal,仍留手牌),抽1张(AtomicOps.Draw),再将该公开卡从手牌移到卡组最上方(Hand.Remove + Deck.Insert(0,...))。wfReason所谓无通道有误,放回卡组顶用Deck.Insert(0)即可实现。已编译通过。"
+      },
+      {
+        "number": "ST22-005",
+        "status": "scripted",
+        "file": "ST22_005_KozukiOden.cs",
+        "reason": "实现【启动主要】【每回合1次】部分:成本横置3张活跃咚(CostArea遍历Active转Rest)+退回我方1张本角色以外角色到手牌(ChooseCards+AtomicOps.BounceToHand),收益将此角色转为活跃(ActivateCard),TurnOnceUsed控制每回合1次,成本可支付性校验(活跃咚≥3且有其他角色)。另一段「因对方效果将要离场时改为弃2手牌不离场」属效果离场的置换/防离场,引擎仅在战斗KO时派发置换钩子OnAllyWillBeKOd,对因效果将要离场无对应通道(规范§17明确效果KO/离场的置换守护仍判complex),该段未实现,已在脚本注释注明。主动效果部分已编译通过。"
+      }
+    ]
+  },
+  {
+    "batch": "ST23-cs-0",
+    "results": [
+      {
+        "number": "ST23-001",
+        "status": "complex",
+        "file": "",
+        "reason": "主要效果「我方场上存在力量≥10000角色时，手牌中此卡费用-4」是手牌内的条件性静态减费，只在卡处于手牌时生效，ContinuousEffect(须在OnEnterField注册、仅评估场上卡)无法表达，不能用IScriptedEffect实现。该效果应走专用的手牌静态减费通道 服务端WebSocket/Effects/HandStaticCost.cs，且已在第59-61行实现(case \"ST23-001\": 我方场上有力量≥10000角色→-4)。其余仅【阻挡者】为纯关键词，由引擎自动处理。故无需也不应写scripted .cs文件。"
+      }
+    ]
+  },
+  {
+    "batch": "ST29-cs-0",
+    "results": [
+      {
+        "number": "ST29-009",
+        "status": "scripted",
+        "file": "ST29_009_NicoRobin.cs",
+        "reason": "【阻挡者】为纯关键词由引擎处理；【触发】「我方领袖为蒙奇·D·路飞时此卡牌登场」走 OnLifeRevealTrigger，参照 OP01-009 凯罗特的自登场范式：生命触发流程已将翻开的卡放入废弃区，校验 ctx.Source 在 Trash 且领袖名 NameIs(\"蒙奇·D·路飞\")后用 AtomicOps.PlayFromTrashFree 登场。引擎有完整通道，wfReason 判 complex 过于保守。"
+      }
+    ]
+  }
+]

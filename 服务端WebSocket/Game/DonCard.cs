@@ -10,8 +10,10 @@ public enum DonState
 
 public class DonCard
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = DeterministicId.Next();
     public DonState State { get; set; } = DonState.InDeck;
     /// <summary>仅 Attached 时有效：被赋予的目标</summary>
     public Guid? AttachedToCardId { get; set; }
+    /// <summary>标记下个重置阶段此咚不转为活跃（一次性，"某咚下个重置不活跃"用）</summary>
+    public bool CannotActivateNextReset { get; set; }
 }

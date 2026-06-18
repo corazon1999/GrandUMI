@@ -63,7 +63,7 @@ export function useVirtualList({
     }
   }, []);
 
-  // 监听容器宽度变化
+  // 监听容器宽度变化 + 滚动
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -74,8 +74,12 @@ export function useVirtualList({
       }
     });
     ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", handleScroll);
+    };
+  }, [handleScroll]);
 
   return {
     containerRef,

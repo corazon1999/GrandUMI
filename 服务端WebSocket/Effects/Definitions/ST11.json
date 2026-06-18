@@ -1,0 +1,54 @@
+{
+  "ST11-001": {
+    "_name": "乌塔（领袖）",
+    "_note": "【咚×1】【攻击时】公开卡组顶1张，将最多1张《FILM》加入手牌，其余放回卡组底（原文【每回合1次】，triggers 无 oncePerTurn 通道，未强制限次）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "LookTopReveal", "count": 1, "max": 1, "restTo": "bottom", "match": { "keyword": "FILM" } }
+        ]
+      }
+    ]
+  },
+  "ST11-002": {
+    "_name": "乌塔（角色）",
+    "_note": "【阻挡者】+【我方的回合结束时】弃1手牌（原文限事件，弃牌不限种类近似）：将我方最多1张《FILM》角色转为活跃状态。",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "FILM" }, "text": "将我方最多1张《FILM》角色转为活跃状态" },
+          { "op": "Activate", "target": "$t" }
+        ]
+      }
+    ]
+  },
+  "ST11-004": {
+    "_name": "新纪元",
+    "_note": "【主要】领袖为“乌塔”时：确认卡组顶3张，公开≤1张“新纪元”以外《FILM》入手，余放回底，并将我方最多1张咚转活跃。",
+    "main": {
+      "if": { "leaderNameEquals": "乌塔" },
+      "then": [
+        { "op": "LookTopReveal", "count": 3, "max": 1, "restTo": "bottom", "match": { "keyword": "FILM", "excludeName": "新纪元" } },
+        { "op": "ActiveOwnDon", "n": 1 }
+      ]
+    }
+  },
+  "ST11-005": {
+    "_name": "我是最强",
+    "_note": "【主要】将我方领袖“乌塔”转为活跃状态；【触发】我方最多1张领袖或角色+1000。",
+    "main": {
+      "if": { "leaderNameEquals": "乌塔" },
+      "then": [
+        { "op": "Activate", "target": "selfLeader" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色+1000" },
+      { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 }
+    ]
+  }
+}

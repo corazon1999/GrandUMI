@@ -2,6 +2,9 @@ import type { CardData } from "./card";
 
 export type GameMode = "Player" | "Observer" | "Playback";
 export type BattlePhase =
+  | "Reset"
+  | "Draw"
+  | "Don"
   | "Main"
   | "Attack"
   | "Block"

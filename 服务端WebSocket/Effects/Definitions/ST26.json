@@ -1,0 +1,45 @@
+{
+  "ST26-002": {
+    "_name": "托尼托尼·乔巴",
+    "_note": "【阻挡者】+【登场时】咚-2：将对方最多1张费用≤1 角色转休息（原文“或休息1张咚”因无横置对方咚 op 已略去）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 2 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 1 }, "text": "将对方最多1张费用≤1 角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST26-003": {
+    "_name": "妮古·罗宾",
+    "_note": "【登场时】咚-2：从咚卡组追加最多1张活跃状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 2 },
+        "then": [
+          { "op": "RefreshDon", "n": 1, "state": "active" }
+        ]
+      }
+    ]
+  },
+  "ST26-004": {
+    "_name": "弗兰奇将军",
+    "_note": "【登场时】咚-2：本回合对方最多2张角色各-2000（两次单选近似“最多2张”）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 2 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$a", "text": "本回合对方角色力量-2000（1/2）" },
+          { "op": "AddPowerThisTurn", "target": "$a", "delta": -2000 },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$b", "text": "本回合对方角色力量-2000（2/2）" },
+          { "op": "AddPowerThisTurn", "target": "$b", "delta": -2000 }
+        ]
+      }
+    ]
+  }
+}

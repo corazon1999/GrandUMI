@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { useDeckStore, FORMAT_RULES, type DeckEntry, type DeckFormat } from "@/store/deckStore";
-import { saveDeck, loadAllDecks, loadDeck, deleteDeck, type SavedDeck } from "@/data/DeckMapper";
+import { useDeckStore, type DeckEntry } from "@/store/deckStore";
+import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName, exportDeckString, importDeckString, type SavedDeck } from "@/data/DeckMapper";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
@@ -15,13 +15,23 @@ type SaveState = "idle" | "saved" | "error";
 
 export default function DeckInfoPanel() {
   const router = useRouter();
-  const { format, leader, entries, totalCards, isValid, removeCard, clearDeck, setLeader, setFormat, getMainSize, notice, clearNotice } =
+  const { leader, entries, totalCards, isValid, removeCard, addCard, clearDeck, setLeader, getMainSize, notice, clearNotice } =
     useDeckStore();
   const [deckName, setDeckName]     = useState("我的卡组");
   const [saveState, setSaveState]   = useState<SaveState>("idle");
   const [showLoad, setShowLoad]     = useState(false);
   const [savedDecks, setSavedDecks] = useState<Record<string, SavedDeck>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  // 当前编辑内容的来源卡组名（载入过/已保存过的名字）；新建时为 null。
+  // 用于判断「保存目标名」是否撞了别的已存在卡组，从而决定是否需要二次确认覆盖。
+  const [loadedName, setLoadedName] = useState<string | null>(null);
+  const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [exportText, setExportText] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importMsg, setImportMsg]   = useState<string | null>(null);
+  const [copied, setCopied]         = useState(false);
   const noticeTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hover, setHover]           = useState<HoverInfo | null>(null);
   const hoverTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,6 +50,18 @@ export default function DeckInfoPanel() {
     setSavedDecks(loadAllDecks());
   }, []);
 
+  // 初始化卡组名称：新建模式 → "新卡组"；否则带入当前已选卡组名
+  useEffect(() => {
+    const isNew = new URLSearchParams(window.location.search).get("new") === "1";
+    if (isNew) {
+      setDeckName(nextDeckName());
+      setLoadedName(null); // 新建明确无来源卡组，防软导航残留旧 loadedName 导致保存时静默覆盖
+    } else {
+      const sel = localStorage.getItem("grandumi_selected_deck");
+      if (sel) { setDeckName(sel); setLoadedName(sel); }
+    }
+  }, []);
+
   // 卡组条目变化时，若悬停的卡牌已不在卡组中则清除预览
   useEffect(() => {
     if (!hover) return;
@@ -49,18 +71,37 @@ export default function DeckInfoPanel() {
     }
   }, [entries, hover]);
 
-  const handleSave = () => {
-    if (!isValid()) return;
+  const handleNew = () => {
+    clearDeck();
+    clearNotice();
+    setDeckName(nextDeckName());
+    setLoadedName(null);
+    setShowLoad(false);
+  };
+
+  const doSave = (name: string) => {
     try {
       const cards = entries.flatMap((e) => Array(e.count).fill(e.card) as CardData[]);
-      saveDeck(deckName, leader!, cards);
+      saveDeck(name, leader!, cards);
       setSavedDecks(loadAllDecks());
+      setLoadedName(name);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
     } catch {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 2000);
     }
+  };
+
+  const handleSave = () => {
+    if (!isValid()) return;
+    // 目标名已存在 → 仅当确实在编辑同名来源卡组(loadedName===deckName)时才静默覆盖自己；
+    // 新建(loadedName===null)或改成别的已存在名都必须二次确认，杜绝「新建卡组误覆盖已有卡组」。
+    if (deckExists(deckName) && (loadedName === null || deckName !== loadedName)) {
+      setOverwriteTarget(deckName);
+      return;
+    }
+    doSave(deckName);
   };
 
   const handleLoad = (name: string) => {
@@ -72,12 +113,50 @@ export default function DeckInfoPanel() {
     const { addCard } = useDeckStore.getState();
     result.cards.forEach((c) => addCard(c));
     setDeckName(name);
+    setLoadedName(name);
     setShowLoad(false);
   };
 
   const handleDelete = (name: string) => {
     deleteDeck(name);
     setSavedDecks(loadAllDecks());
+  };
+
+  const handleExport = () => {
+    if (!leader) {
+      setExportText("⚠ 请先选择领航卡再导出");
+    } else {
+      const cards = entries.flatMap((e) => Array(e.count).fill(e.card) as CardData[]);
+      setExportText(exportDeckString(leader, cards, deckName));
+    }
+    setShowExport(true);
+    setShowImport(false);
+    setShowLoad(false);
+    setCopied(false);
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const handleImportApply = () => {
+    const { leader: lead, cards, skipped } = importDeckString(importText);
+    if (!lead && cards.length === 0) {
+      setImportMsg("没有识别到有效卡牌,请检查卡组码");
+      return;
+    }
+    clearDeck();
+    if (lead) setLeader(lead);
+    const { addCard: add } = useDeckStore.getState();
+    cards.forEach((c) => add(c));
+    setImportMsg(`导入完成:${cards.length} 张${skipped > 0 ? `,跳过 ${skipped} 张无效卡号` : ""}${!lead ? "(未识别到领航)" : ""}`);
+    setTimeout(() => { setShowImport(false); setImportText(""); setImportMsg(null); }, 1800);
   };
 
   const handleMouseEnter = useCallback((card: CardData, rect: DOMRect, currentSprite: string) => {
@@ -109,6 +188,12 @@ export default function DeckInfoPanel() {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={handleNew}
+            className="text-emerald-400 hover:text-emerald-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+          >
+            新建
+          </button>
+          <button
             onClick={() => setShowLoad(!showLoad)}
             className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
           >
@@ -119,6 +204,18 @@ export default function DeckInfoPanel() {
             className="text-gray-400 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             清空
+          </button>
+          <button
+            onClick={handleExport}
+            className="text-sky-400 hover:text-sky-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+          >
+            导出
+          </button>
+          <button
+            onClick={() => { setShowImport((v) => !v); setShowExport(false); setShowLoad(false); setImportMsg(null); }}
+            className="text-sky-400 hover:text-sky-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+          >
+            导入
           </button>
         </div>
       </div>
@@ -171,6 +268,60 @@ export default function DeckInfoPanel() {
         </div>
       )}
 
+      {/* 导出卡组面板 */}
+      {showExport && (
+        <div className="border-b border-gray-800 bg-gray-900 p-3 shrink-0">
+          <textarea
+            readOnly
+            value={exportText}
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            className="w-full h-32 bg-gray-800 text-gray-200 text-[11px] rounded-lg p-2 outline-none border border-gray-700 resize-none font-mono"
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleCopy}
+              className="flex-1 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold transition-colors"
+            >
+              {copied ? "✓ 已复制" : "复制到剪贴板"}
+            </button>
+            <button
+              onClick={() => setShowExport(false)}
+              className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs hover:bg-gray-700 transition-colors"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 导入卡组面板 */}
+      {showImport && (
+        <div className="border-b border-gray-800 bg-gray-900 p-3 shrink-0">
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder="粘贴卡组码…(领航行 + 每行『数量 卡号』)"
+            className="w-full h-32 bg-gray-800 text-gray-200 text-[11px] rounded-lg p-2 outline-none border border-gray-700 focus:border-orange-500 resize-none font-mono"
+          />
+          {importMsg && <p className="text-emerald-400 text-[11px] mt-1.5">{importMsg}</p>}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleImportApply}
+              disabled={!importText.trim()}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${importText.trim() ? "bg-orange-500 hover:bg-orange-400 text-white" : "bg-gray-800 text-gray-600 cursor-not-allowed"}`}
+            >
+              导入
+            </button>
+            <button
+              onClick={() => { setShowImport(false); setImportText(""); setImportMsg(null); }}
+              className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs hover:bg-gray-700 transition-colors"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 删除确认弹窗 */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -196,6 +347,31 @@ export default function DeckInfoPanel() {
         </div>
       )}
 
+      {/* 覆盖同名卡组确认弹窗（方案A：仅当目标名撞了别的已存在卡组时才弹，防新建/改名误覆盖） */}
+      {overwriteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-72 shadow-2xl">
+            <p className="text-white text-sm text-center mb-1">已存在同名卡组</p>
+            <p className="text-gray-400 text-xs text-center mb-4 truncate">「{overwriteTarget}」</p>
+            <p className="text-gray-600 text-[10px] text-center mb-4">继续保存将覆盖它，原内容不可恢复</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setOverwriteTarget(null)}
+                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-300 text-xs hover:bg-gray-700 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => { doSave(overwriteTarget); setOverwriteTarget(null); }}
+                className="flex-1 py-2 rounded-lg bg-orange-600 text-white text-xs font-bold hover:bg-orange-500 transition-colors"
+              >
+                覆盖保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
         {/* 卡组名称 */}
         <div className="px-3 pt-3 pb-2">
@@ -205,29 +381,6 @@ export default function DeckInfoPanel() {
             onChange={(e) => setDeckName(e.target.value)}
             placeholder="卡组名称"
           />
-        </div>
-
-        {/* 对战格式切换 */}
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-[10px] shrink-0">格式</span>
-            <div className="flex flex-1 gap-1">
-              {(Object.keys(FORMAT_RULES) as DeckFormat[]).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFormat(f)}
-                  className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                    format === f
-                      ? "bg-orange-500 text-white"
-                      : "bg-gray-800 text-gray-400 hover:text-white"
-                  }`}
-                  title={FORMAT_RULES[f].label}
-                >
-                  {f === "Unrestricted" ? "自由" : f === "OP15-Only" ? "OP15" : "OP16"}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* 领航卡 */}
@@ -297,7 +450,7 @@ export default function DeckInfoPanel() {
         </div>
 
         {/* 卡牌列表 */}
-        <div className="flex-1 overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 min-h-0">
+        <div className="px-3 pb-2 flex flex-col gap-0.5">
           {entries.length === 0 ? (
             <p className="text-gray-700 text-xs text-center py-6">
               从搜索结果点击卡牌添加
@@ -308,6 +461,7 @@ export default function DeckInfoPanel() {
                 key={e.card.number}
                 entry={e}
                 onRemove={removeCard}
+                onAdd={addCard}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               />
@@ -439,11 +593,13 @@ function CostCurve({ entries }: { entries: DeckEntry[] }) {
 function DeckEntryRow({
   entry,
   onRemove,
+  onAdd,
   onMouseEnter,
   onMouseLeave,
 }: {
   entry: DeckEntry;
   onRemove: (number: string) => void;
+  onAdd: (card: CardData) => void;
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
   onMouseLeave: () => void;
 }) {
@@ -453,14 +609,16 @@ function DeckEntryRow({
 
   return (
     <div
-      className="flex items-center gap-1.5 py-1.5 px-2 border-b border-gray-800/60 group relative rounded-md overflow-hidden cursor-default"
+      className="flex items-center gap-1.5 py-1.5 px-2 border-b border-gray-800/60 group relative rounded-md overflow-hidden cursor-pointer"
       style={{
         backgroundImage: `url(${sprite})`,
         backgroundSize: "cover",
         backgroundPosition: "center 30%",
       }}
+      onClick={() => onRemove(entry.card.number)}
       onMouseEnter={(e) => onMouseEnter(entry.card, e.currentTarget.getBoundingClientRect(), sprite)}
       onMouseLeave={onMouseLeave}
+      title="点击减少一张"
     >
       {/* 半透明遮罩保证文字可读 */}
       <div className="absolute inset-0 bg-gray-950/70 group-hover:bg-gray-950/55 transition-colors" />
@@ -479,10 +637,11 @@ function DeckEntryRow({
       </span>
       <span className="text-gray-300 text-[10px] shrink-0 relative z-10">×{entry.count}</span>
       <button
-        onClick={() => onRemove(entry.card.number)}
-        className="text-gray-300 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all shrink-0 w-4 relative z-10 font-bold"
+        onClick={(e) => { e.stopPropagation(); onAdd(entry.card); }}
+        className="text-gray-300 hover:text-green-400 text-sm opacity-0 group-hover:opacity-100 transition-all shrink-0 w-4 relative z-10 font-bold text-center leading-none"
+        title="点击增加一张"
       >
-        −
+        +
       </button>
     </div>
   );

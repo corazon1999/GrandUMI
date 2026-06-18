@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
+export type CardSize = "sm" | "md" | "lg";
+
+/**
+ * 固定卡牌尺寸档覆盖。
+ * 当处于固定设计画布（如对战页 scale-to-fit）时，用此 Context 强制画布内卡牌尺寸档，
+ * 使画布内组件不随真实视口矮小而缩到更小档（画布已整体等比缩放）。
+ * null = 不覆盖，按真实视口判断。
+ */
+export const CardSizeOverride = createContext<CardSize | null>(null);
 
 export function useResponsive() {
-  const [size, setSize] = useState<"sm" | "md" | "lg">("md");
+  const override = useContext(CardSizeOverride);
+  const [size, setSize] = useState<CardSize>("md");
 
   useEffect(() => {
     function update() {
@@ -19,9 +30,11 @@ export function useResponsive() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  const effective: CardSize = override ?? size;
+
   return {
-    size,
-    cardSize: size === "sm" ? ("sm" as const) : size === "md" ? ("md" as const) : ("lg" as const),
-    isMobile: size === "sm",
+    size: effective,
+    cardSize: effective,
+    isMobile: effective === "sm",
   };
 }

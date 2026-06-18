@@ -14,14 +14,13 @@ const STATE_LABEL: Record<string, string> = {
 
 export default function LoginPanel() {
   const [account, setAccount] = useState("");
-  const [password, setPassword] = useState("");
   const connState = useNetStore((s) => s.connState);
   const error = useNetStore((s) => s.error);
   const canLogin = connState === "connected";
 
   const handleLogin = () => {
-    if (!account.trim() || !password.trim()) return;
-    HomeRequest.login(account.trim(), password.trim());
+    if (!account.trim()) return;
+    HomeRequest.login(account.trim());
   };
 
   return (
@@ -48,16 +47,6 @@ export default function LoginPanel() {
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             disabled={!canLogin}
             autoComplete="username"
-          />
-          <input
-            type="password"
-            className="bg-gray-800 text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-gray-700 focus:border-orange-500 transition-colors disabled:opacity-50"
-            placeholder="密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            disabled={!canLogin}
-            autoComplete="current-password"
           />
         </div>
 

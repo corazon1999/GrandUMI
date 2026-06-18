@@ -1,0 +1,758 @@
+{
+  "OP09-028": {
+    "_name": "山智",
+    "_matcher": "KO时从废弃区登场1张费用≤4且时光旅诗/草帽特征角色(横置)。可选成本(生命顶/底入手)在触发节不支持，按惯例只实现收益。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "anyOf": [
+                {
+                  "keyword": "时光旅诗"
+                },
+                {
+                  "keyword": "草帽一伙"
+                }
+              ],
+              "originalCostLte": 4
+            },
+            "rest": true,
+            "text": "从废弃区将最多1张费用≤4且拥有《时光旅诗》或《草帽一伙》特征的角色以休息状态登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-029": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "我方回合结束时将我方最多1张费用≤4且时光旅诗特征角色转为活跃状态。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "keyword": "时光旅诗"
+            },
+            "text": "选择我方最多1张费用≤4且拥有《时光旅诗》特征的角色"
+          },
+          {
+            "op": "Activate",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-039": {
+    "_name": "橡皮橡皮四棵树JET十字架打击火箭炮",
+    "_matcher": "【反击】给我方1张领袖或角色本回合+2000;【触发】KO对方1张费用≤4且休息状态角色(用 OpponentRestingCharacter 选取休息角色)。反击的领袖时光旅诗+2张休息条件因 counter 不支持 if 条件而省略。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 2000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentRestingCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP09-040": {
+    "_name": "雷光枪抽筋烦恼凤SHOT",
+    "_matcher": "【主要】我方休息角色≥2时KO对方1张费用≤4角色;【触发】将对方1张费用≤4角色转休息。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "ownRestedCharCountGte": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe4",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "Rest",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP09-042": {
+    "_name": "巴奇",
+    "_matcher": "【启动主要】成本横置5张活跃咚并弃1张手牌:从手牌登场最多1张《十字公会》特征角色。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restActiveDon": 5,
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": {
+            "keyword": "十字公会"
+          },
+          "text": "登场1张《十字公会》角色"
+        }
+      ]
+    }
+  },
+  "OP09-044": {
+    "_name": "伊佐",
+    "_matcher": "【攻击时】确认卡组顶5张,公开最多1张《和之国》或《白胡子海盗团》特征加手牌,其余放回卡组底,再自选弃1张手牌。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "和之国"
+                },
+                {
+                  "keyword": "白胡子海盗团"
+                }
+              ]
+            }
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-047": {
+    "_name": "光月御殿",
+    "_matcher": "【KO时】抽2张,自选弃1张手牌(双重攻击为纯关键词单独处理)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-050": {
+    "_name": "奈美",
+    "_matcher": "【攻击时】确认卡组顶5张,公开最多1张蓝色事件加手牌,其余放回卡组底。match 仅能限定为事件(kind:Event),颜色'蓝色'限定无对应 filter 键,已尽量近似。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "kind": "Event"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-053": {
+    "_name": "毛奇",
+    "_matcher": "登场时确认顶5张、公开最多1张“里奇”加手牌(LookTopReveal)，再从手牌登场最多1张“里奇”(PlayCharFromHand)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "nameEquals": "里奇"
+            }
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "里奇"
+            },
+            "text": "将我方手牌中最多1张“里奇”登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-056": {
+    "_name": "Mr.3(加尔迪诺)",
+    "_matcher": "登场时确认顶4张、公开最多1张含《十字公会》或特征包含〈巴洛克工作室〉且非自身名的卡加手牌，用 anyOf+excludeName 表达。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "十字公会"
+                },
+                {
+                  "keywordContains": "巴洛克工作室"
+                }
+              ],
+              "excludeName": "Mr.3(加尔迪诺)"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-058": {
+    "_name": "特制马奇弹",
+    "_matcher": "主要退回对方1张费用≤6角色(BounceToHand)；触发退回最多1张费用≤3角色。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe6",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "BounceToHand",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe3",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "BounceToHand",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP09-064": {
+    "_name": "基拉",
+    "_matcher": "登场时将含《基德海盗团》特征的我方领袖转活跃(Activate selfLeader)；触发节不支持成本，故忽略“咚!!-1”成本只实现收益。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "基德海盗团"
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "selfLeader"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-065": {
+    "_name": "山智",
+    "_matcher": "登场时忽略可选成本(放回咚),实现收益:自身获得速攻并将对方1张费用≤6角色转休息",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "GiveKeyword",
+            "target": "self",
+            "keyword": "速攻",
+            "duration": "ThisTurn"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-068": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "我方回合结束时忽略可选成本(放回咚),实现收益:将自身转为活跃并获得阻挡者至下个对方回合结束",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "self",
+            "keyword": "阻挡者",
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-070": {
+    "_name": "奈美",
+    "_matcher": "登场时忽略可选成本(放回咚),实现收益:给我方1张领袖或角色贴最多2张休息状态的咚",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AttachDon",
+            "target": "$tgt",
+            "n": 2,
+            "from": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-072": {
+    "_name": "弗兰奇",
+    "_matcher": "登场时:可支付(咚!!-2 且 丢弃1手牌):抽取2张",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 2, "handDiscard": 1 },
+        "costPrompt": "是否支付(咚!!-2，丢弃我方1张手牌)以抽取2张?",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-073": {
+    "_name": "布鲁克",
+    "_matcher": "攻击时忽略可选成本(放回咚),实现收益:对方最多2张角色本回合力量-2000",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 2,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-075": {
+    "_name": "尤斯塔斯·基德",
+    "_matcher": "登场时忽略可选成本(生命顶入手),领袖含基德海盗团时从咚卡组追加最多1张活跃咚",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "基德海盗团"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-076": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "登场时忽略可选成本(放回咚),实现收益:从咚卡组追加最多1张活跃咚",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-078": {
+    "_name": "橡皮橡皮巨人",
+    "_matcher": "反击节:成本(咚-2/弃1手牌)在DSL中counter成本无收益强耦合,实现收益:领袖含草帽一伙时我方1张领袖或角色本次战斗+4000,之后抽2张。注:counter为纯op数组不支持if/cost包裹,条件仅作标注,实际加成与领袖特征条件耦合",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        }
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 4000
+      },
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  },
+  "OP09-098": {
+    "_name": "暗穴道",
+    "_matcher": "【主要】领袖含黑胡子海盗团时选对方1张角色本回合效果无效，KO(费用≤4的限制简化为直接KO收益)；【触发】选对方1张领袖或角色本回合效果无效。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Nullify",
+          "target": "$tgt",
+          "duration": "ThisTurn"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "Nullify",
+        "target": "$t",
+        "duration": "ThisTurn"
+      }
+    ]
+  },
+  "OP09-100": {
+    "_name": "乌鸦",
+    "_matcher": "【阻挡者】为纯关键词不写；【触发】在领袖含革命军且双方生命合计≤5时登场此卡，用 PlayCharFromHand 限定卡名表达登场收益。",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": {
+          "nameEquals": "乌鸦"
+        },
+        "text": "登场此卡牌(乌鸦)"
+      }
+    ]
+  },
+  "OP09-102": {
+    "_name": "三叶草博士",
+    "_matcher": "【登场时】领袖为妮古·罗宾时，确认卡组顶3张、公开≤1张拥有【触发】效果的卡加入手牌、其余放回卡组底，用 LookTopReveal 表达。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "妮古·罗宾"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keywordContains": "触发"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-103": {
+    "_name": "克尔拉",
+    "_matcher": "【阻挡者】为纯关键词不写；【登场时】从手牌登场≤1张费用≤4的革命军角色后抽1(可选的生命入手成本无法表达，按惯例忽略成本只实现收益)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "革命军",
+              "kind": "Character",
+              "originalCostLte": 4
+            },
+            "text": "登场1张费用≤4的革命军角色"
+          },
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-106": {
+    "_name": "妮古·奥尔比亚",
+    "_matcher": "登场时选我方≤1张名为妮古·罗宾的领袖本回合+3000；trigger 因依赖领袖名称条件触发(trigger 节不支持 if)未实现。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "nameEquals": "妮古·罗宾"
+            }
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": 3000
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-107": {
+    "_name": "妮古·罗宾",
+    "_matcher": "登场时对方生命≥3则将对方生命顶≤1张置入废弃；trigger 为『将手牌中费用≤3黄色角色登场』无条件可用 PlayCharFromHand 但黄色花色 filter 无颜色键，故 trigger 部分未实现。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppLifeCountGte": 3
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentLifeAll",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-112": {
+    "_name": "贝洛·贝蒂",
+    "_matcher": "登场时我方生命≤2则抽1；trigger 因依赖『领袖含革命军且双方生命合计≤5』条件触发(trigger 节不支持 if)未实现。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownLifeCountLte": 2
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-115": {
+    "_name": "冰块 两棘矛",
+    "_matcher": "主要KO对方≤1张费用≤3且拥有触发效果的角色(以 keywordContains:触发 近似限定)；trigger 抽1。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe3",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keywordContains": "触发"
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP09-117": {
+    "_name": "呔来嘻!!",
+    "_matcher": "主要确认卡组顶5张、公开≤2张『呔来嘻!!』以外拥有触发效果的卡加入手牌、其余放回底(以 keywordContains:触发 近似限定、excludeName 排除自身)；trigger 抽1。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 2,
+          "restTo": "bottom",
+          "match": {
+            "keywordContains": "触发",
+            "excludeName": "呔来嘻!!"
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP09-119": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "登场时翻译为抽1张并使本角色本回合获得速攻；triggers 不支持 cost，可选成本(将1张或更多咚放回咚卡组)按惯例忽略，仅实现固定收益。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "self",
+            "keyword": "速攻",
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  }
+}

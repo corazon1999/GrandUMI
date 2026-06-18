@@ -1,0 +1,957 @@
+{
+  "OP09-002": {
+    "_name": "乌塔",
+    "_matcher": "登场时确认顶5张公开1张《红发海盗团》加入手牌，其余放回卡组底",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "红发海盗团"
+            },
+            "restTo": "bottom"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-003": {
+    "_name": "夏齐＆佩金",
+    "_matcher": "攻击时给对方1张角色力量-2000",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-009": {
+    "_name": "本·贝克曼",
+    "_matcher": "登场时KO对方1张力量≤6000角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 6000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-010": {
+    "_name": "邦克·庞奇",
+    "_matcher": "登场时将手牌中“蒙斯塔”登场；带咚攻击时自身+2000",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "蒙斯塔"
+            },
+            "text": "将手牌中的“蒙斯塔”登场"
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-011": {
+    "_name": "本乡",
+    "_matcher": "启动主要 休息自身：领袖《红发海盗团》时对方1张角色力量-2000",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "红发海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -2000
+        }
+      ]
+    }
+  },
+  "OP09-014": {
+    "_name": "莱姆朱斯",
+    "_matcher": "登场时对方1张力量≤4000角色本回合不能发动阻挡者",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 4000
+            }
+          },
+          {
+            "op": "AddRestriction",
+            "target": "$tgt",
+            "kind": "CannotBeBlocker"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-015": {
+    "_name": "幸运·鲁",
+    "_matcher": "KO时 领袖《红发海盗团》时KO对方1张原本力量≤6000角色（阻挡者由文本自动识别）",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "红发海盗团"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 6000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-020": {
+    "_name": "来吧……我们跟你打!!!",
+    "_matcher": "事件主要 确认顶5张公开1张《红发海盗团》加入手牌；触发抽1",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 1,
+          "match": {
+            "keyword": "红发海盗团",
+            "excludeName": "来吧……我们跟你打!!!"
+          },
+          "restTo": "bottom"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP09-021": {
+    "_name": "红色势力号",
+    "_matcher": "舞台 启动主要 休息自身：领袖《红发海盗团》时对方1张角色力量-1000",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "红发海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -1000
+        }
+      ]
+    }
+  },
+  "OP09-024": {
+    "_name": "撒谎布",
+    "_matcher": "登场时 我方休息角色≥2则抽2丢2",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownRestedCharCountGte": 2
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-026": {
+    "_name": "萨卡斯基",
+    "_matcher": "登场时 我方休息角色≥2则KO对方1张费用≤5角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownRestedCharCountGte": 2
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-027": {
+    "_name": "萨波",
+    "_matcher": "攻击时 我方休息角色≥3则抽1（每回合1次未严格限制）",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "ownRestedCharCountGte": 3
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-030": {
+    "_name": "特拉法尔加·罗",
+    "_matcher": "登场时 可将我方1张角色回手，将手牌中1张费用≤3的《时光旅诗》角色登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$b",
+            "text": "可将我方1张角色放回手牌"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$b"
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "时光旅诗",
+              "originalCostLte": 3,
+              "excludeName": "特拉法尔加·罗"
+            },
+            "text": "将手牌中1张费用≤3的《时光旅诗》角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-031": {
+    "_name": "堂吉诃德·多弗拉门戈",
+    "_matcher": "我方回合结束 我方休息角色≥2则活跃自身（阻挡者由文本自动识别）",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "ownRestedCharCountGte": 2
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-034": {
+    "_name": "佩罗娜",
+    "_matcher": "登场时确认顶5张公开1张《恐怖之船海盗团》或杰拉基尔·米霍克加入手牌，其余放回卡组底并丢1手牌",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "恐怖之船海盗团"
+                },
+                {
+                  "nameEquals": "杰拉基尔·米霍克"
+                }
+              ]
+            },
+            "restTo": "bottom"
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-035": {
+    "_name": "波特夹斯·D·艾斯",
+    "_matcher": "登场时 我方休息角色≥2则使对方1张费用≤5角色休息",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownRestedCharCountGte": 2
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-037": {
+    "_name": "莉姆",
+    "_matcher": "登场时确认顶5张公开1张《时光旅诗》加入手牌；我方回合结束 休息角色≥3则活跃自身",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "时光旅诗",
+              "excludeName": "莉姆"
+            },
+            "restTo": "bottom"
+          }
+        ]
+      },
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "ownRestedCharCountGte": 3
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-043": {
+    "_name": "爱比达",
+    "_matcher": "KO时 领袖《十字公会》时将手牌中1张费用≤5角色（爱比达以外）登场",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "十字公会"
+        },
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "originalCostLte": 5,
+              "excludeName": "爱比达"
+            },
+            "text": "将手牌中1张费用≤5的角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-046": {
+    "_name": "克洛克达尔",
+    "_matcher": "登场时将手牌中1张费用≤5的《十字公会》或特征含〈巴洛克工作室〉角色登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "anyOf": [
+                {
+                  "keyword": "十字公会",
+                  "originalCostLte": 5
+                },
+                {
+                  "keywordContains": "巴洛克工作室",
+                  "originalCostLte": 5
+                }
+              ]
+            },
+            "text": "将手牌中1张费用≤5的《十字公会》/含〈巴洛克工作室〉角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-048": {
+    "_name": "杰拉基尔·米霍克",
+    "_matcher": "登场时抽2丢1（阻挡者由文本自动识别）",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-057": {
+    "_name": "十字公会",
+    "_matcher": "事件主要 确认顶4张公开1张《十字公会》加入手牌；触发同主要",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "match": {
+            "keyword": "十字公会"
+          },
+          "restTo": "bottom"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "match": {
+          "keyword": "十字公会"
+        },
+        "restTo": "bottom"
+      }
+    ]
+  },
+  "OP09-069": {
+    "_name": "特拉法尔加·罗",
+    "_matcher": "登场时确认顶4张公开1张费用≥2且《草帽一伙》或《心脏海盗团》加入手牌",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "草帽一伙",
+                  "originalCostGte": 2
+                },
+                {
+                  "keyword": "心脏海盗团",
+                  "originalCostGte": 2
+                }
+              ]
+            },
+            "restTo": "bottom"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-077": {
+    "_name": "橡皮橡皮雷电",
+    "_matcher": "事件主要 咚-2：KO对方1张力量≤6000角色；触发从咚卡组追加活跃咚1",
+    "main": {
+      "cost": {
+        "donReturn": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "originalPowerLte": 6000
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP09-079": {
+    "_name": "橡皮橡皮跳绳",
+    "_matcher": "事件主要 咚-2：使对方1张费用≤5角色休息并抽1；触发从咚卡组追加活跃咚1",
+    "main": {
+      "cost": {
+        "donReturn": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe5",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        },
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP09-083": {
+    "_name": "旺·奥加",
+    "_matcher": "启动主要 休息自身：领袖《黑胡子海盗团》时对方1张角色费用-3；KO时抽1",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -3
+        }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-085": {
+    "_name": "月光·莫利亚",
+    "_matcher": "登场时将废弃区1张费用≤2的《恐怖之船海盗团》角色以休息状态登场",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "keyword": "恐怖之船海盗团",
+              "originalCostLte": 2
+            },
+            "rest": true,
+            "text": "将废弃区1张费用≤2的《恐怖之船海盗团》角色以休息状态登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-087": {
+    "_name": "夏洛特·布玲",
+    "_matcher": "登场时对方持有≥5张手牌则对方丢1",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppHandCountGte": 5
+        },
+        "then": [
+          {
+            "op": "OpponentDiscard",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-089": {
+    "_name": "壮壮",
+    "_matcher": "启动主要 丢1手牌+自身进废弃：领袖《黑胡子海盗团》时抽1，对方1张角色费用-2",
+    "activated": {
+      "cost": {
+        "handDiscard": 1,
+        "selfToTrash": true
+      },
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -2
+        }
+      ]
+    }
+  },
+  "OP09-090": {
+    "_name": "毒Q",
+    "_matcher": "启动主要 休息自身：领袖《黑胡子海盗团》时KO对方1张费用≤1角色；KO时抽1",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe1",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-095": {
+    "_name": "拉斐特",
+    "_matcher": "启动主要 休息1咚+休息自身：确认顶5张公开1张《黑胡子海盗团》加入手牌",
+    "activated": {
+      "cost": {
+        "restActiveDon": 1,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 1,
+          "match": {
+            "keyword": "黑胡子海盗团"
+          },
+          "restTo": "bottom"
+        }
+      ]
+    }
+  },
+  "OP09-096": {
+    "_name": "就是我的时代!!!",
+    "_matcher": "事件主要 确认顶3张公开1张《黑胡子海盗团》加入手牌，其余进废弃；触发同主要",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "match": {
+            "keyword": "黑胡子海盗团",
+            "excludeName": "就是我的时代!!!"
+          },
+          "restTo": "trash"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 3,
+        "max": 1,
+        "match": {
+          "keyword": "黑胡子海盗团",
+          "excludeName": "就是我的时代!!!"
+        },
+        "restTo": "trash"
+      }
+    ]
+  },
+  "OP09-097": {
+    "_name": "黑暗旋涡",
+    "_matcher": "事件反击 对方1张领袖或角色本回合效果无效且力量-4000（反击打出路径M3未接入，counter暂不触发；触发=仅无效）",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "Nullify",
+        "target": "$tgt"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": -4000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "Nullify",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP09-099": {
+    "_name": "哈奇诺斯",
+    "_matcher": "舞台 启动主要 丢1手牌+休息自身：确认顶3张公开1张《黑胡子海盗团》加入手牌",
+    "activated": {
+      "cost": {
+        "handDiscard": 1,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "match": {
+            "keyword": "黑胡子海盗团"
+          },
+          "restTo": "bottom"
+        }
+      ]
+    }
+  },
+  "OP09-101": {
+    "_name": "库赞",
+    "_matcher": "登场时将对方1张费用≤3角色放入对方生命区，对方丢1（朝向/上下位置近似为最上方）",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "MoveCharToLife",
+            "target": "$tgt"
+          },
+          {
+            "op": "OpponentDiscard",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-110": {
+    "_name": "皮耶尔",
+    "_matcher": "登场时抽2丢2",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-114": {
+    "_name": "林德巴古",
+    "_matcher": "登场时 双方生命合计≤5则KO对方1张力量≤2000角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "bothLifeTotalLte": 5
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 2000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP09-116": {
+    "_name": "不要小看了奇迹!!",
+    "_matcher": "事件反击 本次战斗我方1张领袖或角色+2000（反击打出路径M3未接入，counter暂不触发）；触发将手牌中1张费用≤4《革命军》角色登场",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$tgt",
+        "delta": 2000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": {
+          "keyword": "革命军",
+          "originalCostLte": 4
+        },
+        "text": "将手牌中1张费用≤4的《革命军》角色登场"
+      }
+    ]
+  }
+}
