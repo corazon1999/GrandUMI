@@ -1,0 +1,155 @@
+{
+  "ST14-002": {
+    "_name": "撒谎布",
+    "_note": "【咚×1】【攻击时】我方场上有费用≥8角色时，KO 对方最多1张费用≤4 角色。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1, "ownHasCharCostGte": 8 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "KO 对方最多1张费用≤4 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST14-003": {
+    "_name": "山智",
+    "_note": "【登场时】我方场上有费用≥6角色时，KO 对方最多1张费用≤5 角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "ownHasCharCostGte": 6 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST14-004": {
+    "_name": "甚平",
+    "_note": "【启动主要】【每回合1次】直到下个对方回合结束，我方最多1张《草帽一伙》角色费用+2（原文限黑色，近似）。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "我方最多1张《草帽一伙》角色费用+2" },
+        { "op": "AddCostMod", "target": "$t", "delta": 2, "duration": "UntilNextOpponentEndPhase" }
+      ]
+    }
+  },
+  "ST14-006": {
+    "_name": "奈美",
+    "_note": "【阻挡者】+【登场时】我方场上有费用≥8角色且手牌≤6 时，抽1张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "ownHasCharCostGte": 8, "selfHandCountLte": 6 },
+        "then": [
+          { "op": "Draw", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST14-007": {
+    "_name": "妮古·罗宾",
+    "_note": "【登场时】/【攻击时】我方场上有费用≥8角色时，本回合对方最多1张角色费用-5。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "ownHasCharCostGte": 8 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-5" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -5 }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "if": { "ownHasCharCostGte": 8 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-5" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -5 }
+        ]
+      }
+    ]
+  },
+  "ST14-008": {
+    "_name": "哈雷达斯",
+    "_note": "【启动主要】横置自身：直到下个对方回合结束，我方最多1张《草帽一伙》角色费用+2（原文“之后场上有费用≥8角色则抽1弃1”因 then 无条件分支已略去）。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "我方最多1张《草帽一伙》角色费用+2" },
+        { "op": "AddCostMod", "target": "$t", "delta": 2, "duration": "UntilNextOpponentEndPhase" }
+      ]
+    }
+  },
+  "ST14-011": {
+    "_name": "海格力斯",
+    "_note": "【启动主要】横置自身：直到下个对方回合结束，我方最多1张《草帽一伙》角色费用+2（原文限黑色，近似）。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "我方最多1张《草帽一伙》角色费用+2" },
+        { "op": "AddCostMod", "target": "$t", "delta": 2, "duration": "UntilNextOpponentEndPhase" }
+      ]
+    }
+  },
+  "ST14-014": {
+    "_name": "橡皮橡皮巨人回转弹",
+    "_note": "【反击】场上有费用≥8角色时，我方最多1张领袖或角色+3000；【触发】废弃区最多1张费用≤2角色入手。",
+    "counter": {
+      "if": { "ownHasCharCostGte": 8 },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+3000" },
+        { "op": "AddPowerThisBattle", "target": "$t", "delta": 3000 }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnTrashCharacter", "max": 1, "min": 0, "as": "$c", "filter": { "originalCostLte": 2 }, "text": "废弃区最多1张费用≤2 角色加入手牌" },
+      { "op": "TrashToHand", "target": "$c" }
+    ]
+  },
+  "ST14-015": {
+    "_name": "橡皮橡皮…攻城炮",
+    "_note": "【主要】我方最多1张领袖或角色+3000（原文“之后场上有费用≥8则KO对方费用≤2”因 then 无条件分支已略去）；【触发】KO 对方最多1张费用≤5 角色。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色+3000" },
+        { "op": "AddPowerThisTurn", "target": "$t", "delta": 3000 }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST14-016": {
+    "_name": "我还有伙伴们!!!",
+    "_note": "【主要】抽1张，之后直到下个对方回合结束我方最多1张角色费用+3；【触发】KO 对方最多1张费用≤3 角色。",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "text": "我方最多1张角色费用+3" },
+        { "op": "AddCostMod", "target": "$t", "delta": 3, "duration": "UntilNextOpponentEndPhase" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST14-017": {
+    "_name": "千里·阳光号（舞台）",
+    "_note": "【登场时】领袖含《草帽一伙》时抽1张（“我方草帽黑色角色费用+1”持续部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "草帽一伙" },
+        "then": [
+          { "op": "Draw", "n": 1 }
+        ]
+      }
+    ]
+  }
+}

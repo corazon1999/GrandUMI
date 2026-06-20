@@ -1,0 +1,148 @@
+{
+  "ST30-002": {
+    "_name": "闪电",
+    "_note": "【登场时】确认卡组顶5张，公开≤1张力量为6000的角色入手，余放回底。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "kind": "Character", "originalPowerGte": 6000, "originalPowerLte": 6000 } }
+        ]
+      }
+    ]
+  },
+  "ST30-004": {
+    "_name": "安普里奥·伊万科夫",
+    "_note": "【登场时】公开手牌中力量6000角色（原文2张，以 revealHand 公开1张近似）：抽3张并丢弃2张手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "revealHand": { "kind": "Character", "originalPowerGte": 6000, "originalPowerLte": 6000 } },
+        "then": [
+          { "op": "Draw", "n": 3 },
+          { "op": "DiscardOwnChosen", "n": 2 }
+        ]
+      }
+    ]
+  },
+  "ST30-006": {
+    "_name": "甚平",
+    "_note": "【登场时】弃1手牌（原文限力量6000角色，近似）：抽2张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "handDiscard": 1 },
+        "then": [ { "op": "Draw", "n": 2 } ]
+      }
+    ]
+  },
+  "ST30-007": {
+    "_name": "波特夹斯·D·艾斯",
+    "_note": "【登场时】横置1咚：本回合此角色获得【速攻】；【攻击时】本回合对方最多1张角色力量-1000。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "restActiveDon": 1 },
+        "costPrompt": "横置1咚：本回合此角色获得【速攻】？",
+        "then": [ { "op": "GiveKeyword", "target": "self", "keyword": "速攻" } ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-1000" },
+          { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -1000 }
+        ]
+      }
+    ]
+  },
+  "ST30-008": {
+    "_name": "马尔高",
+    "_note": "【阻挡者】+【KO时】弃1手牌（原文限力量6000角色，近似）：从废弃区将此角色以休息状态登场。",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "PlayFromTrash", "target": "self", "rest": true }
+        ]
+      }
+    ]
+  },
+  "ST30-010": {
+    "_name": "克洛克达尔",
+    "_note": "【阻挡者】+【登场时】对方最多1张休息状态角色，下个对方重置阶段不转为活跃。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentRestingCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "对方最多1张休息角色下个重置阶段不活跃" },
+          { "op": "PreventActivateNextReset", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST30-012": {
+    "_name": "蒙奇·D·路飞",
+    "_note": "【登场时】横置1咚：本回合此角色获得【速攻】；【攻击时】将对方最多1张角色转休息（原文限“拥有阻挡者的角色”，DSL 无阻挡者过滤，取任意角色近似）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "restActiveDon": 1 },
+        "costPrompt": "横置1咚：本回合此角色获得【速攻】？",
+        "then": [ { "op": "GiveKeyword", "target": "self", "keyword": "速攻" } ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "将对方最多1张角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST30-014": {
+    "_name": "Mr.3(加尔迪诺)",
+    "_note": "【启动主要】横置自身：赋予我方最多2张力量6000角色各最多2张休息咚。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$a", "filter": { "originalPowerGte": 6000, "originalPowerLte": 6000 }, "text": "赋予力量6000角色2张休息咚（1/2）" },
+        { "op": "AttachDon", "target": "$a", "n": 2, "from": "rest" },
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$b", "filter": { "originalPowerGte": 6000, "originalPowerLte": 6000 }, "text": "赋予力量6000角色2张休息咚（2/2）" },
+        { "op": "AttachDon", "target": "$b", "n": 2, "from": "rest" }
+      ]
+    }
+  },
+  "ST30-015": {
+    "_name": "这个时代的名字!!就是『白胡子』!!",
+    "_note": "【反击】我方最多1张领袖或角色+4000（原文条件“我方有≥2张力量6000角色”因无该计数条件键已略去）；【触发】KO 对方最多1张力量≤6000 角色。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+    ],
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 6000 }, "text": "KO 对方最多1张力量≤6000 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST30-016": {
+    "_name": "还能战斗吗?路飞!!当然!!",
+    "_note": "【反击】我方最多1张领袖或角色+3000（原文后半“有艾斯6000与路飞6000则抽1”因反击数组无条件分支已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+3000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 3000 }
+    ]
+  },
+  "ST30-017": {
+    "_name": "就知道乱来!!",
+    "_note": "【主要】确认卡组顶5张，公开≤1张力量为6000的角色入手，余放回底；【触发】同。",
+    "main": {
+      "then": [
+        { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "kind": "Character", "originalPowerGte": 6000, "originalPowerLte": 6000 } }
+      ]
+    },
+    "trigger": [
+      { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "kind": "Character", "originalPowerGte": 6000, "originalPowerLte": 6000 } }
+    ]
+  }
+}

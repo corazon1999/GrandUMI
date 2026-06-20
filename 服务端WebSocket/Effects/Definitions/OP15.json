@@ -69,9 +69,13 @@
   },
   "OP15-019": {
     "_name": "防护罩  蛮牛突进",
-    "_matcher": "事件【主要】我方领袖 +N",
+    "_matcher": "事件【主要】抽1,我方领袖 +1000",
     "main": {
       "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
         {
           "op": "AddPowerThisTurn",
           "target": "selfLeader",
@@ -114,17 +118,19 @@
   },
   "OP15-026": {
     "_name": "强高",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶3张,公开≤1张《东海》入手,余放回底",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": { "keywordContains": "东海" }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ],
     "activated": {
@@ -168,15 +174,30 @@
   },
   "OP15-032": {
     "_name": "布鲁克",
-    "_matcher": "启动主要将角色转活跃",
+    "_matcher": "登场时:将对方最多1张卡牌(活跃 领袖/角色/舞台/咚)转休息;启动主要:自送废弃+领袖含草帽一伙则将我方最多1张原本费用≤8的角色转活跃",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RestOpponentCards",
+            "n": 1
+          }
+        ]
+      }
+    ],
     "activated": {
       "oncePerTurn": false,
+      "if": { "leaderHasKeyword": "草帽一伙" },
+      "cost": { "selfToTrash": true },
       "then": [
         {
           "op": "Choose",
           "prompt": "OwnCharacter",
           "max": 1,
-          "as": "$tgt"
+          "min": 0,
+          "as": "$tgt",
+          "filter": { "originalCostLte": 8 }
         },
         {
           "op": "Activate",
@@ -214,17 +235,19 @@
   },
   "OP15-040": {
     "_name": "维奥拉",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶3张,公开≤1张《德莱斯罗兹》入手,余放回底",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": { "keywordContains": "德莱斯罗兹" }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
@@ -275,17 +298,19 @@
   },
   "OP15-053": {
     "_name": "莉贝卡",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶3张,公开≤1张《德莱斯罗兹》入手,余放回底",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": { "keywordContains": "德莱斯罗兹" }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
@@ -604,7 +629,7 @@
   },
   "OP15-101": {
     "_name": "卡尔加拉",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "已由脚本 OP15_101_Calgara 接管(登场:可丢手牌→顶5选≤2诺兰度/山迪亚战士);下方DSL占位脚本优先不执行",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -661,17 +686,19 @@
   },
   "OP15-108": {
     "_name": "奈美",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶3张,公开≤1张《空岛》入手,余放回底",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": { "keywordContains": "空岛" }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
@@ -711,7 +738,7 @@
   },
   "OP15-118": {
     "_name": "艾尼路",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "已由脚本 OP15_118_Enel 接管(持续:咚≤6不离场+2000;登场:咚-1→顶5选≤1+丢手牌);下方DSL占位脚本优先不执行",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -722,6 +749,207 @@
           }
         ],
         "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+      }
+    ]
+  },
+  "OP15-005": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGteOpponent": 1
+        },
+        "then": [
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-033": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "鱼人族"
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "selfLeader"
+          },
+          {
+            "op": "LifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-081": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        },
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 5
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-083": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "if": {
+        "ownTrashCountGte": 15
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP15-096": {
+    "main": {
+      "cost": {
+        "restActiveDon": 1
+      },
+      "if": {
+        "leaderHasKeyword": "草帽一伙"
+      },
+      "then": [
+        {
+          "op": "MillTop",
+          "n": 5
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP15-110": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "山迪亚战士"
+        },
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-113": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP15-117": {
+    "main": {
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
+  },
+  "OP15-021": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -3000
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": -3000
       }
     ]
   }

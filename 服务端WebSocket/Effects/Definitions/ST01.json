@@ -1,0 +1,98 @@
+{
+  "ST01-001": {
+    "_name": "蒙奇·D·路飞（领袖）",
+    "_note": "【启动主要】【每回合1次】赋予此领袖或我方1张角色最多1张休息状态的咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "选择要赋予咚!!的领袖或角色" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  },
+  "ST01-005": {
+    "_name": "甚平",
+    "_note": "【咚×1】【攻击时】我方最多1张此角色以外的领袖或角色+1000（DSL 无排除自身通道，候选含自身，近似）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色力量+1000" },
+          { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 }
+        ]
+      }
+    ]
+  },
+  "ST01-007": {
+    "_name": "奈美",
+    "_note": "【启动主要】【每回合1次】赋予我方1张领袖或角色最多1张休息状态的咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "选择要赋予咚!!的领袖或角色" },
+        { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+      ]
+    }
+  },
+  "ST01-011": {
+    "_name": "布鲁克",
+    "_note": "【登场时】赋予我方1张领袖或角色最多2张休息状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "选择要赋予咚!!的领袖或角色" },
+          { "op": "AttachDon", "target": "$t", "n": 2, "from": "rest" }
+        ]
+      }
+    ]
+  },
+  "ST01-014": {
+    "_name": "毛皮强化",
+    "_note": "【反击】我方最多1张领袖或角色力量+3000；【触发】本回合我方最多1张领袖或角色+1000。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+3000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 3000 }
+    ],
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色力量+1000" },
+      { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 }
+    ]
+  },
+  "ST01-015": {
+    "_name": "橡皮橡皮JET枪",
+    "_note": "【主要】KO 对方最多1张力量≤6000 的角色；【触发】发动此卡牌的【主要】效果。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 6000 }, "text": "KO 对方最多1张力量≤6000 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 6000 }, "text": "KO 对方最多1张力量≤6000 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST01-016": {
+    "_name": "恶魔风脚",
+    "_note": "【主要】选我方最多1张《草帽一伙》领袖或角色，本回合其攻击时对方不能发动【阻挡者】（=赋予【不可阻挡】本回合）。原文生命触发“KO对方费用≤3且拥有阻挡者的角色”因无阻挡者特征过滤已略去。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "本回合该《草帽一伙》领袖或角色攻击时对方不能发动【阻挡者】" },
+        { "op": "GiveKeyword", "target": "$t", "keyword": "不可阻挡" }
+      ]
+    }
+  },
+  "ST01-017": {
+    "_name": "千里·阳光号（舞台）",
+    "_note": "【启动主要】横置此舞台：我方最多1张《草帽一伙》领袖或角色+1000。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "我方最多1张《草帽一伙》领袖或角色+1000" },
+        { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 }
+      ]
+    }
+  }
+}

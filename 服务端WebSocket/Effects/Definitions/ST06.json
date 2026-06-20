@@ -1,0 +1,149 @@
+{
+  "ST06-001": {
+    "_name": "萨卡斯基（领袖）",
+    "_note": "【启动主要】【每回合1次】③+弃1手牌：KO 对方最多1张费用为0 的角色。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "restActiveDon": 3, "handDiscard": 1 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacterCostLe0", "max": 1, "min": 0, "as": "$tgt", "text": "KO 对方最多1张费用为0 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST06-002": {
+    "_name": "可比",
+    "_note": "【登场时】弃1手牌：KO 对方最多1张费用为0 的角色。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacterCostLe0", "max": 1, "min": 0, "as": "$tgt", "text": "KO 对方最多1张费用为0 的角色" },
+          { "op": "KO", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST06-005": {
+    "_name": "战国",
+    "_note": "【攻击时】本回合对方最多1张角色费用-4。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-4" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -4 }
+        ]
+      }
+    ]
+  },
+  "ST06-006": {
+    "_name": "达斯琪",
+    "_note": "【启动主要】横置自身：本回合对方最多1张角色费用-2。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-2" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -2 }
+      ]
+    }
+  },
+  "ST06-008": {
+    "_name": "日奈",
+    "_note": "【登场时】本回合对方最多1张角色费用-4。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-4" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -4 }
+        ]
+      }
+    ]
+  },
+  "ST06-010": {
+    "_name": "希路麦波",
+    "_note": "【登场时】本回合对方最多1张角色费用-3。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-3" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -3 }
+        ]
+      }
+    ]
+  },
+  "ST06-012": {
+    "_name": "蒙奇·D·戈普",
+    "_note": "【启动主要】弃1手牌+横置自身：KO 对方最多1张费用≤4 角色。",
+    "activated": {
+      "cost": { "handDiscard": 1, "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "KO 对方最多1张费用≤4 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST06-014": {
+    "_name": "冲击波",
+    "_note": "【反击】我方最多1张领袖或角色+4000，之后 KO 对方最多1张费用≤3 角色（原文限“活跃状态”，DSL 无该过滤，近似）；【触发】KO 对方最多1张费用≤4 角色。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ],
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "KO 对方最多1张费用≤4 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST06-015": {
+    "_name": "大喷火",
+    "_note": "【主要】抽1张，之后本回合对方最多1张角色费用-2；【触发】对方丢弃1张手牌。",
+    "main": {
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-2" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -2 }
+      ]
+    },
+    "trigger": [
+      { "op": "OpponentDiscard", "n": 1 }
+    ]
+  },
+  "ST06-016": {
+    "_name": "白色烟雾弹",
+    "_note": "【反击】我方最多1张领袖或角色+2000；【触发】抽1张（原文附带“本回合我方角色不会被KO”因无全体保护op已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "ST06-017": {
+    "_name": "海军本部（舞台）",
+    "_note": "【登场时】本回合对方最多1张角色费用-1；【启动主要】横置此舞台：领袖含《海军》时本回合对方最多1张角色费用-1。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-1" },
+          { "op": "AddCostMod", "target": "$tgt", "delta": -1 }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": { "restSelf": true },
+      "if": { "leaderHasKeyword": "海军" },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色费用-1" },
+        { "op": "AddCostMod", "target": "$tgt", "delta": -1 }
+      ]
+    }
+  }
+}

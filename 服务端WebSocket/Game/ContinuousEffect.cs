@@ -14,6 +14,34 @@ public class ContinuousEffect
     public required ContinuousScope Scope { get; init; }
     public int PowerDelta { get; init; }
 
+    /// <summary>持续费用修正（影响 KO/选择判定与卡面显示，正数表示费用升高）</summary>
+    public int CostDelta { get; init; }
+
+    /// <summary>持续/条件赋予的关键词（如 "速攻"/"阻挡者"/"双重攻击"/"不可阻挡"/"流放"）；
+    /// 非空时 Predicate 成立期间使 scope 内卡牌视为拥有该关键词（由 ActionValidator.HasKeyword 查询）。</summary>
+    public string? GrantKeyword { get; init; }
+
+    /// <summary>持续"不会被KO"保护；非空时 Predicate 成立期间 scope 内卡牌不会被 KO。
+    /// "battle"=仅战斗中, "effect"=仅因效果, "any"=任何 KO。</summary>
+    public string? KoGuard { get; init; }
+
+    /// <summary>持续"不会离开场上"保护（含KO/退回手牌/放回卡组/置入生命等离场）；非空时 Predicate 成立期间
+    /// scope 内卡牌不会因相应来源离场。"effect"=仅因效果离场, "any"=任何离场。比 KoGuard 范围更广。</summary>
+    public string? LeaveGuard { get; init; }
+
+    /// <summary>持续"效果无效"；true 时 Predicate 成立期间 scope 内卡牌效果被无效化。</summary>
+    public bool NullifyEffect { get; init; }
+
+    /// <summary>仅无效化某一类触发（如仅【登场时】OnEnterField）；非空时 Predicate 成立期间 scope 内卡牌该触发不发动。</summary>
+    public Effects.EffectTrigger? NullifyOnlyTrigger { get; init; }
+
+    /// <summary>持续"无法转为活跃"；true 时 Predicate 成立期间 scope 内卡牌在重置阶段跳过激活。</summary>
+    public bool PreventReset { get; init; }
+
+    /// <summary>持续/条件施加的限制（如条件性 CannotAttack）；非空时 Predicate 成立期间 scope 内卡牌视为拥有该限制，
+    /// 由 ActionValidator 等查询（区别于一次性的 CardInstance.Restrictions）。</summary>
+    public RestrictionKind? GrantRestriction { get; init; }
+
     /// <summary>
     /// 评估当前是否激活：
     ///   sideMask = bit0:我方激活 bit1:对方激活；

@@ -1,0 +1,124 @@
+{
+  "ST22-002": {
+    "_name": "伊佐",
+    "_note": "【登场时】确认卡组顶5张公开≤1张“伊佐”以外含〈白胡子海盗团〉的牌入手余放回底；【对方的攻击时】自身入废弃：抽1并将1张手牌放回卡组底。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keywordContains": "白胡子海盗团", "excludeName": "伊佐" } }
+        ]
+      },
+      {
+        "on": "OnOppAttackDeclare",
+        "cost": { "selfToTrash": true },
+        "then": [
+          { "op": "Draw", "n": 1 },
+          { "op": "Choose", "prompt": "OwnHand", "max": 1, "min": 0, "as": "$h", "text": "将我方1张手牌放回卡组最下方" },
+          { "op": "ReturnToDeckBottom", "target": "$h", "from": "hand" }
+        ]
+      }
+    ]
+  },
+  "ST22-003": {
+    "_name": "爱德华·纽哥特（9费）",
+    "_note": "【双重攻击】+【登场时】公开卡组顶1张，若含〈白胡子海盗团〉则抽2张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "RevealTopThen", "count": 1, "match": { "keywordContains": "白胡子海盗团" }, "then": [ { "op": "Draw", "n": 2 } ] }
+        ]
+      }
+    ]
+  },
+  "ST22-006": {
+    "_name": "乔兹",
+    "_note": "【登场时】公开卡组顶1张，若含〈白胡子海盗团〉则抽2张并丢弃1张手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "RevealTopThen", "count": 1, "match": { "keywordContains": "白胡子海盗团" }, "then": [ { "op": "Draw", "n": 2 }, { "op": "DiscardOwnChosen", "n": 1 } ] }
+        ]
+      }
+    ]
+  },
+  "ST22-007": {
+    "_name": "斯库亚德",
+    "_note": "【启动主要】【每回合1次】公开卡组顶1张，若含〈白胡子海盗团〉则赋予我方1张领袖或角色最多1张休息咚。",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "RevealTopThen", "count": 1, "match": { "keywordContains": "白胡子海盗团" }, "then": [
+          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "赋予我方1张领袖或角色最多1张休息咚" },
+          { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+        ] }
+      ]
+    }
+  },
+  "ST22-011": {
+    "_name": "霍怀迪贝",
+    "_note": "【我方的回合中】【登场时】公开手牌中含〈白胡子海盗团〉的牌（原文公开2张，以 revealHand 公开1张近似）：本回合我方领袖+2000。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "revealHand": { "keywordContains": "白胡子海盗团" } },
+        "then": [
+          { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 2000 }
+        ]
+      }
+    ]
+  },
+  "ST22-012": {
+    "_name": "马尔高",
+    "_note": "【攻击时】公开卡组顶1张，若含〈白胡子海盗团〉则直到下个对方回合结束此角色+1000（“弃1代替被KO”替身部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          { "op": "RevealTopThen", "count": 1, "match": { "keywordContains": "白胡子海盗团" }, "then": [ { "op": "AddPowerPersistent", "target": "self", "delta": 1000 } ] }
+        ]
+      }
+    ]
+  },
+  "ST22-015": {
+    "_name": "因为我是白胡子!!",
+    "_note": "【主要】领袖含〈白胡子海盗团〉时，将手牌中最多1张“爱德华·纽哥特”登场（原文后半“可生命入手则领袖+2000”已略去）。",
+    "main": {
+      "if": { "leaderHasKeyword": "白胡子海盗团" },
+      "then": [
+        { "op": "PlayCharFromHand", "filter": { "nameEquals": "爱德华·纽哥特" }, "text": "手牌中最多1张“爱德华·纽哥特”登场" }
+      ]
+    }
+  },
+  "ST22-016": {
+    "_name": "收回……你刚才的话……",
+    "_note": "【反击】公开卡组顶1张，若含〈白胡子海盗团〉则我方最多1张领袖或角色+4000；【触发】抽1张。",
+    "counter": [
+      { "op": "RevealTopThen", "count": 1, "match": { "keywordContains": "白胡子海盗团" }, "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+4000" },
+        { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+      ] }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "ST22-017": {
+    "_name": "火拳",
+    "_note": "【主要】公开手牌中含〈白胡子海盗团〉的牌（原文2张，近似1张）：抽1并将最多1张费用≤5 角色放回卡组底；【触发】将最多1张费用≤3 角色放回手牌。",
+    "main": {
+      "cost": { "revealHand": { "keywordContains": "白胡子海盗团" } },
+      "then": [
+        { "op": "Draw", "n": 1 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将最多1张费用≤5 角色放回卡组最下方" },
+        { "op": "ReturnToDeckBottom", "target": "$tgt", "from": "field" }
+      ]
+    },
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "将最多1张费用≤3 角色放回手牌" },
+      { "op": "BounceToHand", "target": "$tgt" }
+    ]
+  }
+}

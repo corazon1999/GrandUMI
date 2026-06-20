@@ -1,0 +1,2007 @@
+[
+  {
+    "set": "OP05",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP05-003",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得关键词【速攻】（场上存在力量7000+其他角色时），属纯静态/持续修正且无事件触发，DSL 无对应表达，需 C# 脚本。"
+      },
+      {
+        "number": "OP05-062",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得关键词【阻挡者】（存在10张咚!!时），属纯静态/持续修正，DSL 无对应表达，需 C# 脚本。"
+      },
+      {
+        "number": "OP05-070",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】条件下持续获得关键词【速攻】（存在8张以上咚!!时），属纯静态/持续修正，DSL 无对应表达，需 C# 脚本。"
+      },
+      {
+        "number": "OP05-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得关键词【阻挡者】（废弃区≥10张时），属纯静态/持续修正，DSL 无对应表达，需 C# 脚本。"
+      },
+      {
+        "number": "OP05-100",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】将要离场时以生命置入废弃替代使其不离场（且存在路飞时无效）的防离场替代机制，无对应 op，属特殊一次性状态机制，需 C# 脚本。"
+      },
+      {
+        "number": "OP05-109",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】当发动【触发】时抽2弃2，属对“任意【触发】被发动时”的元触发，DSL trigger 节仅表达本卡自身生命触发、无此触发枚举，需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP06",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP06-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得关键词【流放】(力量≥7000时)，属纯静态/持续修正且无事件触发，DSL 无法表达条件性赋予关键词，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-010",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】(我方领袖含《FILM》特征时)，纯静态/持续修正无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-012",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续静态的战斗中不被KO(对方场上有原力≥6000领袖/角色时)，属未列机制的持续修正，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-052",
+        "status": "complex",
+        "definition": {},
+        "reason": "常驻贴咚【咚!!×1】条件下手牌≤4时战斗中不被KO，属持续静态防KO机制，无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-054",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】(手牌≤5时)，纯静态/持续修正无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-067",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续力量+1000(我方咚数≤对方咚数时)，属常态持续力量修正，无事件触发，需 C# 脚本；附带的【阻挡者】为持续关键词同需脚本。"
+      },
+      {
+        "number": "OP06-072",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】(领袖含《GERMA 66》且我方咚数比对方少2张以上时)，纯静态/持续修正无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续力量+2000(领袖含《德莱斯罗兹》且领袖活跃时)，属常态持续力量修正无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP06-113",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】(我方场上存在拉奇以外的《山迪亚战士》角色时)，纯静态/持续修正无事件触发，需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP07",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP07-008",
+        "status": "complex",
+        "definition": {},
+        "reason": "effectText 仅为关键词【阻挡者】;trigger 字段为「此卡牌登场」(把自身从生命/废弃登场),无对应 op,触发自登场需C#。"
+      },
+      {
+        "number": "OP07-023",
+        "status": "complex",
+        "definition": {},
+        "reason": "「场上≥6张休息咚时此角色力量+1000」为条件性纯持续/静态修正,无事件触发;另含纯关键词【阻挡者】。需C#。"
+      },
+      {
+        "number": "OP07-029",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续赋予【阻挡者】+【每回合1次】将要离场时改为休息对方角色的替代离场(防离场)机制,均未在 op 列表中。需C#。"
+      },
+      {
+        "number": "OP07-030",
+        "status": "complex",
+        "definition": {},
+        "reason": "「场上存在角色凯米时获得【阻挡者】」为条件性持续静态赋予关键词,无事件触发,无对应 op。需C#。"
+      },
+      {
+        "number": "OP07-033",
+        "status": "complex",
+        "definition": {},
+        "reason": "「我方费用≤3角色不会因对方效果被KO」为全体持续防KO静态效果,无事件触发,未列机制。需C#。"
+      },
+      {
+        "number": "OP07-042",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】将要离场时改为将我方1张角色放回卡组底以防离场的替代离场机制,未在 op 列表中。需C#。"
+      },
+      {
+        "number": "OP07-064",
+        "status": "complex",
+        "definition": {},
+        "reason": "「我方咚比对方少≥2时手牌中此卡费用-3」为条件性手牌静态减费(走专门 HandStaticCost 通道),非 DSL;另含纯关键词【阻挡者】。需C#。"
+      },
+      {
+        "number": "OP07-069",
+        "status": "complex",
+        "definition": {},
+        "reason": "「我方咚不多于对方时,我方福克斯海盗团角色不会因对方效果被KO」为条件性全体持续防KO静态效果,无事件触发。需C#。"
+      }
+    ]
+  },
+  {
+    "set": "OP08",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP08-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】此角色获得【速攻】——条件性(被贴咚≥2)持续静态赋予关键词，无事件触发节，属持续/静态修正需C#脚本。"
+      },
+      {
+        "number": "OP08-029",
+        "status": "complex",
+        "definition": {},
+        "reason": "自身活跃时使我方特定特征(纯毛族、费用≤3、非扁姆兹)角色不会因效果被KO——持续光环型防护机制，未列于op，需C#脚本。"
+      },
+      {
+        "number": "OP08-045",
+        "status": "complex",
+        "definition": {},
+        "reason": "将要被KO或因对方效果离场时改为放废弃并抽1——替代离场的特殊一次性状态机制，未在op列表，需C#脚本。"
+      },
+      {
+        "number": "OP08-093",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】此角色费用+2——条件性(被贴咚≥1)持续静态费用修正，无事件触发，需C#脚本。"
+      },
+      {
+        "number": "OP08-114",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】生命少于对方时，此角色对斩属性卡不被KO且力量+2000——持续条件加成与不被KO防护，纯持续/静态修正，需C#脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP09",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP09-001",
+        "status": "dsl",
+        "definition": {
+          "OP09-001": {
+            "triggers": [
+              {
+                "on": "OnOppAttackDeclare",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentLeaderOrCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "AddPowerThisTurn",
+                    "target": "$tgt",
+                    "delta": -1000
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "对方攻击时(OnOppAttackDeclare)选对方最多1张领袖或角色力量-1000。每回合1次为可选反应，triggers不支持oncePerTurn,核心效果可用DSL表达。"
+      },
+      {
+        "number": "OP09-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "「对方所有角色力量-1000」为常态持续/静态群体修正(在场即生效的光环),无事件触发,需C#持续效果。速攻为关键词。"
+      },
+      {
+        "number": "OP09-012",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代KO效果:邦克·庞奇将被KO时可改为将此角色放废弃区使其免KO,属replacement effect改变KO结算,无对应op,需C#。"
+      },
+      {
+        "number": "OP09-017",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续赋予自身【速攻】(领袖力量≥7000且含基德海盗团时),为静态条件关键词授予,无事件触发,需C#持续效果。"
+      },
+      {
+        "number": "OP09-025",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续:与领袖战斗中不被KO,为静态战斗免KO修正,无事件触发,需C#。"
+      },
+      {
+        "number": "OP09-045",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续:场上存在巴奇或毛奇时战斗中不被KO,为静态战斗免KO修正,无事件触发,需C#。"
+      },
+      {
+        "number": "OP09-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续免对方效果KO + 按废弃区每4张力量+1000的动态静态加成,均为持续/静态修正,无事件触发,需C#。"
+      },
+      {
+        "number": "OP09-118",
+        "status": "complex",
+        "definition": {},
+        "reason": "对方发动【阻挡者】时若任一方生命为0则获胜,为胜利条件触发机制,无对应op;另含速攻关键词,需C#。"
+      }
+    ]
+  },
+  {
+    "set": "OP10",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP10-032",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场效果:我方其他绿色角色将因对方效果离场时改为转休息使其不离场。改变离场处理的替代效果,无对应 op,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-034",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代被KO效果:此角色因战斗将被KO时改为将生命顶1张入手使其不被KO(每回合1次)。替代KO处理,无对应 op,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-049",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场效果:我方其他原费用≤7角色将因对方效果离场时改为放回手牌使其不离场。改变离场处理的替代效果,无对应 op,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-053",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】:场上存在其他《东踏踏族》角色时本卡获得阻挡者。纯持续/静态条件性关键词授予,无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-074",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代被KO效果:此角色因对方效果将被KO时改为横置我方2张活跃咚使其不被KO(每回合1次)。替代KO处理,无对应 op,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-085",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【速攻】:废弃区≥8张时本卡获得速攻。纯持续/静态条件性关键词授予,无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】持续获得【双重攻击】:贴咚≥1时本卡获得双重攻击。纯持续/静态条件性关键词授予(咚光环),无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-104",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】条件性持续\"战斗中不被KO\":领袖含《超新星》且对方生命≥3时本卡战斗中不被KO。纯持续/静态防KO修正,无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP10-108",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续获得【阻挡者】:场上存在其他《超新星》黄色角色时本卡获得阻挡者。纯持续/静态条件性关键词授予,无事件触发,需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP11",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP11-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "两段均为不可表达机制：利刃角色登场回合可攻击角色为持续静态许可；后半为离场替代效果(改为将废弃3张放回卡组底以代替离场)，属替代/离场机制，无对应 op。"
+      },
+      {
+        "number": "OP11-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】条件下此角色不会因无属性(特)角色效果而被KO，属持续静态防KO修正，无事件触发，无对应 op。"
+      },
+      {
+        "number": "OP11-024",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发条件为「因对方效果被KO」无法在 if 表达；后续「丢手牌+咚转休息」作为选择性代价并「那样做的场合」登场，多步联动条件无法精确表达。"
+      },
+      {
+        "number": "OP11-027",
+        "status": "complex",
+        "definition": {},
+        "reason": "领袖为白星时此角色登场回合可攻击角色，属持续静态攻击许可，无对应 op。"
+      },
+      {
+        "number": "OP11-040",
+        "status": "dsl",
+        "definition": {
+          "OP11-040": {
+            "triggers": [
+              {
+                "on": "OnTurnStart",
+                "if": {
+                  "isMyTurn": true,
+                  "selfDonTotalGte": 8
+                },
+                "then": [
+                  {
+                    "op": "LookTopReveal",
+                    "count": 5,
+                    "max": 1,
+                    "restTo": "bottom",
+                    "match": {
+                      "keyword": "草帽一伙"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "我方回合开始时、咚≥8，确认顶5张公开≤1张草帽特征加手牌，其余按 LookTopReveal 标准回底(原卡牌支持自选顶/底重排，DSL 以回底近似)。"
+      },
+      {
+        "number": "OP11-046",
+        "status": "complex",
+        "definition": {},
+        "reason": "【阻挡者】为关键词，但「我方角色仅含GERMA特征时此角色不因对方效果被KO和休息」为条件性持续静态防护，无对应 op。"
+      },
+      {
+        "number": "OP11-057",
+        "status": "complex",
+        "definition": {},
+        "reason": "手牌≤4时此角色获得【阻挡者】，属条件性持续静态赋予关键词，无事件触发，无对应 op。"
+      },
+      {
+        "number": "OP11-058",
+        "status": "complex",
+        "definition": {},
+        "reason": "手牌≥5时此角色无法攻击为持续静态限制；【阻挡者】为关键词。整体核心为静态修正，无对应 op。"
+      },
+      {
+        "number": "OP11-065",
+        "status": "complex",
+        "definition": {},
+        "reason": "场上存在其他大妈海盗团紫色角色时此角色获得【阻挡者】，属条件性持续静态赋予关键词，无对应 op。"
+      },
+      {
+        "number": "OP11-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】对方角色攻击时，若该攻击角色有斩属性则本次战斗+5000；攻击者「斩属性」条件不在 if 列表中，无法表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP11",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP11-096",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性静态赋予【阻挡者】：当我方场上存在『利帕』以外的黑色《海军》角色时此角色持续获得阻挡者。属于有条件的持续/静态关键词修正，DSL 的 GiveKeyword 仅能主动赋予，无法表达随场况变化的条件静态效果，需 C# 脚本。"
+      },
+      {
+        "number": "OP11-101",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场机制：我方其它《超新星》角色因对方效果将离场时，可改为正面朝下置入生命区顶以代替离场。这是未列入 op 列表的『替代离场』关键词类持续能力，DSL 无对应原语，需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP13",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP13-003",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果为改变咚!!放置目标(将放置的咚赋予领袖)+条件式领袖力量-2000的持续静态修正,均无对应op,需C#"
+      },
+      {
+        "number": "OP13-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "生命≥4领袖力量-1000及【咚×1】费用≥8角色存在时领袖与全体角色+1000,均为纯持续静态修正,需C#"
+      },
+      {
+        "number": "OP13-008",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代KO保护(将角色放置废弃区以代替被KO),属未列的替代离场机制,需C#"
+      },
+      {
+        "number": "OP13-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件满足时持续获得【双重攻击】,属纯持续静态修正,需C#"
+      },
+      {
+        "number": "OP13-017",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】替代离场保护(改为力量-2000使角色不离场),属未列的替代离场机制,需C#"
+      },
+      {
+        "number": "OP13-046",
+        "status": "complex",
+        "definition": {},
+        "reason": "【双重攻击】+替代KO/离场(弃白胡子特征手牌代替被KO或离场),替代离场机制无对应op,需C#"
+      },
+      {
+        "number": "OP13-047",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代KO保护(将角色放置废弃区代替被KO),属未列的替代离场机制,需C#"
+      },
+      {
+        "number": "OP13-060",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代KO保护(将角色放置废弃区代替被KO),属未列的替代离场机制,需C#"
+      },
+      {
+        "number": "OP13-078",
+        "status": "complex",
+        "definition": {},
+        "reason": "我方罗杰海盗团角色因对方效果离场时追加休息咚,无对应触发枚举(角色离场触发)且需oncePerTurn,需C#"
+      },
+      {
+        "number": "OP13-112",
+        "status": "complex",
+        "definition": {},
+        "reason": "合计存在≥2张被赋予的咚时持续获得【阻挡者】,属条件式纯持续静态修正,需C#"
+      }
+    ]
+  },
+  {
+    "set": "OP14",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP14-003",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯静态防护(免疫对方原力量≤5000角色效果造成的KO),无对应op,需C#。"
+      },
+      {
+        "number": "OP14-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续赋予关键词(自身力量≥5000时获得速攻),静态修正无事件触发,需C#。"
+      },
+      {
+        "number": "OP14-011",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续赋予关键词(贴咚×2时获得阻挡者),静态修正无事件触发,需C#。"
+      },
+      {
+        "number": "OP14-056",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续限制(无法攻击)+特殊触发(我方手牌因效果被丢弃时本回合自身效果无效),未列机制,需C#。"
+      },
+      {
+        "number": "OP14-070",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发时机'因对方角色效果转为休息时'未列于触发枚举,且关联放回咚后活跃自身,需C#。"
+      },
+      {
+        "number": "OP14-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正(废弃≥7时自身力量+1000且巴洛克工作室角色费用+2),需C#。"
+      },
+      {
+        "number": "OP14-106",
+        "status": "complex",
+        "definition": {},
+        "reason": "生命【触发】此卡牌登场(自生命登场)无对应op,需C#;effectText仅【阻挡者】纯关键词无主动效果。"
+      }
+    ]
+  },
+  {
+    "set": "OP15",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP15-006",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续静态条件加成：我方废弃区≥4张事件时此角色力量+2000，无事件触发节，属常态条件修正，需C#脚本。"
+      },
+      {
+        "number": "OP15-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场救援机制：原本力量≤7000角色因对方效果将离场时改为领袖力量-2000使其不离场，属未列出的离场替代机制，需C#脚本。"
+      },
+      {
+        "number": "OP15-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性手牌静态减费(领袖力量≤0时手牌中此卡费用-2)走HandStaticCost通道，且【阻挡者】为纯关键词，整体属静态修正需C#脚本。"
+      },
+      {
+        "number": "OP15-035",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场救援机制：原本力量≤7000角色因对方效果将离场时改为休息我方2张牌使其不离场，属未列出的离场替代机制，需C#脚本。"
+      },
+      {
+        "number": "OP15-050",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续条件加成：我方场上存在“凯利·凡克”时此角色力量+3000，无事件触发，属常态条件修正，需C#脚本。"
+      },
+      {
+        "number": "OP15-052",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场救援机制：原本力量≤7000角色因对方效果将离场时改为放回1张角色到卡组底使其不离场，属未列出的离场替代机制，需C#脚本。"
+      },
+      {
+        "number": "OP15-068",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续关键词授予：我方咚≤6张时此角色获得【阻挡者】，属常态条件持续效果，需C#脚本。"
+      },
+      {
+        "number": "OP15-069",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场救援机制：原本力量≤7000角色因对方效果将离场时改为将1张咚放回咚卡组使其不离场，属未列出的离场替代机制，需C#脚本。"
+      },
+      {
+        "number": "OP15-090",
+        "status": "complex",
+        "definition": {},
+        "reason": "替代离场救援机制：原本力量≤7000角色因对方效果将离场时改为弃1张手牌使其不离场，属未列出的离场替代机制，需C#脚本。"
+      },
+      {
+        "number": "OP15-092",
+        "status": "complex",
+        "definition": {},
+        "reason": "多段废弃区数量分段持续修正(原本力量变更、费用+10、领袖原本力量变更、力量+1000)，全为静态条件修正，需C#脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP15",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP15-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "核心为「将要离场改为将此角色置入废弃区使其不离场」的替换/重定向离场效果，DSL 无对应 op 或机制可表达；【阻挡者】为纯关键词。需 C# 脚本。"
+      },
+      {
+        "number": "OP15-105",
+        "status": "complex",
+        "definition": {},
+        "reason": "同为「我方原力量≤7000角色将要因对方效果离场时，改为将生命顶1张入手使其不离场」的替换离场效果，DSL 无对应机制可表达。需 C# 脚本。"
+      },
+      {
+        "number": "OP15-119",
+        "status": "complex",
+        "definition": {},
+        "reason": "三段均不可表达:1)6张以上咚条件持续获得【速攻】(条件性持续关键词);2)对方发动事件或阻挡者效果时反应触发(无 OnOppEvent/OnOppBlockerEffect 触发枚举);3)按公开生命牌费用动态加力量。均需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "OP16",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP16-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果为「条件满足时手牌中此卡费用-3」的纯手牌静态减费修正，属持续/静态修正，规范第七条须走 C# HandStaticCost 通道；另带纯关键词【阻挡者】。无对应 DSL op。"
+      },
+      {
+        "number": "OP16-024",
+        "status": "complex",
+        "definition": {},
+        "reason": "「因对方的效果而被KO时」休息对方角色：KO 来源限定为『对方的效果』，if 条件节无对应键无法表达该触发限定；另带纯关键词【阻挡者】。须 C# 脚本。"
+      },
+      {
+        "number": "OP16-027",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】此角色力量+2000，为依据被贴咚数量的持续/静态力量修正，属规范第七条纯持续修正，无对应触发 op，须 C# 实现。"
+      },
+      {
+        "number": "OP16-033",
+        "status": "complex",
+        "definition": {},
+        "reason": "「将要被KO时可改为休息我方2张卡牌使此角色不被KO」为带代偿成本的被动替换型防KO特殊状态，DSL 仅有 MarkPreventKO 标记且无替换/代偿表达，须 C# 实现；另带纯关键词【不可阻挡】。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 0,
+    "results": [
+      {
+        "number": "P-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】持续条件赋予【速攻】,属于被贴咚达2张时常态获得关键词的持续/静态修正,无事件触发,需C#。"
+      },
+      {
+        "number": "P-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "全部手牌放回卡组洗牌后抽取与放回张数相同的牌,抽牌数量为动态(按放回张数)且回收全部手牌入库无对应op,需C#。"
+      },
+      {
+        "number": "P-003",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】持续条件赋予【双重攻击】,被贴咚达2张时常态获得关键词的持续/静态修正,无事件触发,需C#。"
+      },
+      {
+        "number": "P-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】持续条件赋予【阻挡者】,被贴咚达1张时常态获得关键词的持续/静态修正,无事件触发,需C#。"
+      },
+      {
+        "number": "P-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】咚‼-2获得【流放】,流放为未列机制关键词且需本回合限定赋予,需C#。"
+      },
+      {
+        "number": "P-006",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】【我方的回合中】力量+2000,纯持续静态修正,无事件触发,需C#。"
+      },
+      {
+        "number": "P-007",
+        "status": "complex",
+        "definition": {},
+        "reason": "与拥有属性(打)的领袖和角色战斗中不被KO,持续静态特殊状态(条件免疫KO),需C#。"
+      },
+      {
+        "number": "P-008",
+        "status": "dsl",
+        "definition": {
+          "P-008": {
+            "activated": {
+              "cost": {
+                "restSelf": true
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe2",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          }
+        },
+        "reason": "【启动主要】横置自身:横置对方≤1张费用≤2角色,Choose+Rest表达。"
+      },
+      {
+        "number": "P-009",
+        "status": "dsl",
+        "definition": {
+          "P-009": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "if": {
+                  "oppHandCountGte": 6
+                },
+                "then": [
+                  {
+                    "op": "OppLifeToHand"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】对方≥6手牌时对方1张生命入手,if oppHandCountGte+OppLifeToHand。"
+      },
+      {
+        "number": "P-010",
+        "status": "dsl",
+        "definition": {
+          "P-010": {
+            "triggers": [
+              {
+                "on": "OnMyTurnEnd",
+                "then": [
+                  {
+                    "op": "RefreshDon",
+                    "n": 1,
+                    "state": "active"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【我方回合结束时】从咚卡组追加最多1张活跃咚,OnMyTurnEnd+RefreshDon active。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 10,
+    "results": [
+      {
+        "number": "P-011",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果限定『原本没有效果』的角色，filter 键无法表达该约束，需C#脚本。"
+      },
+      {
+        "number": "P-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本为『将此角色放回卡组最下方』，cost 节无对应键（无 returnSelfToDeck），需C#脚本。"
+      },
+      {
+        "number": "P-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "生命【触发】为『此卡牌登场』(自生命/废弃登场)，无对应 op，需C#脚本。"
+      },
+      {
+        "number": "P-017",
+        "status": "dsl",
+        "definition": {
+          "P-017": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "AddPowerThisTurn",
+                    "target": "$tgt",
+                    "delta": -2000
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】对方最多1张角色力量-2000，选择后 AddPowerThisTurn。"
+      },
+      {
+        "number": "P-019",
+        "status": "dsl",
+        "definition": {
+          "P-019": {
+            "triggers": [
+              {
+                "on": "OnAttackDeclare",
+                "if": {
+                  "donAttachedGte": 1
+                },
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt",
+                    "filter": {
+                      "originalPowerLte": 3000
+                    }
+                  },
+                  {
+                    "op": "KO",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【咚!!×1】=被贴咚≥1(donAttachedGte:1)，【攻击时】KO对方最多1张原本力量≤3000角色。"
+      },
+      {
+        "number": "P-020",
+        "status": "dsl",
+        "definition": {
+          "P-020": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OwnLeaderOrCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "AddPowerThisTurn",
+                    "target": "$tgt",
+                    "delta": 1000
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】我方最多1张领袖或角色力量+1000。"
+      },
+      {
+        "number": "P-024",
+        "status": "complex",
+        "definition": {},
+        "reason": "【主要】加成量随场上角色数量动态变化(每1张角色领袖+1000)，无法用固定 delta 表达，需C#脚本。"
+      },
+      {
+        "number": "P-025",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续静态条件抗KO(不会在与无属性角色战斗中被KO)，无事件触发的持续修正，需C#脚本。"
+      },
+      {
+        "number": "P-026",
+        "status": "dsl",
+        "definition": {
+          "P-026": {
+            "triggers": [
+              {
+                "on": "OnAttackDeclare",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "AddCostMod",
+                    "target": "$tgt",
+                    "delta": -3,
+                    "duration": "thisTurn"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【攻击时】对方最多1张角色费用-3，AddCostMod delta:-3 本回合。"
+      },
+      {
+        "number": "P-027",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续静态全体修正(【对方的回合中】原本力量≤3000角色+1000)+名称视同『弗兰奇』，无事件触发，需C#脚本。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 20,
+    "results": [
+      {
+        "number": "P-029",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合结束时】横置自身为成本才能发动，triggers(OnMyTurnEnd)不支持cost节，横置自身成本无法在触发节表达，需C#脚本。"
+      },
+      {
+        "number": "P-030",
+        "status": "complex",
+        "definition": {},
+        "reason": "【KO时】对象为敌我双方任意费用≤3角色并放回其各自持有者卡组底，现有Choose prompt无『任意角色费用≤3』(只分Opponent/Own)，无法精确表达双方+按持有者归位，需C#脚本。"
+      },
+      {
+        "number": "P-031",
+        "status": "dsl",
+        "definition": {
+          "P-031": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "RefreshDon",
+                    "n": 1,
+                    "state": "rest"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】从咚卡组追加最多1张休息状态咚→RefreshDon n=1 state=rest。"
+      },
+      {
+        "number": "P-032",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】【我方的回合中】对方所有角色费用-2，为持续静态减费修正，需C#脚本(持续费用修正光环)。"
+      },
+      {
+        "number": "P-033",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本为『将自身放回卡组底』，cost节无对应键(只有donReturn/restSelf/selfToTrash等)，无法表达自身放回卡组底成本，需C#脚本。"
+      },
+      {
+        "number": "P-034",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】【我方的回合中】生命≤2时此角色力量+2000，为持续静态条件加力，无事件触发，需C#脚本。"
+      },
+      {
+        "number": "P-035",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】以丢弃1张手牌为成本才KO对方费用0角色，triggers(OnAttackDeclare)不支持cost，弃手牌成本无法在触发节表达，需C#脚本。"
+      },
+      {
+        "number": "P-036",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】以『生命最上或最下1张入手』为成本(玩家可选上/下)才加力，triggers不支持cost，且生命可选上/下无对应op，需C#脚本。"
+      },
+      {
+        "number": "P-037",
+        "status": "dsl",
+        "definition": {
+          "P-037": {
+            "triggers": [
+              {
+                "on": "OnAttackDeclare",
+                "if": {
+                  "ownRestedCharCountGte": 2
+                },
+                "then": [
+                  {
+                    "op": "AddPowerThisTurn",
+                    "target": "self",
+                    "delta": 1000
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【攻击时】我方≥2张休息角色时本回合此角色力量+1000→OnAttackDeclare+if ownRestedCharCountGte:2+AddPowerThisTurn self +1000。"
+      },
+      {
+        "number": "P-038",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】以横置我方1张领袖为成本才KO对方费用≤1角色，triggers(OnEnterField)不支持cost，横置领袖成本无法在触发节表达，需C#脚本。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 30,
+    "results": [
+      {
+        "number": "P-039",
+        "status": "complex",
+        "definition": {},
+        "reason": "【流放】为纯关键词；【咚!!×2】我方生命为0时此角色力量+2000 属于持续静态条件加成，无事件触发，需C#脚本。"
+      },
+      {
+        "number": "P-040",
+        "status": "complex",
+        "definition": {},
+        "reason": "对方场上10张咚!!时此角色不会被KO，属于持续静态防KO机制，需C#脚本。"
+      },
+      {
+        "number": "P-042",
+        "status": "dsl",
+        "definition": {
+          "P-042": {
+            "trigger": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe4",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "生命【触发】KO对方最多1张费用≤4的角色，用 trigger 节 Choose+KO 表达。"
+      },
+      {
+        "number": "P-043",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】将最多1张费用≤3的角色放回其持有者手牌，目标为双方任意≤3费角色且需退回各自持有者手牌，无对应 prompt 精确表达双方任意角色，判 complex。"
+      },
+      {
+        "number": "P-044",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】我方手牌≤4时此角色力量+2000，属于持续静态条件加成，需C#脚本。"
+      },
+      {
+        "number": "P-046",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】将我方所有手牌自选顺序放回卡组底并抽取相同张数，涉及全手牌放回卡组底+按放回张数抽牌的联动机制，无对应 op，需C#脚本。"
+      },
+      {
+        "number": "P-047",
+        "status": "dsl",
+        "definition": {
+          "P-047": {
+            "triggers": [
+              {
+                "on": "OnAttackDeclare",
+                "if": {
+                  "selfHandCountLte": 3
+                },
+                "then": [
+                  {
+                    "op": "Draw",
+                    "n": 1
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【咚!!×1】【攻击时】我方手牌≤3张时抽1张，用 OnAttackDeclare 触发+selfHandCountLte 条件表达。咚条件由引擎统一处理。"
+      },
+      {
+        "number": "P-048",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】我方生命≥4时对方将其1张手牌放回卡组最下方，属于对方手牌放回卡组底机制，无对应 op(OpponentDiscard为弃牌)，需C#脚本。"
+      },
+      {
+        "number": "P-049",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认卡组顶5张并自选顺序放置到卡组顶或底，属于查看并重排机制，无对应 op，需C#脚本。"
+      },
+      {
+        "number": "P-050",
+        "status": "complex",
+        "definition": {},
+        "reason": "【阻挡者】为纯关键词；【咚!!×1】【我方的回合中】我方手牌≤3时此角色力量+4000 属于持续静态条件加成，需C#脚本。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 40,
+    "results": [
+      {
+        "number": "P-051",
+        "status": "complex",
+        "definition": {},
+        "reason": "丢弃我方任意张数手牌、每张力量+1000，涉及可变数量循环成本与按数量叠加，DSL无法表达，需C#"
+      },
+      {
+        "number": "P-052",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】与拥有属性(斩)卡牌战斗中不被KO，属于条件性持续防KO并需判定对手属性，列表无对应op，需C#"
+      },
+      {
+        "number": "P-053",
+        "status": "dsl",
+        "definition": {
+          "P-053": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "if": {
+                  "selfHandCountLte": 3
+                },
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacterCostLe3",
+                    "max": 1,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "BounceToHand",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】手牌≤3时，对方≤1张费用≤3角色退回手牌，用OnEnterField+if+Choose+BounceToHand表达"
+      },
+      {
+        "number": "P-054",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】与拥有属性(打)卡牌战斗中不被KO，条件性持续防KO并需判定对手属性，列表无对应op，需C#"
+      },
+      {
+        "number": "P-055",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】可丢弃2张手牌作为成本使对方1角色放回卡组底，但触发节triggers不支持cost(弃牌成本)，无法表达，需C#"
+      },
+      {
+        "number": "P-056",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】支付横置2咚的成本使≤1张费用≤5角色退回手牌，但触发节triggers不支持cost，无法表达，需C#"
+      },
+      {
+        "number": "P-062",
+        "status": "dsl",
+        "definition": {
+          "P-062": {
+            "activated": {
+              "oncePerTurn": true,
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "self",
+                  "delta": 1000
+                },
+                {
+                  "op": "LifeToHand"
+                }
+              ]
+            }
+          }
+        },
+        "reason": "【启动主要】【每回合1次】对方≤1张费用≤4角色横置、本回合此角色力量+1000，之后生命顶1张入手，用activated+Choose+Rest+AddPowerThisTurn+LifeToHand表达"
+      },
+      {
+        "number": "P-063",
+        "status": "dsl",
+        "definition": {
+          "P-063": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacterCostLe1",
+                    "max": 1,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "Rest",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】对方≤1张费用≤1角色横置，用OnEnterField+Choose+Rest表达"
+      },
+      {
+        "number": "P-065",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】对方有费用0角色时，力量+2000持续到下个我方回合开始，非本回合/本战斗加成，DSL无此跨回合持续时长，需C#"
+      },
+      {
+        "number": "P-066",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合中】手牌≤5时我方全体九蛇海盗团角色力量+1000，属纯持续静态修正，无事件触发，需C#"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 50,
+    "results": [
+      {
+        "number": "P-067",
+        "status": "complex",
+        "definition": {},
+        "reason": "休息状态时强制对方只能攻击本角色，属于改变攻击目标/限制机制，无对应 op/触发枚举，需 C#。"
+      },
+      {
+        "number": "P-068",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶5张并自选顺序排列放回顶/底，属于查看并重排机制，无对应 op，需 C#。"
+      },
+      {
+        "number": "P-069",
+        "status": "dsl",
+        "definition": {
+          "P-069": {
+            "activated": {
+              "oncePerTurn": true,
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnLeaderOrCharacter",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AttachDon",
+                  "target": "$tgt",
+                  "n": 1,
+                  "from": "rest"
+                }
+              ]
+            }
+          }
+        },
+        "reason": "启动主要每回合1次：选我方1领袖或角色贴1张休息咚。"
+      },
+      {
+        "number": "P-071",
+        "status": "complex",
+        "definition": {},
+        "reason": "【KO时】将自身从废弃区加入手牌，无对应 op（KO时自身回手），需 C#。"
+      },
+      {
+        "number": "P-072",
+        "status": "dsl",
+        "definition": {
+          "P-072": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacterCostLe4",
+                    "max": 1,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "Rest",
+                    "target": "$tgt"
+                  }
+                ]
+              },
+              {
+                "on": "OnKO",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacterCostLe4",
+                    "max": 1,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "Rest",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】/【KO时】将对方最多1张费用≤4角色横置。"
+      },
+      {
+        "number": "P-073",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本为生命区最上方或最下方1张入手，cost.lifeToHand 仅支持生命顶入手，无法表达'最下方'选项，需 C#。"
+      },
+      {
+        "number": "P-074",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶5张并自选顺序排列放回顶/底（查看并重排机制），且成本为自身放回手牌，均无对应 op，需 C#。"
+      },
+      {
+        "number": "P-075",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】条件'我方场上存在费用≥8角色'无对应 if 键（无 ownCharCostGte 类条件），需 C#。"
+      },
+      {
+        "number": "P-076",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本为弃1张带《海军》特征手牌，cost.handDiscard 不支持按特征过滤弃牌，无法精确表达，需 C#。"
+      },
+      {
+        "number": "P-077",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发时机为'2张或更多咚放回咚卡组时'，无对应触发枚举，需 C#。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 60,
+    "results": [
+      {
+        "number": "P-078",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态条件力量加成(我方≥2张休息的《时光旅诗》角色时力量+1000),无事件触发,需C#"
+      },
+      {
+        "number": "P-079",
+        "status": "complex",
+        "definition": {},
+        "reason": "【阻挡者】+【我方的回合结束时】条件活跃自身;条件为'≥2张休息的《时光旅诗》特征角色',ownRestedCharCountGte无法限定特征,无对应if键,需C#"
+      },
+      {
+        "number": "P-081",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本为'将此角色放回持有者手牌',cost节无对应键(仅donReturn/restSelf/selfToTrash/handDiscard等);且PlayCharFromHand需限定费用5且十字公会,filter可表达但成本无法表达,需C#"
+      },
+      {
+        "number": "P-082",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】条件为'领袖含十字公会 或 含巴洛克工作室'(两个leaderHas条件取OR),if为AND无法表达OR;且Choose对方力量≤2000角色无对应prompt(仅costLe),需C#"
+      },
+      {
+        "number": "P-083",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】【攻击时】弃手牌角色1张→对方角色-1000后抽1;triggers节不支持cost(【咚×1】为成本),需C#"
+      },
+      {
+        "number": "P-084",
+        "status": "complex",
+        "definition": {},
+        "reason": "静态'此角色无法攻击'+条件'费用3/4角色全体无法攻击'+【登场时】登场;混合持续静态修正,需C#"
+      },
+      {
+        "number": "P-085",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】将对方角色正面朝上加入其持有者生命区顶或底;MoveCharToLife仅置入生命顶,无法表达对方生命+可选顶/底,需C#"
+      },
+      {
+        "number": "P-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本含'将我方力量≥3000角色放回卡组底',cost节无对应'放回我方角色'键,该条件成本无法表达,需C#"
+      },
+      {
+        "number": "P-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "生命【触发】'此卡牌登场'(把自身从生命登场),无对应op,触发自登场需C#"
+      },
+      {
+        "number": "P-090",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方的回合中】【KO时】登场费用上限为'对方场上咚!!张数'的动态值,filter无法表达动态费用上限,需C#"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 70,
+    "results": [
+      {
+        "number": "P-091",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】从手牌登场角色可用 PlayCharFromHand 表达，但【启动主要】「让《海王类》角色在登场回合可攻击角色」属于解除登场召唤眩晕的特殊一次性状态，op 列表无对应原语，整卡需 C# 脚本。"
+      },
+      {
+        "number": "P-092",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方回合中】力量-3000 为常态持续修正(无事件触发)，【攻击时】「领袖原本力量变为7000」属改写原本力量的持续效果，均不在 op 列表，需 C# 脚本。"
+      },
+      {
+        "number": "P-093",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】追加休息咚可用 RefreshDon 表达，但条件「我方场上咚张数≤对方场上咚张数」需比较我方与对方咚总数，if 条件键仅支持与固定数字比较(selfDonTotalLte 等)，无双方咚数比较键，需 C# 脚本。"
+      },
+      {
+        "number": "P-094",
+        "status": "dsl",
+        "definition": {
+          "P-094": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentRestingCharacter",
+                    "max": 1,
+                    "min": 0,
+                    "as": "$tgt",
+                    "filter": {
+                      "originalCostLte": 2
+                    }
+                  },
+                  {
+                    "op": "KO",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "【登场时】选对方≤1张休息且费用≤2角色KO：Choose(OpponentRestingCharacter+filter originalCostLte:2)后 KO。"
+      },
+      {
+        "number": "P-095",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方的攻击时】触发节(triggers)不支持 cost，无法表达「弃1张事件」的发动成本，需 C# 脚本。"
+      },
+      {
+        "number": "P-096",
+        "status": "dsl",
+        "definition": {
+          "P-096": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Draw",
+                    "n": 1
+                  },
+                  {
+                    "op": "DiscardOwnChosen",
+                    "n": 1
+                  }
+                ]
+              }
+            ],
+            "activated": {
+              "oncePerTurn": true,
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "nameEquals": "奈美"
+                  }
+                },
+                {
+                  "op": "AttachDon",
+                  "target": "$tgt",
+                  "n": 1,
+                  "from": "rest"
+                }
+              ]
+            }
+          }
+        },
+        "reason": "【登场时】抽1弃1=Draw+DiscardOwnChosen；【启动主要】每回合1次给我方「奈美」贴≤1张休息咚=Choose(OwnCharacter+nameEquals奈美)后 AttachDon from:rest。"
+      },
+      {
+        "number": "P-097",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】/【攻击时】「本回合对方无法发动【阻挡者】」属于改写对方阻挡机制的全局限制，op 列表无对应原语，需 C# 脚本。"
+      },
+      {
+        "number": "P-098",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】条件「我方场上不存在5张费用≥5的角色则放回卡组底」，if 条件键无「特定费用阈值角色数量」计数判定，无法表达该条件，需 C# 脚本。"
+      },
+      {
+        "number": "P-099",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】触发节(triggers)不支持 cost，无法表达「咚!!-10」的发动成本(donReturn 仅 main/activated/counter 可用)，需 C# 脚本。"
+      },
+      {
+        "number": "P-100",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】「本回合对方所有领袖和角色效果无效」属于全体效果无效化的持续/群体机制，op 列表无群体 Nullify 原语，需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 80,
+    "results": [
+      {
+        "number": "P-101",
+        "status": "dsl",
+        "definition": {
+          "P-101": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "AttachDon",
+                    "target": "selfLeader",
+                    "n": 1,
+                    "from": "rest"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "阻挡者为纯关键词无需写;登场时赋予领袖最多1张休息状态咚,用AttachDon target=selfLeader n=1 from=rest"
+      },
+      {
+        "number": "P-102",
+        "status": "dsl",
+        "definition": {
+          "P-102": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "if": {
+                  "leaderHasKeyword": "草帽一伙"
+                },
+                "then": [
+                  {
+                    "op": "ActiveOwnDon",
+                    "n": 2
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "登场时领袖含草帽一伙时,将我方最多2张咚转活跃,用ActiveOwnDon n=2,条件leaderHasKeyword"
+      },
+      {
+        "number": "P-103",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场抽2后将2张手牌自选顺序放置卡组最上方或最下方,无对应op表达手牌重排到卡组顶/底,且后续贴咚为连锁,判complex需C#"
+      },
+      {
+        "number": "P-104",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态:存在10咚时此角色不会因对方效果离场,属持续保护机制,无对应op,判complex需C#"
+      },
+      {
+        "number": "P-105",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续条件获得阻挡者+费用+4为静态修正;登场时以生命顶/底入手为代价赋予咚,triggers不支持cost且可选生命入手代价,判complex需C#"
+      },
+      {
+        "number": "P-106",
+        "status": "complex",
+        "definition": {},
+        "reason": "我方回合结束时需将生命顶翻至正面朝上作代价再活跃艾格赫德角色,翻生命正面无对应op;trigger字段抽1+KO虽可表达但整卡含不可表达机制,判complex需C#"
+      },
+      {
+        "number": "P-107",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时10咚时领袖力量+2000且持续到下个对方结束阶段,属延时持续加成,无对应op,判complex需C#"
+      },
+      {
+        "number": "P-108",
+        "status": "dsl",
+        "definition": {
+          "P-108": {
+            "triggers": [
+              {
+                "on": "OnKO",
+                "then": [
+                  {
+                    "op": "ActiveOwnDon",
+                    "n": 2
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "阻挡者为纯关键词;KO时将我方最多2张咚转活跃,用OnKO触发ActiveOwnDon n=2"
+      },
+      {
+        "number": "P-109",
+        "status": "complex",
+        "definition": {},
+        "reason": "阻挡者为关键词;登场时确认卡组顶3张自选顺序重排到顶/底,属查看并重排机制无对应op,后续贴咚为连锁,判complex需C#"
+      },
+      {
+        "number": "P-111",
+        "status": "complex",
+        "definition": {},
+        "reason": "每回合1次,草帽角色将因对方效果离场时改为休息1张咚使其不离场,属替换离场的持续触发机制,无对应op,判complex需C#"
+      }
+    ]
+  },
+  {
+    "set": "P",
+    "idx": 90,
+    "results": [
+      {
+        "number": "P-112",
+        "status": "dsl",
+        "definition": {
+          "P-112": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "if": {
+                  "leaderNameEquals": "奈美"
+                },
+                "then": [
+                  {
+                    "op": "AttachDon",
+                    "target": "selfLeader",
+                    "n": 1,
+                    "from": "rest"
+                  },
+                  {
+                    "op": "PlayCharFromHand",
+                    "filter": {
+                      "kind": "Character",
+                      "originalCostLte": 2
+                    },
+                    "text": "将我方手牌中最多1张费用不高于2的角色卡牌登场"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "登场时领袖为奈美则给我方领袖贴1张休息咚，之后从手牌登场≤1张费用≤2角色，均有对应op"
+      },
+      {
+        "number": "P-113",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】【对方回合中】持续获得【阻挡者】且力量+2000，属纯持续/静态条件修正，无事件触发，需C#"
+      },
+      {
+        "number": "P-114",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方回合结束时】我方存在处于活跃状态的咚的场合将此角色活跃；if条件无法表达活跃咚存在（selfDonTotalGte为总咚非活跃咚），需C#"
+      },
+      {
+        "number": "P-115",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时贴咚部分可做，但【触发】登场手牌中力量≤5000且拥有【触发】效果的黄色角色，filter无法表达拥有触发效果及黄色，需C#"
+      },
+      {
+        "number": "P-116",
+        "status": "dsl",
+        "definition": {
+          "P-116": {
+            "triggers": [
+              {
+                "on": "OnKO",
+                "if": {
+                  "ownTrashCountGte": 7
+                },
+                "then": [
+                  {
+                    "op": "Draw",
+                    "n": 1
+                  },
+                  {
+                    "op": "DiscardOwnChosen",
+                    "n": 1
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "阻挡者为纯关键词无需写；【KO时】废弃≥7则抽1弃1，均有对应op与条件键"
+      },
+      {
+        "number": "P-117",
+        "status": "complex",
+        "definition": {},
+        "reason": "改变构筑规则与胜负条件（卡组0张不败反胜）属未列机制；攻击给伤时MillTop为持续触发改判，需C#"
+      },
+      {
+        "number": "P-118",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场手牌中费用≤5且拥有《艾格赫德》特征或【触发】效果的角色；filter的anyOf无法表达拥有触发效果，需C#"
+      },
+      {
+        "number": "P-135",
+        "status": "dsl",
+        "definition": {
+          "P-135": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OpponentCharacterCostLe5",
+                    "max": 1,
+                    "as": "$tgt"
+                  },
+                  {
+                    "op": "Rest",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "阻挡者为纯关键词无需写；【登场时】将对方≤1张费用≤5角色休息，Choose+Rest可表达"
+      }
+    ]
+  },
+  {
+    "set": "PRB01",
+    "idx": 0,
+    "results": [
+      {
+        "number": "PRB01-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "启动主要给『费用不高于8且没有【登场时】效果』的我方角色赋予速攻。filter 无『无登场时效果』这一过滤键，无法精确表达该限制条件，需 C# 脚本判定目标角色是否含登场时效果。"
+      }
+    ]
+  },
+  {
+    "set": "PRB02",
+    "idx": 0,
+    "results": [
+      {
+        "number": "PRB02-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "【每回合1次】「此角色因对方效果将要离场时改为力量-2000使其不离场」属于离场替代/不离场机制，DSL无对应op且需C#实现；【攻击时】对方角色-2000虽可DSL，但整卡核心替代机制无法表达，整卡判complex。"
+      },
+      {
+        "number": "PRB02-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】效果为延迟触发(下个对方主要阶段开始时)+横置对方活跃咚，DSL无延迟登记机制且RestActiveDon仅作用于己方咚，无法表达对方咚横置，需C#。"
+      },
+      {
+        "number": "PRB02-006",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方回合中】「此角色将转为休息时改为横置我方其他1张角色使本角色不横置」属于横置替代/不横置机制，DSL无对应op，需C#；含【阻挡者】但有此主动替代效果故非noEffect。"
+      },
+      {
+        "number": "PRB02-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "「我方废弃区≥15张时手牌中此卡费用-3」属于手牌静态减费(条件触发)，纯静态修正走手牌静态减费通道需C#；【阻挡者】为纯关键词无独立主动效果。"
+      },
+      {
+        "number": "PRB02-017",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】需丢弃手牌中拥有【触发】效果的特定卡(filter无法表达),并施加「无法攻击」限制直到下个对方结束阶段(AddRestriction无此kind且对横置领袖/指定名称外角色的范围限定复杂),核心登场效果无法DSL表达;trigger字段的KO费用≤4虽可表达但整卡判complex,需C#。"
+      }
+    ]
+  },
+  {
+    "set": "ST01",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST01-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×2】此角色获得【速攻】是被贴咚数≥2时常态获得关键词的持续/静态条件性授予，非事件触发，无对应 op 可表达，需 C# 脚本（持续光环+donAttachedGte 判定授予速攻）。"
+      }
+    ]
+  },
+  {
+    "set": "ST03",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST03-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "effectText 仅【阻挡者】纯关键词无主动效果；但 trigger 字段为生命【触发】「此卡牌登场」(把自身从生命登场)，无对应 op，触发自登场需 C# 脚本，故整张判 complex。"
+      }
+    ]
+  },
+  {
+    "set": "ST05",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST05-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "生命【触发】仅为「此卡牌登场」(把自身从生命区登场)，无对应 op，需 C# 实现。"
+      }
+    ]
+  },
+  {
+    "set": "ST07",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST07-007",
+        "status": "complex",
+        "definition": {},
+        "reason": "effectText 仅【阻挡者】纯关键词；但 trigger 字段为生命【触发】此卡牌登场（把自身从生命区登场），无对应 op，触发自登场需C#脚本实现。"
+      }
+    ]
+  },
+  {
+    "set": "ST08",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST08-007",
+        "status": "complex",
+        "definition": {},
+        "reason": "effectText仅【阻挡者】纯关键词；但trigger字段为「此卡牌登场」(把自身从生命区登场)，无对应op，触发自登场需C#实现，故整卡判complex。"
+      }
+    ]
+  },
+  {
+    "set": "ST12",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST12-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认卡组顶3张并自选顺序重排放回卡组顶/底，属于规范第七条列出的「查看并重排」机制，无对应 op，需 C# 脚本。（【阻挡者】为纯关键词）"
+      }
+    ]
+  },
+  {
+    "set": "ST17",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST17-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】公开卡组顶1张并按其是否拥有《王下七武海》特征作为后续(抽2+将手牌放回卡组顶)的触发条件。规范中的 if 条件键只能判断领袖/场面/生命等状态，无法表达\"公开的那张牌是否含某特征\"这一条件门，LookTopReveal 只能把符合 match 的牌加手牌而非据此放行另一段 then 连锁，无对应 op 表达该条件分支，需 C# 脚本。"
+      }
+    ]
+  },
+  {
+    "set": "ST22",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST22-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "启动主要含「公开手牌中1张含〈白胡子海盗团〉特征的卡」+「将公开的卡放回卡组最上方」机制：DSL 无「公开手牌牌作为条件并将其放回卡组顶」的 op（ReturnToDeckBottom 仅放回卡组底，cost 节无公开手牌项），无法表达，需 C#。"
+      },
+      {
+        "number": "ST22-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "含「因对方效果将要离场时改为弃2张手牌不离场」的替换/防离场机制（无对应 op）；且启动主要成本为「横置3张咚+将我方1张本角色以外角色放回手牌」，成本节无「退回我方角色到手牌」项，无法表达，需 C#。"
+      }
+    ]
+  },
+  {
+    "set": "ST23",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST23-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "主要效果为「我方场上存在力量10000+角色时，手牌中此卡费用-4」——属于条件性手牌静态减费（持续/静态修正），DSL 无法表达，需走手牌静态减费 C# 通道。其余仅【阻挡者】纯关键词无主动效果。"
+      }
+    ]
+  },
+  {
+    "set": "ST29",
+    "idx": 0,
+    "results": [
+      {
+        "number": "ST29-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "effectText 仅为纯关键词【阻挡者】无主动效果；但 trigger 字段为生命【触发】「我方领袖为蒙奇·D·路飞时，此卡牌登场」，属于触发自登场(把自身从生命登场)，无对应 op，需 C# 实现，故整卡判 complex。"
+      }
+    ]
+  }
+]

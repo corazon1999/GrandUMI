@@ -18,9 +18,8 @@ public class OP15_002_Lucci : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         const string key = "OP15-002-MainOncePerTurn";
         if (me.TurnOnceUsed.Contains(key)) return;
-        // 该效果是"本回合内 ≥3 费事件抽 1"，需在 PlayCard 时联动；
-        // 此处简化：直接给"本回合"标记，PlayCard 处可读取标记额外抽
-        ctx.Vars["LucciEventDrawArmed"] = true;
+        // 启动主要每回合 1 次：打上本回合标记即可。"本回合内发动原始费用≥3 事件时抽 1"的实际联动
+        // 在 GameEngine.ResolveEffectAsync 事件分支读取此 TurnOnceUsed 标记完成（出牌处才拿得到事件费用）。
         me.TurnOnceUsed.Add(key);
         await Task.CompletedTask;
     }

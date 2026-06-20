@@ -1,0 +1,71 @@
+{
+  "ST12-002": {
+    "_name": "古伊娜",
+    "_note": "【启动主要】横置自身：将对方最多1张费用≤4 角色转为休息状态。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "将对方最多1张费用≤4 角色转为休息状态" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST12-008": {
+    "_name": "罗罗诺亚·佐罗",
+    "_note": "【咚×1】【攻击时】将对方最多1张费用≤6 角色转为休息状态。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 6 }, "text": "将对方最多1张费用≤6 角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST12-011": {
+    "_name": "山智",
+    "_note": "【咚×1】【攻击时】我方手牌≤5 时，直到下个我方回合开始，此角色力量+2000。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1, "selfHandCountLte": 5 },
+        "then": [
+          { "op": "AddPowerPersistent", "target": "self", "delta": 2000 }
+        ]
+      }
+    ]
+  },
+  "ST12-012": {
+    "_name": "夏洛特·布玲",
+    "_note": "【启动主要】将此角色放回其持有者的手牌。",
+    "activated": {
+      "then": [
+        { "op": "BounceToHand", "target": "self" }
+      ]
+    }
+  },
+  "ST12-016": {
+    "_name": "狮子挽歌",
+    "_note": "【主要】/【反击】将对方最多1张费用≤4 角色转休息（原文含“领袖或”，DSL 候选无法兼含领袖与费用过滤，取费用≤4角色，近似）。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "将对方最多1张费用≤4 角色转为休息状态" },
+        { "op": "Rest", "target": "$tgt" }
+      ]
+    },
+    "counter": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 4 }, "text": "将对方最多1张费用≤4 角色转为休息状态" },
+      { "op": "Rest", "target": "$tgt" }
+    ]
+  },
+  "ST12-017": {
+    "_name": "整形暴踹",
+    "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“公开卡组顶并登场费用2角色”无卡组登场 op，已略去）。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+    ]
+  }
+}

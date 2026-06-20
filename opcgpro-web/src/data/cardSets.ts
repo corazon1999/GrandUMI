@@ -57,8 +57,6 @@ export const CARD_SET_PATHS: Record<string, string> = {
   P:     "/data/P.json",
   PRB01: "/data/PRB01.json",
   PRB02: "/data/PRB02.json",
-  OPD:   "/data/OPD.json",
-  TY01:  "/data/TY01.json",
 };
 
 export const ALL_SET_NAMES = Object.keys(CARD_SET_PATHS);

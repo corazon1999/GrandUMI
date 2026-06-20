@@ -18,6 +18,7 @@ import type {
   MsgAddAccount,
   MsgUpdatePs,
   MsgEnterMatch,
+  MsgEnterBotMatch,
   MsgCancelMatch,
   MsgMatchFound,
   MsgCreateRoom,
@@ -25,6 +26,18 @@ import type {
   MsgCancelRoom,
   MsgGameStart,
   MsgChatMsg,
+  MsgOnlineCount,
+  MsgPlayerList,
+  MsgInvitePlayer,
+  MsgInviteNotify,
+  MsgInviteResponse,
+  MsgInviteResult,
+  MsgFriendlyRoom,
+  MsgFriendlySelectDeck,
+  MsgFriendlyReady,
+  MsgFriendlyLeave,
+  MsgFriendlyLeft,
+  MsgSpectateRoom,
 } from "@/types/net";
 import { useNetStore } from "@/store/netStore";
 import { showMessage } from "@/components/ui/MessageBox";
@@ -59,6 +72,9 @@ export function registerHomeProtocols() {
       case "MsgEnterMatch":
         handleEnterMatch(msg as MsgEnterMatch);
         break;
+      case "MsgEnterBotMatch":
+        handleEnterBotMatch(msg as MsgEnterBotMatch);
+        break;
       case "MsgCancelMatch":
         handleCancelMatch(msg as MsgCancelMatch);
         break;
@@ -80,7 +96,36 @@ export function registerHomeProtocols() {
       case "MsgChatMsg":
         handleChatMsg(msg as MsgChatMsg);
         break;
+      case "MsgOnlineCount":
+        handleOnlineCount(msg as MsgOnlineCount);
+        break;
+      case "MsgPlayerList":
+        handlePlayerList(msg as MsgPlayerList);
+        break;
+      case "MsgInvitePlayer":
+        handleInvitePlayer(msg as MsgInvitePlayer);
+        break;
+      case "MsgInviteNotify":
+        handleInviteNotify(msg as MsgInviteNotify);
+        break;
+      case "MsgInviteResult":
+        handleInviteResult(msg as MsgInviteResult);
+        break;
+      case "MsgFriendlyRoom":
+        handleFriendlyRoom(msg as MsgFriendlyRoom);
+        break;
+      case "MsgFriendlyLeft":
+        handleFriendlyLeft(msg as MsgFriendlyLeft);
+        break;
     }
+  });
+
+  // 握手成功后（首连/重连/整页刷新）若本地存有账号则自动登录。
+  // 后端 OnLogin 会自动 TryReclaim：找回进行中的对局并回发完整快照，从而恢复棋盘。
+  eventBus.on("connectSucc", () => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("grandumi_account");
+    if (saved) HomeRequest.login(saved);
   });
 }
 
@@ -116,6 +161,10 @@ function handleLogin(msg: MsgLogin) {
     const displayName = saved || msg.name || account;
     store.setLoggedIn(true, displayName, account);
     store.setError(null);
+    // 持久化账号，供刷新/重连后自动登录恢复登录态与进行中的对局
+    if (typeof window !== "undefined" && account) {
+      localStorage.setItem("grandumi_account", account);
+    }
     if (msg.logStr) showMessage(msg.logStr, "info");
   } else {
     store.setError(msg.logStr ?? "账号或密码错误");
@@ -145,10 +194,19 @@ function handleUpdatePs(msg: MsgUpdatePs) {
  */
 function handleEnterMatch(msg: MsgEnterMatch) {
   if (msg.result === false) {
-    showMessage("加入匹配失败", "error");
+    showMessage(msg.logStr ?? "加入匹配失败", "error");
     return;
   }
   useNetStore.getState().setMatchState("matching");
+}
+
+/**
+ * MsgEnterBotMatch — 单人测试开局回包（失败提示；成功后由 MsgMatchFound/MsgGameStart 进入对战）
+ */
+function handleEnterBotMatch(msg: MsgEnterBotMatch) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "单人测试开局失败", "error");
+  }
 }
 
 /**
@@ -207,7 +265,8 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
 function handleGameStart(msg: MsgGameStart) {
   const { useGameStore } = require("@/store/gameStore");
   const gameStore = useGameStore.getState();
-  gameStore.setIsStart(msg.IsFirst ?? false);
+  // 先手信息由服务端 MsgGameState 的 firstPlayer 决定，这里仅切换为对战模式；
+  // IsFirst 另存入 sessionStorage 供 /game 页初始化使用
   gameStore.setMode("Player");
 
   if (typeof window !== "undefined") {
@@ -234,15 +293,67 @@ function handleChatMsg(msg: MsgChatMsg) {
   });
 }
 
+/**
+ * MsgOnlineCount — 在线人数广播
+ * 服务器在有人登录/断开时推送，更新角落徽标
+ */
+function handleOnlineCount(msg: MsgOnlineCount) {
+  useNetStore.getState().setOnlineCount(msg.count ?? 0);
+}
+
+/** MsgPlayerList — 在线玩家列表返回 */
+function handlePlayerList(msg: MsgPlayerList) {
+  useNetStore.getState().setPlayerList(msg.players ?? []);
+}
+
+/** MsgInvitePlayer — 发起邀请的回执（给发起方） */
+function handleInvitePlayer(msg: MsgInvitePlayer) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "邀请失败", "error");
+    return;
+  }
+  showMessage(`已向 ${msg.toName ?? "对方"} 发送对战邀请，等待回应…`, "info");
+}
+
+/** MsgInviteNotify — 收到对战邀请（给被邀请方） */
+function handleInviteNotify(msg: MsgInviteNotify) {
+  useNetStore.getState().setIncomingInvite({ inviteId: msg.inviteId, fromName: msg.fromName });
+}
+
+/** MsgInviteResult — 邀请被拒/失效（接受成功走 MsgFriendlyRoom 进房间，不会到这里） */
+function handleInviteResult(msg: MsgInviteResult) {
+  if (!msg.accepted) {
+    const text = msg.byName ? `${msg.byName} 拒绝了你的对战邀请` : (msg.logStr ?? "邀请未成功");
+    showMessage(text, "info");
+  }
+}
+
+/** MsgFriendlyRoom — 友谊战房间状态更新（进房/选卡组/准备/对局结束回房均经此） */
+function handleFriendlyRoom(msg: MsgFriendlyRoom) {
+  useNetStore.getState().setFriendlyRoom({
+    roomId: msg.roomId,
+    players: msg.players,
+    scores: msg.scores,
+    state: msg.state,
+  });
+  if (msg.error) showMessage(msg.error, "error");
+}
+
+/** MsgFriendlyLeft — 房间已解散/自己已退出 */
+function handleFriendlyLeft(msg: MsgFriendlyLeft) {
+  useNetStore.getState().setFriendlyRoom(null);
+  if (msg.logStr) showMessage(msg.logStr, "info");
+}
+
 // ── 请求发送 ────────────────────────────────────────────────────────────
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
 export const HomeRequest = {
-  login(account: string, password: string) {
+  login(account: string) {
     NetManager.send({
       proto: "MsgLogin",
       account,
-      password,
+      password: "",
     } as MsgLogin);
   },
 
@@ -263,10 +374,21 @@ export const HomeRequest = {
   },
 
   enterMatch(deck: string) {
-    NetManager.send({
+    if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
+    return NetManager.send({
       proto: "MsgEnterMatch",
       deck,
     } as MsgEnterMatch);
+  },
+
+  enterBotMatch(deck: string, goFirst: boolean = true) {
+    // 单人测试：标记本局为机器人对战，对战页据此显示 GM 按钮
+    if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "1");
+    return NetManager.send({
+      proto: "MsgEnterBotMatch",
+      deck,
+      goFirst,
+    } as MsgEnterBotMatch);
   },
 
   cancelMatch() {
@@ -276,6 +398,7 @@ export const HomeRequest = {
   },
 
   createRoom(deck: string) {
+    if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     return NetManager.send({
       proto: "MsgCreateRoom",
       deck,
@@ -283,6 +406,7 @@ export const HomeRequest = {
   },
 
   joinRoom(roomCode: string, deck: string) {
+    if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     NetManager.send({
       proto: "MsgJoinRoom",
       roomCode,
@@ -303,5 +427,36 @@ export const HomeRequest = {
       Name: playerName,
       Msg: content,
     } as MsgChatMsg);
+  },
+
+  requestPlayerList() {
+    return NetManager.send({ proto: "MsgPlayerList" } as MsgPlayerList);
+  },
+
+  invitePlayer(toAccount: string) {
+    return NetManager.send({ proto: "MsgInvitePlayer", toAccount } as MsgInvitePlayer);
+  },
+
+  respondInvite(inviteId: string, accept: boolean) {
+    if (accept && typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
+    return NetManager.send({ proto: "MsgInviteResponse", inviteId, accept } as MsgInviteResponse);
+  },
+
+  friendlySelectDeck(deck: string, deckName: string) {
+    if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
+    return NetManager.send({ proto: "MsgFriendlySelectDeck", deck, deckName } as MsgFriendlySelectDeck);
+  },
+
+  friendlyReady(ready: boolean) {
+    return NetManager.send({ proto: "MsgFriendlyReady", ready } as MsgFriendlyReady);
+  },
+
+  friendlyLeave() {
+    return NetManager.send({ proto: "MsgFriendlyLeave" } as MsgFriendlyLeave);
+  },
+
+  /** 申请观战指定房间（观战者由后端注册，随后每帧收到脱敏快照） */
+  spectateRoom(roomId: string) {
+    return NetManager.send({ proto: "MsgSpectateRoom", roomId } as MsgSpectateRoom);
   },
 };

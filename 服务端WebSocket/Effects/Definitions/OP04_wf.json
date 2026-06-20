@@ -1,0 +1,1212 @@
+{
+  "OP04-001": {
+    "_name": "奈菲特·薇薇",
+    "_matcher": "实现【启动主要】每回合1次咚-2:抽1张并给我方最多1张角色速攻；领袖『无法攻击』静态限制无法用DSL表达,已忽略",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "donReturn": 2
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "GiveKeyword",
+          "target": "$tgt",
+          "keyword": "速攻",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP04-002": {
+    "_name": "伊格拉姆",
+    "_matcher": "实现确认顶5公开1张阿拉巴斯坦王国加手牌(横置自身);'我方活跃领袖力量-5000'这一非标准可选成本无法用cost键表达,已忽略成本部分",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "keyword": "阿拉巴斯坦王国",
+            "excludeName": "伊格拉姆"
+          }
+        }
+      ]
+    }
+  },
+  "OP04-003": {
+    "_name": "撒谎布",
+    "_matcher": "【KO时】KO对方最多1张原本力量≤5000的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 5000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-008": {
+    "_name": "恰卡",
+    "_matcher": "【咚×1】【攻击时】领袖为奈菲特·薇薇时对方1张-3000,之后KO对方1张力量≤0角色(咚×1以donAttachedGte:1表达)",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "leaderNameEquals": "奈菲特·薇薇",
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$a"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$a",
+            "delta": -3000
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$b",
+            "filter": {
+              "originalPowerLte": 0
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$b"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-010": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "【登场时】从手牌登场最多1张力量≤3000且具有动物特征的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "originalPowerLte": 3000,
+              "keyword": "动物"
+            },
+            "rest": false,
+            "text": "从手牌登场最多1张力量≤3000且具有动物特征的角色"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-015": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "登场时对方最多1张角色本回合力量-2000",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-016": {
+    "_name": "反礼仪踢技套餐",
+    "_matcher": "反击我方最多1张领袖或角色本次战斗+3000(成本弃1手牌经 counter 的 cost 表达)；触发对方最多1张领袖或角色本回合-3000",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 3000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": -3000
+      }
+    ]
+  },
+  "OP04-018": {
+    "_name": "魅惑 梅玛依舞",
+    "_matcher": "主要(领袖含阿拉巴斯坦王国)对方最多2张角色各-2000，用两次 Choose 表达；触发发动同主要效果",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderHasKeyword": "阿拉巴斯坦王国"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t1"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t1",
+          "delta": -2000
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t2"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t2",
+          "delta": -2000
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t1"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t1",
+        "delta": -2000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t2"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t2",
+        "delta": -2000
+      }
+    ]
+  },
+  "OP04-019": {
+    "_name": "堂吉诃德·多弗拉门戈",
+    "_matcher": "我方的回合结束时将我方最多2张咚转为活跃",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-022": {
+    "_name": "艾里克",
+    "_matcher": "启动主要横置自身,将对方1张费用≤1角色横置。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe1",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP04-027": {
+    "_name": "达迪·马斯达森",
+    "_matcher": "【咚!!×1】(自身贴咚≥1)时,我方回合结束将自身转为活跃。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-029": {
+    "_name": "德林杰",
+    "_matcher": "我方回合结束时将我方最多1张咚!!转为活跃。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-035": {
+    "_name": "蜘蛛网之墙",
+    "_matcher": "反击：选1张我方领袖或角色本次战斗+4000，再活跃1张我方角色；触发：我方领袖本回合+2000。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 4000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OwnCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$c"
+      },
+      {
+        "op": "Activate",
+        "target": "$c"
+      }
+    ],
+    "trigger": [
+      {
+        "op": "AddPowerThisTurn",
+        "target": "selfLeader",
+        "delta": 2000
+      }
+    ]
+  },
+  "OP04-036": {
+    "_name": "堂吉诃德家族",
+    "_matcher": "反击与触发均为：看卡组顶5张、公开1张《堂吉诃德海盗团》特征加手牌、其余放回卡组底。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "LookTopReveal",
+        "count": 5,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "keyword": "堂吉诃德海盗团",
+          "excludeName": "堂吉诃德家族"
+        }
+      }
+    ],
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 5,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "keyword": "堂吉诃德海盗团",
+          "excludeName": "堂吉诃德家族"
+        }
+      }
+    ]
+  },
+  "OP04-038": {
+    "_name": "弱小之辈连自己怎么死都无法选择!!!",
+    "_matcher": "主要/反击：休息对方1张领袖或角色，之后KO对方1张休息且费用≤6角色；触发：活跃我方最多5张咚。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$r"
+        },
+        {
+          "op": "Rest",
+          "target": "$r"
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentRestingCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$k",
+          "filter": {
+            "originalCostLte": 6
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$k"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$r"
+      },
+      {
+        "op": "Rest",
+        "target": "$r"
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentRestingCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$k",
+        "filter": {
+          "originalCostLte": 6
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$k"
+      }
+    ],
+    "trigger": [
+      {
+        "op": "ActiveOwnDon",
+        "n": 5
+      }
+    ]
+  },
+  "OP04-039": {
+    "_name": "莉贝卡",
+    "_matcher": "启动主要每回合1次：手牌≤6时看卡组顶2张、公开1张《德莱斯罗兹》特征加手牌、其余进废弃；忽略可变的「休息指定数量咚」成本，「此领袖无法攻击」静态限制未实现（需脚本）。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "if": {
+        "selfHandCountLte": 6
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 2,
+          "max": 1,
+          "restTo": "trash",
+          "match": {
+            "keyword": "德莱斯罗兹",
+            "excludeName": "莉贝卡"
+          }
+        }
+      ]
+    }
+  },
+  "OP04-041": {
+    "_name": "阿碧丝",
+    "_matcher": "登场时检索卡组顶5张公开1张东海特征加手牌；可选成本(弃2手牌)无法在triggers表达，按惯例只实现收益部分",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "东海",
+              "excludeName": "阿碧丝"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-044": {
+    "_name": "盖德",
+    "_matcher": "登场时选费用≤8和费用≤3角色各≤1张退回手牌",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe8",
+            "max": 1,
+            "as": "$t1"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$t1"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$t2"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$t2"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-045": {
+    "_name": "烬",
+    "_matcher": "登场时抽1张",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-046": {
+    "_name": "昆因",
+    "_matcher": "领袖含百兽海盗团时检索7张公开≤2张瘟疫弹或冰鬼加手牌",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "百兽海盗团"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 7,
+            "max": 2,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "瘟疫弹"
+                },
+                {
+                  "nameEquals": "冰鬼"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-049": {
+    "_name": "杰克",
+    "_matcher": "KO时抽1张",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-050": {
+    "_name": "衣架先生",
+    "_matcher": "启动主要弃1手牌并横置自身后抽1张",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "handDiscard": 1,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP04-051": {
+    "_name": "福兹·弗",
+    "_matcher": "登场时确认顶5张公开1张百兽海盗团特征(排除自身)加手牌、其余放回底，标准检索",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "百兽海盗团",
+              "excludeName": "福兹·弗"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-052": {
+    "_name": "黑色玛利亚",
+    "_matcher": "启动主要 咚-2并横置自身后抽1；trigger(此卡登场)无对应op已忽略，仅实现主要",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "donReturn": 2,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP04-056": {
+    "_name": "橡皮橡皮业火手枪",
+    "_matcher": "主要将≤1张角色放回卡组底；触发将≤1张费用≤4角色放回卡组底",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "ReturnToDeckBottom",
+          "target": "$tgt",
+          "from": "field"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalCostLte": 4
+        }
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$tgt",
+        "from": "field"
+      }
+    ]
+  },
+  "OP04-057": {
+    "_name": "龙卷坏风",
+    "_matcher": "反击本次战斗≤1领袖或角色+4000，之后≤1张费用≤1角色放回卡组底；触发≤1张费用≤6角色退回手牌",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 4000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalCostLte": 1
+        }
+      },
+      {
+        "op": "ReturnToDeckBottom",
+        "target": "$tgt",
+        "from": "field"
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$b",
+        "filter": {
+          "originalCostLte": 6
+        }
+      },
+      {
+        "op": "BounceToHand",
+        "target": "$b"
+      }
+    ]
+  },
+  "OP04-061": {
+    "_name": "汤姆",
+    "_matcher": "启动主要自身进废弃为成本，领袖含七水之城时从咚卡组补1张休息咚。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "if": {
+        "leaderHasKeyword": "七水之城"
+      },
+      "then": [
+        {
+          "op": "RefreshDon",
+          "n": 1,
+          "state": "rest"
+        }
+      ]
+    }
+  },
+  "OP04-066": {
+    "_name": "Ms.情人节(美琪塔)",
+    "_matcher": "登场时确认卡组顶5张、公开1张含巴洛克工作室特征加手牌，其余放回卡组底。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "巴洛克工作室",
+              "excludeName": "Ms.情人节(美琪塔)"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-074": {
+    "_name": "色彩陷阱",
+    "_matcher": "【反击】我方1张领袖或角色本次战斗+1000,之后横置对方1张费用≤4角色;【触发】补1张活跃咚(咚成本因counter为裸op数组无成本槽略去)。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 1000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "Rest",
+        "target": "$tgt"
+      }
+    ],
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP04-075": {
+    "_name": "鼻空想连环炮",
+    "_matcher": "【反击】我方1张领袖或角色本次战斗+6000;【触发】补1张活跃咚。后半『生命≤2则补1休息咚』因counter裸数组无法附条件分支,仅实现+6000主体。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 6000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP04-076": {
+    "_name": "无能…也是一种罪过…",
+    "_matcher": "【反击】我方1张领袖或角色本回合+1000;【触发】补1张活跃咚(咚成本因counter裸数组无成本槽略去)。",
+    "_src": "wf-dsl",
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 1000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP04-079": {
+    "_name": "欧隆布斯",
+    "_matcher": "【启动主要】【每回合1次】对方1张角色本回合费用-4,卡组顶2张废弃,之后KO我方1张德莱斯罗兹角色。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -4,
+          "duration": "ThisTurn"
+        },
+        {
+          "op": "MillTop",
+          "n": 2
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$own",
+          "filter": {
+            "keyword": "德莱斯罗兹"
+          }
+        },
+        {
+          "op": "KO",
+          "target": "$own"
+        }
+      ]
+    }
+  },
+  "OP04-082": {
+    "_name": "居鲁士",
+    "_matcher": "实现【登场时】领袖为莉贝卡时KO对方费用≤1角色并弃顶1张;开头的被KO时改横置领袖/斗牛竞技场防KO属特殊防KO机制无法表达,已忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "莉贝卡"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          },
+          {
+            "op": "MillTop",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-085": {
+    "_name": "司雷曼",
+    "_matcher": "【登场时】【攻击时】领袖含德莱斯罗兹特征时对方1张角色本回合费用-2并弃顶1张,两个触发节均实现",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "德莱斯罗兹"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$tgt",
+            "delta": -2,
+            "duration": "ThisTurn"
+          },
+          {
+            "op": "MillTop",
+            "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "leaderHasKeyword": "德莱斯罗兹"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$tgt",
+            "delta": -2,
+            "duration": "ThisTurn"
+          },
+          {
+            "op": "MillTop",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-091": {
+    "_name": "雷欧",
+    "_matcher": "【登场时】领袖含德莱斯罗兹时KO对方费用≤1角色并弃顶2张;触发节不支持cost,「可将领袖转休息」的可选成本按惯例忽略只实现收益",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "德莱斯罗兹"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          },
+          {
+            "op": "MillTop",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-092": {
+    "_name": "莉贝卡",
+    "_matcher": "登场时确认卡组顶3张、公开1张德莱斯罗兹(排除自身)加手牌、其余入废弃，LookTopReveal restTo trash 直接表达。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "keyword": "德莱斯罗兹",
+              "excludeName": "莉贝卡"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-097": {
+    "_name": "阿玉",
+    "_matcher": "登场时选对方1张费用≤3且含动物/SMILE特征的角色置入其生命顶，Choose+MoveCharToLife 表达。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "anyOf": [
+                {
+                  "keyword": "动物"
+                },
+                {
+                  "keyword": "SMILE"
+                }
+              ]
+            }
+          },
+          {
+            "op": "MoveCharToLife",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-101": {
+    "_name": "卡鲁梅尔",
+    "_matcher": "我方回合中的登场时抽1(OnEnterField+isMyTurn);触发自身登场后KO对方≤2费角色,登场由触发自动入场,故触发节仅实现KO部分。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "isMyTurn": true
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe2",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP04-103": {
+    "_name": "光月日和",
+    "_matcher": "登场时我方≤1张含《和之国》领袖或角色本回合力量+1000。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "as": "$t",
+            "filter": {
+              "keyword": "和之国"
+            }
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$t",
+            "delta": 1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP04-109": {
+    "_name": "户野康",
+    "_matcher": "启动主要，自身入废弃为成本，我方≤1张含《和之国》领袖或角色本回合力量+3000。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t",
+          "filter": {
+            "keyword": "和之国"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    }
+  },
+  "OP04-115": {
+    "_name": "枪·拟鬼",
+    "_matcher": "主要:支付生命入手成本,给1张和之国角色本回合双重攻击;触发:1张领袖或角色力量+1000(成本以 lifeToHand 近似,顶/底选择无法表达)。",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "lifeToHand": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "和之国"
+          },
+          "text": "选择1张和之国角色获得双重攻击"
+        },
+        {
+          "op": "GiveKeyword",
+          "target": "$tgt",
+          "keyword": "双重攻击",
+          "duration": "ThisTurn"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 1000
+      }
+    ]
+  }
+}

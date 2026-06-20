@@ -1,0 +1,997 @@
+{
+  "OP08-008": {
+    "_name": "",
+    "_matcher": "登场时对方1张角色力量-1000;启动主要(咚!!-1并生命顶1张入手为成本)本回合赋予自身速攻。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": {
+        "donReturn": 1,
+        "lifeToHand": true
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "GiveKeyword",
+          "target": "self",
+          "keyword": "速攻",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP08-010": {
+    "_name": "",
+    "_matcher": "启动主要(咚!!-1)每回合1次,本回合我方1张此角色以外的《动物》角色力量+1000。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "donReturn": 1
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "动物",
+            "excludeName": "郊游熊"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 1000
+        }
+      ]
+    }
+  },
+  "OP08-012": {
+    "_name": "",
+    "_matcher": "攻击时领袖含《铁桶王国》且本卡贴有≥2张咚时,KO对方1张力量≤4000角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "leaderHasKeyword": "铁桶王国",
+          "donAttachedGte": 2
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 4000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-015": {
+    "_name": "",
+    "_matcher": "登场时确认顶4张、公开1张铁桶王国特征或托尼托尼·乔巴加手牌(排除自身),其余放回卡组底",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "铁桶王国"
+                },
+                {
+                  "nameEquals": "托尼托尼·乔巴"
+                }
+              ],
+              "excludeName": "Dr.古蕾娃"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-016": {
+    "_name": "",
+    "_matcher": "启动主要横置自身,领袖为托尼托尼·乔巴时我方所有同名角色本回合力量+2000",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderNameEquals": "托尼托尼·乔巴"
+      },
+      "then": [
+        {
+          "op": "AddPowerAll",
+          "side": "own",
+          "delta": 2000,
+          "excludeLeader": true,
+          "filter": {
+            "nameEquals": "托尼托尼·乔巴"
+          }
+        }
+      ]
+    }
+  },
+  "OP08-017": {
+    "_name": "",
+    "_matcher": "触发时我方最多1张领袖或角色本回合力量+1000",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$t",
+        "delta": 1000
+      }
+    ]
+  },
+  "OP08-019": {
+    "_name": "",
+    "_matcher": "主要/反击对方1张角色-3000且我方1张角色+3000;触发KO对方1张力量≤5000角色",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$o"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$o",
+          "delta": -3000
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$m"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$m",
+          "delta": 3000
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "as": "$o"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$o",
+        "delta": -3000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OwnCharacter",
+        "max": 1,
+        "as": "$m"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$m",
+        "delta": 3000
+      }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "as": "$tgt",
+        "filter": {
+          "originalPowerLte": 5000
+        }
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP08-031": {
+    "_name": "",
+    "_matcher": "登场时活跃我方1张费用≤2且含纯毛族特征的角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacterCostLe2",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "keyword": "纯毛族"
+            }
+          },
+          {
+            "op": "Activate",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-032": {
+    "_name": "",
+    "_matcher": "启动主要：横置自身，领袖含纯毛族时活跃我方最多1张咚",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "纯毛族"
+      },
+      "then": [
+        {
+          "op": "ActiveOwnDon",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "OP08-034": {
+    "_name": "",
+    "_matcher": "登场时确认卡组顶5张，公开1张汪达以外的纯毛族卡加入手牌，其余放回卡组底",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "纯毛族",
+              "excludeName": "汪达"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-039": {
+    "_name": "",
+    "_matcher": "启动主要(横置自身)领袖含纯毛族时活跃1张咚；我方回合结束时活跃最多1张纯毛族角色。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderHasKeyword": "纯毛族"
+      },
+      "then": [
+        {
+          "op": "ActiveOwnDon",
+          "n": 1
+        }
+      ]
+    },
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$t",
+            "filter": {
+              "keyword": "纯毛族"
+            }
+          },
+          {
+            "op": "Activate",
+            "target": "$t"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-040": {
+    "_name": "",
+    "_matcher": "登场时领袖含白胡子海盗团时将对方最多1张费用≤4角色退回手牌(忽略可选公开2张手牌的成本)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "白胡子海盗团"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-042": {
+    "_name": "",
+    "_matcher": "咚!!×1攻击时将最多1张费用≤3角色退回手牌(donAttachedGte:1 表示被贴≥1咚)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-044": {
+    "_name": "",
+    "_matcher": "启动主要每回合1次本回合自身力量+2000(忽略可选公开2张白胡子手牌的成本)。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "AddPowerThisTurn",
+          "target": "self",
+          "delta": 2000
+        }
+      ]
+    }
+  },
+  "OP08-047": {
+    "_name": "乔兹",
+    "_matcher": "已由脚本 OP08_047_Jozu 接管(登场:可选成本我方1张角色回手→场上≤1张费用≤6角色回其持有者手牌);下方DSL占位脚本优先不执行",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "kind": "Character",
+              "originalCostLte": 6
+            }
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-053": {
+    "_name": "",
+    "_matcher": "事件【主要】领袖含白胡子时确认顶3张、公开1张白胡子或路飞加手牌、其余放回,用LookTopReveal+anyOf映射(放回顶/底用restTo:bottom近似)。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderHasKeyword": "白胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "anyOf": [
+              {
+                "keyword": "白胡子海盗团"
+              },
+              {
+                "nameEquals": "蒙奇·D·路飞"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "OP08-059": {
+    "_name": "",
+    "_matcher": "【启动主要】自身进废弃为成本,领袖含百兽海盗团且场上10咚时,用PlayCharFromHand按nameEquals『烬』+费≤7从手牌登场。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "if": {
+        "leaderHasKeyword": "百兽海盗团",
+        "selfDonTotalGte": 10
+      },
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": {
+            "nameEquals": "烬",
+            "originalCostLte": 7
+          },
+          "text": "将手牌中1张费用不高于7的“烬”登场"
+        }
+      ]
+    }
+  },
+  "OP08-060": {
+    "_name": "",
+    "_matcher": "登场时对方咚≥5则自身本回合获得速攻；咚-1为可选成本，触发节不支持cost故忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppDonTotalGte": 5
+        },
+        "then": [
+          {
+            "op": "GiveKeyword",
+            "target": "self",
+            "keyword": "速攻",
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-061": {
+    "_name": "",
+    "_matcher": "攻击时KO对方≤3费角色；咚-1为可选成本，触发节不支持cost故忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-063": {
+    "_name": "",
+    "_matcher": "登场时从咚卡组追加≤1张活跃咚；翻面生命牌为可选成本，触发节不支持cost故忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-064": {
+    "_name": "",
+    "_matcher": "启动主要每回合1次咚-1，从手牌登场≤1张'饼干士兵'",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "donReturn": 1
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": {
+            "nameEquals": "饼干士兵"
+          },
+          "text": "从手牌登场最多1张饼干士兵"
+        }
+      ]
+    }
+  },
+  "OP08-066": {
+    "_name": "",
+    "_matcher": "KO时从咚卡组追加≤1张休息咚；阻挡者为纯关键词另算",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-068": {
+    "_name": "",
+    "_matcher": "KO时从咚卡组追加≤1张休息咚",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-070": {
+    "_name": "",
+    "_matcher": "KO时从手牌登场≤1张费用≤5的'小鸡子爵'；咚-1为可选成本，触发节不支持cost故忽略；阻挡者为纯关键词另算",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "小鸡子爵",
+              "originalCostLte": 5
+            },
+            "text": "从手牌登场最多1张费用≤5的小鸡子爵"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-075": {
+    "_name": "",
+    "_matcher": "咚!!-1 横置对方1张费用≤2角色;“将所有生命翻至背面”属于未列出的生命翻面机制,已忽略该附加分句。",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe2",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP08-076": {
+    "_name": "",
+    "_matcher": "主要/触发均追加1张活跃咚;“对方存在力量≥6000角色再追加1张”条件无对应 if 键,已忽略该附加分句。",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "RefreshDon",
+          "n": 1,
+          "state": "active"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "active"
+      }
+    ]
+  },
+  "OP08-080": {
+    "_name": "",
+    "_matcher": "登场时确认顶5张公开≤1张《百兽海盗团》(排除昆因自身)入手,其余放回卡组底。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "百兽海盗团",
+              "excludeName": "昆因"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-082": {
+    "_name": "",
+    "_matcher": "横置1张活跃咚并横置自身,本回合对方1张角色费用-2。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restActiveDon": 1,
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -2,
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP08-084": {
+    "_name": "",
+    "_matcher": "启动主要：横置自身作为成本，抽1、弃1手牌，再 KO 对方最多1张费用≤3角色。常态费用+4 为静态修正未实现。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "DiscardOwnChosen",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe3",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP08-087": {
+    "_name": "",
+    "_matcher": "启动主要每回合1次：对方最多1张角色本回合费用-1。阻挡者为纯关键词，由系统处理。",
+    "_src": "wf-dsl",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": -1,
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP08-088": {
+    "_name": "",
+    "_matcher": "登场时：我方最多1张角色费用+1，持续到下个对方回合结束。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$tgt",
+            "delta": 1,
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-090": {
+    "_name": "",
+    "_matcher": "登场时：从废弃区登场最多1张费用≤2且含 SMILE 特征的角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "keyword": "SMILE",
+              "originalCostLte": 2
+            },
+            "rest": false,
+            "text": "将我方废弃区中最多1张费用≤2的《SMILE》角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-091": {
+    "_name": "",
+    "_matcher": "登场时：KO 对方1张费用≤3角色。可选成本\"弃1张手牌\"触发节无法表达，按惯例仅实现收益部分。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-092": {
+    "_name": "",
+    "_matcher": "登场时：从废弃区登场最多1张费用≤4、卡名为\"润媞\"的角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "nameEquals": "润媞",
+              "originalCostLte": 4
+            },
+            "rest": false,
+            "text": "将我方废弃区中最多1张费用≤4的“润媞”登场"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-095": {
+    "_name": "",
+    "_matcher": "废弃区≥10时我方1张角色+2000(持续到对方回合结束以本回合加成近似)。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "ownTrashCountGte": 10
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 2000
+        }
+      ]
+    }
+  },
+  "OP08-097": {
+    "_name": "",
+    "_matcher": "领袖含百兽海盗团时对方1角色费用-2,再KO费用0角色。",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderHasKeyword": "百兽海盗团"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$c"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$c",
+          "delta": -2,
+          "duration": "ThisTurn"
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe0",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP08-103": {
+    "_name": "",
+    "_matcher": "生命顶入手为成本,我方1张角色+1000(持续到对方回合结束以本回合加成近似)。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "lifeToHand": true
+      },
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 1000
+        }
+      ]
+    }
+  },
+  "OP08-106": {
+    "_name": "",
+    "_matcher": "登场时可弃1张带【触发】手牌作为成本:KO对方1张费用≤5角色;之后'手牌≤3抽1'因连接在可选成本结算后无法用条件准确表达故仅实现KO收益。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "hasTrigger": true
+          }
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP08-107": {
+    "_name": "",
+    "_matcher": "启动主要横置自身：我方最多1张指定名‘夏洛特·布玲’本回合力量+2000，用Choose的nameEquals限定。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "nameEquals": "夏洛特·布玲"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 2000
+        }
+      ]
+    }
+  }
+}

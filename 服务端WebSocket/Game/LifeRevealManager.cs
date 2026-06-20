@@ -24,17 +24,20 @@ public static class LifeRevealManager
         var s = engine.State;
         var p = s.Players[targetPlayerIdx];
 
-        // 判断本次攻击者是否带【流放】
+        // 判断本次攻击者是否带【流放】；并记录攻击者 id 供 OnDamageToLeader 派发
         bool exile = false;
+        string? attackerIdForTrigger = null;
         if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == targetPlayerIdx)
         {
+            attackerIdForTrigger = b.AttackerCardId.ToString();
             var atk = s.Players[b.AttackerPlayerIndex];
             var attacker = atk.Leader.Id == b.AttackerCardId ? atk.Leader
                 : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
-            if (attacker is not null && ActionValidator.HasKeyword(attacker, "流放"))
+            if (attacker is not null && ActionValidator.HasKeyword(s, attacker, "流放"))
                 exile = true;
         }
 
+        int dealt = 0;
         for (int i = 0; i < damage; i++)
         {
             if (p.LifeArea.Count == 0)
@@ -49,6 +52,7 @@ public static class LifeRevealManager
 
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
+            dealt++;
 
             if (exile)
             {
@@ -69,17 +73,43 @@ public static class LifeRevealManager
                     p.Trash.Add(top);
                     await EffectRuntime.Resolve(s, targetPlayerIdx, top,
                         EffectTrigger.OnLifeRevealTrigger, engine.Prompts);
+                    // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
+                    if (!s.IsGameOver)
+                        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, engine.Prompts,
+                            new Dictionary<string, object?> { ["owner"] = targetPlayerIdx });
                 }
                 else
                 {
-                    p.Hand.Add(top);
+                    AddRevealedLifeToHandOrDeck(p, top);
                 }
             }
             else
             {
-                p.Hand.Add(top);
+                AddRevealedLifeToHandOrDeck(p, top);
             }
+
+            // 生命牌离场 → 派发 watcher（OP05-098 生命变0 / OP08-105 对方生命离场 / OP12-099 等）
+            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, engine.Prompts,
+                new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = p.LifeArea.Count == 0 });
+            if (s.IsGameOver) return;
         }
+
+        // 给对方生命区造成了伤害 → 派发 OnDamageToLeader（攻击者卡可据此发动，如 OP03-040/041/043）
+        if (dealt > 0 && attackerIdForTrigger is not null && !s.IsGameOver)
+            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, engine.Prompts,
+                new Dictionary<string, object?> { ["attackerId"] = attackerIdForTrigger, ["defenderOwner"] = targetPlayerIdx });
+    }
+
+    /// <summary>将受到伤害而揭开的生命牌加入手牌；ST13-003 规则替换：领袖为 ST13-003 时，正面朝上的生命牌改为放回卡组最下方。</summary>
+    private static void AddRevealedLifeToHandOrDeck(PlayerState p, CardInstance top)
+    {
+        if (top.IsLifeFaceUp && p.Leader.Info.Number == "ST13-003")
+        {
+            top.IsLifeFaceUp = false;
+            p.Deck.Add(top); // 卡组最下方
+            return;
+        }
+        p.Hand.Add(top);
     }
 }
 

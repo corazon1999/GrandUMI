@@ -1,18 +1,39 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { CardData } from "@/types/card";
 import { clsx } from "clsx";
+import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardHoverPreview";
+import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 
 interface Props {
   card: CardData | null;
   isSelected?: boolean;
   isTapped?: boolean;
   powerBuff?: number;
+  /** 费用修正（含持续光环，如 OP16-080 对方回合 +1）；正=升高(红) 负=降低(绿) */
+  costBuff?: number;
   attachedDonCount?: number;
   faceDown?: boolean;
+  /** 隐藏反击值徽标（卡牌在场上时反击值无意义，仅手牌防御时显示） */
+  hideCounter?: boolean;
+  /** 隐藏力量值（手牌中的角色不显示力量） */
+  hidePower?: boolean;
+  /** 隐藏费用值（领袖无费用） */
+  hideCost?: boolean;
+  /**
+   * 选中时是否"浮起"（上移+较大放大）。默认 true（手牌等区域）。
+   * 场上角色区容器为支持横向滚动用了 overflow 裁切，上移会被切顶，故传 false：
+   * 仅靠黄框+抬层+轻放大标识选中，不向上溢出。
+   */
+  liftOnSelect?: boolean;
+  /** 是否显示阻挡者「能量护盾」特效（仅场上角色区传 true，手牌/预览等不传） */
+  showBlockerFx?: boolean;
+  /** 攻击状态标识（仅我方场上角色/领袖在我方回合传）：can=可攻击 sick=本回合登场不可攻击 none=不显示 */
+  attackState?: "can" | "sick" | "none";
   onClick?: () => void;
   size?: "sm" | "md" | "lg";
 }
@@ -23,20 +44,74 @@ const sizes = {
   lg: "w-[8rem] h-[11.2rem]",
 };
 
+const HOVER_DELAY = 180; // 悬停多少毫秒后显示详情（避免快速划过时闪烁）
+
 export default function CardItem({
   card,
   isSelected = false,
   isTapped = false,
   powerBuff = 0,
+  costBuff = 0,
   attachedDonCount = 0,
   faceDown = false,
+  hideCounter = false,
+  hidePower = false,
+  hideCost = false,
+  liftOnSelect = true,
+  showBlockerFx = false,
+  attackState = "none",
   onClick,
   size = "md",
 }: Props) {
   const showFaceDown = faceDown || !card;
+  // 阻挡者：仅场上角色（showBlockerFx）且正面、能力含「阻挡者」时显示能量护盾特效
+  const isBlocker = showBlockerFx && !showFaceDown && !!card?.abilities?.includes("阻挡者");
   const donPower = attachedDonCount * 1000;
   const displayPower = (card?.power ?? 0) + powerBuff + donPower;
+  const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);
   const [imgSrc, setImgSrc] = useState(card?.sprite ?? "/sprites/CardBack.png");
+
+  // 卡牌/异画变化时重新同步图源并重试加载（修复曾因服务器暂时不可用 onError 回退到
+  // 卡背后、即使图恢复也一直卡在卡背的问题）
+  useEffect(() => {
+    setImgSrc(card?.sprite ?? "/sprites/CardBack.png");
+  }, [card?.sprite]);
+
+  // 悬停详情预览（仅正面且有卡牌数据时显示，避免泄露对手暗置手牌）
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 右键大图详情（同样仅正面有卡牌时可开，避免泄露对手暗置牌）
+  const [zoomOpen, setZoomOpen] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    };
+  }, []);
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (showFaceDown || !card) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(
+      () => setHoverInfo({ card, rect, currentSprite: imgSrc }),
+      HOVER_DELAY,
+    );
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoverInfo(null);
+  };
+
+  // 右键 → 居中大图详情；屏蔽浏览器原生菜单，背面/无卡数据不弹（防泄露暗置牌）
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (showFaceDown || !card) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoverInfo(null);
+    setZoomOpen(true);
+  };
 
   return (
     <motion.div
@@ -45,16 +120,19 @@ export default function CardItem({
         "relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl shadow-black/35",
         "transform-gpu backface-hidden transition-colors",
         isSelected
-          ? "border-yellow-300 shadow-yellow-300/40"
+          ? "z-30 border-yellow-300 shadow-yellow-300/40"
           : "border-slate-500/70 hover:border-slate-200",
       )}
       animate={{
         rotate: isTapped ? 90 : 0,
-        y: isSelected ? -12 : 0,
-        scale: isSelected ? 1.05 : 1,
+        y: isSelected && liftOnSelect ? -12 : 0,
+        scale: isSelected ? (liftOnSelect ? 1.05 : 1.03) : 1,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       onClick={onClick}
+      onContextMenu={handleContextMenu}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       whileHover={!isSelected ? { scale: 1.03 } : {}}
     >
       {showFaceDown ? (
@@ -68,38 +146,131 @@ export default function CardItem({
             alt={card!.name}
             fill
             sizes="180px"
-            className="object-cover"
+            className={clsx(
+              "object-cover transition-[filter] duration-300",
+              isTapped && "grayscale brightness-[0.6]",
+            )}
             draggable={false}
-            onError={() => setImgSrc("/sprites/CardBack.png")}
+            onError={() =>
+              setImgSrc((cur) =>
+                card?.image && cur !== card.image ? card.image : "/sprites/CardBack.png",
+              )
+            }
           />
-          <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-1.5 pb-1 pt-6 text-xs font-bold">
-            <span className="rounded bg-black/85 px-1.5 text-[11px] text-white ring-1 ring-white/15">
-              {card!.cost}
+          {/* 费用 → 左上角（与卡面一致）；保留 costBuff 升降色。领袖无费用→隐藏 */}
+          {!hideCost && (
+            <span
+              className={clsx(
+                "absolute left-1 top-1 z-10 rounded bg-black/85 px-1.5 text-[11px] font-bold leading-tight ring-1 ring-white/15",
+                costBuff > 0
+                  ? "text-orange-300"
+                  : costBuff < 0
+                    ? "text-green-300"
+                    : "text-white",
+              )}
+            >
+              {displayCost}
             </span>
-            <div className="flex items-center gap-1">
-              {attachedDonCount > 0 && (
-                <span className="rounded bg-yellow-300 px-1 text-[10px] font-black leading-tight text-black">
-                  DONx{attachedDonCount}
-                </span>
+          )}
+
+          {/* 贴咚数量 → 右上角 */}
+          {attachedDonCount > 0 && (
+            <span className="absolute right-1 top-1 z-10 rounded bg-yellow-300 px-1 text-[10px] font-black leading-tight text-black ring-1 ring-black/10">
+              DONx{attachedDonCount}
+            </span>
+          )}
+
+          {/* 反击值 → 底部右侧（避开左下角阻挡者盾牌）；仅手牌防御时显示 */}
+          {card!.counter > 0 && !hideCounter && (
+            <span className="absolute bottom-1 right-1 z-10 rounded bg-amber-500/90 px-1 text-[10px] font-black leading-tight text-black shadow ring-1 ring-black/20">
+              反{card!.counter}
+            </span>
+          )}
+
+          {/* 力量 → 底部居中；手牌中的角色不显示力量。
+              按卡类型判断而非 power>0：基础0力量角色(如OP16-034路飞)、被效果改成负数力量的角色也须显示当前力量。 */}
+          {!hidePower && (card!.type === "Character" || card!.type === "Leader") && (
+            <span
+              className={clsx(
+                "absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded bg-black/85 px-1.5 text-[11px] font-bold leading-tight ring-1 ring-white/15",
+                powerBuff + attachedDonCount * 1000 > 0
+                  ? "text-green-300"
+                  : powerBuff < 0
+                    ? "text-red-300"
+                    : "text-white",
               )}
-              {card!.power > 0 && (
-                <span
-                  className={clsx(
-                    "rounded bg-black/85 px-1.5 text-[11px] ring-1 ring-white/15",
-                    powerBuff + attachedDonCount * 1000 > 0
-                      ? "text-green-300"
-                      : powerBuff < 0
-                        ? "text-red-300"
-                        : "text-white",
-                  )}
+            >
+              {displayPower.toLocaleString()}
+            </span>
+          )}
+
+          {/* 阻挡者「能量护盾」特效：常驻辉光 + 旋转流光边框 + 立体盾牌徽标 */}
+          {isBlocker && (
+            <>
+              {/* 打底常驻青光（呼吸） */}
+              <div className="blocker-glow pointer-events-none absolute inset-0 z-10 rounded-md" />
+              {/* 旋转流光边框（高光沿四边流动） */}
+              <div className="blocker-aura pointer-events-none absolute inset-0 z-20 rounded-md" />
+              {/* 名称栏旁的小盾牌徽标（贴卡面最底，不压插画） */}
+              <span
+                className="pointer-events-none absolute bottom-0.5 left-0.5 z-30 flex items-center justify-center rounded bg-gradient-to-br from-cyan-400/95 to-blue-700/95 p-[1.5px] shadow-[0_0_4px_rgba(34,211,238,0.8)] ring-1 ring-cyan-100/70"
+                title="阻挡者"
+              >
+                {/* 背后柔和径向光晕 */}
+                <span className="pointer-events-none absolute inset-0 -z-10 rounded bg-cyan-300/40 blur-[2px]" />
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-2.5 w-2.5 drop-shadow-[0_0_1px_rgba(255,255,255,0.9)]"
+                  fill="white"
+                  stroke="rgba(255,255,255,0.95)"
+                  strokeWidth="0.6"
+                  aria-hidden
                 >
-                  {displayPower.toLocaleString()}
-                </span>
-              )}
-            </div>
-          </div>
+                  <path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5l-8-3Z" />
+                  {/* 盾面顶部高光 */}
+                  <path
+                    d="M12 4 6 6.3v4.7c0 1.4.4 2.6 1 3.7C8.4 11.5 10 8 12 4Z"
+                    fill="rgba(255,255,255,0.45)"
+                    stroke="none"
+                  />
+                </svg>
+              </span>
+            </>
+          )}
+
+          {/* 攻击状态标识 → 左侧边中部（避开所有现有徽标），仅我方回合显示 */}
+          {attackState === "can" && (
+            <span
+              className="pointer-events-none absolute left-0 top-1/2 z-30 flex -translate-y-1/2 items-center rounded-r bg-gradient-to-r from-emerald-400 to-green-600 px-0.5 py-1 shadow-[0_0_6px_rgba(16,185,129,0.95)] ring-1 ring-emerald-100/70 animate-pulse"
+              title="可攻击"
+            >
+              <svg viewBox="0 0 24 24" className="h-3 w-3 text-white drop-shadow-[0_0_1px_rgba(0,0,0,0.6)]" fill="currentColor" aria-hidden>
+                <path d="M12 4l6 7h-4v7h-4v-7H6z" />
+              </svg>
+            </span>
+          )}
+          {attackState === "sick" && (
+            <span
+              className="pointer-events-none absolute left-0 top-1/2 z-30 flex -translate-y-1/2 items-center rounded-r bg-slate-800/85 px-1 py-0.5 ring-1 ring-slate-400/50"
+              title="本回合登场，不可攻击"
+            >
+              <span className="text-[8px] font-black leading-none tracking-tight text-sky-300/90">Zzz</span>
+            </span>
+          )}
         </>
       )}
+
+      {/* 悬停详情浮窗：portal 到 body，fixed 定位且不拦截鼠标，避免被牌桌 overflow 裁剪 */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {hoverInfo && <CardHoverPreview info={hoverInfo} />}
+            {zoomOpen && card && (
+              <CardZoomOverlay card={card} sprite={imgSrc} onClose={() => setZoomOpen(false)} />
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
     </motion.div>
   );
 }

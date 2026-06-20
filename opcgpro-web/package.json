@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/build-card-bundle.mjs",
     "dev": "next dev -H 0.0.0.0",
+    "prebuild": "node scripts/build-card-bundle.mjs",
     "build": "next build",
+    "build:cards": "node scripts/build-card-bundle.mjs",
+    "gen:card-thumbs": "node scripts/gen-card-thumbs.mjs",
     "start": "next start"
   },
   "dependencies": {

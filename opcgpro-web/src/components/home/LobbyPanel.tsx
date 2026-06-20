@@ -16,14 +16,27 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [roomMode, setRoomMode] = useState<"none" | "create" | "join">("none");
   const [joinInput, setJoinInput] = useState("");
   const [copied, setCopied] = useState(false);
+  const [botGoFirst, setBotGoFirst] = useState(true);
 
   const handleMatch = () => {
     if (!selectedDeck) return;
-    HomeRequest.enterMatch(selectedDeck.cards);
+    const sent = HomeRequest.enterMatch(selectedDeck.cards);
+    if (!sent) {
+      showMessage("服务器未连接，请稍后重试", "error");
+    }
   };
 
   const handleCancelMatch = () => {
     HomeRequest.cancelMatch();
+  };
+
+  // 单人测试：与机器人对战，方便测试单卡效果（机器人轮到自己会自动结束回合）
+  const handleBotMatch = () => {
+    if (!selectedDeck) return;
+    const sent = HomeRequest.enterBotMatch(selectedDeck.cards, botGoFirst);
+    if (!sent) {
+      showMessage("服务器未连接，请稍后重试", "error");
+    }
   };
 
   const handleCreateRoom = () => {
@@ -97,17 +110,47 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
         {/* 匹配按钮区 */}
         <div className="flex flex-col items-center gap-3">
           {matchState === "idle" && (
-            <button
-              onClick={handleMatch}
-              disabled={!selectedDeck}
-              className={`px-10 py-3 rounded-xl text-lg font-bold transition-all ${
-                selectedDeck
-                  ? "bg-orange-500 hover:bg-orange-400 text-white hover:scale-105 active:scale-95"
-                  : "bg-gray-800 text-gray-600 cursor-not-allowed"
-              }`}
-            >
-              开始匹配
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleMatch}
+                disabled={!selectedDeck}
+                className={`px-10 py-3 rounded-xl text-lg font-bold transition-all ${
+                  selectedDeck
+                    ? "bg-orange-500 hover:bg-orange-400 text-white hover:scale-105 active:scale-95"
+                    : "bg-gray-800 text-gray-600 cursor-not-allowed"
+                }`}
+              >
+                开始匹配
+              </button>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={handleBotMatch}
+                  disabled={!selectedDeck}
+                  title="与机器人对战，机器人轮到自己会自动结束回合，方便测试单卡效果"
+                  className={`px-8 py-3 rounded-xl text-lg font-bold transition-all ${
+                    selectedDeck
+                      ? "bg-sky-600 hover:bg-sky-500 text-white hover:scale-105 active:scale-95"
+                      : "bg-gray-800 text-gray-600 cursor-not-allowed"
+                  }`}
+                >
+                  单人测试
+                </button>
+                <div className="flex overflow-hidden rounded-lg border border-sky-700 text-sm font-bold">
+                  <button
+                    onClick={() => setBotGoFirst(true)}
+                    className={`px-4 py-1.5 transition-colors ${botGoFirst ? "bg-sky-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}
+                  >
+                    先手
+                  </button>
+                  <button
+                    onClick={() => setBotGoFirst(false)}
+                    className={`px-4 py-1.5 transition-colors ${!botGoFirst ? "bg-sky-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}
+                  >
+                    后手
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {matchState === "matching" && (

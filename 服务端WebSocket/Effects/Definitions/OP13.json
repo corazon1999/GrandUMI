@@ -1,0 +1,407 @@
+{
+  "OP13-005": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "AttachDon",
+            "target": "selfLeader",
+            "n": 1,
+            "from": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-012": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "阿拉巴斯坦王国"
+                },
+                {
+                  "keyword": "草帽一伙"
+                }
+              ],
+              "originalCostGte": 2
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-020": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -5000
+        }
+      ]
+    }
+  },
+  "OP13-032": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe8",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddRestriction",
+            "target": "$tgt",
+            "kind": "CannotBeBlocker",
+            "duration": "UntilNextOpponentEndPhase"
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-041": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-043": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownLifeCountLte": 3
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-056": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "leaderHasKeyword": "白胡子海盗团"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-063": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "donAttachedGteOwn": 1
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-065": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "罗杰海盗团",
+              "excludeName": "杰克斯"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-067": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "罗杰海盗团"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          },
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-072": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "罗杰海盗团",
+          "donAttachedGteOwn": 1
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-083": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "keyword": "五老星"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-086": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "keyword": "天龙人",
+              "excludeName": "夏尔利亚宫"
+            }
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-087": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-093": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-096": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "trash",
+          "match": {
+            "keyword": "天龙人",
+            "excludeName": "『五老星』参见伊姆大人!!!"
+          }
+        }
+      ]
+    }
+  },
+  "OP13-114": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-116": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 1,
+          "match": {
+            "kind": "Character",
+            "keyword": "超新星"
+          }
+        }
+      ]
+    }
+  },
+  "OP13-117": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe6",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP13-118": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderColorCountGte": 2
+        },
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 4
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-120": {
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": 2,
+          "duration": "UntilNextOpponentEndPhase"
+        },
+        {
+          "op": "AttachDon",
+          "target": "selfLeader",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  }
+}

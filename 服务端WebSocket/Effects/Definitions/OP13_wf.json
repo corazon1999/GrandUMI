@@ -1,0 +1,66 @@
+{
+  "OP13-014": {
+    "_name": "波特夹斯·D·露秀",
+    "_matcher": "生命【触发】：选我方1张名为艾斯的角色本回合力量+3000",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "nameEquals": "波特夹斯·D·艾斯"
+        }
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP13-080": {
+    "_name": "伊赞巴隆·V·纳斯寿郎圣",
+    "_matcher": "实现可表达的【攻击时】(废弃区≥10则对方1张角色-2000)；废弃区≥7的'不因对方效果离场/获得速攻'为持续静态机制，无法表达，已忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "ownTrashCountGte": 10
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "OP13-109": {
+    "_name": "杰丽·邦妮",
+    "_matcher": "实现生命【触发】：抽2张并自选弃1张；'因对方效果离场时翻生命牌改为不离场'为替代离场的特殊机制，判为复杂已忽略",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      },
+      {
+        "op": "DiscardOwnChosen",
+        "n": 1
+      }
+    ]
+  }
+}

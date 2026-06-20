@@ -1,0 +1,452 @@
+{
+  "OP12-006": {
+    "_name": "芍药",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "蒙奇·D·路飞"
+                },
+                {
+                  "color": "红",
+                  "kind": "Event"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-014": {
+    "_name": "波尔·汉库珂",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "蒙奇·D·路飞"
+                },
+                {
+                  "color": "红",
+                  "kind": "Event"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": {
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "选择1张领袖或角色赋予最多2张休息状态的咚"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 2,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP12-033": {
+    "_name": "希路麦波",
+    "triggers": [
+      {
+        "on": "OnBlockDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "text": "将对方最多1张费用不高于5的角色转为休息状态"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-034": {
+    "_name": "佩罗娜",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasProperty": "斩"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "property": "斩"
+                },
+                {
+                  "color": "绿",
+                  "kind": "Event"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-039": {
+    "_name": "路飞是要成为海盗王的男人!!",
+    "main": {
+      "if": {
+        "leaderNameEquals": "罗罗诺亚·佐罗"
+      },
+      "then": [
+        {
+          "op": "Activate",
+          "target": "selfLeader"
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "AddPowerThisTurn",
+        "target": "$tgt",
+        "delta": 1000
+      }
+    ]
+  },
+  "OP12-044": {
+    "_name": "萨卡斯基",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "海军"
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "cost": {
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP12-050": {
+    "_name": "哈古瓦尔·D·萨乌罗",
+    "triggers": []
+  },
+  "OP12-062": {
+    "_name": "温思默克·索拉",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "山智",
+          "selfDonNotMoreThanOpp": true
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          },
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-071": {
+    "_name": "夏洛特·布玲",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "山智"
+                },
+                {
+                  "kind": "Event"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-079": {
+    "_name": "路飞他可是……要当上『海盗王』的男人啊!!!",
+    "main": {
+      "if": {
+        "leaderNameEquals": "山智"
+      },
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "bottom"
+        }
+      ]
+    }
+  },
+  "OP12-084": {
+    "_name": "安普里奥·伊万科夫",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "革命军"
+        },
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 3
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-085": {
+    "_name": "乌鸦",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "leaderHasKeyword": "革命军",
+          "oppHandCountGte": 5
+        },
+        "then": [
+          {
+            "op": "OpponentDiscard",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-086": {
+    "_name": "克尔拉",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "革命军"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "anyOf": [
+                {
+                  "keyword": "革命军"
+                },
+                {
+                  "nameEquals": "妮古·罗宾"
+                }
+              ],
+              "excludeName": "克尔拉"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-097": {
+    "_name": "军队长集结",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 3,
+          "max": 1,
+          "restTo": "trash",
+          "match": {
+            "keyword": "革命军",
+            "excludeName": "军队长集结"
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 3,
+        "max": 1,
+        "restTo": "trash",
+        "match": {
+          "keyword": "革命军",
+          "excludeName": "军队长集结"
+        }
+      }
+    ]
+  },
+  "OP12-106": {
+    "_name": "特拉法尔加·罗",
+    "triggers": []
+  },
+  "OP12-107": {
+    "_name": "堂吉诃德·多弗拉门戈",
+    "_matcher": "对方回合KO时把卡组顶1张加入生命区顶",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "isMyTurn": false
+        },
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP12-116": {
+    "_name": "我会一直为你敲钟的!!等你回来!!!",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 2,
+          "restTo": "bottom",
+          "match": {
+            "anyOf": [
+              {
+                "keyword": "山迪亚战士",
+                "kind": "Character"
+              },
+              {
+                "nameEquals": "蒙布朗·诺兰度"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 1
+      }
+    ]
+  },
+  "OP12-051": {
+    "_name": "日奈",
+    "activated": {
+      "cost": {
+        "restSelf": true,
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe4",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "选择对方最多1张原本的费用不高于4的角色，本回合中无法发动【阻挡者】"
+        },
+        {
+          "op": "AddRestriction",
+          "target": "$tgt",
+          "kind": "CannotBeBlocker",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP12-104": {
+    "_name": "战桃丸",
+    "triggers": [],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "text": "将对方最多1张费用不高于4的角色KO"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  }
+}

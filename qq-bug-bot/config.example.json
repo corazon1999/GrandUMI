@@ -1,0 +1,10 @@
+{
+  "ws_url": "ws://127.0.0.1:3001",
+  "access_token": "",
+  "command_prefix": "#bug ",
+  "allowed_groups": [],
+  "create_issue": true,
+  "github_repo": "corazon1999/GrandUMI",
+  "reply_enabled": true,
+  "min_content_length": 2
+}

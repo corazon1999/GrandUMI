@@ -1,0 +1,193 @@
+{
+  "OP12-002": {
+    "_name": "爱德华·纽哥特",
+    "noEffect": true
+  },
+  "OP12-005": {
+    "_name": "西奇",
+    "noEffect": true
+  },
+  "OP12-010": {
+    "_name": "道格拉斯·巴雷特",
+    "noEffect": true
+  },
+  "OP12-011": {
+    "_name": "迪巴鲁",
+    "noEffect": true
+  },
+  "OP12-020": {
+    "_name": "罗罗诺亚·佐罗",
+    "complex": true
+  },
+  "OP12-021": {
+    "_name": "一本松",
+    "complex": true
+  },
+  "OP12-023": {
+    "_name": "河松",
+    "noEffect": true
+  },
+  "OP12-025": {
+    "_name": "锦卫门",
+    "noEffect": true
+  },
+  "OP12-032": {
+    "_name": "猫蝮蛇",
+    "noEffect": true
+  },
+  "OP12-035": {
+    "_name": "摩根",
+    "noEffect": true
+  },
+  "OP12-036": {
+    "_name": "罗罗诺亚·佐罗",
+    "complex": true
+  },
+  "OP12-040": {
+    "_name": "库赞",
+    "complex": true
+  },
+  "OP12-045": {
+    "_name": "强高",
+    "noEffect": true
+  },
+  "OP12-049": {
+    "_name": "巴奇",
+    "noEffect": true
+  },
+  "OP12-051": {
+    "_name": "日奈",
+    "activated": {
+      "cost": {
+        "restSelf": true,
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe4",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "选择对方最多1张原本的费用不高于4的角色，本回合中无法发动【阻挡者】"
+        },
+        {
+          "op": "AddRestriction",
+          "target": "$tgt",
+          "kind": "CannotBeBlocker",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP12-052": {
+    "_name": "赫波迪",
+    "noEffect": true
+  },
+  "OP12-053": {
+    "_name": "波尔萨利诺",
+    "complex": true
+  },
+  "OP12-055": {
+    "_name": "毛奇&卡巴奇",
+    "noEffect": true
+  },
+  "OP12-061": {
+    "_name": "堂吉诃德·罗西南德",
+    "complex": true
+  },
+  "OP12-064": {
+    "_name": "维尔高",
+    "noEffect": true
+  },
+  "OP12-067": {
+    "_name": "卡门",
+    "noEffect": true
+  },
+  "OP12-068": {
+    "_name": "阿金",
+    "noEffect": true
+  },
+  "OP12-072": {
+    "_name": "卓夫",
+    "complex": true
+  },
+  "OP12-076": {
+    "_name": "莫奈",
+    "noEffect": true
+  },
+  "OP12-081": {
+    "_name": "克尔拉",
+    "complex": true
+  },
+  "OP12-082": {
+    "_name": "一生",
+    "noEffect": true
+  },
+  "OP12-083": {
+    "_name": "闪电",
+    "noEffect": true
+  },
+  "OP12-088": {
+    "_name": "巴斯提尤",
+    "noEffect": true
+  },
+  "OP12-092": {
+    "_name": "米泽卡",
+    "noEffect": true
+  },
+  "OP12-099": {
+    "_name": "卡尔加拉",
+    "complex": true
+  },
+  "OP12-102": {
+    "_name": "白星",
+    "complex": true
+  },
+  "OP12-103": {
+    "_name": "世特",
+    "noEffect": true
+  },
+  "OP12-104": {
+    "_name": "战桃丸",
+    "triggers": [],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "text": "将对方最多1张费用不高于4的角色KO"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP12-109": {
+    "_name": "和平主义者",
+    "complex": true
+  },
+  "OP12-110": {
+    "_name": "巴法罗",
+    "noEffect": true
+  },
+  "OP12-111": {
+    "_name": "Baby 5",
+    "noEffect": true
+  },
+  "OP12-112": {
+    "_name": "Baby 5",
+    "complex": true
+  },
+  "OP12-114": {
+    "_name": "瓦帕",
+    "noEffect": true
+  },
+  "OP12-117": {
+    "_name": "破坏之弦",
+    "complex": true
+  }
+}

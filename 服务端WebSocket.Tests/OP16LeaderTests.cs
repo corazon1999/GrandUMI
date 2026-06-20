@@ -81,12 +81,11 @@ public class OP16LeaderTests
 
     // ──────────────────────────────────────────────────────────────
     // OP16-041 巴奇
-    // 当我方《因佩尔地狱》角色离场时（每回合 1 次）：
-    //   从手牌登场 1 张"因佩尔地狱的囚犯"
-    // 当前脚本通过 OnKO 触发（仅当本卡 KO 时跑，需引擎扩展全局监听才严格符合卡描述）
+    // 【咚!!×1】【每回合1次】当我方《因佩尔地狱》角色离场时：从手牌登场1张"因佩尔地狱的囚犯"。
+    // 重写后监听 OnAnyCharKOd（战斗/效果KO）+ OnCharLeaveField（非KO离场）；需领袖被赋予咚≥1。
     // ──────────────────────────────────────────────────────────────
     [Fact]
-    public async Task OP16_041_Buggy_OnKO_PlaysPrisonerFromHand()
+    public async Task OP16_041_Buggy_OnImpelDownLeave_PlaysPrisonerFromHand()
     {
         var s = TestScene.MaxScenario(myLeader: "OP16-041");
         // 手牌塞 1 张囚犯（清空原 max scenario 的手牌避免目标干扰）
@@ -94,17 +93,30 @@ public class OP16LeaderTests
         var prisoner = new CardInstance { Info = CardDatabase.Get("OP16-042")! };
         s.Players[0].Hand.Add(prisoner);
 
+        // 【咚!!×1】：给领袖赋 1 咚
+        var don0 = s.Players[0].CostArea[0];
+        don0.State = DonState.Attached;
+        don0.AttachedToCardId = s.Players[0].Leader.Id;
+
+        // 模拟一张我方《因佩尔地狱》角色离场（此刻在废弃区），用 OnAnyCharKOd 派发
+        var koChar = new CardInstance { Info = CardDatabase.Get("OP16-034")! }; // OP16-034 含《因佩尔地狱》
+        s.Players[0].Trash.Add(koChar);
+        var payload = new Dictionary<string, object?>
+        {
+            ["owner"] = 0,
+            ["cardId"] = koChar.Id.ToString(),
+        };
+
         int charsBefore = s.Players[0].Characters.Count;
         var mock = new MockPromptService()
             .QueueChoose(prisoner.Id.ToString());
 
-        await EffectRuntime.Resolve(s, 0, s.Players[0].Leader, EffectTrigger.OnKO, mock);
+        await EffectRuntime.Resolve(s, 0, s.Players[0].Leader, EffectTrigger.OnAnyCharKOd, mock, payload);
 
         // 主断言：囚犯登场，手牌移除
         Assert.Contains(prisoner, s.Players[0].Characters);
         Assert.DoesNotContain(prisoner, s.Players[0].Hand);
         Assert.Equal(charsBefore + 1, s.Players[0].Characters.Count);
-        // TODO 进阶：再次触发应被每回合 1 次锁阻止
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -139,8 +151,11 @@ public class OP16LeaderTests
 
         await EffectRuntime.Resolve(s, 0, s.Players[0].Leader, EffectTrigger.ActivatedMain, mock);
 
-        // 主断言：8 张活跃咚放回咚卡组，3 张大将登场
-        Assert.True(s.Players[0].DonDeck.Count >= donDeckBefore + 8);
+        // 主断言：3 张大将登场。
+        // 批次1修复（卡效登场的角色现在会触发各自【登场时】）后，被领袖效果登场的大将会发动登场时：
+        //   OP16-063 库赞 拉2咚(休息)、OP16-073 波尔萨利诺 拉2咚(1活跃+1休息) → 放回的 8 张被回拉 4 张，净 +4。
+        Assert.True(s.Players[0].DonDeck.Count >= donDeckBefore + 4,
+            $"DonDeck={s.Players[0].DonDeck.Count}, before={donDeckBefore}");
         Assert.Contains(kuzan, s.Players[0].Characters);
         Assert.Contains(saka,  s.Players[0].Characters);
         Assert.Contains(bors,  s.Players[0].Characters);

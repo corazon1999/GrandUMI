@@ -1,0 +1,13 @@
+{
+  "PRB01-001": {
+    "_name": "山智",
+    "_matcher": "启动主要每回合1次:我方最多1张费用≤8且无【登场时】效果的角色本回合获得速攻",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "as": "$t", "filter": { "originalCostLte": 8, "noEnterFieldEffect": true } },
+        { "op": "GiveKeyword", "target": "$t", "keyword": "速攻" }
+      ]
+    }
+  }
+}

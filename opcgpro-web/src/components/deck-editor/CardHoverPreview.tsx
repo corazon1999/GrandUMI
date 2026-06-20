@@ -32,11 +32,13 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function CardHoverPreview({ info }: { info: HoverInfo }) {
   const { card, rect, currentSprite } = info;
-  const [imgSrc, setImgSrc] = useState(currentSprite ?? card.sprite ?? "/sprites/CardBack.png");
+  const rawSprite = currentSprite ?? card.sprite ?? "/sprites/CardBack.png";
+  // 大图直接用原图(454px,约87KB)而非256px缩略图,避免高DPI屏放大发糊;悬停一次仅一张,负担可忽略
+  const [imgSrc, setImgSrc] = useState(rawSprite);
 
   useEffect(() => {
-    setImgSrc(currentSprite ?? card.sprite ?? "/sprites/CardBack.png");
-  }, [currentSprite, card.sprite]);
+    setImgSrc(rawSprite);
+  }, [rawSprite]);
 
   const spaceRight = window.innerWidth - rect.right;
   const showRight  = spaceRight >= PREVIEW_W + 16;
@@ -66,9 +68,9 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
           src={imgSrc}
           alt={card.name}
           fill
-          sizes="256px"
+          sizes="480px"
           className="object-cover"
-          onError={() => setImgSrc("/sprites/CardBack.png")}
+          onError={() => setImgSrc((prev) => (card.image && prev !== card.image) ? card.image : "/sprites/CardBack.png")}
         />
         {colorStyle && (
           <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${colorStyle.bg}`} />
@@ -124,12 +126,6 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
               </span>
             ))}
           </div>
-        )}
-
-        {card.effectText && (
-          <p className="text-gray-300 text-[10px] leading-relaxed border-t border-gray-800 pt-1.5">
-            {card.effectText}
-          </p>
         )}
       </div>
     </motion.div>

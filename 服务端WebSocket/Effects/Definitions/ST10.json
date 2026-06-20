@@ -1,0 +1,145 @@
+{
+  "ST10-001": {
+    "_name": "特拉法尔加·罗（领袖）",
+    "_note": "【启动主要】【每回合1次】咚-3：将对方最多1张力量≤3000 角色放回卡组底，手牌中最多1张费用≤4 角色登场。",
+    "activated": {
+      "oncePerTurn": true,
+      "cost": { "donReturn": 3 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 3000 }, "text": "将对方最多1张力量≤3000 角色放回卡组最下方" },
+        { "op": "ReturnToDeckBottom", "target": "$tgt", "from": "field" },
+        { "op": "PlayCharFromHand", "filter": { "originalCostLte": 4 }, "text": "手牌中最多1张费用≤4 角色登场" }
+      ]
+    }
+  },
+  "ST10-003": {
+    "_name": "尤斯塔斯·基德（领袖）",
+    "_note": "【攻击时】咚-1：本回合此领袖力量+2000（“生命≥4 时领袖-1000”持续部分由 C# 实现）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 2000 }
+        ]
+      }
+    ]
+  },
+  "ST10-005": {
+    "_name": "甚平",
+    "_note": "【咚×1】【攻击时】本回合对方最多1张角色力量-2000。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-2000" },
+          { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -2000 }
+        ]
+      }
+    ]
+  },
+  "ST10-008": {
+    "_name": "夏齐＆佩金",
+    "_note": "【登场时】我方咚≤3 时，从咚卡组追加最多2张休息状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "selfDonTotalLte": 3 },
+        "then": [
+          { "op": "RefreshDon", "n": 2, "state": "rest" }
+        ]
+      }
+    ]
+  },
+  "ST10-009": {
+    "_name": "江波尔",
+    "_note": "【登场时】①：从咚卡组追加最多1张活跃状态的咚。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "restActiveDon": 1 },
+        "then": [
+          { "op": "RefreshDon", "n": 1, "state": "active" }
+        ]
+      }
+    ]
+  },
+  "ST10-010": {
+    "_name": "特拉法尔加·罗（角色）",
+    "_note": "【阻挡者】+【登场时】咚-1：对方手牌≥7 时丢弃对方2张手牌。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "oppHandCountGte": 7 },
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "OpponentDiscard", "n": 2, "random": true }
+        ]
+      }
+    ]
+  },
+  "ST10-012": {
+    "_name": "贝宝",
+    "_note": "【登场时】/【攻击时】对方咚不少于我方时，从咚卡组追加最多1张休息咚（原文“多于”，含相等近似）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "selfDonNotMoreThanOpp": true },
+        "then": [ { "op": "RefreshDon", "n": 1, "state": "rest" } ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "if": { "selfDonNotMoreThanOpp": true },
+        "then": [ { "op": "RefreshDon", "n": 1, "state": "rest" } ]
+      }
+    ]
+  },
+  "ST10-013": {
+    "_name": "尤斯塔斯·基德（角色）",
+    "_note": "【登场时】/【攻击时】咚-1：直到下个我方回合开始，我方领袖力量+1000。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 1000 } ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "cost": { "donReturn": 1 },
+        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 1000 } ]
+      }
+    ]
+  },
+  "ST10-015": {
+    "_name": "橡皮橡皮巨人推掌",
+    "_note": "【触发（生命）】我方最多1张领袖或角色+2000，并 KO 对方最多1张力量≤2000 角色。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 2000 }, "text": "KO 对方最多1张力量≤2000 的角色" },
+      { "op": "KO", "target": "$tgt" }
+    ]
+  },
+  "ST10-016": {
+    "_name": "橡皮橡皮猿王枪乱打",
+    "_note": "【主要】KO 对方最多1张力量≤7000 角色。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 7000 }, "text": "KO 对方最多1张力量≤7000 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST10-017": {
+    "_name": "磁气虎钳",
+    "_note": "【主要】将对方最多1张费用≤2 角色转休息，并追加最多1张休息咚。",
+    "main": {
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 2 }, "text": "将对方最多1张费用≤2 角色转为休息状态" },
+        { "op": "Rest", "target": "$tgt" },
+        { "op": "RefreshDon", "n": 1, "state": "rest" }
+      ]
+    }
+  }
+}

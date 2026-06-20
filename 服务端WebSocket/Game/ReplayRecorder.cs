@@ -39,6 +39,26 @@ public static class ReplayRecorder
         }
     }
 
+    /// <summary>重启恢复后以追加模式重开已有录像（跨天会落到原文件；找不到则新建当天文件）。</summary>
+    public static string OpenAppend(string roomId)
+    {
+        lock (_lock)
+        {
+            var root = GetReplayDir();
+            string? existing = null;
+            if (Directory.Exists(root))
+            {
+                var hits = Directory.GetFiles(root, $"{roomId}.jsonl", SearchOption.AllDirectories);
+                if (hits.Length > 0) existing = hits[0];
+            }
+            var path = existing ?? Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{roomId}.jsonl");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var w = new StreamWriter(path, append: true) { AutoFlush = true };
+            _writers[roomId] = w;
+            return path;
+        }
+    }
+
     public static void Append(string roomId, object entry)
     {
         lock (_lock)

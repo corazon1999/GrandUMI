@@ -40,6 +40,32 @@ public static class MatchLogRecorder
         }
     }
 
+    /// <summary>重启恢复后以追加模式重开已有日志（跨天会落到原文件；找不到则新建当天文件）。seq 接着已有行数递增。</summary>
+    public static string OpenAppend(string matchId)
+    {
+        lock (LockObj)
+        {
+            var root = GetLogDir();
+            string? existing = null;
+            if (Directory.Exists(root))
+            {
+                var hits = Directory.GetFiles(root, $"{matchId}.jsonl", SearchOption.AllDirectories);
+                if (hits.Length > 0) existing = hits[0];
+            }
+            var path = existing ?? Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{matchId}.jsonl");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            long startSeq = 0;
+            if (existing is not null)
+            {
+                try { startSeq = File.ReadLines(existing).LongCount(); } catch { }
+            }
+            var writer = new StreamWriter(path, append: true) { AutoFlush = true };
+            Writers[matchId] = writer;
+            Sequences[matchId] = startSeq;
+            return path;
+        }
+    }
+
     public static void Append(string matchId, GameState state, string kind, int? actor, object? payload)
     {
         lock (LockObj)

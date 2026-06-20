@@ -13,7 +13,7 @@ public class OP16_022_Luffy : IScriptedEffect
     public Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        const string key = "OP16-022-MainOncePerTurn";
+        var key = "OP16-022-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
 
         // 条件：场上仅有《因佩尔地狱》角色

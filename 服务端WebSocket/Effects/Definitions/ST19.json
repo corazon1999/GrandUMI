@@ -1,0 +1,32 @@
+{
+  "ST19-001": {
+    "_name": "斯摩格",
+    "_note": "【登场时】弃1手牌（原文限海军黑色，近似）：直到下个对方回合结束，对方最多2张费用≤4 角色无法攻击。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "handDiscard": 1 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$a", "filter": { "originalCostLte": 4 }, "text": "选择对方费用≤4 角色使其无法攻击（1/2）" },
+          { "op": "AddRestriction", "target": "$a", "kind": "CannotAttack", "duration": "UntilNextOpponentEndPhase" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$b", "filter": { "originalCostLte": 4 }, "text": "选择对方费用≤4 角色使其无法攻击（2/2）" },
+          { "op": "AddRestriction", "target": "$b", "kind": "CannotAttack", "duration": "UntilNextOpponentEndPhase" }
+        ]
+      }
+    ]
+  },
+  "ST19-002": {
+    "_name": "战国",
+    "_note": "【登场时】弃2手牌（原文限海军黑色，近似）：领袖含《海军》时抽3张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "海军" },
+        "cost": { "handDiscard": 2 },
+        "then": [
+          { "op": "Draw", "n": 3 }
+        ]
+      }
+    ]
+  }
+}

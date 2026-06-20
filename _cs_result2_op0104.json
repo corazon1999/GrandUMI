@@ -1,0 +1,1076 @@
+[
+  {
+    "batch": "OP01-cs-0",
+    "results": [
+      {
+        "number": "OP01-037",
+        "status": "scripted",
+        "file": "OP01_037_Kawamatsu.cs",
+        "reason": "【触发】此卡牌登场：OnLifeRevealTrigger 时机，自身已被引擎放入废弃区，用 PlayFromTrashFree 从废弃区登场（同 OP01-009 凯罗特模式）。"
+      },
+      {
+        "number": "OP01-044",
+        "status": "scripted",
+        "file": "OP01_044_Shachi.cs",
+        "reason": "阻挡者为关键词由引擎处理；实现【登场时】：我方场上无名为'佩金'的角色时(Characters.Any+MatchesName 判定)，从手牌 PlayFromHandFree 登场最多1张'佩金'。"
+      },
+      {
+        "number": "OP01-050",
+        "status": "scripted",
+        "file": "OP01_050_Penguin.cs",
+        "reason": "对称于044：场上无'夏齐'时从手牌登场最多1张'夏齐'。条件用 MatchesName 判定，登场用 PlayFromHandFree。"
+      },
+      {
+        "number": "OP01-051",
+        "status": "scripted",
+        "file": "OP01_051_EustassKid.cs",
+        "reason": "实现【启动主要】【每回合1次】：可选横置自身(RestCard)后从手牌登场最多1张费用≤3角色，TurnOnceUsed 记一次性。持续攻击目标限制(对方回合此卡休息时禁攻本卡以外)无对应持续通道，未实现，按惯例只实现主动效果。"
+      },
+      {
+        "number": "OP01-061",
+        "status": "complex",
+        "file": "",
+        "reason": "领袖效果触发于'当对方角色被KO时'(含战斗KO)。引擎 Wave2 的 OnCharLeaveField 仅对效果上下文内的离场派发，普通战斗KO不派发，无监听对方角色被战斗KO的事件钩子，判 complex。"
+      },
+      {
+        "number": "OP01-062",
+        "status": "scripted",
+        "file": "OP01_062_Crocodile.cs",
+        "reason": "'当我方发动事件时'用 OnOppEventPlayed 钩子(对所有监听卡派发,owner=出牌方)，脚本判 owner==自己即我方发动事件；条件手牌≤4 且本回合未通过此领袖抽牌(TurnOnceUsed 标记)；可选 ConfirmOptional 抽1张。"
+      },
+      {
+        "number": "OP01-063",
+        "status": "scripted",
+        "file": "OP01_063_Arlong.cs",
+        "reason": "【启动主要】可选横置自身后由我方从对方手牌选1张(传 choiceCards)用 BroadcastReveal 公开；若为事件则将对方生命区顶最多1张放入对方卡组最下方。"
+      },
+      {
+        "number": "OP01-064",
+        "status": "scripted",
+        "file": "OP01_064_Abida.cs",
+        "reason": "【攻击时】可选成本弃我方1张手牌(DiscardHand)后，将对方最多1张费用≤3角色 BounceToHand 退回手牌。攻击时机+成本均可用脚本表达。"
+      },
+      {
+        "number": "OP01-067",
+        "status": "scripted",
+        "file": "OP01_067_Crocodile.cs",
+        "reason": "流放为关键词；'我方手牌中蓝色事件费用-1'用 Wave5 手牌打出费用减免：注册 ContinuousEffect.CostDelta=-1，Scope.Filter 选中我方手牌中水色事件，引擎打出时按 HandPlayCost 扣减。"
+      },
+      {
+        "number": "OP01-068",
+        "status": "scripted",
+        "file": "OP01_068_GekkoMoria.cs",
+        "reason": "条件持续关键词授予(Wave1)：注册 ContinuousEffect.GrantKeyword='双重攻击'，Predicate 限本卡自身、我方回合且我方手牌≥5 时成立。OnEnterField 注册。"
+      }
+    ]
+  },
+  {
+    "batch": "OP01-cs-10",
+    "results": [
+      {
+        "number": "OP01-069",
+        "status": "scripted",
+        "file": "OP01_069_Caesar.cs",
+        "reason": "【KO时】OnKO 触发：从卡组找名为《史姆丽》的角色 ChooseCards 选最多1张登场到场上(Deck.Remove→Characters.Add)，再切洗卡组。"
+      },
+      {
+        "number": "OP01-070",
+        "status": "scripted",
+        "file": "OP01_070_Mihawk.cs",
+        "reason": "【登场时】合并双方场上角色用 CurrentCostOf 判费用≤7 为候选，ChooseCards 选最多1张，按所属方 ReturnFieldToDeckBottom 放卡组底。"
+      },
+      {
+        "number": "OP01-071",
+        "status": "scripted",
+        "file": "OP01_071_Jinbe.cs",
+        "reason": "OnEnterField 实现费用≤3任意角色放卡组底；OnLifeRevealTrigger 实现【触发】此卡牌登场(从废弃区 PlayFromTrashFree)。"
+      },
+      {
+        "number": "OP01-072",
+        "status": "scripted",
+        "file": "OP01_072_Sumire.cs",
+        "reason": "【咚!!×1】【我方回合中】每张手牌+1000：按 OP06-085 惯例注册多条阈值(手牌≥1..≥20)各+1000 的 ContinuousEffect，条件含 AttachedDonCount≥1 与我方回合。"
+      },
+      {
+        "number": "OP01-073",
+        "status": "scripted",
+        "file": "OP01_073_Doflamingo.cs",
+        "reason": "关键词【阻挡者】由引擎处理；仅实现【登场时】确认顶5张自选顺序放顶/底，用 ChooseCards 排序+ChooseOption+ReorderTopK。"
+      },
+      {
+        "number": "OP01-077",
+        "status": "scripted",
+        "file": "OP01_077_Perona.cs",
+        "reason": "【登场时】确认顶5张自选顺序放顶/底，用 ChooseCards 排序+ChooseOption+ReorderTopK。"
+      },
+      {
+        "number": "OP01-082",
+        "status": "scripted",
+        "file": "OP01_082_Monet.cs",
+        "reason": "effectText 为空，仅【触发】此卡牌登场：OnLifeRevealTrigger 时从废弃区 PlayFromTrashFree 登场，复用 OP01-009 凯罗特惯例。"
+      },
+      {
+        "number": "OP01-083",
+        "status": "scripted",
+        "file": "OP01_083_Mr1.cs",
+        "reason": "【咚!!×1】【我方回合中】领袖含《巴洛克工作室》时废弃区每2张事件+1000：注册多条阈值(事件≥2..≥40)各+1000 的 ContinuousEffect，条件含 AttachedDonCount≥1、回合、领袖关键词。"
+      },
+      {
+        "number": "OP01-086",
+        "status": "scripted",
+        "file": "OP01_086_OverHeatWhip.cs",
+        "reason": "【反击】EventCounter +4000(AddPowerThisBattle)后退回活跃费用≤3任意角色(合并双方,!IsTapped,BounceToHand按所属方)；【触发】OnLifeRevealTrigger 退回费用≤4任意角色。"
+      },
+      {
+        "number": "OP01-088",
+        "status": "scripted",
+        "file": "OP01_088_DesertSpada.cs",
+        "reason": "【反击】EventCounter +2000 后确认顶3张自选顺序放顶/底(ReorderTopK)；【触发】OnLifeRevealTrigger 抽2弃1(Draw+ChooseCards+DiscardHand)。"
+      }
+    ]
+  },
+  {
+    "batch": "OP01-cs-20",
+    "results": [
+      {
+        "number": "OP01-089",
+        "status": "scripted",
+        "file": "OP01_089_CrescentDune.cs",
+        "reason": "EventCounter；领袖含《王下七武海》时，从双方费用≤5角色中选最多1张，按目标所属方下标 BounceToHand 退回手牌。"
+      },
+      {
+        "number": "OP01-091",
+        "status": "scripted",
+        "file": "OP01_091_Jin.cs",
+        "reason": "领航卡，OnGameStart 注册 ContinuousEffect：我方回合且费用区咚≥10 时对方全体角色 PowerDelta -1000。"
+      },
+      {
+        "number": "OP01-094",
+        "status": "scripted",
+        "file": "OP01_094_Kaido.cs",
+        "reason": "OnEnterField；领袖含《百兽海盗团》，ConfirmOptional 后 ReturnDonToDeck(6)，遍历双方角色排除自身逐张 KO（按所属方下标）。"
+      },
+      {
+        "number": "OP01-099",
+        "status": "scripted",
+        "file": "OP01_099_KurozumiSemimaru.cs",
+        "reason": "OnEnterField 注册 ContinuousEffect.KoGuard=\"battle\"，Predicate 选我方《黑炭家》且非\"黑炭蝉丸\"角色。"
+      },
+      {
+        "number": "OP01-104",
+        "status": "complex",
+        "file": "",
+        "reason": "【触发】此卡牌登场为引擎生命触发关键词机制（自身从生命登场），无可脚本化的主动效果体，缺对应自身登场 op，规范明确无通道。"
+      },
+      {
+        "number": "OP01-105",
+        "status": "complex",
+        "file": "",
+        "reason": "【登场时】选择并公开对方2张手牌——引擎无公开/操纵对手手牌的通道，判 complex。"
+      },
+      {
+        "number": "OP01-109",
+        "status": "scripted",
+        "file": "OP01_109_FourzFour.cs",
+        "reason": "OnEnterField 注册 ContinuousEffect PowerDelta +1000，Predicate：本卡被贴咚≥1、我方回合、费用区咚≥8。"
+      },
+      {
+        "number": "OP01-112",
+        "status": "scripted",
+        "file": "OP01_112_Page_One.cs",
+        "reason": "ActivatedMain 每回合1次；ReturnDonToDeck(1) 后 GiveKeyword(\"可攻击活跃\",ThisTurn)，ActionValidator 放行攻击对方活跃角色。"
+      },
+      {
+        "number": "OP01-116",
+        "status": "scripted",
+        "file": "OP01_116_SMILE.cs",
+        "reason": "EventMain；确认卡组顶5张，公开最多1张费用≤3且含《SMILE》角色，手动 Deck.Remove→Characters.Add 登场，余牌原序放底。"
+      }
+    ]
+  },
+  {
+    "batch": "OP02-cs-0",
+    "results": [
+      {
+        "number": "OP02-002",
+        "status": "complex",
+        "file": "",
+        "reason": "触发时机为「赋予咚!!时」，EffectTrigger.OnDonAttached 枚举虽存在但引擎从未派发该watcher（全仓仅枚举定义处出现，无 Dispatch），效果无法触发，无可用钩子。"
+      },
+      {
+        "number": "OP02-004",
+        "status": "complex",
+        "file": "",
+        "reason": "效果含「本回合中我方无法通过我方效果将生命卡牌加入手牌」，引擎无此一次性限制通道（无对应状态字段/校验），无法实现。"
+      },
+      {
+        "number": "OP02-008",
+        "status": "scripted",
+        "file": "OP02_008_Jozu.cs",
+        "reason": "条件持续获得【速攻】：用 ContinuousEffect.GrantKeyword=\"速攻\"+Predicate（咚≥1、生命≤2、领袖含白胡子海盗团）注册（Wave1）。"
+      },
+      {
+        "number": "OP02-014",
+        "status": "scripted",
+        "file": "OP02_014_Whitey.cs",
+        "reason": "「也可攻击对方活跃角色」用 ContinuousEffect.GrantKeyword=\"可攻击活跃\"+Predicate（咚≥1）注册，ActionValidator 已支持（Wave3）。"
+      },
+      {
+        "number": "OP02-015",
+        "status": "scripted",
+        "file": "OP02_015_Makino.cs",
+        "reason": "启动主要横置自身为成本（ConfirmOptional+RestCard），筛选费用==1且ColorList含「炎」的我方角色 AddPowerThisTurn(+3000)。"
+      },
+      {
+        "number": "OP02-016",
+        "status": "scripted",
+        "file": "OP02_016_Magra.cs",
+        "reason": "登场时筛选费用==1且ColorList含「炎」的我方角色 ChooseCards 后 AddPowerThisTurn(+3000)。"
+      },
+      {
+        "number": "OP02-018",
+        "status": "scripted",
+        "file": "OP02_018_Marco.cs",
+        "reason": "【KO时】OnKO 触发：可选弃1张含白胡子海盗团手牌为成本，生命≤2且自身在废弃区时 PlayFromTrashFree(restState:true)。阻挡者由引擎关键词处理。"
+      },
+      {
+        "number": "OP02-019",
+        "status": "scripted",
+        "file": "OP02_019_Rakuyo.cs",
+        "reason": "【我方回合中】全体白胡子+1000 持续力量：ContinuousEffect.PowerDelta=1000，Filter 含白胡子，Predicate 限我方回合+咚≥1。"
+      },
+      {
+        "number": "OP02-023",
+        "status": "complex",
+        "file": "",
+        "reason": "主要效果「本回合中我方无法通过我方效果将生命卡牌加入手牌」无引擎通道（同 OP02-004），整卡判 complex（触发节虽可表达但主效果无法实现）。"
+      },
+      {
+        "number": "OP02-024",
+        "status": "scripted",
+        "file": "OP02_024_MobyDick.cs",
+        "reason": "舞台【我方回合中】生命≤1时纽哥特及白胡子角色+2000 持续力量：ContinuousEffect.PowerDelta=2000，Filter 含名称/关键词，Predicate 限我方回合+生命≤1。"
+      }
+    ]
+  },
+  {
+    "batch": "OP02-cs-10",
+    "results": [
+      {
+        "number": "OP02-025",
+        "status": "complex",
+        "file": "",
+        "reason": "启动主要施加的是「本回合下次从手牌登场费用≥3的《和之国》角色减费1」——一次性/消费一次的延迟减费。ContinuousEffect.CostDelta 只能对整个有效期内所有符合条件的登场持续减费，引擎无「仅下一次符合则消费并失效」的通道，无法精确表达「下次(仅一次)」语义，故判 complex。"
+      },
+      {
+        "number": "OP02-035",
+        "status": "scripted",
+        "file": "OP02_035_TrafalgarLaw.cs",
+        "reason": "启动主要：ConfirmOptional 后用 BounceToHand 将自身放回手牌作成本，再 PlayFromHandFree 登场费用为3的角色。括号内可选「休息N咚」附带成本按惯例省略。"
+      },
+      {
+        "number": "OP02-045",
+        "status": "scripted",
+        "file": "OP02_045_SantoryuKikyaku.cs",
+        "reason": "EventCounter 选我方领袖/角色 +6000(本次战斗)后登场 cost≤3 且原本无效果(EffectTags/Abilities/Trigger 皆空)角色；OnLifeRevealTrigger 将对方领袖或费用≤5角色休息。"
+      },
+      {
+        "number": "OP02-046",
+        "status": "scripted",
+        "file": "OP02_046_AkumaFuukyaku.cs",
+        "reason": "EventMain KO 对方休息且费用≤4角色；OnLifeRevealTrigger 登场 cost≤4 且原本无效果(EffectTags/Abilities/Trigger 皆空)角色。"
+      },
+      {
+        "number": "OP02-050",
+        "status": "scripted",
+        "file": "OP02_050_Inazuma.cs",
+        "reason": "手牌≤1时此卡+2000用 ContinuousEffect.PowerDelta(Predicate 判手牌数)在 OnEnterField 注册；阻挡者为纯关键词引擎处理。"
+      },
+      {
+        "number": "OP02-051",
+        "status": "scripted",
+        "file": "OP02_051_Ivankov.cs",
+        "reason": "登场时补抽到手牌3张(need=3-Hand.Count,Draw need)，再 PlayFromHandFree 登场 cost≤6 蓝色(水)《因佩尔地狱》角色。"
+      },
+      {
+        "number": "OP02-052",
+        "status": "scripted",
+        "file": "OP02_052_Cabaji.cs",
+        "reason": "登场时若场上存在名为「毛奇」(MatchesName)的卡则抽2张并丢弃1张手牌。"
+      },
+      {
+        "number": "OP02-062",
+        "status": "scripted",
+        "file": "OP02_062_MonkeyDLuffy.cs",
+        "reason": "登场时/攻击时 ConfirmOptional 后弃2张手牌作成本，BounceToHand 退回费用≤4角色，再 GiveKeyword 双重攻击 ThisTurn。"
+      },
+      {
+        "number": "OP02-063",
+        "status": "scripted",
+        "file": "OP02_063_MisterOne.cs",
+        "reason": "登场时从废弃区取最多1张费用为1、蓝色(水)事件(TrashToHand)。颜色用 ColorList.Contains(\"水\")。"
+      },
+      {
+        "number": "OP02-064",
+        "status": "scripted",
+        "file": "OP02_064_MisterTwo.cs",
+        "reason": "咚×1(AttachedDonCount≥1)攻击时 ConfirmOptional 弃1张手牌，ReturnFieldToDeckBottom 放回费用≤2角色到卡组底。「本次战斗结束时将此角色放回卡组底」无战斗结束钩子，该下行后果未实现，仅实现可获取收益(reason 注明)。"
+      }
+    ]
+  },
+  {
+    "batch": "OP02-cs-20",
+    "results": [
+      {
+        "number": "OP02-065",
+        "status": "scripted",
+        "file": "OP02_065_Mr3.cs",
+        "reason": "关键词【阻挡者】引擎处理；主动效果走 OnMyTurnEnd：ConfirmOptional 可选成本→ChooseCards 弃1手牌→ActivateCard 使自身活跃。wfReason 称 triggers 不支持 cost，但 C# 脚本可直接实现可选成本。"
+      },
+      {
+        "number": "OP02-069",
+        "status": "scripted",
+        "file": "OP02_069_DeathWink.cs",
+        "reason": "反击=EventCounter：ChooseCards 选最多1张领袖/角色 AddPowerThisBattle +6000；动态抽牌「直到手牌2张」运行时算 need=2-Hand.Count 再 Draw(need)，wfReason 称 Draw 需固定n 在 C# 不成立。"
+      },
+      {
+        "number": "OP02-071",
+        "status": "scripted",
+        "file": "OP02_071_Magellan.cs",
+        "reason": "领袖。咚放回咚卡组时=OnDonReturnedToDeck（Wave2 watcher 已支持），限我方回合+每回合1次，AddPowerThisTurn +1000。"
+      },
+      {
+        "number": "OP02-072",
+        "status": "scripted",
+        "file": "OP02_072_Zephyr.cs",
+        "reason": "领袖 OnAttackDeclare。可选成本咚-4：校验费用区可放回咚≥4→ConfirmOptional→ReturnDonToDeck(4)；KO 对方费用≤3角色（CurrentCostOf）；之后 AddPowerThisTurn +1000。"
+      },
+      {
+        "number": "OP02-074",
+        "status": "scripted",
+        "file": "OP02_074_Hannyabal.cs",
+        "reason": "持续给我方卡名「蓝猩」赋予【阻挡者】用 ContinuousEffect.GrantKeyword（Wave1），OnEnterField 注册，Predicate=MatchesName(\"蓝猩\")。wfReason 称无通道在 Wave1 后已可表达。"
+      },
+      {
+        "number": "OP02-094",
+        "status": "scripted",
+        "file": "OP02_094_Hina.cs",
+        "reason": "通过战斗KO对方角色时自身活跃=OnAnyCharKOd(reason==battle)，校验被KO者属对方且 CurrentBattle.AttackerCardId==self；【咚×1】判 AttachedDonCount≥1；每回合1次后 ActivateCard。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-0",
+    "results": [
+      {
+        "number": "OP03-004",
+        "status": "scripted",
+        "file": "OP03_004_Krieg.cs",
+        "reason": "【咚!!×1】获得【速攻】用 ContinuousEffect.GrantKeyword 注册(谓词限本卡且 AttachedDonCount>=1)。「登场回合无法攻击领袖」为仅针对领袖的本回合静态限制，引擎禁攻通道无此目标维度，已注释省略，不影响速攻主效果。"
+      },
+      {
+        "number": "OP03-005",
+        "status": "scripted",
+        "file": "OP03_005_Shakky.cs",
+        "reason": "启动主要每回合1次：AddPowerThisTurn +2000；「回合结束自毁」用 EndTurnTask{Kind=TrashFilm,SourceCardId=自身}，TurnEngine 按 SourceCardId 优先废弃该卡本身，无需 FILM 特征。DSL 误判 complex。"
+      },
+      {
+        "number": "OP03-008",
+        "status": "scripted",
+        "file": "OP03_008_Buggy.cs",
+        "reason": "【登场时】确认顶5张公开1张红色(炎)事件入手用 LookTopReveal+ColorList.Contains(\"炎\") 实现。「与斩属性战斗中不被KO」依赖战斗对手属性，KoGuard 谓词无法获知对手，已注释省略此条静态防KO，登场检索为主效果。"
+      },
+      {
+        "number": "OP03-012",
+        "status": "scripted",
+        "file": "OP03_012_Teach.cs",
+        "reason": "【攻击时】可选成本废弃我方力量>=4000红色(炎)角色→抽1张并本次战斗+1000。颜色用 ColorList.Contains(\"炎\")，全可表达。"
+      },
+      {
+        "number": "OP03-013",
+        "status": "scripted",
+        "file": "OP03_013_Marco.cs",
+        "reason": "【我方回合中】【登场时】KO对方<=3000角色；【KO时】(OnKO，自身已入废弃)可选弃手牌事件→PlayFromTrashFree(restState:true) 休息登场自身。同 OP09-052 马尔高模式。"
+      },
+      {
+        "number": "OP03-015",
+        "status": "scripted",
+        "file": "OP03_015_Lim.cs",
+        "reason": "【阻挡者】关键词引擎处理；核心 OnKO(此卡被KO)且仅对方回合(CurrentTurnPlayer!=owner)时令对方最多1张领袖/角色本回合-2000，AddPowerThisTurn 负值实现。"
+      },
+      {
+        "number": "OP03-016",
+        "status": "scripted",
+        "file": "OP03_016_Enpou.cs",
+        "reason": "事件 EventMain：领袖为艾斯时 KO对方<=8000角色+我方领袖本回合获得【双重攻击】(GiveKeyword)及+3000(AddPowerThisTurn)，「伤害变为2」即双重攻击固有；OnLifeRevealTrigger：KO对方<=6000。CurrentPowerOf 评估。"
+      },
+      {
+        "number": "OP03-020",
+        "status": "scripted",
+        "file": "OP03_020_Striker.cs",
+        "reason": "舞台【启动主要】成本休息2张活跃咚!!+休息此舞台；领袖为艾斯(NameContains)时 LookTopReveal 顶5张公开1事件入手余者放底。仅艾斯时询问发动，与文本一致。"
+      },
+      {
+        "number": "OP03-021",
+        "status": "scripted",
+        "file": "OP03_021_Kuro.cs",
+        "reason": "领航【启动主要】成本休息3张活跃咚!!+横置我方2张活跃《东海》角色(RestCard)；效果 ActivateCard 活跃自身领袖+对方最多1张费用<=5角色转休息。全可表达。"
+      },
+      {
+        "number": "OP03-022",
+        "status": "scripted",
+        "file": "OP03_022_Arlong.cs",
+        "reason": "领航【咚!!×2】(AttachedDonCount>=2)【攻击时】成本休息1张活跃咚!!→从手牌登场最多1张费用<=4且拥有【触发】(Info.Trigger 非空)的角色。「拥有触发」可用 !IsNullOrEmpty(Info.Trigger) 表达(同 OP03-037)，非 complex。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-10",
+    "results": [
+      {
+        "number": "OP03-025",
+        "status": "scripted",
+        "file": "OP03_025_Krieg.cs",
+        "reason": "【登场时】弃1手牌(ConfirmOptional+DiscardHand成本)后KO对方最多2张费用≤4且休息角色;【咚×1】双重攻击用ContinuousEffect.GrantKeyword(AttachedDonCount≥1)注册。"
+      },
+      {
+        "number": "OP03-027",
+        "status": "scripted",
+        "file": "OP03_027_SiamCat.cs",
+        "reason": "领袖《东海》前提下休息对方1张费用≤2角色;场上无\"花斑猫\"(Characters.Any(MatchesName)判定)时从手牌登场最多1张\"花斑猫\"(PlayFromHandFree)。"
+      },
+      {
+        "number": "OP03-028",
+        "status": "scripted",
+        "file": "OP03_028_Jango.cs",
+        "reason": "【登场时】二选一用ChooseOption:选项1活跃我方《东海》领袖/费用≤6角色(ActivateCard);选项2横置自身+对方1张角色(RestCard)。"
+      },
+      {
+        "number": "OP03-030",
+        "status": "scripted",
+        "file": "OP03_030_Nami.cs",
+        "reason": "看顶5张,候选用ColorList含\"草\"(绿色)+HasKeyword(\"东海\")+非\"奈美\"过滤,公开1张入手,其余按原序放底。颜色约束用ColorList可表达。"
+      },
+      {
+        "number": "OP03-032",
+        "status": "scripted",
+        "file": "OP03_032_Buggy.cs",
+        "reason": "与属性(斩)卡牌战斗中不被KO:ContinuousEffect.KoGuard=\"battle\",Predicate从CurrentBattle取战斗对方卡牌,判其Property含\"斩\"(与ST08-002同构)。"
+      },
+      {
+        "number": "OP03-037",
+        "status": "scripted",
+        "file": "OP03_037_IronFist.cs",
+        "reason": "【主要】横置我方《东海》角色(ConfirmOptional成本)后KO对方费用≤3休息角色;【触发】(OnLifeRevealTrigger)登场手牌费用≤4且Info.Trigger非空的角色(\"拥有触发效果\"=Trigger非空)。"
+      },
+      {
+        "number": "OP03-040",
+        "status": "complex",
+        "file": "",
+        "reason": "卡组0张改判胜利为特殊胜利规则,引擎无通道(DealDamageToLeader固定判生命耗尽方败北);且【咚×1】\"攻击给予生命伤害时\"对应OnDamageToLeader,经查LifeRevealManager未派发该触发。"
+      },
+      {
+        "number": "OP03-041",
+        "status": "complex",
+        "file": "",
+        "reason": "【咚×1】\"当通过此角色的攻击给予对方生命区伤害时\"磨牌7张依赖OnDamageToLeader触发,该枚举值存在但引擎(LifeRevealManager.DealDamageToLeader)从未派发,主动效果无可用触发节点。【速攻】由引擎关键词处理。"
+      },
+      {
+        "number": "OP03-043",
+        "status": "complex",
+        "file": "",
+        "reason": "\"当给予对方生命区伤害时\"磨3张+自身入废弃,依赖OnDamageToLeader触发,引擎未派发该触发(仅派发OnLifeLeaveField,且为受伤方监听,非攻击方),无可表达通道。"
+      },
+      {
+        "number": "OP03-045",
+        "status": "scripted",
+        "file": "OP03_045_Gargon.cs",
+        "reason": "【阻挡者】由引擎处理;【对方的回合中】卡组≤20时+3000用ContinuousEffect.PowerDelta注册,Predicate限自身+对方回合+Deck.Count≤20。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-20",
+    "results": [
+      {
+        "number": "OP03-046",
+        "status": "scripted",
+        "file": "OP03_046_Kenzo.cs",
+        "reason": "持续力量修正用 ContinuousEffect 注册（OnEnterField）：对方回合中且我方卡组≤20时本卡+3000。阻挡者为纯关键词由引擎处理。"
+      },
+      {
+        "number": "OP03-047",
+        "status": "scripted",
+        "file": "OP03_047_Zoff.cs",
+        "reason": "实现【登场时】：将敌我任意一方费用≤3角色放回其持有者手牌(BounceToHand)，并可选弃顶2(MillTop)。咚×1给予生命伤害时弃7无对应钩子(OnDealDamage)未实现。"
+      },
+      {
+        "number": "OP03-051",
+        "status": "scripted",
+        "file": "OP03_051_Belmer.cs",
+        "reason": "实现【KO时】(OnKO)可选弃顶3(MillTop)。咚×1给予生命伤害时弃7无对应钩子未实现。"
+      },
+      {
+        "number": "OP03-053",
+        "status": "scripted",
+        "file": "OP03_053_YosakuJohnny.cs",
+        "reason": "持续力量修正用 ContinuousEffect：咚!!×1(AttachedDonCount≥1)且我方卡组≤20时本卡+2000。"
+      },
+      {
+        "number": "OP03-057",
+        "status": "scripted",
+        "file": "OP03_057_SanZenSeKai.cs",
+        "reason": "EventMain(≤5)/OnLifeRevealTrigger(≤3)分支，将敌我任意一方角色放回其持有者卡组底(ReturnFieldToDeckBottom)，候选含双方角色按持有者判定归属。"
+      },
+      {
+        "number": "OP03-058",
+        "status": "scripted",
+        "file": "OP03_058_Spandam.cs",
+        "reason": "领袖无法攻击由卡面文本引擎自动禁攻。【启动主要】成本咚!!-1(ReturnDonToDeck)+横置领袖(RestCard)后，从手牌登场≤5费《卡雷拉公司》角色(PlayFromHandFree)。"
+      },
+      {
+        "number": "OP03-059",
+        "status": "scripted",
+        "file": "OP03_059_Kaku.cs",
+        "reason": "【攻击时】(OnAttackDeclare)可选成本咚!!-1后，本次战斗赋予【流放】(GiveKeyword ThisBattle，引擎已消费流放)。"
+      },
+      {
+        "number": "OP03-060",
+        "status": "scripted",
+        "file": "OP03_060_Kalifa.cs",
+        "reason": "【攻击时】可选成本咚!!-1后抽2(Draw)弃1(ChooseCards+DiscardHand)。"
+      },
+      {
+        "number": "OP03-075",
+        "status": "scripted",
+        "file": "OP03_075_GalleyLaCompany.cs",
+        "reason": "【启动主要】横置舞台(RestCard)，领袖为阿斯巴古时(NameContains)从咚卡组追加1张休息咚(RefreshDonFromDeck Rest)。"
+      },
+      {
+        "number": "OP03-076",
+        "status": "complex",
+        "file": "",
+        "reason": "需反应式监听「对方角色被KO时」使本领袖活跃。引擎无该 watcher（OnAllyWillBeKOd 仅在战斗将KO时对受害方派发置换守护，无法表达「监听任意对方角色被KO后令自身领袖转活跃」的反应式他卡KO事件），无对应钩子，判 complex。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-30",
+    "results": [
+      {
+        "number": "OP03-077",
+        "status": "scripted",
+        "file": "OP03_077_CharlotteLinlin.cs",
+        "reason": "【攻击时】OnAttackDeclare：判【咚‼×2】(AttachedDonCount≥2)，ConfirmOptional后支付②(rest 2活跃咚)+弃1手牌强耦合成本，生命≤1时AddLifeFromDeckTop(1)。"
+      },
+      {
+        "number": "OP03-079",
+        "status": "scripted",
+        "file": "OP03_079_Vergo.cs",
+        "reason": "持续战斗不被KO用ContinuousEffect.KoGuard=\"battle\"，OnEnterField注册，Predicate限本卡且AttachedDonCount≥1(【咚!!×1】)。"
+      },
+      {
+        "number": "OP03-080",
+        "status": "scripted",
+        "file": "OP03_080_Kaku.cs",
+        "reason": "【登场时】可选成本(废弃区2张含<CP>特征卡放回卡组底，Keywords含\"CP\"子串)耦合KO对方费用≤3角色(CurrentCostOf评估)。"
+      },
+      {
+        "number": "OP03-083",
+        "status": "scripted",
+        "file": "OP03_083_Gocchi.cs",
+        "reason": "【登场时】看顶5张，ChooseCards自选最多2张入废弃，其余按原序放卡组底。"
+      },
+      {
+        "number": "OP03-086",
+        "status": "scripted",
+        "file": "OP03_086_Spandam.cs",
+        "reason": "【登场时】领袖Keywords含\"CP\"子串时，看顶3张公开最多1张含CP非斯巴达姆加手牌，其余入废弃。"
+      },
+      {
+        "number": "OP03-091",
+        "status": "scripted",
+        "file": "OP03_091_Hillmappoo.cs",
+        "reason": "【登场时】筛选对方EffectTags与Abilities均为空的(原本没有效果)角色，AddCostModifier施加-当前费用使本回合费用变为0。"
+      },
+      {
+        "number": "OP03-092",
+        "status": "scripted",
+        "file": "OP03_092_RobLucci.cs",
+        "reason": "【登场时】可选成本(废弃区2张含<CP>放回卡组底)耦合GiveKeyword(self,\"速攻\",ThisTurn)。"
+      },
+      {
+        "number": "OP03-093",
+        "status": "scripted",
+        "file": "OP03_093_Wanze.cs",
+        "reason": "【登场时】领袖Keywords含\"CP\"时，可选弃1手牌强耦合成本后KO对方费用≤1角色。"
+      },
+      {
+        "number": "OP03-094",
+        "status": "scripted",
+        "file": "OP03_094_AirDoor.cs",
+        "reason": "EventMain：领袖含CP时看顶5张，选1张费用≤5含CP角色直接登场(移入手牌再PlayFromHandFree)，其余入废弃；OnLifeRevealTrigger：从废弃登场1张费用≤3黑色(地)角色PlayFromTrashFree。"
+      },
+      {
+        "number": "OP03-095",
+        "status": "scripted",
+        "file": "OP03_095_SoapSheep.cs",
+        "reason": "EventMain：选对方最多2张角色逐张AddCostModifier(-2,ThisTurn)；OnLifeRevealTrigger：OpponentDiscardChosen对方弃1手牌。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-40",
+    "results": [
+      {
+        "number": "OP03-098",
+        "status": "scripted",
+        "file": "OP03_098_EnniesLobby.cs",
+        "reason": "启动主要:横置舞台(RestCard)为成本,领袖特征含CP时对方选1角色本回合费用-2用AddCostModifier(ThisTurn)实现。"
+      },
+      {
+        "number": "OP03-099",
+        "status": "scripted",
+        "file": "OP03_099_Katakuri.cs",
+        "reason": "攻击时(OnAttackDeclare):用ChooseOption选我方/对方生命顶,直接操作LifeArea列表放顶/放底,之后AddPowerThisBattle(+1000)。"
+      },
+      {
+        "number": "OP03-102",
+        "status": "scripted",
+        "file": "OP03_102_Sanji.cs",
+        "reason": "攻击时:ChooseOption选生命顶/底1张入手(可选成本),结果AddLifeFromDeckTop卡组顶1张入生命。"
+      },
+      {
+        "number": "OP03-104",
+        "status": "scripted",
+        "file": "OP03_104_Shirley.cs",
+        "reason": "登场时:直接操作LifeArea确认我方/对方生命顶1张放顶/底;阻挡者为关键词由引擎处理。"
+      },
+      {
+        "number": "OP03-108",
+        "status": "scripted",
+        "file": "OP03_108_Cracker.cs",
+        "reason": "持续条件加成:生命少于对方时,注册ContinuousEffect(PowerDelta+1000 与 GrantKeyword=双重攻击),条件Predicate判生命数。"
+      },
+      {
+        "number": "OP03-110",
+        "status": "scripted",
+        "file": "OP03_110_Smoothie.cs",
+        "reason": "攻击时:ChooseOption选生命顶/底1张入手(可选成本),AddPowerThisBattle(+2000)。"
+      },
+      {
+        "number": "OP03-114",
+        "status": "scripted",
+        "file": "OP03_114_BigMom.cs",
+        "reason": "登场时:领袖含大妈海盗团时AddLifeFromDeckTop我方加生命,再直接操作opp.LifeArea/Trash把对方生命顶移入废弃区。"
+      },
+      {
+        "number": "OP03-117",
+        "status": "scripted",
+        "file": "OP03_117_Napoleon.cs",
+        "reason": "启动主要:RestCard为成本,选定夏洛特玲玲注册ContinuousEffect PowerDelta+1000,Predicate以TurnCount基准限制至下个我方回合开始前。"
+      },
+      {
+        "number": "OP03-119",
+        "status": "scripted",
+        "file": "OP03_119_SliceCutMochi.cs",
+        "reason": "事件主要(EventMain):我方生命<对方时,ChooseCards选对方CurrentCostOf<=4角色KO(AtomicOps.KO)。"
+      },
+      {
+        "number": "OP03-120",
+        "status": "scripted",
+        "file": "OP03_120_AtamiHotSpring.cs",
+        "reason": "事件主要:对方生命>=4时直接操作opp.LifeArea/Trash把对方生命顶1张移入废弃区。"
+      }
+    ]
+  },
+  {
+    "batch": "OP03-cs-50",
+    "results": [
+      {
+        "number": "OP03-123",
+        "status": "scripted",
+        "file": "OP03_123_Katakuri.cs",
+        "reason": "【登场时】将最多1张费用≤8角色加入其持有者生命区顶/底。用MoveCharToLife(ownerIdx,card,toTop)即可表达上/下选项（wfReason所述限制不成立，toTop参数支持顶/底），ChooseOption选位置，CurrentCostOf判费用，候选取两方场上角色按所属方置入对应生命区。dotnet build 0错误通过。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-0",
+    "results": [
+      {
+        "number": "OP04-009",
+        "status": "complex",
+        "file": "",
+        "reason": "效果含「本回合结束时将此角色放回持有者手牌」的延迟退手牌；引擎 EndOfTurnTasks 仅支持 TrashFilm，无回合结束自我退手牌的任务类型，无对应通道。"
+      },
+      {
+        "number": "OP04-014",
+        "status": "complex",
+        "file": "",
+        "reason": "仅含【流放】纯关键词，由引擎在给予伤害时直接消费(入废弃不发动触发)，无可脚本化的主动效果，不需要也无法写脚本。"
+      },
+      {
+        "number": "OP04-021",
+        "status": "scripted",
+        "file": "OP04_021_Viola.cs",
+        "reason": "OnOppAttackDeclare 触发；ConfirmOptional 询问后手动将我方2张活跃咚转休息作成本，再将对方1张活跃咚 State 改为 Rest。"
+      },
+      {
+        "number": "OP04-024",
+        "status": "complex",
+        "file": "",
+        "reason": "主能力为【对方的回合中】【每回合1次】「当对方将角色登场时」触发，引擎仅有 OnAllyCharEnter(我方角色登场)无对方角色登场 watcher；含两能力其一不可表达。"
+      },
+      {
+        "number": "OP04-025",
+        "status": "scripted",
+        "file": "OP04_025_Jora.cs",
+        "reason": "OnOppAttackDeclare 触发；ConfirmOptional 后手动横置我方2张活跃咚作成本，ChooseCards 选对方1张费用≤4角色 RestCard。"
+      },
+      {
+        "number": "OP04-026",
+        "status": "complex",
+        "file": "",
+        "reason": "「之后，当本回合结束时，将我方最多1张咚!!转为活跃状态」为延迟到回合结束的活跃咚连锁，EndOfTurnTasks 无对应任务类型，无通道。"
+      },
+      {
+        "number": "OP04-028",
+        "status": "scripted",
+        "file": "OP04_028_Diamante.cs",
+        "reason": "【阻挡者】由引擎处理；只实现主动部分：OnMyTurnEnd 判 AttachedDonCount≥1(咚!!×1) 且 ActiveDonCount≥2 时 ActivateCard 自身。"
+      },
+      {
+        "number": "OP04-030",
+        "status": "scripted",
+        "file": "OP04_030_Trebol.cs",
+        "reason": "OnEnterField 选KO对方休息且费用≤5角色；OnOppAttackDeclare 手动横置我方2咚作成本后横置对方1张费用≤4角色，两能力同卡多时机实现。"
+      },
+      {
+        "number": "OP04-031",
+        "status": "scripted",
+        "file": "OP04_031_Doflamingo.cs",
+        "reason": "OnEnterField；选对方最多3张休息领袖/角色，对每张设 CannotActivateNextReset=true(Wave5 单目标跨重置不活跃通道)。"
+      },
+      {
+        "number": "OP04-032",
+        "status": "scripted",
+        "file": "OP04_032_Baby5.cs",
+        "reason": "OnMyTurnEnd；ConfirmOptional 后用 BattleEngine.KOCard 自我牺牲入废弃作成本，再将我方最多2张休息咚 State 改为 Active。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-10",
+    "results": [
+      {
+        "number": "OP04-033",
+        "status": "scripted",
+        "file": "OP04_033_Machvise.cs",
+        "reason": "登场时领袖含《堂吉诃德海盗团》则休息对方1张费用≤5角色(RestCard)，回合结束入队 EndTurnTask RefreshOwnDon 活跃1张咚，均有通道。"
+      },
+      {
+        "number": "OP04-034",
+        "status": "scripted",
+        "file": "OP04_034_LaoG.cs",
+        "reason": "OnMyTurnEnd，活跃咚用 me.ActiveDonCount>=3 判定，KO对方休息且费用≤3角色。"
+      },
+      {
+        "number": "OP04-037",
+        "status": "scripted",
+        "file": "OP04_037_HanegekiSen.cs",
+        "reason": "EventCounter 中直接判 me.Leader.Info.HasKeyword(堂吉诃德海盗团)，满足则我方1张领袖/角色本回合+2000(AddPowerThisTurn)。触发节由引擎处理。"
+      },
+      {
+        "number": "OP04-040",
+        "status": "scripted",
+        "file": "OP04_040_Queen.cs",
+        "reason": "OnAttackDeclare+咚×1(AttachedDonCount)，生命+手牌≤4时抽1；场上有费用≥8角色时用 ChooseOption 二选一改为 AddLifeFromDeckTop 代替抽牌。"
+      },
+      {
+        "number": "OP04-042",
+        "status": "scripted",
+        "file": "OP04_042_Ipponmatsu.cs",
+        "reason": "属性(斩)=CardInfo.Property==\"斩\"，过滤我方角色选1张本回合+3000，之后 MillTop(1)。"
+      },
+      {
+        "number": "OP04-043",
+        "status": "scripted",
+        "file": "OP04_043_Junti.cs",
+        "reason": "OnAttackDeclare+咚×1，选双方1张费用≤2角色，由持有者 ChooseOption 二选一 BounceToHand/ReturnFieldToDeckBottom。"
+      },
+      {
+        "number": "OP04-047",
+        "status": "complex",
+        "file": "",
+        "reason": "「战斗结束时将与之战斗的对方角色放回卡组底」需战斗结束 watcher 与战斗对手引用，EffectTrigger 无战斗结束钩子，引擎无通道。"
+      },
+      {
+        "number": "OP04-048",
+        "status": "scripted",
+        "file": "OP04_048_Sasaki.cs",
+        "reason": "登场时统计手牌数n，逐张 ReturnHandToDeckBottom 后 Shuffle，再 Draw(n)，动态按数量抽牌可实现。"
+      },
+      {
+        "number": "OP04-053",
+        "status": "complex",
+        "file": "",
+        "reason": "「当我方发动事件时」需自方出事件 watcher；OnPlayCard 枚举虽存在但引擎从未 NotifyWatcher 派发，无可用钩子，判 complex。"
+      },
+      {
+        "number": "OP04-055",
+        "status": "scripted",
+        "file": "OP04_055_PlagueBomb.cs",
+        "reason": "EventMain 可选成本：按名 MatchesName(冰鬼) 弃手牌+放回1张费用≤4角色到卡组底，收益从废弃区 PlayFromTrashFree 登场\"冰鬼\"，按名称匹配均可实现。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-20",
+    "results": [
+      {
+        "number": "OP04-058",
+        "status": "scripted",
+        "file": "OP04_058_Crocodile.cs",
+        "reason": "领袖被动：用 Wave2 的 OnDonReturnedToDeck watcher，对方回合中每回合1次，咚放回咚卡组时 RefreshDonFromDeck 追加1张活跃咚。"
+      },
+      {
+        "number": "OP04-059",
+        "status": "scripted",
+        "file": "OP04_059_Asparagus.cs",
+        "reason": "OnOppAttackDeclare：领袖含七水之城时可选咚-1(ConfirmOptional+ReturnDonToDeck)，本回合 GiveKeyword 阻挡者。"
+      },
+      {
+        "number": "OP04-060",
+        "status": "scripted",
+        "file": "OP04_060_Crocodile.cs",
+        "reason": "登场段咚-2 将卡组顶1张 AddLifeFromDeckTop；对方攻击段每回合1次咚-1 抽1弃1。两段均用 ConfirmOptional+ReturnDonToDeck。"
+      },
+      {
+        "number": "OP04-063",
+        "status": "scripted",
+        "file": "OP04_063_Franky.cs",
+        "reason": "OnOppAttackDeclare 每回合1次可选咚-1，领袖含七水之城时我方1张领袖/角色 AddPowerThisBattle +1000。"
+      },
+      {
+        "number": "OP04-064",
+        "status": "scripted",
+        "file": "OP04_064_MissAllSunday.cs",
+        "reason": "登场时 RefreshDonFromDeck 追加1张休息咚，之后判 TotalDonInCostArea>=6 则 Draw 1，先后联动用脚本顺序表达。"
+      },
+      {
+        "number": "OP04-065",
+        "status": "scripted",
+        "file": "OP04_065_MissGoldenWeek.cs",
+        "reason": "领袖含巴洛克工作室时，对对方费用≤5角色 AddRestriction(CannotAttack, UntilNextOpponentEndPhase)；ActionValidator 已对 CannotAttack 生效，旧 wfReason 已过时。"
+      },
+      {
+        "number": "OP04-068",
+        "status": "scripted",
+        "file": "OP04_068_Yokozuna.cs",
+        "reason": "阻挡者由引擎处理；仅实现 OnOppAttackDeclare 可选咚-1 将对方费用≤2角色 BounceToHand 退回手牌。"
+      },
+      {
+        "number": "OP04-069",
+        "status": "scripted",
+        "file": "OP04_069_MrTwoBonClay.cs",
+        "reason": "OnOppAttackDeclare 可选咚-1，用 CurrentBattle 取攻击者(CurrentPowerOf)后 SetPowerThisTurn 将自身本回合力量设为与攻击者相同(近似原本力量相同)。"
+      },
+      {
+        "number": "OP04-070",
+        "status": "scripted",
+        "file": "OP04_070_Mr3.cs",
+        "reason": "OnOppAttackDeclare 每回合1次可选咚-1，对方1张角色 AddPowerThisTurn -1000。"
+      },
+      {
+        "number": "OP04-071",
+        "status": "scripted",
+        "file": "OP04_071_MrFour.cs",
+        "reason": "OnOppAttackDeclare 可选咚-1，本回合 GiveKeyword 阻挡者 + AddPowerThisTurn +1000；改攻击目标由阻挡者关键词引擎结算。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-30",
+    "results": [
+      {
+        "number": "OP04-072",
+        "status": "scripted",
+        "file": "OP04_072_Mr5.cs",
+        "reason": "OnOppAttackDeclare触发；每回合1次(TurnOnceUsed)+咚-2(ReturnDonToDeck)+横置自身(RestCard)成本，ConfirmOptional确认后KO对方费用≤4角色。"
+      },
+      {
+        "number": "OP04-073",
+        "status": "scripted",
+        "file": "OP04_073_Mr13AndMsFriday.cs",
+        "reason": "ActivatedMain；成本=废弃此角色+另1张《巴洛克工作室》角色(手动移入Trash)，收益RefreshDonFromDeck(1,Active)。"
+      },
+      {
+        "number": "OP04-080",
+        "status": "scripted",
+        "file": "OP04_080_Gatz.cs",
+        "reason": "登场时对最多1张《德莱斯罗兹》角色GiveKeyword(\"可攻击活跃\",ThisTurn)，引擎已支持可攻击活跃。"
+      },
+      {
+        "number": "OP04-081",
+        "status": "scripted",
+        "file": "OP04_081_Cavendish.cs",
+        "reason": "登场注册ContinuousEffect.GrantKeyword=\"可攻击活跃\"(被赋予咚≥1谓词)；OnAttackDeclare横置领袖KO对方费用≤1角色+MillTop(2)。"
+      },
+      {
+        "number": "OP04-083",
+        "status": "scripted",
+        "file": "OP04_083_Sabo.cs",
+        "reason": "登场时注册ContinuousEffect.KoGuard=\"effect\"(我方角色，TurnCount<=base+1限有效期到下个我方回合)，之后抽2弃2。"
+      },
+      {
+        "number": "OP04-084",
+        "status": "scripted",
+        "file": "OP04_084_Stussy.cs",
+        "reason": "看顶3张，符合《CP》费用≤2且非斯图西的角色经卡组→手牌→PlayFromHandFree等价从卡组登场，剩余放废弃。"
+      },
+      {
+        "number": "OP04-086",
+        "status": "complex",
+        "file": "",
+        "reason": "触发条件为「此角色通过战斗将对方角色KO时」，EffectTrigger无『本卡战斗击杀对方』钩子(OnAllyWillBeKOd为置换守护，非主动击杀者监听)，无对应通道。"
+      },
+      {
+        "number": "OP04-088",
+        "status": "scripted",
+        "file": "OP04_088_Hajrudin.cs",
+        "reason": "ActivatedMain；成本横置我方领袖(RestCard)，收益对方最多1张角色AddCostModifier(-4,ThisTurn)。"
+      },
+      {
+        "number": "OP04-090",
+        "status": "scripted",
+        "file": "OP04_090_Luffy.cs",
+        "reason": "登场注册GrantKeyword=\"可攻击活跃\"；启动主要每回合1次，废弃区7张ReturnTrashToDeckBottom，ActivateCard(self)+PreventActivateNextReset(self)。"
+      },
+      {
+        "number": "OP04-093",
+        "status": "scripted",
+        "file": "OP04_093_GumGumKingKongGun.cs",
+        "reason": "EventMain；选1张《德莱斯罗兹》角色AddPowerThisTurn(6000)，再判废弃区≥15则同卡GiveKeyword(\"双重攻击\",ThisTurn)，条件化关键词赋予用C#分支表达。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-40",
+    "results": [
+      {
+        "number": "OP04-094",
+        "status": "scripted",
+        "file": "OP04_094_RaijinHakaiken.cs",
+        "reason": "EventMain：KO对方费用≤(废弃区≥15则6否则4)的角色，按当前张数算阈值切换prompt；OnLifeRevealTrigger：可选横置我方领袖后KO对方费用≤5角色。均用KO/RestCard/ChooseCards实现。"
+      },
+      {
+        "number": "OP04-095",
+        "status": "scripted",
+        "file": "OP04_095_GuardShield.cs",
+        "reason": "EventCounter：选1张我方领袖/角色本次战斗+2000，废弃区≥15时对同一目标再+2000(AddPowerThisBattle两次)；OnLifeRevealTrigger：抽2张后弃1张手牌。条件分支用if即可。"
+      },
+      {
+        "number": "OP04-096",
+        "status": "complex",
+        "file": "",
+        "reason": "舞台纯持续静态：让《德莱斯罗兹》角色在登场回合可攻击角色。引擎对'登场回合可攻击(仅角色，不含领袖)'无对应通道——速攻会同时放开攻击领袖且过度授权，无法精确表达。"
+      },
+      {
+        "number": "OP04-098",
+        "status": "scripted",
+        "file": "OP04_098_Otoko.cs",
+        "reason": "OnEnterField可选成本=丢弃手牌中2张《和之国》特征卡(HasKeyword过滤)，生命≤1时AddLifeFromDeckTop(1)。ConfirmOptional+ChooseCards(2,2)。"
+      },
+      {
+        "number": "OP04-099",
+        "status": "scripted",
+        "file": "OP04_099_OLin.cs",
+        "reason": "'卡名也视为夏洛特·玲玲'用NameAliases实现(引擎MatchesName已支持别名)；OnLifeRevealTrigger生命≤1时此卡从废弃区PlayFromTrashFree登场。"
+      },
+      {
+        "number": "OP04-100",
+        "status": "scripted",
+        "file": "OP04_100_CaponBege.cs",
+        "reason": "OnLifeRevealTrigger：选对方最多1张领袖/角色，AddRestriction(CannotAttack,ThisTurn)。ActionValidator已检查RestrictionKind.CannotAttack。"
+      },
+      {
+        "number": "OP04-102",
+        "status": "scripted",
+        "file": "OP04_102_Kinemon.cs",
+        "reason": "ActivatedMain每回合1次：必付成本=生命区顶/底1张入手(ChooseOption选顶/底/不发动)，收益=ActivateCard(self)。括号内'可选转休息指定数量咚'与收益无文本耦合，按惯例不实现该可选成本。"
+      },
+      {
+        "number": "OP04-105",
+        "status": "scripted",
+        "file": "OP04_105_CharlotteAmande.cs",
+        "reason": "ActivatedMain每回合1次：成本=丢弃手牌中1张拥有【触发】的卡(Info.Trigger非空判定)，收益=RestCard对方费用≤2角色。"
+      },
+      {
+        "number": "OP04-106",
+        "status": "scripted",
+        "file": "OP04_106_CharlotteBavarois.cs",
+        "reason": "【咚×1】持续力量用ContinuousEffect.PowerDelta+谓词(AttachedDonCount≥1且我方生命<对方生命)+1000；OnLifeRevealTrigger可选弃1张手牌后PlayFromTrashFree登场自身。"
+      },
+      {
+        "number": "OP04-108",
+        "status": "scripted",
+        "file": "OP04_108_CharlotteMoscato.cs",
+        "reason": "【咚×1】持续赋予【流放】用ContinuousEffect.GrantKeyword=\"流放\"+谓词(AttachedDonCount≥1)，引擎已消费流放；OnLifeRevealTrigger可选弃1张手牌后PlayFromTrashFree登场自身。"
+      }
+    ]
+  },
+  {
+    "batch": "OP04-cs-50",
+    "results": [
+      {
+        "number": "OP04-110",
+        "status": "scripted",
+        "file": "OP04_110_Pound.cs",
+        "reason": "【KO时】用 MoveCharToLife(ctx.State,1-owner,...) 把对方≤3费角色置入对方生命区，顶/底用 ChooseOption；阻挡者关键词引擎自理。"
+      },
+      {
+        "number": "OP04-111",
+        "status": "scripted",
+        "file": "OP04_111_Hera.cs",
+        "reason": "【启动主要】复合成本(选弃1张其他《Homies》角色+横置自身)用 ChooseCards/RestCard 实现，收益 ActivateCard 激活「夏洛特·玲玲」。"
+      },
+      {
+        "number": "OP04-112",
+        "status": "scripted",
+        "file": "OP04_112_Yamato.cs",
+        "reason": "【登场时】动态费用阈值=双方LifeCount合计在C#运行时算出后过滤候选KO；后半段生命≤1时 AddLifeFromDeckTop(1)。"
+      },
+      {
+        "number": "OP04-113",
+        "status": "scripted",
+        "file": "OP04_113_Rabian.cs",
+        "reason": "【触发】此卡牌登场，OnLifeRevealTrigger 时从废弃区 PlayFromTrashFree 自登场(同 OP01-071 甚平)。"
+      },
+      {
+        "number": "OP04-116",
+        "status": "scripted",
+        "file": "OP04_116_DiableJambeHohnikuShoot.cs",
+        "reason": "【反击】选我方领袖/角色本次战斗+6000，之后条件(生命合计≤4)分支KO对方≤2费，C#可表达条件连锁；触发抽1张。"
+      },
+      {
+        "number": "OP04-117",
+        "status": "scripted",
+        "file": "OP04_117_HeavensFire.cs",
+        "reason": "【主要】MoveCharToLife(1-owner) 把对方≤3费角色入对方生命顶/底；【触发】生命顶/底1张入手后手牌1张入生命顶(HandToLife)。"
+      },
+      {
+        "number": "OP04-118",
+        "status": "scripted",
+        "file": "OP04_118_NefeltariVivi.cs",
+        "reason": "纯持续静态修正用 ContinuousEffect.GrantKeyword=\"速攻\"，Predicate 选中我方费用≥3的炎色他角色。"
+      },
+      {
+        "number": "OP04-119",
+        "status": "scripted",
+        "file": "OP04_119_DonquixoteRosinante.cs",
+        "reason": "持续防KO用 ContinuousEffect.KoGuard=\"effect\"(对方回合+自身休息+我方活跃原费用5角色)；【登场时】可选横置自身登场绿色5费角色。"
+      }
+    ]
+  }
+]

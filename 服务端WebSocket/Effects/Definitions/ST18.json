@@ -1,0 +1,68 @@
+{
+  "ST18-001": {
+    "_name": "撒谎八",
+    "_note": "【登场时】我方场上有≥8咚时，将对方最多1张费用≤5 角色转休息。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "selfDonTotalGte": 8 },
+        "then": [
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将对方最多1张费用≤5 角色转为休息状态" },
+          { "op": "Rest", "target": "$tgt" }
+        ]
+      }
+    ]
+  },
+  "ST18-002": {
+    "_name": "阿奈美",
+    "_note": "【阻挡者】+【登场时】我方场上有≥8咚时，丢弃1张手牌并抽2张。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "selfDonTotalGte": 8 },
+        "then": [
+          { "op": "DiscardOwnChosen", "n": 1 },
+          { "op": "Draw", "n": 2 }
+        ]
+      }
+    ]
+  },
+  "ST18-003": {
+    "_name": "山五郎",
+    "_note": "【攻击时】我方场上有≥8咚时抽1张（原文【每回合1次】，triggers 无 oncePerTurn 通道，未强制限次）。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "selfDonTotalGte": 8 },
+        "then": [
+          { "op": "Draw", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST18-004": {
+    "_name": "卓洛十郎",
+    "_matcher": "登场时确认卡组顶5张,公开≤1张紫《草帽一伙》入手,余放回底",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keywordContains": "草帽一伙", "color": "紫" } }
+        ]
+      }
+    ]
+  },
+  "ST18-005": {
+    "_name": "路飞太郎",
+    "_note": "【登场时】咚-1：手牌中最多1张费用≤5《草帽一伙》角色登场（原文限紫色，近似）。",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": { "donReturn": 1 },
+        "then": [
+          { "op": "PlayCharFromHand", "filter": { "keyword": "草帽一伙", "originalCostLte": 5 }, "text": "手牌中最多1张费用≤5《草帽一伙》角色登场" }
+        ]
+      }
+    ]
+  }
+}

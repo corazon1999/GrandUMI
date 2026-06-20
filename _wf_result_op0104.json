@@ -1,0 +1,7487 @@
+[
+  {
+    "set": "OP01",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP01-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正:【我方的回合中】我方全体角色力量+1000(咚条件光环),无事件触发,需C#脚本"
+      },
+      {
+        "number": "OP01-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场卡需与被退回角色'颜色不同'且费用≤5,filter无颜色键也无法引用前一目标颜色,无法表达"
+      },
+      {
+        "number": "OP01-003",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "donReturn": 4
+            },
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnCharacterCostLe5",
+                "max": 1,
+                "as": "$tgt",
+                "filter": {
+                  "anyOf": [
+                    {
+                      "keyword": "超新星"
+                    },
+                    {
+                      "keyword": "草帽一伙"
+                    }
+                  ],
+                  "originalCostLte": 5
+                },
+                "text": "选择1张费用≤5且拥有《超新星》或《草帽一伙》的角色"
+              },
+              {
+                "op": "Activate",
+                "target": "$tgt"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$tgt",
+                "delta": 1000
+              }
+            ]
+          }
+        },
+        "reason": "启动主要每回合1次,咚-4,将1张费用≤5且含超新星/草帽一伙的角色转活跃并本回合+1000"
+      },
+      {
+        "number": "OP01-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "'当对方发动事件时抽1'依赖对方打出事件的触发节,触发枚举无此项,无法表达"
+      },
+      {
+        "number": "OP01-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时从废弃区取'红色'角色加手牌,filter无颜色键,'红色'限制无法精确表达"
+      },
+      {
+        "number": "OP01-006",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "text": "选择对方最多1张角色"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -2000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时,本回合对方最多1张角色力量-2000"
+      },
+      {
+        "number": "OP01-007",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalPowerLte": 4000
+                  },
+                  "text": "选择对方最多1张力量≤4000的角色"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "KO时,KO对方最多1张力量≤4000的角色"
+      },
+      {
+        "number": "OP01-008",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时可选成本'将1张生命入手'与收益'获得速攻'强耦合,触发节不支持cost,仅实现收益会失真"
+      },
+      {
+        "number": "OP01-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "【触发】此卡牌登场(从生命区直接登场自身),无对应op机制,无法表达"
+      },
+      {
+        "number": "OP01-010",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-'且trigger为空,无任何主动效果"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP01-011",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时抽1；可选成本(将1张手牌放卡组底)无法在triggers表达，仅实现收益抽牌部分"
+      },
+      {
+        "number": "OP01-012",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-'，无主动效果"
+      },
+      {
+        "number": "OP01-013",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "lifeToHand": true
+            },
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "AddPowerThisTurn",
+                "target": "self",
+                "delta": 2000
+              },
+              {
+                "op": "AttachDon",
+                "target": "self",
+                "n": 2,
+                "from": "rest"
+              }
+            ]
+          }
+        },
+        "reason": "启动主要每回合1次，生命入手为成本，本回合此角色+2000并贴2张休息咚"
+      },
+      {
+        "number": "OP01-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "阻挡时从手牌登场红色角色，filter无颜色键，无法表达'红色'限定"
+      },
+      {
+        "number": "OP01-015",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnTrashCharacterCostLe4",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "keyword": "草帽一伙",
+                    "originalCostLte": 4,
+                    "excludeName": "托尼托尼·乔巴"
+                  }
+                },
+                {
+                  "op": "TrashToHand",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "咚×1攻击时，从废弃区将费用≤4的草帽角色(乔巴除外)加手牌；可选弃牌成本无法在triggers表达，仅实现收益部分"
+      },
+      {
+        "number": "OP01-016",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "草帽一伙",
+                    "excludeName": "奈美"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶5张，公开1张草帽特征(自身除外)加手牌，其余放回底"
+      },
+      {
+        "number": "OP01-017",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalPowerLte": 3000
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "咚×1攻击时，KO对方1张力量≤3000的角色"
+      },
+      {
+        "number": "OP01-018",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-'，无主动效果"
+      },
+      {
+        "number": "OP01-019",
+        "status": "complex",
+        "definition": {},
+        "reason": "对方回合中此角色力量+3000，为纯持续/静态修正且无事件触发"
+      },
+      {
+        "number": "OP01-020",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnLeaderOrCharacter",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$tgt",
+                "delta": 2000
+              }
+            ]
+          }
+        },
+        "reason": "启动主要横置自身为成本，本回合我方1张领袖或角色力量+2000"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 20,
+    "results": [
+      {
+        "number": "OP01-021",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果为改变攻击目标(可攻击对方活跃角色),属未列出的攻击目标机制,无对应 op,判 complex。"
+      },
+      {
+        "number": "OP01-022",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$t1"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$t1",
+                  "delta": -2000
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$t2"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$t2",
+                  "delta": -2000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚!!×1】作为 donAttachedGte:1 条件;【攻击时】对方最多2张角色各-2000,用两次 Choose+AddPowerThisTurn 表达。"
+      },
+      {
+        "number": "OP01-023",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为 '-',无任何效果。"
+      },
+      {
+        "number": "OP01-024",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "AttachDon",
+                "target": "self",
+                "n": 2,
+                "from": "rest"
+              }
+            ]
+          }
+        },
+        "reason": "实现【启动主要】每回合1次给自身贴最多2张休息咚;【咚!!×2】不会被KO属持续静态修正,本次忽略不写。"
+      },
+      {
+        "number": "OP01-025",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【速攻】纯关键词,无主动效果。"
+      },
+      {
+        "number": "OP01-026",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 4000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$ko",
+              "filter": {
+                "originalPowerLte": 4000
+              }
+            },
+            {
+              "op": "KO",
+              "target": "$ko"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$d"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$d",
+              "delta": -10000
+            }
+          ]
+        },
+        "reason": "【反击】我方领袖/角色+4000,之后KO对方力量≤4000角色;【触发】对方领袖/角色-10000。"
+      },
+      {
+        "number": "OP01-027",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$t",
+                "delta": -10000
+              }
+            ]
+          }
+        },
+        "reason": "【主要】对方最多1张角色-10000。"
+      },
+      {
+        "number": "OP01-028",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": -2000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": -2000
+            }
+          ]
+        },
+        "reason": "【反击】对方领袖/角色-2000;【触发】发动同样的【反击】效果,等价为对方领袖/角色-2000。"
+      },
+      {
+        "number": "OP01-029",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 2000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": 1000
+            }
+          ]
+        },
+        "reason": "【反击】我方领袖/角色本次战斗+2000(基础部分);【触发】我方领袖/角色+1000。注:'生命≤2则该卡再+2000'需对同一已选目标条件加成,DSL 无法在 op 后接条件复判同一变量,故省略该附加部分仅实现基础+2000。"
+      },
+      {
+        "number": "OP01-030",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 5,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "草帽一伙",
+                  "kind": "Character",
+                  "excludeName": "两年后！!！香波迪群岛见！!！"
+                }
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "LookTopReveal",
+              "count": 5,
+              "max": 1,
+              "restTo": "bottom",
+              "match": {
+                "keyword": "草帽一伙",
+                "kind": "Character",
+                "excludeName": "两年后！!！香波迪群岛见！!！"
+              }
+            }
+          ]
+        },
+        "reason": "【主要】确认卡组顶5张公开1张《草帽一伙》角色入手,其余放回底;【触发】发动同样的【主要】效果。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 30,
+    "results": [
+      {
+        "number": "OP01-031",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本要求丢弃的必须是带《和之国》特征的手牌，cost.handDiscard 无法按特征过滤，且该过滤成本与结果强耦合，判 complex。"
+      },
+      {
+        "number": "OP01-032",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正:对方有≥2休息角色时本角色力量+2000，无事件触发，需 C# 脚本。"
+      },
+      {
+        "number": "OP01-033",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】将对方最多1张费用≤4角色转休息:Choose+Rest。"
+      },
+      {
+        "number": "OP01-034",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "ActiveOwnDon",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】将我方最多1张咚转活跃:ActiveOwnDon 1(咚×2 为登场费用条件,忽略)。"
+      },
+      {
+        "number": "OP01-035",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe5",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】对方最多1张费用≤5角色转休息:Choose+Rest(每回合1次限制 triggers 无法表达,仅实现收益)。"
+      },
+      {
+        "number": "OP01-036",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为\"-\",无任何效果。"
+      },
+      {
+        "number": "OP01-037",
+        "status": "complex",
+        "definition": {},
+        "reason": "【触发】此卡牌登场:从生命区打出自身的机制无对应 op,判 complex。"
+      },
+      {
+        "number": "OP01-038",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentRestingCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 2
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            },
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "OpponentDiscard",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】KO对方≤2费休息角色(Choose+KO);【KO时】对方弃我方1张手牌(OpponentDiscard)。"
+      },
+      {
+        "number": "OP01-039",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnBlockDeclare",
+              "if": {
+                "ownCharCountGte": 3
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【阻挡时】我方≥3角色时抽1张:OnBlockDeclare+if ownCharCountGte+Draw(阻挡者关键词内置)。"
+      },
+      {
+        "number": "OP01-040",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderNameEquals": "光月御殿"
+              },
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "赤鞘九人男",
+                    "originalCostLte": 3
+                  },
+                  "text": "将我方手牌中最多1张费用≤3且《赤鞘九人男》角色登场"
+                }
+              ]
+            },
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "keyword": "赤鞘九人男",
+                    "originalCostLte": 3
+                  }
+                },
+                {
+                  "op": "Activate",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】领袖为光月御殿时从手牌登场≤1张≤3费《赤鞘九人男》(PlayCharFromHand+if leaderNameEquals);【攻击时】将我方≤1张≤3费《赤鞘九人男》角色转活跃(Choose+Activate,每回合1次限制忽略)。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 40,
+    "results": [
+      {
+        "number": "OP01-041",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 5,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "和之国",
+                  "excludeName": "光月桃之助"
+                }
+              }
+            ]
+          }
+        },
+        "reason": "启动主要横置自身，确认卡组顶5张公开1张《和之国》加手牌(可选转咚成本忽略)"
+      },
+      {
+        "number": "OP01-042",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderNameEquals": "光月御殿"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacterCostLe3",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "keyword": "和之国"
+                  }
+                },
+                {
+                  "op": "Activate",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时领袖为光月御殿则将费用≤3且《和之国》角色转活跃(可选转咚成本忽略)"
+      },
+      {
+        "number": "OP01-043",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为 \"-\"，无效果"
+      },
+      {
+        "number": "OP01-044",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时条件「我方场上不存在特定名称佩金」无对应 if 条件键可表达"
+      },
+      {
+        "number": "OP01-045",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为 \"-\"，无效果"
+      },
+      {
+        "number": "OP01-046",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1,
+                "leaderNameEquals": "光月御殿"
+              },
+              "then": [
+                {
+                  "op": "ActiveOwnDon",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "咚×1攻击时领袖为光月御殿则将我方≤2张咚转活跃"
+      },
+      {
+        "number": "OP01-047",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "originalCostLte": 3
+                  },
+                  "text": "将手牌中最多1张费用≤3的角色登场"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时将手牌≤1张费用≤3角色登场(可选放回我方角色成本忽略)"
+      },
+      {
+        "number": "OP01-048",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe3",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时将对方≤1张费用≤3角色横置"
+      },
+      {
+        "number": "OP01-049",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "心脏海盗团",
+                    "originalCostLte": 4,
+                    "excludeName": "贝宝"
+                  },
+                  "text": "将手牌中最多1张贝宝以外费用≤4且《心脏海盗团》角色登场"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "咚×1攻击时将手牌≤1张贝宝以外费用≤4且《心脏海盗团》角色登场"
+      },
+      {
+        "number": "OP01-050",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时条件「我方场上不存在特定名称夏齐」无对应 if 条件键可表达"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 50,
+    "results": [
+      {
+        "number": "OP01-051",
+        "status": "complex",
+        "definition": {},
+        "reason": "含持续限制「对方的回合中此卡休息时对方不能攻击本卡以外的角色」，该攻击目标限制机制无对应 op/condition，无法用 DSL 表达，整卡判 complex。"
+      },
+      {
+        "number": "OP01-052",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "ownRestedCharCountGte": 2
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "攻击时若我方休息角色≥2则抽1张（每回合1次语义由触发本身承载）。"
+      },
+      {
+        "number": "OP01-053",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "效果为「-」，无任何效果。"
+      },
+      {
+        "number": "OP01-054",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentRestingCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 4
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时 KO 对方≤1张休息且费用≤4的角色。"
+      },
+      {
+        "number": "OP01-055",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Draw",
+                "n": 2
+              }
+            ]
+          }
+        },
+        "reason": "主要抽2张；「转为休息我方2张角色」的可选成本无对应 cost 键，按惯例忽略成本仅实现抽牌收益。"
+      },
+      {
+        "number": "OP01-056",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentRestingCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t1",
+                "filter": {
+                  "originalCostLte": 5
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$t1"
+              },
+              {
+                "op": "Choose",
+                "prompt": "OpponentRestingCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t2",
+                "filter": {
+                  "originalCostLte": 5
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$t2"
+              }
+            ]
+          }
+        },
+        "reason": "主要 KO 对方最多2张休息且费用≤5的角色，用两组 Choose+KO 表达。"
+      },
+      {
+        "number": "OP01-057",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 2000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OwnCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$a"
+            },
+            {
+              "op": "Activate",
+              "target": "$a"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentRestingCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "filter": {
+                "originalCostLte": 4
+              }
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "反击给领袖/角色+2000并活跃我方≤1角色；触发 KO 对方≤1张休息费≤4角色。"
+      },
+      {
+        "number": "OP01-058",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 4000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$r",
+              "filter": {
+                "originalCostLte": 4
+              }
+            },
+            {
+              "op": "Rest",
+              "target": "$r"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt"
+            },
+            {
+              "op": "Rest",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "反击给领袖/角色+4000并横置对方≤1张费≤4角色；触发横置对方≤1张角色。"
+      },
+      {
+        "number": "OP01-059",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$a",
+                "filter": {
+                  "keyword": "和之国",
+                  "originalCostLte": 3
+                }
+              },
+              {
+                "op": "Activate",
+                "target": "$a"
+              }
+            ]
+          }
+        },
+        "reason": "主要活跃我方≤1张费≤3且含「和之国」的角色；「丢弃1张含和之国手牌」的可选成本因 handDiscard 不支持 filter 无法精确表达，按惯例忽略成本仅实现收益。"
+      },
+      {
+        "number": "OP01-061",
+        "status": "complex",
+        "definition": {},
+        "reason": "「我方回合中当对方角色被 KO 时」属对方角色被 KO 的持续触发，触发枚举仅有自身 OnKO，无法表达对方角色被 KO 的事件，判 complex。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 60,
+    "results": [
+      {
+        "number": "OP01-062",
+        "status": "complex",
+        "definition": {},
+        "reason": "领袖效果依赖「我方发动事件时」事件触发节(无 OnEventPlay 枚举),且需追踪「本回合是否已通过此领袖效果抽过牌」的特殊一次性状态,DSL 无法表达。"
+      },
+      {
+        "number": "OP01-063",
+        "status": "complex",
+        "definition": {},
+        "reason": "需公开对方手牌并判断「是否为事件卡」再据此让对方生命入卡组底,涉及公开手牌后的条件联动,DSL 无此机制。"
+      },
+      {
+        "number": "OP01-064",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】触发节不支持 cost,而弃1张手牌的成本与回手结果强耦合,无法用 triggers 表达。"
+      },
+      {
+        "number": "OP01-065",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」,无任何效果。"
+      },
+      {
+        "number": "OP01-066",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」,无任何效果。"
+      },
+      {
+        "number": "OP01-067",
+        "status": "complex",
+        "definition": {},
+        "reason": "【流放】为纯关键词,核心效果「我方手牌中的蓝色事件费用-1」为纯静态减费,属手牌静态减费通道,需 C# 脚本。"
+      },
+      {
+        "number": "OP01-068",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合中】手牌≥5时本角色持续获得【双重攻击】,为条件性持续/静态修正,无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP01-069",
+        "status": "complex",
+        "definition": {},
+        "reason": "【KO时】从卡组按名称「史姆丽」登场角色,DSL 无「从卡组登场指定卡」的 op(PlayChar 仅支持手牌/废弃区),需 C# 脚本。"
+      },
+      {
+        "number": "OP01-070",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时将「任意1张费用≤7的角色」(己方或对方均可)放卡组底,prompt 仅有 Opponent*/Own* 分项,无「任意角色费用≤7」取值,无法精确表达。"
+      },
+      {
+        "number": "OP01-071",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时将「任意1张费用≤3的角色」(己方或对方均可)放卡组底,prompt 无「任意角色」取值;且【触发】为此卡自身登场的特殊机制,无法表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 70,
+    "results": [
+      {
+        "number": "OP01-072",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续/动态力量修正(我方回合中每张手牌力量+1000，需贴咚激活)，无事件触发节，属纯静态/持续修正，须C#脚本。"
+      },
+      {
+        "number": "OP01-073",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认卡组顶5张并自选顺序重排放顶或底，属查看并重排机制，op列表未提供该原语。"
+      },
+      {
+        "number": "OP01-074",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "和平主义者",
+                    "originalCostLte": 4
+                  },
+                  "text": "将我方手牌中最多1张费用不高于4的“和平主义者”登场"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】从手牌按特征'和平主义者'且费用≤4免费登场≤1张角色。"
+      },
+      {
+        "number": "OP01-075",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅含【阻挡者】关键词与可入任意张数卡组的规则说明，无主动效果。"
+      },
+      {
+        "number": "OP01-076",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-'，无任何效果。"
+      },
+      {
+        "number": "OP01-077",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认卡组顶5张并自选顺序重排放顶或底，属查看并重排机制，无对应op原语。"
+      },
+      {
+        "number": "OP01-078",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1,
+                "selfHandCountLte": 5
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            },
+            {
+              "on": "OnBlockDeclare",
+              "if": {
+                "donAttachedGte": 1,
+                "selfHandCountLte": 5
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚!!×1】【攻击时】【阻挡时】手牌≤5时抽1，用donAttachedGte:1表达贴咚条件，selfHandCountLte:5表达手牌限制，两个触发节分别覆盖攻击与阻挡。"
+      },
+      {
+        "number": "OP01-079",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "巴洛克工作室"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnTrashEvent",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "TrashToHand",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】领袖含'巴洛克工作室'特征时，从废弃区选≤1张事件加入手牌。"
+      },
+      {
+        "number": "OP01-080",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】抽取1张卡牌。"
+      },
+      {
+        "number": "OP01-081",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-'，无任何效果。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 80,
+    "results": [
+      {
+        "number": "OP01-082",
+        "status": "complex",
+        "definition": {},
+        "reason": "trigger 仅为【触发】将此卡登场，需要从生命区把自身打到场上的机制，无对应 op 可表达"
+      },
+      {
+        "number": "OP01-083",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正：我方回合中按废弃区事件数量条件性力量+1000，无事件触发，需 C# 脚本"
+      },
+      {
+        "number": "OP01-084",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "巴洛克工作室",
+                    "kind": "Event"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】确认卡组顶5张公开1张巴洛克工作室特征事件加入手牌，其余放回卡组底"
+      },
+      {
+        "number": "OP01-085",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "巴洛克工作室"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddRestriction",
+                  "target": "$tgt",
+                  "kind": "CannotAttack",
+                  "duration": "untilOppTurnEnd"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】领袖含巴洛克工作室时，选对方1张费用≤4角色施加不能攻击限制至下个对方回合结束"
+      },
+      {
+        "number": "OP01-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "【反击】后段需将活跃状态且费用≤3的任意（持有者两方）角色放回手牌；filter 无活跃状态键、prompt 无『任意一方角色』取值，trigger 同理无法表达"
+      },
+      {
+        "number": "OP01-087",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "PlayCharFromHand",
+              "filter": {
+                "keyword": "巴洛克工作室",
+                "originalCostLte": 3
+              },
+              "text": "将手牌中最多1张费用≤3且拥有巴洛克工作室特征的角色登场"
+            }
+          ]
+        },
+        "reason": "【反击】从手牌将最多1张费用≤3且巴洛克工作室特征角色登场"
+      },
+      {
+        "number": "OP01-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "【反击】后段需确认卡组顶3张自选排列放最上或最下（查看并重排机制），无对应 op，无法表达"
+      },
+      {
+        "number": "OP01-089",
+        "status": "complex",
+        "definition": {},
+        "reason": "【反击】将任意（持有者两方）费用≤5角色放回手牌，prompt 无『任意一方角色』取值，无法精确表达"
+      },
+      {
+        "number": "OP01-090",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 5,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "巴洛克工作室",
+                  "excludeName": "巴洛克工作室"
+                }
+              }
+            ]
+          }
+        },
+        "reason": "【主要】确认卡组顶5张，公开1张『巴洛克工作室』以外拥有巴洛克工作室特征的卡加入手牌，其余放回卡组底"
+      },
+      {
+        "number": "OP01-091",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正：我方回合中场上10张咚时对方全体角色力量-1000，无事件触发，需 C# 脚本"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 90,
+    "results": [
+      {
+        "number": "OP01-092",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」，无任何主动效果，仅有反击值，香草角色。"
+      },
+      {
+        "number": "OP01-093",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从咚卡组追加最多1张休息状态的咚；可选的转咚成本按惯例忽略，只实现收益。"
+      },
+      {
+        "number": "OP01-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "需将此角色以外的所有角色（敌我双方全体）KO，没有「全体KO/KO除自身外全部」的 op，无法用单目标 KO 表达。"
+      },
+      {
+        "number": "OP01-095",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "selfDonTotalGte": 8
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时我方咚总数≥8则抽1张。"
+      },
+      {
+        "number": "OP01-096",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe3",
+                  "max": 1,
+                  "as": "$t1"
+                },
+                {
+                  "op": "KO",
+                  "target": "$t1"
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe2",
+                  "max": 1,
+                  "as": "$t2"
+                },
+                {
+                  "op": "KO",
+                  "target": "$t2"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时 KO 对方最多1张费用≤3、最多1张费用≤2 的角色；咚-2 成本 triggers 无法承载，按惯例忽略只实现收益。"
+      },
+      {
+        "number": "OP01-097",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "GiveKeyword",
+                  "target": "self",
+                  "keyword": "速攻",
+                  "duration": "thisTurn"
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -2000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时此角色本回合获得速攻，之后对方最多1张角色力量-2000；咚-1 成本忽略只实现收益。"
+      },
+      {
+        "number": "OP01-098",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "SearchDeck",
+                  "filter": {
+                    "nameEquals": "人造恶魔果实SMILE"
+                  },
+                  "text": "公开最多1张「人造恶魔果实SMILE」加入手牌",
+                  "as": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从卡组公开最多1张「人造恶魔果实SMILE」加入手牌并洗牌，用 SearchDeck 按 nameEquals 检索。"
+      },
+      {
+        "number": "OP01-099",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续效果：我方其他《黑炭家》角色不会在战斗中被KO，属静态修正，需 C# 脚本实现。"
+      },
+      {
+        "number": "OP01-100",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】纯关键词，无其他主动效果。"
+      },
+      {
+        "number": "OP01-101",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚×1】攻击时从咚卡组追加最多1张休息状态的咚；条件用被贴咚≥1，可选弃手牌成本 triggers 无法承载，按惯例忽略只实现收益。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 100,
+    "results": [
+      {
+        "number": "OP01-102",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "OpponentDiscard",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "攻击时让对方弃1张手牌；触发节不支持 cost，忽略咚-1 成本只实现收益。"
+      },
+      {
+        "number": "OP01-103",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」，无任何效果与关键词。"
+      },
+      {
+        "number": "OP01-104",
+        "status": "complex",
+        "definition": {},
+        "reason": "【触发】此卡牌登场=从生命作为该卡登场，缺少对应自身登场 op，无法用 DSL 表达。"
+      },
+      {
+        "number": "OP01-105",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】公开对方2张手牌，无公开对方手牌的 op 可用。"
+      },
+      {
+        "number": "OP01-106",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】从咚卡组追加最多1张休息状态咚=RefreshDon n:1 state:rest；trigger 字段的自身登场life效果无法表达，已忽略。"
+      },
+      {
+        "number": "OP01-107",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」，无任何效果与关键词。"
+      },
+      {
+        "number": "OP01-108",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe5",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】KO对方最多1张费用≤5角色；触发节不支持 cost，忽略咚-1 成本只实现收益。"
+      },
+      {
+        "number": "OP01-109",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方回合中】场上咚≥8时本角色力量+1000，属纯持续/静态修正且需条件判定，无事件触发。"
+      },
+      {
+        "number": "OP01-110",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为「-」，无任何效果与关键词。"
+      },
+      {
+        "number": "OP01-111",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnBlockDeclare",
+              "then": [
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "self",
+                  "delta": 1000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【阻挡者】关键词外，【阻挡时】本回合本角色力量+1000；触发节不支持 cost，忽略咚-1 成本只实现收益。"
+      }
+    ]
+  },
+  {
+    "set": "OP01",
+    "idx": 110,
+    "results": [
+      {
+        "number": "OP01-112",
+        "status": "complex",
+        "definition": {},
+        "reason": "「本回合此角色可以攻击对方处于活跃状态的角色」属于改变攻击合法目标规则的特殊一次性状态，op 列表中无对应机制，无法用 DSL 表达。"
+      },
+      {
+        "number": "OP01-113",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】从咚卡组追加最多1张休息状态咚，映射为 RefreshDon n=1 state=rest。"
+      },
+      {
+        "number": "OP01-114",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "OpponentDiscard",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】对方丢弃1张手牌，映射为 OpponentDiscard n=1；triggers 不支持 cost，按惯例忽略「咚-1」可选成本只实现收益。"
+      },
+      {
+        "number": "OP01-115",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe2",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              },
+              {
+                "op": "RefreshDon",
+                "n": 1,
+                "state": "active"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe2",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            },
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【主要】KO对方1张费用≤2角色并追加1张活跃咚；【触发】同【主要】效果，复用同一组 op。"
+      },
+      {
+        "number": "OP01-116",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶5张并将其中符合条件的角色直接登场，再把剩余卡按自选顺序放回卡组底——「看卡组顶若干张并从中登场」的机制 op 列表中没有（LookTopReveal 只能加手牌），无法用 DSL 表达。"
+      },
+      {
+        "number": "OP01-117",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "donReturn": 1
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe6",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "Rest",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "【主要】咚-1：将对方1张费用≤6角色横置，映射为 main cost donReturn=1 + Choose OpponentCharacterCostLe6 + Rest。"
+      },
+      {
+        "number": "OP01-118",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 2000
+            },
+            {
+              "op": "Draw",
+              "n": 1
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【反击】我方1张领袖或角色本次战斗+2000并抽1（counter 支持 cost，但咚-2 为可选成本且与结果非强耦合，按惯例只实现收益）；【触发】追加1张活跃咚。"
+      },
+      {
+        "number": "OP01-119",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 4000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【反击】我方1张领袖或角色本次战斗+4000；【触发】追加1张活跃咚。后半句「我方生命≤2则追加休息咚」是 counter 内条件分支，counter 为无 if 的纯 op 列表无法表达，故省略该条件追加（仅丢失附带收益，主效果保留）。"
+      },
+      {
+        "number": "OP01-120",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】本次战斗中对方力量≤2000的角色不能发动【阻挡者】——需对「对方力量≤2000的全体角色」批量施加 CannotBeBlocker 限制，AddRestriction 仅作用于单个 $tgt 且无按力量批量过滤的机制，无法用 DSL 表达（速攻为纯关键词）。"
+      },
+      {
+        "number": "OP01-121",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【双重攻击】【流放】关键词及「卡名也视为光月御殿」的静态名称视同，无主动触发效果。"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP02-001",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "then": [
+                {
+                  "op": "LifeToHand"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "我方回合结束时将生命顶1张入手"
+      },
+      {
+        "number": "OP02-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发时机是【我方的回合中赋予咚!!时】，无对应触发枚举(无 OnDonAttach)，且为持续型费用减免，无法用 DSL 表达"
+      },
+      {
+        "number": "OP02-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时『直到下个我方回合开始的领袖力量+2000』duration不在列表，且『本回合无法将生命卡加入手牌』为未列出的一次性限制机制，整卡判 complex"
+      },
+      {
+        "number": "OP02-005",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "kind": "Character",
+                    "originalCostGte": 1,
+                    "originalCostLte": 1,
+                    "excludeName": "加利·达丹"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认顶5张公开≤1张费用1的角色加手牌；filter无颜色键，按费用1角色近似(红色色限省略)"
+      },
+      {
+        "number": "OP02-008",
+        "status": "complex",
+        "definition": {},
+        "reason": "在满足条件场合下获得【速攻】属于纯持续/静态条件型关键词赋予，无事件触发，判 complex"
+      },
+      {
+        "number": "OP02-009",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "白胡子海盗团"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -4000
+                },
+                {
+                  "op": "LifeToHand"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时若领袖含白胡子海盗团：对方1张角色力量-4000并将生命顶入手"
+      },
+      {
+        "number": "OP02-010",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "PlayCharFromHand",
+                "filter": {
+                  "kind": "Character",
+                  "originalCostGte": 1,
+                  "originalCostLte": 1,
+                  "excludeName": "多古拉"
+                },
+                "text": "登场1张多古拉以外费用1的红色角色"
+              }
+            ]
+          }
+        },
+        "reason": "启动主要休息自身，从手牌登场≤1张费用1非多古拉角色；filter无颜色键按费用1近似"
+      },
+      {
+        "number": "OP02-011",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalPowerLte": 3000
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时KO对方1张力量≤3000的角色"
+      },
+      {
+        "number": "OP02-012",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【阻挡者】关键词，无其他主动效果"
+      },
+      {
+        "number": "OP02-013",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 2,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -3000
+                }
+              ]
+            },
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "白胡子海盗团"
+              },
+              "then": [
+                {
+                  "op": "GiveKeyword",
+                  "target": "self",
+                  "keyword": "速攻",
+                  "duration": "thisTurn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时对方≤2张角色力量-3000；之后若领袖含白胡子海盗团则自身本回合获得速攻(拆为两个OnEnterField触发，条件分句独立)"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP02-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "「也可以攻击对方活跃状态的角色」属于改变可攻击目标的特殊机制，op 列表无对应原语，需 C# 脚本。"
+      },
+      {
+        "number": "OP02-015",
+        "status": "complex",
+        "definition": {},
+        "reason": "需选「费用为1的红色角色」，filter 无颜色键也无精确等于费用1的取值，无法精确表达，判 complex。"
+      },
+      {
+        "number": "OP02-016",
+        "status": "complex",
+        "definition": {},
+        "reason": "同 OP02-015，需限定「费用为1的红色角色」，filter 缺颜色键，无法精确表达。"
+      },
+      {
+        "number": "OP02-017",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 2
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalPowerLte": 2000
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "贴咚≥2 时攻击触发，KO 对方1张力量≤2000角色。"
+      },
+      {
+        "number": "OP02-018",
+        "status": "complex",
+        "definition": {},
+        "reason": "【KO时】带可选弃牌成本且与「丢弃白胡子卡」强耦合，triggers 不支持 cost，又涉及废弃区休息登场自身的条件联动，判 complex。"
+      },
+      {
+        "number": "OP02-019",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合中】对全体白胡子角色+1000，属纯持续/静态修正，无事件触发，判 complex。"
+      },
+      {
+        "number": "OP02-021",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "if": {
+              "leaderHasKeyword": "白胡子海盗团"
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$tgt",
+                "filter": {
+                  "originalPowerLte": 3000
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": -3000
+            }
+          ]
+        },
+        "reason": "主要：领袖含白胡子时 KO 对方力量≤3000角色；触发：对方领袖或角色-3000。"
+      },
+      {
+        "number": "OP02-022",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 5,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "白胡子海盗团",
+                  "kind": "Character",
+                  "excludeName": "白胡子海盗团"
+                }
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "LookTopReveal",
+              "count": 5,
+              "max": 1,
+              "restTo": "bottom",
+              "match": {
+                "keyword": "白胡子海盗团",
+                "kind": "Character",
+                "excludeName": "白胡子海盗团"
+              }
+            }
+          ]
+        },
+        "reason": "主要：确认顶5张公开1张白胡子角色入手，余放回底；触发同主要效果。"
+      },
+      {
+        "number": "OP02-023",
+        "status": "complex",
+        "definition": {},
+        "reason": "主要「本回合无法通过效果将生命加入手牌」属未列出的特殊限制机制，op 无对应原语，判 complex。"
+      },
+      {
+        "number": "OP02-024",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合中】对指定名称及白胡子角色条件性+2000，属纯持续/静态修正且按名称指定，判 complex。"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 20,
+    "results": [
+      {
+        "number": "OP02-025",
+        "status": "complex",
+        "definition": {},
+        "reason": "启动主要施加的是延迟减费效果(本回合下次从手牌登场费用≥3的《和之国》角色减费1),属于未列出的延迟登场打折机制,DSL无法表达。"
+      },
+      {
+        "number": "OP02-026",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发条件为'登场原本没有效果的角色时',此种以登场卡牌属性为条件的触发不在触发枚举内,无法表达。"
+      },
+      {
+        "number": "OP02-027",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态保护效果(咚全休息时不因对方效果离场),无事件触发,需C#脚本。"
+      },
+      {
+        "number": "OP02-029",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "then": [
+                {
+                  "op": "ActiveOwnDon",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【我方回合结束时】活跃我方最多1张咚。"
+      },
+      {
+        "number": "OP02-030",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "donReturn": 3
+            },
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "Activate",
+                "target": "self"
+              }
+            ]
+          },
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "SearchDeck",
+                  "filter": {
+                    "kind": "Character",
+                    "keyword": "和之国",
+                    "originalCostGte": 3,
+                    "originalCostLte": 3
+                  },
+                  "text": "登场卡组中费用3且《和之国》的绿色角色",
+                  "as": "$c"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "启动主要(咚-3)活跃自身;【KO时】从卡组登场费用3的《和之国》角色后洗牌(SearchDeck含洗牌)。"
+      },
+      {
+        "number": "OP02-031",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性持续静态地获得【阻挡者】关键词(场上存在'光月御殿'时),属纯持续修正,需C#脚本。"
+      },
+      {
+        "number": "OP02-032",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "keyword": "纯毛族",
+                    "originalCostLte": 5
+                  }
+                },
+                {
+                  "op": "Activate",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】活跃我方最多1张费用≤5的《纯毛族》角色(可选成本咚-2忽略,只实现收益)。"
+      },
+      {
+        "number": "OP02-034",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe2",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】横置对方最多1张费用≤2的角色(发动条件咚×1忽略)。"
+      },
+      {
+        "number": "OP02-035",
+        "status": "complex",
+        "definition": {},
+        "reason": "启动主要的成本包含'将此角色放回持有者手牌',此种自身回手作为成本不在cost键列表内,与PlayCharFromHand收益强耦合,无法表达。"
+      },
+      {
+        "number": "OP02-036",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 3,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "FILM",
+                    "excludeName": "奈美"
+                  }
+                }
+              ]
+            },
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 3,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "FILM",
+                    "excludeName": "奈美"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】/【攻击时】确认卡组顶3张,公开≤1张'奈美'以外的《FILM》卡加手牌,其余放回卡组底(可选成本咚-1忽略)。"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 30,
+    "results": [
+      {
+        "number": "OP02-037",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "anyOf": [
+                      {
+                        "keyword": "FILM"
+                      },
+                      {
+                        "keyword": "草帽一伙"
+                      }
+                    ],
+                    "originalCostLte": 2
+                  },
+                  "text": "从手牌登场最多1张费用不高于2且拥有《FILM》或《草帽一伙》特征的角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从手牌登场≤1张费用≤2且FILM/草帽一伙角色，用 PlayCharFromHand+filter 表达。"
+      },
+      {
+        "number": "OP02-038",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】纯关键词，无其他主动效果。"
+      },
+      {
+        "number": "OP02-040",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "anyOf": [
+                      {
+                        "keyword": "FILM"
+                      },
+                      {
+                        "keyword": "草帽一伙"
+                      }
+                    ],
+                    "originalCostLte": 3
+                  },
+                  "text": "从手牌登场最多1张费用不高于3且拥有《FILM》或《草帽一伙》特征的角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从手牌登场≤1张费用≤3且FILM/草帽一伙角色。"
+      },
+      {
+        "number": "OP02-041",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "anyOf": [
+                      {
+                        "keyword": "FILM"
+                      },
+                      {
+                        "keyword": "草帽一伙"
+                      }
+                    ],
+                    "originalCostLte": 4
+                  },
+                  "text": "从手牌登场最多1张费用不高于4且拥有《FILM》或《草帽一伙》特征的角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【阻挡者】为纯关键词无需DSL；实现登场时从手牌登场≤1张费用≤4且FILM/草帽一伙角色。"
+      },
+      {
+        "number": "OP02-042",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe6",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "「卡名也视为光月御殿」为无法表达的改名规则机制忽略；实现登场时将对方≤1张费用≤6角色横置。"
+      },
+      {
+        "number": "OP02-044",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "纯毛族",
+                    "originalCostLte": 3,
+                    "excludeName": "汪达"
+                  },
+                  "text": "从手牌登场最多1张“汪达”以外费用不高于3且拥有《纯毛族》特征的角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从手牌登场≤1张“汪达”以外费用≤3纯毛族角色，filter 用 excludeName 排除汪达。"
+      },
+      {
+        "number": "OP02-045",
+        "status": "complex",
+        "definition": {},
+        "reason": "反击+6000可表达，但「之后将原本没有效果的角色登场」涉及 filter 无法表达的“原本没有效果”判定，且属“之后”连锁分句，整体判 complex。"
+      },
+      {
+        "number": "OP02-046",
+        "status": "complex",
+        "definition": {},
+        "reason": "主要KO可表达，但【触发】「登场原本没有效果的角色」中“原本没有效果”无对应 filter 键无法表达，整卡判 complex。"
+      },
+      {
+        "number": "OP02-047",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe4",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "Rest",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentRestingCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "filter": {
+                "originalCostLte": 3
+              }
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "主要将对方≤1张费用≤4角色横置；触发KO对方≤1张休息状态费用≤3角色(OpponentRestingCharacter+originalCostLte:3)。"
+      },
+      {
+        "number": "OP02-048",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true,
+              "handDiscard": 1
+            },
+            "then": [
+              {
+                "op": "ActiveOwnDon",
+                "n": 1
+              }
+            ]
+          }
+        },
+        "reason": "启动主要：横置本舞台并弃1张手牌为成本，将我方≤1张咚活跃(ActiveOwnDon)。注：成本要求弃的手牌须含《和之国》特征，handDiscard 无法限定特征，按惯例以普通弃1张近似。"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 40,
+    "results": [
+      {
+        "number": "OP02-049",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "if": {
+                "selfHandCountLte": 0
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "我方回合结束时手牌为0张则抽2张"
+      },
+      {
+        "number": "OP02-050",
+        "status": "complex",
+        "definition": {},
+        "reason": "手牌不多于1张时力量+2000属于无事件触发的条件性静态加成，无法用DSL表达；阻挡者为纯关键词"
+      },
+      {
+        "number": "OP02-051",
+        "status": "complex",
+        "definition": {},
+        "reason": "抽卡直到手牌变为3张属于不固定张数的抽卡机制，Draw只支持固定n，无法表达"
+      },
+      {
+        "number": "OP02-052",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件为场上存在名为毛奇的角色，if条件键无按名称判定场上某角色存在的机制"
+      },
+      {
+        "number": "OP02-056",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶3张并自选排序放回顶/底属于查看并重排机制，无对应op；攻击时弃手牌将对方角色放回卡组底也需复合判定"
+      },
+      {
+        "number": "OP02-057",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 2,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "王下七武海",
+                    "excludeName": "巴索罗缪·大熊"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶2张公开1张王下七武海加手牌、其余放回；自选排序顶/底简化为放回底"
+      },
+      {
+        "number": "OP02-058",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "因佩尔地狱",
+                    "excludeName": "巴奇"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶5张公开1张巴奇以外的因佩尔地狱卡加手牌、其余放回底（蓝色限制match无颜色键无法表达，近似为特征过滤）"
+      },
+      {
+        "number": "OP02-059",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 1
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 3
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "攻击时抽1弃1，之后弃最多3张手牌（DiscardOwnChosen表达我方自选弃牌）"
+      },
+      {
+        "number": "OP02-061",
+        "status": "complex",
+        "definition": {},
+        "reason": "禁止对方发动费用≤5角色的阻挡者效果，无对应op机制可表达"
+      },
+      {
+        "number": "OP02-062",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时/攻击时的弃2张手牌成本与放回角色结果强耦合，且触发节不支持cost；双重攻击赋予可表达但整体需C#"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 50,
+    "results": [
+      {
+        "number": "OP02-063",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时从废弃区取「蓝色」事件，filter 无颜色键，无法用 kind/cost 精确表达颜色限定。"
+      },
+      {
+        "number": "OP02-064",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击时含可选弃牌成本+将角色放回卡组底，且「本次战斗结束时将此角色放回卡组底」涉及延迟连锁判定，无法表达。"
+      },
+      {
+        "number": "OP02-065",
+        "status": "complex",
+        "definition": {},
+        "reason": "我方回合结束时带可丢手牌成本将自身活跃，triggers 不支持 cost 且为可选成本，无法表达。"
+      },
+      {
+        "number": "OP02-066",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "handDiscard": 2
+            },
+            "if": {
+              "leaderHasKeyword": "因佩尔地狱"
+            },
+            "then": [
+              {
+                "op": "Draw",
+                "n": 2
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 2
+            }
+          ]
+        },
+        "reason": "主要弃2张手牌、领袖含因佩尔地狱时抽2；触发抽2。"
+      },
+      {
+        "number": "OP02-067",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentLeaderOrCharacter",
+                "max": 1,
+                "filter": {
+                  "kind": "Character",
+                  "originalCostLte": 4
+                },
+                "as": "$tgt"
+              },
+              {
+                "op": "BounceToHand",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "filter": {
+                "kind": "Character",
+                "originalCostLte": 4
+              },
+              "as": "$tgt"
+            },
+            {
+              "op": "BounceToHand",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "主要将最多1张费用≤4角色放回手牌；触发同样发动该主要效果。"
+      },
+      {
+        "number": "OP02-068",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 3000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "filter": {
+                "kind": "Character",
+                "originalCostLte": 2
+              },
+              "as": "$tgt"
+            },
+            {
+              "op": "BounceToHand",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "反击弃1手牌给我方领袖或角色本战斗+3000(弃牌成本经 cost 不可挂可选弦，按收益实现)；触发将费用≤2角色放回手牌。"
+      },
+      {
+        "number": "OP02-069",
+        "status": "complex",
+        "definition": {},
+        "reason": "反击「抽取卡牌直到手牌变为2张」为动态张数抽牌，Draw 需固定 n，无法表达。"
+      },
+      {
+        "number": "OP02-070",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "if": {
+              "leaderNameEquals": "安普里奥.伊娃科夫"
+            },
+            "then": [
+              {
+                "op": "Draw",
+                "n": 1
+              },
+              {
+                "op": "DiscardOwnChosen",
+                "n": 1
+              },
+              {
+                "op": "DiscardOwnChosen",
+                "n": 3
+              }
+            ]
+          }
+        },
+        "reason": "启动主要横置舞台，领袖为伊娃科夫时抽1弃1，之后丢弃最多3张手牌。"
+      },
+      {
+        "number": "OP02-071",
+        "status": "complex",
+        "definition": {},
+        "reason": "「咚放回咚卡组时」触发时机不在触发枚举内，无法表达。"
+      },
+      {
+        "number": "OP02-072",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击时带咚-4成本(与KO结果强耦合)，triggers 不支持 cost，无法表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 60,
+    "results": [
+      {
+        "number": "OP02-073",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "狱卒兽"
+                  },
+                  "text": "登场我方手牌中最多1张《狱卒兽》特征角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从手牌登场最多1张《狱卒兽》特征角色"
+      },
+      {
+        "number": "OP02-074",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正:按指定卡名给我方‘蓝猩’持续赋予【阻挡者】,无事件触发且需按名称针对特定卡,DSL无法表达"
+      },
+      {
+        "number": "OP02-076",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe1",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时KO对方最多1张费用≤1角色;triggers不支持cost,忽略可选的咚!!-1成本只实现收益"
+      },
+      {
+        "number": "OP02-078",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "keyword": "SMILE",
+                    "originalCostLte": 3,
+                    "excludeName": "戴弗高"
+                  },
+                  "text": "登场手牌中‘戴弗高’以外费用≤3的《SMILE》角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时从手牌登场最多1张‘戴弗高’以外费用≤3《SMILE》角色;triggers不支持cost,忽略可选咚!!-2成本"
+      },
+      {
+        "number": "OP02-079",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时将对方最多1张费用≤4角色转休息;triggers不支持cost,忽略可选咚!!-1成本"
+      },
+      {
+        "number": "OP02-081",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【阻挡者】纯关键词,无其他主动效果"
+      },
+      {
+        "number": "OP02-082",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "donReturn": 8
+            },
+            "then": [
+              {
+                "op": "AddPowerThisTurn",
+                "target": "self",
+                "delta": 792000
+              }
+            ]
+          }
+        },
+        "reason": "启动主要咚!!-8:本回合此角色力量+792000"
+      },
+      {
+        "number": "OP02-083",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "因佩尔地狱",
+                    "excludeName": "汉尼拔"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶5张,公开≤1张‘汉尼拔’以外《因佩尔地狱》特征加手牌,其余放回底"
+      },
+      {
+        "number": "OP02-085",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果让对方将其场上的咚!!放回咚!!卡组(减少对方咚),无对应op(ReturnDonToDeck仅作用于我方咚),机制未列出"
+      },
+      {
+        "number": "OP02-086",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "因佩尔地狱"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【阻挡者】纯关键词不计;KO时领袖含《因佩尔地狱》则从咚卡组补1张休息状态咚"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 70,
+    "results": [
+      {
+        "number": "OP02-087",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "因佩尔地狱"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【双重攻击】纯关键词；【KO时】领袖含因佩尔地狱特征时从咚卡组补1张休息咚"
+      },
+      {
+        "number": "OP02-089",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t1"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t1",
+              "delta": -3000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t2"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t2",
+              "delta": -3000
+            }
+          ]
+        },
+        "reason": "【反击】咚!!-1作为反击成本，本回合对方最多2张领袖或角色各力量-3000"
+      },
+      {
+        "number": "OP02-090",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "donReturn": 1
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$tgt",
+                "delta": -3000
+              }
+            ]
+          }
+        },
+        "reason": "【主要】咚!!-1：本回合对方最多1张角色力量-3000"
+      },
+      {
+        "number": "OP02-091",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "RefreshDon",
+                "n": 1,
+                "state": "active"
+              }
+            ]
+          }
+        },
+        "reason": "【主要】从咚卡组追加最多1张活跃咚"
+      },
+      {
+        "number": "OP02-092",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "handDiscard": 1,
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 3,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "因佩尔地狱"
+                }
+              }
+            ]
+          }
+        },
+        "reason": "【启动主要】弃1手牌并休息此舞台：确认3张公开最多1张因佩尔地狱特征加手牌、其余放回底"
+      },
+      {
+        "number": "OP02-093",
+        "status": "complex",
+        "definition": {},
+        "reason": "「之后」需判定场上是否存在费用0角色再给领袖+1000，属无法表达的连锁条件判定"
+      },
+      {
+        "number": "OP02-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "「通过战斗KO对方角色时转活跃」依赖本卡作为攻击方造成KO的事件，触发枚举无对应"
+      },
+      {
+        "number": "OP02-095",
+        "status": "complex",
+        "definition": {},
+        "reason": "「场上存在费用0角色时获得【流放】」为静态条件赋予未列出的关键词机制"
+      },
+      {
+        "number": "OP02-096",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            },
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -4,
+                  "duration": "turn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】抽1；【攻击时】对方最多1张角色费用-4"
+      },
+      {
+        "number": "OP02-098",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe3",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】KO对方最多1张费用≤3角色；可选弃1手牌成本无法用triggers表达，按惯例仅实现收益部分"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 80,
+    "results": [
+      {
+        "number": "OP02-099",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe5",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】KO对方最多1张费用≤5角色;triggers不支持cost,忽略可选的弃手牌成本只实现收益部分"
+      },
+      {
+        "number": "OP02-100",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正:场上存在特定名称『赫波迪』时此角色不被战斗KO,既属按名称的存在条件(无对应if键)又属静态战斗免疫,无法用DSL表达"
+      },
+      {
+        "number": "OP02-101",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】使对方≤5费角色无法发动【阻挡者】效果,属未列出的禁用对方阻挡机制,无对应op"
+      },
+      {
+        "number": "OP02-102",
+        "status": "complex",
+        "definition": {},
+        "reason": "含『不会因效果被KO』静态免疫,且【攻击时】条件『场上存在费用为0的角色』无对应if键,无法用DSL表达"
+      },
+      {
+        "number": "OP02-103",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -2,
+                  "duration": "thisTurn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】对方最多1张角色本回合费用-2;triggers不支持cost,忽略【咚!!×1】支付只实现收益"
+      },
+      {
+        "number": "OP02-105",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -3,
+                  "duration": "thisTurn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】对方最多1张角色本回合费用-3;triggers不支持cost,忽略【咚‼×1】支付只实现收益"
+      },
+      {
+        "number": "OP02-106",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -2,
+                  "duration": "thisTurn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】对方最多1张角色本回合费用-2"
+      },
+      {
+        "number": "OP02-108",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】纯关键词,无其他主动效果"
+      },
+      {
+        "number": "OP02-110",
+        "status": "complex",
+        "definition": {},
+        "reason": "【阻挡时】使对方≤6费角色本回合无法攻击,『无法攻击』限制kind未在规范列出,无法确定可表达,判complex"
+      },
+      {
+        "number": "OP02-111",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】条件为『我方场上存在特定名称强高』,无对应按名称存在的if条件键,无法用DSL表达"
+      }
+    ]
+  },
+  {
+    "set": "OP02",
+    "idx": 90,
+    "results": [
+      {
+        "number": "OP02-112",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$t"
+              },
+              {
+                "op": "AddCostMod",
+                "target": "$t",
+                "delta": -1,
+                "duration": "thisTurn"
+              },
+              {
+                "op": "Choose",
+                "prompt": "OwnLeaderOrCharacter",
+                "max": 1,
+                "as": "$o"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$o",
+                "delta": 1000
+              }
+            ]
+          }
+        },
+        "reason": "启动主要休息自身：对方1角色费用-1，之后我方1领袖或角色+1000"
+      },
+      {
+        "number": "OP02-113",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击时费用-2可表达，但‘之后场上存在费用为0角色则力量+2000’需检测场上是否存在0费角色的条件，if 条件键无此项，无法表达；触发为此卡登场亦特殊"
+      },
+      {
+        "number": "OP02-114",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态效果：对方回合中不被效果KO且力量+1000，无事件触发，需C#脚本"
+      },
+      {
+        "number": "OP02-115",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 2
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe0",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "咚×2攻击时：KO对方1张费用0角色"
+      },
+      {
+        "number": "OP02-117",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$t"
+              },
+              {
+                "op": "AddCostMod",
+                "target": "$t",
+                "delta": -5,
+                "duration": "thisTurn"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe3",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "主要对方1角色费用-5；触发KO对方1张费用≤3角色"
+      },
+      {
+        "number": "OP02-118",
+        "status": "complex",
+        "definition": {},
+        "reason": "反击部分(弃1手牌选我方角色本次战斗不被KO)可表达，但【触发】为‘KO对方费用≤3的舞台’，prompt 无按费用筛选对方舞台的取值，无法完整表达，整卡判complex"
+      },
+      {
+        "number": "OP02-119",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe1",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 2
+            },
+            {
+              "op": "DiscardOwnChosen",
+              "n": 1
+            }
+          ]
+        },
+        "reason": "主要KO对方1张费用≤1角色；触发抽2弃1"
+      },
+      {
+        "number": "OP02-120",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时咚-2效果为‘直到下个我方回合开始时全体领袖角色+1000’，为跨回合持续加成，AddPowerAll仅本回合无该duration，无法表达"
+      },
+      {
+        "number": "OP02-121",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时KO对方0费角色可表达，但核心【我方回合中对方全体角色费用-5】为纯持续静态修正，无事件触发，需C#脚本，整卡判complex"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP03-001",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击或被攻击时可丢弃任意张数事件/舞台卡，按丢弃张数动态决定+1000的次数，属于无固定数量的按量加成连锁，DSL 无法表达。"
+      },
+      {
+        "number": "OP03-002",
+        "status": "complex",
+        "definition": {},
+        "reason": "需对对方所有力量≤2000的角色批量施加【阻挡者】不能发动的限制，AddRestriction 仅单目标($tgt)，无法按 filter 批量施加。"
+      },
+      {
+        "number": "OP03-003",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "白胡子海盗团",
+                    "excludeName": "伊佐"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶5张，公开1张含白胡子海盗团特征(排除自身伊佐)加入手牌，其余放回卡组底。"
+      },
+      {
+        "number": "OP03-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "「登场回合无法攻击领袖」为静态限制、【咚×1】获得速攻为持续静态修正，均无事件触发，属纯静态机制。"
+      },
+      {
+        "number": "OP03-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "「之后当本回合结束时将此角色放入废弃」是与+2000强耦合的延迟连锁，无对应延迟到回合结束自毁的 op，无法表达。"
+      },
+      {
+        "number": "OP03-008",
+        "status": "complex",
+        "definition": {},
+        "reason": "「不会被斩属性KO」为持续静态机制无法表达；登场检索限定为「红色事件」，filter 无颜色键无法精确表达颜色限定。"
+      },
+      {
+        "number": "OP03-009",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnLeaderOrCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t",
+                "text": "选择我方1张领袖或角色赋予1张休息状态的咚"
+              },
+              {
+                "op": "AttachDon",
+                "target": "$t",
+                "n": 1,
+                "from": "rest"
+              }
+            ]
+          }
+        },
+        "reason": "启动主要每回合1次，给我方1张领袖或角色贴1张休息状态的咚。"
+      },
+      {
+        "number": "OP03-010",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】关键词，无其他主动效果。"
+      },
+      {
+        "number": "OP03-011",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "text": "选择对方1张角色力量-2000"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -2000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚×1】攻击时(自身被贴咚≥1)，对方最多1张角色本回合力量-2000。"
+      },
+      {
+        "number": "OP03-012",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击时代价为「将力量≥4000的红色角色放入废弃」与抽1及+1000强耦合，且红色限定 filter 无颜色键，无法精确表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP03-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时KO可表达，但【KO时】需以「丢弃手牌事件」为成本从废弃区横置登场此角色自身（特定名称登场+触发节带成本耦合），DSL 无法表达，整卡判 complex。"
+      },
+      {
+        "number": "OP03-014",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "originalCostLte": 1,
+                    "originalCostGte": 1,
+                    "keyword": ""
+                  },
+                  "text": "登场我方手牌中1张费用1的红色角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【攻击时】从手牌登场最多1张费用1角色（filter 限费用=1；红色无颜色键，靠卡组保证）。"
+      },
+      {
+        "number": "OP03-015",
+        "status": "complex",
+        "definition": {},
+        "reason": "【阻挡者】为关键词；核心效果是【对方的回合中】此角色被KO时令对方1张领袖/角色力量-2000，属于「自身被KO作为触发源」且限对方回合，触发枚举 OnKO 无法区分被KO主体且不带回合条件键，无法精确表达，判 complex。"
+      },
+      {
+        "number": "OP03-016",
+        "status": "complex",
+        "definition": {},
+        "reason": "【主要】含「领袖为艾斯时KO对方≤8000角色」可部分表达，但同时令我方领袖本回合获得【双重攻击】并力量+3000、且「此卡伤害变为2」属于无法表达的伤害修正机制，整卡判 complex。"
+      },
+      {
+        "number": "OP03-017",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "if": {
+              "leaderHasKeyword": "白胡子海盗团"
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$tgt",
+                "delta": -4000
+              }
+            ]
+          },
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$tgt",
+              "delta": -4000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$tgt",
+              "delta": -4000
+            }
+          ]
+        },
+        "reason": "【主要】/【反击】领袖含白胡子海盗团时对方1张角色力量-4000；【触发】同主要效果（counter 无条件键限制按规范无法附 if，沿用同动作）。"
+      },
+      {
+        "number": "OP03-018",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "handDiscard": 1
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$a",
+                "filter": {
+                  "originalPowerLte": 5000
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$a"
+              },
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$b",
+                "filter": {
+                  "originalPowerLte": 4000
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$b"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "as": "$tgt",
+              "filter": {
+                "originalPowerLte": 5000
+              }
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "【主要】弃1事件为成本，KO对方≤5000及≤4000各1张；【触发】KO对方1张≤5000角色（成本用 handDiscard，事件限制靠玩家选弃）。"
+      },
+      {
+        "number": "OP03-019",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "AddPowerThisTurn",
+                "target": "selfLeader",
+                "delta": 4000
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$tgt",
+              "delta": -10000
+            }
+          ]
+        },
+        "reason": "【主要】我方领袖力量+4000；【触发】对方1张领袖或角色力量-10000。"
+      },
+      {
+        "number": "OP03-020",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】检索可用 LookTopReveal 表达，但附带「我方领袖为艾斯」的限定，DSL 无 leaderNameEquals 之外条件可表，且 activated 节确支持 if+cost；不过名称限定 leaderNameEquals 仅以中文官方译名比对存在不确定，且检索条件耦合特定领袖，稳妥判 complex。"
+      },
+      {
+        "number": "OP03-021",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本需「将我方2张《东海》特征角色转为休息」属未列出的特定成本（restActiveDon 仅横置咚，无法横置指定特征角色），且效果含活跃自身领袖，整体无法表达，判 complex。"
+      },
+      {
+        "number": "OP03-022",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚‼×2】为登场前置的贴咚激活条件，叠加【攻击时】以横置1咚为成本登场手牌≤4费且带【触发】角色；触发节不支持 cost、且 filter 无「拥有触发效果」键，无法表达，判 complex。"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 20,
+    "results": [
+      {
+        "number": "OP03-024",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "东海"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$t1"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$t1"
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe4",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$t2"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$t2"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时领袖含东海，分两次选对方费用≤4角色各横置一张，合计最多2张"
+      },
+      {
+        "number": "OP03-025",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时『弃1手牌』成本与KO结果强耦合(可选弃牌才能KO)，triggers不支持cost；且【咚×1】获得双重攻击属于贴咚联动的持续/静态加成，DSL均无法表达"
+      },
+      {
+        "number": "OP03-026",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "东海"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时领袖含东海，将对方最多1张角色横置"
+      },
+      {
+        "number": "OP03-027",
+        "status": "complex",
+        "definition": {},
+        "reason": "包含『我方场上不存在花斑猫』的条件判定及按名称从手牌登场特定卡的多步联动，if条件键与DSL均无法表达该场上不存在判定"
+      },
+      {
+        "number": "OP03-028",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时『选择以下1项』的模式二选一机制，DSL无对应的多项选择op"
+      },
+      {
+        "number": "OP03-029",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentRestingCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 4
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时KO对方最多1张费用≤4且处于休息状态的角色"
+      },
+      {
+        "number": "OP03-030",
+        "status": "complex",
+        "definition": {},
+        "reason": "检索需同时满足『绿色』+『东海』特征，match/filter无颜色过滤键，无法表达绿色约束"
+      },
+      {
+        "number": "OP03-031",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【阻挡者】纯关键词，无其他主动效果"
+      },
+      {
+        "number": "OP03-032",
+        "status": "complex",
+        "definition": {},
+        "reason": "『与属性(斩)卡牌战斗中不被KO』为针对特定属性的持续防KO静态效果，DSL无对应机制"
+      },
+      {
+        "number": "OP03-034",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentRestingCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 2
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时KO对方最多1张费用≤2且处于休息状态的角色"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 30,
+    "results": [
+      {
+        "number": "OP03-036",
+        "status": "dsl",
+        "definition": {
+          "OP03-036": {
+            "main": {
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacter",
+                  "max": 1,
+                  "as": "$t",
+                  "filter": {
+                    "nameEquals": "克洛"
+                  }
+                },
+                {
+                  "op": "Activate",
+                  "target": "$t"
+                }
+              ]
+            },
+            "trigger": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentRestingCharacter",
+                "max": 1,
+                "as": "$tgt",
+                "filter": {
+                  "originalCostLte": 3
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "主要将我方1张克洛转活跃(忽略可选成本横置我方东海角色);触发KO对方1张费用≤3休息角色"
+      },
+      {
+        "number": "OP03-037",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发要将手牌中拥有【触发】效果的角色登场,『拥有触发效果』无法用 filter 表达"
+      },
+      {
+        "number": "OP03-038",
+        "status": "dsl",
+        "definition": {
+          "OP03-038": {
+            "main": {
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 2,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 2
+                  }
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            },
+            "trigger": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$tgt",
+                "filter": {
+                  "originalCostLte": 5
+                }
+              },
+              {
+                "op": "Rest",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "主要横置对方≤2张费用≤2角色;触发横置对方≤1张费用≤5角色"
+      },
+      {
+        "number": "OP03-039",
+        "status": "dsl",
+        "definition": {
+          "OP03-039": {
+            "main": {
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 1
+                  }
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OwnCharacter",
+                  "max": 1,
+                  "as": "$t"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$t",
+                  "delta": 1000
+                }
+              ]
+            },
+            "trigger": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$tgt",
+                "filter": {
+                  "originalCostLte": 4
+                }
+              },
+              {
+                "op": "Rest",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "主要横置对方≤1张费用≤1角色,之后我方≤1张角色力量+1000;触发横置对方≤1张费用≤4角色"
+      },
+      {
+        "number": "OP03-040",
+        "status": "complex",
+        "definition": {},
+        "reason": "卡组0张改判胜利为未列出的特殊胜利机制;且『攻击给予生命伤害时』触发未在触发枚举中"
+      },
+      {
+        "number": "OP03-041",
+        "status": "complex",
+        "definition": {},
+        "reason": "『攻击给予对方生命伤害时』触发未在触发枚举中(OnAttackDeclare为攻击宣言而非造成伤害)"
+      },
+      {
+        "number": "OP03-042",
+        "status": "dsl",
+        "definition": {
+          "OP03-042": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Choose",
+                    "prompt": "OwnTrash",
+                    "max": 1,
+                    "as": "$tgt",
+                    "filter": {
+                      "nameEquals": "撒谎布"
+                    }
+                  },
+                  {
+                    "op": "TrashToHand",
+                    "target": "$tgt"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "登场时将废弃区≤1张『撒谎布』加入手牌(颜色蓝无法 filter,以名称限定)"
+      },
+      {
+        "number": "OP03-043",
+        "status": "complex",
+        "definition": {},
+        "reason": "『给予对方生命伤害时』触发未在触发枚举中"
+      },
+      {
+        "number": "OP03-044",
+        "status": "dsl",
+        "definition": {
+          "OP03-044": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "Draw",
+                    "n": 2
+                  },
+                  {
+                    "op": "DiscardOwnChosen",
+                    "n": 2
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "登场时抽2张并弃2张手牌"
+      },
+      {
+        "number": "OP03-045",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方的回合中】卡组≤20时力量+3000为纯持续静态修正,无事件触发"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 40,
+    "results": [
+      {
+        "number": "OP03-046",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续静态修正:【对方的回合中】卡组≤20时本角色力量+3000,无事件触发,需C#脚本;阻挡者为纯关键词"
+      },
+      {
+        "number": "OP03-047",
+        "status": "complex",
+        "definition": {},
+        "reason": "咚×1当攻击给予对方生命伤害时的触发无对应触发枚举(无OnDealDamage),且与咚条件耦合无法表达,整卡判complex"
+      },
+      {
+        "number": "OP03-048",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderNameEquals": "奈美"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe5",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "BounceToHand",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时领袖为奈美时退回对方≤5费角色到手牌"
+      },
+      {
+        "number": "OP03-049",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "ownLifeCountLte": 99
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnLeaderOrCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalCostLte": 3,
+                    "kind": "Character"
+                  },
+                  "text": "选择最多1张费用不高于3的角色放回手牌"
+                },
+                {
+                  "op": "BounceToHand",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时卡组≤20时退回任意≤3费角色;但缺少卡组数量条件键,if无法表达deckCount≤20"
+      },
+      {
+        "number": "OP03-050",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "MillTop",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "KO时弃卡组顶1张(可选收益部分);阻挡者为纯关键词"
+      },
+      {
+        "number": "OP03-051",
+        "status": "complex",
+        "definition": {},
+        "reason": "含咚×1攻击给予生命伤害时弃7张,无对应触发枚举且与咚条件耦合,整卡判complex"
+      },
+      {
+        "number": "OP03-053",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续静态修正:咚×1且卡组≤20时本角色力量+2000,无事件触发,需C#脚本"
+      },
+      {
+        "number": "OP03-054",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "text": "本次战斗中我方最多1张领袖或角色力量+2000"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$tgt",
+              "delta": 2000
+            },
+            {
+              "op": "MillTop",
+              "n": 1
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 1
+            },
+            {
+              "op": "MillTop",
+              "n": 1
+            }
+          ]
+        },
+        "reason": "反击给我方领袖或角色本次战斗+2000并弃顶1张;触发抽1并弃顶1张"
+      },
+      {
+        "number": "OP03-055",
+        "status": "dsl",
+        "definition": {
+          "counter": {
+            "cost": {
+              "handDiscard": 1
+            },
+            "then": [
+              {
+                "op": "AddPowerThisBattle",
+                "target": "selfLeader",
+                "delta": 4000
+              },
+              {
+                "op": "MillTop",
+                "n": 2
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "filter": {
+                "originalCostLte": 4,
+                "kind": "Character"
+              },
+              "text": "将最多1张费用不高于4的角色放回手牌"
+            },
+            {
+              "op": "BounceToHand",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "反击弃1手牌使我方领袖本次战斗+4000并弃顶2张;触发退回≤4费角色"
+      },
+      {
+        "number": "OP03-056",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Draw",
+                "n": 2
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 2
+            }
+          ]
+        },
+        "reason": "主要抽2张;触发发动主要效果(同样抽2张)"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 50,
+    "results": [
+      {
+        "number": "OP03-057",
+        "status": "complex",
+        "definition": {},
+        "reason": "「将费用≤5/≤3的角色放回卡组底」目标为敌我任意一方的角色，prompt 取值无敌我通用的「按费用筛选任意角色」选项，无法精确表达目标范围。"
+      },
+      {
+        "number": "OP03-058",
+        "status": "complex",
+        "definition": {},
+        "reason": "领袖含「此领袖无法攻击」纯静态限制(无对应触发与限制op),且启动主要为「按名称/特征从手牌登场特定角色」联动成本,整体需 C# 脚本。"
+      },
+      {
+        "number": "OP03-059",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】带咚!!-1成本(triggers 不支持 cost),且授予的【流放】关键词不在 op/keyword 列表中。"
+      },
+      {
+        "number": "OP03-060",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】带咚!!-1成本,triggers 触发节不支持 cost,无法表达。"
+      },
+      {
+        "number": "OP03-062",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "七水之城",
+                    "excludeName": "可可罗"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】确认卡组顶5张、公开≤1张《七水之城》特征(排除自身)加手牌、余者放回底。"
+      },
+      {
+        "number": "OP03-063",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】带咚!!-1成本,triggers 触发节不支持 cost,无法表达(阻挡者为纯关键词)。"
+      },
+      {
+        "number": "OP03-064",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "卡雷拉公司"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】领袖含《卡雷拉公司》时从咚卡组追加≤1张休息状态咚。"
+      },
+      {
+        "number": "OP03-065",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【阻挡者】纯关键词,无其他主动效果。"
+      },
+      {
+        "number": "OP03-066",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】带➁(横置2咚)成本,triggers 触发节不支持 cost,无法表达。"
+      },
+      {
+        "number": "OP03-067",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "donAttachedGte": 1,
+                "leaderHasKeyword": "卡雷拉公司"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚!!×1】【攻击时】领袖含《卡雷拉公司》时从咚卡组追加≤1张休息状态咚(咚!!×1映射为 donAttachedGte:1 条件)。"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 60,
+    "results": [
+      {
+        "number": "OP03-068",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "因佩尔地狱"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "KO时领袖含因佩尔地狱则从咚卡组追加1张休息咚；流放为被动机制不影响该实现"
+      },
+      {
+        "number": "OP03-069",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "if": {
+                "leaderHasKeyword": "因佩尔地狱"
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 2
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "KO时领袖含因佩尔地狱则抽2弃1"
+      },
+      {
+        "number": "OP03-070",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时需弃1张费用5角色作为可选成本才能获得速攻，成本与收益强耦合且triggers不支持cost，无法表达"
+      },
+      {
+        "number": "OP03-071",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe5",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "Rest",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "攻击时将对方1张费用≤5角色横置；咚-1为可选成本triggers无法表达，按惯例忽略只实现收益"
+      },
+      {
+        "number": "OP03-072",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnHand",
+              "max": 1,
+              "as": "$d"
+            },
+            {
+              "op": "DiscardHand",
+              "target": "$d"
+            },
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 3000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "反击弃1手牌使我方1张领袖或角色本次战斗+3000；触发追加1张活跃咚"
+      },
+      {
+        "number": "OP03-073",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "donReturn": 1
+            },
+            "if": {
+              "leaderHasKeyword": "七水之城"
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe2",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe2",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "主要咚-1且领袖含七水之城则KO对方1张费用≤2角色；触发发动同主要效果"
+      },
+      {
+        "number": "OP03-074",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "donReturn": 2
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe4",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "ReturnToDeckBottom",
+                "target": "$tgt",
+                "from": "field"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe4",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "ReturnToDeckBottom",
+              "target": "$tgt",
+              "from": "field"
+            }
+          ]
+        },
+        "reason": "主要咚-2则将对方1张费用≤4角色放回卡组底；触发发动同主要效果"
+      },
+      {
+        "number": "OP03-075",
+        "status": "complex",
+        "definition": {},
+        "reason": "启动主要条件为领袖名等于阿斯巴古，但该领袖名无法用if可用键(leaderNameEquals存在但需领袖具体名匹配，且本卡条件依赖特定领袖名+启动成本横置舞台)；leaderNameEquals判定不确定，谨慎判complex"
+      },
+      {
+        "number": "OP03-076",
+        "status": "complex",
+        "definition": {},
+        "reason": "需监听对方角色被KO的事件并使本领袖活跃，缺少对应触发枚举与机制，且为每回合1次弃牌联动，无法用现有DSL表达"
+      },
+      {
+        "number": "OP03-077",
+        "status": "complex",
+        "definition": {},
+        "reason": "攻击时需被贴2咚为前置且支付②横置费用区咚+弃1手牌作为强耦合成本才入生命，triggers不支持cost，无法表达"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 70,
+    "results": [
+      {
+        "number": "OP03-078",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "oppHandCountGte": 6
+              },
+              "then": [
+                {
+                  "op": "OpponentDiscard",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "实现【登场时】对方≥6手牌弃对方2张；【咚!!×1】【我方的回合中】对方全体费用-3 属纯持续静态修正无法表达，已忽略"
+      },
+      {
+        "number": "OP03-079",
+        "status": "complex",
+        "definition": {},
+        "reason": "【咚!!×1】此角色战斗中不被KO 为持续/静态修正，无对应 op"
+      },
+      {
+        "number": "OP03-080",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】可选成本(把废弃区2张含<CP>卡放回卡组底)与 KO 结果强耦合，triggers 不支持 cost，无法表达"
+      },
+      {
+        "number": "OP03-081",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 2
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 2
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -2,
+                  "duration": "turn"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】抽2、弃我方2张手牌，之后对方≤1张角色本回合费用-2"
+      },
+      {
+        "number": "OP03-083",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认卡组顶5张并自选最多2张置入废弃区、其余放回底，无对应‘自选数张丢废弃’的 op"
+      },
+      {
+        "number": "OP03-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场条件‘领袖特征包含<CP>’需子串匹配，但 leaderHasKeyword/leaderHasProperty 均为精确匹配，无法表达 CP9 等含<CP>领袖"
+      },
+      {
+        "number": "OP03-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "‘此角色不会因效果而被KO’为持续/静态修正，无对应 op(仅余阻挡者关键词)"
+      },
+      {
+        "number": "OP03-089",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 3,
+                  "max": 1,
+                  "restTo": "trash",
+                  "match": {
+                    "keyword": "海军",
+                    "excludeName": "布兰纽"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】确认卡组顶3张、公开≤1张‘布兰纽’以外《海军》加手牌、其余放废弃"
+      },
+      {
+        "number": "OP03-090",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "PlayCharFromTrash",
+                  "filter": {
+                    "kind": "Character",
+                    "originalCostLte": 4,
+                    "keywordContains": "CP"
+                  },
+                  "rest": true,
+                  "text": "将废弃区中费用≤4且特征含<CP>的角色以休息状态登场"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "实现【KO时】从废弃区将≤1张费用≤4含<CP>角色休息登场；【咚!!×1】获得阻挡者属持续效果已忽略"
+      },
+      {
+        "number": "OP03-091",
+        "status": "complex",
+        "definition": {},
+        "reason": "‘原本没有效果的角色’这一筛选条件 filter 无法表达"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 80,
+    "results": [
+      {
+        "number": "OP03-092",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】可选成本(自选废弃区2张含CP特征卡放回卡组底)与结果(获得速攻)强耦合，而triggers不支持cost节，该成本-收益绑定无法用DSL表达。"
+      },
+      {
+        "number": "OP03-093",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】成本(丢弃1张手牌)与KO结果强耦合，triggers不支持cost节，无法表达此成本绑定的可选效果。"
+      },
+      {
+        "number": "OP03-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶5张并将符合条件的角色直接登场(而非加手牌)、剩余入废弃，LookTopReveal只能加手牌、无对应登场op；触发的从废弃区登场指定颜色角色也无filter机制，整体超出现有op。"
+      },
+      {
+        "number": "OP03-095",
+        "status": "complex",
+        "definition": {},
+        "reason": "【主要】对方最多2张角色各费用-2需选多目标分别施加费用修正，AddCostMod为单target且无多选语义，无法表达。"
+      },
+      {
+        "number": "OP03-096",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe0",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt",
+                "text": "将对方最多1张费用为0的角色KO"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 2
+            }
+          ]
+        },
+        "reason": "主要KO对方1张费用0角色；触发抽2。舞台KO分支因prompt无对应舞台费用筛选项暂仅实现角色分支。"
+      },
+      {
+        "number": "OP03-097",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "text": "我方最多1张领袖或角色力量+3000"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$tgt",
+              "delta": 3000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Draw",
+              "n": 1
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe1",
+              "max": 1,
+              "min": 0,
+              "as": "$ko"
+            },
+            {
+              "op": "KO",
+              "target": "$ko"
+            }
+          ]
+        },
+        "reason": "反击给我方1张领袖或角色本次战斗+3000(忽略弃手牌可选成本);触发抽1后KO对方1张费用≤1角色。"
+      },
+      {
+        "number": "OP03-098",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】对方最多1张角色费用-2需对单选角色施加费用修正，但AddCostMod无filter选目标语义且需配合Choose得到目标后施加，现有AddCostMod未提供从$tgt取目标的减费表达，整体属持续/费用修正机制，判complex。"
+      },
+      {
+        "number": "OP03-099",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】确认我方或对方生命区顶1张并放回生命顶或底(重排生命)属未列出的查看并重排机制，无对应op。"
+      },
+      {
+        "number": "OP03-102",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】可选成本(生命顶/底1张入手)与结果(卡组顶1张入生命顶)强耦合，triggers不支持cost且生命顶/底选择无对应op。"
+      },
+      {
+        "number": "OP03-104",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】确认我方或对方生命区顶1张并放回生命顶或底属查看并重排生命的机制，无对应op；【阻挡者】为关键词。"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 90,
+    "results": [
+      {
+        "number": "OP03-105",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】带成本(丢弃1张拥有【触发】效果的手牌)，triggers 不支持 cost，且成本与+3000收益强耦合、需按‘是否拥有触发效果’筛选手牌，无对应 filter 键，判 complex。"
+      },
+      {
+        "number": "OP03-106",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为‘-’，无任何效果与关键词。"
+      },
+      {
+        "number": "OP03-107",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅【阻挡者】纯关键词，无其他主动效果。"
+      },
+      {
+        "number": "OP03-108",
+        "status": "complex",
+        "definition": {},
+        "reason": "持续/静态条件加成(生命少于对方时获得【双重攻击】+力量1000)，属纯持续修正；trigger 为丢弃手牌登场带成本，均无法用 DSL 表达，判 complex。"
+      },
+      {
+        "number": "OP03-109",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "AddLifeFromDeck",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】将卡组顶1张置入生命顶(AddLifeFromDeck)，忽略‘将生命顶或底1张放废弃’的可选成本。"
+      },
+      {
+        "number": "OP03-110",
+        "status": "complex",
+        "definition": {},
+        "reason": "【攻击时】+2000 与‘将生命顶或底1张入手’成本强耦合，而 triggers 不支持 cost，判 complex。"
+      },
+      {
+        "number": "OP03-112",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 4,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "anyOf": [
+                      {
+                        "keyword": "大妈海盗团"
+                      },
+                      {
+                        "nameEquals": "山智"
+                      }
+                    ],
+                    "excludeName": "夏洛特·布玲"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】确认卡组顶4张，公开1张《大妈海盗团》特征或‘山智’加入手牌(排除自身名)，其余放回卡组底。"
+      },
+      {
+        "number": "OP03-113",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 3,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "大妈海盗团",
+                    "excludeName": "夏洛特·佩洛斯佩罗"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】确认卡组顶3张，公开1张《大妈海盗团》特征加入手牌、其余放回底；生命【触发】的丢弃手牌登场带成本无法表达，仅实现 KO 时检索。"
+      },
+      {
+        "number": "OP03-114",
+        "status": "complex",
+        "definition": {},
+        "reason": "‘之后将对方生命区最上方1张放置到废弃区’无对应 op(无法弃置对方生命顶)，判 complex。"
+      },
+      {
+        "number": "OP03-115",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe1",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】KO对方1张费用≤1角色，忽略‘丢弃1张拥有【触发】效果手牌’的可选成本。"
+      }
+    ]
+  },
+  {
+    "set": "OP03",
+    "idx": 100,
+    "results": [
+      {
+        "number": "OP03-116",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 3
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时抽3弃2手牌；触发节为此卡登场(复用登场效果)，DSL无自登场op故仅保留登场触发"
+      },
+      {
+        "number": "OP03-117",
+        "status": "complex",
+        "definition": {},
+        "reason": "需对指定名称『夏洛特·玲玲』给力量+1000且持续到下个我方回合开始的跨回合持续修正，DSL无法表达该持续duration"
+      },
+      {
+        "number": "OP03-118",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 5000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "AddLifeFromDeck",
+              "n": 1
+            }
+          ]
+        },
+        "reason": "反击给我方1张领袖或角色本次战斗+5000；触发将卡组顶1张入生命(忽略可选弃2手牌成本，trigger不支持cost)"
+      },
+      {
+        "number": "OP03-119",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "if": {
+              "selfLifeCountLte": 0
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe4",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "PlayCharFromHand",
+              "filter": {
+                "kind": "Character",
+                "originalCostLte": 4
+              },
+              "text": "登场1张费用≤4且拥有触发效果的角色"
+            }
+          ]
+        },
+        "reason": "主要在我方生命少于对方时KO对方1张费用≤4角色;触发从手牌登场费用≤4角色(条件『我方生命少于对方』无对应if键、且『拥有触发效果』filter无法表达，做近似)"
+      },
+      {
+        "number": "OP03-120",
+        "status": "complex",
+        "definition": {},
+        "reason": "需将对方生命区最上方卡牌放置到废弃区(对方生命弃顶机制)，DSL无对应op，仅有OppLifeToHand将对方生命入手不符合"
+      },
+      {
+        "number": "OP03-121",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "lifeToHand": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe5",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "KO",
+                "target": "$tgt"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe5",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "主要以生命顶入手为成本KO对方1张费用≤5角色;触发同样KO对方1张费用≤5角色(成本lifeToHand近似将生命顶置废弃)"
+      },
+      {
+        "number": "OP03-122",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentLeaderOrCharacter",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "kind": "Character",
+                    "originalCostLte": 6
+                  }
+                },
+                {
+                  "op": "BounceToHand",
+                  "target": "$tgt"
+                },
+                {
+                  "op": "Draw",
+                  "n": 2
+                },
+                {
+                  "op": "DiscardOwnChosen",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时将1张费用≤6角色退回手牌(放回持有者手牌近似BounceToHand)，之后抽2弃2手牌"
+      },
+      {
+        "number": "OP03-123",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时将1张费用≤8角色正面朝上置入持有者生命区最上方或最下方，需选择放生命顶/底且面朝上的机制，MoveCharToLife仅支持置入生命顶无法表达上/下选项"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 0,
+    "results": [
+      {
+        "number": "OP04-001",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "donReturn": 2
+            },
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "Draw",
+                "n": 1
+              },
+              {
+                "op": "Choose",
+                "prompt": "OwnCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "GiveKeyword",
+                "target": "$tgt",
+                "keyword": "速攻",
+                "duration": "thisTurn"
+              }
+            ]
+          }
+        },
+        "reason": "实现【启动主要】每回合1次咚-2:抽1张并给我方最多1张角色速攻；领袖『无法攻击』静态限制无法用DSL表达,已忽略"
+      },
+      {
+        "number": "OP04-002",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 5,
+                "max": 1,
+                "restTo": "bottom",
+                "match": {
+                  "keyword": "阿拉巴斯坦王国",
+                  "excludeName": "伊格拉姆"
+                }
+              }
+            ]
+          }
+        },
+        "reason": "实现确认顶5公开1张阿拉巴斯坦王国加手牌(横置自身);'我方活跃领袖力量-5000'这一非标准可选成本无法用cost键表达,已忽略成本部分"
+      },
+      {
+        "number": "OP04-003",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt",
+                  "filter": {
+                    "originalPowerLte": 5000
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【KO时】KO对方最多1张原本力量≤5000的角色"
+      },
+      {
+        "number": "OP04-004",
+        "status": "complex",
+        "definition": {},
+        "reason": "需给我方所有阿拉巴斯坦王国角色各贴1张休息咚,AttachDon仅能单目标,无群体贴咚op"
+      },
+      {
+        "number": "OP04-005",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件性静态获得阻挡者(场上存在另一张同名功夫海牛时),纯持续/静态修正无事件触发"
+      },
+      {
+        "number": "OP04-006",
+        "status": "complex",
+        "definition": {},
+        "reason": "增益持续'直到下个我方回合开始'超出本回合,AddPowerThisTurn无法表达该持续时长;且代价'领袖-5000'为非标准成本"
+      },
+      {
+        "number": "OP04-007",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为'-',无主动效果,仅基础数值与反击值"
+      },
+      {
+        "number": "OP04-008",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "leaderNameEquals": "奈菲特·薇薇",
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$a"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$a",
+                  "delta": -3000
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$b",
+                  "filter": {
+                    "originalPowerLte": 0
+                  }
+                },
+                {
+                  "op": "KO",
+                  "target": "$b"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚×1】【攻击时】领袖为奈菲特·薇薇时对方1张-3000,之后KO对方1张力量≤0角色(咚×1以donAttachedGte:1表达)"
+      },
+      {
+        "number": "OP04-009",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果为'本回合结束时将自身放回手牌'的延迟触发,无对应op表达回合结束延迟退手牌;且代价为非标准的领袖-5000成本"
+      },
+      {
+        "number": "OP04-010",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "PlayCharFromHand",
+                  "filter": {
+                    "originalPowerLte": 3000,
+                    "keyword": "动物"
+                  },
+                  "rest": false,
+                  "text": "从手牌登场最多1张力量≤3000且具有动物特征的角色"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】从手牌登场最多1张力量≤3000且具有动物特征的角色"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 10,
+    "results": [
+      {
+        "number": "OP04-011",
+        "status": "complex",
+        "definition": {},
+        "reason": "公开卡组顶1张并据其力量条件给自身加力量再放回底，属查看顶卡条件联动机制，LookTopReveal 只能加手牌无法表达此条件性自增益"
+      },
+      {
+        "number": "OP04-012",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合中】对其他阿拉巴斯坦王国角色全体+1000，纯持续静态修正且无事件触发"
+      },
+      {
+        "number": "OP04-013",
+        "status": "complex",
+        "definition": {},
+        "reason": "KO对方力量(当前值)不高于4000的角色，filter 仅有 originalPowerLte 无法表达当前力量阈值，拿不准判 complex"
+      },
+      {
+        "number": "OP04-014",
+        "status": "complex",
+        "definition": {},
+        "reason": "【流放】为给伤害时该卡入废弃而非触发，属规范未列出的特殊机制"
+      },
+      {
+        "number": "OP04-015",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "min": 0,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$tgt",
+                  "delta": -2000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时对方最多1张角色本回合力量-2000"
+      },
+      {
+        "number": "OP04-016",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 3000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$tgt",
+              "delta": -3000
+            }
+          ]
+        },
+        "reason": "反击我方最多1张领袖或角色本次战斗+3000(成本弃1手牌经 counter 的 cost 表达)；触发对方最多1张领袖或角色本回合-3000"
+      },
+      {
+        "number": "OP04-017",
+        "status": "complex",
+        "definition": {},
+        "reason": "【反击】对方-2000后『之后我方领袖活跃则再-1000』，条件列表无『我方领袖活跃』键，属之后分句的无法表达连锁判定"
+      },
+      {
+        "number": "OP04-018",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "if": {
+              "leaderHasKeyword": "阿拉巴斯坦王国"
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t1"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$t1",
+                "delta": -2000
+              },
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$t2"
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$t2",
+                "delta": -2000
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t1"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t1",
+              "delta": -2000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t2"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t2",
+              "delta": -2000
+            }
+          ]
+        },
+        "reason": "主要(领袖含阿拉巴斯坦王国)对方最多2张角色各-2000，用两次 Choose 表达；触发发动同主要效果"
+      },
+      {
+        "number": "OP04-019",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "then": [
+                {
+                  "op": "ActiveOwnDon",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "我方的回合结束时将我方最多2张咚转为活跃"
+      },
+      {
+        "number": "OP04-020",
+        "status": "complex",
+        "definition": {},
+        "reason": "含【我方的回合中】对方所有角色费用-1的纯持续静态修正(无事件触发)，需 C# 脚本，整卡判 complex"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 20,
+    "results": [
+      {
+        "number": "OP04-021",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果是将对方咚!!转为休息，无对应 op(Rest 只能针对角色/领袖，无横置对方咚的原语);且 OnOppAttackDeclare 触发节自带支付2咚成本，触发节不支持 cost。"
+      },
+      {
+        "number": "OP04-022",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacterCostLe1",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "Rest",
+                "target": "$tgt"
+              }
+            ]
+          }
+        },
+        "reason": "启动主要横置自身,将对方1张费用≤1角色横置。"
+      },
+      {
+        "number": "OP04-023",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为 \"-\",无任何效果。"
+      },
+      {
+        "number": "OP04-024",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方的回合中】【每回合1次】当对方登场角色时触发的横置效果,无\"对方登场角色时\"触发枚举,无法用 DSL 表达;含两个能力其一不可表达。"
+      },
+      {
+        "number": "OP04-025",
+        "status": "complex",
+        "definition": {},
+        "reason": "OnOppAttackDeclare 触发自带支付2咚的激活成本,触发节不支持 cost,成本与发动强耦合。"
+      },
+      {
+        "number": "OP04-026",
+        "status": "complex",
+        "definition": {},
+        "reason": "OnAttackDeclare 触发自带支付1咚成本(触发节不支持 cost),且含\"之后当本回合结束时活跃咚\"的延迟连锁,均无法表达。"
+      },
+      {
+        "number": "OP04-027",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "if": {
+                "donAttachedGte": 1
+              },
+              "then": [
+                {
+                  "op": "Activate",
+                  "target": "self"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【咚!!×1】(自身贴咚≥1)时,我方回合结束将自身转为活跃。"
+      },
+      {
+        "number": "OP04-028",
+        "status": "complex",
+        "definition": {},
+        "reason": "活跃自身的条件是\"我方场上有≥2张活跃状态咚!!\",if 条件键中无\"活跃咚数量≥N\"项,无法表达。"
+      },
+      {
+        "number": "OP04-029",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnMyTurnEnd",
+              "then": [
+                {
+                  "op": "ActiveOwnDon",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "我方回合结束时将我方最多1张咚!!转为活跃。"
+      },
+      {
+        "number": "OP04-030",
+        "status": "complex",
+        "definition": {},
+        "reason": "含两个能力:【登场时】KO对方休息且费用≤5角色可表达,但【对方攻击时】②自带支付2咚的激活成本(触发节不支持 cost),整卡含不可表达能力故判 complex。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 30,
+    "results": [
+      {
+        "number": "OP04-031",
+        "status": "complex",
+        "definition": {},
+        "reason": "效果是让对方休息角色在下个重置阶段不转活跃，属于跨阶段的「禁止活跃」标记机制，op 列表中没有对应原语。"
+      },
+      {
+        "number": "OP04-032",
+        "status": "complex",
+        "definition": {},
+        "reason": "【我方的回合结束时】触发节不支持 cost，而本卡的「将此角色放置废弃区」是与活跃咚收益强耦合的牺牲成本，无法在 triggers 中表达。"
+      },
+      {
+        "number": "OP04-033",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时休息部分可表达，但「之后，当本回合结束时活跃1张咚」是登记延迟到回合结束触发的连锁，DSL 无法表达此延迟挂载机制。"
+      },
+      {
+        "number": "OP04-034",
+        "status": "complex",
+        "definition": {},
+        "reason": "条件为「场上存在3张或更多处于活跃状态的咚」，if 条件键中没有「活跃咚数量」判定（selfDonTotalGte 统计的是总咚非活跃咚），无法准确表达。"
+      },
+      {
+        "number": "OP04-035",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 4000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OwnCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$c"
+            },
+            {
+              "op": "Activate",
+              "target": "$c"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "AddPowerThisTurn",
+              "target": "selfLeader",
+              "delta": 2000
+            }
+          ]
+        },
+        "reason": "反击：选1张我方领袖或角色本次战斗+4000，再活跃1张我方角色；触发：我方领袖本回合+2000。"
+      },
+      {
+        "number": "OP04-036",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "LookTopReveal",
+              "count": 5,
+              "max": 1,
+              "restTo": "bottom",
+              "match": {
+                "keyword": "堂吉诃德海盗团",
+                "excludeName": "堂吉诃德家族"
+              }
+            }
+          ],
+          "trigger": [
+            {
+              "op": "LookTopReveal",
+              "count": 5,
+              "max": 1,
+              "restTo": "bottom",
+              "match": {
+                "keyword": "堂吉诃德海盗团",
+                "excludeName": "堂吉诃德家族"
+              }
+            }
+          ]
+        },
+        "reason": "反击与触发均为：看卡组顶5张、公开1张《堂吉诃德海盗团》特征加手牌、其余放回卡组底。"
+      },
+      {
+        "number": "OP04-037",
+        "status": "complex",
+        "definition": {},
+        "reason": "反击效果带「领袖含《堂吉诃德海盗团》特征」前置条件，但 counter 节是无条件 op 列表，不支持 if，无法表达该领袖特征判定。"
+      },
+      {
+        "number": "OP04-038",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentLeaderOrCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$r"
+              },
+              {
+                "op": "Rest",
+                "target": "$r"
+              },
+              {
+                "op": "Choose",
+                "prompt": "OpponentRestingCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$k",
+                "filter": {
+                  "originalCostLte": 6
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$k"
+              }
+            ]
+          },
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$r"
+            },
+            {
+              "op": "Rest",
+              "target": "$r"
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentRestingCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$k",
+              "filter": {
+                "originalCostLte": 6
+              }
+            },
+            {
+              "op": "KO",
+              "target": "$k"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "ActiveOwnDon",
+              "n": 5
+            }
+          ]
+        },
+        "reason": "主要/反击：休息对方1张领袖或角色，之后KO对方1张休息且费用≤6角色；触发：活跃我方最多5张咚。"
+      },
+      {
+        "number": "OP04-039",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "oncePerTurn": true,
+            "if": {
+              "selfHandCountLte": 6
+            },
+            "then": [
+              {
+                "op": "LookTopReveal",
+                "count": 2,
+                "max": 1,
+                "restTo": "trash",
+                "match": {
+                  "keyword": "德莱斯罗兹",
+                  "excludeName": "莉贝卡"
+                }
+              }
+            ]
+          }
+        },
+        "reason": "启动主要每回合1次：手牌≤6时看卡组顶2张、公开1张《德莱斯罗兹》特征加手牌、其余进废弃；忽略可变的「休息指定数量咚」成本，「此领袖无法攻击」静态限制未实现（需脚本）。"
+      },
+      {
+        "number": "OP04-040",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发条件「生命牌与手牌合计张数≤4」无对应 if 条件键，且「场上有8费角色时改为将牌顶置入生命代替抽牌」是二选一替代抽牌机制，均无法用 DSL 表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 40,
+    "results": [
+      {
+        "number": "OP04-041",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "东海",
+                    "excludeName": "阿碧丝"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时检索卡组顶5张公开1张东海特征加手牌；可选成本(弃2手牌)无法在triggers表达，按惯例只实现收益部分"
+      },
+      {
+        "number": "OP04-042",
+        "status": "complex",
+        "definition": {},
+        "reason": "需对'拥有属性（斩）的角色'施加力量+3000，属性(斩)是attribute非特征/费用/力量，filter无对应键无法表达"
+      },
+      {
+        "number": "OP04-043",
+        "status": "complex",
+        "definition": {},
+        "reason": "将费用≤2角色'放回其持有者的手牌或卡组最下方'由持有者二选一，hand/deck分支选择无法用单一op表达"
+      },
+      {
+        "number": "OP04-044",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe8",
+                  "max": 1,
+                  "as": "$t1"
+                },
+                {
+                  "op": "BounceToHand",
+                  "target": "$t1"
+                },
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe3",
+                  "max": 1,
+                  "as": "$t2"
+                },
+                {
+                  "op": "BounceToHand",
+                  "target": "$t2"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时选费用≤8和费用≤3角色各≤1张退回手牌"
+      },
+      {
+        "number": "OP04-045",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时抽1张"
+      },
+      {
+        "number": "OP04-046",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "百兽海盗团"
+              },
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 7,
+                  "max": 2,
+                  "restTo": "bottom",
+                  "match": {
+                    "anyOf": [
+                      {
+                        "nameEquals": "瘟疫弹"
+                      },
+                      {
+                        "nameEquals": "冰鬼"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "领袖含百兽海盗团时检索7张公开≤2张瘟疫弹或冰鬼加手牌"
+      },
+      {
+        "number": "OP04-047",
+        "status": "complex",
+        "definition": {},
+        "reason": "战斗结束时(无对应触发枚举)将与之战斗的对方费用≤5角色放回卡组底，需战斗结束钩子及对手角色引用，无法表达"
+      },
+      {
+        "number": "OP04-048",
+        "status": "complex",
+        "definition": {},
+        "reason": "将全部手牌放回卡组洗牌后抽取相同张数，无对应op机制(手牌整体回库并按数量动态抽牌)"
+      },
+      {
+        "number": "OP04-049",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnKO",
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "KO时抽1张"
+      },
+      {
+        "number": "OP04-050",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "handDiscard": 1,
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "Draw",
+                "n": 1
+              }
+            ]
+          }
+        },
+        "reason": "启动主要弃1手牌并横置自身后抽1张"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 50,
+    "results": [
+      {
+        "number": "OP04-051",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 5,
+                  "max": 1,
+                  "restTo": "bottom",
+                  "match": {
+                    "keyword": "百兽海盗团",
+                    "excludeName": "福兹·弗"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认顶5张公开1张百兽海盗团特征(排除自身)加手牌、其余放回底，标准检索"
+      },
+      {
+        "number": "OP04-052",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "donReturn": 2,
+              "restSelf": true
+            },
+            "then": [
+              {
+                "op": "Draw",
+                "n": 1
+              }
+            ]
+          }
+        },
+        "reason": "启动主要 咚-2并横置自身后抽1；trigger(此卡登场)无对应op已忽略，仅实现主要"
+      },
+      {
+        "number": "OP04-053",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发时机为我方发动事件时，无对应 on 触发枚举(OnPlayEvent类)，无法表达"
+      },
+      {
+        "number": "OP04-054",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为\"-\"，仅特征无主动效果"
+      },
+      {
+        "number": "OP04-055",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本需按名称弃\"冰鬼\"并放回费用≤4角色，且结果为按名称从废弃区登场\"冰鬼\"，成本与结果强耦合且按名称登场无法用filter精确表达"
+      },
+      {
+        "number": "OP04-056",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt"
+              },
+              {
+                "op": "ReturnToDeckBottom",
+                "target": "$tgt",
+                "from": "field"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "filter": {
+                "originalCostLte": 4
+              }
+            },
+            {
+              "op": "ReturnToDeckBottom",
+              "target": "$tgt",
+              "from": "field"
+            }
+          ]
+        },
+        "reason": "主要将≤1张角色放回卡组底；触发将≤1张费用≤4角色放回卡组底"
+      },
+      {
+        "number": "OP04-057",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 4000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$tgt",
+              "filter": {
+                "originalCostLte": 1
+              }
+            },
+            {
+              "op": "ReturnToDeckBottom",
+              "target": "$tgt",
+              "from": "field"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$b",
+              "filter": {
+                "originalCostLte": 6
+              }
+            },
+            {
+              "op": "BounceToHand",
+              "target": "$b"
+            }
+          ]
+        },
+        "reason": "反击本次战斗≤1领袖或角色+4000，之后≤1张费用≤1角色放回卡组底；触发≤1张费用≤6角色退回手牌"
+      },
+      {
+        "number": "OP04-058",
+        "status": "complex",
+        "definition": {},
+        "reason": "对方回合中每回合1次，咚因我方效果被放回咚卡组时补咚，触发时机为咚回卡组事件无对应on枚举，纯被动联动机制"
+      },
+      {
+        "number": "OP04-059",
+        "status": "complex",
+        "definition": {},
+        "reason": "对方攻击时带咚-1成本(triggers不支持cost)，且条件领袖含七水之城本回合获得阻挡者，成本与触发耦合无法表达"
+      },
+      {
+        "number": "OP04-060",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时带咚-2成本(triggers不支持cost)，且含对方攻击时带咚-1成本的第二段效果，成本与触发强耦合无法表达"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 60,
+    "results": [
+      {
+        "number": "OP04-061",
+        "status": "dsl",
+        "definition": {
+          "OP04-061": {
+            "activated": {
+              "cost": {
+                "selfToTrash": true
+              },
+              "if": {
+                "leaderHasKeyword": "七水之城"
+              },
+              "then": [
+                {
+                  "op": "RefreshDon",
+                  "n": 1,
+                  "state": "rest"
+                }
+              ]
+            }
+          }
+        },
+        "reason": "启动主要自身进废弃为成本，领袖含七水之城时从咚卡组补1张休息咚。"
+      },
+      {
+        "number": "OP04-062",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为 '-'，无任何效果或关键词。"
+      },
+      {
+        "number": "OP04-063",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】带咚!!-1成本及【每回合1次】，触发节(triggers)不支持 cost 与 oncePerTurn，成本与发动强耦合，无法用 DSL 表达。"
+      },
+      {
+        "number": "OP04-064",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场补咚后再以'之后'按场上咚数量(≥6)条件抽牌，涉及补咚后再判定的连锁顺序，DSL 无法可靠表达该先后联动。"
+      },
+      {
+        "number": "OP04-065",
+        "status": "complex",
+        "definition": {},
+        "reason": "使对方角色'无法攻击'的限制(CannotAttack)未在 AddRestriction 的 kind 列表中，无法表达。"
+      },
+      {
+        "number": "OP04-066",
+        "status": "dsl",
+        "definition": {
+          "OP04-066": {
+            "triggers": [
+              {
+                "on": "OnEnterField",
+                "then": [
+                  {
+                    "op": "LookTopReveal",
+                    "count": 5,
+                    "max": 1,
+                    "restTo": "bottom",
+                    "match": {
+                      "keyword": "巴洛克工作室",
+                      "excludeName": "Ms.情人节(美琪塔)"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "reason": "登场时确认卡组顶5张、公开1张含巴洛克工作室特征加手牌，其余放回卡组底。"
+      },
+      {
+        "number": "OP04-067",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】关键词，无其他主动效果。"
+      },
+      {
+        "number": "OP04-068",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】带咚!!-1成本将对方角色放回手牌，触发节不支持 cost，成本与发动强耦合，无法表达。"
+      },
+      {
+        "number": "OP04-069",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】带咚!!-1成本，且需将自身原本力量设为与攻击者相同(动态取攻击者力量)，无对应 op 且触发节不支持 cost。"
+      },
+      {
+        "number": "OP04-070",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】带咚!!-1成本及【每回合1次】，触发节不支持 cost 与 oncePerTurn，成本与发动强耦合，无法表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 70,
+    "results": [
+      {
+        "number": "OP04-071",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】带可选咚成本，且核心是『将攻击对象改为此卡牌』改变攻击目标的机制，未在op列表中，无法用DSL表达。"
+      },
+      {
+        "number": "OP04-072",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方攻击时】触发节，但带【每回合1次】+咚-2+横置自身的强耦合成本(KO效果依赖支付成本),triggers不支持cost与oncePerTurn,无法表达。"
+      },
+      {
+        "number": "OP04-073",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本为『将此角色和另1张巴洛克工作室角色放置废弃区』,cost键无『额外废弃一张指定特征角色』选项,成本与登场强相关,无法表达。"
+      },
+      {
+        "number": "OP04-074",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 1000
+            },
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe4",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "Rest",
+              "target": "$tgt"
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【反击】我方1张领袖或角色本次战斗+1000,之后横置对方1张费用≤4角色;【触发】补1张活跃咚(咚成本因counter为裸op数组无成本槽略去)。"
+      },
+      {
+        "number": "OP04-075",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisBattle",
+              "target": "$t",
+              "delta": 6000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【反击】我方1张领袖或角色本次战斗+6000;【触发】补1张活跃咚。后半『生命≤2则补1休息咚』因counter裸数组无法附条件分支,仅实现+6000主体。"
+      },
+      {
+        "number": "OP04-076",
+        "status": "dsl",
+        "definition": {
+          "counter": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": 1000
+            }
+          ],
+          "trigger": [
+            {
+              "op": "RefreshDon",
+              "n": 1,
+              "state": "active"
+            }
+          ]
+        },
+        "reason": "【反击】我方1张领袖或角色本回合+1000;【触发】补1张活跃咚(咚成本因counter裸数组无成本槽略去)。"
+      },
+      {
+        "number": "OP04-077",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】纯关键词,无其他主动效果。"
+      },
+      {
+        "number": "OP04-079",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "oncePerTurn": true,
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OpponentCharacter",
+                "max": 1,
+                "as": "$tgt"
+              },
+              {
+                "op": "AddCostMod",
+                "target": "$tgt",
+                "delta": -4,
+                "duration": "turn"
+              },
+              {
+                "op": "MillTop",
+                "n": 2
+              },
+              {
+                "op": "Choose",
+                "prompt": "OwnCharacter",
+                "max": 1,
+                "as": "$own",
+                "filter": {
+                  "keyword": "德莱斯罗兹"
+                }
+              },
+              {
+                "op": "KO",
+                "target": "$own"
+              }
+            ]
+          }
+        },
+        "reason": "【启动主要】【每回合1次】对方1张角色本回合费用-4,卡组顶2张废弃,之后KO我方1张德莱斯罗兹角色。"
+      },
+      {
+        "number": "OP04-080",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】赋予我方德莱斯罗兹角色『可以攻击活跃状态角色』,该攻击规则修改机制未在op/keyword列表中,无法表达。"
+      },
+      {
+        "number": "OP04-081",
+        "status": "complex",
+        "definition": {},
+        "reason": "含『咚×1可攻击活跃角色』静态攻击规则修改,且【攻击时】成本为横置我方领袖(restLeader不在cost键中),两处机制均无法表达。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 80,
+    "results": [
+      {
+        "number": "OP04-082",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderNameEquals": "莉贝卡"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe1",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                },
+                {
+                  "op": "MillTop",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "实现【登场时】领袖为莉贝卡时KO对方费用≤1角色并弃顶1张;开头的被KO时改横置领袖/斗牛竞技场防KO属特殊防KO机制无法表达,已忽略"
+      },
+      {
+        "number": "OP04-083",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】使我方所有角色直到下回合不会因效果被KO,属持续特殊免KO状态,DSL无对应机制;与后续抽弃为同一登场时效果,整体判complex"
+      },
+      {
+        "number": "OP04-084",
+        "status": "complex",
+        "definition": {},
+        "reason": "确认卡组顶3张并从中将符合条件的角色直接登场(再把剩余弃掉),DSL无从卡组顶登场角色的op(LookTopReveal只能加入手牌),无法表达"
+      },
+      {
+        "number": "OP04-085",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "德莱斯罗兹"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -2,
+                  "duration": "thisTurn"
+                },
+                {
+                  "op": "MillTop",
+                  "n": 1
+                }
+              ]
+            },
+            {
+              "on": "OnAttackDeclare",
+              "if": {
+                "leaderHasKeyword": "德莱斯罗兹"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacter",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "AddCostMod",
+                  "target": "$tgt",
+                  "delta": -2,
+                  "duration": "thisTurn"
+                },
+                {
+                  "op": "MillTop",
+                  "n": 1
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】【攻击时】领袖含德莱斯罗兹特征时对方1张角色本回合费用-2并弃顶1张,两个触发节均实现"
+      },
+      {
+        "number": "OP04-086",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发条件为「此角色通过战斗将对方角色KO时」,DSL的OnKO仅表示本卡被KO时,无对应「本卡战斗击杀对方」的触发枚举,无法表达"
+      },
+      {
+        "number": "OP04-087",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为「-」,无任何效果"
+      },
+      {
+        "number": "OP04-088",
+        "status": "complex",
+        "definition": {},
+        "reason": "【启动主要】成本为「将我方1张领袖转为休息状态」,cost成本节无横置领袖的键(仅restSelf横置自身),成本无法表达且为激活前置,判complex"
+      },
+      {
+        "number": "OP04-089",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "仅有【阻挡者】关键词,无其他主动效果"
+      },
+      {
+        "number": "OP04-090",
+        "status": "complex",
+        "definition": {},
+        "reason": "「可攻击活跃状态角色」为改变攻击目标规则、「7张废弃区卡放回卡组底+下回合不活跃」涉及自选顺序回底与跳过活跃的特殊状态,均无对应op,判complex"
+      },
+      {
+        "number": "OP04-091",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "leaderHasKeyword": "德莱斯罗兹"
+              },
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe1",
+                  "max": 1,
+                  "as": "$tgt"
+                },
+                {
+                  "op": "KO",
+                  "target": "$tgt"
+                },
+                {
+                  "op": "MillTop",
+                  "n": 2
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "【登场时】领袖含德莱斯罗兹时KO对方费用≤1角色并弃顶2张;触发节不支持cost,「可将领袖转休息」的可选成本按惯例忽略只实现收益"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 90,
+    "results": [
+      {
+        "number": "OP04-092",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "LookTopReveal",
+                  "count": 3,
+                  "max": 1,
+                  "restTo": "trash",
+                  "match": {
+                    "keyword": "德莱斯罗兹",
+                    "excludeName": "莉贝卡"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时确认卡组顶3张、公开1张德莱斯罗兹(排除自身)加手牌、其余入废弃，LookTopReveal restTo trash 直接表达。"
+      },
+      {
+        "number": "OP04-093",
+        "status": "complex",
+        "definition": {},
+        "reason": "主要给角色+6000后，按废弃区≥15条件单独让该角色获得双重攻击；op 无法逐条带 if 条件，第二分句的条件化关键词赋予无法用 DSL 表达。"
+      },
+      {
+        "number": "OP04-094",
+        "status": "complex",
+        "definition": {},
+        "reason": "主要的可选 KO 目标费用上限随废弃区≥15在 Le4/Le6 间切换(需按条件切换 prompt)；触发又含'转休息领袖'成本与 KO 强耦合，均无法用 DSL 表达。"
+      },
+      {
+        "number": "OP04-095",
+        "status": "complex",
+        "definition": {},
+        "reason": "反击为 op 数组不支持 if，而'之后若废弃区≥15再+2000'是条件化追加，无法在 counter 中按条件分支表达。"
+      },
+      {
+        "number": "OP04-096",
+        "status": "complex",
+        "definition": {},
+        "reason": "舞台的纯持续/静态效果(登场回合可攻击角色),无事件触发,属 complex。"
+      },
+      {
+        "number": "OP04-097",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OpponentCharacterCostLe3",
+                  "max": 1,
+                  "as": "$tgt",
+                  "filter": {
+                    "anyOf": [
+                      {
+                        "keyword": "动物"
+                      },
+                      {
+                        "keyword": "SMILE"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "op": "MoveCharToLife",
+                  "target": "$tgt"
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时选对方1张费用≤3且含动物/SMILE特征的角色置入其生命顶，Choose+MoveCharToLife 表达。"
+      },
+      {
+        "number": "OP04-098",
+        "status": "complex",
+        "definition": {},
+        "reason": "登场时可选成本为'丢弃2张含和之国特征手牌',触发节不支持 cost,且该具名成本与结果强耦合,无法用 DSL 表达。"
+      },
+      {
+        "number": "OP04-099",
+        "status": "complex",
+        "definition": {},
+        "reason": "主体为'卡名视为夏洛特·玲玲'的规则改名(未列出机制);触发的'此卡牌登场'即从生命区将自身登场也无对应 op。"
+      },
+      {
+        "number": "OP04-100",
+        "status": "complex",
+        "definition": {},
+        "reason": "触发让对方1张领袖或角色本回合'无法攻击',AddRestriction 无 CannotAttack 类限制,机制未在规范列出。"
+      },
+      {
+        "number": "OP04-101",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "if": {
+                "isMyTurn": true
+              },
+              "then": [
+                {
+                  "op": "Draw",
+                  "n": 1
+                }
+              ]
+            }
+          ],
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OpponentCharacterCostLe2",
+              "max": 1,
+              "as": "$tgt"
+            },
+            {
+              "op": "KO",
+              "target": "$tgt"
+            }
+          ]
+        },
+        "reason": "我方回合中的登场时抽1(OnEnterField+isMyTurn);触发自身登场后KO对方≤2费角色,登场由触发自动入场,故触发节仅实现KO部分。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 100,
+    "results": [
+      {
+        "number": "OP04-102",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本为可选费用区咚转休息且数量可变，并需将生命区最上方或最下方1张入手(顶/底选择DSL无法表达)，成本与活跃结果耦合，无对应op。"
+      },
+      {
+        "number": "OP04-103",
+        "status": "dsl",
+        "definition": {
+          "triggers": [
+            {
+              "on": "OnEnterField",
+              "then": [
+                {
+                  "op": "Choose",
+                  "prompt": "OwnLeaderOrCharacter",
+                  "max": 1,
+                  "as": "$t",
+                  "filter": {
+                    "keyword": "和之国"
+                  }
+                },
+                {
+                  "op": "AddPowerThisTurn",
+                  "target": "$t",
+                  "delta": 1000
+                }
+              ]
+            }
+          ]
+        },
+        "reason": "登场时我方≤1张含《和之国》领袖或角色本回合力量+1000。"
+      },
+      {
+        "number": "OP04-104",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText仅【阻挡者】纯关键词；trigger为带可选弃牌成本的登场，触发节不支持cost无法表达。"
+      },
+      {
+        "number": "OP04-105",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本需弃掉手牌中拥有【触发】效果的卡牌，filter无法表达\"拥有触发效果\"这一属性。"
+      },
+      {
+        "number": "OP04-106",
+        "status": "complex",
+        "definition": {},
+        "reason": "咚×1的纯持续/静态力量修正(生命少于对方时+1000)，无事件触发。"
+      },
+      {
+        "number": "OP04-107",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText为\"-\"，无任何效果。"
+      },
+      {
+        "number": "OP04-108",
+        "status": "complex",
+        "definition": {},
+        "reason": "咚×1获得【流放】，属未列出的特殊机制，无对应op。"
+      },
+      {
+        "number": "OP04-109",
+        "status": "dsl",
+        "definition": {
+          "activated": {
+            "cost": {
+              "selfToTrash": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnLeaderOrCharacter",
+                "max": 1,
+                "as": "$t",
+                "filter": {
+                  "keyword": "和之国"
+                }
+              },
+              {
+                "op": "AddPowerThisTurn",
+                "target": "$t",
+                "delta": 3000
+              }
+            ]
+          }
+        },
+        "reason": "启动主要，自身入废弃为成本，我方≤1张含《和之国》领袖或角色本回合力量+3000。"
+      },
+      {
+        "number": "OP04-110",
+        "status": "complex",
+        "definition": {},
+        "reason": "【KO时】将对方≤3费角色正面朝上放入对方生命区最上/最下方，DSL无\"对方角色入对方生命且顶底选择\"的op。"
+      },
+      {
+        "number": "OP04-111",
+        "status": "complex",
+        "definition": {},
+        "reason": "成本为废弃自身以外1张《Homies》角色并横置自身(需选牌的复合成本)，cost节无法表达选定废弃指定特征角色。"
+      }
+    ]
+  },
+  {
+    "set": "OP04",
+    "idx": 110,
+    "results": [
+      {
+        "number": "OP04-112",
+        "status": "complex",
+        "definition": {},
+        "reason": "【登场时】KO 对方费用『不高于双方生命合计张数』的角色,该费用阈值为动态值,prompt 仅有固定 CostLe0..Le9,无法表达动态阈值;后半段我方生命≤1时卡组顶入生命也需联动,整体判 complex。"
+      },
+      {
+        "number": "OP04-113",
+        "status": "complex",
+        "definition": {},
+        "reason": "trigger『此卡牌登场』指从生命牌触发后将自身登场,op 列表无『从生命登场自身』机制,无法表达。"
+      },
+      {
+        "number": "OP04-114",
+        "status": "noEffect",
+        "definition": {},
+        "reason": "effectText 为『-』,trigger 为空,仅有反击值,无主动效果。"
+      },
+      {
+        "number": "OP04-115",
+        "status": "dsl",
+        "definition": {
+          "main": {
+            "cost": {
+              "lifeToHand": true
+            },
+            "then": [
+              {
+                "op": "Choose",
+                "prompt": "OwnCharacter",
+                "max": 1,
+                "min": 0,
+                "as": "$tgt",
+                "filter": {
+                  "keyword": "和之国"
+                },
+                "text": "选择1张和之国角色获得双重攻击"
+              },
+              {
+                "op": "GiveKeyword",
+                "target": "$tgt",
+                "keyword": "双重攻击",
+                "duration": "thisTurn"
+              }
+            ]
+          },
+          "trigger": [
+            {
+              "op": "Choose",
+              "prompt": "OwnLeaderOrCharacter",
+              "max": 1,
+              "min": 0,
+              "as": "$t"
+            },
+            {
+              "op": "AddPowerThisTurn",
+              "target": "$t",
+              "delta": 1000
+            }
+          ]
+        },
+        "reason": "主要:支付生命入手成本,给1张和之国角色本回合双重攻击;触发:1张领袖或角色力量+1000(成本以 lifeToHand 近似,顶/底选择无法表达)。"
+      },
+      {
+        "number": "OP04-116",
+        "status": "complex",
+        "definition": {},
+        "reason": "【反击】+6000可表达,但『之后,双方生命合计≤4时 KO 对方费用≤2角色』为条件分支,counter 节为无条件 op 列表,无法表达该条件连锁,整体判 complex。"
+      },
+      {
+        "number": "OP04-117",
+        "status": "complex",
+        "definition": {},
+        "reason": "【主要】将对方角色正面朝上加入『对方生命区』顶或底,无对应 op(MoveCharToLife 仅置入我方生命),无法表达。"
+      },
+      {
+        "number": "OP04-118",
+        "status": "complex",
+        "definition": {},
+        "reason": "纯持续/静态修正:让此角色以外我方所有费用≥3的红色角色获得速攻,无事件触发,需 C# 脚本。"
+      },
+      {
+        "number": "OP04-119",
+        "status": "complex",
+        "definition": {},
+        "reason": "【对方的回合中】此角色休息时我方活跃且原费用5角色不被效果 KO,为持续静态保护效果,无对应 op/触发机制;【登场时】可选成本登场绿色5费角色亦需联动,整体判 complex。"
+      }
+    ]
+  }
+]

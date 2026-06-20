@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadCardSet } from "@/data/CardLoader";
+import { loadAllCards, loadCardSet } from "@/data/CardLoader";
 import { loadDeck } from "@/data/DeckMapper";
 import { DEFAULT_SEARCH_SETS, ALL_SET_NAMES } from "@/data/cardSets";
 import { useDeckStore } from "@/store/deckStore";
@@ -25,27 +25,40 @@ export default function DeckEditorPage() {
 
     async function load() {
       try {
-        for (const setName of DEFAULT_SEARCH_SETS) {
-          await loadCardSet(setName);
-          setLoaded((n) => n + 1);
+        // 快速通道：一次请求合并单包（永久缓存，重复访问秒进）
+        try {
+          await loadAllCards();
+          setLoaded(total);
+        } catch {
+          // 单包缺失/失败时回退：并行逐集加载，进度条随每个完成递增
+          await Promise.all(
+            DEFAULT_SEARCH_SETS.map((setName) =>
+              loadCardSet(setName)
+                .then(() => setLoaded((n) => n + 1))
+                .catch(() => { setLoaded((n) => n + 1); }),
+            ),
+          );
+          const remaining = ALL_SET_NAMES.filter((s) => !DEFAULT_SEARCH_SETS.includes(s));
+          await Promise.all(remaining.map((s) => loadCardSet(s).catch(() => {})));
         }
         setLoadState("done");
 
-        // 自动加载主页已选中的卡组
-        const selectedDeck = localStorage.getItem("grandumi_selected_deck");
-        if (selectedDeck) {
-          const deck = loadDeck(selectedDeck);
-          if (deck) {
-            const store = useDeckStore.getState();
-            store.clearDeck();
-            store.setLeader(deck.leader);
-            deck.cards.forEach((c) => store.addCard(c));
+        // 新建模式（?new=1）：开空白卡组，不自动载入已选卡组
+        const isNew = new URLSearchParams(window.location.search).get("new") === "1";
+        if (isNew) {
+          useDeckStore.getState().clearDeck();
+        } else {
+          // 自动加载主页已选中的卡组
+          const selectedDeck = localStorage.getItem("grandumi_selected_deck");
+          if (selectedDeck) {
+            const deck = loadDeck(selectedDeck);
+            if (deck) {
+              const store = useDeckStore.getState();
+              store.clearDeck();
+              store.setLeader(deck.leader);
+              deck.cards.forEach((c) => store.addCard(c));
+            }
           }
-        }
-
-        const remaining = ALL_SET_NAMES.filter((s) => !DEFAULT_SEARCH_SETS.includes(s));
-        for (const setName of remaining) {
-          await loadCardSet(setName).catch(() => {});
         }
       } catch {
         setLoadState("error");

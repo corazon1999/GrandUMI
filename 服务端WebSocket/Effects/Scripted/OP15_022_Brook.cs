@@ -14,7 +14,7 @@ public class OP15_022_Brook : IScriptedEffect
     public Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        const string key = "OP15-022-MainOncePerTurn";
+        var key = "OP15-022-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
         AtomicOps.MillTop(me, 4);
         me.TurnOnceUsed.Add(key);

@@ -1,0 +1,300 @@
+{
+  "OP14-002": {
+    "_name": "乌鲁吉",
+    "_matcher": "攻击时若自身力量≥5000则抽1张并KO对方1张原力量≤3000的角色。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "selfPowerGte": 5000
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 3000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-036": {
+    "_name": "试试超越我吧，罗罗诺亚!!",
+    "_matcher": "反击:可放弃成本『将我方1张卡牌(活跃 领袖/角色/舞台/咚)转休息』→我方1张领袖/角色本次+4000;触发:同成本→横置对方1张原本力量≤7000角色",
+    "_src": "wf-dsl",
+    "counter": {
+      "cost": {
+        "restCards": { "n": 1, "optional": true }
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 4000
+        }
+      ]
+    },
+    "trigger": {
+      "cost": {
+        "restCards": { "n": 1, "optional": true }
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "originalPowerLte": 7000
+          }
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP14-045": {
+    "_name": "黑带",
+    "_matcher": "实现【KO时】抽1。前半“手牌被丢弃时获得速攻”无对应触发枚举，忽略不实现。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-049": {
+    "_name": "甚平",
+    "_matcher": "实现【登场时】抽2张（可选成本忽略）。“将1张费用≤7角色放回其持有者手牌”因目标可属任一方、无对应通用 prompt 而省略；“手牌被丢弃时获得速攻”无触发枚举亦忽略。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-059": {
+    "_name": "把我也带去吧!!我一定会帮上忙的!!",
+    "_matcher": "主要:领袖为甚平且手牌≤2时抽2;触发:退回1张费用≤4角色到手牌(无\"任意角色\"prompt,按常用按对方角色实现)",
+    "_src": "wf-dsl",
+    "main": {
+      "if": {
+        "leaderNameEquals": "甚平",
+        "selfHandCountLte": 2
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 2
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt",
+        "filter": {
+          "originalCostLte": 4
+        }
+      },
+      {
+        "op": "BounceToHand",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "OP14-063": {
+    "_name": "糖糖",
+    "_matcher": "登场时补1张活跃咚;KO时对方咚≥6则从手牌登场1张费用≤5的堂吉诃德海盗团角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "if": {
+          "oppDonTotalGte": 6
+        },
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "堂吉诃德海盗团",
+              "originalCostLte": 5
+            },
+            "text": "登场1张费用≤5的堂吉诃德海盗团角色"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-096": {
+    "_name": "浸食轮回",
+    "_matcher": "主要:横置2张活跃咚为成本,使对方1张≤5费角色效果本回合无效;反击:废弃≥10张时本次战斗1张领袖/角色+4000。注:反击的trashCountGte10条件无法在counter(无if)中限定,按收益实现",
+    "_src": "wf-dsl",
+    "main": {
+      "cost": {
+        "restActiveDon": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe5",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Nullify",
+          "target": "$tgt",
+          "duration": "ThisTurn"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "AddPowerThisBattle",
+        "target": "$t",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP14-102": {
+    "_name": "柯玛希",
+    "_matcher": "触发:从废弃区按特征/费用筛选≤1张角色横置登场,用PlayCharFromTrash表达",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "恐怖之船海盗团",
+          "originalCostLte": 4
+        },
+        "rest": true,
+        "text": "将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色横置登场"
+      }
+    ]
+  },
+  "OP14-109": {
+    "_name": "维多利亚·辛德丽",
+    "_matcher": "【阻挡者】为关键词;触发效果用PlayCharFromTrash从废弃区按特征/费用筛选横置登场",
+    "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "恐怖之船海盗团",
+          "originalCostLte": 4
+        },
+        "rest": true,
+        "text": "将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色横置登场"
+      }
+    ]
+  },
+  "OP14-112": {
+    "_name": "波尔·汉库珂",
+    "_matcher": "登场时领袖含王下七武海:卡组顶1张入生命顶,之后对方生命顶1张入对方手。注:trigger生命触发需登场'拥有【触发】效果'角色,filter无法表达'拥有触发效果'条件,该触发部分省略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "王下七武海"
+        },
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          },
+          {
+            "op": "OppLifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "OP14-040": {
+    "_name": "甚平",
+    "_matcher": "启动主要，弃1手牌为成本，给我方1张鱼人族/人鱼族领袖或角色贴最多2张休息状态咚。",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t",
+          "filter": {
+            "anyOf": [
+              {
+                "keyword": "鱼人族"
+              },
+              {
+                "keyword": "人鱼族"
+              }
+            ]
+          }
+        },
+        {
+          "op": "AttachDon",
+          "target": "$t",
+          "n": 2,
+          "from": "rest"
+        }
+      ]
+    }
+  }
+}

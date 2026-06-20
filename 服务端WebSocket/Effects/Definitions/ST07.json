@@ -1,0 +1,86 @@
+{
+  "ST07-004": {
+    "_name": "夏洛特·小食",
+    "_note": "【咚×1】【攻击时】生命顶入手：本次战斗此角色获得【流放】，力量+1000。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "GiveKeyword", "target": "self", "keyword": "流放", "duration": "ThisBattle" },
+          { "op": "AddPowerThisBattle", "target": "self", "delta": 1000 }
+        ]
+      }
+    ]
+  },
+  "ST07-005": {
+    "_name": "夏洛特·大福",
+    "_note": "【咚×1】【攻击时】生命顶入手：将我方卡组顶最多1张加入生命区顶。",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": { "donAttachedGte": 1 },
+        "cost": { "lifeToHand": true },
+        "then": [
+          { "op": "AddLifeFromDeck", "n": 1 }
+        ]
+      }
+    ]
+  },
+  "ST07-009": {
+    "_name": "夏洛特·蒙道尔",
+    "_note": "【启动主要】横置自身+生命顶入手：KO 对方最多1张费用≤3 角色。",
+    "activated": {
+      "cost": { "restSelf": true, "lifeToHand": true },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "ST07-011": {
+    "_name": "宙斯",
+    "_note": "【启动主要】横置自身：本回合我方最多1张“夏洛特·玲玲”获得【流放】。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "nameEquals": "夏洛特·玲玲" }, "text": "本回合我方最多1张“夏洛特·玲玲”获得【流放】" },
+        { "op": "GiveKeyword", "target": "$t", "keyword": "流放" }
+      ]
+    }
+  },
+  "ST07-013": {
+    "_name": "普罗米修斯",
+    "_note": "【启动主要】横置自身：本回合我方最多1张“夏洛特·玲玲”获得【双重攻击】。",
+    "activated": {
+      "cost": { "restSelf": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "nameEquals": "夏洛特·玲玲" }, "text": "本回合我方最多1张“夏洛特·玲玲”获得【双重攻击】" },
+        { "op": "GiveKeyword", "target": "$t", "keyword": "双重攻击" }
+      ]
+    }
+  },
+  "ST07-016": {
+    "_name": "强力麻糬",
+    "_note": "【反击】我方最多1张领袖或角色+2000（原文前置“确认生命顶放回顶/底”无 scry op 已略去）；【触发】抽1张。",
+    "counter": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "ST07-017": {
+    "_name": "女王妈妈圣歌号（舞台）",
+    "_note": "【启动主要】横置此舞台+生命顶入手：将我方最多1张费用为3的角色正面朝上加入生命区顶。",
+    "activated": {
+      "cost": { "restSelf": true, "lifeToHand": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "originalCostGte": 3, "originalCostLte": 3 }, "text": "将我方最多1张费用为3的角色加入生命区顶" },
+        { "op": "MoveCharToLife", "target": "$t" }
+      ]
+    }
+  }
+}

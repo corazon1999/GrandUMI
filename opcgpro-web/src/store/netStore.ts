@@ -1,4 +1,13 @@
 import { create } from "zustand";
+import type { PlayerInfo, FriendlyPlayer } from "@/types/net";
+
+export type IncomingInvite = { inviteId: string; fromName: string };
+export type FriendlyRoomState = {
+  roomId: string;
+  players: FriendlyPlayer[];
+  scores: number[];
+  state: "lobby" | "playing";
+};
 
 export interface ChatMessage {
   Name: string;
@@ -33,6 +42,14 @@ interface NetStore {
   opponentName: string;
   // 房间码
   roomCode: string | null;
+  // 在线人数（服务器广播的已登录人数）
+  onlineCount: number;
+  // 在线玩家列表（点击在线人数时拉取）
+  playerList: PlayerInfo[];
+  // 收到的对战邀请（被邀请方弹窗用）
+  incomingInvite: IncomingInvite | null;
+  // 友谊战房间（非 null 时大厅显示房间界面）
+  friendlyRoom: FriendlyRoomState | null;
   // 聊天
   chatMessages: ChatMessage[];
   // 客户端路由导航（避免 window.location.href 导致整页刷新断开 WebSocket）
@@ -48,6 +65,10 @@ interface NetStore {
   setSelectedDeck: (deck: SelectedDeck | null) => void;
   setOpponentName: (name: string) => void;
   setRoomCode: (code: string | null) => void;
+  setOnlineCount: (n: number) => void;
+  setPlayerList: (list: PlayerInfo[]) => void;
+  setIncomingInvite: (inv: IncomingInvite | null) => void;
+  setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setNavigateTo: (path: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   clearChat: () => void;
@@ -65,6 +86,10 @@ const initialState = {
   selectedDeck: null as SelectedDeck | null,
   opponentName: "",
   roomCode: null as string | null,
+  onlineCount: 0,
+  playerList: [] as PlayerInfo[],
+  incomingInvite: null as IncomingInvite | null,
+  friendlyRoom: null as FriendlyRoomState | null,
   chatMessages: [] as ChatMessage[],
   navigateTo: null as string | null,
 };
@@ -93,6 +118,14 @@ export const useNetStore = create<NetStore>((set) => ({
   setOpponentName: (name) => set({ opponentName: name }),
 
   setRoomCode: (code) => set({ roomCode: code }),
+
+  setOnlineCount: (n) => set({ onlineCount: n }),
+
+  setPlayerList: (list) => set({ playerList: list }),
+
+  setIncomingInvite: (inv) => set({ incomingInvite: inv }),
+
+  setFriendlyRoom: (room) => set({ friendlyRoom: room }),
 
   setNavigateTo: (path) => set({ navigateTo: path }),
 

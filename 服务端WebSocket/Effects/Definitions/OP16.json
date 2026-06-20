@@ -1,10 +1,18 @@
 {
   "OP16-002": {
     "_name": "伊佐",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时公开手牌力量8000角色，抽1",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "revealHand": {
+            "kind": "Character",
+            "originalPowerGte": 8000,
+            "originalPowerLte": 8000,
+            "text": "公开1张力量为8000的角色卡牌（可放弃）"
+          }
+        },
         "then": [
           {
             "op": "Draw",
@@ -36,12 +44,48 @@
       }
     ]
   },
-  "OP16-007": {
-    "_name": "乔兹",
-    "_matcher": "登场时给对方角色力量 -N",
+  "OP16-006": {
+    "_name": "杰克斯",
+    "_matcher": "登场时KO对方角色（力量≤4000）",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restActiveDon": 2
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 4000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ],
+        "_doc": "力量过滤为原始印刷力量近似（卡面文意为当前力量）"
+      }
+    ]
+  },
+  "OP16-007": {
+    "_name": "乔兹",
+    "_matcher": "登场时公开手牌8000角色，给对方1角色力量-1000",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": {
+          "revealHand": {
+            "kind": "Character",
+            "originalPowerGte": 8000,
+            "originalPowerLte": 8000,
+            "text": "公开1张力量为8000的角色卡牌（可放弃）"
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -58,16 +102,132 @@
       }
     ]
   },
-  "OP16-011": {
-    "_name": "比斯塔",
-    "_matcher": "登场时抽 N",
+  "OP16-008": {
+    "_name": "斯库亚德",
+    "_matcher": "登场时弃我方原本10000角色，KO对方力量≤8000角色",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "trashOwnCharacter": {
+            "kind": "Character",
+            "originalPowerGte": 10000,
+            "originalPowerLte": 10000,
+            "text": "选择我方1张原本力量为10000的角色放置废弃区（作为成本，可放弃）"
+          }
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 8000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ],
+        "_doc": "成本：弃我方1张原本力量10000的角色（无候选/放弃则不发动）。KO目标以原本力量≤8000近似'力量不高于8000'（DSL目标过滤暂不含buff后当前力量）。"
+      }
+    ]
+  },
+  "OP16-010": {
+    "_name": "耐休尔",
+    "_matcher": "登场时公开手牌8000角色，KO对方≤2000角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": {
+          "revealHand": {
+            "kind": "Character",
+            "originalPowerGte": 8000,
+            "originalPowerLte": 8000,
+            "text": "公开1张力量为8000的角色卡牌（可放弃）"
+          }
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 2000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ],
+        "_doc": "公开手牌成本经 cost.revealHand 实现；KO 目标按原始印刷力量≤2000过滤"
+      }
+    ]
+  },
+  "OP16-011": {
+    "_name": "比斯塔",
+    "_matcher": "登场时公开手牌8000角色抽1；咚!!×1攻击时KO对方最多2张原本力量≤2000角色",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "cost": {
+          "revealHand": {
+            "kind": "Character",
+            "originalPowerGte": 8000,
+            "originalPowerLte": 8000,
+            "text": "公开1张力量为8000的角色卡牌（可放弃）"
+          }
+        },
         "then": [
           {
             "op": "Draw",
             "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 2,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 2000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-013": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
           }
         ]
       }
@@ -75,7 +235,8 @@
   },
   "OP16-020": {
     "_name": "不怕死的就跟我来吧!!",
-    "_matcher": "事件【主要】抽 N",
+    "_matcher": "事件【主要】抽 N；【反击】弃1手牌→我方最多1领袖/角色+3000",
+    "_doc": "main 现为占位（抽1）；原文实为『休息1咚+公开手牌1张8000角色：抽1』，因 DSL 暂不支持双成本原子支付未实现。counter 原文：『可以丢弃我方的1张手牌：本次战斗中，我方最多1张领袖或角色力量+3000。』",
     "main": {
       "then": [
         {
@@ -83,59 +244,164 @@
           "n": 1
         }
       ]
+    },
+    "counter": {
+      "cost": {
+        "handDiscard": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$tgt",
+          "delta": 3000
+        }
+      ]
     }
-  },
-  "OP16-021": {
-    "_name": "莫比·迪克号",
-    "_matcher": "登场时查看卡组顶 N 张",
-    "triggers": [
-      {
-        "on": "OnEnterField",
-        "then": [
-          {
-            "op": "Draw",
-            "n": 1
-          }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
-      }
-    ]
   },
   "OP16-026": {
     "_name": "安普里奥·伊万科夫",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时顶3公开≤1《因佩尔地狱》入手余放底;之后手牌≤1张费用≤2角色登场",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "因佩尔地狱"
+            }
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": { "originalCostLte": 2 },
+            "text": "之后,将我方手牌中最多1张费用不高于2的角色卡牌登场"
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
+      }
+    ]
+  },
+  "OP16-031": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnHand",
+            "max": 1,
+            "min": 0,
+            "filter": {
+              "nameEquals": "因佩尔地狱的囚犯"
+            },
+            "text": "选择手牌中最多1张「因佩尔地狱的囚犯」登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
+          }
+        ]
       }
     ]
   },
   "OP16-034": {
     "_name": "蒙奇·D·路飞",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶3张，公开≤1张《因佩尔地狱》加入手牌，余放卡组底（咚×1力量持续效果不在此定义）",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 3,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "因佩尔地狱"
+            }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 3 张里按 filter 选 1，剩余放卡组底部"
+        ]
+      }
+    ]
+  },
+  "OP16-036": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-037": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "因佩尔地狱"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-043": {
+    "_name": "撒谎布",
+    "_matcher": "【KO时】将对方≤1张费用≤5的角色退回手牌；可选成本(休息领袖/舞台)在 triggers 中无法表达，按惯例仅实现收益部分。【阻挡者】为纯关键词另行处理。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
       }
     ]
   },
   "OP16-045": {
     "_name": "克洛克达尔",
-    "_matcher": "登场时从手牌登场",
+    "_matcher": "已由脚本 OP16_045_Crocodile 接管(登场:可费用≥2角色回手→登场≤2费《因佩尔地狱》角色);下方DSL占位脚本优先不执行",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -153,14 +419,20 @@
   },
   "OP16-048": {
     "_name": "巴奇",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时领袖含《因佩尔地狱》则抽1+手牌≤1张《因佩尔地狱的囚犯》登场(另【每回合1次】对方攻击时给囚犯阻挡者未做)",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "因佩尔地狱" },
         "then": [
           {
             "op": "Draw",
             "n": 1
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": { "keywordContains": "因佩尔地狱的囚犯" },
+            "text": "将我方手牌中最多1张《因佩尔地狱的囚犯》登场"
           }
         ]
       }
@@ -181,7 +453,7 @@
   },
   "OP16-050": {
     "_name": "密斯·奥利布",
-    "_matcher": "登场时抽 N",
+    "_matcher": "已由脚本 OP16_050_MissDoublefinger 接管(登场:可费用≥2角色回手→抽2丢1);下方DSL占位脚本优先不执行",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -204,6 +476,42 @@
           {
             "op": "Draw",
             "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-052": {
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP16-053": {
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "selfHandCountLte": 6
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
           }
         ]
       }
@@ -241,13 +549,28 @@
   },
   "OP16-056": {
     "_name": "Mr.3(加尔迪诺)",
-    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "_matcher": "启动主要:自身去废弃→抽2→对方最多1张费用≤9角色无法攻击(至下个对方结束阶段)",
     "activated": {
-      "oncePerTurn": true,
+      "cost": {
+        "selfToTrash": true
+      },
       "then": [
         {
           "op": "Draw",
           "n": 2
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe9",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddRestriction",
+          "target": "$tgt",
+          "kind": "CannotAttack",
+          "duration": "UntilNextOpponentEndPhase"
         }
       ]
     }
@@ -279,25 +602,65 @@
       }
     ]
   },
-  "OP16-064": {
-    "_name": "可比",
-    "_matcher": "登场时查看卡组顶 N 张",
+  "OP16-063": {
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "RefreshDon",
+            "n": 2,
+            "state": "rest"
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+        ]
+      }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddRestriction",
+          "target": "$tgt",
+          "kind": "CannotBeBlocker",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
+  },
+  "OP16-064": {
+    "_name": "可比",
+    "_matcher": "登场时确认卡组顶5张，公开≤1张「可比」以外的《海军》加入手牌，余放卡组底",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "海军",
+              "excludeName": "可比"
+            }
+          }
+        ]
       }
     ]
   },
   "OP16-065": {
     "_name": "萨卡斯基",
-    "_matcher": "登场时给对方角色力量 -N",
+    "_matcher": "登场时给对方角色力量-N；启动主要(转休息咚1)海军则追加2活跃咚",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -315,23 +678,48 @@
           }
         ]
       }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "if": { "leaderHasKeyword": "海军" },
+      "cost": { "restActiveDon": 1 },
+      "then": [
+        { "op": "RefreshDon", "n": 2, "state": "active" }
+      ]
+    }
+  },
+  "OP16-066": {
+    "_name": "战国",
+    "_matcher": "登场时追加咚+抽2丢2（领袖有海军特征时）",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "海军"
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 2,
+            "state": "rest"
+          },
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          }
+        ]
+      }
     ]
   },
   "OP16-067": {
     "_name": "阿鹤(海军)",
     "_matcher": "登场时查看卡组顶 N 张",
-    "triggers": [
-      {
-        "on": "OnEnterField",
-        "then": [
-          {
-            "op": "Draw",
-            "n": 1
-          }
-        ],
-        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
-      }
-    ]
+    "_doc": "登场效果由手写脚本 Effects/Scripted/OP16_067_Otsuru.cs 实现（看顶5张选海军入手+弃1手牌），此处不再用 DSL 占位",
+    "triggers": []
   },
   "OP16-068": {
     "_name": "特拉法尔加·罗",
@@ -349,12 +737,39 @@
       }
     ]
   },
-  "OP16-070": {
-    "_name": "堂吉诃德·罗西南德",
-    "_matcher": "登场时从咚卡组追加 1 张",
+  "OP16-069": {
     "triggers": [
       {
         "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      },
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-070": {
+    "_name": "堂吉诃德·罗西南德",
+    "_matcher": "登场时:可横置我方2活跃咚→领袖有《海军》则从咚卡组追加≤1休息咚",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "海军" },
+        "cost": { "restActiveDon": 2 },
+        "costPrompt": "是否将我方2张活跃咚转为休息状态，以从咚卡组追加1张休息咚?",
         "then": [
           {
             "op": "RefreshDon",
@@ -393,23 +808,27 @@
   },
   "OP16-072": {
     "_name": "汉尼拔",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "登场时确认卡组顶5张，公开≤1张《因佩尔地狱》加入手牌，余放卡组底",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "因佩尔地狱"
+            }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
   "OP16-073": {
     "_name": "波尔萨利诺",
-    "_matcher": "登场时从咚卡组追加 1 张",
+    "_matcher": "登场时从咚卡组追加1张活跃咚 + 1张休息咚",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -418,6 +837,36 @@
             "op": "RefreshDon",
             "n": 1,
             "state": "active"
+          },
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-074": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "因佩尔地狱"
+        },
+        "then": [
+          {
+            "op": "ReturnDonToDeck",
+            "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "ReturnDonToDeck",
+            "n": 4
           }
         ]
       }
@@ -425,28 +874,84 @@
   },
   "OP16-075": {
     "_name": "蒙奇·D·戈普",
-    "_matcher": "登场时从咚卡组追加 1 张",
+    "_matcher": "登场时领袖含《海军》时，从咚卡组追加1张活跃咚 + 1张休息咚",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "海军"
+        },
         "then": [
           {
             "op": "RefreshDon",
             "n": 1,
             "state": "active"
+          },
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
           }
         ]
       }
     ]
   },
+  "OP16-076": {
+    "main": {
+      "cost": {
+        "restActiveDon": 3
+      },
+      "then": [
+        {
+          "op": "AddPowerAll",
+          "delta": 2000,
+          "filter": {
+            "keyword": "大将"
+          }
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 4000
+      }
+    ]
+  },
+  "OP16-077": {
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 5,
+          "max": 2,
+          "match": {
+            "keyword": "海军"
+          }
+        },
+        {
+          "op": "DiscardOwnChosen",
+          "n": 1
+        }
+      ]
+    }
+  },
   "OP16-078": {
     "_name": "玛丽弗德",
-    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "_matcher": "登场:确认顶5张公开≤1张《海军》加手余放底；启动主要:咚!!-1+此舞台转休息→抽1丢1",
     "activated": {
-      "oncePerTurn": true,
+      "cost": {
+        "donReturn": 1,
+        "restSelf": true
+      },
       "then": [
         {
           "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "DiscardOwnChosen",
           "n": 1
         }
       ]
@@ -456,27 +961,59 @@
         "on": "OnEnterField",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "海军"
+            }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
+  "OP16-081": {
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -2000
+        }
+      ]
+    }
+  },
   "OP16-082": {
     "_name": "锦卫门",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "领袖含《和之国》时,确认顶5张公开≤1张《和之国》加手,余进废弃区（费用+3持续效果不在此定义）",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "和之国"
+        },
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "keyword": "和之国"
+            }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 5 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
@@ -490,6 +1027,27 @@
           {
             "op": "Draw",
             "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-085": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "text": "选择废弃区中费用不高于6且拥有《和之国》特征的角色（非光月桃之助）登场",
+            "as": "$c"
+          },
+          {
+            "op": "PlayFromTrash",
+            "target": "$c"
           }
         ]
       }
@@ -542,23 +1100,31 @@
   },
   "OP16-091": {
     "_name": "奈美",
-    "_matcher": "登场时查看卡组顶 N 张",
+    "_matcher": "领袖含《和之国》时,确认顶4张公开≤1张「奈美」以外《和之国》加手,余进废弃区",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "和之国"
+        },
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "LookTopReveal",
+            "count": 4,
+            "max": 1,
+            "restTo": "trash",
+            "match": {
+              "keyword": "和之国",
+              "excludeName": "奈美"
+            }
           }
-        ],
-        "_doc": "精确实现需要从卡组顶 4 张里按 filter 选 1，剩余放卡组底部"
+        ]
       }
     ]
   },
   "OP16-092": {
     "_name": "妮古·罗宾",
-    "_matcher": "登场时抽 N",
+    "_matcher": "已由脚本 OP16_092_Robin 接管(登场:可丢费用≥8角色→抽2);下方 DSL 为旧占位,脚本优先 return 不执行",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -586,9 +1152,82 @@
       }
     ]
   },
+  "OP16-094": {
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "OpponentDiscard",
+            "n": 2
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "OP16-095": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "$tgt",
+            "keyword": "Unblockable",
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-096": {
+    "_name": "大和",
+    "_matcher": "【KO时】从废弃区免费登场≤1张费用≤6且卡名为“大和”的角色。【不可阻挡】为纯关键词另行处理。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "nameEquals": "大和",
+              "originalCostLte": 6
+            },
+            "text": "将我方废弃区中最多1张费用不高于6的“大和”登场"
+          }
+        ]
+      }
+    ]
+  },
   "OP16-097": {
     "_name": "大和",
-    "_matcher": "登场时把废弃区角色加入手牌",
+    "_matcher": "登场时:废弃区≤1张(费≤6且《和之国》)入手;之后手牌≤1张(费≤2)角色登场",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -596,12 +1235,20 @@
           {
             "op": "Choose",
             "prompt": "OwnTrashCharacter",
+            "filter": { "originalCostLte": 6, "keyword": "和之国" },
             "max": 1,
-            "as": "$c"
+            "min": 0,
+            "as": "$c",
+            "text": "将我方废弃区最多1张费用≤6且《和之国》的角色加入手牌"
           },
           {
             "op": "TrashToHand",
             "target": "$c"
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": { "originalCostLte": 2 },
+            "text": "将我方手牌中最多1张费用≤2的角色登场"
           }
         ]
       }
@@ -609,18 +1256,84 @@
   },
   "OP16-098": {
     "_name": "大和",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时抽1丢1;启动主要(自废弃)→废弃区1张费用8黑色《大和》登场",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
-          {
-            "op": "Draw",
-            "n": 1
-          }
+          { "op": "Draw", "n": 1 },
+          { "op": "DiscardOwnChosen", "n": 1 }
         ]
       }
+    ],
+    "activated": {
+      "cost": { "selfToTrash": true },
+      "then": [
+        {
+          "op": "PlayCharFromTrash",
+          "filter": { "nameEquals": "大和", "originalCostLte": 8, "originalCostGte": 8 },
+          "text": "将废弃区1张费用为8的黑色《大和》登场"
+        }
+      ]
+    }
+  },
+  "OP16-099": {
+    "main": {
+      "cost": {
+        "restActiveDon": 6
+      },
+      "then": [
+        {
+          "op": "MillTop",
+          "n": 5
+        },
+        {
+          "op": "PlayCharFromTrash",
+          "filter": { "keywordContains": "和之国", "originalCostLte": 6 },
+          "text": "从废弃区登场最多1张费用≤6且拥有《和之国》特征的角色"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
     ]
+  },
+  "OP16-100": {
+    "main": {
+      "cost": {
+        "restActiveDon": 2
+      },
+      "then": []
+    },
+    "counter": [
+      {
+        "op": "AddPowerThisBattle",
+        "target": "selfLeader",
+        "delta": 3000
+      }
+    ]
+  },
+  "OP16-101": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 3000
+        }
+      ]
+    }
   },
   "OP16-102": {
     "_name": "阿瓦罗·匹萨罗",
@@ -677,15 +1390,22 @@
       }
     ]
   },
-  "OP16-108": {
-    "_name": "希流",
-    "_matcher": "【触发】抽 N",
-    "trigger": [
+  "OP16-107": {
+    "triggers": [
       {
-        "op": "Draw",
-        "n": 2
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "OppLifeToHand"
+          }
+        ]
       }
     ]
+  },
+  "OP16-108": {
+    "_name": "希流",
+    "_matcher": "已由脚本 OP16_108_Shiryu 接管(登场:可丢手牌→废弃区≤6费黑胡子正面入生命);原【触发】抽2为错误占位已移除(希流无触发效果)",
+    "trigger": []
   },
   "OP16-109": {
     "_name": "毒Q",
@@ -704,26 +1424,161 @@
   },
   "OP16-110": {
     "_name": "巴斯克·乔特",
-    "_matcher": "KO时抽 N",
+    "_matcher": "KO时:抽1+将对方≤1张(费≤6)角色转休息;【触发】发动同KO时效果",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          { "op": "Draw", "n": 1 },
+          { "op": "Choose", "prompt": "OpponentCharacterCostLe6", "max": 1, "min": 0, "as": "$t", "text": "将对方最多1张费用≤6的角色转为休息状态" },
+          { "op": "Rest", "target": "$t" }
+        ]
+      }
+    ],
+    "trigger": [
+      { "op": "Draw", "n": 1 },
+      { "op": "Choose", "prompt": "OpponentCharacterCostLe6", "max": 1, "min": 0, "as": "$t", "text": "将对方最多1张费用≤6的角色转为休息状态" },
+      { "op": "Rest", "target": "$t" }
+    ]
+  },
+  "OP16-114": {
     "triggers": [
       {
         "on": "OnKO",
         "then": [
           {
-            "op": "Draw",
-            "n": 1
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
           }
         ]
       }
     ]
   },
+  "OP16-115": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnTrash",
+          "max": 1,
+          "min": 0,
+          "text": "选择废弃区中1张拥有触发效果的卡牌加入手牌",
+          "as": "$c"
+        },
+        {
+          "op": "TrashToHand",
+          "target": "$c"
+        }
+      ]
+    }
+  },
   "OP16-116": {
     "_name": "啧哈哈哈哈哈哈!!",
-    "_matcher": "【触发】抽 N",
+    "_matcher": "【主要】我方场上10张咚!!则从手牌登场≤1张《马歇尔·D·提奇》,之后对方生命顶≤1入对方手牌;【触发】抽2弃1。",
+    "main": {
+      "if": { "selfDonTotalGte": 10 },
+      "then": [
+        {
+          "op": "PlayCharFromHand",
+          "filter": { "nameEquals": "马歇尔·D·提奇" },
+          "text": "将我方手牌中最多1张《马歇尔·D·提奇》登场"
+        },
+        {
+          "op": "OppLifeToHand"
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "Draw",
         "n": 2
+      },
+      {
+        "op": "DiscardOwnChosen",
+        "n": 1
+      }
+    ]
+  },
+  "OP16-117": {
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe8",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "Nullify",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "OP16-118": {
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "蒙奇·D·路飞"
+                },
+                {
+                  "keyword": "白胡子海盗团"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "match": {
+              "anyOf": [
+                {
+                  "nameEquals": "蒙奇·D·路飞"
+                },
+                {
+                  "keyword": "白胡子海盗团"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "OP16-119": {
+    "_name": "马歇尔·D·提奇",
+    "_matcher": "已由脚本 OP16_119_Teach 接管(登场:确认顶3张选≤1入生命余放底);下方DSL占位脚本优先不执行",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "AddLifeFromDeck",
+            "n": 1
+          }
+        ]
       }
     ]
   }

@@ -1,0 +1,614 @@
+{
+  "OP09-001": {
+    "_name": "杰克斯",
+    "_matcher": "对方攻击时(OnOppAttackDeclare)选对方最多1张领袖或角色力量-1000。每回合1次为可选反应，triggers不支持oncePerTurn,核心效果可用DSL表达。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnOppAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -1000
+          }
+        ]
+      }
+    ]
+  },
+  "OP11-040": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "我方回合开始时、咚≥8，确认顶5张公开≤1张草帽特征加手牌，其余按 LookTopReveal 标准回底(原卡牌支持自选顶/底重排，DSL 以回底近似)。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnTurnStart",
+        "if": {
+          "isMyTurn": true,
+          "selfDonTotalGte": 8
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "草帽一伙"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "P-008": {
+    "_name": "大和",
+    "_matcher": "【启动主要】横置自身:横置对方≤1张费用≤2角色,Choose+Rest表达。",
+    "_src": "wf-gap",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe2",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "P-009": {
+    "_name": "特拉法尔加·罗",
+    "_matcher": "【登场时】对方≥6手牌时对方1张生命入手,if oppHandCountGte+OppLifeToHand。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "oppHandCountGte": 6
+        },
+        "then": [
+          {
+            "op": "OppLifeToHand"
+          }
+        ]
+      }
+    ]
+  },
+  "P-010": {
+    "_name": "盖德",
+    "_matcher": "【我方回合结束时】从咚卡组追加最多1张活跃咚,OnMyTurnEnd+RefreshDon active。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnMyTurnEnd",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "active"
+          }
+        ]
+      }
+    ]
+  },
+  "P-017": {
+    "_name": "特拉法尔加·罗",
+    "_matcher": "【登场时】对方最多1张角色力量-2000，选择后 AddPowerThisTurn。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": -2000
+          }
+        ]
+      }
+    ]
+  },
+  "P-019": {
+    "_name": "贝宝",
+    "_matcher": "【咚!!×1】=被贴咚≥1(donAttachedGte:1)，【攻击时】KO对方最多1张原本力量≤3000角色。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 3000
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "P-020": {
+    "_name": "希路麦波",
+    "_matcher": "【登场时】我方最多1张领袖或角色力量+1000。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$tgt",
+            "delta": 1000
+          }
+        ]
+      }
+    ]
+  },
+  "P-026": {
+    "_name": "摩根",
+    "_matcher": "【攻击时】对方最多1张角色费用-3，AddCostMod delta:-3 本回合。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$tgt",
+            "delta": -3,
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "P-031": {
+    "_name": "乌塔",
+    "_matcher": "【登场时】从咚卡组追加最多1张休息状态咚→RefreshDon n=1 state=rest。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "P-037": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "【攻击时】我方≥2张休息角色时本回合此角色力量+1000→OnAttackDeclare+if ownRestedCharCountGte:2+AddPowerThisTurn self +1000。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "ownRestedCharCountGte": 2
+        },
+        "then": [
+          {
+            "op": "AddPowerThisTurn",
+            "target": "self",
+            "delta": 1000
+          }
+        ]
+      }
+    ]
+  },
+  "P-042": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "生命【触发】KO对方最多1张费用≤4的角色，用 trigger 节 Choose+KO 表达。",
+    "_src": "wf-gap",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      {
+        "op": "KO",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "P-047": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "【咚!!×1】【攻击时】我方手牌≤3张时抽1张，用 OnAttackDeclare 触发+selfHandCountLte 条件表达。咚条件由引擎统一处理。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnAttackDeclare",
+        "if": {
+          "selfHandCountLte": 3,
+          "donAttachedGte": 1
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "P-053": {
+    "_name": "奈美",
+    "_matcher": "【登场时】手牌≤3时，对方≤1张费用≤3角色退回手牌，用OnEnterField+if+Choose+BounceToHand表达",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "selfHandCountLte": 3
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe3",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "P-062": {
+    "_name": "霍迪&豹藏",
+    "_matcher": "【启动主要】【每回合1次】对方≤1张费用≤4角色横置、本回合此角色力量+1000，之后生命顶1张入手，用activated+Choose+Rest+AddPowerThisTurn+LifeToHand表达",
+    "_src": "wf-gap",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe4",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "self",
+          "delta": 1000
+        },
+        {
+          "op": "LifeToHand"
+        }
+      ]
+    }
+  },
+  "P-063": {
+    "_name": "甚平",
+    "_matcher": "【登场时】对方≤1张费用≤1角色横置，用OnEnterField+Choose+Rest表达",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "P-069": {
+    "_name": "克尔拉",
+    "_matcher": "启动主要每回合1次：选我方1领袖或角色贴1张休息咚。",
+    "_src": "wf-gap",
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "P-072": {
+    "_name": "龙马",
+    "_matcher": "【登场时】/【KO时】将对方最多1张费用≤4角色横置。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "P-094": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "【登场时】选对方≤1张休息且费用≤2角色KO：Choose(OpponentRestingCharacter+filter originalCostLte:2)后 KO。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentRestingCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "originalCostLte": 2
+            }
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "P-096": {
+    "_name": "少女",
+    "_matcher": "【登场时】抽1弃1=Draw+DiscardOwnChosen；【启动主要】每回合1次给我方「奈美」贴≤1张休息咚=Choose(OwnCharacter+nameEquals奈美)后 AttachDon from:rest。",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "nameEquals": "奈美"
+          }
+        },
+        {
+          "op": "AttachDon",
+          "target": "$tgt",
+          "n": 1,
+          "from": "rest"
+        }
+      ]
+    }
+  },
+  "P-101": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "阻挡者为纯关键词无需写;登场时赋予领袖最多1张休息状态咚,用AttachDon target=selfLeader n=1 from=rest",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "AttachDon",
+            "target": "selfLeader",
+            "n": 1,
+            "from": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "P-102": {
+    "_name": "奈美",
+    "_matcher": "登场时领袖含草帽一伙时,将我方最多2张咚转活跃,用ActiveOwnDon n=2,条件leaderHasKeyword",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        },
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "P-108": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "阻挡者为纯关键词;KO时将我方最多2张咚转活跃,用OnKO触发ActiveOwnDon n=2",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "P-112": {
+    "_name": "奈美",
+    "_matcher": "登场时领袖为奈美则给我方领袖贴1张休息咚，之后从手牌登场≤1张费用≤2角色，均有对应op",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderNameEquals": "奈美"
+        },
+        "then": [
+          {
+            "op": "AttachDon",
+            "target": "selfLeader",
+            "n": 1,
+            "from": "rest"
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "kind": "Character",
+              "originalCostLte": 2
+            },
+            "text": "将我方手牌中最多1张费用不高于2的角色卡牌登场"
+          }
+        ]
+      }
+    ]
+  },
+  "P-116": {
+    "_name": "妮古·罗宾",
+    "_matcher": "阻挡者为纯关键词无需写；【KO时】废弃≥7则抽1弃1，均有对应op与条件键",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnKO",
+        "if": {
+          "ownTrashCountGte": 7
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "P-135": {
+    "_name": "蒙奇·D·路飞",
+    "_matcher": "阻挡者为纯关键词无需写；【登场时】将对方≤1张费用≤5角色休息，Choose+Rest可表达",
+    "_src": "wf-gap",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe5",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  }
+}

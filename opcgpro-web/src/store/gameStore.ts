@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { MsgGameState } from "@/types/net";
+import type { MsgGameState, RevealSnapshot } from "@/types/net";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -22,28 +22,39 @@ export interface FieldCardView {
   number: string;
   isTapped: boolean;
   powerCurrent: number;
+  cost: number;              // 当前费用（含持续光环，如 OP16-080 对方回合 +1）
   attachedDon: number;
   gainedKeywords: string[];
   cannotActivateNextReset: boolean;
+  cannotBeRested: boolean;   // 无法被效果转为休息状态
+  activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
   turnPlayed: number;
+  canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
 }
 
 export interface PlayerView {
   name: string;
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
+  handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCount: number;
   fieldCards: FieldCardView[];
   stageNumber: string | null;
   stageId: string | null;
+  stageTapped: boolean;
   trashNumbers: string[];
   deckCount: number;
   lifeCount: number;
   lifeNumbers: string[];       // 始终为空（生命牌不公开），由触发流程单独 prompt
+  // 生命区每张牌的正反朝向（后端权威，顶→底）：faceUp 时 number 为公开番号，否则 null（背面占位）
+  lifeFaceUp?: { faceUp: boolean; number: string | null }[];
   leaderId: string;
   leaderNumber: string;
   leaderTapped: boolean;
   leaderPower: number;
   leaderAttachedDon: number;
+  leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
+  leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
+  stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;
   costRest: number;
   costAttached: number;
@@ -96,6 +107,13 @@ interface GameStore {
   lastAction: string;
   lastActionPayloadObj: Record<string, unknown> | null;
 
+  // 操作日志（按 tick 去重累积）
+  logLines: { id: number; text: string }[];
+  lastLogTick: number;
+
+  // 检索/公开牌瞬时展示（nonce 递增以便重复触发；由 RevealOverlay 计时清除）
+  reveal: (RevealSnapshot & { nonce: number }) | null;
+
   // UI 暂态
   isPending: boolean;
   isGameOver: boolean;
@@ -113,6 +131,7 @@ interface GameStore {
 
   // ── 唯一写入路径 ─────────────────────────────────────────────────────
   syncFromServer: (msg: MsgGameState) => void;
+  clearReveal: () => void;
 
   // 纯本地 UI 状态
   setPending: (v: boolean) => void;
@@ -140,6 +159,9 @@ export const useGameStore = create<GameStore>()(
     battle: null,
     lastAction: "",
     lastActionPayloadObj: null,
+    logLines: [],
+    lastLogTick: -1,
+    reveal: null,
     isPending: false,
     isGameOver: false,
     winnerIsMe: false,
@@ -173,6 +195,20 @@ export const useGameStore = create<GameStore>()(
               catch { return null; }
             })()
           : null;
+        // 操作日志：按 tick 去重累积（重连重发同 tick 不会重复记入）
+        {
+          const line = msg.logLine ?? "";
+          if (line && s.tick > s.lastLogTick) {
+            s.logLines.push({ id: s.tick, text: line });
+            if (s.logLines.length > 200) s.logLines.shift();
+          }
+          if (s.tick > s.lastLogTick) s.lastLogTick = s.tick;
+        }
+        // 检索公开：仅在快照携带 reveal 时写入（递增 nonce 触发展示）；
+        // 不携带时保持原值不动，交由 RevealOverlay 的计时器清除，避免被紧随的普通快照瞬间抹掉
+        if (msg.reveal) {
+          s.reveal = { ...msg.reveal, nonce: (s.reveal?.nonce ?? 0) + 1 };
+        }
         s.isPending = false;
         s.myName = msg.my?.name ?? "";
         s.opponentName = msg.opponent?.name ?? "";
@@ -181,6 +217,8 @@ export const useGameStore = create<GameStore>()(
         s.selectedFieldId = null;
         s.selectedDonIndex = null;
       }),
+
+    clearReveal: () => set((s) => { s.reveal = null; }),
 
     setPending: (v) => set((s) => { s.isPending = v; }),
     setSelectedHand: (idx) => set((s) => {
@@ -212,6 +250,9 @@ export const useGameStore = create<GameStore>()(
       s.battle = null;
       s.lastAction = "";
       s.lastActionPayloadObj = null;
+      s.logLines = [];
+      s.lastLogTick = -1;
+      s.reveal = null;
       s.isPending = false;
       s.isGameOver = false;
       s.winnerIsMe = false;

@@ -3,12 +3,12 @@ using GrandUMI.Game;
 namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
-/// OP15-029 巴索罗缪·大熊（期限效果示例）
+/// OP15-029 巴索罗缪·大熊
 /// 【登场时】直到下个对方的结束阶段结束时为止，对方最多1张费用不高于5的角色无法转为休息状态。
 ///
 /// "无法转为休息状态" — 即禁止此角色在受到效果时变成 IsTapped=true
-/// 用临时关键字 "禁止休息" + KeywordDuration.UntilNextOpponentEndPhase 标记
-/// （需要 BattleEngine.RestCard 检查该关键字才生效；目前作为示例注册）
+/// 用 AtomicOps.AddRestriction(CannotBeRested, UntilNextOpponentEndPhase)，
+/// RestCard 会对其 no-op，并由快照下发 cannotBeRested 显示图标（与 OP11-034/OP16-032 同机制）。
 /// </summary>
 public class OP15_029_Kuma : IScriptedEffect
 {
@@ -30,6 +30,6 @@ public class OP15_029_Kuma : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.GiveKeyword(target, "禁止休息", KeywordDuration.UntilNextOpponentEndPhase);
+        AtomicOps.AddRestriction(target, RestrictionKind.CannotBeRested, KeywordDuration.UntilNextOpponentEndPhase);
     }
 }

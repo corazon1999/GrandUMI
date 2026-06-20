@@ -6,7 +6,6 @@
  */
 
 import { eventBus } from "./eventBus";
-import { GameRequest } from "./GameRequest";
 import type {
   MsgBase,
   MsgGameState,
@@ -14,9 +13,11 @@ import type {
   MsgPlayerReconnected,
   MsgDuelOver,
   MsgActionRejected,
+  MsgGameChat,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
+import { matchRecorder } from "@/data/matchRecorder";
 
 let registered = false;
 
@@ -26,9 +27,24 @@ export function registerGameProtocols() {
 
   eventBus.on("message", (msg: MsgBase) => {
     switch (msg.proto) {
-      case "MsgGameState":
-        useGameStore.getState().syncFromServer(msg as MsgGameState);
+      case "MsgGameState": {
+        const gs = msg as MsgGameState;
+        useGameStore.getState().syncFromServer(gs);
+        // 本地录制对局快照流（仅玩家视角；观战不记）→ 供首页战绩/回放
+        matchRecorder.onSnapshot(gs);
+        // 重启恢复/刷新后：若收到己方对局快照（非观战、未结束）但当前不在 /game，
+        // 说明该账号有进行中的对局，自动回到对战页（服务端 TryReclaim 已发回 Resync 快照）。
+        if (
+          gs.viewerKind === "player" &&
+          !gs.isGameOver &&
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/game"
+        ) {
+          useGameStore.getState().setMode("Player");
+          useNetStore.getState().setNavigateTo("/game");
+        }
         break;
+      }
 
       case "MsgActionRejected":
         useGameStore.getState().setPending(false);
@@ -55,11 +71,24 @@ export function registerGameProtocols() {
           description: (msg as MsgDuelOver).Description,
         });
         break;
+
+      case "MsgGameChat": {
+        const m = msg as MsgGameChat;
+        eventBus.emit("gameChat", {
+          text: m.text ?? "",
+          code: m.code ?? null,
+          fromSeat: m.fromSeat ?? -1,
+          fromAccount: m.fromAccount,
+          fromName: m.fromName ?? "玩家",
+          fromRole: m.fromRole ?? "spectator",
+        });
+        break;
+      }
     }
   });
 
-  // 重连后自动请求完整快照
-  eventBus.on("reconnected", () => {
-    GameRequest.requestState();
-  });
+  // 重连/刷新后的对局恢复改由 HomeProtocol 的自动登录触发：
+  // 后端 OnLogin → TryReclaim 会按账号找回房间并回发完整 Resync 快照。
+  // 不再在此直接 requestState：整页刷新后是全新 SessionId，尚未绑定房间，
+  // 直接 requestState 会落空甚至被判“对局已结束”而误踢。
 }

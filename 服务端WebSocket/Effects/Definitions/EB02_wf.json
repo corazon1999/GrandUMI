@@ -1,0 +1,711 @@
+{
+  "EB02-002": {
+    "_name": "萨波",
+    "_matcher": "启动主要横置自身，选我方1张革命军(排除萨波)角色力量+2000",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "革命军",
+            "excludeName": "萨波"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 2000
+        }
+      ]
+    }
+  },
+  "EB02-003": {
+    "_name": "托尼托尼·乔巴",
+    "_matcher": "登场时领袖含草帽一伙则给我方1张领袖或角色1张休息咚;【咚!!×2】对方回合+2000的持续部分无法表达已省略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AttachDon",
+            "target": "$tgt",
+            "n": 1,
+            "from": "rest"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-008": {
+    "_name": "The Peak",
+    "_matcher": "主要确认卡组顶4张、公开≤1张费用≥4加手牌、其余放回底;触发同主要效果",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  },
+  "EB02-013": {
+    "_name": "凯罗特",
+    "_matcher": "登场时(场上≥3张咚)确认顶7公开1张「佐乌」加手牌(LookTopReveal)，之后将手牌中1张「佐乌」登场(PlayCharFromHand nameEquals)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "selfDonTotalGte": 3
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 7,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "nameEquals": "佐乌"
+            }
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "佐乌"
+            },
+            "text": "将手牌中最多1张「佐乌」登场"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-014": {
+    "_name": "萨方克尔",
+    "_matcher": "登场时将手牌中最多1张「盖蒙」登场(PlayCharFromHand nameEquals)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "盖蒙"
+            },
+            "text": "将手牌中最多1张「盖蒙」登场"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-016": {
+    "_name": "乔巴超人",
+    "_matcher": "登场时将手牌中1张费用≤3且《动物》特征角色登场(PlayCharFromHand filter)。名称视为「托尼托尼·乔巴」的规则改写部分无对应机制，忽略(reason 注明)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "动物",
+              "originalCostLte": 3
+            },
+            "text": "将手牌中最多1张费用≤3且《动物》特征角色登场"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-017": {
+    "_name": "奈美",
+    "_matcher": "登场时确认顶5公开1张「奈美」以外《草帽一伙》特征卡加手牌、余者放回底(LookTopReveal，excludeName 排除自身)。",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "草帽一伙",
+              "excludeName": "奈美"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-019": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "实现【登场时】领袖含草帽一伙时横置对方1张费用≤4角色；前半句『可在登场回合攻击角色』为持续静态规则改写无法用DSL表达，已忽略",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe4",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "Rest",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-020": {
+    "_name": "We Are！",
+    "_matcher": "【主要】及【触发】均为确认顶4张公开1张费用≥4加手牌、其余放回底，用LookTopReveal表达",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  },
+  "EB02-021": {
+    "_name": "橡皮橡皮巨人枪",
+    "_matcher": "【主要】给草帽角色+6000(用Choose+filter+AddPowerThisTurn)；『被选角色下个我方重置阶段不活跃』无对应op已忽略；【触发】横置对方1张费用≤4角色",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "keyword": "草帽一伙"
+          }
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": 6000
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "as": "$tgt"
+      },
+      {
+        "op": "Rest",
+        "target": "$tgt"
+      }
+    ]
+  },
+  "EB02-024": {
+    "_name": "狙击王",
+    "_matcher": "【登场时】抽2、选2张手牌放回卡组底、再将对方1张费用≤1角色退回手牌，用Draw+Choose/ReturnToDeckBottom+BounceToHand表达",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnHand",
+            "max": 1,
+            "as": "$h1"
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$h1",
+            "from": "hand"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnHand",
+            "max": 1,
+            "as": "$h2"
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$h2",
+            "from": "hand"
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "BounceToHand",
+            "target": "$tgt"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-026": {
+    "_name": "奈菲特·薇薇",
+    "_matcher": "【登场时】领袖多色(leaderColorCountGte:2)且手牌≤5(selfHandCountLte:5)时抽2张",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderColorCountGte": 2,
+          "selfHandCountLte": 5
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-027": {
+    "_name": "比斯塔",
+    "_matcher": "登场时选对方力量≤1000角色放回卡组底",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "originalPowerLte": 1000
+            }
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$tgt",
+            "from": "field"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-028": {
+    "_name": "波特夹斯·D·艾斯",
+    "_matcher": "领袖含白胡子时检索公开1张费用2角色，再从手牌休息登场1张费用2角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "leaderHasKeyword": "白胡子海盗团"
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "kind": "Character",
+              "originalCostGte": 2,
+              "originalCostLte": 2
+            }
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "kind": "Character",
+              "originalCostGte": 2,
+              "originalCostLte": 2
+            },
+            "rest": true
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-031": {
+    "_name": "Hope",
+    "_matcher": "主要确认顶4公开1张费用≥4加手牌，触发同效",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  },
+  "EB02-032": {
+    "_name": "阿斯巴古",
+    "_matcher": "咚≥3时检索公开1张卡雷拉公司加手牌，再从手牌登场1张卡雷拉公司",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "selfDonTotalGte": 3
+        },
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 7,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "卡雷拉公司"
+            }
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "卡雷拉公司"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-038": {
+    "_name": "麦哲伦",
+    "_matcher": "登场时将手牌中1张费用≤2且《因佩尔地狱》特征角色免费登场，用 PlayCharFromHand+filter 表达",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "因佩尔地狱",
+              "originalCostLte": 2
+            },
+            "text": "登场费用≤2且含《因佩尔地狱》特征的角色"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-040": {
+    "_name": "BRAND NEW WORLD",
+    "_matcher": "确认顶4张公开≤1张费用≥4加手牌其余放回底，用 LookTopReveal 表达；触发同发动主要效果",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  },
+  "EB02-046": {
+    "_name": "希尔顿",
+    "_matcher": "登场时卡组顶2张入废弃，并对方1张角色本回合费用-1，用 MillTop+Choose+AddCostMod 表达",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "MillTop",
+            "n": 2
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "as": "$tgt"
+          },
+          {
+            "op": "AddCostMod",
+            "target": "$tgt",
+            "delta": -1,
+            "duration": "ThisTurn"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-047": {
+    "_name": "布鲁诺",
+    "_matcher": "启动主要弃1手牌+自身进废弃，从废弃区登场费用≤5含〈CP〉特征且非布鲁诺角色，用 cost+PlayCharFromTrash 表达",
+    "_src": "wf-dsl",
+    "activated": {
+      "cost": {
+        "handDiscard": 1,
+        "selfToTrash": true
+      },
+      "then": [
+        {
+          "op": "PlayCharFromTrash",
+          "filter": {
+            "keywordContains": "CP",
+            "originalCostLte": 5,
+            "excludeName": "布鲁诺"
+          },
+          "text": "登场费用≤5且特征含〈CP〉的非布鲁诺角色"
+        }
+      ]
+    }
+  },
+  "EB02-048": {
+    "_name": "布鲁克",
+    "_matcher": "登场时用Choose+TrashToHand把废弃区拉布加手牌；KO时用PlayCharFromHand按名称费用≤4登场拉布",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnTrashCharacter",
+            "max": 1,
+            "as": "$tgt",
+            "filter": {
+              "nameEquals": "拉布"
+            },
+            "text": "将废弃区中最多1张“拉布”加入手牌"
+          },
+          {
+            "op": "TrashToHand",
+            "target": "$tgt"
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "nameEquals": "拉布",
+              "originalCostLte": 4
+            },
+            "text": "将手牌中最多1张费用不高于4的“拉布”登场"
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-049": {
+    "_name": "蒙奇·D·戈普",
+    "_matcher": "登场时AttachDon给领袖2张休息咚；启动主要休息自身、领袖为戈普时KO对方费用≤1角色",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "AttachDon",
+            "target": "selfLeader",
+            "n": 2,
+            "from": "rest"
+          }
+        ]
+      }
+    ],
+    "activated": {
+      "cost": {
+        "restSelf": true
+      },
+      "if": {
+        "leaderNameEquals": "蒙奇·D·戈普"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe1",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "KO",
+          "target": "$tgt"
+        }
+      ]
+    }
+  },
+  "EB02-050": {
+    "_name": "Kokoro no Chizu",
+    "_matcher": "标准检索事件：看顶4张公开1张费用≥4加手牌、其余放回底；触发节复用主要效果",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  },
+  "EB02-054": {
+    "_name": "山智",
+    "_matcher": "登场时生命≤2则抽2弃1；纯关键词【阻挡者】另行处理，登场收益用Draw+DiscardOwnChosen表达",
+    "_src": "wf-dsl",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "if": {
+          "ownLifeCountLte": 2
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
+        ]
+      }
+    ]
+  },
+  "EB02-058": {
+    "_name": "UUUUUS!",
+    "_matcher": "标准音乐检索:确认顶4公开1张费用≥4加手牌其余放回底,触发同主要",
+    "_src": "wf-dsl",
+    "main": {
+      "then": [
+        {
+          "op": "LookTopReveal",
+          "count": 4,
+          "max": 1,
+          "restTo": "bottom",
+          "match": {
+            "originalCostGte": 4
+          }
+        }
+      ]
+    },
+    "trigger": [
+      {
+        "op": "LookTopReveal",
+        "count": 4,
+        "max": 1,
+        "restTo": "bottom",
+        "match": {
+          "originalCostGte": 4
+        }
+      }
+    ]
+  }
+}

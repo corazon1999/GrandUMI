@@ -13,12 +13,21 @@ public static class AtomicOps
     // ── 抽 & 丢 ──────────────────────────────────────────────────────────
 
     public static int Draw(GameState s, int playerIdx, int n)
-        => TurnEngine.DrawCard(s, playerIdx, n);
+    {
+        int drew = TurnEngine.DrawCard(s, playerIdx, n);
+        // 效果内抽牌(有环境上下文)=抽卡阶段以外抽牌 → 通知 watcher
+        if (drew > 0)
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnDrawCard,
+                new Dictionary<string, object?> { ["count"] = drew, ["player"] = playerIdx });
+        return drew;
+    }
 
     public static void DiscardHand(PlayerState p, CardInstance card)
     {
         p.Hand.Remove(card);
         p.Trash.Add(card);
+        // 手牌因效果被丢弃 → 派发 watcher（OP14-056 绵津见）；仅效果上下文内有效
+        EffectRuntime.NotifyHandDiscarded(p);
     }
 
     /// <summary>把卡组顶部 n 张放入废弃区</summary>
@@ -44,17 +53,208 @@ public static class AtomicOps
 
     // ── 状态切换 ──────────────────────────────────────────────────────────
 
-    public static void RestCard(CardInstance c) { c.IsTapped = true; }
+    public static void RestCard(CardInstance c)
+    {
+        if (c.HasRestriction(RestrictionKind.CannotBeRested)) return; // "无法转为休息状态"（瞬时来源）
+        // 持续来源（ContinuousEffect.GrantRestriction=CannotBeRested，如 OP11-046/GERMA 光环）同样拦截
+        var st = EffectRuntime.CurrentState;
+        if (st is not null && st.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return;
+        bool was = c.IsTapped;
+        c.IsTapped = true;
+        if (!was) // 因效果转为休息状态 → 通知 watcher
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnCharRested,
+                new Dictionary<string, object?> { ["restedCardId"] = c.Id.ToString() });
+    }
     public static void ActivateCard(CardInstance c) { c.IsTapped = false; }
 
     /// <summary>标记下个重置阶段不会转活跃</summary>
     public static void PreventActivateNextReset(CardInstance c)
         => c.CannotActivateNextReset = true;
 
+    /// <summary>「将我方N张卡牌转为休息状态」成本的可休置项数：活跃的 领袖 + 角色 + 舞台 + 咚!!。
+    /// 供发动前的可支付判定（不足 N 则不发动）。</summary>
+    public static int RestableCount(PlayerState p)
+    {
+        int n = 0;
+        if (!p.Leader.IsTapped) n++;
+        n += p.Characters.Count(c => !c.IsTapped);
+        if (p.StageCard is not null && !p.StageCard.IsTapped) n++;
+        n += p.CostArea.Count(d => d.State == DonState.Active);
+        return n;
+    }
+
+    /// <summary>「将我方N张卡牌转为休息状态」通用支付：弹窗让玩家从活跃的 领袖/角色/舞台/咚!! 中选 N 张休置，
+    /// 四类同列展示（卡牌走卡图、咚走 donChoices token）。候选不足 N 或玩家未选满 → 返回 false（不支付）。
+    /// 卡牌走 RestCard（含"无法休息"守护），咚直接置为休息状态。</summary>
+    public static async Task<bool> PromptRestOwnCards(EffectContext ctx, int n, string text, bool optional = false)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var cardCands = new List<CardInstance>();
+        if (!me.Leader.IsTapped) cardCands.Add(me.Leader);
+        cardCands.AddRange(me.Characters.Where(c => !c.IsTapped));
+        if (me.StageCard is not null && !me.StageCard.IsTapped) cardCands.Add(me.StageCard);
+        var activeDon = me.CostArea.Where(d => d.State == DonState.Active).ToList();
+        if (cardCands.Count + activeDon.Count < n) return false;
+
+        var validChoices = cardCands.Select(c => c.Id.ToString())
+            .Concat(activeDon.Select(d => d.Id.ToString())).ToList();
+        var extra = new Dictionary<string, object?>
+        {
+            ["donChoices"] = activeDon.Select(d => new { id = d.Id.ToString(), state = "Active" }).ToList(),
+        };
+        // optional=true：「可以将…休息」式可放弃成本，min=0 给出"跳过"，选不满 n 视为放弃(不支付不发动)
+        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOwnCardsOrDon", text,
+            validChoices, optional ? 0 : n, n, extra);
+        if (pick.Count < n) return false;
+        foreach (var pid in pick)
+        {
+            var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
+            if (don is not null) { don.State = DonState.Rest; continue; }
+            var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
+            if (card is not null) RestCard(card);
+        }
+        return true;
+    }
+
+    /// <summary>「将对方最多N张卡牌转为休息状态」效果：让玩家从对方活跃的 领袖/角色/舞台/咚!! 中选最多 N 张休置
+    /// （min 0，可不选）。四类同列（卡牌走卡图、咚走 donChoices token）。卡牌走 RestCard，咚直接置休息。</summary>
+    public static async Task PromptRestOpponentCards(EffectContext ctx, int n)
+    {
+        var opp = ctx.State.Players[1 - ctx.OwnerIndex];
+        var cardCands = new List<CardInstance>();
+        if (!opp.Leader.IsTapped) cardCands.Add(opp.Leader);
+        cardCands.AddRange(opp.Characters.Where(c => !c.IsTapped));
+        if (opp.StageCard is not null && !opp.StageCard.IsTapped) cardCands.Add(opp.StageCard);
+        var activeDon = opp.CostArea.Where(d => d.State == DonState.Active).ToList();
+        if (cardCands.Count + activeDon.Count == 0) return;
+
+        var validChoices = cardCands.Select(c => c.Id.ToString())
+            .Concat(activeDon.Select(d => d.Id.ToString())).ToList();
+        var extra = new Dictionary<string, object?>
+        {
+            ["donChoices"] = activeDon.Select(d => new { id = d.Id.ToString(), state = "Active" }).ToList(),
+        };
+        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOpponentCardsOrDon",
+            $"将对方最多 {n} 张卡牌转为休息状态（可选活跃 领袖/角色/舞台/咚!!）",
+            validChoices, 0, n, extra);
+        foreach (var pid in pick)
+        {
+            var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
+            if (don is not null) { don.State = DonState.Rest; continue; }
+            var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
+            if (card is not null) RestCard(card);
+        }
+    }
+
     // ── KO ────────────────────────────────────────────────────────────────
 
     public static void KO(GameState s, int ownerIdx, CardInstance card)
-        => BattleEngine.KOCard(s, ownerIdx, card);
+    {
+        // 持续"因效果不会被KO"保护（自送废弃/满员牺牲走 KOCard，不经此入口，不受保护）
+        if (s.IsKoGuarded(card, "effect")) return;
+        if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
+        BattleEngine.KOCard(s, ownerIdx, card);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+        // 任意角色被KO（效果）：场上他卡可据此反应（如 EB01-047 拉布）
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
+    }
+
+    /// <summary>
+    /// 因效果 KO（异步，带置换守护）：相比同步 KO，额外走 PreKO（受害者自身置换）+ OnAllyWillBeKOd（守护者置换）
+    /// + 受害者 OnKO 反应，并设置 KO 来源标记供"因对方的效果而被KO"判定。供 DSL 的 KO op 使用，
+    /// 覆盖绝大多数效果KO；脚本直接调用的同步 KO 不享守护（已文档化）。
+    /// actingSide=发动本次 KO 效果的一方（用于"对方的效果"判定）。返回是否实际 KO。
+    /// </summary>
+    public static async Task<bool> KOByEffectAsync(GameState s, int ownerIdx, CardInstance card, IPromptService prompts, int actingSide)
+    {
+        // 设置 KO 来源（effect + 发起方 + 来源卡），供受害者/守护者判定
+        s.KOReason = "effect";
+        s.KOActingSide = actingSide;
+        s.KOSourceCardId = EffectRuntime.CurrentSource?.Id;
+        try
+        {
+            // PreKO：受害者自身"改为…使其不被KO"置换
+            s.PreventKOCardIds.Remove(card.Id);
+            if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.PreKO))
+                await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.PreKO, prompts);
+            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
+
+            // 守护者：他卡"代替被KO/使其不被KO"置换
+            var guardSide = s.Players[ownerIdx];
+            var guardians = new List<CardInstance> { guardSide.Leader };
+            guardians.AddRange(guardSide.Characters);
+            if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
+            foreach (var g in guardians.ToList())
+            {
+                if (g.Id == card.Id) continue;
+                if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
+                await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
+                    new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
+                if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
+            }
+
+            // 离场守护：他卡"代替离场使其不离场"（KO 属离场的一种；仅"对方效果"触发）
+            if (actingSide != ownerIdx)
+            {
+                s.PreventLeaveCardIds.Remove(card.Id);
+                // 不跳过受害卡本身：支持"此角色将要离场时改为…使其不离场"的自我置换
+                foreach (var g in guardians.ToList())
+                {
+                    if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
+                    await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillLeaveField, prompts,
+                        new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx, ["kind"] = "ko" });
+                    if (s.PreventLeaveCardIds.Contains(card.Id)) { s.PreventLeaveCardIds.Remove(card.Id); return false; }
+                }
+            }
+
+            // 持续守护
+            if (s.IsKoGuarded(card, "effect")) return false;
+            if (s.IsLeaveGuarded(card, "effect")) return false;
+
+            // 实际 KO（复用同步移除逻辑）
+            BattleEngine.KOCard(s, ownerIdx, card);
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+                new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
+                new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
+            // 受害者 OnKO：卡已进入废弃区，但效果在"原场上位置"发动（如 EB01-057 白星因对方效果被KO）
+            await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
+            return true;
+        }
+        finally
+        {
+            s.KOReason = null;
+            s.KOActingSide = -1;
+            s.KOSourceCardId = null;
+        }
+    }
+
+    /// <summary>
+    /// 效果离场置换守护：某卡因"对方效果"将要离开场上(退手牌/回卡组/置入生命等非KO离场)前调用。
+    /// 派发 OnAllyWillLeaveField 给受害卡所属方的守护卡(代替离场效果)；若守护卡 MarkPreventLeave 则取消本次离场。
+    /// 返回 true=离场被阻止(调用方应跳过本次离场)。仅在"对方效果"(CurrentActingSide 为受害方对手)时生效。
+    /// </summary>
+    public static async Task<bool> TryEffectLeaveGuard(GameState s, int victimOwner, CardInstance card, IPromptService prompts, string kind)
+    {
+        int acting = EffectRuntime.CurrentActingSide;
+        if (acting < 0 || acting == victimOwner) return false; // 非"对方效果"(或无效果上下文)
+        var side = s.Players[victimOwner];
+        var guardians = new List<CardInstance> { side.Leader };
+        guardians.AddRange(side.Characters);
+        if (side.StageCard is not null) guardians.Add(side.StageCard);
+        s.PreventLeaveCardIds.Remove(card.Id);
+        // 不跳过受害卡本身：支持"此角色将要离场时改为…使其不离场"的自我置换
+        foreach (var g in guardians.ToList())
+        {
+            if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
+            await EffectRuntime.Resolve(s, victimOwner, g, EffectTrigger.OnAllyWillLeaveField, prompts,
+                new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = victimOwner, ["kind"] = kind });
+            if (s.PreventLeaveCardIds.Contains(card.Id)) { s.PreventLeaveCardIds.Remove(card.Id); return true; }
+        }
+        return false;
+    }
 
     // ── 关键字 ────────────────────────────────────────────────────────────
 
@@ -65,7 +265,15 @@ public static class AtomicOps
 
     // ── 咚操作 ────────────────────────────────────────────────────────────
 
-    /// <summary>从费用区选 n 张咚（按 fromState 状态）附给 target</summary>
+    /// <summary>
+    /// 从费用区选 n 张指定状态(fromState)的咚附给 target，返回实际赋予数。
+    /// 严格按 fromState 取咚，不做跨状态回退：
+    ///   - 「赋予休息状态的咚!!」(fromState=Rest) 只取费用区中已是休息态的咚；无休息咚则不赋予
+    ///     （选择后无事发生）。真实对局里此类效果在支付费用横置咚之后结算，必有休息咚；仅 GM
+    ///     不付费召唤等场景才会出现 0 休息咚——此时按规范不消耗活跃咚。
+    ///   - 「赋予活跃咚」(fromState=Active) 同理只取活跃咚。
+    /// 注：历史上曾在 Rest 不足时回退取活跃咚，现按需求改为不回退（见 ST17-004 修复记录）。
+    /// </summary>
     public static int AttachDonFromCost(PlayerState p, Guid targetId, int n, DonState fromState = DonState.Active)
     {
         int attached = 0;
@@ -78,6 +286,24 @@ public static class AtomicOps
                 d.AttachedToCardId = targetId;
                 attached++;
             }
+        }
+        return attached;
+    }
+
+    /// <summary>从咚!!卡组取 n 张赋予给 target（Attached）；受费用区上限(10)约束。返回实际赋予数。
+    /// 引擎 Attached 状态不分横竖，「休息状态的赋予咚」与「活跃赋予咚」力量贡献一致(+1000/张)，
+    /// 下个准备阶段会解除赋予→Rest→Active 回到费用区，符合规则。</summary>
+    public static int AttachDonFromDeck(PlayerState p, Guid targetId, int n)
+    {
+        int attached = 0;
+        while (attached < n && p.DonDeck.Count > 0 && p.CostArea.Count < 10)
+        {
+            var d = p.DonDeck[0];
+            p.DonDeck.RemoveAt(0);
+            d.State = DonState.Attached;
+            d.AttachedToCardId = targetId;
+            p.CostArea.Add(d);
+            attached++;
         }
         return attached;
     }
@@ -99,7 +325,84 @@ public static class AtomicOps
                 returned++;
             }
         }
+        if (returned > 0) // 咚!!放回咚!!卡组 → 通知 watcher
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
+                new Dictionary<string, object?> { ["count"] = returned });
         return returned;
+    }
+
+    /// <summary>
+    /// 「咚!!-N」通用支付：让玩家从费用区(活跃/休息/附着在角色·领袖身上)手选 N 张咚放回咚!!卡组。
+    /// 合格咚 = 费用区全部状态的咚；不足 N → 返回 false(无法支付，调用方应中止发动)；
+    /// 玩家取消/超时同样返回 false。恰好 N 张且全为活跃(无附着)时自动支付，免无意义弹窗。
+    /// 放回附着咚会使对应角色/领袖失去贴咚加成(power 由 AttachedDonCount 派生，自动生效)。
+    /// </summary>
+    public static async Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n)
+    {
+        if (n <= 0) return true;
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        // 合格咚 = 费用区全部(活跃 + 休息 + 附着)
+        var eligible = me.CostArea
+            .Where(d => d.State is DonState.Active or DonState.Rest or DonState.Attached)
+            .ToList();
+        if (eligible.Count < n) return false;   // 凑不够 → 无法支付
+
+        List<DonCard> chosen;
+        // 全为活跃咚时彼此等价、无"该牺牲哪张"的抉择 → 自动支付，免无意义弹窗；
+        // 一旦存在休息/附着咚(放回它们有不同代价)，才弹窗让玩家手选。
+        bool needPrompt = eligible.Any(d => d.State != DonState.Active);
+        if (!needPrompt)
+        {
+            chosen = eligible.Take(n).ToList();
+        }
+        else
+        {
+            // 反查附着目标卡号/名，供客户端标注"贴在 X"
+            var donChoices = eligible.Select(d =>
+            {
+                string? num = null, name = null;
+                if (d.State == DonState.Attached && d.AttachedToCardId is { } tid)
+                {
+                    CardInstance? t = me.Leader.Id == tid
+                        ? me.Leader
+                        : me.Characters.FirstOrDefault(c => c.Id == tid);
+                    if (t is not null) { num = t.Info.Number; name = t.Info.Name; }
+                }
+                return new
+                {
+                    id = d.Id.ToString(),
+                    state = d.State.ToString(),  // Active / Rest / Attached
+                    attachedToNumber = num,
+                    attachedToName = name,
+                };
+            }).ToList();
+
+            var ans = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
+                $"选择 {n} 张咚!! 放回咚!!卡组",
+                eligible.Select(d => d.Id.ToString()).ToList(), n, n,
+                new Dictionary<string, object?> { ["donChoices"] = donChoices });
+
+            if (ans.Count < n) return false;     // 取消/超时 → 不支付
+            chosen = new List<DonCard>();
+            foreach (var id in ans)
+            {
+                var d = eligible.FirstOrDefault(x => x.Id.ToString() == id);
+                if (d is not null && !chosen.Contains(d)) chosen.Add(d);
+                if (chosen.Count >= n) break;
+            }
+            if (chosen.Count < n) return false;  // 防御：回传 id 对不上
+        }
+
+        foreach (var d in chosen)
+        {
+            d.State = DonState.InDeck;
+            d.AttachedToCardId = null;
+            me.CostArea.Remove(d);
+            me.DonDeck.Add(d);
+        }
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
+            new Dictionary<string, object?> { ["count"] = chosen.Count });
+        return true;
     }
 
     // ── 移动卡牌 ──────────────────────────────────────────────────────────
@@ -107,6 +410,7 @@ public static class AtomicOps
     /// <summary>把场上一张卡放回手牌</summary>
     public static void BounceToHand(GameState s, int ownerIdx, CardInstance card)
     {
+        if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
         var p = s.Players[ownerIdx];
         // 归还附着咚
         foreach (var d in p.CostArea)
@@ -126,6 +430,8 @@ public static class AtomicOps
         card.PowerModPersistent = 0;
         card.GainedKeywords.Clear();
         p.Hand.Add(card);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
     }
 
     /// <summary>把手牌中的角色卡免费登场</summary>
@@ -143,11 +449,13 @@ public static class AtomicOps
             }
             card.TurnPlayed = s.TurnCount;
             p.Characters.Add(card);
+            s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
             if (p.StageCard is not null) p.Trash.Add(p.StageCard);
             p.StageCard = card;
+            s.EnqueueEnterField(playerIdx, card, "hand");
         }
         // 事件类暂不在此入口处理
     }
@@ -205,6 +513,7 @@ public static class AtomicOps
     /// <summary>把场上的卡放回持有者的卡组最下方（先归还附着咚 + 清临时状态）</summary>
     public static void ReturnFieldToDeckBottom(GameState s, int ownerIdx, CardInstance card)
     {
+        if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
         var p = s.Players[ownerIdx];
         foreach (var d in p.CostArea)
         {
@@ -218,6 +527,8 @@ public static class AtomicOps
         if (p.StageCard == card) p.StageCard = null;
         ResetCardEphemeralState(card);
         p.Deck.Add(card);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
     }
 
     /// <summary>把手牌的卡放回卡组最下方</summary>
@@ -253,12 +564,14 @@ public static class AtomicOps
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
             p.Characters.Add(card);
+            s.EnqueueEnterField(playerIdx, card, "trash"); // 触发被登场角色的【登场时】
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
             if (p.StageCard is not null) p.Trash.Add(p.StageCard);
             ResetCardEphemeralState(card);
             p.StageCard = card;
+            s.EnqueueEnterField(playerIdx, card, "trash");
         }
     }
 
@@ -300,6 +613,19 @@ public static class AtomicOps
         }
     }
 
+    /// <summary>让对手随机丢弃 N 张手牌（对应"丢弃对方N张手牌"措辞——无人选择，随机弃）。
+    /// 用确定性 GameState.Rng（与洗牌同源）保证回放/重连一致。区别于 OpponentDiscardChosen("对方丢弃N张"=对方自选)。</summary>
+    public static void OpponentDiscardRandom(GameEngine engine, int opponentIdx, int n)
+    {
+        var opp = engine.State.Players[opponentIdx];
+        int actual = Math.Min(n, opp.Hand.Count);
+        for (int i = 0; i < actual && opp.Hand.Count > 0; i++)
+        {
+            int idx = engine.State.Rng.Next(opp.Hand.Count);
+            DiscardHand(opp, opp.Hand[idx]);
+        }
+    }
+
     /// <summary>清除卡的临时状态（区域间移动时调用）</summary>
     private static void ResetCardEphemeralState(CardInstance c)
     {
@@ -316,6 +642,30 @@ public static class AtomicOps
         c.OriginalPowerOverride = null;
         c.IsEffectsNullified = false;
         c.Restrictions.Clear();
+        c.IsLifeFaceUp = false;
+    }
+
+    // ── M2 生命牌正反朝向 ──────────────────────────────────────────────
+    /// <summary>将我方生命区最上方 1 张翻至正面朝上（已正面则无变化）。生命区空则无操作。</summary>
+    public static void FlipTopLifeFaceUp(PlayerState p)
+    {
+        if (p.LifeArea.Count > 0) p.LifeArea[0].IsLifeFaceUp = true;
+    }
+
+    /// <summary>将我方所有生命卡牌翻至正面朝下。</summary>
+    public static void FlipAllLifeFaceDown(PlayerState p)
+    {
+        foreach (var c in p.LifeArea) c.IsLifeFaceUp = false;
+    }
+
+    /// <summary>按给定 Guid 顺序（顶→底）重排某玩家的生命区；未列出的卡按原序补到末尾。</summary>
+    public static void ReorderLife(PlayerState p, IReadOnlyList<Guid> order)
+    {
+        var lookup = p.LifeArea.ToDictionary(c => c.Id, c => c);
+        var reordered = order.Where(lookup.ContainsKey).Select(g => lookup[g]).ToList();
+        foreach (var c in p.LifeArea) if (!reordered.Contains(c)) reordered.Add(c);
+        p.LifeArea.Clear();
+        p.LifeArea.AddRange(reordered);
     }
 
     // ─── B 阶段 P1 新增原子 ────────────────────────────────────────────────
@@ -347,6 +697,7 @@ public static class AtomicOps
     /// <summary>把场上一张角色卡放到生命区（最上方）：归还附着咚 + 清临时态 + 入生命区</summary>
     public static void MoveCharToLife(GameState s, int ownerIdx, CardInstance card, bool toTop = true)
     {
+        if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
         var p = s.Players[ownerIdx];
         foreach (var d in p.CostArea)
         {
@@ -359,6 +710,72 @@ public static class AtomicOps
         p.Characters.Remove(card);
         if (p.StageCard == card) p.StageCard = null;
         ResetCardEphemeralState(card);
+        if (toTop) p.LifeArea.Insert(0, card);
+        else       p.LifeArea.Add(card);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+    }
+
+    /// <summary>把卡组中的一张角色/舞台卡免费登场（登场后触发其【登场时】，见 EnqueueEnterField）。调用方负责洗牌。</summary>
+    public static void PlayFromDeckFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    {
+        var p = s.Players[playerIdx];
+        if (!p.Deck.Remove(card)) return;
+        if (card.Info.Kind == CardKind.Character)
+        {
+            if (p.Characters.Count >= 5)
+            {
+                var sacrifice = p.Characters[0];
+                p.Characters.RemoveAt(0);
+                p.Trash.Add(sacrifice);
+            }
+            ResetCardEphemeralState(card);
+            card.TurnPlayed = s.TurnCount;
+            card.IsTapped = restState;
+            p.Characters.Add(card);
+            s.EnqueueEnterField(playerIdx, card, "deck"); // 触发被登场角色的【登场时】
+        }
+        else if (card.Info.Kind == CardKind.Stage)
+        {
+            if (p.StageCard is not null) p.Trash.Add(p.StageCard);
+            ResetCardEphemeralState(card);
+            p.StageCard = card;
+            s.EnqueueEnterField(playerIdx, card, "deck");
+        }
+    }
+
+    /// <summary>把生命区中的一张角色卡免费登场（登场后触发其【登场时】，见 EnqueueEnterField）。</summary>
+    public static void PlayFromLifeFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    {
+        var p = s.Players[playerIdx];
+        if (!p.LifeArea.Remove(card)) return;
+        if (card.Info.Kind == CardKind.Character)
+        {
+            if (p.Characters.Count >= 5)
+            {
+                var sacrifice = p.Characters[0];
+                p.Characters.RemoveAt(0);
+                p.Trash.Add(sacrifice);
+            }
+            ResetCardEphemeralState(card);
+            card.TurnPlayed = s.TurnCount;
+            card.IsTapped = restState;
+            p.Characters.Add(card);
+            s.EnqueueEnterField(playerIdx, card, "life"); // 触发被登场角色的【登场时】
+        }
+        else
+        {
+            // 非角色卡无法登场到角色区：退回生命底，避免丢失
+            p.LifeArea.Add(card);
+        }
+    }
+
+    /// <summary>把手牌中的一张卡置入生命区（toTop=true 顶部，faceUp 指定正反朝向）。</summary>
+    public static void HandToLife(PlayerState p, CardInstance card, bool toTop = true, bool faceUp = false)
+    {
+        if (!p.Hand.Remove(card)) return;
+        ResetCardEphemeralState(card);
+        card.IsLifeFaceUp = faceUp;
         if (toTop) p.LifeArea.Insert(0, card);
         else       p.LifeArea.Add(card);
     }
@@ -422,13 +839,16 @@ public static class AtomicOps
         c.Restrictions.Add(new CardRestriction { Kind = kind, Duration = duration });
     }
 
-    /// <summary>洗牌（Fisher–Yates）</summary>
-    private static readonly Random _rng = new();
-    public static void Shuffle<T>(List<T> list)
+    /// <summary>
+    /// 洗牌（Fisher–Yates）。必须传入本局 GameState，使用其确定性 RNG（GameState.Rng）。
+    /// 严禁用共享静态 Random：那会让重放无法重现、并发房间互相干扰。
+    /// </summary>
+    public static void Shuffle<T>(GameState s, List<T> list)
     {
+        var rng = s.Rng;
         for (int i = list.Count - 1; i > 0; i--)
         {
-            int j = _rng.Next(i + 1);
+            int j = rng.Next(i + 1);
             (list[i], list[j]) = (list[j], list[i]);
         }
     }
