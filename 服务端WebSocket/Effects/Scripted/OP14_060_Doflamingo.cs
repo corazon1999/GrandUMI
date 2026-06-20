@@ -50,7 +50,7 @@ public class OP14_060_Doflamingo : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 支付成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         var target = cands.First(c => c.Id.ToString() == chosen[0]);

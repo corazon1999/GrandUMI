@@ -500,6 +500,10 @@
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "oncePerTurn": true,
         "then": [
           {
             "op": "Choose",
@@ -523,6 +527,9 @@
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "Choose",
@@ -593,6 +600,10 @@
       },
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
+        "oncePerTurn": true,
         "then": [
           {
             "op": "Choose",
@@ -1060,6 +1071,9 @@
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "LookTopReveal",
@@ -1364,11 +1378,15 @@
   },
   "OP01-114": {
     "_name": "X·德雷克",
-    "_matcher": "【登场时】对方丢弃1张手牌，映射为 OpponentDiscard n=1；triggers 不支持 cost，按惯例忽略「咚-1」可选成本只实现收益。",
+    "_matcher": "【登场时】咚!!-1：对方丢弃1张手牌，映射为 OpponentDiscard n=1，附可选成本 donReturn=1。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "OpponentDiscard",

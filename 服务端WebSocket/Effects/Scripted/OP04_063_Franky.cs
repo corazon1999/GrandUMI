@@ -32,7 +32,7 @@ public class OP04_063_Franky : IScriptedEffect
             "弗兰奇【对方攻击时】：咚!!-1，本次战斗我方 1 张领袖/角色 +1000？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         var targets = new List<CardInstance> { me.Leader };

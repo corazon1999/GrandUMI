@@ -34,7 +34,7 @@ public class OP04_070_Mr3 : IScriptedEffect
             "Mr.3【对方攻击时】：咚!!-1，本回合对方 1 张角色 -1000？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

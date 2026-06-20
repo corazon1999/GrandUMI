@@ -29,15 +29,15 @@ public class OP12_069_Crocodile : IScriptedEffect
         // 条件：我方领袖须拥有《巴洛克工作室》特征
         if (!me.Leader.Info.HasKeyword("巴洛克工作室")) return;
 
-        // 代价：咚!!-1，需至少 1 张活跃咚
-        if (me.ActiveDonCount < 1) return;
+        // 代价：咚!!-1，需至少 1 张可放回的咚
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "克洛克达尔：咚!!-1，使我方最多 1 张领袖或角色本次战斗力量 +2000？");
         if (!use) return;
 
-        // 支付代价：咚!!-1（活跃咚放回咚卡组）
-        AtomicOps.ReturnDonToDeck(me, 1);
+        // 支付代价：咚!!-1
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 标记本回合已用
         me.TurnOnceUsed.Add(key);

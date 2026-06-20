@@ -106,7 +106,7 @@ public class PromptSystem : IPromptService
 
     /// <summary>按 id 在双方所有区域(领袖/角色/舞台/手牌/卡组/废弃/生命)反查卡牌；非卡 id(无法解析为 Guid)返回 null。
     /// 供 ChooseCards 自动补 choiceCards 时把候选卡 id 映射成卡号，使客户端能显示卡图(反馈#61)。</summary>
-    private static GrandUMI.Cards.CardInstance? FindCardByIdAnyZone(GameState s, string id)
+    private static CardInstance? FindCardByIdAnyZone(GameState s, string id)
     {
         if (!Guid.TryParse(id, out var gid)) return null;
         foreach (var p in s.Players)

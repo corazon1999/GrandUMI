@@ -60,7 +60,7 @@ public class EB03_034_CharlotteLinlin : IScriptedEffect
             "夏洛特·玲玲【KO时】：咚!!-1，将卡组顶最多 1 张加入生命区最上方?");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.AddLifeFromDeckTop(me, 1);
     }
 }

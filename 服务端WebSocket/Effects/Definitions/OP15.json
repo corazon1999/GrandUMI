@@ -174,15 +174,30 @@
   },
   "OP15-032": {
     "_name": "布鲁克",
-    "_matcher": "启动主要将角色转活跃",
+    "_matcher": "登场时:将对方最多1张卡牌(活跃 领袖/角色/舞台/咚)转休息;启动主要:自送废弃+领袖含草帽一伙则将我方最多1张原本费用≤8的角色转活跃",
+    "triggers": [
+      {
+        "on": "OnEnterField",
+        "then": [
+          {
+            "op": "RestOpponentCards",
+            "n": 1
+          }
+        ]
+      }
+    ],
     "activated": {
       "oncePerTurn": false,
+      "if": { "leaderHasKeyword": "草帽一伙" },
+      "cost": { "selfToTrash": true },
       "then": [
         {
           "op": "Choose",
           "prompt": "OwnCharacter",
           "max": 1,
-          "as": "$tgt"
+          "min": 0,
+          "as": "$tgt",
+          "filter": { "originalCostLte": 8 }
         },
         {
           "op": "Activate",

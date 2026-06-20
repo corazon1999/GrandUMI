@@ -20,14 +20,14 @@ public class P_005_Kaido : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 成本：需 2 张活跃咚!! 可放回咚!!卡组
-        if (me.ActiveDonCount < 2) return;
+        // 成本：费用区需 2 张可放回咚!!卡组的咚（活跃/休息/附着皆可）
+        if (me.CostArea.Count < 2) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "盖德【启动主要】：将 2 张咚!! 放回咚!!卡组，使此角色本回合获得【流放】？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         AtomicOps.GiveKeyword(ctx.Source, "流放", KeywordDuration.ThisTurn);
     }
 }

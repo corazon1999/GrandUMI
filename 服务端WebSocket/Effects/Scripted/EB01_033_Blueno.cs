@@ -47,7 +47,7 @@ public class EB01_033_Blueno : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var extra = new Dictionary<string, object?>
         {

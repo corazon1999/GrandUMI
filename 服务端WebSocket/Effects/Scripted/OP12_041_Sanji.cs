@@ -47,8 +47,8 @@ public class OP12_041_Sanji : IScriptedEffect
             .ToList();
         if (candidates.Count == 0) return;
 
-        // 成本：咚!!-1（需至少 1 张活跃咚）
-        if (me.ActiveDonCount < 1) return;
+        // 成本：咚!!-1（需至少 1 张可放回的咚）
+        if (me.CostArea.Count < 1) return;
 
         var extra = new Dictionary<string, object?>
         {
@@ -65,7 +65,7 @@ public class OP12_041_Sanji : IScriptedEffect
         if (card is null) return;
 
         // 支付咚!!-1
-        if (AtomicOps.ReturnDonToDeck(me, 1) < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         me.TurnOnceUsed.Add(key);
         AtomicOps.PlayEventFromHandFree(ctx.State, ctx.OwnerIndex, card, ctx.Prompts);

@@ -24,6 +24,9 @@ public class OP07_068_Hamburg : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return Task.CompletedTask;
+
         if (me.TotalDonInCostArea > opp.TotalDonInCostArea) return Task.CompletedTask;
 
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);

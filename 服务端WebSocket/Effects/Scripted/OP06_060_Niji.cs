@@ -28,7 +28,7 @@ public class OP06_060_Niji : IScriptedEffect
         // 条件：领袖拥有《GERMA 66》特征
         if (!me.Leader.Info.HasKeyword("GERMA 66")) return;
         // 成本可支付性：至少 1 张可放回的咚
-        if (me.ActiveDonCount + me.RestDonCount < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         // 候选：手牌或废弃区中费用为 7 的"温思默克·伊智"
         var handCands = me.Hand.Where(c =>
@@ -42,7 +42,7 @@ public class OP06_060_Niji : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         // 成本：将此角色放置到废弃区
         me.Characters.Remove(self);
         me.Trash.Add(self);

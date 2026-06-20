@@ -32,16 +32,16 @@ public class OP11_072_CharlotteMont_dOr : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本前置条件：自身活跃 + 有活跃咚
+        // 成本前置条件：自身活跃 + 有可放回的咚
         if (self.IsTapped) return;
-        if (me.ActiveDonCount < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "蒙道尔：支付咚!!-1并将此角色转为休息，让对方将其废弃区 2 张放回卡组底，之后我方生命区顶 1 张入手？");
         if (!use) return;
 
         // 支付成本
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.RestCard(self);
         me.TurnOnceUsed.Add(key);
 

@@ -27,8 +27,8 @@ public class P_086_TrafalgarLaw : IScriptedEffect
         var key = "P-086-act";
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本前置：需要至少3张活跃咚
-        if (me.ActiveDonCount < 3) return;
+        // 成本前置：费用区需要至少3张可放回的咚（活跃/休息/附着皆可）
+        if (me.CostArea.Count < 3) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "罗【启动主要】：咚!!-3，并可将我方1张力量≥3000的角色放回卡组底，登场1张费用≤4的《心脏海盗团》角色？");
@@ -37,7 +37,7 @@ public class P_086_TrafalgarLaw : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 成本：咚!!-3
-        AtomicOps.ReturnDonToDeck(me, 3);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 3)) return;
 
         // 可选成本：将我方1张力量≥3000的角色放回卡组最下方
         var charCands = me.Characters

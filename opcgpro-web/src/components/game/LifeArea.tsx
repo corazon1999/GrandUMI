@@ -2,6 +2,8 @@
 
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
+import CardItem from "@/components/ui/CardItem";
+import { getCard } from "@/data/CardLoader";
 
 interface Props {
   side: "my" | "opponent";
@@ -14,8 +16,10 @@ const pileSizes = {
 };
 
 export default function LifeArea({ side }: Props) {
-  const count = useGameStore((s) => (side === "my" ? s.my?.lifeCount : s.opponent?.lifeCount) ?? 0);
+  const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const { cardSize } = useResponsive();
+  const count = player?.lifeCount ?? 0;
+  const faceUp = player?.lifeFaceUp ?? [];
   const visibleCards = Math.min(Math.max(count, 1), 5);
 
   return (
@@ -24,19 +28,37 @@ export default function LifeArea({ side }: Props) {
         {side === "my" ? "生命" : "对手生命"}
       </span>
       {count > 0 ? (
-        Array.from({ length: visibleCards }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-md border-2 border-red-200/35 bg-gradient-to-br from-red-800 via-rose-950 to-slate-950 shadow-xl shadow-black/35"
-            style={{
-              inset: 0,
-              transform: `translate(${i * 4}px, ${i * 4}px)`,
-              zIndex: i,
-            }}
-          >
-            <div className="absolute inset-2 rounded border border-red-100/15" />
-          </div>
-        ))
+        Array.from({ length: visibleCards }).map((_, i) => {
+          const info = faceUp[i];
+          const isFaceUp = !!info?.faceUp && !!info?.number;
+          return (
+            <div
+              key={i}
+              className="absolute"
+              style={{
+                inset: 0,
+                transform: `translate(${i * 4}px, ${i * 4}px)`,
+                // 正面朝上的牌为公开信息，提到背面牌之上以便看清（反馈 #116）
+                zIndex: isFaceUp ? 10 + i : i,
+              }}
+            >
+              {isFaceUp ? (
+                <CardItem
+                  card={getCard(info!.number!) ?? null}
+                  size={cardSize}
+                  hideCounter
+                  hidePower
+                  hideCost
+                  liftOnSelect={false}
+                />
+              ) : (
+                <div className="relative h-full w-full rounded-md border-2 border-red-200/35 bg-gradient-to-br from-red-800 via-rose-950 to-slate-950 shadow-xl shadow-black/35">
+                  <div className="absolute inset-2 rounded border border-red-100/15" />
+                </div>
+              )}
+            </div>
+          );
+        })
       ) : (
         <div className="h-full w-full rounded-md border-2 border-dashed border-slate-500/60 bg-slate-950/45" />
       )}

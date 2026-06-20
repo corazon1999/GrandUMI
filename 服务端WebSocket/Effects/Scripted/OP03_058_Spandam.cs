@@ -25,7 +25,7 @@ public class OP03_058_Spandam : IScriptedEffect
 
         // 领袖须为活跃（可横置作为成本）且至少有 1 咚可放回
         if (me.Leader.IsTapped) return;
-        if (me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest) < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         // 候选：手牌中费用≤5 且《卡雷拉公司》的角色
         var cands = me.Hand.Where(c =>
@@ -49,7 +49,7 @@ public class OP03_058_Spandam : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 支付成本：咚!!-1 + 横置领袖
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.RestCard(me.Leader);
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);

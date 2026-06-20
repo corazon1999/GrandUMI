@@ -27,14 +27,14 @@ public class OP01_094_Kaido : IScriptedEffect
         if (!me.Leader.Info.HasKeyword("百兽海盗团")) return;
 
         // 需可支付咚!!-6
-        if (me.ActiveDonCount < 6) return;
+        if (me.CostArea.Count < 6) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "盖德【登场时】：将6张咚!!放回咚!!卡组，将此角色以外的所有角色KO？");
         if (!use) return;
 
         // 成本：咚!!-6
-        AtomicOps.ReturnDonToDeck(me, 6);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 6)) return;
 
         // 将此角色以外的双方所有角色 KO
         var selfId = ctx.Source.Id;

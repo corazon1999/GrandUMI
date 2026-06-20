@@ -12,14 +12,14 @@ public class ST04_001_Kaido : IScriptedEffect
     public string CardNumber => "ST04-001";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var key = "ST04-001-Activated" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
-        if (me.ActiveDonCount < 7) return Task.CompletedTask;
-        AtomicOps.ReturnDonToDeck(me, 7);
+        if (me.TurnOnceUsed.Contains(key)) return;
+        if (me.CostArea.Count < 7) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 7)) return;
         if (opp.LifeArea.Count > 0)
         {
             var top = opp.LifeArea[0];
@@ -27,7 +27,6 @@ public class ST04_001_Kaido : IScriptedEffect
             opp.Trash.Add(top);
         }
         me.TurnOnceUsed.Add(key);
-        return Task.CompletedTask;
     }
 }
 

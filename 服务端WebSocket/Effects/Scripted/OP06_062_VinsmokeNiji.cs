@@ -81,7 +81,7 @@ public class OP06_062_VinsmokeNiji : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 成本：咚!!1（我方放回 1 张咚到咚卡组）
-        if (me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest) < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         // 目标：对方处于活跃状态的咚
         var activeDon = opp.CostArea.Where(d => d.State == DonState.Active).ToList();
@@ -91,8 +91,7 @@ public class OP06_062_VinsmokeNiji : IScriptedEffect
             "温思默克·强智【启动主要】：咚!!-1，将对方 1 张咚!! 转为休息状态？");
         if (!useAct) return;
 
-        int returned = AtomicOps.ReturnDonToDeck(me, 1);
-        if (returned < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         me.TurnOnceUsed.Add(key);
 

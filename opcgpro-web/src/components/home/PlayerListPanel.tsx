@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useNetStore } from "@/store/netStore";
+import { useGameStore } from "@/store/gameStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import Modal from "@/components/ui/Modal";
 import type { PlayerInfo } from "@/types/net";
@@ -15,6 +17,7 @@ const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> 
 export default function PlayerListPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const players = useNetStore((s) => s.playerList);
   const account = useNetStore((s) => s.account);
+  const router = useRouter();
 
   // 打开时拉取一次，并每 4 秒刷新一次状态
   useEffect(() => {
@@ -26,6 +29,15 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
 
   const handleInvite = (p: PlayerInfo) => {
     HomeRequest.invitePlayer(p.account);
+  };
+
+  // 观战对战中玩家：发起观战 → 切观战模式 → 客户端路由进对战页（不断 WebSocket）
+  const handleSpectate = (p: PlayerInfo) => {
+    if (!p.roomId) return;
+    HomeRequest.spectateRoom(p.roomId);
+    useGameStore.getState().setMode("Observer");
+    onClose();
+    router.push("/game");
   };
 
   return (
@@ -50,17 +62,26 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                   <p className={`text-[10px] ${st.cls}`}>{st.text}</p>
                 </div>
                 {!isMe && (
-                  <button
-                    onClick={() => handleInvite(p)}
-                    disabled={p.status !== "idle"}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                      p.status === "idle"
-                        ? "bg-orange-500 hover:bg-orange-400 text-white"
-                        : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    邀请对战
-                  </button>
+                  p.status === "playing" && p.roomId ? (
+                    <button
+                      onClick={() => handleSpectate(p)}
+                      className="px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-purple-600 hover:bg-purple-500 text-white"
+                    >
+                      观战
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleInvite(p)}
+                      disabled={p.status !== "idle"}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        p.status === "idle"
+                          ? "bg-orange-500 hover:bg-orange-400 text-white"
+                          : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      邀请对战
+                    </button>
+                  )
                 )}
               </div>
             );

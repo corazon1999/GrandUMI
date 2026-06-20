@@ -34,36 +34,46 @@
   },
   "OP14-036": {
     "_name": "试试超越我吧，罗罗诺亚!!",
-    "_matcher": "反击：我方1张领袖或角色本次战斗力量+4000；触发：横置对方1张原本力量≤7000的角色。两处“转为休息1张卡牌”的可选成本无对应 cost 键，按惯例忽略成本仅实现收益。",
+    "_matcher": "反击:可放弃成本『将我方1张卡牌(活跃 领袖/角色/舞台/咚)转休息』→我方1张领袖/角色本次+4000;触发:同成本→横置对方1张原本力量≤7000角色",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "restCards": { "n": 1, "optional": true }
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 4000
-      }
-    ],
-    "trigger": [
-      {
-        "op": "Choose",
-        "prompt": "OpponentCharacter",
-        "max": 1,
-        "as": "$tgt",
-        "filter": {
-          "originalPowerLte": 7000
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 4000
         }
+      ]
+    },
+    "trigger": {
+      "cost": {
+        "restCards": { "n": 1, "optional": true }
       },
-      {
-        "op": "Rest",
-        "target": "$tgt"
-      }
-    ]
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt",
+          "filter": {
+            "originalPowerLte": 7000
+          }
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    }
   },
   "OP14-045": {
     "_name": "黑带",

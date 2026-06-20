@@ -24,11 +24,10 @@ public class EB04_033_BattleMonster : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (returnable < 1) return; // 无法支付成本 咚!!-1
+        if (me.CostArea.Count < 1) return; // 无法支付成本 咚!!-1
 
         // 成本：咚!!-1（强制成本，发动本效果即支付）
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 条件：我方场上≥3 张《福克斯海盗团》角色
         int foxy = me.Characters.Count(c => c.Info.HasKeyword("福克斯海盗团"));

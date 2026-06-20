@@ -13,6 +13,7 @@ import type {
   MsgPlayerReconnected,
   MsgDuelOver,
   MsgActionRejected,
+  MsgGameChat,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
@@ -70,6 +71,19 @@ export function registerGameProtocols() {
           description: (msg as MsgDuelOver).Description,
         });
         break;
+
+      case "MsgGameChat": {
+        const m = msg as MsgGameChat;
+        eventBus.emit("gameChat", {
+          text: m.text ?? "",
+          code: m.code ?? null,
+          fromSeat: m.fromSeat ?? -1,
+          fromAccount: m.fromAccount,
+          fromName: m.fromName ?? "玩家",
+          fromRole: m.fromRole ?? "spectator",
+        });
+        break;
+      }
     }
   });
 

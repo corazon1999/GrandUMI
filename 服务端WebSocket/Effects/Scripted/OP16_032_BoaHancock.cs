@@ -9,8 +9,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 【登场时】直到下个对方的结束阶段结束时为止，对方最多 1 张"蒙奇·D·路飞"以外的角色无法转为休息状态。
 ///
 /// 实现说明：
-///   - "无法转为休息状态"用临时关键字"禁止休息" + KeywordDuration.UntilNextOpponentEndPhase 标记
-///     （与 OP15-029 大熊同机制）。
+///   - "无法转为休息状态"用 AtomicOps.AddRestriction(CannotBeRested, UntilNextOpponentEndPhase)，
+///     RestCard 会对其 no-op，并由快照下发 cannotBeRested 显示图标（与 OP11-034/OP15-029 同机制）。
 ///   - 候选排除卡名为"蒙奇·D·路飞"的角色。
 /// </summary>
 public class OP16_032_BoaHancock : IScriptedEffect
@@ -34,6 +34,6 @@ public class OP16_032_BoaHancock : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.GiveKeyword(target, "禁止休息", KeywordDuration.UntilNextOpponentEndPhase);
+        AtomicOps.AddRestriction(target, RestrictionKind.CannotBeRested, KeywordDuration.UntilNextOpponentEndPhase);
     }
 }

@@ -30,14 +30,13 @@ public class EB04_030_Kaido : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.PreKO)
         {
             // 仅守护自身
-            int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-            if (returnable < 1) return; // 无咚可放回 → 无法置换
+            if (me.CostArea.Count < 1) return; // 无咚可放回 → 无法置换
 
             bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "盖德：将我方场上的 1 张咚!!放回咚!!卡组，使此角色不会被KO？");
             if (!use) return;
 
-            AtomicOps.ReturnDonToDeck(me, 1);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
             ctx.State.MarkPreventKO(ctx.Source.Id);
             return;
         }
@@ -45,11 +44,10 @@ public class EB04_030_Kaido : IScriptedEffect
         // 【登场时】咚!!-2
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-            if (returnable < 2) return; // 无法支付成本 咚!!-2
+            if (me.CostArea.Count < 2) return; // 无法支付成本 咚!!-2
 
             // 咚!!-2（强制成本，发动本效果即支付）
-            AtomicOps.ReturnDonToDeck(me, 2);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
 
             // 条件：领袖含《百兽海盗团》
             if (!me.Leader.Info.HasKeyword("百兽海盗团")) return;

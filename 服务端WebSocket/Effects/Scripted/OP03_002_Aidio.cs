@@ -19,6 +19,9 @@ public class OP03_002_Aidio : IScriptedEffect
 
     public Task Resolve(EffectContext ctx)
     {
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (ctx.State.Players[ctx.OwnerIndex].AttachedDonCount(ctx.Source.Id) < 1) return Task.CompletedTask;
+
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
 

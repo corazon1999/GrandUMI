@@ -24,7 +24,7 @@ public class OP04_067_MsMerryChristmas : IScriptedEffect
             "Ms.圣诞快乐：咚!!-1（将我方1张咚放回咚卡组），使此卡登场？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

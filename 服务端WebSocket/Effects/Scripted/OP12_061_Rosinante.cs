@@ -12,12 +12,10 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 本脚本实现能力 2（启动主要：咚-1，本回合手牌中费用≥4 的"特拉法尔加·罗"登场费用 -2）。
 ///
-/// 实现说明 / 简化点：
-///   - 用 ContinuousEffect.CostDelta 对我方手牌中名为"特拉法尔加·罗"、原本费用≥4 的卡注册
-///     本回合(仅我方回合) -2 的费用修正，影响其打出费用。Predicate 限定为我方回合且该卡仍在手牌。
-///   - 原文"下次…一次"为单次消耗，引擎无"消耗一次后失效"的持续通道，故近似为"本回合内该类卡
-///     登场费用均 -2"（略宽于原文，实战影响有限）。回合结束随 turnPlayer 变化自动失效，并在登场时
-///     先去重防叠加。
+/// 实现说明：
+///   - 用 OneShotPlayDiscount 注册"本回合下一次"从手牌登场、原本费用≥4 的"特拉法尔加·罗" -2 的
+///     一次性减费（CardPlayer 打出该类卡时消费一次即移除；回合末 TurnEngine 统一清空）。
+///     这精确对应原文"下次…一次"（反馈#135：旧用 ContinuousEffect 会让本回合所有罗都减费、用不完）。
 ///   - 能力 1 未实现：PreKO 仅对"将被 KO 的卡自身"派发，无法让罗西南德监听另一张"特拉法尔加·罗"
 ///     的将被 KO 事件（规范 12.6：持续监听他卡被 KO，引擎无通道）。
 /// </summary>
@@ -27,40 +25,29 @@ public class OP12_061_Rosinante : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var self = ctx.Source;
         int owner = ctx.OwnerIndex;
 
         var key = "OP12-061-act" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
 
         // 成本：咚!!-1
-        if (me.ActiveDonCount < 1) return Task.CompletedTask;
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (me.CostArea.Count < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         me.TurnOnceUsed.Add(key);
 
-        // 注册本回合费用修正：手牌中费用≥4 的"特拉法尔加·罗"打出费用 -2
-        var selfId = self.Id;
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        // 一次性减费：我方"本回合下一次"从手牌登场、原本费用≥4 的"特拉法尔加·罗" -2。
+        // 打出一次即被 CardPlayer 消费、回合末 TurnEngine 清空，精确对应原文"下次…一次"。
+        ctx.State.OneShotPlayDiscounts.RemoveAll(d => d.Owner == owner && d.NameContains == "特拉法尔加·罗"); // 防叠加
+        ctx.State.OneShotPlayDiscounts.Add(new OneShotPlayDiscount
         {
-            SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope
-            {
-                Side = 0,
-                IncludeLeader = false,
-                IncludeCharacters = true,
-                Filter = c => c.Info.Name.Contains("特拉法尔加·罗") && c.Info.Cost >= 4,
-            },
-            CostDelta = -2,
-            Predicate = (s, sideIdx, c) =>
-                s.CurrentTurnPlayer == owner &&
-                s.Players[owner].Hand.Any(h => h.Id == c.Id),
+            Owner = owner,
+            Amount = 2,
+            MinCost = 4,
+            NameContains = "特拉法尔加·罗",
         });
-
-        return Task.CompletedTask;
     }
 }

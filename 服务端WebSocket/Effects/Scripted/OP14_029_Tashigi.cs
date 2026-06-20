@@ -36,23 +36,14 @@ public class OP14_029_Tashigi : IScriptedEffect
             // 仅在对方的回合中可用
             if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex) return;
 
-            // 候选：我方活跃(未横置)的领袖或角色
-            var rests = new List<CardInstance>();
-            if (!me.Leader.IsTapped) rests.Add(me.Leader);
-            rests.AddRange(me.Characters.Where(c => !c.IsTapped));
-            if (rests.Count == 0) return;
+            if (AtomicOps.RestableCount(me) < 1) return;
 
             bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "达斯琪：是否将我方 1 张卡牌转为休息状态，使此角色不离场？");
             if (!use) return;
 
-            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
-                "将我方 1 张卡牌转为休息状态（成本）",
-                rests.Select(c => c.Id.ToString()).ToList(), 1, 1);
-            if (chosen.Count == 0) return;
-
-            var tgt = rests.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.RestCard(tgt);
+            if (!await AtomicOps.PromptRestOwnCards(ctx, 1,
+                "将我方 1 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
             ctx.State.MarkPreventKO(self.Id);
             return;
         }
@@ -61,25 +52,14 @@ public class OP14_029_Tashigi : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        var costCands = new List<CardInstance>();
-        if (!me.Leader.IsTapped) costCands.Add(me.Leader);
-        costCands.AddRange(me.Characters.Where(c => !c.IsTapped));
-        if (costCands.Count < 2) return; // 不足 2 张活跃卡牌无法支付成本
+        if (AtomicOps.RestableCount(me) < 2) return; // 不足 2 张活跃可休置项无法支付成本
 
         bool act = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "达斯琪【启动主要】：将我方 2 张卡牌转为休息状态，使此角色力量 +2000？");
         if (!act) return;
 
-        var picked = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
-            "将我方 2 张卡牌转为休息状态（成本）",
-            costCands.Select(c => c.Id.ToString()).ToList(), 2, 2);
-        if (picked.Count < 2) return;
-
-        foreach (var cid in picked)
-        {
-            var c = costCands.First(x => x.Id.ToString() == cid);
-            AtomicOps.RestCard(c);
-        }
+        if (!await AtomicOps.PromptRestOwnCards(ctx, 2,
+            "将我方 2 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
 
         AtomicOps.AddPowerThisTurn(self, 2000);
         me.TurnOnceUsed.Add(key);

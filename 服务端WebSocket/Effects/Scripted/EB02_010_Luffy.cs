@@ -32,8 +32,7 @@ public class EB02_010_Luffy : IScriptedEffect
         if (!me.Characters.All(c => c.Info.HasKeyword("草帽一伙"))) return;
 
         // 成本：咚!!-2，需有≥2张可放回的咚
-        int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (returnable < 2) return;
+        if (me.CostArea.Count < 2) return;
 
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
@@ -45,7 +44,7 @@ public class EB02_010_Luffy : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 成本：咚!!-2
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
 
         // 将最多 2 张休息咚转为活跃
         int n = 0;

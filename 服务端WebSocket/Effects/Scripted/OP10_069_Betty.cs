@@ -29,8 +29,8 @@ public class OP10_069_Betty : IScriptedEffect
         // 【咚!!×1】发动条件：自身贴有至少 1 张咚!!
         if (me.AttachedDonCount(self.Id) < 1) return;
 
-        // 成本：咚!!-1，需要场上有可放回的咚（活跃/休息）
-        int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
+        // 成本：咚!!-1，需要场上有可放回的咚
+        int returnable = me.CostArea.Count;
         if (returnable < 1) return;
 
         var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
@@ -41,8 +41,7 @@ public class OP10_069_Betty : IScriptedEffect
         if (!use) return;
 
         // 支付成本：咚!!-1
-        int returned = AtomicOps.ReturnDonToDeck(me, 1);
-        if (returned < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择最多 1 张费用≤1 的对方角色KO",

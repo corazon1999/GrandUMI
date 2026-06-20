@@ -659,11 +659,14 @@
   },
   "OP10-051": {
     "_name": "哈库",
-    "_matcher": "【攻击时】确认卡组顶3张公开≤1张《革命军》角色加手牌余者放回底;triggers 不支持 cost,忽略【咚!!×1】激活成本",
+    "_matcher": "【攻击时】本卡贴有≥1张咚时,确认卡组顶3张公开≤1张《革命军》角色加手牌余者放回底",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "LookTopReveal",
@@ -1014,11 +1017,15 @@
   },
   "OP10-077": {
     "_name": "贝拉密",
-    "_matcher": "阻挡时从咚卡组追加1张活跃咚；阻挡者为纯关键词，可选横置2咚成本在 triggers 不支持、按惯例忽略，只实现收益。",
+    "_matcher": "阻挡时可将我方2张活跃咚转为休息作为成本:从咚卡组追加1张活跃咚；阻挡者为纯关键词。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnBlockDeclare",
+        "cost": {
+          "restActiveDon": 2
+        },
+        "costPrompt": "将2张活跃咚转为休息：发动？",
         "then": [
           {
             "op": "RefreshDon",

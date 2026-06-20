@@ -55,7 +55,10 @@ public static class AtomicOps
 
     public static void RestCard(CardInstance c)
     {
-        if (c.HasRestriction(RestrictionKind.CannotBeRested)) return; // "无法转为休息状态"
+        if (c.HasRestriction(RestrictionKind.CannotBeRested)) return; // "无法转为休息状态"（瞬时来源）
+        // 持续来源（ContinuousEffect.GrantRestriction=CannotBeRested，如 OP11-046/GERMA 光环）同样拦截
+        var st = EffectRuntime.CurrentState;
+        if (st is not null && st.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return;
         bool was = c.IsTapped;
         c.IsTapped = true;
         if (!was) // 因效果转为休息状态 → 通知 watcher
@@ -67,6 +70,81 @@ public static class AtomicOps
     /// <summary>标记下个重置阶段不会转活跃</summary>
     public static void PreventActivateNextReset(CardInstance c)
         => c.CannotActivateNextReset = true;
+
+    /// <summary>「将我方N张卡牌转为休息状态」成本的可休置项数：活跃的 领袖 + 角色 + 舞台 + 咚!!。
+    /// 供发动前的可支付判定（不足 N 则不发动）。</summary>
+    public static int RestableCount(PlayerState p)
+    {
+        int n = 0;
+        if (!p.Leader.IsTapped) n++;
+        n += p.Characters.Count(c => !c.IsTapped);
+        if (p.StageCard is not null && !p.StageCard.IsTapped) n++;
+        n += p.CostArea.Count(d => d.State == DonState.Active);
+        return n;
+    }
+
+    /// <summary>「将我方N张卡牌转为休息状态」通用支付：弹窗让玩家从活跃的 领袖/角色/舞台/咚!! 中选 N 张休置，
+    /// 四类同列展示（卡牌走卡图、咚走 donChoices token）。候选不足 N 或玩家未选满 → 返回 false（不支付）。
+    /// 卡牌走 RestCard（含"无法休息"守护），咚直接置为休息状态。</summary>
+    public static async Task<bool> PromptRestOwnCards(EffectContext ctx, int n, string text, bool optional = false)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var cardCands = new List<CardInstance>();
+        if (!me.Leader.IsTapped) cardCands.Add(me.Leader);
+        cardCands.AddRange(me.Characters.Where(c => !c.IsTapped));
+        if (me.StageCard is not null && !me.StageCard.IsTapped) cardCands.Add(me.StageCard);
+        var activeDon = me.CostArea.Where(d => d.State == DonState.Active).ToList();
+        if (cardCands.Count + activeDon.Count < n) return false;
+
+        var validChoices = cardCands.Select(c => c.Id.ToString())
+            .Concat(activeDon.Select(d => d.Id.ToString())).ToList();
+        var extra = new Dictionary<string, object?>
+        {
+            ["donChoices"] = activeDon.Select(d => new { id = d.Id.ToString(), state = "Active" }).ToList(),
+        };
+        // optional=true：「可以将…休息」式可放弃成本，min=0 给出"跳过"，选不满 n 视为放弃(不支付不发动)
+        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOwnCardsOrDon", text,
+            validChoices, optional ? 0 : n, n, extra);
+        if (pick.Count < n) return false;
+        foreach (var pid in pick)
+        {
+            var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
+            if (don is not null) { don.State = DonState.Rest; continue; }
+            var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
+            if (card is not null) RestCard(card);
+        }
+        return true;
+    }
+
+    /// <summary>「将对方最多N张卡牌转为休息状态」效果：让玩家从对方活跃的 领袖/角色/舞台/咚!! 中选最多 N 张休置
+    /// （min 0，可不选）。四类同列（卡牌走卡图、咚走 donChoices token）。卡牌走 RestCard，咚直接置休息。</summary>
+    public static async Task PromptRestOpponentCards(EffectContext ctx, int n)
+    {
+        var opp = ctx.State.Players[1 - ctx.OwnerIndex];
+        var cardCands = new List<CardInstance>();
+        if (!opp.Leader.IsTapped) cardCands.Add(opp.Leader);
+        cardCands.AddRange(opp.Characters.Where(c => !c.IsTapped));
+        if (opp.StageCard is not null && !opp.StageCard.IsTapped) cardCands.Add(opp.StageCard);
+        var activeDon = opp.CostArea.Where(d => d.State == DonState.Active).ToList();
+        if (cardCands.Count + activeDon.Count == 0) return;
+
+        var validChoices = cardCands.Select(c => c.Id.ToString())
+            .Concat(activeDon.Select(d => d.Id.ToString())).ToList();
+        var extra = new Dictionary<string, object?>
+        {
+            ["donChoices"] = activeDon.Select(d => new { id = d.Id.ToString(), state = "Active" }).ToList(),
+        };
+        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOpponentCardsOrDon",
+            $"将对方最多 {n} 张卡牌转为休息状态（可选活跃 领袖/角色/舞台/咚!!）",
+            validChoices, 0, n, extra);
+        foreach (var pid in pick)
+        {
+            var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
+            if (don is not null) { don.State = DonState.Rest; continue; }
+            var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
+            if (card is not null) RestCard(card);
+        }
+    }
 
     // ── KO ────────────────────────────────────────────────────────────────
 
@@ -251,6 +329,80 @@ public static class AtomicOps
             EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
                 new Dictionary<string, object?> { ["count"] = returned });
         return returned;
+    }
+
+    /// <summary>
+    /// 「咚!!-N」通用支付：让玩家从费用区(活跃/休息/附着在角色·领袖身上)手选 N 张咚放回咚!!卡组。
+    /// 合格咚 = 费用区全部状态的咚；不足 N → 返回 false(无法支付，调用方应中止发动)；
+    /// 玩家取消/超时同样返回 false。恰好 N 张且全为活跃(无附着)时自动支付，免无意义弹窗。
+    /// 放回附着咚会使对应角色/领袖失去贴咚加成(power 由 AttachedDonCount 派生，自动生效)。
+    /// </summary>
+    public static async Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n)
+    {
+        if (n <= 0) return true;
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        // 合格咚 = 费用区全部(活跃 + 休息 + 附着)
+        var eligible = me.CostArea
+            .Where(d => d.State is DonState.Active or DonState.Rest or DonState.Attached)
+            .ToList();
+        if (eligible.Count < n) return false;   // 凑不够 → 无法支付
+
+        List<DonCard> chosen;
+        // 全为活跃咚时彼此等价、无"该牺牲哪张"的抉择 → 自动支付，免无意义弹窗；
+        // 一旦存在休息/附着咚(放回它们有不同代价)，才弹窗让玩家手选。
+        bool needPrompt = eligible.Any(d => d.State != DonState.Active);
+        if (!needPrompt)
+        {
+            chosen = eligible.Take(n).ToList();
+        }
+        else
+        {
+            // 反查附着目标卡号/名，供客户端标注"贴在 X"
+            var donChoices = eligible.Select(d =>
+            {
+                string? num = null, name = null;
+                if (d.State == DonState.Attached && d.AttachedToCardId is { } tid)
+                {
+                    CardInstance? t = me.Leader.Id == tid
+                        ? me.Leader
+                        : me.Characters.FirstOrDefault(c => c.Id == tid);
+                    if (t is not null) { num = t.Info.Number; name = t.Info.Name; }
+                }
+                return new
+                {
+                    id = d.Id.ToString(),
+                    state = d.State.ToString(),  // Active / Rest / Attached
+                    attachedToNumber = num,
+                    attachedToName = name,
+                };
+            }).ToList();
+
+            var ans = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
+                $"选择 {n} 张咚!! 放回咚!!卡组",
+                eligible.Select(d => d.Id.ToString()).ToList(), n, n,
+                new Dictionary<string, object?> { ["donChoices"] = donChoices });
+
+            if (ans.Count < n) return false;     // 取消/超时 → 不支付
+            chosen = new List<DonCard>();
+            foreach (var id in ans)
+            {
+                var d = eligible.FirstOrDefault(x => x.Id.ToString() == id);
+                if (d is not null && !chosen.Contains(d)) chosen.Add(d);
+                if (chosen.Count >= n) break;
+            }
+            if (chosen.Count < n) return false;  // 防御：回传 id 对不上
+        }
+
+        foreach (var d in chosen)
+        {
+            d.State = DonState.InDeck;
+            d.AttachedToCardId = null;
+            me.CostArea.Remove(d);
+            me.DonDeck.Add(d);
+        }
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
+            new Dictionary<string, object?> { ["count"] = chosen.Count });
+        return true;
     }
 
     // ── 移动卡牌 ──────────────────────────────────────────────────────────
@@ -458,6 +610,19 @@ public static class AtomicOps
         {
             var card = opp.Hand.FirstOrDefault(c => c.Id.ToString() == cid);
             if (card is not null) DiscardHand(opp, card);
+        }
+    }
+
+    /// <summary>让对手随机丢弃 N 张手牌（对应"丢弃对方N张手牌"措辞——无人选择，随机弃）。
+    /// 用确定性 GameState.Rng（与洗牌同源）保证回放/重连一致。区别于 OpponentDiscardChosen("对方丢弃N张"=对方自选)。</summary>
+    public static void OpponentDiscardRandom(GameEngine engine, int opponentIdx, int n)
+    {
+        var opp = engine.State.Players[opponentIdx];
+        int actual = Math.Min(n, opp.Hand.Count);
+        for (int i = 0; i < actual && opp.Hand.Count > 0; i++)
+        {
+            int idx = engine.State.Rng.Next(opp.Hand.Count);
+            DiscardHand(opp, opp.Hand[idx]);
         }
     }
 

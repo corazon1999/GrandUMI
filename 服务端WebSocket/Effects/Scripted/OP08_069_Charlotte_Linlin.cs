@@ -27,7 +27,7 @@ public class OP08_069_Charlotte_Linlin : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         // 成本可用性：需要 1 张可放回的咚 + 至少 1 张手牌可弃
-        bool canPayDon = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest) >= 1;
+        bool canPayDon = me.CostArea.Count >= 1;
         bool canDiscard = me.Hand.Count(c => c.Id != ctx.Source.Id) >= 1;
         if (!canPayDon || !canDiscard) return;
 
@@ -36,7 +36,7 @@ public class OP08_069_Charlotte_Linlin : IScriptedEffect
         if (!use) return;
 
         // 成本 1：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 成本 2：丢弃我方 1 张手牌
         var discardCands = me.Hand.Where(c => c.Id != ctx.Source.Id).ToList();

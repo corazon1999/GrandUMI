@@ -24,6 +24,9 @@ public class OP08_098_Kalgara : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
+
         int donCount = me.TotalDonInCostArea;
         var playable = me.Hand.Where(c =>
             c.Info.Kind == CardKind.Character &&

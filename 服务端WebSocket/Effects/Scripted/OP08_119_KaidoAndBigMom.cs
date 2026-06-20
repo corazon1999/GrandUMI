@@ -21,18 +21,16 @@ public class OP08_119_KaidoAndBigMom : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnAttackDeclare;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
 
-        // 成本：咚!!-10，需费用区有 10 张可放回的咚（活跃/休息）
-        int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (returnable < 10) return Task.CompletedTask;
+        // 成本：咚!!-10，需费用区有 10 张可放回的咚
+        if (me.CostArea.Count < 10) return;
 
-        int returned = AtomicOps.ReturnDonToDeck(me, 10);
-        if (returned < 10) return Task.CompletedTask;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 10)) return;
 
         // 将此角色以外的所有角色 KO（双方）。先快照，避免遍历中集合被修改。
         var myTargets = me.Characters.Where(c => c.Id != self.Id).ToList();
@@ -50,7 +48,5 @@ public class OP08_119_KaidoAndBigMom : IScriptedEffect
             opp.LifeArea.RemoveAt(0);
             opp.Trash.Add(oppLifeTop);
         }
-
-        return Task.CompletedTask;
     }
 }

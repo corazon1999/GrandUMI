@@ -20,6 +20,6 @@ public class OP02_075_Sicilian : IScriptedEffect
         if (me.CostArea.Count == 0) return;
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "西奇：咚!!-1（将我方1张咚放回咚卡组）？");
         if (!use) return;
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
     }
 }

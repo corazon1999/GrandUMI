@@ -29,15 +29,15 @@ public class OP11_074_PowderedCream : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
         if (self.IsTapped) return;
-        // 咚!!-1 须有 1 张可放回（活跃/休息）的咚
-        if (me.ActiveDonCount + me.RestDonCount < 1) return;
+        // 咚!!-1 须有 1 张可放回的咚
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "糖粉奶油末【启动主要】：咚!!-1并将此角色转为休息，宣言费用并公开对方卡组顶 1 张，命中则休息对方 1 张费用≤4角色？");
         if (!use) return;
 
         // 成本
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.RestCard(self);
         me.TurnOnceUsed.Add(key);
 

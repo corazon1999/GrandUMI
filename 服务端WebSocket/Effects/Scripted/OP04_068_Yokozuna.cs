@@ -33,7 +33,7 @@ public class OP04_068_Yokozuna : IScriptedEffect
             "横纲【对方攻击时】：咚!!-1，将对方 1 张费用≤2 的角色退回手牌？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多 1 张费用≤2 的角色，放回其持有者手牌",

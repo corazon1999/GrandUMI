@@ -24,7 +24,7 @@ public class OP03_070_Luffy : IScriptedEffect
         var self = ctx.Source;
 
         // 成本前提：场上≥1咚 且 手牌中有费用 5 的角色
-        if (me.TotalDonInCostArea < 1) return;
+        if (me.CostArea.Count < 1) return;
         var cost5Chars = me.Hand
             .Where(c => c.Info.Kind == CardKind.Character && c.Info.Cost == 5)
             .ToList();
@@ -45,7 +45,7 @@ public class OP03_070_Luffy : IScriptedEffect
         if (discard.Count < 1) return;
 
         // 支付成本：咚!!-1 + 丢弃所选角色
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         var card = cost5Chars.First(c => c.Id.ToString() == discard[0]);
         AtomicOps.DiscardHand(me, card);
 

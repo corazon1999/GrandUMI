@@ -23,6 +23,9 @@ public class OP01_064_Abida : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
+
         if (me.Hand.Count == 0) return;
         var targets = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
         if (targets.Count == 0) return;

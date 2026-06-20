@@ -37,7 +37,7 @@ public class OP07_059_Foxy : IScriptedEffect
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "福克斯【攻击时】：将 3 张咚!!放回咚!!卡组，使对方休息状态的 1 张领袖和 1 张角色在下个对方重置阶段不转活跃？");
         if (!use) return;
-        AtomicOps.ReturnDonToDeck(me, 3);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 3)) return;
 
         // 选择对方最多 1 张处于休息状态的领袖
         if (opp.Leader.IsTapped)

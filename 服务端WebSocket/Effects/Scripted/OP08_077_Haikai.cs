@@ -31,10 +31,8 @@ public class OP08_077_Haikai : IScriptedEffect
         if (!leaderOk) return;
 
         // 成本：咚!!-2（将我方场上 2 张咚放回咚卡组）。可用咚不足则无法支付。
-        int availableDon = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (availableDon < 2) return;
-        int returned = AtomicOps.ReturnDonToDeck(me, 2);
-        if (returned < 2) return;
+        if (me.CostArea.Count < 2) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
 
         // 效果：KO 对方最多 2 张费用不高于 6 的角色
         var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();

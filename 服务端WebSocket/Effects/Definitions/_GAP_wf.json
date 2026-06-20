@@ -271,7 +271,8 @@
       {
         "on": "OnAttackDeclare",
         "if": {
-          "selfHandCountLte": 3
+          "selfHandCountLte": 3,
+          "donAttachedGte": 1
         },
         "then": [
           {

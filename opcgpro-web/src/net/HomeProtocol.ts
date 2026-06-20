@@ -37,6 +37,7 @@ import type {
   MsgFriendlyReady,
   MsgFriendlyLeave,
   MsgFriendlyLeft,
+  MsgSpectateRoom,
 } from "@/types/net";
 import { useNetStore } from "@/store/netStore";
 import { showMessage } from "@/components/ui/MessageBox";
@@ -452,5 +453,10 @@ export const HomeRequest = {
 
   friendlyLeave() {
     return NetManager.send({ proto: "MsgFriendlyLeave" } as MsgFriendlyLeave);
+  },
+
+  /** 申请观战指定房间（观战者由后端注册，随后每帧收到脱敏快照） */
+  spectateRoom(roomId: string) {
+    return NetManager.send({ proto: "MsgSpectateRoom", roomId } as MsgSpectateRoom);
   },
 };

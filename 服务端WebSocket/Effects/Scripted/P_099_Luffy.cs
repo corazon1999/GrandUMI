@@ -23,16 +23,14 @@ public class P_099_Luffy : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 成本需要场上合计 10 张咚!!（活跃 + 休息 + 附着）
-        int donOnField = me.CostArea.Count(d =>
-            d.State == DonState.Active || d.State == DonState.Rest || d.State == DonState.Attached);
-        if (donOnField < 10) return;
+        if (me.CostArea.Count < 10) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "路飞【攻击时】：将我方 10 张咚!! 放回咚!!卡组，使此角色转为活跃状态？");
         if (!use) return;
 
         // 成本：咚!!-10
-        AtomicOps.ReturnDonToDeck(me, 10);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 10)) return;
 
         // 效果：将此角色转为活跃状态
         AtomicOps.ActivateCard(ctx.Source);

@@ -29,11 +29,12 @@ public class OP16_080_Teach : IScriptedEffect
                 SourceCardId = selfId.ToString(),
                 Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
                 CostDelta = 1,
-                // 仅在对方回合、作用于我方角色（排除领袖）
+                // 仅在对方回合、作用于我方【场上】角色。
+                // 必须限定"在场上角色区"，否则 HandPlayCost 也走 ContinuousCostBonus → 手牌角色费用被误+1（反馈#113）。
                 Predicate = (s, sideIdx, c) =>
                     sideIdx == owner
                     && s.CurrentTurnPlayer != owner
-                    && c.Id != s.Players[owner].Leader.Id,
+                    && s.Players[owner].Characters.Any(ch => ch.Id == c.Id),
             });
             return;
         }

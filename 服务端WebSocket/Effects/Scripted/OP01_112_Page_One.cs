@@ -28,7 +28,7 @@ public class OP01_112_Page_One : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 需可支付咚!!-1
-        if (me.ActiveDonCount < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "佩吉旺【启动主要】：将1张咚!!放回咚!!卡组，本回合此角色可以攻击对方活跃角色？");
@@ -37,7 +37,7 @@ public class OP01_112_Page_One : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 本回合此角色可攻击对方活跃角色
         AtomicOps.GiveKeyword(ctx.Source, "可攻击活跃", KeywordDuration.ThisTurn);

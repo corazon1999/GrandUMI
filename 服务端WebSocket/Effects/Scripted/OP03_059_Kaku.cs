@@ -22,13 +22,13 @@ public class OP03_059_Kaku : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        if (me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest) < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "卡古【攻击时】：咚!!-1，本次战斗此角色获得【流放】？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.GiveKeyword(ctx.Source, "流放", KeywordDuration.ThisBattle);
     }
 }

@@ -22,6 +22,13 @@ export default function PromptOverlay() {
 
   const isLifeTrigger = prompt.kind === "LifeTrigger";
   const isOption = prompt.kind === "Option";
+  // 「咚!!-N」放回：服务端用 extra.donChoices 携带费用区每张咚的状态与附着目标，
+  // 这里独立渲染咚 token（咚牌无卡号、不在 fieldCards，走不了通用卡图反查）。
+  const isReturnDon = prompt.kind === "ReturnOwnDon";
+  type DonChoice = { id: string; state: string; attachedToNumber?: string; attachedToName?: string };
+  const donChoices = (prompt.extra?.donChoices as DonChoice[] | undefined) ?? [];
+  // 通用选择分支里，凡 id 命中 donChoices 的渲染成咚 token（混合"卡牌 + 咚"同列，如 OP16-033 休置成本）
+  const donChoiceMap = new Map(donChoices.map((d) => [d.id, d]));
 
   // 服务端注入的效果源卡号：让玩家知道当前在结算哪张卡的效果
   const sourceNumber = prompt.extra?.sourceNumber as string | undefined;
@@ -169,13 +176,99 @@ export default function PromptOverlay() {
           </div>
         )}
 
-        {!isLifeTrigger && !isOption && (
+        {isReturnDon && (
+          <>
+            <div className="flex flex-wrap gap-3 max-w-2xl justify-center">
+              {donChoices.map((d) => {
+                const isSel = selected.includes(d.id);
+                const attachedCard = d.attachedToNumber ? getCard(d.attachedToNumber) ?? null : null;
+                const stateLabel = d.state === "Active" ? "活跃" : d.state === "Rest" ? "休息" : "附着";
+                return (
+                  <div
+                    key={d.id}
+                    onClick={() => toggle(d.id)}
+                    className={`relative flex w-20 cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-1.5 transition ${
+                      isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40 hover:border-white/50"
+                    }`}
+                  >
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-[10px] font-black text-black shadow ${
+                        d.state === "Rest" ? "rotate-90" : ""
+                      }`}
+                    >
+                      DON!!
+                    </div>
+                    <span className="text-[10px] font-bold text-yellow-100">{stateLabel}</span>
+                    {attachedCard ? (
+                      <span
+                        className="max-w-full truncate text-[9px] text-amber-200"
+                        title={`贴在 ${d.attachedToName ?? attachedCard.name}`}
+                      >
+                        贴：{d.attachedToName ?? attachedCard.name}
+                      </span>
+                    ) : (
+                      d.state === "Attached" && (
+                        <span className="text-[9px] text-amber-200">附着中</span>
+                      )
+                    )}
+                    {isSel && (
+                      <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white ring-2 ring-white">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {donChoices.length === 0 && <span className="text-gray-400 text-sm">无可放回的咚</span>}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirm}
+                disabled={!canConfirm}
+                className="bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold"
+              >
+                确认放回（{selected.length} / {prompt.maxChoose}）
+              </button>
+            </div>
+          </>
+        )}
+
+        {!isLifeTrigger && !isOption && !isReturnDon && (
           <>
             <div className="flex flex-wrap gap-2 max-w-2xl justify-center">
               {displayChoiceIds.map((id) => {
+                const selectable = validChoiceSet.has(id);
+                // 咚候选：渲染成咚 token，与卡牌同列混选（如 OP16-033「将我方卡牌转为休息」可选活跃咚）
+                const don = donChoiceMap.get(id);
+                if (don) {
+                  const isSel = selectable && selected.includes(id);
+                  const stLabel = don.state === "Active" ? "活跃" : don.state === "Rest" ? "休息" : "附着";
+                  return (
+                    <div
+                      key={id}
+                      onClick={selectable ? () => toggle(id) : undefined}
+                      className={`relative flex h-28 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 p-1.5 transition ${
+                        isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40"
+                      } ${selectable ? "cursor-pointer hover:border-white/50" : "cursor-default opacity-60"}`}
+                    >
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-[10px] font-black text-black shadow ${
+                          don.state === "Rest" ? "rotate-90" : ""
+                        }`}
+                      >
+                        DON!!
+                      </div>
+                      <span className="text-[10px] font-bold text-yellow-100">{stLabel}咚</span>
+                      {isSel && (
+                        <span className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white ring-2 ring-white">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
                 const card = findCardById(id);
                 const fieldState = fieldStateById(id);
-                const selectable = validChoiceSet.has(id);
                 const orderIdx = isOrdered ? selected.indexOf(id) : -1;
                 return (
                   <div

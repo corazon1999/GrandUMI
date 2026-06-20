@@ -39,7 +39,7 @@ public class OP05_119_MonkeyDLuffy : IScriptedEffect
             if (!use) return;
 
             // 支付成本：咚!!-10
-            AtomicOps.ReturnDonToDeck(me, 10);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 10)) return;
 
             // 将此角色以外的我方所有角色放回卡组最下方
             var others = me.Characters.Where(c => c.Id != self.Id).ToList();

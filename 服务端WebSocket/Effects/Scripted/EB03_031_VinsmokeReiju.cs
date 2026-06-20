@@ -24,7 +24,7 @@ public class EB03_031_VinsmokeReiju : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return; // 【我方的回合中】
         if (!me.Leader.Info.NameIs("山智")) return;                 // 领袖须为"山智"
-        if (me.ActiveDonCount < 1) return;                          // 无法支付咚!!-1
+        if (me.CostArea.Count < 1) return;                          // 无法支付咚!!-1
 
         var cands = me.Trash.Where(c => c.Info.Kind == CardKind.Event && c.Info.Cost <= 7).ToList();
         if (cands.Count == 0) return;
@@ -34,7 +34,7 @@ public class EB03_031_VinsmokeReiju : IScriptedEffect
         if (!pay) return;
 
         // 支付成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var extra = new Dictionary<string, object?>
         {

@@ -263,11 +263,16 @@
   },
   "EB03-021": {
     "_name": "爱比达",
-    "_matcher": "【登场时】将对方最多1张原力≤4000角色和最多1张原费≤3角色放回卡组底。忽略可选成本「弃1手牌」(triggers 不支持 cost)。",
+    "_matcher": "【登场时】可弃1手牌：将对方最多1张原力≤4000角色和最多1张原费≤3角色放回卡组底(弃手牌可选成本已实现)。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -326,11 +331,16 @@
   },
   "EB03-025": {
     "_name": "日奈",
-    "_matcher": "【登场时】将最多1张原本力量为6000的角色退回手牌(originalPower Lte+Gte=6000)。忽略可选成本「弃1手牌」(triggers 不支持 cost)。",
+    "_matcher": "【登场时】可弃1手牌：将最多1张原本力量为6000的角色退回手牌(originalPower Lte+Gte=6000；弃手牌可选成本已实现)。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -481,11 +491,15 @@
   },
   "EB03-036": {
     "_name": "Baby 5",
-    "_matcher": "登场时KO对方最多2张原本费用≤3角色(两次Choose+KO)；忽略咚-1可选成本(triggers不支持cost)。",
+    "_matcher": "登场时KO对方最多2张原本费用≤3角色(两次Choose+KO)；咚!!-1可选成本已实现。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Choose",

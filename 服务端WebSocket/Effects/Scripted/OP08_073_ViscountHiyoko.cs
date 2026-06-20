@@ -27,7 +27,7 @@ public class OP08_073_ViscountHiyoko : IScriptedEffect
         if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex) return;
 
         // 成本前置：需有咚可放回
-        int donCount = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
+        int donCount = me.CostArea.Count;
         if (donCount < 1) return;
 
         // 候选：卡组中费用≤6 的"公鸡伯爵"
@@ -41,7 +41,7 @@ public class OP08_073_ViscountHiyoko : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var extra = new Dictionary<string, object?>
         {

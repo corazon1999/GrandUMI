@@ -45,7 +45,7 @@ public class EB01_038_WayOfTheOkama : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 成本：咚!!-1（确认能完成重定向后再支付）
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var target = cands.First(c => c.Id.ToString() == chosen[0]);
         b.TargetIsLeader = false;

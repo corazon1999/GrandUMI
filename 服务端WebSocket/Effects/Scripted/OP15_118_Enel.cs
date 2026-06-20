@@ -41,8 +41,8 @@ public class OP15_118_Enel : IScriptedEffect
                 s.Players[owner].TotalDonInCostArea <= 6,
         });
 
-        // 【登场时】成本「咚!!-1」：返还 1 张咚到咚卡组；无咚可返还则登场段不发动
-        if (AtomicOps.ReturnDonToDeck(me, 1) < 1) return;
+        // 【登场时】成本「咚!!-1」：返还 1 张咚到咚卡组；无咚可返还或取消则登场段不发动
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 探顶 5 张，将其中最多 1 张（任意）加入手牌
         int peek = Math.Min(5, me.Deck.Count);

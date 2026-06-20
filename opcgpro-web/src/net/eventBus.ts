@@ -19,6 +19,16 @@ type Events = {
   opponentDisconnected: { gracePeriodSeconds: number };
   opponentReconnected: void;
   duelOver: { isWin: boolean; description: string };
+
+  // 局内聊天（房间内：双方+观战者）
+  gameChat: {
+    text: string;
+    code?: string | null;
+    fromSeat: number;
+    fromAccount?: string;
+    fromName: string;
+    fromRole: "player" | "spectator";
+  };
 };
 
 export const eventBus = mitt<Events>();

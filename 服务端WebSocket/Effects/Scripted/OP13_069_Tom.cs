@@ -28,15 +28,15 @@ public class OP13_069_Tom : IScriptedEffect
             .ToList();
         if (candidates.Count == 0) return;
 
-        // 代价：咚!!-1，需至少 1 张活跃咚
-        if (me.ActiveDonCount < 1) return;
+        // 代价：咚!!-1，需至少 1 张可放回的咚
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "汤姆：咚!!-1，将废弃区中最多 1 张费用不高于 3 的舞台卡牌加入手牌？");
         if (!use) return;
 
-        // 支付代价：咚!!-1（活跃咚放回咚卡组）
-        if (AtomicOps.ReturnDonToDeck(me, 1) < 1) return;
+        // 支付代价：咚!!-1
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var extra = new Dictionary<string, object?>
         {

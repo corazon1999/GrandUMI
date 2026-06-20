@@ -129,10 +129,18 @@ public static class DslInterpreter
             if (CheckCondition(main, ctx) && await PayActivationCost(main, ctx) && main.TryGetProperty("then", out var then))
                 await RunSteps(then, ctx);
         }
-        // 4. trigger: 生命牌触发
+        // 4. trigger: 生命牌触发（数组=直接执行；对象=支持 cost/if 节，复用 PayActivationCost，同 counter）
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger && def.TryGetProperty("trigger", out var trig))
         {
-            if (trig.ValueKind == JsonValueKind.Array) await RunSteps(trig, ctx);
+            if (trig.ValueKind == JsonValueKind.Array)
+            {
+                await RunSteps(trig, ctx);
+            }
+            else if (trig.ValueKind == JsonValueKind.Object)
+            {
+                if (CheckCondition(trig, ctx) && await PayActivationCost(trig, ctx) && trig.TryGetProperty("then", out var tthen))
+                    await RunSteps(tthen, ctx);
+            }
         }
         // 5. activated: 【启动主要】（由 HandleUseEffect 触发 ActivatedMain）
         if (ctx.Trigger == EffectTrigger.ActivatedMain && def.TryGetProperty("activated", out var act))
@@ -196,13 +204,12 @@ public static class DslInterpreter
         if (!node.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) return true;
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // donReturn: 咚!!-N（把活跃咚 N 张放回咚卡组）
+        // donReturn: 咚!!-N（将指定数量的咚放回咚卡组，可放回任意状态：活跃/休息/附着）
+        // 弹窗让玩家手选要放回哪几张；合格咚不足或玩家取消则不支付、不发动。
         if (cost.TryGetProperty("donReturn", out var dr) && dr.ValueKind == JsonValueKind.Number)
         {
             int n = dr.GetInt32();
-            int active = me.ActiveDonCount;
-            if (active < n) return false;
-            AtomicOps.ReturnDonToDeck(me, n);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, n)) return false;
         }
 
         // restSelf: 把自身转休息
@@ -269,6 +276,21 @@ public static class DslInterpreter
                 }
             }
             if (restCount < n) return false;
+        }
+
+        // restCards: 将 N 张"卡牌"转为休息状态（活跃 领袖/角色/舞台/咚!! 混选）。
+        //   数字形=强制成本；对象形 {n, optional:true}=「可以…」可放弃(放弃则不支付不发动)。
+        if (cost.TryGetProperty("restCards", out var rcd))
+        {
+            int n = 0; bool rcOpt = false;
+            if (rcd.ValueKind == JsonValueKind.Number) n = rcd.GetInt32();
+            else if (rcd.ValueKind == JsonValueKind.Object)
+            {
+                n = GetInt(rcd, "n", 1);
+                rcOpt = rcd.TryGetProperty("optional", out var ro) && ro.ValueKind == JsonValueKind.True;
+            }
+            if (n > 0 && !await AtomicOps.PromptRestOwnCards(ctx, n,
+                $"将我方 {n} 张卡牌转为休息状态（{(rcOpt ? "可放弃，" : "")}可选活跃 领袖/角色/舞台/咚!!）", rcOpt)) return false;
         }
 
         // millTop: 从卡组顶废弃 N 张（用于某些特殊费用）
@@ -639,6 +661,10 @@ public static class DslInterpreter
                     if (target is not null) AtomicOps.RestCard(target);
                     break;
                 }
+            // RestOpponentCards: 将对方最多 N 张"卡牌"转为休息状态（活跃的 领袖/角色/舞台/咚!! 混选，对应"将对方N张卡牌转为休息"）
+            case "RestOpponentCards":
+                await AtomicOps.PromptRestOpponentCards(ctx, GetInt(op, "n", 1));
+                break;
             case "Activate":
                 {
                     var target = ResolveTarget(op, "target", ctx);
@@ -754,6 +780,7 @@ public static class DslInterpreter
                     var target = ResolveTarget(op, "target", ctx);
                     if (target is null) break;
                     bool rest = op.TryGetProperty("rest", out var rv) && rv.ValueKind == JsonValueKind.True;
+                    await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, target);
                     AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
                     break;
                 }
@@ -778,8 +805,15 @@ public static class DslInterpreter
             case "OpponentDiscard":
                 {
                     // DSL 中 op 是同步 switch，但内部可 await
+                    // random:true → 随机弃（"丢弃对方N张手牌"措辞）；否则对方自选（"对方丢弃N张手牌"措辞）
                     if (ctx.Engine is not null)
-                        await AtomicOps.OpponentDiscardChosen(ctx.Engine, 1 - ctx.OwnerIndex, GetInt(op, "n", 1));
+                    {
+                        int dn = GetInt(op, "n", 1);
+                        if (op.TryGetProperty("random", out var rdm) && rdm.ValueKind == JsonValueKind.True)
+                            AtomicOps.OpponentDiscardRandom(ctx.Engine, 1 - ctx.OwnerIndex, dn);
+                        else
+                            await AtomicOps.OpponentDiscardChosen(ctx.Engine, 1 - ctx.OwnerIndex, dn);
+                    }
                     break;
                 }
             case "MarkPreventKO":
@@ -925,8 +959,9 @@ public static class DslInterpreter
                 {
                     var target = ResolveTarget(op, "target", ctx);
                     if (target is null) break;
-                    int owner = FindOwner(s, target);
-                    if (owner >= 0) AtomicOps.PlayFromHandFree(s, owner, target);
+                    int owner = ctx.OwnerIndex; // 手牌卡 owner 恒为效果控制者，FindOwner 不搜手牌会误判 -1
+                    await EnsureRoomForCharacter(ctx, owner, target);
+                    AtomicOps.PlayFromHandFree(s, owner, target);
                     break;
                 }
             case "PlayEventFromHandFree":
@@ -975,6 +1010,10 @@ public static class DslInterpreter
                     }
                     break;
                 }
+            case "NoPlayCharacter":
+                // 本回合中我方无法登场角色卡牌（回合结束自动清除）
+                ctx.State.NoPlayCharacterThisTurn.Add(ctx.OwnerIndex);
+                break;
             case "SelfToTrash":
                 {
                     // 把自身放置到废弃区（不触发 KO 事件），常用于成本
@@ -1021,6 +1060,7 @@ public static class DslInterpreter
                         var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
                         if (picked is not null)
                         {
+                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
                             AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
                             if (rest) AtomicOps.RestCard(picked);
                         }
@@ -1044,11 +1084,32 @@ public static class DslInterpreter
                     if (chosen.Count > 0)
                     {
                         var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
-                        if (picked is not null) AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
+                        if (picked is not null)
+                        {
+                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
+                            AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
+                        }
                     }
                     break;
                 }
         }
+    }
+
+    /// <summary>角色登场前腾位：我方角色区已满 5 张时，让玩家选 1 张己方角色放置到废弃区(满场该弃谁由玩家决定，反馈#138)。
+    /// 仅对角色卡、确实满员时触发；非角色/未满不打扰。把引擎原"自动弃最左"改为玩家可选，超时兜底取第一张(=旧行为)。
+    /// 仅供 DSL 登场入口调用；脚本直连 AtomicOps.Play*Free 仍走引擎自动弃置(暂留限制)。</summary>
+    static async Task EnsureRoomForCharacter(EffectContext ctx, int ownerIdx, CardInstance entering)
+    {
+        if (ownerIdx < 0 || entering.Info.Kind != CardKind.Character) return;
+        var p = ctx.State.Players[ownerIdx];
+        if (p.Characters.Count < 5) return;
+        var ids = p.Characters.Select(c => c.Id.ToString()).ToList();
+        var chosen = await ctx.Prompts.ChooseCards(ownerIdx, "ChooseCharToTrashForRoom",
+            "我方角色区已满5张，选择1张放置到废弃区以腾出登场位置", ids, 1, 1);
+        var victim = (chosen.Count > 0 ? p.Characters.FirstOrDefault(c => c.Id.ToString() == chosen[0]) : null)
+                     ?? p.Characters[0];
+        p.Characters.Remove(victim);
+        p.Trash.Add(victim);
     }
 
     /// <summary>丢弃我方 n 张手牌（玩家自选；手牌不足则丢全部）。客户端经 extra.choiceCards 显示卡面</summary>

@@ -25,8 +25,8 @@ public class OP14_061_Vergo : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        // 成本：咚!!-1，需有活跃咚可返还
-        if (me.ActiveDonCount < 1) return;
+        // 成本：咚!!-1，需有可返还的咚（活跃/休息/附着皆可）
+        if (me.CostArea.Count < 1) return;
 
         var cands = opp.Characters.ToList();
         if (cands.Count == 0) return;
@@ -36,7 +36,7 @@ public class OP14_061_Vergo : IScriptedEffect
         if (!use) return;
 
         // 支付成本
-        if (AtomicOps.ReturnDonToDeck(me, 1) < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 效果：选择对方最多 1 张角色，本回合 -2000
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

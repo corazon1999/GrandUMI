@@ -31,7 +31,7 @@ public class OP04_059_Asparagus : IScriptedEffect
             "阿斯巴古【对方攻击时】：咚!!-1，本回合此角色获得【阻挡者】？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.GiveKeyword(self, "阻挡者", KeywordDuration.ThisTurn);
     }
 }

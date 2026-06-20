@@ -39,7 +39,7 @@ public class EB01_037_Mr9 : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

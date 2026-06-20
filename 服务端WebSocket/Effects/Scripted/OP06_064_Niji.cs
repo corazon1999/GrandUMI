@@ -42,7 +42,7 @@ public class OP06_064_Niji : IScriptedEffect
         if (all.Count == 0) return;
 
         // 成本一需要至少 1 张可放回的咚
-        if (me.ActiveDonCount + me.RestDonCount < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "尼智【启动主要】：咚!!-1 并将此角色放置废弃区，从手牌/废弃区登场 1 张费用5的“温思默克·尼智”？");
@@ -59,7 +59,7 @@ public class OP06_064_Niji : IScriptedEffect
         if (chosen.Count == 0) return; // 放弃 → 不支付成本
 
         // 支付成本：咚!!-1 + 将此角色放置废弃区
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         // 「放置到废弃区」是自费而非 KO：手动移入废弃区，避免被 KO 守护拦截或误触发对方「角色被KO时」反应
         me.Characters.Remove(self);
         me.Trash.Add(self);

@@ -28,7 +28,7 @@ public class OP10_071_Doflamingo : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
             // 成本：咚!!-1，需要场上有可放回的咚
-            int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
+            int returnable = me.CostArea.Count;
             if (returnable < 1) return;
 
             var playable = me.Hand.Where(c =>
@@ -41,8 +41,7 @@ public class OP10_071_Doflamingo : IScriptedEffect
                 "多弗拉门戈【登场时】：咚!!-1，登场 1 张费用≤5 的《堂吉诃德海盗团》角色？");
             if (!use) return;
 
-            int returned = AtomicOps.ReturnDonToDeck(me, 1);
-            if (returned < 1) return;
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
             var extra = new Dictionary<string, object?>
             {

@@ -24,23 +24,15 @@ public class EB04_015_Jinbe : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 可横置成本候选：我方活跃的领袖或角色
-        var restable = new List<CardInstance>();
-        if (!me.Leader.IsTapped) restable.Add(me.Leader);
-        restable.AddRange(me.Characters.Where(c => !c.IsTapped));
-        if (restable.Count == 0) return;
+        if (AtomicOps.RestableCount(me) < 1) return; // 无活跃可休置项(领袖/角色/舞台/咚)，无法支付
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "甚平【KO时】：将我方 1 张卡牌转为休息状态，若领袖含《鱼人族》或《人鱼族》则登场 1 张费用≤6 的绿色角色？");
         if (!use) return;
 
-        // 支付成本：选择 1 张转为休息状态
-        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
-            "将我方 1 张卡牌转为休息状态",
-            restable.Select(c => c.Id.ToString()).ToList(), 1, 1);
-        if (pick.Count == 0) return;
-        var cost = restable.First(c => c.Id.ToString() == pick[0]);
-        AtomicOps.RestCard(cost);
+        // 支付成本：选择 1 张活跃 领袖/角色/舞台/咚 转为休息状态
+        if (!await AtomicOps.PromptRestOwnCards(ctx, 1,
+            "将我方 1 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
 
         // 收益条件：领袖含《鱼人族》或《人鱼族》
         if (!me.Leader.Info.HasKeyword("鱼人族") && !me.Leader.Info.HasKeyword("人鱼族")) return;

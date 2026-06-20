@@ -183,6 +183,18 @@ export interface MsgChatMsg extends MsgBase {
   Msg?: string;
 }
 
+// 局内聊天（房间内：对战双方 + 观战者）。区别于大厅全局 MsgChatMsg。
+// 客户端→服务器只需带 Text（+可选 Code 预设短语编号）；服务器→客户端回带发送者信息。
+export interface MsgGameChat extends MsgBase {
+  proto: "MsgGameChat";
+  text: string;
+  code?: string | null;       // 预设短语编号（自由文字为 null）
+  fromSeat?: number;          // 0/1=玩家座位, -1=观战者
+  fromAccount?: string;       // 发送者账号（客户端据此判断是否为自己）
+  fromName?: string;          // 发送者显示名
+  fromRole?: "player" | "spectator";
+}
+
 // ── 在线人数 ──────────────────────────────────────────────────────────────
 // 服务器 → 客户端：当前在线（已登录）人数，登录/断开时广播
 export interface MsgOnlineCount extends MsgBase {
@@ -195,6 +207,7 @@ export interface PlayerInfo {
   account: string;
   name: string;
   status: "idle" | "matching" | "playing";
+  roomId?: string | null;   // 对战中玩家所在的对局房间ID，供一键观战；无对局房间时为 null
 }
 
 // 客户端 → 服务器:请求在线玩家列表;服务器 → 客户端:返回列表
@@ -312,6 +325,8 @@ export interface FieldCardSnapshot {
   attachedDon: number;
   gainedKeywords: string[];
   cannotActivateNextReset: boolean;
+  cannotBeRested: boolean;   // 无法被效果转为休息状态
+  activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
 }
@@ -336,6 +351,8 @@ export interface PlayerSnapshot {
   leaderPower: number;
   leaderAttachedDon: number;
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
+  leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
+  stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;
   costRest: number;
   costAttached: number;
@@ -481,4 +498,5 @@ export type AnyMsg =
   | MsgPlayerReconnected
   | MsgBugReport
   | MsgChatMsg
+  | MsgGameChat
   | MsgOnlineCount;

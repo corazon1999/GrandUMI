@@ -1065,14 +1065,16 @@
       "then": [
         {
           "op": "OpponentDiscard",
-          "n": 1
+          "n": 1,
+          "random": true
         }
       ]
     },
     "trigger": [
       {
         "op": "OpponentDiscard",
-        "n": 1
+        "n": 1,
+        "random": true
       }
     ]
   },

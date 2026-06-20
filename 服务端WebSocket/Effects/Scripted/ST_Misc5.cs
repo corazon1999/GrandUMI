@@ -110,15 +110,14 @@ public class ST26_005_Luffy : IScriptedEffect
     public string CardNumber => "ST26-005";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField || t == EffectTrigger.OnAttackDeclare;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         bool multiColor = me.Leader.Info.ColorList.Length >= 2;
-        if (!(multiColor && opp.TotalDonInCostArea >= 5 && me.Leader.Info.HasKeyword("草帽一伙"))) return Task.CompletedTask;
-        if (me.ActiveDonCount < 2) return Task.CompletedTask;
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!(multiColor && opp.TotalDonInCostArea >= 5 && me.Leader.Info.HasKeyword("草帽一伙"))) return;
+        if (me.CostArea.Count < 2) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         me.Leader.OriginalPowerOverride = 7000;
-        return Task.CompletedTask;
     }
 }

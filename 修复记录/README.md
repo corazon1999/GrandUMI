@@ -25,3 +25,6 @@
 - [OP12-028 等检索类 choiceCards 只下发候选](OP12-028_检索choiceCards只发候选.md) — 看顶N张公开M张的检索卡，choiceCards 误用候选列表导致不符合条件的牌不显示。波及 OP12-080/108/047。
 - [OP12-001 等公开手牌成本未向对手广播](OP12-001_公开手牌未向对手广播.md) — "公开我方手牌中N张……"成本只对发动者弹选牌框、漏调 BroadcastReveal，对手看不到公开牌。波及 OP08-055/12-003/12-004/12-009/12-013/12-015/13-024/14-105/07-090(摩根斯反向)。
 - [OP16-008 缺成本与目标过滤](OP16-008_缺成本与目标过滤.md) — 近似实现漏了"弃我方10000角色"的成本和"对方力量≤8000"的目标过滤，登场直接选任意对方角色KO。新增 DSL 原语 trashOwnCharacter。
+- [引擎/UI 无法转休息状态图标 + RestCard 持续来源拦截](引擎_无法转休息状态图标与RestCard持续来源拦截.md) — CannotBeRested 没下发到对战 UI；且 RestCard 只拦瞬时来源、持续来源(OP11-046/GERMA光环)未拦截。补全快照→net→FieldCardView→组件全链路 + 左下角「横置矩形+红×」图标；EffectRuntime 暴露 CurrentState 让 RestCard 同时拦两源。追加：OP16-032/OP15-029 用孤立占位关键字「禁止休息」(只写不读)导致效果与图标双失效，改回标准 AddRestriction(CannotBeRested)。
+- [OP16-036 缺攻击时原本力量变领袖](OP16-036_缺攻击时原本力量变领袖.md) — 纯 DSL 只实现【登场时】，【攻击时】(effectTags 已标 OnAttackDeclare)无 handler 派发后空过。新建脚本仅接管 OnAttackDeclare(设 OriginalPowerOverride=对方领袖力量)，登场时仍走 DSL。同款仅 OP16-055。
+- [UI 启动效果按钮一回合一次用后未隐藏](UI_启动效果按钮一回合一次用后未隐藏.md) — 前端 canActivate 只看 effectTags 有无 ActivatedMain，不判断本回合是否已用；后端 TurnOnceUsed 未下发。公开快照新增 activatedUsedThisTurn(领袖/角色/舞台三处，key 兼容 DSL「{id}-Activated」与脚本「{番号}-act:{id}」)，前端据此隐藏按钮。全部【每回合1次】启动卡统一生效。

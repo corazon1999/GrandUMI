@@ -29,7 +29,7 @@ public class OP14_069_Doflamingo : IScriptedEffect
 
         // 成本：咚!!-3（费用区需 ≥3 张咚!!）
         if (me.TotalDonInCostArea < 3) return;
-        AtomicOps.ReturnDonToDeck(me, 3);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 3)) return;
 
         // 二选一
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,

@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import type { CardData } from "@/types/card";
 import { clsx } from "clsx";
 import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardHoverPreview";
+import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 
 interface Props {
   card: CardData | null;
@@ -79,6 +80,8 @@ export default function CardItem({
   // 悬停详情预览（仅正面且有卡牌数据时显示，避免泄露对手暗置手牌）
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 右键大图详情（同样仅正面有卡牌时可开，避免泄露对手暗置牌）
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -101,6 +104,15 @@ export default function CardItem({
     setHoverInfo(null);
   };
 
+  // 右键 → 居中大图详情；屏蔽浏览器原生菜单，背面/无卡数据不弹（防泄露暗置牌）
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (showFaceDown || !card) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoverInfo(null);
+    setZoomOpen(true);
+  };
+
   return (
     <motion.div
       className={clsx(
@@ -118,6 +130,7 @@ export default function CardItem({
       }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       onClick={onClick}
+      onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       whileHover={!isSelected ? { scale: 1.03 } : {}}
@@ -174,8 +187,9 @@ export default function CardItem({
             </span>
           )}
 
-          {/* 力量 → 底部居中；手牌中的角色不显示力量 */}
-          {!hidePower && card!.power > 0 && (
+          {/* 力量 → 底部居中；手牌中的角色不显示力量。
+              按卡类型判断而非 power>0：基础0力量角色(如OP16-034路飞)、被效果改成负数力量的角色也须显示当前力量。 */}
+          {!hidePower && (card!.type === "Character" || card!.type === "Leader") && (
             <span
               className={clsx(
                 "absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded bg-black/85 px-1.5 text-[11px] font-bold leading-tight ring-1 ring-white/15",
@@ -251,6 +265,9 @@ export default function CardItem({
         createPortal(
           <AnimatePresence>
             {hoverInfo && <CardHoverPreview info={hoverInfo} />}
+            {zoomOpen && card && (
+              <CardZoomOverlay card={card} sprite={imgSrc} onClose={() => setZoomOpen(false)} />
+            )}
           </AnimatePresence>,
           document.body,
         )}

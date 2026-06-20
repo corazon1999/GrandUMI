@@ -35,7 +35,7 @@ public class OP02_085_Magellan : IScriptedEffect
         }
 
         // 【登场时】咚!!-1（可选成本：我方放回 1 张咚），对方放回 1 张咚
-        bool meHasReturnable = me.CostArea.Any(d => d.State == DonState.Active || d.State == DonState.Rest);
+        bool meHasReturnable = me.CostArea.Count > 0;
         bool oppHasReturnable = opp.CostArea.Any(d => d.State == DonState.Active || d.State == DonState.Rest);
         if (!meHasReturnable) return;  // 无法支付成本
         if (!oppHasReturnable) return; // 无收益则不发动
@@ -44,7 +44,7 @@ public class OP02_085_Magellan : IScriptedEffect
             "麦哲伦【登场时】：将我方 1 张咚!!放回咚!!卡组，令对方将其 1 张咚!!放回咚!!卡组？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.ReturnDonToDeck(opp, 1);
     }
 }

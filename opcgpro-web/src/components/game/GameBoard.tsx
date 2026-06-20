@@ -13,6 +13,7 @@ import GameLog from "@/components/game/GameLog";
 import GameActions from "@/components/game/GameActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import RevealOverlay from "@/components/game/RevealOverlay";
+import GameChatPanel from "@/components/game/GameChatPanel";
 import { useGameStore } from "@/store/gameStore";
 import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
@@ -273,6 +274,9 @@ export default function GameBoard({
           </div>
         </CardSizeOverride.Provider>
       </div>
+
+      {/* 局内聊天（固定屏幕角，不随画布缩放；回放模式内部自隐） */}
+      <GameChatPanel isPlayback={isPlayback} />
     </>
   );
 }

@@ -338,6 +338,9 @@
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "Choose",
@@ -802,11 +805,15 @@
   },
   "OP02-076": {
     "_name": "希流",
-    "_matcher": "登场时KO对方最多1张费用≤1角色;triggers不支持cost,忽略可选的咚!!-1成本只实现收益",
+    "_matcher": "登场时咚!!-1：KO对方最多1张费用≤1角色，附可选成本 donReturn=1",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -824,11 +831,15 @@
   },
   "OP02-078": {
     "_name": "戴弗高",
-    "_matcher": "登场时从手牌登场最多1张‘戴弗高’以外费用≤3《SMILE》角色;triggers不支持cost,忽略可选咚!!-2成本",
+    "_matcher": "登场时咚!!-2：从手牌登场最多1张‘戴弗高’以外费用≤3《SMILE》角色，附可选成本 donReturn=2",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 2
+        },
+        "costPrompt": "咚!!-2：发动此效果？",
         "then": [
           {
             "op": "PlayCharFromHand",
@@ -845,11 +856,15 @@
   },
   "OP02-079": {
     "_name": "道格拉斯・巴雷特",
-    "_matcher": "登场时将对方最多1张费用≤4角色转休息;triggers不支持cost,忽略可选咚!!-1成本",
+    "_matcher": "登场时咚!!-1：将对方最多1张费用≤4角色转休息，附可选成本 donReturn=1",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -1094,11 +1109,16 @@
   },
   "OP02-099": {
     "_name": "萨卡斯基",
-    "_matcher": "【登场时】KO对方最多1张费用≤5角色;triggers不支持cost,忽略可选的弃手牌成本只实现收益部分",
+    "_matcher": "【登场时】可弃1张手牌：KO对方最多1张费用≤5角色，附可选成本 handDiscard n=1",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -1117,11 +1137,14 @@
   },
   "OP02-103": {
     "_name": "战国",
-    "_matcher": "【攻击时】对方最多1张角色本回合费用-2;triggers不支持cost,忽略【咚!!×1】支付只实现收益",
+    "_matcher": "【咚×1】【攻击时】对方最多1张角色本回合费用-2，发动条件 if donAttachedGte=1",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "Choose",
@@ -1142,11 +1165,14 @@
   },
   "OP02-105": {
     "_name": "达斯琪",
-    "_matcher": "【攻击时】对方最多1张角色本回合费用-3;triggers不支持cost,忽略【咚‼×1】支付只实现收益",
+    "_matcher": "【咚×1】【攻击时】对方最多1张角色本回合费用-3，发动条件 if donAttachedGte=1",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "Choose",

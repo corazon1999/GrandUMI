@@ -27,8 +27,8 @@ public class P_090_CharlotteSmoothie : IScriptedEffect
         // 仅【对方的回合中】发动
         if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex) return;
 
-        // 成本前置：需要至少1张活跃咚
-        if (me.ActiveDonCount < 1) return;
+        // 成本前置：费用区需要至少1张可放回的咚（活跃/休息/附着皆可）
+        if (me.CostArea.Count < 1) return;
 
         int costCap = opp.TotalDonInCostArea;
         var playable = me.Hand.Where(c =>
@@ -43,7 +43,7 @@ public class P_090_CharlotteSmoothie : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         var extra = new Dictionary<string, object?>
         {

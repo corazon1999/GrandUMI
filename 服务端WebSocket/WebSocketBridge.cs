@@ -24,6 +24,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, InviteInfo> PendingInvites = new(); // inviteId → 邀请对战
     private static readonly ConcurrentDictionary<string, FriendlyRoom> FriendlyRooms = new(); // roomId → 友谊战房间
     private static readonly ConcurrentDictionary<string, string> FriendlyByAccount = new(StringComparer.OrdinalIgnoreCase); // account → roomId
+    private static readonly ConcurrentDictionary<string, DateTime> GameChatAt = new(); // sessionId → 上次局内聊天时间(限频防刷屏)
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
 
@@ -145,6 +146,7 @@ public static class WebSocketBridge
         if (session.CurrentRoomCode is not null) PendingRooms.TryRemove(session.CurrentRoomCode, out _);
         // 对局中的玩家断开 → 进入 90s 宽限期（M1）
         GameOpponent.TryRemove(session.SessionId, out _);
+        GameChatAt.TryRemove(session.SessionId, out _);
         CleanupInvites(session.SessionId);
         if (session.Account is not null) HandleFriendlyDisconnect(session.Account);
         GameRoomManager.OnPlayerDisconnect(session.SessionId);
@@ -190,6 +192,7 @@ public static class WebSocketBridge
             case "MsgTransmit":    OnTransmit(session, msg);     break;
             case "MsgSurrender":   OnSurrender(session);         break;
             case "MsgChatMsg":     OnChatMsg(session, msg);      break;
+            case "MsgGameChat":    OnGameChat(session, msg);     break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -512,7 +515,16 @@ public static class WebSocketBridge
         }
         var players = Sessions.Values
             .Where(x => x.IsLoggedIn)
-            .Select(x => new { account = x.Account, name = x.PlayerName ?? x.Account, status = StatusOf(x) })
+            .Select(x =>
+            {
+                var status = StatusOf(x);
+                // 仅对战中玩家附带其所在对局房间ID，供前端一键观战；
+                // 友谊战房内(lobby)虽也判为 playing，但尚无对局房间，GetRoomBySession 返回 null。
+                var roomId = status == "playing"
+                    ? GameRoomManager.GetRoomBySession(x.SessionId)?.RoomId
+                    : null;
+                return new { account = x.Account, name = x.PlayerName ?? x.Account, status, roomId };
+            })
             .ToArray();
         Send(s.SessionId, new { proto = "MsgPlayerList", players });
     }
@@ -914,6 +926,39 @@ public static class WebSocketBridge
         var pkt  = new { proto = "MsgChatMsg", type, Name = name, Msg = text };
 
         BroadcastAll(pkt);
+    }
+
+    /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。
+    /// 限频(1.2s/条)+长度上限(100)防刷屏。瞬时消息,不进对局状态/快照。区别于大厅全局 OnChatMsg(BroadcastAll)。</summary>
+    private static void OnGameChat(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var room = GameRoomManager.GetRoomBySession(s.SessionId);
+        if (room is null) return;
+
+        var now = DateTime.UtcNow;
+        if (GameChatAt.TryGetValue(s.SessionId, out var last) && (now - last).TotalMilliseconds < 1200) return;
+
+        var text = (Str(msg, "Text") ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > 100) text = text[..100];   // 长度上限
+        var code = Str(msg, "Code");                  // 预设短语编号(可空,仅供客户端样式)
+
+        GameChatAt[s.SessionId] = now;
+
+        int seat = Array.IndexOf(room.PlayerSessionIds, s.SessionId); // 0/1=玩家, -1=观战
+        var pkt = new
+        {
+            proto = "MsgGameChat",
+            text,
+            code,
+            fromSeat = seat,
+            fromAccount = s.Account,
+            fromName = s.PlayerName ?? s.Account ?? "玩家",
+            fromRole = seat >= 0 ? "player" : "spectator",
+        };
+        Send(room.PlayerSessionIds[0], pkt);
+        Send(room.PlayerSessionIds[1], pkt);
+        foreach (var spec in room.Spectators) Send(spec, pkt);
     }
 
     // ── 对手查找 ──────────────────────────────────────────────────────────

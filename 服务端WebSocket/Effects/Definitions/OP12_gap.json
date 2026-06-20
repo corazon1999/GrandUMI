@@ -31,10 +31,6 @@
     "_name": "锦卫门",
     "noEffect": true
   },
-  "OP12-027": {
-    "_name": "耕四郎",
-    "complex": true
-  },
   "OP12-032": {
     "_name": "猫蝮蛇",
     "noEffect": true
@@ -54,10 +50,6 @@
   "OP12-045": {
     "_name": "强高",
     "noEffect": true
-  },
-  "OP12-048": {
-    "_name": "堂吉诃德·罗西南德",
-    "complex": true
   },
   "OP12-049": {
     "_name": "巴奇",
@@ -108,10 +100,6 @@
     "_name": "维尔高",
     "noEffect": true
   },
-  "OP12-066": {
-    "_name": "加尔根",
-    "complex": true
-  },
   "OP12-067": {
     "_name": "卡门",
     "noEffect": true
@@ -147,10 +135,6 @@
   "OP12-092": {
     "_name": "米泽卡",
     "noEffect": true
-  },
-  "OP12-093": {
-    "_name": "莫里",
-    "complex": true
   },
   "OP12-099": {
     "_name": "卡尔加拉",

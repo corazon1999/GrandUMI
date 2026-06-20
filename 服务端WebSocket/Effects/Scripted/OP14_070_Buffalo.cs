@@ -40,7 +40,7 @@ public class OP14_070_Buffalo : IScriptedEffect
             "巴法罗：将我方场上 1 张咚!! 放回咚!! 卡组，并将此角色转为活跃状态？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.ActivateCard(ctx.Source);
     }
 }

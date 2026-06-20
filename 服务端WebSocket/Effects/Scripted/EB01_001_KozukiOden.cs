@@ -24,6 +24,9 @@ public class EB01_001_KozukiOden : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return Task.CompletedTask;
+
         // 仅领袖攻击时本效果生效
         if (ctx.Source.Id != me.Leader.Id) return Task.CompletedTask;
 

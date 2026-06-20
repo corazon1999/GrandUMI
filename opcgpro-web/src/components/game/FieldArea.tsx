@@ -111,6 +111,29 @@ export default function FieldArea({ side }: Props) {
               {isAttackTarget && (
                 <div className="absolute -right-2 -top-2 h-5 w-5 animate-pulse rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
               )}
+              {/* 锁定标识：被「下个重置阶段不会转为活跃」效果命中的角色（如 OP16-030） */}
+              {fc.cannotActivateNextReset && (
+                <div
+                  title="下个重置阶段不会转为活跃"
+                  className="pointer-events-none absolute -bottom-2 -right-2 z-40 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/90 text-amber-300 shadow-lg ring-2 ring-amber-400/70"
+                >
+                  <span className="text-[12px] leading-none">🔒</span>
+                </div>
+              )}
+              {/* 无法转为休息状态：横置矩形(休息态卡牌)+红×(不能)，如 OP11-034/OP14-033/EB02-011 */}
+              {fc.cannotBeRested && (
+                <div
+                  title="无法被效果转为休息状态"
+                  className="pointer-events-none absolute -bottom-2 -left-2 z-40 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/90 shadow-lg ring-2 ring-rose-400/70"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+                    {/* 横置的卡牌（休息状态）：横向圆角矩形 */}
+                    <rect x="3" y="8.5" width="18" height="7" rx="1.5" stroke="#e2e8f0" strokeWidth="1.6" />
+                    {/* 覆盖的 × 表示"不能转为该状态" */}
+                    <path d="M5.5 6 L18.5 18 M18.5 6 L5.5 18" stroke="#f43f5e" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+              )}
               {selectedDonIndex !== null && side === "my" && !isPending && (
                 <div className="absolute -left-2 -top-2 z-40 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
                   <span className="text-[10px] font-black text-black">+</span>

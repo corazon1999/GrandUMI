@@ -32,10 +32,9 @@ public class OP15_064_Kotori : IScriptedEffect
         bool kobe = me.Characters.Any(c => c.MatchesName("小边"));
         if (!agu || !kobe) return;
 
-        // 成本可支付性：自身需活跃；费用区需 ≥2 张可放回的咚
+        // 成本可支付性：自身需活跃；费用区需 ≥2 张可放回的咚（活跃/休息/附着皆可）
         if (self.IsTapped) return;
-        int payable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (payable < 2) return;
+        if (me.CostArea.Count < 2) return;
 
         // 收益候选：对方力量≤5000 的角色
         var candidates = opp.Characters
@@ -48,8 +47,7 @@ public class OP15_064_Kotori : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-2 + 横置自身
-        int paid = AtomicOps.ReturnDonToDeck(me, 2);
-        if (paid < 2) return; // 成本未实际支付
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         AtomicOps.RestCard(self);
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterPwLe5000",

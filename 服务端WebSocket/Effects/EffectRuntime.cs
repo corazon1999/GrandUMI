@@ -59,6 +59,10 @@ public static class EffectRuntime
     /// 用于"因对方效果离场"判定：若某卡因效果离场而 CurrentActingSide 为其对手，则属"对方效果"。</summary>
     public static int CurrentActingSide => _actingSideAL.Value ?? -1;
 
+    /// <summary>当前正在解析的效果所属对局（无效果上下文时为 null）。
+    /// 供 AtomicOps 在状态变更时查询持续型限制（如持续来源的 CannotBeRested）。</summary>
+    public static GameState? CurrentState => _ambientAL.Value;
+
     /// <summary>由 AtomicOps 在状态变更时调用，把 watcher 事件入队到当前效果所属的 state（无效果上下文时忽略）</summary>
     public static void NotifyWatcher(EffectTrigger trigger, Dictionary<string, object?>? payload = null)
         => _ambient?.EnqueueWatcher(trigger, payload);

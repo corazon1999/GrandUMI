@@ -35,7 +35,7 @@ public class OP06_074_Zephyr : IScriptedEffect
         if (!use) return;
 
         // 支付成本：1 张咚放回咚卡组
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 选择对方最多 1 张角色
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

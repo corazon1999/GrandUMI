@@ -319,6 +319,7 @@ public class OneShotPlayDiscount
     public int MinCost { get; init; }          // 原本费用≥MinCost 才适用
     public string? Keyword { get; init; }      // 需含的特征（null=不限）
     public string? Kind { get; init; }         // 需为某类（"Character" 等，null=不限）
+    public string? NameContains { get; init; } // 卡名需包含此子串（null=不限；用于"下次登场的某名角色-N"，如OP12-061）
 
     public bool Matches(int playerIdx, CardInstance card)
     {
@@ -326,6 +327,7 @@ public class OneShotPlayDiscount
         if (card.Info.Cost < MinCost) return false;
         if (Keyword is not null && !card.Info.HasKeyword(Keyword)) return false;
         if (Kind == "Character" && card.Info.Kind != Cards.CardKind.Character) return false;
+        if (NameContains is not null && !card.Info.Name.Contains(NameContains)) return false;
         return true;
     }
 }

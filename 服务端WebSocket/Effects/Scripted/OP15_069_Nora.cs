@@ -25,7 +25,7 @@ public class OP15_069_Nora : IScriptedEffect
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             $"诺拉：将我方1张咚!!放回咚卡组，使「{victim.Info.Name}」不离场？");
         if (!use) return;
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         ctx.State.MarkPreventLeave(victim.Id);
     }
 }

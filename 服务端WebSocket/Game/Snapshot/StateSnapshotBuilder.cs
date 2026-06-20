@@ -97,12 +97,18 @@ public static class StateSnapshotBuilder
                 attachedDon  = p.AttachedDonCount(c.Id),
                 gainedKeywords = c.GainedKeywords.Select(k => k.Keyword).ToArray(),
                 cannotActivateNextReset = c.CannotActivateNextReset,
+                // 无法被效果转为休息状态：综合瞬时(AddRestriction)与持续(GrantRestriction)两种来源
+                cannotBeRested = c.HasRestriction(GrandUMI.Game.RestrictionKind.CannotBeRested)
+                              || state.HasContinuousRestriction(c, GrandUMI.Game.RestrictionKind.CannotBeRested),
                 turnPlayed   = c.TurnPlayed,
                 canAttack    = GrandUMI.Game.Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
+                // 本回合【启动主要】【每回合1次】是否已用 → 供客户端用完隐藏"启动效果"按钮
+                activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
             }).ToArray(),
             stageNumber    = p.StageCard?.Info.Number,
             stageId        = p.StageCard?.Id.ToString(),
             stageTapped    = p.StageCard?.IsTapped ?? false,
+            stageActivatedUsedThisTurn = p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
             trashNumbers   = p.Trash.Select(c => c.Info.Number).ToArray(),
             deckCount      = p.DeckCount,
             lifeCount      = p.LifeCount,
@@ -117,6 +123,7 @@ public static class StateSnapshotBuilder
             leaderPower    = state.CurrentPowerOf(idx, p.Leader),
             leaderAttachedDon = p.AttachedDonCount(p.Leader.Id),
             leaderCanAttack = GrandUMI.Game.Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
+            leaderActivatedUsedThisTurn = ActivatedUsedThisTurn(p, p.Leader),
             costActive     = p.ActiveDonCount,
             costRest       = p.RestDonCount,
             costAttached   = p.CostArea.Count(d => d.State == DonState.Attached),
@@ -125,4 +132,11 @@ public static class StateSnapshotBuilder
             mulliganDone   = p.MulliganDone,
         };
     }
+
+    /// <summary>该卡本回合的【启动主要】【每回合1次】是否已用。
+    /// DSL 启动效果 key = "{id}-Activated"；脚本约定 key = "{番号}-act:{id}"。
+    /// 仅 oncePerTurn 卡会写入 TurnOnceUsed，故可多次发动的启动效果天然恒 false（不会误隐藏按钮）。</summary>
+    static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
+        => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
+        || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
 }

@@ -36,7 +36,7 @@ public class OP06_068_Reiju : IScriptedEffect
         all.AddRange(trashCands);
         if (all.Count == 0) return;
 
-        if (me.ActiveDonCount + me.RestDonCount < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "丽久【启动主要】：咚!!-1 并将此角色放置废弃区，从手牌/废弃区登场 1 张费用4的“温思默克·丽久”？");
@@ -51,7 +51,7 @@ public class OP06_068_Reiju : IScriptedEffect
             all.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (chosen.Count == 0) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         // 「放置到废弃区」是自费而非 KO：手动移入废弃区，避免被 KO 守护拦截或误触发对方「角色被KO时」反应
         me.Characters.Remove(self);
         me.Trash.Add(self);

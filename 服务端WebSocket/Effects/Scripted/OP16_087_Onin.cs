@@ -12,9 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现：
 ///   - 可选成本：确认后将自身放置废弃区（BattleEngine.KOCard，不触发 KO 事件，同 DSL selfToTrash）。
-///   - 领袖《和之国》才有收益：抽1 + 选我方1张"光月桃之助"(场上或手牌) CostModThisTurn+=20。
-///   - +20 用于启用 OP16-084 桃之助的【启动主要】(需费用≥20)。场上卡的 CostModThisTurn 回合末由
-///     TurnEngine 清；手牌卡的清除由 EnterEndPhase 新增的手牌清理覆盖。
+///   - 领袖《和之国》才有收益：抽1 + 选我方场上1张"光月桃之助" CostModThisTurn+=20（仅场上，反馈#133）。
+///   - +20 用于启用 OP16-084 桃之助的【启动主要】(需费用≥20)。场上卡的 CostModThisTurn 回合末由 TurnEngine 清。
 /// </summary>
 public class OP16_087_Onin : IScriptedEffect
 {
@@ -37,10 +36,8 @@ public class OP16_087_Onin : IScriptedEffect
         if (!me.Leader.Info.HasKeyword("和之国")) return;
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
 
-        // 选1张"光月桃之助"(场上优先，含手牌)，本回合费用+20
-        var cands = me.Characters.Where(c => c.MatchesName("光月桃之助"))
-            .Concat(me.Hand.Where(c => c.Info.Kind == CardKind.Character && c.MatchesName("光月桃之助")))
-            .ToList();
+        // 选我方场上1张"光月桃之助"，本回合费用+20（官方原文未含手牌；+20仅对场上角色有意义，见反馈#133）
+        var cands = me.Characters.Where(c => c.MatchesName("光月桃之助")).ToList();
         if (cands.Count == 0) return;
         var extra = new Dictionary<string, object?>
         {

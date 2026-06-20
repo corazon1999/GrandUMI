@@ -37,7 +37,7 @@ public class OP08_057_Kingdew : IScriptedEffect
             "烬【启动主要】：咚!!-2，选择 1 项（抽 1 张 / 对方 1 张角色费用-2）？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         me.TurnOnceUsed.Add(key);
 
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex, "选择以下的 1 项",

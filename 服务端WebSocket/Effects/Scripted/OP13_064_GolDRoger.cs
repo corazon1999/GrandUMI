@@ -26,7 +26,7 @@ public class OP13_064_GolDRoger : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -49,8 +49,8 @@ public class OP13_064_GolDRoger : IScriptedEffect
         });
 
         // ── 【登场时】咚!!-3 ──
-        if (me.ActiveDonCount < 3) return Task.CompletedTask;
-        AtomicOps.ReturnDonToDeck(me, 3);
+        if (me.CostArea.Count < 3) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 3)) return;
 
         // 有效期基准：本回合 + 下个对方回合（近似"直到下个对方结束阶段结束时"）
         int baseTurn = ctx.State.TurnCount;
@@ -78,7 +78,5 @@ public class OP13_064_GolDRoger : IScriptedEffect
                 card.Info.Kind == CardKind.Character &&
                 s.TurnCount <= baseTurn + 2,
         });
-
-        return Task.CompletedTask;
     }
 }

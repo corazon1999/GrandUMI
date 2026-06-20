@@ -115,6 +115,14 @@ function compareSetNewness(a: string, b: string): number {
  * 优先级：费用(升序) → 角标(大→小) → 发售时间(晚→早) → 类型(角色→事件→场地) → 卡号(稳定兜底)
  */
 export function compareCards(a: CardData, b: CardData): number {
+  // 领袖之间：以角标(大→小)为主键，不按费用分组
+  // （领袖的 cost 字段数据不统一，按费用排会把角标顺序打散）
+  if (a.type === "Leader" && b.type === "Leader") {
+    if (a.subscript !== b.subscript) return b.subscript - a.subscript;
+    const setCmp = compareSetNewness(setCodeOf(a), setCodeOf(b));
+    if (setCmp !== 0) return setCmp;
+    return a.number.localeCompare(b.number);
+  }
   if (a.cost !== b.cost) return a.cost - b.cost;
   if (a.subscript !== b.subscript) return b.subscript - a.subscript;
   const setCmp = compareSetNewness(setCodeOf(a), setCodeOf(b));

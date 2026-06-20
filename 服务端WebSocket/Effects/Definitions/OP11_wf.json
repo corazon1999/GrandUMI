@@ -70,13 +70,18 @@
   },
   "OP11-008": {
     "_name": "朵尔",
-    "_matcher": "阻挡者(关键词);登场时领袖含海军时对方1张角色-6000(忽略可选弃手牌成本，triggers不支持cost)",
+    "_matcher": "阻挡者(关键词);登场时可弃1张手牌作为成本:领袖含海军时对方1张角色-6000",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
         "if": {
           "leaderHasKeyword": "海军"
+        },
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
         },
         "then": [
           {

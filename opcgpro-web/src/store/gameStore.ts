@@ -26,6 +26,8 @@ export interface FieldCardView {
   attachedDon: number;
   gainedKeywords: string[];
   cannotActivateNextReset: boolean;
+  cannotBeRested: boolean;   // 无法被效果转为休息状态
+  activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
 }
@@ -43,12 +45,16 @@ export interface PlayerView {
   deckCount: number;
   lifeCount: number;
   lifeNumbers: string[];       // 始终为空（生命牌不公开），由触发流程单独 prompt
+  // 生命区每张牌的正反朝向（后端权威，顶→底）：faceUp 时 number 为公开番号，否则 null（背面占位）
+  lifeFaceUp?: { faceUp: boolean; number: string | null }[];
   leaderId: string;
   leaderNumber: string;
   leaderTapped: boolean;
   leaderPower: number;
   leaderAttachedDon: number;
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
+  leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
+  stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;
   costRest: number;
   costAttached: number;

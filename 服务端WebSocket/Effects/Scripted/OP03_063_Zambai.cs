@@ -24,14 +24,14 @@ public class OP03_063_Zambai : IScriptedEffect
         // 收益前提：领袖拥有《七水之城》特征
         if (!me.Leader.Info.HasKeyword("七水之城")) return;
         // 成本前提：场上至少有 1 张咚可放回
-        if (me.TotalDonInCostArea < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "赞巴【登场时】：咚!!-1（放回 1 张咚!!），抽取 1 张卡牌？");
         if (!use) return;
 
         // 成本：咚!!-1
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         // 效果：抽 1
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
     }

@@ -27,12 +27,12 @@ public class OP02_120_Uta : IScriptedEffect
         int owner = ctx.OwnerIndex;
 
         // 成本：咚!!-2（可选）
-        if (me.TotalDonInCostArea < 2) return;
+        if (me.CostArea.Count < 2) return;
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "乌塔【登场时】：将2张咚!!放回咚!!卡组，使我方全体领袖和角色力量+1000（直到下个我方回合开始）？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
 
         int baseTurn = ctx.State.TurnCount;
         ctx.State.ContinuousEffects.Add(new ContinuousEffect

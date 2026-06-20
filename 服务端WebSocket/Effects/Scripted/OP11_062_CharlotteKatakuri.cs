@@ -29,14 +29,14 @@ public class OP11_062_CharlotteKatakuri : IScriptedEffect
         var key = me.Leader.Info.Number + "-act" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本：咚!!-1，需有活跃咚可返还
-        if (me.ActiveDonCount < 1) return;
+        // 成本：咚!!-1，需有可放回的咚
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "卡塔库栗：支付咚!!-1，确认对方卡组顶 1 张，本次战斗此领袖力量 +1000？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         // 收益：本次战斗此领袖 +1000

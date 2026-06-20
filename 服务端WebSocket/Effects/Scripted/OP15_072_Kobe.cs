@@ -27,16 +27,16 @@ public class OP15_072_Kobe : IScriptedEffect
         var self = ctx.Source;
         int oppIdx = 1 - ctx.OwnerIndex;
 
-        // 成本前置条件：自身活跃 + 有至少 2 张活跃咚
+        // 成本前置条件：自身活跃 + 费用区至少 2 张可返还的咚（活跃/休息/附着皆可）
         if (self.IsTapped) return;
-        if (me.ActiveDonCount < 2) return;
+        if (me.CostArea.Count < 2) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "小边【启动主要】：支付咚!!-2 并将此角色转为休息状态以发动效果？");
         if (!use) return;
 
         // 支付成本
-        AtomicOps.ReturnDonToDeck(me, 2);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         AtomicOps.RestCard(self);
 
         // 条件：我方场上存在“小鸟”和“阿悟”

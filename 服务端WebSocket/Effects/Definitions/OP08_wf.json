@@ -69,13 +69,14 @@
   },
   "OP08-012": {
     "_name": "",
-    "_matcher": "攻击时领袖含《铁桶王国》则KO对方1张力量≤4000角色;triggers 不支持 cost,忽略【咚!!×2】成本只实现收益。",
+    "_matcher": "攻击时领袖含《铁桶王国》且本卡贴有≥2张咚时,KO对方1张力量≤4000角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
         "if": {
-          "leaderHasKeyword": "铁桶王国"
+          "leaderHasKeyword": "铁桶王国",
+          "donAttachedGte": 2
         },
         "then": [
           {
@@ -941,11 +942,17 @@
   },
   "OP08-106": {
     "_name": "",
-    "_matcher": "登场时KO对方1张费用≤5角色;弃带触发手牌的可选成本triggers不支持故忽略;之后'手牌≤3抽1'因连接在可选成本结算后无法用条件准确表达故仅实现KO收益。",
+    "_matcher": "登场时可弃1张带【触发】手牌作为成本:KO对方1张费用≤5角色;之后'手牌≤3抽1'因连接在可选成本结算后无法用条件准确表达故仅实现KO收益。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "hasTrigger": true
+          }
+        },
         "then": [
           {
             "op": "Choose",

@@ -299,6 +299,9 @@
             "prompt": "OwnHand",
             "max": 1,
             "min": 0,
+            "filter": {
+              "nameEquals": "因佩尔地狱的囚犯"
+            },
             "text": "选择手牌中最多1张「因佩尔地狱的囚犯」登场",
             "as": "$c"
           },
@@ -325,30 +328,6 @@
             "match": {
               "keyword": "因佩尔地狱"
             }
-          }
-        ]
-      }
-    ]
-  },
-  "OP16-035": {
-    "_name": "罗罗诺亚·佐罗",
-    "_matcher": "实现【登场时】将对方最多1张卡牌转为休息(Choose+Rest);忽略『之后可弃1张手牌则给领袖最多3张休息咚』的可选成本部分,因 triggers 不支持 cost 且与弃牌强耦合。",
-    "_src": "wf-dsl",
-    "triggers": [
-      {
-        "on": "OnEnterField",
-        "then": [
-          {
-            "op": "Choose",
-            "prompt": "OpponentLeaderOrCharacter",
-            "max": 1,
-            "min": 0,
-            "as": "$tgt",
-            "text": "将对方最多1张卡牌转为休息状态"
-          },
-          {
-            "op": "Rest",
-            "target": "$tgt"
           }
         ]
       }
@@ -681,7 +660,7 @@
   },
   "OP16-065": {
     "_name": "萨卡斯基",
-    "_matcher": "登场时给对方角色力量 -N",
+    "_matcher": "登场时给对方角色力量-N；启动主要(转休息咚1)海军则追加2活跃咚",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -699,7 +678,15 @@
           }
         ]
       }
-    ]
+    ],
+    "activated": {
+      "oncePerTurn": true,
+      "if": { "leaderHasKeyword": "海军" },
+      "cost": { "restActiveDon": 1 },
+      "then": [
+        { "op": "RefreshDon", "n": 2, "state": "active" }
+      ]
+    }
   },
   "OP16-066": {
     "_name": "战国",

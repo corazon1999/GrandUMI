@@ -13,8 +13,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   之后，本回合中，我方无法登场角色卡牌。
 ///
 /// 实现说明 / 简化点：
-///   - 成本"将我方 1 张卡牌转为休息状态"实现为：从我方领袖/角色中选 1 张横置。
-///     （选项不含咚!!；横置咚收益对等且为常见简化。）若无可横置目标则不发动。
+///   - 成本"将我方 1 张卡牌转为休息状态"= 活跃的 领袖/角色/舞台/咚!! 选 1 张横置
+///     （走 AtomicOps.PromptRestOwnCards 混选）。若无可横置目标则不发动。
 ///   - "场上存在费用为 5 或更高的角色"按双方角色当前费用判定（CurrentCostOf）。
 ///   - "将我方最多 3 张咚!!转为活跃状态"= 把费用区中最多 3 张休息咚改为活跃。
 ///   - 之后用 NoPlayCharacterThisTurn 标记本回合我方无法登场角色（回合结束自动清除）。
@@ -46,18 +46,9 @@ public class OP14_020_Mihawk : IScriptedEffect
             "米霍克【启动主要】：将我方 1 张卡牌转为休息状态，将最多 3 张咚!! 转为活跃（之后本回合无法登场角色）？");
         if (!use) return;
 
-        // 成本：选择我方 1 张领袖/角色转为休息状态
-        var restTargets = new List<CardInstance>();
-        if (!me.Leader.IsTapped) restTargets.Add(me.Leader);
-        restTargets.AddRange(me.Characters.Where(c => !c.IsTapped));
-        if (restTargets.Count == 0) return; // 无可横置目标 → 无法支付成本
-
-        var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
-            "选择我方 1 张卡牌转为休息状态（成本）",
-            restTargets.Select(c => c.Id.ToString()).ToList(), 1, 1);
-        if (pick.Count == 0) return; // 未支付成本
-        var costCard = restTargets.First(c => c.Id.ToString() == pick[0]);
-        AtomicOps.RestCard(costCard);
+        // 成本：将我方 1 张活跃 领袖/角色/舞台/咚 转为休息状态
+        if (!await AtomicOps.PromptRestOwnCards(ctx, 1,
+            "选择我方 1 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
 
         me.TurnOnceUsed.Add(key);
 

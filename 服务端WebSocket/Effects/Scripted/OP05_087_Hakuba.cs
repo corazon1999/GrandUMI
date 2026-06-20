@@ -25,6 +25,9 @@ public class OP05_087_Hakuba : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (me.AttachedDonCount(self.Id) < 1) return;
+
         // 成本目标：我方此角色以外的角色
         var costTargets = me.Characters.Where(c => c.Id != self.Id).ToList();
         if (costTargets.Count == 0) return;

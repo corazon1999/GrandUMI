@@ -25,14 +25,13 @@ public class OP02_072_Zephyr : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
 
         // 成本：咚!!-4（费用区可放回的咚 ≥4）
-        int available = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-        if (available < 4) return;
+        if (me.CostArea.Count < 4) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "泽法【攻击时】：咚!!-4（将 4 张咚放回咚卡组），KO 对方最多 1 张费用≤3 角色并本回合此领袖+1000？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 4);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 4)) return;
 
         var cands = ctx.State.Players[oppIdx].Characters
             .Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 3).ToList();

@@ -40,7 +40,7 @@ public class OP04_069_MrTwoBonClay : IScriptedEffect
             "Mr.2【对方攻击时】：咚!!-1，本回合此角色力量变为与攻击者相同？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         int atkPower = ctx.State.CurrentPowerOf(atkSide, attacker);
         bool ownerTurn = ctx.State.CurrentTurnPlayer == ctx.OwnerIndex;

@@ -919,7 +919,8 @@
         "then": [
           {
             "op": "OpponentDiscard",
-            "n": 2
+            "n": 2,
+            "random": true
           }
         ]
       }
@@ -1177,7 +1178,7 @@
   },
   "OP03-118": {
     "_name": "威国",
-    "_matcher": "反击给我方1张领袖或角色本次战斗+5000；触发将卡组顶1张入生命(忽略可选弃2手牌成本，trigger不支持cost)",
+    "_matcher": "反击给我方1张领袖或角色本次战斗+5000；触发可弃2手牌为成本：卡组顶1张入生命(trigger对象形带 cost handDiscard n=2)",
     "_src": "wf-dsl",
     "counter": [
       {
@@ -1192,12 +1193,19 @@
         "delta": 5000
       }
     ],
-    "trigger": [
-      {
-        "op": "AddLifeFromDeck",
-        "n": 1
-      }
-    ]
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 2
+        }
+      },
+      "then": [
+        {
+          "op": "AddLifeFromDeck",
+          "n": 1
+        }
+      ]
+    }
   },
   "OP03-121": {
     "_name": "雷霆",

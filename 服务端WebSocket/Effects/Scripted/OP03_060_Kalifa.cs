@@ -20,13 +20,13 @@ public class OP03_060_Kalifa : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        if (me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest) < 1) return;
+        if (me.CostArea.Count < 1) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "佳妮法【攻击时】：咚!!-1，抽 2 张并弃 1 张手牌？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
 
         if (me.Hand.Count == 0) return;

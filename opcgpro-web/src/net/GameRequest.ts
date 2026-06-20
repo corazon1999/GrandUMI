@@ -87,4 +87,11 @@ export const GameRequest = {
   endByDisconnect: () => {
     NetManager.send({ proto: "MsgEndByDisconnect" } as MsgBase);
   },
+
+  /** 局内聊天：发送一条消息到本对局房间（双方+观战者）。code=预设短语编号（自由文字省略）。 */
+  sendGameChat: (text: string, code?: string) => {
+    const t = text.trim();
+    if (!t) return;
+    NetManager.send({ proto: "MsgGameChat", Text: t.slice(0, 100), Code: code ?? null } as unknown as MsgBase);
+  },
 };

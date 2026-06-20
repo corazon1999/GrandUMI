@@ -29,7 +29,7 @@ public class OP04_071_MrFour : IScriptedEffect
             "Mr.4【对方攻击时】：咚!!-1，本回合此角色获得【阻挡者】并 +1000？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         AtomicOps.GiveKeyword(self, "阻挡者", KeywordDuration.ThisTurn);
         AtomicOps.AddPowerThisTurn(self, 1000);
     }

@@ -25,6 +25,9 @@ public class OP08_014_Wapol : IScriptedEffect
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
+        // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
+        if (ctx.State.Players[ctx.OwnerIndex].AttachedDonCount(ctx.Source.Id) < 1) return;
+
         // 本回合中，对方最多 1 张角色力量-2000
         var cands = opp.Characters.ToList();
         if (cands.Count > 0)

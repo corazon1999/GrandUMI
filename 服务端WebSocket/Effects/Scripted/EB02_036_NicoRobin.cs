@@ -31,7 +31,7 @@ public class EB02_036_NicoRobin : IScriptedEffect
             "妮古·罗宾【KO时】：咚!!-1，确认卡组顶3张并公开最多1张《草帽一伙》加入手牌？");
         if (!use) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         int peek = Math.Min(3, me.Deck.Count);
         if (peek == 0) return;

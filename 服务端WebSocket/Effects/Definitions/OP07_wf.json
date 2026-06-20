@@ -288,11 +288,16 @@
   },
   "OP07-019": {
     "_name": "",
-    "_matcher": "对方攻击时将对方最多1张领袖或角色横置；triggers 不支持 cost/oncePerTurn，已忽略可选转休息咚成本与每回合1次限制",
+    "_matcher": "【对方攻击时】【每回合1次】①转休息1张活跃咚为成本：将对方最多1张领袖或角色横置",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
+        "cost": {
+          "restActiveDon": 1
+        },
+        "costPrompt": "将1张活跃咚转为休息：发动？",
         "then": [
           {
             "op": "Choose",
@@ -379,11 +384,15 @@
   },
   "OP07-024": {
     "_name": "",
-    "_matcher": "对方攻击时给我方1张费用≤5且鱼人族角色赋予阻挡者；triggers不支持cost，忽略转休息成本只实现收益。",
+    "_matcher": "【对方攻击时】将此角色转休息为成本：给我方1张费用≤5且鱼人族角色赋予阻挡者。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "cost": {
+          "restSelf": true
+        },
+        "costPrompt": "将此角色转为休息：发动？",
         "then": [
           {
             "op": "Choose",
@@ -830,7 +839,7 @@
   },
   "OP07-061": {
     "_name": "",
-    "_matcher": "【登场时】领袖含温思默克家时抽1张;忽略可选的咚-1成本(triggers不支持cost)。",
+    "_matcher": "【登场时】咚!!-1为成本：领袖含温思默克家时抽1张。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -838,6 +847,10 @@
         "if": {
           "leaderHasKeyword": "温思默克家"
         },
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Draw",
@@ -864,11 +877,15 @@
   },
   "OP07-072": {
     "_name": "",
-    "_matcher": "【登场时】检索5公开1福克斯特征，再从手牌登场≤1张力量≤4000角色；triggers不支持cost，忽略咚-1成本。颜色限制无filter键，按力量+kind近似。",
+    "_matcher": "【登场时】咚!!-1为成本：检索5公开1福克斯特征，再从手牌登场≤1张力量≤4000角色。颜色限制无filter键，按力量+kind近似。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "LookTopReveal",

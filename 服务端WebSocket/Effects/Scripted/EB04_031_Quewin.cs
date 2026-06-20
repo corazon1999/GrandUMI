@@ -28,14 +28,13 @@ public class EB04_031_Quewin : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.PreKO)
         {
-            int returnable = me.CostArea.Count(d => d.State == DonState.Active || d.State == DonState.Rest);
-            if (returnable < 1) return; // 无咚可放回 → 无法置换
+            if (me.CostArea.Count < 1) return; // 无咚可放回 → 无法置换
 
             bool useKo = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "烬：将我方场上的 1 张咚!!放回咚!!卡组，使此角色不会被KO？");
             if (!useKo) return;
 
-            AtomicOps.ReturnDonToDeck(me, 1);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
             ctx.State.MarkPreventKO(self.Id);
             return;
         }

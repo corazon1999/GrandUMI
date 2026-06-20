@@ -52,13 +52,23 @@ export default function GameActions() {
   const selectedHasActivated = selectedNumber
     ? (getCard(selectedNumber)?.effectTags?.includes("ActivatedMain") ?? false)
     : false;
+  // 该启动效果若为【每回合1次】且本回合已发动过，则后端权威下发已用标记 → 隐藏按钮
+  const selectedActivatedUsed =
+    my && selectedFieldId !== null
+      ? selectedFieldId === my.leaderId
+        ? my.leaderActivatedUsedThisTurn
+        : selectedFieldId === my.stageId
+          ? my.stageActivatedUsedThisTurn
+          : (my.fieldCards.find((c) => c.id === selectedFieldId)?.activatedUsedThisTurn ?? false)
+      : false;
   const canActivate =
     currentTurn &&
     phase === "Main" &&
     !battle &&
     !isSelectingTarget &&
     selectedFieldId !== null &&
-    selectedHasActivated;
+    selectedHasActivated &&
+    !selectedActivatedUsed;
 
   const btn =
     "w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";

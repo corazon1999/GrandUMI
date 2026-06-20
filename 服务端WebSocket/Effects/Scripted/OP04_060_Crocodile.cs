@@ -35,7 +35,7 @@ public class OP04_060_Crocodile : IScriptedEffect
                 "克洛克达尔【登场时】：咚!!-2，将卡组顶 1 张加入生命区最上方？");
             if (!use) return;
 
-            AtomicOps.ReturnDonToDeck(me, 2);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
             // 卡组顶 1 张 → 生命区最上方
             AtomicOps.AddLifeFromDeckTop(me, 1);
             return;
@@ -50,7 +50,7 @@ public class OP04_060_Crocodile : IScriptedEffect
             "克洛克达尔【对方攻击时】：咚!!-1，抽取 1 张并丢弃 1 张手牌？");
         if (!use2) return;
 
-        AtomicOps.ReturnDonToDeck(me, 1);
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);

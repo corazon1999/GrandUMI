@@ -35,7 +35,7 @@ public class OP10_062_Viola : IScriptedEffect
         if (cands.Count == 0) return;
 
         // 成本可支付性：费用区需有 ≥1 张可放回的咚
-        bool canPayCost = me.CostArea.Any(d => d.State == DonState.Active || d.State == DonState.Rest);
+        bool canPayCost = me.CostArea.Count >= 1;
         if (!canPayCost) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -43,8 +43,7 @@ public class OP10_062_Viola : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1
-        int paid = AtomicOps.ReturnDonToDeck(me, 1);
-        if (paid < 1) return; // 成本未实际支付
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return; // 成本未实际支付
 
         // 收益：废弃区紫色事件最多 1 张加入手牌
         var extra = new Dictionary<string, object?>

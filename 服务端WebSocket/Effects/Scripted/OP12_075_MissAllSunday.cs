@@ -72,9 +72,8 @@ public class OP12_075_MissAllSunday : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-1（把 1 张咚放回咚卡组）
-        if (me.ActiveDonCount + me.CostArea.Count(d => d.State == DonState.Rest) < 1) return;
-        int returned = AtomicOps.ReturnDonToDeck(me, 1);
-        if (returned < 1) return;
+        if (me.CostArea.Count < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 
         // 从废弃区将此卡免费登场
         if (me.Trash.Contains(ctx.Source))

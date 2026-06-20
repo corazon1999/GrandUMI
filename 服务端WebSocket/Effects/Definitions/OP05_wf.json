@@ -201,11 +201,14 @@
   },
   "OP05-014": {
     "_name": "",
-    "_matcher": "攻击时对方最多1张角色力量-2000；triggers不支持cost，忽略【咚!!×1】成本只实现收益",
+    "_matcher": "【咚!!×1】攻击时(对方贴咚≥1为发动条件)对方最多1张角色力量-2000",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "donAttachedGte": 1
+        },
         "then": [
           {
             "op": "Choose",
@@ -1018,11 +1021,16 @@
   },
   "OP05-073": {
     "_name": "",
-    "_matcher": "登场时从咚卡组追加最多1张休息咚(RefreshDon state:rest)。忽略'可丢弃1手牌'的可选成本(triggers 不支持 cost)；trigger 字段为'此卡登场'特殊机制无法表达，未实现。",
+    "_matcher": "登场时可丢弃1手牌为成本，从咚卡组追加最多1张休息咚(RefreshDon state:rest)。trigger 字段为'此卡登场'特殊机制无法表达，未实现。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "RefreshDon",
@@ -1035,11 +1043,16 @@
   },
   "OP05-075": {
     "_name": "",
-    "_matcher": "对方攻击时从手牌登场≤1张费≤3的巴洛克工作室角色(PlayCharFromHand+filter)。忽略'咚-1'成本与每回合1次限制(triggers 不支持 cost/oncePerTurn)。",
+    "_matcher": "【对方攻击时】【每回合1次】咚!!-1为成本：从手牌登场≤1张费≤3的巴洛克工作室角色(PlayCharFromHand+filter)。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "PlayCharFromHand",
