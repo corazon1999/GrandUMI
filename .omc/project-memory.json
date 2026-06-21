@@ -1,0 +1,547 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1782018081916,
+  "projectRoot": "D:\\code\\GrandUMI",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "playwright",
+        "version": "1.60.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1782018081872,
+      "keyFiles": []
+    },
+    "dogfood-output": {
+      "path": "dogfood-output",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1782018081873,
+      "keyFiles": [
+        "deck-editor-1264.png",
+        "deck-editor-1920-zoomed.png",
+        "deck-editor-now.png",
+        "deck-editor-zoomed.png",
+        "login-1920-zoomed.png"
+      ]
+    },
+    "opcgpro-vue": {
+      "path": "opcgpro-vue",
+      "purpose": null,
+      "fileCount": 32,
+      "lastAccessed": 1782018081884,
+      "keyFiles": [
+        "ARCHITECTURE.md",
+        "CLAUDE.md",
+        "deck-editor-new.png",
+        "home-current.png",
+        "home-deck.png"
+      ]
+    },
+    "opcgpro-web": {
+      "path": "opcgpro-web",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1782018081884,
+      "keyFiles": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "gen-thumbs.mjs",
+        "next-env.d.ts",
+        "next.config.ts"
+      ]
+    },
+    "qq-bug-bot": {
+      "path": "qq-bug-bot",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1782018081884,
+      "keyFiles": [
+        "bot.py",
+        "config.example.json",
+        "dedup.py",
+        "export_by_date.py",
+        "feedback_export.csv"
+      ]
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1782018081885,
+      "keyFiles": [
+        "download-sprites-jp.mjs",
+        "download-sprites.mjs",
+        "export-training-samples.mjs",
+        "fetch-card-set.mjs",
+        "gen-dsl.mjs"
+      ]
+    },
+    "修复记录": {
+      "path": "修复记录",
+      "purpose": null,
+      "fileCount": 74,
+      "lastAccessed": 1782018081885,
+      "keyFiles": [
+        "2026-06-15_OP16-007_OP16-010_公开手牌成本.md",
+        "2026-06-15_OP16-011_补全公开手牌成本与攻击时KO.md",
+        "2026-06-15_OP16-017_自身条件减力未实现.md",
+        "2026-06-15_对局重启恢复-阶段0-重放确定性.md",
+        "2026-06-16_DebugSummon未触发登场效果致持续效果型卡失效.md"
+      ]
+    },
+    "卡牌审查": {
+      "path": "卡牌审查",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1782018081886,
+      "keyFiles": [
+        "2026-06-20_跳过成本卡清单.md",
+        "OP05-16审查报告_2026-06-18.md"
+      ]
+    },
+    "卡牌数据": {
+      "path": "卡牌数据",
+      "purpose": null,
+      "fileCount": 54,
+      "lastAccessed": 1782018081886,
+      "keyFiles": [
+        "EB01.json",
+        "EB02.json",
+        "EB03.json",
+        "EB04.json",
+        "OP01.json"
+      ]
+    },
+    "文档": {
+      "path": "文档",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1782018081887,
+      "keyFiles": [
+        "OP15对战验收方案.md",
+        "前端游戏界面设计说明.md",
+        "启动流程.md",
+        "对战日志与AI训练数据设计.md",
+        "架构文档.md"
+      ]
+    },
+    "服务端WebSocket": {
+      "path": "服务端WebSocket",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1782018081887,
+      "keyFiles": [
+        "BugReportStore.cs",
+        "GrandUMIServer.csproj",
+        "Program.cs",
+        "WebSocketBridge.cs",
+        "WsSession.cs"
+      ]
+    },
+    "服务端WebSocket.Tests": {
+      "path": "服务端WebSocket.Tests",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1782018081887,
+      "keyFiles": [
+        "AtomicOpsTests.cs",
+        "CardEffectTests.cs",
+        "DeckValidatorTests.cs",
+        "EB_M6_Tests.cs",
+        "GrandUMIServer.Tests.csproj"
+      ]
+    },
+    "opcgpro-vue\\dist": {
+      "path": "opcgpro-vue\\dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 3,
+      "lastAccessed": 1782018081888,
+      "keyFiles": [
+        "favicon.svg",
+        "icons.svg",
+        "index.html"
+      ]
+    },
+    "opcgpro-vue\\docs": {
+      "path": "opcgpro-vue\\docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1782018081888,
+      "keyFiles": [
+        "cyberpunk-ui-redesign.md",
+        "GrandUMI Redesign Offline.html"
+      ]
+    },
+    "opcgpro-web\\node_modules": {
+      "path": "opcgpro-web\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1782018081889,
+      "keyFiles": []
+    },
+    "服务端WebSocket\\bin": {
+      "path": "服务端WebSocket\\bin",
+      "purpose": "Executable scripts",
+      "fileCount": 0,
+      "lastAccessed": 1782018081891,
+      "keyFiles": []
+    },
+    "服务端WebSocket.Tests\\Fixtures": {
+      "path": "服务端WebSocket.Tests\\Fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 1,
+      "lastAccessed": 1782018081891,
+      "keyFiles": [
+        "matchlog-minimal.v1.jsonl"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "C:\\Users\\xiong\\.claude\\plans\\next-delegated-penguin.md",
+      "accessCount": 15,
+      "lastAccessed": 1781929184457,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\ui\\CardItem.vue",
+      "accessCount": 10,
+      "lastAccessed": 1781971420863,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\gameStore.ts",
+      "accessCount": 6,
+      "lastAccessed": 1781971325885,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\GamePage.vue",
+      "accessCount": 6,
+      "lastAccessed": 1781971556479,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\next-to-vue-migration.md",
+      "accessCount": 5,
+      "lastAccessed": 1781954812156,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\DeckEditorPage.vue",
+      "accessCount": 5,
+      "lastAccessed": 1782019412586,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\App.vue",
+      "accessCount": 4,
+      "lastAccessed": 1781928163897,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\deckStore.ts",
+      "accessCount": 4,
+      "lastAccessed": 1782018448602,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\netStore.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781927828655,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\battleStore.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781927831475,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\audioStore.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781927836185,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\settingsStore.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781927838209,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\tsconfig.app.json",
+      "accessCount": 3,
+      "lastAccessed": 1781929099830,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\LoadingPage.vue",
+      "accessCount": 3,
+      "lastAccessed": 1781958836280,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\DeckChoosePanel.vue",
+      "accessCount": 3,
+      "lastAccessed": 1781959302402,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\AvatarPicker.vue",
+      "accessCount": 3,
+      "lastAccessed": 1781959303821,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\PlayerAvatar.vue",
+      "accessCount": 3,
+      "lastAccessed": 1781959305018,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\net\\eventBus.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781971327659,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\package.json",
+      "accessCount": 3,
+      "lastAccessed": 1782018449416,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\main.ts",
+      "accessCount": 2,
+      "lastAccessed": 1781928089012,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\HomePage.vue",
+      "accessCount": 2,
+      "lastAccessed": 1781928318847,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\SpectatePage.vue",
+      "accessCount": 2,
+      "lastAccessed": 1781928671233,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\pages\\ReplayPage.vue",
+      "accessCount": 2,
+      "lastAccessed": 1781928690177,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\router\\index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1782018433331,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\hooks\\useNet.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781927744483,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\.claude\\plans\\vue-tidy-sedgewick.md",
+      "accessCount": 1,
+      "lastAccessed": 1781927798337,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\composables\\useStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781927851788,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\NetProvider.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928015901,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\app\\layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928016390,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\app\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928016822,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\app\\home\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928017320,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\net\\NetManager.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781928017696,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\composables\\useNet.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781928030073,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\ui\\CardItem.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928105591,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\ui\\Modal.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928106042,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\ui\\NetStatePanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928106514,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\ui\\MessageBox.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928107001,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\ui\\MessageBox.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781928107370,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\ui\\Modal.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928139403,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\ui\\NetStatePanel.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928145988,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\ui\\MessageBox.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928156762,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\home\\LoginPanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928186387,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\home\\MainPanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928186831,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\net\\HomeProtocol.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781928187311,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\home\\LobbyPanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928197962,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\home\\DeckChoosePanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928199238,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-web\\src\\components\\home\\ChatPanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781928199780,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\ChatPanel.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928213170,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\LoginPanel.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928223748,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\components\\home\\LobbyPanel.vue",
+      "accessCount": 1,
+      "lastAccessed": 1781928276447,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

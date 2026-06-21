@@ -1,0 +1,40 @@
+[
+  {
+    "number": "ST19-001",
+    "name": "斯摩格",
+    "color": "地",
+    "type": "角色",
+    "property": "特",
+    "power": "8000",
+    "cost": "6",
+    "keyWords": "海军",
+    "counter": "",
+    "effectText": "【登场时】可以丢弃我方手牌中1张拥有《海军》特征的黑色卡牌：直到下个对方的回合结束时为止，对方最多2张费用不高于4的角色无法攻击。",
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887428ST19-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST19-002",
+    "name": "战国",
+    "color": "地",
+    "type": "角色",
+    "property": "知",
+    "power": "1000",
+    "cost": "1",
+    "keyWords": "海军",
+    "counter": "1000",
+    "effectText": "【登场时】可以丢弃我方手牌中2张拥有《海军》特征的黑色卡牌：我方领袖拥有《海军》特征的场合，抽取3张卡牌。",
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华补充包 历代典藏合集Vol.2【PRBC-02】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1755138895791ST19-002_02.png",
+    "cartograph": "画师原创"
+  }
+]

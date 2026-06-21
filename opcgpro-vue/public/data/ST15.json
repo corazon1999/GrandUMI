@@ -1,0 +1,40 @@
+[
+  {
+    "number": "ST15-001",
+    "name": "阿特摩斯",
+    "color": "炎",
+    "type": "角色",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "白胡子海盗团",
+    "counter": "1000",
+    "effectText": "【攻击时】我方领袖为“爱德华·纽哥特”的场合，本回合中，我方无法通过我方的效果将生命卡牌加入手牌。",
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887394ST15-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST15-002",
+    "name": "爱德华·纽哥特",
+    "color": "炎",
+    "type": "角色",
+    "property": "特",
+    "power": "8000",
+    "cost": "7",
+    "keyWords": "四皇/白胡子海盗团",
+    "counter": "",
+    "effectText": "【登场时】赋予我方1张领袖或角色最多1张休息状态的咚!!。【启动主要】可以将此角色转为休息状态：将对方最多1张力量不高于5000的角色KO。",
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华补充包 历代典藏合集Vol.2【PRBC-02】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1755138895771ST15-002_02.png",
+    "cartograph": "画师原创"
+  }
+]

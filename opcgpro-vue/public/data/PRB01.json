@@ -1,0 +1,21 @@
+[
+  {
+    "number": "PRB01-001",
+    "name": "山智",
+    "color": "炎",
+    "type": "领航",
+    "property": "打",
+    "power": "5000",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectText": "【启动主要】【每回合1次】本回合中，我方最多1张费用不高于8且没有【登场时】效果的角色获得【速攻】效果。（此卡牌在登场的回合中可以进行攻击）",
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华补充包 历代典藏合集【PRBC-01】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1726626190400EB02-001.png",
+    "cartograph": "动画"
+  }
+]

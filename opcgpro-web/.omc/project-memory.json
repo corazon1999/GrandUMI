@@ -1,0 +1,431 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1781891357090,
+  "projectRoot": "D:\\code\\GrandUMI\\opcgpro-web",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.2.6",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.4",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev -H 0.0.0.0",
+      "build": "next build",
+      "start": "next start"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 5,
+      "lastAccessed": 1781891357060,
+      "keyFiles": [
+        "file.svg",
+        "globe.svg",
+        "next.svg",
+        "vercel.svg",
+        "window.svg"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1781891357060,
+      "keyFiles": []
+    },
+    "public\\data": {
+      "path": "public\\data",
+      "purpose": "Data files",
+      "fileCount": 57,
+      "lastAccessed": 1781891357067,
+      "keyFiles": [
+        "EB01.json",
+        "EB02.json",
+        "EB03.json"
+      ]
+    },
+    "src\\app": {
+      "path": "src\\app",
+      "purpose": "Application code",
+      "fileCount": 4,
+      "lastAccessed": 1781891357068,
+      "keyFiles": [
+        "favicon.ico",
+        "globals.css",
+        "layout.tsx"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 1,
+      "lastAccessed": 1781891357068,
+      "keyFiles": [
+        "NetProvider.tsx"
+      ]
+    },
+    "src\\data": {
+      "path": "src\\data",
+      "purpose": "Data files",
+      "fileCount": 4,
+      "lastAccessed": 1781891357068,
+      "keyFiles": [
+        "CardLoader.ts",
+        "cardSets.ts",
+        "DeckMapper.ts"
+      ]
+    },
+    "src\\lib": {
+      "path": "src\\lib",
+      "purpose": "Library code",
+      "fileCount": 1,
+      "lastAccessed": 1781891357068,
+      "keyFiles": [
+        "colorMap.ts"
+      ]
+    },
+    "src\\types": {
+      "path": "src\\types",
+      "purpose": "Type definitions",
+      "fileCount": 4,
+      "lastAccessed": 1781891357069,
+      "keyFiles": [
+        "card.ts",
+        "game.ts",
+        "net.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "C:\\Users\\xiong\\.claude\\plans\\next-delegated-penguin.md",
+      "accessCount": 7,
+      "lastAccessed": 1781893418474,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 2,
+      "lastAccessed": 1781891596890,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1781891391070,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1781891391514,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1781891398820,
+      "type": "file"
+    },
+    {
+      "path": "next.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891399302,
+      "type": "file"
+    },
+    {
+      "path": "tsconfig.json",
+      "accessCount": 1,
+      "lastAccessed": 1781891399778,
+      "type": "file"
+    },
+    {
+      "path": "vercel.json",
+      "accessCount": 1,
+      "lastAccessed": 1781891400245,
+      "type": "file"
+    },
+    {
+      "path": "postcss.config.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1781891400699,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\NetManager.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891407975,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\eventBus.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891408940,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\GameProtocol.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891409398,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\proto\\MsgBase.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891409857,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\proto\\ProtocolEnum.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891410341,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891410808,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891411209,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\gameStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891417746,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\netStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891418215,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\GameRequest.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891418704,
+      "type": "file"
+    },
+    {
+      "path": "src\\net\\HomeProtocol.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891419651,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\NetProvider.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891420130,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\CardLoader.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891420349,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useNet.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891435862,
+      "type": "file"
+    },
+    {
+      "path": "src\\types\\net.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891436310,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\DeckMapper.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891436797,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\cardSets.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891437522,
+      "type": "file"
+    },
+    {
+      "path": "src\\game\\battle\\BattlePhase.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891438221,
+      "type": "file"
+    },
+    {
+      "path": "src\\game\\effect\\EffectHandler.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891438393,
+      "type": "file"
+    },
+    {
+      "path": "src\\types\\game.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891450692,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useGameInit.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891451161,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\usePlayback.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891451628,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\deckStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891452078,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\game\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891460653,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useGame.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891461103,
+      "type": "file"
+    },
+    {
+      "path": "src\\game\\effect\\effects\\index.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891461589,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\home\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891462048,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useGameAnimation.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891462488,
+      "type": "file"
+    },
+    {
+      "path": "src\\types\\card.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891476516,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\battleStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891477138,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\MockPlayback.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781891499535,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\spectate\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891500000,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\globals.css",
+      "accessCount": 1,
+      "lastAccessed": 1781891554851,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\home\\MainPanel.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781891555565,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\next-to-vue-migration.md",
+      "accessCount": 1,
+      "lastAccessed": 1781893443643,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\MEMORY.md",
+      "accessCount": 1,
+      "lastAccessed": 1781893444984,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
