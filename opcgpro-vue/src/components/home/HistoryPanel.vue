@@ -88,7 +88,7 @@ onMounted(refresh);
   <div class="history-root enter scroll">
     <div class="history-inner">
       <!-- 顶部标题 -->
-      <div class="kicker" style="font-size: 12px">BATTLE LOG</div>
+      <div class="kicker" style="font-size: 12px">最近战绩</div>
       <h1 class="head" style="font-size: 40px; margin: 10px 0 4px">对局记录</h1>
       <div class="dim" style="font-size: 13px; margin-bottom: 24px">
         仅保留本设备最近 {{ list.length }} 局

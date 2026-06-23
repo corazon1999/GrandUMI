@@ -13,15 +13,25 @@ const flow = computed(() => (inBattle.value ? BATTLE_FLOW : TURN_FLOW));
 </script>
 
 <template>
-  <div class="flex shrink-0 items-center justify-center gap-2 py-0.5">
-    <span :class="['shrink-0 rounded-md px-2.5 py-1 text-[11px] font-black', currentTurn ? 'bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/40' : 'bg-red-500/20 text-red-200 ring-1 ring-red-400/40']">
-      {{ currentTurn ? "我的回合" : "对手回合" }}{{ inBattle ? " · 战斗中" : "" }}
-    </span>
-    <div class="flex items-center gap-1.5">
-      <div v-for="p in flow" :key="p"
-        :class="['rounded-md px-2.5 py-1 text-[11px] font-black transition-colors', p === phase ? (currentTurn ? 'bg-sky-500 text-white shadow shadow-sky-500/40' : 'bg-red-500 text-white shadow shadow-red-500/40') : 'border border-white/10 bg-slate-800/60 text-slate-400']">
+  <!-- 阶段条（饱和毛毡牌桌：浮于中央接缝，源自 battle.jsx .bf-phase） -->
+  <div class="flex shrink-0 items-center justify-center">
+    <div class="bf-phase">
+      <span
+        class="bf-phase__turn"
+        :style="currentTurn ? {} : {
+          color: 'var(--accent)',
+          background: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+        }"
+      >
+        {{ currentTurn ? "我的回合" : "对手回合" }}{{ inBattle ? " · 战斗中" : "" }}
+      </span>
+      <span
+        v-for="p in flow"
+        :key="p"
+        :class="['bf-phase__opt', { 'is-active': p === phase }]"
+      >
         {{ (PHASE_LABELS as Record<string, string>)[p] ?? p }}
-      </div>
+      </span>
     </div>
   </div>
 </template>

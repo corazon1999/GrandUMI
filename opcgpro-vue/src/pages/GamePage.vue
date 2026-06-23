@@ -70,7 +70,7 @@ function backToHome() {
 </script>
 
 <template>
-  <div class="relative h-screen w-screen select-none overflow-hidden bg-[#07111f] text-white">
+  <div class="relative h-screen w-screen select-none overflow-hidden text-white">
     <!-- 玩家专属浮层（不随画布缩放） -->
     <template v-if="showPlayerControls">
       <ReconnectOverlay />

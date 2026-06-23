@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useResponsive } from "@/composables/useResponsive";
-import DonCardItem from "./DonCardItem.vue";
 
+/**
+ * DON 活跃 / 休息格（毛毡牌桌：.bf-box「DON + 数量」，源自 battle.jsx DonCluster）。
+ * 活跃且有量时高亮为主题金；可交互时（我方回合选 DON）整体可点。
+ */
 const props = withDefaults(
   defineProps<{
     label: string;
@@ -15,30 +17,62 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ (e: "click"): void }>();
 
-const slotSizes = {
-  sm: "h-[6.3rem] w-[4.5rem]",
-  md: "h-[8.4rem] w-[6rem]",
-  lg: "h-[11.2rem] w-[8rem]",
-} as const;
-const { cardSize } = useResponsive();
-const slot = computed(() => slotSizes[cardSize.value]);
 const clickable = computed(() => props.count > 0 && props.canInteract);
+const on = computed(() => props.state === "active" && props.count > 0);
 </script>
 
 <template>
-  <button
-    type="button"
-    :disabled="count <= 0 || !canInteract"
-    :class="[slot, 'relative shrink-0 rounded-md border border-sky-200/15 bg-black/15 text-left shadow-inner shadow-black/25 disabled:cursor-default']"
-    @click="clickable && emit('click')"
-  >
-    <span :class="['absolute left-2 top-2 z-20 text-xs font-black drop-shadow', state === 'active' ? 'text-yellow-200' : 'text-zinc-200']">
-      {{ label }}
-    </span>
-    <DonCardItem v-if="count > 0" :state="state" :size="cardSize" :is-selected="selected" disabled />
-    <div v-else class="h-full w-full rounded-md border-2 border-dashed border-slate-500/50 bg-slate-950/35" />
-    <div class="absolute inset-x-0 bottom-1 z-30 flex justify-center">
-      <span class="rounded bg-slate-950/90 px-2 py-0.5 text-xs font-black text-white shadow">{{ count }}</span>
-    </div>
-  </button>
+  <div class="bf-well">
+    <span class="kicker">{{ label }}</span>
+    <button
+      type="button"
+      :disabled="count <= 0 || !canInteract"
+      :class="['bf-box bf-don-box', { 'is-on': on, 'is-selected': selected }]"
+      @click="clickable && emit('click')"
+    >
+      <span class="bf-don-box__t">DON</span>
+      <span class="bf-don-box__n">{{ count }}</span>
+    </button>
+  </div>
 </template>
+
+<style scoped>
+.bf-don-box {
+  width: 60px;
+  height: 90px;
+  cursor: default;
+}
+.bf-don-box:not(:disabled) {
+  cursor: pointer;
+}
+.bf-don-box__t {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+.bf-don-box__n {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 22px;
+  color: var(--ink);
+  margin-top: 2px;
+}
+.bf-don-box.is-on {
+  border-color: var(--primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 24px -4px var(--primary-glow);
+}
+.bf-don-box.is-on .bf-don-box__t,
+.bf-don-box.is-on .bf-don-box__n {
+  color: var(--primary);
+}
+.bf-don-box.is-selected {
+  border-color: var(--primary-bright);
+  box-shadow:
+    0 0 0 2px var(--primary-glow),
+    0 0 20px -2px var(--primary-glow);
+}
+</style>

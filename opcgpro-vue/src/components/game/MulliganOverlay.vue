@@ -5,20 +5,19 @@ import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
 import { getCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem.vue";
-import { useResponsive } from "@/composables/useResponsive";
 
 const my = useStore(useGameStore, (s) => s.my);
 const opp = useStore(useGameStore, (s) => s.opponent);
 const isFirst = useStore(useGameStore, (s) => s.currentTurn || s.firstPlayer === 0);
 const mulliganBothDone = useStore(useGameStore, (s) => s.mulliganBothDone);
-const { cardSize } = useResponsive();
 
 const visible = computed(() => !!my.value && !mulliganBothDone.value);
 const myDone = computed(() => my.value?.mulliganDone ?? false);
 const oppDone = computed(() => opp.value?.mulliganDone ?? false);
 const choosing = computed(() => !myDone.value);
 const handCards = computed(() => (my.value ? my.value.handCardNumbers.map((n) => getCard(n) ?? null) : []));
-const mulliganCardSize = computed(() => (cardSize.value === "sm" ? "md" : "lg"));
+// 浮层不占桌面空间，统一用最大尺寸 lg（≈ 设计稿 132px）让起手牌更清晰
+const mulliganCardSize = "lg" as const;
 </script>
 
 <template>

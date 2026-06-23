@@ -19,22 +19,61 @@ const visibleCards = computed(() => Math.min(Math.max(count.value, 1), 5));
 </script>
 
 <template>
-  <div :class="['relative', pile]">
-    <span class="absolute left-2 top-2 z-20 text-xs font-semibold text-slate-200 drop-shadow">
-      {{ side === "my" ? "生命" : "对手生命" }}
-    </span>
-    <template v-if="count > 0">
-      <div v-for="(_, i) in visibleCards" :key="i" class="absolute"
-        :style="{ inset: '0', transform: `translate(${i * 4}px, ${i * 4}px)`, zIndex: faceUp[i]?.faceUp && faceUp[i]?.number ? 10 + i : i }">
-        <CardItem v-if="faceUp[i]?.faceUp && faceUp[i]?.number" :card="getCard(faceUp[i].number!) ?? null" :size="cardSize" :hide-counter="true" :hide-power="true" :hide-cost="true" />
-        <div v-else class="relative h-full w-full rounded-md border-2 border-red-200/35 bg-gradient-to-br from-red-800 via-rose-950 to-slate-950 shadow-xl shadow-black/35">
-          <div class="absolute inset-2 rounded border border-red-100/15" />
+  <div class="bf-well">
+    <span class="kicker">{{ side === "my" ? "生命" : "对手生命" }}</span>
+    <div :class="['relative', pile]">
+      <template v-if="count > 0">
+        <div v-for="(_, i) in visibleCards" :key="i" class="absolute inset-0"
+          :style="{ transform: `translate(${i * 4}px, ${i * -2}px)`, zIndex: faceUp[i]?.faceUp && faceUp[i]?.number ? 10 + i : i }">
+          <CardItem v-if="faceUp[i]?.faceUp && faceUp[i]?.number" :card="getCard(faceUp[i].number!) ?? null" :size="cardSize" :hide-counter="true" :hide-power="true" :hide-cost="true" />
+          <div v-else class="bf-life__back" />
         </div>
-      </div>
-    </template>
-    <div v-else class="h-full w-full rounded-md border-2 border-dashed border-slate-500/60 bg-slate-950/45" />
-    <div class="absolute -right-4 -top-3 z-30 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow">
-      {{ count }}
+      </template>
+      <div v-else class="bf-life__empty" />
+      <span class="bf-life__count">{{ count }}</span>
     </div>
   </div>
 </template>
+
+<style scoped>
+.bf-life__back {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: 8px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 82%, #000), var(--bg0));
+  border: 2px solid var(--accent);
+  box-shadow:
+    0 2px 0 color-mix(in srgb, var(--accent) 45%, #000),
+    0 8px 16px -8px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.bf-life__empty {
+  height: 100%;
+  width: 100%;
+  border-radius: 8px;
+  border: 1.5px dashed var(--line-strong);
+  background: rgba(0, 0, 0, 0.18);
+}
+.bf-life__count {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 30;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, var(--primary-bright), var(--primary));
+  color: var(--on-primary);
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    0 0 14px var(--primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+</style>

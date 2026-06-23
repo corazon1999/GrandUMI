@@ -1,25 +1,42 @@
 <script setup lang="ts">
 import { useStore } from "@/composables/useStore";
 import { useGameStore } from "@/store/gameStore";
-import { useResponsive } from "@/composables/useResponsive";
-import DonCardItem from "./DonCardItem.vue";
 
+/** DON 卡堆（毛毡牌桌：抽象 .bf-box「DON + 数量」，源自 battle.jsx DonCluster 卡堆格） */
 const props = defineProps<{ side: "my" | "opponent" }>();
 
 const count = useStore(useGameStore, (s) =>
   (props.side === "my" ? s.my?.donDeckCount : s.opponent?.donDeckCount) ?? 0,
 );
-const { cardSize } = useResponsive();
-const pileSizes = { sm: "h-[6.3rem] w-[4.5rem]", md: "h-[8.4rem] w-[6rem]", lg: "h-[11.2rem] w-[8rem]" } as const;
 </script>
 
 <template>
-  <div :class="[pileSizes[cardSize], 'relative shrink-0']">
-    <span class="absolute left-2 top-2 z-20 text-xs font-semibold text-slate-200 drop-shadow">DON 卡堆</span>
-    <DonCardItem v-if="count > 0" state="deck" :size="cardSize" disabled />
-    <div v-else class="h-full w-full rounded-md border-2 border-dashed border-slate-500/60 bg-slate-950/35" />
-    <div class="absolute inset-x-0 bottom-1 z-30 flex justify-center">
-      <span class="rounded bg-slate-950/90 px-2 py-0.5 text-xs font-black text-white shadow">{{ count }}</span>
+  <div class="bf-well">
+    <span class="kicker">卡堆</span>
+    <div class="bf-box bf-don-box">
+      <span class="bf-don-box__t">DON</span>
+      <span class="bf-don-box__n">{{ count }}</span>
     </div>
   </div>
 </template>
+
+<style scoped>
+.bf-don-box {
+  width: 60px;
+  height: 90px;
+}
+.bf-don-box__t {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+.bf-don-box__n {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 22px;
+  color: var(--ink);
+  margin-top: 2px;
+}
+</style>

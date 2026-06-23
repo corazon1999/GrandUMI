@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, inject } from "vue";
 import type { CardData } from "@/types/card";
 import { clsx } from "clsx";
+import { CARD_FELT } from "@/composables/useResponsive";
 import CardZoomOverlay from "./CardZoomOverlay.vue";
 
 const props = withDefaults(
@@ -80,6 +81,40 @@ const transformStyle = computed(() => {
   const scale = props.isSelected && lift ? 1.05 : 1;
   return { transform: `translateY(${y}px) rotate(${rotate}deg) scale(${scale})` };
 });
+
+// ── 毛毡光泽框（牌桌内由 GameBoard provide 开启，源自 battle.jsx 厚卡） ──
+const felt = inject(CARD_FELT, false);
+// 卡色（数据形 炎/风/水/暗/地/光）→ battle.jsx CC 十六进制
+const FELT_CC: Record<string, string> = {
+  炎: "#e0463d", 风: "#3fb061", 水: "#3f86e6", 暗: "#9a5fe0", 地: "#8a7f96", 光: "#ecc24a",
+};
+function hexA(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+const cardColor = computed(() => {
+  const first = (props.card?.color ?? "").split("/")[0].trim();
+  return FELT_CC[first] ?? "";
+});
+// 根样式：变换 + （毛毡模式下）卡色边 + 立体底边 + 彩色辉光
+// 领航卡更厚：3px 边、更深底边、更大辉光（源自 battle.jsx Leader）
+const rootStyle = computed<Record<string, string>>(() => {
+  const base: Record<string, string> = { ...transformStyle.value };
+  if (felt && !showFaceDown.value && cardColor.value) {
+    const c = cardColor.value;
+    if (!props.isSelected) base.borderColor = c;
+    if (props.card?.type === "Leader") {
+      base.borderWidth = "3px";
+      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.3), 0 4px 0 ${hexA(c, 0.6)}, 0 16px 30px -8px rgba(0,0,0,.85), 0 0 40px -4px ${hexA(c, 0.65)}`;
+    } else {
+      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.24), 0 3.5px 0 ${hexA(c, 0.5)}, 0 12px 22px -8px rgba(0,0,0,.82), 0 0 20px -8px ${hexA(c, 0.55)}`;
+    }
+  }
+  return base;
+});
 </script>
 
 <template>
@@ -93,7 +128,7 @@ const transformStyle = computed(() => {
         ? 'border-yellow-300 shadow-yellow-300/40'
         : 'border-slate-500/70 hover:border-slate-200',
     )"
-    :style="transformStyle"
+    :style="rootStyle"
     @click="emit('click')"
     @contextmenu="handleContextMenu"
   >
@@ -111,6 +146,12 @@ const transformStyle = computed(() => {
         :draggable="false"
         loading="lazy"
         @error="imgSrc = FALLBACK"
+      />
+      <!-- 毛毡光泽高光（牌桌厚卡，源自 battle.jsx .bf-card::after） -->
+      <div
+        v-if="felt"
+        class="pointer-events-none absolute inset-0 z-[2]"
+        style="background: linear-gradient(157deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 46%)"
       />
       <div
         class="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-1.5 pb-1 pt-6 text-xs font-bold"

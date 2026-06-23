@@ -18,26 +18,18 @@ const pile = computed(() => pileSizes[cardSize.value]);
 const open = ref(false);
 
 const count = computed(() => trash.value.length);
-const topNumber = computed(() => (count.value > 0 ? trash.value[count.value - 1] : null));
-const topCard = computed(() => (topNumber.value ? getCard(topNumber.value) ?? null : null));
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-2 rounded-md border border-zinc-300/15 bg-black/30 px-2.5 py-2 shadow-lg shadow-black/25">
-    <span class="text-xs font-semibold text-slate-300">墓地</span>
+  <div class="bf-well">
+    <span class="kicker">墓地</span>
     <div
-      :class="['relative cursor-pointer', pile]"
+      :class="[pile, 'bf-area bf-trash']"
       :title="count > 0 ? `查看墓地（${count} 张）` : '墓地为空'"
       @click="open = true"
     >
-      <!-- 封面 = 最近送入的卡 -->
-      <CardItem v-if="topCard" :card="topCard" :size="cardSize" />
-      <div v-else class="flex h-full w-full items-center justify-center rounded-md border-2 border-dashed border-zinc-400/35 bg-zinc-950/60">
-        <span class="text-xs font-black text-zinc-500">TRASH</span>
-      </div>
-      <div class="absolute -right-3 -top-3 z-30 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow">
-        {{ count }}
-      </div>
+      <span class="bf-trash__lbl">TRASH</span>
+      <span class="bf-trash__n">{{ count }}</span>
     </div>
 
     <!-- 墓地弹窗 -->
@@ -64,6 +56,23 @@ const topCard = computed(() => (topNumber.value ? getCard(topNumber.value) ?? nu
 </template>
 
 <style scoped>
+.bf-trash {
+  cursor: pointer;
+}
+.bf-trash__lbl {
+  position: absolute;
+  top: 7px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+.bf-trash__n {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 26px;
+  color: var(--ink-dim);
+}
 .fade-enter-active,
 .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from,

@@ -38,7 +38,7 @@ function send() {
   <div class="chat-root">
     <!-- 头部 -->
     <div class="chat-header">
-      <span class="kicker chat-header__title">COMMS</span>
+      <span class="kicker chat-header__title">聊天</span>
       <span class="chat-header__line" />
       <span class="mono dim chat-header__online">
         <span class="dot dot--live" /> 在线 {{ onlineText }}

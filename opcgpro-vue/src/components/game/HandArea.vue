@@ -64,6 +64,18 @@ const marginLeft = computed(() => {
   return step - cardW;
 });
 
+// 扇形手牌：每张按到中心的偏移旋转（源自 battle.jsx 手牌 rotate (i-mid)*2.6deg）
+function fanStyle(i: number, n: number) {
+  const mid = (n - 1) / 2;
+  const isMy = props.side === "my";
+  const deg = (i - mid) * (isMy ? 2.6 : 2);
+  const ty = isMy ? Math.abs(i - mid) * 5 : 0;
+  return {
+    transform: `rotate(${deg}deg) translateY(${ty}px)`,
+    transformOrigin: isMy ? "bottom center" : "top center",
+  };
+}
+
 function handleClick(i: number) {
   if (props.hidden || isPending.value) return;
   if (isCounterStep.value) { const c = cards.value[i]; if (c && (c.counter ?? 0) > 0) GameRequest.playCounterFromHand(i); else if (isCounterEventPlayable(c, i)) GameRequest.playCounterEvent(i); return; }
@@ -80,7 +92,9 @@ function handleClick(i: number) {
         :class="['relative hover:z-20', (isCounterStep && ((card?.counter ?? 0) > 0 || isCounterEventPlayable(card, i))) ? 'rounded-md ring-2 ring-amber-400 animate-pulse' : '']"
         :style="{ marginLeft: i === 0 ? '0' : `${marginLeft}px` }"
         @mouseenter="emit('hover-card', card)" @mouseleave="emit('hover-card', null)">
-        <CardItem :card="card" :is-selected="!hidden && selectedHandIndex === i" :face-down="hidden || card === null" :size="cardSize" hide-power :cost-buff="side === 'my' && card && player?.handCardCosts?.[i] != null ? player.handCardCosts[i] - card.cost : 0" @click="handleClick(i)" />
+        <div :style="fanStyle(i, cards.length)">
+          <CardItem :card="card" :is-selected="!hidden && selectedHandIndex === i" :face-down="hidden || card === null" :size="cardSize" hide-power :cost-buff="side === 'my' && card && player?.handCardCosts?.[i] != null ? player.handCardCosts[i] - card.cost : 0" @click="handleClick(i)" />
+        </div>
       </div>
     </TransitionGroup>
     <span v-if="cards.length === 0" class="text-xs text-gray-700">{{ hidden ? "对手手牌" : "手牌为空" }}</span>

@@ -22,6 +22,14 @@ import { useNetStore } from './store/netStore'
 // DEV: 暴露 store 到 window 以便自动化测试注入状态（仅 vite dev 模式）
 if (import.meta.env.DEV) {
   ;(window as unknown as { __netStore: typeof useNetStore }).__netStore = useNetStore
+  // dev-only：?__mock_board=1 时灌入一份「满桌」快照，
+  // 让没有后端对局时也能渲染牌桌卡牌，便于按 redesign/battle.jsx 做样式 1:1 比对。
+  if (typeof window !== "undefined" && window.location.search.includes("__mock_board=1")) {
+    import("./data/mockBoard").then(({ loadMockBoard }) => {
+      ;(window as unknown as { __loadMockBoard: typeof loadMockBoard }).__loadMockBoard = loadMockBoard
+      setTimeout(loadMockBoard, 300)
+    })
+  }
 }
 
 createApp(App).use(router).mount('#app')

@@ -29,9 +29,18 @@ function handleClick() {
 </script>
 
 <template>
-  <div :class="[dimensions, 'relative flex items-center justify-center rounded-md border border-dashed border-sky-200/25 bg-black/20 shadow-inner shadow-black/30']">
-    <span class="absolute left-2 top-2 z-10 text-xs font-semibold text-slate-200 drop-shadow">场地</span>
-    <CardItem v-if="stageNumber" :card="stageCard" :size="cardSize" :is-selected="selectedFieldId === stageId" :is-tapped="stageTapped" @click="handleClick" />
-    <span v-else class="text-xs font-black text-slate-600">STAGE</span>
+  <div class="bf-well">
+    <span class="kicker">场地</span>
+    <div :class="[dimensions, 'bf-area']">
+      <CardItem v-if="stageNumber" :card="stageCard" :size="cardSize" :is-selected="selectedFieldId === stageId" :is-tapped="stageTapped" @click="handleClick" />
+      <span v-else class="mono faint bf-area__txt">STAGE</span>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.bf-area__txt {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+</style>

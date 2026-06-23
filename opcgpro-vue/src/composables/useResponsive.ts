@@ -2,6 +2,10 @@ import { ref, computed, inject, onMounted, onUnmounted, type InjectionKey, type 
 
 export const CARD_SIZE_OVERRIDE: InjectionKey<Ref<"sm" | "md" | "lg">> = Symbol("cardSizeOverride");
 
+/** 牌桌「毛毡光泽卡」模式：GameBoard 提供 true，CardItem 注入后按卡色套立体光泽边框；
+ *  卡组编辑器等不提供 → 默认 false，沿用原卡面样式。 */
+export const CARD_FELT: InjectionKey<boolean> = Symbol("cardFelt");
+
 export function useResponsive() {
   const override = inject(CARD_SIZE_OVERRIDE, null);
   const size = ref<"sm" | "md" | "lg">("md");

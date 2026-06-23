@@ -137,6 +137,8 @@ function onLeaderImgError(e: Event) {
       />
     </div>
 
-    <CardHoverPreview v-if="hover" :info="hover" />
+    <Teleport to="body">
+      <CardHoverPreview v-if="hover" :info="hover" />
+    </Teleport>
   </div>
 </template>

@@ -49,12 +49,30 @@ function cardOf(number: string) { return getCard(number) ?? null; }
 function powerBuff(fc: { powerCurrent: number; attachedDon: number; number: string }) {
   return fc.powerCurrent - (cardOf(fc.number)?.power ?? 0) - fc.attachedDon * 1000;
 }
+
+// 始终 5 个槽位（不足补空槽，源自 battle.jsx CharRow）
+const slots = computed(() =>
+  Array.from({ length: 5 }, (_, i) => player.value?.fieldCards[i] ?? null),
+);
+const slotDim = computed(
+  () =>
+    ({ sm: "h-[6.3rem] w-[4.5rem]", md: "h-[8.4rem] w-[6rem]", lg: "h-[11.2rem] w-[8rem]" })[
+      cardSize.value
+    ],
+);
 </script>
 
 <template>
-  <div v-if="player" class="flex h-full min-h-0 min-w-0 items-center justify-center gap-3 overflow-visible rounded-md border border-sky-200/15 bg-black/15 px-4 py-3 shadow-inner shadow-black/30">
-    <div v-for="fc in player.fieldCards" :key="fc.id" class="relative flex h-full min-h-0 shrink-0 items-center">
-      <div class="relative">
+  <!-- 角色行：始终 5 槽（源自 battle.jsx CharRow），空槽显示编号 -->
+  <div class="bf-row bf-charrow">
+    <template v-for="(fc, i) in slots" :key="fc?.id ?? ('empty-' + i)">
+      <!-- 有角色 -->
+      <div
+        v-if="fc"
+        class="relative shrink-0"
+        @mouseenter="emit('hover-card', cardOf(fc.number))"
+        @mouseleave="emit('hover-card', null)"
+      >
         <!-- 战斗高亮：攻击者红环 / 被攻击目标琥珀环 -->
         <div v-if="battle && side === attackerSide && fc.id === battle.attackerCardId" class="pointer-events-none absolute -inset-1 z-20 animate-pulse rounded-lg shadow-lg shadow-red-500/50 ring-4 ring-red-500" />
         <div v-if="battle && side === defenderSide && !battle.targetIsLeader && fc.id === battle.targetCardId" class="pointer-events-none absolute -inset-1 z-20 animate-pulse rounded-lg shadow-lg shadow-amber-400/50 ring-4 ring-amber-400" />
@@ -94,8 +112,20 @@ function powerBuff(fc: { powerCurrent: number; attachedDon: number; number: stri
           <span class="text-[10px] font-black text-black">+</span>
         </div>
       </div>
-    </div>
-    <span v-if="player.fieldCards.length === 0" class="text-xs font-semibold text-slate-600">{{ side === "my" ? "角色区" : "对手角色区" }}</span>
+
+      <!-- 空槽 -->
+      <div v-else :class="[slotDim, 'bf-slot bf-charslot']">
+        <span class="bf-slot__n">{{ i + 1 }}</span>
+      </div>
+    </template>
   </div>
-  <div v-else class="h-full min-h-0" />
 </template>
+
+<style scoped>
+.bf-charrow {
+  overflow: visible;
+}
+.bf-charslot .bf-slot__n {
+  font-size: 24px;
+}
+</style>

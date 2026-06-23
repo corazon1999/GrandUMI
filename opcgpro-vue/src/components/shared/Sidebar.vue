@@ -1,25 +1,36 @@
 <script setup lang="ts">
 import Ticks from "./Ticks.vue";
+import Avatar from "./Avatar.vue";
+import { useProfile } from "@/composables/useProfile";
 
 /**
  * 侧边导航栏（CLAUDE.md §5.6）：
- * 84×full panel，头像 + 三项导航 + 底部连接状态。
+ * 84×full panel，头像（点击进个人中心）+ 三项导航 + 底部连接状态。
  */
+type NavView = "home" | "lobby" | "deck" | "friends" | "rank" | "history" | "settings" | "profile";
+
 defineProps<{
   username: string;
   level?: number;
-  active: "lobby" | "deck" | "history";
+  active: NavView;
   connected: boolean;
 }>();
 
 defineEmits<{
-  (e: "navigate", view: "lobby" | "deck" | "history"): void;
+  (e: "navigate", view: NavView): void;
 }>();
 
-const NAV_ITEMS: { id: "lobby" | "deck" | "history"; glyph: string; lbl: string }[] = [
-  { id: "lobby",   glyph: "厅", lbl: "大厅" },
-  { id: "deck",    glyph: "组", lbl: "卡组" },
-  { id: "history", glyph: "战", lbl: "战绩" },
+const { profile } = useProfile();
+
+// 导航项（对齐 design components.jsx NAV，7 项）
+const NAV_ITEMS: { id: Exclude<NavView, "profile">; glyph: string; lbl: string }[] = [
+  { id: "home",     glyph: "首", lbl: "主页" },
+  { id: "lobby",    glyph: "厅", lbl: "大厅" },
+  { id: "deck",     glyph: "组", lbl: "卡组" },
+  { id: "friends",  glyph: "友", lbl: "好友" },
+  { id: "rank",     glyph: "榜", lbl: "排行" },
+  { id: "history",  glyph: "战", lbl: "战绩" },
+  { id: "settings", glyph: "设", lbl: "设置" },
 ];
 </script>
 
@@ -27,12 +38,17 @@ const NAV_ITEMS: { id: "lobby" | "deck" | "history"; glyph: string; lbl: string 
   <aside class="sidebar">
     <Ticks />
 
-    <div class="sidebar__avatar">
-      <div class="sidebar__avatar-circle">
-        <span>{{ level ?? "?" }}</span>
-      </div>
-      <span class="mono faint sidebar__username">{{ username || "guest" }}</span>
-    </div>
+    <button
+      type="button"
+      class="sidebar__avatar"
+      :class="{ 'is-active': active === 'profile' }"
+      title="个人中心"
+      @click="$emit('navigate', 'profile')"
+    >
+      <span v-if="active === 'profile'" class="sidebar__avatar-mark" />
+      <Avatar :src="profile.avatar" :name="profile.name" :size="46" :glow="active === 'profile'" />
+      <span class="mono faint sidebar__username">{{ profile.name || username || "guest" }}</span>
+    </button>
 
     <span class="sidebar__divider" />
 
@@ -75,27 +91,29 @@ const NAV_ITEMS: { id: "lobby" | "deck" | "history"; glyph: string; lbl: string 
 }
 
 .sidebar__avatar {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 4px 0 10px;
   width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
-.sidebar__avatar-circle {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid var(--primary);
-  background: var(--surface2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-head);
-  font-weight: 900;
-  font-size: 18px;
+.sidebar__avatar-mark {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 14px var(--primary-glow);
+}
+.sidebar__avatar.is-active .sidebar__username {
   color: var(--primary);
-  box-shadow: 0 0 18px -4px var(--primary-glow);
 }
 .sidebar__username {
   font-size: 10px;
@@ -120,6 +138,8 @@ const NAV_ITEMS: { id: "lobby" | "deck" | "history"; glyph: string; lbl: string 
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar__status {
