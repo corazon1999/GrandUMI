@@ -48,9 +48,28 @@ public class EB03_048_Rebecca : IScriptedEffect
                 }
             }
 
+            // 之后：将剩余卡牌自选顺序放回卡组最下方。
+            // 即使空检索（top5 无《德莱斯罗兹》舞台卡）也要执行——这一步本身是"确认顶5张并自选排序"。
+            // 此前空检索时无任何弹窗、静默按原序放回，玩家看不到也无法排序，被误判为"效果不发动"（#141）。
             var rest = top.Where(c => me.Deck.Contains(c)).ToList();
-            foreach (var c in rest) me.Deck.Remove(c);
-            me.Deck.AddRange(rest);
+            if (rest.Count > 0)
+            {
+                var rextra = new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                };
+                var ordered = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RebeccaReorder",
+                    "确认卡组顶部剩余卡牌，自选顺序放回卡组最下方",
+                    rest.Select(c => c.Id.ToString()).ToList(), rest.Count, rest.Count, rextra);
+                var order = ordered
+                    .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))
+                    .Where(c => c is not null)
+                    .Select(c => c!.Id)
+                    .ToList();
+                foreach (var c in rest)
+                    if (!order.Contains(c.Id)) order.Add(c.Id);
+                AtomicOps.ReorderTopK(me, order, toBottom: true);
+            }
         }
 
         // 之后：将手牌中最多 1 张费用为 1 且《德莱斯罗兹》的舞台卡登场

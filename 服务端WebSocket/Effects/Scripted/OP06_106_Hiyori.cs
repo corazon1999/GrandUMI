@@ -31,22 +31,24 @@ public class OP06_106_Hiyori : IScriptedEffect
             "光月日和【登场时】：将生命区最上方或最下方 1 张卡牌加入手牌，再将 1 张手牌加入生命区最上方？");
         if (!use) return;
 
-        // 成本：选择生命顶或底 1 张加入手牌
+        // 成本：选择生命顶或底 1 张加入手牌。
+        // 生命牌正面朝下，不得公开其身份——故按"位置"用文本选项选择，不下发 choiceCards 卡面（#157）。
         var top = me.LifeArea[0];
         var bottom = me.LifeArea[me.LifeArea.Count - 1];
-        // 顶 / 底可能为同一张（仅 1 张生命）
-        var lifeCands = new List<CardInstance> { top };
-        if (!ReferenceEquals(top, bottom)) lifeCands.Add(bottom);
-
-        var lifeExtra = new Dictionary<string, object?>
+        CardInstance takenLife;
+        if (ReferenceEquals(top, bottom))
         {
-            ["choiceCards"] = lifeCands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
-        };
-        var lifeChoice = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LifeTopOrBottom",
-            "选择生命区最上方或最下方的 1 张卡牌加入手牌",
-            lifeCands.Select(c => c.Id.ToString()).ToList(), 1, 1, lifeExtra);
-        if (lifeChoice.Count == 0) return; // 未支付成本
-        var takenLife = lifeCands.First(c => c.Id.ToString() == lifeChoice[0]);
+            // 仅 1 张生命，顶即底，无需选择
+            takenLife = top;
+        }
+        else
+        {
+            int posIdx = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                "选择将生命区最上方或最下方的 1 张卡牌加入手牌（不公开其身份）",
+                new[] { "最上方", "最下方" });
+            if (posIdx < 0) return; // 放弃 → 未支付成本
+            takenLife = posIdx == 0 ? top : bottom;
+        }
         me.LifeArea.Remove(takenLife);
         me.Hand.Add(takenLife);
 

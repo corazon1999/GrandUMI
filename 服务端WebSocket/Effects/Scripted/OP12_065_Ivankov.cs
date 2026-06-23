@@ -10,24 +10,39 @@ namespace GrandUMI.Effects.Scripted;
 ///   1. 我方废弃区中有 4 张或更多事件的场合，此角色获得【阻挡者】效果。（条件式静态关键字）
 ///   2. 【KO时】将我方废弃区中最多 1 张事件加入手牌。
 ///
-/// 本脚本实现 (2)：【KO时】从我方废弃区中选最多 1 张事件加入手牌（可选，min=0）。
-/// 候选来自废弃区，经 extra.choiceCards 下发卡面。
-///
-/// 简化点：(1) 条件式获得【阻挡者】未实现 —— 引擎 HasKeyword 仅做卡面文本
-///   contains("【阻挡者】") + 临时关键字判定，无法按"废弃区事件≥4"这一游戏状态条件
-///   动态评估；ContinuousEffect 也仅支持力量修正，无条件式关键字钩子。
-///   （注意：由于卡面文本含"【阻挡者】"字样，现引擎会将此角色恒视为带【阻挡者】，
-///    无法区分条件是否满足。此为既有引擎缺口，非本脚本可修正。）
+/// 本脚本实现：
+///   (1) 登场时注册 ContinuousEffect：我方废弃区事件≥4 时此角色获得【阻挡者】（按废弃区动态评估）。
+///   (2)【KO时】从我方废弃区中选最多 1 张事件加入手牌（可选，min=0）。候选经 extra.choiceCards 下发卡面。
 /// </summary>
 public class OP12_065_Ivankov : IScriptedEffect
 {
     public string CardNumber => "OP12-065";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnKO;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnKO || t == EffectTrigger.OnEnterField;
 
     public async Task Resolve(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
+        int owner = ctx.OwnerIndex;
+
+        // ── ① 持续光环：我方废弃区事件≥4 → 此角色获得【阻挡者】（登场时注册，按废弃区动态评估）──
+        if (ctx.Trigger == EffectTrigger.OnEnterField)
+        {
+            var selfId0 = ctx.Source.Id;
+            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
+            ctx.State.ContinuousEffects.Add(new ContinuousEffect
+            {
+                SourceCardId = selfId0.ToString(),
+                Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+                GrantKeyword = "阻挡者",
+                Predicate = (st, side, card) => card.Id == selfId0 &&
+                    st.Players[owner].Trash.Count(c => c.Info.Kind == CardKind.Event) >= 4,
+            });
+            return;
+        }
+
+        // ── ②【KO时】将我方废弃区中最多 1 张事件加入手牌 ──
+        var me = ctx.State.Players[owner];
 
         // 候选：我方废弃区中的事件卡
         var candidates = me.Trash.Where(c => c.Info.Kind == CardKind.Event).ToList();

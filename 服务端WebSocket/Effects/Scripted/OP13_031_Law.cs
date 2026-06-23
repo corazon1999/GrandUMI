@@ -17,9 +17,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 之后从手牌中选最多 1 张费用 ≤5 的角色，以休息状态登场。
 ///   - 手牌候选经 extra.choiceCards 下发卡面给客户端。
 ///
-/// 简化点 / 未实现：
-///   - "生命 ≤1 时获得【阻挡者】" 为条件型持续被动（需引擎在判定阻挡资格时按生命数动态求值），
-///     当前脚本不处理该被动；仅实现【登场时】。
+/// 持续光环（登场时注册 ContinuousEffect）：
+///   "我方生命≤1 时此角色获得【阻挡者】" 由 GrantKeyword="阻挡者" 的条件持续效果实现，按生命数动态评估。
 /// </summary>
 public class OP13_031_Law : IScriptedEffect
 {
@@ -29,7 +28,20 @@ public class OP13_031_Law : IScriptedEffect
 
     public async Task Resolve(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
+        int owner = ctx.OwnerIndex;
+
+        // ── 持续光环：我方生命≤1 → 此角色获得【阻挡者】（登场时无条件注册，按生命数动态评估）──
+        var selfId0 = ctx.Source.Id;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId0.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "阻挡者",
+            Predicate = (st, side, card) => card.Id == selfId0 && st.Players[owner].LifeArea.Count <= 1,
+        });
+
+        var me = ctx.State.Players[owner];
 
         // 成本/条件：可以将我方 1 张角色放回手牌（含自身在内）。可选——不选则整个效果不发动。
         if (me.Characters.Count == 0) return;

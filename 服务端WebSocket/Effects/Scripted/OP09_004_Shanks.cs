@@ -18,6 +18,8 @@ public class OP09_004_Shanks : IScriptedEffect
     {
         var self = ctx.Source;
         var selfId = self.Id;
+        int owner = ctx.OwnerIndex;
+        int oppSide = 1 - owner;
 
         // 防重复注册
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
@@ -28,7 +30,11 @@ public class OP09_004_Shanks : IScriptedEffect
             SourceCardId = selfId.ToString(),
             Scope = new ContinuousScope { Side = 1, IncludeLeader = false, IncludeCharacters = true },
             PowerDelta = -1000,
-            Predicate = (s, sideIdx, c) => true,
+            // Scope 仅供显示，作用对象必须写进 Predicate：仅对方场上角色（不含领袖、不含己方）。
+            // 否则 Predicate=true 会减全场两侧角色与领袖（#149）。
+            Predicate = (s, sideIdx, c) =>
+                sideIdx == oppSide &&
+                s.Players[oppSide].Characters.Contains(c),
         });
 
         return Task.CompletedTask;

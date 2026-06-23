@@ -14,9 +14,9 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 成本：丢弃我方 1 张手牌（玩家自选，需手牌 ≥1）；
 ///   - 效果：若对方手牌 ≥5，对方自选丢弃 2 张。
 ///
-/// 简化/未实现（见 summary，归引擎缺口）：
-///   "我方领袖为克尔拉/路飞时获得【阻挡者】并费用+3" 是持续性静态能力，
-///   引擎暂无"条件持续静态能力（持续授予关键字 / 持续改费）"通道，故此脚本不处理该静态部分。
+/// 持续光环（登场时注册 ContinuousEffect）：
+///   "我方领袖为克尔拉/路飞时此角色获得【阻挡者】并费用+3" 由 GrantKeyword="阻挡者"+CostDelta=3
+///   的条件持续效果实现，按领袖名动态评估。
 /// </summary>
 public class OP12_087_Robin : IScriptedEffect
 {
@@ -26,11 +26,26 @@ public class OP12_087_Robin : IScriptedEffect
 
     public async Task Resolve(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
-        int oppIdx = 1 - ctx.OwnerIndex;
+        int owner = ctx.OwnerIndex;
+
+        // ── 持续光环：我方领袖为"克尔拉"或"蒙奇·D·路飞"→ 此角色获得【阻挡者】、费用+3（登场时无条件注册，按领袖动态评估）──
+        var selfId0 = ctx.Source.Id;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId0.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "阻挡者",
+            CostDelta = 3,
+            Predicate = (st, side, card) => card.Id == selfId0 &&
+                (st.Players[owner].Leader.Info.Name == "克尔拉" || st.Players[owner].Leader.Info.Name == "蒙奇·D·路飞"),
+        });
+
+        var me = ctx.State.Players[owner];
+        int oppIdx = 1 - owner;
         var opp = ctx.State.Players[oppIdx];
 
-        // 成本需要：我方手牌 ≥1 才能丢弃
+        // 成本需要：我方手牌 ≥1 才能丢弃（【登场时】可选效果）
         if (me.Hand.Count < 1) return;
 
         // 可选效果：询问是否发动（"可以…"）

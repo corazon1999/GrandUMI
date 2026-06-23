@@ -235,9 +235,16 @@
   },
   "OP16-020": {
     "_name": "不怕死的就跟我来吧!!",
-    "_matcher": "事件【主要】抽 N；【反击】弃1手牌→我方最多1领袖/角色+3000",
-    "_doc": "main 现为占位（抽1）；原文实为『休息1咚+公开手牌1张8000角色：抽1』，因 DSL 暂不支持双成本原子支付未实现。counter 原文：『可以丢弃我方的1张手牌：本次战斗中，我方最多1张领袖或角色力量+3000。』",
+    "_matcher": "事件【主要】(双成本:转休息1咚+公开1张力量8000角色)抽1;【反击】(成本:弃1手牌)我方≤1张领袖/角色本战斗+3000",
     "main": {
+      "cost": {
+        "restActiveDon": 1,
+        "revealHand": {
+          "kind": "Character",
+          "originalPowerGte": 8000,
+          "originalPowerLte": 8000
+        }
+      },
       "then": [
         {
           "op": "Draw",
@@ -282,7 +289,9 @@
           },
           {
             "op": "PlayCharFromHand",
-            "filter": { "originalCostLte": 2 },
+            "filter": {
+              "originalCostLte": 2
+            },
             "text": "之后,将我方手牌中最多1张费用不高于2的角色卡牌登场"
           }
         ]
@@ -378,7 +387,7 @@
   },
   "OP16-043": {
     "_name": "撒谎布",
-    "_matcher": "【KO时】将对方≤1张费用≤5的角色退回手牌；可选成本(休息领袖/舞台)在 triggers 中无法表达，按惯例仅实现收益部分。【阻挡者】为纯关键词另行处理。",
+    "_matcher": "已由脚本 OP16_043_Usopp 接管(可选成本:横置我方《德莱斯罗兹》活跃领袖/舞台 → 收益:对方≤1张费用≤5角色回手)；下方DSL占位(仅收益)脚本优先不执行。【阻挡者】为纯关键词另行处理。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -419,11 +428,13 @@
   },
   "OP16-048": {
     "_name": "巴奇",
-    "_matcher": "登场时领袖含《因佩尔地狱》则抽1+手牌≤1张《因佩尔地狱的囚犯》登场(另【每回合1次】对方攻击时给囚犯阻挡者未做)",
+    "_matcher": "登场:领袖含《因佩尔地狱》则抽1+手牌最多1张名为「因佩尔地狱的囚犯」登场；【每回合1次】对方攻击时给我方1张「因佩尔地狱的囚犯」本回合获得【阻挡者】",
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "leaderHasKeyword": "因佩尔地狱" },
+        "if": {
+          "leaderHasKeyword": "因佩尔地狱"
+        },
         "then": [
           {
             "op": "Draw",
@@ -431,8 +442,32 @@
           },
           {
             "op": "PlayCharFromHand",
-            "filter": { "keywordContains": "因佩尔地狱的囚犯" },
-            "text": "将我方手牌中最多1张《因佩尔地狱的囚犯》登场"
+            "filter": {
+              "nameEquals": "因佩尔地狱的囚犯"
+            },
+            "text": "将我方手牌中最多1张「因佩尔地狱的囚犯」登场"
+          }
+        ]
+      },
+      {
+        "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OwnCharacter",
+            "filter": {
+              "nameEquals": "因佩尔地狱的囚犯"
+            },
+            "max": 1,
+            "min": 0,
+            "as": "$blk",
+            "text": "选择我方最多1张「因佩尔地狱的囚犯」本回合获得【阻挡者】"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "$blk",
+            "keyword": "阻挡者"
           }
         ]
       }
@@ -440,9 +475,11 @@
   },
   "OP16-049": {
     "_name": "波特夹斯·D·艾斯",
-    "_matcher": "启动主要 抽 N（每回合 1 次）",
+    "_matcher": "启动主要 成本:横置自身(restSelf) → 抽1；横置后自身已横置自然每回合最多一次，不用 oncePerTurn",
     "activated": {
-      "oncePerTurn": true,
+      "cost": {
+        "restSelf": true
+      },
       "then": [
         {
           "op": "Draw",
@@ -681,10 +718,18 @@
     ],
     "activated": {
       "oncePerTurn": true,
-      "if": { "leaderHasKeyword": "海军" },
-      "cost": { "restActiveDon": 1 },
+      "if": {
+        "leaderHasKeyword": "海军"
+      },
+      "cost": {
+        "restActiveDon": 1
+      },
       "then": [
-        { "op": "RefreshDon", "n": 2, "state": "active" }
+        {
+          "op": "RefreshDon",
+          "n": 2,
+          "state": "active"
+        }
       ]
     }
   },
@@ -767,8 +812,12 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "leaderHasKeyword": "海军" },
-        "cost": { "restActiveDon": 2 },
+        "if": {
+          "leaderHasKeyword": "海军"
+        },
+        "cost": {
+          "restActiveDon": 2
+        },
         "costPrompt": "是否将我方2张活跃咚转为休息状态，以从咚卡组追加1张休息咚?",
         "then": [
           {
@@ -828,7 +877,7 @@
   },
   "OP16-073": {
     "_name": "波尔萨利诺",
-    "_matcher": "登场时从咚卡组追加1张活跃咚 + 1张休息咚",
+    "_matcher": "登场时从咚卡组追加1张活跃咚+1张休息咚；【我方回合结束时】咚!!-2:此角色转活跃,并至下个对方结束阶段获得阻挡者",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -842,6 +891,23 @@
             "op": "RefreshDon",
             "n": 1,
             "state": "rest"
+          }
+        ]
+      },
+      {
+        "on": "OnMyTurnEnd",
+        "cost": { "donReturn": 2 },
+        "costPrompt": "咚!!-2：将此角色转为活跃状态，并直到下个对方的结束阶段为止获得【阻挡者】？",
+        "then": [
+          {
+            "op": "Activate",
+            "target": "self"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "self",
+            "keyword": "阻挡者",
+            "duration": "UntilNextOpponentEndPhase"
           }
         ]
       }
@@ -1184,6 +1250,7 @@
     }
   },
   "OP16-095": {
+    "_note": "【登场时】本回合中我方最多1张《和之国》黑色角色获得【不可阻挡】。候选须限定和之国+黑色（#154）。",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -1193,7 +1260,9 @@
             "prompt": "OwnCharacter",
             "max": 1,
             "min": 0,
-            "as": "$tgt"
+            "as": "$tgt",
+            "filter": { "keyword": "和之国", "color": "黑" },
+            "text": "选择我方最多1张《和之国》特征的黑色角色获得【不可阻挡】"
           },
           {
             "op": "GiveKeyword",
@@ -1235,7 +1304,10 @@
           {
             "op": "Choose",
             "prompt": "OwnTrashCharacter",
-            "filter": { "originalCostLte": 6, "keyword": "和之国" },
+            "filter": {
+              "originalCostLte": 6,
+              "keyword": "和之国"
+            },
             "max": 1,
             "min": 0,
             "as": "$c",
@@ -1247,7 +1319,9 @@
           },
           {
             "op": "PlayCharFromHand",
-            "filter": { "originalCostLte": 2 },
+            "filter": {
+              "originalCostLte": 2
+            },
             "text": "将我方手牌中最多1张费用≤2的角色登场"
           }
         ]
@@ -1261,17 +1335,29 @@
       {
         "on": "OnEnterField",
         "then": [
-          { "op": "Draw", "n": 1 },
-          { "op": "DiscardOwnChosen", "n": 1 }
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 1
+          }
         ]
       }
     ],
     "activated": {
-      "cost": { "selfToTrash": true },
+      "cost": {
+        "selfToTrash": true
+      },
       "then": [
         {
           "op": "PlayCharFromTrash",
-          "filter": { "nameEquals": "大和", "originalCostLte": 8, "originalCostGte": 8 },
+          "filter": {
+            "nameEquals": "大和",
+            "originalCostLte": 8,
+            "originalCostGte": 8
+          },
           "text": "将废弃区1张费用为8的黑色《大和》登场"
         }
       ]
@@ -1289,7 +1375,10 @@
         },
         {
           "op": "PlayCharFromTrash",
-          "filter": { "keywordContains": "和之国", "originalCostLte": 6 },
+          "filter": {
+            "keywordContains": "和之国",
+            "originalCostLte": 6
+          },
           "text": "从废弃区登场最多1张费用≤6且拥有《和之国》特征的角色"
         }
       ]
@@ -1400,7 +1489,19 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP16-108": {
     "_name": "希流",
@@ -1429,17 +1530,73 @@
       {
         "on": "OnKO",
         "then": [
-          { "op": "Draw", "n": 1 },
-          { "op": "Choose", "prompt": "OpponentCharacterCostLe6", "max": 1, "min": 0, "as": "$t", "text": "将对方最多1张费用≤6的角色转为休息状态" },
-          { "op": "Rest", "target": "$t" }
+          {
+            "op": "Draw",
+            "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe6",
+            "max": 1,
+            "min": 0,
+            "as": "$t",
+            "text": "将对方最多1张费用≤6的角色转为休息状态"
+          },
+          {
+            "op": "Rest",
+            "target": "$t"
+          }
         ]
       }
     ],
     "trigger": [
-      { "op": "Draw", "n": 1 },
-      { "op": "Choose", "prompt": "OpponentCharacterCostLe6", "max": 1, "min": 0, "as": "$t", "text": "将对方最多1张费用≤6的角色转为休息状态" },
-      { "op": "Rest", "target": "$t" }
+      {
+        "op": "Draw",
+        "n": 1
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe6",
+        "max": 1,
+        "min": 0,
+        "as": "$t",
+        "text": "将对方最多1张费用≤6的角色转为休息状态"
+      },
+      {
+        "op": "Rest",
+        "target": "$t"
+      }
     ]
+  },
+  "OP16-111": {
+    "_name": "波尔·桑达索尼娅",
+    "_matcher": "【触发】我方生命≤2时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP16-113": {
+    "_name": "波尔·玛丽格鲁德",
+    "_matcher": "【触发】领袖含《九蛇海盗团》时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP16-114": {
     "triggers": [
@@ -1483,11 +1640,15 @@
     "_name": "啧哈哈哈哈哈哈!!",
     "_matcher": "【主要】我方场上10张咚!!则从手牌登场≤1张《马歇尔·D·提奇》,之后对方生命顶≤1入对方手牌;【触发】抽2弃1。",
     "main": {
-      "if": { "selfDonTotalGte": 10 },
+      "if": {
+        "selfDonTotalGte": 10
+      },
       "then": [
         {
           "op": "PlayCharFromHand",
-          "filter": { "nameEquals": "马歇尔·D·提奇" },
+          "filter": {
+            "nameEquals": "马歇尔·D·提奇"
+          },
           "text": "将我方手牌中最多1张《马歇尔·D·提奇》登场"
         },
         {

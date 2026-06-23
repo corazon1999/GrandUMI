@@ -31,12 +31,14 @@
   },
   "OP04-002": {
     "_name": "伊格拉姆",
-    "_matcher": "实现确认顶5公开1张阿拉巴斯坦王国加手牌(横置自身);'我方活跃领袖力量-5000'这一非标准可选成本无法用cost键表达,已忽略成本部分",
+    "_matcher": "启动主要,横置自身且本回合我方活跃领袖力量-5000为成本:确认顶5公开1张阿拉巴斯坦王国加手牌。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
-        "restSelf": true
+        "restSelf": true,
+        "leaderPowerThisTurn": -5000
       },
+      "costPrompt": "横置此角色并使我方活跃领袖本回合力量-5000：发动此效果？",
       "then": [
         {
           "op": "LookTopReveal",
@@ -772,7 +774,7 @@
   },
   "OP04-066": {
     "_name": "Ms.情人节(美琪塔)",
-    "_matcher": "登场时确认卡组顶5张、公开1张含巴洛克工作室特征加手牌，其余放回卡组底。",
+    "_matcher": "登场时确认卡组顶5张、公开1张含巴洛克工作室特征加手牌，其余放回卡组底。【触发】咚!!-1放回咚1为成本从废弃区登场自身。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -790,7 +792,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP04-074": {
     "_name": "色彩陷阱",
@@ -1002,11 +1014,18 @@
   },
   "OP04-091": {
     "_name": "雷欧",
-    "_matcher": "【登场时】领袖含德莱斯罗兹时KO对方费用≤1角色并弃顶2张;触发节不支持cost,「可将领袖转休息」的可选成本按惯例忽略只实现收益",
+    "_matcher": "【登场时】可将我方1张领袖转休息为成本(用restCards通用横置近似,无专用领袖休置键):领袖含德莱斯罗兹时KO对方费用≤1角色并弃顶2张。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restCards": {
+            "n": 1,
+            "optional": true
+          }
+        },
+        "costPrompt": "将我方1张领袖转为休息状态：发动此效果？",
         "if": {
           "leaderHasKeyword": "德莱斯罗兹"
         },
@@ -1102,6 +1121,9 @@
       }
     ],
     "trigger": [
+      {
+        "op": "PlaySelf"
+      },
       {
         "op": "Choose",
         "prompt": "OpponentCharacterCostLe2",
@@ -1208,5 +1230,131 @@
         "delta": 1000
       }
     ]
+  },
+  "OP04-064": {
+    "_name": "Ms.全周日",
+    "_matcher": "【触发】咚!!2（放回咚卡组2张）为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "donReturn": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-065": {
+    "_name": "Ms.黄金周(玛丽安奴)",
+    "_matcher": "【触发】咚!!-1（放回咚卡组1张）为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-067": {
+    "_name": "Ms.圣诞快乐(多洛菲)",
+    "_matcher": "【触发】咚!!-1（放回咚卡组1张）为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-069": {
+    "_name": "Mr.2·盆·岁末(本萨姆)",
+    "_matcher": "【触发】咚!!-1（放回咚卡组1张）为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-099": {
+    "_name": "阿玲",
+    "_matcher": "【触发】我方生命卡牌不多于1张时：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-104": {
+    "_name": "山智",
+    "_matcher": "【触发】可丢弃我方1张手牌为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-106": {
+    "_name": "夏洛特·巴巴洛亚",
+    "_matcher": "【触发】可丢弃我方1张手牌为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP04-108": {
+    "_name": "夏洛特·莫斯卡特",
+    "_matcher": "【触发】可丢弃我方1张手牌为成本：从废弃区登场自身（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   }
 }

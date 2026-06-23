@@ -1236,9 +1236,7 @@
     "keyWords": "纯毛族",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1412,9 +1410,7 @@
     "keyWords": "大妈海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2094,9 +2090,7 @@
     "keyWords": "东海/海军",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,

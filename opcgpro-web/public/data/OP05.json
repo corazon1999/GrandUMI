@@ -1366,9 +1366,7 @@
     "keyWords": "草帽一伙",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -1894,9 +1892,7 @@
     "keyWords": "阿拉巴斯坦王国",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,

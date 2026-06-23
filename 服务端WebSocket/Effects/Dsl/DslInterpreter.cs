@@ -316,19 +316,39 @@ public static class DslInterpreter
         //   候选卡随 extra.choiceCards 下发卡面（手牌等私有区需显式下发番号才能在客户端显示）。
         if (cost.TryGetProperty("revealHand", out var rev) && rev.ValueKind == JsonValueKind.Object)
         {
+            int n = GetInt(rev, "n", 1);
             var pred = BuildMatchPredicate(rev);
             var cands = me.Hand.Where(pred).ToList();
-            if (cands.Count == 0) return false;
+            if (cands.Count < n) return false;
             var text = rev.TryGetProperty("text", out var tx) ? tx.GetString() ?? "选择要公开的手牌（可放弃）" : "选择要公开的手牌（可放弃）";
             var extra = new Dictionary<string, object?>
             {
                 ["choiceCards"] = cands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
             };
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RevealOwnHand", text,
-                cands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
-            if (chosen.Count == 0) return false;
-            var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-            ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new List<string> { picked.Info.Number });
+                cands.Select(c => c.Id.ToString()).ToList(), 0, n, extra);
+            if (chosen.Count < n) return false;
+            var nums = chosen.Select(cid => cands.First(c => c.Id.ToString() == cid).Info.Number).ToList();
+            ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, nums);
+        }
+
+        // handToDeckBottom: 将我方 N 张手牌放置到卡组最下方作为成本（"可以将手牌放卡组底：…"）。可放弃。
+        if (cost.TryGetProperty("handToDeckBottom", out var htd))
+        {
+            int n = htd.ValueKind == JsonValueKind.Number ? htd.GetInt32() : GetInt(htd, "n", 1);
+            var pred = htd.ValueKind == JsonValueKind.Object ? BuildMatchPredicate(htd) : (_ => true);
+            var cands = me.Hand.Where(pred).ToList();
+            if (cands.Count < n) return false;
+            var extra = new Dictionary<string, object?>
+            { ["choiceCards"] = cands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList() };
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandToDeckBottom",
+                $"将 {n} 张手牌放置到卡组最下方（可放弃）", cands.Select(c => c.Id.ToString()).ToList(), 0, n, extra);
+            if (chosen.Count < n) return false;
+            foreach (var cid in chosen)
+            {
+                var card = cands.FirstOrDefault(c => c.Id.ToString() == cid);
+                if (card is not null) AtomicOps.ReturnHandToDeckBottom(me, card);
+            }
         }
 
         // trashOwnCharacter: 将我方场上 1 张符合过滤的角色放置废弃区作为成本（"可以…放置…：…"）。
@@ -350,6 +370,144 @@ public static class DslInterpreter
             BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, picked);
         }
 
+        // lifeFaceUp: 将我方生命区最上方 1 张翻至正面朝上作为成本（"可以将生命顶1张翻正：…"）。已正面/生命空则无法支付。
+        if (cost.TryGetProperty("lifeFaceUp", out var lfu) && lfu.ValueKind == JsonValueKind.True)
+        {
+            if (me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return false;
+            AtomicOps.FlipTopLifeFaceUp(me);
+        }
+
+        // leaderPowerThisTurn: 将我方(活跃)领袖本回合力量 +N(N可为负) 作为成本（OP07-006 领袖-5000）。需领袖活跃。
+        if (cost.TryGetProperty("leaderPowerThisTurn", out var lpt) && lpt.ValueKind == JsonValueKind.Number)
+        {
+            if (me.Leader.IsTapped) return false;
+            AtomicOps.AddPowerThisTurn(me.Leader, lpt.GetInt32());
+        }
+
+        // lifeToHandChoice: 将我方生命区"最上方或最下方"1 张加入手牌作为成本（玩家选 顶/底/放弃）。
+        if (cost.TryGetProperty("lifeToHandChoice", out var lhc) && lhc.ValueKind == JsonValueKind.True)
+        {
+            if (ctx.State.NoEffectLifeToHandThisTurn.Contains(ctx.OwnerIndex)) return false;
+            if (me.LifeArea.Count == 0) return false;
+            int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                "将生命区1张卡牌加入手牌作为成本：", new[] { "最上方", "最下方", "放弃" });
+            if (opt is < 0 or 2) return false; // 放弃/超时 → 不支付
+            int li = opt == 0 ? 0 : me.LifeArea.Count - 1;
+            var lc = me.LifeArea[li];
+            me.LifeArea.RemoveAt(li);
+            lc.IsLifeFaceUp = false;
+            me.Hand.Add(lc);
+        }
+
+        // restOwnKeyworded: 将我方 1 张含指定特征的领袖/舞台转为休息状态作为成本（OP10-044/081/095「休息德莱斯罗兹领袖/舞台」）。
+        if (cost.TryGetProperty("restOwnKeyworded", out var rok) && rok.ValueKind == JsonValueKind.Object)
+        {
+            var kw = rok.TryGetProperty("keyword", out var kwv) ? kwv.GetString() ?? "" : "";  // 空=不限特征(任意领袖/舞台)
+            var rcands = new List<CardInstance>();
+            if (!me.Leader.IsTapped && (kw == "" || me.Leader.Info.HasKeyword(kw))) rcands.Add(me.Leader);
+            if (me.StageCard is not null && !me.StageCard.IsTapped && (kw == "" || me.StageCard.Info.HasKeyword(kw))) rcands.Add(me.StageCard);
+            if (rcands.Count == 0) return false;
+            var rchosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrStageToRest",
+                kw == "" ? "将我方1张领袖或舞台转为休息状态（可放弃）" : $"将我方1张《{kw}》领袖或舞台转为休息状态（可放弃）",
+                rcands.Select(c => c.Id.ToString()).ToList(), 0, 1);
+            if (rchosen.Count == 0) return false;
+            AtomicOps.RestCard(rcands.First(c => c.Id.ToString() == rchosen[0]));
+        }
+
+        // bounceOwnChar: 将我方 N 张角色放回手牌作为成本（数字=任意角色；对象 {n,...过滤} 带筛选，如 OP10-056 费≥4 德莱斯罗兹）。
+        if (cost.TryGetProperty("bounceOwnChar", out var boc))
+        {
+            int n = boc.ValueKind == JsonValueKind.Number ? boc.GetInt32() : GetInt(boc, "n", 1);
+            var bpred = boc.ValueKind == JsonValueKind.Object ? BuildMatchPredicate(boc) : (Func<CardInstance, bool>)(_ => true);
+            var bcands = me.Characters.Where(bpred).ToList();
+            if (bcands.Count < n) return false;
+            var bextra = new Dictionary<string, object?>
+            { ["choiceCards"] = bcands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList() };
+            var bchosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacterToBounce",
+                $"将我方 {n} 张角色放回手牌（可放弃）", bcands.Select(c => c.Id.ToString()).ToList(), 0, n, bextra);
+            if (bchosen.Count < n) return false;
+            foreach (var cid in bchosen)
+            {
+                var card = bcands.FirstOrDefault(c => c.Id.ToString() == cid);
+                if (card is not null) AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, card);
+            }
+        }
+
+        // trashToDeckBottom: 将我方废弃区 N 张(按过滤)自选放回卡组最下方作为成本（EB03-043/OP07-080「废弃区2张含CP放回卡组底」）。
+        if (cost.TryGetProperty("trashToDeckBottom", out var ttd) && ttd.ValueKind == JsonValueKind.Object)
+        {
+            int n = GetInt(ttd, "n", 1);
+            var pred = BuildMatchPredicate(ttd);
+            var tcands = me.Trash.Where(pred).ToList();
+            if (tcands.Count < n) return false;
+            var textra = new Dictionary<string, object?>
+            { ["choiceCards"] = tcands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList() };
+            var tchosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnTrashToDeckBottom",
+                $"将废弃区 {n} 张卡牌放回卡组最下方（可放弃）", tcands.Select(c => c.Id.ToString()).ToList(), 0, n, textra);
+            if (tchosen.Count < n) return false;
+            foreach (var cid in tchosen)
+            {
+                var card = tcands.FirstOrDefault(c => c.Id.ToString() == cid);
+                if (card is not null) AtomicOps.ReturnTrashToDeckBottom(me, card);
+            }
+        }
+
+        // lifeFaceDown: 将我方生命区最上方 1 张翻至正面朝下作为成本（白星/鱼人岛系；生命空则不可付）。
+        if (cost.TryGetProperty("lifeFaceDown", out var lfd) && lfd.ValueKind == JsonValueKind.True)
+        {
+            if (me.LifeArea.Count == 0) return false;
+            me.LifeArea[0].IsLifeFaceUp = false;
+        }
+
+        // lifeToTrash: 将我方生命区最上方 1 张放置到废弃区作为成本（EB03-055）。
+        if (cost.TryGetProperty("lifeToTrash", out var ltt) && ltt.ValueKind == JsonValueKind.True)
+        {
+            if (me.LifeArea.Count == 0) return false;
+            var lc = me.LifeArea[0]; me.LifeArea.RemoveAt(0); lc.IsLifeFaceUp = false; me.Trash.Add(lc);
+        }
+
+        // returnOwnStage: 将我方 1 张舞台放回卡组最下方作为成本（可带 originalCost 过滤；可放弃）。
+        if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
+        {
+            if (me.StageCard is null) return false;
+            bool sok = true;
+            if (ros.ValueKind == JsonValueKind.Object)
+            {
+                if (ros.TryGetProperty("originalCostLte", out var ocl) && me.StageCard.Info.Cost > ocl.GetInt32()) sok = false;
+                if (ros.TryGetProperty("originalCostGte", out var ocg) && me.StageCard.Info.Cost < ocg.GetInt32()) sok = false;
+            }
+            if (!sok) return false;
+            var schosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnStageToDeckBottom",
+                "将我方1张舞台放回卡组最下方（可放弃）", new List<string> { me.StageCard.Id.ToString() }, 0, 1);
+            if (schosen.Count == 0) return false;
+            AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, me.StageCard);
+        }
+
+        // selfToDeckBottom: 将此角色放回持有者卡组最下方作为成本（OP06-016）。
+        if (cost.TryGetProperty("selfToDeckBottom", out var sdb) && sdb.ValueKind == JsonValueKind.True)
+        {
+            AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, ctx.Source);
+        }
+
+        // attachDonToNamed: 赋予我方 1 张指定卡名角色 N 张活跃咚作为成本（EB04-009 给「希尔巴兹·雷利」贴活跃咚）。
+        if (cost.TryGetProperty("attachDonToNamed", out var adn) && adn.ValueKind == JsonValueKind.Object)
+        {
+            var nm = adn.TryGetProperty("name", out var nmv) ? nmv.GetString() ?? "" : "";
+            int n = GetInt(adn, "n", 1);
+            var targets = me.Characters.Where(c => c.MatchesName(nm)).ToList();
+            if (targets.Count == 0 || me.ActiveDonCount < n) return false;
+            CardInstance tgt;
+            if (targets.Count == 1) tgt = targets[0];
+            else
+            {
+                var ac = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnNamedCharForDon",
+                    $"选择要赋予 {n} 张活跃咚的「{nm}」", targets.Select(c => c.Id.ToString()).ToList(), 1, 1);
+                if (ac.Count == 0) return false;
+                tgt = targets.First(c => c.Id.ToString() == ac[0]);
+            }
+            AtomicOps.AttachDonFromCost(me, tgt.Id, n, DonState.Active);
+        }
+
         return true;
     }
 
@@ -357,7 +515,7 @@ public static class DslInterpreter
     /// 交互类成本（handDiscard 对象 / revealHand / trashOwnCharacter）自带放弃机制，不计入。</summary>
     static bool CostNeedsConfirm(JsonElement cost)
     {
-        string[] silent = { "donReturn", "restSelf", "selfToTrash", "restActiveDon", "millTop", "lifeToHand" };
+        string[] silent = { "donReturn", "restSelf", "selfToTrash", "restActiveDon", "millTop", "lifeToHand", "lifeFaceUp", "leaderPowerThisTurn", "lifeFaceDown", "lifeToTrash", "selfToDeckBottom" };
         foreach (var k in silent)
             if (cost.TryGetProperty(k, out _)) return true;
         // handDiscard 数字形式=强制丢弃 N 张，属静默；对象形式自带选择放弃，不计入
@@ -406,13 +564,73 @@ public static class DslInterpreter
         if (cost.TryGetProperty("revealHand", out var rev) && rev.ValueKind == JsonValueKind.Object)
         {
             var pred = BuildMatchPredicate(rev);
-            if (!me.Hand.Any(pred)) return false;
+            if (me.Hand.Count(pred) < GetInt(rev, "n", 1)) return false;
+        }
+
+        if (cost.TryGetProperty("handToDeckBottom", out var htd))
+        {
+            int n = htd.ValueKind == JsonValueKind.Number ? htd.GetInt32() : GetInt(htd, "n", 1);
+            int have = htd.ValueKind == JsonValueKind.Object ? me.Hand.Count(BuildMatchPredicate(htd)) : me.Hand.Count;
+            if (have < n) return false;
         }
 
         if (cost.TryGetProperty("trashOwnCharacter", out var toc) && toc.ValueKind == JsonValueKind.Object)
         {
             var pred = BuildMatchPredicate(toc);
             if (!me.Characters.Any(pred)) return false;
+        }
+
+        if (cost.TryGetProperty("lifeFaceUp", out var lfu) && lfu.ValueKind == JsonValueKind.True)
+            if (me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return false;
+
+        if (cost.TryGetProperty("leaderPowerThisTurn", out var lpt) && lpt.ValueKind == JsonValueKind.Number)
+            if (me.Leader.IsTapped) return false;
+
+        if (cost.TryGetProperty("lifeToHandChoice", out var lhc) && lhc.ValueKind == JsonValueKind.True)
+        {
+            if (ctx.State.NoEffectLifeToHandThisTurn.Contains(ctx.OwnerIndex)) return false;
+            if (me.LifeArea.Count == 0) return false;
+        }
+
+        if (cost.TryGetProperty("restOwnKeyworded", out var rok) && rok.ValueKind == JsonValueKind.Object)
+        {
+            var kw = rok.TryGetProperty("keyword", out var kwv) ? kwv.GetString() ?? "" : "";
+            bool any = (!me.Leader.IsTapped && (kw == "" || me.Leader.Info.HasKeyword(kw)))
+                       || (me.StageCard is not null && !me.StageCard.IsTapped && (kw == "" || me.StageCard.Info.HasKeyword(kw)));
+            if (!any) return false;
+        }
+
+        if (cost.TryGetProperty("bounceOwnChar", out var boc))
+        {
+            int n = boc.ValueKind == JsonValueKind.Number ? boc.GetInt32() : GetInt(boc, "n", 1);
+            int have = boc.ValueKind == JsonValueKind.Object ? me.Characters.Count(BuildMatchPredicate(boc)) : me.Characters.Count;
+            if (have < n) return false;
+        }
+
+        if (cost.TryGetProperty("trashToDeckBottom", out var ttd) && ttd.ValueKind == JsonValueKind.Object)
+        {
+            var pred = BuildMatchPredicate(ttd);
+            if (me.Trash.Count(pred) < GetInt(ttd, "n", 1)) return false;
+        }
+
+        if ((cost.TryGetProperty("lifeFaceDown", out var lfd) && lfd.ValueKind == JsonValueKind.True)
+            || (cost.TryGetProperty("lifeToTrash", out var ltt) && ltt.ValueKind == JsonValueKind.True))
+            if (me.LifeArea.Count == 0) return false;
+
+        if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
+        {
+            if (me.StageCard is null) return false;
+            if (ros.ValueKind == JsonValueKind.Object)
+            {
+                if (ros.TryGetProperty("originalCostLte", out var ocl) && me.StageCard.Info.Cost > ocl.GetInt32()) return false;
+                if (ros.TryGetProperty("originalCostGte", out var ocg) && me.StageCard.Info.Cost < ocg.GetInt32()) return false;
+            }
+        }
+
+        if (cost.TryGetProperty("attachDonToNamed", out var adn) && adn.ValueKind == JsonValueKind.Object)
+        {
+            var nm = adn.TryGetProperty("name", out var nmv) ? nmv.GetString() ?? "" : "";
+            if (!me.Characters.Any(c => c.MatchesName(nm)) || me.ActiveDonCount < GetInt(adn, "n", 1)) return false;
         }
 
         return true;
@@ -678,7 +896,8 @@ public static class DslInterpreter
                     {
                         var kw = op.GetProperty("keyword").GetString() ?? "";
                         var dur = GetDuration(op);
-                        AtomicOps.GiveKeyword(target, kw, dur);
+                        // 传入控制者一方，使 UntilNextOpponentEndPhase 正确持续到对方结束阶段（#147）
+                        AtomicOps.GiveKeyword(target, kw, dur, ctx.OwnerIndex);
                     }
                     break;
                 }
@@ -784,6 +1003,14 @@ public static class DslInterpreter
                     AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
                     break;
                 }
+            // PlaySelf:「此卡牌登场」生命触发——把此卡(发动触发时已被移入废弃区)从废弃区登场到场上(触发其登场时)。
+            case "PlaySelf":
+                if (ctx.Source.Info.Kind == CardKind.Character)
+                {
+                    await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, ctx.Source);
+                    AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source);
+                }
+                break;
             case "TrashToHand":
                 {
                     var target = ResolveTarget(op, "target", ctx);
@@ -885,7 +1112,7 @@ public static class DslInterpreter
                     if (target is null) break;
                     var kindStr = op.TryGetProperty("kind", out var ks) ? ks.GetString() : null;
                     if (Enum.TryParse<RestrictionKind>(kindStr, out var kind))
-                        AtomicOps.AddRestriction(target, kind, GetDuration(op));
+                        AtomicOps.AddRestriction(target, kind, GetDuration(op), ctx.OwnerIndex);
                     break;
                 }
 

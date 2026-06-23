@@ -679,6 +679,22 @@
       }
     ]
   },
+  "EB02-055": {
+    "_name": "甚平",
+    "_matcher": "触发:[领袖含鱼人族(原文鱼人族或人鱼族,或条件近似)且我方生命≤2]此卡自登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "鱼人族",
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "EB02-058": {
     "_name": "UUUUUS!",
     "_matcher": "标准音乐检索:确认顶4公开1张费用≥4加手牌其余放回底,触发同主要",

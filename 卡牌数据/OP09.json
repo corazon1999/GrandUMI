@@ -1499,9 +1499,7 @@
     "effectTags": [
       "OnMyTurnEnd"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,

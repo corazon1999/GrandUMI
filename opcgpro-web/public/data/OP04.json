@@ -98,9 +98,7 @@
     "keyWords": "动物/阿拉巴斯坦王国",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -1273,9 +1271,7 @@
     "keyWords": "七水之城/卡雷拉公司",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -1531,9 +1527,7 @@
     "keyWords": "巴洛克工作室",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,

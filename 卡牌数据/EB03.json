@@ -397,9 +397,7 @@
     "effectTags": [
       "OnMyTurnEnd"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -981,9 +979,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,

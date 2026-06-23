@@ -528,9 +528,7 @@
     "effectTags": [
       "OnOppAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -637,9 +635,7 @@
       "OnCharLeaveField",
       "OnAllyWillBeKOd"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 2,
@@ -659,9 +655,7 @@
     "keyWords": "动物",
     "counter": "2000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,

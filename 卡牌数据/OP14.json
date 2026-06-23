@@ -232,9 +232,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,

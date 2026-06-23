@@ -141,18 +141,43 @@ export function exportDeckString(leader: CardData, cards: CardData[], name?: str
 
 const CARD_NO_RE = /[A-Z]{1,4}\d{0,2}-\d{1,4}/i;
 
+// 「数量x卡号」紧凑格式（OPTCGSim/常见模拟器风格），如 1xOP13-002 3xOP13-007 …，
+// 可全部写在一行或换行、空格分隔；x 也接受 × / X，可选 | sprite。领航靠卡牌 type 识别（#159/#160）。
+const MULT_RE = /(\d+)\s*[x×]\s*([A-Za-z]{1,4}\d{0,2}-\d{1,4})(?:\s*\|\s*(\S+))?/gi;
+
 /**
- * 解析卡组码文本,宽松容错:
- *   - 忽略空行与 # 注释
- *   - 领航行:以「领航/leader/L:」开头,或卡牌 type 为 Leader
- *   - 卡牌行:卡号前的数字为数量(默认 1,上限 4),| 之后为异画 sprite
- * 返回识别到的领航与卡牌(逐张展开),以及跳过的无效卡号数量。
+ * 解析卡组码文本,宽松容错,支持两种格式:
+ *   A. 每行『数量 卡号』(导出格式): 领航行以「领航/leader/L:」开头或 type=Leader; 卡号前数字为数量, | 后为异画 sprite。
+ *   B. 紧凑『数量x卡号』: 如 1xOP13-002 3xOP13-007 …(可同行/换行)。领航靠 type=Leader 识别。
+ * 自动按是否含「数字x卡号」判定走 B, 否则走 A。返回识别到的领航与卡牌(逐张展开)及跳过的无效卡号数量。
  */
 export function importDeckString(text: string): { leader: CardData | null; cards: CardData[]; skipped: number } {
   let leader: CardData | null = null;
   const cards: CardData[] = [];
   let skipped = 0;
 
+  // 去掉 # 注释行后整体检测/解析「数量x卡号」紧凑格式
+  const cleaned = text
+    .split(/\r?\n/)
+    .filter((l) => !l.trim().startsWith("#"))
+    .join("\n");
+  MULT_RE.lastIndex = 0;
+  let mm: RegExpExecArray | null;
+  let anyMult = false;
+  while ((mm = MULT_RE.exec(cleaned)) !== null) {
+    anyMult = true;
+    const qty = parseInt(mm[1], 10) || 1;
+    const number = mm[2].toUpperCase();
+    const sprite = mm[3];
+    if (sprite) applyCachedSprite(number, sprite);
+    const card = getCard(number);
+    if (!card) { skipped += qty; continue; }
+    if (card.type === "Leader") { leader = card; continue; } // 领航不计入数量
+    for (let i = 0; i < Math.min(qty, 4); i++) cards.push(card);
+  }
+  if (anyMult) return { leader, cards, skipped };
+
+  // ── 回退:格式 A『每行 数量 卡号』──
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;

@@ -530,9 +530,7 @@
     "effectTags": [
       "OnOppAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -640,9 +638,7 @@
       "OnAllyWillBeKOd",
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 2,
@@ -664,9 +660,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,

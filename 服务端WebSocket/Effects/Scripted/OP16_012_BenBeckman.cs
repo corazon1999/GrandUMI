@@ -26,14 +26,33 @@ public class OP16_012_BenBeckman : IScriptedEffect
 
         // 条件：领袖拥有《红发海盗团》特征
         if (!me.Leader.Info.HasKeyword("红发海盗团")) return;
-        // 条件：我方场上存在 10 张或更多咚!!
+        // 条件：我方场上存在 10 张或更多咚!!（休息咚也计入总数，故先付成本不影响判定）
         if (me.TotalDonInCostArea < 10) return;
 
-        // 收益：将手牌中最多1张"杰克斯"登场
+        // 收益候选：手牌中的"杰克斯"角色
         var cands = me.Hand.Where(c =>
             c.Info.Kind == CardKind.Character && c.MatchesName("杰克斯")).ToList();
         if (cands.Count == 0) return;
 
+        // 成本：可以将我方 1 张咚!!转为休息状态。需有至少 1 张活跃咚才能支付（#150）。
+        if (me.ActiveDonCount < 1) return;
+
+        // 可选发动：确认是否支付成本
+        bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+            "本·贝克曼【登场时】：将我方 1 张咚!!转为休息状态，登场手牌中 1 张\"杰克斯\"？");
+        if (!use) return;
+
+        // 支付成本：将 1 张活跃咚转为休息状态（冒号前=成本，须先支付）
+        foreach (var d in me.CostArea)
+        {
+            if (d.State == DonState.Active && d.AttachedToCardId is null)
+            {
+                d.State = DonState.Rest;
+                break;
+            }
+        }
+
+        // 收益：将手牌中最多 1 张"杰克斯"登场
         var extra = new Dictionary<string, object?>
         {
             ["choiceCards"] = cands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),

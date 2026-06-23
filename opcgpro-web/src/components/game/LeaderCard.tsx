@@ -58,9 +58,9 @@ export default function LeaderCard({ side }: Props) {
       confirmAttackTarget({ isLeader: true });
       return;
     }
-    // 选中了活跃咚 + 点自己领袖 → 贴咚
+    // 选中了活跃咚 + 点自己领袖 → 贴咚（依附拟选的张数，#144）
     if (selectedDonIndex !== null && side === "my") {
-      GameRequest.attachDon("leader");
+      GameRequest.attachDon("leader", selectedDonIndex || 1);
       setSelectedDon(null);
       return;
     }
@@ -112,8 +112,8 @@ export default function LeaderCard({ side }: Props) {
         <div className="pointer-events-none absolute -right-2 -top-2 h-5 w-5 animate-pulse rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
       )}
       {selectedDonIndex !== null && side === "my" && !isPending && (
-        <div className="pointer-events-none absolute -left-2 -top-2 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
-          <span className="text-[10px] font-black text-black">+</span>
+        <div className="pointer-events-none absolute -left-2 -top-2 flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 px-1 shadow-lg shadow-yellow-300/50">
+          <span className="text-[10px] font-black text-black">+{selectedDonIndex}</span>
         </div>
       )}
     </div>

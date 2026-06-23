@@ -138,7 +138,11 @@
             "max": 1,
             "min": 0,
             "text": "选择手牌中最多1张力量不高于2000的红色角色登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "color": "红",
+              "originalPowerLte": 2000
+            }
           },
           {
             "op": "PlayFromHandFree",
@@ -210,8 +214,16 @@
           "count": 4,
           "max": 1,
           "match": {
-            "kind": "Character",
-            "keyword": "草帽一伙"
+            "anyOf": [
+              {
+                "kind": "Character",
+                "keyword": "超新星"
+              },
+              {
+                "kind": "Character",
+                "keyword": "草帽一伙"
+              }
+            ]
           }
         }
       ]
@@ -282,7 +294,11 @@
             "max": 1,
             "min": 0,
             "text": "选择手牌中最多1张费用不高于6且拥有《东海》特征的角色登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "kind": "Character",
+              "keyword": "东海"
+            }
           },
           {
             "op": "PlayFromHandFree",
@@ -316,7 +332,10 @@
     "_matcher": "主要:可放弃成本『将我方3张卡牌(活跃 领袖/角色/舞台/咚)转为休息』→KO对方1张休息角色;反击:领袖+3000",
     "main": {
       "cost": {
-        "restCards": { "n": 3, "optional": true }
+        "restCards": {
+          "n": 3,
+          "optional": true
+        }
       },
       "then": [
         {
@@ -430,7 +449,19 @@
             "max": 1,
             "min": 0,
             "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》或《人鱼族》特征的角色登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "anyOf": [
+                {
+                  "kind": "Character",
+                  "keyword": "鱼人族"
+                },
+                {
+                  "kind": "Character",
+                  "keyword": "人鱼族"
+                }
+              ]
+            }
           },
           {
             "op": "PlayFromHandFree",
@@ -503,7 +534,19 @@
             "max": 1,
             "min": 0,
             "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》或《人鱼族》特征的角色登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "anyOf": [
+                {
+                  "kind": "Character",
+                  "keyword": "鱼人族"
+                },
+                {
+                  "kind": "Character",
+                  "keyword": "人鱼族"
+                }
+              ]
+            }
           },
           {
             "op": "PlayFromHandFree",
@@ -573,7 +616,11 @@
             "max": 1,
             "min": 0,
             "text": "丢弃3张手牌后，将手牌中最多1张费用不高于6且拥有《因佩尔地狱》特征的角色登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "kind": "Character",
+              "keyword": "因佩尔地狱"
+            }
           },
           {
             "op": "PlayFromHandFree",
@@ -615,7 +662,14 @@
           "op": "AddPowerAll",
           "delta": 1000,
           "filter": {
-            "keyword": "鱼人族"
+            "anyOf": [
+              {
+                "keyword": "鱼人族"
+              },
+              {
+                "keyword": "人鱼族"
+              }
+            ]
           }
         }
       ]
@@ -633,7 +687,11 @@
           "max": 1,
           "min": 0,
           "text": "选择手牌中最多1张费用不高于3且拥有《鱼人族》特征的角色登场",
-          "as": "$c"
+          "as": "$c",
+          "filter": {
+            "kind": "Character",
+            "keyword": "鱼人族"
+          }
         },
         {
           "op": "PlayFromHandFree",
@@ -1188,6 +1246,21 @@
       }
     ]
   },
+  "OP14-105": {
+    "_name": "戈耳工三姐妹",
+    "_matcher": "【触发】领袖含《九蛇海盗团》时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP14-107": {
     "triggers": [
       {
@@ -1206,7 +1279,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP14-108": {
     "triggers": [
@@ -1240,7 +1323,10 @@
           {
             "op": "Choose",
             "prompt": "OwnTrashCharacterCostLe4",
-            "filter": { "hasTrigger": true, "excludeName": "豪格巴克医生" },
+            "filter": {
+              "hasTrigger": true,
+              "excludeName": "豪格巴克医生"
+            },
             "max": 1,
             "min": 0,
             "text": "选择废弃区中最多1张（非豪格巴克医生）费用不高于4且拥有触发效果的角色登场",
@@ -1313,7 +1399,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP14-114": {
     "_name": "阿兰",
@@ -1338,6 +1434,16 @@
           "from": "rest"
         }
       ]
+    },
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
     }
   },
   "OP14-115": {
@@ -1354,7 +1460,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "九蛇海盗团"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP14-116": {
     "counter": [
@@ -1369,7 +1485,19 @@
         "max": 1,
         "min": 0,
         "text": "选择手牌中最多1张费用不高于4且拥有《亚马逊·百合》或《九蛇海盗团》特征的角色登场",
-        "as": "$c"
+        "as": "$c",
+        "filter": {
+          "anyOf": [
+            {
+              "kind": "Character",
+              "keyword": "亚马逊·百合"
+            },
+            {
+              "kind": "Character",
+              "keyword": "九蛇海盗团"
+            }
+          ]
+        }
       },
       {
         "op": "PlayFromHandFree",

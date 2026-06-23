@@ -241,9 +241,7 @@
     "effectTags": [
       "OnKO"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -534,9 +532,7 @@
     "effectTags": [
       "OnKO"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1194,9 +1190,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -1240,9 +1234,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1355,9 +1347,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -1536,9 +1526,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1970,9 +1958,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,

@@ -76,9 +76,7 @@
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "P",
     "subscript": 1,
@@ -2161,9 +2159,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "P",
     "subscript": 4,
@@ -2340,9 +2336,7 @@
     "keyWords": "邦妮海盗团",
     "counter": "反击+2000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "P",
     "subscript": 4,

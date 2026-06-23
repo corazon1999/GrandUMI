@@ -83,7 +83,7 @@
   },
   "ST30-012": {
     "_name": "蒙奇·D·路飞",
-    "_note": "【登场时】横置1咚：本回合此角色获得【速攻】；【攻击时】将对方最多1张角色转休息（原文限“拥有阻挡者的角色”，DSL 无阻挡者过滤，取任意角色近似）。",
+    "_note": "【登场时】横置1咚：本回合此角色获得【速攻】；【攻击时】将对方最多1张【拥有阻挡者】的角色转休息（#148 已加阻挡者过滤）。",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -94,7 +94,7 @@
       {
         "on": "OnAttackDeclare",
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "将对方最多1张角色转为休息状态" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "keyword": "阻挡者" }, "text": "将对方最多1张拥有【阻挡者】的角色转为休息状态" },
           { "op": "Rest", "target": "$tgt" }
         ]
       }

@@ -1260,9 +1260,7 @@
     "keyWords": "生物兵器/艾格赫德/海军",
     "counter": "2000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1282,9 +1280,7 @@
     "keyWords": "奥哈拉/科学家",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1374,9 +1370,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 4,

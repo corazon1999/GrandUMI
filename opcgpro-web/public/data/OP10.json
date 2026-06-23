@@ -1159,9 +1159,7 @@
     "keyWords": "东踏踏族/德莱斯罗兹",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -2179,9 +2177,7 @@
     "effectTags": [
       "OnMyTurnEnd"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 3,
@@ -2375,9 +2371,7 @@
     "keyWords": "超新星/广播海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,

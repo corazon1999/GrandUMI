@@ -149,7 +149,7 @@
   },
   "OP05-011": {
     "_name": "",
-    "_matcher": "登场时KO对方最多1张力量≤2000的角色；trigger为'多颜色领袖时此卡登场'属生命牌登场动作无额外收益效果，故仅实现登场时KO效果。",
+    "_matcher": "登场时KO对方最多1张力量≤2000的角色；trigger为'我方领袖为多种颜色时此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -171,11 +171,21 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderColorCountGte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP05-012": {
     "_name": "",
-    "_matcher": "登场时选对方最多1张力量≤2000角色KO；trigger字段为登场条件(多色领袖才登场)，非效果故忽略",
+    "_matcher": "登场时选对方最多1张力量≤2000角色KO；trigger为'我方领袖为多种颜色时此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -197,7 +207,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderColorCountGte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP05-014": {
     "_name": "",
@@ -248,9 +268,29 @@
       }
     ]
   },
+  "OP05-016": {
+    "_name": "",
+    "_matcher": "trigger为'可丢弃我方1张手牌：我方领袖为多种颜色时此卡牌登场'；攻击时段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "if": {
+        "leaderColorCountGte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP05-017": {
     "_name": "",
-    "_matcher": "攻击时自身力量≥7000则KO对方最多1张力量≤3000角色",
+    "_matcher": "攻击时自身力量≥7000则KO对方最多1张力量≤3000角色；trigger为'可丢弃我方1张手牌：我方领袖为多种颜色时此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -275,7 +315,22 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "if": {
+        "leaderColorCountGte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP05-018": {
     "_name": "",
@@ -563,7 +618,7 @@
   },
   "OP05-034": {
     "_name": "",
-    "_matcher": "启动主要休息自身：确认顶5公开1张堂吉诃德海盗团加手牌，检索标配；忽略可选的咚转休息成本",
+    "_matcher": "启动主要休息自身：确认顶5公开1张堂吉诃德海盗团加手牌，检索标配；原文另有可选『费用区指定数量咚转休息』成本，为非固定数量无对应cost键，按规范跳过",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
@@ -608,22 +663,29 @@
   },
   "OP05-037": {
     "_name": "",
-    "_matcher": "反击给我方1张领袖或角色本次战斗+3000；触发将对方1张费用≤4角色横置；忽略弃手牌可选成本",
+    "_matcher": "反击可丢弃1张手牌为成本：我方1张领袖或角色本次战斗+3000；触发将对方1张费用≤4角色横置",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 3000
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "Choose",
@@ -1021,7 +1083,7 @@
   },
   "OP05-073": {
     "_name": "",
-    "_matcher": "登场时可丢弃1手牌为成本，从咚卡组追加最多1张休息咚(RefreshDon state:rest)。trigger 字段为'此卡登场'特殊机制无法表达，未实现。",
+    "_matcher": "登场时可丢弃1手牌为成本，从咚卡组追加最多1张休息咚(RefreshDon state:rest)。trigger为'咚!!-1：此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1039,7 +1101,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP05-075": {
     "_name": "",
@@ -1399,7 +1471,7 @@
   },
   "OP05-104": {
     "_name": "",
-    "_matcher": "登场时抽1弃1（可选的『放回舞台』成本无法在 triggers 表达，按惯例忽略成本只实现收益）。",
+    "_matcher": "登场时(成本:将我方1张舞台放回卡组底)抽1弃1",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1413,9 +1485,29 @@
             "op": "DiscardOwnChosen",
             "n": 1
           }
-        ]
+        ],
+        "cost": {
+          "returnOwnStage": true
+        }
       }
     ]
+  },
+  "OP05-105": {
+    "_name": "",
+    "_matcher": "无场上效果；trigger为'可丢弃我方1张手牌：此卡牌登场'。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP05-106": {
     "_name": "",

@@ -30,11 +30,19 @@ export default function HandArea({ side, hidden = false }: Props) {
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const update = () => setWrapW(el.clientWidth);
+    // rAF 包裹 + 阈值防抖：避免 ResizeObserver 自反馈循环与亚像素抖动导致手牌反复重排（#143/#161）
+    const update = () => {
+      const w = el.clientWidth;
+      setWrapW((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+    };
     update();
-    const ro = new ResizeObserver(update);
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
   if (!player) return <div className="min-h-20" />;
@@ -69,7 +77,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   const cardW = cardSize === "sm" ? 72 : cardSize === "md" ? 96 : 128; // CardItem 各档宽度(px)
   const GAP = 8;                       // 不重叠时的卡间距（≈gap-2）
   const PAD = 24;                      // 容器左右内边距(px-3 各 12)
-  const minStep = Math.round(cardW * 0.3); // 重叠下限：每张至少露出 ~30% 便于悬停
+  const minStep = Math.round(cardW * 0.22); // 重叠下限：每张至少露出 ~22%（手牌很多时也能铺下不溢出）
   const avail = Math.max(0, wrapW - PAD);
   const n = cards.length;
   let step = cardW + GAP;              // 默认：满间距、零重叠
@@ -77,7 +85,8 @@ export default function HandArea({ side, hidden = false }: Props) {
     const fitStep = (avail - cardW) / (n - 1);
     step = Math.max(minStep, Math.min(cardW + GAP, fitStep));
   }
-  const marginLeft = step - cardW;     // 负值=重叠；正值=普通间距
+  // 取整：避免亚像素 marginLeft 在 framer-motion layout 下反复微动（漂移）
+  const marginLeft = Math.round(step - cardW); // 负值=重叠；正值=普通间距
 
   const handleClick = (i: number) => {
     if (hidden || isPending) return;

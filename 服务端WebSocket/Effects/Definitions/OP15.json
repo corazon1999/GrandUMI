@@ -548,23 +548,32 @@
   },
   "OP15-086": {
     "_name": "奈美",
-    "_matcher": "登场时从废弃区登场",
+    "_matcher": "登场时(领袖草帽)从废弃区登场≤7费草帽角色,本回合该角色获得速攻",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": { "leaderHasKeyword": "草帽一伙" },
         "then": [
           {
             "op": "Choose",
-            "prompt": "OwnTrashCharacter",
+            "prompt": "OwnTrashCharacterCostLe7",
             "max": 1,
-            "as": "$c"
+            "as": "$c",
+            "filter": { "keyword": "草帽一伙" },
+            "text": "从废弃区选 1 张费用≤7 且《草帽一伙》的角色登场（本回合获得【速攻】）"
           },
           {
             "op": "PlayFromTrash",
             "target": "$c"
+          },
+          {
+            "op": "GiveKeyword",
+            "target": "$c",
+            "keyword": "速攻",
+            "duration": "ThisTurn"
           }
         ],
-        "_doc": "从废弃区选 1 张费用 ≤7 的角色登场"
+        "_doc": "从废弃区选 1 张费用 ≤7 的《草帽一伙》角色登场，本回合该角色获得【速攻】（#158）"
       }
     ]
   },
@@ -645,13 +654,22 @@
   },
   "OP15-103": {
     "_name": "捷宝",
-    "_matcher": "【触发】抽 N",
-    "trigger": [
-      {
-        "op": "Draw",
-        "n": 1
-      }
-    ]
+    "_matcher": "【触发】抽1，之后我方生命≤2则此卡从废弃区登场。近似:抽1也被条件化(原文抽1无条件，受限于trigger对象单一if节，抽1与登场共用ownLifeCountLte≤2条件)",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP15-104": {
     "_name": "柯妮丝",
@@ -880,9 +898,11 @@
     ]
   },
   "OP15-113": {
+    "_note": "【登场时】可以丢弃我方1张手牌(成本)：将卡组顶最多1张加入生命区最上方。须先付丢牌成本才回血（#155）。",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": { "handDiscard": { "n": 1, "text": "丢弃我方1张手牌作为成本（可放弃；放弃则不回血）" } },
         "then": [
           {
             "op": "AddLifeFromDeck",

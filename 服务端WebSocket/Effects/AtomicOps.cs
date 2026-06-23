@@ -258,9 +258,9 @@ public static class AtomicOps
 
     // ── 关键字 ────────────────────────────────────────────────────────────
 
-    public static void GiveKeyword(CardInstance c, string keyword, KeywordDuration duration)
+    public static void GiveKeyword(CardInstance c, string keyword, KeywordDuration duration, int appliedBy = -1)
     {
-        c.GainedKeywords.Add(new TemporaryKeyword { Keyword = keyword, Duration = duration });
+        c.GainedKeywords.Add(new TemporaryKeyword { Keyword = keyword, Duration = duration, AppliedBySide = appliedBy });
     }
 
     // ── 咚操作 ────────────────────────────────────────────────────────────
@@ -834,9 +834,9 @@ public static class AtomicOps
     }
 
     /// <summary>给卡加限制（CannotAttack 等）</summary>
-    public static void AddRestriction(CardInstance c, RestrictionKind kind, KeywordDuration duration)
+    public static void AddRestriction(CardInstance c, RestrictionKind kind, KeywordDuration duration, int appliedBy = -1)
     {
-        c.Restrictions.Add(new CardRestriction { Kind = kind, Duration = duration });
+        c.Restrictions.Add(new CardRestriction { Kind = kind, Duration = duration, AppliedBySide = appliedBy });
     }
 
     /// <summary>

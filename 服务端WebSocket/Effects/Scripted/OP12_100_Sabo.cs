@@ -12,9 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   成本：将我方生命区最上方的 1 张卡牌加入手牌（需生命区非空）。
 ///   效果：抽取 2 张卡牌；之后丢弃我方 1 张手牌（玩家自选，经 extra.choiceCards 显示卡面）。
 ///
-/// 简化点（未实现）：
-///   - 前半"生命≤3 时获得【阻挡者】、费用+3"为持续型静态效果（被动、随生命数量动态生效），
-///     引擎目前没有可在脚本里挂载的持续静态状态通道，此处未实现。该被动需引擎层支持。
+/// 持续光环（登场时注册 ContinuousEffect）：
+///   "我方生命≤3 时此角色获得【阻挡者】、费用+3" 由 GrantKeyword="阻挡者"+CostDelta=3 实现，随生命数动态评估。
 /// </summary>
 public class OP12_100_Sabo : IScriptedEffect
 {
@@ -24,9 +23,23 @@ public class OP12_100_Sabo : IScriptedEffect
 
     public async Task Resolve(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
+        int owner = ctx.OwnerIndex;
 
-        // 成本：需生命区有牌才能将最上方 1 张加入手牌
+        // ── 持续光环：我方生命≤3 → 此角色获得【阻挡者】、费用+3（登场时无条件注册，按生命数动态评估）──
+        var selfId0 = ctx.Source.Id;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId0.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "阻挡者",
+            CostDelta = 3,
+            Predicate = (st, side, card) => card.Id == selfId0 && st.Players[owner].LifeArea.Count <= 3,
+        });
+
+        var me = ctx.State.Players[owner];
+
+        // 成本：需生命区有牌才能将最上方 1 张加入手牌（【登场时】可选效果）
         if (me.LifeArea.Count == 0) return;
 
         // 可选效果：询问是否发动

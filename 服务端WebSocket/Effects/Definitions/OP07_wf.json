@@ -94,8 +94,8 @@
     ]
   },
   "OP07-006": {
-    "_name": "",
-    "_matcher": "成本为我方活跃领袖力量-5000(无对应cost键且triggers不支持cost),按惯例忽略成本,只实现抽1弃1的收益。",
+    "_name": "斯特利",
+    "_matcher": "登场时(成本:活跃领袖本回合力量-5000)抽1丢1",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -109,7 +109,11 @@
             "op": "DiscardOwnChosen",
             "n": 1
           }
-        ]
+        ],
+        "cost": {
+          "leaderPowerThisTurn": -5000
+        },
+        "costPrompt": "将我方活跃领袖力量-5000：抽1弃1？"
       }
     ]
   },
@@ -670,8 +674,8 @@
     ]
   },
   "OP07-055": {
-    "_name": "",
-    "_matcher": "【反击】本次战斗领袖/角色+4000后退回我方1角色；【触发】退回我方角色为可选成本(trigger 不支持 cost，作为 op 顺序表达)后退回对方≤5费角色。",
+    "_name": "蛇舞",
+    "_matcher": "反击:我方1张领袖/角色本次+4000,之后退回我方最多1角色;触发(成本:退回我方1角色)退回对方最多1张费≤5角色",
     "_src": "wf-dsl",
     "counter": [
       {
@@ -700,32 +704,25 @@
         "target": "$b"
       }
     ],
-    "trigger": [
-      {
-        "op": "Choose",
-        "prompt": "OwnCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$c",
-        "text": "可以将我方1张角色放回其持有者的手牌(成本)"
+    "trigger": {
+      "cost": {
+        "bounceOwnChar": 1
       },
-      {
-        "op": "BounceToHand",
-        "target": "$c"
-      },
-      {
-        "op": "Choose",
-        "prompt": "OpponentCharacterCostLe5",
-        "max": 1,
-        "min": 0,
-        "as": "$o",
-        "text": "将对方最多1张费用不高于5的角色放回其持有者的手牌"
-      },
-      {
-        "op": "BounceToHand",
-        "target": "$o"
-      }
-    ]
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe5",
+          "max": 1,
+          "min": 0,
+          "as": "$o",
+          "text": "将对方最多1张费用≤5的角色放回手牌"
+        },
+        {
+          "op": "BounceToHand",
+          "target": "$o"
+        }
+      ]
+    }
   },
   "OP07-056": {
     "_name": "",
@@ -1032,8 +1029,8 @@
     ]
   },
   "OP07-080": {
-    "_name": "",
-    "_matcher": "【登场时】选对方1张角色本回合费用-3；triggers不支持cost，忽略‘废弃区2张CP卡放回卡组底’的可选成本，仅实现收益。",
+    "_name": "卡古",
+    "_matcher": "登场时(成本:废弃区2张含CP卡放回卡组底)对方1张角色本回合费用-3",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1051,7 +1048,13 @@
             "delta": -3,
             "duration": "ThisTurn"
           }
-        ]
+        ],
+        "cost": {
+          "trashToDeckBottom": {
+            "n": 2,
+            "keywordContains": "CP"
+          }
+        }
       }
     ]
   },
@@ -1140,6 +1143,21 @@
       }
     ]
   },
+  "OP07-098": {
+    "_name": "阿特拉斯",
+    "_matcher": "【触发】我方领袖为‘贝加班克’的场合，此卡牌登场。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP07-100": {
     "_name": "",
     "_matcher": "登场时若我方生命≤2则抽2张并自选弃2张手牌",
@@ -1161,7 +1179,32 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP07-101": {
+    "_name": "释迦",
+    "_matcher": "【触发】我方领袖为‘贝加班克’的场合，此卡牌登场。（【阻挡者】为纯关键词不写）",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP07-104": {
     "_name": "",
@@ -1196,7 +1239,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP07-106": {
     "_name": "",
@@ -1226,15 +1279,23 @@
     ]
   },
   "OP07-107": {
-    "_name": "",
-    "_matcher": "生命触发抽1已表达;之后生命≤1时本卡登场属特殊自我登场,无对应op,已忽略。",
+    "_name": "弗兰奇",
+    "_matcher": "【触发】抽1。之后我方生命≤1则此卡牌登场。近似:抽1也被条件化(原文抽1无条件,此处放在 if:ownLifeCountLte:1 的 then 内,故仅在生命≤1时才抽1)。",
     "_src": "wf-dsl",
-    "trigger": [
-      {
-        "op": "Draw",
-        "n": 1
-      }
-    ]
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 1
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP07-109": {
     "_name": "",
@@ -1280,8 +1341,8 @@
     ]
   },
   "OP07-110": {
-    "_name": "",
-    "_matcher": "登场时KO对方费≤2角色。可选成本(生命入手)triggers不支持,按惯例仅实现收益。trigger字段按领袖名登场无法表达,已忽略。",
+    "_name": "约克",
+    "_matcher": "登场时(成本:生命顶或底1张入手)KO对方最多1张费≤2角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1298,9 +1359,22 @@
             "op": "KO",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "lifeToHandChoice": true
+        }
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP07-111": {
     "_name": "",
@@ -1322,15 +1396,29 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP07-112": {
-    "_name": "",
-    "_matcher": "攻击时(每回合1次,可选生命入手成本)横置对方1张费≤4角色,之后生命≤1时卡组顶1张入生命。triggers不支持成本/oncePerTurn,按惯例仅实现收益。",
+    "_name": "路西",
+    "_matcher": "攻击时[每回合1次](成本:生命顶或底1张入手)横置对方1张费≤4角色(原文之后生命≤1补1生命的次要分条已舍弃以免无成本触发)",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "oncePerTurn": true,
+        "cost": {
+          "lifeToHandChoice": true
+        },
         "then": [
           {
             "op": "Choose",
@@ -1342,18 +1430,6 @@
           {
             "op": "Rest",
             "target": "$tgt"
-          }
-        ]
-      },
-      {
-        "on": "OnAttackDeclare",
-        "if": {
-          "ownLifeCountLte": 1
-        },
-        "then": [
-          {
-            "op": "AddLifeFromDeck",
-            "n": 1
           }
         ]
       }
@@ -1434,11 +1510,16 @@
   },
   "OP07-118": {
     "_name": "",
-    "_matcher": "映射【登场时】KO对方各≤5费、≤3费角色各1张;可选成本'丢弃1张手牌'无法在 triggers 表达,按惯例只实现收益部分(忽略弃牌成本)。",
+    "_matcher": "映射【登场时】可丢弃1张手牌为成本:KO对方各≤5费、≤3费角色各1张。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "Choose",

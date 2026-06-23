@@ -1066,11 +1066,10 @@
     "keyWords": "因佩尔地狱,巴奇海盗团",
     "counter": "反击+1000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnOppAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,
@@ -1631,9 +1630,7 @@
       "OnEnterField",
       "OnMyTurnEnd"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,
@@ -2522,9 +2519,7 @@
     "keyWords": "九蛇海盗团",
     "counter": "反击+1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 5,
