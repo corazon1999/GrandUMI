@@ -1,0 +1,817 @@
+@import "tailwindcss";
+
+/* ════════════════════════════════════════════════════════════════
+   共享基础 token（不随主题变化的：字体、圆角、缓动、时长）
+   ════════════════════════════════════════════════════════════════ */
+@theme {
+  /* 卡牌六色（游戏机制色，与主题无关） */
+  --color-card-red: #ef4444;
+  --color-card-green: #22c55e;
+  --color-card-blue: #3b82f6;
+  --color-card-purple: #8b5cf6;
+  --color-card-black: #6b7280;
+  --color-card-yellow: #eab308;
+
+  /* 兼容旧 CardItem 等未改造组件 */
+  --color-surface-base: #0c0a09;
+  --color-surface-panel: #1c1917;
+  --color-surface-raised: #292524;
+  --color-gold-500: #c8a04a;
+  --color-gold-300: #d4b876;
+  --color-gold-700: #8a6d2e;
+  --color-warm-glow: #3a2810;
+  --color-accent-orange: #f59e0b;
+
+  /* 字号（沿用现有） */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.75rem;
+}
+
+:root {
+  /* 缓动与时长（共享） */
+  --ease-hs-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-hs-bounce: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --ease-hs-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-maritime: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-wave: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --dur-hover: 180ms;
+  --dur-card-flip: 320ms;
+  --dur-glow: 600ms;
+  --dur-wave: 4s;
+  --dur-sail-sway: 6s;
+  --dur-flag-flutter: 3s;
+
+  /* 圆角（共享） */
+  --radius-card: 0.5rem;
+  --radius-panel: 0.75rem;
+  --radius-button: 0.375rem;
+  --radius: 10px;        /* GrandUMI 2.0 canonical */
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* 面板模糊 */
+  --panel-blur: 14px;
+
+  /* 按钮字间距 */
+  --btn-upper: none;
+  --btn-spacing: 0.06em;
+
+  /* 标题字体属性 */
+  --head-weight: 900;
+  --head-spacing: 0.01em;
+
+  /* kicker 标签 */
+  --kick-spacing: 0.26em;
+  --kick-size: 12px;
+
+  /* 字体（共享） */
+  --font-display: "Cinzel", "Cinzel Decorative", "Trajan Pro", "Georgia", serif;
+  --font-head: "Noto Serif SC", "Cinzel", "Trajan Pro", "Georgia", serif;
+  --font-ui: "Space Grotesk", "Noto Sans SC", "Inter", "Arial", sans-serif;
+  --font-body: "Space Grotesk", "Noto Sans SC", "Inter", "Arial", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Courier New", monospace;
+}
+
+/* ── Mood 气质系统（CLAUDE.md §3.1） ───────────────────── */
+[data-mood="a"] {
+  /* 终端 */
+  --font-head: "Noto Sans SC", "JetBrains Mono", monospace;
+  --head-weight: 900;
+  --head-spacing: 0.02em;
+  --font-ui: "JetBrains Mono", "Noto Sans SC", monospace;
+  --radius: 3px;
+  --radius-lg: 5px;
+  --radius-pill: 5px;
+  --kick-spacing: 0.34em;
+  --btn-upper: uppercase;
+  --btn-spacing: 0.16em;
+  --panel-blur: 8px;
+}
+[data-mood="b"] {
+  /* 电影（默认） */
+  --font-head: "Noto Serif SC", "Cinzel", serif;
+  --head-weight: 900;
+  --head-spacing: 0.01em;
+  --font-ui: "Space Grotesk", "Noto Sans SC", sans-serif;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --kick-spacing: 0.26em;
+  --btn-upper: none;
+  --btn-spacing: 0.06em;
+  --panel-blur: 14px;
+}
+[data-mood="c"] {
+  /* 游戏 */
+  --font-head: "Noto Sans SC", "Anton", sans-serif;
+  --head-weight: 900;
+  --head-spacing: 0.0em;
+  --font-ui: "Space Grotesk", "Noto Sans SC", sans-serif;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --kick-spacing: 0.18em;
+  --btn-upper: none;
+  --btn-spacing: 0.04em;
+  --panel-blur: 16px;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   主题 1：PIRATE 海贼风（GrandUMI 2.0 权威值）
+   默认主题，对应 ONE PIECE 原作主调
+   ════════════════════════════════════════════════════════════════ */
+:root,
+:root[data-theme="pirate"] {
+  /* ─── GrandUMI 2.0 设计系统 canonical tokens ─── */
+  --bg0: #0e0a06;
+  --bg1: #160e08;
+  --surface: #1d1510;
+  --surface2: #241a12;
+  --line: rgba(232,176,75,0.16);
+  --line-strong: rgba(232,176,75,0.34);
+  --primary: #e8b04b;
+  --primary-bright: #f5cd72;
+  --primary-glow: rgba(232,176,75,0.45);
+  --on-primary: #1a1206;
+  --accent: #b23b32;
+  --ink: #f3e9d8;
+  --ink-dim: rgba(243,233,216,0.56);
+  --ink-faint: rgba(243,233,216,0.30);
+  --good: #6fcf97;
+  --bad: #e26a6a;
+
+  /* ─── 向后兼容：旧 --color-* 名称（旧组件继续使用） ─── */
+  --color-bg-void: var(--bg0);
+  --color-bg-deep: var(--bg1);
+  --color-bg-raised: var(--surface);
+  --color-bg-overlay: rgba(14, 10, 6, 0.78);
+
+  --color-primary: var(--primary);
+  --color-primary-dim: #c4821c;
+  --color-primary-glow: var(--primary-glow);
+
+  --color-secondary: #8b1e1e;
+  --color-secondary-dim: #5e1313;
+  --color-secondary-glow: rgba(139, 30, 30, 0.45);
+
+  --color-accent: #b08d3a;
+  --color-accent-dim: #6f5a26;
+  --color-accent-glow: rgba(176, 141, 58, 0.4);
+
+  --color-text-primary: var(--ink);
+  --color-text-muted: var(--ink-dim);
+  --color-text-faint: var(--ink-faint);
+
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-divider: rgba(176, 141, 58, 0.25);
+
+  --shadow-glow-sm: 0 0 8px var(--primary-glow);
+  --shadow-glow-md: 0 0 16px var(--primary-glow), 0 0 32px rgba(232,176,75,0.25);
+  --shadow-glow-lg: 0 0 24px var(--primary), 0 0 56px var(--primary-glow);
+  --shadow-panel: 0 0 0 1px var(--line),
+                  0 0 24px rgba(0, 0, 0, 0.6),
+                  inset 0 1px 0 rgba(232,176,75,0.12);
+
+  --theme-emblem: "☠";
+  --theme-decoration: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='%23b08d3a' stroke-width='0.6' opacity='0.18'><path d='M40 8c-12 0-22 8-26 20-2 6 0 14 4 18 2 2 2 4 0 6-2 2-4 6-2 10 2 4 6 4 8 2 2-2 4-2 6 0 4 4 10 4 14 0 2-2 4-2 6 0 2 2 6 2 8-2 2-4 0-8-2-10-2-2-2-4 0-6 4-4 6-12 4-18-4-12-14-20-26-20z'/><circle cx='33' cy='32' r='4' fill='%23b08d3a' opacity='0.4'/><circle cx='47' cy='32' r='4' fill='%23b08d3a' opacity='0.4'/><path d='M30 44h20M40 38v8' stroke='%23b08d3a' stroke-width='1.2'/><path d='M20 56l40 0M20 60l40 0M24 64l32 0' stroke='%23b08d3a' stroke-width='0.5'/></g></svg>");
+}
+
+/* ════════════════════════════════════════════════════════════════
+   主题 2：MARINE / NAVY 海军风（GrandUMI 2.0 权威值）
+   ════════════════════════════════════════════════════════════════ */
+:root[data-theme="marine"],
+:root[data-theme="navy"] {
+  /* ─── GrandUMI 2.0 canonical tokens ─── */
+  --bg0: #070d18;
+  --bg1: #0a1322;
+  --surface: #0f1c30;
+  --surface2: #143150;
+  --line: rgba(120,175,235,0.18);
+  --line-strong: rgba(120,175,235,0.40);
+  --primary: #5b9bd5;
+  --primary-bright: #8fc3f2;
+  --primary-glow: rgba(95,160,230,0.50);
+  --on-primary: #061018;
+  --accent: #cf4233;
+  --ink: #eaf1fa;
+  --ink-dim: rgba(234,241,250,0.58);
+  --ink-faint: rgba(234,241,250,0.30);
+  --good: #6fcf97;
+  --bad: #e26a6a;
+
+  /* ─── 向后兼容 ─── */
+  --color-bg-void: var(--bg0);
+  --color-bg-deep: var(--bg1);
+  --color-bg-raised: var(--surface);
+  --color-bg-overlay: rgba(7, 13, 24, 0.78);
+
+  --color-primary: var(--primary);
+  --color-primary-dim: #8a6d3a;
+  --color-primary-glow: var(--primary-glow);
+
+  --color-secondary: #c8d4e3;
+  --color-secondary-dim: #8a9aaf;
+  --color-secondary-glow: rgba(200, 212, 227, 0.4);
+
+  --color-accent: #1e3a5f;
+  --color-accent-dim: #142640;
+  --color-accent-glow: rgba(30, 58, 95, 0.45);
+
+  --color-text-primary: var(--ink);
+  --color-text-muted: var(--ink-dim);
+  --color-text-faint: var(--ink-faint);
+
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-divider: rgba(120, 175, 235, 0.2);
+
+  --shadow-glow-sm: 0 0 8px var(--primary-glow);
+  --shadow-glow-md: 0 0 16px var(--primary-glow), 0 0 32px rgba(95,160,230,0.25);
+  --shadow-glow-lg: 0 0 24px var(--primary), 0 0 56px var(--primary-glow);
+  --shadow-panel: 0 0 0 1px var(--line),
+                  0 0 24px rgba(0, 0, 0, 0.6),
+                  inset 0 1px 0 rgba(120,175,235,0.12);
+
+  --theme-emblem: "⚓";
+  --theme-decoration: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='%235b9bd5' stroke-width='0.6' opacity='0.18'><circle cx='40' cy='40' r='32'/><circle cx='40' cy='40' r='24'/><circle cx='40' cy='40' r='3' fill='%235b9bd5'/><path d='M40 8v64M8 40h64M16 16l48 48M16 64l48-48' stroke-width='0.4'/><path d='M40 12l-4 8h8z' fill='%235b9bd5' opacity='0.5'/><path d='M40 68l-4-8h8z' fill='%235b9bd5' opacity='0.5'/><path d='M12 40l8-4v8z' fill='%235b9bd5' opacity='0.5'/><path d='M68 40l-8-4v8z' fill='%235b9bd5' opacity='0.5'/></g></svg>");
+}
+
+/* ════════════════════════════════════════════════════════════════
+   全局基础样式
+   ════════════════════════════════════════════════════════════════ */
+body {
+  margin: 0;
+  background: var(--color-bg-void);
+  background-image:
+    /* 顶部光晕（草帽橙/古铜金） */
+    radial-gradient(ellipse 80% 40% at 50% 0%, var(--color-primary-glow) 0%, transparent 60%),
+    /* 底部光晕（酒红/钢蓝） */
+    radial-gradient(ellipse 60% 30% at 80% 100%, var(--color-secondary-glow) 0%, transparent 60%),
+    /* 主题装饰纹理（极淡） */
+    var(--theme-decoration),
+    var(--color-bg-void);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  transition: background-color 600ms ease;
+}
+
+/* 全局滚动条（主题色 thumb） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary-dim) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--color-bg-deep);
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-dim) 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 6px var(--color-primary-glow);
+}
+*::-webkit-scrollbar-thumb:hover {
+  box-shadow: 0 0 10px var(--color-primary);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ═══ 字体 utility ═══ */
+.font-hs-heading {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* ═══ GrandUMI 2.0 设计系统组件工具类 ═══ */
+.gde-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--kick-size);
+  letter-spacing: var(--kick-spacing);
+  color: var(--primary);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* gde-kicker ::before 已移除 — 不展示 // 前缀 */
+/* 设计稿权威 .kicker（== .gde-kicker 别名，组件直接引用） */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--kick-size);
+  letter-spacing: var(--kick-spacing);
+  color: var(--primary);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+/* .kicker ::before 已移除 — 不展示 // 前缀 */
+.gde-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.gde-rule::before,
+.gde-rule::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+.font-cyber-display {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* 兼容旧金边类 */
+.hs-gold-border {
+  border: 1.5px solid var(--color-gold-500);
+  box-shadow: 0 0 0 1px var(--line), 0 0 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(232,176,75,.12);
+}
+.hs-gold-border:hover {
+  border-color: var(--color-gold-300);
+}
+
+/* ═══ 主题文字 utility ═══ */
+.theme-text-primary {
+  color: var(--color-primary);
+  text-shadow:
+    0 0 4px var(--color-primary-glow),
+    0 0 12px color-mix(in srgb, var(--color-primary-glow) 60%, transparent);
+}
+.theme-text-secondary {
+  color: var(--color-secondary);
+  text-shadow: 0 0 8px var(--color-secondary-glow);
+}
+.theme-text-accent {
+  color: var(--color-accent);
+  text-shadow: 0 0 6px var(--color-accent-glow);
+}
+
+/* ═══ 关键帧（主题切换时自然过渡） ═══ */
+@keyframes wave-pulse {
+  0%, 100% { opacity: 0.6; transform: translateY(0); }
+  50% { opacity: 0.9; transform: translateY(-3px); }
+}
+@keyframes wave-pulse-magenta {
+  0%, 100% { opacity: 0.6; transform: translateY(0); }
+  50% { opacity: 0.9; transform: translateY(-3px); }
+}
+@keyframes sail-sway {
+  0%, 100% { transform: rotate(-1.5deg) translateY(0); }
+  50% { transform: rotate(1.5deg) translateY(-2px); }
+}
+@keyframes flag-flutter {
+  0%, 100% { transform: skewX(-1deg); }
+  50% { transform: skewX(1deg); }
+}
+@keyframes compass-needle {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+@keyframes anchor-drop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--color-primary-glow), 0 0 16px color-mix(in srgb, var(--color-primary-glow) 50%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 14px var(--color-primary), 0 0 28px var(--color-primary-glow);
+    opacity: 0.85;
+  }
+}
+@keyframes glow-pulse-secondary {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--color-secondary-glow), 0 0 16px color-mix(in srgb, var(--color-secondary-glow) 50%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 14px var(--color-secondary), 0 0 28px var(--color-secondary-glow);
+    opacity: 0.85;
+  }
+}
+@keyframes border-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ═══ Reduced motion 守护 ═══ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.05ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══ 主题切换过渡（防止硬切） ═══ */
+body, .theme-aware {
+  transition: background-color 400ms ease, border-color 400ms ease, color 400ms ease;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GrandUMI 2.0 设计系统 — 原生工具类（源自 Design HTML 权威定义）
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 面板 ── */
+.panel {
+  position: relative;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--panel-blur));
+  transition: background-color .6s, border-color .6s;
+}
+.panel-pad { padding: 26px; }
+
+/* ── 角落装饰 ticks ── */
+.ticks > i {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-color: var(--primary);
+  opacity: 0.7;
+}
+.ticks > i:nth-child(1) { top: -1px;    left: -1px;  border-top: 2px solid;    border-left: 2px solid; }
+.ticks > i:nth-child(2) { top: -1px;    right: -1px; border-top: 2px solid;    border-right: 2px solid; }
+.ticks > i:nth-child(3) { bottom: -1px; left: -1px;  border-bottom: 2px solid; border-left: 2px solid; }
+.ticks > i:nth-child(4) { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+/* ── 按钮 ── */
+.btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 13px 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  transition: transform .18s, background-color .25s, border-color .25s, box-shadow .25s, color .25s;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  white-space: nowrap;
+}
+.btn:hover               { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+.btn:active              { transform: translateY(0) scale(.99); }
+.btn--primary {
+  color: var(--on-primary);
+  border: none;
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--primary-bright), var(--primary));
+  box-shadow: 0 8px 26px -8px var(--primary-glow);
+}
+.btn--primary:hover      { color: var(--on-primary); transform: translateY(-2px); box-shadow: 0 14px 34px -8px var(--primary-glow); }
+.btn--primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -60%;
+  width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  transform: skewX(-18deg);
+  transition: left .6s;
+}
+.btn--primary:hover::after { left: 120%; }
+.btn--secondary {
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 80%, #fff 20%), var(--accent));
+  box-shadow: 0 8px 26px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.btn--secondary:hover    { color: #fff; transform: translateY(-2px); }
+.btn--ghost              { border-color: var(--line); color: var(--ink-dim); }
+.btn--ghost:hover        { color: var(--ink); border-color: var(--line-strong); }
+.btn--lg                 { padding: 17px 34px; font-size: 17px; }
+.btn--block              { width: 100%; }
+.btn:disabled            { opacity: .4; cursor: not-allowed; }
+.btn:disabled:hover      { transform: none !important; }
+
+/* ── 分段控件 ── */
+.seg {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 4px);
+}
+.seg__opt {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: background-color .25s, color .25s;
+  white-space: nowrap;
+}
+.seg__opt.is-active {
+  color: var(--on-primary);
+  background: linear-gradient(180deg, var(--primary-bright), var(--primary));
+}
+
+/* ── 输入框容器 ── */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color .25s, box-shadow .25s;
+}
+.field:focus-within          { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.field input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+}
+.field input::placeholder     { color: var(--ink-faint); }
+.field input.is-error         { color: var(--accent); }
+.field:has(.is-error)         { border-color: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 30%, transparent); }
+.field .ic {
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s;
+}
+.field .ic:hover              { color: var(--primary); }
+
+/* ── 状态点 ── */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot--ok   { background: var(--primary);  box-shadow: 0 0 10px var(--primary); }
+.dot--live { background: var(--primary);  box-shadow: 0 0 10px var(--primary); animation: grandumi-dot-pulse 1.8s ease-in-out infinite; }
+.dot--down { background: var(--accent);   box-shadow: 0 0 6px var(--accent);   animation: grandumi-dot-pulse 1.2s ease-in-out infinite; }
+.dot--wait { background: var(--primary);  opacity: .6; animation: grandumi-dot-pulse 1s ease-in-out infinite; }
+
+/* ── 带线分隔标题 ── */
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+.rule::before,
+.rule::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+
+/* ── 发光大标题 ── */
+.glow-title {
+  font-family: var(--font-head);
+  font-weight: 900;
+  color: var(--primary);
+  text-shadow: 0 0 40px var(--primary-glow);
+  margin: 0;
+}
+
+/* ── 入场动画 ── */
+.enter > * {
+  animation: grandumi-fadeUp .6s cubic-bezier(.2,.7,.2,1) both;
+}
+.enter-scale {
+  animation: grandumi-scaleIn .5s cubic-bezier(.2,.7,.2,1) both;
+}
+
+/* ── 关键帧 ── */
+@keyframes grandumi-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+@keyframes grandumi-breathe {
+  0%, 100% { opacity: .05; }
+  50%       { opacity: .085; }
+}
+@keyframes grandumi-fadeUp {
+  from { opacity: .5; transform: translateY(20px); }
+  to   { opacity: 1;  transform: none; }
+}
+@keyframes grandumi-scaleIn {
+  from { opacity: .55; transform: scale(.96); }
+  to   { opacity: 1;   transform: none; }
+}
+@keyframes grandumi-blink {
+  50% { opacity: 0; }
+}
+
+/* ═══ GrandUMI 2.0 一比一还原补充工具类（CLAUDE.md §3.3） ═══ */
+
+/* ── 标题字体 ── */
+.head {
+  font-family: var(--font-head);
+  font-weight: var(--head-weight);
+  letter-spacing: var(--head-spacing);
+}
+
+/* ── 单色文字变体 ── */
+.dim  { color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }
+
+/* ── 卡片槽（卡组编辑器用） ── */
+.cardslot {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border: 1.5px solid var(--cc, var(--line-strong));
+  background: var(--surface2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.cardslot:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.7),
+              0 0 26px -6px var(--cc, var(--primary-glow));
+}
+.cardslot .cost {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cc, var(--primary));
+  color: #111;
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 8px var(--cc, var(--primary-glow));
+  z-index: 2;
+}
+.cardslot .pw {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  z-index: 2;
+}
+.cardslot .art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cardslot .nm {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.65);
+  border-top: 1px solid var(--cc, var(--line-strong));
+  font-size: 11px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 1;
+}
+
+/* ── 侧栏导航（全局版，Sidebar 组件亦可复用） ── */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-faint);
+  padding: 14px 0;
+  width: 100%;
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+.nav-item:hover {
+  color: var(--ink-dim);
+}
+.nav-item.is-active {
+  color: var(--primary);
+}
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 14px var(--primary-glow);
+}
+.nav-item .glyph {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1;
+}
+.nav-item .lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+/* ── 标签 pill（filter chips） ── */
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.tag:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.tag.is-active {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+

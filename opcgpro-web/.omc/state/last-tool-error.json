@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\xiong\\\\.claude\\\\projects\\\\D--code-GrandUMI\\\\memory\\\\MEMORY.md\"}",
+  "error": "File does not exist. Note: your current working directory is D:\\code\\GrandUMI\\opcgpro-web.",
+  "timestamp": "2026-06-19T18:23:38.960Z",
+  "retry_count": 1
+}

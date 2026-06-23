@@ -1,0 +1,7 @@
+{
+  "tool_name": "PowerShell",
+  "tool_input_preview": "{\"command\":\"\\n# Find the main settings.json\\nGet-Item 'C:\\\\Users\\\\xiong\\\\.claude\\\\settings.json' -ErrorAction SilentlyContinue\\nGet-Item 'C:\\\\Users\\\\xiong\\\\.claude\\\\settings.local.json' -ErrorAction S...",
+  "error": "Exit code 1\n    目录: C:\\Users\\xiong\\.claude\r\n\r\n\r\nMode                 LastWriteTime         Length Name                                                                                                                                                                                                                                 \r\n----                 -------------         ------ ----                                                                                                                     ...",
+  "timestamp": "2026-06-21T06:29:24.169Z",
+  "retry_count": 1
+}

@@ -1,0 +1,4 @@
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"agent-browser"}
+{"t":0,"agent":"a46c533","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"aba3544","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"agent-browser"}

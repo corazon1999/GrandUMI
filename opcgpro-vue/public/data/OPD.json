@@ -1,0 +1,41 @@
+[
+  {
+    "number": "OPD-001",
+    "name": "波特夹斯·D·艾斯",
+    "color": "炎",
+    "type": "领航",
+    "property": "特",
+    "power": "5000",
+    "cost": "5",
+    "keyWords": "白胡子海贼团",
+    "counter": "",
+    "effectText": "【咚!!x2】此领航对对手领航造成伤害时，可以将你生命区上方开始的1张生命卡加入你的手牌，造成的伤害变为2点",
+    "effectEvent": "OPD001"
+  },
+  {
+    "number": "OPD-002",
+    "name": "夏洛特·玲玲",
+    "color": "暗/光",
+    "type": "领航",
+    "property": "斩",
+    "power": "5000",
+    "cost": "5",
+    "keyWords": "四皇/大妈海贼团",
+    "counter": "",
+    "effectText": "【主阶启动】【一回合一次】咚!!-5（可以将自己场上指定数量的咚!!牌返回咚!!牌组）：将你的1张手牌置于你的生命区最上方。",
+    "effectEvent": "OPD002"
+  },
+  {
+    "number": "OPD-003",
+    "name": "战桃丸",
+    "color": "水/地",
+    "type": "领航",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "海军",
+    "counter": "",
+    "effectText": "【咚!!x1】【攻击时】②（横置费用区中指定数量的咚!!牌）：从你的弃牌堆打出至多一个费用为4或以下的[和平主义者]",
+    "effectEvent": "OPD003"
+  }
+]
