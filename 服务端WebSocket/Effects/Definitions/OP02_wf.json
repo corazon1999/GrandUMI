@@ -306,11 +306,15 @@
   },
   "OP02-032": {
     "_name": "狮子里昂",
-    "_matcher": "【登场时】活跃我方最多1张费用≤5的《纯毛族》角色(可选成本咚-2忽略,只实现收益)。",
+    "_matcher": "【登场时】将费用区2张活跃咚转休息为可选成本:活跃我方最多1张费用≤5的《纯毛族》角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restActiveDon": 2
+        },
+        "costPrompt": "将费用区2张咚‼转为休息状态：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -359,11 +363,15 @@
   },
   "OP02-036": {
     "_name": "奈美",
-    "_matcher": "【登场时】/【攻击时】确认卡组顶3张,公开≤1张'奈美'以外的《FILM》卡加手牌,其余放回卡组底(可选成本咚-1忽略)。",
+    "_matcher": "【登场时】/【攻击时】将费用区1张活跃咚转休息为可选成本:确认卡组顶3张,公开≤1张'奈美'以外的《FILM》卡加手牌,其余放回卡组底。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restActiveDon": 1
+        },
+        "costPrompt": "将费用区1张咚‼转为休息状态：发动此效果？",
         "then": [
           {
             "op": "LookTopReveal",
@@ -379,6 +387,10 @@
       },
       {
         "on": "OnAttackDeclare",
+        "cost": {
+          "restActiveDon": 1
+        },
+        "costPrompt": "将费用区1张咚‼转为休息状态：发动此效果？",
         "then": [
           {
             "op": "LookTopReveal",
@@ -1086,11 +1098,16 @@
   },
   "OP02-098": {
     "_name": "可比",
-    "_matcher": "【登场时】KO对方最多1张费用≤3角色；可选弃1手牌成本无法用triggers表达，按惯例仅实现收益部分",
+    "_matcher": "【登场时】可丢弃我方1张手牌为成本:KO对方最多1张费用≤3角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
+        },
         "then": [
           {
             "op": "Choose",

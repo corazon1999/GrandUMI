@@ -431,6 +431,21 @@
       ]
     }
   },
+  "OP12-101": {
+    "_name": "杰丽·邦妮",
+    "_matcher": "【触发】领袖含《超新星》时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "超新星"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP12-104": {
     "_name": "战桃丸",
     "triggers": [],

@@ -43,9 +43,9 @@ export default function FieldArea({ side }: Props) {
       return;
     }
 
-    // 选中了活跃咚 + 点自己角色 → 贴咚
+    // 选中了活跃咚 + 点自己角色 → 贴咚（依附拟选的张数，#144）
     if (selectedDonIndex !== null && side === "my") {
-      GameRequest.attachDon(cardId);
+      GameRequest.attachDon(cardId, selectedDonIndex || 1);
       setSelectedDon(null);
       return;
     }
@@ -135,8 +135,8 @@ export default function FieldArea({ side }: Props) {
                 </div>
               )}
               {selectedDonIndex !== null && side === "my" && !isPending && (
-                <div className="absolute -left-2 -top-2 z-40 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
-                  <span className="text-[10px] font-black text-black">+</span>
+                <div className="absolute -left-2 -top-2 z-40 flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 px-1 shadow-lg shadow-yellow-300/50">
+                  <span className="text-[10px] font-black text-black">+{selectedDonIndex}</span>
                 </div>
               )}
             </div>

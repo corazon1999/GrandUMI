@@ -207,9 +207,7 @@
     "keyWords": "FILM/航海世博会",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1180,9 +1178,7 @@
     "keyWords": "海军",
     "counter": "",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -1579,9 +1575,7 @@
     "keyWords": "GERMA王国",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -2479,9 +2473,7 @@
     "keyWords": "空岛/山迪亚战士",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,

@@ -1,3 +1,4 @@
+using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game.Validation;
 
@@ -73,6 +74,13 @@ public static class LifeRevealManager
                     p.Trash.Add(top);
                     await EffectRuntime.Resolve(s, targetPlayerIdx, top,
                         EffectTrigger.OnLifeRevealTrigger, engine.Prompts);
+                    // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
+                    // 带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op 处理(那时卡已离开废弃区→不再命中此兜底)。
+                    if (!s.IsGameOver && top.Info.Kind == CardKind.Character
+                        && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
+                    {
+                        AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
+                    }
                     // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
                     if (!s.IsGameOver)
                         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, engine.Prompts,
@@ -98,6 +106,14 @@ public static class LifeRevealManager
         if (dealt > 0 && attackerIdForTrigger is not null && !s.IsGameOver)
             await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, engine.Prompts,
                 new Dictionary<string, object?> { ["attackerId"] = attackerIdForTrigger, ["defenderOwner"] = targetPlayerIdx });
+    }
+
+    /// <summary>是否为"纯【触发】此卡牌登场"(无成本「：」、无条件「场合」、无后续「之后」)。
+    /// 这类由引擎通用兜底自动从废弃区登场；带条件/成本的自登场卡用各自 DSL trigger 的 PlaySelf op 处理。</summary>
+    private static bool IsPlainPlaySelfTrigger(string? trigger)
+    {
+        if (string.IsNullOrEmpty(trigger) || !trigger.Contains("此卡牌登场")) return false;
+        return !trigger.Contains("：") && !trigger.Contains(":") && !trigger.Contains("场合") && !trigger.Contains("之后");
     }
 
     /// <summary>将受到伤害而揭开的生命牌加入手牌；ST13-003 规则替换：领袖为 ST13-003 时，正面朝上的生命牌改为放回卡组最下方。</summary>

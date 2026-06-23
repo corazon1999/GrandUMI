@@ -41,7 +41,12 @@ public class OP10_042_Usopp : IScriptedEffect
                 Filter = c => c.Info.Cost >= 2 && c.Info.HasKeyword("德莱斯罗兹"),
             },
             CostDelta = 1,
-            Predicate = (s, sideIdx, c) => true,
+            // Scope 仅供显示，作用对象必须写进 Predicate：仅我方场上、费用≥2 且《德莱斯罗兹》的角色，
+            // 否则会漏到手牌/对方手牌/对方场上（#139）。
+            Predicate = (s, sideIdx, c) =>
+                sideIdx == owner &&
+                s.Players[owner].Characters.Contains(c) &&
+                c.Info.Cost >= 2 && c.Info.HasKeyword("德莱斯罗兹"),
         });
 
         return Task.CompletedTask;

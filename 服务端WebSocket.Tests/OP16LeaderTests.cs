@@ -119,6 +119,104 @@ public class OP16LeaderTests
         Assert.Equal(charsBefore + 1, s.Players[0].Characters.Count);
     }
 
+    // 复现用户反馈：OP16-045 克洛克达尔【登场时】把己方《因佩尔地狱》角色放回手牌作为成本，
+    // 该角色「离开场上」应触发领航 OP16-041 巴奇 → 弹窗登场囚犯。走 OnCharLeaveField（非KO离场）+ 排空链路。
+    [Fact]
+    public async Task OP16_041_TriggersOn_OP16_045_BounceCost_PlaysPrisoner()
+    {
+        var s = TestScene.MaxScenario(myLeader: "OP16-041"); // MaxScenario 已给领航 2 张赋予中咚
+
+        // 场上：克洛克达尔(刚登场) + 1 张费用≥2《因佩尔地狱》角色作为回手成本目标
+        s.Players[0].Characters.Clear();
+        var croc = new CardInstance { Info = CardDatabase.Get("OP16-045")! };            // cost4
+        var bounceTarget = new CardInstance { Info = CardDatabase.Get("OP16-037")! };    // cost2 《因佩尔地狱》
+        s.Players[0].Characters.Add(croc);
+        s.Players[0].Characters.Add(bounceTarget);
+
+        // 手牌仅放 1 张囚犯(OP16-042, cost6)：不会成为克洛克达尔登场收益(≤2)的候选，
+        // 故克洛克达尔不再二次弹窗，仅做回手成本，随后触发巴奇。
+        s.Players[0].Hand.Clear();
+        var prisoner = new CardInstance { Info = CardDatabase.Get("OP16-042")! };
+        s.Players[0].Hand.Add(prisoner);
+
+        var mock = new MockPromptService()
+            .QueueConfirm(true)                       // 克洛克达尔【登场时】确认发动
+            .QueueChoose(bounceTarget.Id.ToString())  // 选费用≥2角色回手
+            .QueueChoose(prisoner.Id.ToString());     // 巴奇：选囚犯登场
+
+        await EffectRuntime.Resolve(s, 0, croc, EffectTrigger.OnEnterField, mock);
+
+        // 回手成本生效
+        Assert.Contains(bounceTarget, s.Players[0].Hand);
+        Assert.DoesNotContain(bounceTarget, s.Players[0].Characters);
+        // 巴奇触发：囚犯登场
+        Assert.Contains(prisoner, s.Players[0].Characters);
+        Assert.DoesNotContain(prisoner, s.Players[0].Hand);
+    }
+
+    // 完整实战(严格)：克洛克达尔回手成本 + 收益(登场≤2《因佩尔地狱》) 同时发生。
+    // 用户反馈：选择收益登场时会"吞掉"领航 OP16-041 的离场触发；跳过收益则正常。
+    // 严格化：回手目标 OP16-024(被回手不触发其【K.O.时】)、收益卡 OP16-044(effectTags=[]，登场无弹窗)，
+    //   保证 mock 队列与每一步弹窗严格一一对应，不会被中途效果偷吃而假阳性。
+    [Fact]
+    public async Task OP16_041_TriggersOn_OP16_045_WithBenefitSummon()
+    {
+        var s = TestScene.MaxScenario(myLeader: "OP16-041");
+
+        s.Players[0].Characters.Clear();
+        var croc = new CardInstance { Info = CardDatabase.Get("OP16-045")! };
+        var bounceTarget = new CardInstance { Info = CardDatabase.Get("OP16-024")! }; // cost2《因佩尔地狱》, 无登场/离场弹窗
+        s.Players[0].Characters.Add(croc);
+        s.Players[0].Characters.Add(bounceTarget);
+
+        s.Players[0].Hand.Clear();
+        var prisoner = new CardInstance { Info = CardDatabase.Get("OP16-042")! };          // 巴奇登场目标
+        var benefit  = new CardInstance { Info = CardDatabase.Get("OP16-044")! };          // cost2《因佩尔地狱》effectTags=[] 收益
+        s.Players[0].Hand.Add(prisoner);
+        s.Players[0].Hand.Add(benefit);
+
+        var mock = new MockPromptService()
+            .QueueConfirm(true)                       // 克洛克达尔确认
+            .QueueChoose(bounceTarget.Id.ToString())  // 回手成本
+            .QueueChoose(benefit.Id.ToString())       // 收益：登场 OP16-044
+            .QueueChoose(prisoner.Id.ToString());     // 巴奇：登场囚犯
+
+        await EffectRuntime.Resolve(s, 0, croc, EffectTrigger.OnEnterField, mock);
+
+        Assert.Contains(benefit, s.Players[0].Characters);   // 收益登场
+        Assert.Contains(prisoner, s.Players[0].Characters);  // 巴奇仍触发(关键)
+        Assert.DoesNotContain(prisoner, s.Players[0].Hand);
+    }
+
+    // 真实 bug 复现：回手目标 == 收益登场目标(同一张 OP16-044：cost2 既满足≥2回手又满足≤2因佩尔地狱收益)。
+    // 该卡 场上→回手→又被收益登场回场上；巴奇 FindLeft 只搜废弃/手牌/卡组/生命，找不到回到场上的它 → 静默不触发。
+    [Fact]
+    public async Task OP16_041_Triggers_When_BounceTarget_IsReSummonedAsBenefit()
+    {
+        var s = TestScene.MaxScenario(myLeader: "OP16-041");
+        s.Players[0].Characters.Clear();
+        var croc = new CardInstance { Info = CardDatabase.Get("OP16-045")! };
+        var iva = new CardInstance { Info = CardDatabase.Get("OP16-044")! }; // 同时是回手目标和收益候选
+        s.Players[0].Characters.Add(croc);
+        s.Players[0].Characters.Add(iva);
+
+        s.Players[0].Hand.Clear();
+        var prisoner = new CardInstance { Info = CardDatabase.Get("OP16-042")! };
+        s.Players[0].Hand.Add(prisoner); // 手牌无其他收益候选 → 收益只能选回手回来的 iva
+
+        var mock = new MockPromptService()
+            .QueueConfirm(true)                    // 克洛克达尔确认
+            .QueueChoose(iva.Id.ToString())        // 回手 iva
+            .QueueChoose(iva.Id.ToString())        // 收益：把同一张 iva 登场回场上
+            .QueueChoose(prisoner.Id.ToString());  // 巴奇：选囚犯
+
+        await EffectRuntime.Resolve(s, 0, croc, EffectTrigger.OnEnterField, mock);
+
+        Assert.Contains(iva, s.Players[0].Characters);       // iva 回手后又登场, 现在在场上
+        Assert.Contains(prisoner, s.Players[0].Characters);  // 巴奇必须触发(修复前此处失败)
+        Assert.DoesNotContain(prisoner, s.Players[0].Hand);
+    }
+
     // ──────────────────────────────────────────────────────────────
     // OP16-060 战国
     // 启动主要：把 8 张活跃咚放回咚卡组 →

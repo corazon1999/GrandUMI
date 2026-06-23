@@ -9,8 +9,8 @@ namespace GrandUMI.Effects.Scripted;
 /// ②【KO时】我方领袖拥有《黑胡子海盗团》特征的场合，将对方最多1张原本的费用不高于4的角色KO。
 ///
 /// 实现说明 / 取舍：
-///   - ① 费用+4 为条件持续光环：登场时注册 ContinuousEffect（仅作用自身，Predicate=我方领袖含《黑胡子海盗团》，CostDelta=+4）。
-///     "获得【阻挡者】"——卡库 abilities 已无条件含「阻挡者」（实战领袖几乎恒为黑胡子，等价简化），故此处不再条件化阻挡者。
+///   - ① 阻挡者 + 费用+4 为同一条件持续光环：登场时注册 ContinuousEffect（仅作用自身，Predicate=我方领袖含《黑胡子海盗团》，
+///     GrantKeyword="阻挡者" + CostDelta=+4）。卡库 abilities 已移除「阻挡者」，改由此条件评估。
 ///   - ②【KO时】领袖含《黑胡子海盗团》→ KO 对方最多1张原本费用(印刷)≤4 的角色（迁移自原 DSL）。
 ///   - 本卡同时有持续光环+触发效果，故整卡用 C# 脚本实现（脚本优先于 DSL，原 PRB02.json 条目已移除）。
 /// </summary>
@@ -38,7 +38,8 @@ public class PRB02_015_Shiryu : IScriptedEffect
                 SourceCardId = selfId.ToString(),
                 Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true, Filter = c => c.Id == selfId },
                 CostDelta = 4,
-                // 注：引擎 ContinuousCostBonus 仅按 Predicate 判定、不应用 Scope，故须在此显式限定仅作用本卡自身
+                GrantKeyword = "阻挡者",   // 同一条件（领袖含《黑胡子海盗团》）下亦获得【阻挡者】
+                // 注：引擎 ContinuousCostBonus / HasContinuousKeyword 均仅按 Predicate 判定、不应用 Scope，故须在此显式限定仅作用本卡自身
                 Predicate = (s, side, card) => card.Id == selfId && s.Players[owner].Leader.Info.HasKeyword("黑胡子海盗团"),
             });
             return;

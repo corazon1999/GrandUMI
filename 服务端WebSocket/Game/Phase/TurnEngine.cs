@@ -95,8 +95,10 @@ public static class TurnEngine
             foreach (var c in p.Characters)
             {
                 ClearTurnScopedState(c);
+                ClearUntilNextOpponentEndPhase(c, state.CurrentTurnPlayer);
             }
             ClearTurnScopedState(p.Leader);
+            ClearUntilNextOpponentEndPhase(p.Leader, state.CurrentTurnPlayer);
             // 手牌卡的本回合费用修正（如 OP16-087 给"光月桃之助"+20）也需回合末清，否则会跨回合残留
             foreach (var c in p.Hand) c.CostModThisTurn = 0;
             p.TurnOnceUsed.Clear();
@@ -155,15 +157,41 @@ public static class TurnEngine
         c.IsEffectsNullified = false;
         c.NoAttackCostLeThisTurn = 0;
         c.ReactivateAfterBattleThisTurn = false;
+        // 注意：UntilNextOpponentEndPhase 不在此清除——它须保留到"对方"的结束阶段，
+        // 否则会在施加者自己的结束阶段就失效（#146/#147）。改由 ClearUntilNextOpponentEndPhase 处理。
         c.GainedKeywords.RemoveAll(k =>
             k.Duration == KeywordDuration.ThisTurn ||
-            k.Duration == KeywordDuration.ThisBattle ||
-            k.Duration == KeywordDuration.UntilNextOpponentEndPhase);
+            k.Duration == KeywordDuration.ThisBattle);
         c.Restrictions.RemoveAll(r =>
             r.Duration == KeywordDuration.ThisTurn ||
-            r.Duration == KeywordDuration.ThisBattle ||
-            r.Duration == KeywordDuration.UntilNextOpponentEndPhase);
+            r.Duration == KeywordDuration.ThisBattle);
         c.OncePerTurnUsedKeys.Clear();
+    }
+
+    /// <summary>
+    /// 清除"直到下个对方的结束阶段结束时为止"(UntilNextOpponentEndPhase) 的关键词 / 限制。
+    /// 语义：由控制者一方 S 施加，应持续到 S 的对手(1-S)的结束阶段结束。
+    ///   - AppliedBySide 已指定：仅当本结束阶段属于对手(CurrentTurnPlayer == 1-S)时清除；
+    ///     S 自己的结束阶段保留（这正是修复点——此前会在 S 的结束阶段被误清）。
+    ///   - AppliedBySide 未指定(-1，旧调用方)：回退为"生存一个结束阶段"——首个结束阶段保留、
+    ///     第二个结束阶段清除。对绝大多数"我方回合发动"的效果与上面等价。
+    /// </summary>
+    private static void ClearUntilNextOpponentEndPhase(CardInstance c, int currentTurnPlayer)
+    {
+        c.GainedKeywords.RemoveAll(k =>
+        {
+            if (k.Duration != KeywordDuration.UntilNextOpponentEndPhase) return false;
+            if (k.AppliedBySide >= 0) return currentTurnPlayer == 1 - k.AppliedBySide;
+            if (k.EndPhasesSeen == 0) { k.EndPhasesSeen = 1; return false; }
+            return true;
+        });
+        c.Restrictions.RemoveAll(r =>
+        {
+            if (r.Duration != KeywordDuration.UntilNextOpponentEndPhase) return false;
+            if (r.AppliedBySide >= 0) return currentTurnPlayer == 1 - r.AppliedBySide;
+            if (r.EndPhasesSeen == 0) { r.EndPhasesSeen = 1; return false; }
+            return true;
+        });
     }
 
     private static bool IsSourceCardOnField(GameState s, string sourceId)

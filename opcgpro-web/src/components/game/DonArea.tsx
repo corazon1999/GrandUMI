@@ -19,6 +19,7 @@ function DonCountSlot({
   count,
   state,
   selected,
+  stagedCount,
   canInteract,
   onClick,
 }: {
@@ -26,6 +27,7 @@ function DonCountSlot({
   count: number;
   state: "active" | "rest";
   selected?: boolean;
+  stagedCount?: number;
   canInteract?: boolean;
   onClick?: () => void;
 }) {
@@ -46,6 +48,12 @@ function DonCountSlot({
       ) : (
         <div className="h-full w-full rounded-md border-2 border-dashed border-slate-500/50 bg-slate-950/35" />
       )}
+      {/* 拟依附张数徽标：再点 +1，达上限后再点取消（#144 复数咚依附） */}
+      {stagedCount && stagedCount > 0 ? (
+        <span className="absolute right-1 top-1 z-30 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-black shadow ring-2 ring-amber-200">
+          依附×{stagedCount}
+        </span>
+      ) : null}
       <div className="absolute inset-x-0 bottom-1 z-30 flex justify-center">
         <span className="rounded bg-slate-950/90 px-2 py-0.5 text-xs font-black text-white shadow">
           {count}
@@ -73,8 +81,13 @@ export default function DonArea({ side }: Props) {
         count={player.costActive}
         state="active"
         selected={selectedDonIndex !== null}
+        stagedCount={selectedDonIndex ?? 0}
         canInteract={canInteract}
-        onClick={() => setSelectedDon(selectedDonIndex === null ? 0 : null)}
+        // 每次点击拟依附数 +1（封顶=活跃咚数），到顶后再点取消；目标点击时一次依附该数量
+        onClick={() => {
+          const cur = selectedDonIndex ?? 0;
+          setSelectedDon(cur >= player.costActive ? null : cur + 1);
+        }}
       />
       <DonCountSlot
         label="休息"

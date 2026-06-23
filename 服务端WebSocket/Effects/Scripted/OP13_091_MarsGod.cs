@@ -14,9 +14,9 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 成本：丢弃我方 1 张手牌（玩家自选，需手牌 ≥1）；
 ///   - 效果：将对方最多 1 张"原本的费用不高于 5"（Info.Cost ≤ 5）的角色 KO（min=0，可不选）。
 ///
-/// 简化/未实现（引擎缺口，见 summary）：
-///   "废弃区≥7 时不会因对方效果离场 + 获得【阻挡者】"为带条件的持续静态能力，引擎暂无按
-///   废弃区张数动态开关静态免疫/关键字的通道（且【阻挡者】由卡面文本恒定授予），故未实现。
+/// 持续光环（登场时注册 ContinuousEffect）：
+///   "废弃区≥7 时此角色获得【阻挡者】，且不会因效果离场" 由 GrantKeyword="阻挡者"+LeaveGuard="effect"
+///   实现（引擎粒度为"任意效果"，略宽于卡面"对方的效果"），按废弃区张数动态评估。
 /// </summary>
 public class OP13_091_MarsGod : IScriptedEffect
 {
@@ -27,11 +27,25 @@ public class OP13_091_MarsGod : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
-        var me = s.Players[ctx.OwnerIndex];
-        int oppIdx = 1 - ctx.OwnerIndex;
+        int owner = ctx.OwnerIndex;
+
+        // ── 持续光环：我方废弃区≥7 → 此角色获得【阻挡者】，且不会因效果离场（登场时无条件注册）──
+        var selfId0 = ctx.Source.Id;
+        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
+        s.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId0.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "阻挡者",
+            LeaveGuard = "effect",   // 引擎粒度为"任意效果离场"，略宽于卡面"对方的效果"
+            Predicate = (st, side, card) => card.Id == selfId0 && st.Players[owner].Trash.Count >= 7,
+        });
+
+        var me = s.Players[owner];
+        int oppIdx = 1 - owner;
         var opp = s.Players[oppIdx];
 
-        // 成本需要：我方手牌 ≥1 才能丢弃
+        // 成本需要：我方手牌 ≥1 才能丢弃（【登场时】可选效果）
         if (me.Hand.Count < 1) return;
 
         // 候选：对方"原本的费用不高于 5"的角色

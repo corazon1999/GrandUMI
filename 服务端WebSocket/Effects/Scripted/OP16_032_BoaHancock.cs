@@ -34,6 +34,7 @@ public class OP16_032_BoaHancock : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.AddRestriction(target, RestrictionKind.CannotBeRested, KeywordDuration.UntilNextOpponentEndPhase);
+        // 控制者为我方：此限制须持续到"下个对方的结束阶段结束时"，而非我方自己的结束阶段（#146）。
+        AtomicOps.AddRestriction(target, RestrictionKind.CannotBeRested, KeywordDuration.UntilNextOpponentEndPhase, ctx.OwnerIndex);
     }
 }

@@ -26,17 +26,16 @@
   },
   "EB03-006": {
     "_name": "奈美",
-    "_matcher": "登场时领袖-5000抽1(忽略可选成本,直接给收益);启动主要每回合领袖含阿拉巴斯坦时对方1角色-1000。",
+    "_matcher": "登场时可选成本(活跃领袖力量-5000)已实现后抽1;启动主要每回合领袖含阿拉巴斯坦时对方1角色-1000。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "leaderPowerThisTurn": -5000
+        },
+        "costPrompt": "将活跃状态的领袖力量-5000：发动此效果？",
         "then": [
-          {
-            "op": "AddPowerThisTurn",
-            "target": "selfLeader",
-            "delta": -5000
-          },
           {
             "op": "Draw",
             "n": 1
@@ -527,7 +526,7 @@
   },
   "EB03-043": {
     "_name": "斯图西",
-    "_matcher": "登场时KO对方最多1张费用≤4角色；忽略「将废弃区2张含CP卡放回卡组底」可选成本(triggers不支持cost)。",
+    "_matcher": "登场时(成本:废弃区2张含CP卡放回卡组底)KO对方最多1张费用≤4角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -543,7 +542,13 @@
             "op": "KO",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "trashToDeckBottom": {
+            "n": 2,
+            "keywordContains": "CP"
+          }
+        }
       }
     ]
   },
@@ -669,7 +674,7 @@
   },
   "EB03-053": {
     "_name": "奈美",
-    "_matcher": "登场时:赋予领袖1张休息咚,对方生命≥3时对方生命顶1张入对方手(OppLifeToHand已含生命数判定);KO时带生命翻面成本且triggers不支持cost,忽略该节",
+    "_matcher": "登场时:赋予领袖1张休息咚,对方生命≥3则对方生命顶1张入对方手;KO时(成本:生命顶1张翻正)登场我方手牌≤1张力量≤6000角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -684,12 +689,28 @@
             "op": "OppLifeToHand"
           }
         ]
+      },
+      {
+        "on": "OnKO",
+        "cost": {
+          "lifeFaceUp": true
+        },
+        "costPrompt": "将生命顶1张翻至正面：发动？",
+        "then": [
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "originalPowerLte": 6000
+            },
+            "text": "登场我方手牌中最多1张力量≤6000的角色"
+          }
+        ]
       }
     ]
   },
   "EB03-054": {
     "_name": "妮古·罗宾",
-    "_matcher": "登场时可选成本(生命放废弃)无法在triggers表达,只实现收益:卡组顶1张入生命;trigger弃手牌登场为自动登场无对应op,忽略",
+    "_matcher": "登场时可选成本(生命放废弃)无法在triggers表达,只实现收益:卡组顶1张入生命;trigger弃1手牌此卡自登场",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -701,11 +722,23 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "EB03-055": {
     "_name": "妮古·罗宾",
-    "_matcher": "登场时可选成本忽略,只实现收益:领袖含草帽一伙时卡组顶2张入生命;KO时给对方1点伤害无对应op,忽略",
+    "_matcher": "登场时(成本:生命顶1张入废弃)领袖含草帽一伙则卡组顶2张入生命;KO时给对方1点伤害(无对应op)未实现",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -718,17 +751,25 @@
             "op": "AddLifeFromDeck",
             "n": 2
           }
-        ]
+        ],
+        "cost": {
+          "lifeToTrash": true
+        },
+        "costPrompt": "将生命顶1张放置废弃区：发动？"
       }
     ]
   },
   "EB03-056": {
     "_name": "贝洛·贝蒂",
-    "_matcher": "登场时可选成本(生命翻正)忽略,只实现收益:KO对方1张原本费用≤3的角色",
+    "_matcher": "登场时可选成本(生命顶1张翻正)已实现:KO对方1张原本费用≤3的角色",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "lifeFaceUp": true
+        },
+        "costPrompt": "将生命顶1张翻至正面：发动？",
         "then": [
           {
             "op": "Choose",
@@ -766,7 +807,7 @@
   },
   "EB03-058": {
     "_name": "莉莉丝",
-    "_matcher": "我方回合中登场时,生命≤2则抽1;trigger为领袖贝加班克时自动登场无对应op,忽略",
+    "_matcher": "我方回合中登场时,生命≤2则抽1;trigger领袖为贝加班克时此卡自登场",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -782,7 +823,17 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "贝加班克"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "EB03-060": {
     "_name": "你要不要当我的仆人呀？",

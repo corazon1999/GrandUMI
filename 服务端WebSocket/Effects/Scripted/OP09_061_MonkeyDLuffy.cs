@@ -62,9 +62,13 @@ public class OP09_061_MonkeyDLuffy : IScriptedEffect
             SourceCardId = selfId.ToString(),
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
             CostDelta = 1,
-            // 【咚!!×1】：此领袖身上附着的咚!! ≥1 时生效
+            // 【咚!!×1】：此领袖身上附着的咚!! ≥1 时生效。
+            // Scope 仅供显示，作用对象必须写进 Predicate：仅我方场上角色，
+            // 否则会漏到对方场上/双方手牌（#152）。
             Predicate = (s, sideIdx, card) =>
-                s.Players[owner].AttachedDonCount(selfId) >= 1,
+                s.Players[owner].AttachedDonCount(selfId) >= 1 &&
+                sideIdx == owner &&
+                s.Players[owner].Characters.Contains(card),
         });
     }
 }

@@ -107,7 +107,7 @@
   },
   "EB04-009": {
     "_name": "弟子要出航了，还望手下留情啊……",
-    "_matcher": "主要：对方最多1张角色力量-2000（忽略给雷利贴活跃咚的可选成本，cost无法表达特定名称贴咚）；反击：我方最多1张角色力量+2000",
+    "_matcher": "主要(成本:给我方1张希尔巴兹·雷利贴1活跃咚)对方1张角色本回合-2000;反击:我方1张角色或雷利本次+2000",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -122,7 +122,13 @@
           "target": "$tgt",
           "delta": -2000
         }
-      ]
+      ],
+      "cost": {
+        "attachDonToNamed": {
+          "name": "希尔巴兹·雷利",
+          "n": 1
+        }
+      }
     },
     "counter": [
       {
@@ -237,7 +243,10 @@
         "leaderHasKeyword": "纯毛族"
       },
       "cost": {
-        "restCards": { "n": 1, "optional": true }
+        "restCards": {
+          "n": 1,
+          "optional": true
+        }
       },
       "then": [
         {
@@ -520,13 +529,18 @@
   },
   "EB04-034": {
     "_name": "夏洛特·布玲",
-    "_matcher": "对方攻击时废弃区≥4事件则我方1张领袖或角色本次战斗+2000；忽略可选的弃1手牌成本(触发节不支持cost)",
+    "_matcher": "对方攻击时可选成本(弃1手牌)已实现:废弃区≥4事件则我方1张领袖或角色本次战斗+2000",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
         "if": {
           "ownTrashEventCountGte": 4
+        },
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
         },
         "then": [
           {
@@ -546,11 +560,15 @@
   },
   "EB04-036": {
     "_name": "福克斯",
-    "_matcher": "登场时领袖含福克斯海盗团则抽2弃1并休息对方1张费用≤9角色(忽略可选咚-1成本)；启动主要每回合追加1张休息咚",
+    "_matcher": "登场时可选成本(咚!!-1)已实现:领袖含福克斯海盗团则抽2弃1并休息对方1张费用≤9角色；启动主要每回合追加1张休息咚",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "if": {
           "leaderHasKeyword": "福克斯海盗团"
         },
@@ -782,6 +800,27 @@
       }
     ]
   },
+  "EB04-051": {
+    "_name": "埃米特",
+    "_matcher": "触发:[我方生命=0]本回合对方全体角色-3000后此卡自登场(原文:对方全体-3000,之后生命=0则登场;-3000一并置于生命=0条件下,近似)",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 0
+      },
+      "then": [
+        {
+          "op": "AddPowerAll",
+          "side": "opp",
+          "delta": -3000,
+          "excludeLeader": true
+        },
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "EB04-053": {
     "_name": "战桃丸",
     "_matcher": "阻挡时(已含阻挡者关键词)我方生命≤2则抽1张",
@@ -830,7 +869,7 @@
   },
   "EB04-055": {
     "_name": "巴索罗缪·大熊",
-    "_matcher": "KO时从手牌登场≤1张费用≤4《革命军》角色；生命牌触发节的「此卡牌登场」属特殊登场机制无法表达已忽略",
+    "_matcher": "KO时从手牌登场≤1张费用≤4《革命军》角色；trigger领袖含革命军且双方生命合计≤5时此卡自登场",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -846,7 +885,18 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "革命军",
+        "bothLifeTotalLte": 5
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "EB04-058": {
     "_name": "波尔萨利诺",

@@ -37,6 +37,12 @@
         { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 对方最多1张费用≤3 的角色" },
         { "op": "KO", "target": "$tgt" }
       ]
+    },
+    "trigger": {
+      "cost": { "handDiscard": { "n": 1 } },
+      "then": [
+        { "op": "PlaySelf" }
+      ]
     }
   },
   "ST07-011": {

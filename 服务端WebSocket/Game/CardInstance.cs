@@ -102,12 +102,20 @@ public class CardRestriction
 {
     public required RestrictionKind Kind { get; init; }
     public required KeywordDuration Duration { get; init; }
+    /// <summary>施加此限制的控制者一方（用于 UntilNextOpponentEndPhase：仅在"对方"的结束阶段清除）。-1 表示未指定，回退为"生存一个结束阶段"。</summary>
+    public int AppliedBySide { get; init; } = -1;
+    /// <summary>UntilNextOpponentEndPhase 在 AppliedBySide 未指定时，已经历的结束阶段数（生存 1 个）。</summary>
+    public int EndPhasesSeen { get; set; }
 }
 
 public class TemporaryKeyword
 {
     public required string Keyword { get; init; } // "速攻" / "双重攻击" / "阻挡者" / "不可阻挡"
     public required KeywordDuration Duration { get; init; }
+    /// <summary>赋予此关键词的控制者一方（用于 UntilNextOpponentEndPhase：仅在"对方"的结束阶段清除）。-1 表示未指定，回退为"生存一个结束阶段"。</summary>
+    public int AppliedBySide { get; init; } = -1;
+    /// <summary>UntilNextOpponentEndPhase 在 AppliedBySide 未指定时，已经历的结束阶段数（生存 1 个）。</summary>
+    public int EndPhasesSeen { get; set; }
 }
 
 public enum KeywordDuration

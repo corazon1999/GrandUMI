@@ -91,11 +91,17 @@
   },
   "OP01-011": {
     "_name": "哥顿",
-    "_matcher": "登场时抽1；可选成本(将1张手牌放卡组底)无法在triggers表达，仅实现收益抽牌部分",
+    "_matcher": "登场时,可选成本将1张手牌放卡组底:抽1张",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handToDeckBottom": {
+            "n": 1,
+            "text": "可以将我方的1张手牌放置到卡组最下方：发动此效果？"
+          }
+        },
         "then": [
           {
             "op": "Draw",
@@ -131,13 +137,18 @@
   },
   "OP01-015": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "咚×1攻击时，从废弃区将费用≤4的草帽角色(乔巴除外)加手牌；可选弃牌成本无法在triggers表达，仅实现收益部分",
+    "_matcher": "咚×1攻击时,可选成本丢弃1张手牌:从废弃区将费用≤4的草帽角色(乔巴除外)加手牌",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
         "if": {
           "donAttachedGte": 1
+        },
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
         },
         "then": [
           {
@@ -626,12 +637,14 @@
   },
   "OP01-041": {
     "_name": "光月桃之助",
-    "_matcher": "启动主要横置自身，确认卡组顶5张公开1张《和之国》加手牌(可选转咚成本忽略)",
+    "_matcher": "启动主要,成本转休息1张活跃咚+横置自身,确认卡组顶5张公开1张《和之国》加手牌",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
+        "restActiveDon": 1,
         "restSelf": true
       },
+      "costPrompt": "①（将1张活跃咚转为休息状态），横置此角色：发动此效果？",
       "then": [
         {
           "op": "LookTopReveal",
@@ -648,7 +661,7 @@
   },
   "OP01-042": {
     "_name": "小紫",
-    "_matcher": "登场时领袖为光月御殿则将费用≤3且《和之国》角色转活跃(可选转咚成本忽略)",
+    "_matcher": "登场时,可选成本将3张活跃咚转休息,领袖为光月御殿则将费用≤3且《和之国》角色转活跃",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -656,6 +669,10 @@
         "if": {
           "leaderNameEquals": "光月御殿"
         },
+        "cost": {
+          "restActiveDon": 3
+        },
+        "costPrompt": "③（将3张活跃咚转为休息状态）：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -696,11 +713,15 @@
   },
   "OP01-047": {
     "_name": "特拉法尔加·罗",
-    "_matcher": "登场时将手牌≤1张费用≤3角色登场(可选放回我方角色成本忽略)",
+    "_matcher": "登场时,可选成本将我方1张角色放回手牌:将手牌≤1张费用≤3角色登场",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "bounceOwnChar": 1
+        },
+        "costPrompt": "将我方1张角色放回持有者的手牌：发动此效果？",
         "then": [
           {
             "op": "PlayCharFromHand",
@@ -806,9 +827,15 @@
   },
   "OP01-055": {
     "_name": "成为我的『武士』吧！！！",
-    "_matcher": "主要抽2张；「转为休息我方2张角色」的可选成本无对应 cost 键，按惯例忽略成本仅实现抽牌收益。",
+    "_matcher": "主要,可选成本将我方2张角色转休息(用restCards通用):抽2张。",
     "_src": "wf-dsl",
     "main": {
+      "cost": {
+        "restCards": {
+          "n": 2,
+          "optional": true
+        }
+      },
       "then": [
         {
           "op": "Draw",
@@ -948,9 +975,15 @@
   },
   "OP01-059": {
     "_name": "梆梆‼",
-    "_matcher": "主要活跃我方≤1张费≤3且含「和之国」的角色；「丢弃1张含和之国手牌」的可选成本因 handDiscard 不支持 filter 无法精确表达，按惯例忽略成本仅实现收益。",
+    "_matcher": "主要,可选成本丢弃1张含「和之国」特征手牌:活跃我方≤1张费≤3且含「和之国」的角色。",
     "_src": "wf-dsl",
     "main": {
+      "cost": {
+        "handDiscard": {
+          "n": 1,
+          "keyword": "和之国"
+        }
+      },
       "then": [
         {
           "op": "Choose",
@@ -1152,11 +1185,15 @@
   },
   "OP01-093": {
     "_name": "润媞",
-    "_matcher": "登场时从咚卡组追加最多1张休息状态的咚；可选的转咚成本按惯例忽略，只实现收益。",
+    "_matcher": "登场时,可选成本将1张活跃咚转休息:从咚卡组追加最多1张休息状态的咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restActiveDon": 1
+        },
+        "costPrompt": "①（将1张活跃咚转为休息状态）：发动此效果？",
         "then": [
           {
             "op": "RefreshDon",
@@ -1188,11 +1225,15 @@
   },
   "OP01-096": {
     "_name": "烬",
-    "_matcher": "登场时 KO 对方最多1张费用≤3、最多1张费用≤2 的角色；咚-2 成本 triggers 无法承载，按惯例忽略只实现收益。",
+    "_matcher": "登场时,成本咚!!-2(放回咚卡组):KO 对方最多1张费用≤3、最多1张费用≤2 的角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 2
+        },
+        "costPrompt": "咚!!-2：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -1220,11 +1261,15 @@
   },
   "OP01-097": {
     "_name": "昆因",
-    "_matcher": "登场时此角色本回合获得速攻，之后对方最多1张角色力量-2000；咚-1 成本忽略只实现收益。",
+    "_matcher": "登场时,成本咚!!-1(放回咚卡组):此角色本回合获得速攻，之后对方最多1张角色力量-2000。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "GiveKeyword",
@@ -1269,13 +1314,18 @@
   },
   "OP01-101": {
     "_name": "笹木",
-    "_matcher": "【咚×1】攻击时从咚卡组追加最多1张休息状态的咚；条件用被贴咚≥1，可选弃手牌成本 triggers 无法承载，按惯例忽略只实现收益。",
+    "_matcher": "【咚×1】攻击时,可选成本丢弃1张手牌:从咚卡组追加最多1张休息状态的咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
         "if": {
           "donAttachedGte": 1
+        },
+        "cost": {
+          "handDiscard": {
+            "n": 1
+          }
         },
         "then": [
           {
@@ -1289,11 +1339,15 @@
   },
   "OP01-102": {
     "_name": "杰克",
-    "_matcher": "攻击时让对方弃1张手牌；触发节不支持 cost，忽略咚-1 成本只实现收益。",
+    "_matcher": "攻击时,成本咚‼-1(放回咚卡组):让对方弃1张手牌。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "OpponentDiscard",
@@ -1322,11 +1376,15 @@
   },
   "OP01-108": {
     "_name": "砍人镰造",
-    "_matcher": "【KO时】KO对方最多1张费用≤5角色；触发节不支持 cost，忽略咚-1 成本只实现收益。",
+    "_matcher": "【KO时】成本咚‼-1(放回咚卡组):KO对方最多1张费用≤5角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnKO",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -1344,11 +1402,15 @@
   },
   "OP01-111": {
     "_name": "黑色玛利亚",
-    "_matcher": "【阻挡者】关键词外，【阻挡时】本回合本角色力量+1000；触发节不支持 cost，忽略咚-1 成本只实现收益。",
+    "_matcher": "【阻挡者】关键词外，【阻挡时】成本咚‼-1(放回咚卡组):本回合本角色力量+1000。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnBlockDeclare",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "AddPowerThisTurn",

@@ -36,11 +36,14 @@ public class OP13_078_OroJackson : IScriptedEffect
         var cardId = ctx.Vars.TryGetValue("cardId", out var cv) ? cv as string : null;
         if (cardId is null) return Task.CompletedTask;
 
-        // 离场卡已不在场上，跨区查回以读取特征
+        // 离场卡跨区查回以读取特征。除废弃/手牌/卡组/生命外还须搜场上角色区/舞台：
+        // 离场卡可能被同一效果链后续操作再次登场回场上，OnCharLeaveField 已证明它确实离场过。
         var left = me.Trash.FirstOrDefault(c => c.Id.ToString() == cardId)
                    ?? me.Hand.FirstOrDefault(c => c.Id.ToString() == cardId)
                    ?? me.Deck.FirstOrDefault(c => c.Id.ToString() == cardId)
-                   ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId);
+                   ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId)
+                   ?? me.Characters.FirstOrDefault(c => c.Id.ToString() == cardId)
+                   ?? (me.StageCard is { } st && st.Id.ToString() == cardId ? st : null);
         if (left is null || !left.Info.HasKeyword("罗杰海盗团")) return Task.CompletedTask;
 
         // 每回合1次

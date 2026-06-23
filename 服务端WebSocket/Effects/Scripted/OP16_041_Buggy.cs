@@ -60,10 +60,15 @@ public class OP16_041_Buggy : IScriptedEffect
         AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
     }
 
-    // 离场卡此刻可能在废弃/手牌/卡组/生命区，按常见顺序查找
+    // 离场卡此刻可能在废弃/手牌/卡组/生命区，按常见顺序查找。
+    // 还须搜场上角色区/舞台：同一效果链里离场的卡可能被后续操作再次登场回场上
+    //（如 OP16-045 把费用≥2角色回手作成本、其收益又把这张≤2《因佩尔地狱》角色登场回场上）。
+    // OnCharLeaveField 事件已证明它确实离场过，故全区域定位以读取特征是安全的。
     private static CardInstance? FindLeft(PlayerState me, string cardId)
         => me.Trash.FirstOrDefault(c => c.Id.ToString() == cardId)
         ?? me.Hand.FirstOrDefault(c => c.Id.ToString() == cardId)
         ?? me.Deck.FirstOrDefault(c => c.Id.ToString() == cardId)
-        ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId);
+        ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId)
+        ?? me.Characters.FirstOrDefault(c => c.Id.ToString() == cardId)
+        ?? (me.StageCard is { } st && st.Id.ToString() == cardId ? st : null);
 }

@@ -9,5 +9,16 @@
         { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
       ]
     }
+  },
+  "ST20-002": {
+    "_name": "夏洛特·克力架",
+    "_matcher": "【触发】可以丢弃我方的1张手牌：此卡牌登场（触发其登场时）。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": { "handDiscard": { "n": 1 } },
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
   }
 }

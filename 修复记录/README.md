@@ -28,3 +28,6 @@
 - [引擎/UI 无法转休息状态图标 + RestCard 持续来源拦截](引擎_无法转休息状态图标与RestCard持续来源拦截.md) — CannotBeRested 没下发到对战 UI；且 RestCard 只拦瞬时来源、持续来源(OP11-046/GERMA光环)未拦截。补全快照→net→FieldCardView→组件全链路 + 左下角「横置矩形+红×」图标；EffectRuntime 暴露 CurrentState 让 RestCard 同时拦两源。追加：OP16-032/OP15-029 用孤立占位关键字「禁止休息」(只写不读)导致效果与图标双失效，改回标准 AddRestriction(CannotBeRested)。
 - [OP16-036 缺攻击时原本力量变领袖](OP16-036_缺攻击时原本力量变领袖.md) — 纯 DSL 只实现【登场时】，【攻击时】(effectTags 已标 OnAttackDeclare)无 handler 派发后空过。新建脚本仅接管 OnAttackDeclare(设 OriginalPowerOverride=对方领袖力量)，登场时仍走 DSL。同款仅 OP16-055。
 - [UI 启动效果按钮一回合一次用后未隐藏](UI_启动效果按钮一回合一次用后未隐藏.md) — 前端 canActivate 只看 effectTags 有无 ActivatedMain，不判断本回合是否已用；后端 TurnOnceUsed 未下发。公开快照新增 activatedUsedThisTurn(领袖/角色/舞台三处，key 兼容 DSL「{id}-Activated」与脚本「{番号}-act:{id}」)，前端据此隐藏按钮。全部【每回合1次】启动卡统一生效。
+- [OP16-043 KO时缺成本横置领袖舞台](OP16-043_KO时缺成本横置领袖舞台.md) — 纯 DSL triggers 无激活成本通道，只实现收益(回手)、跳过成本(横置《德莱斯罗兹》领袖/舞台)。转脚本 OP16_043_Usopp 补可选成本。附带通用前端修复：PromptOverlay 反查补舞台(原只认领袖+fieldCards，舞台候选能点选但卡图空白)。
+- [OP16-047 启动成本先付再判条件](OP16-047_启动成本先付再判条件.md) — 效果条件「对方手牌≥8」被放在成本「横置自己」之前判断，手牌<8 时成本没付。调整为先横置(成本)再判手牌。**通用规则：冒号「：」前=成本须无条件先付，整张卡效严格按卡面从前到后执行**(已入记忆)。
+- [OP16-049 启动缺横置自身成本](OP16-049_启动缺横置自身成本.md) — DSL activated 只抽1、漏写成本「横置自身」(还误加 oncePerTurn)。加 cost:{restSelf:true} 去掉 oncePerTurn。DSL activated 原生支持 restSelf 付横置成本，无需转脚本。

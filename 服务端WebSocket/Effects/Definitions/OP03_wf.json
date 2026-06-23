@@ -312,6 +312,21 @@
       }
     ]
   },
+  "OP03-033": {
+    "_name": "小八",
+    "_matcher": "触发:[领袖含东海]此卡自登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "东海"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP03-034": {
     "_name": "花斑猫",
     "_matcher": "登场时KO对方最多1张费用≤2且处于休息状态的角色",
@@ -340,9 +355,16 @@
   },
   "OP03-036": {
     "_name": "杓死",
-    "_matcher": "主要将我方1张克洛转活跃(忽略可选成本横置我方东海角色);触发KO对方1张费用≤3休息角色",
+    "_matcher": "主要将我方1张克洛转活跃(可选成本'横置我方1张东海角色'用restCards通用横置近似,玩家自选;无专用东海限定键);触发KO对方1张费用≤3休息角色",
     "_src": "wf-dsl",
     "main": {
+      "cost": {
+        "restCards": {
+          "n": 1,
+          "optional": true
+        }
+      },
+      "costPrompt": "将我方1张《东海》角色转为休息状态：发动此效果？",
       "then": [
         {
           "op": "Choose",
@@ -778,7 +800,7 @@
   },
   "OP03-071": {
     "_name": "罗布·鲁兹",
-    "_matcher": "攻击时将对方1张费用≤5角色横置；咚-1为可选成本triggers无法表达，按惯例忽略只实现收益",
+    "_matcher": "攻击时(成本咚!!-1)横置对方1张费用≤5角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -794,7 +816,11 @@
             "op": "Rest",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？"
       }
     ]
   },
@@ -1032,23 +1058,30 @@
   },
   "OP03-097": {
     "_name": "六王枪",
-    "_matcher": "反击给我方1张领袖或角色本次战斗+3000(忽略弃手牌可选成本);触发抽1后KO对方1张费用≤1角色。",
+    "_matcher": "反击可丢弃我方1张手牌为成本:给我方1张领袖或角色本次战斗+3000;触发抽1后KO对方1张费用≤1角色。",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$tgt",
-        "text": "我方最多1张领袖或角色力量+3000"
+    "counter": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$tgt",
-        "delta": 3000
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "我方最多1张领袖或角色力量+3000"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$tgt",
+          "delta": 3000
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "Draw",
@@ -1067,6 +1100,23 @@
       }
     ]
   },
+  "OP03-108": {
+    "_name": "夏洛特·克力架",
+    "_matcher": "触发:[弃1手牌]此卡自登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP03-109": {
     "_name": "夏洛特·戚风蛋糕",
     "_matcher": "【登场时】将卡组顶1张置入生命顶(AddLifeFromDeck)，忽略‘将生命顶或底1张放废弃’的可选成本。",
@@ -1082,6 +1132,23 @@
         ]
       }
     ]
+  },
+  "OP03-110": {
+    "_name": "夏洛特·果昔",
+    "_matcher": "触发:[弃1手牌]此卡自登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP03-112": {
     "_name": "夏洛特·布玲",
@@ -1114,7 +1181,7 @@
   },
   "OP03-113": {
     "_name": "夏洛特·佩洛斯佩罗",
-    "_matcher": "【KO时】确认卡组顶3张，公开1张《大妈海盗团》特征加入手牌、其余放回底；生命【触发】的丢弃手牌登场带成本无法表达，仅实现 KO 时检索。",
+    "_matcher": "【KO时】确认卡组顶3张，公开1张《大妈海盗团》特征加入手牌、其余放回底；trigger弃1手牌此卡自登场。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1132,15 +1199,33 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP03-115": {
     "_name": "糖粉奶油末",
-    "_matcher": "【登场时】KO对方1张费用≤1角色，忽略‘丢弃1张拥有【触发】效果手牌’的可选成本。",
+    "_matcher": "【登场时】可丢弃手牌中1张拥有【触发】效果的卡牌为成本:KO对方1张费用≤1角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "hasTrigger": true
+          }
+        },
         "then": [
           {
             "op": "Choose",

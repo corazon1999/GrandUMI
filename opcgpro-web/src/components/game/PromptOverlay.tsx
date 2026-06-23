@@ -65,6 +65,11 @@ export default function PromptOverlay() {
       return my?.leaderNumber ? getCard(my.leaderNumber) ?? null : null;
     if (id === opp?.leaderId)
       return opp?.leaderNumber ? getCard(opp.leaderNumber) ?? null : null;
+    // 舞台不在 fieldCards 里（stageId/stageNumber 扁平字段），需单独识别，否则候选卡图加载不出
+    if (my && id === my.stageId)
+      return my.stageNumber ? getCard(my.stageNumber) ?? null : null;
+    if (opp && id === opp.stageId)
+      return opp.stageNumber ? getCard(opp.stageNumber) ?? null : null;
     const allCards = [
       ...(my?.fieldCards ?? []),
       ...(opp?.fieldCards ?? []),
@@ -95,6 +100,11 @@ export default function PromptOverlay() {
         isTapped: opp.leaderTapped,
       };
     }
+    // 舞台：无贴咚、无力量修正，仅横置状态
+    if (my && id === my.stageId)
+      return { attachedDonCount: 0, powerBuff: 0, isTapped: my.stageTapped };
+    if (opp && id === opp.stageId)
+      return { attachedDonCount: 0, powerBuff: 0, isTapped: opp.stageTapped };
     const fc = [...(my?.fieldCards ?? []), ...(opp?.fieldCards ?? [])].find((c) => c.id === id);
     if (!fc) return null;
     const base = getCard(fc.number)?.power ?? 0;

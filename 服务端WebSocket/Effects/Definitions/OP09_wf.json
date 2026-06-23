@@ -306,11 +306,15 @@
   },
   "OP09-064": {
     "_name": "基拉",
-    "_matcher": "登场时将含《基德海盗团》特征的我方领袖转活跃(Activate selfLeader)；触发节不支持成本，故忽略“咚!!-1”成本只实现收益。",
+    "_matcher": "登场时可选成本(咚!!-1)→将含《基德海盗团》特征的我方领袖转活跃(Activate selfLeader)。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "if": {
           "leaderHasKeyword": "基德海盗团"
         },
@@ -325,11 +329,15 @@
   },
   "OP09-065": {
     "_name": "山智",
-    "_matcher": "登场时忽略可选成本(放回咚),实现收益:自身获得速攻并将对方1张费用≤6角色转休息",
+    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→自身获得速攻并将对方1张费用≤6角色转休息。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
           {
             "op": "GiveKeyword",
@@ -354,11 +362,15 @@
   },
   "OP09-068": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "我方回合结束时忽略可选成本(放回咚),实现收益:将自身转为活跃并获得阻挡者至下个对方回合结束",
+    "_matcher": "我方回合结束时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→将自身转为活跃并获得阻挡者至下个对方回合结束。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnMyTurnEnd",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
           {
             "op": "Activate",
@@ -376,11 +388,15 @@
   },
   "OP09-070": {
     "_name": "奈美",
-    "_matcher": "登场时忽略可选成本(放回咚),实现收益:给我方1张领袖或角色贴最多2张休息状态的咚",
+    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→给我方1张领袖或角色贴最多2张休息状态的咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -406,7 +422,10 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "cost": { "donReturn": 2, "handDiscard": 1 },
+        "cost": {
+          "donReturn": 2,
+          "handDiscard": 1
+        },
         "costPrompt": "是否支付(咚!!-2，丢弃我方1张手牌)以抽取2张?",
         "then": [
           {
@@ -419,11 +438,15 @@
   },
   "OP09-073": {
     "_name": "布鲁克",
-    "_matcher": "攻击时忽略可选成本(放回咚),实现收益:对方最多2张角色本回合力量-2000",
+    "_matcher": "攻击时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→对方最多2张角色本回合力量-2000。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -443,11 +466,15 @@
   },
   "OP09-075": {
     "_name": "尤斯塔斯·基德",
-    "_matcher": "登场时忽略可选成本(生命顶入手),领袖含基德海盗团时从咚卡组追加最多1张活跃咚",
+    "_matcher": "登场时可选成本(生命顶1张入手)→领袖含基德海盗团时从咚卡组追加最多1张活跃咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "lifeToHand": true
+        },
+        "costPrompt": "将生命区最上方1张加入手牌：发动此效果？",
         "if": {
           "leaderHasKeyword": "基德海盗团"
         },
@@ -463,11 +490,15 @@
   },
   "OP09-076": {
     "_name": "罗罗诺亚·佐罗",
-    "_matcher": "登场时忽略可选成本(放回咚),实现收益:从咚卡组追加最多1张活跃咚",
+    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→从咚卡组追加最多1张活跃咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
           {
             "op": "RefreshDon",
@@ -546,17 +577,19 @@
   },
   "OP09-100": {
     "_name": "乌鸦",
-    "_matcher": "【阻挡者】为纯关键词不写；【触发】在领袖含革命军且双方生命合计≤5时登场此卡，用 PlayCharFromHand 限定卡名表达登场收益。",
+    "_matcher": "【阻挡者】为纯关键词不写；【触发】我方领袖拥有《革命军》特征且双方生命合计≤5的场合，此卡牌登场(PlaySelf)。",
     "_src": "wf-dsl",
-    "trigger": [
-      {
-        "op": "PlayCharFromHand",
-        "filter": {
-          "nameEquals": "乌鸦"
-        },
-        "text": "登场此卡牌(乌鸦)"
-      }
-    ]
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "革命军",
+        "bothLifeTotalLte": 5
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP09-102": {
     "_name": "三叶草博士",
@@ -584,7 +617,7 @@
   },
   "OP09-103": {
     "_name": "克尔拉",
-    "_matcher": "【阻挡者】为纯关键词不写；【登场时】从手牌登场≤1张费用≤4的革命军角色后抽1(可选的生命入手成本无法表达，按惯例忽略成本只实现收益)。",
+    "_matcher": "登场时(成本生命顶入手)从手牌登场≤1张费≤4革命军角色后抽1;阻挡者为关键词",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -603,7 +636,11 @@
             "op": "Draw",
             "n": 1
           }
-        ]
+        ],
+        "cost": {
+          "lifeToHand": true
+        },
+        "costPrompt": "将生命顶1张加入手牌：发动？"
       }
     ]
   },
@@ -660,9 +697,40 @@
       }
     ]
   },
+  "OP09-108": {
+    "_name": "巴索罗缪·大熊",
+    "_matcher": "【触发】我方领袖拥有《革命军》特征且双方生命合计≤5的场合，此卡牌登场(PlaySelf)。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "革命军",
+        "bothLifeTotalLte": 5
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP09-109": {
+    "_name": "哈古瓦尔·D·萨乌罗",
+    "_matcher": "【触发】我方领袖为‘妮古·罗宾’的场合，此卡牌登场(PlaySelf)。（【阻挡者】为纯关键词不写）",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "leaderNameEquals": "妮古·罗宾"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP09-112": {
     "_name": "贝洛·贝蒂",
-    "_matcher": "登场时我方生命≤2则抽1；trigger 因依赖『领袖含革命军且双方生命合计≤5』条件触发(trigger 节不支持 if)未实现。",
+    "_matcher": "登场时我方生命≤2则抽1；【触发】我方领袖拥有《革命军》特征且双方生命合计≤5的场合，此卡牌登场(PlaySelf)。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -677,7 +745,18 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "革命军",
+        "bothLifeTotalLte": 5
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP09-115": {
     "_name": "冰块 两棘矛",

@@ -589,7 +589,7 @@
   },
   "OP10-044": {
     "_name": "卡布",
-    "_matcher": "登场时退回对方≤1张费≤1角色到手牌(triggers不支持cost，忽略可选成本横置领袖/舞台，仅实现收益)。",
+    "_matcher": "登场时(成本:休息我方1张德莱斯罗兹领袖/舞台)退回对方≤1张费≤1角色到手牌",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -609,7 +609,12 @@
             "op": "BounceToHand",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "restOwnKeyworded": {
+            "keyword": "德莱斯罗兹"
+          }
+        }
       }
     ]
   },
@@ -636,11 +641,16 @@
   },
   "OP10-048": {
     "_name": "蔡义",
-    "_matcher": "【登场时】将对方最多1张费用≤1角色退回手牌;忽略可选成本(休息我方《德莱斯罗兹》领袖/舞台)",
+    "_matcher": "【登场时】可放弃成本『休息我方1张《德莱斯罗兹》领袖/舞台』→将对方最多1张费用≤1角色退回手牌",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "restOwnKeyworded": {
+            "keyword": "德莱斯罗兹"
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -731,7 +741,7 @@
   },
   "OP10-056": {
     "_name": "蔓谢丽",
-    "_matcher": "【登场时】将对方最多1张费用≤4角色退回手牌;忽略可选双重成本(休息《德莱斯罗兹》领袖/舞台并退回我方费用≥4《德莱斯罗兹》角色)",
+    "_matcher": "登场时(双重成本:休息1张德莱斯罗兹领袖/舞台+退回1张费≥4德莱斯罗兹角色)退回对方≤1张费≤4角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -748,13 +758,23 @@
             "op": "BounceToHand",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "restOwnKeyworded": {
+            "keyword": "德莱斯罗兹"
+          },
+          "bounceOwnChar": {
+            "n": 1,
+            "originalCostGte": 4,
+            "keyword": "德莱斯罗兹"
+          }
+        }
       }
     ]
   },
   "OP10-057": {
     "_name": "雷欧",
-    "_matcher": "【登场时】领袖为撒谎布时确认顶5张公开≤2张《德莱斯罗兹》(非雷欧)加手牌,余者放回底并弃1手牌;忽略可选成本(休息领袖/舞台)",
+    "_matcher": "登场时(成本:休息我方1张领袖/舞台)领袖撒谎布则看顶5公开≤2张德莱斯罗兹(非雷欧)加手牌余放底弃1",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -777,7 +797,10 @@
             "op": "DiscardOwnChosen",
             "n": 1
           }
-        ]
+        ],
+        "cost": {
+          "restOwnKeyworded": {}
+        }
       }
     ]
   },
@@ -939,7 +962,7 @@
   },
   "OP10-067": {
     "_name": "赛诺尔·平克",
-    "_matcher": "【登场时】忽略可选咚!!-1成本，实现收益：废弃区取1张费用≤5事件加手牌(无颜色filter键，紫色限制无法表达,按事件费用≤5近似)，之后活跃1张咚",
+    "_matcher": "登场时(成本咚!!-1)废弃区取1张费≤5事件加手牌(紫色限制近似),之后活跃1张",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -963,17 +986,28 @@
             "op": "ActiveOwnDon",
             "n": 1
           }
-        ]
+        ],
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？"
       }
     ]
   },
   "OP10-072": {
     "_name": "堂吉诃德·罗西南德",
-    "_matcher": "【登场时】忽略可选弃事件成本仅实现抽2；【我方回合结束时】场上咚≥7时活跃2张咚，用 selfDonTotalGte+ActiveOwnDon 表达",
+    "_matcher": "【登场时】可放弃成本『丢弃我方手牌中1张事件』→抽2；【我方回合结束时】场上咚≥7时活跃2张咚，用 selfDonTotalGte+ActiveOwnDon 表达",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "kind": "Event",
+            "text": "丢弃我方手牌中1张事件作为成本（可放弃）"
+          }
+        },
         "then": [
           {
             "op": "Draw",
@@ -997,11 +1031,17 @@
   },
   "OP10-076": {
     "_name": "Baby 5",
-    "_matcher": "登场时领袖含堂吉诃德海盗团则从咚卡组追加1张活跃咚；可选弃手牌成本无法在 triggers 中表达，按惯例忽略成本只实现收益。",
+    "_matcher": "登场时可放弃成本『丢弃我方1张手牌』→领袖含堂吉诃德海盗团则从咚卡组追加1张活跃咚。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "text": "丢弃我方1张手牌作为成本（可放弃）"
+          }
+        },
         "if": {
           "leaderHasKeyword": "堂吉诃德海盗团"
         },
@@ -1100,7 +1140,7 @@
   },
   "OP10-081": {
     "_name": "撒谎布",
-    "_matcher": "登场时KO对方1张费用≤2角色，之后卡组顶弃2张；可选横置德莱斯罗兹领袖/舞台成本在 triggers 不支持，按惯例忽略只实现收益。",
+    "_matcher": "登场时(成本:休息我方1张德莱斯罗兹领袖/舞台)KO对方1张费≤2角色,之后磨2",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1120,7 +1160,12 @@
             "op": "MillTop",
             "n": 2
           }
-        ]
+        ],
+        "cost": {
+          "restOwnKeyworded": {
+            "keyword": "德莱斯罗兹"
+          }
+        }
       }
     ]
   },
@@ -1151,11 +1196,14 @@
   },
   "OP10-087": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "启动主要：对方手牌≥5则弃1，之后磨2。可选成本中‘休息我方1张德莱斯罗兹领袖或舞台’无对应cost键，仅保留restSelf并忽略该附加成本。",
+    "_matcher": "启动主要(成本:休息此角色+休息我方1张《德莱斯罗兹》领袖/舞台)：对方手牌≥5则弃1，之后磨2。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
-        "restSelf": true
+        "restSelf": true,
+        "restOwnKeyworded": {
+          "keyword": "德莱斯罗兹"
+        }
       },
       "if": {
         "oppHandCountGte": 5
@@ -1174,11 +1222,14 @@
   },
   "OP10-088": {
     "_name": "奈美",
-    "_matcher": "启动主要：抽1，之后磨2。可选成本中‘休息我方1张德莱斯罗兹领袖或舞台’无对应cost键，仅保留restSelf并忽略该附加成本。",
+    "_matcher": "启动主要(成本:休息此角色+休息我方1张《德莱斯罗兹》领袖/舞台)：抽1，之后磨2。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
-        "restSelf": true
+        "restSelf": true,
+        "restOwnKeyworded": {
+          "keyword": "德莱斯罗兹"
+        }
       },
       "then": [
         {
@@ -1215,11 +1266,14 @@
   },
   "OP10-091": {
     "_name": "布鲁克",
-    "_matcher": "启动主要：KO对方≤1张费用≤1角色，之后磨2。附加成本‘休息德莱斯罗兹领袖或舞台’无对应cost键，仅保留restSelf。",
+    "_matcher": "启动主要(成本:休息此角色+休息我方1张《德莱斯罗兹》领袖/舞台)：KO对方≤1张费用≤1角色，之后磨2。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
-        "restSelf": true
+        "restSelf": true,
+        "restOwnKeyworded": {
+          "keyword": "德莱斯罗兹"
+        }
       },
       "then": [
         {
@@ -1241,7 +1295,7 @@
   },
   "OP10-095": {
     "_name": "罗罗诺亚·佐罗",
-    "_matcher": "【登场时】KO对方≤1张费用≤4角色，之后磨2。triggers不支持cost，按惯例忽略可选成本‘休息德莱斯罗兹领袖或舞台’只实现收益。",
+    "_matcher": "登场时(成本:休息我方1张德莱斯罗兹领袖/舞台)KO对方1张费≤4角色,之后磨2",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1261,7 +1315,12 @@
             "op": "MillTop",
             "n": 2
           }
-        ]
+        ],
+        "cost": {
+          "restOwnKeyworded": {
+            "keyword": "德莱斯罗兹"
+          }
+        }
       }
     ]
   },
@@ -1337,7 +1396,7 @@
   },
   "OP10-099": {
     "_name": "尤斯塔斯·基德",
-    "_matcher": "我方回合结束时把1张超新星(3-8费)角色转活跃并赋予阻挡者；triggers不支持cost，故忽略可选的翻生命卡成本，只实现收益部分。",
+    "_matcher": "我方回合结束时(成本:生命顶1张翻正)将1张费3-8超新星角色转活跃并赋予阻挡者(至对方回合结束)",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1366,7 +1425,11 @@
             "keyword": "阻挡者",
             "duration": "UntilNextOpponentEndPhase"
           }
-        ]
+        ],
+        "cost": {
+          "lifeFaceUp": true
+        },
+        "costPrompt": "将生命顶1张翻至正面：发动？"
       }
     ]
   },
@@ -1401,6 +1464,21 @@
       }
     ]
   },
+  "OP10-110": {
+    "_name": "火特&瓦亚",
+    "_matcher": "【触发】我方生命≤2时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP10-111": {
     "_name": "蒙奇·D·路飞",
     "_matcher": "登场时确认卡组顶5张、公开≤1张‘蒙奇·D·路飞’以外的超新星卡加手牌、余者放底；match用excludeName排除自身卡名。",
@@ -1422,5 +1500,25 @@
         ]
       }
     ]
+  },
+  "OP10-113": {
+    "_name": "罗罗诺亚·佐罗",
+    "_matcher": "【触发】可丢弃1张手牌且领袖含《超新星》时此卡从废弃区登场",
+    "_src": "wf-dsl",
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "if": {
+        "leaderHasKeyword": "超新星"
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   }
 }

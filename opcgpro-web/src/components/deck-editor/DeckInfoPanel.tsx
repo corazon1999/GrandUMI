@@ -300,7 +300,7 @@ export default function DeckInfoPanel() {
           <textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder="粘贴卡组码…(领航行 + 每行『数量 卡号』)"
+            placeholder={"粘贴卡组码…\n支持两种格式:\n· 每行『数量 卡号』(本站导出格式)\n· 紧凑『数量x卡号』如 1xOP13-002 3xOP13-007 …(领航自动识别)"}
             className="w-full h-32 bg-gray-800 text-gray-200 text-[11px] rounded-lg p-2 outline-none border border-gray-700 focus:border-orange-500 resize-none font-mono"
           />
           {importMsg && <p className="text-emerald-400 text-[11px] mt-1.5">{importMsg}</p>}

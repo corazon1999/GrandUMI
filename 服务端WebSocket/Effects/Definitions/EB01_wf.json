@@ -318,6 +318,7 @@
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
         "if": {
           "leaderHasKeyword": "巴洛克工作室"
         },

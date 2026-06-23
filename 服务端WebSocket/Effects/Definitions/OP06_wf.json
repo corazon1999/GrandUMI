@@ -79,7 +79,7 @@
   },
   "OP06-016": {
     "_name": "",
-    "_matcher": "启动主要使对方1张角色本回合力量-3000；放回卡组底的成本无对应cost键，按惯例忽略成本只实现收益。",
+    "_matcher": "启动主要(成本:将此角色放回卡组底)对方1张角色本回合力量-3000",
     "_src": "wf-dsl",
     "activated": {
       "then": [
@@ -94,7 +94,10 @@
           "target": "$tgt",
           "delta": -3000
         }
-      ]
+      ],
+      "cost": {
+        "selfToDeckBottom": true
+      }
     }
   },
   "OP06-017": {
@@ -355,7 +358,7 @@
   },
   "OP06-033": {
     "_name": "",
-    "_matcher": "登场时KO对方1张休息状态角色;触发节无法表达可选成本(弃鱼人族牌/废弃方舟诺亚),按惯例仅实现收益部分,忽略成本",
+    "_matcher": "登场时(成本:弃1张鱼人族手牌;原文另可改弃方舟诺亚,二选一未实现)KO对方1张休息角色",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -372,7 +375,13 @@
             "op": "KO",
             "target": "$tgt"
           }
-        ]
+        ],
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "keyword": "鱼人族"
+          }
+        }
       }
     ]
   },
@@ -730,11 +739,15 @@
   },
   "OP06-071": {
     "_name": "",
-    "_matcher": "登场时若领袖含《FILM》，从废弃区选最多2张《FILM》费用≤4角色加入手牌(可选咚成本按惯例忽略)。",
+    "_matcher": "登场时咚!!-1为成本：若领袖含《FILM》，从废弃区选最多2张《FILM》费用≤4角色加入手牌。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "if": {
           "leaderHasKeyword": "FILM"
         },
@@ -785,11 +798,15 @@
   },
   "OP06-075": {
     "_name": "",
-    "_matcher": "登场时(忽略可选咚成本)把对方最多2张费用≤2角色转休息，用两次Choose分别横置。",
+    "_matcher": "登场时咚!!-1为成本：把对方最多2张费用≤2角色转休息，用两次Choose分别横置。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动此效果？",
         "then": [
           {
             "op": "Choose",
@@ -904,11 +921,16 @@
   },
   "OP06-081": {
     "_name": "",
-    "_matcher": "登场时(忽略可选『废弃区2张放回卡组底』成本)KO对方最多1张费用≤2角色。",
+    "_matcher": "登场时可将废弃区2张自选放回卡组最下方为成本：KO对方最多1张费用≤2角色。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "trashToDeckBottom": {
+            "n": 2
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -1014,7 +1036,7 @@
   },
   "OP06-090": {
     "_name": "",
-    "_matcher": "【登场时】将废弃区中≤1张除自身外的恐怖之船海盗团卡牌加入手牌(可选成本：放回2张废弃区到卡组底，无法表达故忽略成本)",
+    "_matcher": "登场时(成本废弃区2张放回卡组底)废弃区取≤1张除自身外恐怖之船卡加手牌",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1034,7 +1056,12 @@
             "op": "TrashToHand",
             "target": "$t"
           }
-        ]
+        ],
+        "cost": {
+          "trashToDeckBottom": {
+            "n": 2
+          }
+        }
       }
     ]
   },
@@ -1080,7 +1107,7 @@
   },
   "OP06-098": {
     "_name": "",
-    "_matcher": "启动主要(横置自身)：领袖含恐怖之船海盗团时，从废弃区休息登场1张费用≤2该特征角色；可选的咚转休息附加成本按惯例忽略。",
+    "_matcher": "启动主要(横置自身)：领袖含恐怖之船海盗团时，从废弃区休息登场1张费用≤2该特征角色；原文另有可选『费用区指定数量咚转休息』成本，为非固定数量无对应cost键，按规范跳过。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
@@ -1102,9 +1129,54 @@
       ]
     }
   },
+  "OP06-100": {
+    "_name": "",
+    "_matcher": "trigger为'对方生命卡牌不多于3张时此卡牌登场'；攻击时段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP06-102": {
+    "_name": "",
+    "_matcher": "trigger为'我方生命卡牌不多于2张时此卡牌登场'；启动主要段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP06-103": {
+    "_name": "",
+    "_matcher": "trigger为'对方生命卡牌不多于3张时此卡牌登场'；攻击时段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP06-104": {
     "_name": "",
-    "_matcher": "KO时若对方生命≤3，卡组顶1张置入生命顶；生命牌触发同样置入1张(原触发为登场，此处保守按收益表达置生命)。",
+    "_matcher": "KO时若对方生命≤3，卡组顶1张置入生命顶；trigger为'对方生命卡牌不多于3张时此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1120,12 +1192,16 @@
         ]
       }
     ],
-    "trigger": [
-      {
-        "op": "AddLifeFromDeck",
-        "n": 1
-      }
-    ]
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP06-107": {
     "_name": "",
@@ -1177,9 +1253,69 @@
       }
     ]
   },
+  "OP06-109": {
+    "_name": "",
+    "_matcher": "trigger为'对方生命卡牌不多于3张时此卡牌登场'；咚!!×2持续段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP06-110": {
+    "_name": "",
+    "_matcher": "trigger为'对方生命卡牌不多于3张时此卡牌登场'；咚!!×2持续段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP06-111": {
+    "_name": "",
+    "_matcher": "trigger为'我方生命卡牌不多于2张时此卡牌登场'；启动主要段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
+  "OP06-112": {
+    "_name": "",
+    "_matcher": "trigger为'对方生命卡牌不多于3张时此卡牌登场'；攻击时段为C#脚本另行处理，此处仅补登场触发。",
+    "_src": "wf-dsl",
+    "trigger": {
+      "if": {
+        "oppLifeCountLte": 3
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
+  },
   "OP06-114": {
     "_name": "",
-    "_matcher": "【登场时】确认卡组顶5张、公开≤1张『神之岛』或《山迪亚战士》加手牌、其余放回底；可选舞台成本按惯例忽略",
+    "_matcher": "登场时(成本:将1张费1舞台放回卡组底)看顶5公开≤1张神之岛/山迪亚战士加手牌余放底",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1202,28 +1338,41 @@
               "excludeName": "瓦帕"
             }
           }
-        ]
+        ],
+        "cost": {
+          "returnOwnStage": {
+            "originalCostLte": 1,
+            "originalCostGte": 1
+          }
+        }
       }
     ]
   },
   "OP06-115": {
     "_name": "",
-    "_matcher": "【反击】我方1张领袖或角色本次战斗+3000(可选弃牌成本忽略)；【触发】卡组顶1张入生命后弃1张手牌（生命为0条件按惯例近似省略，核心收益为入生命+弃牌）",
+    "_matcher": "【反击】可丢弃1张手牌为成本：我方1张领袖或角色本次战斗+3000；【触发】卡组顶1张入生命后弃1张手牌（生命为0条件按惯例近似省略，核心收益为入生命+弃牌）",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 3000
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "AddLifeFromDeck",

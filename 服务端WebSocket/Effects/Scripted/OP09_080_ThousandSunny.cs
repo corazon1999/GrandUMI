@@ -61,6 +61,9 @@ public class OP09_080_ThousandSunny : IScriptedEffect
         foreach (var c in p.Hand) if (c.Id.ToString() == id) return c;
         foreach (var c in p.Deck) if (c.Id.ToString() == id) return c;
         foreach (var c in p.LifeArea) if (c.Id.ToString() == id) return c;
+        // 离场卡可能被同一效果链后续操作再次登场回场上，须搜场上角色区/舞台
+        foreach (var c in p.Characters) if (c.Id.ToString() == id) return c;
+        if (p.StageCard is not null && p.StageCard.Id.ToString() == id) return p.StageCard;
         return null;
     }
 }

@@ -39,6 +39,11 @@ public class EB03_055_Robin : IScriptedEffect
             me.LifeArea.RemoveAt(0);
             me.Trash.Add(lifeTop);
 
+            // 生命牌离场 → 派发 OnLifeLeaveField，使"当生命卡牌离开场上时"类触发能响应
+            // （如 OP11-041 奈美 我方回合中生命离场抽 1）。此前脚本直接移生命未派发事件，#156。
+            await EffectRuntime.TriggerEvent(ctx.State, EffectTrigger.OnLifeLeaveField, ctx.Prompts,
+                new Dictionary<string, object?> { ["owner"] = ctx.OwnerIndex, ["toZero"] = me.LifeArea.Count == 0 });
+
             // 收益：领袖含《草帽一伙》→ 卡组顶最多 2 张加入生命区最上方
             if (me.Leader.Info.HasKeyword("草帽一伙"))
                 AtomicOps.AddLifeFromDeckTop(me, 2);

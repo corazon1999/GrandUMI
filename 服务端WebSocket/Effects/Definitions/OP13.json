@@ -328,7 +328,19 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": {
+        "handDiscard": {
+          "n": 1
+        }
+      },
+      "then": [
+        {
+          "op": "PlaySelf"
+        }
+      ]
+    }
   },
   "OP13-116": {
     "main": {
