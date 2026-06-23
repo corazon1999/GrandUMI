@@ -118,6 +118,7 @@ onUnmounted(() => {
         <div
           v-for="card in results"
           :key="card.number"
+          v-memo="[isLeaderMode, getCount(card.number)]"
         >
           <CardGridItem
             :card="card"
@@ -133,7 +134,9 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <CardHoverPreview v-if="hover" :info="hover" />
+    <Teleport to="body">
+      <CardHoverPreview v-if="hover" :info="hover" />
+    </Teleport>
     <CardInfoPanel :card="modal" @close="modal = null" />
   </div>
 </template>
@@ -210,5 +213,11 @@ onUnmounted(() => {
 .result-grid {
   display: grid;
   gap: 12px;
+}
+/* 离屏卡牌跳过渲染（布局/绘制），大幅降低长列表初始绘制与滚动开销；
+   contain-intrinsic-size 预留高度避免滚动条跳动（auto 会记住实测高度）。 */
+.result-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
 }
 </style>

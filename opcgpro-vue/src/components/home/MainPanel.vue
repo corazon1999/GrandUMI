@@ -8,6 +8,11 @@ import Ticks from "@/components/shared/Ticks.vue";
 import LobbyPanel from "./LobbyPanel.vue";
 import DeckChoosePanel from "./DeckChoosePanel.vue";
 import HistoryPanel from "./HistoryPanel.vue";
+import ProfilePanel from "./ProfilePanel.vue";
+import HomePanel from "./HomePanel.vue";
+import FriendsPanel from "./FriendsPanel.vue";
+import RankPanel from "./RankPanel.vue";
+import SettingsPanel from "./SettingsPanel.vue";
 import ChatPanel from "./ChatPanel.vue";
 import PlayerListPanel from "./PlayerListPanel.vue";
 import FriendlyRoomPanel from "./FriendlyRoomPanel.vue";
@@ -18,8 +23,8 @@ import NetStatePanel from "@/components/ui/NetStatePanel.vue";
 const SELECTED_DECK_KEY = "grandumi_selected_deck";
 const ONLINE_BADGE_POS_KEY = "grandumi_online_badge_pos";
 
-type View = "lobby" | "deck" | "history";
-const view = ref<View>("lobby");
+type View = "home" | "lobby" | "deck" | "friends" | "rank" | "history" | "settings" | "profile";
+const view = ref<View>("home");
 const showPlayerList = ref(false);
 
 const onlineCount = useStore(useNetStore, (s) => s.onlineCount);
@@ -91,6 +96,10 @@ function onBadgePointerUp(e: PointerEvent) {
 function onNavigate(v: View) {
   view.value = v;
 }
+
+function goTo(v: View) {
+  view.value = v;
+}
 </script>
 
 <template>
@@ -132,8 +141,11 @@ function onNavigate(v: View) {
         </button>
 
         <Transition name="view-fade" mode="out-in">
+          <!-- 主页 / 指挥室 -->
+          <HomePanel v-if="view === 'home'" key="home" class="solo-panel enter" @navigate="goTo" />
+
           <!-- 大厅视图：双栏（中 Lobby + 右 Chat） -->
-          <div v-if="view === 'lobby'" key="lobby" class="lobby-stack enter">
+          <div v-else-if="view === 'lobby'" key="lobby" class="lobby-stack enter">
             <div class="lobby-stack__main">
               <LobbyPanel @go-to-deck="view = 'deck'" />
             </div>
@@ -151,7 +163,11 @@ function onNavigate(v: View) {
             class="solo-panel enter"
             @deck-selected="view = 'lobby'"
           />
+          <FriendsPanel v-else-if="view === 'friends'" key="friends" class="solo-panel enter" @navigate="goTo" />
+          <RankPanel v-else-if="view === 'rank'" key="rank" class="solo-panel enter" />
           <HistoryPanel v-else-if="view === 'history'" key="history" class="solo-panel enter" />
+          <SettingsPanel v-else-if="view === 'settings'" key="settings" class="solo-panel enter" />
+          <ProfilePanel v-else-if="view === 'profile'" key="profile" class="solo-panel enter" />
         </Transition>
       </div>
     </main>
@@ -216,10 +232,15 @@ function onNavigate(v: View) {
 }
 
 /* ── 单栏（卡组/战绩） ── */
+/* 不在此处设 overflow：各面板根元素自带 overflow-y:auto（HomePanel/Friends/
+   History/Rank/Settings/Profile）或由内部容器滚动（DeckChoose）。
+   这里若设 overflow:hidden 会与面板根元素同级冲突并盖掉其滚动条；
+   外层 .main-content 已 overflow:hidden 负责裁剪。min-height:0 让 flex 子项
+   可收缩，保证内部滚动容器生效。 */
 .solo-panel {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  min-height: 0;
 }
 
 /* ── 在线浮标 ── */

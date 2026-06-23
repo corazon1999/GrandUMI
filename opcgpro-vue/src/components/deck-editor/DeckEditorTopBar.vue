@@ -193,7 +193,7 @@ function closeDropdowns() {
         ← 返回
       </button>
       <div class="de-topbar__title-group">
-        <span class="de-topbar__kicker">DECK EDITOR</span>
+        <span class="de-topbar__kicker">卡组编辑器</span>
       </div>
     </div>
 

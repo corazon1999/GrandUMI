@@ -19,9 +19,11 @@ watch(
 );
 
 const showRight = computed(() => window.innerWidth - props.info.rect.right >= PREVIEW_W + 16);
-const x = computed(() =>
-  showRight.value ? props.info.rect.right + 12 : props.info.rect.left - 12 - PREVIEW_W,
-);
+const x = computed(() => {
+  const raw = showRight.value ? props.info.rect.right + 12 : props.info.rect.left - 12 - PREVIEW_W;
+  // 夹在视口内，避免出界/被右栏遮挡（配合 Teleport to body 后 fixed 相对视口生效）
+  return Math.max(8, Math.min(raw, window.innerWidth - PREVIEW_W - 8));
+});
 const y = computed(() => {
   const cardCenterY = props.info.rect.top + props.info.rect.height / 2;
   const rawY = cardCenterY - PREVIEW_H_APPROX / 2;

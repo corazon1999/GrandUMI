@@ -16,17 +16,52 @@ const pile = computed(() => pileSizes[cardSize.value]);
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-2 rounded-md border border-sky-200/15 bg-black/30 px-2.5 py-2 shadow-lg shadow-black/25">
-    <span class="text-xs font-semibold text-slate-300">牌库</span>
-    <div :class="['relative', pile]">
-      <div class="absolute inset-0 translate-x-2 translate-y-2 rounded-md border border-sky-300/20 bg-slate-950" />
-      <div class="absolute inset-0 translate-x-1 translate-y-1 rounded-md border border-sky-300/30 bg-blue-950" />
-      <div class="absolute inset-0 flex items-center justify-center rounded-md border-2 border-sky-300/45 bg-gradient-to-br from-sky-950 via-blue-950 to-slate-950 shadow-xl shadow-black/40">
-        <span class="text-xs font-black text-sky-300">DECK</span>
-      </div>
-      <div class="absolute -right-3 -top-3 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow">
-        {{ count }}
-      </div>
+  <div class="bf-well">
+    <span class="kicker">牌库</span>
+    <div :class="[pile, 'bf-deck']">
+      <span class="bf-deck__txt">DECK</span>
+      <span class="bf-deck__count">{{ count }}</span>
     </div>
   </div>
 </template>
+
+<style scoped>
+.bf-deck {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 2px solid var(--primary);
+  background: linear-gradient(158deg, var(--primary-bright), var(--bg1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 0 var(--primary-glow),
+    0 12px 22px -8px rgba(0, 0, 0, 0.8);
+}
+.bf-deck__txt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--on-primary);
+}
+.bf-deck__count {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, var(--surface2), var(--bg1));
+  border: 1.5px solid var(--primary);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+</style>

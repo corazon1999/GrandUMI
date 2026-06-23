@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782043687143,
+  "lastScanned": 1782132579610,
   "projectRoot": "D:\\code\\GrandUMI\\opcgpro-vue",
   "techStack": {
     "languages": [
@@ -69,32 +69,11 @@
   },
   "customNotes": [],
   "directoryMap": {
-    "diff": {
-      "path": "diff",
-      "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1782043687063,
-      "keyFiles": [
-        "image copy.png",
-        "image.png"
-      ]
-    },
-    "dist": {
-      "path": "dist",
-      "purpose": "Distribution/build output",
-      "fileCount": 3,
-      "lastAccessed": 1782043687064,
-      "keyFiles": [
-        "favicon.svg",
-        "icons.svg",
-        "index.html"
-      ]
-    },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 2,
-      "lastAccessed": 1782043687075,
+      "lastAccessed": 1782132579577,
       "keyFiles": [
         "GrandUMI Redesign Offline.html",
         "grandumi-design-system.md"
@@ -104,7 +83,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 2,
-      "lastAccessed": 1782043687076,
+      "lastAccessed": 1782132579577,
       "keyFiles": [
         "favicon.svg",
         "icons.svg"
@@ -114,7 +93,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 1,
-      "lastAccessed": 1782043687076,
+      "lastAccessed": 1782132579584,
       "keyFiles": [
         "convert-to-webp.mjs"
       ]
@@ -123,40 +102,18 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 3,
-      "lastAccessed": 1782043687076,
+      "lastAccessed": 1782132579584,
       "keyFiles": [
         "App.vue",
         "main.ts",
         "style.css"
       ]
     },
-    "dist\\assets": {
-      "path": "dist\\assets",
-      "purpose": "Static assets",
-      "fileCount": 18,
-      "lastAccessed": 1782043687077,
-      "keyFiles": [
-        "CardHoverPreview-BR40yn_0.js",
-        "DeckEditorPage-B852KoPa.css",
-        "DeckEditorPage-BpTn51aS.js"
-      ]
-    },
-    "dist\\data": {
-      "path": "dist\\data",
-      "purpose": "Data files",
-      "fileCount": 57,
-      "lastAccessed": 1782043687077,
-      "keyFiles": [
-        "EB01.json",
-        "EB02.json",
-        "EB03.json"
-      ]
-    },
     "public\\data": {
       "path": "public\\data",
       "purpose": "Data files",
       "fileCount": 57,
-      "lastAccessed": 1782043687078,
+      "lastAccessed": 1782132579585,
       "keyFiles": [
         "EB01.json",
         "EB02.json",
@@ -167,14 +124,14 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 0,
-      "lastAccessed": 1782043687079,
+      "lastAccessed": 1782132579586,
       "keyFiles": []
     },
     "src\\data": {
       "path": "src\\data",
       "purpose": "Data files",
       "fileCount": 8,
-      "lastAccessed": 1782043687080,
+      "lastAccessed": 1782132579586,
       "keyFiles": [
         "CardLoader.ts",
         "cardSets.ts",
@@ -185,7 +142,7 @@
       "path": "src\\lib",
       "purpose": "Library code",
       "fileCount": 1,
-      "lastAccessed": 1782043687081,
+      "lastAccessed": 1782132579586,
       "keyFiles": [
         "colorMap.ts"
       ]
@@ -194,7 +151,7 @@
       "path": "src\\pages",
       "purpose": "Page components",
       "fileCount": 7,
-      "lastAccessed": 1782043687082,
+      "lastAccessed": 1782132579586,
       "keyFiles": [
         "DeckEditorPage.vue",
         "GamePage.vue",
@@ -204,303 +161,303 @@
   },
   "hotPaths": [
     {
+      "path": "src\\components\\game\\GameBoard.vue",
+      "accessCount": 13,
+      "lastAccessed": 1782230271582,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\MEMORY.md",
+      "accessCount": 7,
+      "lastAccessed": 1782228467657,
+      "type": "file"
+    },
+    {
       "path": "src\\pages\\LoginPage.vue",
-      "accessCount": 37,
-      "lastAccessed": 1782055337126,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 26,
-      "lastAccessed": 1782055213212,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\home\\LobbyPanel.vue",
-      "accessCount": 18,
-      "lastAccessed": 1782051512855,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\home\\MainPanel.vue",
-      "accessCount": 16,
-      "lastAccessed": 1782055227955,
-      "type": "file"
-    },
-    {
-      "path": "src\\router\\index.ts",
-      "accessCount": 14,
-      "lastAccessed": 1782055235762,
-      "type": "file"
-    },
-    {
-      "path": "src\\store\\netStore.ts",
-      "accessCount": 13,
-      "lastAccessed": 1782049096613,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 13,
-      "lastAccessed": 1782055228392,
-      "type": "directory"
-    },
-    {
-      "path": "src\\types\\net.ts",
-      "accessCount": 12,
-      "lastAccessed": 1782047469465,
-      "type": "file"
-    },
-    {
-      "path": "src\\App.vue",
-      "accessCount": 11,
-      "lastAccessed": 1782055326795,
-      "type": "file"
-    },
-    {
-      "path": "src\\pages\\HomePage.vue",
-      "accessCount": 10,
-      "lastAccessed": 1782047406952,
-      "type": "file"
-    },
-    {
-      "path": "src\\net\\HomeProtocol.ts",
-      "accessCount": 10,
-      "lastAccessed": 1782047469829,
-      "type": "file"
-    },
-    {
-      "path": "src\\store\\gameStore.ts",
-      "accessCount": 9,
-      "lastAccessed": 1782049219317,
-      "type": "file"
-    },
-    {
-      "path": "src\\pages\\GamePage.vue",
-      "accessCount": 9,
-      "lastAccessed": 1782050081517,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\game\\LeaderCard.vue",
-      "accessCount": 6,
-      "lastAccessed": 1782047418746,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\game\\HandArea.vue",
-      "accessCount": 6,
-      "lastAccessed": 1782047419429,
-      "type": "file"
-    },
-    {
-      "path": "src\\net\\GameRequest.ts",
-      "accessCount": 6,
-      "lastAccessed": 1782047449575,
+      "accessCount": 7,
+      "lastAccessed": 1782228566079,
       "type": "file"
     },
     {
       "path": "src\\components\\ui\\CardItem.vue",
       "accessCount": 6,
-      "lastAccessed": 1782049202122,
+      "lastAccessed": 1782139726661,
       "type": "file"
     },
     {
-      "path": "src\\components\\game\\PromptOverlay.vue",
-      "accessCount": 5,
-      "lastAccessed": 1782047418397,
+      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\battle-board-reskin.md",
+      "accessCount": 6,
+      "lastAccessed": 1782140254699,
       "type": "file"
     },
     {
-      "path": "src\\types\\game.ts",
+      "path": "src\\components\\shared\\Sidebar.vue",
       "accessCount": 5,
-      "lastAccessed": 1782048178068,
+      "lastAccessed": 1782139960845,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\TrashPile.vue",
+      "accessCount": 4,
+      "lastAccessed": 1782134509024,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\home\\MainPanel.vue",
+      "accessCount": 4,
+      "lastAccessed": 1782139312645,
       "type": "file"
     },
     {
       "path": "src\\components\\game\\FieldArea.vue",
-      "accessCount": 5,
-      "lastAccessed": 1782048731710,
+      "accessCount": 4,
+      "lastAccessed": 1782229840162,
       "type": "file"
     },
     {
-      "path": "src\\components\\home\\HistoryPanel.vue",
-      "accessCount": 5,
-      "lastAccessed": 1782055227627,
+      "path": "src\\style.css",
+      "accessCount": 4,
+      "lastAccessed": 1782229849173,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\mockBoard.ts",
+      "accessCount": 3,
+      "lastAccessed": 1782138475072,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\HandArea.vue",
+      "accessCount": 3,
+      "lastAccessed": 1782139814223,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\PlayerMat.vue",
+      "accessCount": 3,
+      "lastAccessed": 1782229821184,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\PhaseTrack.vue",
+      "accessCount": 2,
+      "lastAccessed": 1782133747961,
+      "type": "file"
+    },
+    {
+      "path": "src\\pages\\GamePage.vue",
+      "accessCount": 2,
+      "lastAccessed": 1782134298686,
       "type": "file"
     },
     {
       "path": "src\\components\\game\\StageSlot.vue",
-      "accessCount": 4,
-      "lastAccessed": 1782047419050,
-      "type": "file"
-    },
-    {
-      "path": "src\\net\\NetManager.ts",
-      "accessCount": 4,
-      "lastAccessed": 1782047449231,
-      "type": "file"
-    },
-    {
-      "path": "src\\composables\\useNet.ts",
-      "accessCount": 4,
-      "lastAccessed": 1782047458276,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\ui\\LoginCharacter.vue",
-      "accessCount": 3,
-      "lastAccessed": 1781958274543,
-      "type": "file"
-    },
-    {
-      "path": "C:\\Users\\xiong\\.claude\\projects\\D--code-GrandUMI\\memory\\focus-vue-project.md",
-      "accessCount": 3,
-      "lastAccessed": 1781971670396,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\home\\LoginPanel.vue",
-      "accessCount": 3,
-      "lastAccessed": 1782025493866,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\game\\GameMenu.vue",
-      "accessCount": 3,
-      "lastAccessed": 1782047431276,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\game\\OpponentDisconnectBanner.vue",
-      "accessCount": 3,
-      "lastAccessed": 1782047437663,
-      "type": "file"
-    },
-    {
-      "path": "src\\composables\\useIsDefender.ts",
-      "accessCount": 3,
-      "lastAccessed": 1782047457113,
-      "type": "file"
-    },
-    {
-      "path": "src\\data\\cardSets.ts",
-      "accessCount": 3,
-      "lastAccessed": 1782049261982,
-      "type": "file"
-    },
-    {
-      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\claude\\D--code-GrandUMI\\bf86497b-fc0e-4359-b1bb-d4ce24196fdc\\tasks\\bnzoowlsm.output",
       "accessCount": 2,
-      "lastAccessed": 1781972654061,
+      "lastAccessed": 1782134467504,
       "type": "file"
     },
     {
-      "path": "src\\components\\home\\PlayerListPanel.vue",
+      "path": "src\\components\\game\\DeckPile.vue",
       "accessCount": 2,
-      "lastAccessed": 1782025492865,
+      "lastAccessed": 1782134480289,
       "type": "file"
     },
     {
-      "path": "src\\components\\home\\FriendlyRoomPanel.vue",
+      "path": "src\\components\\game\\LifeArea.vue",
       "accessCount": 2,
-      "lastAccessed": 1782025493086,
+      "lastAccessed": 1782134526107,
       "type": "file"
     },
     {
-      "path": "src\\components\\home\\InviteNotifyOverlay.vue",
+      "path": "src\\components\\game\\DonDeckPile.vue",
       "accessCount": 2,
-      "lastAccessed": 1782025493330,
+      "lastAccessed": 1782134543165,
       "type": "file"
     },
     {
-      "path": "src\\data\\matchHistoryDB.ts",
+      "path": "src\\components\\game\\DonCountSlot.vue",
       "accessCount": 2,
-      "lastAccessed": 1782047503899,
+      "lastAccessed": 1782134623212,
       "type": "file"
     },
     {
-      "path": "src\\data\\gameLabels.ts",
+      "path": "src\\types\\net.ts",
       "accessCount": 2,
-      "lastAccessed": 1782047504905,
+      "lastAccessed": 1782138245162,
       "type": "file"
     },
     {
       "path": "src\\main.ts",
-      "accessCount": 1,
-      "lastAccessed": 1781956279861,
+      "accessCount": 2,
+      "lastAccessed": 1782138304649,
       "type": "file"
     },
     {
-      "path": "src\\game\\battle\\BattlePhase.ts",
+      "path": "src\\App.vue",
       "accessCount": 1,
-      "lastAccessed": 1781956296934,
+      "lastAccessed": 1782133023610,
       "type": "file"
     },
     {
-      "path": "src\\net\\proto\\ProtocolEnum.ts",
+      "path": "src\\pages\\HomePage.vue",
       "accessCount": 1,
-      "lastAccessed": 1781956297327,
+      "lastAccessed": 1782133023806,
       "type": "file"
     },
     {
-      "path": "src\\net\\proto\\MsgBase.ts",
+      "path": "src\\components\\home\\LoginPanel.vue",
       "accessCount": 1,
-      "lastAccessed": 1781956297382,
+      "lastAccessed": 1782133048470,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\shared\\TopBar.vue",
+      "accessCount": 1,
+      "lastAccessed": 1782133049534,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\shared\\ScreenHead.vue",
+      "accessCount": 1,
+      "lastAccessed": 1782133050136,
+      "type": "file"
+    },
+    {
+      "path": "src\\router\\index.ts",
+      "accessCount": 1,
+      "lastAccessed": 1782133077893,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\LeaderCard.vue",
+      "accessCount": 1,
+      "lastAccessed": 1782133618061,
+      "type": "file"
+    },
+    {
+      "path": "src\\pages\\ReplayPage.vue",
+      "accessCount": 1,
+      "lastAccessed": 1782133877096,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\claude\\D--code-GrandUMI-opcgpro-vue\\88593242-1d3f-4e7c-a8d2-f4d14d6bbbbd\\tasks\\b4mcmt7c7.output",
+      "accessCount": 1,
+      "lastAccessed": 1782134068468,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-baseline.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134085503,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-slice23.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134235668,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-bg.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134319519,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\DonArea.vue",
+      "accessCount": 1,
+      "lastAccessed": 1782134360894,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-wells.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134559835,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-don-chars.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134780194,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-rails.png",
+      "accessCount": 1,
+      "lastAccessed": 1782134919011,
+      "type": "file"
+    },
+    {
+      "path": "src\\data\\MockPlayback.ts",
+      "accessCount": 1,
+      "lastAccessed": 1782138063410,
+      "type": "file"
+    },
+    {
+      "path": "src\\types\\game.ts",
+      "accessCount": 1,
+      "lastAccessed": 1782138089054,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\gameStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1782138089515,
+      "type": "file"
+    },
+    {
+      "path": "src\\composables\\useGameInit.ts",
+      "accessCount": 1,
+      "lastAccessed": 1782138114450,
       "type": "file"
     },
     {
       "path": "src\\lib\\colorMap.ts",
       "accessCount": 1,
-      "lastAccessed": 1781956333398,
+      "lastAccessed": 1782138114738,
       "type": "file"
     },
     {
-      "path": "ARCHITECTURE.md",
+      "path": "src\\data\\cardSets.ts",
       "accessCount": 1,
-      "lastAccessed": 1781956462046,
+      "lastAccessed": 1782138155806,
       "type": "file"
     },
     {
-      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\claude\\D--code-GrandUMI\\bf86497b-fc0e-4359-b1bb-d4ce24196fdc\\tasks\\bqefyojoy.output",
+      "path": "public\\data\\ST01.json",
       "accessCount": 1,
-      "lastAccessed": 1781971754691,
+      "lastAccessed": 1782138162671,
       "type": "file"
     },
     {
-      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\claude\\D--code-GrandUMI\\bf86497b-fc0e-4359-b1bb-d4ce24196fdc\\tasks\\bf5jpmuhh.output",
+      "path": "src\\types\\card.ts",
       "accessCount": 1,
-      "lastAccessed": 1781972641640,
+      "lastAccessed": 1782138162843,
       "type": "file"
     },
     {
-      "path": "web-home.png",
+      "path": "public\\data\\ST04.json",
       "accessCount": 1,
-      "lastAccessed": 1781972797905,
+      "lastAccessed": 1782138205568,
       "type": "file"
     },
     {
-      "path": "vue-home.png",
+      "path": "public\\data\\ST06.json",
       "accessCount": 1,
-      "lastAccessed": 1781972798073,
+      "lastAccessed": 1782138206127,
       "type": "file"
     },
     {
-      "path": "web-lobby.png",
+      "path": "src/types/net.ts",
       "accessCount": 1,
-      "lastAccessed": 1781972819335,
-      "type": "file"
+      "lastAccessed": 1782138232038,
+      "type": "directory"
     },
     {
-      "path": "vue-lobby.png",
+      "path": "C:\\Users\\xiong\\AppData\\Local\\Temp\\board-mock-baseline.png",
       "accessCount": 1,
-      "lastAccessed": 1781972819397,
-      "type": "file"
-    },
-    {
-      "path": "vue-login-fail.png",
-      "accessCount": 1,
-      "lastAccessed": 1781972881739,
+      "lastAccessed": 1782138321964,
       "type": "file"
     }
   ],

@@ -815,3 +815,240 @@ body, .theme-aware {
   border-color: var(--primary);
 }
 
+/* ════════════════════════════════════════════════════════════════
+   GrandUMI 对战桌面 v3 — 饱和毛毡牌桌（源自 redesign/battle.jsx + styles.css）
+   .bf-* 一族；keyframes pulse/blink 映射到本项目的 grandumi-* 命名
+   ════════════════════════════════════════════════════════════════ */
+.bf-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+/* 毛毡牌桌：整块饱和色 + 纹理铺底 */
+.bf-felt {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 0%, var(--felt-a), transparent 60%),
+    radial-gradient(120% 80% at 50% 100%, var(--felt-b), transparent 60%),
+    linear-gradient(180deg, var(--felt-base), var(--felt-base2));
+  border: 1px solid var(--line-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 90px rgba(0, 0, 0, 0.55),
+    0 30px 70px -30px rgba(0, 0, 0, 0.85);
+}
+.bf-felt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(130% 120% at 50% 50%, #000, transparent 82%);
+  mask-image: radial-gradient(130% 120% at 50% 50%, #000, transparent 82%);
+}
+
+/* 中央接缝 + 发光线 */
+.bf-seam {
+  position: relative;
+  height: 0;
+}
+.bf-seam::before {
+  content: "";
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary-glow), transparent);
+}
+
+/* 单侧半场：左(生命+DON) | 中(领袖+角色行) | 右(场地+牌库+墓地) */
+.bf-half {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 14px 20px;
+}
+
+/* 角色行：5 个显式槽位 */
+.bf-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.bf-slot {
+  position: relative;
+  border-radius: 11px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.22));
+  border: 1.5px solid var(--line);
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bf-slot__n {
+  font-family: var(--font-head);
+  font-weight: 900;
+  color: var(--ink-faint);
+  opacity: 0.5;
+}
+
+/* 带标签虚线井（场地 / 墓地） */
+.bf-area {
+  position: relative;
+  border-radius: 11px;
+  border: 1.5px dashed var(--line-strong);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.08));
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bf-area__lbl {
+  position: absolute;
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+/* 实心卡井（DON / 活跃 / 休息 / 牌库） */
+.bf-box {
+  position: relative;
+  border-radius: 11px;
+  border: 1.5px solid var(--line-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 85%, transparent), var(--bg1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -4px 11px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 厚实光泽卡 */
+.bf-card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.18s;
+}
+.bf-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  background: linear-gradient(157deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 46%);
+}
+.bf-card:hover {
+  transform: translateY(-12px) scale(1.05);
+  z-index: 30;
+}
+.bf-hand .bf-card:hover {
+  transform: translateY(-30px) scale(1.08);
+  z-index: 40;
+}
+
+/* 毛毡配色（按主题；navy 与 marine 同值） */
+:root[data-theme="pirate"] {
+  --felt-base: #1a1206;
+  --felt-base2: #0c0805;
+  --felt-a: rgba(110, 60, 16, 0.55);
+  --felt-b: rgba(150, 40, 30, 0.32);
+}
+:root[data-theme="navy"],
+:root[data-theme="marine"] {
+  --felt-base: #0a1626;
+  --felt-base2: #060d18;
+  --felt-a: rgba(28, 70, 120, 0.55);
+  --felt-b: rgba(20, 50, 95, 0.4);
+}
+
+/* 阶段条（浮于接缝） */
+.bf-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 10px 30px -10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.bf-phase__turn {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+.bf-phase__opt {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink-dim);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.bf-phase__opt:hover {
+  color: var(--ink);
+}
+.bf-phase__opt.is-active {
+  color: var(--on-primary);
+  background: linear-gradient(180deg, var(--primary-bright), var(--primary));
+  font-weight: 700;
+  box-shadow: 0 4px 14px -4px var(--primary-glow);
+}
+
+/* 井位「标签在上」包装（场地/牌库/墓地/DON/生命 共用） */
+.bf-well {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.bf-well > .kicker {
+  font-size: 9px;
+}
+
+/* DON 活跃发光（映射到 grandumi-dot-pulse） */
+.don-glow {
+  animation: grandumi-dot-pulse 2.4s ease-in-out infinite;
+}
+
+/* 终端光标（映射到 grandumi-blink） */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  background: var(--primary);
+  margin-left: 1px;
+  vertical-align: -2px;
+  animation: grandumi-blink 1s step-end infinite;
+}
+

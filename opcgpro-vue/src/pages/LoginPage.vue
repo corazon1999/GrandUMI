@@ -130,7 +130,9 @@ function handleRegister() {
 <template>
   <div class="login-root">
     <!-- ── 主题切换：仅登录页展示 ─────────────────── -->
-    <div class="theme-toggle" title="切换主题">
+    <div class="theme-switch-wrap">
+      <span class="mono faint theme-switch-wrap__label">选择阵营</span>
+      <div class="theme-toggle" title="切换主题">
       <button
         :class="['theme-toggle__btn', { 'is-active': themeKey === 'pirate' }]"
         title="海贼"
@@ -170,6 +172,7 @@ function handleRegister() {
           <path d="M5 14c0 4 3.5 6 7 6s7-2 7-6" />
         </svg>
       </button>
+      </div>
     </div>
 
     <!-- ── 内容层 ──────────────────────────────────── -->
@@ -178,10 +181,20 @@ function handleRegister() {
       <div class="login-layout">
         <!-- ── 左栏品牌 ────────────────────────────── -->
         <div class="brand-col enter">
-          <div class="kicker" style="font-size: 13px">ONE PIECE TCG</div>
+          <div class="kicker" style="font-size: 13px">海贼王卡牌对战</div>
           <h1 class="glow-title brand-title">GRANDUMI</h1>
-          <div class="rule brand-rule">ONLINE · BATTLE · TERMINAL</div>
+          <div class="rule brand-rule">在线 · 对战 · 集结</div>
           <p class="brand-tagline">{{ copy.tagline }}</p>
+          <div class="mono dim brand-status">
+            <span
+              class="dot"
+              :class="{
+                'dot--live': connDotClass === 'is-ok',
+                'dot--wait': connDotClass === 'is-pending',
+                'dot--down': connDotClass === 'is-down',
+              }" />
+            {{ connLabel[connState] ?? connState }} · {{ copy.faction }}阵营
+          </div>
         </div>
 
         <!-- ── 右栏表单 ────────────────────────────── -->
@@ -191,7 +204,7 @@ function handleRegister() {
             <div class="ticks"><i /><i /><i /><i /></div>
 
             <!-- 标题分隔线 -->
-            <div class="rule" style="margin-bottom: 22px">LOGIN TERMINAL</div>
+            <div class="rule" style="margin-bottom: 22px">登录</div>
 
             <!-- 错误 / 成功提示 -->
             <Transition name="form-notice">
@@ -442,11 +455,20 @@ function handleRegister() {
 }
 
 /* ── 主题切换按钮组（仅登录页显示） ── */
-.theme-toggle {
+.theme-switch-wrap {
   position: absolute;
   top: 20px;
   right: 20px;
   z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.theme-switch-wrap__label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+.theme-toggle {
   display: inline-flex;
   align-items: center;
   padding: 4px;

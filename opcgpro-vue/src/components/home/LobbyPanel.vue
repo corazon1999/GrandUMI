@@ -107,7 +107,7 @@ function copyRoomCode() {
 
 <template>
   <div class="lobby-root enter scroll">
-    <ScreenHead kicker="GRAND UMI · LOBBY" title="对战大厅" />
+    <ScreenHead kicker="集结你的船员" title="对战大厅" />
 
     <!-- ── 当前卡组卡片 ────────────────────────────────────── -->
     <div v-if="selectedDeck" class="panel panel-pad deck-card">

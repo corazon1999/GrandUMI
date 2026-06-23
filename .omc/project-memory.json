@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782018081916,
+  "lastScanned": 1782226036641,
   "projectRoot": "D:\\code\\GrandUMI",
   "techStack": {
     "languages": [
@@ -53,40 +53,34 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1782018081872,
+      "lastAccessed": 1782226036595,
       "keyFiles": []
     },
     "dogfood-output": {
       "path": "dogfood-output",
       "purpose": null,
-      "fileCount": 7,
-      "lastAccessed": 1782018081873,
-      "keyFiles": [
-        "deck-editor-1264.png",
-        "deck-editor-1920-zoomed.png",
-        "deck-editor-now.png",
-        "deck-editor-zoomed.png",
-        "login-1920-zoomed.png"
-      ]
+      "fileCount": 0,
+      "lastAccessed": 1782226036595,
+      "keyFiles": []
     },
     "opcgpro-vue": {
       "path": "opcgpro-vue",
       "purpose": null,
-      "fileCount": 32,
-      "lastAccessed": 1782018081884,
+      "fileCount": 13,
+      "lastAccessed": 1782226036596,
       "keyFiles": [
         "ARCHITECTURE.md",
         "CLAUDE.md",
-        "deck-editor-new.png",
-        "home-current.png",
-        "home-deck.png"
+        "index.html",
+        "package-lock.json",
+        "package.json"
       ]
     },
     "opcgpro-web": {
       "path": "opcgpro-web",
       "purpose": null,
       "fileCount": 12,
-      "lastAccessed": 1782018081884,
+      "lastAccessed": 1782226036616,
       "keyFiles": [
         "AGENTS.md",
         "CLAUDE.md",
@@ -99,7 +93,7 @@
       "path": "qq-bug-bot",
       "purpose": null,
       "fileCount": 11,
-      "lastAccessed": 1782018081884,
+      "lastAccessed": 1782226036616,
       "keyFiles": [
         "bot.py",
         "config.example.json",
@@ -112,7 +106,7 @@
       "path": "tools",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1782018081885,
+      "lastAccessed": 1782226036617,
       "keyFiles": [
         "download-sprites-jp.mjs",
         "download-sprites.mjs",
@@ -125,7 +119,7 @@
       "path": "修复记录",
       "purpose": null,
       "fileCount": 74,
-      "lastAccessed": 1782018081885,
+      "lastAccessed": 1782226036617,
       "keyFiles": [
         "2026-06-15_OP16-007_OP16-010_公开手牌成本.md",
         "2026-06-15_OP16-011_补全公开手牌成本与攻击时KO.md",
@@ -138,7 +132,7 @@
       "path": "卡牌审查",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1782018081886,
+      "lastAccessed": 1782226036618,
       "keyFiles": [
         "2026-06-20_跳过成本卡清单.md",
         "OP05-16审查报告_2026-06-18.md"
@@ -148,7 +142,7 @@
       "path": "卡牌数据",
       "purpose": null,
       "fileCount": 54,
-      "lastAccessed": 1782018081886,
+      "lastAccessed": 1782226036618,
       "keyFiles": [
         "EB01.json",
         "EB02.json",
@@ -161,7 +155,7 @@
       "path": "文档",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1782018081887,
+      "lastAccessed": 1782226036619,
       "keyFiles": [
         "OP15对战验收方案.md",
         "前端游戏界面设计说明.md",
@@ -174,7 +168,7 @@
       "path": "服务端WebSocket",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1782018081887,
+      "lastAccessed": 1782226036619,
       "keyFiles": [
         "BugReportStore.cs",
         "GrandUMIServer.csproj",
@@ -187,7 +181,7 @@
       "path": "服务端WebSocket.Tests",
       "purpose": null,
       "fileCount": 12,
-      "lastAccessed": 1782018081887,
+      "lastAccessed": 1782226036619,
       "keyFiles": [
         "AtomicOpsTests.cs",
         "CardEffectTests.cs",
@@ -196,46 +190,41 @@
         "GrandUMIServer.Tests.csproj"
       ]
     },
-    "opcgpro-vue\\dist": {
-      "path": "opcgpro-vue\\dist",
-      "purpose": "Distribution/build output",
-      "fileCount": 3,
-      "lastAccessed": 1782018081888,
-      "keyFiles": [
-        "favicon.svg",
-        "icons.svg",
-        "index.html"
-      ]
-    },
     "opcgpro-vue\\docs": {
       "path": "opcgpro-vue\\docs",
       "purpose": "Documentation",
-      "fileCount": 2,
-      "lastAccessed": 1782018081888,
+      "fileCount": 1,
+      "lastAccessed": 1782226036620,
       "keyFiles": [
-        "cyberpunk-ui-redesign.md",
-        "GrandUMI Redesign Offline.html"
+        "grandumi-design-system.md"
       ]
+    },
+    "opcgpro-vue\\node_modules": {
+      "path": "opcgpro-vue\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1782226036620,
+      "keyFiles": []
     },
     "opcgpro-web\\node_modules": {
       "path": "opcgpro-web\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1782018081889,
+      "lastAccessed": 1782226036621,
       "keyFiles": []
     },
     "服务端WebSocket\\bin": {
       "path": "服务端WebSocket\\bin",
       "purpose": "Executable scripts",
       "fileCount": 0,
-      "lastAccessed": 1782018081891,
+      "lastAccessed": 1782226036622,
       "keyFiles": []
     },
     "服务端WebSocket.Tests\\Fixtures": {
       "path": "服务端WebSocket.Tests\\Fixtures",
       "purpose": "Test fixtures",
       "fileCount": 1,
-      "lastAccessed": 1782018081891,
+      "lastAccessed": 1782226036623,
       "keyFiles": [
         "matchlog-minimal.v1.jsonl"
       ]
@@ -255,6 +244,12 @@
       "type": "file"
     },
     {
+      "path": "opcgpro-vue\\src\\components\\home\\DeckChoosePanel.vue",
+      "accessCount": 8,
+      "lastAccessed": 1782230977568,
+      "type": "file"
+    },
+    {
       "path": "opcgpro-vue\\src\\store\\gameStore.ts",
       "accessCount": 6,
       "lastAccessed": 1781971325885,
@@ -264,6 +259,12 @@
       "path": "opcgpro-vue\\src\\pages\\GamePage.vue",
       "accessCount": 6,
       "lastAccessed": 1781971556479,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\App.vue",
+      "accessCount": 6,
+      "lastAccessed": 1782230804321,
       "type": "file"
     },
     {
@@ -279,15 +280,27 @@
       "type": "file"
     },
     {
-      "path": "opcgpro-vue\\src\\App.vue",
-      "accessCount": 4,
-      "lastAccessed": 1781928163897,
-      "type": "file"
-    },
-    {
       "path": "opcgpro-vue\\src\\store\\deckStore.ts",
       "accessCount": 4,
       "lastAccessed": 1782018448602,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\settingsStore.ts",
+      "accessCount": 4,
+      "lastAccessed": 1782227337186,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\store\\audioStore.ts",
+      "accessCount": 4,
+      "lastAccessed": 1782227454103,
+      "type": "file"
+    },
+    {
+      "path": "opcgpro-vue\\src\\router\\index.ts",
+      "accessCount": 4,
+      "lastAccessed": 1782231063701,
       "type": "file"
     },
     {
@@ -303,18 +316,6 @@
       "type": "file"
     },
     {
-      "path": "opcgpro-vue\\src\\store\\audioStore.ts",
-      "accessCount": 3,
-      "lastAccessed": 1781927836185,
-      "type": "file"
-    },
-    {
-      "path": "opcgpro-vue\\src\\store\\settingsStore.ts",
-      "accessCount": 3,
-      "lastAccessed": 1781927838209,
-      "type": "file"
-    },
-    {
       "path": "opcgpro-vue\\tsconfig.app.json",
       "accessCount": 3,
       "lastAccessed": 1781929099830,
@@ -324,12 +325,6 @@
       "path": "opcgpro-vue\\src\\pages\\LoadingPage.vue",
       "accessCount": 3,
       "lastAccessed": 1781958836280,
-      "type": "file"
-    },
-    {
-      "path": "opcgpro-vue\\src\\components\\home\\DeckChoosePanel.vue",
-      "accessCount": 3,
-      "lastAccessed": 1781959302402,
       "type": "file"
     },
     {
@@ -357,15 +352,15 @@
       "type": "file"
     },
     {
-      "path": "opcgpro-vue\\src\\main.ts",
-      "accessCount": 2,
-      "lastAccessed": 1781928089012,
+      "path": "opcgpro-vue\\src\\pages\\HomePage.vue",
+      "accessCount": 3,
+      "lastAccessed": 1782230792418,
       "type": "file"
     },
     {
-      "path": "opcgpro-vue\\src\\pages\\HomePage.vue",
-      "accessCount": 2,
-      "lastAccessed": 1781928318847,
+      "path": "opcgpro-vue\\src\\main.ts",
+      "accessCount": 3,
+      "lastAccessed": 1782231063256,
       "type": "file"
     },
     {
@@ -381,9 +376,9 @@
       "type": "file"
     },
     {
-      "path": "opcgpro-vue\\src\\router\\index.ts",
+      "path": "opcgpro-vue\\src\\composables\\useStore.ts",
       "accessCount": 2,
-      "lastAccessed": 1782018433331,
+      "lastAccessed": 1782227753816,
       "type": "file"
     },
     {
@@ -396,12 +391,6 @@
       "path": "C:\\Users\\xiong\\.claude\\plans\\vue-tidy-sedgewick.md",
       "accessCount": 1,
       "lastAccessed": 1781927798337,
-      "type": "file"
-    },
-    {
-      "path": "opcgpro-vue\\src\\composables\\useStore.ts",
-      "accessCount": 1,
-      "lastAccessed": 1781927851788,
       "type": "file"
     },
     {
