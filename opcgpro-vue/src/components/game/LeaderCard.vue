@@ -34,7 +34,7 @@ const isTargetable = computed(() => isSelectingTarget.value && props.side === "o
 function handleClick() {
   if (isPending.value) return;
   if (isTargetable.value) { useBattleStore.getState().confirmAttackTarget({ isLeader: true }); return; }
-  if (selectedDonIndex.value !== null && props.side === "my") { GameRequest.attachDon("leader"); useGameStore.getState().setSelectedDon(null); return; }
+  if (selectedDonIndex.value !== null && props.side === "my") { GameRequest.attachDon("leader", selectedDonIndex.value || 1); useGameStore.getState().setSelectedDon(null); return; }
   if (props.side === "my" && player.value) { useGameStore.getState().setSelectedField(selectedFieldId.value === player.value.leaderId ? null : player.value.leaderId); }
 }
 </script>
@@ -50,8 +50,8 @@ function handleClick() {
     <span v-if="isBattleTarget" class="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">目标</span>
     <CardItem :card="leader" :size="cardSize" :is-selected="(side === 'my' && selectedFieldId === player.leaderId) || isTargetable" :is-tapped="player.leaderTapped" :attached-don-count="player.leaderAttachedDon" :power-buff="player.leaderPower - (leader.power ?? 0) - player.leaderAttachedDon * 1000" hide-cost hide-counter :lift-on-select="false" :attack-state="side === 'my' && currentTurn && player.leaderCanAttack ? 'can' : 'none'" @click="handleClick" />
     <div v-if="isTargetable" class="absolute -right-2 -top-2 h-5 w-5 animate-pulse rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
-    <div v-if="selectedDonIndex !== null && side === 'my' && !isPending" class="pointer-events-none absolute -left-2 -top-2 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
-      <span class="text-[10px] font-black text-black">+</span>
+    <div v-if="selectedDonIndex !== null && side === 'my' && !isPending" class="pointer-events-none absolute -left-2 -top-2 flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 px-1 shadow-lg shadow-yellow-300/50">
+      <span class="text-[10px] font-black text-black">+{{ selectedDonIndex }}</span>
     </div>
   </div>
 </template>

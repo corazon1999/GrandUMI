@@ -35,9 +35,9 @@ function handleCardClick(cardId: string, isTapped: boolean) {
     return;
   }
 
-  // 选中了活跃咚 + 点自己角色 -> 贴咚
+  // 选中了活跃咚 + 点自己角色 -> 贴咚（依附拟选的张数，#144）
   if (selectedDonIndex.value !== null && props.side === "my") {
-    GameRequest.attachDon(cardId);
+    GameRequest.attachDon(cardId, selectedDonIndex.value || 1);
     useGameStore.getState().setSelectedDon(null);
     return;
   }
@@ -108,8 +108,8 @@ const slotDim = computed(
         </div>
 
         <!-- 咚附着指示器 -->
-        <div v-if="selectedDonIndex !== null && side === 'my' && !isPending" class="pointer-events-none absolute -left-2 -top-2 z-40 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50">
-          <span class="text-[10px] font-black text-black">+</span>
+        <div v-if="selectedDonIndex !== null && side === 'my' && !isPending" class="pointer-events-none absolute -left-2 -top-2 z-40 flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full bg-yellow-300 px-1 shadow-lg shadow-yellow-300/50">
+          <span class="text-[10px] font-black text-black">+{{ selectedDonIndex }}</span>
         </div>
       </div>
 

@@ -38,6 +38,8 @@ function hexToRgb(h: string): [number, number, number] {
 
 let raf: number | null = null;
 let ro: ResizeObserver | null = null;
+let running = true;
+let onVis: (() => void) | null = null;
 let state: {
   t: number;
   motes: { x: number; y: number; r: number; sp: number; drift: number; ph: number }[];
@@ -74,6 +76,7 @@ onMounted(() => {
   ro = new ResizeObserver(resize);
   ro.observe(canvas);
 
+  const reduce = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   let last = performance.now();
 
   const draw = (now: number) => {
@@ -177,15 +180,34 @@ onMounted(() => {
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, h);
 
-    raf = requestAnimationFrame(draw);
+    if (running && !reduce) raf = requestAnimationFrame(draw);
   };
 
-  raf = requestAnimationFrame(draw);
+  if (reduce) {
+    draw(performance.now()); // 降低动态：仅绘制一帧静态画面，不进入 rAF 循环
+  } else {
+    raf = requestAnimationFrame(draw);
+  }
+
+  // 页面隐藏（切后台/最小化）时暂停 rAF，避免无谓 GPU/CPU 占用
+  onVis = () => {
+    if (document.hidden) {
+      running = false;
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+    } else if (!reduce && !running) {
+      running = true;
+      last = performance.now();
+      raf = requestAnimationFrame(draw);
+    }
+  };
+  document.addEventListener("visibilitychange", onVis);
 });
 
 onBeforeUnmount(() => {
+  running = false;
   if (raf) cancelAnimationFrame(raf);
   if (ro) ro.disconnect();
+  if (onVis) document.removeEventListener("visibilitychange", onVis);
 });
 </script>
 

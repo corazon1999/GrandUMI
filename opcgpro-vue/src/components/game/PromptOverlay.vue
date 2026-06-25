@@ -27,6 +27,11 @@ const donChoiceMap = computed(() => new Map(donChoices.value.map((d) => [d.id, d
 
 function findCardById(id: string) {
   if (id === "leader") return null;
+  // 领袖与舞台不在 fieldCards 里（扁平字段），需单独识别，否则候选卡图加载不出
+  if (my.value && id === my.value.leaderId) return my.value.leaderNumber ? getCard(my.value.leaderNumber) ?? null : null;
+  if (opp.value && id === opp.value.leaderId) return opp.value.leaderNumber ? getCard(opp.value.leaderNumber) ?? null : null;
+  if (my.value && id === my.value.stageId) return my.value.stageNumber ? getCard(my.value.stageNumber) ?? null : null;
+  if (opp.value && id === opp.value.stageId) return opp.value.stageNumber ? getCard(opp.value.stageNumber) ?? null : null;
   const all = [...(my.value?.fieldCards ?? []), ...(opp.value?.fieldCards ?? [])];
   const found = all.find((c) => c.id === id);
   return found ? getCard(found.number) ?? null : null;

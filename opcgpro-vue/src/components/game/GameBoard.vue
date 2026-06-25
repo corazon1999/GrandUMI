@@ -203,6 +203,13 @@ const focusCard = computed(() => {
 </template>
 
 <style scoped>
+/* 性能：牌桌内面板去掉 backdrop-blur（背景为静态渐变时无需每帧重采样模糊），
+   提高底色不透明度补偿磨砂质感，避免操作时的合成卡顿。 */
+:deep(.panel) {
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
 /* 毛毡牌桌：上下半场各占一半，接缝在中间 */
 .bf-board {
   flex: 1;

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, inject } from "vue";
 import type { CardData } from "@/types/card";
 import CardFrame from "@/components/ui/CardFrame.vue";
 import RarityRing from "@/components/ui/RarityRing.vue";
 import { useCardHover } from "@/composables/useCardHover";
+import { CARD_IMG_IO } from "./cardImgIO";
 
 const props = defineProps<{
   card: CardData;
@@ -36,29 +37,20 @@ const cardRef = ref<HTMLElement | null>(null);
 const rootRef = ref<HTMLElement | null>(null);
 const { onEnter: onHoverIn, onLeave: onHoverOut } = useCardHover(cardRef);
 
-const inView = ref(false);
-let io: IntersectionObserver | null = null;
+// 图片懒加载：复用父级共享 observer（见 cardImgIO.ts），仅在进入视口附近才创建 <img>。
+// 无 provider 时（例如单测/复用场景）退化为立即显示。
+const imgIO = inject(CARD_IMG_IO, null);
+const inView = ref(!imgIO);
 
 onMounted(() => {
+  // 异画默认取最后一个版本（与原逻辑一致）
   const initialSprite = sprites.value[sprites.value.length - 1];
   if (initialSprite && props.card.sprite !== initialSprite) props.card.sprite = initialSprite;
 
-  const el = rootRef.value;
-  if (!el) { inView.value = true; return; }
-  io = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) {
-        inView.value = true;
-        io?.disconnect();
-        io = null;
-      }
-    },
-    { rootMargin: "400px" },
-  );
-  io.observe(el);
+  if (imgIO && rootRef.value) imgIO.observe(rootRef.value, () => { inView.value = true; });
 });
 
-onUnmounted(() => { io?.disconnect(); });
+onUnmounted(() => { if (imgIO && rootRef.value) imgIO.unobserve(rootRef.value); });
 
 function goPrev() {
   imgFailed.value = false;
@@ -85,7 +77,7 @@ function onLeave() {
 <template>
   <div
     ref="rootRef"
-    class="group flex transform-gpu flex-col gap-1.5 backface-hidden"
+    class="group flex flex-col gap-1.5"
   >
     <CardFrame
       ref="cardRef"
@@ -106,8 +98,9 @@ function onLeave() {
           v-if="inView"
           :src="currentSrc"
           :alt="card.name"
-          class="absolute inset-0 h-full w-full object-cover"
+          class="absolute inset-0 h-full w-full bg-stone-800 object-cover"
           :draggable="false"
+          decoding="async"
           @error="imgFailed = true"
         />
         <div v-else class="absolute inset-0 bg-stone-800" />

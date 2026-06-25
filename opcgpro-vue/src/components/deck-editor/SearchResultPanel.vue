@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from "vue";
+import { ref, computed, watch, onUnmounted, provide } from "vue";
 import { getAllCachedCards } from "@/data/CardLoader";
 import { useStore } from "@/composables/useStore";
 import { useDeckStore, FORMAT_RULES } from "@/store/deckStore";
@@ -8,6 +8,7 @@ import CardInfoPanel from "@/components/game/CardInfoPanel.vue";
 import CardHoverPreview from "./CardHoverPreview.vue";
 import type { HoverInfo } from "./CardHoverPreview";
 import CardGridItem from "./CardGridItem.vue";
+import { CARD_IMG_IO } from "./cardImgIO";
 
 const HOVER_DELAY = 180;
 
@@ -25,6 +26,33 @@ const notice = useStore(useDeckStore, (s) => s.notice);
 const entries = useStore(useDeckStore, (s) => s.entries);
 
 const store = () => useDeckStore.getState();
+
+// ── 卡图懒加载：单个共享 IntersectionObserver（见 cardImgIO.ts） ──
+// 在 setup 期同步创建（IO 无需 DOM），子组件 onMounted 时即可 observe。
+const imgIoMap = new Map<Element, () => void>();
+const sharedImgIO: IntersectionObserver | null =
+  typeof IntersectionObserver !== "undefined"
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            imgIoMap.get(e.target)?.();
+            sharedImgIO!.unobserve(e.target);
+            imgIoMap.delete(e.target);
+          }
+        },
+        { rootMargin: "600px" },
+      )
+    : null;
+provide(CARD_IMG_IO, {
+  observe(el, cb) {
+    if (sharedImgIO) { imgIoMap.set(el, cb); sharedImgIO.observe(el); }
+    else cb();
+  },
+  unobserve(el) {
+    if (sharedImgIO) { sharedImgIO.unobserve(el); imgIoMap.delete(el); }
+  },
+});
 
 const modal = ref<CardData | null>(null);
 const hover = ref<HoverInfo | null>(null);
@@ -91,6 +119,8 @@ function onSpriteChange(card: CardData, sprite: string) {
 onUnmounted(() => {
   if (hoverTimer) clearTimeout(hoverTimer);
   if (noticeTimer) clearTimeout(noticeTimer);
+  sharedImgIO?.disconnect();
+  imgIoMap.clear();
 });
 </script>
 

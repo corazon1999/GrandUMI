@@ -22,10 +22,20 @@ const isDefender = useIsDefender();
 const wrapRef = ref<HTMLDivElement | null>(null);
 const wrapW = ref(0);
 let ro: ResizeObserver | null = null;
+let raf = 0;
+// rAF 包裹 + 阈值防抖：避免 ResizeObserver 自反馈循环与亚像素抖动导致手牌反复重排（#143/#161）
+const updateWrapW = () => {
+  const w = wrapRef.value?.clientWidth ?? 0;
+  if (Math.abs(wrapW.value - w) > 1) wrapW.value = w;
+};
 onMounted(() => {
-  if (wrapRef.value) { wrapW.value = wrapRef.value.clientWidth; ro = new ResizeObserver(() => { wrapW.value = wrapRef.value?.clientWidth ?? 0; }); ro.observe(wrapRef.value); }
+  if (wrapRef.value) {
+    wrapW.value = wrapRef.value.clientWidth;
+    ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(updateWrapW); });
+    ro.observe(wrapRef.value);
+  }
 });
-onUnmounted(() => ro?.disconnect());
+onUnmounted(() => { cancelAnimationFrame(raf); ro?.disconnect(); });
 
 const cards = computed(() => {
   if (!player.value) return [];
@@ -57,11 +67,12 @@ const marginLeft = computed(() => {
   const cardW = cardSize.value === "sm" ? 72 : cardSize.value === "md" ? 96 : 128;
   const GAP = 8;
   const PAD = 24;
-  const minStep = Math.round(cardW * 0.3);
+  const minStep = Math.round(cardW * 0.22); // 重叠下限：每张至少露出 ~22%（手牌很多时也能铺下不溢出）
   const avail = Math.max(0, wrapW.value - PAD);
   let step = cardW + GAP;
   if (n > 1 && avail > 0) { const fitStep = (avail - cardW) / (n - 1); step = Math.max(minStep, Math.min(cardW + GAP, fitStep)); }
-  return step - cardW;
+  // 取整：避免亚像素 marginLeft 在过渡动画下反复微动（漂移）
+  return Math.round(step - cardW);
 });
 
 // 扇形手牌：每张按到中心的偏移旋转（源自 battle.jsx 手牌 rotate (i-mid)*2.6deg）

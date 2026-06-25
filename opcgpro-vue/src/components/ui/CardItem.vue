@@ -106,11 +106,13 @@ const rootStyle = computed<Record<string, string>>(() => {
   if (felt && !showFaceDown.value && cardColor.value) {
     const c = cardColor.value;
     if (!props.isSelected) base.borderColor = c;
+    // 去掉常驻大半径彩色辉光（0 0 40px / 0 0 20px）——这是最贵的每帧重栅格化项；
+    // 保留 inset 高光 + 3D 底边 + 收敛投影，立体感不变。
     if (props.card?.type === "Leader") {
       base.borderWidth = "3px";
-      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.3), 0 4px 0 ${hexA(c, 0.6)}, 0 16px 30px -8px rgba(0,0,0,.85), 0 0 40px -4px ${hexA(c, 0.65)}`;
+      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.3), 0 4px 0 ${hexA(c, 0.6)}, 0 16px 30px -8px rgba(0,0,0,.85)`;
     } else {
-      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.24), 0 3.5px 0 ${hexA(c, 0.5)}, 0 12px 22px -8px rgba(0,0,0,.82), 0 0 20px -8px ${hexA(c, 0.55)}`;
+      base.boxShadow = `inset 0 1px 0 rgba(255,255,255,.24), 0 3.5px 0 ${hexA(c, 0.5)}, 0 12px 22px -8px rgba(0,0,0,.82)`;
     }
   }
   return base;
@@ -121,8 +123,8 @@ const rootStyle = computed<Record<string, string>>(() => {
   <div
     :class="clsx(
       sizes[size],
-      'relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl shadow-black/35',
-      'transform-gpu backface-hidden transition-all duration-200 ease-out',
+      'relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-md shadow-black/30',
+      'transform-gpu backface-hidden transition-transform duration-200 ease-out',
       !isSelected && 'hover:scale-[1.03]',
       isSelected
         ? 'border-yellow-300 shadow-yellow-300/40'
@@ -145,6 +147,7 @@ const rootStyle = computed<Record<string, string>>(() => {
         class="absolute inset-0 h-full w-full object-cover"
         :draggable="false"
         loading="lazy"
+        decoding="async"
         @error="imgSrc = FALLBACK"
       />
       <!-- 毛毡光泽高光（牌桌厚卡，源自 battle.jsx .bf-card::after） -->
