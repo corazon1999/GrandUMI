@@ -387,10 +387,13 @@
   },
   "OP15-066": {
     "_name": "阿悟",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时【咚!!-1】抽1（攻击时摸排段未实现）",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
         "then": [
           {
             "op": "Draw",
@@ -589,28 +592,6 @@
             "n": 2
           }
         ]
-      }
-    ]
-  },
-  "OP15-088": {
-    "_name": "宇宙对接6",
-    "_matcher": "登场时从废弃区登场",
-    "triggers": [
-      {
-        "on": "OnEnterField",
-        "then": [
-          {
-            "op": "Choose",
-            "prompt": "OwnTrashCharacter",
-            "max": 1,
-            "as": "$c"
-          },
-          {
-            "op": "PlayFromTrash",
-            "target": "$c"
-          }
-        ],
-        "_doc": "从废弃区选 1 张费用 ≤2 的角色登场"
       }
     ]
   },

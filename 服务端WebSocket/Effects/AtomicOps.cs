@@ -51,6 +51,10 @@ public static class AtomicOps
     public static void AddPowerPersistent(CardInstance c, int delta)
         => c.PowerModPersistent += delta;
 
+    /// <summary>给卡加"直到下个对方结束阶段"持续的力量修正（appliedBy=施加方索引，供 TurnEngine 在对方结束阶段清除）。</summary>
+    public static void AddPowerUntilOppEnd(CardInstance c, int delta, int appliedBy)
+        => c.PowerModsUntilOppEnd.Add(new CardPowerMod { Delta = delta, AppliedBySide = appliedBy });
+
     // ── 状态切换 ──────────────────────────────────────────────────────────
 
     public static void RestCard(CardInstance c)
@@ -428,6 +432,7 @@ public static class AtomicOps
         card.PowerModThisTurn = 0;
         card.PowerModThisBattle = 0;
         card.PowerModPersistent = 0;
+        card.PowerModsUntilOppEnd.Clear();
         card.GainedKeywords.Clear();
         p.Hand.Add(card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
@@ -633,6 +638,7 @@ public static class AtomicOps
         c.PowerModThisTurn = 0;
         c.PowerModThisBattle = 0;
         c.PowerModPersistent = 0;
+        c.PowerModsUntilOppEnd.Clear();
         c.GainedKeywords.Clear();
         c.CannotActivateNextReset = false;
         c.OncePerTurnUsedKeys.Clear();

@@ -862,6 +862,13 @@ public static class DslInterpreter
                     if (target is not null) AtomicOps.AddPowerThisBattle(target, GetInt(op, "delta", 0));
                     break;
                 }
+            case "AddPowerUntilOppEnd":
+                {
+                    // 力量±N "直到下个对方的结束阶段结束时为止"（如 OP16-065 对方角色力量-6000）
+                    var target = ResolveTarget(op, "target", ctx);
+                    if (target is not null) AtomicOps.AddPowerUntilOppEnd(target, GetInt(op, "delta", 0), ctx.OwnerIndex);
+                    break;
+                }
             case "KO":
                 {
                     var target = ResolveTarget(op, "target", ctx);

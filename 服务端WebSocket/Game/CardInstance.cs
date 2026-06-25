@@ -23,6 +23,10 @@ public class CardInstance
     /// <summary>持久力量修正</summary>
     public int PowerModPersistent { get; set; }
 
+    /// <summary>"直到下个对方结束阶段结束时为止"持续的力量修正（由 TurnEngine 在对方结束阶段清除）。
+    /// PowerModThisTurn 在施加者本回合末就清(过早)、PowerModPersistent 永不清(过久)，故另设此通道。</summary>
+    public List<CardPowerMod> PowerModsUntilOppEnd { get; } = new();
+
     /// <summary>临时获得的关键字（带过期时点）</summary>
     public List<TemporaryKeyword> GainedKeywords { get; } = new();
 
@@ -65,7 +69,7 @@ public class CardInstance
     public List<string> NameAliases { get; } = new();
 
     public bool MatchesName(string name)
-        => Info.Name == name || NameAliases.Contains(name);
+        => Info.NameIs(name) || NameAliases.Contains(name);  // 静态视为别名(Info.AlsoNames) + 运行时别名
 
     /// <summary>当前费用（含修正，不低于 0）</summary>
     public int CurrentCost()
@@ -85,8 +89,19 @@ public class CardInstance
     {
         int baseP = OriginalPowerOverride ?? Info.Power;
         int donBonus = ownerTurn ? donAttachedCount * 1000 : 0;
-        return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent;
+        int untilOppEnd = 0;
+        foreach (var m in PowerModsUntilOppEnd) untilOppEnd += m.Delta;
+        return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent + untilOppEnd;
     }
+}
+
+/// <summary>"直到下个对方结束阶段"持续的单次力量修正。清除规则同关键字/限制：仅在"对方"(1-AppliedBySide)的结束阶段清。</summary>
+public class CardPowerMod
+{
+    public required int Delta { get; init; }
+    /// <summary>施加此修正的控制者一方。-1 表示未指定，回退为"生存一个结束阶段"。</summary>
+    public int AppliedBySide { get; init; } = -1;
+    public int EndPhasesSeen { get; set; }
 }
 
 public enum RestrictionKind

@@ -1401,9 +1401,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,

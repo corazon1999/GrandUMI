@@ -697,7 +697,7 @@
   },
   "OP16-065": {
     "_name": "萨卡斯基",
-    "_matcher": "登场时给对方角色力量-N；启动主要(转休息咚1)海军则追加2活跃咚",
+    "_matcher": "登场时给对方1角色力量-6000(至对方回合结束)；启动主要(转休息咚1)海军则追加2活跃咚",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -709,7 +709,7 @@
             "as": "$tgt"
           },
           {
-            "op": "AddPowerThisTurn",
+            "op": "AddPowerUntilOppEnd",
             "target": "$tgt",
             "delta": -6000
           }

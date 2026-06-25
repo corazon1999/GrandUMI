@@ -192,6 +192,13 @@ public static class TurnEngine
             if (r.EndPhasesSeen == 0) { r.EndPhasesSeen = 1; return false; }
             return true;
         });
+        // 力量修正（"直到下个对方结束阶段力量±N"，如 OP16-065）同理清除
+        c.PowerModsUntilOppEnd.RemoveAll(m =>
+        {
+            if (m.AppliedBySide >= 0) return currentTurnPlayer == 1 - m.AppliedBySide;
+            if (m.EndPhasesSeen == 0) { m.EndPhasesSeen = 1; return false; }
+            return true;
+        });
     }
 
     private static bool IsSourceCardOnField(GameState s, string sourceId)

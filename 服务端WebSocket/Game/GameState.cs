@@ -327,7 +327,7 @@ public class OneShotPlayDiscount
         if (card.Info.Cost < MinCost) return false;
         if (Keyword is not null && !card.Info.HasKeyword(Keyword)) return false;
         if (Kind == "Character" && card.Info.Kind != Cards.CardKind.Character) return false;
-        if (NameContains is not null && !card.Info.Name.Contains(NameContains)) return false;
+        if (NameContains is not null && !card.Info.NameContains(NameContains)) return false;  // 含"视为卡名"别名(EB04-038)
         return true;
     }
 }

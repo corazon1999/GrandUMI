@@ -98,6 +98,7 @@ public static class CardDatabase
         public string[]? abilities { get; set; }
         public string? trigger     { get; set; }
         public string? rarity      { get; set; }
+        public string[]? alsoNames { get; set; }
     }
 
     private static CardInfo? MapToCardInfo(RawCard r)
@@ -137,6 +138,7 @@ public static class CardDatabase
             Abilities  = r.abilities ?? Array.Empty<string>(),
             Trigger    = r.trigger ?? "",
             Rarity     = r.rarity ?? "",
+            AlsoNames  = r.alsoNames ?? Array.Empty<string>(),
         };
     }
 

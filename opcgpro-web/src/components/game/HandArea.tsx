@@ -85,8 +85,13 @@ export default function HandArea({ side, hidden = false }: Props) {
     const fitStep = (avail - cardW) / (n - 1);
     step = Math.max(minStep, Math.min(cardW + GAP, fitStep));
   }
-  // 取整：避免亚像素 marginLeft 在 framer-motion layout 下反复微动（漂移）
-  const marginLeft = Math.round(step - cardW); // 负值=重叠；正值=普通间距
+  step = Math.round(step);             // 整数步进，杜绝亚像素
+  // 整数像素绝对定位（替代 flex 居中 + 负 marginLeft + framer-motion layout）：
+  // 每张卡的 x 由整数公式算出，motion.div 用 animate={{x}} 平移到位，不挂 layout、
+  // 不依赖浏览器 justify-center → 无亚像素居中、无 layout 反复测量 → 手牌再多也不漂移（#161）。
+  const totalW = cardW + (n - 1) * step;
+  const startX = Math.round(Math.max(PAD / 2, (wrapW - totalW) / 2)); // 居中起点；溢出则贴左内边距
+  const xOf = (i: number) => startX + i * step;                       // 已是整数
 
   const handleClick = (i: number) => {
     if (hidden || isPending) return;
@@ -103,7 +108,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   return (
     <div
       ref={wrapRef}
-      className="flex min-h-24 w-full min-w-0 items-end justify-center overflow-x-auto px-3 py-6 -my-5 lg:min-h-32"
+      className="relative h-full w-full min-w-0 overflow-visible"
     >
       <AnimatePresence>
         {cards.map((card, i) => {
@@ -112,17 +117,17 @@ export default function HandArea({ side, hidden = false }: Props) {
           return (
             <motion.div
               key={stableKeys[i]}
-              layout
-              initial={{ y: side === "my" ? 36 : -24, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              initial={{ x: xOf(i), y: side === "my" ? 36 : -24, opacity: 0 }}
+              animate={{ x: xOf(i), y: 0, opacity: 1 }}
               exit={{ y: side === "my" ? -24 : 24, opacity: 0 }}
               transition={{
-                default: { delay: i * 0.04, type: "spring", stiffness: 200 },
-                layout: { type: "spring", stiffness: 350, damping: 30 },
+                x: { type: "spring", stiffness: 350, damping: 30 },
+                y: { delay: i * 0.04, type: "spring", stiffness: 200 },
+                opacity: { delay: i * 0.04 },
               }}
-              style={{ marginLeft: i === 0 ? 0 : marginLeft }}
+              style={{ position: "absolute", left: 0, bottom: 0 }}
               className={[
-                "relative hover:z-20", // 悬停提升层级，盖过邻牌，便于看清被压住的卡（低于右栏操作区 z-30，避免盖住出牌/结束回合按钮）
+                "hover:z-20", // 悬停提升层级，盖过邻牌，便于看清被压住的卡（低于右栏操作区 z-30，避免盖住出牌/结束回合按钮）
                 counterPlayable ? "rounded-md ring-2 ring-amber-400 animate-pulse" : "",
               ].join(" ")}
             >
@@ -145,7 +150,7 @@ export default function HandArea({ side, hidden = false }: Props) {
       </AnimatePresence>
 
       {cards.length === 0 && (
-        <span className="text-xs text-gray-700">
+        <span className="absolute inset-0 flex items-center justify-center text-xs text-gray-700">
           {hidden ? "对手手牌" : "手牌为空"}
         </span>
       )}

@@ -22,6 +22,10 @@ public class CardInfo
     public string Trigger            { get; init; } = "";
     public string Rarity             { get; init; } = "";
 
+    /// <summary>规则上"卡牌名称也视为"的其它名称（如 EB04-038 也视为"特拉法尔加·罗"/"堂吉诃德·罗西南德"）。
+    /// 静态恒成立(手牌/卡组/场上全区)，故卡名匹配(NameContains/NameIs)同时匹配主名与这些别名。</summary>
+    public string[] AlsoNames        { get; init; } = Array.Empty<string>();
+
     /// <summary>单人测试模式专用：为 true 时 HasKeyword 一律返回 true（特征通配）。仅克隆副本设置，不污染共享缓存实例。</summary>
     public bool AllKeywordsWildcard  { get; init; }
 
@@ -56,14 +60,18 @@ public class CardInfo
     public bool NameContains(string s)
     {
         if (NameWildcard) return true;
-        return Name.Contains(s);
+        if (Name.Contains(s)) return true;
+        foreach (var a in AlsoNames) if (a.Contains(s)) return true;  // 视为别名也算
+        return false;
     }
 
     /// <summary>名称是否等于指定字符串。单人测试模式领袖（NameWildcard）一律返回 true。</summary>
     public bool NameIs(string s)
     {
         if (NameWildcard) return true;
-        return Name == s;
+        if (Name == s) return true;
+        foreach (var a in AlsoNames) if (a == s) return true;  // 视为别名也算
+        return false;
     }
 
     /// <summary>返回「所有特征判定 + 名称判定均为 true」的副本（单人测试模式领袖用，不污染共享缓存实例）</summary>
@@ -72,6 +80,7 @@ public class CardInfo
         Number = Number, Name = Name, Color = Color, Kind = Kind, Property = Property,
         Power = Power, Cost = Cost, Keywords = Keywords, Counter = Counter,
         EffectTags = EffectTags, Abilities = Abilities, Trigger = Trigger, Rarity = Rarity,
+        AlsoNames = AlsoNames,
         AllKeywordsWildcard = true,
         NameWildcard = true,
     };
