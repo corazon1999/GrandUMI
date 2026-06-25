@@ -11,9 +11,10 @@ const props = withDefaults(
     count: number;
     state: "active" | "rest";
     selected?: boolean;
+    stagedCount?: number;
     canInteract?: boolean;
   }>(),
-  { selected: false, canInteract: false },
+  { selected: false, stagedCount: 0, canInteract: false },
 );
 const emit = defineEmits<{ (e: "click"): void }>();
 
@@ -27,11 +28,16 @@ const on = computed(() => props.state === "active" && props.count > 0);
     <button
       type="button"
       :disabled="count <= 0 || !canInteract"
-      :class="['bf-box bf-don-box', { 'is-on': on, 'is-selected': selected }]"
+      :class="['bf-box bf-don-box relative', { 'is-on': on, 'is-selected': selected }]"
       @click="clickable && emit('click')"
     >
       <span class="bf-don-box__t">DON</span>
       <span class="bf-don-box__n">{{ count }}</span>
+      <!-- 拟依附张数徽标：再点 +1，达上限后再点取消（#144 复数咚依附） -->
+      <span
+        v-if="stagedCount > 0"
+        class="absolute right-1 top-1 z-30 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-black shadow ring-2 ring-amber-200"
+      >依附×{{ stagedCount }}</span>
     </button>
   </div>
 </template>

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782132579610,
+  "lastScanned": 1782306232253,
   "projectRoot": "D:\\code\\GrandUMI\\opcgpro-vue",
   "techStack": {
     "languages": [
@@ -72,10 +72,9 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 2,
-      "lastAccessed": 1782132579577,
+      "fileCount": 1,
+      "lastAccessed": 1782306232206,
       "keyFiles": [
-        "GrandUMI Redesign Offline.html",
         "grandumi-design-system.md"
       ]
     },
@@ -83,7 +82,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 2,
-      "lastAccessed": 1782132579577,
+      "lastAccessed": 1782306232207,
       "keyFiles": [
         "favicon.svg",
         "icons.svg"
@@ -93,7 +92,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 1,
-      "lastAccessed": 1782132579584,
+      "lastAccessed": 1782306232214,
       "keyFiles": [
         "convert-to-webp.mjs"
       ]
@@ -102,7 +101,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 3,
-      "lastAccessed": 1782132579584,
+      "lastAccessed": 1782306232216,
       "keyFiles": [
         "App.vue",
         "main.ts",
@@ -113,7 +112,7 @@
       "path": "public\\data",
       "purpose": "Data files",
       "fileCount": 57,
-      "lastAccessed": 1782132579585,
+      "lastAccessed": 1782306232219,
       "keyFiles": [
         "EB01.json",
         "EB02.json",
@@ -124,14 +123,14 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 0,
-      "lastAccessed": 1782132579586,
+      "lastAccessed": 1782306232221,
       "keyFiles": []
     },
     "src\\data": {
       "path": "src\\data",
       "purpose": "Data files",
-      "fileCount": 8,
-      "lastAccessed": 1782132579586,
+      "fileCount": 9,
+      "lastAccessed": 1782306232221,
       "keyFiles": [
         "CardLoader.ts",
         "cardSets.ts",
@@ -142,7 +141,7 @@
       "path": "src\\lib",
       "purpose": "Library code",
       "fileCount": 1,
-      "lastAccessed": 1782132579586,
+      "lastAccessed": 1782306232222,
       "keyFiles": [
         "colorMap.ts"
       ]
@@ -151,7 +150,7 @@
       "path": "src\\pages",
       "purpose": "Page components",
       "fileCount": 7,
-      "lastAccessed": 1782132579586,
+      "lastAccessed": 1782306232223,
       "keyFiles": [
         "DeckEditorPage.vue",
         "GamePage.vue",
@@ -162,8 +161,26 @@
   "hotPaths": [
     {
       "path": "src\\components\\game\\GameBoard.vue",
-      "accessCount": 13,
-      "lastAccessed": 1782230271582,
+      "accessCount": 16,
+      "lastAccessed": 1782390864572,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\ui\\CardItem.vue",
+      "accessCount": 10,
+      "lastAccessed": 1782309724015,
+      "type": "file"
+    },
+    {
+      "path": "src\\App.vue",
+      "accessCount": 9,
+      "lastAccessed": 1782390852352,
+      "type": "file"
+    },
+    {
+      "path": "src\\pages\\LoginPage.vue",
+      "accessCount": 9,
+      "lastAccessed": 1782390864220,
       "type": "file"
     },
     {
@@ -173,15 +190,9 @@
       "type": "file"
     },
     {
-      "path": "src\\pages\\LoginPage.vue",
+      "path": "src\\components\\shared\\Sidebar.vue",
       "accessCount": 7,
-      "lastAccessed": 1782228566079,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\ui\\CardItem.vue",
-      "accessCount": 6,
-      "lastAccessed": 1782139726661,
+      "lastAccessed": 1782390889641,
       "type": "file"
     },
     {
@@ -191,9 +202,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\shared\\Sidebar.vue",
-      "accessCount": 5,
-      "lastAccessed": 1782139960845,
+      "path": "src\\style.css",
+      "accessCount": 6,
+      "lastAccessed": 1782390785490,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\home\\MainPanel.vue",
+      "accessCount": 6,
+      "lastAccessed": 1782390889372,
       "type": "file"
     },
     {
@@ -203,21 +220,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\home\\MainPanel.vue",
-      "accessCount": 4,
-      "lastAccessed": 1782139312645,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\game\\FieldArea.vue",
       "accessCount": 4,
       "lastAccessed": 1782229840162,
       "type": "file"
     },
     {
-      "path": "src\\style.css",
+      "path": "src\\components\\shared\\TopBar.vue",
       "accessCount": 4,
-      "lastAccessed": 1782229849173,
+      "lastAccessed": 1782390859493,
       "type": "file"
     },
     {
@@ -239,15 +250,27 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\game\\PhaseTrack.vue",
-      "accessCount": 2,
-      "lastAccessed": 1782133747961,
+      "path": "src\\pages\\HomePage.vue",
+      "accessCount": 3,
+      "lastAccessed": 1782390882907,
       "type": "file"
     },
     {
       "path": "src\\pages\\GamePage.vue",
+      "accessCount": 3,
+      "lastAccessed": 1782390887847,
+      "type": "file"
+    },
+    {
+      "path": "src\\main.ts",
+      "accessCount": 3,
+      "lastAccessed": 1782391014949,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\game\\PhaseTrack.vue",
       "accessCount": 2,
-      "lastAccessed": 1782134298686,
+      "lastAccessed": 1782133747961,
       "type": "file"
     },
     {
@@ -287,45 +310,21 @@
       "type": "file"
     },
     {
-      "path": "src\\main.ts",
+      "path": "src\\router\\index.ts",
       "accessCount": 2,
-      "lastAccessed": 1782138304649,
+      "lastAccessed": 1782309747106,
       "type": "file"
     },
     {
-      "path": "src\\App.vue",
-      "accessCount": 1,
-      "lastAccessed": 1782133023610,
-      "type": "file"
-    },
-    {
-      "path": "src\\pages\\HomePage.vue",
-      "accessCount": 1,
-      "lastAccessed": 1782133023806,
+      "path": "src\\components\\shared\\ScreenHead.vue",
+      "accessCount": 2,
+      "lastAccessed": 1782390794365,
       "type": "file"
     },
     {
       "path": "src\\components\\home\\LoginPanel.vue",
       "accessCount": 1,
       "lastAccessed": 1782133048470,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\shared\\TopBar.vue",
-      "accessCount": 1,
-      "lastAccessed": 1782133049534,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\shared\\ScreenHead.vue",
-      "accessCount": 1,
-      "lastAccessed": 1782133050136,
-      "type": "file"
-    },
-    {
-      "path": "src\\router\\index.ts",
-      "accessCount": 1,
-      "lastAccessed": 1782133077893,
       "type": "file"
     },
     {
