@@ -154,6 +154,17 @@ export default function HandArea({ side, hidden = false }: Props) {
           {hidden ? "对手手牌" : "手牌为空"}
         </span>
       )}
+
+      {/* #188 手牌数量角标：我方底部/对手顶部，避开右栏(left 定位)，z-30 + pointer-events-none 不遮点击 */}
+      <span
+        className={[
+          "pointer-events-none absolute left-1 z-30",
+          "rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white ring-1 ring-white/20",
+          side === "my" ? "bottom-1" : "top-1",
+        ].join(" ")}
+      >
+        {cards.length}
+      </span>
     </div>
   );
 }

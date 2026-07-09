@@ -302,6 +302,11 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
 
   addCard: (card) =>
     set((s) => {
+      // 未选领航卡时禁止加卡：否则下方颜色校验因 `s.leader &&` 短路被跳过，
+      // 任意颜色的卡都会被塞进卡组（bug #184）。
+      if (!s.leader) {
+        return { notice: { message: "请先选择领航卡，再添加卡牌", type: "error" as const } };
+      }
       const allowed = isCardAllowedInFormat(card, s.format, false);
       if (!allowed.ok) {
         return { notice: { message: allowed.reason!, type: "error" as const } };

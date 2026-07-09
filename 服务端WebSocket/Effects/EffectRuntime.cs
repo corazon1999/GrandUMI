@@ -47,6 +47,7 @@ public static class EffectRuntime
     private static readonly AsyncLocal<bool> _drainingAL = new();
     private static readonly AsyncLocal<CardInstance?> _currentSourceAL = new();
     private static readonly AsyncLocal<int?> _actingSideAL = new();
+    private static readonly AsyncLocal<IPromptService?> _promptsAL = new();
     private static GameState? _ambient { get => _ambientAL.Value; set => _ambientAL.Value = value; }
     private static int _depth { get => _depthAL.Value; set => _depthAL.Value = value; }
     private static bool _draining { get => _drainingAL.Value; set => _drainingAL.Value = value; }
@@ -63,18 +64,36 @@ public static class EffectRuntime
     /// 供 AtomicOps 在状态变更时查询持续型限制（如持续来源的 CannotBeRested）。</summary>
     public static GameState? CurrentState => _ambientAL.Value;
 
+    /// <summary>当前效果解析可用的 Prompt 服务（无效果上下文时为 null）。
+    /// 供 AtomicOps 内需要临时交互的场景（如 PlayFromHandFree 满场自选弃谁）使用，
+    /// 免去给 136 处同步调用点改签名。</summary>
+    public static IPromptService? CurrentPrompts => _promptsAL.Value;
+
     /// <summary>由 AtomicOps 在状态变更时调用，把 watcher 事件入队到当前效果所属的 state（无效果上下文时忽略）</summary>
     public static void NotifyWatcher(EffectTrigger trigger, Dictionary<string, object?>? payload = null)
         => _ambient?.EnqueueWatcher(trigger, payload);
 
-    /// <summary>手牌因效果被丢弃时入队 OnHandDiscarded（owner=该手牌所属方）；仅效果上下文内有效。</summary>
+    /// <summary>是否正在支付效果成本（DSL PayActivationCost 内为 true）。
+    /// 成本丢手牌 ≠「因效果丢弃」，供 OnHandDiscarded 消费端（如 OP12-040 青雉）区分。</summary>
+    private static readonly AsyncLocal<bool> _payingCostAL = new();
+    public static bool PayingCost { get => _payingCostAL.Value; set => _payingCostAL.Value = value; }
+
+    /// <summary>手牌因效果被丢弃时入队 OnHandDiscarded（owner=该手牌所属方）；仅效果上下文内有效。
+    /// payload 额外携带丢弃来源：sourceNumber=当前结算效果的来源卡番号、actingSide=效果控制方、
+    /// isCost=是否成本支付（供"通过X特征卡牌的效果丢弃"类监听判定，如 OP12-040）。</summary>
     public static void NotifyHandDiscarded(PlayerState p)
     {
         var s = _ambient;
         if (s is null) return;
         int owner = ReferenceEquals(s.Players[0], p) ? 0 : ReferenceEquals(s.Players[1], p) ? 1 : -1;
         if (owner < 0) return;
-        s.EnqueueWatcher(EffectTrigger.OnHandDiscarded, new Dictionary<string, object?> { ["owner"] = owner });
+        s.EnqueueWatcher(EffectTrigger.OnHandDiscarded, new Dictionary<string, object?>
+        {
+            ["owner"] = owner,
+            ["sourceNumber"] = CurrentSource?.Info.Number,
+            ["actingSide"] = CurrentActingSide,
+            ["isCost"] = PayingCost,
+        });
     }
 
     /// <summary>对单个卡牌的指定触发时机解析效果</summary>
@@ -83,9 +102,11 @@ public static class EffectRuntime
         var prevAmbient = _ambient;
         var prevSource = _currentSourceAL.Value;
         var prevActing = _actingSideAL.Value;
+        var prevPrompts = _promptsAL.Value;
         _ambient = s;
         _currentSourceAL.Value = source;
         _actingSideAL.Value = ownerIdx;
+        _promptsAL.Value = prompts;
         _depth++;
         try
         {
@@ -121,15 +142,21 @@ public static class EffectRuntime
             _ambient = prevAmbient;
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
+            _promptsAL.Value = prevPrompts;
             // 最外层效果结束后，排空期间积累的反应式 watcher 事件 + 被效果登场卡的【登场时】
             if (_depth == 0 && !_draining && (s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))
-                await DrainWatchers(s, prompts);
+                await DrainPendingEnterFields(s, prompts);
         }
     }
 
-    /// <summary>排空 watcher 队列 + 被效果登场卡的【登场时】（带再入上限防死循环）</summary>
-    private static async Task DrainWatchers(GameState s, IPromptService prompts)
+    /// <summary>排空 watcher 队列 + 被效果登场卡的【登场时】（带再入上限防死循环）。
+    /// 反馈#203：改为 public，供 LifeRevealManager 在"纯自登场"(PlayFromTrashFree 只 EnqueueEnterField)之后
+    /// 显式排空一次——否则该链路后续若无 depth-0 的 Resolve，PendingEnterFields 不会被排空，
+    /// 导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。
+    /// _draining 守卫保证与 Resolve 的 finally 排空互不重入。</summary>
+    public static async Task DrainPendingEnterFields(GameState s, IPromptService prompts)
     {
+        if (_draining) return; // 已在排空中(如被更外层的 finally 触发)——避免重入
         _draining = true;
         try
         {

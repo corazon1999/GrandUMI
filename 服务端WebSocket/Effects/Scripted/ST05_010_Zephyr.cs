@@ -41,7 +41,7 @@ public class ST05_010_Zephyr : IScriptedEffect
                     var atk = s.Players[b.AttackerPlayerIndex];
                     foe = atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
                 }
-                return foe is not null && foe.Info.Property == "打";
+                return foe is not null && foe.Info.Property.Split('/').Contains("打");
             },
         });
         return Task.CompletedTask;

@@ -54,11 +54,7 @@ public class OP08_007_Chopper : IScriptedEffect
                 me.Deck.Remove(picked);
                 // 以休息状态登场（直接进入角色区；角色区满 5 张时牺牲最左侧）
                 if (me.Characters.Count >= 5)
-                {
-                    var sacrifice = me.Characters[0];
-                    me.Characters.RemoveAt(0);
-                    me.Trash.Add(sacrifice);
-                }
+                    AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 picked.TurnPlayed = ctx.State.TurnCount;
                 picked.IsTapped = true;
                 me.Characters.Add(picked);

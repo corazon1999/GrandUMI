@@ -21,7 +21,7 @@ public class EB02_035_SanjiAndBrulee : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnEnterField || t == EffectTrigger.OnDonReturnedToDeck;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
@@ -30,28 +30,31 @@ public class EB02_035_SanjiAndBrulee : IScriptedEffect
         {
             if (me.TotalDonInCostArea <= opp.TotalDonInCostArea)
                 AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-            return Task.CompletedTask;
+            return;
         }
 
         if (ctx.Trigger == EffectTrigger.OnDonReturnedToDeck)
         {
             // 仅【我方的回合中】
-            if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
+            if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
             // 本次放回张数 ≥2
             int count = ctx.Vars.TryGetValue("count", out var v) && v is int n ? n : 0;
-            if (count < 2) return Task.CompletedTask;
+            if (count < 2) return;
 
-            // 【每回合1次】
+            // 【每回合1次】——标记移到"确认追加"之后再消耗，选择不追加则不占用本回合机会
             var key = ctx.Source.Info.Number + "-don" + ":" + ctx.Source.Id;
-            if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
-            me.TurnOnceUsed.Add(key);
+            if (me.TurnOnceUsed.Contains(key)) return;
 
-            // 从咚!!卡组追加最多1张活跃咚
-            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
-            return Task.CompletedTask;
+            // 卡面"从咚!!卡组追加【最多1张】活跃咚!!"→可选，先问玩家是否追加（反馈#174:无法自选是否跳咚）
+            if (await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "是否从咚!!卡组追加1张活跃状态的咚!!？"))
+            {
+                AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
+                me.TurnOnceUsed.Add(key);
+            }
+            return;
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

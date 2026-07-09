@@ -341,10 +341,13 @@
   },
   "OP15-061": {
     "_name": "欧姆",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时咚-1抽1(反馈#218补成本)；攻击时咚≤6对方1张-1000(补条件与min:0)",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
         "then": [
           {
             "op": "Draw",
@@ -354,11 +357,15 @@
       },
       {
         "on": "OnAttackDeclare",
+        "if": {
+          "selfDonTotalLte": 6
+        },
         "then": [
           {
             "op": "Choose",
             "prompt": "OpponentCharacter",
             "max": 1,
+            "min": 0,
             "as": "$tgt"
           },
           {
@@ -405,10 +412,13 @@
   },
   "OP15-067": {
     "_name": "修罗",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时咚-1抽1(反馈#217补成本;条件速攻属abilities硬写通病另行专项)",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
         "then": [
           {
             "op": "Draw",
@@ -448,13 +458,56 @@
   },
   "OP15-075": {
     "_name": "神之制裁",
-    "_matcher": "【反击】本次战斗中我方 +N",
+    "_matcher": "主要:咚-1领袖艾尼路时我方1张+1000,之后KO对方1张力量≤3000角色(反馈#233补整段);反击:我方1张艾尼路本战斗+2000(补名过滤)",
+    "main": {
+      "cost": {
+        "donReturn": 1
+      },
+      "if": {
+        "leaderNameEquals": "艾尼路"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$a",
+          "text": "本回合中，我方最多1张领袖或角色力量+1000"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$a",
+          "delta": 1000
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "filter": {
+            "originalPowerLte": 3000
+          },
+          "as": "$b",
+          "text": "将对方最多1张力量不高于3000的角色KO"
+        },
+        {
+          "op": "KO",
+          "target": "$b"
+        }
+      ]
+    },
     "counter": [
       {
         "op": "Choose",
         "prompt": "OwnLeaderOrCharacter",
         "max": 1,
-        "as": "$tgt"
+        "min": 0,
+        "filter": {
+          "nameEquals": "艾尼路"
+        },
+        "as": "$tgt",
+        "text": "本次战斗中，我方最多1张“艾尼路”力量+2000"
       },
       {
         "op": "AddPowerThisBattle",
@@ -493,7 +546,7 @@
   },
   "OP15-077": {
     "_name": "雷龙",
-    "_matcher": "启动主要 咚-N 抽 1",
+    "_matcher": "主要:咚-1抽1,之后对方最多1张休息且力量≤6000角色下个重置阶段不转活跃(反馈#232补锁怪段)",
     "main": {
       "cost": {
         "donReturn": 1
@@ -502,13 +555,28 @@
         {
           "op": "Draw",
           "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentRestingCharacter",
+          "max": 1,
+          "min": 0,
+          "filter": {
+            "originalPowerLte": 6000
+          },
+          "as": "$tgt",
+          "text": "对方最多1张休息状态且力量不高于6000的角色，下个对方重置阶段不转为活跃"
+        },
+        {
+          "op": "PreventActivateNextReset",
+          "target": "$tgt"
         }
       ]
     }
   },
   "OP15-078": {
     "_name": "万雷",
-    "_matcher": "启动主要 咚-N 抽 1",
+    "_matcher": "启动主要 咚-2 抽1,之后休息对方最多1张力量≤5000角色",
     "main": {
       "cost": {
         "donReturn": 2
@@ -517,6 +585,21 @@
         {
           "op": "Draw",
           "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "filter": {
+            "originalPowerLte": 5000
+          },
+          "text": "将对方最多1张力量不高于5000的角色转为休息状态"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
         }
       ]
     },

@@ -43,7 +43,7 @@
   },
   "OP09-009": {
     "_name": "本·贝克曼",
-    "_matcher": "登场时KO对方1张力量≤6000角色",
+    "_matcher": "登场时将对方1张力量≤6000角色放置到废弃区(非KO不触发KO时,力量按当前口径;反馈#212)",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -52,13 +52,15 @@
             "op": "Choose",
             "prompt": "OpponentCharacter",
             "max": 1,
+            "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 6000
-            }
+              "currentPowerLte": 6000
+            },
+            "text": "将对方最多1张力量不高于6000的角色放置到废弃区"
           },
           {
-            "op": "KO",
+            "op": "TrashTarget",
             "target": "$tgt"
           }
         ]

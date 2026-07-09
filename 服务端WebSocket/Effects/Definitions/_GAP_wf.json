@@ -1,11 +1,12 @@
 {
   "OP09-001": {
     "_name": "杰克斯",
-    "_matcher": "对方攻击时(OnOppAttackDeclare)选对方最多1张领袖或角色力量-1000。每回合1次为可选反应，triggers不支持oncePerTurn,核心效果可用DSL表达。",
+    "_matcher": "对方攻击时(OnOppAttackDeclare)选对方最多1张领袖或角色力量-1000。【每回合1次】用 triggers oncePerTurn；Choose min:0 提供可以不发动。",
     "_src": "wf-gap",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
         "then": [
           {
             "op": "Choose",

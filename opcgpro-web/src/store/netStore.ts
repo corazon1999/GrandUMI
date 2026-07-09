@@ -20,6 +20,7 @@ export interface SelectedDeck {
   name: string;
   leader: string;
   leaderName: string;
+  leaderSprite?: string; // 领航卡面图 URL（大厅「已选卡组」显示头像用）
   cards: string; // 卡组字符串（DeckMapper.exportDeckString 格式）
 }
 

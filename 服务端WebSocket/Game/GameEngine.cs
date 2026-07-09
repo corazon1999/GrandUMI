@@ -749,7 +749,7 @@ public class GameEngine
         State.PendingReveal = null;
     }
 
-    private void SendError(int playerIndex, string reason)
+    public void SendError(int playerIndex, string reason)
     {
         _activeActionRejected = true;
         RecordMatchLog("player_action_rejected", _activeActor ?? playerIndex, new

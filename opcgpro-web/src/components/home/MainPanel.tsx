@@ -360,6 +360,7 @@ export default function MainPanel() {
       name,
       leader: saved.leader,
       leaderName: saved.leaderName,
+      leaderSprite: saved.leaderSprite,
       cards: [saved.leader, ...saved.cards].join("\n"),
     });
   }, []);

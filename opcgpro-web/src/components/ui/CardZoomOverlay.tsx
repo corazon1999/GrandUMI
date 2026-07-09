@@ -63,10 +63,10 @@ export default function CardZoomOverlay({
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 26 }}
       >
-        {/* 大卡图：高度跟随视口，宽按 0.717 卡牌比例 */}
+        {/* 大卡图：高度跟随视口，宽按 0.717 卡牌比例；#162 同时按 88vw 约束高度，防竖屏窄屏派生宽度超屏横向溢出 */}
         <div
           className="relative overflow-hidden rounded-2xl border border-gray-600 shadow-2xl"
-          style={{ height: "min(78vh, 640px)", aspectRatio: "0.717" }}
+          style={{ height: "min(78vh, 640px, calc(88vw / 0.717))", aspectRatio: "0.717" }}
         >
           <NextImage
             src={imgSrc}
@@ -88,25 +88,27 @@ export default function CardZoomOverlay({
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-bold text-base leading-tight">{card.name}</p>
             {colorStyle && (
-              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${colorStyle.bg} text-white`}>
+              // #179 信息条字号响应式上调一档：手机可读
+              <span className={`text-xs sm:text-sm font-bold px-1.5 py-0.5 rounded ${colorStyle.bg} text-white`}>
                 {displayColor}
               </span>
             )}
-            <span className="text-gray-400 text-[11px]">
+            <span className="text-gray-400 text-xs sm:text-sm">
               {TYPE_LABELS[card.type] ?? card.type}
             </span>
             {card.property && (
-              <span className="text-gray-400 text-[11px]">{card.property}</span>
+              <span className="text-gray-400 text-xs sm:text-sm">{card.property}</span>
             )}
             {card.rarity && (
-              <span className={`text-[10px] font-bold px-1 rounded ${RARITY_STYLES[card.rarity] ?? "bg-gray-700 text-white"}`}>
+              <span className={`text-xs sm:text-sm font-bold px-1 rounded ${RARITY_STYLES[card.rarity] ?? "bg-gray-700 text-white"}`}>
                 {card.rarity}
               </span>
             )}
-            <span className="text-gray-500 text-[11px] ml-auto">{card.number}</span>
+            <span className="text-gray-500 text-xs sm:text-sm ml-auto">{card.number}</span>
           </div>
 
-          <div className="mt-1.5 flex items-center gap-4 text-[12px]">
+          {/* #179 费/力/反信息行字号响应式：手机端更大 */}
+          <div className="mt-1.5 flex items-center gap-4 text-sm sm:text-base">
             {card.cost > 0 && (
               <span className="text-gray-300">费 <span className="text-white font-bold">{card.cost}</span></span>
             )}
@@ -121,7 +123,7 @@ export default function CardZoomOverlay({
           {card.keyWords.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {card.keyWords.map((k) => (
-                <span key={k} className="text-[10px] bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded">
+                <span key={k} className="text-xs sm:text-sm bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded">
                   {k}
                 </span>
               ))}
@@ -131,7 +133,7 @@ export default function CardZoomOverlay({
           {card.abilities.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {card.abilities.map((a) => (
-                <span key={a} className="text-[10px] bg-emerald-900/60 text-emerald-300 px-1.5 py-0.5 rounded">
+                <span key={a} className="text-xs sm:text-sm bg-emerald-900/60 text-emerald-300 px-1.5 py-0.5 rounded">
                   {a}
                 </span>
               ))}
@@ -139,7 +141,8 @@ export default function CardZoomOverlay({
           )}
 
           {card.trigger && (
-            <p className="mt-2 text-[12px] leading-snug text-amber-200">
+            // #179 触发文本字号响应式：手机端从 12px 提升到 sm/base
+            <p className="mt-2 text-sm sm:text-base leading-snug text-amber-200">
               <span className="font-bold">触发</span> {card.trigger}
             </p>
           )}

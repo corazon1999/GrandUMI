@@ -59,11 +59,7 @@ public class OP12_058_Whitebeard : IScriptedEffect
         // 登场：从卡组顶移除，按 5 张上限处理后入场
         me.Deck.Remove(top);
         if (me.Characters.Count >= 5)
-        {
-            var sacrifice = me.Characters[0];
-            me.Characters.RemoveAt(0);
-            me.Trash.Add(sacrifice);
-        }
+            AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
         top.TurnPlayed = ctx.State.TurnCount;
         me.Characters.Add(top);
 

@@ -46,8 +46,7 @@
           "max": 1,
           "restTo": "bottom",
           "match": {
-            "keyword": "阿拉巴斯坦王国",
-            "excludeName": "伊格拉姆"
+            "keyword": "阿拉巴斯坦王国"
           }
         }
       ]
@@ -168,22 +167,27 @@
   },
   "OP04-016": {
     "_name": "反礼仪踢技套餐",
-    "_matcher": "反击我方最多1张领袖或角色本次战斗+3000(成本弃1手牌经 counter 的 cost 表达)；触发对方最多1张领袖或角色本回合-3000",
+    "_matcher": "反击弃1手牌为成本:我方最多1张领袖或角色本次战斗+3000(反馈#228,counter改对象形带cost)；触发对方最多1张领袖或角色本回合-3000",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "handDiscard": 1
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 3000
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "Choose",

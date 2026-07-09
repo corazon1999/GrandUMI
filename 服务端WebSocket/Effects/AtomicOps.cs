@@ -65,9 +65,9 @@ public static class AtomicOps
         if (st is not null && st.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return;
         bool was = c.IsTapped;
         c.IsTapped = true;
-        if (!was) // 因效果转为休息状态 → 通知 watcher
+        if (!was) // 因效果转为休息状态 → 通知 watcher（reason=effect；攻击/阻挡横置由 BattleEngine 以 attack/block 派发）
             EffectRuntime.NotifyWatcher(EffectTrigger.OnCharRested,
-                new Dictionary<string, object?> { ["restedCardId"] = c.Id.ToString() });
+                new Dictionary<string, object?> { ["restedCardId"] = c.Id.ToString(), ["reason"] = "effect" });
     }
     public static void ActivateCard(CardInstance c) { c.IsTapped = false; }
 
@@ -440,6 +440,32 @@ public static class AtomicOps
     }
 
     /// <summary>把手牌中的角色卡免费登场</summary>
+    /// <summary>角色区满员（5张）时为效果登场腾位：有效果 Prompt 上下文则让登场方自选 1 张角色送废弃区
+    /// （与正常出牌的 OverflowTrash 流程一致，非 KO、不触发【K.O.时】）；无上下文时回退旧行为（挤最左）。
+    /// 供 PlayFromHandFree / PlayFromTrashFree / PlayFromDeckFree / PlayFromLifeFree 及脚本卡满场登场复用。</summary>
+    public static void SqueezeCharacterSlot(GameState s, int playerIdx)
+    {
+        var p = s.Players[playerIdx];
+        if (p.Characters.Count < 5) return;
+        var victim = p.Characters[0];
+        var prompts = EffectRuntime.CurrentPrompts;
+        if (prompts is not null && ReferenceEquals(EffectRuntime.CurrentState, s))
+        {
+            try
+            {
+                var picked = prompts.ChooseCards(playerIdx, "OverflowTrash",
+                    "角色区已满，请选择 1 张角色送去废弃区",
+                    p.Characters.Select(c => c.Id.ToString()).ToList(), 1, 1)
+                    .GetAwaiter().GetResult();
+                if (picked.Count > 0)
+                    victim = p.Characters.FirstOrDefault(c => c.Id.ToString() == picked[0]) ?? victim;
+            }
+            catch { /* Prompt 异常时回退挤最左，避免卡死效果链 */ }
+        }
+        p.Characters.Remove(victim);
+        p.Trash.Add(victim);
+    }
+
     public static void PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
     {
         var p = s.Players[playerIdx];
@@ -447,11 +473,7 @@ public static class AtomicOps
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-            {
-                var sacrifice = p.Characters[0];
-                p.Characters.RemoveAt(0);
-                p.Trash.Add(sacrifice);
-            }
+                SqueezeCharacterSlot(s, playerIdx);
             card.TurnPlayed = s.TurnCount;
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
@@ -560,11 +582,7 @@ public static class AtomicOps
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-            {
-                var sacrifice = p.Characters[0];
-                p.Characters.RemoveAt(0);
-                p.Trash.Add(sacrifice);
-            }
+                SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
@@ -730,11 +748,7 @@ public static class AtomicOps
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-            {
-                var sacrifice = p.Characters[0];
-                p.Characters.RemoveAt(0);
-                p.Trash.Add(sacrifice);
-            }
+                SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
@@ -758,11 +772,7 @@ public static class AtomicOps
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-            {
-                var sacrifice = p.Characters[0];
-                p.Characters.RemoveAt(0);
-                p.Trash.Add(sacrifice);
-            }
+                SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;

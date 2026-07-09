@@ -914,11 +914,31 @@
     ]
   },
   "OP14-077": {
+    "_name": "五色线",
+    "_matcher": "反击:我方1张领袖或角色本战斗+4000;之后对方存在力量≥6000角色则可追加1张休息咚(反馈#251补跳咚段)",
     "counter": [
       {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$t",
+        "text": "本次战斗中，我方最多1张领袖或角色力量+4000"
+      },
+      {
         "op": "AddPowerThisBattle",
-        "target": "selfLeader",
+        "target": "$t",
         "delta": 4000
+      },
+      {
+        "op": "RefreshDon",
+        "n": 1,
+        "state": "rest",
+        "optional": true,
+        "if": {
+          "oppHasCharPowerGte": 6000
+        },
+        "text": "对方场上存在力量≥6000的角色：是否从咚!!卡组追加1张休息状态的咚!!？"
       }
     ]
   },
@@ -1068,6 +1088,8 @@
     ]
   },
   "OP14-088": {
+    "_name": "Miss.圣诞快乐(多洛菲)",
+    "_matcher": "KO时领袖含巴洛克:抽1+KO对方最多1张费用1舞台(反馈#207补舞台段;成本KO派发链修复见OP14_079)",
     "triggers": [
       {
         "on": "OnKO",
@@ -1078,6 +1100,22 @@
           {
             "op": "Draw",
             "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentStage",
+            "max": 1,
+            "min": 0,
+            "as": "$st",
+            "filter": {
+              "originalCostLte": 1,
+              "originalCostGte": 1
+            },
+            "text": "将对方最多1张费用为1的舞台KO"
+          },
+          {
+            "op": "KO",
+            "target": "$st"
           }
         ]
       }
@@ -1136,21 +1174,20 @@
     ]
   },
   "OP14-091": {
+    "_name": "Mr.2·盆·岁末(本萨姆)",
+    "_matcher": "KO时将手牌或废弃区最多1张自身以外费用≤5特征含巴洛克工作室的角色登场(反馈#189,改用PlayCharFromHandOrTrash,旧Choose+PlayFromTrash仅覆盖废弃区且prompt无巴洛克过滤)",
     "triggers": [
       {
         "on": "OnKO",
         "then": [
           {
-            "op": "Choose",
-            "prompt": "OwnTrashCharacterCostLe5",
-            "max": 1,
-            "min": 0,
-            "text": "选择手牌或废弃区中最多1张费用不高于5且拥有《巴洛克工作室》特征的角色（非Mr.2）登场",
-            "as": "$c"
-          },
-          {
-            "op": "PlayFromTrash",
-            "target": "$c"
+            "op": "PlayCharFromHandOrTrash",
+            "filter": {
+              "excludeName": "Mr.2·盆·岁末(本萨姆)",
+              "originalCostLte": 5,
+              "keywordContains": "巴洛克工作室"
+            },
+            "text": "将手牌或废弃区中最多1张“Mr.2·盆·岁末(本萨姆)”以外、费用≤5 且特征含〈巴洛克工作室〉的角色登场"
           }
         ]
       }
@@ -1524,13 +1561,28 @@
     ]
   },
   "OP14-119": {
+    "_name": "杰拉基尔·米霍克",
+    "_matcher": "第一段'我方回合中转休息时锁对方1张≤9费角色'由脚本OP14_119_Mihawk处理(反馈#227);第二段对方攻击时每回合1次弃1手牌:我方1张领袖或角色本战斗+2000(补oncePerTurn/成本/目标选择)",
     "triggers": [
       {
         "on": "OnOppAttackDeclare",
+        "oncePerTurn": true,
+        "cost": {
+          "handDiscard": 1
+        },
+        "costPrompt": "丢弃我方1张手牌：本次战斗中，我方最多1张领袖或角色力量+2000？",
         "then": [
           {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$t",
+            "text": "本次战斗中，我方最多1张领袖或角色力量+2000"
+          },
+          {
             "op": "AddPowerThisBattle",
-            "target": "selfLeader",
+            "target": "$t",
             "delta": 2000
           }
         ]

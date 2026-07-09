@@ -24,11 +24,13 @@ public class OP12_118_JewelryBonney : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 统计我方场上处于休息状态的卡牌数量：休息角色 + 休息舞台 + 休息咚!!
+        // 统计我方场上处于休息状态的卡牌数量（反馈#222 修口径）：
+        // 休息领袖 + 休息角色 + 休息舞台 + 休息咚!! + 被赋予中的咚!!（附着咚按官方规则以横置状态置于卡下，计入休息卡）
+        int restedLeader = me.Leader.IsTapped ? 1 : 0;
         int restedChars = me.Characters.Count(c => c.IsTapped);
         int restedStage = (me.StageCard is not null && me.StageCard.IsTapped) ? 1 : 0;
-        int restedDon = me.RestDonCount;
-        int restedTotal = restedChars + restedStage + restedDon;
+        int restedDon = me.CostArea.Count(d => d.State == DonState.Rest || d.State == DonState.Attached);
+        int restedTotal = restedLeader + restedChars + restedStage + restedDon;
 
         if (restedTotal < 8) return;
 

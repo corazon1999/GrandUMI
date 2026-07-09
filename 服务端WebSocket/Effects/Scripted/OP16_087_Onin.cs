@@ -29,8 +29,10 @@ public class OP16_087_Onin : IScriptedEffect
             "阿忍【登场时】：将此角色放置到废弃区？（领袖有《和之国》则抽1，并使我方1张\"光月桃之助\"本回合费用+20）");
         if (!use) return;
 
-        // 支付：自身入废弃（不触发 KO 事件）
+        // 支付：自身入废弃（不触发 KO 事件，但属"离开场上"须派发离场 watcher，反馈#224 同类缺口）
         BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, ctx.Source);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = ctx.Source.Id.ToString(), ["owner"] = ctx.OwnerIndex });
 
         // 领袖《和之国》才有收益
         if (!me.Leader.Info.HasKeyword("和之国")) return;

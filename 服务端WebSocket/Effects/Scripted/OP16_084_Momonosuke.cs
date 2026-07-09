@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -27,19 +28,28 @@ public class OP16_084_Momonosuke : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
-        // 成本前置条件：此角色当前费用为 20 或更高
-        if (ctx.State.CurrentCostOf(ctx.OwnerIndex, self) < 20) return;
+        // 成本前置条件：此角色当前费用为 20 或更高。不足时明确报错而非静默（反馈#193"点了没反应"）
+        if (ctx.State.CurrentCostOf(ctx.OwnerIndex, self) < 20)
+        {
+            ctx.Engine?.SendError(ctx.OwnerIndex, "此角色当前费用不足 20，需先用效果提升费用（如 OP16-087 阿忍 +20）");
+            return;
+        }
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "光月桃之助【启动主要】：将此角色放置到废弃区？（场上有 9 张以上咚!! 时，登场废弃区 1 张费用 9 的\"光月桃之助\"）");
         if (!use) return;
 
-        // 支付成本：将此角色放置到废弃区
-        me.Characters.Remove(self);
-        me.Trash.Add(self);
+        // 支付成本：将此角色放置到废弃区（走 KOCard 归还附着咚+清持续效果，并派发离场 watcher）
+        BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, self);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = self.Id.ToString(), ["owner"] = ctx.OwnerIndex });
 
         // 条件：我方场上存在 9 张或更多咚!!
-        if (me.TotalDonInCostArea < 9) return;
+        if (me.TotalDonInCostArea < 9)
+        {
+            ctx.Engine?.SendError(ctx.OwnerIndex, "我方场上咚!!不足 9 张，登场收益未发动");
+            return;
+        }
 
         // 目标：废弃区中卡名"光月桃之助"且卡面费用为 9 的角色
         var cands = me.Trash.Where(c =>

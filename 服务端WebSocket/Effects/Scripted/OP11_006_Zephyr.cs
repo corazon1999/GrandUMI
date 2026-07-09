@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 【咚!!×1】的发动条件（贴有 ≥1 咚）由引擎在调度【攻击时】效果前判定/门控，脚本只实现收益部分。
-///   - "属性（特）"对应卡面 Property 字段（"斩"/"打"/"特"…），直接用 c.Info.Property == "特" 过滤。
+///   - "属性（特）"对应卡面 Property 字段（"斩"/"打"/"特"…），直接用 c.Info.Property.Split('/').Contains("特") 过滤。
 ///   - "最多 1 张"，玩家可放弃（min=0）。
 /// </summary>
 public class OP11_006_Zephyr : IScriptedEffect
@@ -26,7 +26,7 @@ public class OP11_006_Zephyr : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
 
-        var cands = opp.Characters.Where(c => c.Info.Property == "特").ToList();
+        var cands = opp.Characters.Where(c => c.Info.Property.Split('/').Contains("特")).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

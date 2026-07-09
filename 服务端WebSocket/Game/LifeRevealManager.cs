@@ -80,6 +80,11 @@ public static class LifeRevealManager
                         && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                     {
                         AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
+                        // 反馈#203：PlayFromTrashFree 只把【登场时】入 PendingEnterFields 延迟队列；
+                        // 这条"纯自登场"链路后续未必有 depth-0 的 Resolve 来排空该队列，
+                        // 会导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。此处显式排空一次。
+                        if (!s.IsGameOver)
+                            await EffectRuntime.DrainPendingEnterFields(s, engine.Prompts);
                     }
                     // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
                     if (!s.IsGameOver)

@@ -9,7 +9,9 @@
     "cost": "5",
     "keyWords": "四皇/红发海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",

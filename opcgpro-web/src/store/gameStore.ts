@@ -114,6 +114,9 @@ interface GameStore {
   // 检索/公开牌瞬时展示（nonce 递增以便重复触发；由 RevealOverlay 计时清除）
   reveal: (RevealSnapshot & { nonce: number }) | null;
 
+  // #241 选择/确认成功的瞬时提示（nonce 递增触发；由 PromptSuccessFlash 计时清除）
+  promptFlash: number;
+
   // UI 暂态
   isPending: boolean;
   isGameOver: boolean;
@@ -132,6 +135,7 @@ interface GameStore {
   // ── 唯一写入路径 ─────────────────────────────────────────────────────
   syncFromServer: (msg: MsgGameState) => void;
   clearReveal: () => void;
+  flashPromptSuccess: () => void;
 
   // 纯本地 UI 状态
   setPending: (v: boolean) => void;
@@ -162,6 +166,7 @@ export const useGameStore = create<GameStore>()(
     logLines: [],
     lastLogTick: -1,
     reveal: null,
+    promptFlash: 0,
     isPending: false,
     isGameOver: false,
     winnerIsMe: false,
@@ -219,6 +224,7 @@ export const useGameStore = create<GameStore>()(
       }),
 
     clearReveal: () => set((s) => { s.reveal = null; }),
+    flashPromptSuccess: () => set((s) => { s.promptFlash = s.promptFlash + 1; }),
 
     setPending: (v) => set((s) => { s.isPending = v; }),
     setSelectedHand: (idx) => set((s) => {

@@ -167,7 +167,7 @@
   },
   "EB03-016": {
     "_name": "光月日和",
-    "_matcher": "登场时领袖为光月御殿抽1(leaderNameEquals)；启动主要以自身进废弃为成本，为含和之国特征的领袖补1张休息咚(RefreshDon rest)。",
+    "_matcher": "登场时领袖为光月御殿抽1；启动主要自身进废弃为成本，给含《和之国》特征的领袖贴1张休息咚(反馈#230:原leaderHasProperty查属性字段恒false+RefreshDon是补咚非贴咚,双重错)。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -188,13 +188,14 @@
         "selfToTrash": true
       },
       "if": {
-        "leaderHasProperty": "和之国"
+        "leaderHasKeyword": "和之国"
       },
       "then": [
         {
-          "op": "RefreshDon",
+          "op": "AttachDon",
+          "target": "selfLeader",
           "n": 1,
-          "state": "rest"
+          "from": "rest"
         }
       ]
     }

@@ -74,8 +74,9 @@ public class OP16_021_MobyDick : IScriptedEffect
             "莫比·迪克号【启动主要】：将此舞台放置到废弃区，赋予我方1张领袖或角色1张休息状态的咚!!？");
         if (!use) return;
 
-        // 是否有可给的咚（活跃或休息）
-        bool hasDon = me.CostArea.Any(d => d.State == DonState.Active || d.State == DonState.Rest);
+        // 卡面限定"休息状态的咚!!"：只查休息咚，不做活跃回退（反馈#214——附活跃咚等于白亏一费，
+        // 与 AttachDonFromCost 的"严格按 fromState 取咚"规范一致，见 ST17-004 修复记录）
+        bool hasDon = me.CostArea.Any(d => d.State == DonState.Rest);
 
         // 成本：将本舞台移入废弃区
         if (me.StageCard is not null && me.StageCard.Id == self.Id)
@@ -95,7 +96,6 @@ public class OP16_021_MobyDick : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = targets.First(c => c.Id.ToString() == chosen[0]);
-        int n = AtomicOps.AttachDonFromCost(me, target.Id, 1, DonState.Active);
-        if (n == 0) AtomicOps.AttachDonFromCost(me, target.Id, 1, DonState.Rest);
+        AtomicOps.AttachDonFromCost(me, target.Id, 1, DonState.Rest);
     }
 }

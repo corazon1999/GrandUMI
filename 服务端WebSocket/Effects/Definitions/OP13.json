@@ -26,13 +26,14 @@
             "match": {
               "anyOf": [
                 {
-                  "keyword": "阿拉巴斯坦王国"
+                  "keyword": "阿拉巴斯坦王国",
+                  "originalCostGte": 2
                 },
                 {
-                  "keyword": "草帽一伙"
+                  "keyword": "草帽一伙",
+                  "originalCostGte": 2
                 }
-              ],
-              "originalCostGte": 2
+              ]
             }
           }
         ]

@@ -23,6 +23,9 @@ public class OP14_027_Jacks : IScriptedEffect
 
     public async Task Resolve(EffectContext ctx)
     {
+        // 攻击/阻挡宣言的横置(reason=attack/block)不触发——本卡为「因效果转为休息」类（#227 引擎补派发后须显式过滤；reason 缺席=旧效果派发路径，放行）
+        if (ctx.Vars.TryGetValue("reason", out var __restReason) && __restReason as string != "effect") return;
+
         var self = ctx.Source;
         var selfId = self.Id;
         int owner = ctx.OwnerIndex;

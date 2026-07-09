@@ -9,6 +9,7 @@ import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
 import PromptOverlay from "@/components/game/PromptOverlay";
+import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
 import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
 import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
@@ -56,6 +57,7 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
       {!isObserver && !isPlayback && <MulliganOverlay />}
       {!isObserver && !isPlayback && <PromptOverlay />}
+      {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
       {!isObserver && !isPlayback && <GameMenu />}
       {!isObserver && !isPlayback && <GMPanel />}

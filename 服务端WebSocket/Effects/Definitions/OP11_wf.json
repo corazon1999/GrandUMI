@@ -706,7 +706,8 @@
           {
             "op": "RefreshDon",
             "n": 1,
-            "state": "rest"
+            "state": "rest",
+            "optional": true
           }
         ]
       }
@@ -738,7 +739,7 @@
   },
   "OP11-070": {
     "_name": "夏洛特·布玲",
-    "_matcher": "登场时确认顶5公开1张费用≥2的大妈海盗团加手牌；启动主要仅'确认对方卡组顶1张'无可表达收益op，故仅实现登场时检索。",
+    "_matcher": "登场时确认顶5公开1张费用≥2的大妈海盗团加手牌；启动主要(咚-1+转休息)确认对方卡组顶1张(反馈#176,新增LookOppTop op)。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -757,7 +758,13 @@
           }
         ]
       }
-    ]
+    ],
+    "activated": {
+      "cost": { "donReturn": 1, "restSelf": true },
+      "then": [
+        { "op": "LookOppTop", "count": 1 }
+      ]
+    }
   },
   "OP11-075": {
     "_name": "哈古瓦尔·D·萨乌罗",

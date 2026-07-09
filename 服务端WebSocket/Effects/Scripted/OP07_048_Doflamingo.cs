@@ -62,11 +62,7 @@ public class OP07_048_Doflamingo : IScriptedEffect
                 // 从卡组取出该卡，以休息状态登场（卡组无对应免费登场原子，手动入场）
                 me.Deck.Remove(top);
                 if (me.Characters.Count >= 5)
-                {
-                    var sacrifice = me.Characters[0];
-                    me.Characters.RemoveAt(0);
-                    me.Trash.Add(sacrifice);
-                }
+                    AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 top.TurnPlayed = ctx.State.TurnCount;
                 top.IsTapped = true; // 休息状态登场
                 me.Characters.Add(top);

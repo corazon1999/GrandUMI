@@ -49,11 +49,7 @@ public class OP06_003_Ivankov : IScriptedEffect
                 me.Deck.Remove(picked);
                 // 从卡组顶登场角色（与 PlayFromHandFree 角色登场逻辑一致）
                 if (me.Characters.Count >= 5)
-                {
-                    var sacrifice = me.Characters[0];
-                    me.Characters.RemoveAt(0);
-                    me.Trash.Add(sacrifice);
-                }
+                    AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 picked.TurnPlayed = ctx.State.TurnCount;
                 me.Characters.Add(picked);
             }

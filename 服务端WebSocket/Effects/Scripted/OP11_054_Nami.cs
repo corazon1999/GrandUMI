@@ -33,6 +33,7 @@ public class OP11_054_Nami : IScriptedEffect
 
         // 将 2 张手牌自选顺序放到卡组顶/底
         int count = Math.Min(2, me.Hand.Count);
+        int placedTop = 0;   // 已放到卡组顶的张数，用于保序：先选的在更上方（避免二次 Insert(0) 反转，反馈 #197）
         for (int i = 0; i < count; i++)
         {
             var hand = me.Hand.ToList();
@@ -54,7 +55,7 @@ public class OP11_054_Nami : IScriptedEffect
                 "将该牌放到卡组最上方还是最下方？", new[] { "卡组最上方", "卡组最下方" });
 
             me.Hand.Remove(card);
-            if (where == 0) me.Deck.Insert(0, card);
+            if (where == 0) me.Deck.Insert(placedTop++, card);   // 放顶时按选择次序保序，先选的更靠上
             else me.Deck.Add(card);
         }
     }

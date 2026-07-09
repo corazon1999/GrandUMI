@@ -20,7 +20,7 @@
   },
   "OP06-007": {
     "_name": "",
-    "_matcher": "登场时KO对方1张力量≤10000的角色，Choose对方角色+originalPowerLte:10000过滤后KO。",
+    "_matcher": "登场时KO对方1张力量≤10000的角色;力量按当前口径currentPowerLte(反馈#215)。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -30,9 +30,10 @@
             "op": "Choose",
             "prompt": "OpponentCharacter",
             "filter": {
-              "originalPowerLte": 10000
+              "currentPowerLte": 10000
             },
             "max": 1,
+            "min": 0,
             "as": "$tgt"
           },
           {

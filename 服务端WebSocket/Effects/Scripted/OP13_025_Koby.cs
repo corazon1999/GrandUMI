@@ -25,7 +25,7 @@ public class OP13_025_Koby : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 我方领袖拥有《FILM》特征 或 属性（打）
-        bool ok = me.Leader.Info.HasKeyword("FILM") || me.Leader.Info.Property == "打";
+        bool ok = me.Leader.Info.HasKeyword("FILM") || me.Leader.Info.Property.Split('/').Contains("打");
         if (!ok) return Task.CompletedTask;
 
         // 将我方最多 1 张休息状态的咚!! 转为活跃状态

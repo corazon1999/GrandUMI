@@ -6,6 +6,18 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
 import ChatPanel from "./ChatPanel";
 
+// 从导出卡组码（exportDeckString 格式 A）统计主卡组张数：
+// 卡牌行形如「<数量> <卡号>」，跳过「# 注释」与「领航:」行。
+// 解析不出（返回 0）时按「未知」处理，调用方 fail-open，避免误拦合法卡组。
+function countMainCards(deckStr: string): number {
+  let total = 0;
+  for (const line of deckStr.split("\n")) {
+    const m = line.match(/^\s*(\d+)\s+[A-Za-z]/);
+    if (m) total += parseInt(m[1], 10);
+  }
+  return total;
+}
+
 export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const matchState    = useNetStore((s) => s.matchState);
   const selectedDeck  = useNetStore((s) => s.selectedDeck);
@@ -17,6 +29,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [joinInput, setJoinInput] = useState("");
   const [copied, setCopied] = useState(false);
   const [botGoFirst, setBotGoFirst] = useState(true);
+
+  // 主卡组须恰好 50 张（后端 DeckValidator 强制，不满会被拒，bug #183）。
+  // 这里前置拦截：未满 50 时置灰按钮并提示，避免「点了没反应」。
+  // mainCount === 0 表示解析失败/未知，fail-open 不拦截，交由后端校验兜底。
+  const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
+  const deckIncomplete = mainCount > 0 && mainCount !== 50;
+  const canEnter      = !!selectedDeck && !deckIncomplete;
 
   const handleMatch = () => {
     if (!selectedDeck) return;
@@ -90,10 +109,29 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                 <span className="text-gray-400 text-xs">已选卡组</span>
                 <span className="text-orange-400 text-[10px] font-bold">已就绪</span>
               </div>
-              <p className="text-white text-sm font-bold">{selectedDeck.name}</p>
-              <p className="text-gray-500 text-xs">
-                领航：{selectedDeck.leaderName}
-              </p>
+              <div className="flex items-center gap-3">
+                {/* 领航头像 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selectedDeck.leaderSprite || "/sprites/CardBack.png"}
+                  alt={selectedDeck.leaderName}
+                  className="w-10 h-14 object-cover rounded border border-gray-600 shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/sprites/CardBack.png";
+                  }}
+                />
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-bold truncate">{selectedDeck.name}</p>
+                  <p className="text-gray-500 text-xs truncate">
+                    领航：{selectedDeck.leaderName}
+                  </p>
+                </div>
+              </div>
+              {deckIncomplete && (
+                <p className="text-red-400 text-xs font-bold">
+                  卡组需 50 张（当前 {mainCount} 张），请补满后再进入对战
+                </p>
+              )}
             </div>
           ) : (
             <div className="text-center py-2">
@@ -113,9 +151,9 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleMatch}
-                disabled={!selectedDeck}
+                disabled={!canEnter}
                 className={`px-10 py-3 rounded-xl text-lg font-bold transition-all ${
-                  selectedDeck
+                  canEnter
                     ? "bg-orange-500 hover:bg-orange-400 text-white hover:scale-105 active:scale-95"
                     : "bg-gray-800 text-gray-600 cursor-not-allowed"
                 }`}
@@ -125,10 +163,10 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
               <div className="flex flex-col items-center gap-2">
                 <button
                   onClick={handleBotMatch}
-                  disabled={!selectedDeck}
+                  disabled={!canEnter}
                   title="与机器人对战，机器人轮到自己会自动结束回合，方便测试单卡效果"
                   className={`px-8 py-3 rounded-xl text-lg font-bold transition-all ${
-                    selectedDeck
+                    canEnter
                       ? "bg-sky-600 hover:bg-sky-500 text-white hover:scale-105 active:scale-95"
                       : "bg-gray-800 text-gray-600 cursor-not-allowed"
                   }`}
@@ -190,9 +228,9 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             <div className="flex gap-3">
               <button
                 onClick={handleCreateRoom}
-                disabled={!selectedDeck}
+                disabled={!canEnter}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  selectedDeck
+                  canEnter
                     ? "bg-blue-600 hover:bg-blue-500 text-white"
                     : "bg-gray-800 text-gray-600 cursor-not-allowed"
                 }`}
@@ -201,9 +239,9 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
               </button>
               <button
                 onClick={handleJoinRoom}
-                disabled={!selectedDeck}
+                disabled={!canEnter}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  selectedDeck
+                  canEnter
                     ? "bg-green-600 hover:bg-green-500 text-white"
                     : "bg-gray-800 text-gray-600 cursor-not-allowed"
                 }`}

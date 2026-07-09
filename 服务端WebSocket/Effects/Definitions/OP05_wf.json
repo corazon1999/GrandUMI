@@ -371,7 +371,7 @@
   },
   "OP05-019": {
     "_name": "",
-    "_matcher": "主要对方角色-4000;但'之后我方生命≤2则KO力量≤0角色'的连锁需基于减后力量判定的二段KO,DSL无法表达该联动,仅实现-4000部分,KO段从略(reason注明)",
+    "_matcher": "主要对方角色-4000;之后我方生命≤2则KO对方1张当前力量≤0角色(反馈#209,步骤级if+currentPowerLte已支持);触发同主要",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -386,6 +386,24 @@
           "op": "AddPowerThisTurn",
           "target": "$tgt",
           "delta": -4000
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$ko",
+          "if": {
+            "ownLifeCountLte": 2
+          },
+          "filter": {
+            "currentPowerLte": 0
+          },
+          "text": "我方生命不多于2张：将对方最多1张力量不高于0的角色KO"
+        },
+        {
+          "op": "KO",
+          "target": "$ko"
         }
       ]
     },
@@ -401,6 +419,24 @@
         "op": "AddPowerThisTurn",
         "target": "$tgt",
         "delta": -4000
+      },
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$ko",
+        "if": {
+          "ownLifeCountLte": 2
+        },
+        "filter": {
+          "currentPowerLte": 0
+        },
+        "text": "我方生命不多于2张：将对方最多1张力量不高于0的角色KO"
+      },
+      {
+        "op": "KO",
+        "target": "$ko"
       }
     ]
   },

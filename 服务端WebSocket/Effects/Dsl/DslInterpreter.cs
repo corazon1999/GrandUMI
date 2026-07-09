@@ -74,6 +74,10 @@ public static class DslInterpreter
             int n = 0;
             foreach (var (k, v) in dict)
             {
+                // 占位条目（仅 complex/noEffect 标记、无真实效果键）不得覆盖已加载的真实定义。
+                // 定义目录按 Directory.GetFiles 枚举顺序加载，该顺序在 Linux 生产机不保证字母序，
+                // 占位文件(如 *_gap.json)可能后加载冲掉真实定义(如 *_wf.json)，导致线上卡效失效。
+                if (_defs.ContainsKey(k) && IsPlaceholderDef(v)) continue;
                 _defs[k] = v;
                 n++;
             }
@@ -85,6 +89,19 @@ public static class DslInterpreter
             Console.Error.WriteLine($"[DSL] 加载 {path} 失败: {ex.Message}");
             return 0;
         }
+    }
+
+    /// <summary>判断定义条目是否为"占位"（仅含 complex/noEffect 标记、无任何真实效果键）。
+    /// 占位用于标记"已知但未实现/无效果"的卡，不应覆盖其它文件里的真实定义。</summary>
+    static bool IsPlaceholderDef(JsonElement v)
+    {
+        if (v.ValueKind != JsonValueKind.Object) return false;
+        if (v.TryGetProperty("triggers", out _) || v.TryGetProperty("trigger", out _)
+            || v.TryGetProperty("activated", out _) || v.TryGetProperty("main", out _)
+            || v.TryGetProperty("counter", out _)) return false;
+        bool complex  = v.TryGetProperty("complex",  out var c)  && c.ValueKind  == JsonValueKind.True;
+        bool noEffect = v.TryGetProperty("noEffect", out var ne) && ne.ValueKind == JsonValueKind.True;
+        return complex || noEffect;
     }
 
     public static async Task<bool> TryResolve(EffectContext ctx)
@@ -202,6 +219,20 @@ public static class DslInterpreter
     static async Task<bool> PayActivationCost(JsonElement node, EffectContext ctx)
     {
         if (!node.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) return true;
+        // 标记"正在支付成本"：成本丢手牌不算"因效果丢弃"（如 OP12-040 青雉只吃效果丢弃）
+        EffectRuntime.PayingCost = true;
+        try
+        {
+            return await PayActivationCostCore(cost, ctx);
+        }
+        finally
+        {
+            EffectRuntime.PayingCost = false;
+        }
+    }
+
+    static async Task<bool> PayActivationCostCore(JsonElement cost, EffectContext ctx)
+    {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // donReturn: 咚!!-N（将指定数量的咚放回咚卡组，可放回任意状态：活跃/休息/附着）
@@ -222,8 +253,12 @@ public static class DslInterpreter
         // selfToTrash: 把自身放置到废弃区
         if (cost.TryGetProperty("selfToTrash", out var st) && st.ValueKind == JsonValueKind.True)
         {
-            // 自送废弃：从场上移除，不触发 KO
+            // 自送废弃：从场上移除，不触发 KO；但属"离开场上"，须派发离场 watcher
+            // （反馈#224：OP16-056 自弃后 OP16-041 巴奇领袖"离场时"效果收不到事件）
             BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, ctx.Source);
+            if (ctx.Source.Info.Kind == CardKind.Character)
+                EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+                    new Dictionary<string, object?> { ["cardId"] = ctx.Source.Id.ToString(), ["owner"] = ctx.OwnerIndex });
         }
 
         // handDiscard: 丢弃我方 N 张手牌作为成本。
@@ -368,6 +403,9 @@ public static class DslInterpreter
             if (chosen.Count == 0) return false;
             var picked = cands.First(c => c.Id.ToString() == chosen[0]);
             BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, picked);
+            // 成本离场同属"离开场上"，派发离场 watcher（反馈#224 同类缺口）
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+                new Dictionary<string, object?> { ["cardId"] = picked.Id.ToString(), ["owner"] = ctx.OwnerIndex });
         }
 
         // lifeFaceUp: 将我方生命区最上方 1 张翻至正面朝上作为成本（"可以将生命顶1张翻正：…"）。已正面/生命空则无法支付。
@@ -531,7 +569,9 @@ public static class DslInterpreter
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         if (cost.TryGetProperty("donReturn", out var dr) && dr.ValueKind == JsonValueKind.Number)
-            if (me.ActiveDonCount < dr.GetInt32()) return false;
+            // donReturn 实际支付走 PromptReturnDonToDeck，可放回活跃/休息/附着任意咚，
+            // 故预检口径须用费用区总咚数而非仅活跃咚，否则高费角色登场后效果被误判不可支付而静默跳过。
+            if (me.TotalDonInCostArea < dr.GetInt32()) return false;
 
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
             if (ctx.Source.IsTapped) return false;
@@ -659,7 +699,8 @@ public static class DslInterpreter
                     if (!me.Leader.Info.NameIs(p.Value.GetString() ?? "")) return false;
                     break;
                 case "leaderHasProperty":
-                    if (me.Leader.Info.Property != (p.Value.GetString() ?? "")) return false;
+                    // 多属性卡（如"斩/打"）按 / 拆分匹配，精确比较会漏掉（反馈#225）
+                    if (!me.Leader.Info.Property.Split('/').Contains(p.Value.GetString() ?? "")) return false;
                     break;
                 case "leaderColorIncludes":
                     if (!ColorMatches(me.Leader, p.Value.GetString() ?? "")) return false;
@@ -803,6 +844,10 @@ public static class DslInterpreter
                     // 对方场上存在当前力量 ≥ N 的角色
                     if (!opp.Characters.Any(c => s.CurrentPowerOf(1 - ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
                     break;
+                case "ownHasCharWithKeyword":
+                    // 我方场上存在拥有指定特征的角色（如 OP16-076 反击段"存在《大将》角色"）
+                    if (!me.Characters.Any(c => c.Info.HasKeyword(p.Value.GetString() ?? ""))) return false;
+                    break;
                 case "boardHasCharCostLte":
                     // 场上（双方）存在原本费用 ≤ N 的角色（“场上存在费用为0的角色”用 0）
                     if (!me.Characters.Concat(opp.Characters).Any(c => c.Info.Cost <= p.Value.GetInt32())) return false;
@@ -830,6 +875,8 @@ public static class DslInterpreter
         if (steps.ValueKind != JsonValueKind.Array) return;
         foreach (var step in steps.EnumerateArray())
         {
+            // 步骤级条件：op 节点带 "if" 时不满足则跳过该步（对应卡面"之后，X的场合…"分句，如 OP05-019）
+            if (!CheckCondition(step, ctx)) continue;
             await RunOp(step, ctx);
             if (ctx.State.IsGameOver) return;
         }
@@ -852,21 +899,64 @@ public static class DslInterpreter
                 break;
             case "AddPowerThisTurn":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null) AtomicOps.AddPowerThisTurn(target, GetInt(op, "delta", 0));
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.AddPowerThisTurn(target, GetInt(op, "delta", 0));
                     break;
                 }
             case "AddPowerThisBattle":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null) AtomicOps.AddPowerThisBattle(target, GetInt(op, "delta", 0));
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.AddPowerThisBattle(target, GetInt(op, "delta", 0));
                     break;
                 }
             case "AddPowerUntilOppEnd":
                 {
                     // 力量±N "直到下个对方的结束阶段结束时为止"（如 OP16-065 对方角色力量-6000）
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null) AtomicOps.AddPowerUntilOppEnd(target, GetInt(op, "delta", 0), ctx.OwnerIndex);
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.AddPowerUntilOppEnd(target, GetInt(op, "delta", 0), ctx.OwnerIndex);
+                    break;
+                }
+            // 「原本的力量变为 N」（本回合）：写 OriginalPowerOverride，咚/加成照常叠加；回合末自动清。
+            // 区别于 SetPower（"当前总力量变为N"差值法，会吞掉咚加成）。如 OP16-106。
+            case "SetOriginalPower":
+                {
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        target.OriginalPowerOverride = GetInt(op, "value", 0);
+                    break;
+                }
+            // 「我方所有符合过滤的角色原本力量变为 N」（本回合），如 OP16-058 囚犯全体变7000
+            case "SetOriginalPowerAll":
+                {
+                    var sopPred = BuildMatchPredicate(op.TryGetProperty("filter", out var sopF) ? sopF : default);
+                    foreach (var c in me.Characters.Where(sopPred))
+                        c.OriginalPowerOverride = GetInt(op, "value", 0);
+                    break;
+                }
+            // 「原本的力量变为 N，直到下个对方的结束阶段结束时为止」：以 delta = N - 卡面Power 经
+            // AddPowerUntilOppEnd 近似（与库内"变为X"持续实现惯例一致）。如 ST26-005 草帽领袖变7000。
+            case "SetOriginalPowerUntilOppEnd":
+                {
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.AddPowerUntilOppEnd(target, GetInt(op, "value", 0) - target.Info.Power, ctx.OwnerIndex);
+                    break;
+                }
+            // 「对方将其 N 张手牌放回卡组最下方」（对方自选，如 EB04-025）。手牌不足时按实有张数。
+            case "OppHandToDeckBottom":
+                {
+                    int ohn = Math.Min(GetInt(op, "n", 1), opp.Hand.Count);
+                    if (ohn == 0) break;
+                    var ohExtra = new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = opp.Hand.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    };
+                    var ohChosen = await ctx.Prompts.ChooseCards(1 - ctx.OwnerIndex, "OwnHand",
+                        $"将你的 {ohn} 张手牌放回卡组最下方",
+                        opp.Hand.Select(c => c.Id.ToString()).ToList(), ohn, ohn, ohExtra);
+                    foreach (var cid in ohChosen)
+                    {
+                        var picked = opp.Hand.FirstOrDefault(c => c.Id.ToString() == cid);
+                        if (picked is not null) AtomicOps.ReturnHandToDeckBottom(opp, picked);
+                    }
                     break;
                 }
             case "KO":
@@ -877,6 +967,23 @@ public static class DslInterpreter
                         int owner = FindOwner(s, target);
                         // 走异步效果KO：含 PreKO/守护者置换/受害者OnKO + KO来源标记（覆盖绝大多数效果KO）
                         if (owner >= 0) await AtomicOps.KOByEffectAsync(s, owner, target, ctx.Prompts, ctx.OwnerIndex);
+                    }
+                    break;
+                }
+            // 「将…放置到废弃区」（如 OP09-009）：非 KO——不触发【K.O.时】/PreKO/守护者置换/"不会被KO"保护，
+            // 但仍受"不会离场"保护约束并派发离场 watcher。
+            case "TrashTarget":
+                {
+                    var target = ResolveTarget(op, "target", ctx);
+                    if (target is not null)
+                    {
+                        int owner = FindOwner(s, target);
+                        if (owner >= 0 && !s.IsLeaveGuarded(target, "effect"))
+                        {
+                            BattleEngine.KOCard(s, owner, target);
+                            EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+                                new Dictionary<string, object?> { ["cardId"] = target.Id.ToString(), ["owner"] = owner });
+                        }
                     }
                     break;
                 }
@@ -943,7 +1050,14 @@ public static class DslInterpreter
                     var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, promptKind, text,
                         candidates.Select(c => c.Id.ToString()).ToList(), min, max, chExtra);
                     var varName = op.TryGetProperty("as", out var v) ? v.GetString() : "$tgt";
-                    if (chosen.Count > 0)
+                    if (max > 1)
+                    {
+                        // 多选（最多N张）：存 List，消费端经 ResolveTargets 逐个应用（如 OP16-076 选最多3张各+2000）
+                        ctx.Vars[varName!] = chosen
+                            .Select(id => candidates.FirstOrDefault(c => c.Id.ToString() == id))
+                            .Where(c => c is not null).Cast<CardInstance>().ToList();
+                    }
+                    else if (chosen.Count > 0)
                     {
                         var picked = candidates.First(c => c.Id.ToString() == chosen[0]);
                         ctx.Vars[varName!] = picked;
@@ -980,7 +1094,16 @@ public static class DslInterpreter
                 {
                     var state = op.TryGetProperty("state", out var st) && st.GetString() == "rest"
                         ? DonState.Rest : DonState.Active;
-                    AtomicOps.RefreshDonFromDeck(me, GetInt(op, "n", 1), state);
+                    int rdn = GetInt(op, "n", 1);
+                    // optional:true → 卡面"追加最多N张"，玩家可选择不追加（如"不跳咚"）。
+                    bool rdOptional = op.TryGetProperty("optional", out var rdo) && rdo.ValueKind == JsonValueKind.True;
+                    if (rdOptional)
+                    {
+                        if (me.DonDeck.Count == 0 || me.TotalDonInCostArea >= TurnEngine.MaxDonInCostArea) break;
+                        var rdText = op.TryGetProperty("text", out var rdt) ? rdt.GetString() : null;
+                        if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, rdText ?? $"是否从咚!!卡组追加{rdn}张咚!!？")) break;
+                    }
+                    AtomicOps.RefreshDonFromDeck(me, rdn, state);
                     break;
                 }
             case "ReturnToDeckBottom":
@@ -1141,6 +1264,24 @@ public static class DslInterpreter
                             if (card is not null) AtomicOps.DiscardHand(opp, card);
                         }
                     }
+                    break;
+                }
+            // ── 反馈#176：确认对方卡组最上方 count 张（私下、仅发动方可见，无后续操作）──
+            //    复用通用 ChooseCards 只读展示通道：validChoices 留空(不可选)，choiceCards 携带牌面，
+            //    快照按 PlayerIndex 过滤 extra → 只有发动方能看到牌面，对手看不到（"确认"语义）。
+            case "LookOppTop":
+                {
+                    int count = GetInt(op, "count", 1);
+                    int peek = Math.Min(count, opp.Deck.Count);
+                    if (peek == 0) break;
+                    var top = opp.Deck.Take(peek).ToList();
+                    var extra = new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    };
+                    // validChoices 空 + min/max=0 → 前端渲染为"仅供确认、不可选"的卡图，带跳过/确认按钮关闭。
+                    await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookOppTop",
+                        $"确认对方卡组最上方的 {peek} 张卡牌", new List<string>(), 0, 0, extra);
                     break;
                 }
             case "ShuffleDeck":
@@ -1326,6 +1467,43 @@ public static class DslInterpreter
                     }
                     break;
                 }
+            // 从"手牌或废弃区"合并候选按 filter 选最多 1 张角色免费登场，按卡实际所在区走对应登场路径。
+            // 对应「将手牌或废弃区中最多1张…角色登场」句式(如 OP14-091)。
+            case "PlayCharFromHandOrTrash":
+                {
+                    var pred = BuildMatchPredicate(op.TryGetProperty("filter", out var f) ? f : default);
+                    var handCands = me.Hand.Where(c => c.Info.Kind == CardKind.Character).Where(pred).ToList();
+                    var trashCands = me.Trash.Where(c => c.Info.Kind == CardKind.Character).Where(pred).ToList();
+                    var cands = handCands.Concat(trashCands).ToList();
+                    if (cands.Count == 0) break;
+                    bool rest = op.TryGetProperty("rest", out var rv) && rv.ValueKind == JsonValueKind.True;
+                    var text = op.TryGetProperty("text", out var tx) ? tx.GetString() ?? "从手牌或废弃区登场最多1张角色" : "从手牌或废弃区登场最多1张角色";
+                    var extra = new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = cands.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    };
+                    var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "PlayCharFromHandOrTrash", text,
+                        cands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
+                    if (chosen.Count > 0)
+                    {
+                        var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
+                        if (picked is not null)
+                        {
+                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
+                            bool fromHand = handCands.Any(c => c.Id == picked.Id);
+                            if (fromHand)
+                            {
+                                AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
+                                if (rest) AtomicOps.RestCard(picked);
+                            }
+                            else
+                            {
+                                AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
+                            }
+                        }
+                    }
+                    break;
+                }
         }
     }
 
@@ -1431,16 +1609,22 @@ public static class DslInterpreter
             {
                 if (!ColorMatches(c, col.GetString() ?? "")) return false;
             }
-            // property: 属性（斩/打/特/知/…），完全匹配
+            // property: 属性（斩/打/特/知/…）。多属性卡形如"斩/打"，按 / 拆分匹配（反馈#225：精确比较漏双属性卡）
             if (node.TryGetProperty("property", out var prop))
             {
-                if (c.Info.Property != (prop.GetString() ?? "")) return false;
+                if (!c.Info.Property.Split('/').Contains(prop.GetString() ?? "")) return false;
             }
             if (node.TryGetProperty("originalCostLte", out var oc) && c.Info.Cost > oc.GetInt32()) return false;
             if (node.TryGetProperty("originalCostGte", out var oc2) && c.Info.Cost < oc2.GetInt32()) return false;
             if (node.TryGetProperty("originalPowerLte", out var pp) && c.Info.Power > pp.GetInt32()) return false;
             if (node.TryGetProperty("originalPowerGte", out var pp2) && c.Info.Power < pp2.GetInt32()) return false;
+            // currentPowerLte/Gte: 按"当前力量"判定（卡面「力量X以下」未写"原本的"时的默认口径）。
+            // 场上卡走 CurrentPowerOf（含贴咚/回合加成/持续光环），非场上候选回退原本力量。
+            if (node.TryGetProperty("currentPowerLte", out var cpl) && CurrentPowerOfCard(c) > cpl.GetInt32()) return false;
+            if (node.TryGetProperty("currentPowerGte", out var cpg) && CurrentPowerOfCard(c) < cpg.GetInt32()) return false;
             if (node.TryGetProperty("nameEquals", out var nm) && !c.MatchesName(nm.GetString() ?? "")) return false;
+            // excludeName: 排除指定卡名（对应「…以外的角色」，如 OP14-091「Mr.2·冯·克雷以外」排除自身同名）
+            if (node.TryGetProperty("excludeName", out var exn) && c.MatchesName(exn.GetString() ?? "")) return false;
             // keywordContains: 特征"包含"指定子串（对应「特征中包含〈X〉」语义，区别于精确匹配的 keyword）
             if (node.TryGetProperty("keywordContains", out var kwc))
             {
@@ -1459,6 +1643,16 @@ public static class DslInterpreter
             }
             return true;
         };
+    }
+
+    /// <summary>该卡的"当前力量"：在场上按 CurrentPowerOf（含贴咚/加成/光环），不在场回退原本力量。
+    /// 供 currentPowerLte/Gte 过滤键使用；经 EffectRuntime.CurrentState 取 ambient 对局。</summary>
+    static int CurrentPowerOfCard(CardInstance c)
+    {
+        var st = EffectRuntime.CurrentState;
+        if (st is null) return c.Info.Power;
+        int side = st.SideOf(c);
+        return side >= 0 ? st.CurrentPowerOf(side, c) : c.Info.Power;
     }
 
     /// <summary>
@@ -1508,7 +1702,10 @@ public static class DslInterpreter
         var name = t.GetString() ?? "";
         if (name.StartsWith("$"))
         {
-            return ctx.Vars.TryGetValue(name, out var v) ? v as CardInstance : null;
+            if (!ctx.Vars.TryGetValue(name, out var v)) return null;
+            // 多选 Choose 存的是 List：单目标消费端取第一个（兼容误配）
+            if (v is List<CardInstance> list) return list.FirstOrDefault();
+            return v as CardInstance;
         }
         return name switch
         {
@@ -1517,6 +1714,19 @@ public static class DslInterpreter
             "oppLeader"   => ctx.State.Players[1 - ctx.OwnerIndex].Leader,
             _ => null,
         };
+    }
+
+    /// <summary>目标解析（多目标版）：$var 为 List 时全量返回；单卡包装成单元素列表。供 AddPower 系 op 支持"最多N张各±X"。</summary>
+    static List<CardInstance> ResolveTargets(JsonElement op, string key, EffectContext ctx)
+    {
+        if (op.TryGetProperty(key, out var t) && t.ValueKind == JsonValueKind.String)
+        {
+            var name = t.GetString() ?? "";
+            if (name.StartsWith("$") && ctx.Vars.TryGetValue(name, out var v) && v is List<CardInstance> list)
+                return list;
+        }
+        var single = ResolveTarget(op, key, ctx);
+        return single is null ? new List<CardInstance>() : new List<CardInstance> { single };
     }
 
     static int FindOwner(GameState s, CardInstance c)
@@ -1553,6 +1763,7 @@ public static class DslInterpreter
             "OwnTrashEvent"               => me.Trash.Where(c => c.Info.Kind == CardKind.Event).ToList(),
             "OwnTrash"                    => me.Trash.ToList(),
             "OwnStage"                    => me.StageCard is { } sc ? new List<CardInstance> { sc } : new(),
+            "OpponentStage"               => opp.StageCard is { } osc ? new List<CardInstance> { osc } : new(),
             "AnyStage"                    => new[] { me.StageCard, opp.StageCard }.Where(c => c is not null).Cast<CardInstance>().ToList(),
             "OpponentCharacterCostLe5"    => opp.Characters.Where(c => c.Info.Cost <= 5).ToList(),
             // C2 看对手私有区域：候选 ID 仍是卡 GUID，但仅向查看方暴露

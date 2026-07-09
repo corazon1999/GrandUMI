@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import HandArea from "@/components/game/HandArea";
 import FieldArea from "@/components/game/FieldArea";
 import LeaderCard from "@/components/game/LeaderCard";
@@ -109,18 +110,60 @@ const TURN_FLOW = ["Reset", "Draw", "Don", "Main", "End"];
 // 战斗子流程（攻击宣言后显示后端真实的 4 个步骤）
 const BATTLE_FLOW = ["Attack", "Block", "Counter", "Damage"];
 const BATTLE_PHASES = new Set(BATTLE_FLOW);
+// #238 每回合倒计时基准秒数（纯前端提示，不判负；后端无权威计时）
+const TURN_SECONDS = 300;
+
+// #238 回合倒计时徽章：每次 turnCount 变化即从 TURN_SECONDS 重新倒数；仅对局中（live）走秒
+function TurnTimer({ turnCount, live }: { turnCount: number; live: boolean }) {
+  const [remain, setRemain] = useState(TURN_SECONDS);
+
+  // 回合切换即重置（turnCount 由后端权威快照驱动，天然与实际回合对齐）
+  useEffect(() => {
+    setRemain(TURN_SECONDS);
+  }, [turnCount]);
+
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => {
+      setRemain((r) => (r > 0 ? r - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [live, turnCount]);
+
+  const mm = Math.floor(remain / 60);
+  const ss = remain % 60;
+  const low = remain <= 30;
+  return (
+    <span
+      className={[
+        "shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-black tabular-nums",
+        low
+          ? "bg-red-500/25 text-red-200 ring-1 ring-red-400/50"
+          : "bg-slate-700/50 text-slate-200 ring-1 ring-white/10",
+      ].join(" ")}
+      title="本回合计时（前端提示，不判负）"
+    >
+      ⏱ {mm}:{ss.toString().padStart(2, "0")}
+    </span>
+  );
+}
 
 function PhaseTrack({
   currentTurn,
   phase,
+  turnCount,
+  live,
 }: {
   currentTurn: boolean;
   phase: string;
+  turnCount: number;
+  live: boolean;
 }) {
   const inBattle = BATTLE_PHASES.has(phase);
   const flow = inBattle ? BATTLE_FLOW : TURN_FLOW;
   return (
     <div className="flex shrink-0 items-center justify-center gap-2 py-0.5">
+      <TurnTimer turnCount={turnCount} live={live} />
       <span
         className={[
           "shrink-0 rounded-md px-2.5 py-1 text-[11px] font-black",
@@ -228,6 +271,7 @@ export default function GameBoard({
 }) {
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
+  const turnCount = useGameStore((s) => s.turnCount);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
 
@@ -259,7 +303,12 @@ export default function GameBoard({
               <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
                 <PlayerMat side="opponent" isObserver={isObserver} isPlayback={isPlayback} />
 
-                <PhaseTrack currentTurn={currentTurn} phase={phase} />
+                <PhaseTrack
+                  currentTurn={currentTurn}
+                  phase={phase}
+                  turnCount={turnCount}
+                  live={!isObserver && !isPlayback}
+                />
 
                 <PlayerMat side="my" isObserver={isObserver} isPlayback={isPlayback} />
               </main>

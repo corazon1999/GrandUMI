@@ -46,11 +46,7 @@ public class OP01_116_SMILE : IScriptedEffect
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 if (me.Characters.Count >= 5)
-                {
-                    var sacrifice = me.Characters[0];
-                    me.Characters.RemoveAt(0);
-                    me.Trash.Add(sacrifice);
-                }
+                    AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 picked.TurnPlayed = ctx.State.TurnCount;
                 me.Characters.Add(picked);
             }

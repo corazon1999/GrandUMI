@@ -624,13 +624,32 @@
   },
   "OP16-058": {
     "_name": "犯人们发起暴动了……",
-    "_matcher": "【反击】本次战斗中我方 +N",
+    "_matcher": "主要:场上10咚时我方所有'因佩尔地狱的囚犯'本回合原本力量变7000(反馈#226补整段,新op SetOriginalPowerAll);反击:我方1张'巴奇'本战斗+4000(补名过滤)",
+    "main": {
+      "if": {
+        "selfDonTotalGte": 10
+      },
+      "then": [
+        {
+          "op": "SetOriginalPowerAll",
+          "value": 7000,
+          "filter": {
+            "nameEquals": "因佩尔地狱的囚犯"
+          }
+        }
+      ]
+    },
     "counter": [
       {
         "op": "Choose",
         "prompt": "OwnLeaderOrCharacter",
         "max": 1,
-        "as": "$tgt"
+        "min": 0,
+        "filter": {
+          "nameEquals": "巴奇"
+        },
+        "as": "$tgt",
+        "text": "本次战斗中，我方最多1张“巴奇”力量+4000"
       },
       {
         "op": "AddPowerThisBattle",
@@ -963,27 +982,51 @@
     ]
   },
   "OP16-076": {
+    "_name": "『三大将』!",
+    "_matcher": "主要:休息3咚,选我方最多3张大将角色各+2000(反馈#236,原AddPowerAll全场含领袖误加成);反击:场上有大将角色时我方1张领袖或角色+4000",
     "main": {
       "cost": {
         "restActiveDon": 3
       },
       "then": [
         {
-          "op": "AddPowerAll",
-          "delta": 2000,
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 3,
+          "min": 0,
           "filter": {
             "keyword": "大将"
-          }
+          },
+          "as": "$t",
+          "text": "选择我方最多3张《大将》角色，本回合力量+2000"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 2000
         }
       ]
     },
-    "counter": [
-      {
-        "op": "AddPowerThisBattle",
-        "target": "selfLeader",
-        "delta": 4000
-      }
-    ]
+    "counter": {
+      "if": {
+        "ownHasCharWithKeyword": "大将"
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t",
+          "text": "本次战斗中，我方最多1张领袖或角色力量+4000"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 4000
+        }
+      ]
+    }
   },
   "OP16-077": {
     "main": {
@@ -1441,43 +1484,134 @@
   },
   "OP16-103": {
     "_name": "旺·奥加",
-    "_matcher": "KO时抽 N",
+    "_matcher": "【对方的回合中】【KO时】领袖含黑胡子海盗团:抽1+对方最多1张领袖或角色本回合力量-3000;【触发】发动同KO时效果",
     "triggers": [
       {
         "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "黑胡子海盗团",
+          "isOppTurn": true
+        },
         "then": [
           {
             "op": "Draw",
             "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$t",
+            "text": "选择对方最多1张领袖或角色，本回合力量-3000"
+          },
+          {
+            "op": "AddPowerThisTurn",
+            "target": "$t",
+            "delta": -3000
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团",
+        "isOppTurn": true
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t",
+          "text": "选择对方最多1张领袖或角色，本回合力量-3000"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": -3000
+        }
+      ]
+    }
   },
   "OP16-104": {
     "_name": "卡特琳·蝶美",
-    "_matcher": "【触发】抽 N",
+    "_matcher": "【触发】抽1并从废弃区登场最多1张费用1《黑胡子海盗团》角色(攻击时改力量效果另属缺口未实现)",
     "trigger": [
       {
         "op": "Draw",
         "n": 1
+      },
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "黑胡子海盗团",
+          "originalCostLte": 1,
+          "originalCostGte": 1
+        },
+        "text": "从废弃区登场最多1张费用1《黑胡子海盗团》角色"
       }
     ]
   },
   "OP16-106": {
     "_name": "圣胡安·恶狼",
-    "_matcher": "KO时抽 N",
+    "_matcher": "【KO时】领袖含黑胡子海盗团:抽1+我方最多1张领袖或角色本回合原本力量变为7000;【触发】发动同KO时效果",
     "triggers": [
       {
         "on": "OnKO",
+        "if": {
+          "leaderHasKeyword": "黑胡子海盗团"
+        },
         "then": [
           {
             "op": "Draw",
             "n": 1
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$t",
+            "text": "选择我方最多1张领袖或角色，本回合原本力量变为7000"
+          },
+          {
+            "op": "SetOriginalPower",
+            "target": "$t",
+            "value": 7000
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "黑胡子海盗团"
+      },
+      "then": [
+        {
+          "op": "Draw",
+          "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$t",
+          "text": "选择我方最多1张领袖或角色，本回合原本力量变为7000"
+        },
+        {
+          "op": "SetOriginalPower",
+          "target": "$t",
+          "value": 7000
+        }
+      ]
+    }
   },
   "OP16-107": {
     "triggers": [
@@ -1505,8 +1639,13 @@
   },
   "OP16-108": {
     "_name": "希流",
-    "_matcher": "已由脚本 OP16_108_Shiryu 接管(登场:可丢手牌→废弃区≤6费黑胡子正面入生命);原【触发】抽2为错误占位已移除(希流无触发效果)",
-    "trigger": []
+    "_matcher": "登场时由脚本 OP16_108_Shiryu 接管;【触发】抽2张(卡面确有独立【触发】,勿再误删,反馈#200)",
+    "trigger": [
+      {
+        "op": "Draw",
+        "n": 2
+      }
+    ]
   },
   "OP16-109": {
     "_name": "毒Q",

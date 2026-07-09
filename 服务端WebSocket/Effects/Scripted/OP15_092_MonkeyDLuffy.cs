@@ -50,6 +50,8 @@ public class OP15_092_MonkeyDLuffy : IScriptedEffect
         });
 
         // ≥20 张：对方回合中，我方领袖原本力量变为 7000
+        // 注意加"自身仍在场"守卫：此条作用对象是领袖而非本卡，路飞被KO后若无守卫会继续生效
+        // 直到回合末兜底清理（反馈#245）；引擎虽已在 KOCard 即时清理，回手/回卡组等路径仍靠它。
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = selfId.ToString(),
@@ -58,7 +60,8 @@ public class OP15_092_MonkeyDLuffy : IScriptedEffect
             Predicate = (s, sideIdx, card) =>
                 card.Id == s.Players[owner].Leader.Id &&
                 s.CurrentTurnPlayer != owner &&
-                s.Players[owner].Trash.Count >= 20,
+                s.Players[owner].Trash.Count >= 20 &&
+                s.Players[owner].Characters.Any(c => c.Id == selfId),
         });
 
         // ≥30 张：此角色力量 +1000

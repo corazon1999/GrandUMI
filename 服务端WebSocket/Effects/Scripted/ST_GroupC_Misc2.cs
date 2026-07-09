@@ -61,7 +61,7 @@ public class ST12_003_Mihawk : IScriptedEffect
             c.Info.Kind == CardKind.Character &&
             c.Info.Cost <= 4 &&
             !c.Info.NameIs("杰拉基尔·米霍克") &&
-            (c.Info.HasKeyword("阴森王国") || c.Info.Property == "斩")).ToList();
+            (c.Info.HasKeyword("阴森王国") || c.Info.Property.Split('/').Contains("斩"))).ToList();
         if (cands.Count == 0) return;
         var extra = new Dictionary<string, object?>
         {
@@ -92,7 +92,7 @@ public class ST12_007_Rika : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         if (opp.LifeCount < 3) return;
         if (me.ActiveDonCount < 2) return;
-        var cands = me.Characters.Where(c => c.Info.Cost <= 4 && c.Info.Property == "斩").ToList();
+        var cands = me.Characters.Where(c => c.Info.Cost <= 4 && c.Info.Property.Split('/').Contains("斩")).ToList();
         if (cands.Count == 0) return;
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "将我方最多1张费用≤4属性(斩)角色转为活跃状态", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

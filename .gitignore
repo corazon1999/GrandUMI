@@ -112,3 +112,11 @@ opcg_app.js
 # 入库的 卡牌数据/ 已剥离 effectText；有原文的这份不入库
 # =========================
 卡牌数据_含原文/
+
+# =========================
+# 隔壁独立项目（各自单独建仓，绝不并入本仓库）
+# Beast: Unity 客户端(含 Library/PackageCache 上万文件+LFS大图)；opcgpro-vue: Vue 版前端
+# 曾被 deploy 的 git add -A 误吞导致 push 超时，故显式忽略
+# =========================
+Beast/
+opcgpro-vue/

@@ -23,8 +23,21 @@ public class OP15_088_CosmicDock : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+        int owner = ctx.OwnerIndex;
+        var selfId = ctx.Source.Id;
 
-        // "可以…" 可选发动
+        // 第①段（无条件持续）：「此角色的费用+6」。登场即注册永续效果，仅作用于自身(card.Id==selfId)，
+        // 离场由 TurnEngine 结束阶段按 SourceCardId 自动清理。反馈#194:此前完全没注册→费用恒显示5、判定按5。
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = owner, IncludeLeader = false, IncludeCharacters = true },
+            CostDelta = 6,
+            Predicate = (s, sideIdx, c) => sideIdx == owner && c.Id == selfId,
+        });
+
+        // 第②段【登场时】："可以…" 可选发动
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "宇宙对接6【登场时】：可以将卡组顶3张放置废弃区，登场废弃区中1张费用≤2的《草帽一伙》角色？");
         if (!use) return;

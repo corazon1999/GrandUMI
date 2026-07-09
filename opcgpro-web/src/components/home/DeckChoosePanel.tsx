@@ -30,6 +30,7 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
       name,
       leader: saved.leader,
       leaderName: saved.leaderName,
+      leaderSprite: saved.leaderSprite,
       cards: cardsStr,
     });
 

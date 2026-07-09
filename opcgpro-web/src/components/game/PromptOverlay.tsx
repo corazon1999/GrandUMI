@@ -14,6 +14,7 @@ export default function PromptOverlay() {
   const prompt = useGameStore((s) => s.pendingPrompt);
   const my = useGameStore((s) => s.my);
   const opp = useGameStore((s) => s.opponent);
+  const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => { setSelected([]); }, [prompt?.promptId]);
@@ -127,6 +128,8 @@ export default function PromptOverlay() {
 
   const handleConfirm = () => {
     GameRequest.respondPrompt(prompt.promptId, selected);
+    // #241 目标确认后弹一个"选择成功"瞬时提示（弹窗随即由服务器快照关闭）
+    flashPromptSuccess();
   };
   const handleSkip = () => {
     GameRequest.respondPrompt(prompt.promptId, []);
@@ -202,13 +205,23 @@ export default function PromptOverlay() {
                     }`}
                   >
                     <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-[10px] font-black text-black shadow ${
-                        d.state === "Rest" ? "rotate-90" : ""
+                      className={`flex h-12 w-12 items-center justify-center rounded-full text-[10px] font-black shadow ${
+                        d.state === "Rest"
+                          ? "rotate-90 bg-gradient-to-br from-indigo-400 to-indigo-700 text-indigo-50"
+                          : d.state === "Attached"
+                            ? "bg-gradient-to-br from-amber-300 to-amber-600 text-black"
+                            : "bg-gradient-to-br from-yellow-300 to-amber-500 text-black"
                       }`}
                     >
                       DON!!
                     </div>
-                    <span className="text-[10px] font-bold text-yellow-100">{stateLabel}</span>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        d.state === "Rest" ? "text-indigo-200" : "text-yellow-100"
+                      }`}
+                    >
+                      {stateLabel}
+                    </span>
                     {attachedCard ? (
                       <span
                         className="max-w-full truncate text-[9px] text-amber-200"

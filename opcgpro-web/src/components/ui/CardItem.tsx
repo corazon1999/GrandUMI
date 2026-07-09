@@ -32,6 +32,8 @@ interface Props {
   liftOnSelect?: boolean;
   /** 是否显示阻挡者「能量护盾」特效（仅场上角色区传 true，手牌/预览等不传） */
   showBlockerFx?: boolean;
+  /** 快照下发的动态获得关键词（贴咚/条件/回合内授予的阻挡者等），与静态卡面 abilities 一并判定特效 */
+  gainedKeywords?: string[];
   /** 攻击状态标识（仅我方场上角色/领袖在我方回合传）：can=可攻击 sick=本回合登场不可攻击 none=不显示 */
   attackState?: "can" | "sick" | "none";
   onClick?: () => void;
@@ -59,13 +61,18 @@ export default function CardItem({
   hideCost = false,
   liftOnSelect = true,
   showBlockerFx = false,
+  gainedKeywords,
   attackState = "none",
   onClick,
   size = "md",
 }: Props) {
   const showFaceDown = faceDown || !card;
-  // 阻挡者：仅场上角色（showBlockerFx）且正面、能力含「阻挡者」时显示能量护盾特效
-  const isBlocker = showBlockerFx && !showFaceDown && !!card?.abilities?.includes("阻挡者");
+  // 阻挡者：仅场上角色（showBlockerFx）且正面、静态能力或动态获得关键词含「阻挡者」时显示能量护盾特效
+  // （动态授予如 OP16-073 回合末获得、OP15-053 贴咚获得——此前只看静态 abilities，玩家看不到任何变化，反馈#242/#253）
+  const isBlocker =
+    showBlockerFx &&
+    !showFaceDown &&
+    (!!card?.abilities?.includes("阻挡者") || !!gainedKeywords?.includes("阻挡者"));
   const donPower = attachedDonCount * 1000;
   const displayPower = (card?.power ?? 0) + powerBuff + donPower;
   const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);

@@ -51,7 +51,7 @@ public class OP12_028_Hiyori : IScriptedEffect
 
         // 可公开并加入手牌：拥有属性（斩）的卡牌 或 绿色（风）事件
         var candidates = top.Where(c =>
-            c.Info.Property == "斩"
+            c.Info.Property.Split('/').Contains("斩")
             || (c.Info.Kind == CardKind.Event && c.Info.ColorList.Contains("绿")))
             .ToList();
 

@@ -20,8 +20,10 @@ public class OP16_001_Ace : IScriptedEffect
         // 原文「我方 1 张力量≥8000 的…」含领袖自身（艾斯 keyWords 含「白胡子海盗团」），故候选池纳入领袖
         var pool = new List<CardInstance> { me.Leader };
         pool.AddRange(me.Characters);
+        // "力量为8000或更高"按规则指当前力量（含贴咚加成），须用 CurrentPowerOf 而非印刷 Info.Power，
+        // 否则伊佐(基础7000)贴1咚后实际8000会被 7000<8000 误过滤（反馈#191）。
         var candidates = pool.Where(c =>
-            c.Info.Power >= 8000 &&
+            ctx.State.CurrentPowerOf(ctx.OwnerIndex, c) >= 8000 &&
             (c.MatchesName("蒙奇·D·路飞") || c.Info.HasKeyword("白胡子海盗团"))
         ).ToList();
         if (candidates.Count == 0) return;

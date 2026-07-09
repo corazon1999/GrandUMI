@@ -869,7 +869,9 @@
     "cost": "5",
     "keyWords": "海军",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnHandDiscarded"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",

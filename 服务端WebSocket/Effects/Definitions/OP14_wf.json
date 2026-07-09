@@ -247,7 +247,7 @@
   },
   "OP14-112": {
     "_name": "波尔·汉库珂",
-    "_matcher": "登场时领袖含王下七武海:卡组顶1张入生命顶,之后对方生命顶1张入对方手。注:trigger生命触发需登场'拥有【触发】效果'角色,filter无法表达'拥有触发效果'条件,该触发部分省略",
+    "_matcher": "登场时领袖含王下七武海:卡组顶1张入生命顶,之后对方生命顶1张入对方手;【触发】登场手牌中最多1张力量≤6000且拥有【触发】效果的角色(hasTrigger filter已支持,反馈#180)",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -264,6 +264,16 @@
             "op": "OppLifeToHand"
           }
         ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": {
+          "originalPowerLte": 6000,
+          "hasTrigger": true
+        },
+        "text": "登场我方手牌中最多1张力量≤6000且拥有【触发】效果的角色"
       }
     ]
   },

@@ -18,11 +18,16 @@ public class OP12_020_Zoro : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source; // 领袖自身
 
-        // 【咚!!×3】发动条件：自身被赋予咚 ≥ 3
-        if (me.AttachedDonCount(self.Id) < 3) return Task.CompletedTask;
+        // 【咚!!×3】发动条件：自身被赋予咚 ≥ 3。不足时明确报错而非静默（反馈#168"点了没反应"）
+        if (me.AttachedDonCount(self.Id) < 3)
+        {
+            ctx.Engine?.SendError(ctx.OwnerIndex, "需要为此领袖赋予 3 张或更多咚!!才能发动");
+            return Task.CompletedTask;
+        }
 
-        // 【每回合1次】
-        var key = "OP12-020-Activated" + ":" + ctx.Source.Id;
+        // 【每回合1次】：key 须符合快照约定 "{番号}-act:{id}"，否则 leaderActivatedUsedThisTurn
+        // 恒 false、按钮用后不消失，再点永远静默（反馈#168 根因）
+        var key = "OP12-020-act:" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
         me.TurnOnceUsed.Add(key);
 

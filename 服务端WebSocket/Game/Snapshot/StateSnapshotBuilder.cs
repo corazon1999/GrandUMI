@@ -95,7 +95,9 @@ public static class StateSnapshotBuilder
                 powerCurrent = state.CurrentPowerOf(idx, c),
                 cost         = state.CurrentCostOf(idx, c),
                 attachedDon  = p.AttachedDonCount(c.Id),
-                gainedKeywords = c.GainedKeywords.Select(k => k.Keyword).ToArray(),
+                gainedKeywords = c.GainedKeywords.Select(k => k.Keyword)
+                                  .Concat(ContinuousGrantedKeywords(state, c))
+                                  .Distinct().ToArray(),
                 cannotActivateNextReset = c.CannotActivateNextReset,
                 // 无法被效果转为休息状态：综合瞬时(AddRestriction)与持续(GrantRestriction)两种来源
                 cannotBeRested = c.HasRestriction(GrandUMI.Game.RestrictionKind.CannotBeRested)
@@ -139,4 +141,10 @@ public static class StateSnapshotBuilder
     static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
         => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
         || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
+
+    /// <summary>ContinuousEffect 当前授予该卡的关键词（如贴咚【阻挡者】、条件【速攻】）。
+    /// 客户端仅认快照 gainedKeywords + 静态卡面，不并入这里的话条件授予关键词在前端不可见/不可选。</summary>
+    static readonly string[] GrantableKeywords = { "阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };
+    static IEnumerable<string> ContinuousGrantedKeywords(GameState state, CardInstance c)
+        => GrantableKeywords.Where(kw => state.HasContinuousKeyword(c, kw));
 }

@@ -24,9 +24,9 @@ export default function LoginPanel() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-950">
+    <div className="flex flex-col items-center justify-center h-[100dvh] bg-gray-950">
       <motion.div
-        className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-80 shadow-2xl"
+        className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-80 max-w-[90vw] shadow-2xl"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -39,15 +39,20 @@ export default function LoginPanel() {
         </p>
 
         <div className="flex flex-col gap-3 mb-4">
+          {/* #178 无独立注册流程：输名字点登录即自动建号，placeholder 明示引导 */}
           <input
             className="bg-gray-800 text-white rounded-lg px-4 py-2.5 text-sm outline-none border border-gray-700 focus:border-orange-500 transition-colors disabled:opacity-50"
-            placeholder="账号"
+            placeholder="输入名字即可进入（首次自动创建）"
             value={account}
             onChange={(e) => setAccount(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             disabled={!canLogin}
             autoComplete="username"
           />
+          {/* #178 小字提示：账号即昵称，无需单独注册 */}
+          <p className="text-gray-500 text-xs text-center">
+            无需注册，输入的名字即你的昵称
+          </p>
         </div>
 
         {error && (

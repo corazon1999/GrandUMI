@@ -104,6 +104,7 @@ export default function FieldArea({ side }: Props) {
                 hideCounter
                 liftOnSelect={false}
                 showBlockerFx
+                gainedKeywords={fc.gainedKeywords}
                 attackState={attackState}
                 size={cardSize}
                 onClick={() => handleCardClick(fc.id, fc.isTapped)}

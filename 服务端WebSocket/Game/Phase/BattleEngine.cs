@@ -57,6 +57,19 @@ public static class BattleEngine
     /// <summary>触发【攻击时】+【对方的攻击时】效果（按回合玩家优先顺序），完成后进入 BattleBlock</summary>
     public static async Task TriggerAttackDeclareAsync(GameState s, IPromptService prompts)
     {
+        // 攻击宣言横置也属"转为休息状态"（反馈#227 OP14-119）：对角色攻击者派发 OnCharRested(reason=attack)。
+        // "因效果转休息"类监听卡已按 reason 过滤，不受影响。
+        if (s.CurrentBattle is { } ab)
+        {
+            var atkP = s.Players[ab.AttackerPlayerIndex];
+            var atkChar = atkP.Characters.FirstOrDefault(c => c.Id == ab.AttackerCardId);
+            if (atkChar is not null)
+            {
+                await EffectRuntime.TriggerEvent(s, EffectTrigger.OnCharRested, prompts,
+                    new Dictionary<string, object?> { ["restedCardId"] = atkChar.Id.ToString(), ["reason"] = "attack" });
+                if (s.IsGameOver) return;
+            }
+        }
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAttackDeclare, prompts);
         if (s.IsGameOver) return;
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnOppAttackDeclare, prompts,
@@ -81,6 +94,13 @@ public static class BattleEngine
 
     public static async Task TriggerBlockDeclareAsync(GameState s, IPromptService prompts)
     {
+        // 阻挡宣言横置同属"转为休息状态"（reason=block），"因效果"类监听卡按 reason 过滤不受影响
+        if (s.CurrentBattle is { ReplacedByBlockerCardId: { } bid })
+        {
+            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnCharRested, prompts,
+                new Dictionary<string, object?> { ["restedCardId"] = bid.ToString(), ["reason"] = "block" });
+            if (s.IsGameOver) return;
+        }
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnBlockDeclare, prompts);
     }
 
@@ -240,6 +260,10 @@ public static class BattleEngine
             }
         }
         p.Characters.Remove(card);
+        if (ReferenceEquals(p.StageCard, card)) p.StageCard = null; // 舞台卡被KO/送废弃（如 OP14-088 KO对方1费舞台）
         p.Trash.Add(card);
+        // 来源离场即时清理其注册的持续效果：此前仅靠 TurnEngine 结束阶段兜底，
+        // 角色被KO后其持续光环会残留到回合末（反馈#245 OP15-092 领袖7000残留）。
+        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == card.Id.ToString());
     }
 }
