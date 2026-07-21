@@ -1,0 +1,115 @@
+[
+  {
+    "number": "ST33-001",
+    "name": "可比",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "1000",
+    "cost": "2",
+    "keyWords": "海军",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红黑萨波&蓝色库赞【STC35&33】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250836526ST33-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST33-002",
+    "name": "萨卡斯基",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "海军",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红黑萨波&蓝色库赞【STC35&33】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250836526ST33-002.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST33-003",
+    "name": "斯摩格",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "海军",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红黑萨波&蓝色库赞【STC35&33】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250836526ST33-003.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST33-004",
+    "name": "波尔萨利诺",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "6",
+    "keyWords": "海军",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红黑萨波&蓝色库赞【STC35&33】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250836526ST33-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST33-005",
+    "name": "蒙奇·D·戈普",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "6",
+    "keyWords": "海军",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红黑萨波&蓝色库赞【STC35&33】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250836527ST33-005.png",
+    "cartograph": "画师原创"
+  }
+]

@@ -1,0 +1,113 @@
+[
+  {
+    "number": "ST32-001",
+    "name": "锦卫门",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "和之国,赤鞘九人男",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 绿色罗罗诺亚·佐罗&黄色尤斯塔斯·基德【STC32&36】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250845193ST32-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST32-002",
+    "name": "光月御殿",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "和之国,光月家",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 绿色罗罗诺亚·佐罗&黄色尤斯塔斯·基德【STC32&36】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250845194ST32-002.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST32-003",
+    "name": "杰拉基尔·米霍克",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "7000",
+    "cost": "6",
+    "keyWords": "阴森王国,王下七武海",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "OnCharRested"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 绿色罗罗诺亚·佐罗&黄色尤斯塔斯·基德【STC32&36】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250845194ST32-003.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST32-004",
+    "name": "希尔巴兹·雷利",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "原罗杰海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 绿色罗罗诺亚·佐罗&黄色尤斯塔斯·基德【STC32&36】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250845194ST32-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST32-005",
+    "name": "罗罗诺亚·佐罗",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "超新星,草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 绿色罗罗诺亚·佐罗&黄色尤斯塔斯·基德【STC32&36】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250845195ST32-005.png",
+    "cartograph": "画师原创"
+  }
+]

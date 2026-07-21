@@ -38,7 +38,13 @@ for (const card of cards) {
   // 后缀沿用 URL 中的扩展名
   const m = card.image.match(/\.(png|jpg|jpeg|webp)(?:\?|$)/i);
   const ext = (m?.[1] ?? "png").toLowerCase();
-  const filename = `${card.number}.${ext}`;
+  // 官网异画的详情 cardNumber 仍是基础卡号，但图片文件名带 `_01` 等后缀。
+  // 优先从 URL 取完整卡号，避免异画覆盖正画。
+  const escapedNumber = card.number.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const imageNumber = decodeURIComponent(card.image)
+    .match(new RegExp(`${escapedNumber}(?:_[A-Za-z0-9-]+)?(?=\\.(?:png|jpg|jpeg|webp)(?:\\?|$))`, "i"))?.[0]
+    ?? card.number;
+  const filename = `${imageNumber}.${ext}`;
   const savePath = path.join(outDir, filename);
   tasks.push({ url: card.image, savePath, name: filename });
 }

@@ -1,0 +1,115 @@
+[
+  {
+    "number": "ST31-001",
+    "name": "山智",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "3000",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856736ST31-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST31-002",
+    "name": "甚平",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "鱼人族,草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856736ST31-002.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST31-003",
+    "name": "布鲁克",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856737ST31-003.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST31-004",
+    "name": "蒙奇·D·路飞",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "9000",
+    "cost": "7",
+    "keyWords": "四皇,草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856737ST31-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST31-005",
+    "name": "千里·阳光号",
+    "color": "红",
+    "type": "舞台",
+    "property": "-",
+    "power": "-",
+    "cost": "1",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856737ST31-005.png",
+    "cartograph": "画师原创"
+  }
+]

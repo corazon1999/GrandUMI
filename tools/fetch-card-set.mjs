@@ -24,18 +24,20 @@ const OUT_DIR    = path.join(ROOT, "卡牌数据");
 const API_BASE   = "https://onepieceserve.windoent.com";
 const REFERER    = "https://www.onepiece-cardgame.cn/";
 const UA         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
-const PAGE_SIZE  = 200;
+// 官网列表接口经本地代理传输超大响应时可能被中途切断；500 条/页既能
+// 明显减少全量扫描请求数，又能把单次响应控制在稳定范围内。
+const PAGE_SIZE  = 500;
 const REQ_DELAY  = 100; // ms
 const MAX_RETRY  = 3;
 
 // ── 颜色 / 类型 映射 ──────────────────────────────────────────────────────
 const COLOR_MAP = {
-  "红": "炎",
-  "绿": "风",
-  "蓝": "水",
-  "紫": "暗",
-  "黑": "地",
-  "黄": "光",
+  "红": "红",
+  "绿": "绿",
+  "蓝": "蓝",
+  "紫": "紫",
+  "黑": "黑",
+  "黄": "黄",
 };
 const TYPE_MAP = {
   "领袖": "领航",  // 现有数据用"领航"
@@ -83,10 +85,10 @@ async function fetchCardSet(setCode) {
   const setPrefix = setCode.toUpperCase() + "-";
 
   // 1. 翻所有页找出该卡集的所有 (id, cardNumber)
-  //    同一 cardNumber 在 weblist 中可能有多个 id（不同 cardOfferType 分类
-  //    重复登记，如 OPC-16 主集 + 限定商品收录卡牌），按 cardNumber 去重保留首个 id。
+  //    同一 cardNumber 在 weblist 中可能有多个 id（正画、异画或不同商品重复收录）。
+  //    先保留全部候选，详情阶段优先选择卡号无后缀的正画记录。
   console.log("[1/2] 扫描卡牌列表...");
-  const byNumber = new Map(); // cardNumber -> id
+  const byNumber = new Map(); // cardNumber -> id[]
   let page = 0;
   let totalPage = 1;
   let dupCount = 0;
@@ -97,8 +99,11 @@ async function fetchCardSet(setCode) {
     totalPage = data.page.totalPage;
     for (const item of data.page.list) {
       if (item.cardNumber && item.cardNumber.startsWith(setPrefix)) {
-        if (byNumber.has(item.cardNumber)) { dupCount++; continue; }
-        byNumber.set(item.cardNumber, item.id);
+        const canonicalNumber = item.cardNumber.replace(/_[A-Za-z0-9-]+$/i, "");
+        const ids = byNumber.get(canonicalNumber) ?? [];
+        if (ids.length > 0) dupCount++;
+        ids.push(item.id);
+        byNumber.set(canonicalNumber, ids);
       }
     }
     process.stdout.write(`\r  扫描 ${page + 1}/${totalPage} 页，唯一 ${byNumber.size}，重复 ${dupCount}      `);
@@ -106,7 +111,7 @@ async function fetchCardSet(setCode) {
     await sleep(REQ_DELAY);
   }
   console.log();
-  const idsOfSet = [...byNumber.entries()].map(([number, id]) => ({ id, number }));
+  const idsOfSet = [...byNumber.entries()].map(([number, ids]) => ({ ids, number }));
 
   if (idsOfSet.length === 0) {
     console.error(`!! 未在 API 中找到 ${setCode} 卡牌`);
@@ -117,16 +122,24 @@ async function fetchCardSet(setCode) {
   console.log(`[2/2] 拉取 ${idsOfSet.length} 张卡详情...`);
   const cards = [];
   for (let i = 0; i < idsOfSet.length; i++) {
-    const { id, number } = idsOfSet[i];
-    const url = `${API_BASE}/cardList/cardlist/webInfo/${id}`;
-    const data = await fetchJson(url);
-    if (data.code !== 0 || !data.info) {
-      console.warn(`\n  [警告] ${number} (id=${id}) 拉取失败：${data.msg ?? "无 info"}`);
-      continue;
+    const { ids, number } = idsOfSet[i];
+    const candidates = [];
+    for (const id of ids) {
+      const url = `${API_BASE}/cardList/cardlist/webInfo/${id}`;
+      const data = await fetchJson(url);
+      if (data.code !== 0 || !data.info) {
+        console.warn(`\n  [警告] ${number} (id=${id}) 拉取失败：${data.msg ?? "无 info"}`);
+      } else {
+        candidates.push(data.info);
+      }
+      await sleep(REQ_DELAY);
     }
-    cards.push(toSchemaCard(data.info));
+    if (candidates.length === 0) continue;
+    const escaped = number.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const baseImage = new RegExp(`${escaped}\\.(?:png|jpg|jpeg|webp)(?:\\?|$)`, "i");
+    candidates.sort((a, b) => Number(baseImage.test(b.cardImg ?? "")) - Number(baseImage.test(a.cardImg ?? "")));
+    cards.push(toSchemaCard({ ...candidates[0], cardNumber: number }));
     process.stdout.write(`\r  ${i + 1}/${idsOfSet.length}  ${number}                `);
-    await sleep(REQ_DELAY);
   }
   console.log();
 

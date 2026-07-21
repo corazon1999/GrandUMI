@@ -104,6 +104,8 @@ public static class ActionValidator
 
     public static bool HasKeyword(GameState s, CardInstance c, string kw)
     {
+        // 官网使用【速攻：角色】表示仅在登场回合可攻击角色；引擎内部沿用语义化名称。
+        if (kw == "登场回合可攻击角色" && Array.IndexOf(c.Info.Abilities, "速攻：角色") >= 0) return true;
         if (Array.IndexOf(c.Info.Abilities, kw) >= 0) return true;
         if (c.GainedKeywords.Any(k => k.Keyword == kw)) return true;
         return s.HasContinuousKeyword(c, kw);

@@ -1,0 +1,113 @@
+[
+  {
+    "number": "ST34-001",
+    "name": "夏洛特·卡塔库栗",
+    "color": "紫",
+    "type": "角色",
+    "property": "打",
+    "power": "7000",
+    "cost": "5",
+    "keyWords": "大妈海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnKO",
+      "OnDonReturnedToDeck"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856737ST34-001.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST34-002",
+    "name": "夏洛特·克力架",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856737ST34-002.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST34-003",
+    "name": "夏洛特·布蕾",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856738ST34-003.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST34-004",
+    "name": "夏洛特･玲玲",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "12000",
+    "cost": "10",
+    "keyWords": "四皇,大妈海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856738ST34-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST34-005",
+    "name": "蛋蛋男爵&扁姆兹",
+    "color": "紫",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "纯毛族,大妈海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "基本卡组 红色蒙奇·D·路飞&紫色夏洛特·卡塔库栗【STC31&34】",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1783250856739ST34-005.png",
+    "cartograph": "画师原创"
+  }
+]

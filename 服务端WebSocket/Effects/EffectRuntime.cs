@@ -87,6 +87,7 @@ public static class EffectRuntime
         if (s is null) return;
         int owner = ReferenceEquals(s.Players[0], p) ? 0 : ReferenceEquals(s.Players[1], p) ? 1 : -1;
         if (owner < 0) return;
+        if (!PayingCost) p.HandDiscardedByEffectThisTurn = true;
         s.EnqueueWatcher(EffectTrigger.OnHandDiscarded, new Dictionary<string, object?>
         {
             ["owner"] = owner,

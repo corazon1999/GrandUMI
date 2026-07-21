@@ -14,6 +14,7 @@
  * 运行：
  *   node tools/strip-effecttext.mjs            # 预演
  *   node tools/strip-effecttext.mjs --write    # 落盘
+ *   node tools/strip-effecttext.mjs --write ST30 ST31  # 仅处理指定卡集
  */
 
 import { readFile, writeFile, readdir } from 'fs/promises'
@@ -29,6 +30,11 @@ const TARGET_DIRS = [
 ]
 
 const WRITE = process.argv.includes('--write')
+const SET_FILTER = new Set(
+  process.argv.slice(2)
+    .filter(arg => !arg.startsWith('--'))
+    .map(set => `${set.toUpperCase()}.json`),
+)
 
 // ── 触发时机判定（逐行复刻 EffectRuntime.HasEffectForTrigger，去掉 OnLifeRevealTrigger）──
 const TRIGGER_PREDICATES = {
@@ -76,6 +82,9 @@ function computeAbilities(text) {
 
 /** 重建卡对象：保留键顺序，在 effectText 原位换成 effectTags + abilities */
 function transformCard(card) {
+  // 已迁移文件不再带 effectText；重复运行时必须保留人工补过的标签。
+  if (!Object.hasOwn(card, 'effectText')) return card
+
   const text = typeof card.effectText === 'string' ? card.effectText : ''
   const effectTags = computeEffectTags(text)
   const abilities = computeAbilities(text)
@@ -96,7 +105,9 @@ function transformCard(card) {
 async function processDir(dir) {
   let files
   try {
-    files = (await readdir(dir)).filter(f => f.endsWith('.json'))
+    files = (await readdir(dir)).filter(
+      f => f.endsWith('.json') && (SET_FILTER.size === 0 || SET_FILTER.has(f)),
+    )
   } catch {
     console.log(`  ⚠ 跳过（目录不存在）: ${dir}`)
     return { files: 0, cards: 0, withText: 0 }

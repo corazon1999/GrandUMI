@@ -33,6 +33,9 @@ public class PlayerState
     /// <summary>每回合 1 次效果的使用记录（key = "卡号-效果Id"）</summary>
     public HashSet<string> TurnOnceUsed { get; } = new();
 
+    /// <summary>本回合中该玩家是否曾因卡牌效果丢弃过手牌（不含发动成本）。</summary>
+    public bool HandDiscardedByEffectThisTurn { get; set; }
+
     // ── 帮助查询 ──────────────────────────────────────────────────────────
 
     public int ActiveDonCount => CostArea.Count(d => d.State == DonState.Active);

@@ -102,6 +102,7 @@ public static class TurnEngine
             // 手牌卡的本回合费用修正（如 OP16-087 给"光月桃之助"+20）也需回合末清，否则会跨回合残留
             foreach (var c in p.Hand) c.CostModThisTurn = 0;
             p.TurnOnceUsed.Clear();
+            p.HandDiscardedByEffectThisTurn = false;
         }
         // 延迟到回合结束执行的任务（如 OP06-006：将我方1张FILM角色放置废弃区）
         foreach (var task in state.EndOfTurnTasks)

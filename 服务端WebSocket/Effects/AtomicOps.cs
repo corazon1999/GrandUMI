@@ -330,8 +330,14 @@ public static class AtomicOps
             }
         }
         if (returned > 0) // 咚!!放回咚!!卡组 → 通知 watcher
+        {
+            var state = EffectRuntime.CurrentState;
+            int owner = state is null ? -1
+                : ReferenceEquals(state.Players[0], p) ? 0
+                : ReferenceEquals(state.Players[1], p) ? 1 : -1;
             EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
-                new Dictionary<string, object?> { ["count"] = returned });
+                new Dictionary<string, object?> { ["count"] = returned, ["owner"] = owner });
+        }
         return returned;
     }
 
@@ -405,7 +411,7 @@ public static class AtomicOps
             me.DonDeck.Add(d);
         }
         EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
-            new Dictionary<string, object?> { ["count"] = chosen.Count });
+            new Dictionary<string, object?> { ["count"] = chosen.Count, ["owner"] = ctx.OwnerIndex });
         return true;
     }
 

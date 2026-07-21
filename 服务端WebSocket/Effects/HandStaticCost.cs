@@ -69,6 +69,10 @@ public static class HandStaticCost
                 return me.Characters.Any(c => c.Info.Power >= 7000 &&
                     (c.Info.NameIs("山五郎") || c.Info.NameIs("山智"))) ? -5 : 0;
 
+            // ST33-004 波尔萨利诺：本回合中我方手牌曾因效果丢弃时，手牌中的此卡费用-3。
+            case "ST33-004":
+                return me.HandDiscardedByEffectThisTurn ? -3 : 0;
+
             // PRB02-014 萨波：我方废弃区中有 15 张或更多卡牌 → 费用-3
             case "PRB02-014":
                 return me.Trash.Count >= 15 ? -3 : 0;
