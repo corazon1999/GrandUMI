@@ -848,6 +848,31 @@ public static class DslInterpreter
                     // 我方场上存在拥有指定特征的角色（如 OP16-076 反击段"存在《大将》角色"）
                     if (!me.Characters.Any(c => c.Info.HasKeyword(p.Value.GetString() ?? ""))) return false;
                     break;
+                case "ownOriginalPowerCharCountGte":
+                {
+                    // 我方场上原本力量等于指定值的角色数量不少于 count。
+                    // 使用 Info.Power，避免咚!!或临时力量修正影响“原本力量”判定。
+                    if (p.Value.ValueKind != JsonValueKind.Object) return false;
+                    int power = GetInt(p.Value, "power", 0);
+                    int count = GetInt(p.Value, "count", 1);
+                    if (me.Characters.Count(c => c.Info.Power == power) < count) return false;
+                    break;
+                }
+                case "ownHasNamedOriginalPowerChars":
+                {
+                    // 每项要求由不同角色满足，支持卡牌的静态别名与运行时名称别名。
+                    if (p.Value.ValueKind != JsonValueKind.Array) return false;
+                    var unmatched = me.Characters.ToList();
+                    foreach (var requirement in p.Value.EnumerateArray())
+                    {
+                        string name = requirement.TryGetProperty("name", out var nv) ? nv.GetString() ?? "" : "";
+                        int power = GetInt(requirement, "power", 0);
+                        var match = unmatched.FirstOrDefault(c => c.MatchesName(name) && c.Info.Power == power);
+                        if (match is null) return false;
+                        unmatched.Remove(match);
+                    }
+                    break;
+                }
                 case "boardHasCharCostLte":
                     // 场上（双方）存在原本费用 ≤ N 的角色（“场上存在费用为0的角色”用 0）
                     if (!me.Characters.Concat(opp.Characters).Any(c => c.Info.Cost <= p.Value.GetInt32())) return false;

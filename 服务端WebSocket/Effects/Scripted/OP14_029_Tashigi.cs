@@ -10,13 +10,11 @@ namespace GrandUMI.Effects.Scripted;
 /// 【启动主要】【每回合1次】可以将我方 2 张卡牌转为休息状态：
 ///   直到下个对方的结束阶段结束时为止，此角色的力量 +2000。
 ///
-/// 实现说明 / 简化点：
-///   - "将要离开场上 → 改为不离场" 通过 PreKO 钩子实现（引擎的离场替换通道即 PreKO；
-///     最常见的离场为被 KO，简化为只处理 KO，且不严格区分是否"对方的效果"，仅在对方回合中生效）。
-///     成本：将我方 1 张活跃卡牌(领袖/角色)转为休息状态；支付后调用 MarkPreventKO 取消本次 KO。
+/// 实现说明：
+///   - 效果KO走 OnAllyWillBeKOd，非KO效果离场走 OnAllyWillLeaveField；仅对方回合且受害者为自身时可用。
+///     成本：将我方1张活跃卡牌转为休息状态；支付后阻止对应离场。
 ///   - 【启动主要】成本为将我方 2 张活跃卡牌(领袖/角色)转为休息状态；收益为自身力量 +2000。
-///     "直到下个对方结束阶段" 的力量加成用 AddPowerThisTurn 近似（启动主要在我方回合使用，
-///     +2000 覆盖本回合；引擎无"直到下个对方结束阶段"的专用力量通道，按惯例近似为本回合）。
+///     力量加成使用 AddPowerUntilOppEnd，持续到下个对方结束阶段结束。
 ///   - 每回合 1 次用 TurnOnceUsed 控制。
 /// </summary>
 public class OP14_029_Tashigi : IScriptedEffect
@@ -24,17 +22,24 @@ public class OP14_029_Tashigi : IScriptedEffect
     public string CardNumber => "OP14-029";
 
     public bool HandlesTrigger(EffectTrigger t)
-        => t == EffectTrigger.PreKO || t == EffectTrigger.ActivatedMain;
+        => t is EffectTrigger.OnAllyWillBeKOd or EffectTrigger.OnAllyWillLeaveField or EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
-        if (ctx.Trigger == EffectTrigger.PreKO)
+        if (ctx.Trigger != EffectTrigger.ActivatedMain)
         {
             // 仅在对方的回合中可用
             if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex) return;
+
+            bool nonKoLeave = ctx.Trigger == EffectTrigger.OnAllyWillLeaveField;
+            if (!nonKoLeave &&
+                (ctx.State.KOReason != "effect" || ctx.State.KOActingSide != 1 - ctx.OwnerIndex)) return;
+            var victimId = ctx.Vars.TryGetValue("victimId", out var v) ? v as string : null;
+            var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int oi ? oi : -1;
+            if (victimOwner != ctx.OwnerIndex || victimId != self.Id.ToString()) return;
 
             if (AtomicOps.RestableCount(me) < 1) return;
 
@@ -44,7 +49,8 @@ public class OP14_029_Tashigi : IScriptedEffect
 
             if (!await AtomicOps.PromptRestOwnCards(ctx, 1,
                 "将我方 1 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
-            ctx.State.MarkPreventKO(self.Id);
+            if (nonKoLeave) ctx.State.MarkPreventLeave(self.Id);
+            else ctx.State.MarkPreventKO(self.Id);
             return;
         }
 
@@ -61,7 +67,7 @@ public class OP14_029_Tashigi : IScriptedEffect
         if (!await AtomicOps.PromptRestOwnCards(ctx, 2,
             "将我方 2 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
 
-        AtomicOps.AddPowerThisTurn(self, 2000);
+        AtomicOps.AddPowerUntilOppEnd(self, 2000, ctx.OwnerIndex);
         me.TurnOnceUsed.Add(key);
     }
 }

@@ -634,7 +634,8 @@
     "effectTags": [
       "ActivatedMain",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1359,7 +1360,8 @@
     "effectTags": [
       "OnAttackDeclare",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

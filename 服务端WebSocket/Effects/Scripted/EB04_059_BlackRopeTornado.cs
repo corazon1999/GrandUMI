@@ -9,9 +9,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   我方角色少于对方角色的场合，将对方最多 1 张费用不高于 6 的角色
 ///   和最多 1 张费用不高于 5 的角色 KO。
 ///
-/// 实现说明 / 简化点：
-///   - 成本"将生命区最上方 1 张翻至正面朝上"：引擎生命牌无正/反面状态字段，无法表达，
-///     按既有惯例（参见 OP11-022 白星）省略该成本，仅实现收益。
+/// 实现说明：
+///   - 成本为将生命区最上方1张翻至正面朝上；生命为空或生命顶已经正面朝上时无法发动。
 ///   - "可以…"为可选效果：先 ConfirmOptional。
 ///   - 条件"我方角色少于对方角色"：比较双方场上角色数量 me.Characters.Count < opp.Characters.Count。
 ///   - KO 段：先 KO 最多 1 张费用≤6 的对方角色，再 KO 最多 1 张费用≤5 的对方角色；
@@ -29,15 +28,19 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         int oppIdx = 1 - ctx.OwnerIndex;
 
+        if (me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return;
+
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "黑绳大龙卷风【主要】：将生命区最上方 1 张翻至正面朝上，KO 对方角色？");
         if (!use) return;
+        AtomicOps.FlipTopLifeFaceUp(me);
 
         // 条件：我方角色少于对方角色
         if (me.Characters.Count >= opp.Characters.Count) return;
 
         // KO 最多 1 张费用 ≤6 的对方角色
         var cand6 = opp.Characters.Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 6).ToList();
+        Guid? firstChosenId = null;
         if (cand6.Count > 0)
         {
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
@@ -46,12 +49,14 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
             if (ch.Count > 0)
             {
                 var tgt = cand6.First(c => c.Id.ToString() == ch[0]);
-                AtomicOps.KO(ctx.State, oppIdx, tgt);
+                firstChosenId = tgt.Id;
+                await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, tgt, ctx.Prompts, ctx.OwnerIndex);
             }
         }
 
         // KO 最多 1 张费用 ≤5 的对方角色（不含上一步已 KO 者）
-        var cand5 = opp.Characters.Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 5).ToList();
+        var cand5 = opp.Characters.Where(c =>
+            c.Id != firstChosenId && ctx.State.CurrentCostOf(oppIdx, c) <= 5).ToList();
         if (cand5.Count > 0)
         {
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
@@ -60,7 +65,7 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
             if (ch.Count > 0)
             {
                 var tgt = cand5.First(c => c.Id.ToString() == ch[0]);
-                AtomicOps.KO(ctx.State, oppIdx, tgt);
+                await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, tgt, ctx.Prompts, ctx.OwnerIndex);
             }
         }
     }

@@ -35,8 +35,8 @@
     "effectTags": [
       "OnAttackDeclare",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd",
-      "PreKO"
+      "PreKO",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

@@ -489,7 +489,9 @@
     "cost": "4",
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnCharLeaveField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

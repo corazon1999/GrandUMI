@@ -1377,7 +1377,8 @@
     "keyWords": "因佩尔地狱/原巴洛克工作室",
     "counter": "2000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "OnBattleEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2030,7 +2031,9 @@
     "cost": "3",
     "keyWords": "海军",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnAnyCharKOd"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",

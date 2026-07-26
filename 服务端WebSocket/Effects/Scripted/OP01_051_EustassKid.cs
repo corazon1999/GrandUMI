@@ -8,21 +8,40 @@ namespace GrandUMI.Effects.Scripted;
 /// 【咚!!×1】【对方的回合中】此角色处于休息状态的场合，对方不能攻击"尤斯塔斯·基德"以外的角色。
 /// 【启动主要】【每回合1次】可以将此角色转为休息状态：将我方手牌中最多 1 张费用不高于 3 的角色卡牌登场。
 ///
-/// 实现说明 / 简化点：
-///   - 仅实现【启动主要】部分：每回合1次，可选支付成本（横置自身），随后从手牌登场最多 1 张费用≤3 角色。
-///   - 持续限制"【对方的回合中】此角色休息时对方不能攻击本卡以外的角色"属"攻击目标限制/守护型持续"，
-///     引擎暂无对应持续通道，未实现（不影响启动主要部分）。
+/// 实现说明：
+///   - 登场时注册条件性攻击目标锁定关键词：对方回合、本卡休息且附有咚×1时生效。
+///   - 【启动主要】每回合1次，可选支付成本（横置自身），随后从手牌登场最多1张费用≤3角色。
 /// </summary>
 public class OP01_051_EustassKid : IScriptedEffect
 {
     public string CardNumber => "OP01-051";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.OnEnterField or EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
+
+        if (ctx.Trigger == EffectTrigger.OnEnterField)
+        {
+            var selfId = self.Id;
+            int owner = ctx.OwnerIndex;
+            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+            ctx.State.ContinuousEffects.Add(new ContinuousEffect
+            {
+                SourceCardId = selfId.ToString(),
+                Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+                GrantKeyword = "仅可攻击角色：尤斯塔斯·基德",
+                Predicate = (s, sideIdx, card) =>
+                    sideIdx == owner && card.Id == selfId &&
+                    s.CurrentTurnPlayer != owner && card.IsTapped &&
+                    s.Players[owner].AttachedDonCount(selfId) >= 1 &&
+                    !card.IsEffectsNullified && !s.IsContinuouslyNullified(card),
+            });
+            return;
+        }
 
         // 每回合1次
         var key = self.Info.Number + "-act" + ":" + self.Id;

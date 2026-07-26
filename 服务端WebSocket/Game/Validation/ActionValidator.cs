@@ -85,6 +85,11 @@ public static class ActionValidator
             && !(HasKeyword(s, attacker, "登场回合可攻击角色") && !targetIsLeader))
             return Fail("新登场角色无法攻击");
 
+        // 「登场回合无法攻击领袖」：即使同时获得【速攻】，本回合也只能攻击角色（OP03-004）。
+        if (targetIsLeader && attacker != me.Leader && attacker.TurnPlayed == s.TurnCount
+            && HasKeyword(s, attacker, "登场回合无法攻击领袖"))
+            return Fail("此角色在登场回合中无法攻击领袖");
+
         // 目标：对方领袖或对方休息状态角色
         if (targetIsLeader)
         {
@@ -94,6 +99,11 @@ public static class ActionValidator
         if (targetId is null) return Fail("未指定目标");
         var target = op.Characters.FirstOrDefault(c => c.Id == targetId.Value);
         if (target is null) return Fail("目标不在对方场上");
+        // 防守方存在生效中的攻击目标锁定时，只能攻击对应名称的角色；攻击领袖不受影响（OP01-051）。
+        bool kidTargetLock = op.Characters.Any(c =>
+            HasKeyword(s, c, "仅可攻击角色：尤斯塔斯·基德"));
+        if (kidTargetLock && !target.MatchesName("尤斯塔斯·基德"))
+            return Fail("对方效果限制：只能攻击“尤斯塔斯·基德”角色");
         // 通常只能攻击休息状态角色；带"可攻击活跃"授予的攻击者可攻击活跃角色
         if (!target.IsTapped && !HasKeyword(s, attacker, "可攻击活跃")) return Fail("不能攻击活跃状态的角色");
         // 按费用禁攻（OP12-020：本回合此领袖无法攻击对方原本费用≤N角色）

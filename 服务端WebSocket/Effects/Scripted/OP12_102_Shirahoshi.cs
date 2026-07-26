@@ -10,42 +10,59 @@ namespace GrandUMI.Effects.Scripted;
 ///   —— 通过 ContinuousEffect 注册：仅对方回合、且我方场上无其他原本费用2的"白星"时生效，
 ///      作用于我方所有含《海王类》特征的角色。
 ///
-/// 简化点（部分效果判 complex，本脚本只实现持续力量修正部分）：
-///   - 文本另含"我方原本费用≤6的角色因对方效果将要离场时可改为翻开生命牌使其不离场"的
-///     离场替代效果（无对应触发钩子，引擎无该机制）——未实现。
-///   - 本脚本仅实现可由 ContinuousEffect 承载的条件性全体《海王类》+2000。
+/// 我方原本费用≤6的角色因对方效果将要离场时，可以改为将生命区最上方1张翻至正面，使该角色不离场。
+/// 效果KO和非KO效果离场共用统一守护逻辑；生命为空或生命顶已经正面朝上时无法支付。
 /// </summary>
 public class OP12_102_Shirahoshi : IScriptedEffect
 {
     public string CardNumber => "OP12-102";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.OnEnterField or EffectTrigger.OnAllyWillBeKOd or EffectTrigger.OnAllyWillLeaveField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var self = ctx.Source;
         int owner = ctx.OwnerIndex;
         var selfId = self.Id;
 
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope
+            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+            ctx.State.ContinuousEffects.Add(new ContinuousEffect
             {
-                Side = 0,
-                IncludeLeader = false,
-                IncludeCharacters = true,
-                Filter = c => c.Info.HasKeyword("海王类"),
-            },
-            PowerDelta = 2000,
-            Predicate = (s, sideIdx, card) =>
-                s.CurrentTurnPlayer != owner &&
-                // 我方场上没有"其他"原本费用为2的"白星"
-                !s.Players[owner].Characters.Any(c =>
-                    c.Id != selfId && c.Info.Cost == 2 && c.Info.Name.Contains("白星")),
-        });
+                SourceCardId = selfId.ToString(),
+                Scope = new ContinuousScope
+                {
+                    Side = 0,
+                    IncludeLeader = false,
+                    IncludeCharacters = true,
+                    Filter = c => c.Info.HasKeyword("海王类"),
+                },
+                PowerDelta = 2000,
+                Predicate = (s, sideIdx, card) =>
+                    s.CurrentTurnPlayer != owner &&
+                    !s.Players[owner].Characters.Any(c =>
+                        c.Id != selfId && c.Info.Cost == 2 && c.Info.Name.Contains("白星")),
+            });
+            return;
+        }
 
-        return Task.CompletedTask;
+        bool nonKoLeave = ctx.Trigger == EffectTrigger.OnAllyWillLeaveField;
+        if (!nonKoLeave &&
+            (ctx.State.KOReason != "effect" || ctx.State.KOActingSide != 1 - owner)) return;
+        var me = ctx.State.Players[owner];
+        var victimId = ctx.Vars.TryGetValue("victimId", out var v) ? v as string : null;
+        var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int oi ? oi : -1;
+        var victim = me.Characters.FirstOrDefault(c => c.Id.ToString() == victimId);
+        if (victimOwner != owner || victim is null || victim.Info.Cost > 6) return;
+        if (me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return;
+
+        if (!await ctx.Prompts.ConfirmOptional(owner,
+            "白星：将生命区最上方1张翻至正面，使该费用不高于6的角色不离场？")) return;
+        AtomicOps.FlipTopLifeFaceUp(me);
+        if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
+        else ctx.State.MarkPreventKO(victim.Id);
+
     }
 }

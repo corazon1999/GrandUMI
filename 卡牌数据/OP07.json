@@ -636,6 +636,7 @@
     "effectTags": [
       "OnCharLeaveField",
       "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
       "OnEnterField"
     ],
     "abilities": [],
@@ -925,7 +926,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2137,7 +2139,8 @@
     "keyWords": "科学家/艾格赫德",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnTurnStart"
     ],
     "abilities": [],
     "effectEvent": "",

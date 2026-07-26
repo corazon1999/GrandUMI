@@ -13,8 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "角色 或 咚!!" 为二选一 → ChooseOption。
 ///       · 选角色：从对方费用≤3 的角色中选最多 1 张横置(IsTapped=true)。
 ///       · 选咚!!：将对方 1 张活跃咚转为休息状态。
-///   - 简化点：文末"本回合中我方无法通过效果将生命入手"属引擎未列机制（非力量持续修正），
-///     无持续通道，本脚本仅实现横置收益、未实现该自我限制（与"只实现收益"惯例一致）。
+///   - 支付成本后置位 NoEffectLifeToHandThisTurn，使本回合我方所有效果生命入手通道失效；结束阶段清除。
 /// </summary>
 public class OP06_020_HodyJones : IScriptedEffect
 {
@@ -41,6 +40,7 @@ public class OP06_020_HodyJones : IScriptedEffect
 
         // 成本：横置领袖自身
         AtomicOps.RestCard(self);
+        ctx.State.NoEffectLifeToHandThisTurn.Add(ctx.OwnerIndex);
 
         // 二选一
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,

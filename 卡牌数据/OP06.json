@@ -1051,7 +1051,8 @@
     "keyWords": "东海",
     "counter": "1000",
     "effectTags": [
-      "OnOppBlocker"
+      "OnOppBlocker",
+      "OnOppEventPlayed"
     ],
     "abilities": [
       "阻挡者"

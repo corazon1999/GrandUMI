@@ -2205,7 +2205,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

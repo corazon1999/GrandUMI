@@ -12,20 +12,30 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【咚!!×1】发动门槛：本卡被赋予的咚 ≥1 时才发动（AttachedDonCount）。
 ///   - 成本为可选丢弃我方 1 张手牌；「可以」=可选，先 ConfirmOptional，确认后弃 1 张支付。
 ///   - 收益：将最多 1 张费用≤2 的角色(双方场上)放回其持有者卡组最下方。
-///   - 「之后，本次战斗结束时将此角色放回卡组最下方」属延迟到战斗结束的连锁，引擎无"本次战斗结束时"钩子，
-///     此下行后果(放回自身)未实现，仅实现可获取收益。
+///   - 支付成本后记录本次战斗的延迟效果，并在 OnBattleEnd 确认本卡为攻击者后将自身放回卡组最下方。
 /// </summary>
 public class OP02_064_MisterTwo : IScriptedEffect
 {
     public string CardNumber => "OP02-064";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnAttackDeclare;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.OnAttackDeclare or EffectTrigger.OnBattleEnd;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
+        var battleReturnKey = $"OP02-064-battle-return:{self.Id}";
+
+        if (ctx.Trigger == EffectTrigger.OnBattleEnd)
+        {
+            var attackerId = ctx.Vars.TryGetValue("attackerId", out var av) ? av as string : null;
+            if (attackerId != self.Id.ToString() || !self.OncePerTurnUsedKeys.Remove(battleReturnKey)) return;
+            if (me.Characters.Contains(self))
+                AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, self);
+            return;
+        }
 
         // 【咚!!×1】门槛
         if (me.AttachedDonCount(self.Id) < 1) return;
@@ -41,11 +51,14 @@ public class OP02_064_MisterTwo : IScriptedEffect
         if (disc.Count < 1) return;
         var dcard = me.Hand.First(c => c.Id.ToString() == disc[0]);
         AtomicOps.DiscardHand(me, dcard);
+        self.OncePerTurnUsedKeys.Add(battleReturnKey);
 
         // 收益：将最多 1 张费用≤2 的角色放回其持有者卡组最下方（双方场上）
         var cands = new List<(CardInstance card, int ownerIdx)>();
-        foreach (var c in me.Characters.Where(c => c.Info.Cost <= 2)) cands.Add((c, ctx.OwnerIndex));
-        foreach (var c in opp.Characters.Where(c => c.Info.Cost <= 2)) cands.Add((c, 1 - ctx.OwnerIndex));
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(ctx.OwnerIndex, c) <= 2))
+            cands.Add((c, ctx.OwnerIndex));
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 2))
+            cands.Add((c, 1 - ctx.OwnerIndex));
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

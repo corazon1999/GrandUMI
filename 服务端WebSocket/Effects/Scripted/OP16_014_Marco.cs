@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -8,21 +9,47 @@ namespace GrandUMI.Effects.Scripted;
 /// 持续：我方角色因对方的效果将要离开场上的场合，可以改为将此角色 KO，使该角色不离场。
 /// 【KO时】可以丢弃我方手牌中 1 张力量为 8000 的角色卡牌：从废弃区中登场此角色卡牌。
 ///
-/// 实现说明 / 简化点：
-///   - "持续替身保护(其他角色将离场→改KO自身)"为持续监听他卡离场的静态机制，PreKO 仅能拦截
-///     被KO卡自身、无法持续监听其他角色，引擎无此通道，未实现(仅注释保留)。
-///   - 仅实现可脚本的【KO时】：此卡被KO进入废弃区后触发；成本为可选丢弃 1 张力量8000角色手牌，
+/// 实现说明：
+///   - 持续替身保护覆盖效果KO和非KO效果离场；将本卡直接KO后阻止原角色离场，并正常结算本卡【KO时】。
+///   - 【KO时】：此卡被KO进入废弃区后触发；成本为可选丢弃 1 张力量8000角色手牌，
 ///     收益为从废弃区将此角色登场(活跃状态)。
 /// </summary>
 public class OP16_014_Marco : IScriptedEffect
 {
     public string CardNumber => "OP16-014";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnKO;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.OnKO or EffectTrigger.OnAllyWillBeKOd or EffectTrigger.OnAllyWillLeaveField;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+
+        if (ctx.Trigger != EffectTrigger.OnKO)
+        {
+            bool nonKoLeave = ctx.Trigger == EffectTrigger.OnAllyWillLeaveField;
+            if (!nonKoLeave &&
+                (ctx.State.KOReason != "effect" || ctx.State.KOActingSide != 1 - ctx.OwnerIndex)) return;
+            var victimId = ctx.Vars.TryGetValue("victimId", out var v) ? v as string : null;
+            var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int oi ? oi : -1;
+            var victim = me.Characters.FirstOrDefault(c => c.Id.ToString() == victimId);
+            if (victimOwner != ctx.OwnerIndex || victim is null || !me.Characters.Contains(ctx.Source)) return;
+
+            if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+                "马尔高：改为将此角色KO，使原角色不离场？")) return;
+
+            var self = ctx.Source;
+            BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, self);
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+                new Dictionary<string, object?> { ["cardId"] = self.Id.ToString(), ["owner"] = ctx.OwnerIndex });
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
+                new Dictionary<string, object?> { ["cardId"] = self.Id.ToString(), ["owner"] = ctx.OwnerIndex, ["reason"] = "effect" });
+            await EffectRuntime.Resolve(ctx.State, ctx.OwnerIndex, self, EffectTrigger.OnKO, ctx.Prompts);
+
+            if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
+            else ctx.State.MarkPreventKO(victim.Id);
+            return;
+        }
 
         // 此角色须确实在废弃区（被 KO 后由引擎放入）
         if (!me.Trash.Contains(ctx.Source)) return;

@@ -75,10 +75,10 @@
     "cost": "3",
     "keyWords": "白胡子海盗团",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -1021,7 +1021,8 @@
     "keyWords": "东海",
     "counter": "1000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnDamageToLeader"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1111,7 +1112,8 @@
     "keyWords": "东海/原海军",
     "counter": "1000",
     "effectTags": [
-      "OnKO"
+      "OnKO",
+      "OnDamageToLeader"
     ],
     "abilities": [],
     "effectEvent": "",

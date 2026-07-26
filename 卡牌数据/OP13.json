@@ -513,7 +513,8 @@
     "keyWords": "FILM",
     "counter": "2000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1003,7 +1004,7 @@
     "effectTags": [
       "PreKO",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [
       "双重攻击"
@@ -1454,7 +1455,8 @@
     "keyWords": "罗杰海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnMyTurnEnd"
     ],
     "abilities": [
       "速攻"

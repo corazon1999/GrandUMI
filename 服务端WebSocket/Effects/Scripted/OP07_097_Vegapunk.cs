@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 「此领袖无法进行攻击」无永久限制时长，故在 OnGameStart 与每个 OnTurnStart 重新对领袖
 ///     施加 CannotAttack(UntilNextOpponentEndPhase)，从而每回合持续生效，等效永久无法攻击。
 ///   - 【启动主要】成本①横置 1 张活跃咚（手动转 Rest）；每回合 1 次。
-///   - 「正面朝上加入生命区最上方」：me.Hand.Remove + me.LifeArea.Insert(0,..)（引擎无对应原子）。
+///   - 「正面朝上加入生命区最上方」：移出手牌、设置 IsLifeFaceUp 后插入生命区顶部。
 ///   - 「或登场」：用 PlayFromHandFree（角色/舞台）。事件卡不可登场，故仅角色/舞台提供「登场」选项。
 /// </summary>
 public class OP07_097_Vegapunk : IScriptedEffect
@@ -80,6 +80,7 @@ public class OP07_097_Vegapunk : IScriptedEffect
         if (opt == 0)
         {
             me.Hand.Remove(card);
+            card.IsLifeFaceUp = true;
             me.LifeArea.Insert(0, card);
         }
         else

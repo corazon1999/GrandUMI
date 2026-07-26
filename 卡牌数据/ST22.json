@@ -101,7 +101,8 @@
     "effectTags": [
       "ActivatedMain",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

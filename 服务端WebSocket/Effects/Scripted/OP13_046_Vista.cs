@@ -10,21 +10,28 @@ namespace GrandUMI.Effects.Scripted;
 ///   可以改为丢弃我方手牌中1张拥有的特征中包含〈白胡子海盗团〉的卡牌，以代替被KO或离场。
 ///
 /// 实现说明：
-///   - 置换防KO用 PreKO 钩子（守护自身）。置换成本：丢弃1张含〈白胡子海盗团〉特征的手牌，MarkPreventKO 取消本次KO。
-///   - 每回合1次。
-///   - 局限：PreKO 仅覆盖"将要被KO"的场合；"因对方效果将要离开场上"(退回手牌/放回卡组等非KO离场)
-///     引擎无对应的"自身离场前置换"钩子，故该分支未实现（仅实现防KO分支）。
+///   - KO置换走 PreKO，非KO效果离场走 OnAllyWillLeaveField。
+///   - 两条路径共用同一个每回合1次标记和弃牌成本。
 /// </summary>
 public class OP13_046_Vista : IScriptedEffect
 {
     public string CardNumber => "OP13-046";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.PreKO;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.PreKO or EffectTrigger.OnAllyWillLeaveField;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
+        bool nonKoLeave = ctx.Trigger == EffectTrigger.OnAllyWillLeaveField;
+
+        if (nonKoLeave)
+        {
+            var victimId = ctx.Vars.TryGetValue("victimId", out var v) ? v as string : null;
+            var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int oi ? oi : -1;
+            if (victimOwner != ctx.OwnerIndex || victimId != self.Id.ToString()) return;
+        }
 
         var key = self.Info.Number + "-guard" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
@@ -34,7 +41,7 @@ public class OP13_046_Vista : IScriptedEffect
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "比斯塔【每回合1次】：丢弃1张〈白胡子海盗团〉手牌，使此角色不会被KO？");
+            "比斯塔【每回合1次】：丢弃1张〈白胡子海盗团〉手牌，使此角色不被KO或离场？");
         if (!use) return;
 
         var extra = new Dictionary<string, object?>
@@ -49,7 +56,8 @@ public class OP13_046_Vista : IScriptedEffect
         var disc = cands.First(c => c.Id.ToString() == pick[0]);
         AtomicOps.DiscardHand(me, disc);
 
-        ctx.State.MarkPreventKO(self.Id);
+        if (nonKoLeave) ctx.State.MarkPreventLeave(self.Id);
+        else ctx.State.MarkPreventKO(self.Id);
         me.TurnOnceUsed.Add(key);
     }
 }

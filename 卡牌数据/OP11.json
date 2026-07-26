@@ -11,7 +11,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2353,7 +2354,8 @@
     "keyWords": "海王类",
     "counter": "1000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [
       "阻挡者"

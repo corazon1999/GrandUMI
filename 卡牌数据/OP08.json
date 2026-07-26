@@ -1624,7 +1624,8 @@
     "keyWords": "百兽海盗团",
     "counter": "2000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2213,7 +2214,8 @@
     "keyWords": "大妈海盗团",
     "counter": "1000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",

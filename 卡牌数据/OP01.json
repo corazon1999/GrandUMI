@@ -1101,6 +1101,7 @@
     "keyWords": "超新星/基德海盗团",
     "counter": "",
     "effectTags": [
+      "OnEnterField",
       "ActivatedMain"
     ],
     "abilities": [],
@@ -1318,7 +1319,9 @@
     "cost": "4",
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppEventPlayed"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",

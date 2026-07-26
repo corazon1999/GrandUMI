@@ -9,10 +9,9 @@ namespace GrandUMI.Effects.Scripted;
 /// 【登场时】确认我方卡组最上方的5张卡牌，公开其中最多1张红色事件并加入手牌。
 ///   之后，将剩余的卡牌自选顺序放回卡组最下方。
 ///
-/// 实现说明 / 简化点：
+/// 实现说明：
 ///   - 【登场时】检索：确认顶5张，公开其中最多1张「红色（炎）事件」加入手牌，其余按原相对顺序放底。
-///   - "与属性（斩）卡牌战斗中不会被KO" 为依赖「当前战斗对手属性」的条件防KO，KoGuard 谓词无法获知
-///     战斗对手的属性，引擎无对应通道，故此条静态防KO未实现（仅实现登场检索），属可接受简化。
+///   - 通过 KoGuard="battle" 读取 CurrentBattle；当本卡作为防守方与斩属性攻击者战斗时不会被KO。
 /// </summary>
 public class OP03_008_Buggy : IScriptedEffect
 {
@@ -23,6 +22,27 @@ public class OP03_008_Buggy : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+        var self = ctx.Source;
+        var selfId = self.Id;
+
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            KoGuard = "battle",
+            Predicate = (s, sideIdx, card) =>
+            {
+                if (card.Id != selfId || card.IsEffectsNullified || s.IsContinuouslyNullified(card)) return false;
+                var battle = s.CurrentBattle;
+                if (battle is null || (battle.ReplacedByBlockerCardId ?? battle.TargetCardId) != selfId) return false;
+                var attackerSide = s.Players[battle.AttackerPlayerIndex];
+                var attacker = attackerSide.Leader.Id == battle.AttackerCardId
+                    ? attackerSide.Leader
+                    : attackerSide.Characters.FirstOrDefault(c => c.Id == battle.AttackerCardId);
+                return attacker is not null && attacker.Info.Property.Split('/').Contains("斩");
+            },
+        });
 
         int k = Math.Min(5, me.Deck.Count);
         if (k == 0) return;
