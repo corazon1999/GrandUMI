@@ -4,12 +4,13 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
 import { getAllCachedCards } from "@/data/CardLoader";
-import { useDeckStore, FORMAT_RULES, compareCards, UNLIMITED_COPY_CARDS, colorMatch } from "@/store/deckStore";
+import { useDeckStore, FORMAT_RULES, UNLIMITED_COPY_CARDS } from "@/store/deckStore";
 import type { CardData } from "@/types/card";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
 import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPreview";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
+import { filterAndSortCards } from "@/lib/cardSearch";
 
 const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪烁）
 const CARD_WIDTH    = 72;   // w-16(64px) + gap
@@ -35,36 +36,25 @@ export default function SearchResultPanel() {
   const isLeaderMode = filterType === "Leader";
 
   const results = useMemo(() => {
-    const all = getAllCachedCards();
     const rule = FORMAT_RULES[format];
     const whitelist = isLeaderMode ? rule.leaderSetWhitelist : rule.mainSetWhitelist;
-    return all.filter((card) => {  // filter 返回新数组，下方 sort 不会污染缓存原数组
-      const setCode = card.number.split("-")[0];
-      // 格式卡集白名单过滤（Unrestricted 时为 null = 不限）
-      if (whitelist && !whitelist.includes(setCode)) return false;
-      // 用户手动选的弹数筛选（多选；空数组 = 不过滤）
-      if (filterSets.length > 0 && !filterSets.includes(setCode)) return false;
-      // 角标=1 默认隐藏（旧环境/早期版本）
-      if (!filterShowSub1 && card.subscript === 1) return false;
-      if (isLeaderMode && card.type !== "Leader") return false;
-      if (!isLeaderMode && card.type === "Leader") return false;
-      // 已选领航时，结果只显示领航色可入卡组的牌（即便处于「全部」）
-      if (!isLeaderMode && leader && !colorMatch(leader.color, card.color)) return false;
-      if (filterColor && !card.color.includes(filterColor)) return false;
-      if (filterProperty && card.property !== filterProperty) return false;
-      if (filterRarity && card.rarity !== filterRarity) return false;
-      if (filterCost !== null && card.cost !== filterCost) return false;
-      if (!isLeaderMode && filterType && card.type !== filterType) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (
-          !card.name.toLowerCase().includes(q) &&
-          !card.number.toLowerCase().includes(q) &&
-          !card.keyWords.some((k) => k.toLowerCase().includes(q))
-        ) return false;
-      }
-      return true;
-    }).sort(compareCards);
+    return filterAndSortCards(
+      getAllCachedCards(),
+      {
+        searchQuery,
+        filterColor,
+        filterType,
+        filterProperty,
+        filterRarity,
+        filterCost,
+        filterSets,
+        filterShowSub1,
+      },
+      {
+        allowedSets: whitelist,
+        leaderColor: leader?.color,
+      },
+    );
   }, [format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
 
   // 虚拟网格列表

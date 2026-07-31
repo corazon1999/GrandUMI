@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import type { CardData } from "@/types/card";
+import { colorMatch, compareCards } from "@/lib/cardSearch";
+
+export { colorMatch, compareCards } from "@/lib/cardSearch";
 
 // ── 对战格式 ──────────────────────────────────────────────────────────────
 //
@@ -55,83 +58,6 @@ export const UNLIMITED_COPY_CARDS = new Set<string>([
   "OP08-072", // 饼干士兵
   "OP16-042", // 因佩尔地狱的囚犯
 ]);
-
-export function colorMatch(leaderColor: string, cardColor: string): boolean {
-  const leaderColors = new Set(leaderColor.split("/"));
-  return cardColor.split("/").some((c) => leaderColors.has(c));
-}
-
-const TYPE_ORDER: Record<string, number> = {
-  Character: 0,
-  Event: 1,
-  Stage: 2,
-};
-
-// 发售顺序映射：序号越大 = 越晚发售 = 同费用下排在越前面
-// 基于 OPCG 实际发售时间线近似排列（编号相同的 ST 与 OP 同期，同期 ST 靠后）
-const SET_RELEASE_ORDER: Record<string, number> = (() => {
-  // 按发行顺序列出所有卡集（越靠后序号越大）
-  const order = [
-    "OP01",    "ST01","ST02","ST03","ST04","ST05","ST06",
-    "OP02",    "ST07",
-    "ST08","ST09",
-    "EB01",
-    "OP03",    "ST10",
-    "OP04",    "EB02",
-    "ST11","ST12",
-    "OP05",    "ST13",
-    "ST14",
-    "OP06",
-    "EB03",
-    "OP07",    "ST15","ST16","ST17",
-    "OP08",    "ST18","ST19","ST20",
-    "OP09",    "ST21",
-    "PRB01",
-    "OP10",    "ST22","ST23","ST24","ST25","ST26",
-    "OP11",    "EB04",
-    "OP12",    "ST27","ST28",
-    "OP13",    "PRB02",
-    "OP14",    "ST29","ST30",
-    "OP15",
-    "OP16",    "ST31","ST32","ST33","ST34","ST35","ST36",
-    "P",
-  ];
-  const map: Record<string, number> = {};
-  order.forEach((code, i) => { map[code] = i + 1; });
-  return map;
-})();
-
-// 弹序比较：按发售顺序序号大→小在前，未收录的卡集按字符串倒序垫底
-function compareSetNewness(a: string, b: string): number {
-  const oa = SET_RELEASE_ORDER[a] ?? 0;
-  const ob = SET_RELEASE_ORDER[b] ?? 0;
-  if (oa !== ob) return ob - oa;
-  // 同序号的（如同期多组 ST）用编号稳定排序
-  return b.localeCompare(a);
-}
-
-/**
- * compareCards — 卡牌统一排序比较器
- * 优先级：费用(升序) → 角标(大→小) → 发售时间(晚→早) → 类型(角色→事件→场地) → 卡号(稳定兜底)
- */
-export function compareCards(a: CardData, b: CardData): number {
-  // 领袖之间：以角标(大→小)为主键，不按费用分组
-  // （领袖的 cost 字段数据不统一，按费用排会把角标顺序打散）
-  if (a.type === "Leader" && b.type === "Leader") {
-    if (a.subscript !== b.subscript) return b.subscript - a.subscript;
-    const setCmp = compareSetNewness(setCodeOf(a), setCodeOf(b));
-    if (setCmp !== 0) return setCmp;
-    return a.number.localeCompare(b.number);
-  }
-  if (a.cost !== b.cost) return a.cost - b.cost;
-  if (a.subscript !== b.subscript) return b.subscript - a.subscript;
-  const setCmp = compareSetNewness(setCodeOf(a), setCodeOf(b));
-  if (setCmp !== 0) return setCmp;
-  const orderA = TYPE_ORDER[a.type] ?? 99;
-  const orderB = TYPE_ORDER[b.type] ?? 99;
-  if (orderA !== orderB) return orderA - orderB;
-  return a.number.localeCompare(b.number);
-}
 
 function sortEntries(entries: DeckEntry[]): DeckEntry[] {
   return [...entries].sort((a, b) => compareCards(a.card, b.card));

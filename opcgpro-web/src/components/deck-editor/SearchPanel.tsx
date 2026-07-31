@@ -6,25 +6,18 @@ import {
   COLOR_DISPLAY_NAMES,
   COLOR_STYLES,
 } from "@/lib/colorMap";
-
-const PROPERTIES = ["", "斩", "打", "射", "智", "特"];
-const DECK_TYPES  = ["", "Character", "Stage", "Event"];
+import {
+  CARD_COSTS as COSTS,
+  CARD_PROPERTIES as PROPERTIES,
+  CARD_RARITIES as RARITIES,
+  CARD_SET_GROUPS as SET_GROUPS,
+  CARD_TYPES as DECK_TYPES,
+} from "@/lib/cardSearch";
 
 const TYPE_LABELS: Record<string, string> = {
   Character: "角色", Stage: "场地", Event: "事件",
 };
-const RARITIES    = ["", "L", "SR", "R", "UC", "C", "SEC", "P"];
-const COSTS       = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const COL_PRESETS = [4, 5, 6, 7, 8, 9, 10, 12];
-
-
-// 按弹数筛选用的卡集列表（与 cardSets.ts 同步；新卡集发售时手动追加）
-const SET_GROUPS: { label: string; sets: string[] }[] = [
-  { label: "OP 主弹", sets: ["OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10","OP11","OP12","OP13","OP14","OP15","OP16"] },
-  { label: "ST 起始", sets: ["ST01","ST02","ST03","ST04","ST05","ST06","ST07","ST08","ST09","ST10","ST11","ST12","ST13","ST14","ST15","ST16","ST17","ST18","ST19","ST20","ST21","ST22","ST23","ST24","ST25","ST26","ST27","ST28","ST29","ST30","ST31","ST32","ST33","ST34","ST35","ST36"] },
-  { label: "EB/PRB", sets: ["EB01","EB02","EB03","EB04","PRB01","PRB02"] },
-  { label: "P/其他", sets: ["P"] },
-];
 
 export default function SearchPanel() {
   const {

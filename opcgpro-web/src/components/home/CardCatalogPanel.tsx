@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CardData } from "@/types/card";
 import { getAllCachedCards, loadAllCards } from "@/data/CardLoader";
-import { ALL_SET_NAMES } from "@/data/cardSets";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import { thumbSrc } from "@/lib/sprite";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
+import {
+  CARD_COSTS,
+  CARD_PROPERTIES,
+  CARD_RARITIES,
+  CARD_SET_GROUPS,
+  filterAndSortCards,
+} from "@/lib/cardSearch";
 
 const TYPE_OPTIONS = [
   { value: "Leader", label: "领航" },
@@ -16,8 +22,6 @@ const TYPE_OPTIONS = [
 ] as const;
 
 const COLOR_OPTIONS = ["红", "绿", "蓝", "紫", "黑", "黄"];
-const RARITY_OPTIONS = ["L", "SEC", "SR", "R", "UC", "C", "P"];
-const COST_OPTIONS = Array.from({ length: 11 }, (_, index) => index);
 
 const CARD_WIDTH = 118;
 const CARD_HEIGHT = 198;
@@ -25,35 +29,25 @@ const CARD_GAP = 12;
 
 type LoadState = "loading" | "done" | "error";
 
-function cardSetOf(card: CardData): string {
-  return card.number.split("-")[0];
-}
-
-function cardMatchesColor(card: CardData, color: string): boolean {
-  return !color || card.color.split("/").includes(color);
-}
-
 export default function CardCatalogPanel() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [cards, setCards] = useState<CardData[]>([]);
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
 
   const [query, setQuery] = useState("");
-  const [filterSet, setFilterSet] = useState("");
+  const [filterSets, setFilterSets] = useState<string[]>([]);
   const [filterColor, setFilterColor] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterProperty, setFilterProperty] = useState("");
   const [filterRarity, setFilterRarity] = useState("");
-  const [filterCost, setFilterCost] = useState("");
+  const [filterCost, setFilterCost] = useState<number | null>(null);
+  const [filterShowSub1, setFilterShowSub1] = useState(false);
 
   const loadCards = useCallback(async () => {
     setLoadState("loading");
     try {
       await loadAllCards();
-      setCards(
-        getAllCachedCards()
-          .slice()
-          .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })),
-      );
+      setCards(getAllCachedCards().slice());
       setLoadState("done");
     } catch {
       setLoadState("error");
@@ -65,37 +59,60 @@ export default function CardCatalogPanel() {
   }, [loadCards]);
 
   const filteredCards = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    const cost = filterCost === "" ? null : Number(filterCost);
-
-    return cards.filter((card) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        card.name.toLocaleLowerCase().includes(normalizedQuery) ||
-        card.number.toLocaleLowerCase().includes(normalizedQuery);
-
-      return (
-        matchesQuery &&
-        (!filterSet || cardSetOf(card) === filterSet) &&
-        cardMatchesColor(card, filterColor) &&
-        (!filterType || card.type === filterType) &&
-        (!filterRarity || card.rarity === filterRarity) &&
-        (cost === null || card.cost === cost)
-      );
-    });
-  }, [cards, query, filterSet, filterColor, filterType, filterRarity, filterCost]);
+    return filterAndSortCards(
+      cards,
+      {
+        searchQuery: query,
+        filterColor,
+        filterType,
+        filterProperty,
+        filterRarity,
+        filterCost,
+        filterSets,
+        filterShowSub1,
+      },
+      { includeLeadersWhenAllTypes: true },
+    );
+  }, [
+    cards,
+    query,
+    filterColor,
+    filterType,
+    filterProperty,
+    filterRarity,
+    filterCost,
+    filterSets,
+    filterShowSub1,
+  ]);
 
   const hasFilters = Boolean(
-    query || filterSet || filterColor || filterType || filterRarity || filterCost,
+    query ||
+      filterSets.length > 0 ||
+      filterColor ||
+      filterType ||
+      filterProperty ||
+      filterRarity ||
+      filterCost !== null ||
+      filterShowSub1,
   );
 
   const resetFilters = () => {
     setQuery("");
-    setFilterSet("");
+    setFilterSets([]);
     setFilterColor("");
     setFilterType("");
+    setFilterProperty("");
     setFilterRarity("");
-    setFilterCost("");
+    setFilterCost(null);
+    setFilterShowSub1(false);
+  };
+
+  const toggleFilterSet = (setName: string) => {
+    setFilterSets((current) =>
+      current.includes(setName)
+        ? current.filter((name) => name !== setName)
+        : [...current, setName],
+    );
   };
 
   if (loadState === "loading") {
@@ -143,25 +160,23 @@ export default function CardCatalogPanel() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[minmax(220px,2fr)_repeat(5,minmax(96px,1fr))]">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[minmax(220px,2fr)_repeat(6,minmax(96px,1fr))]">
           <label className="col-span-2 sm:col-span-3 xl:col-span-1">
-            <span className="sr-only">搜索卡名或卡号</span>
+            <span className="sr-only">搜索卡名、卡号或关键词</span>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索卡名或卡号"
+              placeholder="卡名 / 卡号 / 关键词"
               className="h-9 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 text-xs text-white outline-none transition-colors placeholder:text-gray-500 focus:border-orange-500"
             />
           </label>
 
-          <FilterSelect label="卡集" value={filterSet} onChange={setFilterSet}>
-            {ALL_SET_NAMES.map((setName) => (
-              <option key={setName} value={setName}>
-                {setName}
-              </option>
-            ))}
-          </FilterSelect>
+          <CardSetFilter
+            selectedSets={filterSets}
+            onToggle={toggleFilterSet}
+            onClear={() => setFilterSets([])}
+          />
 
           <FilterSelect label="颜色" value={filterColor} onChange={setFilterColor}>
             {COLOR_OPTIONS.map((color) => (
@@ -179,21 +194,58 @@ export default function CardCatalogPanel() {
             ))}
           </FilterSelect>
 
-          <FilterSelect label="稀有度" value={filterRarity} onChange={setFilterRarity}>
-            {RARITY_OPTIONS.map((rarity) => (
+          <FilterSelect label="属性" value={filterProperty} onChange={setFilterProperty}>
+            {CARD_PROPERTIES.filter(Boolean).map((property) => (
+              <option key={property} value={property}>
+                {property}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
+            label="稀有度"
+            value={filterRarity}
+            onChange={(rarity) => {
+              setFilterRarity(rarity);
+              if (rarity === "L") setFilterType("Leader");
+            }}
+          >
+            {CARD_RARITIES.filter(Boolean).map((rarity) => (
               <option key={rarity} value={rarity}>
                 {rarity}
               </option>
             ))}
           </FilterSelect>
 
-          <FilterSelect label="费用" value={filterCost} onChange={setFilterCost}>
-            {COST_OPTIONS.map((cost) => (
+          <FilterSelect
+            label="费用"
+            value={filterCost ?? ""}
+            onChange={(value) => setFilterCost(value === "" ? null : Number(value))}
+          >
+            {CARD_COSTS.map((cost) => (
               <option key={cost} value={cost}>
                 {cost}
               </option>
             ))}
           </FilterSelect>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterShowSub1((current) => !current)}
+            className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-colors ${
+              filterShowSub1
+                ? "border-blue-600 bg-blue-600/40 text-blue-200"
+                : "border-gray-700 bg-gray-800 text-gray-500 hover:text-white"
+            }`}
+            title="角标 1 通常是旧环境或早期版本卡，默认隐藏"
+          >
+            {filterShowSub1 ? "✓ 显示角标 1 卡" : "已隐藏角标 1 卡"}
+          </button>
+          <span className="text-[10px] text-gray-600">
+            排序：费用升序 · 角标降序 · 新卡集优先
+          </span>
         </div>
       </header>
 
@@ -201,7 +253,16 @@ export default function CardCatalogPanel() {
         cards={filteredCards}
         onSelect={setSelectedCard}
         onReset={resetFilters}
-        resetSignal={[query, filterSet, filterColor, filterType, filterRarity, filterCost].join("\0")}
+        resetSignal={[
+          query,
+          filterSets.join(","),
+          filterColor,
+          filterType,
+          filterProperty,
+          filterRarity,
+          filterCost ?? "",
+          String(filterShowSub1),
+        ].join("\0")}
       />
 
       <CardInfoPanel card={selectedCard} onClose={() => setSelectedCard(null)} />
@@ -277,6 +338,65 @@ function CatalogGrid({
   );
 }
 
+function CardSetFilter({
+  selectedSets,
+  onToggle,
+  onClear,
+}: {
+  selectedSets: string[];
+  onToggle: (setName: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <details className="group relative">
+      <summary className="flex h-9 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-2 text-xs text-gray-200 outline-none transition-colors hover:border-gray-600 focus:border-orange-500 [&::-webkit-details-marker]:hidden">
+        <span>{selectedSets.length === 0 ? "弹数：全部" : `弹数：已选 ${selectedSets.length}`}</span>
+        <span className="text-gray-500 transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="absolute left-0 top-full z-40 mt-1 w-72 rounded-lg border border-gray-700 bg-gray-900 p-3 shadow-2xl">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold text-gray-400">弹数（可多选）</span>
+          {selectedSets.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-[10px] text-gray-500 transition-colors hover:text-orange-400"
+            >
+              清空
+            </button>
+          )}
+        </div>
+        <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+          {CARD_SET_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="mb-1 text-[9px] font-bold text-gray-600">{group.label}</p>
+              <div className="flex flex-wrap gap-1">
+                {group.sets.map((setName) => {
+                  const selected = selectedSets.includes(setName);
+                  return (
+                    <button
+                      key={setName}
+                      type="button"
+                      onClick={() => onToggle(setName)}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                        selected
+                          ? "bg-orange-500 text-white"
+                          : "bg-gray-800 text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      {setName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function FilterSelect({
   label,
   value,
@@ -284,7 +404,7 @@ function FilterSelect({
   children,
 }: {
   label: string;
-  value: string;
+  value: string | number;
   onChange: (value: string) => void;
   children: React.ReactNode;
 }) {
