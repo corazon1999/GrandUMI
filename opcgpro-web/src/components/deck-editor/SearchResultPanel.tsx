@@ -148,7 +148,6 @@ export default function SearchResultPanel() {
                     card={card}
                     deckCount={isLeaderMode ? 0 : getCount(card.number)}
                     isLeaderMode={isLeaderMode}
-                    noLeader={!isLeaderMode && !leader}
                     onClick={() => handleCardClick(card)}
                     onRightClick={(e) => { e.preventDefault(); setModal(card); }}
                     onMouseEnter={handleMouseEnter}
@@ -182,7 +181,6 @@ interface CardGridItemProps {
   card: CardData;
   deckCount: number;
   isLeaderMode: boolean;
-  noLeader: boolean;       // 主卡模式下尚未选领航：禁止点击（bug #184）
   onClick: () => void;
   onRightClick: (e: React.MouseEvent) => void;
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
@@ -191,10 +189,9 @@ interface CardGridItemProps {
 }
 
 function CardGridItem({
-  card, deckCount, isLeaderMode, noLeader, onClick, onRightClick, onMouseEnter, onMouseLeave, onSpriteChange,
+  card, deckCount, isLeaderMode, onClick, onRightClick, onMouseEnter, onMouseLeave, onSpriteChange,
 }: CardGridItemProps) {
   const isFull    = !isLeaderMode && deckCount >= 4 && !UNLIMITED_COPY_CARDS.has(card.number);
-  const disabled  = isFull || noLeader;   // 满4张 或 未选领航：均不可点击
   const hasInDeck = deckCount > 0;
 
   const sprites   = card.sprites?.length ? card.sprites : [card.sprite ?? "/sprites/CardBack.png"];
@@ -243,7 +240,7 @@ function CardGridItem({
     >
       <div
         className={`relative w-16 h-24 rounded-lg overflow-hidden select-none border-2 transition-all
-          ${disabled
+          ${isFull
             ? "border-red-800 opacity-50 cursor-not-allowed"
             : isLeaderMode
               ? "border-yellow-600 hover:border-yellow-400 hover:scale-105 cursor-pointer"

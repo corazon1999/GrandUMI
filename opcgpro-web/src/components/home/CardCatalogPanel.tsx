@@ -85,19 +85,6 @@ export default function CardCatalogPanel() {
     });
   }, [cards, query, filterSet, filterColor, filterType, filterRarity, filterCost]);
 
-  const { containerRef, totalHeight, visibleItems } = useVirtualList({
-    itemCount: filteredCards.length,
-    itemHeight: CARD_HEIGHT,
-    rowWidth: CARD_WIDTH,
-    columns: 1,
-    gap: CARD_GAP,
-    overscan: 3,
-  });
-
-  useEffect(() => {
-    containerRef.current?.scrollTo({ top: 0 });
-  }, [query, filterSet, filterColor, filterType, filterRarity, filterCost, containerRef]);
-
   const hasFilters = Boolean(
     query || filterSet || filterColor || filterType || filterRarity || filterCost,
   );
@@ -210,45 +197,83 @@ export default function CardCatalogPanel() {
         </div>
       </header>
 
-      <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
-        {filteredCards.length === 0 ? (
-          <div className="flex h-52 flex-col items-center justify-center gap-2">
-            <p className="text-sm text-gray-500">没有找到符合条件的卡牌</p>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-xs text-orange-400 transition-colors hover:text-orange-300"
-            >
-              清除筛选条件
-            </button>
-          </div>
-        ) : (
-          <div className="relative" style={{ height: totalHeight }}>
-            {visibleItems.map(({ index, row, col }) => {
-              const card = filteredCards[index];
-              if (!card) return null;
-
-              return (
-                <div
-                  key={card.number}
-                  className="absolute"
-                  style={{
-                    left: col * (CARD_WIDTH + CARD_GAP),
-                    top: row * (CARD_HEIGHT + CARD_GAP),
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                  }}
-                >
-                  <CatalogCard card={card} onClick={() => setSelectedCard(card)} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <CatalogGrid
+        cards={filteredCards}
+        onSelect={setSelectedCard}
+        onReset={resetFilters}
+        resetSignal={[query, filterSet, filterColor, filterType, filterRarity, filterCost].join("\0")}
+      />
 
       <CardInfoPanel card={selectedCard} onClose={() => setSelectedCard(null)} />
     </section>
+  );
+}
+
+/**
+ * 仅在卡牌数据加载完成后挂载网格，确保 useVirtualList 首次执行副作用时
+ * 滚动容器已经存在，可以正确绑定 ResizeObserver 与 scroll 事件。
+ */
+function CatalogGrid({
+  cards,
+  onSelect,
+  onReset,
+  resetSignal,
+}: {
+  cards: CardData[];
+  onSelect: (card: CardData) => void;
+  onReset: () => void;
+  resetSignal: string;
+}) {
+  const { containerRef, totalHeight, visibleItems } = useVirtualList({
+    itemCount: cards.length,
+    itemHeight: CARD_HEIGHT,
+    rowWidth: CARD_WIDTH,
+    columns: 1,
+    gap: CARD_GAP,
+    overscan: 3,
+  });
+
+  useEffect(() => {
+    containerRef.current?.scrollTo({ top: 0 });
+  }, [resetSignal, containerRef]);
+
+  return (
+    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
+      {cards.length === 0 ? (
+        <div className="flex h-52 flex-col items-center justify-center gap-2">
+          <p className="text-sm text-gray-500">没有找到符合条件的卡牌</p>
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-xs text-orange-400 transition-colors hover:text-orange-300"
+          >
+            清除筛选条件
+          </button>
+        </div>
+      ) : (
+        <div className="relative" style={{ height: totalHeight }}>
+          {visibleItems.map(({ index, row, col }) => {
+            const card = cards[index];
+            if (!card) return null;
+
+            return (
+              <div
+                key={card.number}
+                className="absolute"
+                style={{
+                  left: col * (CARD_WIDTH + CARD_GAP),
+                  top: row * (CARD_HEIGHT + CARD_GAP),
+                  width: CARD_WIDTH,
+                  height: CARD_HEIGHT,
+                }}
+              >
+                <CatalogCard card={card} onClick={() => onSelect(card)} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

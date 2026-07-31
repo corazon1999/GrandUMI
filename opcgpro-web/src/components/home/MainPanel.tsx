@@ -387,35 +387,35 @@ export default function MainPanel() {
       }}
     >
       {/* 侧边导航 */}
-      <nav className="w-16 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-4 gap-3">
+      <nav className="w-28 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-4 px-3 gap-3">
         <PlayerAvatar />
         <button
           onClick={() => setView("lobby")}
-          className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "lobby" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "lobby" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="大厅"
         >
-          厅
+          大厅
         </button>
         <button
           onClick={() => setView("deck")}
-          className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="卡组"
         >
-          组
+          卡组
         </button>
         <button
           onClick={() => setView("catalog")}
-          className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="卡牌图鉴"
         >
-          图
+          卡牌图鉴
         </button>
         <button
           onClick={() => setView("history")}
-          className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="对局记录"
         >
-          战
+          对局记录
         </button>
         <div className="mt-auto">
           <NetStatePanel />
