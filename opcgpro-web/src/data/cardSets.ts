@@ -58,6 +58,7 @@ export const CARD_SET_PATHS: Record<string, string> = {
   ST33: "/data/ST33.json",
   ST34: "/data/ST34.json",
   ST35: "/data/ST35.json",
+  ST36: "/data/ST36.json",
   // 特殊/促销系列
   P:     "/data/P.json",
   PRB01: "/data/PRB01.json",
@@ -75,6 +76,6 @@ export const DEFAULT_SEARCH_SETS = [
   "ST09","ST10","ST11","ST12","ST13","ST14","ST15","ST16",
   "ST17","ST18","ST19","ST20","ST21","ST22","ST23","ST24",
   "ST25","ST26","ST27","ST28","ST29","ST30","ST31","ST32",
-  "ST33","ST34","ST35",
+  "ST33","ST34","ST35","ST36",
   "P","PRB01","PRB02",
 ];

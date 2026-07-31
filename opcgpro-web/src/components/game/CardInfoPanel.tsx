@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
@@ -17,32 +18,93 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function CardInfoPanel({ card, onClose }: Props) {
-  if (!card) return null;
+  return (
+    <Modal
+      open={!!card}
+      onClose={onClose}
+      title={card?.name}
+      maxWidthClass="w-[calc(100vw-2rem)] max-w-4xl"
+    >
+      {card && <CardInfoContent card={card} />}
+    </Modal>
+  );
+}
 
+function CardInfoContent({ card }: { card: CardData }) {
   const displayColor = toDisplayColor(card.color);
   const primary      = primaryDisplayColor(card.color);
   const colorStyle   = COLOR_STYLES[primary];
+  const sprites = card.sprites?.length
+    ? card.sprites
+    : [card.sprite ?? card.image ?? "/sprites/CardBack.png"];
+  const [spriteIndex, setSpriteIndex] = useState(0);
+  const [imageSrc, setImageSrc] = useState(sprites[0]);
+
+  useEffect(() => {
+    setSpriteIndex(0);
+    setImageSrc(sprites[0]);
+    // 卡号变化即代表切换到另一张卡，重置为正画
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.number]);
+
+  const selectSprite = (index: number) => {
+    setSpriteIndex(index);
+    setImageSrc(sprites[index]);
+  };
+
+  const moveSprite = (direction: -1 | 1) => {
+    const next = (spriteIndex + direction + sprites.length) % sprites.length;
+    selectSprite(next);
+  };
 
   return (
-    <Modal open={!!card} onClose={onClose} title={card.name} maxWidthClass="max-w-4xl">
-      <div className="flex gap-5">
+    <div className="max-h-[78vh] overflow-y-auto pr-1">
+      <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start">
         {/* 卡图 */}
-        <div className="w-[28rem] h-[39.2rem] rounded-lg overflow-hidden shrink-0 bg-gray-800 relative">
+        <div className="relative aspect-[0.717] w-full max-w-[22rem] shrink-0 overflow-hidden rounded-lg bg-gray-800">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={card.sprite ?? "/sprites/CardBack.png"}
+            src={imageSrc}
             alt={card.name}
             className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+            onError={() =>
+              setImageSrc((current) =>
+                card.image && current !== card.image ? card.image : "/sprites/CardBack.png",
+              )
+            }
           />
           {/* 颜色条 */}
           {colorStyle && (
             <div className={`absolute bottom-0 left-0 right-0 h-1 ${colorStyle.bg}`} />
           )}
+
+          {sprites.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => moveSprite(-1)}
+                aria-label="上一张异画"
+                className="absolute bottom-1/2 left-2 flex h-9 w-9 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => moveSprite(1)}
+                aria-label="下一张异画"
+                className="absolute bottom-1/2 right-2 flex h-9 w-9 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
+              >
+                ›
+              </button>
+              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
+                {spriteIndex + 1} / {sprites.length}
+              </span>
+            </>
+          )}
         </div>
 
         {/* 卡片信息 */}
-        <div className="flex flex-col gap-2.5 text-base min-w-0">
+        <div className="flex w-full min-w-0 flex-col gap-3 text-base">
           {/* 编号 + 颜色 + 类型 */}
           <div className="flex flex-wrap gap-1.5 items-center">
             <span className="text-orange-400 font-bold text-sm">{card.number}</span>
@@ -116,16 +178,44 @@ export default function CardInfoPanel({ card, onClose }: Props) {
 
           {/* 关键词 */}
           {card.keyWords.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {card.keyWords.map((k) => (
-                <span key={k} className="text-xs bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded">
-                  {k}
-                </span>
-              ))}
+            <div>
+              <p className="mb-1 text-xs font-bold text-gray-500">特征</p>
+              <div className="flex flex-wrap gap-1">
+                {card.keyWords.map((k) => (
+                  <span key={k} className="text-xs bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded">
+                    {k}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {card.abilities.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-bold text-gray-500">能力</p>
+              <div className="flex flex-wrap gap-1">
+                {card.abilities.map((ability) => (
+                  <span
+                    key={ability}
+                    className="rounded bg-emerald-900/60 px-2 py-0.5 text-xs text-emerald-300"
+                  >
+                    {ability}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {card.trigger && (
+            <div className="rounded-lg border border-amber-800/50 bg-amber-950/30 p-3">
+              <p className="mb-1 text-xs font-bold text-amber-400">触发</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-amber-100">
+                {card.trigger}
+              </p>
             </div>
           )}
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import PlayerListPanel from "./PlayerListPanel";
 import InviteNotifyOverlay from "./InviteNotifyOverlay";
 import FriendlyRoomPanel from "./FriendlyRoomPanel";
 import HistoryPanel from "./HistoryPanel";
+import CardCatalogPanel from "./CardCatalogPanel";
 import NetStatePanel from "@/components/ui/NetStatePanel";
 import { useNetStore } from "@/store/netStore";
 import { getAllCachedCards, loadCardSet } from "@/data/CardLoader";
@@ -18,7 +19,7 @@ import Modal from "@/components/ui/Modal";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 
-type View = "lobby" | "deck" | "history";
+type View = "lobby" | "deck" | "catalog" | "history";
 
 const AVATAR_KEY = "grandumi_avatar";
 
@@ -403,6 +404,13 @@ export default function MainPanel() {
           组
         </button>
         <button
+          onClick={() => setView("catalog")}
+          className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          title="卡牌图鉴"
+        >
+          图
+        </button>
+        <button
           onClick={() => setView("history")}
           className={`w-10 h-10 rounded-xl text-xs font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="对局记录"
@@ -419,6 +427,7 @@ export default function MainPanel() {
         <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
         {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
         {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
+        {view === "catalog" && <CardCatalogPanel />}
         {view === "history" && <HistoryPanel />}
       </main>
 
