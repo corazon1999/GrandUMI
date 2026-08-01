@@ -10,6 +10,25 @@ public class ST30EffectTests
     static CardInstance Card(string number) => new() { Info = CardDatabase.Get(number)! };
 
     [Fact]
+    public async Task ST30_001_OpponentTurnBonus_AppliesToNamedCharacters_NotDualNameLeader()
+    {
+        var s = TestScene.New("ST30-001").Build();
+        var me = s.Players[0];
+        var luffy = Card("ST30-012");
+        me.Characters.Add(luffy);
+
+        await EffectRuntime.Resolve(s, 0, me.Leader, EffectTrigger.OnGameStart, new MockPromptService());
+
+        s.CurrentTurnPlayer = 1;
+        Assert.Equal(6000, s.CurrentPowerOf(0, me.Leader));
+        Assert.Equal(9000, s.CurrentPowerOf(0, luffy));
+
+        s.CurrentTurnPlayer = 0;
+        Assert.Equal(6000, s.CurrentPowerOf(0, me.Leader));
+        Assert.Equal(6000, s.CurrentPowerOf(0, luffy));
+    }
+
+    [Fact]
     public async Task ST30_004_RevealsTwoPower6000Characters_BeforeDrawAndDiscard()
     {
         var s = TestScene.New()

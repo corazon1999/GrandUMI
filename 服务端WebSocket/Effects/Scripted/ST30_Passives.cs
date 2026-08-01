@@ -33,7 +33,9 @@ public class ST30_001_LuffyAce : IScriptedEffect
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
             PowerDelta = 3000,
             Predicate = (s, sideIdx, card) =>
-                sideIdx == owner && s.CurrentTurnPlayer != owner &&
+                sideIdx == owner &&
+                card.Info.Kind == CardKind.Character &&
+                s.CurrentTurnPlayer != owner &&
                 (card.Info.NameIs("波特夹斯·D·艾斯") || card.Info.NameIs("蒙奇·D·路飞")),
         });
         return Task.CompletedTask;
