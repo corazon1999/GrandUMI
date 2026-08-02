@@ -21,6 +21,7 @@ export default function LifeArea({ side }: Props) {
   const count = player?.lifeCount ?? 0;
   const faceUp = player?.lifeFaceUp ?? [];
   const visibleCards = Math.min(Math.max(count, 1), 5);
+  const topCardOffset = count > 0 ? (visibleCards - 1) * 4 : 0;
 
   return (
     <div className={`relative ${pileSizes[cardSize]}`}>
@@ -62,7 +63,14 @@ export default function LifeArea({ side }: Props) {
       ) : (
         <div className="h-full w-full rounded-md border-2 border-dashed border-slate-500/60 bg-slate-950/45" />
       )}
-      <div className="absolute -right-4 -top-3 z-30 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow">
+      <div
+        className="absolute z-30 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow"
+        style={{
+          left: `calc(50% + ${topCardOffset}px)`,
+          top: topCardOffset - 12,
+          transform: "translateX(-50%)",
+        }}
+      >
         {count}
       </div>
     </div>
