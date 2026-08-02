@@ -191,6 +191,66 @@ public static class BattleEngine
     /// </summary>
     public static async Task<bool> KOCardAsync(GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
+        if (await IsKOReplacedAsync(s, ownerIdx, card, prompts)) return false;
+
+        await CompleteKOAsync(s, ownerIdx, card, prompts);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves cards that are KO'd by one process. All replacement effects are checked
+    /// while every victim is still on the field, so one replacement can cover the whole
+    /// matching part of the process (comprehensive rules 8-1-3-4-4).
+    /// </summary>
+    public static async Task<int> KOCardsSimultaneouslyAsync(
+        GameState s, int ownerIdx, IReadOnlyCollection<CardInstance> cards, IPromptService prompts)
+    {
+        var victims = cards
+            .Where(card => s.Players[ownerIdx].Characters.Contains(card))
+            .DistinctBy(card => card.Id)
+            .ToList();
+        if (victims.Count == 0) return 0;
+
+        var previousBatch = s.SimultaneousKOVictimIds;
+        var victimIds = victims.Select(card => card.Id).ToHashSet();
+        s.SimultaneousKOVictimIds = victimIds;
+        foreach (var id in victimIds) s.PreventKOCardIds.Remove(id);
+
+        try
+        {
+            var replaced = new HashSet<Guid>();
+            foreach (var card in victims)
+            {
+                if (s.IsGameOver) break;
+                if (!s.Players[ownerIdx].Characters.Contains(card)) continue;
+                if (await IsKOReplacedAsync(s, ownerIdx, card, prompts)) replaced.Add(card.Id);
+            }
+            replaced.UnionWith(victimIds.Where(id => s.PreventKOCardIds.Contains(id)));
+
+            int count = 0;
+            foreach (var card in victims)
+            {
+                if (s.IsGameOver) break;
+                if (replaced.Contains(card.Id) || !s.Players[ownerIdx].Characters.Contains(card)) continue;
+                await CompleteKOAsync(s, ownerIdx, card, prompts);
+                count++;
+            }
+            return count;
+        }
+        finally
+        {
+            foreach (var id in victimIds) s.PreventKOCardIds.Remove(id);
+            s.SimultaneousKOVictimIds = previousBatch;
+        }
+    }
+
+    private static async Task<bool> IsKOReplacedAsync(
+        GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
+    {
+        // A replacement may already cover this card as part of the active simultaneous process.
+        if (s.SimultaneousKOVictimIds?.Contains(card.Id) == true && s.PreventKOCardIds.Remove(card.Id))
+            return true;
+
         // PreKO 触发：仅本卡的效果有机会拦截（缩小范围避免误触发其他卡）
         s.PreventKOCardIds.Remove(card.Id);
         if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.PreKO))
@@ -200,7 +260,7 @@ public static class BattleEngine
         if (s.PreventKOCardIds.Contains(card.Id))
         {
             s.PreventKOCardIds.Remove(card.Id);
-            return false; // KO 被取消
+            return true; // KO 被取消
         }
         // 守护者：他卡"将要被KO时改为…代替被KO/使其不被KO"置换效果
         var guardSide = s.Players[ownerIdx];
@@ -213,11 +273,17 @@ public static class BattleEngine
             if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
             await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
                 new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
-            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
+            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return true; }
         }
         // 持续"战斗中不会被KO"保护
-        if (s.IsKoGuarded(card, "battle")) return false;
+        if (s.IsKoGuarded(card, "battle")) return true;
 
+        return false;
+    }
+
+    private static async Task CompleteKOAsync(
+        GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
+    {
         // 实际 KO：归还附着咚 + 进废弃区
         var p = s.Players[ownerIdx];
         foreach (var d in p.CostArea)
@@ -244,7 +310,6 @@ public static class BattleEngine
                 ["reason"] = "battle",
                 ["attackerId"] = s.CurrentBattle?.AttackerCardId.ToString(),
             });
-        return true;
     }
 
     /// <summary>同步 KO（保留供内部不会被置换的场景：满员废弃、放回手牌前不需走 KO 等）</summary>

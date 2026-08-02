@@ -59,6 +59,12 @@ public class GameState
 
     public void MarkPreventKO(Guid cardId) => PreventKOCardIds.Add(cardId);
 
+    /// <summary>
+    /// Cards being KO'd by the same simultaneous process. Replacement effects may use
+    /// this set to replace the whole matching part of that process with one payment.
+    /// </summary>
+    public IReadOnlySet<Guid>? SimultaneousKOVictimIds { get; internal set; }
+
     /// <summary>"代替离场使其不离场"置换守护写入的卡集合：离场路径(KO/退手牌/回卡组/置入生命)检查后取消该卡本次离场。</summary>
     public HashSet<Guid> PreventLeaveCardIds { get; } = new();
     public void MarkPreventLeave(Guid cardId) => PreventLeaveCardIds.Add(cardId);

@@ -281,7 +281,7 @@ public class GameEngine
             var victims = p.Characters.ToList(); // 复制：KO 过程会改动 Characters
             int count = victims.Count;
 
-            // 仅 KO 角色，不动 Leader/舞台；逐个走异步 KO 流程（触发 PreKO/置换/OnKO）。
+            // 仅 KO 角色，不动 Leader/舞台；按同一次批量 KO 结算（触发 PreKO/置换/OnKO）。
             // GM 模拟"因对方效果被KO"：设置来源标记，使 OP16-024 等【因对方的效果被KO时】效果发动。
             // 仍用 KOCardAsync（非 KOByEffectAsync）：GM 不在效果上下文内，前者用 TriggerEvent 立即派发
             // OnAnyCharKOd，后者用 NotifyWatcher 会因无 ambient 被丢弃，反而破坏其它卡的 KO 联动。
@@ -289,11 +289,7 @@ public class GameEngine
             State.KOActingSide = 1 - targetIndex;   // KO 方=被KO一方的对手
             try
             {
-                foreach (var card in victims)
-                {
-                    if (State.IsGameOver) break;
-                    await BattleEngine.KOCardAsync(State, targetIndex, card, Prompts);
-                }
+                await BattleEngine.KOCardsSimultaneouslyAsync(State, targetIndex, victims, Prompts);
             }
             finally
             {

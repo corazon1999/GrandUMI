@@ -96,7 +96,7 @@ function PlayerMat({
             {fieldZone}
           </div>
         ) : (
-          <div className="relative min-h-0 min-w-0 pl-24 md:pl-28">
+          <div className="relative -ml-[233px] min-h-0 min-w-0">
             <HandArea side={side} hidden={isObserver} />
           </div>
         )}
@@ -201,7 +201,7 @@ function PhaseTrack({
 
 function LeftRail() {
   return (
-    <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col gap-3">
+    <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 pb-28">
       <section className="min-h-0 flex-1 rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30">
         <h2 className="text-xs font-black text-slate-300">选中卡</h2>
         <div className="mt-3 aspect-[5/7] rounded-md border border-dashed border-slate-600/70 bg-black/20" />

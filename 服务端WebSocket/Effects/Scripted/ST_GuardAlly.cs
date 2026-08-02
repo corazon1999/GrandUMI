@@ -101,6 +101,22 @@ public class ST30_011_Buggy : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnAllyWillLeaveField)
             ctx.State.MarkPreventLeave(victim.Id);
         else
-            ctx.State.MarkPreventKO(victim.Id);
+        {
+            var simultaneousVictims = ctx.State.SimultaneousKOVictimIds;
+            if (simultaneousVictims is null)
+            {
+                ctx.State.MarkPreventKO(victim.Id);
+                return;
+            }
+
+            // One replacement applies to every matching card removed by this same process.
+            foreach (var candidate in me.Characters)
+            {
+                if (candidate.Id != self.Id &&
+                    candidate.Info.Power == 6000 &&
+                    simultaneousVictims.Contains(candidate.Id))
+                    ctx.State.MarkPreventKO(candidate.Id);
+            }
+        }
     }
 }

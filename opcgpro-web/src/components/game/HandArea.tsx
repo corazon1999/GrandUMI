@@ -108,7 +108,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   return (
     <div
       ref={wrapRef}
-      className="relative h-full w-full min-w-0 overflow-visible"
+      className="relative z-30 h-full w-full min-w-0 overflow-visible"
     >
       <AnimatePresence>
         {cards.map((card, i) => {

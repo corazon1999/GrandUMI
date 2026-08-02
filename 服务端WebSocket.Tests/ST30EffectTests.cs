@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -8,6 +9,27 @@ namespace GrandUMI.Tests;
 public class ST30EffectTests
 {
     static CardInstance Card(string number) => new() { Info = CardDatabase.Get(number)! };
+
+    [Fact]
+    public async Task ST30_012_HasNoPrintedBlocker_AndRushRequiresPaidEnterEffect()
+    {
+        var info = CardDatabase.Get("ST30-012")!;
+        Assert.DoesNotContain("阻挡者", info.Abilities);
+        Assert.DoesNotContain("速攻", info.Abilities);
+
+        var withoutDon = TestScene.New().Build();
+        var unpaidLuffy = Card("ST30-012");
+        withoutDon.Players[0].Characters.Add(unpaidLuffy);
+        await EffectRuntime.Resolve(withoutDon, 0, unpaidLuffy, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.DoesNotContain(unpaidLuffy.GainedKeywords, keyword => keyword.Keyword == "速攻");
+
+        var withDon = TestScene.New().MyActiveDon(1).Build();
+        var paidLuffy = Card("ST30-012");
+        withDon.Players[0].Characters.Add(paidLuffy);
+        await EffectRuntime.Resolve(withDon, 0, paidLuffy, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Contains(paidLuffy.GainedKeywords, keyword => keyword.Keyword == "速攻");
+        Assert.Equal(0, withDon.Players[0].ActiveDonCount);
+    }
 
     [Fact]
     public async Task ST30_001_OpponentTurnBonus_AppliesToNamedCharacters_NotDualNameLeader()
@@ -150,6 +172,31 @@ public class ST30EffectTests
         Assert.Contains(victim, me.Characters);
         Assert.DoesNotContain(victim, me.Hand);
         Assert.True(guard.IsTapped);
+    }
+
+    [Fact]
+    public async Task ST30_011_OneRestProtectsAllPower6000CharactersFromSimultaneousKO()
+    {
+        var s = TestScene.New().Build();
+        var me = s.Players[0];
+        var guard = Card("ST30-011");
+        var first = Card("ST30-006");
+        var second = Card("ST30-007");
+        // Put the guard first to prove all replacements resolve before any victim leaves.
+        me.Characters.AddRange([guard, first, second]);
+        var prompts = new MockPromptService().QueueConfirm(true);
+        s.KOReason = "effect";
+        s.KOActingSide = 1;
+
+        var koCount = await BattleEngine.KOCardsSimultaneouslyAsync(
+            s, 0, me.Characters.ToList(), prompts);
+
+        Assert.Equal(1, koCount);
+        Assert.Contains(first, me.Characters);
+        Assert.Contains(second, me.Characters);
+        Assert.Contains(guard, me.Trash);
+        Assert.True(guard.IsTapped);
+        Assert.Single(prompts.ConfirmHistory);
     }
 
     [Fact]

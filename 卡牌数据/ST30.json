@@ -264,10 +264,7 @@
       "OnEnterField",
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者",
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,
