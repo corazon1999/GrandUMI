@@ -4,7 +4,7 @@
 #    .\deploy-hk.ps1                  # 推已提交的代码并触发香港重建
 #    .\deploy-hk.ps1 -Commit "说明"   # 先提交当前改动再推+热更
 #    .\deploy-hk.ps1 -All             # 强制前后端全量重建
-#  流程: 提交 → pull合并协作者改动 → push(失败即中止) → ssh触发香港deploy.sh → 验证200
+#  流程: 提交 → pull合并协作者改动 → push → SSH增量传输 → 香港重建 → 验证200
 #  注: 本文件必须存为 UTF-8 with BOM,否则 PS5.1 按GBK解码中文会语法报错。
 # ============================================================
 param(
@@ -12,38 +12,89 @@ param(
   [switch]$All
 )
 $ErrorActionPreference = "Stop"
-$SRV  = "root@8.210.155.25"
-$repo = "D:\Self\GrandUMI"
+$SRV  = "grandumi-hk"
+$repo = $PSScriptRoot
 Set-Location $repo
 
 function Die($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
 
+# Codex 自带的 Git 不一定在系统 PATH 中；优先用 PATH，其次自动寻找本机可用版本。
+$gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
+$gitCandidates = @(
+  @(
+    $(if ($gitCommand) { $gitCommand.Source }),
+    "$env:ProgramFiles\Git\cmd\git.exe",
+    "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+)
+if (-not $gitCandidates) {
+  $codexGit = Get-ChildItem "$env:USERPROFILE\.cache\codex-runtimes" -Filter git.exe -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -like '*\native\git\cmd\git.exe' } |
+    Select-Object -First 1
+  if ($codexGit) { $gitCandidates = @($codexGit.FullName) }
+}
+if (-not $gitCandidates) { Die "未找到 git.exe，请先安装 Git for Windows。" }
+$git = $gitCandidates[0]
+$ssh = (Get-Command ssh.exe -ErrorAction Stop).Source
+$scp = (Get-Command scp.exe -ErrorAction Stop).Source
+
 Write-Host "===== [1/4] 提交本地改动 =====" -ForegroundColor Cyan
-$dirty = git status --porcelain
+$dirty = & $git status --porcelain
 if ($dirty) {
   if ($Commit) {
-    git add -A
-    git commit -m $Commit
+    & $git add -A
+    & $git commit -m $Commit
     if ($LASTEXITCODE -ne 0) { Die "git commit 失败,已中止" }
   } else {
     Write-Host "有未提交改动:" -ForegroundColor Yellow
-    git status --short
+    & $git status --short
     Die "请先提交,或用  .\deploy-hk.ps1 -Commit `"说明`"  自动提交后再热更。"
   }
 }
 
 Write-Host "===== [2/4] 同步远端(先合并协作者改动,避免push被拒) =====" -ForegroundColor Cyan
-git pull --no-rebase --no-edit origin main
+& $git pull --no-rebase --no-edit origin main
 if ($LASTEXITCODE -ne 0) { Die "git pull 失败(可能有冲突),请手动解决后重试,本次未部署。" }
 
 Write-Host "===== [3/4] 推送 GitHub =====" -ForegroundColor Cyan
-git push origin main
+& $git push origin main
 if ($LASTEXITCODE -ne 0) { Die "git push 失败,已中止(未部署)。请重试。" }
 
-Write-Host "===== [4/4] 触发香港热更 + 验证 =====" -ForegroundColor Cyan
+Write-Host "===== [4/4] SSH增量传输 + 香港热更 + 验证 =====" -ForegroundColor Cyan
+$localHead = (& $git rev-parse HEAD).Trim()
+$serverHead = (& $ssh -o BatchMode=yes $SRV "git -C /opt/grandumi rev-parse HEAD").Trim()
+if ($LASTEXITCODE -ne 0 -or $serverHead -notmatch '^[0-9a-f]{40}$') {
+  Die "无法读取香港服务器版本，请检查 SSH 配置。"
+}
+
+if ($serverHead -ne $localHead) {
+  & $git merge-base --is-ancestor $serverHead $localHead
+  if ($LASTEXITCODE -ne 0) {
+    Die "香港服务器版本不是当前 main 的祖先，已中止以避免覆盖，请人工检查。"
+  }
+
+  $shortHead = $localHead.Substring(0, 12)
+  $bundle = Join-Path ([IO.Path]::GetTempPath()) "grandumi-$shortHead.bundle"
+  $remoteBundle = "/tmp/grandumi-$shortHead.bundle"
+  try {
+    if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
+    & $git bundle create $bundle main "^$serverHead"
+    if ($LASTEXITCODE -ne 0) { Die "创建 Git 增量包失败。" }
+    & $scp -o BatchMode=yes $bundle "${SRV}:$remoteBundle"
+    if ($LASTEXITCODE -ne 0) { Die "上传 Git 增量包失败。" }
+    & $ssh -o BatchMode=yes $SRV "git -C /opt/grandumi fetch '$remoteBundle' refs/heads/main:refs/remotes/origin/main"
+    if ($LASTEXITCODE -ne 0) { Die "香港服务器导入 Git 增量包失败。" }
+  } finally {
+    if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
+  }
+}
+
 $arg = if ($All) { "all" } else { "" }
-ssh $SRV "bash /opt/grandumi/deploy.sh $arg"
+& $ssh -o BatchMode=yes $SRV "bash /opt/grandumi/deploy.sh $arg"
 if ($LASTEXITCODE -ne 0) { Die "香港 deploy.sh 执行报错,请查香港日志。" }
+
+$deployedHead = (& $ssh -o BatchMode=yes $SRV "git -C /opt/grandumi rev-parse HEAD").Trim()
+if ($deployedHead -ne $localHead) { Die "香港版本校验失败：期望 $localHead，实际 $deployedHead" }
 
 # 用 curl.exe --noproxy 绕过本机代理(127.0.0.1:9098),否则代理会把直连香港的请求误判为失败
 $code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://grand-umi.com/"
