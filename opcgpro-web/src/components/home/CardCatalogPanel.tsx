@@ -11,6 +11,7 @@ import {
   CARD_PROPERTIES,
   CARD_RARITIES,
   CARD_SET_GROUPS,
+  compareCatalogCards,
   filterAndSortCards,
 } from "@/lib/cardSearch";
 
@@ -71,7 +72,10 @@ export default function CardCatalogPanel() {
         filterSets,
         filterShowSub1,
       },
-      { includeLeadersWhenAllTypes: true },
+      {
+        includeLeadersWhenAllTypes: true,
+        sortComparator: compareCatalogCards,
+      },
     );
   }, [
     cards,
@@ -244,7 +248,7 @@ export default function CardCatalogPanel() {
             {filterShowSub1 ? "✓ 显示角标 1 卡" : "已隐藏角标 1 卡"}
           </button>
           <span className="text-[10px] text-gray-600">
-            排序：费用升序 · 角标降序 · 新卡集优先
+            排序：卡集顺序 · 卡号升序
           </span>
         </div>
       </header>

@@ -41,6 +41,8 @@ interface CardSearchOptions {
   leaderColor?: string | null;
   /** 图鉴的“全部类型”需要包含领航；组卡普通模式则排除领航。 */
   includeLeadersWhenAllTypes?: boolean;
+  /** 默认使用组卡排序；图鉴可传入按卡号排列的专用比较器。 */
+  sortComparator?: (a: CardData, b: CardData) => number;
 }
 
 export function cardSetOf(card: CardData): string {
@@ -121,6 +123,25 @@ export function compareCards(a: CardData, b: CardData): number {
   return a.number.localeCompare(b.number);
 }
 
+const CATALOG_SET_ORDER = new Map(
+  ALL_SET_NAMES.map((setName, index) => [setName, index]),
+);
+
+/** 图鉴排序：按卡集分组，每个卡集内按卡号数字从低到高排列。 */
+export function compareCatalogCards(a: CardData, b: CardData): number {
+  const setA = cardSetOf(a);
+  const setB = cardSetOf(b);
+  const orderA = CATALOG_SET_ORDER.get(setA) ?? Number.MAX_SAFE_INTEGER;
+  const orderB = CATALOG_SET_ORDER.get(setB) ?? Number.MAX_SAFE_INTEGER;
+
+  if (orderA !== orderB) return orderA - orderB;
+
+  const setComparison = setA.localeCompare(setB, undefined, { numeric: true });
+  if (setComparison !== 0) return setComparison;
+
+  return a.number.localeCompare(b.number, undefined, { numeric: true });
+}
+
 /** 图鉴与组卡界面共用的筛选和排序入口。 */
 export function filterAndSortCards(
   cards: CardData[],
@@ -173,5 +194,5 @@ export function filterAndSortCards(
       }
       return true;
     })
-    .sort(compareCards);
+    .sort(options.sortComparator ?? compareCards);
 }
