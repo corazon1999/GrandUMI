@@ -17,6 +17,7 @@ export const CARD_SET_PATHS: Record<string, string> = {
   OP14: "/data/OP14.json",
   OP15: "/data/OP15.json",
   OP16: "/data/OP16.json",
+  OP17: "/data/OP17.json",
   // Event Base
   EB01: "/data/EB01.json",
   EB02: "/data/EB02.json",
@@ -70,7 +71,7 @@ export const ALL_SET_NAMES = Object.keys(CARD_SET_PATHS);
 // 卡组编辑器搜索时默认加载的卡集（常用集）
 export const DEFAULT_SEARCH_SETS = [
   "OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08",
-  "OP09","OP10","OP11","OP12","OP13","OP14","OP15","OP16",
+  "OP09","OP10","OP11","OP12","OP13","OP14","OP15","OP16","OP17",
   "EB01","EB02","EB03","EB04",
   "ST01","ST02","ST03","ST04","ST05","ST06","ST07","ST08",
   "ST09","ST10","ST11","ST12","ST13","ST14","ST15","ST16",

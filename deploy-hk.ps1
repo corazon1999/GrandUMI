@@ -4,15 +4,17 @@
 #    .\deploy-hk.ps1                  # 推已提交的代码并触发香港重建
 #    .\deploy-hk.ps1 -Commit "说明"   # 先提交当前改动再推+热更
 #    .\deploy-hk.ps1 -All             # 强制前后端全量重建
+#    .\deploy-hk.ps1 -Server "root@8.210.155.25" # 指定 SSH 服务器
 #  流程: 提交 → pull合并协作者改动 → push → SSH增量传输 → 香港重建 → 验证200
 #  注: 本文件必须存为 UTF-8 with BOM,否则 PS5.1 按GBK解码中文会语法报错。
 # ============================================================
 param(
   [string]$Commit = "",
-  [switch]$All
+  [switch]$All,
+  [string]$Server = "grandumi-hk"
 )
 $ErrorActionPreference = "Stop"
-$SRV  = "grandumi-hk"
+$SRV  = $Server
 $repo = $PSScriptRoot
 Set-Location $repo
 
