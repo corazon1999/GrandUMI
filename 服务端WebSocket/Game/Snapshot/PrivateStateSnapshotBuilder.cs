@@ -69,13 +69,13 @@ public static class PrivateStateSnapshotBuilder
         {
             index = playerIndex,
             accountName = player.AccountName,
-            leader = SnapshotCard(player.Leader),
-            hand = player.Hand.Select(SnapshotCard).ToArray(),
-            characters = player.Characters.Select(SnapshotCard).ToArray(),
-            stage = player.StageCard is null ? null : SnapshotCard(player.StageCard),
-            trash = player.Trash.Select(SnapshotCard).ToArray(),
-            deck = player.Deck.Select(SnapshotCard).ToArray(),
-            life = player.LifeArea.Select(SnapshotCard).ToArray(),
+            leader = SnapshotCard(state, playerIndex, player.Leader),
+            hand = player.Hand.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
+            characters = player.Characters.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
+            stage = player.StageCard is null ? null : SnapshotCard(state, playerIndex, player.StageCard),
+            trash = player.Trash.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
+            deck = player.Deck.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
+            life = player.LifeArea.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             donDeck = player.DonDeck.Select(SnapshotDon).ToArray(),
             costArea = player.CostArea.Select(SnapshotDon).ToArray(),
             activeDonCount = player.ActiveDonCount,
@@ -88,7 +88,7 @@ public static class PrivateStateSnapshotBuilder
         };
     }
 
-    private static object SnapshotCard(CardInstance card)
+    private static object SnapshotCard(GameState state, int ownerIndex, CardInstance card)
     {
         return new
         {
@@ -101,7 +101,7 @@ public static class PrivateStateSnapshotBuilder
             basePower = card.Info.Power,
             baseCost = card.Info.Cost,
             currentCost = card.CurrentCost(),
-            counter = card.Info.Counter,
+            counter = Effects.HandStaticCounter.Value(state, ownerIndex, card),
             keywords = card.Info.Keywords,
             isTapped = card.IsTapped,
             turnPlayed = card.TurnPlayed,
@@ -111,6 +111,12 @@ public static class PrivateStateSnapshotBuilder
             costModThisTurn = card.CostModThisTurn,
             costModPersistent = card.CostModPersistent,
             originalPowerOverride = card.OriginalPowerOverride,
+            originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd.Select(x => new
+            {
+                x.Value,
+                x.AppliedBySide,
+                x.EndPhasesSeen,
+            }).ToArray(),
             isEffectsNullified = card.IsEffectsNullified,
             cannotActivateNextReset = card.CannotActivateNextReset,
             gainedKeywords = card.GainedKeywords.Select(k => new

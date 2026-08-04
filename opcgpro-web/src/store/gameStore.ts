@@ -36,6 +36,7 @@ export interface PlayerView {
   name: string;
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
+  handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
   handCount: number;
   fieldCards: FieldCardView[];
   stageNumber: string | null;

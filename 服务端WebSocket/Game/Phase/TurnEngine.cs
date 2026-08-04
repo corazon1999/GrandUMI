@@ -200,6 +200,12 @@ public static class TurnEngine
             if (m.EndPhasesSeen == 0) { m.EndPhasesSeen = 1; return false; }
             return true;
         });
+        c.OriginalPowerOverridesUntilOppEnd.RemoveAll(m =>
+        {
+            if (m.AppliedBySide >= 0) return currentTurnPlayer == 1 - m.AppliedBySide;
+            if (m.EndPhasesSeen == 0) { m.EndPhasesSeen = 1; return false; }
+            return true;
+        });
     }
 
     private static bool IsSourceCardOnField(GameState s, string sourceId)

@@ -33,6 +33,7 @@ public enum EffectTrigger
     OnAllyWillLeaveField,   // 守护者：我方角色因对方效果"将要离开场上"时（KO/退手牌/回卡组/置入生命，payload: victimId, victimOwner, kind）让"代替离场"置换效果有机会发动
     OnAnyCharKOd,           // 当(任意一方)角色被KO时（payload: cardId, owner, reason="battle"|"effect"）场上他卡可据此反应
     OnBattleEnd,            // 战斗结束时（在 EndBattle 清场前派发；CurrentBattle 仍可读，payload: attackerId/defenderPlayerIdx/targetCardId/targetIsLeader）
+    OnLeaderBattle,         // 任一领袖攻击或成为攻击对象时（场上旁观卡使用，payload: attackerId/targetLeaderOwner）
     OnTriggerActivated,     // 当(某方)发动生命【触发】时（payload: owner=发动方）——元触发，OP05-109
     OnHandDiscarded,        // 当(某方)手牌因效果被丢弃时（payload: owner）——OP14-056
     // 启动效果（玩家主动）

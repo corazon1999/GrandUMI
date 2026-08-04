@@ -553,7 +553,8 @@ public class GameEngine
         if (State.CurrentBattle is null) return;
         var defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
         var def = State.Players[defenderIdx];
-        bool canCounter = def.Hand.Any(c => c.Info.Counter > 0 || Array.IndexOf(c.Info.EffectTags, "EventCounter") >= 0);
+        bool canCounter = def.Hand.Any(c => HandStaticCounter.Value(State, defenderIdx, c) > 0
+                                         || Array.IndexOf(c.Info.EffectTags, "EventCounter") >= 0);
         if (!canCounter)
         {
             BattleEngine.PassCounter(State);
@@ -622,11 +623,12 @@ public class GameEngine
             int handIndex = hi.GetInt32();
             if (handIndex < 0 || handIndex >= def.Hand.Count) { SendError(playerIndex, "手牌索引非法"); return; }
             var counterCard = def.Hand[handIndex];
-            if (counterCard.Info.Counter <= 0) { SendError(playerIndex, "该卡无反击值"); return; }
+            int counterValue = HandStaticCounter.Value(State, playerIndex, counterCard);
+            if (counterValue <= 0) { SendError(playerIndex, "该卡无反击值"); return; }
             def.Hand.RemoveAt(handIndex);
             def.Trash.Add(counterCard);
-            BattleEngine.ApplyCounter(State, playerIndex, counterCard.Info.Counter);
-            Broadcast("CounterIcon", new { handIndex, value = counterCard.Info.Counter });
+            BattleEngine.ApplyCounter(State, playerIndex, counterValue);
+            Broadcast("CounterIcon", new { handIndex, value = counterValue });
         }
         else
         {

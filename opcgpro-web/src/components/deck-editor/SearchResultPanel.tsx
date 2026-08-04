@@ -10,7 +10,7 @@ import CardInfoPanel from "@/components/game/CardInfoPanel";
 import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPreview";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
-import { filterAndSortCards } from "@/lib/cardSearch";
+import { compareCatalogCards, filterAndSortCards } from "@/lib/cardSearch";
 
 const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪烁）
 const CARD_WIDTH    = 72;   // w-16(64px) + gap
@@ -53,6 +53,7 @@ export default function SearchResultPanel() {
       {
         allowedSets: whitelist,
         leaderColor: leader?.color,
+        sortComparator: filterSets.length === 1 ? compareCatalogCards : undefined,
       },
     );
   }, [format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
@@ -225,7 +226,7 @@ function CardGridItem({
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.15 }}
       className="group flex flex-col items-center gap-1 transform-gpu backface-hidden"
-      onMouseEnter={(e) => onMouseEnter(card, e.currentTarget.getBoundingClientRect(), currentSrc)}
+      onMouseEnter={(e) => onMouseEnter(card, e.currentTarget.getBoundingClientRect(), rawSrc)}
       onMouseLeave={onMouseLeave}
     >
       <div

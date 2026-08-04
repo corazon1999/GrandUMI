@@ -92,9 +92,17 @@ public static class ActionValidator
             && HasKeyword(s, attacker, "登场回合无法攻击领袖"))
             return Fail("此角色在登场回合中无法攻击领袖");
 
+        // OP17-044 约翰船长：满足条件且处于休息状态时，对方只能攻击同名角色（领袖也不能成为目标）。
+        bool johnTargetLock = op.Characters.Any(c =>
+            c.Info.Number == "OP17-044"
+            && c.IsTapped
+            && !c.IsEffectsNullified
+            && op.Leader.Info.HasKeyword("洛克斯海盗团"));
+
         // 目标：对方领袖或对方休息状态角色
         if (targetIsLeader)
         {
+            if (johnTargetLock) return Fail("对方效果限制：只能攻击“约翰船长”角色");
             // 领袖必然合法（除非有"无法被攻击"效果，暂不实现）
             return OkResult;
         }
@@ -106,6 +114,8 @@ public static class ActionValidator
             HasKeyword(s, c, "仅可攻击角色：尤斯塔斯·基德"));
         if (kidTargetLock && !target.MatchesName("尤斯塔斯·基德"))
             return Fail("对方效果限制：只能攻击“尤斯塔斯·基德”角色");
+        if (johnTargetLock && !target.MatchesName("约翰船长"))
+            return Fail("对方效果限制：只能攻击“约翰船长”角色");
         // 通常只能攻击休息状态角色；带"可攻击活跃"授予的攻击者可攻击活跃角色
         if (!target.IsTapped && !HasKeyword(s, attacker, "可攻击活跃")) return Fail("不能攻击活跃状态的角色");
         // 按费用禁攻（OP12-020：本回合此领袖无法攻击对方原本费用≤N角色）

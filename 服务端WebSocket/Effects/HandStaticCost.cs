@@ -24,6 +24,16 @@ public static class HandStaticCost
 
         switch (card.Info.Number)
         {
+            // OP17-005 爱德华·纽哥特：对方存在力量≥10000角色 → 手牌费用-4
+            case "OP17-005":
+                return state.Players[1 - playerIdx].Characters.Any(c =>
+                    state.CurrentPowerOf(1 - playerIdx, c) >= 10000) ? -4 : 0;
+
+            // OP17-013 波特夹斯·D·艾斯：对方存在力量≥10000角色 → 手牌费用-2
+            case "OP17-013":
+                return state.Players[1 - playerIdx].Characters.Any(c =>
+                    state.CurrentPowerOf(1 - playerIdx, c) >= 10000) ? -2 : 0;
+
             // OP16-005 沙奇：我方场上存在力量≥8000 且特征含〈白胡子海盗团〉的角色 → 费用-3
             case "OP16-005":
                 return me.Characters.Any(c =>

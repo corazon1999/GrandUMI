@@ -65,10 +65,12 @@ export default function HandArea({ side, hidden = false }: Props) {
   // 防守方判断用 isDefender（攻击者属于对手），兼容 GM「对手领袖攻击」在我方回合制造的战斗。
   const isCounterStep = !hidden && side === "my" && phase === "Counter" && isDefender;
   const myActiveDon = side === "my" && player ? player.costActive : 0;
+  const effectiveCounter = (c: ReturnType<typeof getCard> | null, i: number) =>
+    (side === "my" ? player.handCardCounters?.[i] : undefined) ?? c?.counter ?? 0;
 
   // 反击事件是否可打：带 EventCounter 标签，且有效费用 ≤ 当前活跃咚
   const isCounterEventPlayable = (c: ReturnType<typeof getCard> | null, i: number) =>
-    isCounterStep && !!c && (c.counter ?? 0) <= 0 &&
+    isCounterStep && !!c && effectiveCounter(c, i) <= 0 &&
     c.effectTags.includes("EventCounter") &&
     ((side === "my" ? player.handCardCosts?.[i] : undefined) ?? c.cost) <= myActiveDon;
 
@@ -97,7 +99,7 @@ export default function HandArea({ side, hidden = false }: Props) {
     if (hidden || isPending) return;
     if (isCounterStep) {
       const c = cards[i];
-      if (c && c.counter > 0) GameRequest.playCounterFromHand(i);
+      if (c && effectiveCounter(c, i) > 0) GameRequest.playCounterFromHand(i);
       else if (isCounterEventPlayable(c, i)) GameRequest.playCounterEvent(i);
       return;
     }
@@ -113,7 +115,7 @@ export default function HandArea({ side, hidden = false }: Props) {
       <AnimatePresence>
         {cards.map((card, i) => {
           const counterPlayable =
-            (isCounterStep && (card?.counter ?? 0) > 0) || isCounterEventPlayable(card, i);
+            (isCounterStep && effectiveCounter(card, i) > 0) || isCounterEventPlayable(card, i);
           return (
             <motion.div
               key={stableKeys[i]}

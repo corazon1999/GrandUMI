@@ -55,6 +55,14 @@ public static class AtomicOps
     public static void AddPowerUntilOppEnd(CardInstance c, int delta, int appliedBy)
         => c.PowerModsUntilOppEnd.Add(new CardPowerMod { Delta = delta, AppliedBySide = appliedBy });
 
+    /// <summary>将原本力量覆盖为指定值，持续到施加方的下个对方结束阶段。</summary>
+    public static void SetOriginalPowerUntilOppEnd(CardInstance c, int value, int appliedBy)
+        => c.OriginalPowerOverridesUntilOppEnd.Add(new OriginalPowerOverrideUntilOppEnd
+        {
+            Value = value,
+            AppliedBySide = appliedBy,
+        });
+
     // ── 状态切换 ──────────────────────────────────────────────────────────
 
     public static void RestCard(CardInstance c)
@@ -663,6 +671,7 @@ public static class AtomicOps
         c.PowerModThisBattle = 0;
         c.PowerModPersistent = 0;
         c.PowerModsUntilOppEnd.Clear();
+        c.OriginalPowerOverridesUntilOppEnd.Clear();
         c.GainedKeywords.Clear();
         c.CannotActivateNextReset = false;
         c.OncePerTurnUsedKeys.Clear();

@@ -72,6 +72,22 @@ public static class BattleEngine
         }
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAttackDeclare, prompts);
         if (s.IsGameOver) return;
+        if (s.CurrentBattle is { } leaderBattle)
+        {
+            var attackerSide = s.Players[leaderBattle.AttackerPlayerIndex];
+            bool attackerIsLeader = attackerSide.Leader.Id == leaderBattle.AttackerCardId;
+            if (attackerIsLeader || leaderBattle.TargetIsLeader)
+            {
+                await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLeaderBattle, prompts,
+                    new Dictionary<string, object?>
+                    {
+                        ["attackerId"] = leaderBattle.AttackerCardId.ToString(),
+                        ["attackerOwner"] = leaderBattle.AttackerPlayerIndex,
+                        ["targetLeaderOwner"] = leaderBattle.TargetIsLeader ? leaderBattle.DefenderPlayerIndex : -1,
+                    });
+                if (s.IsGameOver) return;
+            }
+        }
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnOppAttackDeclare, prompts,
             new Dictionary<string, object?> { ["AttackerIdx"] = s.CurrentBattle!.AttackerPlayerIndex });
         if (s.IsGameOver) return;

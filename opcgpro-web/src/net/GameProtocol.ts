@@ -87,8 +87,9 @@ export function registerGameProtocols() {
     }
   });
 
-  // 重连/刷新后的对局恢复改由 HomeProtocol 的自动登录触发：
-  // 后端 OnLogin → TryReclaim 会按账号找回房间并回发完整 Resync 快照。
+  // 对局中的网络重连会由 HomeProtocol 自动重新登录；整页刷新则由玩家
+  // 在登录页确认账号后触发登录。后端 OnLogin → TryReclaim 会按账号找回房间
+  // 并回发完整 Resync 快照。
   // 不再在此直接 requestState：整页刷新后是全新 SessionId，尚未绑定房间，
   // 直接 requestState 会落空甚至被判“对局已结束”而误踢。
 }

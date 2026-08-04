@@ -53,6 +53,9 @@ public class CardInstance
     /// <summary>原本力量修正（"原本的力量变为 X"）</summary>
     public int? OriginalPowerOverride { get; set; }
 
+    /// <summary>“原本力量变为X，直到下个对方结束阶段”为止的跨回合覆盖；后加入者优先。</summary>
+    public List<OriginalPowerOverrideUntilOppEnd> OriginalPowerOverridesUntilOppEnd { get; } = new();
+
     /// <summary>效果是否被无效化（OnXxx 触发被跳过）</summary>
     public bool IsEffectsNullified { get; set; }
 
@@ -87,12 +90,22 @@ public class CardInstance
     /// <summary>当前总力量（含修正，可为负）</summary>
     public int CurrentPower(int donAttachedCount, bool ownerTurn)
     {
-        int baseP = OriginalPowerOverride ?? Info.Power;
+        int baseP = OriginalPowerOverride
+            ?? OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
+            ?? Info.Power;
         int donBonus = ownerTurn ? donAttachedCount * 1000 : 0;
         int untilOppEnd = 0;
         foreach (var m in PowerModsUntilOppEnd) untilOppEnd += m.Delta;
         return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent + untilOppEnd;
     }
+}
+
+/// <summary>持续到施加方下个对方结束阶段的原本力量覆盖。</summary>
+public class OriginalPowerOverrideUntilOppEnd
+{
+    public required int Value { get; init; }
+    public int AppliedBySide { get; init; } = -1;
+    public int EndPhasesSeen { get; set; }
 }
 
 /// <summary>"直到下个对方结束阶段"持续的单次力量修正。清除规则同关键字/限制：仅在"对方"(1-AppliedBySide)的结束阶段清。</summary>

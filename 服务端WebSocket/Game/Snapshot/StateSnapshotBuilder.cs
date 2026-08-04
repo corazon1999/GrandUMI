@@ -86,6 +86,8 @@ public static class StateSnapshotBuilder
             handCardNumbers = asSelf ? p.Hand.Select(c => c.Info.Number).ToArray() : Array.Empty<string>(),
             // 每张手牌的有效费用（含手牌静态减费/持续光环），仅下发给己方供 UI 显示；对手为空
             handCardCosts  = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
+            // 动态反击值（OP17-063/118）；仅己方可见，并与手牌顺序一一对应。
+            handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),
             handCount      = p.Hand.Count,
             fieldCards     = p.Characters.Select(c => new
             {

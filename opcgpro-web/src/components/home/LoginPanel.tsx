@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
@@ -17,6 +17,10 @@ export default function LoginPanel() {
   const connState = useNetStore((s) => s.connState);
   const error = useNetStore((s) => s.error);
   const canLogin = connState === "connected";
+
+  useEffect(() => {
+    setAccount(localStorage.getItem("grandumi_account") ?? "");
+  }, []);
 
   const handleLogin = () => {
     if (!account.trim()) return;

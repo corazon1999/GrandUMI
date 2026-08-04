@@ -120,12 +120,11 @@ export function registerHomeProtocols() {
     }
   });
 
-  // 握手成功后（首连/重连/整页刷新）若本地存有账号则自动登录。
-  // 后端 OnLogin 会自动 TryReclaim：找回进行中的对局并回发完整快照，从而恢复棋盘。
-  eventBus.on("connectSucc", () => {
-    if (typeof window === "undefined") return;
-    const saved = localStorage.getItem("grandumi_account");
-    if (saved) HomeRequest.login(saved);
+  // 仅在已登录会话发生网络断线时自动重新登录。
+  // 整页刷新会重建 store，此时必须由玩家在登录页确认账号后再恢复对局。
+  eventBus.on("reconnected", () => {
+    const { loggedIn, account } = useNetStore.getState();
+    if (loggedIn && account) HomeRequest.login(account);
   });
 }
 
@@ -161,7 +160,7 @@ function handleLogin(msg: MsgLogin) {
     const displayName = saved || msg.name || account;
     store.setLoggedIn(true, displayName, account);
     store.setError(null);
-    // 持久化账号，供刷新/重连后自动登录恢复登录态与进行中的对局
+    // 持久化账号仅用于下次打开登录页时预填；刷新后仍需玩家主动确认
     if (typeof window !== "undefined" && account) {
       localStorage.setItem("grandumi_account", account);
     }

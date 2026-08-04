@@ -277,8 +277,7 @@
     "counter": "反击+1000",
     "effectTags": [
       "OnKO",
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -390,8 +389,7 @@
     "keyWords": "红发海盗团旗下",
     "counter": "",
     "effectTags": [
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -413,7 +411,8 @@
     "keyWords": "红发海盗团",
     "counter": "反击+1000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnLeaderBattle"
     ],
     "abilities": [
       "流放"
@@ -852,8 +851,8 @@
     "counter": "",
     "effectTags": [
       "OnEnterField",
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "PreKO",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -898,8 +897,7 @@
     "counter": "",
     "effectTags": [
       "OnEnterField",
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1918,8 +1916,7 @@
     "keyWords": "埃鲁巴夫,草帽一伙",
     "counter": "反击+2000",
     "effectTags": [
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
