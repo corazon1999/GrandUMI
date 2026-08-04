@@ -1795,7 +1795,7 @@ public static class DslInterpreter
             "OpponentHand"                => opp.Hand.ToList(),
             "OpponentLifeAll"             => opp.LifeArea.ToList(),
             // D 阶段新增：更丰富的候选范围
-            "OpponentCharacterCostLe0"    => opp.Characters.Where(c => c.Info.Cost <= 0).ToList(),
+            "OpponentCharacterCostLe0"    => opp.Characters.Where(c => s.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 0).ToList(),
             "OpponentCharacterCostLe1"    => opp.Characters.Where(c => c.Info.Cost <= 1).ToList(),
             "OpponentCharacterCostLe2"    => opp.Characters.Where(c => c.Info.Cost <= 2).ToList(),
             "OpponentCharacterCostLe3"    => opp.Characters.Where(c => c.Info.Cost <= 3).ToList(),

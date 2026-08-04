@@ -9416,6 +9416,12 @@
   "OP17-008": [
     "/cards/op17/OP17-008.png"
   ],
+  "OP17-010": [
+    "/cards/op17/OP17-010.png"
+  ],
+  "OP17-011": [
+    "/cards/op17/OP17-011.png"
+  ],
   "OP17-012": [
     "/cards/op17/OP17-012.png"
   ],
@@ -9425,6 +9431,9 @@
   "OP17-015": [
     "/cards/op17/OP17-015.png"
   ],
+  "OP17-018": [
+    "/cards/op17/OP17-018.png"
+  ],
   "OP17-019": [
     "/cards/op17/OP17-019.png"
   ],
@@ -9433,6 +9442,9 @@
   ],
   "OP17-022": [
     "/cards/op17/OP17-022.png"
+  ],
+  "OP17-023": [
+    "/cards/op17/OP17-023.png"
   ],
   "OP17-024": [
     "/cards/op17/OP17-024.png"
@@ -9468,7 +9480,10 @@
     "/cards/op17/OP17-034.png"
   ],
   "OP17-035": [
-    "/cards/op17/OP17-035.jpg"
+    "/cards/op17/OP17-035.png"
+  ],
+  "OP17-036": [
+    "/cards/op17/OP17-036.png"
   ],
   "OP17-037": [
     "/cards/op17/OP17-037.png"
@@ -9477,7 +9492,7 @@
     "/cards/op17/OP17-038.png"
   ],
   "OP17-039": [
-    "/cards/op17/OP17-039.jpg"
+    "/cards/op17/OP17-039.png"
   ],
   "OP17-040": [
     "/cards/op17/OP17-040.png"
@@ -9510,7 +9525,7 @@
     "/cards/op17/OP17-050.png"
   ],
   "OP17-051": [
-    "/cards/op17/OP17-051.jpg"
+    "/cards/op17/OP17-051.png"
   ],
   "OP17-052": [
     "/cards/op17/OP17-052.png"
@@ -9557,14 +9572,29 @@
   "OP17-066": [
     "/cards/op17/OP17-066.png"
   ],
+  "OP17-067": [
+    "/cards/op17/OP17-067.png"
+  ],
+  "OP17-068": [
+    "/cards/op17/OP17-068.png"
+  ],
+  "OP17-070": [
+    "/cards/op17/OP17-070.png"
+  ],
   "OP17-071": [
     "/cards/op17/OP17-071.png"
   ],
   "OP17-072": [
-    "/cards/op17/OP17-072.png"
+    "/cards/op17/OP17-072.jpg"
+  ],
+  "OP17-073": [
+    "/cards/op17/OP17-073.png"
   ],
   "OP17-074": [
     "/cards/op17/OP17-074.png"
+  ],
+  "OP17-076": [
+    "/cards/op17/OP17-076.png"
   ],
   "OP17-078": [
     "/cards/op17/OP17-078.png"
@@ -9585,22 +9615,22 @@
     "/cards/op17/OP17-083.png"
   ],
   "OP17-084": [
-    "/cards/op17/OP17-084.png"
+    "/cards/op17/OP17-084.jpg"
   ],
   "OP17-085": [
     "/cards/op17/OP17-085.png"
   ],
+  "OP17-086": [
+    "/cards/op17/OP17-086.png"
+  ],
   "OP17-087": [
     "/cards/op17/OP17-087.png"
-  ],
-  "OP17-088": [
-    "/cards/op17/OP17-088.png"
   ],
   "OP17-089": [
     "/cards/op17/OP17-089.png"
   ],
   "OP17-090": [
-    "/cards/op17/OP17-090.png"
+    "/cards/op17/OP17-090.jpg"
   ],
   "OP17-091": [
     "/cards/op17/OP17-091.png"
@@ -9626,6 +9656,9 @@
   "OP17-101": [
     "/cards/op17/OP17-101.png"
   ],
+  "OP17-102": [
+    "/cards/op17/OP17-102.png"
+  ],
   "OP17-103": [
     "/cards/op17/OP17-103.png"
   ],
@@ -9638,11 +9671,20 @@
   "OP17-106": [
     "/cards/op17/OP17-106.png"
   ],
+  "OP17-107": [
+    "/cards/op17/OP17-107.png"
+  ],
   "OP17-108": [
     "/cards/op17/OP17-108.png"
   ],
   "OP17-109": [
     "/cards/op17/OP17-109.png"
+  ],
+  "OP17-110": [
+    "/cards/op17/OP17-110.png"
+  ],
+  "OP17-111": [
+    "/cards/op17/OP17-111.png"
   ],
   "OP17-112": [
     "/cards/op17/OP17-112.png"
@@ -9652,6 +9694,9 @@
   ],
   "OP17-114": [
     "/cards/op17/OP17-114.png"
+  ],
+  "OP17-115": [
+    "/cards/op17/OP17-115.png"
   ],
   "OP17-116": [
     "/cards/op17/OP17-116.png"

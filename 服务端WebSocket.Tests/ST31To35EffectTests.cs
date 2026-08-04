@@ -77,6 +77,47 @@ public class ST31To35EffectTests
     }
 
     [Fact]
+    public async Task ST32_002_SelectedCharacterCannotAttackBlockOrBeRestedByEffect()
+    {
+        var s = TestScene.New()
+            .MyDeckTop("ST31-003")
+            .OppCharacter("ST31-003")
+            .Build();
+        var oden = new CardInstance { Info = CardDatabase.Get("ST32-002")! };
+        var target = s.Players[1].Characters[0];
+        s.Players[0].Characters.Add(oden);
+
+        await EffectRuntime.Resolve(s, 0, oden, EffectTrigger.OnEnterField,
+            new MockPromptService().QueueChoose(target.Id.ToString()));
+
+        Assert.True(target.HasRestriction(RestrictionKind.CannotBeRested));
+
+        AtomicOps.RestCard(target);
+        Assert.False(target.IsTapped);
+
+        target.GainedKeywords.Add(new TemporaryKeyword
+        {
+            Keyword = "阻挡者",
+            Duration = KeywordDuration.ThisTurn,
+        });
+        s.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            AttackerCardId = oden.Id,
+            DefenderPlayerIndex = 1,
+            TargetIsLeader = true,
+        };
+        s.Phase = Phase.BattleBlock;
+        Assert.False(ActionValidator.CanDeclareBlocker(s, 1, target.Id).Ok);
+
+        s.CurrentBattle = null;
+        s.CurrentTurnPlayer = 1;
+        s.TurnCount = 2;
+        s.Phase = Phase.Main;
+        Assert.False(ActionValidator.CanAttack(s, 1, target.Id, true, null).Ok);
+    }
+
+    [Fact]
     public async Task ST33_004_DiscountTracksEffectDiscardButNotCostsAndClearsAtEndPhase()
     {
         var s = TestScene.New()

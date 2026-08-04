@@ -176,6 +176,50 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-010",
+    "name": "哈尔塔",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "白胡子海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-010.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-011",
+    "name": "拉克约",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "2000",
+    "cost": "3",
+    "keyWords": "白胡子海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-011.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-012",
     "name": "布雷哈姆",
     "color": "红",
@@ -246,6 +290,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-018",
+    "name": "呜啦啦啦啦啦啦！！！",
+    "color": "红",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "四皇,白胡子海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-018.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-019",
     "name": "我没时间跟乳臭未干的小鬼说话",
     "color": "红",
@@ -311,6 +377,29 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-022.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-023",
+    "name": "欧丽婆",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "红发海盗团旗下",
+    "counter": "",
+    "effectTags": [
+      "OnCharLeaveField",
+      "OnAllyWillBeKOd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-023.png",
     "cartograph": ""
   },
   {
@@ -587,7 +676,30 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-035.jpg",
+    "image": "/cards/op17/OP17-035.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-036",
+    "name": "在场的各位 都给我个面子",
+    "color": "绿",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "四皇,红发海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-036.png",
     "cartograph": ""
   },
   {
@@ -655,7 +767,7 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-039.jpg",
+    "image": "/cards/op17/OP17-039.png",
     "cartograph": ""
   },
   {
@@ -803,7 +915,7 @@
     "name": "格罗丽欧莎",
     "color": "蓝",
     "type": "角色",
-    "property": "知",
+    "property": "智",
     "power": "1000",
     "cost": "4",
     "keyWords": "亚马逊·百合,洛克斯海盗团",
@@ -909,7 +1021,7 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-051.jpg",
+    "image": "/cards/op17/OP17-051.png",
     "cartograph": ""
   },
   {
@@ -962,7 +1074,7 @@
     "name": "Miss·芭金戈姆·斯图西",
     "color": "蓝",
     "type": "角色",
-    "property": "知",
+    "property": "智",
     "power": "5000",
     "cost": "3",
     "keyWords": "洛克斯海盗团",
@@ -1241,7 +1353,7 @@
     "name": "黑炭大蛇",
     "color": "紫",
     "type": "角色",
-    "property": "知",
+    "property": "智",
     "power": "0",
     "cost": "1",
     "keyWords": "和之国,黑炭家",
@@ -1256,6 +1368,74 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-066.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-067",
+    "name": "笹木",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "百兽海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-067.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-068",
+    "name": "杰克",
+    "color": "紫",
+    "type": "角色",
+    "property": "打",
+    "power": "10000",
+    "cost": "9",
+    "keyWords": "鱼人族,百兽海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻：角色"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-068.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-070",
+    "name": "巴基尔·霍金斯",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "1000",
+    "cost": "3",
+    "keyWords": "百兽海盗团,霍金斯海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-070.png",
     "cartograph": ""
   },
   {
@@ -1301,7 +1481,29 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-072.png",
+    "image": "/cards/op17/OP17-072.jpg",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-073",
+    "name": "X·德雷克",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "2",
+    "keyWords": "海军,德雷克海盗团,百兽海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-073.png",
     "cartograph": ""
   },
   {
@@ -1326,6 +1528,28 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-074.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-076",
+    "name": "喔咯咯咯咯···！！！我的酒彻底醒了",
+    "color": "紫",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "0",
+    "keyWords": "四皇,百兽海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "咚!!-1：抽取2张卡牌。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-076.png",
     "cartograph": ""
   },
   {
@@ -1482,7 +1706,7 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-084.png",
+    "image": "/cards/op17/OP17-084.jpg",
     "cartograph": ""
   },
   {
@@ -1500,11 +1724,33 @@
     ],
     "abilities": [],
     "effectEvent": "",
-    "rarity": "R",
+    "rarity": "UC",
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-085.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-086",
+    "name": "奈美",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "埃鲁巴夫,草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-086.png",
     "cartograph": ""
   },
   {
@@ -1527,28 +1773,6 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-087.png",
-    "cartograph": ""
-  },
-  {
-    "number": "OP17-088",
-    "name": "奈美",
-    "color": "黑",
-    "type": "角色",
-    "property": "特",
-    "power": "2000",
-    "cost": "1",
-    "keyWords": "埃鲁巴夫,草帽一伙",
-    "counter": "反击+1000",
-    "effectTags": [
-      "OnEnterField"
-    ],
-    "abilities": [],
-    "effectEvent": "",
-    "rarity": "UC",
-    "subscript": 5,
-    "trigger": "",
-    "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-088.png",
     "cartograph": ""
   },
   {
@@ -1592,7 +1816,7 @@
     "subscript": 5,
     "trigger": "",
     "set": "补充包【OPC-17】",
-    "image": "/cards/op17/OP17-090.png",
+    "image": "/cards/op17/OP17-090.jpg",
     "cartograph": ""
   },
   {
@@ -1774,6 +1998,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-102",
+    "name": "夏洛特·烤箱",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "4000",
+    "cost": "4",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "此卡牌登场。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-102.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-103",
     "name": "夏洛特·卡塔库栗",
     "color": "黄",
@@ -1822,7 +2068,7 @@
     "name": "夏洛特·戚风",
     "color": "黄",
     "type": "角色",
-    "property": "知",
+    "property": "智",
     "power": "0",
     "cost": "5",
     "keyWords": "火焰坦克海盗团,原大妈海盗团",
@@ -1862,6 +2108,26 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-107",
+    "name": "夏洛特·大福",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "此卡牌登场。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-107.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-108",
     "name": "夏洛特·布蕾",
     "color": "黄",
@@ -1888,7 +2154,7 @@
     "name": "夏洛特·布玲",
     "color": "黄",
     "type": "角色",
-    "property": "知",
+    "property": "智",
     "power": "4000",
     "cost": "3",
     "keyWords": "大妈海盗团",
@@ -1903,6 +2169,52 @@
     "trigger": "确认我方卡组最上方5张卡牌，公开其中最多1张拥有《大妈海盗团》特征的卡牌并加入手牌。之后，将剩余卡牌自选顺序放回卡组最下方。",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-109.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-110",
+    "name": "夏洛特·佩洛斯佩罗",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "4000",
+    "cost": "7",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "此卡牌登场。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-110.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-111",
+    "name": "夏洛特·蒙道尔",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "此卡牌登场。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-111.png",
     "cartograph": ""
   },
   {
@@ -1969,6 +2281,31 @@
     "trigger": "此卡牌登场。",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-114.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-115",
+    "name": "也是要讲仁义的啊 大白痴们",
+    "color": "黄",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "四皇,大妈海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [
+      "不可阻挡"
+    ],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-115.png",
     "cartograph": ""
   },
   {

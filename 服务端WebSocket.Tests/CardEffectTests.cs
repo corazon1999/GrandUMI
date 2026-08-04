@@ -16,6 +16,37 @@ namespace GrandUMI.Tests;
 public class CardEffectTests
 {
     /// <summary>
+    /// OP14-083 Miss.星期三
+    /// DSL 主动效果：自身放置到废弃区后，对方最多 1 张当前费用为 0 的角色力量 -3000。
+    /// </summary>
+    [Fact]
+    public async Task OP14_083_MissWednesday_Activated_UsesCurrentCostForPowerReduction()
+    {
+        var s = TestScene.New()
+            .OppCharacter("OP15-050")
+            .Build();
+
+        var source = new CardInstance { Info = CardDatabase.Get("OP14-083")! };
+        s.Players[0].Characters.Add(source);
+
+        var target = s.Players[1].Characters[0];
+        target.CostModThisTurn = -target.Info.Cost;
+        Assert.Equal(0, s.CurrentCostOf(1, target));
+
+        var prompts = new MockPromptService()
+            .QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(s, 0, source, EffectTrigger.ActivatedMain, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(
+            h => h.kind == "OpponentCharacterCostLe0"));
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+        Assert.Equal(-3000, target.PowerModThisTurn);
+        Assert.DoesNotContain(source, s.Players[0].Characters);
+        Assert.Contains(source, s.Players[0].Trash);
+    }
+
+    /// <summary>
     /// OP15-004 海猫
     /// DSL: 【登场时】我方领袖力量≤0 → 对方最多 1 张角色力量 -3000
     /// </summary>
@@ -63,6 +94,95 @@ public class CardEffectTests
         Assert.Equal(handBefore + 1, s.Players[0].Hand.Count);
         Assert.Equal(deckBefore - 1, s.Players[0].Deck.Count);
         Assert.Equal(activeDonBefore - 1, s.Players[0].ActiveDonCount);
+    }
+
+    /// <summary>
+    /// OP15-076 雷兽（主要）
+    /// 咚!!-1：领袖为“艾尼路”时抽 1，之后可选择已被减力量的对方角色继续 -1000。
+    /// </summary>
+    [Fact]
+    public async Task OP15_076_Raiju_EventMain_CanSelectAlreadyReducedCharacter()
+    {
+        var s = TestScene.New(myLeaderNumber: "OP15-058")
+            .MyActiveDon(2)
+            .MyDeckTop("OP15-050")
+            .OppCharacter("OP15-050")
+            .Build();
+
+        var target = s.Players[1].Characters[0];
+        target.PowerModThisTurn = -2000;
+        int handBefore = s.Players[0].Hand.Count;
+        int activeDonBefore = s.Players[0].ActiveDonCount;
+        var prompts = new MockPromptService()
+            .QueueChoose(target.Id.ToString());
+        var card = new CardInstance { Info = CardDatabase.Get("OP15-076")! };
+
+        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(h => h.kind == "OpponentCharacter"));
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+        Assert.Equal(-3000, target.PowerModThisTurn);
+        Assert.Equal(handBefore + 1, s.Players[0].Hand.Count);
+        Assert.Equal(activeDonBefore - 1, s.Players[0].ActiveDonCount);
+    }
+
+    /// <summary>
+    /// OP15-076 雷兽（反击）
+    /// 已被减力量的“艾尼路”仍是合法目标，非“艾尼路”角色不可选。
+    /// </summary>
+    [Fact]
+    public async Task OP15_076_Raiju_EventCounter_CanSelectReducedEnelOnly()
+    {
+        var s = TestScene.New(myLeaderNumber: "OP15-058")
+            .MyCharacter("OP15-060")
+            .MyCharacter("OP15-071")
+            .Build();
+
+        var reducedEnel = s.Players[0].Characters[0];
+        var nonEnel = s.Players[0].Characters[1];
+        reducedEnel.PowerModThisTurn = -3000;
+        var prompts = new MockPromptService()
+            .QueueChoose(reducedEnel.Id.ToString());
+        var card = new CardInstance { Info = CardDatabase.Get("OP15-076")! };
+
+        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventCounter, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(h => h.kind == "OwnLeaderOrCharacter"));
+        Assert.Contains(reducedEnel.Id.ToString(), targetPrompt.choices);
+        Assert.DoesNotContain(nonEnel.Id.ToString(), targetPrompt.choices);
+        Assert.Equal(-3000, reducedEnel.PowerModThisTurn);
+        Assert.Equal(2000, reducedEnel.PowerModThisBattle);
+    }
+
+    /// <summary>
+    /// OP15-078 万雷（事件）
+    /// DSL main: 抽 1，之后将对方最多 1 张当前力量不高于 5000 的角色转为休息状态
+    /// </summary>
+    [Fact]
+    public async Task OP15_078_WanLei_EventMain_UsesCurrentPowerForTargetSelection()
+    {
+        var s = TestScene.New()
+            .MyActiveDon(2)
+            .MyDeckTop("OP15-050")
+            .OppCharacter("OP07-064")
+            .OppCharacter("OP07-064")
+            .Build();
+
+        var reducedTarget = s.Players[1].Characters[0];
+        var unreducedTarget = s.Players[1].Characters[1];
+        reducedTarget.PowerModThisTurn = -1000;
+
+        var prompts = new MockPromptService()
+            .QueueChoose(reducedTarget.Id.ToString());
+        var card = new CardInstance { Info = CardDatabase.Get("OP15-078")! };
+
+        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(h => h.kind == "OpponentCharacter"));
+        Assert.Contains(reducedTarget.Id.ToString(), targetPrompt.choices);
+        Assert.DoesNotContain(unreducedTarget.Id.ToString(), targetPrompt.choices);
+        Assert.True(reducedTarget.IsTapped);
+        Assert.False(unreducedTarget.IsTapped);
     }
 
     /// <summary>

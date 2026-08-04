@@ -394,7 +394,7 @@
   },
   "OP15-066": {
     "_name": "阿悟",
-    "_matcher": "登场时【咚!!-1】抽1（攻击时摸排段未实现）",
+    "_matcher": "登场时【咚!!-1】抽1；攻击时咚≤6，确认顶2并自选顺序放置到卡组顶或底",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -518,15 +518,31 @@
   },
   "OP15-076": {
     "_name": "雷兽",
-    "_matcher": "启动主要 咚-N 抽 1",
+    "_matcher": "主要:咚-1且领袖为艾尼路时抽1,之后对方最多1张角色本回合力量-1000;反击:我方最多1张艾尼路本次战斗力量+2000",
     "main": {
       "cost": {
         "donReturn": 1
+      },
+      "if": {
+        "leaderNameEquals": "艾尼路"
       },
       "then": [
         {
           "op": "Draw",
           "n": 1
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "本回合中，对方最多1张角色力量-1000"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$tgt",
+          "delta": -1000
         }
       ]
     },
@@ -535,7 +551,12 @@
         "op": "Choose",
         "prompt": "OwnLeaderOrCharacter",
         "max": 1,
-        "as": "$tgt"
+        "min": 0,
+        "filter": {
+          "nameEquals": "艾尼路"
+        },
+        "as": "$tgt",
+        "text": "本次战斗中，我方最多1张“艾尼路”力量+2000"
       },
       {
         "op": "AddPowerThisBattle",
@@ -593,7 +614,7 @@
           "min": 0,
           "as": "$tgt",
           "filter": {
-            "originalPowerLte": 5000
+            "currentPowerLte": 5000
           },
           "text": "将对方最多1张力量不高于5000的角色转为休息状态"
         },

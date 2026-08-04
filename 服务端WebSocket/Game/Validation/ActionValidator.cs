@@ -71,6 +71,8 @@ public static class ActionValidator
             attacker = ch;
         }
         if (attacker.IsTapped) return Fail("攻击者已休息");
+        if (attacker.HasRestriction(RestrictionKind.CannotBeRested))
+            return Fail("此角色当前无法转为休息状态，不能攻击");
         if (attacker.HasRestriction(RestrictionKind.CannotAttack)) return Fail("此角色本回合无法攻击");
         // 条件性静态禁攻（持续效果，按当前场况实时判定；被效果无效化时本回合解除）
         if (!attacker.IsEffectsNullified && s.HasContinuousRestriction(attacker, RestrictionKind.CannotAttack))
@@ -146,6 +148,8 @@ public static class ActionValidator
         if (card is null)              return Fail("阻挡者不在你场上");
         if (card.IsTapped)             return Fail("阻挡者必须为活跃状态");
         if (!HasKeyword(s, card, "阻挡者")) return Fail("该角色没有【阻挡者】效果");
+        if (card.HasRestriction(RestrictionKind.CannotBeRested))
+            return Fail("此角色当前无法转为休息状态，不能发动【阻挡者】");
         if (card.HasRestriction(RestrictionKind.CannotBeBlocker)) return Fail("该角色本回合不能发动【阻挡者】");
 
         // 不可阻挡 keyword 检查
