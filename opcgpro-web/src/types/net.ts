@@ -314,6 +314,7 @@ export type GameActionType =
   | "DebugKoAll"        // { target: "self" | "opponent" }                       ← GM 调试：KO 一方全部角色
   | "DebugRestAll"      // { target: "self" | "opponent" }                       ← GM 调试：横置一方全部角色
   | "DebugLeaderAttack" // {}                       ← GM 调试：对手领袖攻击我方领袖
+  | "DebugRunOP17Coverage" // {}                    ← GM 调试：巡检当前领航颜色的全部 OP17 卡牌
   | "Surrender";        // {}
 
 /** 服务器推送的场地卡快照 */

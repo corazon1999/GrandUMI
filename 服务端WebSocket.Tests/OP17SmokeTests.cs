@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.Debug;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -85,6 +86,30 @@ public class OP17SmokeTests
         if (crashes.Count == 0) return;
         foreach (var crash in crashes) _log.WriteLine($"{cardNumber} {crash}");
         Assert.Fail($"{cardNumber} 在 {crashes.Count} 个适用触发中发生异常");
+    }
+
+    [Theory]
+    [InlineData("红", 15)]
+    [InlineData("绿", 18)]
+    [InlineData("蓝", 19)]
+    [InlineData("紫", 18)]
+    [InlineData("黑", 18)]
+    [InlineData("黄", 18)]
+    public async Task OP17_GMColorCoverageRunner_CoversEveryCardWithoutFailure(string color, int expectedCount)
+    {
+        _ = TestScene.New().Build();
+
+        var report = await OP17CoverageRunner.RunColorAsync(color);
+
+        Assert.Equal(expectedCount, report.Total);
+        Assert.Equal(expectedCount, report.Passed);
+        Assert.Equal(0, report.Failed);
+        Assert.Equal(expectedCount, report.Results.Select(result => result.Number).Distinct().Count());
+        Assert.All(report.Results, result =>
+        {
+            Assert.True(result.Passed, $"{result.Number}: {result.Message}");
+            Assert.NotEmpty(result.Triggers);
+        });
     }
 
     private static IEnumerable<EffectTrigger> ApplicableTriggers(CardInfo info)

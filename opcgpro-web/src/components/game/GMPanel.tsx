@@ -10,6 +10,25 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameRequest } from "@/net/GameRequest";
+import { useGameStore } from "@/store/gameStore";
+
+interface OP17CoverageCardResult {
+  number: string;
+  name: string;
+  color: string;
+  passed: boolean;
+  triggers: string[];
+  message: string;
+}
+
+interface OP17CoverageReport {
+  color: string;
+  total: number;
+  passed: number;
+  failed: number;
+  results: OP17CoverageCardResult[];
+  error?: string;
+}
 
 export default function GMPanel({ showButton = false }: { showButton?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -19,8 +38,12 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
   const [donCount, setDonCount] = useState("9");
   const [summonNumber, setSummonNumber] = useState("");
   const [summonTarget, setSummonTarget] = useState<"self" | "opponent">("self");
+  const [coverageRunning, setCoverageRunning] = useState(false);
+  const [coverageReports, setCoverageReports] = useState<Record<string, OP17CoverageReport>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const summonInputRef = useRef<HTMLInputElement>(null);
+  const lastAction = useGameStore((s) => s.lastAction);
+  const lastActionPayload = useGameStore((s) => s.lastActionPayloadObj);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -40,6 +63,38 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  useEffect(() => {
+    if (lastAction === "DebugOP17CoverageStarted") {
+      setCoverageRunning(true);
+      return;
+    }
+    if (lastAction !== "DebugOP17CoverageResult" || !lastActionPayload) return;
+
+    const color = String(lastActionPayload.color ?? "未知");
+    const rawResults = Array.isArray(lastActionPayload.results) ? lastActionPayload.results : [];
+    const results: OP17CoverageCardResult[] = rawResults.map((raw) => {
+      const item = raw as Record<string, unknown>;
+      return {
+        number: String(item.number ?? ""),
+        name: String(item.name ?? ""),
+        color: String(item.color ?? color),
+        passed: item.passed === true,
+        triggers: Array.isArray(item.triggers) ? item.triggers.map(String) : [],
+        message: String(item.message ?? ""),
+      };
+    });
+    const report: OP17CoverageReport = {
+      color,
+      total: Number(lastActionPayload.total ?? results.length),
+      passed: Number(lastActionPayload.passed ?? results.filter((item) => item.passed).length),
+      failed: Number(lastActionPayload.failed ?? results.filter((item) => !item.passed).length),
+      results,
+      error: typeof lastActionPayload.error === "string" ? lastActionPayload.error : undefined,
+    };
+    setCoverageReports((current) => ({ ...current, [color]: report }));
+    setCoverageRunning(false);
+  }, [lastAction, lastActionPayload]);
 
   function submit() {
     const num = cardNumber.trim().toUpperCase();
@@ -83,6 +138,11 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
     GameRequest.debugLeaderAttack();
   }
 
+  function runOP17Coverage() {
+    setCoverageRunning(true);
+    GameRequest.debugRunOP17Coverage();
+  }
+
   return (
     <>
       {/* 单人测试专用：左上角浮动 GM 按钮（移动端无 T 键时唤出面板） */}
@@ -116,6 +176,44 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
 
           {/* 内容区：随 GM 指令增多可上下滚动，避免底部指令被裁掉无法点击 */}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <label className="block text-xs font-bold text-amber-300">OP17 当前颜色全卡巡检</label>
+          <button
+            onClick={runOP17Coverage}
+            disabled={coverageRunning}
+            className={`mt-1.5 w-full rounded px-3 py-2 text-sm font-black transition-colors ${
+              coverageRunning
+                ? "cursor-wait bg-slate-800 text-slate-500"
+                : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+            }`}
+          >
+            {coverageRunning ? "巡检中…" : "巡检当前领航颜色"}
+          </button>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            在独立宽松场景中依次运行该颜色每张 OP17 卡的适用触发，不改变当前对局场面。
+          </p>
+          {Object.values(coverageReports).map((report) => (
+            <details key={report.color} className="mt-2 rounded border border-white/10 bg-slate-900/80 px-2 py-1.5">
+              <summary className={`cursor-pointer text-xs font-bold ${report.failed === 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                {report.color}色：{report.passed}/{report.total} 通过
+              </summary>
+              {report.error && <p className="mt-1 text-[10px] text-rose-300">{report.error}</p>}
+              <div className="mt-1.5 max-h-44 space-y-1 overflow-y-auto pr-1">
+                {report.results.map((result) => (
+                  <div key={result.number} className="rounded bg-black/20 px-1.5 py-1 text-[10px] leading-4">
+                    <span className={result.passed ? "text-emerald-300" : "text-rose-300"}>
+                      {result.passed ? "✓" : "✕"} {result.number}
+                    </span>
+                    <span className="ml-1 text-slate-300">{result.name}</span>
+                    <p className="text-slate-500">{result.triggers.join(" / ") || result.message}</p>
+                    {!result.passed && <p className="text-rose-300">{result.message}</p>}
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+
+          <div className="my-2 h-px bg-white/10" />
+
           <label className="block text-xs font-bold text-slate-300">加牌到手牌</label>
           <div className="mt-1.5 flex gap-2">
             <input

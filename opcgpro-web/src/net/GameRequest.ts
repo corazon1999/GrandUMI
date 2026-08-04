@@ -74,6 +74,8 @@ export const GameRequest = {
     send("DebugRestAll", { target }),
   /** GM 调试：对手领袖向我方领袖发起一次完整攻击（含阻挡/反击/伤害结算） */
   debugLeaderAttack: () => send("DebugLeaderAttack"),
+  /** GM 调试：按当前领航颜色运行 OP17 全卡独立场景巡检 */
+  debugRunOP17Coverage: () => send("DebugRunOP17Coverage"),
 
   /** 响应服务器发起的 Prompt */
   respondPrompt: (promptId: string, chosen: string[]) => {

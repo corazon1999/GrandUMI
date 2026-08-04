@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
+using GrandUMI.Game.Debug;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
@@ -32,6 +33,7 @@ public class GameEngine
     /// <summary>最近一次动作触发的最外层 fire-and-forget 效果链；重放在喂下一个动作前等它进入稳定态。</summary>
     private Task _settle = Task.CompletedTask;
     private Task Track(Task t) { _settle = t; return t; }
+    private bool _op17CoverageRunning;
 
     /// <summary>
     /// 用双方 deck 字符串构造引擎（已通过 DeckValidator 校验）
@@ -117,6 +119,7 @@ public class GameEngine
             case "DebugKoAll":     _ = HandleDebugKoAllAsync(playerIndex, data); break;
             case "DebugRestAll":   HandleDebugRestAll(playerIndex, data); break;
             case "DebugLeaderAttack": _ = HandleDebugLeaderAttackAsync(playerIndex); break;
+            case "DebugRunOP17Coverage": _ = Track(HandleDebugRunOP17CoverageAsync(playerIndex)); break;
             default:
                 SendError(playerIndex, $"未知动作: {action}");
                 break;
@@ -354,6 +357,64 @@ public class GameEngine
             await AdvanceBattleAfterAttackDeclareAsync(attackerIdx);
         }
         catch (Exception ex) { Console.Error.WriteLine($"[GM] 对手领袖攻击异常: {ex.Message}"); }
+    }
+
+    // ── GM 调试：按当前领航颜色运行 OP17 全卡独立场景巡检 ──────────────────
+    private async Task HandleDebugRunOP17CoverageAsync(int playerIndex)
+    {
+        if (_op17CoverageRunning)
+        {
+            SendError(playerIndex, "本房间已有 OP17 巡检正在运行");
+            return;
+        }
+
+        string color = State.Players[playerIndex].Leader.Info.ColorList.FirstOrDefault() ?? "";
+        if (!OP17CoverageRunner.Colors().Contains(color, StringComparer.Ordinal))
+        {
+            SendError(playerIndex, $"当前领航颜色“{color}”不属于 OP17 巡检范围");
+            return;
+        }
+
+        _op17CoverageRunning = true;
+        Broadcast("DebugOP17CoverageStarted", new { player = playerIndex, color });
+        try
+        {
+            var report = await OP17CoverageRunner.RunColorAsync(color);
+            Broadcast("DebugOP17CoverageResult", new
+            {
+                player = playerIndex,
+                color = report.Color,
+                total = report.Total,
+                passed = report.Passed,
+                failed = report.Failed,
+                results = report.Results.Select(result => new
+                {
+                    number = result.Number,
+                    name = result.Name,
+                    color = result.Color,
+                    passed = result.Passed,
+                    triggers = result.Triggers,
+                    message = result.Message,
+                }),
+            });
+        }
+        catch (Exception ex)
+        {
+            Broadcast("DebugOP17CoverageResult", new
+            {
+                player = playerIndex,
+                color,
+                total = 0,
+                passed = 0,
+                failed = 1,
+                results = Array.Empty<OP17CoverageCardResult>(),
+                error = ex.Message,
+            });
+        }
+        finally
+        {
+            _op17CoverageRunning = false;
+        }
     }
 
     // ── 出牌 ───────────────────────────────────────────────────────────────

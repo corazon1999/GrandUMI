@@ -99,6 +99,10 @@ public static class ActionLogFormatter
                 return $"{Side(GetInt(payload, "player"))}【GM】KO 了 {Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
             case "DebugRestAll":
                 return $"{Side(GetInt(payload, "player"))}【GM】横置了 {Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
+            case "DebugOP17CoverageStarted":
+                return $"{Side(GetInt(payload, "player"))}【GM】开始巡检 OP17 {GetStr(payload, "color")}色卡牌";
+            case "DebugOP17CoverageResult":
+                return $"{Side(GetInt(payload, "player"))}【GM】完成 OP17 {GetStr(payload, "color")}色巡检：{GetInt(payload, "passed")}/{GetInt(payload, "total")} 通过";
 
             default:
                 return ""; // 其余动作不记录到操作日志

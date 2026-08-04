@@ -3,6 +3,7 @@ using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Validation;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Xunit;
 
@@ -177,5 +178,30 @@ public class OP17EffectTests
         Assert.Equal(before + 1, engine.State.Players[1].LifeArea.Count);
         Assert.Equal("OP17-117", engine.State.Players[1].LifeArea[0].Info.Number);
         Assert.False(engine.State.Players[1].LifeArea[0].IsLifeFaceUp);
+    }
+
+    [Fact]
+    public async Task DebugRunOP17Coverage_BroadcastsCurrentLeaderColorReport()
+    {
+        _ = TestScene.New().Build();
+        var deck = LegalOp17Deck("OP17-001");
+        var engine = new GameEngine("op17-coverage", ("s0", "alice", deck), ("s1", "bob", deck), 0, 17);
+        var messages = new ConcurrentQueue<string>();
+        engine.OnSendToPlayer = (player, payload) =>
+        {
+            if (player == 0) messages.Enqueue(JsonSerializer.Serialize(payload));
+        };
+
+        engine.HandleAction(0, "DebugRunOP17Coverage", JsonSerializer.SerializeToElement(new { }));
+        await engine.WaitSettledAsync(60_000);
+
+        var parsed = messages.Select(message => JsonDocument.Parse(message)).ToList();
+        Assert.Contains(parsed, document => document.RootElement.GetProperty("lastAction").GetString() == "DebugOP17CoverageStarted");
+        var resultMessage = Assert.Single(parsed.Where(document =>
+            document.RootElement.GetProperty("lastAction").GetString() == "DebugOP17CoverageResult"));
+        using var resultPayload = JsonDocument.Parse(resultMessage.RootElement.GetProperty("actionPayload").GetString()!);
+        Assert.Equal("红", resultPayload.RootElement.GetProperty("color").GetString());
+        Assert.Equal(15, resultPayload.RootElement.GetProperty("total").GetInt32());
+        Assert.Equal(0, resultPayload.RootElement.GetProperty("failed").GetInt32());
     }
 }
