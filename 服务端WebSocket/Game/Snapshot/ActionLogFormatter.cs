@@ -89,6 +89,8 @@ public static class ActionLogFormatter
             // ── GM 调试动作 ──
             case "DebugAddCard":
                 return $"{Side(GetInt(payload, "player"))}【GM】将 {Name(GetStr(payload, "cardNumber"))} 加入手牌";
+            case "DebugAddLife":
+                return $"{Side(GetInt(payload, "player"))}【GM】将 {Name(GetStr(payload, "cardNumber"))} 置于 {Side(GetInt(payload, "target"))}生命区顶端";
             case "DebugAddDon":
                 return $"{Side(GetInt(payload, "player"))}【GM】增加 {GetInt(payload, "count", 1)} 个咚";
             case "DebugSummon":

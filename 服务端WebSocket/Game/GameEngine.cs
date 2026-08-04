@@ -110,6 +110,7 @@ public class GameEngine
             case "PromptResponse": HandlePromptResponse(playerIndex, data); break;
             case "UseEffect":      HandleUseEffect(playerIndex, data); break;
             case "DebugAddCard":   HandleDebugAddCard(playerIndex, data); break;
+            case "DebugAddLife":   HandleDebugAddLife(playerIndex, data); break;
             case "DebugAddDon":    HandleDebugAddDon(playerIndex, data); break;
             case "DebugRefreshDon": HandleDebugRefreshDon(playerIndex); break;
             case "DebugSummon":    _ = HandleDebugSummonAsync(playerIndex, data); break;
@@ -161,6 +162,26 @@ public class GameEngine
         var card = new CardInstance { Info = info };
         State.Players[playerIndex].Hand.Add(card);
         Broadcast("DebugAddCard", new { player = playerIndex, cardNumber = number });
+    }
+
+    // ── GM 调试：按编号将卡牌置于指定一方生命区顶端 ─────────────────────────
+    // 用于确定性验证生命【触发】，避免依赖洗牌后随机进入生命区。
+    private void HandleDebugAddLife(int playerIndex, JsonElement data)
+    {
+        if (!data.TryGetProperty("cardNumber", out var cn) || cn.ValueKind != JsonValueKind.String)
+        { SendError(playerIndex, "缺少 cardNumber"); return; }
+        var number = cn.GetString()!.Trim();
+
+        var info = CardDatabase.Get(number);
+        if (info == null) { SendError(playerIndex, $"未知卡牌编号: {number}"); return; }
+
+        var target = data.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.String
+            ? t.GetString()
+            : "self";
+        var targetIndex = target == "opponent" ? 1 - playerIndex : playerIndex;
+        var card = new CardInstance { Info = info, IsLifeFaceUp = false };
+        State.Players[targetIndex].LifeArea.Insert(0, card);
+        Broadcast("DebugAddLife", new { player = playerIndex, target = targetIndex, cardNumber = number });
     }
 
     // ── GM 调试：加咚（活跃）到费用区 ──────────────────────────────────────

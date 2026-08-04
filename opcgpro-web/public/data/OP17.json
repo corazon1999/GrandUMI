@@ -411,8 +411,7 @@
     "keyWords": "红发海盗团",
     "counter": "反击+1000",
     "effectTags": [
-      "OnEnterField",
-      "OnLeaderBattle"
+      "OnEnterField"
     ],
     "abilities": [
       "流放"
@@ -780,7 +779,8 @@
     "keyWords": "洛克斯海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnLeaderBattle"
     ],
     "abilities": [],
     "effectEvent": "",

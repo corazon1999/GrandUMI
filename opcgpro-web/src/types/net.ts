@@ -307,6 +307,7 @@ export type GameActionType =
   | "EndTurn"           // {}
   | "ConfirmDamage"     // {}
   | "DebugAddCard"      // { cardNumber: string }  ← GM 调试：加牌到手牌
+  | "DebugAddLife"      // { cardNumber: string; target: "self" | "opponent" } ← GM 调试：置于生命区顶端
   | "DebugAddDon"       // { count: number }       ← GM 调试：加咚
   | "DebugRefreshDon"   // {}                       ← GM 调试：刷新所有咚
   | "DebugSummon"       // { cardNumber: string; target: "self" | "opponent" }  ← GM 调试：召唤到场上

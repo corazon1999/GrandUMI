@@ -14,6 +14,8 @@ import { GameRequest } from "@/net/GameRequest";
 export default function GMPanel({ showButton = false }: { showButton?: boolean }) {
   const [open, setOpen] = useState(false);
   const [cardNumber, setCardNumber] = useState("");
+  const [lifeNumber, setLifeNumber] = useState("");
+  const [lifeTarget, setLifeTarget] = useState<"self" | "opponent">("self");
   const [donCount, setDonCount] = useState("9");
   const [summonNumber, setSummonNumber] = useState("");
   const [summonTarget, setSummonTarget] = useState<"self" | "opponent">("self");
@@ -49,6 +51,12 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
   function submitDon() {
     const n = parseInt(donCount, 10);
     GameRequest.debugAddDon(Number.isFinite(n) && n > 0 ? n : 1);
+  }
+
+  function submitLife() {
+    const num = lifeNumber.trim().toUpperCase();
+    if (!num) return;
+    GameRequest.debugAddLife(num, lifeTarget);
   }
 
   function refreshDon() {
@@ -129,6 +137,48 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           </div>
           <p className="mt-1.5 text-[11px] text-slate-500">
             输入卡牌编号后回车或点"添加"，可连续加牌。
+          </p>
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <label className="block text-xs font-bold text-slate-300">置于生命区顶端</label>
+          <div className="mt-1.5 flex gap-1 rounded border border-slate-600 bg-slate-900 p-0.5">
+            <button
+              onClick={() => setLifeTarget("self")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+                lifeTarget === "self" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              我方生命
+            </button>
+            <button
+              onClick={() => setLifeTarget("opponent")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+                lifeTarget === "opponent" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              对方生命
+            </button>
+          </div>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              value={lifeNumber}
+              onChange={(e) => setLifeNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitLife();
+              }}
+              placeholder="例：OP17-101"
+              className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none"
+            />
+            <button
+              onClick={submitLife}
+              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              放入
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            下一次该方领袖受到伤害时，可确定性验证这张卡牌的生命【触发】。
           </p>
 
           <div className="my-2 h-px bg-white/10" />

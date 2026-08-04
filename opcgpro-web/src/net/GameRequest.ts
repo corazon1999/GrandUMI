@@ -56,6 +56,9 @@ export const GameRequest = {
 
   /** GM 调试：按编号加一张牌到自己手牌 */
   debugAddCard: (cardNumber: string) => send("DebugAddCard", { cardNumber }),
+  /** GM 调试：按编号将一张牌置于指定一方生命区顶端 */
+  debugAddLife: (cardNumber: string, target: "self" | "opponent" = "self") =>
+    send("DebugAddLife", { cardNumber, target }),
   /** GM 调试：加 count 张活跃咚 */
   debugAddDon: (count = 1) => send("DebugAddDon", { count }),
   /** GM 调试：刷新所有咚（回费用区并竖直/活跃，含解除赋予） */
