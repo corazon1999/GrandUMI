@@ -16,6 +16,17 @@ const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪�
 const CARD_WIDTH    = 72;   // w-16(64px) + gap
 const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
+// 悬停后立即预加载原图，利用预览出现前的延迟提前完成网络请求。
+// 加载失败时移出缓存集合，后续悬停仍可重试。
+const preloadedSprites = new Set<string>();
+function preloadSprite(src: string) {
+  if (!src || preloadedSprites.has(src)) return;
+  preloadedSprites.add(src);
+  const image = new window.Image();
+  image.onerror = () => preloadedSprites.delete(src);
+  image.src = src;
+}
+
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
   const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
@@ -78,7 +89,13 @@ export default function SearchResultPanel() {
   // 延迟显示预览，鼠标快速划过时不触发
   const handleMouseEnter = useCallback((card: CardData, rect: DOMRect, currentSprite: string) => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => setHover({ card, rect, currentSprite }), HOVER_DELAY);
+    preloadSprite(currentSprite);
+    hoverTimer.current = setTimeout(() => {
+      // 延迟期间可能已点击异画箭头，触发时必须读取最新版本，不能使用移入时的旧闭包值。
+      const latestSprite = card.sprite ?? currentSprite;
+      preloadSprite(latestSprite);
+      setHover({ card, rect, currentSprite: latestSprite });
+    }, HOVER_DELAY);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
@@ -144,8 +161,13 @@ export default function SearchResultPanel() {
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                     onSpriteChange={(sprite) => {
+                      preloadSprite(sprite);
                       card.sprite = sprite;
-                      setHover((prev) => prev ? { ...prev, currentSprite: sprite } : null);
+                      setHover((prev) =>
+                        prev?.card.number === card.number
+                          ? { ...prev, currentSprite: sprite }
+                          : prev,
+                      );
                     }}
                   />
                 </div>

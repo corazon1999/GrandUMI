@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import NextImage from "next/image";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
+import { thumbSrc } from "@/lib/sprite";
 
 export const PREVIEW_W = 240;
 const PREVIEW_H_APPROX = 480;
@@ -35,9 +36,11 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
   const rawSprite = currentSprite ?? card.sprite ?? "/sprites/CardBack.png";
   // 大图直接用原图(454px,约87KB)而非256px缩略图,避免高DPI屏放大发糊;悬停一次仅一张,负担可忽略
   const [imgSrc, setImgSrc] = useState(rawSprite);
+  const [fullImageLoaded, setFullImageLoaded] = useState(false);
 
   useEffect(() => {
     setImgSrc(rawSprite);
+    setFullImageLoaded(false);
   }, [rawSprite]);
 
   const spaceRight = window.innerWidth - rect.right;
@@ -64,13 +67,28 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
       transition={{ duration: 0.15, ease: "easeOut" }}
     >
       <div className="relative bg-gray-900" style={{ height: PREVIEW_W * 1.4 }}>
+        {/* 网格缩略图仅约 6KB，先即时显示；原图就绪后再平滑覆盖。 */}
         <NextImage
+          src={thumbSrc(rawSprite)}
+          alt=""
+          fill
+          sizes="480px"
+          className="object-cover"
+          unoptimized
+        />
+        <NextImage
+          key={imgSrc}
           src={imgSrc}
           alt={card.name}
           fill
           sizes="480px"
-          className="object-cover"
-          onError={() => setImgSrc((prev) => (card.image && prev !== card.image) ? card.image : "/sprites/CardBack.png")}
+          className={`object-cover transition-opacity duration-150 ${fullImageLoaded ? "opacity-100" : "opacity-0"}`}
+          unoptimized
+          onLoad={() => setFullImageLoaded(true)}
+          onError={() => {
+            setFullImageLoaded(false);
+            setImgSrc((prev) => (card.image && prev !== card.image) ? card.image : "/sprites/CardBack.png");
+          }}
         />
         {colorStyle && (
           <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${colorStyle.bg}`} />

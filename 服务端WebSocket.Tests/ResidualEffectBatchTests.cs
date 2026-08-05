@@ -35,6 +35,37 @@ public class ResidualEffectBatchTests
     }
 
     [Fact]
+    public async Task EB03_053_OnKO_PlaysCharacterAfterChoosingOverflowVictim()
+    {
+        var state = TestScene.New().Build();
+        var nami = Card("EB03-053");
+        var life = Card("ST30-002");
+        var valid = Card("EB03-002");
+        var overflowVictim = Card("EB03-002");
+        state.Players[0].Trash.Add(nami);
+        state.Players[0].LifeArea.Add(life);
+        state.Players[0].Hand.Add(valid);
+        state.Players[0].Characters.Add(overflowVictim);
+        for (var i = 0; i < 4; i++)
+            state.Players[0].Characters.Add(Card("EB03-002"));
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(valid.Id.ToString())
+            .QueueChoose(overflowVictim.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, nami, EffectTrigger.OnKO, prompts);
+
+        Assert.True(life.IsLifeFaceUp);
+        Assert.Contains(valid, state.Players[0].Characters);
+        Assert.DoesNotContain(valid, state.Players[0].Hand);
+        Assert.Contains(overflowVictim, state.Players[0].Trash);
+        Assert.DoesNotContain(overflowVictim, state.Players[0].Characters);
+        Assert.Equal(5, state.Players[0].Characters.Count);
+        Assert.Equal(2, prompts.ChooseHistory.Count);
+        Assert.Equal("OverflowTrash", prompts.ChooseHistory[1].kind);
+    }
+
+    [Fact]
     public async Task EB03_053_OnEnterField_ClearsFaceUpStateWhenOpponentLifeMovesToHand()
     {
         var state = TestScene.New().Build();
