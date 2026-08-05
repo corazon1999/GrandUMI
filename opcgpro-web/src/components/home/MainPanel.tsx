@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import NextImage from "next/image";
 import LobbyPanel from "./LobbyPanel";
 import DeckChoosePanel from "./DeckChoosePanel";
@@ -267,71 +267,17 @@ function AvatarGrid({
   );
 }
 
-// ── 在线人数徽标（可拖动，避免与聊天发送键重叠；位置持久化到 localStorage）────────────
-
-const ONLINE_BADGE_POS_KEY = "grandumi_online_badge_pos";
+// ── 左侧常驻在线人数入口 ──────────────────────────────────────────────────
 
 function OnlineCountBadge({ onClick }: { onClick: () => void }) {
   const onlineCount = useNetStore((s) => s.onlineCount);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
-  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  // 恢复上次拖到的位置
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(ONLINE_BADGE_POS_KEY);
-      if (saved) setPos(JSON.parse(saved));
-    } catch {}
-  }, []);
-
-  const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const rect = btnRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: rect.left, baseY: rect.top, moved: false };
-    btnRef.current?.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
-    // 小于阈值视为点击抖动，不进入拖动
-    if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-    d.moved = true;
-    const bw = btnRef.current?.offsetWidth ?? 0;
-    const bh = btnRef.current?.offsetHeight ?? 0;
-    const x = Math.min(Math.max(0, d.baseX + dx), window.innerWidth - bw);
-    const y = Math.min(Math.max(0, d.baseY + dy), window.innerHeight - bh);
-    const np = { x, y };
-    lastPosRef.current = np;
-    setPos(np);
-  };
-
-  const onPointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    try { btnRef.current?.releasePointerCapture(e.pointerId); } catch {}
-    if (!d) return;
-    if (!d.moved) {
-      onClick(); // 未拖动 → 视为点击，打开在线玩家列表
-    } else if (lastPosRef.current) {
-      try { localStorage.setItem(ONLINE_BADGE_POS_KEY, JSON.stringify(lastPosRef.current)); } catch {}
-    }
-  };
 
   return (
     <button
-      ref={btnRef}
       type="button"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      title="查看在线玩家（可拖动）"
-      style={pos ? { position: "fixed", left: pos.x, top: pos.y } : undefined}
-      className={`${pos ? "" : "absolute bottom-3 right-4"} z-30 flex items-center gap-1.5 bg-gray-900/80 border border-gray-800 hover:border-green-600 rounded-full px-3 py-1 text-xs backdrop-blur-sm transition-colors cursor-grab active:cursor-grabbing touch-none select-none`}
+      onClick={onClick}
+      title="查看在线玩家"
+      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-1.5 text-[11px] transition-colors hover:border-green-600 hover:bg-gray-800"
     >
       <span className="w-2 h-2 rounded-full bg-green-400" />
       <span className="text-gray-300">
@@ -417,14 +363,14 @@ export default function MainPanel() {
         >
           对局记录
         </button>
-        <div className="mt-auto">
+        <div className="mt-auto flex w-full flex-col gap-2">
+          <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
           <NetStatePanel />
         </div>
       </nav>
 
       {/* 主内容区 */}
       <main className="relative flex-1 overflow-hidden">
-        <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
         {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
         {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
         {view === "catalog" && <CardCatalogPanel />}
