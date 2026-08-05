@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * FeedbackOverlay — 游戏内反馈窗口
+ * FeedbackOverlay — 大厅与游戏内共用的反馈窗口
  *
- * 仅在 game 页挂载，按 F 弹出/关闭。输入反馈内容后提交，
- * 连同客户端全量信息（gameStore 镜像 + 元信息）发送给服务端落盘。
+ * 按 F 弹出/关闭。大厅只附带基础环境信息，游戏内额外附带
+ * gameStore 镜像，发送给服务端落盘。
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +12,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { useGameStore } from "@/store/gameStore";
+import { useNetStore } from "@/store/netStore";
 import type { FeedbackCategory, MsgBase, MsgBugReport } from "@/types/net";
+
+interface Props {
+  context: "lobby" | "game";
+}
 
 type SubmitState =
   | { kind: "idle" }
@@ -36,7 +41,7 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
-export default function FeedbackOverlay() {
+export default function FeedbackOverlay({ context }: Props) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [drafts, setDrafts] = useState<Record<FeedbackCategory, string>>({
@@ -48,6 +53,10 @@ export default function FeedbackOverlay() {
   const pendingCategoryRef = useRef<FeedbackCategory | null>(null);
   const description = drafts[category];
   const config = CATEGORY_CONFIG[category];
+  const placeholder =
+    category === "bug" && context === "lobby"
+      ? "描述大厅中触发 Bug 的操作、实际现象和期望结果……提交时会自动附带当前页面信息。"
+      : config.placeholder;
 
   // F 切换显隐；在输入区域打字时不抢占按键。
   useEffect(() => {
@@ -116,20 +125,30 @@ export default function FeedbackOverlay() {
     const trimmedDescription = description.trim();
     if (!trimmedDescription || submit.kind === "sending") return;
 
-    const gameState = useGameStore.getState();
+    const netState = useNetStore.getState();
+    const gameState = context === "game" ? useGameStore.getState() : null;
     const clientInfo = JSON.stringify({
       meta: {
         ts: new Date().toISOString(),
         url: typeof window !== "undefined" ? window.location.href : "",
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        mode: gameState.mode,
-        phase: gameState.phase,
-        turnCount: gameState.turnCount,
-        currentTurn: gameState.currentTurn,
-        myName: gameState.myName,
-        opponentName: gameState.opponentName,
+        context,
+        account: netState.account,
+        playerName: netState.playerName,
+        connectionState: netState.connState,
+        ...(gameState
+          ? {
+              mode: gameState.mode,
+              phase: gameState.phase,
+              turnCount: gameState.turnCount,
+              currentTurn: gameState.currentTurn,
+              myName: gameState.myName,
+              opponentName: gameState.opponentName,
+            }
+          : {}),
       },
-      gameStore: gameState, // 函数会被 JSON.stringify 自动忽略，仅保留数据字段。
+      // 大厅不附带上一局可能残留的对局数据。
+      ...(gameState ? { gameStore: gameState } : {}),
     });
 
     setSubmit({ kind: "sending" });
@@ -218,7 +237,7 @@ export default function FeedbackOverlay() {
               }
               maxLength={4000}
               rows={5}
-              placeholder={config.placeholder}
+              placeholder={placeholder}
               className={`mt-1.5 w-full resize-none rounded border border-slate-600 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none ${
                 category === "bug" ? "focus:border-rose-400" : "focus:border-sky-400"
               }`}

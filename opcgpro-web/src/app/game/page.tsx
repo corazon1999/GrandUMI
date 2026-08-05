@@ -61,7 +61,7 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
       {!isObserver && !isPlayback && <GameMenu />}
       {!isObserver && !isPlayback && <GMPanel />}
-      {!isPlayback && <FeedbackOverlay />}
+      {!isPlayback && <FeedbackOverlay context="game" />}
 
       {isObserver && (
         <div className="absolute left-4 top-4 z-20 rounded-full bg-purple-600/80 px-3 py-1 text-xs text-white">
