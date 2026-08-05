@@ -57,7 +57,7 @@ public class OP08_054_DontCatchTheKing : IScriptedEffect
             if (pick.Count > 0)
             {
                 me.Deck.Remove(top);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, top);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, top);
                 return; // 已登场，无剩余牌
             }
         }

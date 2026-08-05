@@ -52,7 +52,7 @@ public class OP16_045_Crocodile : IScriptedEffect
         if (sPick.Count > 0)
         {
             var picked = summonCands.First(c => c.Id.ToString() == sPick[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

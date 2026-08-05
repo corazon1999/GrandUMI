@@ -46,7 +46,7 @@ public class OP06_119_Sanji : IScriptedEffect
             {
                 me.Deck.Remove(topCard);
                 me.Hand.Add(topCard);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, topCard);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, topCard);
                 played = true;
             }
         }

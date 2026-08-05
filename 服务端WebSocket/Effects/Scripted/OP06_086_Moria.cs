@@ -74,7 +74,7 @@ public class OP06_086_Moria : IScriptedEffect
 
         foreach (var c in picked)
         {
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, c, restState: c != activeOne);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, c, restState: c != activeOne);
         }
     }
 }

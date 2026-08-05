@@ -36,6 +36,8 @@ interface Props {
   gainedKeywords?: string[];
   /** 攻击状态标识（仅我方场上角色/领袖在我方回合传）：can=可攻击 sick=本回合登场不可攻击 none=不显示 */
   attackState?: "can" | "sick" | "none";
+  /** 战斗中的身份高亮；选框挂在卡牌旋转节点上，可自动适配活跃/横置形状 */
+  battleHighlight?: "attacker" | "target" | "blocker";
   onClick?: () => void;
   size?: "sm" | "md" | "lg";
 }
@@ -63,6 +65,7 @@ export default function CardItem({
   showBlockerFx = false,
   gainedKeywords,
   attackState = "none",
+  battleHighlight,
   onClick,
   size = "md",
 }: Props) {
@@ -124,11 +127,20 @@ export default function CardItem({
     <motion.div
       className={clsx(
         sizes[size],
-        "relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl shadow-black/35",
+        "relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl",
         "transform-gpu backface-hidden transition-colors",
         isSelected
-          ? "z-30 border-yellow-300 shadow-yellow-300/40"
+          ? "z-30 border-yellow-300"
           : "border-slate-500/70 hover:border-slate-200",
+        battleHighlight === "attacker"
+          ? "ring-4 ring-red-500 shadow-red-500/50"
+          : battleHighlight === "target"
+            ? "ring-4 ring-amber-400 shadow-amber-400/50"
+            : battleHighlight === "blocker"
+              ? "ring-4 ring-cyan-300 shadow-cyan-400/60"
+              : isSelected
+                ? "shadow-yellow-300/40"
+                : "shadow-black/35",
       )}
       animate={{
         rotate: isTapped ? 90 : 0,

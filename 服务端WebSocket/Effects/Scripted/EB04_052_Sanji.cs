@@ -56,7 +56,7 @@ public class EB04_052_Sanji : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             }
             return;
         }

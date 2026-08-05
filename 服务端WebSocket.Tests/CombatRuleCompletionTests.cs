@@ -15,7 +15,7 @@ public class CombatRuleCompletionTests
     public async Task OP01_051_LocksOpponentCharacterTargets_OnlyWhileRestedWithDon()
     {
         var state = TestScene.New().Build();
-        state.TurnCount = 2;
+        state.TurnCount = 3;
         state.CurrentTurnPlayer = 1;
         var kid = Card("OP01-051");
         var otherTarget = Card("ST30-006");
@@ -44,9 +44,9 @@ public class CombatRuleCompletionTests
     public async Task OP03_004_GainsRushWithDon_ButCannotAttackLeaderOnPlayTurn()
     {
         var state = TestScene.New().OppCharacter("ST30-006").Build();
-        state.TurnCount = 2;
+        state.TurnCount = 3;
         var krieg = Card("OP03-004");
-        krieg.TurnPlayed = 2;
+        krieg.TurnPlayed = 3;
         state.Players[0].Characters.Add(krieg);
         state.Players[1].Characters[0].IsTapped = true;
 
@@ -64,7 +64,7 @@ public class CombatRuleCompletionTests
         Assert.True(ActionValidator.CanAttack(state, 0, krieg.Id, false, state.Players[1].Characters[0].Id).Ok);
         Assert.False(ActionValidator.CanAttack(state, 0, krieg.Id, true, null).Ok);
 
-        krieg.TurnPlayed = 1;
+        krieg.TurnPlayed = 2;
         Assert.True(ActionValidator.CanAttack(state, 0, krieg.Id, true, null).Ok);
     }
 

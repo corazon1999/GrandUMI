@@ -123,7 +123,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var picked = await Choose(ctx, ctx.OwnerIndex, "OwnHandCharacter", text, me.Hand.Where(filter).ToList());
-        if (picked is not null) AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        if (picked is not null) await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
     }
 
     private static async Task PlayFromHandOrTrash(EffectContext ctx, Func<CardInstance, bool> filter, string text)
@@ -134,8 +134,8 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         var picked = await Choose(ctx, ctx.OwnerIndex, "HandOrTrashCharacter", text,
             cards.Select(x => x.card).ToList());
         if (picked is null) return;
-        if (cards.First(x => x.card.Id == picked.Id).trash) AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
-        else AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        if (cards.First(x => x.card.Id == picked.Id).trash) await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+        else await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
     }
 
     private static async Task KOChosen(EffectContext ctx, Func<CardInstance, bool> filter, string text)
@@ -251,12 +251,17 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     private static async Task ST32_001(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+        var activeDon = me.CostArea.Where(d => d.State == DonState.Active).ToList();
         var ids = new List<string>();
         if (!me.Leader.IsTapped && SlashLeader(me)) ids.Add(me.Leader.Id.ToString());
-        ids.AddRange(me.CostArea.Where(d => d.State == DonState.Active).Select(d => d.Id.ToString()));
+        ids.AddRange(activeDon.Select(d => d.Id.ToString()));
         if (ids.Count == 0) return;
+        var extra = new Dictionary<string, object?>
+        {
+            ["donChoices"] = activeDon.Select(d => new { id = d.Id.ToString(), state = "Active" }).ToList(),
+        };
         var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrDon",
-            "可以将斩属性领袖或1张咚!!转为休息状态：抽2张，丢弃1张手牌", ids, 0, 1);
+            "可以将斩属性领袖或1张咚!!转为休息状态：抽2张，丢弃1张手牌", ids, 0, 1, extra);
         if (selected.Count == 0) return;
         if (selected[0] == me.Leader.Id.ToString()) me.Leader.IsTapped = true;
         else

@@ -291,8 +291,32 @@ public static class BattleEngine
                 new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
             if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return true; }
         }
-        // 持续"战斗中不会被KO"保护
-        if (s.IsKoGuarded(card, "battle")) return true;
+
+        // 效果 KO 还需检查“因对方效果将要离场”类守护；战斗 KO 不进入该分支。
+        if (s.KOReason == "effect" && s.KOActingSide >= 0 && s.KOActingSide != ownerIdx)
+        {
+            s.PreventLeaveCardIds.Remove(card.Id);
+            foreach (var g in guardians.ToList())
+            {
+                if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
+                await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillLeaveField, prompts,
+                    new Dictionary<string, object?>
+                    {
+                        ["victimId"] = card.Id.ToString(),
+                        ["victimOwner"] = ownerIdx,
+                        ["kind"] = "ko",
+                    });
+                if (s.PreventLeaveCardIds.Contains(card.Id))
+                {
+                    s.PreventLeaveCardIds.Remove(card.Id);
+                    return true;
+                }
+            }
+        }
+
+        string reason = s.KOReason == "effect" ? "effect" : "battle";
+        if (s.IsKoGuarded(card, reason)) return true;
+        if (reason == "effect" && s.IsLeaveGuarded(card, "effect")) return true;
 
         return false;
     }
@@ -315,16 +339,17 @@ public static class BattleEngine
 
         // OnKO：卡已进入废弃区，但效果在"原场上位置"上发动
         await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
-        // 任意角色被KO（战斗）：场上他卡可据此反应（如 EB01-047 拉布 / OP01-061 / OP04-086）。
-        // 战斗 KO 不在效果上下文内（无 ambient），NotifyWatcher 会被丢弃，故直接 TriggerEvent 立即派发。
+        string reason = s.KOReason == "effect" ? "effect" : "battle";
+        // 任意角色被KO：场上他卡可据此反应（如 EB01-047 拉布 / OP01-061 / OP04-086）。
+        // BattleEngine 路径可能不在效果 ambient 内，因此直接 TriggerEvent 立即派发。
         // 携带 attackerId 供"通过此角色战斗KO对方"类效果判定（CurrentBattle 此刻仍未清场）。
         await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAnyCharKOd, prompts,
             new Dictionary<string, object?>
             {
                 ["cardId"] = card.Id.ToString(),
                 ["owner"] = ownerIdx,
-                ["reason"] = "battle",
-                ["attackerId"] = s.CurrentBattle?.AttackerCardId.ToString(),
+                ["reason"] = reason,
+                ["attackerId"] = reason == "battle" ? s.CurrentBattle?.AttackerCardId.ToString() : null,
             });
     }
 

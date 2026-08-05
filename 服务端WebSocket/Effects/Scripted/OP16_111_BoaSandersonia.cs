@@ -20,16 +20,16 @@ public class OP16_111_BoaSandersonia : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
         // 条件：我方生命卡牌不多于 2 张
-        if (me.LifeCount > 2) return Task.CompletedTask;
+        if (me.LifeCount > 2) return;
 
         // 此卡牌登场（发动触发时本卡已在废弃区）
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
-        return Task.CompletedTask;
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+        return;
     }
 }

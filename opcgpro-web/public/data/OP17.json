@@ -387,7 +387,7 @@
     "power": "2000",
     "cost": "1",
     "keyWords": "红发海盗团旗下",
-    "counter": "",
+    "counter": "2000",
     "effectTags": [
       "OnAllyWillLeaveField"
     ],

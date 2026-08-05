@@ -21,7 +21,7 @@ public class EB04_051_Emeth : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnEnterField || t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
@@ -36,7 +36,7 @@ public class EB04_051_Emeth : IScriptedEffect
                     card.Id == selfId &&
                     !s.Players[0].Characters.Concat(s.Players[1].Characters).Any(x => x.Info.Power >= 12000),
             });
-            return Task.CompletedTask;
+            return;
         }
 
         // OnLifeRevealTrigger：对方所有角色本回合 -3000
@@ -45,8 +45,8 @@ public class EB04_051_Emeth : IScriptedEffect
 
         // 之后：我方生命为 0 时，此卡（当前在废弃区）登场
         if (me.LifeArea.Count == 0)
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
 
-        return Task.CompletedTask;
+        return;
     }
 }

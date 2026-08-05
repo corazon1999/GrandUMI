@@ -56,7 +56,7 @@ public class OP08_071_CountNiwatori : IScriptedEffect
             var picked = cands.First(c => c.Id.ToString() == chosen[0]);
             me.Deck.Remove(picked);
             if (me.Characters.Count >= 5)
-                AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
+                await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
             picked.TurnPlayed = ctx.State.TurnCount;
             me.Characters.Add(picked);
         }

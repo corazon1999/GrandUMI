@@ -37,7 +37,7 @@ public class ST03_007_Sentomaru : IScriptedEffect
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "PlayCharFromDeck",
             "从卡组将最多1张费用≤4的“和平主义者”登场", cands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (ch.Count > 0)
-            AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, cands.First(c => c.Id.ToString() == ch[0]));
+            await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, cands.First(c => c.Id.ToString() == ch[0]));
         AtomicOps.Shuffle(ctx.State, me.Deck);
     }
 }
@@ -74,7 +74,7 @@ public class ST12_010_Ivankov : IScriptedEffect
         {
             if (await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, $"将公开的「{top.Info.Name}」登场？"))
             {
-                AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, top, rest);
+                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, top, rest);
                 return;
             }
         }

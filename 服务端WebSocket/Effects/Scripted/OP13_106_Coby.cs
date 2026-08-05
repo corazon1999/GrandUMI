@@ -25,18 +25,18 @@ public class OP13_106_Coby : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
 
         // 触发发动时本卡已被放入废弃区，从废弃区免费以活跃状态登场（“此卡牌登场”）
-        if (!me.Trash.Contains(ctx.Source)) return Task.CompletedTask;
-        AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
+        if (!me.Trash.Contains(ctx.Source)) return;
+        await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
 
         // 仅当确实登场到场上才继续（场上满 5 张时本卡可能未能登场——PlayFromTrashFree 会先牺牲最左侧角色，
         // 故本卡通常能登场；若仍不在场上则不授予）
-        if (!me.Characters.Contains(ctx.Source)) return Task.CompletedTask;
+        if (!me.Characters.Contains(ctx.Source)) return;
 
         // 【对方的回合中】当发动【触发】效果时：本回合获得【阻挡者】
         // 生命牌触发只在对方回合发动，这里再判定一次以保证语义。
@@ -45,6 +45,6 @@ public class OP13_106_Coby : IScriptedEffect
             AtomicOps.GiveKeyword(ctx.Source, "阻挡者", KeywordDuration.ThisTurn);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

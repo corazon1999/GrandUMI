@@ -14,6 +14,9 @@ public class ContinuousEffect
     public required ContinuousScope Scope { get; init; }
     public int PowerDelta { get; init; }
 
+    /// <summary>持续“原本力量变为 X”覆盖；与 PowerDelta 不同，多条相同覆盖不会重复累加。</summary>
+    public int? OriginalPowerOverride { get; init; }
+
     /// <summary>持续费用修正（影响 KO/选择判定与卡面显示，正数表示费用升高）</summary>
     public int CostDelta { get; init; }
 

@@ -85,7 +85,7 @@ public class OP14_033_Perona : IScriptedEffect
         if (chosenPlay.Count > 0)
         {
             var picked = playable.First(c => c.Id.ToString() == chosenPlay[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

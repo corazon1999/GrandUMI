@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -41,7 +41,7 @@ public class OP07_070_BigPan : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = playable.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

@@ -46,7 +46,7 @@ public class OP03_094_AirDoor : IScriptedEffect
             if (pick.Count > 0)
             {
                 var picked = trashCands.First(c => c.Id.ToString() == pick[0]);
-                AtomicOps.PlayFromTrashFree(ctx.State, owner, picked);
+                await AtomicOps.PlayFromTrashFree(ctx.State, owner, picked);
             }
             return;
         }
@@ -78,7 +78,7 @@ public class OP03_094_AirDoor : IScriptedEffect
                 // 从卡组登场：移入手牌后免费登场
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
-                AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
             }
         }
 

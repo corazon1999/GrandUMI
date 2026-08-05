@@ -69,7 +69,7 @@ public class OP13_023_Uta : IScriptedEffect
             var picked = candidates.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
             if (picked is null) return;
 
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             // 以休息状态登场
             if (me.Characters.Contains(picked)) picked.IsTapped = true;
         }

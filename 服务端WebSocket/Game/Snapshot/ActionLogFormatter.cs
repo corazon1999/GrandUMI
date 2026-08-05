@@ -3,6 +3,9 @@ using GrandUMI.Cards;
 
 namespace GrandUMI.Game.Snapshot;
 
+/// <summary>等待随下一份状态快照下发的操作日志事件。</summary>
+public sealed record ActionLogEvent(string Action, object? Payload);
+
 /// <summary>
 /// 把一次动作广播(lastAction + payload)格式化为「观看者视角」的一行中文操作日志。
 /// 返回空字符串表示该动作不记录到操作日志。
@@ -15,7 +18,12 @@ public static class ActionLogFormatter
         string Side(int actor) =>
             viewerIndex < 0 ? $"玩家{actor + 1}" : (actor == viewerIndex ? "我方" : "对手");
 
-        string Name(string number) => CardDatabase.Get(number)?.Name ?? number;
+        string Card(string number)
+        {
+            if (string.IsNullOrWhiteSpace(number)) return "未知卡牌";
+            var name = CardDatabase.Get(number)?.Name;
+            return string.IsNullOrWhiteSpace(name) ? number : $"{number} {name}";
+        }
 
         // 防守方 = 非当前回合方（用于"不阻挡 / 使用反击"这类没有 player 字段的动作）
         int defenderIdx = 1 - state.CurrentTurnPlayer;
@@ -23,7 +31,8 @@ public static class ActionLogFormatter
         switch (action)
         {
             case "PlayCard":
-                return $"{Side(GetInt(payload, "player"))} 打出 {Name(GetStr(payload, "cardNumber"))}";
+                if (GetBool(payload, "suppressLog")) return "";
+                return $"[出牌] {Side(GetInt(payload, "player"))}打出【{Card(GetStr(payload, "cardNumber"))}】";
 
             case "AttachDon":
             {
@@ -33,7 +42,7 @@ public static class ActionLogFormatter
                 string targetName = targetId == "leader"
                     ? "领袖"
                     : (FindCard(state, targetId) is { } t ? t.Card.Info.Name : "角色");
-                return $"{Side(player)} 为 {targetName} 附加 {count} 个咚";
+                return $"[咚] {Side(player)}为【{targetName}】附加 {count} 个咚";
             }
 
             case "Attack":
@@ -51,7 +60,7 @@ public static class ActionLogFormatter
                     var tgt = FindCard(state, GetStr(payload, "targetId"));
                     targetDesc = tgt?.Card.Info.Name ?? "角色";
                 }
-                return $"{Side(attackerOwner)} 用 {attackerName} 攻击 {targetDesc}";
+                return $"[攻击] {Side(attackerOwner)}用【{attackerName}】攻击【{targetDesc}】";
             }
 
             case "DeclareBlocker":
@@ -59,21 +68,52 @@ public static class ActionLogFormatter
                 var blk = FindCard(state, GetStr(payload, "blocker"));
                 int owner = blk?.Owner ?? defenderIdx;
                 string name = blk?.Card.Info.Name ?? "角色";
-                return $"{Side(owner)} 用 {name} 宣言【阻挡者】";
+                return $"[阻挡] {Side(owner)}用【{name}】宣言【阻挡者】";
             }
 
             case "PassBlock":
-                return $"{Side(defenderIdx)} 不进行阻挡";
+                return $"[阻挡] {Side(defenderIdx)}不进行阻挡";
 
             case "CounterIcon":
-                return $"{Side(defenderIdx)} 使用反击 +{GetInt(payload, "value")}";
+                return $"[反击] {Side(defenderIdx)}使用反击 +{GetInt(payload, "value")}";
 
             case "UseEffect":
             {
+                if (GetBool(payload, "suppressLog")) return "";
                 var src = FindCard(state, GetStr(payload, "source"));
                 int owner = src?.Owner ?? state.CurrentTurnPlayer;
-                string name = src?.Card.Info.Name ?? Name(GetStr(payload, "card"));
-                return $"{Side(owner)} 发动 {name} 的效果";
+                string name = src is null ? Card(GetStr(payload, "card")) : $"{src.Value.Card.Info.Number} {src.Value.Card.Info.Name}";
+                return $"[启动效果] {Side(owner)}发动【{name}】的效果";
+            }
+
+            case "PromptResolved":
+            {
+                int actor = GetInt(payload, "player");
+                string sourceNumber = GetStr(payload, "sourceNumber");
+                string source = string.IsNullOrWhiteSpace(sourceNumber) ? "当前流程" : $"【{Card(sourceNumber)}】";
+                string promptText = GetStr(payload, "text");
+                string visibility = GetStr(payload, "detailVisibility");
+                var detailViewers = GetIntArray(payload, "detailViewers");
+                bool maySeeDetail = visibility != "restricted"
+                    || viewerIndex == actor
+                    || detailViewers.Contains(viewerIndex);
+                if (!maySeeDetail)
+                    return $"[效果选择] {Side(actor)}完成了 {source} 的非公开选择";
+
+                var labels = GetStrArray(payload, "labels");
+                string result = labels.Count == 0
+                    ? "未选择"
+                    : string.Join("、", labels.Select(x => $"【{x}】"));
+                string prompt = string.IsNullOrWhiteSpace(promptText) ? "" : $"：“{promptText}”";
+                return $"[效果选择] {Side(actor)}处理 {source}{prompt} → {result}";
+            }
+
+            case "RevealCards":
+            {
+                int actor = GetInt(payload, "player");
+                var cards = GetStrArray(payload, "cardNumbers").Select(Card).ToArray();
+                if (cards.Length == 0) return "";
+                return $"[公开] {Side(actor)}公开 {string.Join("、", cards.Select(x => $"【{x}】"))}";
             }
 
             case "EndTurn":
@@ -84,21 +124,21 @@ public static class ActionLogFormatter
             }
 
             case "Surrender":
-                return $"{Side(GetInt(payload, "surrendered"))} 投降";
+                return $"[结束] {Side(GetInt(payload, "surrendered"))}投降";
 
             // ── GM 调试动作 ──
             case "DebugAddCard":
-                return $"{Side(GetInt(payload, "player"))}【GM】将 {Name(GetStr(payload, "cardNumber"))} 加入手牌";
+                return $"[GM] {Side(GetInt(payload, "player"))}将【{Card(GetStr(payload, "cardNumber"))}】加入手牌";
             case "DebugAddLife":
-                return $"{Side(GetInt(payload, "player"))}【GM】将 {Name(GetStr(payload, "cardNumber"))} 置于 {Side(GetInt(payload, "target"))}生命区顶端";
+                return $"[GM] {Side(GetInt(payload, "player"))}将【{Card(GetStr(payload, "cardNumber"))}】置于{Side(GetInt(payload, "target"))}生命区顶端";
             case "DebugAddDon":
-                return $"{Side(GetInt(payload, "player"))}【GM】增加 {GetInt(payload, "count", 1)} 个咚";
+                return $"[GM] {Side(GetInt(payload, "player"))}增加 {GetInt(payload, "count", 1)} 个咚";
             case "DebugSummon":
-                return $"{Side(GetInt(payload, "player"))}【GM】将 {Name(GetStr(payload, "cardNumber"))} 打出到场上";
+                return $"[GM] {Side(GetInt(payload, "player"))}将【{Card(GetStr(payload, "cardNumber"))}】打出到场上";
             case "DebugKoAll":
-                return $"{Side(GetInt(payload, "player"))}【GM】KO 了 {Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
+                return $"[GM] {Side(GetInt(payload, "player"))}KO 了{Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
             case "DebugRestAll":
-                return $"{Side(GetInt(payload, "player"))}【GM】横置了 {Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
+                return $"[GM] {Side(GetInt(payload, "player"))}横置了{Side(GetInt(payload, "target"))}全部角色（{GetInt(payload, "count")} 张）";
             case "DebugOP17CoverageStarted":
                 return $"{Side(GetInt(payload, "player"))}【GM】开始巡检 OP17 {GetStr(payload, "color")}色卡牌";
             case "DebugOP17CoverageResult":
@@ -139,4 +179,31 @@ public static class ActionLogFormatter
 
     private static bool GetBool(JsonElement payload, string prop)
         => payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.True;
+
+    private static List<string> GetStrArray(JsonElement payload, string prop)
+    {
+        if (payload.ValueKind != JsonValueKind.Object
+            || !payload.TryGetProperty(prop, out var value)
+            || value.ValueKind != JsonValueKind.Array)
+            return new List<string>();
+
+        return value.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString() ?? "")
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+    }
+
+    private static List<int> GetIntArray(JsonElement payload, string prop)
+    {
+        if (payload.ValueKind != JsonValueKind.Object
+            || !payload.TryGetProperty(prop, out var value)
+            || value.ValueKind != JsonValueKind.Array)
+            return new List<int>();
+
+        return value.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.Number && x.TryGetInt32(out _))
+            .Select(x => x.GetInt32())
+            .ToList();
+    }
 }

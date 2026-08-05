@@ -75,7 +75,7 @@ public class OP16_059_StrategicAdjustment : IScriptedEffect
                     // 经手牌入口登场：先从卡组移入手牌，再走标准登场流程
                     me.Deck.Remove(picked);
                     me.Hand.Add(picked);
-                    AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                    await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
                 }
             }
         }

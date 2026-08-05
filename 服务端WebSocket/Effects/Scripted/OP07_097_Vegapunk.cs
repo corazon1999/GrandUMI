@@ -85,7 +85,7 @@ public class OP07_097_Vegapunk : IScriptedEffect
         }
         else
         {
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
         }
     }
 }

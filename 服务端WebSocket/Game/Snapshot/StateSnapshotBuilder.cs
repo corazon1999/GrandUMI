@@ -1,152 +1,240 @@
-using GrandUMI.Cards;
+using System.Text.Json;
 
 namespace GrandUMI.Game.Snapshot;
 
-/// <summary>
-/// 把 GameState 编码为客户端可消费的 MsgGameState（双方各自一份，按视角脱敏）
-/// </summary>
+/// <summary>把 GameState 编码为按视角脱敏的客户端快照。</summary>
 public static class StateSnapshotBuilder
 {
-    /// <summary>
-    /// 构建发给 viewerIndex 的快照。viewerIndex = -1 表示观战视角（双方手牌/生命都脱敏）
-    /// </summary>
-    public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null)
+    public sealed record SnapshotSet(object Player0, object Player1, object Spectator);
+
+    /// <summary>单视角构建，供重连和单个观战者加入时使用。</summary>
+    public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null)
     {
-        bool isSpectator = viewerIndex < 0;
-        int myIdx  = isSpectator ? 0 : viewerIndex;
-        int oppIdx = isSpectator ? 1 : 1 - viewerIndex;
+        var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
+        return BuildForViewer(state, viewerIndex, lastAction, ComputePayload(actionPayload), boards, queuedLogEvents);
+    }
 
-        var my  = SnapshotForPlayer(state, myIdx,  asSelf: !isSpectator);
-        var opp = SnapshotForPlayer(state, oppIdx, asSelf: false);
+    /// <summary>
+    /// 一次构建双方玩家和观战三种视角。双方公开牌桌、力量、关键词和攻击合法性
+    /// 每个玩家只计算一次，避免原先三份快照各自重复遍历。
+    /// </summary>
+    public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null)
+    {
+        var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
+        var payload = ComputePayload(actionPayload);
+        return new SnapshotSet(
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents));
+    }
 
-        // 操作日志（按观看者视角生成一行中文；不可记录的动作返回空串）
-        var payloadElem = actionPayload is null
-            ? default
-            : System.Text.Json.JsonSerializer.SerializeToElement(actionPayload);
-        var logLine = ActionLogFormatter.Format(state, viewerIndex, lastAction ?? "", payloadElem);
+    private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
+        PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents)
+    {
+        var isSpectator = viewerIndex < 0;
+        var myIdx = isSpectator ? 0 : viewerIndex;
+        var oppIdx = isSpectator ? 1 : 1 - viewerIndex;
+        var my = BuildPlayerSnapshot(state, myIdx, asSelf: !isSpectator, boards[myIdx]);
+        var opponent = BuildPlayerSnapshot(state, oppIdx, asSelf: false, boards[oppIdx]);
+
+        var logLines = new List<string>();
+        if (queuedLogEvents is not null)
+        {
+            foreach (var item in queuedLogEvents)
+            {
+                var eventPayload = ComputePayload(item.Payload);
+                var text = ActionLogFormatter.Format(state, viewerIndex, item.Action, eventPayload.Element);
+                if (!string.IsNullOrWhiteSpace(text)) logLines.Add(text);
+            }
+        }
+        var currentLine = ActionLogFormatter.Format(state, viewerIndex, lastAction ?? "", payload.Element);
+        if (!string.IsNullOrWhiteSpace(currentLine)) logLines.Add(currentLine);
+        var logLine = logLines.LastOrDefault() ?? "";
 
         return new
         {
-            proto         = "MsgGameState",
-            tick          = state.Tick,
-            phase         = PhaseLabels.Of(state.Phase),
-            currentTurn   = !isSpectator && state.CurrentTurnPlayer == myIdx,
-            turnCount     = state.TurnCount,
-            firstPlayer   = state.FirstPlayer,
+            proto = "MsgGameState",
+            tick = state.Tick,
+            phase = PhaseLabels.Of(state.Phase),
+            currentTurn = !isSpectator && state.CurrentTurnPlayer == myIdx,
+            turnCount = state.TurnCount,
+            firstPlayer = state.FirstPlayer,
             mulliganBothDone = state.MulliganBothDone,
-            isGameOver    = state.IsGameOver,
-            winnerIsMe    = !isSpectator && state.WinnerIndex == myIdx,
+            isGameOver = state.IsGameOver,
+            winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
             gameOverReason = state.GameOverReason,
-            viewerKind    = isSpectator ? "spectator" : "player",
-            lastAction    = lastAction ?? "",
-            actionPayload = actionPayload is null ? "" : System.Text.Json.JsonSerializer.Serialize(actionPayload),
-            logLine       = logLine,
-            my            = my,
-            opponent      = opp,
-            pendingPrompt = state.PendingPrompt is { } p && p.PlayerIndex == myIdx
-                ? new {
-                    promptId   = p.PromptId,
-                    kind       = p.Kind,
-                    text       = p.PromptText,
+            viewerKind = isSpectator ? "spectator" : "player",
+            lastAction = lastAction ?? "",
+            actionPayload = payload.Json,
+            logLine,
+            logLines = logLines.ToArray(),
+            my,
+            opponent,
+            // 观战者永远不能拿到选择候选，避免隐藏区信息泄露。
+            pendingPrompt = !isSpectator && state.PendingPrompt is { } p && p.PlayerIndex == myIdx
+                ? new
+                {
+                    promptId = p.PromptId,
+                    kind = p.Kind,
+                    text = p.PromptText,
                     validChoices = p.ValidChoices,
-                    minChoose  = p.MinChoose,
-                    maxChoose  = p.MaxChoose,
-                    extra      = p.Extra,
-                  }
+                    minChoose = p.MinChoose,
+                    maxChoose = p.MaxChoose,
+                    extra = p.Extra,
+                }
                 : null,
-            // 检索/公开牌的瞬时展示：side 按当前视角换算（自己公开 → my，对手公开 → opponent）
             reveal = state.PendingReveal is { } rv
-                ? new {
+                ? new
+                {
                     side = (!isSpectator && rv.OwnerIndex == myIdx) ? "my" : "opponent",
                     cardNumbers = rv.CardNumbers,
-                  }
+                }
                 : null,
             battle = state.CurrentBattle is { } b
-                ? new {
+                ? new
+                {
                     attackerPlayer = b.AttackerPlayerIndex,
                     attackerCardId = b.AttackerCardId.ToString(),
                     targetIsLeader = b.TargetIsLeader,
-                    targetCardId   = b.TargetCardId?.ToString(),
-                    blockerCardId  = b.ReplacedByBlockerCardId?.ToString(),
-                    attackerBonus  = b.AttackerBattleBonus,
-                    defenderBonus  = b.DefenderBattleBonus,
-                  }
+                    targetCardId = b.TargetCardId?.ToString(),
+                    blockerCardId = b.ReplacedByBlockerCardId?.ToString(),
+                    attackerBonus = b.AttackerBattleBonus,
+                    defenderBonus = b.DefenderBattleBonus,
+                }
                 : null,
         };
     }
 
-    private static object SnapshotForPlayer(GameState state, int idx, bool asSelf)
+    private static PayloadComputed ComputePayload(object? actionPayload)
+        => actionPayload is null
+            ? new PayloadComputed(default, "")
+            : new PayloadComputed(JsonSerializer.SerializeToElement(actionPayload), JsonSerializer.Serialize(actionPayload));
+
+    private static PlayerBoardComputed ComputePlayerBoard(GameState state, int idx)
     {
         var p = state.Players[idx];
-        var ownerTurn = state.CurrentTurnPlayer == idx;
+        var fieldCards = p.Characters.Select(c => (object)new
+        {
+            id = c.Id.ToString(),
+            number = c.Info.Number,
+            isTapped = c.IsTapped,
+            powerCurrent = state.CurrentPowerOf(idx, c),
+            cost = state.CurrentCostOf(idx, c),
+            attachedDon = p.AttachedDonCount(c.Id),
+            gainedKeywords = c.GainedKeywords.Select(k => k.Keyword)
+                .Concat(ContinuousGrantedKeywords(state, c)).Distinct().ToArray(),
+            cannotActivateNextReset = c.CannotActivateNextReset,
+            cannotBeRested = c.HasRestriction(RestrictionKind.CannotBeRested)
+                || state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested),
+            turnPlayed = c.TurnPlayed,
+            canAttack = Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
+            activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
+        }).ToArray();
 
+        return new PlayerBoardComputed(
+            p.AccountName,
+            p.Hand.Count,
+            fieldCards,
+            p.StageCard?.Info.Number,
+            p.StageCard?.Id.ToString(),
+            p.StageCard?.IsTapped ?? false,
+            p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
+            p.Trash.Select(c => c.Info.Number).ToArray(),
+            p.DeckCount,
+            p.LifeCount,
+            p.LifeArea.Select(c => (object)new
+            {
+                faceUp = c.IsLifeFaceUp,
+                number = c.IsLifeFaceUp ? c.Info.Number : null,
+            }).ToArray(),
+            p.Leader.Id.ToString(),
+            p.Leader.Info.Number,
+            p.Leader.IsTapped,
+            state.CurrentPowerOf(idx, p.Leader),
+            p.AttachedDonCount(p.Leader.Id),
+            Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
+            ActivatedUsedThisTurn(p, p.Leader),
+            p.ActiveDonCount,
+            p.RestDonCount,
+            p.CostArea.Count(d => d.State == DonState.Attached),
+            p.DonDeck.Count,
+            p.HasReDraw,
+            p.MulliganDone);
+    }
+
+    private static object BuildPlayerSnapshot(GameState state, int idx, bool asSelf, PlayerBoardComputed board)
+    {
+        var p = state.Players[idx];
         return new
         {
-            name           = p.AccountName,
+            name = board.Name,
             handCardNumbers = asSelf ? p.Hand.Select(c => c.Info.Number).ToArray() : Array.Empty<string>(),
-            // 每张手牌的有效费用（含手牌静态减费/持续光环），仅下发给己方供 UI 显示；对手为空
-            handCardCosts  = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
-            // 动态反击值（OP17-063/118）；仅己方可见，并与手牌顺序一一对应。
+            handCardCosts = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
             handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),
-            handCount      = p.Hand.Count,
-            fieldCards     = p.Characters.Select(c => new
-            {
-                id           = c.Id.ToString(),
-                number       = c.Info.Number,
-                isTapped     = c.IsTapped,
-                powerCurrent = state.CurrentPowerOf(idx, c),
-                cost         = state.CurrentCostOf(idx, c),
-                attachedDon  = p.AttachedDonCount(c.Id),
-                gainedKeywords = c.GainedKeywords.Select(k => k.Keyword)
-                                  .Concat(ContinuousGrantedKeywords(state, c))
-                                  .Distinct().ToArray(),
-                cannotActivateNextReset = c.CannotActivateNextReset,
-                // 无法被效果转为休息状态：综合瞬时(AddRestriction)与持续(GrantRestriction)两种来源
-                cannotBeRested = c.HasRestriction(GrandUMI.Game.RestrictionKind.CannotBeRested)
-                              || state.HasContinuousRestriction(c, GrandUMI.Game.RestrictionKind.CannotBeRested),
-                turnPlayed   = c.TurnPlayed,
-                canAttack    = GrandUMI.Game.Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
-                // 本回合【启动主要】【每回合1次】是否已用 → 供客户端用完隐藏"启动效果"按钮
-                activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
-            }).ToArray(),
-            stageNumber    = p.StageCard?.Info.Number,
-            stageId        = p.StageCard?.Id.ToString(),
-            stageTapped    = p.StageCard?.IsTapped ?? false,
-            stageActivatedUsedThisTurn = p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
-            trashNumbers   = p.Trash.Select(c => c.Info.Number).ToArray(),
-            deckCount      = p.DeckCount,
-            lifeCount      = p.LifeCount,
-            // 生命牌内容：永远不发给对手；自己也只在加入手牌前不知道（生命区背面朝上规则）
-            // ↓ 故 lifeNumbers 始终为空数组，触发流程时单独通过 prompt 公开
-            lifeNumbers    = Array.Empty<string>(),
-            // 正面朝上的生命牌为公开信息（双方可见番号）；背面者仅下发占位（faceUp=false, number=null）
-            lifeFaceUp     = p.LifeArea.Select(c => new { faceUp = c.IsLifeFaceUp, number = c.IsLifeFaceUp ? c.Info.Number : null }).ToArray(),
-            leaderId       = p.Leader.Id.ToString(),
-            leaderNumber   = p.Leader.Info.Number,
-            leaderTapped   = p.Leader.IsTapped,
-            leaderPower    = state.CurrentPowerOf(idx, p.Leader),
-            leaderAttachedDon = p.AttachedDonCount(p.Leader.Id),
-            leaderCanAttack = GrandUMI.Game.Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
-            leaderActivatedUsedThisTurn = ActivatedUsedThisTurn(p, p.Leader),
-            costActive     = p.ActiveDonCount,
-            costRest       = p.RestDonCount,
-            costAttached   = p.CostArea.Count(d => d.State == DonState.Attached),
-            donDeckCount   = p.DonDeck.Count,
-            hasReDraw      = p.HasReDraw,
-            mulliganDone   = p.MulliganDone,
+            handCount = board.HandCount,
+            fieldCards = board.FieldCards,
+            stageNumber = board.StageNumber,
+            stageId = board.StageId,
+            stageTapped = board.StageTapped,
+            stageActivatedUsedThisTurn = board.StageActivatedUsedThisTurn,
+            trashNumbers = board.TrashNumbers,
+            deckCount = board.DeckCount,
+            lifeCount = board.LifeCount,
+            lifeNumbers = Array.Empty<string>(),
+            lifeFaceUp = board.LifeFaceUp,
+            leaderId = board.LeaderId,
+            leaderNumber = board.LeaderNumber,
+            leaderTapped = board.LeaderTapped,
+            leaderPower = board.LeaderPower,
+            leaderAttachedDon = board.LeaderAttachedDon,
+            leaderCanAttack = board.LeaderCanAttack,
+            leaderActivatedUsedThisTurn = board.LeaderActivatedUsedThisTurn,
+            costActive = board.CostActive,
+            costRest = board.CostRest,
+            costAttached = board.CostAttached,
+            donDeckCount = board.DonDeckCount,
+            hasReDraw = board.HasReDraw,
+            mulliganDone = board.MulliganDone,
         };
     }
 
-    /// <summary>该卡本回合的【启动主要】【每回合1次】是否已用。
-    /// DSL 启动效果 key = "{id}-Activated"；脚本约定 key = "{番号}-act:{id}"。
-    /// 仅 oncePerTurn 卡会写入 TurnOnceUsed，故可多次发动的启动效果天然恒 false（不会误隐藏按钮）。</summary>
-    static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
-        => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
-        || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
+    private sealed record PlayerBoardComputed(
+        string Name,
+        int HandCount,
+        object[] FieldCards,
+        string? StageNumber,
+        string? StageId,
+        bool StageTapped,
+        bool StageActivatedUsedThisTurn,
+        string[] TrashNumbers,
+        int DeckCount,
+        int LifeCount,
+        object[] LifeFaceUp,
+        string LeaderId,
+        string LeaderNumber,
+        bool LeaderTapped,
+        int LeaderPower,
+        int LeaderAttachedDon,
+        bool LeaderCanAttack,
+        bool LeaderActivatedUsedThisTurn,
+        int CostActive,
+        int CostRest,
+        int CostAttached,
+        int DonDeckCount,
+        bool HasReDraw,
+        bool MulliganDone);
 
-    /// <summary>ContinuousEffect 当前授予该卡的关键词（如贴咚【阻挡者】、条件【速攻】）。
-    /// 客户端仅认快照 gainedKeywords + 静态卡面，不并入这里的话条件授予关键词在前端不可见/不可选。</summary>
-    static readonly string[] GrantableKeywords = { "阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };
-    static IEnumerable<string> ContinuousGrantedKeywords(GameState state, CardInstance c)
+    private sealed record PayloadComputed(JsonElement Element, string Json);
+
+    private static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
+        => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
+           || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
+
+    private static readonly string[] GrantableKeywords =
+        { "阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };
+
+    private static IEnumerable<string> ContinuousGrantedKeywords(GameState state, CardInstance c)
         => GrantableKeywords.Where(kw => state.HasContinuousKeyword(c, kw));
 }

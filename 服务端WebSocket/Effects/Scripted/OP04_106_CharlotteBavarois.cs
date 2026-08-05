@@ -58,6 +58,6 @@ public class OP04_106_CharlotteBavarois : IScriptedEffect
         var card = me.Hand.First(c => c.Id.ToString() == disc[0]);
         AtomicOps.DiscardHand(me, card);
 
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
     }
 }

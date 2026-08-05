@@ -45,6 +45,6 @@ public class OP05_105_Aisa : IScriptedEffect
         AtomicOps.DiscardHand(me, toDiscard);
 
         // 此卡牌登场（发动触发时本卡已在废弃区）
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
     }
 }

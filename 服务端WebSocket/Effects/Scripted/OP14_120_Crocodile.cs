@@ -32,6 +32,6 @@ public class OP14_120_Crocodile : IScriptedEffect
         if (discard is null) return;
 
         AtomicOps.DiscardHand(me, discard);
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

@@ -33,14 +33,14 @@ public class ST17_003_Buggy : IScriptedEffect
     public string CardNumber => "ST17-003";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var top = me.Deck.Take(3).ToList();
-        if (top.Count == 0) return Task.CompletedTask;
+        if (top.Count == 0) return;
         // 仅放回最上方（自选顺序简化为原相对顺序）
         AtomicOps.ReorderTopK(me, top.Select(c => c.Id).ToList(), toBottom: false);
-        return Task.CompletedTask;
+        return;
     }
 }
 
@@ -72,7 +72,7 @@ public class ST12_003_Mihawk : IScriptedEffect
             cands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (ch.Count == 0) return;
         var picked = cands.First(c => c.Id.ToString() == ch[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         AtomicOps.RestCard(picked);
     }
 }
@@ -119,13 +119,13 @@ public class ST28_003_Kinemon : IScriptedEffect
     public string CardNumber => "ST28-003";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         if (me.Leader.Info.HasKeyword("和之国") && opp.LifeCount <= 3)
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }
 
@@ -138,11 +138,11 @@ public class ST29_005_Jinbe : IScriptedEffect
     public string CardNumber => "ST29-005";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (me.Leader.Info.NameIs("蒙奇·D·路飞"))
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }

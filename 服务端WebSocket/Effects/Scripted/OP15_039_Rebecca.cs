@@ -43,7 +43,7 @@ public class OP15_039_Rebecca : IScriptedEffect
         if (picked2.Count > 0)
         {
             var card = handCandidates.First(c => c.Id.ToString() == picked2[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
         }
     }
 }

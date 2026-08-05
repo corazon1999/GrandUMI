@@ -39,7 +39,7 @@ public class ST22_015_WhitebeardEvent : IScriptedEffect
             if (pick.Count > 0)
             {
                 var picked = cands.First(c => c.Id.ToString() == pick[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked); // 其登场时由批次1兜底触发
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked); // 其登场时由批次1兜底触发
             }
         }
 

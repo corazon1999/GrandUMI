@@ -64,7 +64,7 @@ public class EB02_025_Rosinante : IScriptedEffect
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 if (me.Characters.Count >= 5)
-                    AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
+                    await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 picked.TurnPlayed = ctx.State.TurnCount;
                 picked.IsTapped = true; // 以休息状态登场
                 me.Characters.Add(picked);

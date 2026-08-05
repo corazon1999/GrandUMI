@@ -18,15 +18,15 @@ public class OP07_101_Shaka : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 条件：我方领袖为"贝加班克"
-        if (!me.Leader.Info.NameContains("贝加班克")) return Task.CompletedTask;
+        if (!me.Leader.Info.NameContains("贝加班克")) return;
 
         // 此卡已在废弃区，从废弃区免费登场（活跃状态）
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
-        return Task.CompletedTask;
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
+        return;
     }
 }

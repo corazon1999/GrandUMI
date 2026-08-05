@@ -84,7 +84,7 @@ public class OP15_080_Oars : IScriptedEffect
         // 收益：从废弃区登场此角色
         if (me.Trash.Any(c => c.Id == selfId))
         {
-            AtomicOps.PlayFromTrashFree(s, owner, self, restState: false);
+            await AtomicOps.PlayFromTrashFree(s, owner, self, restState: false);
         }
     }
 }

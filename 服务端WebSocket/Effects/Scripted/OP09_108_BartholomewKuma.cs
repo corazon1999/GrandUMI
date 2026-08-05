@@ -22,20 +22,20 @@ public class OP09_108_BartholomewKuma : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
         var opp = s.Players[1 - ctx.OwnerIndex];
 
         // 条件：领袖含《革命军》且双方生命合计 ≤5
-        if (!me.Leader.Info.HasKeyword("革命军")) return Task.CompletedTask;
-        if (me.LifeCount + opp.LifeCount > 5) return Task.CompletedTask;
+        if (!me.Leader.Info.HasKeyword("革命军")) return;
+        if (me.LifeCount + opp.LifeCount > 5) return;
 
         // 此卡牌登场：触发发动时本卡在废弃区，从废弃区免费以活跃状态登场
-        if (!me.Trash.Contains(ctx.Source)) return Task.CompletedTask;
-        AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
+        if (!me.Trash.Contains(ctx.Source)) return;
+        await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
 
-        return Task.CompletedTask;
+        return;
     }
 }

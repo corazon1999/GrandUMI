@@ -67,6 +67,6 @@ public class OP13_119_Ace : IScriptedEffect
         if (playChosen.Count == 0) return;
 
         var playCard = oppPlayable.First(c => c.Id.ToString() == playChosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, oppIndex, playCard);
+        await AtomicOps.PlayFromHandFree(ctx.State, oppIndex, playCard);
     }
 }

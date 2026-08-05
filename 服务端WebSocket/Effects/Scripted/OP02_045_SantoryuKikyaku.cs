@@ -73,7 +73,7 @@ public class OP02_045_SantoryuKikyaku : IScriptedEffect
         if (chosen2.Count > 0)
         {
             var picked = playable.First(c => c.Id.ToString() == chosen2[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
         }
     }
 }

@@ -30,12 +30,13 @@ export type AnimationEvent =
 export function useGameAnimation(): AnimationEvent {
   const lastAction = useGameStore((s) => s.lastAction);
   const lastActionPayload = useGameStore((s) => s.lastActionPayloadObj);
+  const tick = useGameStore((s) => s.tick);
   const [event, setEvent] = useState<AnimationEvent>({ type: "none" });
-  const prevActionRef = useRef<string>("");
+  const prevTickRef = useRef<number>(-1);
 
   useEffect(() => {
-    if (!lastAction || lastAction === prevActionRef.current) return;
-    prevActionRef.current = lastAction;
+    if (!lastAction || tick === prevTickRef.current) return;
+    prevTickRef.current = tick;
 
     const payload = lastActionPayload ?? {};
 
@@ -91,7 +92,7 @@ export function useGameAnimation(): AnimationEvent {
       default:
         setEvent({ type: "none" });
     }
-  }, [lastAction, lastActionPayload]);
+  }, [tick, lastAction, lastActionPayload]);
 
   return event;
 }

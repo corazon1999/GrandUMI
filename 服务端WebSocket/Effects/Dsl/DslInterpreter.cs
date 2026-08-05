@@ -986,12 +986,20 @@ public static class DslInterpreter
                 }
             case "KO":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null)
+                    var targets = ResolveTargets(op, "target", ctx)
+                        .DistinctBy(c => c.Id)
+                        .ToList();
+                    foreach (var ownerGroup in targets.GroupBy(target => FindOwner(s, target)))
                     {
-                        int owner = FindOwner(s, target);
-                        // 走异步效果KO：含 PreKO/守护者置换/受害者OnKO + KO来源标记（覆盖绝大多数效果KO）
-                        if (owner >= 0) await AtomicOps.KOByEffectAsync(s, owner, target, ctx.Prompts, ctx.OwnerIndex);
+                        int owner = ownerGroup.Key;
+                        if (owner < 0) continue;
+                        var cards = ownerGroup.ToList();
+                        var characters = cards.Where(c => s.Players[owner].Characters.Contains(c)).ToList();
+                        if (characters.Count > 0)
+                            await AtomicOps.KOCardsByEffectAsync(s, owner, characters, ctx.Prompts, ctx.OwnerIndex);
+                        // 舞台等非角色目标不属于批量角色 KO，仍走完整的单目标效果 KO。
+                        foreach (var target in cards.Where(c => !characters.Contains(c)))
+                            await AtomicOps.KOByEffectAsync(s, owner, target, ctx.Prompts, ctx.OwnerIndex);
                     }
                     break;
                 }
@@ -1014,8 +1022,8 @@ public static class DslInterpreter
                 }
             case "Rest":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null) AtomicOps.RestCard(target);
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.RestCard(target);
                     break;
                 }
             // RestOpponentCards: 将对方最多 N 张"卡牌"转为休息状态（活跃的 领袖/角色/舞台/咚!! 混选，对应"将对方N张卡牌转为休息"）
@@ -1155,7 +1163,7 @@ public static class DslInterpreter
                     if (target is null) break;
                     bool rest = op.TryGetProperty("rest", out var rv) && rv.ValueKind == JsonValueKind.True;
                     await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, target);
-                    AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
+                    await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
                     break;
                 }
             // PlaySelf:「此卡牌登场」生命触发——把此卡(发动触发时已被移入废弃区)从废弃区登场到场上(触发其登场时)。
@@ -1163,7 +1171,7 @@ public static class DslInterpreter
                 if (ctx.Source.Info.Kind == CardKind.Character)
                 {
                     await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, ctx.Source);
-                    AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source);
+                    await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source);
                 }
                 break;
             case "TrashToHand":
@@ -1361,7 +1369,7 @@ public static class DslInterpreter
                     if (target is null) break;
                     int owner = ctx.OwnerIndex; // 手牌卡 owner 恒为效果控制者，FindOwner 不搜手牌会误判 -1
                     await EnsureRoomForCharacter(ctx, owner, target);
-                    AtomicOps.PlayFromHandFree(s, owner, target);
+                    await AtomicOps.PlayFromHandFree(s, owner, target);
                     break;
                 }
             case "PlayEventFromHandFree":
@@ -1439,6 +1447,31 @@ public static class DslInterpreter
                     opp.Hand.Add(top);
                     break;
                 }
+            case "OppLifeToTrash":
+                {
+                    if (opp.LifeArea.Count == 0) break;
+                    bool optional = op.TryGetProperty("optional", out var oltOpt)
+                                    && oltOpt.ValueKind == JsonValueKind.True;
+                    if (optional)
+                    {
+                        var text = op.TryGetProperty("text", out var oltText)
+                            ? oltText.GetString()
+                            : "是否将对方生命区最上方的1张卡牌放置到废弃区？";
+                        if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, text ?? "是否将对方生命区最上方的1张卡牌放置到废弃区？"))
+                            break;
+                    }
+                    var top = opp.LifeArea[0];
+                    opp.LifeArea.RemoveAt(0);
+                    top.IsLifeFaceUp = false;
+                    opp.Trash.Add(top);
+                    EffectRuntime.NotifyWatcher(EffectTrigger.OnLifeLeaveField,
+                        new Dictionary<string, object?>
+                        {
+                            ["owner"] = 1 - ctx.OwnerIndex,
+                            ["toZero"] = opp.LifeArea.Count == 0,
+                        });
+                    break;
+                }
 
             // ── B 阶段（OP09）新增 op ─────────────────────────────────
             // 从手牌按 filter 选最多 1 张角色免费登场（rest=true 时以休息状态登场）
@@ -1461,7 +1494,7 @@ public static class DslInterpreter
                         if (picked is not null)
                         {
                             await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
-                            AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
+                            await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
                             if (rest) AtomicOps.RestCard(picked);
                         }
                     }
@@ -1487,7 +1520,7 @@ public static class DslInterpreter
                         if (picked is not null)
                         {
                             await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
-                            AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
+                            await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
                         }
                     }
                     break;
@@ -1518,12 +1551,12 @@ public static class DslInterpreter
                             bool fromHand = handCands.Any(c => c.Id == picked.Id);
                             if (fromHand)
                             {
-                                AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
+                                await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
                                 if (rest) AtomicOps.RestCard(picked);
                             }
                             else
                             {
-                                AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
+                                await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
                             }
                         }
                     }

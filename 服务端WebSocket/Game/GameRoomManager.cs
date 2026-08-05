@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading.Channels;
+using GrandUMI.Diagnostics;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 
@@ -11,6 +13,10 @@ namespace GrandUMI.Game;
 public static class GameRoomManager
 {
     private const int GracePeriodSeconds = 90;
+    /// <summary>仅排障时开启；私有快照平均约 63 KB，不应作为正式服常态日志。</summary>
+    private static readonly bool PrivateSnapshotLogEnabled =
+        string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "1", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>对局存活上限：自最后一次操作起超过此时长即弃局（重启不恢复）。</summary>
     private static readonly TimeSpan RestoreTtl = TimeSpan.FromMinutes(30);
@@ -40,7 +46,18 @@ public static class GameRoomManager
         public bool BotScheduled { get; set; }
         /// <summary>关联的友谊战房间 ID(非友谊战为 null);对局结束时回调更新比分并退回房间</summary>
         public string? FriendlyRoomId { get; set; }
+        internal Channel<RoomWork> ActionQueue { get; } = Channel.CreateBounded<RoomWork>(new BoundedChannelOptions(256)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+            FullMode = BoundedChannelFullMode.Wait,
+        });
+        internal Task ActionWorker { get; set; } = Task.CompletedTask;
+        internal int ActionQueueDepth;
     }
+
+    internal sealed record RoomWork(string Name, long EnqueuedAt, Func<Task> Execute);
 
     /// <summary>双方匹配/房间码成功后创建房间</summary>
     public static RoomEntry CreateRoom(string p0Sid, string p0Account, string p0Deck,
@@ -56,6 +73,7 @@ public static class GameRoomManager
             (p1Sid, p1Account, p1Deck),
             firstPlayer: p0First ? 0 : 1,
             leaderKeywordWildcard: vsBot);
+        engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
         engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
 
@@ -73,8 +91,7 @@ public static class GameRoomManager
         engine.OnSendToPlayer = (idx, payload) =>
         {
             if (idx == 1 && vsBot) { BotDriver.OnBotMessage(entry); return; }
-            var sid = idx == 0 ? p0Sid : p1Sid;
-            WebSocketBridge.Send(sid, payload);
+            WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
         };
 
         engine.OnSendToSpectators = (_, payload) =>
@@ -82,6 +99,7 @@ public static class GameRoomManager
             foreach (var sid in entry.Spectators.Keys)
                 WebSocketBridge.Send(sid, payload);
         };
+        engine.HasSpectators = () => !entry.Spectators.IsEmpty;
         entry.ReplayPath = ReplayRecorder.Open(roomId);
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
         engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
@@ -121,6 +139,7 @@ public static class GameRoomManager
         _rooms[roomId] = entry;
         _sessionRoom[p0Sid] = roomId;
         _sessionRoom[p1Sid] = roomId;
+        StartActionWorker(entry);
 
         // 推送初始状态 → 进入 mulligan
         engine.BroadcastInitialState();
@@ -149,19 +168,55 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "观战者不能操作" });
             return;
         }
-        room.Engine.RecordMatchLog("player_action_requested", idx, new
+        if (!EnqueuePlayerAction(room, idx, action, data.Clone()))
+            WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对局正在结束，操作未执行" });
+    }
+
+    internal static void EnqueueBotAction(RoomEntry room, int playerIndex, string action, JsonElement data)
+        => EnqueuePlayerAction(room, playerIndex, action, data.Clone());
+
+    private static bool EnqueuePlayerAction(RoomEntry room, int playerIndex, string action, JsonElement data)
+    {
+        var promptIdBefore = action == "PromptResponse" ? room.Engine.State.PendingPrompt?.PromptId : null;
+        return EnqueueWork(room, new RoomWork(action, LatencyDiagnostics.Start(), async () =>
         {
-            action,
-            data,
+            room.Engine.RecordMatchLog("player_action_requested", playerIndex, new { action, data });
+            room.Engine.HandleAction(playerIndex, action, data);
+            await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
+            if (room.Engine.State.IsGameOver)
+                CleanupRoom(room.RoomId);
+        }));
+    }
+
+    private static bool EnqueueWork(RoomEntry room, RoomWork work)
+    {
+        Interlocked.Increment(ref room.ActionQueueDepth);
+        if (room.ActionQueue.Writer.TryWrite(work)) return true;
+        Interlocked.Decrement(ref room.ActionQueueDepth);
+        return false;
+    }
+
+    private static void StartActionWorker(RoomEntry room)
+    {
+        room.ActionWorker = Task.Run(async () =>
+        {
+            await foreach (var work in room.ActionQueue.Reader.ReadAllAsync())
+            {
+                if (!_rooms.TryGetValue(room.RoomId, out var active) || !ReferenceEquals(active, room))
+                    break;
+                var depth = Interlocked.Decrement(ref room.ActionQueueDepth);
+                LatencyDiagnostics.Observe("房间动作排队", work.EnqueuedAt,
+                    $"房间={room.RoomId}，动作={work.Name}，剩余深度={Math.Max(0, depth)}");
+                try
+                {
+                    await work.Execute();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[房间队列] {room.RoomId} 动作 {work.Name} 异常: {ex.Message}");
+                }
+            }
         });
-        lock (room.Engine) // 与机器人动作串行化（引擎线程不安全）
-        {
-            room.Engine.HandleAction(idx, action, data);
-        }
-        if (room.Engine.State.IsGameOver)
-        {
-            CleanupRoom(room.RoomId);
-        }
     }
 
     /// <summary>客户端 MsgRequestState 入口</summary>
@@ -174,19 +229,18 @@ public static class GameRoomManager
             return;
         }
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
-        if (idx < 0)
+        EnqueueWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), () =>
         {
-            // 观战者重连
-            WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, -1, "Resync"));
-            return;
-        }
-        // 取消宽限期
-        if (_grace.TryRemove(room.RoomId + ":" + sessionId, out var cts)) cts.Cancel();
-        // 通知对手已重连
-        var oppSid = room.PlayerSessionIds[1 - idx];
-        WebSocketBridge.Send(oppSid, new { proto = "MsgPlayerReconnected" });
-        // 重新发完整状态
-        WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, idx, "Resync"));
+            if (idx < 0)
+            {
+                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, -1, "Resync"));
+                return Task.CompletedTask;
+            }
+            if (_grace.TryRemove(room.RoomId + ":" + sessionId, out var cts)) cts.Cancel();
+            WebSocketBridge.Send(room.PlayerSessionIds[1 - idx], new { proto = "MsgPlayerReconnected" });
+            WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, idx, "Resync"));
+            return Task.CompletedTask;
+        }));
     }
 
     /// <summary>玩家断线 → 启动 90s 宽限期</summary>
@@ -215,10 +269,17 @@ public static class GameRoomManager
             // 超时 → 判负
             var r = GetRoom(room.RoomId);
             if (r is null) return;
-            r.Engine.State.WinnerIndex = 1 - idx;
-            r.Engine.State.GameOverReason = $"{r.PlayerAccounts[idx]} 断线超时";
-            r.Engine.Broadcast("DisconnectTimeout", new { disconnected = idx });
-            CleanupRoom(room.RoomId);
+            EnqueueWork(r, new RoomWork("DisconnectTimeout", LatencyDiagnostics.Start(), () =>
+            {
+                if (!r.Engine.State.IsGameOver)
+                {
+                    r.Engine.State.WinnerIndex = 1 - idx;
+                    r.Engine.State.GameOverReason = $"{r.PlayerAccounts[idx]} 断线超时";
+                    r.Engine.Broadcast("DisconnectTimeout", new { disconnected = idx });
+                }
+                CleanupRoom(room.RoomId);
+                return Task.CompletedTask;
+            }));
         });
     }
 
@@ -245,17 +306,18 @@ public static class GameRoomManager
         }
         cts.Cancel(); // 取消对手宽限计时器，避免随后超时逻辑重复判负
 
-        lock (room.Engine)
+        if (!EnqueueWork(room, new RoomWork("EndByDisconnect", LatencyDiagnostics.Start(), () =>
         {
-            // 判对手负：设 WinnerIndex → IsGameOver 自动为真 → 广播带 isGameOver 的快照（前端据此显示结束画面）
             if (!room.Engine.State.IsGameOver)
             {
                 room.Engine.State.WinnerIndex = idx;
                 room.Engine.State.GameOverReason = $"{room.PlayerAccounts[oppIdx]} 断线，对手确认结束对局";
                 room.Engine.Broadcast("DisconnectTimeout", new { disconnected = oppIdx });
             }
-        }
-        CleanupRoom(room.RoomId); // 删恢复日志 + 友谊战回房（OnFriendlyGameEnd）；TryRemove 幂等安全
+            CleanupRoom(room.RoomId);
+            return Task.CompletedTask;
+        })))
+            WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对局正在结束，请稍候" });
     }
 
     /// <summary>断线玩家在宽限期内重新连接（同账号新 sessionId）</summary>
@@ -278,17 +340,15 @@ public static class GameRoomManager
                     r.PlayerSessionIds[i] = newSessionId;
                     _sessionRoom[newSessionId] = r.RoomId;
                     // 重新绑定引擎回调（PlayerIndex 编号未变，sid 已替换）
-                    var newSid0 = r.PlayerSessionIds[0];
-                    var newSid1 = r.PlayerSessionIds[1];
                     r.Engine.OnSendToPlayer = (idx, payload) =>
+                        WebSocketBridge.Send(r.PlayerSessionIds[idx], payload);
+                    var playerIndex = i;
+                    EnqueueWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), () =>
                     {
-                        var sid = idx == 0 ? newSid0 : newSid1;
-                        WebSocketBridge.Send(sid, payload);
-                    };
-                    var oppSid = r.PlayerSessionIds[1 - i];
-                    WebSocketBridge.Send(oppSid, new { proto = "MsgPlayerReconnected" });
-                    // 给重连方发完整快照
-                    WebSocketBridge.Send(newSessionId, StateSnapshotBuilder.Build(r.Engine.State, i, "Resync"));
+                        WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
+                        WebSocketBridge.Send(newSessionId, StateSnapshotBuilder.Build(r.Engine.State, playerIndex, "Resync"));
+                        return Task.CompletedTask;
+                    }));
                     return true;
                 }
             }
@@ -340,7 +400,12 @@ public static class GameRoomManager
             return;
         }
         WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = true, roomId });
-        WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(r.Engine.State, -1, "SpectateJoin"));
+        EnqueueWork(r, new RoomWork("SpectateJoin", LatencyDiagnostics.Start(), () =>
+        {
+            if (r.Spectators.ContainsKey(sessionId))
+                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(r.Engine.State, -1, "SpectateJoin"));
+            return Task.CompletedTask;
+        }));
     }
 
     /// <summary>主动退出观战。重复退出按成功处理，保证客户端可以安全返回大厅。</summary>
@@ -370,6 +435,7 @@ public static class GameRoomManager
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
+            r.ActionQueue.Writer.TryComplete();
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
             r.Engine.RecordMatchLog("match_end", -1, new
@@ -483,6 +549,7 @@ public static class GameRoomManager
             actions,
             leaderKeywordWildcard: false,
             p0AlwaysPrompt: p0Always, p1AlwaysPrompt: p1Always);
+        engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
 
         if (engine.State.IsGameOver) { TryDelete(file); return false; } // 已分胜负不恢复
 
@@ -503,6 +570,7 @@ public static class GameRoomManager
         {
             foreach (var sid in entry.Spectators.Keys) WebSocketBridge.Send(sid, payload);
         };
+        engine.HasSpectators = () => !entry.Spectators.IsEmpty;
         entry.ReplayPath   = ReplayRecorder.OpenAppend(roomId);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
         engine.OnReplay        = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
@@ -511,6 +579,7 @@ public static class GameRoomManager
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）
 
         _rooms[roomId] = entry;
+        StartActionWorker(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;

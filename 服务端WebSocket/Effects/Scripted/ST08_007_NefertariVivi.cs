@@ -16,10 +16,10 @@ public class ST08_007_NefertariVivi : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         // 触发发动时本卡已位于废弃区，将其免费登场到场上
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }

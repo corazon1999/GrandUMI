@@ -23,18 +23,18 @@ public class OP09_109_JaguarDSaul : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
 
         // 条件：我方领袖为"妮古·罗宾"
-        if (!me.Leader.Info.NameContains("妮古·罗宾")) return Task.CompletedTask;
+        if (!me.Leader.Info.NameContains("妮古·罗宾")) return;
 
         // 此卡牌登场：触发发动时本卡在废弃区，从废弃区免费以活跃状态登场
-        if (!me.Trash.Contains(ctx.Source)) return Task.CompletedTask;
-        AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
+        if (!me.Trash.Contains(ctx.Source)) return;
+        await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
 
-        return Task.CompletedTask;
+        return;
     }
 }

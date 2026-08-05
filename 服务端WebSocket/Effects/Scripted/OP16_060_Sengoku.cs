@@ -36,7 +36,7 @@ public class OP16_060_Sengoku : IScriptedEffect
             if (chosen.Count == 0) break;
             var card = pool.First(c => c.Id.ToString() == chosen[0]);
             pickedNames.Add(card.Info.Name);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
         }
     }
 }

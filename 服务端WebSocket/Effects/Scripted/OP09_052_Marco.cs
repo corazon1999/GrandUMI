@@ -46,6 +46,6 @@ public class OP09_052_Marco : IScriptedEffect
         AtomicOps.DiscardHand(me, discard);
 
         // 从废弃区将此角色以休息状态登场
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: true);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: true);
     }
 }

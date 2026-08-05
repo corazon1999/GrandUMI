@@ -45,7 +45,7 @@ public class OP08_098_Kalgara : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var picked = playable.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
 
         // 登场成功 → 将生命区最上方 1 张加入手牌
         if (me.LifeArea.Count > 0)

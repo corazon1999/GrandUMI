@@ -77,6 +77,6 @@ public class OP10_022_Law : IScriptedEffect
         // 从生命区取出该卡 → 入手 → 免费登场
         me.LifeArea.RemoveAt(0);
         me.Hand.Add(lifeTop);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, lifeTop);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, lifeTop);
     }
 }

@@ -82,7 +82,7 @@ public class OP13_082_FiveElders : IScriptedEffect
 
             var picked = cands.First(c => c.Id.ToString() == pick[0]);
             chosenNames.Add(picked.Info.Name);
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

@@ -75,6 +75,10 @@ public class GameState
     /// <summary>待派发的反应式 watcher 事件队列（AtomicOps 同步入队，EffectRuntime 在最外层效果结束后异步排空）</summary>
     public List<PendingWatcher> PendingWatchers { get; } = new();
 
+    /// <summary>旧同步效果 KO 产生的定向【KO时】队列。
+    /// 目标卡已离场，不能再通过场上监听器收集，故保存卡实例及 KO 来源上下文，在最外层效果结束后异步结算。</summary>
+    public List<PendingKOEffect> PendingKOEffects { get; } = new();
+
     /// <summary>待触发【登场时】的"被效果登场"卡牌队列：AtomicOps.Play*Free 同步入队，
     /// EffectRuntime 在最外层效果结束后定向解析其【登场时】并派发 OnAllyCharEnter（修：卡效登场的角色登场时不发动）。</summary>
     public List<PendingEnterField> PendingEnterFields { get; } = new();
@@ -115,6 +119,16 @@ public class GameState
     public void EnqueueWatcher(Effects.EffectTrigger trigger, Dictionary<string, object?>? payload = null)
         => PendingWatchers.Add(new PendingWatcher { Trigger = trigger, Payload = payload ?? new() });
 
+    /// <summary>登记一张已被效果 KO 的卡，稍后定向发动其【KO时】效果。</summary>
+    public void EnqueueKOEffect(int owner, CardInstance card, int actingSide, Guid? sourceCardId)
+        => PendingKOEffects.Add(new PendingKOEffect
+        {
+            Owner = owner,
+            Card = card,
+            ActingSide = actingSide,
+            SourceCardId = sourceCardId,
+        });
+
     /// <summary>入队一张"被效果登场"的卡牌（由 AtomicOps.Play*Free 调用），稍后定向触发其【登场时】效果。
     /// from = 来源区("hand"/"trash"/"deck"/"life")，供 OnAllyCharEnter 监听卡区分（如 OP16-079 仅废弃区登场赋速攻）。</summary>
     public void EnqueueEnterField(int owner, CardInstance card, string? from = null)
@@ -135,6 +149,19 @@ public class GameState
         return sum;
     }
 
+    /// <summary>评估持续效果对指定卡“原本力量”的覆盖；多条同时生效时以后注册者为准。</summary>
+    public int? ContinuousOriginalPowerOverride(int sideIdx, CardInstance card)
+    {
+        int? value = null;
+        foreach (var eff in ContinuousEffects)
+        {
+            if (!eff.OriginalPowerOverride.HasValue) continue;
+            if (!eff.Predicate(this, sideIdx, card)) continue;
+            value = eff.OriginalPowerOverride.Value;
+        }
+        return value;
+    }
+
     /// <summary>统一计算某张卡当前力量：基础 + 咚 + 临时修正 + 永续修正</summary>
     public int CurrentPowerOf(int sideIdx, CardInstance card)
     {
@@ -142,6 +169,12 @@ public class GameState
         int donCount = p.AttachedDonCount(card.Id);
         bool ownerTurn = CurrentTurnPlayer == sideIdx;
         int basePower = card.CurrentPower(donCount, ownerTurn);
+        int currentOriginalPower = card.OriginalPowerOverride
+            ?? card.OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
+            ?? card.Info.Power;
+        int? continuousOriginalPower = ContinuousOriginalPowerOverride(sideIdx, card);
+        if (continuousOriginalPower.HasValue)
+            basePower += continuousOriginalPower.Value - currentOriginalPower;
         return basePower + ContinuousPowerBonus(sideIdx, card);
     }
 
@@ -343,6 +376,15 @@ public class PendingWatcher
 {
     public required Effects.EffectTrigger Trigger { get; init; }
     public Dictionary<string, object?> Payload { get; init; } = new();
+}
+
+/// <summary>待定向结算的【KO时】效果及其原始效果 KO 上下文。</summary>
+public class PendingKOEffect
+{
+    public required int Owner { get; init; }
+    public required CardInstance Card { get; init; }
+    public required int ActingSide { get; init; }
+    public Guid? SourceCardId { get; init; }
 }
 
 /// <summary>待触发【登场时】的"被效果登场"卡牌</summary>

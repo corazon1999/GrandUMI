@@ -35,7 +35,7 @@ public class OP12_101_Bonney : IScriptedEffect
             // 条件：我方领袖拥有《超新星》特征
             if (!me.Leader.Info.HasKeyword("超新星")) return;
             // 此卡已在废弃区，从废弃区免费登场
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
             await Task.CompletedTask;
             return;
         }

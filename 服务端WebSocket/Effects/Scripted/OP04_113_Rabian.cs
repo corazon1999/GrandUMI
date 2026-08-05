@@ -18,12 +18,12 @@ public class OP04_113_Rabian : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         // 此卡牌登场：从废弃区登场到我方场上
         if (me.Trash.Contains(ctx.Source))
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }

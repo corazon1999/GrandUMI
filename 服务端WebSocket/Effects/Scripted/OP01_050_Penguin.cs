@@ -40,7 +40,7 @@ public class OP01_050_Penguin : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = candidates.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

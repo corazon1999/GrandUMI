@@ -16,12 +16,12 @@ public class EB02_055_Jinbe : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         bool leaderOk = me.Leader.Info.HasKeyword("鱼人族") || me.Leader.Info.HasKeyword("人鱼族");
         if (leaderOk && me.LifeArea.Count <= 2)
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
-        return Task.CompletedTask;
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: false);
+        return;
     }
 }

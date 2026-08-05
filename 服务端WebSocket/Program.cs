@@ -1,5 +1,6 @@
 using GrandUMI;
 using GrandUMI.Cards;
+using System.Runtime.Loader;
 
 Console.Title = "GrandUMI WebSocket 服务器";
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -27,15 +28,27 @@ WebSocketBridge.Start(port);
 
 // 等待 Ctrl+C
 var tcs = new TaskCompletionSource();
+var stopping = 0;
+void RequestStop()
+{
+    if (Interlocked.Exchange(ref stopping, 1) != 0) return;
+    Console.WriteLine("\n[服务器] 正在停止...");
+    WebSocketBridge.Stop();
+    tcs.TrySetResult();
+}
+
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
-    Console.WriteLine("\n[服务器] 正在停止...");
-    WebSocketBridge.Stop();
-    tcs.SetResult();
+    RequestStop();
 };
+// Linux/systemd 的 SIGTERM 会触发卸载回调，确保发布重启时也能排空日志队列。
+AssemblyLoadContext.Default.Unloading += _ => RequestStop();
 
 await tcs.Task;
+// 先停止接收新消息，再排空诊断日志与录像队列，避免正常关服丢失队尾数据。
+GrandUMI.Game.ReplayRecorder.Shutdown();
+GrandUMI.Game.Logging.MatchLogRecorder.Shutdown();
 Console.WriteLine("[服务器] 已停止");
 return;
 

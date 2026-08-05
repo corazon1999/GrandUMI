@@ -25,6 +25,20 @@ public static class LifeRevealManager
         var s = engine.State;
         var p = s.Players[targetPlayerIdx];
 
+        if (damage <= 0) return;
+
+        // 胜利条件只看本次伤害开始时是否已经没有生命。
+        // 双重攻击等多点伤害不会让超出剩余生命的部分穿透并直接获胜。
+        if (p.LifeArea.Count == 0)
+        {
+            if (!s.IsGameOver)
+            {
+                s.WinnerIndex = 1 - targetPlayerIdx;
+                s.GameOverReason = $"{p.AccountName} 生命耗尽";
+            }
+            return;
+        }
+
         // 判断本次攻击者是否带【流放】；并记录攻击者 id 供 OnDamageToLeader 派发
         bool exile = false;
         string? attackerIdForTrigger = null;
@@ -42,14 +56,7 @@ public static class LifeRevealManager
         for (int i = 0; i < damage; i++)
         {
             if (p.LifeArea.Count == 0)
-            {
-                if (!s.IsGameOver)
-                {
-                    s.WinnerIndex = 1 - targetPlayerIdx;
-                    s.GameOverReason = $"{p.AccountName} 生命耗尽";
-                }
-                return;
-            }
+                break;
 
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
@@ -70,16 +77,20 @@ public static class LifeRevealManager
                 bool useTrigger = await engine.Prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
                 if (useTrigger && hasTrigger)
                 {
-                    // 发动触发：卡牌进废弃区，效果用 OnLifeRevealTrigger 触发
+                    // 发动触发：卡牌进废弃区。
+                    // “发动此卡牌的【KO时】效果”是元触发，直接复用 OnKO，避免每张卡重复维护一份 trigger 定义。
                     p.Trash.Add(top);
+                    var revealTrigger = InvokesOwnKOEffect(top.Info.Trigger)
+                        ? EffectTrigger.OnKO
+                        : EffectTrigger.OnLifeRevealTrigger;
                     await EffectRuntime.Resolve(s, targetPlayerIdx, top,
-                        EffectTrigger.OnLifeRevealTrigger, engine.Prompts);
+                        revealTrigger, engine.Prompts);
                     // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
                     // 带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op 处理(那时卡已离开废弃区→不再命中此兜底)。
                     if (!s.IsGameOver && top.Info.Kind == CardKind.Character
                         && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                     {
-                        AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
+                        await AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
                         // 反馈#203：PlayFromTrashFree 只把【登场时】入 PendingEnterFields 延迟队列；
                         // 这条"纯自登场"链路后续未必有 depth-0 的 Resolve 来排空该队列，
                         // 会导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。此处显式排空一次。
@@ -121,6 +132,12 @@ public static class LifeRevealManager
         return !trigger.Contains("：") && !trigger.Contains(":") && !trigger.Contains("场合") && !trigger.Contains("之后");
     }
 
+    private static bool InvokesOwnKOEffect(string? trigger)
+        => !string.IsNullOrEmpty(trigger)
+           && trigger.Contains("发动此卡牌的")
+           && (trigger.Contains("【KO时】") || trigger.Contains("【K.O.时】"))
+           && trigger.Contains("效果");
+
     /// <summary>将受到伤害而揭开的生命牌加入手牌；ST13-003 规则替换：领袖为 ST13-003 时，正面朝上的生命牌改为放回卡组最下方。</summary>
     private static void AddRevealedLifeToHandOrDeck(PlayerState p, CardInstance top)
     {
@@ -140,17 +157,23 @@ public static class LifeRevealManagerSync
     public static void DealDamageToLeaderNoPrompt(GameState s, int targetPlayerIdx, int damage)
     {
         var p = s.Players[targetPlayerIdx];
+
+        if (damage <= 0) return;
+
+        if (p.LifeArea.Count == 0)
+        {
+            if (!s.IsGameOver)
+            {
+                s.WinnerIndex = 1 - targetPlayerIdx;
+                s.GameOverReason = $"{p.AccountName} 生命耗尽";
+            }
+            return;
+        }
+
         for (int i = 0; i < damage; i++)
         {
             if (p.LifeArea.Count == 0)
-            {
-                if (!s.IsGameOver)
-                {
-                    s.WinnerIndex = 1 - targetPlayerIdx;
-                    s.GameOverReason = $"{p.AccountName} 生命耗尽";
-                }
-                return;
-            }
+                break;
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
             p.Hand.Add(top);

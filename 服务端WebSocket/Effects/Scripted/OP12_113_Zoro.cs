@@ -48,7 +48,7 @@ public class OP12_113_Zoro : IScriptedEffect
         var target = candidates.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
         if (target is null) return;
 
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, target);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, target);
         target.IsTapped = true; // 以休息状态登场
     }
 }

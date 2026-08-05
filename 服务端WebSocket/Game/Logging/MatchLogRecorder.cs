@@ -4,7 +4,6 @@ namespace GrandUMI.Game.Logging;
 
 public static class MatchLogRecorder
 {
-    private static readonly Dictionary<string, StreamWriter> Writers = new();
     private static readonly Dictionary<string, long> Sequences = new();
     private static readonly object LockObj = new();
 
@@ -12,6 +11,7 @@ public static class MatchLogRecorder
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
+    private static readonly AsyncJsonlWriter Writer = new(JsonOptions);
 
     public static string GetLogDir()
     {
@@ -27,89 +27,73 @@ public static class MatchLogRecorder
 
     public static string Open(string matchId)
     {
+        var path = Path.Combine(GetLogDir(), DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{matchId}.jsonl");
         lock (LockObj)
-        {
-            var root = GetLogDir();
-            var dayDir = Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"));
-            Directory.CreateDirectory(dayDir);
-            var path = Path.Combine(dayDir, $"{matchId}.jsonl");
-            var writer = new StreamWriter(path, append: false) { AutoFlush = true };
-            Writers[matchId] = writer;
             Sequences[matchId] = 0;
-            return path;
-        }
+        Writer.Open(matchId, path, append: false);
+        return path;
     }
 
-    /// <summary>重启恢复后以追加模式重开已有日志（跨天会落到原文件；找不到则新建当天文件）。seq 接着已有行数递增。</summary>
+    /// <summary>重启恢复后以追加模式重开已有日志，序号接着已有行数递增。</summary>
     public static string OpenAppend(string matchId)
     {
-        lock (LockObj)
+        var root = GetLogDir();
+        string? existing = null;
+        if (Directory.Exists(root))
         {
-            var root = GetLogDir();
-            string? existing = null;
-            if (Directory.Exists(root))
-            {
-                var hits = Directory.GetFiles(root, $"{matchId}.jsonl", SearchOption.AllDirectories);
-                if (hits.Length > 0) existing = hits[0];
-            }
-            var path = existing ?? Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{matchId}.jsonl");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            long startSeq = 0;
-            if (existing is not null)
-            {
-                try { startSeq = File.ReadLines(existing).LongCount(); } catch { }
-            }
-            var writer = new StreamWriter(path, append: true) { AutoFlush = true };
-            Writers[matchId] = writer;
-            Sequences[matchId] = startSeq;
-            return path;
+            var hits = Directory.GetFiles(root, $"{matchId}.jsonl", SearchOption.AllDirectories);
+            if (hits.Length > 0) existing = hits[0];
         }
+
+        var path = existing ?? Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{matchId}.jsonl");
+        long startSeq = 0;
+        if (existing is not null)
+        {
+            try { startSeq = File.ReadLines(existing).LongCount(); } catch { }
+        }
+
+        lock (LockObj)
+            Sequences[matchId] = startSeq;
+        Writer.Open(matchId, path, append: true);
+        return path;
     }
 
     public static void Append(string matchId, GameState state, string kind, int? actor, object? payload)
     {
+        object entry;
         lock (LockObj)
         {
-            if (!Writers.TryGetValue(matchId, out var writer)) return;
+            if (!Sequences.TryGetValue(matchId, out var current)) return;
+            var seq = current + 1;
+            Sequences[matchId] = seq;
 
-            try
+            // 在游戏线程只捕获标量与不可变快照；JSON 序列化和文件 I/O 留给后台线程。
+            entry = new
             {
-                var seq = Sequences.TryGetValue(matchId, out var current) ? current + 1 : 1;
-                Sequences[matchId] = seq;
-
-                var entry = new
-                {
-                    schema = "grandumi.matchlog.v1",
-                    matchId,
-                    seq,
-                    tick = state.Tick,
-                    turn = state.TurnCount,
-                    phase = PhaseLabels.Of(state.Phase),
-                    timeUtc = DateTime.UtcNow,
-                    kind,
-                    actor,
-                    payload = payload ?? new { },
-                };
-
-                writer.WriteLine(JsonSerializer.Serialize(entry, JsonOptions));
-            }
-            catch
-            {
-                // Match log must never interrupt the game flow.
-            }
+                schema = "grandumi.matchlog.v1",
+                matchId,
+                seq,
+                tick = state.Tick,
+                turn = state.TurnCount,
+                phase = PhaseLabels.Of(state.Phase),
+                timeUtc = DateTime.UtcNow,
+                kind,
+                actor,
+                payload = payload ?? new { },
+            };
         }
+
+        Writer.Append(matchId, entry);
     }
 
+    /// <summary>关闭前会等待该房间已经入队的日志全部落盘。</summary>
     public static void Close(string matchId)
     {
+        Writer.Close(matchId);
         lock (LockObj)
-        {
-            if (Writers.TryGetValue(matchId, out var writer))
-            {
-                try { writer.Flush(); writer.Dispose(); } catch { }
-                Writers.Remove(matchId);
-            }
             Sequences.Remove(matchId);
-        }
     }
+
+    /// <summary>正常关服时排空队列并关闭全部日志文件。</summary>
+    public static void Shutdown() => Writer.Shutdown();
 }

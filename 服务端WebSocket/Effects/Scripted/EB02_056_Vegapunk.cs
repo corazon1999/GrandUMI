@@ -54,7 +54,7 @@ public class EB02_056_Vegapunk : IScriptedEffect
                     me.Deck.Remove(picked);
                     // 从卡组登场：临时入手后复用免费登场逻辑
                     me.Hand.Add(picked);
-                    AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                    await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
                 }
             }
 

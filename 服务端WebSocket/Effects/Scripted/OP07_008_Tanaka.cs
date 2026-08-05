@@ -19,16 +19,16 @@ public class OP07_008_Tanaka : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
         if (me.Trash.Contains(self))
         {
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

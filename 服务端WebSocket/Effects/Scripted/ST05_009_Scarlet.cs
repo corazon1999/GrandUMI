@@ -19,10 +19,10 @@ public class ST05_009_Scarlet : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         // 触发时此卡已在废弃区，从废弃区登场到角色区。
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }

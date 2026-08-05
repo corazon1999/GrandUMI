@@ -47,7 +47,7 @@ public class OP16_019_ShowYouOurPower : IScriptedEffect
         foreach (var id in chosen)
         {
             var picked = cands.First(c => c.Id.ToString() == id);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

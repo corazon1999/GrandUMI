@@ -50,7 +50,7 @@ export default function FieldArea({ side }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 items-center justify-center gap-3 overflow-visible rounded-md border border-sky-200/15 bg-black/15 px-4 py-3 shadow-inner shadow-black/30">
+    <div className="flex h-full min-h-0 min-w-0 items-center justify-center gap-8 overflow-visible rounded-md border border-sky-200/15 bg-black/15 px-4 py-3 shadow-inner shadow-black/30">
       {player.fieldCards.map((fc) => {
         const cardData = getCard(fc.number) ?? null;
         const attachedCount = fc.attachedDon;
@@ -81,13 +81,6 @@ export default function FieldArea({ side }: Props) {
                 isBattleTarget ? "battle-target-impact" : "",
               ].join(" ")}
             >
-              {/* 战斗高亮：攻击者红环 / 被攻击目标琥珀环 */}
-              {isAttacker && (
-                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 shadow-lg shadow-red-500/50" />
-              )}
-              {isBattleTarget && (
-                <div className={`pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 shadow-lg ${isBlocker ? "ring-cyan-300 shadow-cyan-400/60" : "ring-amber-400 shadow-amber-400/50"}`} />
-              )}
               {isAttacker && (
                 <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-red-600 px-1.5 text-[10px] font-black text-white shadow">
                   攻击
@@ -102,6 +95,7 @@ export default function FieldArea({ side }: Props) {
                 card={cardData}
                 isSelected={selectedFieldId === fc.id || isAttackTarget}
                 isTapped={fc.isTapped}
+                battleHighlight={isAttacker ? "attacker" : isBlocker ? "blocker" : isBattleTarget ? "target" : undefined}
                 powerBuff={fc.powerCurrent - (cardData?.power ?? 0) - attachedCount * 1000}
                 costBuff={fc.cost - (cardData?.cost ?? 0)}
                 attachedDonCount={attachedCount}

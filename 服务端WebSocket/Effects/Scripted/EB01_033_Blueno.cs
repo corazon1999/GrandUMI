@@ -60,8 +60,8 @@ public class EB01_033_Blueno : IScriptedEffect
 
         var picked = cands.First(t => t.card.Id.ToString() == chosen[0]);
         if (picked.fromTrash)
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked.card);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked.card);
         else
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked.card);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked.card);
     }
 }

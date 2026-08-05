@@ -54,7 +54,7 @@ public class OP06_080_Moria : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

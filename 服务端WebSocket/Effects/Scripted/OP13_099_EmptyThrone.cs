@@ -76,6 +76,6 @@ public class OP13_099_EmptyThrone : IScriptedEffect
         for (int i = 0; i < 3; i++) activeDons[i].State = DonState.Rest;
 
         var card = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, card);
+        await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, card);
     }
 }

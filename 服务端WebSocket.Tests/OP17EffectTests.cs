@@ -89,7 +89,7 @@ public class OP17EffectTests
     {
         var state = TestScene.New("OP17-039").Build();
         state.CurrentTurnPlayer = 1;
-        state.TurnCount = 2;
+        state.TurnCount = 3;
         var john = Card("OP17-044");
         var other = Card("OP17-040");
         john.IsTapped = true;
@@ -203,5 +203,68 @@ public class OP17EffectTests
         Assert.Equal("红", resultPayload.RootElement.GetProperty("color").GetString());
         Assert.Equal(15, resultPayload.RootElement.GetProperty("total").GetInt32());
         Assert.Equal(0, resultPayload.RootElement.GetProperty("failed").GetInt32());
+    }
+
+    [Fact]
+    public async Task OP17_SearchTop_ShowsAllCardsToChooser_ButRevealsOnlyAddedCard()
+    {
+        _ = TestScene.New().Build();
+        var deck = LegalOp17Deck("OP17-039");
+        var engine = new GameEngine("op17-search-reveal", ("s0", "alice", deck), ("s1", "bob", deck), 0, 17);
+        var messages = new ConcurrentQueue<string>();
+        engine.OnSendToPlayer = (playerIndex, payload) =>
+        {
+            if (playerIndex == 0) messages.Enqueue(JsonSerializer.Serialize(payload));
+        };
+
+        var eligibleInfo = CardDatabase.GetBySet("OP17")
+            .First(c => c.Kind != CardKind.Leader && c.HasKeyword("红发海盗团"));
+        var ineligibleInfos = CardDatabase.GetBySet("OP17")
+            .Where(c => c.Kind != CardKind.Leader && !c.HasKeyword("红发海盗团"))
+            .Take(2)
+            .ToList();
+        Assert.Equal(2, ineligibleInfos.Count);
+
+        var selected = new CardInstance { Info = eligibleInfo };
+        var checkedCards = new List<CardInstance>
+        {
+            selected,
+            new() { Info = ineligibleInfos[0] },
+            new() { Info = ineligibleInfos[1] },
+        };
+        var player = engine.State.Players[0];
+        player.Deck.Clear();
+        player.Deck.AddRange(checkedCards);
+
+        var resolveTask = EffectRuntime.Resolve(
+            engine.State, 0, Card("OP17-032"), EffectTrigger.OnEnterField, engine.Prompts);
+
+        for (int i = 0; i < 100 && engine.State.PendingPrompt is null; i++)
+            await Task.Delay(10);
+
+        var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
+        Assert.Single(prompt.ValidChoices);
+        Assert.Equal(selected.Id.ToString(), prompt.ValidChoices[0]);
+        using (var choiceCards = JsonDocument.Parse(JsonSerializer.Serialize(prompt.Extra["choiceCards"])))
+            Assert.Equal(3, choiceCards.RootElement.GetArrayLength());
+
+        engine.Prompts.Resolve(prompt.PromptId, new[] { selected.Id.ToString() });
+        await resolveTask;
+
+        Assert.Contains(selected, player.Hand);
+        var revealMessages = messages
+            .Select(message => JsonDocument.Parse(message))
+            .Where(document => document.RootElement.GetProperty("lastAction").GetString() == "RevealCards")
+            .ToList();
+        var revealMessage = Assert.Single(revealMessages);
+        var revealedNumbers = revealMessage.RootElement
+            .GetProperty("reveal")
+            .GetProperty("cardNumbers")
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .ToList();
+        Assert.Equal(new[] { selected.Info.Number }, revealedNumbers);
+
+        foreach (var document in revealMessages) document.Dispose();
     }
 }

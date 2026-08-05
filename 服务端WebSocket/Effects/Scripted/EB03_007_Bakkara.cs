@@ -38,7 +38,7 @@ public class EB03_007_Bakkara : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = playable.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

@@ -61,7 +61,7 @@ public class OP10_058_Rebecca : IScriptedEffect
         if (playChosen.Count == 0) return;
 
         var playCard = revealedCards.First(c => c.Id.ToString() == playChosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, playCard);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, playCard);
 
         // 剩余的公开卡牌若费用≤4 则以休息状态登场
         foreach (var c in revealedCards)
@@ -69,7 +69,7 @@ public class OP10_058_Rebecca : IScriptedEffect
             if (c.Id == playCard.Id) continue;
             if (c.Info.Cost <= 4 && me.Hand.Contains(c))
             {
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, c);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, c);
                 AtomicOps.RestCard(c);
             }
         }

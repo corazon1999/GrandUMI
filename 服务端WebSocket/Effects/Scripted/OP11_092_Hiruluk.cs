@@ -64,7 +64,7 @@ public class OP11_092_Hiruluk : IScriptedEffect
         {
             var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
             if (picked is not null)
-                AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using GrandUMI.Diagnostics;
 using GrandUMI.Game;
 using GrandUMI.Game.Validation;
 
@@ -15,6 +16,13 @@ namespace GrandUMI;
 /// </summary>
 public static class WebSocketBridge
 {
+    private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
+    {
+        "GameStart", "Resync", "SpectateJoin",
+        "Prompt", "PromptTimeout", "RevealCards",
+        "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
+        "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
+    };
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
@@ -103,10 +111,12 @@ public static class WebSocketBridge
         catch (Exception ex) { LogErr($"握手失败: {ex.Message}"); return; }
 
         var session = new WsSession { Socket = wsCtx.WebSocket };
+        session.StartSender(message => SendDirectAsync(session, message));
         Sessions[session.SessionId] = session;
         Log($"连接 {session.SessionId}");
 
         await ReceiveLoop(session, ct);
+        await session.StopSenderAsync();
         CloseSession(session);
     }
 
@@ -131,7 +141,9 @@ public static class WebSocketBridge
                     sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
                 } while (!result.EndOfMessage);
 
-                _ = Task.Run(() => Route(session.SessionId, sb.ToString()), ct);
+                // 单连接按接收顺序路由；游戏动作进入房间队列后会立即返回，
+                // 无需再为每条消息创建可能乱序的独立线程池任务。
+                Route(session.SessionId, sb.ToString());
             }
         }
         catch (OperationCanceledException) { }
@@ -1027,12 +1039,13 @@ public static class WebSocketBridge
     public static void Send(string sessionId, object data)
     {
         if (Sessions.TryGetValue(sessionId, out var s))
-            _ = SendAsync(s, data);
+            s.Enqueue(data, IsReplaceableStateSnapshot(data));
     }
 
     private static void BroadcastAll(object data)
     {
-        foreach (var kv in Sessions) _ = SendAsync(kv.Value, data);
+        var isStateSnapshot = IsReplaceableStateSnapshot(data);
+        foreach (var kv in Sessions) kv.Value.Enqueue(data, isStateSnapshot);
     }
 
     /// <summary>广播当前在线人数（已登录会话数）给所有客户端</summary>
@@ -1042,17 +1055,34 @@ public static class WebSocketBridge
         BroadcastAll(new { proto = "MsgOnlineCount", count });
     }
 
-    private static async Task SendAsync(WsSession s, object data)
+    private static bool IsReplaceableStateSnapshot(object data)
+    {
+        var type = data.GetType();
+        if (!string.Equals(type.GetProperty("proto")?.GetValue(data) as string, "MsgGameState", StringComparison.Ordinal))
+            return false;
+        var lastAction = type.GetProperty("lastAction")?.GetValue(data) as string ?? "";
+        return !NonReplaceableStateActions.Contains(lastAction);
+    }
+
+    private static async Task SendDirectAsync(WsSession s, WsSession.OutboundMessage message)
     {
         if (s.Socket.State != WebSocketState.Open) return;
-        var bytes = Encoding.UTF8.GetBytes(Json(data));
-        await s.WriteLock.WaitAsync();
+        var totalStartedAt = LatencyDiagnostics.Start();
+        var serializeStartedAt = totalStartedAt;
+        var bytes = Encoding.UTF8.GetBytes(Json(message.Data));
+        LatencyDiagnostics.Observe("WebSocket 序列化", serializeStartedAt, $"会话={s.SessionId[..8]}，字节={bytes.Length}");
         try
         {
-            await s.Socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+            using var sendTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await s.Socket.SendAsync(bytes, WebSocketMessageType.Text, true, sendTimeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            LogWarn($"Send {s.SessionId}: 超过 5 秒，终止慢连接");
+            s.Socket.Abort();
         }
         catch (Exception ex) { LogErr($"Send {s.SessionId}: {ex.Message}"); }
-        finally { s.WriteLock.Release(); }
+        LatencyDiagnostics.Observe("WebSocket 发送总耗时", totalStartedAt, $"会话={s.SessionId[..8]}，字节={bytes.Length}");
     }
 
     // ── 日志工具 ──────────────────────────────────────────────────────────

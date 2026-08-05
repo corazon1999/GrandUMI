@@ -60,7 +60,7 @@ public class OP14_104_Moria : IScriptedEffect
         }
         else
         {
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 
@@ -85,6 +85,6 @@ public class OP14_104_Moria : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
     }
 }

@@ -46,8 +46,8 @@ public class ST31To35EffectTests
         var s = TestScene.New(myLeaderNumber: "OP01-001")
             .OppCharacter("ST31-003")
             .Build();
-        s.TurnCount = 2;
-        var rayleigh = new CardInstance { Info = CardDatabase.Get("ST32-004")!, TurnPlayed = 2 };
+        s.TurnCount = 3;
+        var rayleigh = new CardInstance { Info = CardDatabase.Get("ST32-004")!, TurnPlayed = 3 };
         s.Players[0].Characters.Add(rayleigh);
         s.Players[1].Characters[0].IsTapped = true;
 
@@ -112,7 +112,7 @@ public class ST31To35EffectTests
 
         s.CurrentBattle = null;
         s.CurrentTurnPlayer = 1;
-        s.TurnCount = 2;
+        s.TurnCount = 3;
         s.Phase = Phase.Main;
         Assert.False(ActionValidator.CanAttack(s, 1, target.Id, true, null).Ok);
     }
@@ -147,6 +147,26 @@ public class ST31To35EffectTests
         TurnEngine.EnterEndPhase(s);
         Assert.False(s.Players[0].HandDiscardedByEffectThisTurn);
         Assert.Equal(6, s.HandPlayCost(0, borsalino));
+    }
+
+    [Fact]
+    public async Task ST32_001_DonChoicesCarryDonDisplayMetadata()
+    {
+        var s = TestScene.New().Build();
+        var don = new DonCard { State = DonState.Active };
+        s.Players[0].CostArea.Add(don);
+        var kinemon = new CardInstance { Info = CardDatabase.Get("ST32-001")! };
+        s.Players[0].Characters.Add(kinemon);
+        var prompts = new MockPromptService().QueueChooseEmpty();
+
+        await EffectRuntime.Resolve(s, 0, kinemon, EffectTrigger.OnEnterField, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnLeaderOrDon", prompt.kind);
+        var donChoices = Assert.IsAssignableFrom<IEnumerable<object>>(prompt.extra!["donChoices"]);
+        var choice = Assert.Single(donChoices);
+        Assert.Equal(don.Id.ToString(), choice.GetType().GetProperty("id")!.GetValue(choice));
+        Assert.Equal("Active", choice.GetType().GetProperty("state")!.GetValue(choice));
     }
 
     [Fact]

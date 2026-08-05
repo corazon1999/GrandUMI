@@ -63,7 +63,7 @@ public class EB03_013_Carrot : IScriptedEffect
             if (ch2.Count > 0)
             {
                 var picked = zou.First(c => c.Id.ToString() == ch2[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             }
         }
     }

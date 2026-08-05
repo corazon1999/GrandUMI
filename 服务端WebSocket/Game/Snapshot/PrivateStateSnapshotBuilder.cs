@@ -59,6 +59,7 @@ public static class PrivateStateSnapshotBuilder
                     hasFilter = e.Scope.Filter is not null,
                 },
                 e.PowerDelta,
+                e.OriginalPowerOverride,
             }).ToArray(),
         };
     }

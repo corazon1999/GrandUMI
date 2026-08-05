@@ -283,7 +283,7 @@
   },
   "OP15-048": {
     "_name": "青椒",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时抽2；对方回合中KO时对方将1张手牌放回卡组最下方",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -291,6 +291,18 @@
           {
             "op": "Draw",
             "n": 2
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "if": {
+          "isOppTurn": true
+        },
+        "then": [
+          {
+            "op": "OppHandToDeckBottom",
+            "n": 1
           }
         ]
       }
@@ -379,7 +391,7 @@
   },
   "OP15-063": {
     "_name": "涅槃",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时抽1；KO时我方咚≤6则KO对方最多1张当前力量≤2000角色",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -387,6 +399,29 @@
           {
             "op": "Draw",
             "n": 1
+          }
+        ]
+      },
+      {
+        "on": "OnKO",
+        "if": {
+          "selfDonTotalLte": 6
+        },
+        "then": [
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacter",
+            "max": 1,
+            "min": 0,
+            "as": "$tgt",
+            "filter": {
+              "currentPowerLte": 2000
+            },
+            "text": "将对方最多1张力量不高于2000的角色KO"
+          },
+          {
+            "op": "KO",
+            "target": "$tgt"
           }
         ]
       }

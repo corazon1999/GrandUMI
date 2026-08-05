@@ -53,6 +53,6 @@ public class OP03_058_Spandam : IScriptedEffect
         AtomicOps.RestCard(me.Leader);
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
     }
 }

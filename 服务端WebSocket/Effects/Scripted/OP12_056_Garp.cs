@@ -68,6 +68,6 @@ public class OP12_056_Garp : IScriptedEffect
         if (pchosen.Count == 0) return;
 
         var pick = candidates.First(c => c.Id.ToString() == pchosen[0]);
-        AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, pick);
+        await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, pick);
     }
 }

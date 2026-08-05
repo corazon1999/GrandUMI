@@ -70,7 +70,7 @@ public class OP08_110_Wapol : IScriptedEffect
             if (ch.Count > 0)
             {
                 var p = playable.First(c => c.Id.ToString() == ch[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
             }
         }
     }

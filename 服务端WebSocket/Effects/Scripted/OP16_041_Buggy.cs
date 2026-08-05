@@ -57,7 +57,7 @@ public class OP16_041_Buggy : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
         var card = prisoners.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
     }
 
     // 离场卡此刻可能在废弃/手牌/卡组/生命区，按常见顺序查找。

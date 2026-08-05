@@ -42,6 +42,6 @@ public class OP13_074_Hera : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, target);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, target);
     }
 }

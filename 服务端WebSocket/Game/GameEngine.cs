@@ -1,4 +1,5 @@
 using GrandUMI.Cards;
+using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
 using GrandUMI.Game.Debug;
 using GrandUMI.Game.PhaseFlow;
@@ -21,19 +22,63 @@ public class GameEngine
     public Action<object>?      OnReplay       { get; set; }   // 写入回放
     public Action<string, int?, object?>? OnMatchLog { get; set; }
     public Action<int, object>? OnSendToSpectators { get; set; } // 观战推送（spectator 视角）
+    public Func<bool>? HasSpectators { get; set; }
     public Action<int, string, JsonElement>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
+    /// <summary>
+    /// 是否记录含双方完整牌库的私有快照。直接构造引擎时默认开启以兼容测试；
+    /// 线上房间由 GameRoomManager 按环境变量显式配置，默认关闭。
+    /// </summary>
+    public bool EnablePrivateSnapshotLog { get; set; } = true;
     private string? _activeAction;
     private int? _activeActor;
     private bool _activeActionRejected;
+    private readonly object _snapshotBatchGate = new();
+    private bool _snapshotBatchActive;
+    private int _trackedOperations;
+    private PendingBroadcast? _pendingBroadcast;
+    private long _latencyActionStartedAt;
+    private string _latencyAction = "";
     private readonly List<(string Kind, int? Actor, object? Payload)> _pendingMatchLogs = new();
+    private readonly List<ActionLogEvent> _pendingActionLogs = new();
 
     /// <summary>本局确定性卡实例 ID 工厂（由 RngSeed 派生，全局唯一计数器）。重放重建依赖它。</summary>
     private readonly Func<Guid> _idFactory;
 
     /// <summary>最近一次动作触发的最外层 fire-and-forget 效果链；重放在喂下一个动作前等它进入稳定态。</summary>
     private Task _settle = Task.CompletedTask;
-    private Task Track(Task t) { _settle = t; return t; }
+    private Task Track(Task task)
+    {
+        Interlocked.Increment(ref _trackedOperations);
+        var tracked = CompleteTrackedAsync(task);
+        _settle = tracked;
+        return tracked;
+    }
+
+    private async Task CompleteTrackedAsync(Task task)
+    {
+        try { await task; }
+        finally
+        {
+            if (Interlocked.Decrement(ref _trackedOperations) == 0)
+                EndSnapshotBatch();
+        }
+    }
     private bool _op17CoverageRunning;
+
+    /// <summary>
+    /// 必须立刻下发的交互/动画屏障。到达屏障时，之前暂存的普通状态会被当前完整快照覆盖；
+    /// 屏障之后产生的新状态仍可继续合并到下一个稳定点。
+    /// </summary>
+    private static readonly HashSet<string> ImmediateSnapshotActions = new(StringComparer.Ordinal)
+    {
+        "Prompt", "PromptTimeout", "RevealCards",
+        "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
+        "MulliganComplete", "MulliganUpdate",
+        "DuelOver", "Surrender",
+        "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
+    };
+
+    private sealed record PendingBroadcast(string LastAction, object? Payload);
 
     /// <summary>
     /// 用双方 deck 字符串构造引擎（已通过 DeckValidator 校验）
@@ -89,6 +134,11 @@ public class GameEngine
     {
         if (State.IsGameOver) return;
 
+        var dispatchStartedAt = LatencyDiagnostics.Start();
+        BeginSnapshotBatch();
+        _latencyActionStartedAt = dispatchStartedAt;
+        _latencyAction = action;
+
         // 动作可能由新线程（重连/线程池）进入，重新挂上本局确定性 ID 工厂；
         // 由本动作启动的 async 续延会捕获该上下文并沿用同一计数器。
         DeterministicId.Current = _idFactory;
@@ -97,7 +147,14 @@ public class GameEngine
         _activeActor = playerIndex;
         _activeActionRejected = false;
 
-        switch (action)
+        // 卡牌效果等待玩家选择时，必须先完成当前效果链，不能让任何一方抢先推进牌局。
+        // 投降不受限制；PromptResponse 是解除等待状态的唯一常规入口。
+        if (State.PendingPrompt is not null
+            && action is not "PromptResponse" and not "Surrender")
+        {
+            SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
+        }
+        else switch (action)
         {
             case "Mulligan":       HandleMulligan(playerIndex, data); break;
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
@@ -133,6 +190,9 @@ public class GameEngine
 
         _activeAction = null;
         _activeActor = null;
+        if (Volatile.Read(ref _trackedOperations) == 0)
+            EndSnapshotBatch();
+        LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
     }
 
     /// <summary>
@@ -140,9 +200,20 @@ public class GameEngine
     /// 等待玩家响应的 PendingPrompt 上。供重放/恢复在喂下一个动作前调用，确保不会在效果
     /// 还没跑到稳定点时就塞入后续动作。timeoutMs 仅为防卡死的安全网，不参与对局逻辑。
     /// </summary>
-    public async Task WaitSettledAsync(int timeoutMs = 15000)
+    public async Task WaitSettledAsync(int timeoutMs = 15000, string? resolvingPromptId = null)
     {
         var deadline = Environment.TickCount64 + timeoutMs;
+        // PromptResponse 入队后，先等待它所响应的旧 Prompt 被续延消费；若效果链创建了下一个
+        // 新 Prompt，则新 Prompt 本身就是新的稳定点，不继续等待玩家输入。
+        while (!_settle.IsCompleted
+               && resolvingPromptId is not null
+               && State.PendingPrompt?.PromptId == resolvingPromptId)
+        {
+            if (Environment.TickCount64 > deadline)
+                throw new TimeoutException("WaitSettledAsync 超时：PromptResponse 未被效果链消费");
+            await Task.WhenAny(_settle, Task.Delay(5));
+        }
+
         while (State.PendingPrompt is null && !_settle.IsCompleted)
         {
             if (Environment.TickCount64 > deadline)
@@ -434,16 +505,38 @@ public class GameEngine
         // 角色区满员（≥5）：先让玩家选择 1 张己方角色送去废弃区，再登场新角色
         if (handCard.Info.Kind == CardKind.Character && p.Characters.Count >= 5)
         {
-            _ = Track(PlayCharacterWithOverflowAsync(playerIndex, handCard));
-            return;
+            // 新客户端会把腾位目标与出牌合并提交，省掉一次服务端 Prompt 往返；
+            // 未携带该字段的旧客户端仍走下面的兼容 Prompt 流程。
+            if (data.TryGetProperty("overflowTrashCardId", out var victimIdElem))
+            {
+                if (victimIdElem.ValueKind != JsonValueKind.String
+                    || !Guid.TryParse(victimIdElem.GetString(), out var victimId))
+                {
+                    SendError(playerIndex, "腾位角色 ID 无效");
+                    return;
+                }
+
+                var victim = p.Characters.FirstOrDefault(c => c.Id == victimId);
+                if (victim is null)
+                {
+                    SendError(playerIndex, "所选腾位角色已不在角色区");
+                    return;
+                }
+
+                p.Characters.Remove(victim);
+                p.Trash.Add(victim);
+            }
+            else
+            {
+                _ = Track(PlayCharacterWithOverflowAsync(playerIndex, handCard));
+                return;
+            }
         }
 
         var cardNumber = handCard.Info.Number;
         var result = CardPlayer.Play(State, playerIndex, handIndex);
-        Broadcast("PlayCard", new { player = playerIndex, cardNumber, kind = result.Kind.ToString(), cardId = result.Card.Id.ToString() });
-
-        // 触发对应效果
-        _ = Track(ResolveEffectAsync(playerIndex, result));
+        // 等效果链进入稳定点后只广播一次最终出牌状态；效果中若产生 Prompt，Prompt 自身会先广播当前牌桌。
+        _ = Track(ResolveEffectAndBroadcastPlayAsync(playerIndex, result, cardNumber));
     }
 
     /// <summary>
@@ -469,15 +562,23 @@ public class GameEngine
 
             var cardNumber = handCard.Info.Number;
             var result = CardPlayer.Play(State, playerIndex, handIndex);
-            Broadcast("PlayCard", new { player = playerIndex, cardNumber, kind = result.Kind.ToString(), cardId = result.Card.Id.ToString() });
-
-            await ResolveEffectAsync(playerIndex, result);
+            await ResolveEffectAndBroadcastPlayAsync(playerIndex, result, cardNumber);
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Play] 满员登场异常: {ex.Message}"); }
     }
 
-    private async Task ResolveEffectAsync(int playerIndex, PlayResult result)
+    private async Task ResolveEffectAndBroadcastPlayAsync(int playerIndex, PlayResult result, string cardNumber)
     {
+        var playPayload = new
+        {
+            player = playerIndex,
+            cardNumber,
+            kind = result.Kind.ToString(),
+            cardId = result.Card.Id.ToString(),
+        };
+        // 先排入日志，保证遇到登场效果 Prompt 时仍按“出牌 → 选择 → 公开”显示；
+        // 实际 PlayCard 快照仍在结算结束后广播，保持既有动画与状态时机。
+        QueueActionLog("PlayCard", playPayload);
         try
         {
             if (result.Kind == PlayKind.Character || result.Kind == PlayKind.Stage)
@@ -507,11 +608,22 @@ public class GameEngine
                     await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppEventPlayed, Prompts,
                         new Dictionary<string, object?> { ["owner"] = playerIndex });
             }
-            Broadcast("EffectResolved", new { cardNumber = result.Card.Info.Number });
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[Effects] {result.Card.Info.Number} 解析异常: {ex.Message}");
+        }
+        finally
+        {
+            // 保留 PlayCard 动画/日志语义，同时避免此前 PlayCard + EffectResolved 两份连续完整快照。
+            Broadcast("PlayCard", new
+            {
+                player = playerIndex,
+                cardNumber,
+                kind = result.Kind.ToString(),
+                cardId = result.Card.Id.ToString(),
+                suppressLog = true,
+            });
         }
     }
 
@@ -529,22 +641,26 @@ public class GameEngine
         Guid targetId = targetIdStr == "leader" ? p.Leader.Id : Guid.Parse(targetIdStr);
         int count = data.TryGetProperty("count", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 1;
         for (int i = 0; i < count; i++) CardPlayer.AttachDon(p, targetId);
-        Broadcast("AttachDon", new { player = playerIndex, targetId = targetIdStr, count });
-        // 赋予咚!! 时触发（OP02-002 戈普领袖：我方回合赋予咚→对方角色减费）
-        _ = Track(ResolveDonAttachedAsync(playerIndex, targetId));
+        // 赋予咚!! 时触发（OP02-002 戈普领袖：我方回合赋予咚→对方角色减费），
+        // 效果链稳定后再以 AttachDon 语义发送最终快照，避免 AttachDon + EffectResolved 连发两包。
+        _ = Track(ResolveDonAttachedAsync(playerIndex, targetId, targetIdStr, count));
     }
 
     /// <summary>赋予咚!! 后派发 OnDonAttached（监听卡如 OP02-002 据此发动），随后刷新状态</summary>
-    private async Task ResolveDonAttachedAsync(int playerIndex, Guid targetId)
+    private async Task ResolveDonAttachedAsync(int playerIndex, Guid targetId, string targetIdStr, int count)
     {
         try
         {
             await EffectRuntime.TriggerEvent(State, EffectTrigger.OnDonAttached, Prompts,
                 new Dictionary<string, object?> { ["targetId"] = targetId.ToString(), ["owner"] = playerIndex });
-            Broadcast("EffectResolved", new { cardNumber = "OnDonAttached" });
             CheckGameOver();
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DonAttached] 派发异常: {ex.Message}"); }
+        finally
+        {
+            if (!State.IsGameOver)
+                Broadcast("AttachDon", new { player = playerIndex, targetId = targetIdStr, count });
+        }
     }
 
     // ── 攻击 ───────────────────────────────────────────────────────────────
@@ -797,27 +913,108 @@ public class GameEngine
 
     public void BroadcastInitialState()
     {
+        var startedAt = LatencyDiagnostics.Start();
         State.Tick++;
-        // 给双方各自发一份脱敏快照
-        OnSendToPlayer?.Invoke(0, StateSnapshotBuilder.Build(State, 0, "GameStart"));
-        OnSendToPlayer?.Invoke(1, StateSnapshotBuilder.Build(State, 1, "GameStart"));
-        var publicSnapshot = StateSnapshotBuilder.Build(State, -1, "GameStart");
-        OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        var snapshots = StateSnapshotBuilder.BuildAll(State, "GameStart");
+        OnSendToPlayer?.Invoke(0, snapshots.Player0);
+        OnSendToPlayer?.Invoke(1, snapshots.Player1);
+        var publicSnapshot = snapshots.Spectator;
+        if (HasSpectators?.Invoke() != false)
+            OnSendToSpectators?.Invoke(-1, publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = publicSnapshot });
         RecordMatchLog("public_snapshot", -1, publicSnapshot);
-        RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
+        if (EnablePrivateSnapshotLog)
+            RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
+        LatencyDiagnostics.Observe("初始快照构建与入队", startedAt, $"房间={State.RoomId}，Tick={State.Tick}");
     }
 
+    private void BeginSnapshotBatch()
+    {
+        lock (_snapshotBatchGate)
+        {
+            if (_snapshotBatchActive) return;
+            _snapshotBatchActive = true;
+            _pendingBroadcast = null;
+        }
+    }
+
+    private void EndSnapshotBatch()
+    {
+        PendingBroadcast? pending;
+        lock (_snapshotBatchGate)
+        {
+            if (!_snapshotBatchActive || Volatile.Read(ref _trackedOperations) != 0) return;
+            pending = _pendingBroadcast;
+            _pendingBroadcast = null;
+            _snapshotBatchActive = false;
+        }
+
+        if (pending is not null)
+            BroadcastNow(pending.LastAction, pending.Payload);
+    }
+
+    /// <summary>
+    /// 动作结算期间，普通中间状态只保留最后一份；交互与关键动画屏障立即发送。
+    /// 不在 HandleAction/Track 链内的广播保持原有即时行为。
+    /// </summary>
     public void Broadcast(string lastAction, object? payload = null)
     {
+        var sendNow = false;
+        lock (_snapshotBatchGate)
+        {
+            if (!_snapshotBatchActive)
+            {
+                sendNow = true;
+            }
+            else if (ImmediateSnapshotActions.Contains(lastAction))
+            {
+                // 当前完整快照已包含此前所有状态，旧的普通中间快照无需再发。
+                _pendingBroadcast = null;
+                sendNow = true;
+            }
+            else
+            {
+                _pendingBroadcast = new PendingBroadcast(lastAction, payload);
+            }
+        }
+
+        if (sendNow)
+            BroadcastNow(lastAction, payload);
+    }
+
+    /// <summary>
+    /// 将一条操作日志暂存到下一份状态快照。用于一次效果结算内可能出现的多次选择，
+    /// 避免为了日志额外发送完整牌桌快照。
+    /// </summary>
+    public void QueueActionLog(string action, object? payload)
+    {
+        lock (_snapshotBatchGate)
+            _pendingActionLogs.Add(new ActionLogEvent(action, payload));
+    }
+
+    private void BroadcastNow(string lastAction, object? payload)
+    {
+        var startedAt = LatencyDiagnostics.Start();
+        ActionLogEvent[] queuedLogEvents;
+        lock (_snapshotBatchGate)
+        {
+            queuedLogEvents = _pendingActionLogs.ToArray();
+            _pendingActionLogs.Clear();
+        }
         State.Tick++;
-        OnSendToPlayer?.Invoke(0, StateSnapshotBuilder.Build(State, 0, lastAction, payload));
-        OnSendToPlayer?.Invoke(1, StateSnapshotBuilder.Build(State, 1, lastAction, payload));
-        var publicSnapshot = StateSnapshotBuilder.Build(State, -1, lastAction, payload);
-        OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        var snapshots = StateSnapshotBuilder.BuildAll(State, lastAction, payload, queuedLogEvents);
+        OnSendToPlayer?.Invoke(0, snapshots.Player0);
+        OnSendToPlayer?.Invoke(1, snapshots.Player1);
+        var publicSnapshot = snapshots.Spectator;
+        if (HasSpectators?.Invoke() != false)
+            OnSendToSpectators?.Invoke(-1, publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = publicSnapshot });
         RecordMatchLog("public_snapshot", -1, publicSnapshot);
-        RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
+        if (EnablePrivateSnapshotLog)
+            RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
+        LatencyDiagnostics.Observe("快照构建与入队", startedAt, $"房间={State.RoomId}，Tick={State.Tick}，事件={lastAction}");
+        if (_latencyActionStartedAt != 0)
+            LatencyDiagnostics.Observe("动作到快照", _latencyActionStartedAt, $"房间={State.RoomId}，动作={_latencyAction}，事件={lastAction}");
     }
 
     /// <summary>短暂向双方公开 ownerIndex 检索到的牌（搭一次广播即清空），客户端弹出展示浮层</summary>
@@ -825,7 +1022,7 @@ public class GameEngine
     {
         if (cardNumbers.Count == 0) return;
         State.PendingReveal = new RevealInfo { OwnerIndex = ownerIndex, CardNumbers = cardNumbers.ToList() };
-        Broadcast("RevealCards", new { player = ownerIndex });
+        Broadcast("RevealCards", new { player = ownerIndex, cardNumbers = cardNumbers.ToArray() });
         State.PendingReveal = null;
     }
 
@@ -935,10 +1132,12 @@ public class GameEngine
 
     private async Task ResolveActivatedAsync(int playerIndex, CardInstance source)
     {
+        var effectPayload = new { source = source.Id.ToString(), card = source.Info.Number };
+        QueueActionLog("UseEffect", effectPayload);
         try
         {
             await EffectRuntime.Resolve(State, playerIndex, source, EffectTrigger.ActivatedMain, Prompts);
-            Broadcast("UseEffect", new { source = source.Id.ToString(), card = source.Info.Number });
+            Broadcast("UseEffect", new { source = source.Id.ToString(), card = source.Info.Number, suppressLog = true });
             CheckGameOver();
         }
         catch (Exception ex)
@@ -951,10 +1150,11 @@ public class GameEngine
 
     private void HandlePromptResponse(int playerIndex, JsonElement data)
     {
-        if (State.PendingPrompt is null) { SendError(playerIndex, "没有待响应的 prompt"); return; }
-        if (State.PendingPrompt.PlayerIndex != playerIndex) { SendError(playerIndex, "不是你的 prompt"); return; }
+        var pending = State.PendingPrompt;
+        if (pending is null) { SendError(playerIndex, "没有待响应的 prompt"); return; }
+        if (pending.PlayerIndex != playerIndex) { SendError(playerIndex, "不是你的 prompt"); return; }
         var promptId = data.TryGetProperty("promptId", out var pi) ? pi.GetString() ?? "" : "";
-        if (promptId != State.PendingPrompt.PromptId) { SendError(playerIndex, "promptId 不匹配"); return; }
+        if (promptId != pending.PromptId) { SendError(playerIndex, "promptId 不匹配"); return; }
         var chosen = new List<string>();
         if (data.TryGetProperty("chosen", out var ch) && ch.ValueKind == JsonValueKind.Array)
             foreach (var item in ch.EnumerateArray())

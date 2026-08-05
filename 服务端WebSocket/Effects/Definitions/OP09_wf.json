@@ -789,7 +789,7 @@
   },
   "OP09-117": {
     "_name": "呔来嘻!!",
-    "_matcher": "主要确认卡组顶5张、公开≤2张『呔来嘻!!』以外拥有触发效果的卡加入手牌、其余放回底(以 keywordContains:触发 近似限定、excludeName 排除自身)；trigger 抽1。",
+    "_matcher": "主要确认卡组顶5张、公开≤2张『呔来嘻!!』以外拥有触发效果的卡加入手牌、其余放回底(hasTrigger 判断触发效果、excludeName 排除自身)；trigger 抽1。",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -799,7 +799,7 @@
           "max": 2,
           "restTo": "bottom",
           "match": {
-            "keywordContains": "触发",
+            "hasTrigger": true,
             "excludeName": "呔来嘻!!"
           }
         }

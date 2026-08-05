@@ -71,7 +71,7 @@ public class OP13_031_Law : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var card = playable.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
         card.IsTapped = true; // 以休息状态登场
     }
 }

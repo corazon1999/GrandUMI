@@ -72,6 +72,6 @@ public class OP04_055_PlagueBomb : IScriptedEffect
         // 收益：从我方废弃区登场 1 张"冰鬼"
         var revive = me.Trash.FirstOrDefault(c => c.MatchesName("冰鬼") && c.Info.Kind == CardKind.Character);
         if (revive is not null)
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, revive);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, revive);
     }
 }

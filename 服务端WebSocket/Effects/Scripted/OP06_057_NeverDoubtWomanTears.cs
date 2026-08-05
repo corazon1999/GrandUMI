@@ -56,7 +56,7 @@ public class OP06_057_NeverDoubtWomanTears : IScriptedEffect
                 // 经由手牌中转以复用登场逻辑（满场牺牲 / TurnPlayed 设置等）
                 me.Deck.Remove(topCard);
                 me.Hand.Add(topCard);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, topCard);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, topCard);
                 played = true;
             }
         }

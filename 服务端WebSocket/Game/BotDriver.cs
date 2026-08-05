@@ -33,45 +33,34 @@ public static class BotDriver
         var s = engine.State;
         if (s.IsGameOver) return;
 
-        lock (engine) // 与人类动作串行化（引擎线程不安全）
+        // 机器人也走房间动作队列，与真人操作保持同一有序入口。
+        if (s.PendingPrompt is { } p && p.PlayerIndex == BOT)
         {
-            if (s.IsGameOver) return;
-
-            // 1. 有发给机器人的 prompt → 默认应答
-            if (s.PendingPrompt is { } p && p.PlayerIndex == BOT)
-            {
-                string[] chosen;
-                if (p.Kind == "LifeTrigger")
-                    chosen = new[] { "hand" };                       // 生命触发：直接加入手牌，不发动
-                else if (p.MinChoose > 0)
-                    chosen = p.ValidChoices.Take(p.MinChoose).ToArray(); // 必选：取前 N 个合法项
-                else
-                    chosen = Array.Empty<string>();                  // 可选：跳过
-                engine.HandleAction(BOT, "PromptResponse", El(new { promptId = p.PromptId, chosen }));
-                return;
-            }
-
-            // 2. 重抽决策（不换牌）
-            if (!s.Players[BOT].MulliganDone)
-            {
-                engine.HandleAction(BOT, "Mulligan", El(new { redraw = false }));
-                return;
-            }
-
-            // 3. 防守：人类攻击机器人时，放弃阻挡 / 放弃反击
-            if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == BOT)
-            {
-                if (s.Phase == Phase.BattleBlock) { engine.HandleAction(BOT, "PassBlock", El(new { })); return; }
-                if (s.Phase == Phase.BattleCounter) { engine.HandleAction(BOT, "PassCounter", El(new { })); return; }
-            }
-
-            // 4. 轮到机器人 + 主要阶段 + 无战斗 → 直接结束回合，交还给玩家
-            if (s.CurrentTurnPlayer == BOT && s.Phase == Phase.Main && s.CurrentBattle is null)
-            {
-                engine.HandleAction(BOT, "EndTurn", El(new { }));
-                return;
-            }
+            string[] chosen;
+            if (p.Kind == "LifeTrigger")
+                chosen = new[] { "hand" };
+            else if (p.MinChoose > 0)
+                chosen = p.ValidChoices.Take(p.MinChoose).ToArray();
+            else
+                chosen = Array.Empty<string>();
+            GameRoomManager.EnqueueBotAction(room, BOT, "PromptResponse", El(new { promptId = p.PromptId, chosen }));
+            return;
         }
+
+        if (!s.Players[BOT].MulliganDone)
+        {
+            GameRoomManager.EnqueueBotAction(room, BOT, "Mulligan", El(new { redraw = false }));
+            return;
+        }
+
+        if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == BOT)
+        {
+            if (s.Phase == Phase.BattleBlock) { GameRoomManager.EnqueueBotAction(room, BOT, "PassBlock", El(new { })); return; }
+            if (s.Phase == Phase.BattleCounter) { GameRoomManager.EnqueueBotAction(room, BOT, "PassCounter", El(new { })); return; }
+        }
+
+        if (s.CurrentTurnPlayer == BOT && s.Phase == Phase.Main && s.CurrentBattle is null)
+            GameRoomManager.EnqueueBotAction(room, BOT, "EndTurn", El(new { }));
     }
 
     private static JsonElement El(object o) => JsonSerializer.SerializeToElement(o);

@@ -44,6 +44,6 @@ public class OP11_024_Aladine : IScriptedEffect
             "登场最多1张≤6费《鱼人族/人鱼族》角色", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
         if (pick.Count == 0) return;
         var card = cands.FirstOrDefault(c => c.Id.ToString() == pick[0]);
-        if (card is not null) AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+        if (card is not null) await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
     }
 }

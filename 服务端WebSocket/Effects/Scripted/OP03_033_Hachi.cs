@@ -14,11 +14,11 @@ public class OP03_033_Hachi : IScriptedEffect
     public string CardNumber => "OP03-033";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        if (!me.Leader.Info.HasKeyword("东海")) return Task.CompletedTask;
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
-        return Task.CompletedTask;
+        if (!me.Leader.Info.HasKeyword("东海")) return;
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        return;
     }
 }

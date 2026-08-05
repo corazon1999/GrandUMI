@@ -83,7 +83,7 @@ public class EB03_044_BlackMaria : IScriptedEffect
             if (ch.Count > 0)
             {
                 var p = island.First(c => c.Id.ToString() == ch[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
             }
         }
     }

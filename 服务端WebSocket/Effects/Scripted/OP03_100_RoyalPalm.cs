@@ -30,6 +30,6 @@ public class OP03_100_RoyalPalm : IScriptedEffect
         me.LifeArea.Remove(life);
         me.Trash.Add(life);
 
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

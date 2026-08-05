@@ -165,12 +165,16 @@ public static class AtomicOps
         // 持续"因效果不会被KO"保护（自送废弃/满员牺牲走 KOCard，不经此入口，不受保护）
         if (s.IsKoGuarded(card, "effect")) return;
         if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
+        var owner = s.Players[ownerIdx];
+        if (!owner.Characters.Contains(card) && !ReferenceEquals(owner.StageCard, card)) return;
         BattleEngine.KOCard(s, ownerIdx, card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
             new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
         // 任意角色被KO（效果）：场上他卡可据此反应（如 EB01-047 拉布）
         EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
             new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
+        // 旧脚本的同步效果 KO 无法在此 await 交互式【KO时】，登记后由 EffectRuntime 在当前效果结束时定向结算。
+        s.EnqueueKOEffect(ownerIdx, card, EffectRuntime.CurrentActingSide, EffectRuntime.CurrentSource?.Id);
     }
 
     /// <summary>
@@ -240,6 +244,29 @@ public static class AtomicOps
             s.KOReason = null;
             s.KOActingSide = -1;
             s.KOSourceCardId = null;
+        }
+    }
+
+    /// <summary>同一个效果同时 KO 多张角色。统一设置 effect 来源上下文，令置换、防离场、【KO时】及
+    /// “因对方效果被KO”判定都按效果 KO 处理；所有受害者会在置换检查时保持同时在场。</summary>
+    public static async Task<int> KOCardsByEffectAsync(
+        GameState s, int ownerIdx, IReadOnlyCollection<CardInstance> cards, IPromptService prompts, int actingSide)
+    {
+        var previousReason = s.KOReason;
+        var previousActingSide = s.KOActingSide;
+        var previousSource = s.KOSourceCardId;
+        s.KOReason = "effect";
+        s.KOActingSide = actingSide;
+        s.KOSourceCardId = EffectRuntime.CurrentSource?.Id;
+        try
+        {
+            return await BattleEngine.KOCardsSimultaneouslyAsync(s, ownerIdx, cards, prompts);
+        }
+        finally
+        {
+            s.KOReason = previousReason;
+            s.KOActingSide = previousActingSide;
+            s.KOSourceCardId = previousSource;
         }
     }
 
@@ -457,7 +484,7 @@ public static class AtomicOps
     /// <summary>角色区满员（5张）时为效果登场腾位：有效果 Prompt 上下文则让登场方自选 1 张角色送废弃区
     /// （与正常出牌的 OverflowTrash 流程一致，非 KO、不触发【K.O.时】）；无上下文时回退旧行为（挤最左）。
     /// 供 PlayFromHandFree / PlayFromTrashFree / PlayFromDeckFree / PlayFromLifeFree 及脚本卡满场登场复用。</summary>
-    public static void SqueezeCharacterSlot(GameState s, int playerIdx)
+    public static async Task SqueezeCharacterSlot(GameState s, int playerIdx)
     {
         var p = s.Players[playerIdx];
         if (p.Characters.Count < 5) return;
@@ -467,10 +494,9 @@ public static class AtomicOps
         {
             try
             {
-                var picked = prompts.ChooseCards(playerIdx, "OverflowTrash",
+                var picked = await prompts.ChooseCards(playerIdx, "OverflowTrash",
                     "角色区已满，请选择 1 张角色送去废弃区",
-                    p.Characters.Select(c => c.Id.ToString()).ToList(), 1, 1)
-                    .GetAwaiter().GetResult();
+                    p.Characters.Select(c => c.Id.ToString()).ToList(), 1, 1);
                 if (picked.Count > 0)
                     victim = p.Characters.FirstOrDefault(c => c.Id.ToString() == picked[0]) ?? victim;
             }
@@ -480,14 +506,14 @@ public static class AtomicOps
         p.Trash.Add(victim);
     }
 
-    public static void PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
+    public static async Task PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
     {
         var p = s.Players[playerIdx];
         if (!p.Hand.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-                SqueezeCharacterSlot(s, playerIdx);
+                await SqueezeCharacterSlot(s, playerIdx);
             card.TurnPlayed = s.TurnCount;
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
@@ -589,14 +615,14 @@ public static class AtomicOps
     }
 
     /// <summary>从废弃区免费登场（restState=true 时以休息状态登场）</summary>
-    public static void PlayFromTrashFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    public static async Task PlayFromTrashFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
         if (!p.Trash.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-                SqueezeCharacterSlot(s, playerIdx);
+                await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
@@ -756,14 +782,14 @@ public static class AtomicOps
     }
 
     /// <summary>把卡组中的一张角色/舞台卡免费登场（登场后触发其【登场时】，见 EnqueueEnterField）。调用方负责洗牌。</summary>
-    public static void PlayFromDeckFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    public static async Task PlayFromDeckFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
         if (!p.Deck.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-                SqueezeCharacterSlot(s, playerIdx);
+                await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
@@ -780,14 +806,14 @@ public static class AtomicOps
     }
 
     /// <summary>把生命区中的一张角色卡免费登场（登场后触发其【登场时】，见 EnqueueEnterField）。</summary>
-    public static void PlayFromLifeFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    public static async Task PlayFromLifeFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
         if (!p.LifeArea.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-                SqueezeCharacterSlot(s, playerIdx);
+                await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = restState;
@@ -846,6 +872,10 @@ public static class AtomicOps
             p.Hand.Add(picked);
         }
         engine.ShuffleDeck(p, playerIdx, "search_deck");
+        // “从卡组检索并加入手牌”按规则公开被检索到的牌；统一走公开广播，
+        // 同时让双方的右侧操作日志明确记录具体卡牌。
+        if (picked is not null)
+            engine.BroadcastReveal(playerIdx, new[] { picked.Info.Number });
         return picked;
     }
 

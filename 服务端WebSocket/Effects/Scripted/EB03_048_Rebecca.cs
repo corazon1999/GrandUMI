@@ -89,7 +89,7 @@ public class EB03_048_Rebecca : IScriptedEffect
             if (ch.Count > 0)
             {
                 var p = stages.First(c => c.Id.ToString() == ch[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, p);
             }
         }
     }

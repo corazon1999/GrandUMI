@@ -31,6 +31,6 @@ public class OP04_104_Sanji : IScriptedEffect
         if (card is null) return;
         AtomicOps.DiscardHand(me, card);
 
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

@@ -71,6 +71,6 @@ public class OP16_014_Marco : IScriptedEffect
         AtomicOps.DiscardHand(me, discard);
 
         // 收益：从废弃区登场此角色
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

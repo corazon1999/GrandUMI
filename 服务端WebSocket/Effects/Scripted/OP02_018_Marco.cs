@@ -49,6 +49,6 @@ public class OP02_018_Marco : IScriptedEffect
 
         // 仍需自身在废弃区方可登场
         if (me.Trash.Contains(self))
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self, restState: true);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self, restState: true);
     }
 }

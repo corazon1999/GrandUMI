@@ -27,7 +27,7 @@ public class OP01_071_Jinbe : IScriptedEffect
         {
             // 此卡牌登场：从废弃区登场到我方场上
             if (me.Trash.Contains(ctx.Source))
-                AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+                await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
             return;
         }
 

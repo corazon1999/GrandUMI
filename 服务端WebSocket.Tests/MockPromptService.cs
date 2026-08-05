@@ -23,7 +23,7 @@ public class MockPromptService : IPromptService
     private readonly Queue<int>           _optionAnswers = new();
     private readonly Queue<bool>          _lifeTriggerAnswers = new();
 
-    public List<(string kind, string text, IReadOnlyList<string> choices, int min, int max)> ChooseHistory { get; } = new();
+    public List<(string kind, string text, IReadOnlyList<string> choices, int min, int max, Dictionary<string, object?>? extra)> ChooseHistory { get; } = new();
     public List<string> ConfirmHistory { get; } = new();
 
     public MockPromptService QueueChoose(params string[] ids)
@@ -56,7 +56,7 @@ public class MockPromptService : IPromptService
         IReadOnlyList<string> validChoices, int min, int max,
         Dictionary<string, object?>? extra = null)
     {
-        ChooseHistory.Add((kind, text, validChoices, min, max));
+        ChooseHistory.Add((kind, text, validChoices, min, max, extra));
         if (_chooseAnswers.Count > 0)
         {
             var ans = _chooseAnswers.Dequeue();

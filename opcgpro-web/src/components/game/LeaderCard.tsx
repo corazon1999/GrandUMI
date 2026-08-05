@@ -27,6 +27,7 @@ function EmptyLeader({ label }: { label: string }) {
 
 export default function LeaderCard({ side }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
+  const opposingPlayer = useGameStore((s) => (side === "my" ? s.opponent : s.my));
   const isPending = useGameStore((s) => s.isPending);
   const selectedFieldId = useGameStore((s) => s.selectedFieldId);
   const setSelectedField = useGameStore((s) => s.setSelectedField);
@@ -46,7 +47,16 @@ export default function LeaderCard({ side }: Props) {
 
   // 直接按服务端卡牌 ID 判断，兼容观战/回放以及 GM 发起的非当前回合攻击。
   const isAttacker = !!battle && player.leaderId === battle.attackerCardId;
-  const isBattleTarget = !!battle && !battle.blockerCardId && battle.targetIsLeader && !isAttacker;
+  const attackerBelongsToOpposingPlayer =
+    !!battle &&
+    !!opposingPlayer &&
+    (opposingPlayer.leaderId === battle.attackerCardId ||
+      opposingPlayer.fieldCards.some((card) => card.id === battle.attackerCardId));
+  const isBattleTarget =
+    !!battle &&
+    !battle.blockerCardId &&
+    battle.targetIsLeader &&
+    attackerBelongsToOpposingPlayer;
 
   const isTargetable = isSelectingTarget && side === "opponent" && !isPending;
 
@@ -86,13 +96,6 @@ export default function LeaderCard({ side }: Props) {
         isBattleTarget ? "battle-target-impact" : "",
       ].join(" ")}
     >
-      {/* 战斗高亮：攻击者红环 / 被攻击目标琥珀环 */}
-      {isAttacker && (
-        <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 shadow-lg shadow-red-500/50" />
-      )}
-      {isBattleTarget && (
-        <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-amber-400 shadow-lg shadow-amber-400/50" />
-      )}
       {isAttacker && (
         <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-red-600 px-1.5 text-[10px] font-black text-white shadow">
           攻击
@@ -108,6 +111,7 @@ export default function LeaderCard({ side }: Props) {
         size={cardSize}
         isSelected={(side === "my" && selectedFieldId === player.leaderId) || isTargetable}
         isTapped={player.leaderTapped}
+        battleHighlight={isAttacker ? "attacker" : isBattleTarget ? "target" : undefined}
         attachedDonCount={player.leaderAttachedDon}
         powerBuff={player.leaderPower - (leader.power ?? 0) - player.leaderAttachedDon * 1000}
         hideCost

@@ -66,7 +66,7 @@ public class OP06_015_LilyCarnation : IScriptedEffect
         if (pick.Count > 0)
         {
             var revive = reviveCands.First(c => c.Id.ToString() == pick[0]);
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, revive, restState: true);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, revive, restState: true);
         }
     }
 }

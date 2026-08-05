@@ -19,14 +19,15 @@ internal static class OP17Effects
 
     private static async Task<List<CardInstance>> Pick(
         EffectContext c, int chooser, string kind, string text,
-        IEnumerable<CardInstance> source, int min, int max)
+        IEnumerable<CardInstance> source, int min, int max,
+        IEnumerable<CardInstance>? displaySource = null)
     {
         var cards = source.DistinctBy(x => x.Id).ToList();
         if (cards.Count == 0 || max <= 0) return new();
         max = Math.Min(max, cards.Count);
         min = Math.Min(min, max);
         var ids = await c.Prompts.ChooseCards(chooser, kind, text,
-            cards.Select(x => x.Id.ToString()).ToList(), min, max, ChoiceCards(cards));
+            cards.Select(x => x.Id.ToString()).ToList(), min, max, ChoiceCards(displaySource ?? cards));
         var selected = new List<CardInstance>();
         foreach (var id in ids)
         {
@@ -109,7 +110,7 @@ internal static class OP17Effects
     {
         var victims = cards.Where(x => Opp(c).Characters.Contains(x)).DistinctBy(x => x.Id).ToList();
         if (victims.Count == 0) return;
-        await BattleEngine.KOCardsSimultaneouslyAsync(c.State, 1 - c.OwnerIndex, victims, c.Prompts);
+        await AtomicOps.KOCardsByEffectAsync(c.State, 1 - c.OwnerIndex, victims, c.Prompts, c.OwnerIndex);
     }
 
     private static async Task SearchTop(
@@ -119,10 +120,9 @@ internal static class OP17Effects
         var me = Me(c);
         var top = me.Deck.Take(count).ToList();
         if (top.Count == 0) return;
-        c.Engine?.BroadcastReveal(c.OwnerIndex, top.Select(x => x.Info.Number).ToList());
         var candidates = top.Where(filter).ToList();
         var picked = await Pick(c, c.OwnerIndex, "LookTop", text, candidates,
-            requireOne && candidates.Count > 0 ? 1 : 0, 1);
+            requireOne && candidates.Count > 0 ? 1 : 0, 1, top);
 
         foreach (var card in top) me.Deck.Remove(card);
         if (picked.Count > 0)
@@ -132,6 +132,8 @@ internal static class OP17Effects
         }
         if (trashRemainder) me.Trash.AddRange(top);
         else me.Deck.AddRange(top);
+        if (picked.Count > 0)
+            c.Engine?.BroadcastReveal(c.OwnerIndex, new[] { picked[0].Info.Number });
     }
 
     private static async Task<CardInstance?> PlayOneFromHand(
@@ -140,7 +142,7 @@ internal static class OP17Effects
         var picked = await Pick(c, c.OwnerIndex, "OwnHandCharacter", text,
             Me(c).Hand.Where(x => x.Info.Kind == CardKind.Character && filter(x)), 0, 1);
         if (picked.Count == 0) return null;
-        AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, picked[0]);
+        await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, picked[0]);
         return picked[0];
     }
 
@@ -150,7 +152,7 @@ internal static class OP17Effects
         var picked = await Pick(c, c.OwnerIndex, "OwnTrashCharacter", text,
             Me(c).Trash.Where(x => x.Info.Kind == CardKind.Character && filter(x)), 0, 1);
         if (picked.Count == 0) return null;
-        AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, picked[0]);
+        await AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, picked[0]);
         return picked[0];
     }
 
@@ -161,8 +163,8 @@ internal static class OP17Effects
             .Where(x => x.Info.Kind == CardKind.Character && filter(x)).ToList();
         var picked = await Pick(c, c.OwnerIndex, "OwnHandOrTrashCharacter", text, candidates, 0, 1);
         if (picked.Count == 0) return null;
-        if (Me(c).Hand.Contains(picked[0])) AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, picked[0]);
-        else AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, picked[0]);
+        if (Me(c).Hand.Contains(picked[0])) await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, picked[0]);
+        else await AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, picked[0]);
         return picked[0];
     }
 
@@ -225,9 +227,9 @@ internal static class OP17Effects
         me.Trash.Add(c.Source);
     }
 
-    private static void PlaySelfFromTrash(EffectContext c)
+    private static async Task PlaySelfFromTrash(EffectContext c)
     {
-        if (Me(c).Trash.Contains(c.Source)) AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, c.Source);
+        if (Me(c).Trash.Contains(c.Source)) await AtomicOps.PlayFromTrashFree(c.State, c.OwnerIndex, c.Source);
     }
 
     private static async Task<List<CardInstance>> ChooseByTotalCost(
@@ -346,7 +348,7 @@ internal static class OP17Effects
             case "OP17-104": await C104(c); break;
             case "OP17-105": await C105(c); break;
             case "OP17-106": await C106(c); break;
-            case "OP17-107": C107(c); break;
+            case "OP17-107": await C107(c); break;
             case "OP17-108": await C108(c); break;
             case "OP17-109": await C109(c); break;
             case "OP17-110": await C110(c); break;
@@ -454,7 +456,7 @@ internal static class OP17Effects
             if (!c.Vars.TryGetValue("victimId", out var raw) || raw is not string id || !Guid.TryParse(id, out var victimId)) return;
             if (victimId == c.Source.Id || !Me(c).Characters.Contains(c.Source)) return;
             if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "KO马尔高，使将要因对方效果离场的角色不离场？")) return;
-            bool ko = await BattleEngine.KOCardAsync(c.State, c.OwnerIndex, c.Source, c.Prompts);
+            bool ko = await AtomicOps.KOByEffectAsync(c.State, c.OwnerIndex, c.Source, c.Prompts, c.OwnerIndex);
             if (ko) c.State.MarkPreventLeave(victimId);
             return;
         }
@@ -462,7 +464,7 @@ internal static class OP17Effects
         var candidates = Me(c).Hand.Where(x => x.Info.HasKeyword("白胡子海盗团")).ToList();
         if (candidates.Count == 0 || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃1张《白胡子海盗团》卡牌，将马尔高从废弃区登场？")) return;
         if (await DiscardOwnFiltered(c, x => x.Info.HasKeyword("白胡子海盗团"), 1, "选择丢弃1张《白胡子海盗团》卡牌"))
-            PlaySelfFromTrash(c);
+            await PlaySelfFromTrash(c);
     }
 
     private static async Task C018(EffectContext c)
@@ -1051,7 +1053,7 @@ internal static class OP17Effects
 
     private static async Task C071(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
         await KOByEffect(c, await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 2, 2, "选择最多2张费用≤2的角色KO"));
     }
@@ -1331,7 +1333,7 @@ internal static class OP17Effects
 
     private static async Task C102(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnKO) return;
         await PlayOneFromTrash(c, x => !x.MatchesName("夏洛特·烤箱") && x.Info.Power <= 4000,
             "将废弃区中最多1张其他力量≤4000的角色登场");
@@ -1339,7 +1341,7 @@ internal static class OP17Effects
 
     private static async Task C103(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex || !LeaderHas(c, "大妈海盗团")) return;
         AtomicOps.AddLifeFromDeckTop(Me(c), 1);
         var target = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-3000");
@@ -1348,7 +1350,7 @@ internal static class OP17Effects
 
     private static async Task C104(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex
             || !LeaderHas(c, "大妈海盗团") || Me(c).ActiveDonCount < 2) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，将卡组顶1张加入生命？")) return;
@@ -1367,7 +1369,7 @@ internal static class OP17Effects
 
     private static async Task C106(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex || Me(c).ActiveDonCount < 2) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，将卡组顶1张加入生命并使对方丢弃1张手牌？")) return;
         RestActiveDon(c, 2);
@@ -1376,9 +1378,9 @@ internal static class OP17Effects
         else if (Opp(c).Hand.Count > 0) AtomicOps.DiscardHand(Opp(c), Opp(c).Hand[0]);
     }
 
-    private static void C107(EffectContext c)
+    private static async Task C107(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) PlaySelfFromTrash(c);
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) await PlaySelfFromTrash(c);
     }
 
     private static async Task C108(EffectContext c)
@@ -1402,7 +1404,7 @@ internal static class OP17Effects
 
     private static async Task C110(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex) return;
         await PlayOneFromHand(c, x => x.Info.Cost <= 6 && x.Info.HasKeyword("大妈海盗团"),
             "将手牌中最多1张费用≤6的《大妈海盗团》角色登场");
@@ -1411,7 +1413,7 @@ internal static class OP17Effects
 
     private static async Task C111(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         if (!await DiscardOwnFiltered(c, x => !string.IsNullOrEmpty(x.Info.Trigger), 2,
             "公开手牌中2张拥有【触发】的卡牌", revealOnly: true)) return;
@@ -1423,12 +1425,14 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         int owner = c.OwnerIndex;
         var id = c.Source.Id;
+        var source = c.Source;
         RegisterContinuous(c, new ContinuousEffect
         {
             SourceCardId = id.ToString(),
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-            PowerDelta = 4000,
-            Predicate = (s, side, card) => side == owner && s.CurrentTurnPlayer == owner
+            OriginalPowerOverride = 8000,
+            Predicate = (s, side, card) => !source.IsEffectsNullified && !s.IsContinuouslyNullified(source)
+                && side == owner && s.CurrentTurnPlayer == owner
                 && s.Players[owner].Characters.Contains(card)
                 && card.Info.Power == 4000 && !string.IsNullOrEmpty(card.Info.Trigger),
         });
@@ -1453,7 +1457,7 @@ internal static class OP17Effects
 
     private static async Task C114(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { PlaySelfFromTrash(c); return; }
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex || Me(c).ActiveDonCount < 2) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，抽1张并将卡组顶1张加入生命？")) return;
         RestActiveDon(c, 2);
@@ -1518,7 +1522,7 @@ internal static class OP17Effects
         var selected = await ChooseByTotalCost(c,
             Me(c).Hand.Where(x => x.Info.Kind == CardKind.Character && x.Info.HasKeyword("洛克斯海盗团")),
             9, 2, "选择不同名称的《洛克斯海盗团》角色登场", distinctNames: true);
-        foreach (var card in selected) AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, card);
+        foreach (var card in selected) await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, card);
     }
 
     private static async Task C119(EffectContext c)

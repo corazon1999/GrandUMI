@@ -74,6 +74,6 @@ public class OP10_113_Zoro : IScriptedEffect
 
         // 收益：此卡牌从废弃区登场（以活跃状态）
         if (me.Trash.Contains(self))
-            AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, self, restState: false);
+            await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, self, restState: false);
     }
 }

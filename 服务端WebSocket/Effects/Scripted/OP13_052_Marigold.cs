@@ -44,6 +44,6 @@ public class OP13_052_Marigold : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var pick = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, pick);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, pick);
     }
 }

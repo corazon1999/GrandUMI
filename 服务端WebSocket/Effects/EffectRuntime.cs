@@ -144,13 +144,14 @@ public static class EffectRuntime
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
             _promptsAL.Value = prevPrompts;
-            // 最外层效果结束后，排空期间积累的反应式 watcher 事件 + 被效果登场卡的【登场时】
-            if (_depth == 0 && !_draining && (s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))
+            // 最外层效果结束后，排空期间积累的【KO时】、反应式 watcher 与被效果登场卡的【登场时】。
+            if (_depth == 0 && !_draining
+                && (s.PendingKOEffects.Count > 0 || s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))
                 await DrainPendingEnterFields(s, prompts);
         }
     }
 
-    /// <summary>排空 watcher 队列 + 被效果登场卡的【登场时】（带再入上限防死循环）。
+    /// <summary>排空旧同步 KO 的【KO时】、watcher 队列与被效果登场卡的【登场时】（带再入上限防死循环）。
     /// 反馈#203：改为 public，供 LifeRevealManager 在"纯自登场"(PlayFromTrashFree 只 EnqueueEnterField)之后
     /// 显式排空一次——否则该链路后续若无 depth-0 的 Resolve，PendingEnterFields 不会被排空，
     /// 导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。
@@ -162,21 +163,64 @@ public static class EffectRuntime
         try
         {
             int guard = 0;
-            while ((s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0) && guard++ < 50)
+            while ((s.PendingKOEffects.Count > 0 || s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0)
+                   && guard++ < 50)
             {
+                // KO 已经发生，先定向结算离场卡自身的【KO时】；卡已不在场，不能走 CollectListeners。
+                if (s.PendingKOEffects.Count > 0)
+                {
+                    var ko = s.PendingKOEffects[0];
+                    s.PendingKOEffects.RemoveAt(0);
+                    var previousReason = s.KOReason;
+                    var previousActingSide = s.KOActingSide;
+                    var previousSource = s.KOSourceCardId;
+                    s.KOReason = "effect";
+                    s.KOActingSide = ko.ActingSide;
+                    s.KOSourceCardId = ko.SourceCardId;
+                    try
+                    {
+                        await Resolve(s, ko.Owner, ko.Card, EffectTrigger.OnKO, prompts);
+                    }
+                    finally
+                    {
+                        s.KOReason = previousReason;
+                        s.KOActingSide = previousActingSide;
+                        s.KOSourceCardId = previousSource;
+                    }
+                    if (s.IsGameOver)
+                    {
+                        s.PendingKOEffects.Clear();
+                        s.PendingWatchers.Clear();
+                        s.PendingEnterFields.Clear();
+                        break;
+                    }
+                    continue;
+                }
                 // 优先结算"被效果登场角色的登场时"，保证登场连锁先于普通 watcher
                 if (s.PendingEnterFields.Count > 0)
                 {
                     var ef = s.PendingEnterFields[0];
                     s.PendingEnterFields.RemoveAt(0);
                     await ResolveEnterField(s, ef, prompts);
-                    if (s.IsGameOver) { s.PendingWatchers.Clear(); s.PendingEnterFields.Clear(); break; }
+                    if (s.IsGameOver)
+                    {
+                        s.PendingKOEffects.Clear();
+                        s.PendingWatchers.Clear();
+                        s.PendingEnterFields.Clear();
+                        break;
+                    }
                     continue;
                 }
                 var ev = s.PendingWatchers[0];
                 s.PendingWatchers.RemoveAt(0);
                 await TriggerEvent(s, ev.Trigger, prompts, ev.Payload);
-                if (s.IsGameOver) { s.PendingWatchers.Clear(); s.PendingEnterFields.Clear(); break; }
+                if (s.IsGameOver)
+                {
+                    s.PendingKOEffects.Clear();
+                    s.PendingWatchers.Clear();
+                    s.PendingEnterFields.Clear();
+                    break;
+                }
             }
         }
         finally { _draining = false; }

@@ -11,15 +11,41 @@ import CardItem from "@/components/ui/CardItem";
  * 服务端 Prompt 弹窗：处理选择目标 / 选项 / 生命牌触发等交互
  */
 export default function PromptOverlay() {
-  const prompt = useGameStore((s) => s.pendingPrompt);
+  const serverPrompt = useGameStore((s) => s.pendingPrompt);
+  const localOverflowHandIndex = useGameStore((s) => s.localOverflowHandIndex);
   const my = useGameStore((s) => s.my);
   const opp = useGameStore((s) => s.opponent);
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
+  const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
   const [selected, setSelected] = useState<string[]>([]);
+  const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
 
-  useEffect(() => { setSelected([]); }, [prompt?.promptId]);
+  const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
+    ? {
+        promptId: `local-overflow-${localOverflowHandIndex}`,
+        kind: "LocalOverflowTrash",
+        text: "角色区已满，请选择 1 张角色送去废弃区",
+        validChoices: my.fieldCards.map((c) => c.id),
+        minChoose: 1,
+        maxChoose: 1,
+        extra: {},
+      }
+    : null;
+  const prompt = serverPrompt ?? localPrompt;
 
-  if (!prompt) return null;
+  useEffect(() => {
+    setSelected([]);
+    setSubmittingPromptId(null);
+  }, [prompt?.promptId]);
+
+  // 网络异常时允许重新提交，避免弹窗永久消失。
+  useEffect(() => {
+    if (!submittingPromptId) return;
+    const timer = window.setTimeout(() => setSubmittingPromptId(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [submittingPromptId]);
+
+  if (!prompt || submittingPromptId === prompt.promptId) return null;
 
   const isLifeTrigger = prompt.kind === "LifeTrigger";
   const isOption = prompt.kind === "Option";
@@ -79,6 +105,29 @@ export default function PromptOverlay() {
     return found ? getCard(found.number) ?? null : null;
   };
 
+  // 场上目标需要明确所属阵营，避免双方存在同名或同卡图角色时无法分辨。
+  // 手牌、卡组、废弃区等非场上候选不显示阵营标记。
+  const fieldSideById = (id: string): "my" | "opponent" | null => {
+    if (
+      my &&
+      (id === "leader" ||
+        id === my.leaderId ||
+        id === my.stageId ||
+        my.fieldCards.some((c) => c.id === id))
+    ) {
+      return "my";
+    }
+    if (
+      opp &&
+      (id === opp.leaderId ||
+        id === opp.stageId ||
+        opp.fieldCards.some((c) => c.id === id))
+    ) {
+      return "opponent";
+    }
+    return null;
+  };
+
   // 把候选 id 反查成场上真实状态（贴咚数 / 当前攻击力修正），让选择列表与牌桌同步。
   // powerBuff 取「服务端当前攻击力 - 基础power - 贴咚*1000」，使 CardItem 的 displayPower 等于权威当前值。
   // 卡组/手牌等非场上候选返回 null，CardItem 退回基础卡面。
@@ -127,7 +176,17 @@ export default function PromptOverlay() {
   const canConfirm = selected.length >= prompt.minChoose && selected.length <= prompt.maxChoose;
 
   const handleConfirm = () => {
-    GameRequest.respondPrompt(prompt.promptId, selected);
+    const victimId = selected[0];
+    const isLocalOverflow = prompt.kind === "LocalOverflowTrash";
+    const sent = isLocalOverflow
+      ? GameRequest.playCard(localOverflowHandIndex!, victimId)
+      : GameRequest.respondPrompt(prompt.promptId, selected);
+    if (!sent) return;
+
+    // 立即收起弹窗；场上角色和废弃区只等待服务端权威快照更新，
+    // 避免本地提前移牌与后续效果/拒绝响应叠加时出现视觉错位。
+    setSubmittingPromptId(prompt.promptId);
+    if (isLocalOverflow) clearLocalOverflow();
     // #241 目标确认后弹一个"选择成功"瞬时提示（弹窗随即由服务器快照关闭）
     flashPromptSuccess();
   };
@@ -292,6 +351,12 @@ export default function PromptOverlay() {
                 }
                 const card = findCardById(id);
                 const fieldState = fieldStateById(id);
+                const fieldSide = fieldSideById(id);
+                const fieldIndex = fieldSide === "my"
+                  ? (my?.fieldCards.findIndex((c) => c.id === id) ?? -1)
+                  : fieldSide === "opponent"
+                    ? (opp?.fieldCards.findIndex((c) => c.id === id) ?? -1)
+                    : -1;
                 const orderIdx = isOrdered ? selected.indexOf(id) : -1;
                 return (
                   <div
@@ -305,9 +370,20 @@ export default function PromptOverlay() {
                       card={card}
                       size="md"
                       isSelected={selectable && selected.includes(id)}
+                      isTapped={fieldState?.isTapped ?? false}
                       attachedDonCount={fieldState?.attachedDonCount ?? 0}
                       powerBuff={fieldState?.powerBuff ?? 0}
                     />
+                    {fieldSide && (
+                      <span
+                        className={`pointer-events-none absolute -top-4 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-md ring-1 ring-white/70 ${
+                          fieldSide === "my" ? "bg-sky-600" : "bg-rose-600"
+                        }`}
+                      >
+                        {fieldSide === "my" ? "己方" : "对方"}
+                        {fieldIndex >= 0 ? ` · 第${fieldIndex + 1}位` : ""}
+                      </span>
+                    )}
                     {!selectable && (
                       <span className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-black/65 py-0.5 text-center text-[10px] font-bold text-slate-200">
                         不可选

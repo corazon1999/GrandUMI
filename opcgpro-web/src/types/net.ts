@@ -405,6 +405,8 @@ export interface MsgGameState extends MsgBase {
   actionPayload: string;
   /** 操作日志：按观看者视角生成的一行中文（不可记录的动作为空串） */
   logLine?: string;
+  /** 本次快照附带的全部操作日志；用于一次效果结算中连续记录多个选择。 */
+  logLines?: string[];
   pendingPrompt: PromptSnapshot | null;
   battle: BattleSnapshot | null;
   /** 检索/公开牌的瞬时展示（side 已按视角换算），仅在公开那一刻的快照里非空 */

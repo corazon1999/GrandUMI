@@ -30,6 +30,7 @@ public class PromptSystem : IPromptService
         // CurrentSource 随 AsyncLocal 传播，覆盖 DSL / 脚本 / AtomicOps 等所有调用点；
         // 无效果上下文（如战斗流程）时为 null，自然不注入，老行为不变。
         var src = EffectRuntime.CurrentSource;
+        var sourceNumber = src?.Info.Number;
         if (src is not null)
         {
             extra ??= new();
@@ -49,8 +50,8 @@ public class PromptSystem : IPromptService
                 var cc = new List<object>();
                 foreach (var id in validChoices)
                 {
-                    var ci = FindCardByIdAnyZone(_engine.State, id);
-                    if (ci is not null) cc.Add(new { id, number = ci.Info.Number });
+                    var located = FindCardByIdAnyZone(_engine.State, id);
+                    if (located is not null) cc.Add(new { id, number = located.Card.Info.Number });
                 }
                 if (cc.Count > 0) extra["choiceCards"] = cc;
             }
@@ -78,10 +79,11 @@ public class PromptSystem : IPromptService
             maxChoose = max,
             extra = extra ?? new(),
         });
-        _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
-
+        // 先登记再广播，避免极低延迟客户端在 _pending 写入前回包。
+        // 续延保持确定性的同序执行，确保动作重放与线上结算顺序一致。
         var tcs = new TaskCompletionSource<PromptAnswer>();
         _pending[promptId] = tcs;
+        _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
         try
         {
             var timeout = Task.Delay(TimeSpan.FromSeconds(TimeoutSeconds));
@@ -96,6 +98,10 @@ public class PromptSystem : IPromptService
             }
             var ans = await tcs.Task;
             _engine.State.PendingPrompt = null;
+            QueueResolvedLog(playerIdx, kind, text, ans.Chosen, extra, sourceNumber);
+            // 普通日志快照请求：若后续还有公开、出牌或下一次 Prompt，会自然合并进对应快照；
+            // 若效果在此结束，则在当前批次结束时至少下发这一条选择日志。
+            _engine.Broadcast("EffectChoice");
             return ans.Chosen;
         }
         finally
@@ -106,20 +112,79 @@ public class PromptSystem : IPromptService
 
     /// <summary>按 id 在双方所有区域(领袖/角色/舞台/手牌/卡组/废弃/生命)反查卡牌；非卡 id(无法解析为 Guid)返回 null。
     /// 供 ChooseCards 自动补 choiceCards 时把候选卡 id 映射成卡号，使客户端能显示卡图(反馈#61)。</summary>
-    private static CardInstance? FindCardByIdAnyZone(GameState s, string id)
+    private sealed record LocatedCard(CardInstance Card, int Owner, string Zone, bool IsPublic);
+
+    private static LocatedCard? FindCardByIdAnyZone(GameState s, string id)
     {
         if (!Guid.TryParse(id, out var gid)) return null;
-        foreach (var p in s.Players)
+        for (int owner = 0; owner < s.Players.Length; owner++)
         {
-            if (p.Leader.Id == gid) return p.Leader;
-            if (p.StageCard is not null && p.StageCard.Id == gid) return p.StageCard;
-            foreach (var c in p.Characters) if (c.Id == gid) return c;
-            foreach (var c in p.Hand) if (c.Id == gid) return c;
-            foreach (var c in p.Deck) if (c.Id == gid) return c;
-            foreach (var c in p.Trash) if (c.Id == gid) return c;
-            foreach (var c in p.LifeArea) if (c.Id == gid) return c;
+            var p = s.Players[owner];
+            if (p.Leader.Id == gid) return new LocatedCard(p.Leader, owner, "leader", true);
+            if (p.StageCard is not null && p.StageCard.Id == gid) return new LocatedCard(p.StageCard, owner, "stage", true);
+            foreach (var c in p.Characters) if (c.Id == gid) return new LocatedCard(c, owner, "character", true);
+            foreach (var c in p.Hand) if (c.Id == gid) return new LocatedCard(c, owner, "hand", false);
+            foreach (var c in p.Deck) if (c.Id == gid) return new LocatedCard(c, owner, "deck", false);
+            foreach (var c in p.Trash) if (c.Id == gid) return new LocatedCard(c, owner, "trash", true);
+            foreach (var c in p.LifeArea)
+                if (c.Id == gid) return new LocatedCard(c, owner, "life", c.IsLifeFaceUp);
         }
         return null;
+    }
+
+    private void QueueResolvedLog(int playerIdx, string kind, string text, IReadOnlyList<string> chosen,
+        Dictionary<string, object?>? extra, string? sourceNumber)
+    {
+        var labels = new List<string>();
+        bool hasHiddenCard = false;
+        var detailViewers = new HashSet<int> { playerIdx };
+        string[]? options = null;
+        if (extra is not null
+            && extra.TryGetValue("options", out var rawOptions)
+            && rawOptions is IEnumerable<string> optionValues)
+            options = optionValues.ToArray();
+
+        foreach (var value in chosen)
+        {
+            if (options is not null
+                && int.TryParse(value, out var optionIndex)
+                && optionIndex >= 0
+                && optionIndex < options.Length)
+            {
+                labels.Add(options[optionIndex]);
+                continue;
+            }
+
+            var located = FindCardByIdAnyZone(_engine.State, value);
+            if (located is not null)
+            {
+                labels.Add($"{located.Card.Info.Number} {located.Card.Info.Name}");
+                hasHiddenCard |= !located.IsPublic;
+                if (!located.IsPublic) detailViewers.Add(located.Owner);
+                continue;
+            }
+
+            labels.Add(value switch
+            {
+                "trigger" => "发动触发",
+                "hand" => "加入手牌",
+                "yes" => "是",
+                "no" => "否",
+                _ when Guid.TryParse(value, out _) => "已选择卡牌",
+                _ => value,
+            });
+        }
+
+        _engine.QueueActionLog("PromptResolved", new
+        {
+            player = playerIdx,
+            kind,
+            text,
+            sourceNumber = sourceNumber ?? "",
+            labels = labels.ToArray(),
+            detailVisibility = hasHiddenCard ? "restricted" : "public",
+            detailViewers = detailViewers.ToArray(),
+        });
     }
 
     public async Task<bool> ConfirmOptional(int playerIdx, string text)

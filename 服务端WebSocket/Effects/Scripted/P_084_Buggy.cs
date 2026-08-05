@@ -51,6 +51,6 @@ public class P_084_Buggy : IScriptedEffect
             playable.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (chosen.Count == 0) return;
         var picked = playable.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
     }
 }

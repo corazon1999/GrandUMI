@@ -61,14 +61,14 @@ public class NewAtomicOpsTests
     }
 
     [Fact]
-    public void PlayFromTrashFree_RestoresCharacter_FromTrashToField()
+    public async Task PlayFromTrashFree_RestoresCharacter_FromTrashToField()
     {
         var s = TestScene.New().Build();
         var info = CardDatabase.Get("OP15-003")!;
         var card = new CardInstance { Info = info, IsTapped = true, PowerModThisTurn = 1234 };
         s.Players[0].Trash.Add(card);
 
-        AtomicOps.PlayFromTrashFree(s, 0, card, restState: false);
+        await AtomicOps.PlayFromTrashFree(s, 0, card, restState: false);
 
         Assert.Contains(card, s.Players[0].Characters);
         Assert.DoesNotContain(card, s.Players[0].Trash);

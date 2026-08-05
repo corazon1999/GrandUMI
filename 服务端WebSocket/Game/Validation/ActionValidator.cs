@@ -56,7 +56,9 @@ public static class ActionValidator
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段宣言攻击");
         if (s.CurrentBattle is not null)      return Fail("已有战斗进行中");
-        if (s.TurnCount == 1)                 return Fail("第 1 回合不能战斗");
+        // TurnCount 记录的是整场对局中经过的玩家回合数：
+        // 1 为先手的首回合，2 为后手的首回合。双方各自的首回合均不能攻击。
+        if (s.TurnCount <= 2)                 return Fail("双方各自第 1 回合不能战斗");
 
         var me = s.Players[playerIdx];
         var op = s.Players[1 - playerIdx];

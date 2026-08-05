@@ -25,6 +25,6 @@ public class OP04_067_MsMerryChristmas : IScriptedEffect
         if (!use) return;
 
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
     }
 }

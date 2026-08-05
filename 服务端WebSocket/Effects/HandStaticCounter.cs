@@ -18,6 +18,13 @@ public static class HandStaticCounter
                 c.Info.Number == "OP17-063" && !state.IsContinuouslyNullified(c)))
             value = 1000;
 
+        // OP16-118 艾斯：我方手牌中所有印刷力量为8000的角色卡牌，变为反击+2000；同名光环不叠加。
+        if (card.Info.Power == 8000 && me.Characters.Any(c =>
+                c.Info.Number == "OP16-118"
+                && !c.IsEffectsNullified
+                && !state.IsContinuouslyNullified(c)))
+            value = 2000;
+
         // OP17-118 洛克斯：我方场上仅存在没有反击值的角色时，手牌中的自身反击+2000。
         if (card.Info.Number == "OP17-118"
             && me.Characters.All(c => c.Info.Counter == 0))

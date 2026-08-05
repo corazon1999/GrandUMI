@@ -70,7 +70,7 @@ public class EB02_039_Germa66 : IScriptedEffect
         if (pick.Count > 0)
         {
             var picked = playCands.First(c => c.Id.ToString() == pick[0]);
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

@@ -20,7 +20,7 @@ public class OP16_113_BoaMarigold : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t)
         => t == EffectTrigger.OnEnterField || t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -32,9 +32,9 @@ public class OP16_113_BoaMarigold : IScriptedEffect
         {
             if (me.Leader.Info.HasKeyword("九蛇海盗团"))
             {
-                AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+                await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
             }
-            return Task.CompletedTask;
+            return;
         }
 
         // ── 持续：我方生命牌 ≤2 时，此角色获得【阻挡者】 ──
@@ -48,6 +48,6 @@ public class OP16_113_BoaMarigold : IScriptedEffect
                 c.Id == selfId && s.Players[owner].LifeCount <= 2,
         });
 
-        return Task.CompletedTask;
+        return;
     }
 }

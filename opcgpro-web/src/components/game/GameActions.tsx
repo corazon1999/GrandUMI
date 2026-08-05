@@ -20,6 +20,7 @@ export default function GameActions() {
   const battle = useGameStore((s) => s.battle);
   const my = useGameStore((s) => s.my);
   const setSelectedField = useGameStore((s) => s.setSelectedField);
+  const openLocalOverflow = useGameStore((s) => s.openLocalOverflow);
   const isDefender = useIsDefender();
 
   const endTurn = useBattleStore((s) => s.endTurn);
@@ -82,6 +83,16 @@ export default function GameActions() {
     setSelectedField(null);
   };
 
+  const playSelectedCard = () => {
+    if (selectedHandIndex === null || !my) return;
+    const selected = getCard(my.handCardNumbers[selectedHandIndex] ?? "");
+    if (selected?.type === "Character" && my.fieldCards.length >= 5) {
+      openLocalOverflow(selectedHandIndex);
+      return;
+    }
+    GameRequest.playCard(selectedHandIndex);
+  };
+
   return (
     <div className="flex flex-col gap-2">
       {canAttack && (
@@ -106,7 +117,7 @@ export default function GameActions() {
 
       {canPlay && (
         <button
-          onClick={() => GameRequest.playCard(selectedHandIndex!)}
+          onClick={playSelectedCard}
           disabled={isPending}
           className={`${btn} bg-blue-500 hover:bg-blue-400`}
         >

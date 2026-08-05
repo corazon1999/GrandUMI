@@ -52,6 +52,6 @@ public class OP13_110_Stussy : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var card = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
     }
 }

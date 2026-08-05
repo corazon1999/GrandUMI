@@ -2,20 +2,52 @@
  * GameRequest.ts — 游戏动作发送层
  *
  * 所有动作均通过 MsgGameAction 发到服务器；服务器结算后通过 MsgGameState 推回。
- * 客户端不在本地预演任何状态变更。
+ * 对贴咚、攻击横置和出牌仅做可回滚的即时视觉反馈；规则结算仍完全以服务端为准。
  */
 
 import { NetManager } from "./NetManager";
 import type { MsgBase, MsgGameAction, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 
-function send(action: GameActionType, data: Record<string, unknown> = {}) {
-  useGameStore.getState().setPending(true);
-  NetManager.send({
+type PendingLatency = { action: string; startedAt: number };
+let pendingLatency: PendingLatency | null = null;
+
+function markActionSent(action: string) {
+  if (typeof performance !== "undefined") {
+    pendingLatency = { action, startedAt: performance.now() };
+  }
+}
+
+/** 收到下一份权威快照时结束本次客户端→服务端→客户端计时。 */
+export function completePendingActionLatency(tick: number) {
+  if (!pendingLatency || typeof performance === "undefined") return;
+  const elapsed = performance.now() - pendingLatency.startedAt;
+  if (elapsed >= 80) {
+    console.info(`[延迟] ${pendingLatency.action} 到快照 ${elapsed.toFixed(1)}ms，Tick=${tick}`);
+  }
+  pendingLatency = null;
+}
+
+function send(
+  action: GameActionType,
+  data: Record<string, unknown> = {},
+  optimistic?: () => void,
+) {
+  const store = useGameStore.getState();
+  store.setPending(true);
+  optimistic?.();
+  const sent = NetManager.send({
     proto: "MsgGameAction",
     action,
     data,
   } as MsgGameAction);
+  if (sent) markActionSent(action);
+  else {
+    pendingLatency = null;
+    useGameStore.getState().rollbackOptimistic();
+    useGameStore.getState().setPending(false);
+  }
+  return sent;
 }
 
 export const GameRequest = {
@@ -23,18 +55,24 @@ export const GameRequest = {
   mulligan: (redraw: boolean) => send("Mulligan", { redraw }),
 
   /** 出牌：handIndex = 当前手牌列表下标 */
-  playCard: (handIndex: number) => send("PlayCard", { handIndex }),
+  playCard: (handIndex: number, overflowTrashCardId?: string) =>
+    send("PlayCard", {
+      handIndex,
+      ...(overflowTrashCardId ? { overflowTrashCardId } : {}),
+    }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
   /** 赋予咚：将一张活跃咚附给领袖或场上角色 */
   attachDon: (targetId: string | "leader", count = 1) =>
-    send("AttachDon", { targetId, count }),
+    send("AttachDon", { targetId, count }, () =>
+      useGameStore.getState().optimisticAttachDon(targetId, count)),
 
   /** 攻击宣言 */
   attack: (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>
     send("Attack",
       target.isLeader
         ? { attackerId, targetIsLeader: true }
-        : { attackerId, targetIsLeader: false, targetId: target.cardId }),
+        : { attackerId, targetIsLeader: false, targetId: target.cardId },
+      () => useGameStore.getState().optimisticAttack(attackerId)),
 
   /** 宣言【阻挡者】 */
   declareBlocker: (blockerId: string) => send("DeclareBlocker", { blockerId }),
@@ -80,7 +118,14 @@ export const GameRequest = {
   /** 响应服务器发起的 Prompt */
   respondPrompt: (promptId: string, chosen: string[]) => {
     useGameStore.getState().setPending(true);
-    NetManager.send({ proto: "MsgPromptResponse", promptId, chosen } as MsgPromptResponse);
+    const sent = NetManager.send({ proto: "MsgPromptResponse", promptId, chosen } as MsgPromptResponse);
+    if (sent) markActionSent("PromptResponse");
+    else {
+      pendingLatency = null;
+      useGameStore.getState().rollbackOptimistic();
+      useGameStore.getState().setPending(false);
+    }
+    return sent;
   },
 
   /** 断线重连后请求完整快照 */

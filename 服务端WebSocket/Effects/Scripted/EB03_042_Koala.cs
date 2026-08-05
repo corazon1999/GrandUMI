@@ -68,7 +68,7 @@ public class EB03_042_Koala : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-        if (me.Hand.Contains(picked)) AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
-        else if (me.Trash.Contains(picked)) AtomicOps.PlayFromTrashFree(ctx.State, owner, picked);
+        if (me.Hand.Contains(picked)) await AtomicOps.PlayFromHandFree(ctx.State, owner, picked);
+        else if (me.Trash.Contains(picked)) await AtomicOps.PlayFromTrashFree(ctx.State, owner, picked);
     }
 }

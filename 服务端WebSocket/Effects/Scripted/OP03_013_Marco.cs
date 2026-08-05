@@ -67,6 +67,6 @@ public class OP03_013_Marco : IScriptedEffect
         var discard = events.First(c => c.Id.ToString() == discardPick[0]);
         AtomicOps.DiscardHand(me, discard);
 
-        AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: true);
+        await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source, restState: true);
     }
 }

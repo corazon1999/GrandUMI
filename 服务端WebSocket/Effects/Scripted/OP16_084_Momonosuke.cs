@@ -68,7 +68,7 @@ public class OP16_084_Momonosuke : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
         }
     }
 }

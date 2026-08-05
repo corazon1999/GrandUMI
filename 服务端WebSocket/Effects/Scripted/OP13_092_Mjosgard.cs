@@ -47,7 +47,7 @@ public class OP13_092_Mjosgard : IScriptedEffect
         if (chosen.Count > 0)
         {
             var target = candidates.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
-            if (target is not null) AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, target);
+            if (target is not null) await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, target);
         }
     }
 }

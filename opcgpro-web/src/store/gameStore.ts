@@ -64,6 +64,23 @@ export interface PlayerView {
   mulliganDone: boolean;
 }
 
+function clonePlayerView(player: PlayerView | null): PlayerView | null {
+  if (!player) return null;
+  return {
+    ...player,
+    handCardNumbers: [...player.handCardNumbers],
+    handCardCosts: [...player.handCardCosts],
+    handCardCounters: [...player.handCardCounters],
+    fieldCards: player.fieldCards.map((card) => ({
+      ...card,
+      gainedKeywords: [...card.gainedKeywords],
+    })),
+    trashNumbers: [...player.trashNumbers],
+    lifeNumbers: [...player.lifeNumbers],
+    lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),
+  };
+}
+
 export interface PromptView {
   promptId: string;
   kind: string;
@@ -99,9 +116,14 @@ interface GameStore {
   // 双方
   my: PlayerView | null;
   opponent: PlayerView | null;
+  // 最近一份服务端权威副本，供乐观更新被拒绝时回滚。
+  authoritativeMy: PlayerView | null;
+  authoritativeBattle: BattleView | null;
 
   // 当前 prompt / 战斗
   pendingPrompt: PromptView | null;
+  // 普通手牌满场出牌时的本地腾位选择；确认后与 PlayCard 合并为一次请求
+  localOverflowHandIndex: number | null;
   battle: BattleView | null;
 
   // 动作驱动动画
@@ -109,7 +131,7 @@ interface GameStore {
   lastActionPayloadObj: Record<string, unknown> | null;
 
   // 操作日志（按 tick 去重累积）
-  logLines: { id: number; text: string }[];
+  logLines: { id: string; text: string }[];
   lastLogTick: number;
 
   // 检索/公开牌瞬时展示（nonce 递增以便重复触发；由 RevealOverlay 计时清除）
@@ -137,6 +159,13 @@ interface GameStore {
   syncFromServer: (msg: MsgGameState) => void;
   clearReveal: () => void;
   flashPromptSuccess: () => void;
+  openLocalOverflow: (handIndex: number) => void;
+  clearLocalOverflow: () => void;
+  optimisticTrashFieldCard: (cardId: string) => void;
+  optimisticPlayCard: (handIndex: number) => void;
+  optimisticAttachDon: (targetId: string, count: number) => void;
+  optimisticAttack: (attackerId: string) => void;
+  rollbackOptimistic: () => void;
 
   // 纯本地 UI 状态
   setPending: (v: boolean) => void;
@@ -160,7 +189,10 @@ export const useGameStore = create<GameStore>()(
     viewerKind: "player",
     my: null,
     opponent: null,
+    authoritativeMy: null,
+    authoritativeBattle: null,
     pendingPrompt: null,
+    localOverflowHandIndex: null,
     battle: null,
     lastAction: "",
     lastActionPayloadObj: null,
@@ -192,8 +224,11 @@ export const useGameStore = create<GameStore>()(
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
         s.my = msg.my ?? null;
         s.opponent = msg.opponent ?? null;
+        s.authoritativeMy = clonePlayerView(msg.my ?? null);
         s.pendingPrompt = msg.pendingPrompt ?? null;
+        s.localOverflowHandIndex = null;
         s.battle = msg.battle ?? null;
+        s.authoritativeBattle = msg.battle ? { ...msg.battle } : null;
         s.lastAction = msg.lastAction ?? "";
         s.lastActionPayloadObj = msg.actionPayload
           ? (() => {
@@ -201,12 +236,18 @@ export const useGameStore = create<GameStore>()(
               catch { return null; }
             })()
           : null;
-        // 操作日志：按 tick 去重累积（重连重发同 tick 不会重复记入）
+        // 操作日志：同一快照可携带多条效果选择记录；仍按 tick 去重，避免重连重复追加。
         {
-          const line = msg.logLine ?? "";
-          if (line && s.tick > s.lastLogTick) {
-            s.logLines.push({ id: s.tick, text: line });
-            if (s.logLines.length > 200) s.logLines.shift();
+          const lines = msg.logLines?.length
+            ? msg.logLines
+            : (msg.logLine ? [msg.logLine] : []);
+          if (s.tick > s.lastLogTick) {
+            lines.forEach((text, index) => {
+              if (text) s.logLines.push({ id: `${s.tick}:${index}`, text });
+            });
+            if (s.logLines.length > 200) {
+              s.logLines.splice(0, s.logLines.length - 200);
+            }
           }
           if (s.tick > s.lastLogTick) s.lastLogTick = s.tick;
         }
@@ -226,6 +267,48 @@ export const useGameStore = create<GameStore>()(
 
     clearReveal: () => set((s) => { s.reveal = null; }),
     flashPromptSuccess: () => set((s) => { s.promptFlash = s.promptFlash + 1; }),
+    openLocalOverflow: (handIndex) => set((s) => { s.localOverflowHandIndex = handIndex; }),
+    clearLocalOverflow: () => set((s) => { s.localOverflowHandIndex = null; }),
+    // 只做即时视觉反馈；下一份服务端快照会覆盖为权威状态。
+    optimisticTrashFieldCard: (cardId) => set((s) => {
+      if (!s.my) return;
+      const index = s.my.fieldCards.findIndex((c) => c.id === cardId);
+      if (index < 0) return;
+      const [card] = s.my.fieldCards.splice(index, 1);
+      s.my.trashNumbers.push(card.number);
+    }),
+    optimisticPlayCard: (handIndex) => set((s) => {
+      if (!s.my || handIndex < 0 || handIndex >= s.my.handCardNumbers.length) return;
+      s.my.handCardNumbers.splice(handIndex, 1);
+      s.my.handCardCosts.splice(handIndex, 1);
+      s.my.handCardCounters.splice(handIndex, 1);
+      s.my.handCount = Math.max(0, s.my.handCount - 1);
+    }),
+    optimisticAttachDon: (targetId, count) => set((s) => {
+      if (!s.my) return;
+      const actual = Math.max(0, Math.min(count, s.my.costActive));
+      if (actual === 0) return;
+      s.my.costActive -= actual;
+      s.my.costAttached += actual;
+      if (targetId === "leader" || targetId === s.my.leaderId) {
+        s.my.leaderAttachedDon += actual;
+      } else {
+        const target = s.my.fieldCards.find((c) => c.id === targetId);
+        if (target) target.attachedDon += actual;
+      }
+    }),
+    optimisticAttack: (attackerId) => set((s) => {
+      if (!s.my) return;
+      if (attackerId === s.my.leaderId) s.my.leaderTapped = true;
+      else {
+        const attacker = s.my.fieldCards.find((c) => c.id === attackerId);
+        if (attacker) attacker.isTapped = true;
+      }
+    }),
+    rollbackOptimistic: () => set((s) => {
+      s.my = clonePlayerView(s.authoritativeMy);
+      s.battle = s.authoritativeBattle ? { ...s.authoritativeBattle } : null;
+    }),
 
     setPending: (v) => set((s) => { s.isPending = v; }),
     setSelectedHand: (idx) => set((s) => {
@@ -253,7 +336,10 @@ export const useGameStore = create<GameStore>()(
       s.phase = "Main";
       s.my = null;
       s.opponent = null;
+      s.authoritativeMy = null;
+      s.authoritativeBattle = null;
       s.pendingPrompt = null;
+      s.localOverflowHandIndex = null;
       s.battle = null;
       s.lastAction = "";
       s.lastActionPayloadObj = null;

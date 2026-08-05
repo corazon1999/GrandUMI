@@ -67,8 +67,8 @@ public class OP06_064_Niji : IScriptedEffect
 
         var picked = all.First(c => c.Id.ToString() == chosen[0]);
         if (me.Hand.Contains(picked))
-            AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
         else
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
     }
 }

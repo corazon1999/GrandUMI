@@ -71,7 +71,7 @@ public class OP06_062_VinsmokeNiji : IScriptedEffect
                 if (ch.Count == 0) break;
                 var picked = cands.First(c => c.Id.ToString() == ch[0]);
                 usedNames.Add(picked.Info.Name);
-                AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
             }
             return;
         }

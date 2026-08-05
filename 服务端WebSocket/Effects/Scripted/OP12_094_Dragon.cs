@@ -69,6 +69,6 @@ public class OP12_094_Dragon : IScriptedEffect
 
         var pick = playPool.FirstOrDefault(c => c.Id.ToString() == playChosen[0]);
         if (pick is null) return;
-        AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, pick);
+        await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, pick);
     }
 }

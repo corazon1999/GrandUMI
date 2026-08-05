@@ -20,20 +20,20 @@ public class ST29_009_NicoRobin : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
         // 条件：我方领袖为"蒙奇·D·路飞"
-        if (!me.Leader.Info.NameIs("蒙奇·D·路飞")) return Task.CompletedTask;
+        if (!me.Leader.Info.NameIs("蒙奇·D·路飞")) return;
 
         // 仅当此卡当前在废弃区(由生命触发流程放入)时，将其登场
         if (me.Trash.Contains(self))
         {
-            AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, self);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

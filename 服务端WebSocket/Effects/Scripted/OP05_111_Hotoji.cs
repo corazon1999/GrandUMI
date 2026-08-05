@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -40,7 +40,7 @@ public class OP05_111_Hotoji : IScriptedEffect
             "从手牌登场 1 张\"小鸟\"", birds.Select(c => c.Id.ToString()).ToList(), 1, 1, extra);
         if (pickBird.Count == 0) return; // 未支付成本
         var bird = birds.First(c => c.Id.ToString() == pickBird[0]);
-        AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, bird);
+        await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, bird);
 
         // 收益：将对方最多 1 张费用≤3 的角色加入其生命区最上方或最下方
         var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();

@@ -49,7 +49,7 @@ public class OP04_084_Stussy : IScriptedEffect
                 // 卡组 → 手牌 → 登场（等价于从卡组直接登场）
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             }
         }
 

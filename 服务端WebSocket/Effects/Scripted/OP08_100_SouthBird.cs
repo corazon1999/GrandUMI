@@ -46,7 +46,7 @@ public class OP08_100_SouthBird : IScriptedEffect
                 // 从卡组移入手牌再登场（等价于从卡组登场该角色）
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             }
         }
 

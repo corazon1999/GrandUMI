@@ -70,7 +70,7 @@ public class OP09_022_Lim : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = playable.First(c => c.Id.ToString() == chosen[0]);
-                AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             }
         }
     }

@@ -77,6 +77,6 @@ public class OP12_075_MissAllSunday : IScriptedEffect
 
         // 从废弃区将此卡免费登场
         if (me.Trash.Contains(ctx.Source))
-            AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
+            await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source, restState: false);
     }
 }
