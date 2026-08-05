@@ -234,16 +234,18 @@ function RightRail({
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
       </section>
-      {!isObserver && !isPlayback && (
+      {!isPlayback && (
         <>
           <section className="relative min-h-0 flex-1 overflow-y-auto rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
             <h2 className="text-xs font-black text-slate-300">操作日志</h2>
             <GameLog />
           </section>
-          <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
-            <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
-            <GameActions />
-          </section>
+          {!isObserver && (
+            <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
+              <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
+              <GameActions />
+            </section>
+          )}
         </>
       )}
       {isPlayback && (

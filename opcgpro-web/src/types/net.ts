@@ -206,7 +206,7 @@ export interface MsgOnlineCount extends MsgBase {
 export interface PlayerInfo {
   account: string;
   name: string;
-  status: "idle" | "matching" | "playing";
+  status: "idle" | "matching" | "playing" | "spectating";
   roomId?: string | null;   // 对战中玩家所在的对局房间ID，供一键观战；无对局房间时为 null
 }
 
@@ -432,6 +432,13 @@ export interface MsgSpectateRoom extends MsgBase {
   logStr?: string;
 }
 
+/** 客户端 → 服务器：主动退出观战；服务端以同协议回执 */
+export interface MsgLeaveSpectate extends MsgBase {
+  proto: "MsgLeaveSpectate";
+  result?: boolean;
+  logStr?: string;
+}
+
 /** 服务端 → 客户端：动作被拒绝（不发对手） */
 export interface MsgActionRejected extends MsgBase {
   proto: "MsgActionRejected";
@@ -498,6 +505,7 @@ export type AnyMsg =
   | MsgGameAction
   | MsgPromptResponse
   | MsgSpectateRoom
+  | MsgLeaveSpectate
   | MsgActionRejected
   | MsgRequestState
   | MsgPlayerDisconnected

@@ -1,0 +1,17 @@
+[Unit]
+Description=GrandUMI 测试服前端（Next 3001）
+After=network.target grandumi-test-backend.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/grandumi-test/opcgpro-web
+ExecStart=/usr/bin/node /opt/grandumi-test/opcgpro-web/node_modules/next/dist/bin/next start -p 3001
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_WS_URL=wss://test.grand-umi.com/ws
+CPUQuota=50%
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

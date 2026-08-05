@@ -1,0 +1,11 @@
+[Unit]
+Description=GrandUMI 每天北京时间零点发布已批准版本
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=0
+Unit=grandumi-production-promote.service
+
+[Install]
+WantedBy=timers.target

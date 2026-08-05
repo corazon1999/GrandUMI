@@ -17,6 +17,7 @@ import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
 import { useGameInit } from "@/hooks/useGameInit";
+import { HomeRequest } from "@/net/HomeProtocol";
 
 export default function GamePage() {
   const router = useRouter();
@@ -51,6 +52,15 @@ export default function GamePage() {
     }
   }, [isPlayback, playback]);
 
+  const returnToHome = () => {
+    if (isObserver) HomeRequest.leaveSpectate();
+    useGameStore.getState().resetGame();
+    useGameStore.getState().setMode("Player");
+    useNetStore.getState().setMatchState("idle");
+    useNetStore.getState().setOpponentName("");
+    router.push("/home");
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
       {!isObserver && !isPlayback && <ReconnectOverlay />}
@@ -64,9 +74,19 @@ export default function GamePage() {
       {!isPlayback && <FeedbackOverlay context="game" />}
 
       {isObserver && (
-        <div className="absolute left-4 top-4 z-20 rounded-full bg-purple-600/80 px-3 py-1 text-xs text-white">
-          观战模式
-        </div>
+        <>
+          <div className="absolute left-4 top-4 z-20 rounded-full bg-purple-600/80 px-3 py-1 text-xs text-white">
+            观战模式
+          </div>
+          {!isGameOver && (
+            <button
+              onClick={returnToHome}
+              className="absolute right-4 top-4 z-20 rounded-lg border border-white/20 bg-gray-950/80 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-gray-800"
+            >
+              退出观战
+            </button>
+          )}
+        </>
       )}
 
       {isPlayback && (
@@ -99,7 +119,9 @@ export default function GamePage() {
           >
             <motion.h1
               className={
-                winnerIsMe
+                isObserver
+                  ? "text-5xl font-black text-purple-300 drop-shadow-[0_0_12px_rgba(216,180,254,0.5)]"
+                  : winnerIsMe
                   ? "text-5xl font-black text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)]"
                   : "text-5xl font-black text-gray-400 drop-shadow-[0_0_12px_rgba(156,163,175,0.5)]"
               }
@@ -107,7 +129,7 @@ export default function GamePage() {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              {winnerIsMe ? "你胜利了！" : "你战败了"}
+              {isObserver ? "对局结束" : winnerIsMe ? "你胜利了！" : "你战败了"}
             </motion.h1>
             {gameOverReason && (
               <motion.p
@@ -120,12 +142,7 @@ export default function GamePage() {
               </motion.p>
             )}
             <motion.button
-              onClick={() => {
-                useGameStore.getState().resetGame();
-                useNetStore.getState().setMatchState("idle");
-                useNetStore.getState().setOpponentName("");
-                router.push("/home");
-              }}
+              onClick={returnToHome}
               className="mt-6 rounded-lg bg-orange-500 px-6 py-2 text-white transition-colors hover:bg-orange-400"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}

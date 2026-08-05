@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useNetStore } from "@/store/netStore";
-import { useGameStore } from "@/store/gameStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import Modal from "@/components/ui/Modal";
 import type { PlayerInfo } from "@/types/net";
@@ -12,12 +10,14 @@ const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> 
   idle:     { text: "空闲",   cls: "text-green-400" },
   matching: { text: "匹配中", cls: "text-yellow-400" },
   playing:  { text: "对战中", cls: "text-red-400" },
+  spectating:{ text: "观战中", cls: "text-purple-400" },
 };
 
 export default function PlayerListPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const players = useNetStore((s) => s.playerList);
   const account = useNetStore((s) => s.account);
-  const router = useRouter();
+  const spectateState = useNetStore((s) => s.spectateState);
+  const spectateRoomId = useNetStore((s) => s.spectateRoomId);
 
   // 打开时拉取一次，并每 4 秒刷新一次状态
   useEffect(() => {
@@ -31,13 +31,10 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
     HomeRequest.invitePlayer(p.account);
   };
 
-  // 观战对战中玩家：发起观战 → 切观战模式 → 客户端路由进对战页（不断 WebSocket）
+  // 等服务端确认房间有效后再进入对战页，失败时保留弹窗并显示原因
   const handleSpectate = (p: PlayerInfo) => {
     if (!p.roomId) return;
     HomeRequest.spectateRoom(p.roomId);
-    useGameStore.getState().setMode("Observer");
-    onClose();
-    router.push("/game");
   };
 
   return (
@@ -65,9 +62,10 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                   p.status === "playing" && p.roomId ? (
                     <button
                       onClick={() => handleSpectate(p)}
-                      className="px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-purple-600 hover:bg-purple-500 text-white"
+                      disabled={spectateState === "joining"}
+                      className="px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-purple-600 hover:bg-purple-500 disabled:bg-purple-950 disabled:text-purple-300 disabled:cursor-wait text-white"
                     >
-                      观战
+                      {spectateState === "joining" && spectateRoomId === p.roomId ? "进入中…" : "观战"}
                     </button>
                   ) : (
                     <button

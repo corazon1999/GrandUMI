@@ -1,0 +1,14 @@
+[Unit]
+Description=GrandUMI 服务器可靠 DNS 覆盖
+After=network-online.target systemd-resolved.service
+Wants=network-online.target systemd-resolved.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/resolvectl dns eth0 223.5.5.5 1.1.1.1 8.8.8.8
+ExecStart=/usr/bin/resolvectl domain eth0 ~.
+ExecStop=/usr/bin/resolvectl revert eth0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

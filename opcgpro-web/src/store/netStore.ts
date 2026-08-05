@@ -25,6 +25,7 @@ export interface SelectedDeck {
 }
 
 type MatchState = "idle" | "matching" | "matched";
+export type SpectateState = "idle" | "joining" | "watching";
 
 interface NetStore {
   // 连接状态（含重连状态）
@@ -51,6 +52,9 @@ interface NetStore {
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
   friendlyRoom: FriendlyRoomState | null;
+  // 观战申请与当前观战房间
+  spectateState: SpectateState;
+  spectateRoomId: string | null;
   // 聊天
   chatMessages: ChatMessage[];
   // 客户端路由导航（避免 window.location.href 导致整页刷新断开 WebSocket）
@@ -70,6 +74,7 @@ interface NetStore {
   setPlayerList: (list: PlayerInfo[]) => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
+  setSpectate: (state: SpectateState, roomId?: string | null) => void;
   setNavigateTo: (path: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   clearChat: () => void;
@@ -91,6 +96,8 @@ const initialState = {
   playerList: [] as PlayerInfo[],
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
+  spectateState: "idle" as SpectateState,
+  spectateRoomId: null as string | null,
   chatMessages: [] as ChatMessage[],
   navigateTo: null as string | null,
 };
@@ -127,6 +134,8 @@ export const useNetStore = create<NetStore>((set) => ({
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 
   setFriendlyRoom: (room) => set({ friendlyRoom: room }),
+
+  setSpectate: (spectateState, roomId = null) => set({ spectateState, spectateRoomId: roomId }),
 
   setNavigateTo: (path) => set({ navigateTo: path }),
 

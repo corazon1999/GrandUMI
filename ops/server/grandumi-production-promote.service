@@ -1,0 +1,12 @@
+[Unit]
+Description=GrandUMI 将已批准测试版本发布到正式服
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/grandumi/promote-approved.sh
+TimeoutStartSec=70min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

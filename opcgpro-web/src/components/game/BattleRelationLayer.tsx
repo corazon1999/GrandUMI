@@ -259,12 +259,18 @@ export default function BattleRelationLayer() {
                 strokeWidth="5"
                 strokeLinecap="round"
                 strokeDasharray="14 10"
-                markerEnd={isBlocked ? "url(#battle-arrow-block)" : "url(#battle-arrow-attack)"}
                 filter="url(#battle-route-glow)"
                 initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
                 animate={{ opacity: 1, pathLength: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.42, ease: "easeOut" }}
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke="transparent"
+                strokeWidth="5"
+                markerEnd={isBlocked ? "url(#battle-arrow-block)" : "url(#battle-arrow-attack)"}
               />
 
               {!reduceMotion && (

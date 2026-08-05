@@ -22,10 +22,10 @@ const COL_PRESETS = [4, 5, 6, 7, 8, 9, 10, 12];
 export default function SearchPanel() {
   const {
     leader,
-    searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost,
+    searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost,
     filterSets, filterShowSub1,
     gridColumns,
-    setSearchQuery, setFilterColor, setFilterType, setFilterProperty, setFilterRarity, setFilterCost,
+    setSearchQuery, toggleFilterColor, clearFilterColors, setFilterType, setFilterProperty, setFilterRarity, setFilterCost,
     toggleFilterSet, clearFilterSets, setFilterShowSub1,
     setGridColumns,
   } = useDeckStore();
@@ -34,9 +34,7 @@ export default function SearchPanel() {
   const [setGroupExpanded, setSetGroupExpanded] = useState<number | null>(null);
 
   const isLeaderMode        = filterType === "Leader";
-  // 数据层颜色已统一为标准色，filterColor 直接即显示色
-  const activeDisplayColor  = filterColor;
-  const hasFilter           = !!(searchQuery || filterColor || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1);
+  const hasFilter           = !!(searchQuery || filterColors.length > 0 || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1);
 
   // 已选领航且非领航模式时，颜色筛选收缩为领航拥有的颜色（双色剩 2、单色剩 1）；否则显示全部 6 色
   const leaderDataColors    = leader && !isLeaderMode ? leader.color.split("/") : null;
@@ -100,9 +98,9 @@ export default function SearchPanel() {
             <label className="text-gray-500 text-[10px]">颜色</label>
             <div className="flex flex-wrap gap-1">
               {showAllColorBtn && (
-                <button onClick={() => setFilterColor("")}
+                <button onClick={clearFilterColors}
                   className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                    filterColor === ""
+                    filterColors.length === 0
                       ? "bg-orange-500 text-white"
                       : "bg-gray-800 text-gray-400 hover:text-white"
                   }`}>
@@ -110,11 +108,10 @@ export default function SearchPanel() {
                 </button>
               )}
               {visibleColorNames.map((name) => {
-                const dataValue = name;
                 const styles    = COLOR_STYLES[name];
-                const isActive  = activeDisplayColor === name;
+                const isActive  = filterColors.includes(name);
                 return (
-                  <button key={name} onClick={() => setFilterColor(dataValue)}
+                  <button key={name} onClick={() => toggleFilterColor(name)}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
                       isActive
                         ? `${styles.bg} text-white scale-105`
@@ -253,7 +250,7 @@ export default function SearchPanel() {
           {hasFilter && (
             <button
               onClick={() => {
-                setSearchQuery(""); setFilterColor(""); setFilterType(""); setFilterProperty(""); setFilterRarity(""); setFilterCost(null);
+                setSearchQuery(""); clearFilterColors(); setFilterType(""); setFilterProperty(""); setFilterRarity(""); setFilterCost(null);
                 clearFilterSets(); setFilterShowSub1(false);
               }}
               className="text-gray-600 hover:text-white text-[10px] transition-colors text-center"

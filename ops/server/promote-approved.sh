@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+repo=/opt/grandumi
+state_dir=/var/lib/grandumi-release
+approved_file="$state_dir/approved"
+test_file="$state_dir/test-deployed"
+deployed_file="$state_dir/production-deployed"
+
+log() {
+  echo "[$(date '+%F %T')] $*"
+}
+
+die() {
+  log "错误：$*" >&2
+  exit 1
+}
+
+[[ -s "$approved_file" ]] || { log "没有已批准版本，本次不发布。"; exit 0; }
+[[ -s "$test_file" ]] || die "没有测试服部署记录。"
+approved="$(tr -d '\r\n' < "$approved_file")"
+tested="$(tr -d '\r\n' < "$test_file")"
+[[ "$approved" =~ ^[0-9a-f]{40}$ ]] || die "批准记录格式无效。"
+[[ "$approved" == "$tested" ]] || die "已批准版本与当前测试服版本不一致。"
+
+# 最长等待一小时；只要仍有经过 Caddy 的 WebSocket 连接，就不重启正式服。
+for attempt in {1..13}; do
+  connections="$(ss -Hnt state established '( sport = :8080 )' | wc -l)"
+  if [[ "$connections" -eq 0 ]]; then
+    break
+  fi
+  if [[ "$attempt" -eq 13 ]]; then
+    log "正式服仍有 $connections 个 WebSocket 连接，跳过本次发布。"
+    exit 0
+  fi
+  log "正式服仍有 $connections 个连接，5 分钟后重试（$attempt/12）。"
+  sleep 300
+done
+
+generated='opcgpro-web/src/data/dataVersion.ts'
+dirty="$(git -C "$repo" -c core.quotepath=false diff --name-only |
+  grep -Fvx "$generated" |
+  grep -v '^服务端WebSocket/publish/' || true)"
+[[ -z "$dirty" ]] || die "正式服存在未知受控文件改动，拒绝发布：$dirty"
+git -C "$repo" restore --worktree --staged -- "$generated" 2>/dev/null || true
+git -C "$repo" restore --worktree --staged -- '服务端WebSocket/publish' 2>/dev/null || true
+
+log "获取已批准提交 $approved"
+git -C "$repo" fetch origin main
+git -C "$repo" cat-file -e "$approved^{commit}" 2>/dev/null || die "正式服仓库中不存在已批准提交。"
+git -C "$repo" merge-base --is-ancestor "$approved" origin/main || die "已批准提交不属于 origin/main。"
+
+old="$(cat "$deployed_file" 2>/dev/null || git -C "$repo" rev-parse HEAD)"
+git -C "$repo" merge-base --is-ancestor "$old" "$approved" || die "批准版本不是正式服版本的后继提交。"
+[[ "$old" != "$approved" ]] || { log "正式服已经是该版本。"; exit 0; }
+changed="$(git -C "$repo" -c core.quotepath=false diff --name-only "$old" "$approved")"
+
+# 仅快进，不覆盖未知本地数据。
+git -C "$repo" merge --ff-only "$approved"
+
+need_back=0
+need_front=0
+need_npm=0
+grep -q '^服务端WebSocket/' <<<"$changed" && need_back=1 || true
+grep -q '^opcgpro-web/' <<<"$changed" && need_front=1 || true
+grep -Eq '^opcgpro-web/(package|package-lock)\.json$' <<<"$changed" && need_npm=1 || true
+
+next_publish="$repo/服务端WebSocket/publish.next"
+if [[ "$need_back" == 1 ]]; then
+  log "在临时目录构建正式服后端"
+  rm -rf "$next_publish"
+  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo
+fi
+
+if [[ "$need_front" == 1 ]]; then
+  log "构建正式服前端并保留旧构建"
+  cd "$repo/opcgpro-web"
+  [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
+  rm -rf .next.previous
+  [[ -d .next ]] && mv .next .next.previous
+  if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' npm run build; then
+    rm -rf .next
+    [[ -d .next.previous ]] && mv .next.previous .next
+    die "正式服前端构建失败，旧服务保持运行。"
+  fi
+fi
+
+if [[ "$need_back" == 1 ]]; then
+  previous_publish="$repo/服务端WebSocket/publish.previous"
+  rm -rf "$previous_publish"
+  [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
+  mv "$next_publish" "$repo/服务端WebSocket/publish"
+  if ! systemctl restart grandumi-backend.service || ! systemctl is-active --quiet grandumi-backend.service; then
+    rm -rf "$repo/服务端WebSocket/publish"
+    [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    systemctl restart grandumi-backend.service || true
+    die "正式服后端启动失败，已尝试回滚。"
+  fi
+fi
+
+if [[ "$need_front" == 1 ]]; then
+  if ! systemctl restart grandumi-frontend.service || ! systemctl is-active --quiet grandumi-frontend.service; then
+    rm -rf "$repo/opcgpro-web/.next"
+    [[ -d "$repo/opcgpro-web/.next.previous" ]] && mv "$repo/opcgpro-web/.next.previous" "$repo/opcgpro-web/.next"
+    systemctl restart grandumi-frontend.service || true
+    die "正式服前端启动失败，已尝试回滚。"
+  fi
+  rm -rf "$repo/opcgpro-web/.next.previous"
+fi
+
+sleep 3
+curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3000/
+echo "$approved" > "$deployed_file.next"
+mv "$deployed_file.next" "$deployed_file"
+rm -f "$approved_file"
+log "正式服发布成功：$approved"

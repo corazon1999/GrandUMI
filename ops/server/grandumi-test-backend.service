@@ -1,0 +1,16 @@
+[Unit]
+Description=GrandUMI 测试服后端（WebSocket 8081）
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/grandumi-test/服务端WebSocket/publish
+ExecStart=/usr/bin/dotnet /opt/grandumi-test/服务端WebSocket/publish/GrandUMIServer.dll 8081
+Restart=always
+RestartSec=3
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+CPUQuota=50%
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

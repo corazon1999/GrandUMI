@@ -64,7 +64,7 @@ export default function CardCatalogPanel() {
       cards,
       {
         searchQuery: query,
-        filterColor,
+        filterColors: filterColor ? [filterColor] : [],
         filterType,
         filterProperty,
         filterRarity,

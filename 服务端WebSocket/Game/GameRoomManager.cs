@@ -30,7 +30,7 @@ public static class GameRoomManager
         public required GameEngine Engine { get; init; }
         public required string[] PlayerSessionIds { get; init; }  // [P0, P1]
         public required string[] PlayerAccounts   { get; init; }
-        public List<string> Spectators { get; } = new();
+        public ConcurrentDictionary<string, byte> Spectators { get; } = new();
         public DateTime CreatedAt { get; } = DateTime.UtcNow;
         public string? ReplayPath { get; set; }
         public string? MatchLogPath { get; set; }
@@ -79,7 +79,7 @@ public static class GameRoomManager
 
         engine.OnSendToSpectators = (_, payload) =>
         {
-            foreach (var sid in entry.Spectators)
+            foreach (var sid in entry.Spectators.Keys)
                 WebSocketBridge.Send(sid, payload);
         };
         entry.ReplayPath = ReplayRecorder.Open(roomId);
@@ -198,7 +198,7 @@ public static class GameRoomManager
         if (idx < 0)
         {
             // 观战者直接移除
-            room.Spectators.Remove(sessionId);
+            room.Spectators.TryRemove(sessionId, out _);
             _sessionRoom.TryRemove(sessionId, out _);
             return;
         }
@@ -298,15 +298,72 @@ public static class GameRoomManager
 
     public static void AddSpectator(string roomId, string sessionId)
     {
+        if (string.IsNullOrWhiteSpace(roomId))
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "房间 ID 不能为空" });
+            return;
+        }
         if (!_rooms.TryGetValue(roomId, out var r))
         {
             WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "房间不存在" });
             return;
         }
-        r.Spectators.Add(sessionId);
+
+        if (_sessionRoom.TryGetValue(sessionId, out var currentRoomId))
+        {
+            if (!_rooms.TryGetValue(currentRoomId, out var currentRoom))
+            {
+                _sessionRoom.TryRemove(sessionId, out _);
+            }
+            else
+            {
+                if (Array.IndexOf(currentRoom.PlayerSessionIds, sessionId) >= 0)
+                {
+                    WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "对战中的玩家无法观战" });
+                    return;
+                }
+                if (!string.Equals(currentRoomId, roomId, StringComparison.Ordinal))
+                {
+                    WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "请先退出当前观战" });
+                    return;
+                }
+            }
+        }
+
+        r.Spectators.TryAdd(sessionId, 0);
         _sessionRoom[sessionId] = roomId;
+        if (!_rooms.TryGetValue(roomId, out var activeRoom) || !ReferenceEquals(activeRoom, r))
+        {
+            r.Spectators.TryRemove(sessionId, out _);
+            _sessionRoom.TryRemove(sessionId, out _);
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "对局刚刚结束" });
+            return;
+        }
         WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = true, roomId });
         WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(r.Engine.State, -1, "SpectateJoin"));
+    }
+
+    /// <summary>主动退出观战。重复退出按成功处理，保证客户端可以安全返回大厅。</summary>
+    public static void RemoveSpectator(string sessionId)
+    {
+        if (!_sessionRoom.TryGetValue(sessionId, out var roomId))
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgLeaveSpectate", result = true });
+            return;
+        }
+
+        if (_rooms.TryGetValue(roomId, out var room))
+        {
+            if (Array.IndexOf(room.PlayerSessionIds, sessionId) >= 0)
+            {
+                WebSocketBridge.Send(sessionId, new { proto = "MsgLeaveSpectate", result = false, logStr = "对战玩家不能退出观战" });
+                return;
+            }
+            room.Spectators.TryRemove(sessionId, out _);
+        }
+
+        _sessionRoom.TryRemove(sessionId, out _);
+        WebSocketBridge.Send(sessionId, new { proto = "MsgLeaveSpectate", result = true });
     }
 
     public static void CleanupRoom(string roomId)
@@ -314,7 +371,7 @@ public static class GameRoomManager
         if (_rooms.TryRemove(roomId, out var r))
         {
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
-            foreach (var sid in r.Spectators)        _sessionRoom.TryRemove(sid, out _);
+            foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
             r.Engine.RecordMatchLog("match_end", -1, new
             {
                 winnerIndex = r.Engine.State.WinnerIndex,
@@ -444,7 +501,7 @@ public static class GameRoomManager
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
         engine.OnSendToSpectators = (_, payload) =>
         {
-            foreach (var sid in entry.Spectators) WebSocketBridge.Send(sid, payload);
+            foreach (var sid in entry.Spectators.Keys) WebSocketBridge.Send(sid, payload);
         };
         entry.ReplayPath   = ReplayRecorder.OpenAppend(roomId);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);

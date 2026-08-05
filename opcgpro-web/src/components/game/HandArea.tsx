@@ -47,9 +47,13 @@ export default function HandArea({ side, hidden = false }: Props) {
 
   if (!player) return <div className="min-h-20" />;
 
-  const cards = side === "my"
-    ? player.handCardNumbers.map((n) => getCard(n) ?? null)
-    : Array.from({ length: player.handCount }, () => null);
+  // 观战时双方手牌都已脱敏，统一按服务端 handCount 生成卡背。
+  // 普通玩家视角下，仅己方使用真实手牌列表，对手仍只显示卡背与数量。
+  const cards = hidden
+    ? Array.from({ length: player.handCount }, () => null)
+    : side === "my"
+      ? player.handCardNumbers.map((n) => getCard(n) ?? null)
+      : Array.from({ length: player.handCount }, () => null);
 
   // 稳定 key：按卡号 + 同名出现次序，不含数组下标。
   // 这样打出中间某张时，仅被移除那张的 key 消失，其余 key 不变 → 不会整手牌重排乱跳。
@@ -153,7 +157,7 @@ export default function HandArea({ side, hidden = false }: Props) {
 
       {cards.length === 0 && (
         <span className="absolute inset-0 flex items-center justify-center text-xs text-gray-700">
-          {hidden ? "对手手牌" : "手牌为空"}
+          {hidden ? "手牌" : "手牌为空"}
         </span>
       )}
 

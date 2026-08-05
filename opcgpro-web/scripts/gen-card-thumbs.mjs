@@ -1,8 +1,8 @@
 // 给卡组编辑器实际使用的 public/cards 树生成小尺寸 WebP 缩略图，输出到 public/cards-thumb。
-// 网格(64px)与悬停预览(240px)用它，体积约为原 PNG 的 15%。
+// 网格以 64px 显示，使用 128px 缩略图兼顾高分屏清晰度与首次加载速度。
 //
 // 用法：npm run gen:card-thumbs
-// 增量：输出已存在且不旧于源文件则跳过，可反复运行。
+// 增量：输出已存在且不旧于源文件则跳过；传入 --force 可强制重建全部缩略图。
 // 注意：public/cards 是指向 D:\Self\GrandUMI\CardImages 的目录联接，sharp 会自动跟随。
 //       cards-thumb 为本地派生产物(已 gitignore)，部署时需与 CardImages 一并同步到服务器，
 //       或在服务器上跑一次本脚本。
@@ -15,9 +15,10 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(__dirname, "..", "public", "cards");
 const DST = path.join(__dirname, "..", "public", "cards-thumb");
-const WIDTH = 256;
-const QUALITY = 72;
+const WIDTH = 128;
+const QUALITY = 62;
 const CONC = 8;
+const FORCE = process.argv.includes("--force");
 
 async function* walk(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
@@ -50,7 +51,7 @@ async function main() {
       const rel = path.relative(SRC, f);
       const out = path.join(DST, rel.replace(/\.png$/i, ".webp"));
       try {
-        if (await isFresh(f, out)) {
+        if (!FORCE && await isFresh(f, out)) {
           skip++;
         } else {
           await mkdir(path.dirname(out), { recursive: true });

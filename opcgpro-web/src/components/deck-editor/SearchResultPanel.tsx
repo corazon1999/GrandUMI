@@ -18,7 +18,7 @@ const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
+  const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -42,7 +42,7 @@ export default function SearchResultPanel() {
       getAllCachedCards(),
       {
         searchQuery,
-        filterColor,
+        filterColors,
         filterType,
         filterProperty,
         filterRarity,
@@ -56,7 +56,7 @@ export default function SearchResultPanel() {
         sortComparator: filterSets.length === 1 ? compareCatalogCards : undefined,
       },
     );
-  }, [format, leader, searchQuery, filterColor, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
+  }, [format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
 
   // 虚拟网格列表
   const {

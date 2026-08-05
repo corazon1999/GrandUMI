@@ -1,8 +1,8 @@
 ﻿# ============================================================
 #  deploy-hk.ps1 — 一键热更香港线上 (grand-umi.com @ 8.210.155.25)
 #  用法:
-#    .\deploy-hk.ps1                  # 推已提交的代码并触发香港重建
-#    .\deploy-hk.ps1 -Commit "说明"   # 先提交当前改动再推+热更
+#    .\deploy-hk.ps1 -Emergency       # 紧急情况下直接发布正式服
+#    .\deploy-test.ps1                # 日常改动应先发布测试服
 #    .\deploy-hk.ps1 -All             # 强制前后端全量重建
 #    .\deploy-hk.ps1 -Server "root@8.210.155.25" # 指定 SSH 服务器
 #  流程: 提交 → pull合并协作者改动 → push → SSH增量传输 → 香港重建 → 验证200
@@ -11,6 +11,7 @@
 param(
   [string]$Commit = "",
   [switch]$All,
+  [switch]$Emergency,
   [string]$Server = "grandumi-hk"
 )
 $ErrorActionPreference = "Stop"
@@ -19,6 +20,10 @@ $repo = $PSScriptRoot
 Set-Location $repo
 
 function Die($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
+
+if (-not $Emergency) {
+  Die "已启用测试服发布流程。日常发布请运行 .\deploy-test.ps1；只有紧急上线正式服时才可加 -Emergency。"
+}
 
 # Codex 自带的 Git 不一定在系统 PATH 中；优先用 PATH，其次自动寻找本机可用版本。
 $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue

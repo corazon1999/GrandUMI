@@ -38,13 +38,21 @@ import type {
   MsgFriendlyLeave,
   MsgFriendlyLeft,
   MsgSpectateRoom,
+  MsgLeaveSpectate,
 } from "@/types/net";
 import { useNetStore } from "@/store/netStore";
+import { useGameStore } from "@/store/gameStore";
 import { showMessage } from "@/components/ui/MessageBox";
 
 // ── 协议注册 ────────────────────────────────────────────────────────────
 
 let registered = false;
+let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSpectateRequestTimer() {
+  if (spectateRequestTimer) clearTimeout(spectateRequestTimer);
+  spectateRequestTimer = null;
+}
 
 /**
  * 注册所有大厅协议处理器
@@ -117,6 +125,12 @@ export function registerHomeProtocols() {
       case "MsgFriendlyLeft":
         handleFriendlyLeft(msg as MsgFriendlyLeft);
         break;
+      case "MsgSpectateRoom":
+        handleSpectateRoom(msg as MsgSpectateRoom);
+        break;
+      case "MsgLeaveSpectate":
+        handleLeaveSpectate(msg as MsgLeaveSpectate);
+        break;
     }
   });
 
@@ -125,6 +139,22 @@ export function registerHomeProtocols() {
   eventBus.on("reconnected", () => {
     const { loggedIn, account } = useNetStore.getState();
     if (loggedIn && account) HomeRequest.login(account);
+  });
+
+  eventBus.on("close", () => {
+    const { spectateState } = useNetStore.getState();
+    if (spectateState === "idle") return;
+
+    clearSpectateRequestTimer();
+    useNetStore.getState().setSpectate("idle");
+    useGameStore.getState().resetGame();
+    useGameStore.getState().setMode("Player");
+    if (spectateState === "joining") {
+      showMessage("网络已断开，无法进入观战", "error");
+    } else {
+      showMessage("观战连接已断开，已返回大厅", "error");
+      useNetStore.getState().setNavigateTo("/home");
+    }
   });
 }
 
@@ -344,6 +374,35 @@ function handleFriendlyLeft(msg: MsgFriendlyLeft) {
   if (msg.logStr) showMessage(msg.logStr, "info");
 }
 
+/** MsgSpectateRoom — 服务端确认成功后才进入观战页，失败则留在原页面 */
+function handleSpectateRoom(msg: MsgSpectateRoom) {
+  const netStore = useNetStore.getState();
+  clearSpectateRequestTimer();
+
+  // 超时后才抵达的成功回包不能再把用户带入对局，同时主动清理服务端关系。
+  if (netStore.spectateState !== "joining") {
+    if (msg.result !== false) NetManager.send({ proto: "MsgLeaveSpectate" } as MsgLeaveSpectate);
+    return;
+  }
+
+  if (msg.result === false) {
+    netStore.setSpectate("idle");
+    showMessage(msg.logStr ?? "无法进入观战", "error");
+    return;
+  }
+
+  const roomId = msg.roomId || netStore.spectateRoomId;
+  netStore.setSpectate("watching", roomId);
+  useGameStore.getState().setMode("Observer");
+  netStore.setNavigateTo("/game");
+}
+
+/** MsgLeaveSpectate — 主动退出观战回执（服务端按幂等方式处理） */
+function handleLeaveSpectate(msg: MsgLeaveSpectate) {
+  useNetStore.getState().setSpectate("idle");
+  if (msg.result === false && msg.logStr) showMessage(msg.logStr, "error");
+}
+
 // ── 请求发送 ────────────────────────────────────────────────────────────
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
@@ -456,6 +515,38 @@ export const HomeRequest = {
 
   /** 申请观战指定房间（观战者由后端注册，随后每帧收到脱敏快照） */
   spectateRoom(roomId: string) {
-    return NetManager.send({ proto: "MsgSpectateRoom", roomId } as MsgSpectateRoom);
+    const normalizedRoomId = roomId.trim();
+    if (!normalizedRoomId) {
+      showMessage("请输入有效的房间 ID", "error");
+      return false;
+    }
+
+    const netStore = useNetStore.getState();
+    if (netStore.spectateState === "joining") return false;
+
+    netStore.setSpectate("joining", normalizedRoomId);
+    const sent = NetManager.send({ proto: "MsgSpectateRoom", roomId: normalizedRoomId } as MsgSpectateRoom);
+    if (!sent) {
+      netStore.setSpectate("idle");
+      showMessage("网络未连接，无法进入观战", "error");
+      return false;
+    }
+
+    clearSpectateRequestTimer();
+    spectateRequestTimer = setTimeout(() => {
+      const current = useNetStore.getState();
+      if (current.spectateState !== "joining" || current.spectateRoomId !== normalizedRoomId) return;
+      current.setSpectate("idle");
+      showMessage("进入观战超时，请确认对局仍在进行后重试", "error");
+    }, 8_000);
+    return sent;
+  },
+
+  /** 主动退出观战；本地立即恢复大厅状态，服务端回执用于最终确认 */
+  leaveSpectate() {
+    clearSpectateRequestTimer();
+    const sent = NetManager.send({ proto: "MsgLeaveSpectate" } as MsgLeaveSpectate);
+    useNetStore.getState().setSpectate("idle");
+    return sent;
   },
 };

@@ -200,6 +200,7 @@ public static class WebSocketBridge
             case "MsgRequestState": OnRequestState(session);     break;
             case "MsgEndByDisconnect": OnEndByDisconnect(session); break;
             case "MsgSpectateRoom": OnSpectateRoom(session, msg); break;
+            case "MsgLeaveSpectate": OnLeaveSpectate(session); break;
             case "MsgBugReport":   OnBugReport(session, msg);     break;
             default: LogWarn($"未知协议: {proto}"); break;
         }
@@ -503,6 +504,8 @@ public static class WebSocketBridge
         if (GameOpponent.ContainsKey(s.SessionId)) return "playing";
         if (s.Account is not null && FriendlyByAccount.ContainsKey(s.Account)) return "playing";
         if (s.IsMatching) return "matching";
+        var room = GameRoomManager.GetRoomBySession(s.SessionId);
+        if (room is not null && Array.IndexOf(room.PlayerSessionIds, s.SessionId) < 0) return "spectating";
         return "idle";
     }
 
@@ -917,8 +920,35 @@ public static class WebSocketBridge
     /// <summary>MsgSpectateRoom — 加入观战</summary>
     private static void OnSpectateRoom(WsSession s, Dictionary<string, JsonElement> msg)
     {
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (s.IsMatching)
+        {
+            Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "请先取消匹配再观战" });
+            return;
+        }
+        if (s.Account is not null && FriendlyByAccount.ContainsKey(s.Account))
+        {
+            Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "你正在友谊战房间中，无法观战" });
+            return;
+        }
+        if (GameOpponent.ContainsKey(s.SessionId))
+        {
+            Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "对战中的玩家无法观战" });
+            return;
+        }
+
         var roomId = Str(msg, "roomId") ?? "";
         GameRoomManager.AddSpectator(roomId, s.SessionId);
+    }
+
+    /// <summary>MsgLeaveSpectate — 主动退出观战</summary>
+    private static void OnLeaveSpectate(WsSession s)
+    {
+        GameRoomManager.RemoveSpectator(s.SessionId);
     }
 
     /// <summary>MsgPromptResponse — 玩家响应服务端 prompt</summary>
@@ -984,7 +1014,7 @@ public static class WebSocketBridge
         };
         Send(room.PlayerSessionIds[0], pkt);
         Send(room.PlayerSessionIds[1], pkt);
-        foreach (var spec in room.Spectators) Send(spec, pkt);
+        foreach (var spec in room.Spectators.Keys) Send(spec, pkt);
     }
 
     // ── 对手查找 ──────────────────────────────────────────────────────────

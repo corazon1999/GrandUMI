@@ -27,7 +27,7 @@ export const CARD_SET_GROUPS: { label: string; sets: string[] }[] = [
 
 export interface CardSearchFilters {
   searchQuery: string;
-  filterColor: string;
+  filterColors: string[];
   filterType: string;
   filterProperty: string;
   filterRarity: string;
@@ -150,7 +150,7 @@ export function filterAndSortCards(
 ): CardData[] {
   const {
     searchQuery,
-    filterColor,
+    filterColors,
     filterType,
     filterProperty,
     filterRarity,
@@ -160,6 +160,7 @@ export function filterAndSortCards(
   } = filters;
   const isLeaderMode = filterType === "Leader";
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+  const selectedColors = new Set(filterColors);
 
   return cards
     .filter((card) => {
@@ -176,7 +177,12 @@ export function filterAndSortCards(
         return false;
       }
 
-      if (filterColor && !card.color.split("/").includes(filterColor)) return false;
+      if (
+        selectedColors.size > 0 &&
+        !card.color.split("/").some((color) => selectedColors.has(color))
+      ) {
+        return false;
+      }
       if (filterProperty && card.property !== filterProperty) return false;
       if (filterRarity && card.rarity !== filterRarity) return false;
       if (filterCost !== null && card.cost !== filterCost) return false;

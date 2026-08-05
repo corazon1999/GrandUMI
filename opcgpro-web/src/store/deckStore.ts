@@ -90,7 +90,7 @@ interface DeckStore {
   entries: DeckEntry[];
   notice: DeckNotice | null;
   searchQuery: string;
-  filterColor: string;
+  filterColors: string[];
   filterType: string;
   filterProperty: string;
   filterRarity: string;
@@ -105,7 +105,8 @@ interface DeckStore {
   removeCard: (number: string) => void;
   clearNotice: () => void;
   setSearchQuery: (q: string) => void;
-  setFilterColor: (color: string) => void;
+  toggleFilterColor: (color: string) => void;
+  clearFilterColors: () => void;
   setFilterType: (type: string) => void;
   setFilterProperty: (p: string) => void;
   setFilterRarity: (r: string) => void;
@@ -139,7 +140,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   entries: [],
   notice: null,
   searchQuery: "",
-  filterColor: "",
+  filterColors: [],
   filterType: "",
   filterProperty: "",
   filterRarity: "",
@@ -197,7 +198,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   setLeader: (card) => {
     if (!card) {
       // 退出/清空领航：颜色筛选复位为「全部」
-      set({ leader: null, filterColor: "", notice: null });
+      set({ leader: null, filterColors: [], notice: null });
       return;
     }
     const fmt = get().format;
@@ -212,13 +213,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
         0
       );
       const entries = s.entries.filter((e) => colorMatch(card.color, e.card.color));
-      // 颜色筛选自动收缩为领航颜色：单色直接选中该色，双色置「全部」（两色都显示，可再点其一收窄）
+      // 颜色筛选自动收缩为领航颜色：单色直接选中该色，双色置「全部」（两色都显示，可再按需多选）
       const leaderColors = card.color.split("/");
-      const filterColor = leaderColors.length === 1 ? leaderColors[0] : "";
+      const filterColors = leaderColors.length === 1 ? leaderColors : [];
       return {
         leader: card,
         entries,
-        filterColor,
+        filterColors,
         notice: removed > 0
           ? { message: `已自动移除 ${removed} 张颜色不符的卡牌`, type: "info" as const }
           : null,
@@ -269,7 +270,12 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   clearNotice: () => set({ notice: null }),
 
   setSearchQuery: (q) => set({ searchQuery: q }),
-  setFilterColor: (color) => set({ filterColor: color }),
+  toggleFilterColor: (color) => set((s) => ({
+    filterColors: s.filterColors.includes(color)
+      ? s.filterColors.filter((selectedColor) => selectedColor !== color)
+      : [...s.filterColors, color],
+  })),
+  clearFilterColors: () => set({ filterColors: [] }),
   setFilterType: (type) => set({ filterType: type }),
   setFilterProperty: (p) => set({ filterProperty: p }),
   setFilterRarity: (r) => set({ filterRarity: r }),
@@ -288,7 +294,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       localStorage.setItem(GRID_COLS_KEY, String(clamped));
     set({ gridColumns: clamped });
   },
-  clearDeck: () => set({ leader: null, entries: [], filterColor: "" }),
+  clearDeck: () => set({ leader: null, entries: [], filterColors: [] }),
 
   totalCards: () => get().entries.reduce((sum, e) => sum + e.count, 0),
 

@@ -128,6 +128,26 @@ git push
 - `docs:` 文档
 - `chore:` 杂项（依赖、配置）
 
+## 测试服与正式服发布
+
+日常改动先部署到 `https://test.grand-umi.com`：
+
+```powershell
+.\deploy-test.ps1
+```
+
+确认测试正常后，批准当前测试服版本：
+
+```powershell
+.\approve-release.ps1
+```
+
+服务器会在北京时间每天 `00:00` 自动发布已批准版本。如果正式服仍有 WebSocket
+玩家连接，则会等待最多一小时；仍有玩家在线时跳过当晚发布，不会强制断线。
+
+`deploy-hk.ps1` 只保留紧急发布用途，必须显式添加 `-Emergency`。服务器配置源文件
+位于 `ops/server/`。
+
 ## 文档索引
 
 - [架构文档](文档/架构文档.md) —— 分层 / 模块 / 卡牌系统 / 网络协议
