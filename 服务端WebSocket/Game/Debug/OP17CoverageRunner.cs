@@ -30,7 +30,7 @@ public static class OP17CoverageRunner
 {
     private static readonly HashSet<string> BlankCards = new(StringComparer.Ordinal)
     {
-        "OP17-006", "OP17-035", "OP17-051",
+        "OP17-006", "OP17-035", "OP17-051", "OP17-100",
     };
 
     public static async Task<OP17CoverageReport> RunColorAsync(string color)

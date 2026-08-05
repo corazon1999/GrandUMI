@@ -199,16 +199,16 @@
   },
   {
     "number": "OP17-011",
-    "name": "拉克约",
+    "name": "布拉门科",
     "color": "红",
     "type": "角色",
     "property": "打",
-    "power": "2000",
-    "cost": "3",
+    "power": "6000",
+    "cost": "5",
     "keyWords": "白胡子海盗团",
-    "counter": "反击+2000",
+    "counter": "反击+1000",
     "effectTags": [
-      "OnEnterField"
+      "OnAttackDeclare"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -266,6 +266,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-014",
+    "name": "霍怀迪贝",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "1000",
+    "cost": "1",
+    "keyWords": "白胡子海盗团旗下",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField",
+      "OnOppAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-014.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-015",
     "name": "马尔高",
     "color": "红",
@@ -286,6 +309,51 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-015.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-016",
+    "name": "拉克约",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "2000",
+    "cost": "3",
+    "keyWords": "白胡子海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-016.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-017",
+    "name": "毁灭世界的力量",
+    "color": "红",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "四皇,白胡子海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-017.png",
     "cartograph": ""
   },
   {
@@ -355,6 +423,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-021",
+    "name": "欧丽婆",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "红发海盗团旗下",
+    "counter": "2000",
+    "effectTags": [
+      "OnAllyWillLeaveField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-021.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-022",
     "name": "杰克斯",
     "color": "绿",
@@ -380,16 +470,17 @@
   },
   {
     "number": "OP17-023",
-    "name": "欧丽婆",
+    "name": "奈美",
     "color": "绿",
     "type": "角色",
-    "property": "斩",
-    "power": "2000",
+    "property": "智",
+    "power": "1000",
     "cost": "1",
-    "keyWords": "红发海盗团旗下",
-    "counter": "2000",
+    "keyWords": "东海,草帽一伙",
+    "counter": "反击+2000",
     "effectTags": [
-      "OnAllyWillLeaveField"
+      "PreKO",
+      "OnAllyWillBeKOd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -930,6 +1021,28 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-046.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-047",
+    "name": "西奇",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特",
+    "power": "10000",
+    "cost": "9",
+    "keyWords": "FILM,因佩尔地狱,金狮子海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnMyTurnEnd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-047.png",
     "cartograph": ""
   },
   {
@@ -1551,6 +1664,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-077",
+    "name": "军荼利龙盛军",
+    "color": "紫",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "四皇,百兽海盗团",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-077.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-078",
     "name": "酒龙八卦",
     "color": "紫",
@@ -1928,6 +2064,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP17-096",
+    "name": "我是路飞！！要成为海盗王的男人！！",
+    "color": "黑",
+    "type": "事件",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "埃鲁巴夫,四皇,草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "将我方废弃区中最多1张拥有《埃鲁巴夫》特征的卡牌加入手牌。",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-096.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP17-098",
     "name": "橡皮橡皮猿王枪",
     "color": "黑",
@@ -1970,6 +2128,26 @@
     "trigger": "",
     "set": "补充包【OPC-17】",
     "image": "/cards/op17/OP17-099.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP17-100",
+    "name": "卡彭·班吉",
+    "color": "黄",
+    "type": "角色",
+    "property": "射",
+    "power": "8000",
+    "cost": "7",
+    "keyWords": "超新星,火焰坦克海盗团",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-17】",
+    "image": "/cards/op17/OP17-100.png",
     "cartograph": ""
   },
   {

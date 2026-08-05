@@ -269,10 +269,14 @@ internal static class OP17Effects
             case "OP17-011": await C011(c); break;
             case "OP17-012": await C012(c); break;
             case "OP17-013": await C013(c); break;
+            case "OP17-014": await C014(c); break;
             case "OP17-015": await C015(c); break;
+            case "OP17-016": await C016(c); break;
+            case "OP17-017": await C017(c); break;
             case "OP17-018": await C018(c); break;
             case "OP17-019": await C019(c); break;
             case "OP17-020": await C020(c); break;
+            case "OP17-021": await C021(c); break;
             case "OP17-022": C022(c); break;
             case "OP17-023": await C023(c); break;
             case "OP17-024": await C024(c); break;
@@ -297,6 +301,7 @@ internal static class OP17Effects
             case "OP17-044": await C044(c); break;
             case "OP17-045": await C045(c); break;
             case "OP17-046": await C046(c); break;
+            case "OP17-047": await C047(c); break;
             case "OP17-048": await C048(c); break;
             case "OP17-049": await C049(c); break;
             case "OP17-050": await C050(c); break;
@@ -323,6 +328,7 @@ internal static class OP17Effects
             case "OP17-073": await C073(c); break;
             case "OP17-074": C074(c); break;
             case "OP17-076": await C076(c); break;
+            case "OP17-077": await C077(c); break;
             case "OP17-078": await C078(c); break;
             case "OP17-079": C079(c); break;
             case "OP17-080": await C080(c); break;
@@ -340,6 +346,7 @@ internal static class OP17Effects
             case "OP17-093": await C093(c); break;
             case "OP17-094": C094(c); break;
             case "OP17-095": await C095(c); break;
+            case "OP17-096": await C096(c); break;
             case "OP17-098": await C098(c); break;
             case "OP17-099": await C099(c); break;
             case "OP17-101": await C101(c); break;
@@ -431,8 +438,45 @@ internal static class OP17Effects
 
     private static async Task C011(EffectContext c)
     {
+        if (c.Trigger != EffectTrigger.OnAttackDeclare || Me(c).AttachedDonCount(c.Source.Id) < 2) return;
+        var pick = await ChooseOppChars(c, _ => true, 1, "选择对方最多1张角色，本回合力量-4000");
+        if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -4000);
+    }
+
+    private static async Task C014(EffectContext c)
+    {
+        if (c.Trigger == EffectTrigger.OnEnterField)
+        {
+            await KOByEffect(c, await ChooseOppChars(c, x => x.Info.Power <= 2000, 1,
+                "选择最多1张原本力量≤2000的角色KO"));
+            return;
+        }
+        if (c.Trigger != EffectTrigger.OnOppAttackDeclare || !Me(c).Characters.Contains(c.Source)) return;
+        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将霍怀迪贝放置到废弃区，使我方领袖本次战斗力量+1000？")) return;
+        TrashSelfAsCost(c);
+        AtomicOps.AddPowerThisBattle(Me(c).Leader, 1000);
+    }
+
+    private static async Task C016(EffectContext c)
+    {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         await KOByEffect(c, await ChooseOppChars(c, x => x.Info.Power <= 2000, 2, "选择最多2张原本力量≤2000的角色KO"));
+    }
+
+    private static async Task C017(EffectContext c)
+    {
+        if (c.Trigger == EffectTrigger.EventMain)
+        {
+            if (Me(c).ActiveDonCount < 2
+                || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，KO对方最多1张舞台？")) return;
+            RestActiveDon(c, 2);
+            if (Opp(c).StageCard is { } stage) AtomicOps.KO(c.State, 1 - c.OwnerIndex, stage);
+            return;
+        }
+        if (c.Trigger != EffectTrigger.EventCounter || Me(c).Characters.Count(x => x.Info.Power >= 8000) < 2) return;
+        var pick = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择本次战斗力量+4000的卡牌",
+            OwnLeaderAndCharacters(c), 0, 1);
+        if (pick.Count > 0) AtomicOps.AddPowerThisBattle(pick[0], 4000);
     }
 
     private static async Task C012(EffectContext c)
@@ -513,7 +557,7 @@ internal static class OP17Effects
         foreach (var ch in Opp(c).Characters) AtomicOps.RestCard(ch);
     }
 
-    private static async Task C023(EffectContext c)
+    private static async Task C021(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnAllyWillLeaveField
             || !c.Vars.TryGetValue("victimId", out var raw) || raw is not string id || !Guid.TryParse(id, out var victimId)) return;
@@ -522,6 +566,23 @@ internal static class OP17Effects
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方1张卡牌转为休息状态，使《红发海盗团》角色不离场？")) return;
         if (await AtomicOps.PromptRestOwnCards(c, 1, "选择我方1张卡牌转为休息状态", optional: true))
             c.State.MarkPreventLeave(victimId);
+    }
+
+    private static async Task C023(EffectContext c)
+    {
+        if (c.Trigger is not (EffectTrigger.PreKO or EffectTrigger.OnAllyWillBeKOd)
+            || !Me(c).Characters.Contains(c.Source) || c.Source.IsTapped) return;
+
+        CardInstance? victim;
+        if (c.Trigger == EffectTrigger.PreKO) victim = c.Source;
+        else if (c.Vars.TryGetValue("victimId", out var raw) && raw is string id && Guid.TryParse(id, out var victimId))
+            victim = Me(c).Characters.FirstOrDefault(x => x.Id == victimId);
+        else return;
+
+        if (victim is null || !(victim.Info.HasKeyword("东海") || victim.Info.HasKeyword("草帽一伙"))) return;
+        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将奈美转为休息状态，使该角色不被KO？")) return;
+        AtomicOps.RestCard(c.Source);
+        c.State.MarkPreventKO(victim.Id);
     }
 
     private static async Task C024(EffectContext c)
@@ -792,6 +853,15 @@ internal static class OP17Effects
         int owner = Me(c).Characters.Contains(pick[0]) ? c.OwnerIndex : 1 - c.OwnerIndex;
         if (!await AtomicOps.TryEffectLeaveGuard(c.State, owner, pick[0], c.Prompts, "deck-bottom"))
             AtomicOps.ReturnFieldToDeckBottom(c.State, owner, pick[0]);
+    }
+
+    private static async Task C047(EffectContext c)
+    {
+        if (c.Trigger != EffectTrigger.OnMyTurnEnd || Me(c).Hand.Count > 2 || Opp(c).Hand.Count == 0) return;
+        var pick = await Pick(c, 1 - c.OwnerIndex, "OwnHandToDeckBottom",
+            "选择1张手牌放回卡组最下方", Opp(c).Hand, 1, 1);
+        var card = pick.Count == 1 ? pick[0] : Opp(c).Hand[0];
+        AtomicOps.ReturnHandToDeckBottom(Opp(c), card);
     }
 
     private static async Task C048(EffectContext c)
@@ -1096,6 +1166,22 @@ internal static class OP17Effects
         if (pick.Count > 0) AtomicOps.AddPowerThisBattle(pick[0], 3000);
     }
 
+    private static async Task C077(EffectContext c)
+    {
+        if (c.Trigger == EffectTrigger.EventCounter)
+        {
+            if (!await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
+            AtomicOps.AddPowerThisBattle(Me(c).Leader, 4000);
+            return;
+        }
+        if (c.Trigger != EffectTrigger.EventMain || Me(c).ActiveDonCount < 3 || Me(c).Hand.Count < 2) return;
+        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex,
+                "将3张咚!!转为休息状态并丢弃2张手牌，追加最多3张休息咚!!？")) return;
+        if (!await DiscardOwn(c, 2, "选择丢弃2张手牌")) return;
+        RestActiveDon(c, 3);
+        if (LeaderHas(c, "百兽海盗团")) AtomicOps.RefreshDonFromDeck(Me(c), 3, DonState.Rest);
+    }
+
     private static async Task C078(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.EventCounter)
@@ -1279,6 +1365,25 @@ internal static class OP17Effects
         if (order.Count < 3) return;
         foreach (var card in order) AtomicOps.ReturnTrashToDeckBottom(Me(c), card);
         c.State.MarkPreventLeave(victimId);
+    }
+
+    private static async Task C096(EffectContext c)
+    {
+        if (c.Trigger == EffectTrigger.OnLifeRevealTrigger)
+        {
+            var pick = await Pick(c, c.OwnerIndex, "OwnTrashCard", "将废弃区中最多1张《埃鲁巴夫》卡牌加入手牌",
+                Me(c).Trash.Where(x => x.Info.HasKeyword("埃鲁巴夫")), 0, 1);
+            if (pick.Count > 0)
+            {
+                Me(c).Trash.Remove(pick[0]);
+                Me(c).Hand.Add(pick[0]);
+            }
+            return;
+        }
+        if (c.Trigger != EffectTrigger.EventCounter || !AnyCostAtLeast(c, 12)) return;
+        var target = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择本次战斗力量+4000的卡牌",
+            OwnLeaderAndCharacters(c), 0, 1);
+        if (target.Count > 0) AtomicOps.AddPowerThisBattle(target[0], 4000);
     }
 
     private static async Task C098(EffectContext c)
@@ -1556,10 +1661,14 @@ public sealed class OP17_010_Effect : OP17CardEffect { protected override string
 public sealed class OP17_011_Effect : OP17CardEffect { protected override string Number => "OP17-011"; }
 public sealed class OP17_012_Effect : OP17CardEffect { protected override string Number => "OP17-012"; }
 public sealed class OP17_013_Effect : OP17CardEffect { protected override string Number => "OP17-013"; }
+public sealed class OP17_014_Effect : OP17CardEffect { protected override string Number => "OP17-014"; }
 public sealed class OP17_015_Effect : OP17CardEffect { protected override string Number => "OP17-015"; }
+public sealed class OP17_016_Effect : OP17CardEffect { protected override string Number => "OP17-016"; }
+public sealed class OP17_017_Effect : OP17CardEffect { protected override string Number => "OP17-017"; }
 public sealed class OP17_018_Effect : OP17CardEffect { protected override string Number => "OP17-018"; }
 public sealed class OP17_019_Effect : OP17CardEffect { protected override string Number => "OP17-019"; }
 public sealed class OP17_020_Effect : OP17CardEffect { protected override string Number => "OP17-020"; }
+public sealed class OP17_021_Effect : OP17CardEffect { protected override string Number => "OP17-021"; }
 public sealed class OP17_022_Effect : OP17CardEffect { protected override string Number => "OP17-022"; }
 public sealed class OP17_023_Effect : OP17CardEffect { protected override string Number => "OP17-023"; }
 public sealed class OP17_024_Effect : OP17CardEffect { protected override string Number => "OP17-024"; }
@@ -1584,6 +1693,7 @@ public sealed class OP17_043_Effect : OP17CardEffect { protected override string
 public sealed class OP17_044_Effect : OP17CardEffect { protected override string Number => "OP17-044"; }
 public sealed class OP17_045_Effect : OP17CardEffect { protected override string Number => "OP17-045"; }
 public sealed class OP17_046_Effect : OP17CardEffect { protected override string Number => "OP17-046"; }
+public sealed class OP17_047_Effect : OP17CardEffect { protected override string Number => "OP17-047"; }
 public sealed class OP17_048_Effect : OP17CardEffect { protected override string Number => "OP17-048"; }
 public sealed class OP17_049_Effect : OP17CardEffect { protected override string Number => "OP17-049"; }
 public sealed class OP17_050_Effect : OP17CardEffect { protected override string Number => "OP17-050"; }
@@ -1610,6 +1720,7 @@ public sealed class OP17_072_Effect : OP17CardEffect { protected override string
 public sealed class OP17_073_Effect : OP17CardEffect { protected override string Number => "OP17-073"; }
 public sealed class OP17_074_Effect : OP17CardEffect { protected override string Number => "OP17-074"; }
 public sealed class OP17_076_Effect : OP17CardEffect { protected override string Number => "OP17-076"; }
+public sealed class OP17_077_Effect : OP17CardEffect { protected override string Number => "OP17-077"; }
 public sealed class OP17_078_Effect : OP17CardEffect { protected override string Number => "OP17-078"; }
 public sealed class OP17_079_Effect : OP17CardEffect { protected override string Number => "OP17-079"; }
 public sealed class OP17_080_Effect : OP17CardEffect { protected override string Number => "OP17-080"; }
@@ -1627,6 +1738,7 @@ public sealed class OP17_092_Effect : OP17CardEffect { protected override string
 public sealed class OP17_093_Effect : OP17CardEffect { protected override string Number => "OP17-093"; }
 public sealed class OP17_094_Effect : OP17CardEffect { protected override string Number => "OP17-094"; }
 public sealed class OP17_095_Effect : OP17CardEffect { protected override string Number => "OP17-095"; }
+public sealed class OP17_096_Effect : OP17CardEffect { protected override string Number => "OP17-096"; }
 public sealed class OP17_098_Effect : OP17CardEffect { protected override string Number => "OP17-098"; }
 public sealed class OP17_099_Effect : OP17CardEffect { protected override string Number => "OP17-099"; }
 public sealed class OP17_101_Effect : OP17CardEffect { protected override string Number => "OP17-101"; }

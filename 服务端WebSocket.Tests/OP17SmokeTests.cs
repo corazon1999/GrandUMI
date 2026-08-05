@@ -12,7 +12,7 @@ public class OP17SmokeTests
 {
     private static readonly HashSet<string> BlankCards = new(StringComparer.Ordinal)
     {
-        "OP17-006", "OP17-035", "OP17-051",
+        "OP17-006", "OP17-035", "OP17-051", "OP17-100",
     };
 
     private readonly ITestOutputHelper _log;
@@ -34,8 +34,8 @@ public class OP17SmokeTests
         _ = TestScene.New().Build();
         var cards = CardDatabase.GetBySet("OP17").OrderBy(x => x.Number).ToList();
 
-        Assert.Equal(106, cards.Count);
-        Assert.Equal(103, cards.Count(x => !BlankCards.Contains(x.Number)));
+        Assert.Equal(114, cards.Count);
+        Assert.Equal(110, cards.Count(x => !BlankCards.Contains(x.Number)));
         foreach (var card in cards.Where(x => !BlankCards.Contains(x.Number)))
             Assert.NotNull(ScriptedEffectRegistry.TryGet(card.Number));
         foreach (var card in cards.Where(x => BlankCards.Contains(x.Number)))
@@ -89,12 +89,12 @@ public class OP17SmokeTests
     }
 
     [Theory]
-    [InlineData("红", 15)]
-    [InlineData("绿", 18)]
-    [InlineData("蓝", 19)]
-    [InlineData("紫", 18)]
-    [InlineData("黑", 18)]
-    [InlineData("黄", 18)]
+    [InlineData("红", 18)]
+    [InlineData("绿", 19)]
+    [InlineData("蓝", 20)]
+    [InlineData("紫", 19)]
+    [InlineData("黑", 19)]
+    [InlineData("黄", 19)]
     public async Task OP17_GMColorCoverageRunner_CoversEveryCardWithoutFailure(string color, int expectedCount)
     {
         _ = TestScene.New().Build();
