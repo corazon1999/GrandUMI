@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import HandArea from "@/components/game/HandArea";
 import FieldArea from "@/components/game/FieldArea";
 import LeaderCard from "@/components/game/LeaderCard";
@@ -15,6 +15,7 @@ import GameActions from "@/components/game/GameActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import RevealOverlay from "@/components/game/RevealOverlay";
 import GameChatPanel from "@/components/game/GameChatPanel";
+import AttackFlowLine from "@/components/game/AttackFlowLine";
 import { useGameStore } from "@/store/gameStore";
 import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
@@ -276,6 +277,7 @@ export default function GameBoard({
   const opponentName = useGameStore((s) => s.opponentName);
 
   const stageScale = useStageScale(STAGE_W, STAGE_H);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
@@ -289,6 +291,7 @@ export default function GameBoard({
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         <CardSizeOverride.Provider value="sm">
           <div
+            ref={stageRef}
             className="relative shrink-0"
             style={{
               width: STAGE_W,
@@ -320,6 +323,8 @@ export default function GameBoard({
                 isPlayback={isPlayback}
               />
             </div>
+
+            <AttackFlowLine stageRef={stageRef} />
           </div>
         </CardSizeOverride.Provider>
       </div>

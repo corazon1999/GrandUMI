@@ -22,6 +22,27 @@ body {
   overflow: hidden;
 }
 
+/* ===== 战斗攻击流向线 ===== */
+
+@keyframes attack-flow-travel {
+  to {
+    stroke-dashoffset: -42;
+  }
+}
+
+/* 保持整条连线亮度稳定，只让短亮点沿路径连续前进。 */
+.attack-flow-stream {
+  animation: attack-flow-travel 0.78s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attack-flow-stream {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* ===== 阻挡者「能量护盾」特效 ===== */
 
 /*

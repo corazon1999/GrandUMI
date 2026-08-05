@@ -76,13 +76,13 @@ export default function FieldArea({ side }: Props) {
 
         return (
           <div key={fc.id} className="relative flex h-full min-h-0 shrink-0 items-center">
-            <div className="relative">
+            <div className="relative" data-battle-card-id={fc.id}>
               {/* 战斗高亮：攻击者红环 / 被攻击目标琥珀环 */}
               {isAttacker && (
-                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 animate-pulse shadow-lg shadow-red-500/50" />
+                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 shadow-lg shadow-red-500/50" />
               )}
               {isBattleTarget && (
-                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-amber-400 animate-pulse shadow-lg shadow-amber-400/50" />
+                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-amber-400 shadow-lg shadow-amber-400/50" />
               )}
               {isAttacker && (
                 <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-red-600 px-1.5 text-[10px] font-black text-white shadow">

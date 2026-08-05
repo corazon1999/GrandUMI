@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace GrandUMI;
 
 /// <summary>
-/// Bug 反馈落盘：根目录 BugReports/ → 按日期(yyyy-MM-dd)分子目录 → 每条反馈一个 JSON 文件。
-/// 文件内含反馈描述 + 客户端全量信息 + 服务端权威全量快照，便于定位 bug。
+/// 游戏反馈落盘：根目录 BugReports/ → 按日期(yyyy-MM-dd)分子目录 → 每条反馈一个 JSON 文件。
+/// 文件内含反馈类型、描述、客户端全量信息和服务端权威全量快照。
 /// </summary>
 public static class BugReportStore
 {
@@ -16,26 +16,31 @@ public static class BugReportStore
 
     private static string? _root;
     private static readonly object _lock = new();
+    private static readonly object _writeLock = new();
 
     /// <summary>保存一条反馈，返回写入文件的完整路径。</summary>
-    public static string Save(object report, string account, string? roomId)
+    public static string Save(object report, string account, string? roomId, string category)
     {
         var now = DateTime.Now;
         var dateDir = Path.Combine(GetRoot(), now.ToString("yyyy-MM-dd"));
-        Directory.CreateDirectory(dateDir);
-
         var safeAccount = Sanitize(string.IsNullOrEmpty(account) ? "anon" : account);
         var safeRoom = string.IsNullOrEmpty(roomId) ? "noroom" : Sanitize(roomId);
-        var fileName = $"{now:HH-mm-ss}_{safeAccount}_{safeRoom}.json";
-        var fullPath = Path.Combine(dateDir, fileName);
+        var safeCategory = category == "suggestion" ? "suggestion" : "bug";
 
-        // 同一秒多条反馈防覆盖
-        int dup = 1;
-        while (File.Exists(fullPath))
-            fullPath = Path.Combine(dateDir, $"{now:HH-mm-ss}_{safeAccount}_{safeRoom}_{dup++}.json");
+        lock (_writeLock)
+        {
+            Directory.CreateDirectory(dateDir);
+            var filePrefix = $"{safeCategory}_{now:HH-mm-ss}_{safeAccount}_{safeRoom}";
+            var fullPath = Path.Combine(dateDir, $"{filePrefix}.json");
 
-        File.WriteAllText(fullPath, JsonSerializer.Serialize(report, WriteOpts), System.Text.Encoding.UTF8);
-        return fullPath;
+            // 同一秒多条反馈防覆盖；检查与写入放在同一把锁内，避免并发竞争。
+            int duplicate = 1;
+            while (File.Exists(fullPath))
+                fullPath = Path.Combine(dateDir, $"{filePrefix}_{duplicate++}.json");
+
+            File.WriteAllText(fullPath, JsonSerializer.Serialize(report, WriteOpts), System.Text.Encoding.UTF8);
+            return fullPath;
+        }
     }
 
     private static string GetRoot()

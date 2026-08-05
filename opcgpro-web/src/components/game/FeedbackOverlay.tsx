@@ -1,87 +1,157 @@
 "use client";
 
 /**
- * FeedbackOverlay — 游戏内 Bug 反馈
+ * FeedbackOverlay — 游戏内反馈窗口
  *
- * 仅在 game 页挂载，按 F2 弹出/关闭。输入问题描述后提交，
- * 连同客户端全量信息(gameStore 镜像 + 元信息)发送给服务端落盘。
+ * 仅在 game 页挂载，按 F 弹出/关闭。输入反馈内容后提交，
+ * 连同客户端全量信息（gameStore 镜像 + 元信息）发送给服务端落盘。
  */
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { useGameStore } from "@/store/gameStore";
-import type { MsgBase, MsgBugReport } from "@/types/net";
+import type { FeedbackCategory, MsgBase, MsgBugReport } from "@/types/net";
 
 type SubmitState =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "ok"; path?: string }
+  | { kind: "ok" }
   | { kind: "fail"; error?: string };
+
+const CATEGORY_CONFIG: Record<
+  FeedbackCategory,
+  { tab: string; label: string; placeholder: string }
+> = {
+  bug: {
+    tab: "提交 Bug",
+    label: "问题描述",
+    placeholder: "描述触发 Bug 的操作、实际现象和期望结果……提交时会自动附带当前对局信息。",
+  },
+  suggestion: {
+    tab: "优化建议",
+    label: "建议内容",
+    placeholder: "描述你希望优化的功能、操作体验或界面效果……",
+  },
+};
 
 export default function FeedbackOverlay() {
   const [open, setOpen] = useState(false);
-  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<FeedbackCategory>("bug");
+  const [drafts, setDrafts] = useState<Record<FeedbackCategory, string>>({
+    bug: "",
+    suggestion: "",
+  });
   const [submit, setSubmit] = useState<SubmitState>({ kind: "idle" });
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCategoryRef = useRef<FeedbackCategory | null>(null);
+  const description = drafts[category];
+  const config = CATEGORY_CONFIG[category];
 
-  // F2 切换显隐
+  // F 切换显隐；在输入区域打字时不抢占按键。
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "F2") return;
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isEditing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (
+        e.code !== "KeyF" ||
+        e.repeat ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.metaKey ||
+        isEditing
+      ) {
+        return;
+      }
+
       e.preventDefault();
-      setOpen((v) => !v);
+      setOpen((visible) => !visible);
     }
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // 打开时聚焦、重置提交状态
+  // 打开时聚焦、重置提交状态。
   useEffect(() => {
-    if (open) {
-      setSubmit({ kind: "idle" });
-      // 等待动画后聚焦
-      const t = setTimeout(() => textRef.current?.focus(), 50);
-      return () => clearTimeout(t);
-    }
+    if (!open) return;
+
+    setSubmit((current) => (current.kind === "sending" ? current : { kind: "idle" }));
+    const timer = setTimeout(() => textRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
   }, [open]);
 
-  // 订阅服务端回执
+  // 订阅服务端回执。
   useEffect(() => {
     const handler = (msg: MsgBase) => {
       if (msg.proto !== "MsgBugReport") return;
-      const m = msg as MsgBugReport;
-      if (m.result) setSubmit({ kind: "ok", path: m.path });
-      else setSubmit({ kind: "fail", error: m.error });
+
+      const response = msg as MsgBugReport;
+      if (response.result) {
+        const submittedCategory = pendingCategoryRef.current;
+        if (submittedCategory) {
+          setDrafts((current) => ({ ...current, [submittedCategory]: "" }));
+        }
+        setSubmit({ kind: "ok" });
+      } else {
+        setSubmit({ kind: "fail", error: response.error });
+      }
+      pendingCategoryRef.current = null;
     };
+
     eventBus.on("message", handler);
     return () => eventBus.off("message", handler);
   }, []);
 
   function handleSubmit() {
-    const desc = description.trim();
-    if (!desc || submit.kind === "sending") return;
+    const trimmedDescription = description.trim();
+    if (!trimmedDescription || submit.kind === "sending") return;
 
-    const s = useGameStore.getState();
+    const gameState = useGameStore.getState();
     const clientInfo = JSON.stringify({
       meta: {
         ts: new Date().toISOString(),
         url: typeof window !== "undefined" ? window.location.href : "",
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        mode: s.mode,
-        phase: s.phase,
-        turnCount: s.turnCount,
-        currentTurn: s.currentTurn,
-        myName: s.myName,
-        opponentName: s.opponentName,
+        mode: gameState.mode,
+        phase: gameState.phase,
+        turnCount: gameState.turnCount,
+        currentTurn: gameState.currentTurn,
+        myName: gameState.myName,
+        opponentName: gameState.opponentName,
       },
-      gameStore: s, // 函数会被 JSON.stringify 自动忽略，仅保留数据字段
+      gameStore: gameState, // 函数会被 JSON.stringify 自动忽略，仅保留数据字段。
     });
 
     setSubmit({ kind: "sending" });
-    const sent = NetManager.send({ proto: "MsgBugReport", description: desc, clientInfo } as MsgBugReport);
-    if (!sent) setSubmit({ kind: "fail", error: "未连接服务器" });
+    pendingCategoryRef.current = category;
+    const sent = NetManager.send({
+      proto: "MsgBugReport",
+      category,
+      description: trimmedDescription,
+      clientInfo,
+    } as MsgBugReport);
+
+    if (!sent) {
+      pendingCategoryRef.current = null;
+      setSubmit({ kind: "fail", error: "未连接服务器" });
+    }
+  }
+
+  function selectCategory(nextCategory: FeedbackCategory) {
+    if (submit.kind === "sending") return;
+    setCategory(nextCategory);
+    setSubmit({ kind: "idle" });
+    requestAnimationFrame(() => textRef.current?.focus());
   }
 
   return (
@@ -95,15 +165,18 @@ export default function FeedbackOverlay() {
           onClick={() => setOpen(false)}
         >
           <motion.div
-            className="w-full max-w-md rounded-lg border border-rose-400/40 bg-slate-950/95 p-5 shadow-2xl shadow-black/60"
+            className={`w-full max-w-md rounded-lg border bg-slate-950/95 p-5 shadow-2xl shadow-black/60 ${
+              category === "bug" ? "border-rose-400/40" : "border-sky-400/40"
+            }`}
             initial={{ scale: 0.92, y: 16 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.92, y: 16 }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-black text-rose-300">反馈 Bug（F2）</h2>
+              <h2 className="text-sm font-black text-white">游戏反馈（F）</h2>
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="rounded px-2 py-0.5 text-xs text-slate-400 transition-colors hover:text-white"
               >
@@ -111,34 +184,73 @@ export default function FeedbackOverlay() {
               </button>
             </div>
 
-            <label className="block text-xs font-bold text-slate-300">问题描述</label>
+            <div className="mb-4 grid grid-cols-2 rounded-md bg-slate-900 p-1" role="tablist">
+              {(Object.keys(CATEGORY_CONFIG) as FeedbackCategory[]).map((item) => {
+                const selected = item === category;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    disabled={submit.kind === "sending"}
+                    onClick={() => selectCategory(item)}
+                    className={`rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-wait ${
+                      selected
+                        ? item === "bug"
+                          ? "bg-rose-500 text-white"
+                          : "bg-sky-500 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {CATEGORY_CONFIG[item].tab}
+                  </button>
+                );
+              })}
+            </div>
+
+            <label className="block text-xs font-bold text-slate-300">{config.label}</label>
             <textarea
               ref={textRef}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(event) =>
+                setDrafts((current) => ({ ...current, [category]: event.target.value }))
+              }
+              maxLength={4000}
               rows={5}
-              placeholder="描述触发 bug 的操作、现象、期望结果……提交时会自动附带当前对局全量信息。"
-              className="mt-1.5 w-full resize-none rounded border border-slate-600 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-400 focus:outline-none"
+              placeholder={config.placeholder}
+              className={`mt-1.5 w-full resize-none rounded border border-slate-600 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none ${
+                category === "bug" ? "focus:border-rose-400" : "focus:border-sky-400"
+              }`}
             />
 
-            <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="mt-1 text-right text-[10px] text-slate-500">
+              {description.length}/4000
+            </div>
+
+            <div className="mt-2 flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1 text-[11px]">
                 {submit.kind === "ok" && (
-                  <span className="text-emerald-400">
-                    已提交并保存{submit.path ? `：${submit.path}` : ""}
-                  </span>
+                  <span className="text-emerald-400">已提交并保存，感谢你的反馈</span>
                 )}
                 {submit.kind === "fail" && (
-                  <span className="text-rose-400">提交失败{submit.error ? `：${submit.error}` : ""}</span>
+                  <span className="text-rose-400">
+                    提交失败{submit.error ? `：${submit.error}` : ""}
+                  </span>
                 )}
                 {submit.kind === "sending" && <span className="text-slate-400">提交中……</span>}
               </div>
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={!description.trim() || submit.kind === "sending"}
-                className="shrink-0 rounded bg-rose-500 px-4 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`shrink-0 rounded px-4 py-1.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  category === "bug"
+                    ? "bg-rose-500 hover:bg-rose-400"
+                    : "bg-sky-500 hover:bg-sky-400"
+                }`}
               >
-                提交反馈
+                发送
               </button>
             </div>
           </motion.div>

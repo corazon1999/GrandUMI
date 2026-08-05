@@ -450,9 +450,12 @@ export interface MsgRequestState extends MsgBase {
   proto: "MsgRequestState";
 }
 
-/** 游戏内 F2 反馈 Bug（客户端 → 服务器；服务端回执带 result/path） */
+export type FeedbackCategory = "bug" | "suggestion";
+
+/** 游戏内反馈（客户端 → 服务器；服务端回执带 result/path） */
 export interface MsgBugReport extends MsgBase {
   proto: "MsgBugReport";
+  category: FeedbackCategory; // bug 或优化建议
   description: string;   // 问题描述
   clientInfo: string;    // 客户端全量信息（JSON 字符串）
   result?: boolean;      // 服务端回执：是否保存成功

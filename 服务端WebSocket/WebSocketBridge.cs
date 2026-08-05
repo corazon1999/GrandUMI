@@ -836,11 +836,35 @@ public static class WebSocketBridge
     }
 
     /// <summary>
-    /// MsgBugReport — 游戏内 F2 反馈：描述 + 客户端全量信息，服务端补充权威全量快照后落盘
+    /// MsgBugReport — 游戏内反馈：类型 + 描述 + 客户端全量信息，服务端补充权威全量快照后落盘
     /// </summary>
     private static void OnBugReport(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        var description = Str(msg, "description") ?? "";
+        var description = (Str(msg, "description") ?? "").Trim();
+        if (description.Length == 0)
+        {
+            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能为空" });
+            return;
+        }
+        if (description.Length > 4000)
+        {
+            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能超过 4000 字" });
+            return;
+        }
+
+        var categoryRaw = Str(msg, "category");
+        var category = categoryRaw switch
+        {
+            null or "" or "bug" => "bug",
+            "suggestion" => "suggestion",
+            _ => null,
+        };
+        if (category is null)
+        {
+            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈类型无效" });
+            return;
+        }
+
         var clientInfoRaw = Str(msg, "clientInfo") ?? "";
 
         // clientInfo 是 JSON 字符串，尝试解析为对象嵌入（失败则原样作为字符串保存）
@@ -861,6 +885,7 @@ public static class WebSocketBridge
             sessionId   = s.SessionId,
             roomId      = room?.RoomId,
             playerIndex,
+            category,
             description,
             clientInfo,
             serverSnapshot,
@@ -868,8 +893,9 @@ public static class WebSocketBridge
 
         try
         {
-            var path = BugReportStore.Save(report, s.Account ?? "anon", room?.RoomId);
-            Log($"BugReport 已保存: {path}");
+            var path = BugReportStore.Save(report, s.Account ?? "anon", room?.RoomId, category);
+            var categoryName = category == "suggestion" ? "优化建议" : "Bug";
+            Log($"{categoryName} 反馈已保存: {path}");
             Send(s.SessionId, new { proto = "MsgBugReport", result = true, path });
         }
         catch (Exception ex)
