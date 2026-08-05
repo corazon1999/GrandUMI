@@ -11,7 +11,7 @@ export type AnimationEvent =
   | { type: "none" }
   | { type: "drawCard"; side: "my" | "opponent"; cardNumber?: string }
   | { type: "playCard"; side: "my" | "opponent"; cardNumber: string; fieldIndex?: number }
-  | { type: "attack"; attackerIndex: number; targetIndex: number | "leader" }
+  | { type: "attack"; attackerId: string; targetIsLeader: boolean; targetId: string | null }
   | { type: "block"; blockerIndex: number }
   | { type: "counter"; handIndex: number }
   | { type: "damage"; target: "leader" | "character"; success: boolean }
@@ -54,8 +54,9 @@ export function useGameAnimation(): AnimationEvent {
       case "Attack":
         setEvent({
           type: "attack",
-          attackerIndex: (payload.attackerIndex as number) ?? 0,
-          targetIndex: (payload.targetIndex as number | "leader") ?? 0,
+          attackerId: (payload.attacker as string) ?? "",
+          targetIsLeader: (payload.targetIsLeader as boolean) ?? false,
+          targetId: (payload.targetId as string) ?? null,
         });
         break;
       case "Block":

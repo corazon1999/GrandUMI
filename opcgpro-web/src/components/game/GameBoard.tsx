@@ -13,9 +13,9 @@ import StageSlot from "@/components/game/StageSlot";
 import GameLog from "@/components/game/GameLog";
 import GameActions from "@/components/game/GameActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
+import BattleRelationLayer from "@/components/game/BattleRelationLayer";
 import RevealOverlay from "@/components/game/RevealOverlay";
 import GameChatPanel from "@/components/game/GameChatPanel";
-import AttackFlowLine from "@/components/game/AttackFlowLine";
 import { useGameStore } from "@/store/gameStore";
 import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
@@ -300,6 +300,7 @@ export default function GameBoard({
               transformOrigin: "center",
             }}
           >
+            <BattleRelationLayer />
             <div className="absolute inset-3 flex gap-3">
               <LeftRail />
 
@@ -324,7 +325,6 @@ export default function GameBoard({
               />
             </div>
 
-            <AttackFlowLine stageRef={stageRef} />
           </div>
         </CardSizeOverride.Provider>
       </div>

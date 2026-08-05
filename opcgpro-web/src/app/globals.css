@@ -22,27 +22,6 @@ body {
   overflow: hidden;
 }
 
-/* ===== 战斗攻击流向线 ===== */
-
-@keyframes attack-flow-travel {
-  to {
-    stroke-dashoffset: -42;
-  }
-}
-
-/* 保持整条连线亮度稳定，只让短亮点沿路径连续前进。 */
-.attack-flow-stream {
-  animation: attack-flow-travel 0.78s linear infinite;
-  will-change: stroke-dashoffset;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .attack-flow-stream {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
-}
-
 /* ===== 阻挡者「能量护盾」特效 ===== */
 
 /*
@@ -107,4 +86,63 @@ body {
     inset 0 0 10px rgba(34, 211, 238, 0.55),
     inset 0 0 2px rgba(165, 243, 252, 0.9);
   animation: blocker-breathe 2.4s ease-in-out infinite;
+}
+
+/* ===== 战斗攻击关系特效 ===== */
+
+@keyframes battle-attacker-lunge-up {
+  0% { transform: translateY(0) scale(1); filter: brightness(1); }
+  18% { transform: translateY(5px) scale(1.04); filter: brightness(1.2); }
+  48% { transform: translateY(-18px) scale(1.09); filter: brightness(1.4); }
+  72% { transform: translateY(-10px) scale(1.05); filter: brightness(1.2); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+}
+
+@keyframes battle-attacker-lunge-down {
+  0% { transform: translateY(0) scale(1); filter: brightness(1); }
+  18% { transform: translateY(-5px) scale(1.04); filter: brightness(1.2); }
+  48% { transform: translateY(18px) scale(1.09); filter: brightness(1.4); }
+  72% { transform: translateY(10px) scale(1.05); filter: brightness(1.2); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+}
+
+@keyframes battle-target-impact {
+  0%, 34% { transform: translate(0, 0); filter: brightness(1); }
+  43% { transform: translate(-4px, 1px); filter: brightness(1.8); }
+  51% { transform: translate(4px, -1px); }
+  59% { transform: translate(-3px, 0); }
+  68% { transform: translate(2px, 1px); filter: brightness(1.25); }
+  100% { transform: translate(0, 0); filter: brightness(1); }
+}
+
+@keyframes battle-route-flow {
+  to { stroke-dashoffset: -48; }
+}
+
+.battle-attacker-lunge-up {
+  animation: battle-attacker-lunge-up 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: center;
+}
+
+.battle-attacker-lunge-down {
+  animation: battle-attacker-lunge-down 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: center;
+}
+
+.battle-target-impact {
+  animation: battle-target-impact 720ms ease-out both;
+  transform-origin: center;
+}
+
+.battle-route-dash {
+  animation: battle-route-flow 1.15s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-attacker-lunge-up,
+  .battle-attacker-lunge-down,
+  .battle-target-impact,
+  .battle-route-dash {
+    animation: none;
+  }
 }

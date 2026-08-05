@@ -44,11 +44,9 @@ export default function LeaderCard({ side }: Props) {
     return <EmptyLeader label={dimensions} />;
   }
 
-  // 战斗高亮：攻击方=当前回合方；领袖可为攻击者或被攻击目标
-  const attackerSide = currentTurn ? "my" : "opponent";
-  const defenderSide = currentTurn ? "opponent" : "my";
-  const isAttacker = !!battle && side === attackerSide && player.leaderId === battle.attackerCardId;
-  const isBattleTarget = !!battle && side === defenderSide && battle.targetIsLeader;
+  // 直接按服务端卡牌 ID 判断，兼容观战/回放以及 GM 发起的非当前回合攻击。
+  const isAttacker = !!battle && player.leaderId === battle.attackerCardId;
+  const isBattleTarget = !!battle && !battle.blockerCardId && battle.targetIsLeader && !isAttacker;
 
   const isTargetable = isSelectingTarget && side === "opponent" && !isPending;
 
@@ -79,7 +77,15 @@ export default function LeaderCard({ side }: Props) {
   }
 
   return (
-    <div className={`${dimensions} relative`} data-battle-card-id={player.leaderId}>
+    <div
+      data-battle-card-id={player.leaderId}
+      className={[
+        dimensions,
+        "relative",
+        isAttacker ? (side === "my" ? "battle-attacker-lunge-up" : "battle-attacker-lunge-down") : "",
+        isBattleTarget ? "battle-target-impact" : "",
+      ].join(" ")}
+    >
       {/* 战斗高亮：攻击者红环 / 被攻击目标琥珀环 */}
       {isAttacker && (
         <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 shadow-lg shadow-red-500/50" />
