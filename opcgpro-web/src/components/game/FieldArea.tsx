@@ -29,10 +29,6 @@ export default function FieldArea({ side }: Props) {
 
   if (!player) return <div className="h-full min-h-0" />;
 
-  // 战斗中：攻击方=当前回合方，防守方=另一方。按卡 id 区分攻击者 / 被攻击目标。
-  const attackerSide = currentTurn ? "my" : "opponent";
-  const defenderSide = currentTurn ? "opponent" : "my";
-
   const handleCardClick = (cardId: string, isTapped: boolean) => {
     if (isPending) return;
 
@@ -58,9 +54,10 @@ export default function FieldArea({ side }: Props) {
       {player.fieldCards.map((fc) => {
         const cardData = getCard(fc.number) ?? null;
         const attachedCount = fc.attachedDon;
-        const isAttacker = !!battle && side === attackerSide && fc.id === battle.attackerCardId;
+        const isAttacker = !!battle && fc.id === battle.attackerCardId;
+        const isBlocker = !!battle && fc.id === battle.blockerCardId;
         const isBattleTarget =
-          !!battle && side === defenderSide && !battle.targetIsLeader && fc.id === battle.targetCardId;
+          isBlocker || (!!battle && !battle.blockerCardId && !battle.targetIsLeader && fc.id === battle.targetCardId);
         // 选择攻击目标时：只有横置(休息)的对手角色可被选中
         const isAttackTarget = isSelectingTarget && side === "opponent" && !isPending && fc.isTapped;
         // 攻击状态标识：仅我方角色、我方回合显示。canAttack 来自后端权威；
@@ -76,13 +73,20 @@ export default function FieldArea({ side }: Props) {
 
         return (
           <div key={fc.id} className="relative flex h-full min-h-0 shrink-0 items-center">
-            <div className="relative">
+            <div
+              data-battle-card-id={fc.id}
+              className={[
+                "relative",
+                isAttacker ? (side === "my" ? "battle-attacker-lunge-up" : "battle-attacker-lunge-down") : "",
+                isBattleTarget ? "battle-target-impact" : "",
+              ].join(" ")}
+            >
               {/* 战斗高亮：攻击者红环 / 被攻击目标琥珀环 */}
               {isAttacker && (
                 <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-red-500 animate-pulse shadow-lg shadow-red-500/50" />
               )}
               {isBattleTarget && (
-                <div className="pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 ring-amber-400 animate-pulse shadow-lg shadow-amber-400/50" />
+                <div className={`pointer-events-none absolute -inset-1 z-20 rounded-lg ring-4 animate-pulse shadow-lg ${isBlocker ? "ring-cyan-300 shadow-cyan-400/60" : "ring-amber-400 shadow-amber-400/50"}`} />
               )}
               {isAttacker && (
                 <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-red-600 px-1.5 text-[10px] font-black text-white shadow">
@@ -90,8 +94,8 @@ export default function FieldArea({ side }: Props) {
                 </span>
               )}
               {isBattleTarget && (
-                <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">
-                  目标
+                <span className={`pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded px-1.5 text-[10px] font-black text-black shadow ${isBlocker ? "bg-cyan-300" : "bg-amber-500"}`}>
+                  {isBlocker ? "阻挡" : "目标"}
                 </span>
               )}
               <CardItem
