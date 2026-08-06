@@ -381,6 +381,83 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task OP17_058_AttackTrigger_AllowsCancellingDonMinusWithActiveDon()
+    {
+        var state = TestScene.New("OP17-058").MyActiveDon(1).OppCharacter("OP17-011").Build();
+        var target = state.Players[1].Characters[0];
+        var prompts = new MockPromptService().QueueChooseEmpty();
+
+        await EffectRuntime.Resolve(
+            state, 0, state.Players[0].Leader, EffectTrigger.OnOppAttackDeclare, prompts);
+
+        Assert.Single(state.Players[0].CostArea);
+        Assert.Empty(state.Players[0].DonDeck);
+        Assert.Equal(0, target.PowerModThisTurn);
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("ReturnOwnDon", prompt.kind);
+        Assert.Single(prompt.choices);
+        Assert.Equal(state.Players[0].CostArea[0].Id.ToString(), prompt.choices[0]);
+        Assert.True(Assert.IsType<bool>(prompt.extra!["canCancel"]));
+    }
+
+    [Fact]
+    public async Task OP17_058_DonMinusPrompt_IncludesActiveRestAndAttachedDon()
+    {
+        var state = TestScene.New("OP17-058").MyActiveDon(1).OppCharacter("OP17-011").Build();
+        var me = state.Players[0];
+        me.CostArea.Add(new DonCard { State = DonState.Rest });
+        me.CostArea.Add(new DonCard { State = DonState.Attached, AttachedToCardId = me.Leader.Id });
+        var expectedIds = me.CostArea.Select(d => d.Id.ToString()).ToHashSet();
+        var prompts = new MockPromptService().QueueChooseEmpty();
+
+        await EffectRuntime.Resolve(
+            state, 0, me.Leader, EffectTrigger.OnAttackDeclare, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("ReturnOwnDon", prompt.kind);
+        Assert.Equal(expectedIds, prompt.choices.ToHashSet());
+        Assert.Equal(3, me.CostArea.Count);
+        Assert.Empty(me.DonDeck);
+    }
+
+    [Fact]
+    public async Task OP17_058_AttackTrigger_CanPayWithActiveDonAndReduceOpponentPower()
+    {
+        var state = TestScene.New("OP17-058").MyActiveDon(1).OppCharacter("OP17-011").Build();
+        var donId = state.Players[0].CostArea[0].Id.ToString();
+        var target = state.Players[1].Characters[0];
+        var prompts = new MockPromptService()
+            .QueueChoose(donId)
+            .QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, state.Players[0].Leader, EffectTrigger.OnAttackDeclare, prompts);
+
+        Assert.Empty(state.Players[0].CostArea);
+        Assert.Single(state.Players[0].DonDeck);
+        Assert.Equal(-2000, target.PowerModThisTurn);
+        Assert.Contains(
+            $"OP17-058-battle:{state.Players[0].Leader.Id}",
+            state.Players[0].TurnOnceUsed);
+    }
+
+    [Fact]
+    public async Task OP08_074_EndTurnDonReturn_RemainsMandatory()
+    {
+        var state = TestScene.New().MyActiveDon(1).Build();
+        var maria = Card("OP08-074");
+        maria.OncePerTurnUsedKeys.Add("OP08-074-PendingReturn");
+        state.Players[0].Characters.Add(maria);
+        var prompts = new MockPromptService().QueueChooseEmpty();
+
+        await EffectRuntime.Resolve(state, 0, maria, EffectTrigger.OnMyTurnEnd, prompts);
+
+        Assert.Empty(state.Players[0].CostArea);
+        Assert.Single(state.Players[0].DonDeck);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
     public async Task OP17_077_HandlesMainCostsAndCounterDonMinus()
     {
         var main = TestScene.New("OP17-058").MyActiveDon(3).MyHandAdd("OP17-011").MyHandAdd("OP17-014").Build();

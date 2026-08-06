@@ -31,16 +31,22 @@ const TYPE_LABELS: Record<string, string> = {
   Leader: "领航", Character: "角色", Stage: "舞台", Event: "事件",
 };
 
-export default function CardHoverPreview({ info }: { info: HoverInfo }) {
+export default function CardHoverPreview({
+  info,
+  counterValue,
+}: {
+  info: HoverInfo;
+  counterValue?: number;
+}) {
   const { card, rect, currentSprite } = info;
+  const displayCounter = counterValue ?? card.counter;
   const rawSprite = currentSprite ?? card.sprite ?? "/sprites/CardBack.png";
   // 大图直接用原图(454px,约87KB)而非256px缩略图,避免高DPI屏放大发糊;悬停一次仅一张,负担可忽略
   const [imgSrc, setImgSrc] = useState(rawSprite);
-  const [fullImageLoaded, setFullImageLoaded] = useState(false);
+  const [loadedImageSrc, setLoadedImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     setImgSrc(rawSprite);
-    setFullImageLoaded(false);
   }, [rawSprite]);
 
   const spaceRight = window.innerWidth - rect.right;
@@ -82,11 +88,11 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
           alt={card.name}
           fill
           sizes="480px"
-          className={`object-cover transition-opacity duration-150 ${fullImageLoaded ? "opacity-100" : "opacity-0"}`}
+          className={`object-cover transition-opacity duration-150 ${loadedImageSrc === imgSrc ? "opacity-100" : "opacity-0"}`}
           unoptimized
-          onLoad={() => setFullImageLoaded(true)}
+          onLoad={() => setLoadedImageSrc(imgSrc)}
           onError={() => {
-            setFullImageLoaded(false);
+            setLoadedImageSrc(null);
             setImgSrc((prev) => (card.image && prev !== card.image) ? card.image : "/sprites/CardBack.png");
           }}
         />
@@ -129,9 +135,9 @@ export default function CardHoverPreview({ info }: { info: HoverInfo }) {
               力 <span className="text-white font-bold">{card.power.toLocaleString()}</span>
             </span>
           )}
-          {card.counter > 0 && (
+          {displayCounter > 0 && (
             <span className="text-gray-300">
-              反 <span className="text-white font-bold">+{card.counter}</span>
+              反 <span className="text-white font-bold">+{displayCounter}</span>
             </span>
           )}
         </div>

@@ -181,9 +181,17 @@ public static class AtomicOps
     /// 因效果 KO（异步，带置换守护）：相比同步 KO，额外走 PreKO（受害者自身置换）+ OnAllyWillBeKOd（守护者置换）
     /// + 受害者 OnKO 反应，并设置 KO 来源标记供"因对方的效果而被KO"判定。供 DSL 的 KO op 使用，
     /// 覆盖绝大多数效果KO；脚本直接调用的同步 KO 不享守护（已文档化）。
-    /// actingSide=发动本次 KO 效果的一方（用于"对方的效果"判定）。返回是否实际 KO。
+    /// actingSide=发动本次 KO 效果的一方（用于"对方的效果"判定）。deferOnKO=true 时，
+    /// 将受害者【KO时】加入最外层效果结束后的待结算队列，供“先完整处理当前效果，再处理成本卡触发”的卡效使用。
+    /// 返回是否实际 KO。
     /// </summary>
-    public static async Task<bool> KOByEffectAsync(GameState s, int ownerIdx, CardInstance card, IPromptService prompts, int actingSide)
+    public static async Task<bool> KOByEffectAsync(
+        GameState s,
+        int ownerIdx,
+        CardInstance card,
+        IPromptService prompts,
+        int actingSide,
+        bool deferOnKO = false)
     {
         // 设置 KO 来源（effect + 发起方 + 来源卡），供受害者/守护者判定
         s.KOReason = "effect";
@@ -235,8 +243,12 @@ public static class AtomicOps
                 new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
             EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
                 new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
-            // 受害者 OnKO：卡已进入废弃区，但效果在"原场上位置"发动（如 EB01-057 白星因对方效果被KO）
-            await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
+            // 受害者 OnKO：卡已进入废弃区，但效果在"原场上位置"发动（如 EB01-057 白星因对方效果被KO）。
+            // 个别卡效要求先完整处理当前效果，再处理作为成本被 KO 的角色触发；此时复用既有延迟队列。
+            if (deferOnKO)
+                s.EnqueueKOEffect(ownerIdx, card, actingSide, EffectRuntime.CurrentSource?.Id);
+            else
+                await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
             return true;
         }
         finally
@@ -379,10 +391,12 @@ public static class AtomicOps
     /// <summary>
     /// 「咚!!-N」通用支付：让玩家从费用区(活跃/休息/附着在角色·领袖身上)手选 N 张咚放回咚!!卡组。
     /// 合格咚 = 费用区全部状态的咚；不足 N → 返回 false(无法支付，调用方应中止发动)；
-    /// 玩家取消/超时同样返回 false。恰好 N 张且全为活跃(无附着)时自动支付，免无意义弹窗。
+    /// optional=true 时始终弹出选择，让玩家可以取消发动；optional=false 用于规则要求的强制返还，
+    /// 此时若所有合格咚均为活跃状态则直接支付，存在休息/附着咚时仍要求玩家选择具体卡牌。
+    /// 玩家取消/超时返回 false。
     /// 放回附着咚会使对应角色/领袖失去贴咚加成(power 由 AttachedDonCount 派生，自动生效)。
     /// </summary>
-    public static async Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n)
+    public static async Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
     {
         if (n <= 0) return true;
         var me = ctx.State.Players[ctx.OwnerIndex];
@@ -393,9 +407,9 @@ public static class AtomicOps
         if (eligible.Count < n) return false;   // 凑不够 → 无法支付
 
         List<DonCard> chosen;
-        // 全为活跃咚时彼此等价、无"该牺牲哪张"的抉择 → 自动支付，免无意义弹窗；
-        // 一旦存在休息/附着咚(放回它们有不同代价)，才弹窗让玩家手选。
-        bool needPrompt = eligible.Any(d => d.State != DonState.Active);
+        // 「咚!!-N」成本均可选择是否发动：即使全为活跃咚，也必须给玩家取消机会。
+        // 强制返还时，只有存在休息/附着咚（具体放回哪张会影响局面）才需要选择。
+        bool needPrompt = optional || eligible.Any(d => d.State != DonState.Active);
         if (!needPrompt)
         {
             chosen = eligible.Take(n).ToList();
@@ -423,9 +437,15 @@ public static class AtomicOps
             }).ToList();
 
             var ans = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
-                $"选择 {n} 张咚!! 放回咚!!卡组",
+                optional
+                    ? $"选择 {n} 张咚!! 放回咚!!卡组，或取消发动"
+                    : $"选择 {n} 张咚!! 放回咚!!卡组",
                 eligible.Select(d => d.Id.ToString()).ToList(), n, n,
-                new Dictionary<string, object?> { ["donChoices"] = donChoices });
+                new Dictionary<string, object?>
+                {
+                    ["donChoices"] = donChoices,
+                    ["canCancel"] = optional,
+                });
 
             if (ans.Count < n) return false;     // 取消/超时 → 不支付
             chosen = new List<DonCard>();

@@ -114,6 +114,7 @@ public class CardEffectTests
         int handBefore = s.Players[0].Hand.Count;
         int activeDonBefore = s.Players[0].ActiveDonCount;
         var prompts = new MockPromptService()
+            .QueueChoose(s.Players[0].CostArea[0].Id.ToString())
             .QueueChoose(target.Id.ToString());
         var card = new CardInstance { Info = CardDatabase.Get("OP15-076")! };
 
@@ -173,6 +174,7 @@ public class CardEffectTests
         reducedTarget.PowerModThisTurn = -1000;
 
         var prompts = new MockPromptService()
+            .QueueChoose(s.Players[0].CostArea.Select(d => d.Id.ToString()).ToArray())
             .QueueChoose(reducedTarget.Id.ToString());
         var card = new CardInstance { Info = CardDatabase.Get("OP15-078")! };
 
@@ -183,6 +185,45 @@ public class CardEffectTests
         Assert.DoesNotContain(unreducedTarget.Id.ToString(), targetPrompt.choices);
         Assert.True(reducedTarget.IsTapped);
         Assert.False(unreducedTarget.IsTapped);
+    }
+
+    /// <summary>
+    /// OP15-078 万雷（事件）反击：我方最多 1 张领袖或角色本战斗 +1000；
+    /// 之后，我方场上咚!!不多于 6 张时抽 1。
+    /// </summary>
+    [Fact]
+    public async Task OP15_078_WanLei_EventCounter_DrawsOnlyWhenOwnDonIsAtMostSix()
+    {
+        var sixDonState = TestScene.New()
+            .MyActiveDon(6)
+            .MyDeckTop("OP15-050")
+            .Build();
+        var sixDonLeader = sixDonState.Players[0].Leader;
+        var sixDonPrompts = new MockPromptService()
+            .QueueChoose(sixDonLeader.Id.ToString());
+        var sixDonCard = new CardInstance { Info = CardDatabase.Get("OP15-078")! };
+
+        await EffectRuntime.Resolve(
+            sixDonState, 0, sixDonCard, EffectTrigger.EventCounter, sixDonPrompts);
+
+        Assert.Equal(1000, sixDonLeader.PowerModThisBattle);
+        Assert.Contains(sixDonState.Players[0].Hand, card => card.Info.Number == "OP15-050");
+
+        var sevenDonState = TestScene.New()
+            .MyActiveDon(7)
+            .MyDeckTop("OP15-050")
+            .Build();
+        var sevenDonLeader = sevenDonState.Players[0].Leader;
+        var sevenDonPrompts = new MockPromptService()
+            .QueueChoose(sevenDonLeader.Id.ToString());
+        var sevenDonCard = new CardInstance { Info = CardDatabase.Get("OP15-078")! };
+
+        await EffectRuntime.Resolve(
+            sevenDonState, 0, sevenDonCard, EffectTrigger.EventCounter, sevenDonPrompts);
+
+        Assert.Equal(1000, sevenDonLeader.PowerModThisBattle);
+        Assert.Empty(sevenDonState.Players[0].Hand);
+        Assert.Single(sevenDonState.Players[0].Deck);
     }
 
     /// <summary>

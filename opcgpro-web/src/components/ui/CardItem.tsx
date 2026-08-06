@@ -20,6 +20,8 @@ interface Props {
   faceDown?: boolean;
   /** 隐藏反击值徽标（卡牌在场上时反击值无意义，仅手牌防御时显示） */
   hideCounter?: boolean;
+  /** 当前有效反击值（含场上静态效果）；未提供时使用卡牌印刷值 */
+  counterValue?: number;
   /** 隐藏力量值（手牌中的角色不显示力量） */
   hidePower?: boolean;
   /** 隐藏费用值（领袖无费用） */
@@ -59,6 +61,7 @@ export default function CardItem({
   attachedDonCount = 0,
   faceDown = false,
   hideCounter = false,
+  counterValue,
   hidePower = false,
   hideCost = false,
   liftOnSelect = true,
@@ -79,6 +82,7 @@ export default function CardItem({
   const donPower = attachedDonCount * 1000;
   const displayPower = (card?.power ?? 0) + powerBuff + donPower;
   const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);
+  const displayCounter = counterValue ?? card?.counter ?? 0;
   const [imgSrc, setImgSrc] = useState(card?.sprite ?? "/sprites/CardBack.png");
 
   // 卡牌/异画变化时重新同步图源并重试加载（修复曾因服务器暂时不可用 onError 回退到
@@ -200,9 +204,9 @@ export default function CardItem({
           )}
 
           {/* 反击值 → 底部右侧（避开左下角阻挡者盾牌）；仅手牌防御时显示 */}
-          {card!.counter > 0 && !hideCounter && (
+          {displayCounter > 0 && !hideCounter && (
             <span className="absolute bottom-1 right-1 z-10 rounded bg-amber-500/90 px-1 text-[10px] font-black leading-tight text-black shadow ring-1 ring-black/20">
-              反{card!.counter}
+              反{displayCounter}
             </span>
           )}
 
@@ -283,9 +287,14 @@ export default function CardItem({
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
-            {hoverInfo && <CardHoverPreview info={hoverInfo} />}
+            {hoverInfo && <CardHoverPreview info={hoverInfo} counterValue={displayCounter} />}
             {zoomOpen && card && (
-              <CardZoomOverlay card={card} sprite={imgSrc} onClose={() => setZoomOpen(false)} />
+              <CardZoomOverlay
+                card={card}
+                sprite={imgSrc}
+                counterValue={displayCounter}
+                onClose={() => setZoomOpen(false)}
+              />
             )}
           </AnimatePresence>,
           document.body,

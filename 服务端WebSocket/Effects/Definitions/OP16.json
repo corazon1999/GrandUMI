@@ -1853,7 +1853,7 @@
                   "nameEquals": "蒙奇·D·路飞"
                 },
                 {
-                  "keyword": "白胡子海盗团"
+                  "keywordContains": "白胡子海盗团"
                 }
               ]
             }
@@ -1873,7 +1873,7 @@
                   "nameEquals": "蒙奇·D·路飞"
                 },
                 {
-                  "keyword": "白胡子海盗团"
+                  "keywordContains": "白胡子海盗团"
                 }
               ]
             }

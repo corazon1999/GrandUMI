@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.Validation;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -9,6 +10,35 @@ public class OP16EffectTests
 {
     private static CardInstance Card(string number)
         => new() { Info = CardDatabase.Get(number)! };
+
+    [Fact]
+    public async Task OP16_003_BuffsOnlyLeaderDuringOwnerTurn()
+    {
+        var state = TestScene.New("OP16-001").Build();
+        var newgate = Card("OP16-003");
+        state.Players[0].Characters.Add(newgate);
+
+        Assert.DoesNotContain("双重攻击", newgate.Info.Abilities);
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            newgate,
+            EffectTrigger.OnEnterField,
+            new MockPromptService());
+
+        var leader = state.Players[0].Leader;
+        Assert.True(ActionValidator.HasKeyword(state, leader, "双重攻击"));
+        Assert.False(ActionValidator.HasKeyword(state, newgate, "双重攻击"));
+        Assert.Equal(7000, state.CurrentPowerOf(0, leader));
+        Assert.Equal(10000, state.CurrentPowerOf(0, newgate));
+
+        state.CurrentTurnPlayer = 1;
+
+        Assert.False(ActionValidator.HasKeyword(state, leader, "双重攻击"));
+        Assert.Equal(5000, state.CurrentPowerOf(0, leader));
+        Assert.Equal(10000, state.CurrentPowerOf(0, newgate));
+    }
 
     [Fact]
     public void OP16_118_Changes8000PowerCharactersInHandToCounter2000()

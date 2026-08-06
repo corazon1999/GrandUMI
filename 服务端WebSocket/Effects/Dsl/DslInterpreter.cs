@@ -1687,7 +1687,7 @@ public static class DslInterpreter
             if (node.TryGetProperty("keywordContains", out var kwc))
             {
                 var sub = kwc.GetString() ?? "";
-                if (!c.Info.Keywords.Any(k => k.Contains(sub))) return false;
+                if (!c.Info.HasKeywordContaining(sub)) return false;
             }
             // hasTrigger: 拥有【触发】效果
             if (node.TryGetProperty("hasTrigger", out var ht) && ht.ValueKind == JsonValueKind.True)

@@ -54,6 +54,7 @@ export default function PromptOverlay() {
   const isReturnDon = prompt.kind === "ReturnOwnDon";
   type DonChoice = { id: string; state: string; attachedToNumber?: string; attachedToName?: string };
   const donChoices = (prompt.extra?.donChoices as DonChoice[] | undefined) ?? [];
+  const canCancelReturnDon = prompt.extra?.canCancel === true;
   // 通用选择分支里，凡 id 命中 donChoices 的渲染成咚 token（混合"卡牌 + 咚"同列，如 OP16-033 休置成本）
   const donChoiceMap = new Map(donChoices.map((d) => [d.id, d]));
 
@@ -193,6 +194,11 @@ export default function PromptOverlay() {
   const handleSkip = () => {
     GameRequest.respondPrompt(prompt.promptId, []);
   };
+  const handleCancelReturnDon = () => {
+    const sent = GameRequest.respondPrompt(prompt.promptId, []);
+    if (!sent) return;
+    setSubmittingPromptId(prompt.promptId);
+  };
 
   return (
     <AnimatePresence>
@@ -304,6 +310,14 @@ export default function PromptOverlay() {
               {donChoices.length === 0 && <span className="text-gray-400 text-sm">无可放回的咚</span>}
             </div>
             <div className="flex gap-3">
+              {canCancelReturnDon && (
+                <button
+                  onClick={handleCancelReturnDon}
+                  className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
+                >
+                  不发动
+                </button>
+              )}
               <button
                 onClick={handleConfirm}
                 disabled={!canConfirm}

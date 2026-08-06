@@ -80,8 +80,10 @@ public class PromptSystem : IPromptService
             extra = extra ?? new(),
         });
         // 先登记再广播，避免极低延迟客户端在 _pending 写入前回包。
-        // 续延保持确定性的同序执行，确保动作重放与线上结算顺序一致。
-        var tcs = new TaskCompletionSource<PromptAnswer>();
+        // PromptResponse 在房间锁内调用 Resolve；若让 await 续程在当前线程内联执行，
+        // 续程再次发起满场挤位选择时会持锁同步等待下一次响应，造成 30 秒超时。
+        // 强制异步调度续程，让 Resolve 先退出并释放房间锁。
+        var tcs = new TaskCompletionSource<PromptAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[promptId] = tcs;
         _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
         try
@@ -227,6 +229,12 @@ public class PromptSystem : IPromptService
             promptId,
             chosen = chosen.ToArray(),
         });
+
+        // 续程改为异步调度后，Resolve 返回与续程恢复之间存在一个很短的窗口。
+        // 立即清除已响应的 prompt，避免客户端重复提交旧 prompt，也让 WaitSettledAsync
+        // 正确等待效果链进入“下一个 prompt 或完全结束”的稳定态。
+        if (_engine.State.PendingPrompt?.PromptId == promptId)
+            _engine.State.PendingPrompt = null;
         tcs.TrySetResult(new PromptAnswer(chosen.ToList()));
     }
 

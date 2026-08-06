@@ -9,8 +9,10 @@ import InviteNotifyOverlay from "./InviteNotifyOverlay";
 import FriendlyRoomPanel from "./FriendlyRoomPanel";
 import HistoryPanel from "./HistoryPanel";
 import CardCatalogPanel from "./CardCatalogPanel";
+import ChangelogModal from "./ChangelogModal";
 import NetStatePanel from "@/components/ui/NetStatePanel";
 import { useNetStore } from "@/store/netStore";
+import { LATEST_CHANGELOG } from "@/data/changelog";
 import { getAllCachedCards, loadCardSet } from "@/data/CardLoader";
 import { loadAllDecks } from "@/data/DeckMapper";
 import { DEFAULT_SEARCH_SETS } from "@/data/cardSets";
@@ -289,11 +291,40 @@ function OnlineCountBadge({ onClick }: { onClick: () => void }) {
 
 const SELECTED_DECK_KEY = "grandumi_selected_deck";
 
+function changelogSeenKey(account: string): string {
+  return `grandumi_changelog_seen_${encodeURIComponent(account)}`;
+}
+
 export default function MainPanel() {
   const [view, setView] = useState<View>("lobby");
   const [showPlayerList, setShowPlayerList] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const setGlobalDeck = useNetStore((s) => s.setSelectedDeck);
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
+  const account = useNetStore((s) => s.account);
+
+  // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
+  useEffect(() => {
+    if (!account || !LATEST_CHANGELOG) return;
+    try {
+      const seenId = localStorage.getItem(changelogSeenKey(account));
+      if (seenId !== LATEST_CHANGELOG.id) setShowChangelog(true);
+    } catch {
+      // 浏览器禁用本地存储时仍展示日志，但不阻断主页使用。
+      setShowChangelog(true);
+    }
+  }, [account]);
+
+  const closeChangelog = () => {
+    if (account && LATEST_CHANGELOG) {
+      try {
+        localStorage.setItem(changelogSeenKey(account), LATEST_CHANGELOG.id);
+      } catch {
+        // 本地存储不可用时只关闭本次弹窗。
+      }
+    }
+    setShowChangelog(false);
+  };
 
   // 启动时恢复已保存的卡组选择到全局 store
   // 直接从 SavedDeck 构建卡组字符串，不依赖卡牌缓存（缓存可能尚未加载）
@@ -318,6 +349,7 @@ export default function MainPanel() {
       <>
         <FriendlyRoomPanel />
         <InviteNotifyOverlay />
+        <ChangelogModal open={showChangelog} onClose={closeChangelog} />
       </>
     );
   }
@@ -364,6 +396,14 @@ export default function MainPanel() {
           对局记录
         </button>
         <div className="mt-auto flex w-full flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowChangelog(true)}
+            title="查看更新日志"
+            className="w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-1.5 text-[11px] text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
+          >
+            更新日志
+          </button>
           <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
           <NetStatePanel />
         </div>
@@ -379,6 +419,7 @@ export default function MainPanel() {
 
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
       <InviteNotifyOverlay />
+      <ChangelogModal open={showChangelog} onClose={closeChangelog} />
     </div>
   );
 }

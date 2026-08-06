@@ -57,6 +57,6 @@ public class OP08_074_BlackMaria : IScriptedEffect
         int myDon = me.CostArea.Count;
         int oppDon = opp.CostArea.Count;
         int excess = myDon - oppDon;
-        if (excess > 0) await AtomicOps.PromptReturnDonToDeck(ctx, excess);
+        if (excess > 0) await AtomicOps.PromptReturnDonToDeck(ctx, excess, optional: false);
     }
 }

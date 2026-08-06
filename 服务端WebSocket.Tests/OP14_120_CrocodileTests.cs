@@ -34,7 +34,9 @@ public class OP14_120_CrocodileTests
     [Fact]
     public async Task OP14_079_LeaderEffectKO_TriggersDiscardAndReplay()
     {
-        var state = TestScene.New("OP14-079").Build();
+        var state = TestScene.New("OP14-079")
+            .MyDeckTop("OP15-050", "OP15-051")
+            .Build();
         var me = state.Players[0];
         var crocodile = Card("OP14-120");
         var discard = Card("OP15-003");
@@ -52,6 +54,9 @@ public class OP14_120_CrocodileTests
         Assert.DoesNotContain(crocodile, me.Trash);
         Assert.DoesNotContain(discard, me.Hand);
         Assert.Contains(discard, me.Trash);
+        Assert.Equal(3, prompts.ConfirmHistory.Count);
+        Assert.Contains("卡组最上方", prompts.ConfirmHistory[1]);
+        Assert.Contains("【KO时】", prompts.ConfirmHistory[2]);
     }
 
     [Fact]

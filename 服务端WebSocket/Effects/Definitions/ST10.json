@@ -102,12 +102,12 @@
       {
         "on": "OnEnterField",
         "cost": { "donReturn": 1 },
-        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 1000 } ]
+        "then": [ { "op": "AddPowerUntilOppEnd", "target": "selfLeader", "delta": 1000 } ]
       },
       {
         "on": "OnAttackDeclare",
         "cost": { "donReturn": 1 },
-        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 1000 } ]
+        "then": [ { "op": "AddPowerUntilOppEnd", "target": "selfLeader", "delta": 1000 } ]
       }
     ]
   },

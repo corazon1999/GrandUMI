@@ -670,6 +670,13 @@
         "op": "AddPowerThisBattle",
         "target": "$tgt",
         "delta": 1000
+      },
+      {
+        "op": "Draw",
+        "n": 1,
+        "if": {
+          "selfDonTotalLte": 6
+        }
       }
     ]
   },

@@ -102,6 +102,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         {
             me.Deck.Remove(picked);
             me.Hand.Add(picked);
+            ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { picked.Info.Number });
         }
         var remaining = top.Where(c => !ReferenceEquals(c, picked)).ToList();
         var ordered = remaining;

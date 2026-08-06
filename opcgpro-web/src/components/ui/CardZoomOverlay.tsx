@@ -19,13 +19,16 @@ const TYPE_LABELS: Record<string, string> = {
 export default function CardZoomOverlay({
   card,
   sprite,
+  counterValue,
   onClose,
 }: {
   card: CardData;
   sprite: string;
+  counterValue?: number;
   onClose: () => void;
 }) {
   const rawSprite = sprite ?? card.sprite ?? "/sprites/CardBack.png";
+  const displayCounter = counterValue ?? card.counter;
   const [imgSrc, setImgSrc] = useState(rawSprite);
 
   useEffect(() => {
@@ -115,8 +118,8 @@ export default function CardZoomOverlay({
             {(card.type === "Character" || card.type === "Leader") && (
               <span className="text-gray-300">力 <span className="text-white font-bold">{card.power.toLocaleString()}</span></span>
             )}
-            {card.counter > 0 && (
-              <span className="text-gray-300">反 <span className="text-white font-bold">+{card.counter}</span></span>
+            {displayCounter > 0 && (
+              <span className="text-gray-300">反 <span className="text-white font-bold">+{displayCounter}</span></span>
             )}
           </div>
 

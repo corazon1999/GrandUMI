@@ -44,9 +44,10 @@ public class OP14_079_Crocodile : IScriptedEffect
             costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (costPick.Count < 1) return; // 未支付成本
         var costCard = costCands.First(c => c.Id.ToString() == costPick[0]);
-        // 成本KO也是KO：须走 KOByEffectAsync 派发受害者【K.O.时】——同步 KO 不派发，
-        // 巴洛克体系用领袖KO自家 OP14-088/091 时其KO时效果全部哑火（反馈#207/#235 根因）
-        await AtomicOps.KOByEffectAsync(ctx.State, ctx.OwnerIndex, costCard, ctx.Prompts, ctx.OwnerIndex);
+        // 成本KO也是KO：须走 KOByEffectAsync 派发受害者【K.O.时】——同步 KO 不派发。
+        // 本领袖效果要先完整处理费用-10与可选堆墓，再结算成本角色的【KO时】，故显式延迟触发。
+        await AtomicOps.KOByEffectAsync(
+            ctx.State, ctx.OwnerIndex, costCard, ctx.Prompts, ctx.OwnerIndex, deferOnKO: true);
 
         me.TurnOnceUsed.Add(key);
 

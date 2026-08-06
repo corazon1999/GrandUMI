@@ -48,11 +48,19 @@ public class CardInfo
         return false;
     }
 
-    /// <summary>是否拥有指定特征（特征字符串完全匹配）</summary>
+    /// <summary>是否拥有指定特征（经译名与排版标准化后完全匹配）</summary>
     public bool HasKeyword(string kw)
     {
         if (AllKeywordsWildcard) return true;
-        foreach (var k in Keywords) if (k == kw) return true;
+        foreach (var k in Keywords) if (KeywordNormalizer.Equals(k, kw)) return true;
+        return false;
+    }
+
+    /// <summary>特征中是否包含指定文本（经译名与排版标准化后匹配）。</summary>
+    public bool HasKeywordContaining(string fragment)
+    {
+        if (AllKeywordsWildcard) return true;
+        foreach (var k in Keywords) if (KeywordNormalizer.Contains(k, fragment)) return true;
         return false;
     }
 

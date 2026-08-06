@@ -3,6 +3,8 @@ using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Validation;
+using System.Collections.Concurrent;
+using System.Text.Json;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -19,6 +21,59 @@ public class ST31To35EffectTests
             Assert.NotNull(CardDatabase.Get(number));
             Assert.NotNull(ScriptedEffectRegistry.TryGet(number));
         }
+    }
+
+    [Fact]
+    public async Task ST31_005_Search_RevealsOnlyAddedCardToOpponent()
+    {
+        const string deck = "OP01-001\nST31-005";
+        var engine = new GameEngine("st31-005-search-reveal",
+            ("s0", "alice", deck), ("s1", "bob", deck), 0, 31);
+        var opponentMessages = new ConcurrentQueue<string>();
+        engine.OnSendToPlayer = (playerIndex, payload) =>
+        {
+            if (playerIndex == 1) opponentMessages.Enqueue(JsonSerializer.Serialize(payload));
+        };
+
+        var selected = new CardInstance { Info = CardDatabase.Get("ST31-003")! };
+        var ineligible = new CardInstance { Info = CardDatabase.Get("ST35-005")! };
+        Assert.True(selected.Info.HasKeyword("草帽一伙"));
+        Assert.False(ineligible.Info.HasKeyword("草帽一伙"));
+
+        var player = engine.State.Players[0];
+        player.Deck.Clear();
+        player.Deck.AddRange(new[] { selected, ineligible });
+        var source = new CardInstance { Info = CardDatabase.Get("ST31-005")! };
+
+        var resolveTask = EffectRuntime.Resolve(
+            engine.State, 0, source, EffectTrigger.OnEnterField, engine.Prompts);
+
+        for (int i = 0; i < 100 && engine.State.PendingPrompt is null; i++)
+            await Task.Delay(10);
+
+        var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
+        Assert.Equal(new[] { selected.Id.ToString() }, prompt.ValidChoices);
+        using (var choiceCards = JsonDocument.Parse(JsonSerializer.Serialize(prompt.Extra["choiceCards"])))
+            Assert.Equal(2, choiceCards.RootElement.GetArrayLength());
+
+        engine.Prompts.Resolve(prompt.PromptId, new[] { selected.Id.ToString() });
+        await resolveTask;
+
+        Assert.Contains(selected, player.Hand);
+        var revealMessages = opponentMessages
+            .Select(message => JsonDocument.Parse(message))
+            .Where(document => document.RootElement.GetProperty("lastAction").GetString() == "RevealCards")
+            .ToList();
+        var revealMessage = Assert.Single(revealMessages);
+        var revealedNumbers = revealMessage.RootElement
+            .GetProperty("reveal")
+            .GetProperty("cardNumbers")
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .ToList();
+        Assert.Equal(new[] { selected.Info.Number }, revealedNumbers);
+
+        foreach (var document in revealMessages) document.Dispose();
     }
 
     [Fact]
