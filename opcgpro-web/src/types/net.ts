@@ -295,6 +295,7 @@ export interface MsgFriendlyLeft extends MsgBase {
 
 /** 客户端可发送的游戏动作类型（服务端权威结算） */
 export type GameActionType =
+  | "ChooseFirstPlayer" // { goFirst: boolean }
   | "Mulligan"          // { redraw: boolean }
   | "PlayCard"          // { handIndex: number, freeCost?: boolean }
   | "AttachDon"         // { targetId: "leader" | cardId, count: number }
@@ -396,6 +397,11 @@ export interface MsgGameState extends MsgBase {
   currentTurn: boolean;
   turnCount: number;
   firstPlayer: number;
+  firstPlayerChosen: boolean;
+  isFirstPlayer: boolean;
+  canChooseFirstPlayer: boolean;
+  diceWinnerIsMe: boolean;
+  startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   isGameOver: boolean;
   winnerIsMe: boolean;

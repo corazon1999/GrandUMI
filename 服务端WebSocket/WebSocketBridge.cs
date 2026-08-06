@@ -18,7 +18,7 @@ public static class WebSocketBridge
 {
     private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
     {
-        "GameStart", "Resync", "SpectateJoin",
+        "GameStart", "Resync", "SpectateJoin", "FirstPlayerChosen",
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
@@ -354,8 +354,6 @@ public static class WebSocketBridge
 
             var deck1 = p1.Deck ?? "";
             var deck2 = p2.Deck ?? "";
-            bool p1First = Random.Shared.Next(2) == 0;
-
             // 记录对局对手关系
             GameOpponent[p1.SessionId] = p2.SessionId;
             GameOpponent[p2.SessionId] = p1.SessionId;
@@ -365,8 +363,8 @@ public static class WebSocketBridge
             Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?" });
 
             // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
-            Send(p1.SessionId, new { proto = "MsgGameStart", IsFirst = p1First });
-            Send(p2.SessionId, new { proto = "MsgGameStart", IsFirst = !p1First });
+            Send(p1.SessionId, new { proto = "MsgGameStart" });
+            Send(p2.SessionId, new { proto = "MsgGameStart" });
 
             // 创建引擎并广播首份快照
             try
@@ -374,7 +372,6 @@ public static class WebSocketBridge
                 GameRoomManager.CreateRoom(
                     p1.SessionId, p1.Account ?? "?", deck1,
                     p2.SessionId, p2.Account ?? "?", deck2,
-                    p0First: p1First,
                     p0AlwaysPrompt: p1.AlwaysPromptOnLifeReveal,
                     p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal);
             }
@@ -387,7 +384,7 @@ public static class WebSocketBridge
 
             p1.IsMatching = false;
             p2.IsMatching = false;
-            Log($"匹配成功: {p1.Account} vs {p2.Account} 先手={p1.Account}({p1First})");
+            Log($"匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
         }
     }
 
@@ -637,26 +634,23 @@ public static class WebSocketBridge
         }
     }
 
-    /// <summary>建立对局(房间码/邀请/友谊战共用):随机先后手 → 记录对手 → 双方进场 → 建房。返回对局 roomId(失败 null)</summary>
+    /// <summary>建立对局(房间码/邀请/友谊战共用):双方进场 → 骰点选择先后手 → 建房。返回对局 roomId(失败 null)</summary>
     private static string? StartDuel(WsSession host, string hostDeck, WsSession guest, string guestDeck, string? friendlyRoomId = null)
     {
         host.CurrentRoomCode  = null;
         guest.CurrentRoomCode = null;
-        bool hostFirst = Random.Shared.Next(2) == 0;
-
         GameOpponent[host.SessionId]  = guest.SessionId;
         GameOpponent[guest.SessionId] = host.SessionId;
 
         // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
-        Send(host.SessionId,  new { proto = "MsgGameStart", IsFirst = hostFirst });
-        Send(guest.SessionId, new { proto = "MsgGameStart", IsFirst = !hostFirst });
+        Send(host.SessionId,  new { proto = "MsgGameStart" });
+        Send(guest.SessionId, new { proto = "MsgGameStart" });
 
         try
         {
             var room = GameRoomManager.CreateRoom(
                 host.SessionId,  host.Account  ?? "?", hostDeck,
                 guest.SessionId, guest.Account ?? "?", guestDeck,
-                p0First: hostFirst,
                 p0AlwaysPrompt: host.AlwaysPromptOnLifeReveal,
                 p1AlwaysPrompt: guest.AlwaysPromptOnLifeReveal,
                 friendlyRoomId: friendlyRoomId);

@@ -73,7 +73,7 @@ public class GameEngine
     {
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
-        "MulliganComplete", "MulliganUpdate",
+        "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
         "DuelOver", "Surrender",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
@@ -82,7 +82,7 @@ public class GameEngine
 
     /// <summary>
     /// 用双方 deck 字符串构造引擎（已通过 DeckValidator 校验）
-    /// firstPlayer = 先手玩家索引 (0/1)
+    /// firstPlayer = 先手玩家索引 (0/1)；-1 表示启用开局骰点选择流程
     /// </summary>
     public GameEngine(string roomId, (string sessionId, string accountName, string deckRaw) p0,
                                        (string sessionId, string accountName, string deckRaw) p1,
@@ -125,6 +125,8 @@ public class GameEngine
         State.CurrentTurnPlayer = firstPlayer;
         State.Phase = Phase.Reset;
         State.TurnCount = 0; // 在双方完成 mulligan 后调用 TurnEngine.StartFirstTurn 才进入 turn 1
+        if (firstPlayer < 0)
+            RollStartingDice();
         Prompts = new PromptSystem(this);
     }
 
@@ -154,8 +156,14 @@ public class GameEngine
         {
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
+        else if (!State.StartingPlayerChosen
+            && action is not "ChooseFirstPlayer" and not "Surrender")
+        {
+            SendError(playerIndex, "请先完成先后手选择");
+        }
         else switch (action)
         {
+            case "ChooseFirstPlayer": HandleChooseFirstPlayer(playerIndex, data); break;
             case "Mulligan":       HandleMulligan(playerIndex, data); break;
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
             case "AttachDon":      HandleAttachDon(playerIndex, data); break;
@@ -193,6 +201,63 @@ public class GameEngine
         if (Volatile.Read(ref _trackedOperations) == 0)
             EndSnapshotBatch();
         LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
+    }
+
+    // ── 开局骰点与先后手选择 ─────────────────────────────────────────────
+
+    private void RollStartingDice()
+    {
+        while (true)
+        {
+            var player0 = State.Rng.Next(1, 7);
+            var player1 = State.Rng.Next(1, 7);
+            State.StartingDiceRounds.Add(new StartingDiceRound(player0, player1));
+            var randomSeq = ++State.RandomSeq;
+            RecordMatchLog("random_event", -1, new
+            {
+                randomSeq,
+                type = "starting_dice",
+                player0,
+                player1,
+                tie = player0 == player1,
+                rngSeed = State.RngSeed,
+            });
+
+            if (player0 == player1) continue;
+            State.StartingPlayerChooser = player0 > player1 ? 0 : 1;
+            break;
+        }
+    }
+
+    private void HandleChooseFirstPlayer(int playerIndex, JsonElement data)
+    {
+        if (State.StartingPlayerChosen)
+        {
+            SendError(playerIndex, "先后手已经确定");
+            return;
+        }
+        if (State.StartingPlayerChooser != playerIndex)
+        {
+            SendError(playerIndex, "本次骰点胜者才可选择先后手");
+            return;
+        }
+        if (data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("goFirst", out var goFirstElement)
+            || goFirstElement.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+        {
+            SendError(playerIndex, "缺少有效的先后手选择");
+            return;
+        }
+
+        var goFirst = goFirstElement.GetBoolean();
+        State.FirstPlayer = goFirst ? playerIndex : 1 - playerIndex;
+        State.CurrentTurnPlayer = State.FirstPlayer;
+        Broadcast("FirstPlayerChosen", new
+        {
+            player = playerIndex,
+            goFirst,
+            firstPlayer = State.FirstPlayer,
+        });
     }
 
     /// <summary>
@@ -592,16 +657,6 @@ public class GameEngine
             else if (result.Kind == PlayKind.Event)
             {
                 await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventMain, Prompts);
-
-                // OP15-002 路西：启动主要激活后(每回合1次)，本回合内我方发动原始费用≥3的事件时抽1。
-                // armed 状态由 OP15_002_Lucci 脚本写入的 TurnOnceUsed 标记表示；事件费用按印刷费 Info.Cost 判定。
-                var lucciPlayer = State.Players[playerIndex];
-                if (lucciPlayer.Leader.Info.Number == "OP15-002"
-                    && lucciPlayer.TurnOnceUsed.Contains("OP15-002-MainOncePerTurn")
-                    && result.Card.Info.Cost >= 3)
-                {
-                    AtomicOps.Draw(State, playerIndex, 1);
-                }
 
                 // 旁观者：当对方发动事件时（监听卡为非出牌方，脚本内自行判定）
                 if (!State.IsGameOver)

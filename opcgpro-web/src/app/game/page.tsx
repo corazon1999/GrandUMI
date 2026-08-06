@@ -7,6 +7,7 @@ import GameBoard from "@/components/game/GameBoard";
 import GameMenu from "@/components/game/GameMenu";
 import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
+import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
 import PromptOverlay from "@/components/game/PromptOverlay";
 import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
@@ -64,6 +65,7 @@ export default function GamePage() {
     <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
       {!isObserver && !isPlayback && <ReconnectOverlay />}
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
+      {!isObserver && !isPlayback && <FirstPlayerOverlay />}
       {!isObserver && !isPlayback && <MulliganOverlay />}
       {!isObserver && !isPlayback && <PromptOverlay />}
       {!isObserver && !isPlayback && <PromptSuccessFlash />}

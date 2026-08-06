@@ -61,6 +61,16 @@ public static class StateSnapshotBuilder
             currentTurn = !isSpectator && state.CurrentTurnPlayer == myIdx,
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
+            firstPlayerChosen = state.StartingPlayerChosen,
+            isFirstPlayer = !isSpectator && state.StartingPlayerChosen && state.FirstPlayer == myIdx,
+            canChooseFirstPlayer = !isSpectator && !state.StartingPlayerChosen && state.StartingPlayerChooser == myIdx,
+            diceWinnerIsMe = !isSpectator && state.StartingPlayerChooser == myIdx,
+            startingDiceRolls = state.StartingDiceRounds.Select(round => new
+            {
+                my = myIdx == 0 ? round.Player0 : round.Player1,
+                opponent = myIdx == 0 ? round.Player1 : round.Player0,
+                tie = round.Player0 == round.Player1,
+            }).ToArray(),
             mulliganBothDone = state.MulliganBothDone,
             isGameOver = state.IsGameOver,
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,

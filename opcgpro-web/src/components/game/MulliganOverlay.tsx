@@ -10,11 +10,13 @@ import { useResponsive } from "@/hooks/useResponsive";
 export default function MulliganOverlay() {
   const my = useGameStore((s) => s.my);
   const opp = useGameStore((s) => s.opponent);
-  const isFirst = useGameStore((s) => s.currentTurn || s.firstPlayer === 0);
+  const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
+  const isFirst = useGameStore((s) => s.isFirstPlayer);
   const mulliganBothDone = useGameStore((s) => s.mulliganBothDone);
   const { cardSize } = useResponsive();
 
   if (!my) return null;
+  if (!firstPlayerChosen) return null;
   if (mulliganBothDone) return null;
 
   const myDone = my.mulliganDone;

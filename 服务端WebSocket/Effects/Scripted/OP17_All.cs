@@ -562,7 +562,7 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnAllyWillLeaveField
             || !c.Vars.TryGetValue("victimId", out var raw) || raw is not string id || !Guid.TryParse(id, out var victimId)) return;
         var victim = Me(c).Characters.FirstOrDefault(x => x.Id == victimId);
-        if (victim is null || !victim.Info.HasKeyword("红发海盗团")) return;
+        if (victim is null || !victim.Info.HasKeywordContaining("红发海盗团")) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方1张卡牌转为休息状态，使《红发海盗团》角色不离场？")) return;
         if (await AtomicOps.PromptRestOwnCards(c, 1, "选择我方1张卡牌转为休息状态", optional: true))
             c.State.MarkPreventLeave(victimId);
@@ -672,14 +672,14 @@ internal static class OP17Effects
     private static async Task C032(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
-            await SearchTop(c, 3, x => x.Info.HasKeyword("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
+            await SearchTop(c, 3, x => x.Info.HasKeywordContaining("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
     }
 
     private static async Task C033(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
         {
-            await SearchTop(c, 3, x => x.Info.HasKeyword("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
+            await SearchTop(c, 3, x => x.Info.HasKeywordContaining("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
             return;
         }
         if (c.Trigger != EffectTrigger.OnOppAttackDeclare || !Me(c).Characters.Contains(c.Source)) return;
@@ -721,7 +721,7 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.EventMain)
         {
-            await SearchTop(c, 5, x => x.Info.HasKeyword("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
+            await SearchTop(c, 5, x => x.Info.HasKeywordContaining("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
             return;
         }
         if (c.Trigger != EffectTrigger.EventCounter || AtomicOps.RestableCount(Me(c)) < 1) return;

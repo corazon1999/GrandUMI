@@ -1375,6 +1375,17 @@
           }
         ]
       }
+    ],
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "恐怖之船海盗团",
+          "originalCostLte": 4
+        },
+        "rest": true,
+        "text": "将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色以休息状态登场"
+      }
     ]
   },
   "OP14-111": {
@@ -1414,6 +1425,17 @@
             "duration": "UntilNextOpponentEndPhase"
           }
         ]
+      }
+    ],
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "恐怖之船海盗团",
+          "originalCostLte": 4
+        },
+        "rest": true,
+        "text": "将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色以休息状态登场"
       }
     ]
   },

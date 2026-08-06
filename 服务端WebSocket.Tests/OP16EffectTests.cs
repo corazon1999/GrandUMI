@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Validation;
 using Xunit;
 
@@ -38,6 +39,70 @@ public class OP16EffectTests
         Assert.False(ActionValidator.HasKeyword(state, leader, "双重攻击"));
         Assert.Equal(5000, state.CurrentPowerOf(0, leader));
         Assert.Equal(10000, state.CurrentPowerOf(0, newgate));
+    }
+
+    [Fact]
+    public async Task OP16_015_Discards8000PowerCharacter_AndChangesOriginalPowerTo7000()
+    {
+        var state = TestScene.New("OP16-001").Build();
+        state.CurrentTurnPlayer = 1;
+
+        var luffy = Card("OP16-015");
+        var discard = Card("OP16-011");
+        state.Players[0].Characters.Add(luffy);
+        state.Players[0].Hand.Add(discard);
+
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.TriggerEvent(
+            state,
+            EffectTrigger.OnOppAttackDeclare,
+            prompts,
+            new Dictionary<string, object?> { ["AttackerIdx"] = 1 });
+
+        Assert.DoesNotContain(discard, state.Players[0].Hand);
+        Assert.Contains(discard, state.Players[0].Trash);
+        Assert.Equal(7000, state.CurrentPowerOf(0, state.Players[0].Leader));
+        Assert.Equal(7000, state.CurrentPowerOf(0, luffy));
+        Assert.Equal(7000, Assert.Single(state.Players[0].Leader.OriginalPowerOverridesUntilOppEnd).Value);
+        Assert.Equal(7000, Assert.Single(luffy.OriginalPowerOverridesUntilOppEnd).Value);
+    }
+
+    [Fact]
+    public async Task OP16_015_OriginalPowerOverride_StacksWithModifiers_AndExpiresAtOpponentTurnEnd()
+    {
+        var state = TestScene.New("OP16-001").Build();
+        state.CurrentTurnPlayer = 1;
+
+        var leader = state.Players[0].Leader;
+        var luffy = Card("OP16-015");
+        var discard = Card("OP16-011");
+        leader.PowerModThisTurn = 1000;
+        luffy.PowerModThisTurn = -1000;
+        state.Players[0].Characters.Add(luffy);
+        state.Players[0].Hand.Add(discard);
+
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.TriggerEvent(
+            state,
+            EffectTrigger.OnOppAttackDeclare,
+            prompts,
+            new Dictionary<string, object?> { ["AttackerIdx"] = 1 });
+
+        Assert.Equal(8000, state.CurrentPowerOf(0, leader));
+        Assert.Equal(6000, state.CurrentPowerOf(0, luffy));
+
+        TurnEngine.EnterEndPhase(state);
+
+        Assert.Empty(leader.OriginalPowerOverridesUntilOppEnd);
+        Assert.Empty(luffy.OriginalPowerOverridesUntilOppEnd);
+        Assert.Equal(5000, state.CurrentPowerOf(0, leader));
+        Assert.Equal(6000, state.CurrentPowerOf(0, luffy));
     }
 
     [Fact]

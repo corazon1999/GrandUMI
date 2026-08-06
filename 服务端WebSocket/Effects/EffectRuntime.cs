@@ -123,6 +123,15 @@ public static class EffectRuntime
             if (payload is not null)
                 foreach (var (k, v) in payload) ctx.Vars[k] = v;
 
+            // “发动过事件”是发动历史，而不是事件效果是否成功解决。
+            // 统一在效果运行时记录，确保从手牌直接发动、反击发动和被其它效果免费发动都能被统计。
+            if (source.Info.Kind == CardKind.Event
+                && source.Info.Cost >= 3
+                && (trigger == EffectTrigger.EventMain || trigger == EffectTrigger.EventCounter))
+            {
+                s.Players[ownerIdx].HasActivatedBaseCost3PlusEventThisTurn = true;
+            }
+
             // 持续"效果无效"：被持续无效化的卡（整卡或该类触发），其效果不发动
             if (s.IsContinuouslyNullified(source) || s.IsTriggerNullified(source, trigger)) return;
 

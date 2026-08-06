@@ -47,6 +47,14 @@ public static class BotDriver
             return;
         }
 
+        // 真人对局目前不会启用机器人；保留此分支以保证未来骰点机器人房间可自行推进。
+        if (!s.StartingPlayerChosen)
+        {
+            if (s.StartingPlayerChooser == BOT)
+                GameRoomManager.EnqueueBotAction(room, BOT, "ChooseFirstPlayer", El(new { goFirst = true }));
+            return;
+        }
+
         if (!s.Players[BOT].MulliganDone)
         {
             GameRoomManager.EnqueueBotAction(room, BOT, "Mulligan", El(new { redraw = false }));

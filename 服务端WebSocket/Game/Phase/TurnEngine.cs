@@ -103,6 +103,7 @@ public static class TurnEngine
             foreach (var c in p.Hand) c.CostModThisTurn = 0;
             p.TurnOnceUsed.Clear();
             p.HandDiscardedByEffectThisTurn = false;
+            p.HasActivatedBaseCost3PlusEventThisTurn = false;
         }
         // 延迟到回合结束执行的任务（如 OP06-006：将我方1张FILM角色放置废弃区）
         foreach (var task in state.EndOfTurnTasks)

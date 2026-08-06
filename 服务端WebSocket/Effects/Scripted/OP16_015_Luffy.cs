@@ -41,9 +41,11 @@ public class OP16_015_Luffy : IScriptedEffect
         var discard = cands.First(c => c.Id.ToString() == pick[0]);
         AtomicOps.DiscardHand(me, discard);
 
-        // 收益：本回合我方领袖和此角色原本力量变为 7000
-        bool myTurn = ctx.State.CurrentTurnPlayer == ctx.OwnerIndex; // 对方攻击时 → 一般为对方回合
-        AtomicOps.SetPowerThisTurn(me.Leader, 7000, 0, myTurn);
-        AtomicOps.SetPowerThisTurn(self, 7000, 0, myTurn);
+        // 收益：本回合我方领袖和此角色原本力量变为 7000。
+        // 此效果在对方攻击时发动，因此“本回合”会在当前对方回合结束时到期。
+        // 必须覆盖原本力量，不能用临时力量修正把当前总力量凑成 7000；
+        // 已有的力量加减效果仍应在 7000 的原本力量之上继续叠加。
+        AtomicOps.SetOriginalPowerUntilOppEnd(me.Leader, 7000, ctx.OwnerIndex);
+        AtomicOps.SetOriginalPowerUntilOppEnd(self, 7000, ctx.OwnerIndex);
     }
 }

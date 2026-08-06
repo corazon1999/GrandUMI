@@ -36,6 +36,9 @@ public class PlayerState
     /// <summary>本回合中该玩家是否曾因卡牌效果丢弃过手牌（不含发动成本）。</summary>
     public bool HandDiscardedByEffectThisTurn { get; set; }
 
+    /// <summary>本回合中该玩家是否发动过原始费用不低于 3 的事件。</summary>
+    public bool HasActivatedBaseCost3PlusEventThisTurn { get; set; }
+
     // ── 帮助查询 ──────────────────────────────────────────────────────────
 
     public int ActiveDonCount => CostArea.Count(d => d.State == DonState.Active);

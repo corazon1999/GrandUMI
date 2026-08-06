@@ -49,4 +49,27 @@ public class OP08_OP14RegressionTests
         Assert.Equal("OpponentCharacter", prompt.kind);
         Assert.Equal(1, prompt.max);
     }
+
+    [Theory]
+    [InlineData("OP14-110")]
+    [InlineData("OP14-111")]
+    public async Task OP14_110_111_LifeTrigger_PlaysSelectedThrillerBarkCharacterRested(string sourceNumber)
+    {
+        var state = TestScene.New().Build();
+        var source = new CardInstance { Info = CardDatabase.Get(sourceNumber)! };
+        var selected = new CardInstance { Info = CardDatabase.Get("OP14-102")! };
+        var invalid = new CardInstance { Info = CardDatabase.Get("OP15-050")! };
+        state.Players[0].Trash.AddRange([source, selected, invalid]);
+        var prompts = new MockPromptService().QueueChoose(selected.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnLifeRevealTrigger, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("PlayCharFromTrash", prompt.kind);
+        Assert.Contains(selected.Id.ToString(), prompt.choices);
+        Assert.DoesNotContain(invalid.Id.ToString(), prompt.choices);
+        Assert.DoesNotContain(selected, state.Players[0].Trash);
+        Assert.Contains(selected, state.Players[0].Characters);
+        Assert.True(selected.IsTapped);
+    }
 }

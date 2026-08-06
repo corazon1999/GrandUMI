@@ -12,6 +12,13 @@ public static class PrivateStateSnapshotBuilder
             currentTurnPlayer = state.CurrentTurnPlayer,
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
+            firstPlayerChosen = state.StartingPlayerChosen,
+            startingPlayerChooser = state.StartingPlayerChooser,
+            startingDiceRolls = state.StartingDiceRounds.Select(round => new
+            {
+                player0 = round.Player0,
+                player1 = round.Player1,
+            }).ToArray(),
             rngSeed = state.RngSeed,
             randomSeq = state.RandomSeq,
             mulliganBothDone = state.MulliganBothDone,

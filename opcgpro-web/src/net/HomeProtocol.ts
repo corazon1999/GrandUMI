@@ -294,14 +294,12 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
 function handleGameStart(msg: MsgGameStart) {
   const { useGameStore } = require("@/store/gameStore");
   const gameStore = useGameStore.getState();
-  // 先手信息由服务端 MsgGameState 的 firstPlayer 决定，这里仅切换为对战模式；
-  // IsFirst 另存入 sessionStorage 供 /game 页初始化使用
+  // 先后手信息由服务端 MsgGameState 决定，这里仅切换为对战模式。
   gameStore.setMode("Player");
 
   if (typeof window !== "undefined") {
     sessionStorage.setItem("myDeck", msg.MainDeck ?? "");
     sessionStorage.setItem("enemyDeck", msg.EnemyDeck ?? "");
-    sessionStorage.setItem("isFirst", msg.IsFirst ? "1" : "0");
     const net = useNetStore.getState();
     sessionStorage.setItem("myName", net.playerName);
     sessionStorage.setItem("opponentName", net.opponentName);

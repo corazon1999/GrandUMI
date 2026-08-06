@@ -35,7 +35,7 @@ function PlayerMat({
   isPlayback: boolean;
 }) {
   const isOpponent = side === "opponent";
-  const canShowDon = !isObserver && !isPlayback;
+  const canShowDon = !isPlayback;
   const leaderStage = (
     <div className="flex items-end justify-center gap-4 md:gap-5">
       <LeaderCard side={side} />

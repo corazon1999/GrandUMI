@@ -68,26 +68,29 @@ public class LatencyOptimizationTests
     }
 
     [Fact]
-    public async Task 房间动作队列_按进入顺序完成换牌并结束首回合()
+    public async Task 房间动作队列_按进入顺序完成先后手选择换牌并结束首回合()
     {
         TestScene.New();
         var deck = BuildLegalDeck("OP15-001");
         var room = GameRoomManager.CreateRoom(
             "queue-s0", "queue-alice", deck,
-            "queue-s1", "queue-bob", deck,
-            p0First: true);
+            "queue-s1", "queue-bob", deck);
 
         try
         {
+            var chooser = room.Engine.State.StartingPlayerChooser;
+            var chooserSid = chooser == 0 ? "queue-s0" : "queue-s1";
+            GameRoomManager.HandleAction(chooserSid, "ChooseFirstPlayer", JsonSerializer.SerializeToElement(new { goFirst = true }));
             GameRoomManager.HandleAction("queue-s0", "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
             GameRoomManager.HandleAction("queue-s1", "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
-            GameRoomManager.HandleAction("queue-s0", "EndTurn", JsonSerializer.SerializeToElement(new { }));
+            GameRoomManager.HandleAction(chooserSid, "EndTurn", JsonSerializer.SerializeToElement(new { }));
 
-            for (var i = 0; i < 500 && room.Engine.State.CurrentTurnPlayer != 1; i++)
+            for (var i = 0; i < 500 && room.Engine.State.TurnCount != 2; i++)
                 await Task.Delay(2);
 
+            Assert.True(room.Engine.State.StartingPlayerChosen);
             Assert.True(room.Engine.State.MulliganBothDone);
-            Assert.Equal(1, room.Engine.State.CurrentTurnPlayer);
+            Assert.Equal(1 - chooser, room.Engine.State.CurrentTurnPlayer);
             Assert.Equal(2, room.Engine.State.TurnCount);
         }
         finally

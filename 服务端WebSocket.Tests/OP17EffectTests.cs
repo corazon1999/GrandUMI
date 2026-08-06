@@ -205,39 +205,40 @@ public class OP17EffectTests
         Assert.Equal(0, resultPayload.RootElement.GetProperty("failed").GetInt32());
     }
 
-    [Fact]
-    public async Task OP17_SearchTop_ShowsAllCardsToChooser_ButRevealsOnlyAddedCard()
+    [Theory]
+    [InlineData("OP17-032", EffectTrigger.OnEnterField, 3)]
+    [InlineData("OP17-033", EffectTrigger.OnEnterField, 3)]
+    [InlineData("OP17-037", EffectTrigger.EventMain, 5)]
+    public async Task OP17_SearchTop_IncludesSubgroupTrait_AndRevealsOnlyAddedCard(
+        string sourceNumber, EffectTrigger trigger, int checkedCount)
     {
         _ = TestScene.New().Build();
         var deck = LegalOp17Deck("OP17-039");
-        var engine = new GameEngine("op17-search-reveal", ("s0", "alice", deck), ("s1", "bob", deck), 0, 17);
+        var engine = new GameEngine($"op17-search-reveal-{sourceNumber}", ("s0", "alice", deck), ("s1", "bob", deck), 0, 17);
         var messages = new ConcurrentQueue<string>();
         engine.OnSendToPlayer = (playerIndex, payload) =>
         {
             if (playerIndex == 0) messages.Enqueue(JsonSerializer.Serialize(payload));
         };
 
-        var eligibleInfo = CardDatabase.GetBySet("OP17")
-            .First(c => c.Kind != CardKind.Leader && c.HasKeyword("红发海盗团"));
+        var eligibleInfo = CardDatabase.Get("OP17-021")!;
+        Assert.False(eligibleInfo.HasKeyword("红发海盗团"));
+        Assert.True(eligibleInfo.HasKeywordContaining("红发海盗团"));
         var ineligibleInfos = CardDatabase.GetBySet("OP17")
-            .Where(c => c.Kind != CardKind.Leader && !c.HasKeyword("红发海盗团"))
-            .Take(2)
+            .Where(c => c.Kind != CardKind.Leader && !c.HasKeywordContaining("红发海盗团"))
+            .Take(checkedCount - 1)
             .ToList();
-        Assert.Equal(2, ineligibleInfos.Count);
+        Assert.Equal(checkedCount - 1, ineligibleInfos.Count);
 
         var selected = new CardInstance { Info = eligibleInfo };
-        var checkedCards = new List<CardInstance>
-        {
-            selected,
-            new() { Info = ineligibleInfos[0] },
-            new() { Info = ineligibleInfos[1] },
-        };
+        var checkedCards = new List<CardInstance> { selected };
+        checkedCards.AddRange(ineligibleInfos.Select(info => new CardInstance { Info = info }));
         var player = engine.State.Players[0];
         player.Deck.Clear();
         player.Deck.AddRange(checkedCards);
 
         var resolveTask = EffectRuntime.Resolve(
-            engine.State, 0, Card("OP17-032"), EffectTrigger.OnEnterField, engine.Prompts);
+            engine.State, 0, Card(sourceNumber), trigger, engine.Prompts);
 
         for (int i = 0; i < 100 && engine.State.PendingPrompt is null; i++)
             await Task.Delay(10);
@@ -246,7 +247,7 @@ public class OP17EffectTests
         Assert.Single(prompt.ValidChoices);
         Assert.Equal(selected.Id.ToString(), prompt.ValidChoices[0]);
         using (var choiceCards = JsonDocument.Parse(JsonSerializer.Serialize(prompt.Extra["choiceCards"])))
-            Assert.Equal(3, choiceCards.RootElement.GetArrayLength());
+            Assert.Equal(checkedCount, choiceCards.RootElement.GetArrayLength());
 
         engine.Prompts.Resolve(prompt.PromptId, new[] { selected.Id.ToString() });
         await resolveTask;
@@ -340,6 +341,23 @@ public class OP17EffectTests
 
         await EffectRuntime.Resolve(counter, 0, Card("OP17-017"), EffectTrigger.EventCounter, new MockPromptService());
         Assert.Equal(4000, counter.Players[0].Leader.PowerModThisBattle);
+    }
+
+    [Fact]
+    public async Task OP17_021_RestsOwnCardToProtectSubgroupCharacterFromOpponentEffectKO()
+    {
+        var state = TestScene.New().Build();
+        var ouri = Card("OP17-021");
+        state.Players[0].Characters.Add(ouri);
+        var prompts = new MockPromptService().QueueChoose(ouri.Id.ToString());
+
+        bool wasKOd = await AtomicOps.KOByEffectAsync(state, 0, ouri, prompts, actingSide: 1);
+
+        Assert.False(wasKOd);
+        Assert.Contains(ouri, state.Players[0].Characters);
+        Assert.DoesNotContain(ouri, state.Players[0].Trash);
+        Assert.True(ouri.IsTapped);
+        Assert.Contains(prompts.ConfirmHistory, text => text.Contains("《红发海盗团》角色不离场"));
     }
 
     [Fact]

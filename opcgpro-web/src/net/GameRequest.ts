@@ -51,6 +51,9 @@ function send(
 }
 
 export const GameRequest = {
+  /** 开局骰点胜者选择自己先手或后手。 */
+  chooseFirstPlayer: (goFirst: boolean) => send("ChooseFirstPlayer", { goFirst }),
+
   /** 重抽决策（双方初始 5 张后） */
   mulligan: (redraw: boolean) => send("Mulligan", { redraw }),
 

@@ -1,5 +1,8 @@
 namespace GrandUMI.Game;
 
+/// <summary>开局决定先后手时的一轮双方六面骰结果。</summary>
+public sealed record StartingDiceRound(int Player0, int Player1);
+
 /// <summary>
 /// 完整对局状态。引擎所有操作都在此对象上进行。
 /// </summary>
@@ -26,8 +29,17 @@ public class GameState
     /// <summary>当前回合玩家索引（0 / 1）</summary>
     public int CurrentTurnPlayer { get; set; }
 
-    /// <summary>第一回合的先攻方索引</summary>
-    public int FirstPlayer { get; init; }
+    /// <summary>第一回合的先攻方索引；-1 表示仍在等待骰点胜者选择。</summary>
+    public int FirstPlayer { get; set; }
+
+    /// <summary>开局骰点的全部轮次；同点轮次也会保留，供客户端播放重骰过程。</summary>
+    public List<StartingDiceRound> StartingDiceRounds { get; } = new();
+
+    /// <summary>最终骰点较大、拥有先后手选择权的玩家索引；非骰点开局为 -1。</summary>
+    public int StartingPlayerChooser { get; set; } = -1;
+
+    /// <summary>是否已经确定第一回合的先攻方。</summary>
+    public bool StartingPlayerChosen => FirstPlayer is 0 or 1;
 
     public int TurnCount { get; set; } = 1;
 

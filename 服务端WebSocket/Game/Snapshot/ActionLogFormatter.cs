@@ -30,6 +30,13 @@ public static class ActionLogFormatter
 
         switch (action)
         {
+            case "FirstPlayerChosen":
+            {
+                var chooser = GetInt(payload, "player");
+                var goFirst = GetBool(payload, "goFirst");
+                return $"[开局] {Side(chooser)}选择了{(goFirst ? "先手" : "后手")}";
+            }
+
             case "PlayCard":
                 if (GetBool(payload, "suppressLog")) return "";
                 return $"[出牌] {Side(GetInt(payload, "player"))}打出【{Card(GetStr(payload, "cardNumber"))}】";

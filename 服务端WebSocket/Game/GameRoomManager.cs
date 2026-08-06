@@ -62,16 +62,17 @@ public static class GameRoomManager
     /// <summary>双方匹配/房间码成功后创建房间</summary>
     public static RoomEntry CreateRoom(string p0Sid, string p0Account, string p0Deck,
                                         string p1Sid, string p1Account, string p1Deck,
-                                        bool p0First,
+                                        bool? p0First = null,
                                         bool p0AlwaysPrompt = false, bool p1AlwaysPrompt = false,
                                         bool vsBot = false,
                                         string? friendlyRoomId = null)
     {
         var roomId = Guid.NewGuid().ToString("N")[..12];
+        var firstPlayer = p0First.HasValue ? (p0First.Value ? 0 : 1) : -1;
         var engine = new GameEngine(roomId,
             (p0Sid, p0Account, p0Deck),
             (p1Sid, p1Account, p1Deck),
-            firstPlayer: p0First ? 0 : 1,
+            firstPlayer: firstPlayer,
             leaderKeywordWildcard: vsBot);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
@@ -112,7 +113,9 @@ public static class GameRoomManager
                 new { index = 0, accountName = p0Account, deckRaw = p0Deck },
                 new { index = 1, accountName = p1Account, deckRaw = p1Deck },
             },
-            firstPlayer = p0First ? 0 : 1,
+            firstPlayer,
+            startingPlayerChooser = engine.State.StartingPlayerChooser,
+            startingDiceRolls = engine.State.StartingDiceRounds,
             rngSeed = engine.State.RngSeed,
             rulesVersion = "opcg-grandumi-v1",
             cardDbVersion = "local-card-json",
@@ -127,7 +130,7 @@ public static class GameRoomManager
                 kind = "create",
                 roomId,
                 seed = engine.State.RngSeed,
-                firstPlayer = p0First ? 0 : 1,
+                firstPlayer,
                 p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt },
                 p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt },
                 vsBot,
@@ -141,7 +144,7 @@ public static class GameRoomManager
         _sessionRoom[p1Sid] = roomId;
         StartActionWorker(entry);
 
-        // 推送初始状态 → 进入 mulligan
+        // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         engine.BroadcastInitialState();
         return entry;
     }

@@ -6,7 +6,7 @@ namespace GrandUMI.Effects.Scripted;
 /// <summary>
 /// OP15-002 路西（领航）
 /// 【攻击时】/【对方的攻击时】：可丢弃任意张事件/舞台，每张本次战斗本领袖力量 +1000（反馈#208）
-/// 启动主要每回合 1 次：本回合内发动费用 ≥3 事件时抽 1
+/// 启动主要每回合 1 次：若本回合已经发动过原始费用 ≥3 的事件，抽 1
 /// </summary>
 public class OP15_002_Lucci : IScriptedEffect
 {
@@ -44,11 +44,12 @@ public class OP15_002_Lucci : IScriptedEffect
             return;
         }
 
-        // 【启动主要】每回合 1 次：打上本回合标记即可。"本回合内发动原始费用≥3 事件时抽 1"的实际联动
-        // 在 GameEngine.ResolveEffectAsync 事件分支读取此 TurnOnceUsed 标记完成（出牌处才拿得到事件费用）。
+        // 【启动主要】【每回合 1 次】：本回合已经发动过原始费用≥3 的事件时，抽 1。
+        // 条件未满足时不发动、不消耗每回合次数；事件历史由 EffectRuntime 在所有发动入口统一记录。
         const string key = "OP15-002-MainOncePerTurn";
         if (me.TurnOnceUsed.Contains(key)) return;
+        if (!me.HasActivatedBaseCost3PlusEventThisTurn) return;
         me.TurnOnceUsed.Add(key);
-        await Task.CompletedTask;
+        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
     }
 }

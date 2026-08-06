@@ -109,6 +109,11 @@ interface GameStore {
   currentTurn: boolean;
   turnCount: number;
   firstPlayer: number;
+  firstPlayerChosen: boolean;
+  isFirstPlayer: boolean;
+  canChooseFirstPlayer: boolean;
+  diceWinnerIsMe: boolean;
+  startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   phase: BattlePhase;
   viewerKind: "player" | "spectator";
@@ -183,7 +188,12 @@ export const useGameStore = create<GameStore>()(
     tick: 0,
     currentTurn: false,
     turnCount: 0,
-    firstPlayer: 0,
+    firstPlayer: -1,
+    firstPlayerChosen: false,
+    isFirstPlayer: false,
+    canChooseFirstPlayer: false,
+    diceWinnerIsMe: false,
+    startingDiceRolls: [],
     mulliganBothDone: false,
     phase: "Main",
     viewerKind: "player",
@@ -216,7 +226,12 @@ export const useGameStore = create<GameStore>()(
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
         s.turnCount = msg.turnCount;
-        s.firstPlayer = msg.firstPlayer ?? 0;
+        s.firstPlayer = msg.firstPlayer ?? -1;
+        s.firstPlayerChosen = msg.firstPlayerChosen ?? false;
+        s.isFirstPlayer = msg.isFirstPlayer ?? false;
+        s.canChooseFirstPlayer = msg.canChooseFirstPlayer ?? false;
+        s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
+        s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
         s.isGameOver = msg.isGameOver ?? false;
         s.winnerIsMe = msg.winnerIsMe ?? false;
@@ -331,7 +346,12 @@ export const useGameStore = create<GameStore>()(
       s.tick = 0;
       s.currentTurn = false;
       s.turnCount = 0;
-      s.firstPlayer = 0;
+      s.firstPlayer = -1;
+      s.firstPlayerChosen = false;
+      s.isFirstPlayer = false;
+      s.canChooseFirstPlayer = false;
+      s.diceWinnerIsMe = false;
+      s.startingDiceRolls = [];
       s.mulliganBothDone = false;
       s.phase = "Main";
       s.my = null;
