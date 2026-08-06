@@ -20,23 +20,24 @@ public class OP16_060_Sengoku : IScriptedEffect
         AtomicOps.ReturnDonToDeck(me, 8);
 
         // 从手牌选最多 3 张卡名不同的《大将》角色登场
+        // 同名卡的任意一张在本效果中等价，候选中仅保留一张以在服务端直接保证“卡名不同”。
         var candidates = me.Hand
             .Where(c => c.Info.Kind == CardKind.Character && c.Info.HasKeyword("大将"))
+            .GroupBy(c => c.Info.Name)
+            .Select(group => group.First())
             .ToList();
         if (candidates.Count == 0) return;
 
-        var pickedNames = new HashSet<string>();
-        for (int i = 0; i < 3; i++)
+        // 一次性选定，顺序即后续各卡【登场时】效果的结算顺序。
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandShogun",
+            "选择最多 3 张卡名不同的《大将》角色登场（按选择顺序结算登场时效果）",
+            candidates.Select(c => c.Id.ToString()).ToList(), 0, Math.Min(3, candidates.Count));
+
+        foreach (var cardId in chosen)
         {
-            var pool = candidates.Where(c => !pickedNames.Contains(c.Info.Name) && me.Hand.Contains(c)).ToList();
-            if (pool.Count == 0) break;
-            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandShogun",
-                $"选 1 张卡名不同的《大将》角色登场（{i + 1}/3）",
-                pool.Select(c => c.Id.ToString()).ToList(), 0, 1);
-            if (chosen.Count == 0) break;
-            var card = pool.First(c => c.Id.ToString() == chosen[0]);
-            pickedNames.Add(card.Info.Name);
-            await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+            var card = candidates.FirstOrDefault(c => c.Id.ToString() == cardId);
+            if (card is not null && me.Hand.Contains(card))
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
         }
     }
 }

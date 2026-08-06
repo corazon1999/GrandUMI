@@ -1281,6 +1281,17 @@
           }
         ]
       }
+    ],
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": {
+          "keyword": "恐怖之船海盗团",
+          "originalCostLte": 4
+        },
+        "rest": true,
+        "text": "将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色以休息状态登场"
+      }
     ]
   },
   "OP14-105": {
@@ -1449,7 +1460,7 @@
             "count": 5,
             "max": 1,
             "match": {
-              "keyword": "九蛇海盗团"
+              "keyword": "亚马逊·百合"
             }
           },
           {

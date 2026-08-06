@@ -17,6 +17,7 @@ interface Props {
 export default function HandArea({ side, hidden = false }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const currentTurn = useGameStore((s) => s.currentTurn);
+  const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
   const phase = useGameStore((s) => s.phase);
   const isPending = useGameStore((s) => s.isPending);
   const selectedHandIndex = useGameStore((s) => s.selectedHandIndex);
@@ -49,11 +50,13 @@ export default function HandArea({ side, hidden = false }: Props) {
 
   // 观战时双方手牌都已脱敏，统一按服务端 handCount 生成卡背。
   // 普通玩家视角下，仅己方使用真实手牌列表，对手仍只显示卡背与数量。
-  const cards = hidden
-    ? Array.from({ length: player.handCount }, () => null)
-    : side === "my"
-      ? player.handCardNumbers.map((n) => getCard(n) ?? null)
-      : Array.from({ length: player.handCount }, () => null);
+  const cards = !firstPlayerChosen
+    ? []
+    : hidden
+      ? Array.from({ length: player.handCount }, () => null)
+      : side === "my"
+        ? player.handCardNumbers.map((n) => getCard(n) ?? null)
+        : Array.from({ length: player.handCount }, () => null);
 
   // 稳定 key：按卡号 + 同名出现次序，不含数组下标。
   // 这样打出中间某张时，仅被移除那张的 key 消失，其余 key 不变 → 不会整手牌重排乱跳。

@@ -55,6 +55,21 @@ public class PromptSystem : IPromptService
                 }
                 if (cc.Count > 0) extra["choiceCards"] = cc;
             }
+
+            // 无论调用方是否已自行传入 choiceCards，都补充候选卡所在区域。
+            // 同一张卡可能同时出现在手牌与废弃区候选中（如 OP17-085），仅靠卡号无法区分；
+            // 区域信息只随该玩家的私有 Prompt 下发，不会暴露手牌给对手。
+            if (!extra.ContainsKey("choiceCardZones"))
+            {
+                var zones = new List<object>();
+                foreach (var id in validChoices)
+                {
+                    var located = FindCardByIdAnyZone(_engine.State, id);
+                    if (located is not null)
+                        zones.Add(new { id, zone = located.Zone });
+                }
+                if (zones.Count > 0) extra["choiceCardZones"] = zones;
+            }
         }
 
         _engine.State.PendingPrompt = new PendingPrompt

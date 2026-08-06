@@ -13,6 +13,29 @@ public class OP16EffectTests
         => new() { Info = CardDatabase.Get(number)! };
 
     [Fact]
+    public async Task OP16_003_RevealsTwo8000Characters_ThenReducesChosenOpponentBy6000()
+    {
+        var state = TestScene.New("OP16-001").Build();
+        var newgate = Card("OP16-003");
+        var revealA = Card("OP16-004");
+        var revealB = Card("OP16-005");
+        var target = Card("OP15-050");
+        state.Players[0].Characters.Add(newgate);
+        state.Players[0].Hand.AddRange([revealA, revealB]);
+        state.Players[1].Characters.Add(target);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(revealA.Id.ToString(), revealB.Id.ToString())
+            .QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, newgate, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(-6000, target.PowerModThisTurn);
+        Assert.Equal(2, prompts.ChooseHistory.Count);
+        Assert.All(prompts.ChooseHistory[0].choices, id => Assert.Contains(id, new[] { revealA.Id.ToString(), revealB.Id.ToString() }));
+    }
+
+    [Fact]
     public async Task OP16_003_BuffsOnlyLeaderDuringOwnerTurn()
     {
         var state = TestScene.New("OP16-001").Build();

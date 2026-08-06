@@ -30,6 +30,10 @@ public static class GameRoomManager
     /// <summary>roomId → 断线计时器</summary>
     private static readonly ConcurrentDictionary<string, CancellationTokenSource> _grace = new();
 
+    /// <summary>roomId → 调度手牌超时任务；实际结算仍排入房间串行队列。</summary>
+    private static readonly ConcurrentDictionary<string, MulliganTimeout> _mulliganTimeouts = new();
+    private sealed record MulliganTimeout(DateTime DeadlineUtc, CancellationTokenSource Cancellation);
+
     public class RoomEntry
     {
         public required string RoomId { get; init; }
@@ -69,11 +73,13 @@ public static class GameRoomManager
     {
         var roomId = Guid.NewGuid().ToString("N")[..12];
         var firstPlayer = p0First.HasValue ? (p0First.Value ? 0 : 1) : -1;
+        var openingSetupAfterFirstPlayerChoice = firstPlayer < 0;
         var engine = new GameEngine(roomId,
             (p0Sid, p0Account, p0Deck),
             (p1Sid, p1Account, p1Deck),
             firstPlayer: firstPlayer,
-            leaderKeywordWildcard: vsBot);
+            leaderKeywordWildcard: vsBot,
+            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
         engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
@@ -117,6 +123,7 @@ public static class GameRoomManager
             startingPlayerChooser = engine.State.StartingPlayerChooser,
             startingDiceRolls = engine.State.StartingDiceRounds,
             rngSeed = engine.State.RngSeed,
+            openingSetupAfterFirstPlayerChoice,
             rulesVersion = "opcg-grandumi-v1",
             cardDbVersion = "local-card-json",
         });
@@ -131,6 +138,7 @@ public static class GameRoomManager
                 roomId,
                 seed = engine.State.RngSeed,
                 firstPlayer,
+                openingSetupAfterFirstPlayerChoice,
                 p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt },
                 p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt },
                 vsBot,
@@ -143,6 +151,7 @@ public static class GameRoomManager
         _sessionRoom[p0Sid] = roomId;
         _sessionRoom[p1Sid] = roomId;
         StartActionWorker(entry);
+        EnsureMulliganTimeout(entry);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         engine.BroadcastInitialState();
@@ -186,9 +195,87 @@ public static class GameRoomManager
             room.Engine.RecordMatchLog("player_action_requested", playerIndex, new { action, data });
             room.Engine.HandleAction(playerIndex, action, data);
             await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
+            EnsureMulliganTimeout(room);
             if (room.Engine.State.IsGameOver)
                 CleanupRoom(room.RoomId);
         }));
+    }
+
+    /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
+    private static void EnsureMulliganTimeout(RoomEntry room)
+    {
+        var deadline = room.Engine.State.MulliganDeadlineUtc;
+        if (deadline is null || room.Engine.State.MulliganBothDone)
+        {
+            CancelMulliganTimeout(room.RoomId);
+            return;
+        }
+
+        if (_mulliganTimeouts.TryGetValue(room.RoomId, out var current)
+            && current.DeadlineUtc == deadline.Value)
+            return;
+
+        var next = new MulliganTimeout(deadline.Value, new CancellationTokenSource());
+        while (true)
+        {
+            if (_mulliganTimeouts.TryGetValue(room.RoomId, out current))
+            {
+                if (current.DeadlineUtc == deadline.Value)
+                {
+                    next.Cancellation.Dispose();
+                    return;
+                }
+                if (!_mulliganTimeouts.TryUpdate(room.RoomId, next, current)) continue;
+                current.Cancellation.Cancel();
+                current.Cancellation.Dispose();
+            }
+            else if (!_mulliganTimeouts.TryAdd(room.RoomId, next))
+            {
+                continue;
+            }
+
+            StartMulliganTimeoutWait(room, next);
+            return;
+        }
+    }
+
+    private static void StartMulliganTimeoutWait(RoomEntry room, MulliganTimeout timer)
+    {
+        _ = Task.Run(async () =>
+        {
+            var delay = timer.DeadlineUtc - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero)
+            {
+                try { await Task.Delay(delay, timer.Cancellation.Token); }
+                catch (TaskCanceledException) { return; }
+            }
+
+            if (timer.Cancellation.IsCancellationRequested) return;
+            var active = GetRoom(room.RoomId);
+            if (active is null || !ReferenceEquals(active, room)) return;
+            EnqueueWork(active, new RoomWork("MulliganTimeout", LatencyDiagnostics.Start(), async () =>
+            {
+                if (active.Engine.State.MulliganDeadlineUtc != timer.DeadlineUtc) return;
+                var autoKept = active.Engine.AutoKeepMulligans(DateTime.UtcNow);
+                foreach (var playerIndex in autoKept)
+                {
+                    var data = JsonSerializer.SerializeToElement(new { redraw = false });
+                    active.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { redraw = false });
+                    active.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data);
+                }
+                await active.Engine.WaitSettledAsync();
+                EnsureMulliganTimeout(active);
+            }));
+        });
+    }
+
+    private static void CancelMulliganTimeout(string roomId)
+    {
+        if (_mulliganTimeouts.TryRemove(roomId, out var timer))
+        {
+            timer.Cancellation.Cancel();
+            timer.Cancellation.Dispose();
+        }
     }
 
     private static bool EnqueueWork(RoomEntry room, RoomWork work)
@@ -438,6 +525,7 @@ public static class GameRoomManager
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
+            CancelMulliganTimeout(roomId);
             r.ActionQueue.Writer.TryComplete();
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
@@ -517,6 +605,10 @@ public static class GameRoomManager
         var p1Deck      = p1.GetProperty("deckRaw").GetString()!;
         var p0Always    = p0.TryGetProperty("alwaysPrompt", out var a0) && a0.GetBoolean();
         var p1Always    = p1.TryGetProperty("alwaysPrompt", out var a1) && a1.GetBoolean();
+        // 旧日志没有此字段，默认 false，保持升级前“构造时发牌”的随机序列以便正确恢复。
+        var openingSetupAfterFirstPlayerChoice =
+            h.TryGetProperty("openingSetupAfterFirstPlayerChoice", out var deferredSetup)
+            && deferredSetup.GetBoolean();
 
         if (vsBot) { TryDelete(file); return false; } // 范围=仅 PvP
 
@@ -551,7 +643,9 @@ public static class GameRoomManager
             (p0Account, p0Deck), (p1Account, p1Deck),
             actions,
             leaderKeywordWildcard: false,
-            p0AlwaysPrompt: p0Always, p1AlwaysPrompt: p1Always);
+            p0AlwaysPrompt: p0Always,
+            p1AlwaysPrompt: p1Always,
+            openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
 
         if (engine.State.IsGameOver) { TryDelete(file); return false; } // 已分胜负不恢复
@@ -583,6 +677,7 @@ public static class GameRoomManager
 
         _rooms[roomId] = entry;
         StartActionWorker(entry);
+        EnsureMulliganTimeout(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;

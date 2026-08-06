@@ -14,6 +14,29 @@ public class OP17EffectTests
     private static CardInstance Card(string number, int turnPlayed = 0)
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
+    [Fact]
+    public async Task OP17_091_MakesOpponentChooseWhichHandCardToDiscard()
+    {
+        var state = TestScene.New("OP17-039").Build();
+        var brook = Card("OP17-091");
+        var chosen = Card("OP17-044");
+        var kept = Card("OP17-085");
+        var highCost = Card("OP17-118");
+        highCost.CostModPersistent = 2;
+        state.Players[0].Characters.Add(brook);
+        state.Players[1].Characters.Add(highCost);
+        state.Players[1].Hand.AddRange([chosen, kept]);
+        var prompts = new MockPromptService().QueueChoose(chosen.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, brook, EffectTrigger.OnEnterField, prompts);
+
+        Assert.DoesNotContain(chosen, state.Players[1].Hand);
+        Assert.Contains(chosen, state.Players[1].Trash);
+        Assert.Contains(kept, state.Players[1].Hand);
+        var discard = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnHandDiscard", discard.kind);
+    }
+
     private static string LegalOp17Deck(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
@@ -511,5 +534,38 @@ public class OP17EffectTests
         await EffectRuntime.Resolve(trigger, 0, Card("OP17-096"), EffectTrigger.OnLifeRevealTrigger, new MockPromptService());
         Assert.DoesNotContain(elbaf, trigger.Players[0].Trash);
         Assert.Contains(elbaf, trigger.Players[0].Hand);
+    }
+
+    [Fact]
+    public async Task OP17_085_MixedHandAndTrashPrompt_ContainsZoneMetadata()
+    {
+        _ = TestScene.New().Build();
+        var engine = new GameEngine("op17-085-zone", ("s0", "alice", LegalOp17Deck("OP17-079")),
+            ("s1", "bob", LegalOp17Deck("OP17-079")), 0, 17);
+        var me = engine.State.Players[0];
+        me.Hand.Clear();
+        me.Trash.Clear();
+        var dorry = Card("OP17-085");
+        var brogyInHand = Card("OP17-092");
+        var brogyInTrash = Card("OP17-092");
+        me.Characters.Add(dorry);
+        me.Hand.Add(brogyInHand);
+        me.Trash.Add(brogyInTrash);
+
+        var resolveTask = EffectRuntime.Resolve(engine.State, 0, dorry, EffectTrigger.OnEnterField, engine.Prompts);
+        for (int i = 0; i < 100 && engine.State.PendingPrompt is null; i++)
+            await Task.Delay(10);
+
+        var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
+        Assert.Equal("OwnHandOrTrashCharacter", prompt.Kind);
+        using var zones = JsonDocument.Parse(JsonSerializer.Serialize(prompt.Extra["choiceCardZones"]));
+        var zoneById = zones.RootElement.EnumerateArray().ToDictionary(
+            item => item.GetProperty("id").GetString()!,
+            item => item.GetProperty("zone").GetString()!);
+        Assert.Equal("hand", zoneById[brogyInHand.Id.ToString()]);
+        Assert.Equal("trash", zoneById[brogyInTrash.Id.ToString()]);
+
+        engine.Prompts.Resolve(prompt.PromptId, new[] { brogyInHand.Id.ToString() });
+        await resolveTask;
     }
 }

@@ -9,6 +9,27 @@ namespace GrandUMI.Tests;
 public class OP08_OP14RegressionTests
 {
     [Fact]
+    public async Task OP08_050_WhenOnlyOneCardCanBeDrawn_ReturnsThatOneCard()
+    {
+        var state = TestScene.New().Build();
+        var source = new CardInstance { Info = CardDatabase.Get("OP08-050")! };
+        var onlyCard = new CardInstance { Info = CardDatabase.Get("OP15-050")! };
+        state.Players[0].Characters.Add(source);
+        state.Players[0].Deck.Add(onlyCard);
+        var prompts = new MockPromptService()
+            .QueueChoose(onlyCard.Id.ToString())
+            .QueueOption(0);
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        var choice = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal(1, choice.min);
+        Assert.Equal(1, choice.max);
+        Assert.Empty(state.Players[0].Hand);
+        Assert.Equal(onlyCard, Assert.Single(state.Players[0].Deck));
+    }
+
+    [Fact]
     public async Task OP14_031_OnEnter_RestsBothSelectedCharacters()
     {
         var state = TestScene.New()
@@ -53,6 +74,7 @@ public class OP08_OP14RegressionTests
     [Theory]
     [InlineData("OP14-110")]
     [InlineData("OP14-111")]
+    [InlineData("OP14-100")]
     public async Task OP14_110_111_LifeTrigger_PlaysSelectedThrillerBarkCharacterRested(string sourceNumber)
     {
         var state = TestScene.New().Build();
@@ -71,5 +93,62 @@ public class OP08_OP14RegressionTests
         Assert.DoesNotContain(selected, state.Players[0].Trash);
         Assert.Contains(selected, state.Players[0].Characters);
         Assert.True(selected.IsTapped);
+    }
+
+    [Fact]
+    public async Task OP08_105_ReceivesLifeLeaveWatcherFromScriptedEffect()
+    {
+        var state = TestScene.New()
+            .MyCharacter("OP08-105")
+            .MyDeckTop("OP15-050", "OP15-051")
+            .Build();
+        var bonney = state.Players[0].Characters.Single();
+        state.Players[0].CostArea.Add(new DonCard { State = DonState.Attached, AttachedToCardId = bonney.Id });
+        state.Players[0].Hand.Add(new CardInstance { Info = CardDatabase.Get("OP15-052")! });
+        state.Players[1].LifeArea.Add(new CardInstance { Info = CardDatabase.Get("OP15-053")! });
+        var hawkins = new CardInstance { Info = CardDatabase.Get("OP10-109")! };
+        var discard = state.Players[0].Hand.Single();
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, hawkins, EffectTrigger.OnKO, prompts);
+
+        Assert.Empty(state.Players[1].LifeArea);
+        Assert.Empty(state.Players[0].Deck);
+        Assert.Equal(2, state.Players[0].Hand.Count);
+        Assert.DoesNotContain(state.Players[0].Hand, c => c.Id == discard.Id);
+        Assert.Contains(state.Players[0].Trash, c => c.Id == discard.Id);
+    }
+
+    [Fact]
+    public async Task OP14_113_SearchesAmazonLilyButNotKujaPirates()
+    {
+        var state = TestScene.New().Build();
+        var source = new CardInstance { Info = CardDatabase.Get("OP14-113")! };
+        var amazonLily = new CardInstance { Info = CardDatabase.Get("OP14-107")! };
+        var kujaPirates = new CardInstance { Info = CardDatabase.Get("OP14-114")! };
+        var discard = new CardInstance { Info = CardDatabase.Get("OP15-050")! };
+        state.Players[0].Characters.Add(source);
+        state.Players[0].Deck.AddRange([
+            amazonLily,
+            kujaPirates,
+            new CardInstance { Info = CardDatabase.Get("OP15-050")! },
+            new CardInstance { Info = CardDatabase.Get("OP15-051")! },
+            new CardInstance { Info = CardDatabase.Get("OP15-052")! },
+        ]);
+        state.Players[0].Hand.Add(discard);
+        var prompts = new MockPromptService()
+            .QueueChoose(amazonLily.Id.ToString())
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        var search = prompts.ChooseHistory[0];
+        Assert.Equal("LookTopReveal", search.kind);
+        Assert.Contains(amazonLily.Id.ToString(), search.choices);
+        Assert.DoesNotContain(kujaPirates.Id.ToString(), search.choices);
+        Assert.Contains(amazonLily, state.Players[0].Hand);
+        Assert.Contains(discard, state.Players[0].Trash);
     }
 }

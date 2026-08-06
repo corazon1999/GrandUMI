@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
@@ -13,7 +14,9 @@ export default function MulliganOverlay() {
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
   const isFirst = useGameStore((s) => s.isFirstPlayer);
   const mulliganBothDone = useGameStore((s) => s.mulliganBothDone);
+  const mulliganDeadlineUtc = useGameStore((s) => s.mulliganDeadlineUtc);
   const { cardSize } = useResponsive();
+  const [now, setNow] = useState(() => Date.now());
 
   if (!my) return null;
   if (!firstPlayerChosen) return null;
@@ -22,6 +25,19 @@ export default function MulliganOverlay() {
   const myDone = my.mulliganDone;
   const oppDone = opp?.mulliganDone ?? false;
   const choosing = !myDone;
+  const deadlineMs = mulliganDeadlineUtc ? Date.parse(mulliganDeadlineUtc) : Number.NaN;
+  const remainingSeconds = Number.isFinite(deadlineMs)
+    ? Math.max(0, Math.ceil((deadlineMs - now) / 1000))
+    : 60;
+  const isExpiring = remainingSeconds <= 10;
+  const timedOut = remainingSeconds === 0;
+
+  useEffect(() => {
+    if (!mulliganDeadlineUtc || mulliganBothDone) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [mulliganDeadlineUtc, mulliganBothDone]);
 
   const handCards = my.handCardNumbers.map((n) => getCard(n) ?? null);
 
@@ -33,8 +49,13 @@ export default function MulliganOverlay() {
       >
         <div className="text-center">
           <p className="text-white text-lg font-bold mb-1">{isFirst ? "你是先手" : "你是后手"}</p>
+          <p className={`mb-2 text-sm font-black tabular-nums ${isExpiring ? "text-rose-300" : "text-amber-200"}`}>
+            调度剩余 {remainingSeconds} 秒
+          </p>
           <p className="text-gray-400 text-sm">
-            {choosing ? "是否要更换起始手牌？" : oppDone ? "进入对局..." : "等待对手选择..."}
+            {timedOut && choosing
+              ? "时间到，正在自动保留手牌…"
+              : choosing ? "是否要更换起始手牌？" : oppDone ? "进入对局..." : "等待对手选择..."}
           </p>
         </div>
 
@@ -54,12 +75,12 @@ export default function MulliganOverlay() {
         {choosing && (
           <motion.div className="flex gap-4"
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}>
-            <button onClick={() => GameRequest.mulligan(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors">
+            <button onClick={() => GameRequest.mulligan(true)} disabled={timedOut}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors disabled:cursor-wait disabled:opacity-50">
               更换
             </button>
-            <button onClick={() => GameRequest.mulligan(false)}
-              className="bg-orange-500 hover:bg-orange-400 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors">
+            <button onClick={() => GameRequest.mulligan(false)} disabled={timedOut}
+              className="bg-orange-500 hover:bg-orange-400 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors disabled:cursor-wait disabled:opacity-50">
               保留
             </button>
           </motion.div>

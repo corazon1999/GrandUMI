@@ -17,6 +17,8 @@ import type { FeedbackCategory, MsgBase, MsgBugReport } from "@/types/net";
 
 interface Props {
   context: "lobby" | "game";
+  /** 外部入口每次递增该值即可打开反馈窗口；F 键仍可独立切换。 */
+  openRequest?: number;
 }
 
 type SubmitState =
@@ -41,7 +43,7 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
-export default function FeedbackOverlay({ context }: Props) {
+export default function FeedbackOverlay({ context, openRequest }: Props) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [drafts, setDrafts] = useState<Record<FeedbackCategory, string>>({
@@ -51,6 +53,7 @@ export default function FeedbackOverlay({ context }: Props) {
   const [submit, setSubmit] = useState<SubmitState>({ kind: "idle" });
   const textRef = useRef<HTMLTextAreaElement>(null);
   const pendingCategoryRef = useRef<FeedbackCategory | null>(null);
+  const lastOpenRequestRef = useRef(openRequest);
   const description = drafts[category];
   const config = CATEGORY_CONFIG[category];
   const placeholder =
@@ -89,6 +92,13 @@ export default function FeedbackOverlay({ context }: Props) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // 左侧栏等外部入口仅负责请求打开；首次挂载不自动弹窗。
+  useEffect(() => {
+    if (openRequest === undefined || openRequest === lastOpenRequestRef.current) return;
+    lastOpenRequestRef.current = openRequest;
+    setOpen(true);
+  }, [openRequest]);
 
   // 打开时聚焦、重置提交状态。
   useEffect(() => {

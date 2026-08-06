@@ -674,12 +674,16 @@ public static class AtomicOps
     }
 
     /// <summary>让对手丢弃 N 张手牌（由对手自己 Prompt 选择）。0 张直接返回</summary>
-    public static async Task OpponentDiscardChosen(GameEngine engine, int opponentIdx, int n)
+    public static Task OpponentDiscardChosen(GameEngine engine, int opponentIdx, int n)
+        => OpponentDiscardChosen(engine.State, engine.Prompts, opponentIdx, n);
+
+    /// <summary>让对手丢弃 N 张手牌（由对手自己选择），可在脚本和测试中直接使用。</summary>
+    public static async Task OpponentDiscardChosen(GameState state, IPromptService prompts, int opponentIdx, int n)
     {
-        var opp = engine.State.Players[opponentIdx];
+        var opp = state.Players[opponentIdx];
         int actual = Math.Min(n, opp.Hand.Count);
         if (actual <= 0) return;
-        var chosen = await engine.Prompts.ChooseCards(opponentIdx, "OwnHandDiscard",
+        var chosen = await prompts.ChooseCards(opponentIdx, "OwnHandDiscard",
             $"丢弃 {actual} 张手牌",
             opp.Hand.Select(c => c.Id.ToString()).ToList(), actual, actual);
         if (chosen.Count == 0)

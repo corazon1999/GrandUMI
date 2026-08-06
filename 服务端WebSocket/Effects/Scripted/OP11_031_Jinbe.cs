@@ -29,7 +29,9 @@ public class OP11_031_Jinbe : IScriptedEffect
         if (!ok) return;
 
         // 将对方最多 1 张费用不高于 5 的角色转为休息状态
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var cands = opp.Characters
+            .Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 5)
+            .ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

@@ -30,6 +30,7 @@ export interface FieldCardView {
   activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
+  cannotAttack: boolean;     // 是否存在明确的“无法攻击”状态（不含横置、新登场等普通条件）
 }
 
 export interface PlayerView {
@@ -54,6 +55,7 @@ export interface PlayerView {
   leaderPower: number;
   leaderAttachedDon: number;
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
+  leaderCannotAttack: boolean; // 领袖是否存在明确的“无法攻击”状态
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
   stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;
@@ -115,6 +117,7 @@ interface GameStore {
   diceWinnerIsMe: boolean;
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
+  mulliganDeadlineUtc: string | null;
   phase: BattlePhase;
   viewerKind: "player" | "spectator";
 
@@ -195,6 +198,7 @@ export const useGameStore = create<GameStore>()(
     diceWinnerIsMe: false,
     startingDiceRolls: [],
     mulliganBothDone: false,
+    mulliganDeadlineUtc: null,
     phase: "Main",
     viewerKind: "player",
     my: null,
@@ -233,6 +237,7 @@ export const useGameStore = create<GameStore>()(
         s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
         s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
+        s.mulliganDeadlineUtc = msg.mulliganDeadlineUtc ?? null;
         s.isGameOver = msg.isGameOver ?? false;
         s.winnerIsMe = msg.winnerIsMe ?? false;
         s.gameOverReason = msg.gameOverReason ?? "";
@@ -353,6 +358,7 @@ export const useGameStore = create<GameStore>()(
       s.diceWinnerIsMe = false;
       s.startingDiceRolls = [];
       s.mulliganBothDone = false;
+      s.mulliganDeadlineUtc = null;
       s.phase = "Main";
       s.my = null;
       s.opponent = null;

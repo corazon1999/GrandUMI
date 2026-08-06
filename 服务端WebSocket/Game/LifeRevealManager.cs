@@ -78,11 +78,10 @@ public static class LifeRevealManager
                 if (useTrigger && hasTrigger)
                 {
                     // 发动触发：卡牌进废弃区。
-                    // “发动此卡牌的【KO时】效果”是元触发，直接复用 OnKO，避免每张卡重复维护一份 trigger 定义。
+                    // “发动此卡牌的【主要】/【反击】/【登场时】/【KO时】效果”是元触发，
+                    // 直接复用对应时机，避免每张卡重复维护一份 trigger 定义。
                     p.Trash.Add(top);
-                    var revealTrigger = InvokesOwnKOEffect(top.Info.Trigger)
-                        ? EffectTrigger.OnKO
-                        : EffectTrigger.OnLifeRevealTrigger;
+                    var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
                     await EffectRuntime.Resolve(s, targetPlayerIdx, top,
                         revealTrigger, engine.Prompts);
                     // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
@@ -132,10 +131,23 @@ public static class LifeRevealManager
         return !trigger.Contains("：") && !trigger.Contains(":") && !trigger.Contains("场合") && !trigger.Contains("之后");
     }
 
-    private static bool InvokesOwnKOEffect(string? trigger)
+    private static EffectTrigger ResolveLifeTrigger(string? trigger)
+    {
+        if (InvokesOwnEffect(trigger, "【KO时】") || InvokesOwnEffect(trigger, "【K.O.时】"))
+            return EffectTrigger.OnKO;
+        if (InvokesOwnEffect(trigger, "【主要】"))
+            return EffectTrigger.EventMain;
+        if (InvokesOwnEffect(trigger, "【反击】"))
+            return EffectTrigger.EventCounter;
+        if (InvokesOwnEffect(trigger, "【登场时】"))
+            return EffectTrigger.OnEnterField;
+        return EffectTrigger.OnLifeRevealTrigger;
+    }
+
+    private static bool InvokesOwnEffect(string? trigger, string effectTiming)
         => !string.IsNullOrEmpty(trigger)
            && trigger.Contains("发动此卡牌的")
-           && (trigger.Contains("【KO时】") || trigger.Contains("【K.O.时】"))
+           && trigger.Contains(effectTiming)
            && trigger.Contains("效果");
 
     /// <summary>将受到伤害而揭开的生命牌加入手牌；ST13-003 规则替换：领袖为 ST13-003 时，正面朝上的生命牌改为放回卡组最下方。</summary>

@@ -26,13 +26,14 @@ public class OP08_050_Nairu : IScriptedEffect
         // 抽 2 张
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
 
-        // 需要至少 2 张手牌才能放回 2 张
-        if (me.Hand.Count < 2) return;
+        // 抽牌后手牌不足 2 张时，仍须将现有手牌全部放回；最多放回 2 张。
+        int returnCount = Math.Min(2, me.Hand.Count);
+        if (returnCount == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
-            "选择 2 张手牌放回卡组（自选顺序）",
-            me.Hand.Select(c => c.Id.ToString()).ToList(), 2, 2);
-        if (chosen.Count < 2) return;
+            $"选择 {returnCount} 张手牌放回卡组（自选顺序）",
+            me.Hand.Select(c => c.Id.ToString()).ToList(), returnCount, returnCount);
+        if (chosen.Count < returnCount) return;
 
         // 按玩家选择的顺序取出这 2 张
         var picks = chosen
@@ -40,7 +41,7 @@ public class OP08_050_Nairu : IScriptedEffect
             .ToList();
 
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
-            "将这 2 张手牌放回卡组最上方或最下方",
+            $"将这 {returnCount} 张手牌放回卡组最上方或最下方",
             new[] { "放回最上方", "放回最下方" });
 
         foreach (var c in picks) me.Hand.Remove(c);

@@ -47,7 +47,9 @@ public class OP11_115_NotMyType : IScriptedEffect
         }
 
         // ── 【触发】将对方最多 1 张费用≤2 的角色 KO ──
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters
+            .Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 2)
+            .ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

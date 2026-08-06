@@ -243,9 +243,7 @@ public class OP16LeaderTests
         int donDeckBefore = s.Players[0].DonDeck.Count;
 
         var mock = new MockPromptService()
-            .QueueChoose(kuzan.Id.ToString())
-            .QueueChoose(saka.Id.ToString())
-            .QueueChoose(bors.Id.ToString());
+            .QueueChoose(kuzan.Id.ToString(), saka.Id.ToString(), bors.Id.ToString());
 
         await EffectRuntime.Resolve(s, 0, s.Players[0].Leader, EffectTrigger.ActivatedMain, mock);
 
@@ -257,6 +255,9 @@ public class OP16LeaderTests
         Assert.Contains(kuzan, s.Players[0].Characters);
         Assert.Contains(saka,  s.Players[0].Characters);
         Assert.Contains(bors,  s.Players[0].Characters);
+        var selection = mock.ChooseHistory[0];
+        Assert.Equal(3, selection.max);
+        Assert.Equal(new[] { kuzan.Id.ToString(), saka.Id.ToString(), bors.Id.ToString() }, selection.choices);
         // TODO 反例：若手牌只有 2 张大将，应只登场 2 张不报错
         // TODO 反例：活跃咚不足 8 时，效果不应发动（don 不被消耗，手牌不动）
     }

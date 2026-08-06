@@ -60,10 +60,12 @@ export default function FieldArea({ side }: Props) {
           isBlocker || (!!battle && !battle.blockerCardId && !battle.targetIsLeader && fc.id === battle.targetCardId);
         // 选择攻击目标时：只有横置(休息)的对手角色可被选中
         const isAttackTarget = isSelectingTarget && side === "opponent" && !isPending && fc.isTapped;
-        // 攻击状态标识：仅我方角色、我方回合显示。canAttack 来自后端权威；
-        // 不可攻击且本回合刚登场(未横置)→ 召唤眩晕(sick)；其余不可攻击不额外标(横置已变灰)
-        const attackState: "can" | "sick" | "none" =
-          side === "my" && currentTurn
+        // 明确的禁攻状态对敌我双方、任意回合都可见；其他攻击状态仅在我方回合显示。
+        // 新登场且未横置时显示召唤眩晕(sick)，横置等普通不可攻击条件不额外标记。
+        const attackState: "can" | "sick" | "blocked" | "none" =
+          fc.cannotAttack
+            ? "blocked"
+            : side === "my" && currentTurn
             ? fc.canAttack
               ? "can"
               : !fc.isTapped && fc.turnPlayed === turnCount

@@ -47,9 +47,9 @@ public class OP11_059_GomuGomuNoKingCobra : IScriptedEffect
 
         // 【触发】将最多 1 张费用不高于 2 的角色放回其持有者的手牌
         var bounceCands = new List<(int owner, CardInstance card)>();
-        foreach (var c in me.Characters.Where(c => c.Info.Cost <= 2))
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(ctx.OwnerIndex, c) <= 2))
             bounceCands.Add((ctx.OwnerIndex, c));
-        foreach (var c in opp.Characters.Where(c => c.Info.Cost <= 2))
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 2))
             bounceCands.Add((1 - ctx.OwnerIndex, c));
         if (bounceCands.Count == 0) return;
 

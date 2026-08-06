@@ -36,8 +36,8 @@ interface Props {
   showBlockerFx?: boolean;
   /** 快照下发的动态获得关键词（贴咚/条件/回合内授予的阻挡者等），与静态卡面 abilities 一并判定特效 */
   gainedKeywords?: string[];
-  /** 攻击状态标识（仅我方场上角色/领袖在我方回合传）：can=可攻击 sick=本回合登场不可攻击 none=不显示 */
-  attackState?: "can" | "sick" | "none";
+  /** 攻击状态标识：can=可攻击 sick=本回合登场不可攻击 blocked=受到禁攻状态 none=不显示 */
+  attackState?: "can" | "sick" | "blocked" | "none";
   /** 战斗中的身份高亮；选框挂在卡牌旋转节点上，可自动适配活跃/横置形状 */
   battleHighlight?: "attacker" | "target" | "blocker";
   onClick?: () => void;
@@ -278,6 +278,20 @@ export default function CardItem({
               title="本回合登场，不可攻击"
             >
               <span className="text-[8px] font-black leading-none tracking-tight text-sky-300/90">Zzz</span>
+            </span>
+          )}
+          {attackState === "blocked" && (
+            <span
+              className="pointer-events-none absolute left-0 top-1/2 z-30 flex -translate-y-1/2 items-center rounded-r bg-slate-950/90 p-0.5 shadow-[0_0_6px_rgba(239,68,68,0.9)] ring-1 ring-red-400/80"
+              title="无法攻击"
+            >
+              <NextImage
+                src="/status-icons/cannot-attack.png"
+                alt=""
+                width={24}
+                height={24}
+                className="h-5 w-5 object-contain"
+              />
             </span>
           )}
         </>

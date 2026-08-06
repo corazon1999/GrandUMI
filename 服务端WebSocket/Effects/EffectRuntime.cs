@@ -100,6 +100,16 @@ public static class EffectRuntime
     /// <summary>对单个卡牌的指定触发时机解析效果</summary>
     public static async Task Resolve(GameState s, int ownerIdx, CardInstance source, EffectTrigger trigger, IPromptService prompts, Dictionary<string, object?>? payload = null)
     {
+        // 许多旧脚本直接操作 LifeArea，容易漏派发“生命牌离场”监听。
+        // 仅最外层效果记录前后生命区的卡实例，统一补齐实际离开的生命牌事件；
+        // 嵌套效果共用这一轮快照，避免同一张生命牌被重复通知。
+        bool isRootResolve = _depth == 0;
+        HashSet<Guid>? lifeBefore0 = isRootResolve
+            ? s.Players[0].LifeArea.Select(c => c.Id).ToHashSet()
+            : null;
+        HashSet<Guid>? lifeBefore1 = isRootResolve
+            ? s.Players[1].LifeArea.Select(c => c.Id).ToHashSet()
+            : null;
         var prevAmbient = _ambient;
         var prevSource = _currentSourceAL.Value;
         var prevActing = _actingSideAL.Value;
@@ -133,7 +143,7 @@ public static class EffectRuntime
             }
 
             // 持续"效果无效"：被持续无效化的卡（整卡或该类触发），其效果不发动
-            if (s.IsContinuouslyNullified(source) || s.IsTriggerNullified(source, trigger)) return;
+            if (source.IsEffectsNullified || s.IsContinuouslyNullified(source) || s.IsTriggerNullified(source, trigger)) return;
 
             // 1. 优先用手写脚本
             var scripted = ScriptedEffectRegistry.TryGet(source.Info.Number);
@@ -149,6 +159,8 @@ public static class EffectRuntime
         finally
         {
             _depth--;
+            if (isRootResolve)
+                EnqueueLifeLeaveWatchers(s, lifeBefore0!, lifeBefore1!);
             _ambient = prevAmbient;
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
@@ -157,6 +169,32 @@ public static class EffectRuntime
             if (_depth == 0 && !_draining
                 && (s.PendingKOEffects.Count > 0 || s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))
                 await DrainPendingEnterFields(s, prompts);
+        }
+    }
+
+    /// <summary>
+    /// 为一次最外层卡牌效果中实际离开生命区的每张卡入队监听。
+    /// 采用卡实例 Id 差集而不是数量差：补生命、换生命、批量移生命都能正确识别；
+    /// 单纯重排后仍在生命区的卡不会被误判为离场。
+    /// </summary>
+    private static void EnqueueLifeLeaveWatchers(GameState s, HashSet<Guid> lifeBefore0, HashSet<Guid> lifeBefore1)
+    {
+        EnqueueForPlayer(0, lifeBefore0);
+        EnqueueForPlayer(1, lifeBefore1);
+
+        void EnqueueForPlayer(int owner, HashSet<Guid> before)
+        {
+            var after = s.Players[owner].LifeArea.Select(c => c.Id).ToHashSet();
+            int leftCount = before.Count(id => !after.Contains(id));
+            for (int i = 0; i < leftCount; i++)
+            {
+                s.EnqueueWatcher(EffectTrigger.OnLifeLeaveField,
+                    new Dictionary<string, object?>
+                    {
+                        ["owner"] = owner,
+                        ["toZero"] = s.Players[owner].LifeArea.Count == 0,
+                    });
+            }
         }
     }
 

@@ -72,6 +72,7 @@ public static class StateSnapshotBuilder
                 tie = round.Player0 == round.Player1,
             }).ToArray(),
             mulliganBothDone = state.MulliganBothDone,
+            mulliganDeadlineUtc = state.MulliganDeadlineUtc,
             isGameOver = state.IsGameOver,
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
             gameOverReason = state.GameOverReason,
@@ -140,6 +141,7 @@ public static class StateSnapshotBuilder
                 || state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested),
             turnPlayed = c.TurnPlayed,
             canAttack = Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
+            cannotAttack = HasCannotAttackStatus(state, c),
             activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
         }).ToArray();
 
@@ -165,6 +167,7 @@ public static class StateSnapshotBuilder
             state.CurrentPowerOf(idx, p.Leader),
             p.AttachedDonCount(p.Leader.Id),
             Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
+            HasCannotAttackStatus(state, p.Leader),
             ActivatedUsedThisTurn(p, p.Leader),
             p.ActiveDonCount,
             p.RestDonCount,
@@ -200,6 +203,7 @@ public static class StateSnapshotBuilder
             leaderPower = board.LeaderPower,
             leaderAttachedDon = board.LeaderAttachedDon,
             leaderCanAttack = board.LeaderCanAttack,
+            leaderCannotAttack = board.LeaderCannotAttack,
             leaderActivatedUsedThisTurn = board.LeaderActivatedUsedThisTurn,
             costActive = board.CostActive,
             costRest = board.CostRest,
@@ -228,6 +232,7 @@ public static class StateSnapshotBuilder
         int LeaderPower,
         int LeaderAttachedDon,
         bool LeaderCanAttack,
+        bool LeaderCannotAttack,
         bool LeaderActivatedUsedThisTurn,
         int CostActive,
         int CostRest,
@@ -241,6 +246,16 @@ public static class StateSnapshotBuilder
     private static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
         => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
            || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
+
+    /// <summary>
+    /// 是否存在明确的“无法攻击”状态。只统计卡牌限制、持续限制和卡牌自带禁攻，
+    /// 不把非当前回合、已休息、新登场等普通攻击条件误判为禁攻状态。
+    /// </summary>
+    private static bool HasCannotAttackStatus(GameState state, CardInstance card)
+        => card.HasRestriction(RestrictionKind.CannotAttack)
+           || (!card.IsEffectsNullified
+               && (state.HasContinuousRestriction(card, RestrictionKind.CannotAttack)
+                   || Array.IndexOf(card.Info.Abilities, "此角色无法攻击") >= 0));
 
     private static readonly string[] GrantableKeywords =
         { "阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };

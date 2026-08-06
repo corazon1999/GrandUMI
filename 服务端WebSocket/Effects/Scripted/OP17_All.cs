@@ -1311,9 +1311,7 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         if (!AnyCostAtLeast(c, 12)) return;
-        if (c.Engine is not null) AtomicOps.OpponentDiscardRandom(c.Engine, 1 - c.OwnerIndex, 1);
-        else if (Opp(c).Hand.Count > 0) AtomicOps.DiscardHand(Opp(c), Opp(c).Hand[0]);
-        await Task.CompletedTask;
+        await AtomicOps.OpponentDiscardChosen(c.State, c.Prompts, 1 - c.OwnerIndex, 1);
     }
 
     private static async Task C092(EffectContext c)

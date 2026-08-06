@@ -19,6 +19,7 @@ export default function PromptOverlay() {
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
     ? {
@@ -36,6 +37,7 @@ export default function PromptOverlay() {
   useEffect(() => {
     setSelected([]);
     setSubmittingPromptId(null);
+    setIsMinimized(false);
   }, [prompt?.promptId]);
 
   // 网络异常时允许重新提交，避免弹窗永久消失。
@@ -46,6 +48,26 @@ export default function PromptOverlay() {
   }, [submittingPromptId]);
 
   if (!prompt || submittingPromptId === prompt.promptId) return null;
+
+  if (isMinimized) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          className="pointer-events-none fixed inset-0 z-[60]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            className="pointer-events-auto fixed bottom-4 right-4 rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+          >
+            恢复选择
+          </button>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   const isLifeTrigger = prompt.kind === "LifeTrigger";
   const isOption = prompt.kind === "Option";
@@ -72,8 +94,14 @@ export default function PromptOverlay() {
 
   // 服务端可在 extra.choiceCards 里携带候选卡的 {id, number}，
   // 用于显示卡组/手牌等"不下发身份"区域的候选（findCardById 默认只认场上卡）
-  const choiceCards = (prompt.extra?.choiceCards as { id: string; number: string }[] | undefined) ?? [];
+  const choiceCards = (prompt.extra?.choiceCards as { id: string; number: string; zone?: string }[] | undefined) ?? [];
   const choiceMap = new Map(choiceCards.map((c) => [c.id, c.number]));
+  // 服务端按候选 id 补充区域；混合手牌/墓地选择时为同名卡提供明确来源标识。
+  const choiceCardZones = (prompt.extra?.choiceCardZones as { id: string; zone: string }[] | undefined) ?? [];
+  const choiceZoneMap = new Map([
+    ...choiceCards.filter((c) => c.zone).map((c) => [c.id, c.zone!] as const),
+    ...choiceCardZones.map((c) => [c.id, c.zone] as const),
+  ]);
 
   // 检索/确认类效果约定：choiceCards = "确认到的全部牌"（让玩家看全），
   // validChoices = "可公开/可选的子集"。展示全部 choiceCards（叠加不在其中的 validChoices），
@@ -206,6 +234,13 @@ export default function PromptOverlay() {
         className="fixed inset-0 z-50 overflow-y-auto bg-black/75"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       >
+        <button
+          type="button"
+          onClick={() => setIsMinimized(true)}
+          className="fixed right-4 top-4 z-[60] rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+        >
+          隐藏
+        </button>
         {/* 内容包一层：内容少时居中；横屏等矮视口下内容超高时可纵向滚动、不裁切底部「加入手牌/确认」按钮 */}
         <div className="flex min-h-full flex-col items-center justify-center gap-6 p-4 max-md:justify-start max-md:gap-4">
         {sourceCard && (
@@ -366,6 +401,8 @@ export default function PromptOverlay() {
                 const card = findCardById(id);
                 const fieldState = fieldStateById(id);
                 const fieldSide = fieldSideById(id);
+                const choiceZone = choiceZoneMap.get(id);
+                const zoneLabel = choiceZone === "hand" ? "手牌" : choiceZone === "trash" ? "墓地" : null;
                 const fieldIndex = fieldSide === "my"
                   ? (my?.fieldCards.findIndex((c) => c.id === id) ?? -1)
                   : fieldSide === "opponent"
@@ -396,6 +433,11 @@ export default function PromptOverlay() {
                       >
                         {fieldSide === "my" ? "己方" : "对方"}
                         {fieldIndex >= 0 ? ` · 第${fieldIndex + 1}位` : ""}
+                      </span>
+                    )}
+                    {zoneLabel && (
+                      <span className="pointer-events-none absolute -top-3 -right-1 z-40 rounded-full bg-violet-700 px-2 py-0.5 text-[10px] font-bold text-white shadow-md ring-1 ring-white/70">
+                        {zoneLabel}
                       </span>
                     )}
                     {!selectable && (

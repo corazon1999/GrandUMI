@@ -37,7 +37,9 @@ public class OP11_106_Zeus : IScriptedEffect
         me.Hand.Add(lifeCard);
 
         // 收益：将对方最多 1 张费用≤5 的角色 KO
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var cands = opp.Characters
+            .Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 5)
+            .ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe5",
             "将对方 1 张费用≤5 的角色 KO（可放弃）",

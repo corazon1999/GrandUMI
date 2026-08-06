@@ -102,6 +102,36 @@ public class StartingPlayerFlowTests
     }
 
     [Fact]
+    public void 调度超时_未决定双方自动保留并进入第一回合()
+    {
+        var engine = CreateEngine(firstPlayer: 0, seed: 20260807);
+        var deadline = Assert.IsType<DateTime>(engine.State.MulliganDeadlineUtc);
+
+        var autoKept = engine.AutoKeepMulligans(deadline);
+
+        Assert.Equal(new[] { 0, 1 }, autoKept);
+        Assert.True(engine.State.MulliganBothDone);
+        Assert.Equal(1, engine.State.TurnCount);
+        Assert.Null(engine.State.MulliganDeadlineUtc);
+        Assert.All(engine.State.Players, player => Assert.True(player.HasReDraw));
+    }
+
+    [Fact]
+    public void 调度超时_不会覆盖已自行选择更换手牌的玩家()
+    {
+        var engine = CreateEngine(firstPlayer: 0, seed: 20260808);
+        var deadline = Assert.IsType<DateTime>(engine.State.MulliganDeadlineUtc);
+
+        engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = true }));
+        var autoKept = engine.AutoKeepMulligans(deadline);
+
+        Assert.Equal(new[] { 1 }, autoKept);
+        Assert.False(engine.State.Players[0].HasReDraw);
+        Assert.True(engine.State.Players[1].HasReDraw);
+        Assert.True(engine.State.MulliganBothDone);
+    }
+
+    [Fact]
     public void 开局快照_按玩家视角映射骰点和选择权()
     {
         var engine = CreateEngine(firstPlayer: -1, seed: 424242);

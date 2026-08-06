@@ -52,7 +52,9 @@ public class OP11_110_Samezvezda : IScriptedEffect
         me.Hand.Add(card);
 
         // 效果：将对方最多 1 张费用≤1 的角色 KO
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters
+            .Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 1)
+            .ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

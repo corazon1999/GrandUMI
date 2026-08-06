@@ -15,6 +15,7 @@ namespace GrandUMI.Game;
 /// </summary>
 public class GameEngine
 {
+    public const int MulliganTimeoutSeconds = 60;
     public GameState State { get; }
     public PromptSystem Prompts { get; }
     public Action<int, object>? OnSendToPlayer { get; set; }   // (playerIndex, payload)
@@ -43,6 +44,8 @@ public class GameEngine
 
     /// <summary>本局确定性卡实例 ID 工厂（由 RngSeed 派生，全局唯一计数器）。重放重建依赖它。</summary>
     private readonly Func<Guid> _idFactory;
+    /// <summary>骰点对局是否延迟到先后手确定后再洗牌、设置生命区并抽取起手牌。</summary>
+    private readonly bool _deferOpeningSetupUntilFirstPlayerChosen;
 
     /// <summary>最近一次动作触发的最外层 fire-and-forget 效果链；重放在喂下一个动作前等它进入稳定态。</summary>
     private Task _settle = Task.CompletedTask;
@@ -83,17 +86,20 @@ public class GameEngine
     /// <summary>
     /// 用双方 deck 字符串构造引擎（已通过 DeckValidator 校验）
     /// firstPlayer = 先手玩家索引 (0/1)；-1 表示启用开局骰点选择流程
+    /// deferOpeningSetupUntilFirstPlayerChosen 仅用于新骰点对局；恢复旧日志时保持 false 以兼容旧随机序列。
     /// </summary>
     public GameEngine(string roomId, (string sessionId, string accountName, string deckRaw) p0,
                                        (string sessionId, string accountName, string deckRaw) p1,
                                        int firstPlayer,
                                        int? rngSeed = null,
-                                       bool leaderKeywordWildcard = false)
+                                       bool leaderKeywordWildcard = false,
+                                       bool deferOpeningSetupUntilFirstPlayerChosen = false)
     {
         var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
         // 必须在创建任何卡实例（ParseDeck/InitDonDeck/InitLifeAndHand）之前装好确定性 ID 工厂，
         // 否则建出的牌走随机 GUID，重放将无法对齐。
         _idFactory = DeterministicId.SeededFactory(seed);
+        _deferOpeningSetupUntilFirstPlayerChosen = deferOpeningSetupUntilFirstPlayerChosen;
         DeterministicId.Current = _idFactory;
         State = new GameState { RoomId = roomId, FirstPlayer = firstPlayer, RngSeed = seed };
 
@@ -108,7 +114,6 @@ public class GameEngine
         };
         player0.Deck.AddRange(p0Cards);
         InitDonDeck(player0);
-        InitLifeAndHand(player0, 0);
 
         var player1 = new PlayerState
         {
@@ -118,16 +123,24 @@ public class GameEngine
         };
         player1.Deck.AddRange(p1Cards);
         InitDonDeck(player1);
-        InitLifeAndHand(player1, 1);
 
         State.Players[0] = player0;
         State.Players[1] = player1;
+        // 预设先后手（如单人测试）以及旧日志恢复沿用构造时发牌；
+        // 新骰点对局必须等胜者选定先后手后才生成生命区和起手牌。
+        if (!_deferOpeningSetupUntilFirstPlayerChosen || firstPlayer >= 0)
+        {
+            InitLifeAndHand(player0, 0);
+            InitLifeAndHand(player1, 1);
+        }
         State.CurrentTurnPlayer = firstPlayer;
         State.Phase = Phase.Reset;
         State.TurnCount = 0; // 在双方完成 mulligan 后调用 TurnEngine.StartFirstTurn 才进入 turn 1
         if (firstPlayer < 0)
             RollStartingDice();
         Prompts = new PromptSystem(this);
+        if (State.StartingPlayerChosen)
+            BeginMulliganPhase();
     }
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
@@ -252,6 +265,12 @@ public class GameEngine
         var goFirst = goFirstElement.GetBoolean();
         State.FirstPlayer = goFirst ? playerIndex : 1 - playerIndex;
         State.CurrentTurnPlayer = State.FirstPlayer;
+        if (_deferOpeningSetupUntilFirstPlayerChosen)
+        {
+            InitLifeAndHand(State.Players[0], 0);
+            InitLifeAndHand(State.Players[1], 1);
+        }
+        BeginMulliganPhase();
         Broadcast("FirstPlayerChosen", new
         {
             player = playerIndex,
@@ -1112,6 +1131,27 @@ public class GameEngine
 
     // ── Mulligan ─────────────────────────────────────────────────────────
 
+    private void BeginMulliganPhase()
+        => State.MulliganDeadlineUtc = DateTime.UtcNow.AddSeconds(MulliganTimeoutSeconds);
+
+    /// <summary>调度截止时，令所有尚未决定的玩家自动保留手牌。由房间串行队列调用。</summary>
+    public IReadOnlyList<int> AutoKeepMulligans(DateTime utcNow)
+    {
+        if (State.MulliganDeadlineUtc is not { } deadline
+            || utcNow < deadline
+            || State.MulliganBothDone)
+            return Array.Empty<int>();
+
+        var autoKept = new List<int>();
+        for (int playerIndex = 0; playerIndex < State.Players.Length; playerIndex++)
+        {
+            if (State.Players[playerIndex].MulliganDone) continue;
+            CompleteMulligan(playerIndex, redraw: false);
+            autoKept.Add(playerIndex);
+        }
+        return autoKept;
+    }
+
     private void HandleMulligan(int playerIndex, JsonElement data)
     {
         var p = State.Players[playerIndex];
@@ -1124,6 +1164,12 @@ public class GameEngine
         if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("redraw", out var r))
             redraw = r.ValueKind == JsonValueKind.True;
 
+        CompleteMulligan(playerIndex, redraw);
+    }
+
+    private void CompleteMulligan(int playerIndex, bool redraw)
+    {
+        var p = State.Players[playerIndex];
         if (redraw && p.HasReDraw)
         {
             // 把当前 5 张手牌放回卡组顶部 → 洗牌 → 重抽 5 张
@@ -1143,6 +1189,7 @@ public class GameEngine
 
         if (State.MulliganBothDone)
         {
+            State.MulliganDeadlineUtc = null;
             TurnEngine.StartFirstTurn(State);
             // 注册双方领袖的永续被动（如 OP16-080【对方回合中】我方角色费用+1）。
             // 注册为纯状态写入（无 prompt），同步完成后再广播，使快照立即包含该效果。
@@ -1215,6 +1262,16 @@ public class GameEngine
             foreach (var item in ch.EnumerateArray())
                 if (item.ValueKind == JsonValueKind.String)
                     chosen.Add(item.GetString()!);
+
+        // 客户端响应只是输入，不能借由空选、超量、重复或伪造 ID 跳过必选成本/效果。
+        // 超时仍由 PromptSystem 自己处理；这里仅拒绝玩家主动提交的不合法答案，并保留原 prompt。
+        if (chosen.Count < pending.MinChoose || chosen.Count > pending.MaxChoose)
+        { SendError(playerIndex, "选择数量不符合要求"); return; }
+        if (chosen.Distinct(StringComparer.Ordinal).Count() != chosen.Count)
+        { SendError(playerIndex, "不能重复选择同一项"); return; }
+        if (chosen.Any(id => !pending.ValidChoices.Contains(id)))
+        { SendError(playerIndex, "包含不可选择的项目"); return; }
+
         Prompts.Resolve(promptId, chosen);
     }
 

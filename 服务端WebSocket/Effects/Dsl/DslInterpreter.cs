@@ -1464,12 +1464,8 @@ public static class DslInterpreter
                     opp.LifeArea.RemoveAt(0);
                     top.IsLifeFaceUp = false;
                     opp.Trash.Add(top);
-                    EffectRuntime.NotifyWatcher(EffectTrigger.OnLifeLeaveField,
-                        new Dictionary<string, object?>
-                        {
-                            ["owner"] = 1 - ctx.OwnerIndex,
-                            ["toZero"] = opp.LifeArea.Count == 0,
-                        });
+                    // 最外层 EffectRuntime.Resolve 会按生命区前后卡实例差集统一派发
+                    // OnLifeLeaveField，避免各生命移动操作漏派或重复派发。
                     break;
                 }
 

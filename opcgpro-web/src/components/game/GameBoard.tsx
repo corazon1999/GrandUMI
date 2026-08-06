@@ -200,7 +200,7 @@ function PhaseTrack({
   );
 }
 
-function LeftRail() {
+function LeftRail({ onOpenFeedback }: { onOpenFeedback?: () => void }) {
   return (
     <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 pb-28">
       <section className="min-h-0 flex-1 rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30">
@@ -210,6 +210,16 @@ function LeftRail() {
       <section className="h-36 rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30 xl:h-44">
         <h2 className="text-xs font-black text-slate-300">记录</h2>
       </section>
+      {onOpenFeedback && (
+        <button
+          type="button"
+          onClick={onOpenFeedback}
+          className="rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20"
+          aria-label="打开 Bug 和建议反馈（快捷键 F）"
+        >
+          F · 反馈 Bug 和建议
+        </button>
+      )}
     </aside>
   );
 }
@@ -268,9 +278,11 @@ function RightRail({
 export default function GameBoard({
   isObserver,
   isPlayback,
+  onOpenFeedback,
 }: {
   isObserver: boolean;
   isPlayback: boolean;
+  onOpenFeedback?: () => void;
 }) {
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
@@ -304,7 +316,7 @@ export default function GameBoard({
           >
             <BattleRelationLayer />
             <div className="absolute inset-3 flex gap-3">
-              <LeftRail />
+              <LeftRail onOpenFeedback={onOpenFeedback} />
 
               <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
                 <PlayerMat side="opponent" isObserver={isObserver} isPlayback={isPlayback} />

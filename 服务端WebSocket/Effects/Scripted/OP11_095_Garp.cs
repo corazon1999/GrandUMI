@@ -60,11 +60,11 @@ public class OP11_095_Garp : IScriptedEffect
 
         // 效果 2：场上存在费用≥9 的角色时，KO 对方最多 1 张费用≤7 的角色
         bool hasBigChar =
-            me.Characters.Any(c => c.Info.Cost >= 9) ||
-            opp.Characters.Any(c => c.Info.Cost >= 9);
+            me.Characters.Any(c => s.CurrentCostOf(ctx.OwnerIndex, c) >= 9) ||
+            opp.Characters.Any(c => s.CurrentCostOf(oppIdx, c) >= 9);
         if (!hasBigChar) return;
 
-        var koCands = opp.Characters.Where(c => c.Info.Cost <= 7).ToList();
+        var koCands = opp.Characters.Where(c => s.CurrentCostOf(oppIdx, c) <= 7).ToList();
         if (koCands.Count == 0) return;
 
         var koPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

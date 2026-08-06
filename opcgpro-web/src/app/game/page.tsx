@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import GameBoard from "@/components/game/GameBoard";
@@ -22,6 +22,7 @@ import { HomeRequest } from "@/net/HomeProtocol";
 
 export default function GamePage() {
   const router = useRouter();
+  const [feedbackOpenRequest, setFeedbackOpenRequest] = useState(0);
   // 只订阅页面壳实际使用的字段，避免每份完整牌桌快照都让整个页面树重新渲染。
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
@@ -72,7 +73,7 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
       {!isObserver && !isPlayback && <GameMenu />}
       {!isObserver && !isPlayback && <GMPanel />}
-      {!isPlayback && <FeedbackOverlay context="game" />}
+      {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
 
       {isObserver && (
         <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
@@ -155,7 +156,11 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      <GameBoard isObserver={isObserver} isPlayback={isPlayback} />
+      <GameBoard
+        isObserver={isObserver}
+        isPlayback={isPlayback}
+        onOpenFeedback={isPlayback ? undefined : () => setFeedbackOpenRequest((value) => value + 1)}
+      />
     </div>
   );
 }

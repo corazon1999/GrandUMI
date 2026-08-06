@@ -332,6 +332,7 @@ export interface FieldCardSnapshot {
   activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
+  cannotAttack: boolean;     // 该角色是否存在明确的“无法攻击”状态（不含横置、新登场等普通条件）
 }
 
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
@@ -355,6 +356,7 @@ export interface PlayerSnapshot {
   leaderPower: number;
   leaderAttachedDon: number;
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
+  leaderCannotAttack: boolean; // 领袖是否存在明确的“无法攻击”状态
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
   stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;
@@ -403,6 +405,7 @@ export interface MsgGameState extends MsgBase {
   diceWinnerIsMe: boolean;
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
+  mulliganDeadlineUtc?: string | null;
   isGameOver: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;

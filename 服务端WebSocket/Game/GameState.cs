@@ -340,6 +340,9 @@ public class GameState
     /// <summary>双方都完成 Mulligan 后此值变 true，进入第一回合</summary>
     public bool MulliganBothDone => Players[0].MulliganDone && Players[1].MulliganDone;
 
+    /// <summary>调度手牌阶段的服务端权威截止时间；null 表示当前不在调度阶段。</summary>
+    public DateTime? MulliganDeadlineUtc { get; set; }
+
     public PlayerState Me(int idx)  => Players[idx];
     public PlayerState Op(int idx)  => Players[1 - idx];
     public PlayerState Turn        => Players[CurrentTurnPlayer];

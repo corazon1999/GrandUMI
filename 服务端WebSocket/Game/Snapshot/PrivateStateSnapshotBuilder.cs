@@ -22,6 +22,7 @@ public static class PrivateStateSnapshotBuilder
             rngSeed = state.RngSeed,
             randomSeq = state.RandomSeq,
             mulliganBothDone = state.MulliganBothDone,
+            mulliganDeadlineUtc = state.MulliganDeadlineUtc,
             isGameOver = state.IsGameOver,
             winnerIndex = state.WinnerIndex,
             gameOverReason = state.GameOverReason,

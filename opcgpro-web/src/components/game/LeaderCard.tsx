@@ -115,7 +115,13 @@ export default function LeaderCard({ side }: Props) {
         attachedDonCount={player.leaderAttachedDon}
         powerBuff={player.leaderPower - (leader.power ?? 0) - player.leaderAttachedDon * 1000}
         hideCost
-        attackState={side === "my" && currentTurn && player.leaderCanAttack ? "can" : "none"}
+        attackState={
+          player.leaderCannotAttack
+            ? "blocked"
+            : side === "my" && currentTurn && player.leaderCanAttack
+              ? "can"
+              : "none"
+        }
         onClick={handleClick}
       />
       {isTargetable && (

@@ -71,6 +71,30 @@ public class KOTriggerRegressionTests
     }
 
     [Fact]
+    public async Task OP17_063_NullifiesTargetBeforeEffectKO_AndPreventsOnKO()
+    {
+        var state = TestScene.New("OP17-039", "OP16-080")
+            .MyActiveDon(1)
+            .OppCharacter("OP16-109")
+            .Build();
+        var ged = Card("OP17-063");
+        ged.TurnPlayed = state.TurnCount;
+        state.Players[0].Characters.Add(ged);
+        var returnedDon = state.Players[0].CostArea.Single();
+        var victim = state.Players[1].Characters.Single();
+        state.Players[1].Deck.Add(Card("OP15-003"));
+        var prompts = new MockPromptService()
+            .QueueChoose(returnedDon.Id.ToString())
+            .QueueChoose(victim.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, ged, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.True(victim.IsEffectsNullified);
+        Assert.Contains(victim, state.Players[1].Trash);
+        Assert.Empty(state.Players[1].Hand);
+    }
+
+    [Fact]
     public async Task EffectBatchKO_PreservesEffectReasonForConditionalOnKO()
     {
         var state = TestScene.New().MyCharacter("EB01-057").Build();

@@ -39,7 +39,8 @@ public static class MatchReplay
         IReadOnlyList<ActionEntry> actions,
         bool leaderKeywordWildcard = false,
         bool p0AlwaysPrompt = false,
-        bool p1AlwaysPrompt = false)
+        bool p1AlwaysPrompt = false,
+        bool openingSetupAfterFirstPlayerChoice = false)
     {
         var engine = new GameEngine(
             roomId,
@@ -47,7 +48,8 @@ public static class MatchReplay
             ("replay-p1", p1.account, p1.deckRaw),
             firstPlayer: firstPlayer,
             rngSeed: seed,
-            leaderKeywordWildcard: leaderKeywordWildcard);
+            leaderKeywordWildcard: leaderKeywordWildcard,
+            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice);
 
         // 必须在喂入动作之前恢复"防触发信息泄露"开关：它决定生命揭示是否暂停发 prompt，
         // 进而决定动作磁带里有没有对应的 PromptResponse —— 不还原会导致重放分歧。
