@@ -7,6 +7,7 @@ import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
 import { getCard } from "@/data/CardLoader";
+import CardBack from "@/components/ui/CardBack";
 
 interface Props {
   side: "my" | "opponent";
@@ -93,9 +94,7 @@ export default function LifeArea({ side }: Props) {
                     liftOnSelect={false}
                   />
                 ) : (
-                  <div className="relative h-full w-full rounded-md border-2 border-red-200/35 bg-gradient-to-br from-red-800 via-rose-950 to-slate-950 shadow-xl shadow-black/35">
-                    <div className="absolute inset-2 rounded border border-red-100/15" />
-                  </div>
+                  <CardBack cardBackId={player?.cardBackId} className="shadow-xl shadow-black/35" />
                 )}
               </div>
             );
@@ -153,6 +152,7 @@ export default function LifeArea({ side }: Props) {
                         <CardItem
                           card={isFaceUp ? getCard(info!.number!) ?? null : null}
                           faceDown={!isFaceUp}
+                          cardBackId={player?.cardBackId}
                           size="md"
                           hideCounter
                           hidePower

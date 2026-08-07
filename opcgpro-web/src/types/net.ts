@@ -41,6 +41,8 @@ export enum ProtocolEnum {
   MsgUpdateProfile = 36,
   MsgImportDecks = 37,
   MsgLeaderLeaderboard = 38,
+  MsgPlayerProfileStats = 39,
+  MsgUpdateCardBack = 40,
 }
 
 // WebSocket JSON 消息基类
@@ -55,13 +57,16 @@ export interface MsgBase {
 export interface MsgSecret extends MsgBase {
   proto: "MsgSecret";
   vesion?: string;   // 客户端版本号（发送）
+  supportsStateDelta?: boolean; // 客户端声明支持 MsgGameStateDelta
   Secret?: string;   // 服务器返回的 AES 密钥
   result?: boolean;  // 版本是否匹配
+  stateDeltaEnabled?: boolean; // 服务端确认本连接启用增量快照
 }
 
 // ── 心跳 ──────────────────────────────────────────────────────────────
 export interface MsgPing extends MsgBase {
   proto: "MsgPing";
+  id?: string; // 客户端生成、服务端原样回显，用于计算 RTT
 }
 
 // ── 账户 ──────────────────────────────────────────────────────────────
@@ -72,6 +77,7 @@ export interface MsgLogin extends MsgBase {
   password?: string;  // 已不再校验密码，仅为兼容旧协议字段保留
   name?: string;     // 服务器返回的玩家昵称
   avatar?: string;
+  cardBackId?: string;
   selectedDeckName?: string | null;
   decks?: SavedDeck[];
   result?: boolean;  // true = 成功（C# 中是 bool 不是 int）
@@ -99,6 +105,7 @@ export interface MsgPlayerData extends MsgBase {
   account?: string;
   displayName?: string;
   avatar?: string;
+  cardBackId?: string;
   selectedDeckName?: string | null;
   decks?: SavedDeck[];
 }
@@ -122,6 +129,11 @@ export interface MsgUpdateProfile extends MsgBase {
   proto: "MsgUpdateProfile";
   displayName: string;
   avatar: string;
+}
+
+export interface MsgUpdateCardBack extends MsgBase {
+  proto: "MsgUpdateCardBack";
+  cardBackId: string;
 }
 
 export interface MsgImportDecks extends MsgBase {
@@ -266,6 +278,10 @@ export interface PlayerInfo {
 export interface MsgPlayerList extends MsgBase {
   proto: "MsgPlayerList";
   players?: PlayerInfo[];
+  offset?: number;
+  limit?: number;
+  total?: number;
+  hasMore?: boolean;
 }
 
 // ── Leader 排行榜 ─────────────────────────────────────────────────────
@@ -323,6 +339,46 @@ export interface MsgLeaderMatchups extends MsgBase {
   generatedAtUtc?: string;
   sinceUtc?: string | null;
   items?: LeaderMatchupItem[];
+}
+
+export interface PlayerLeaderStatsItem {
+  leaderNumber: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  usageRate: number;
+  firstGames: number;
+  firstWinRate: number | null;
+  secondGames: number;
+  secondWinRate: number | null;
+}
+
+export interface PlayerStatsTrendPoint {
+  label: string;
+  games: number;
+  wins: number;
+  winRate: number | null;
+}
+
+/** 当前登录账号的私有聚合战绩；客户端不能指定其他账号。 */
+export interface MsgPlayerProfileStats extends MsgBase {
+  proto: "MsgPlayerProfileStats";
+  period: LeaderboardPeriod;
+  result?: boolean;
+  error?: string;
+  generatedAtUtc?: string;
+  sinceUtc?: string | null;
+  games?: number;
+  wins?: number;
+  losses?: number;
+  winRate?: number;
+  firstGames?: number;
+  firstWinRate?: number | null;
+  secondGames?: number;
+  secondWinRate?: number | null;
+  topLeaders?: PlayerLeaderStatsItem[];
+  trend?: PlayerStatsTrendPoint[];
 }
 
 // 客户端 → 服务器:邀请某玩家对战(带自己卡组);服务器 → 发起方:回执
@@ -450,6 +506,8 @@ export interface FieldCardSnapshot {
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
 export interface PlayerSnapshot {
   name: string;
+  /** 旧回放没有该字段时回退经典卡背。 */
+  cardBackId?: string;
   handCardNumbers: string[];  // 仅自己有内容
   handCardCosts: number[];    // 每张手牌的有效费用（含静态减费），仅自己有内容；对手为空
   handCardCounters: number[]; // 每张手牌的有效反击值（含静态光环），仅自己有内容；对手为空
@@ -522,6 +580,8 @@ export interface MsgGameState extends MsgBase {
   winnerIsMe: boolean;
   gameOverReason: string;
   viewerKind: "player" | "spectator";
+  /** 对应触发本次状态变化的客户端请求；无客户端请求时为空。 */
+  requestId?: string | null;
   lastAction: string;
   actionPayload: string;
   /** 操作日志：按观看者视角生成的一行中文（不可记录的动作为空串） */
@@ -532,6 +592,21 @@ export interface MsgGameState extends MsgBase {
   battle: BattleSnapshot | null;
   /** 检索/公开牌的瞬时展示（side 已按视角换算），仅在公开那一刻的快照里非空 */
   reveal?: RevealSnapshot | null;
+}
+
+export type GameStateDeltaChanges = Partial<
+  Omit<MsgGameState, "proto" | "tick" | "my" | "opponent">
+> & {
+  my?: Partial<PlayerSnapshot>;
+  opponent?: Partial<PlayerSnapshot>;
+};
+
+/** 服务端 → 客户端：相对上一份已确认 Tick 的浅层增量快照。 */
+export interface MsgGameStateDelta extends MsgBase {
+  proto: "MsgGameStateDelta";
+  baseTick: number;
+  tick: number;
+  changes: GameStateDeltaChanges;
 }
 
 /** 检索/公开牌的瞬时展示信息 */
@@ -545,6 +620,7 @@ export interface MsgPromptResponse extends MsgBase {
   proto: "MsgPromptResponse";
   promptId: string;
   chosen: string[];   // 卡 ID 列表，长度 ∈ [minChoose, maxChoose]
+  requestId?: string;
 }
 
 /** 客户端 → 服务器：申请观战 */
@@ -562,10 +638,17 @@ export interface MsgLeaveSpectate extends MsgBase {
   logStr?: string;
 }
 
+/** 服务端 → 对战双方：当前观战者名称列表 */
+export interface MsgSpectatorList extends MsgBase {
+  proto: "MsgSpectatorList";
+  spectators: string[];
+}
+
 /** 服务端 → 客户端：动作被拒绝（不发对手） */
 export interface MsgActionRejected extends MsgBase {
   proto: "MsgActionRejected";
   reason: string;
+  requestId?: string | null;
 }
 
 /** 客户端 → 服务器：游戏动作请求 */
@@ -573,6 +656,7 @@ export interface MsgGameAction extends MsgBase {
   proto: "MsgGameAction";
   action: GameActionType;
   data: Record<string, unknown>;  // 按 action 类型不同
+  requestId?: string;
 }
 
 /** 客户端 → 服务器：重连后请求完整快照 */
@@ -616,6 +700,7 @@ export type AnyMsg =
   | MsgDeleteDeck
   | MsgSelectDeck
   | MsgUpdateProfile
+  | MsgUpdateCardBack
   | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch
@@ -635,6 +720,7 @@ export type AnyMsg =
   | MsgPromptResponse
   | MsgSpectateRoom
   | MsgLeaveSpectate
+  | MsgSpectatorList
   | MsgActionRejected
   | MsgRequestState
   | MsgPlayerDisconnected
@@ -644,4 +730,5 @@ export type AnyMsg =
   | MsgGameChat
   | MsgLeaderLeaderboard
   | MsgLeaderMatchups
+  | MsgPlayerProfileStats
   | MsgOnlineCount;

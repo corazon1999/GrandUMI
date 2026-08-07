@@ -332,7 +332,7 @@ export default function GameBoard({
       </div>
 
       {/* 局内聊天（固定屏幕角，不随画布缩放；回放模式内部自隐） */}
-      <GameChatPanel isPlayback={isPlayback} />
+      <GameChatPanel isPlayback={isPlayback} isObserver={isObserver} />
     </>
   );
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GrandUMI.Game.Logging;
 
 namespace GrandUMI.Game;
 
@@ -15,12 +16,16 @@ namespace GrandUMI.Game;
 /// </summary>
 public static class RoomJournal
 {
-    private static readonly Dictionary<string, StreamWriter> _writers = new();
-    private static readonly object _lock = new();
+    private static readonly AsyncJsonlWriter Writer = new(jsonOptions: null, capacity: 8_192);
 
     /// <summary>持久化根目录：服务端项目根下的 Persist/（向上查找 GrandUMIServer.csproj）。</summary>
     public static string GetPersistDir()
     {
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "Persist"));
+
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
@@ -37,67 +42,49 @@ public static class RoomJournal
     /// <summary>建文件并写入 header（首行 {kind:"create", ...}）。append:false 覆盖旧残留。</summary>
     public static void Open(string roomId, object header)
     {
-        lock (_lock)
+        try
         {
-            try
-            {
-                Directory.CreateDirectory(GetPersistDir());
-                var w = new StreamWriter(PathOf(roomId), append: false) { AutoFlush = true };
-                w.WriteLine(JsonSerializer.Serialize(header));
-                _writers[roomId] = w;
-            }
-            catch { /* 不影响主流程 */ }
+            Writer.Open(roomId, PathOf(roomId), append: false);
+            Writer.Append(roomId, header);
         }
+        catch { /* 不影响主流程 */ }
     }
 
     /// <summary>以追加模式重开已有日志（重启恢复后续写新动作，不重写 header）。</summary>
     public static void Reopen(string roomId)
     {
-        lock (_lock)
-        {
-            try
-            {
-                Directory.CreateDirectory(GetPersistDir());
-                var w = new StreamWriter(PathOf(roomId), append: true) { AutoFlush = true };
-                _writers[roomId] = w;
-            }
-            catch { /* 不影响主流程 */ }
-        }
+        try { Writer.Open(roomId, PathOf(roomId), append: true); }
+        catch { /* 不影响主流程 */ }
     }
 
     /// <summary>追加一个被接受的动作（{kind:"action", playerIndex, action, data, tsUtc}）。</summary>
     public static void Append(string roomId, int playerIndex, string action, JsonElement data)
     {
-        lock (_lock)
+        try
         {
-            if (!_writers.TryGetValue(roomId, out var w)) return;
-            try
+            Writer.Append(roomId, new
             {
-                var line = JsonSerializer.Serialize(new
-                {
-                    kind = "action",
-                    playerIndex,
-                    action,
-                    data,
-                    tsUtc = DateTime.UtcNow,
-                });
-                w.WriteLine(line);
-            }
-            catch { /* 不影响主流程 */ }
+                kind = "action",
+                playerIndex,
+                action,
+                data,
+                tsUtc = DateTime.UtcNow,
+            });
         }
+        catch { /* 不影响主流程 */ }
     }
 
     /// <summary>关闭并删除该房间的日志（分胜负/结束时调用）。</summary>
     public static void Delete(string roomId)
+        => DeleteDeferred(roomId).GetAwaiter().GetResult();
+
+    public static Task DeleteDeferred(string roomId)
     {
-        lock (_lock)
-        {
-            if (_writers.TryGetValue(roomId, out var w))
-            {
-                try { w.Flush(); w.Dispose(); } catch { }
-                _writers.Remove(roomId);
-            }
-            try { File.Delete(PathOf(roomId)); } catch { }
-        }
+        try { return Writer.DeleteDeferred(roomId, PathOf(roomId)); }
+        catch { return Task.CompletedTask; }
     }
+
+    public static int QueueDepth => Writer.QueueDepth;
+    public static long DroppedEntries => Writer.DroppedEntries;
+    public static void Shutdown() => Writer.Shutdown();
 }

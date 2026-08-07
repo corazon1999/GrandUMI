@@ -41,6 +41,7 @@ public sealed record PlayerDataSnapshot(
     string Account,
     string DisplayName,
     string Avatar,
+    string CardBackId,
     string? SelectedDeckName,
     IReadOnlyList<StoredDeck> Decks);
 

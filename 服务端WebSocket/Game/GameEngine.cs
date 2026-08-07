@@ -2,6 +2,7 @@ using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
 using GrandUMI.Game.Debug;
+using GrandUMI.Game.Logging;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
@@ -39,6 +40,7 @@ public class GameEngine
     private PendingBroadcast? _pendingBroadcast;
     private long _latencyActionStartedAt;
     private string _latencyAction = "";
+    private string? _latencyRequestId;
     private readonly List<(string Kind, int? Actor, object? Payload)> _pendingMatchLogs = new();
     private readonly List<ActionLogEvent> _pendingActionLogs = new();
 
@@ -145,7 +147,7 @@ public class GameEngine
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
 
-    public bool HandleAction(int playerIndex, string action, JsonElement data)
+    public bool HandleAction(int playerIndex, string action, JsonElement data, string? requestId = null)
     {
         if (State.IsGameOver) return false;
 
@@ -153,6 +155,7 @@ public class GameEngine
         BeginSnapshotBatch();
         _latencyActionStartedAt = dispatchStartedAt;
         _latencyAction = action;
+        _latencyRequestId = requestId;
 
         // 动作可能由新线程（重连/线程池）进入，重新挂上本局确定性 ID 工厂；
         // 由本动作启动的 async 续延会捕获该上下文并沿用同一计数器。
@@ -822,24 +825,14 @@ public class GameEngine
         catch (Exception ex) { Console.Error.WriteLine($"[Battle] AttackDeclare 异常: {ex.Message}"); }
     }
 
-    private async Task AdvanceBattleAfterBlockAsync()
+    private Task AdvanceBattleAfterBlockAsync()
     {
-        if (State.CurrentBattle is null) return;
-        var defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
-        var def = State.Players[defenderIdx];
-        bool canCounter = def.Hand.Any(c => HandStaticCounter.Value(State, defenderIdx, c) > 0
-                                         || Array.IndexOf(c.Info.EffectTags, "EventCounter") >= 0);
-        if (!canCounter)
-        {
-            BattleEngine.PassCounter(State);
-            Broadcast("ResolveBattle");
-            await ResolveBattleDamageAsync(defenderIdx);
-        }
-        else
-        {
-            // 进入反击等待：通知防守方（人类显示反击UI / 机器人据此放弃反击）
-            Broadcast("AwaitCounter");
-        }
+        if (State.CurrentBattle is null) return Task.CompletedTask;
+
+        // 无论防守方手牌是否存在可用反击，都必须进入反击等待。
+        // 否则自动跳过会向对手泄露防守方手中没有反击值或反击事件。
+        Broadcast("AwaitCounter");
+        return Task.CompletedTask;
     }
 
     private void HandleDeclareBlocker(int playerIndex, JsonElement data)
@@ -997,8 +990,9 @@ public class GameEngine
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
             OnSendToSpectators?.Invoke(-1, publicSnapshot);
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = publicSnapshot });
-        RecordMatchLog("public_snapshot", -1, publicSnapshot);
+        var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
+        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = sharedPublicSnapshot });
+        RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);
         if (EnablePrivateSnapshotLog)
             RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
         LatencyDiagnostics.Observe("初始快照构建与入队", startedAt, $"房间={State.RoomId}，Tick={State.Tick}");
@@ -1027,6 +1021,9 @@ public class GameEngine
 
         if (pending is not null)
             BroadcastNow(pending.LastAction, pending.Payload);
+        _latencyActionStartedAt = 0;
+        _latencyAction = "";
+        _latencyRequestId = null;
     }
 
     /// <summary>
@@ -1078,14 +1075,16 @@ public class GameEngine
             _pendingActionLogs.Clear();
         }
         State.Tick++;
-        var snapshots = StateSnapshotBuilder.BuildAll(State, lastAction, payload, queuedLogEvents);
+        var snapshots = StateSnapshotBuilder.BuildAll(
+            State, lastAction, payload, queuedLogEvents, requestId: _latencyRequestId);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
             OnSendToSpectators?.Invoke(-1, publicSnapshot);
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = publicSnapshot });
-        RecordMatchLog("public_snapshot", -1, publicSnapshot);
+        var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
+        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = sharedPublicSnapshot });
+        RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);
         if (EnablePrivateSnapshotLog)
             RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
         LatencyDiagnostics.Observe("快照构建与入队", startedAt, $"房间={State.RoomId}，Tick={State.Tick}，事件={lastAction}");
@@ -1110,7 +1109,7 @@ public class GameEngine
             action = _activeAction ?? "",
             reason,
         });
-        OnSendToPlayer?.Invoke(playerIndex, new { proto = "MsgActionRejected", reason });
+        OnSendToPlayer?.Invoke(playerIndex, new { proto = "MsgActionRejected", reason, requestId = _latencyRequestId });
     }
 
     public void RecordMatchLog(string kind, int? actor, object? payload)

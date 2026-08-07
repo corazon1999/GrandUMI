@@ -14,11 +14,12 @@ import type {
   MsgDuelOver,
   MsgActionRejected,
   MsgGameChat,
+  MsgSpectatorList,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { matchRecorder } from "@/data/matchRecorder";
-import { completePendingActionLatency } from "./GameRequest";
+import { completePendingActionLatency, completeRejectedActionLatency } from "./GameRequest";
 
 let registered = false;
 
@@ -30,7 +31,7 @@ export function registerGameProtocols() {
     switch (msg.proto) {
       case "MsgGameState": {
         const gs = msg as MsgGameState;
-        completePendingActionLatency(gs.tick ?? 0);
+        completePendingActionLatency(gs.requestId, gs.tick ?? 0);
         useGameStore.getState().syncFromServer(gs);
         // 本地录制对局快照流（仅玩家视角；观战不记）→ 供首页战绩/回放
         matchRecorder.onSnapshot(gs);
@@ -49,6 +50,7 @@ export function registerGameProtocols() {
       }
 
       case "MsgActionRejected":
+        completeRejectedActionLatency((msg as MsgActionRejected).requestId);
         useGameStore.getState().rollbackOptimistic();
         useGameStore.getState().setPending(false);
         eventBus.emit("actionRejected", { reason: (msg as MsgActionRejected).reason });
@@ -87,6 +89,10 @@ export function registerGameProtocols() {
         });
         break;
       }
+
+      case "MsgSpectatorList":
+        useGameStore.getState().setSpectatorNames((msg as MsgSpectatorList).spectators ?? []);
+        break;
     }
   });
 

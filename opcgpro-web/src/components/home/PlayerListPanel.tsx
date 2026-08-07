@@ -20,12 +20,10 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
   const spectateRoomId = useNetStore((s) => s.spectateRoomId);
   const [search, setSearch] = useState("");
 
-  // 打开时拉取一次，并每 4 秒刷新一次状态
+  // 打开时拉取一页。在线人数由服务端主动推送，避免大量客户端轮询形成平方级流量。
   useEffect(() => {
     if (!open) return;
-    HomeRequest.requestPlayerList();
-    const t = setInterval(() => HomeRequest.requestPlayerList(), 4000);
-    return () => clearInterval(t);
+    HomeRequest.requestPlayerList(0, 200);
   }, [open]);
 
   const visiblePlayers = useMemo(() => {

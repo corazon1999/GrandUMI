@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +13,14 @@ namespace GrandUMI.Persistence;
 public sealed class PlayerDataStore
 {
     public const int MaxDecksPerPlayer = 100;
+    public const string DefaultCardBackId = "classic";
+    private static readonly HashSet<string> ValidCardBackIds = new(StringComparer.Ordinal)
+    {
+        DefaultCardBackId,
+        "straw-hat",
+        "marine",
+        "emperor",
+    };
     public const int MaxAccountLength = 32;
     public const int MaxDisplayNameLength = 32;
     public const int MaxDeckNameLength = 50;
@@ -20,22 +29,29 @@ public sealed class PlayerDataStore
 
     private readonly string _databasePath;
     private readonly string _connectionString;
+    private readonly bool _deferLoginWrites;
+    private readonly ConcurrentDictionary<long, long> _pendingLoginTouches = new();
+    private readonly SemaphoreSlim _loginFlushGate = new(1, 1);
+    private readonly Timer? _loginFlushTimer;
 
-    public PlayerDataStore(string databasePath)
+    public PlayerDataStore(string databasePath, bool deferLoginWrites = false)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
             throw new ArgumentException("数据库路径不能为空。", nameof(databasePath));
 
         _databasePath = Path.GetFullPath(databasePath);
+        _deferLoginWrites = deferLoginWrites;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Shared,
             ForeignKeys = true,
-            Pooling = false,
+            Pooling = deferLoginWrites,
             DefaultTimeout = 5,
         }.ToString();
+        if (_deferLoginWrites)
+            _loginFlushTimer = new Timer(_ => FlushPendingLoginTouches(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
     public string DatabasePath => _databasePath;
@@ -79,6 +95,7 @@ public sealed class PlayerDataStore
                 account            TEXT NOT NULL,
                 display_name       TEXT NOT NULL,
                 avatar             TEXT NOT NULL DEFAULT '',
+                card_back_id       TEXT NOT NULL DEFAULT 'classic',
                 selected_deck_name TEXT NULL,
                 created_at         INTEGER NOT NULL,
                 updated_at         INTEGER NOT NULL,
@@ -108,6 +125,7 @@ public sealed class PlayerDataStore
             PRAGMA user_version=1;
             """;
         command.ExecuteNonQuery();
+        EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
     }
 
     public PlayerDataSnapshot Login(string account)
@@ -137,12 +155,17 @@ public sealed class PlayerDataStore
         }
         else
         {
-            using var update = connection.CreateCommand();
-            update.Transaction = transaction;
-            update.CommandText = "UPDATE players SET last_login_at=$now WHERE id=$id;";
-            update.Parameters.AddWithValue("$now", now);
-            update.Parameters.AddWithValue("$id", playerId.Value);
-            update.ExecuteNonQuery();
+            if (_deferLoginWrites)
+                _pendingLoginTouches[playerId.Value] = now;
+            else
+            {
+                using var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = "UPDATE players SET last_login_at=$now WHERE id=$id;";
+                update.Parameters.AddWithValue("$now", now);
+                update.Parameters.AddWithValue("$id", playerId.Value);
+                update.ExecuteNonQuery();
+            }
         }
 
         var snapshot = LoadSnapshot(connection, transaction, playerId.Value);
@@ -297,6 +320,86 @@ public sealed class PlayerDataStore
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
         return snapshot;
+    }
+
+    /// <summary>保存账号卡背；只接受服务端内置 ID，禁止客户端注入任意资源路径。</summary>
+    public PlayerDataSnapshot UpdateCardBack(string account, string cardBackId)
+    {
+        var normalizedCardBackId = NormalizeCardBackId(cardBackId);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = "UPDATE players SET card_back_id=$cardBackId, updated_at=$now WHERE id=$id;";
+        update.Parameters.AddWithValue("$cardBackId", normalizedCardBackId);
+        update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        update.Parameters.AddWithValue("$id", playerId);
+        update.ExecuteNonQuery();
+
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        transaction.Commit();
+        return snapshot;
+    }
+
+    public static string NormalizeCardBackId(string? cardBackId)
+    {
+        var normalized = (cardBackId ?? "").Trim().ToLowerInvariant();
+        if (!ValidCardBackIds.Contains(normalized))
+            throw new PlayerDataValidationException("请选择有效的卡背。");
+        return normalized;
+    }
+
+    public int PendingLoginWrites => _pendingLoginTouches.Count;
+
+    /// <summary>服务退出前排空合并的最后登录时间写入。</summary>
+    public void Shutdown()
+    {
+        _loginFlushTimer?.Dispose();
+        FlushPendingLoginTouches(waitForCurrentFlush: true);
+        SqliteConnection.ClearAllPools();
+    }
+
+    private void FlushPendingLoginTouches(bool waitForCurrentFlush = false)
+    {
+        if (_pendingLoginTouches.IsEmpty) return;
+        if (waitForCurrentFlush)
+            _loginFlushGate.Wait();
+        else if (!_loginFlushGate.Wait(0))
+            return;
+
+        try
+        {
+            var pending = _pendingLoginTouches.ToArray();
+            if (pending.Length == 0) return;
+
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE players SET last_login_at=$now WHERE id=$id AND last_login_at<$now;";
+            var nowParameter = update.Parameters.Add("$now", SqliteType.Integer);
+            var idParameter = update.Parameters.Add("$id", SqliteType.Integer);
+            foreach (var item in pending)
+            {
+                nowParameter.Value = item.Value;
+                idParameter.Value = item.Key;
+                update.ExecuteNonQuery();
+            }
+            transaction.Commit();
+
+            var collection = (ICollection<KeyValuePair<long, long>>)_pendingLoginTouches;
+            foreach (var item in pending) collection.Remove(item);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[玩家数据] 合并最后登录时间失败：{ex.Message}");
+        }
+        finally
+        {
+            _loginFlushGate.Release();
+        }
     }
 
     private SqliteConnection OpenConnection()
@@ -514,18 +617,35 @@ public sealed class PlayerDataStore
         command.Parameters.AddWithValue("$updatedAt", serverUpdatedAt);
     }
 
+    private static void EnsureColumn(SqliteConnection connection, string table, string column, string definition)
+    {
+        using var inspect = connection.CreateCommand();
+        inspect.CommandText = $"PRAGMA table_info({table});";
+        using var reader = inspect.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        }
+        reader.Close();
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+        alter.ExecuteNonQuery();
+    }
+
     private static PlayerDataSnapshot LoadSnapshot(SqliteConnection connection, SqliteTransaction transaction, long playerId)
     {
         string account;
         string displayName;
         string avatar;
+        string cardBackId;
         string? selectedDeckName;
 
         using (var player = connection.CreateCommand())
         {
             player.Transaction = transaction;
             player.CommandText = """
-                SELECT account, display_name, avatar, selected_deck_name FROM players WHERE id=$id;
+                SELECT account, display_name, avatar, card_back_id, selected_deck_name FROM players WHERE id=$id;
                 """;
             player.Parameters.AddWithValue("$id", playerId);
             using var reader = player.ExecuteReader();
@@ -533,7 +653,8 @@ public sealed class PlayerDataStore
             account = reader.GetString(0);
             displayName = reader.GetString(1);
             avatar = reader.GetString(2);
-            selectedDeckName = reader.IsDBNull(3) ? null : reader.GetString(3);
+            cardBackId = reader.IsDBNull(3) ? DefaultCardBackId : reader.GetString(3);
+            selectedDeckName = reader.IsDBNull(4) ? null : reader.GetString(4);
         }
 
         var decks = new List<StoredDeck>();
@@ -568,6 +689,6 @@ public sealed class PlayerDataStore
             }
         }
 
-        return new PlayerDataSnapshot(account, displayName, avatar, selectedDeckName, decks);
+        return new PlayerDataSnapshot(account, displayName, avatar, cardBackId, selectedDeckName, decks);
     }
 }

@@ -13,8 +13,16 @@ public static class MatchLogRecorder
     };
     private static readonly AsyncJsonlWriter Writer = new(JsonOptions);
 
+    public static int QueueDepth => Writer.QueueDepth;
+    public static long DroppedEntries => Writer.DroppedEntries;
+
     public static string GetLogDir()
     {
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "MatchLogs"));
+
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
@@ -92,6 +100,14 @@ public static class MatchLogRecorder
         Writer.Close(matchId);
         lock (LockObj)
             Sequences.Remove(matchId);
+    }
+
+    public static Task CloseDeferred(string matchId)
+    {
+        var completion = Writer.CloseDeferred(matchId);
+        lock (LockObj)
+            Sequences.Remove(matchId);
+        return completion;
     }
 
     /// <summary>正常关服时排空队列并关闭全部日志文件。</summary>

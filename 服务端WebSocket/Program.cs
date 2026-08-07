@@ -1,8 +1,14 @@
 using GrandUMI;
 using GrandUMI.Cards;
+using GrandUMI.Diagnostics;
+using GrandUMI.Game;
+using GrandUMI.Game.Logging;
 using GrandUMI.Game.Stats;
 using GrandUMI.Persistence;
-using System.Runtime.Loader;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringComparison.Ordinal))
 {
@@ -19,73 +25,118 @@ if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringC
     Console.WriteLine(
         $"[LeaderStats 回填] 扫描 {report.FilesScanned}，新增 {report.Imported}，已存在 {report.AlreadyRecorded}，" +
         $"未结束 {report.SkippedIncomplete}，无效 {report.SkippedInvalid}，错误 {report.Errors.Count}");
-    foreach (var error in report.Errors.Take(20))
-        Console.Error.WriteLine($"[LeaderStats 回填错误] {error}");
+    foreach (var error in report.Errors.Take(20)) Console.Error.WriteLine($"[LeaderStats 回填错误] {error}");
     if (report.Errors.Count > 0) Environment.ExitCode = 1;
     return;
 }
 
-Console.Title = "GrandUMI WebSocket 服务器";
+try { Console.Title = "GrandUMI WebSocket 服务器"; } catch { }
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-int port = args.Length > 0 && int.TryParse(args[0], out int p) ? p : 8080;
-
-Console.WriteLine("╔══════════════════════════════════════╗");
-Console.WriteLine("║    GrandUMI WebSocket 服务器          ║");
-Console.WriteLine($"║    ws://localhost:{port}/ws/              ║");
-Console.WriteLine("║    按 Ctrl+C 停止                     ║");
-Console.WriteLine("╚══════════════════════════════════════╝\n");
-
-// 玩家数据存放在 publish 目录之外，避免发布替换程序时丢失。
-var playerDataStore = new PlayerDataStore(PlayerDataStore.ResolveDefaultPath());
+var port = args.Length > 0 && int.TryParse(args[0], out var parsedPort) ? parsedPort : 8080;
+var playerDataStore = new PlayerDataStore(PlayerDataStore.ResolveDefaultPath(), deferLoginWrites: true);
 playerDataStore.Initialize();
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
 
-// 加载卡牌数据库（项目根目录下的"卡牌数据"目录）
-var cardDataPath = ResolveCardDataPath();
-CardDatabase.LoadFrom(cardDataPath);
-
-// 加载效果 DSL 定义（整个 Definitions 目录下所有 *.json）
-var dslDir = ResolveDslDir();
-GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(dslDir);
-
-// Leader 排行榜使用独立 SQLite；线上可用 GRANDUMI_DATA_DIR 指向持久化目录。
+CardDatabase.LoadFrom(ResolveCardDataPath());
+GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(ResolveDslDir());
 LeaderStatsStore.Default.Initialize();
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
 
-// 重启恢复：把 TTL 内未结束的 PvP 对局重放重建回内存（须在卡库/DSL 加载之后、开监听之前）
-await GrandUMI.Game.GameRoomManager.RestoreAll();
+await GameRoomManager.RestoreAll();
+WebSocketBridge.Initialize(playerDataStore);
 
-WebSocketBridge.Start(port, playerDataStore);
-
-// 等待 Ctrl+C
-var tcs = new TaskCompletionSource();
-var stopping = 0;
-void RequestStop()
+var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
+builder.Logging.ClearProviders();
+builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
+builder.WebHost.ConfigureKestrel(options =>
 {
-    if (Interlocked.Exchange(ref stopping, 1) != 0) return;
-    Console.WriteLine("\n[服务器] 正在停止...");
+    options.AddServerHeader = false;
+    options.Limits.MaxConcurrentConnections = ServerCapacity.MaxConnections + 256;
+    options.Limits.MaxConcurrentUpgradedConnections = ServerCapacity.MaxConnections;
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(15);
+    options.Limits.MaxRequestBodySize = 256 * 1024;
+});
+
+var app = builder.Build();
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(20),
+});
+
+app.MapGet("/live", () => Results.Json(new
+{
+    status = "live",
+    nodeId = BuildInfo.NodeId,
+    version = BuildInfo.Version,
+}));
+
+app.MapGet("/ready", () =>
+{
+    var overloaded = ServerCapacity.IsOverloaded(out var reason);
+    var ready = WebSocketBridge.IsReady && !overloaded;
+    return Results.Json(new
+    {
+        status = ready ? "ready" : "not_ready",
+        overloaded,
+        reason = ready ? null : reason,
+        connections = WebSocketBridge.ConnectionCount,
+        rooms = GameRoomManager.RoomCount,
+    }, statusCode: ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);
+});
+
+app.MapGet("/version", () => Results.Json(new
+{
+    version = BuildInfo.Version,
+    commit = BuildInfo.Commit,
+    buildTimeUtc = BuildInfo.BuildTimeUtc,
+    nodeId = BuildInfo.NodeId,
+}));
+
+app.MapGet("/metrics", () => Results.Text(
+    ServerMetrics.RenderPrometheus(playerDataStore),
+    "text/plain; version=0.0.4; charset=utf-8"));
+
+app.Map("/ws", async context =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync("需要 WebSocket 握手");
+        return;
+    }
+    if (!ServerCapacity.CanAcceptConnection(out var reason))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.Headers["Retry-After"] = "5";
+        await context.Response.WriteAsync($"服务器过载：{reason}");
+        return;
+    }
+
+    using var socket = await context.WebSockets.AcceptWebSocketAsync();
+    await WebSocketBridge.AcceptClientAsync(socket, context.RequestAborted);
+});
+
+app.Lifetime.ApplicationStopping.Register(WebSocketBridge.Stop);
+Console.WriteLine($"[网络] Kestrel 监听 http://127.0.0.1:{port}，WebSocket 路径 /ws");
+Console.WriteLine($"[构建] version={BuildInfo.Version}, commit={BuildInfo.Commit}, node={BuildInfo.NodeId}");
+
+try
+{
+    await app.RunAsync();
+}
+finally
+{
     WebSocketBridge.Stop();
-    tcs.TrySetResult();
+    ReplayRecorder.Shutdown();
+    MatchLogRecorder.Shutdown();
+    RoomJournal.Shutdown();
+    playerDataStore.Shutdown();
+    Console.WriteLine("[服务器] 已停止");
 }
 
-Console.CancelKeyPress += (_, e) =>
-{
-    e.Cancel = true;
-    RequestStop();
-};
-// Linux/systemd 的 SIGTERM 会触发卸载回调，确保发布重启时也能排空日志队列。
-AssemblyLoadContext.Default.Unloading += _ => RequestStop();
-
-await tcs.Task;
-// 先停止接收新消息，再排空诊断日志与录像队列，避免正常关服丢失队尾数据。
-GrandUMI.Game.ReplayRecorder.Shutdown();
-GrandUMI.Game.Logging.MatchLogRecorder.Shutdown();
-Console.WriteLine("[服务器] 已停止");
-return;
-
-// ─── 卡牌数据路径解析（向上查找直到找到"卡牌数据"目录） ───
 static string ResolveCardDataPath()
 {
     var dir = new DirectoryInfo(AppContext.BaseDirectory);

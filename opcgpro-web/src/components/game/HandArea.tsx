@@ -144,6 +144,7 @@ export default function HandArea({ side, hidden = false }: Props) {
                 card={card}
                 isSelected={!hidden && selectedHandIndex === i}
                 faceDown={hidden || card === null}
+                cardBackId={player.cardBackId}
                 hidePower
                 counterValue={effectiveCounter(card, i)}
                 onClick={() => handleClick(i)}

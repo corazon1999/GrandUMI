@@ -1654,25 +1654,6 @@
     ]
   },
   "OP14-120": {
-    "triggers": [
-      {
-        "on": "OnEnterField",
-        "then": [
-          {
-            "op": "Choose",
-            "prompt": "OpponentCharacterCostLe9",
-            "max": 1,
-            "min": 0,
-            "as": "$tgt"
-          },
-          {
-            "op": "AddRestriction",
-            "target": "$tgt",
-            "kind": "CannotAttack",
-            "duration": "UntilNextOpponentEndPhase"
-          }
-        ]
-      }
-    ]
+    "_matcher": "【登场时】与【KO时】均由脚本 OP14_120_Crocodile 完整接管"
   }
 }

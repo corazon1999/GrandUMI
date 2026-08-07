@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import type { PlayerInfo, FriendlyPlayer, MsgLeaderLeaderboard, MsgLeaderMatchups } from "@/types/net";
+import type {
+  PlayerInfo,
+  FriendlyPlayer,
+  MsgLeaderLeaderboard,
+  MsgLeaderMatchups,
+  MsgPlayerProfileStats,
+} from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
   return `${period}:${leaderNumber}`;
@@ -45,6 +51,7 @@ interface NetStore {
   account: string;
   playerName: string;
   avatar: string;
+  cardBackId: string;
   // 错误提示
   error: string | null;
   // 匹配
@@ -62,6 +69,8 @@ interface NetStore {
   leaderLeaderboard: MsgLeaderLeaderboard | null;
   // 点击榜单项后按“周期:Leader”保存的对战前十统计
   leaderMatchups: Record<string, MsgLeaderMatchups>;
+  // 当前个人详情页的周期统计
+  playerProfileStats: MsgPlayerProfileStats | null;
   // 收到的对战邀请（被邀请方弹窗用）
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
@@ -79,7 +88,7 @@ interface NetStore {
   setReconnectCountdown: (n: number) => void;
   setLoggedIn: (v: boolean, name?: string, account?: string) => void;
   setPlayerName: (name: string) => void;
-  setProfile: (name: string, avatar: string) => void;
+  setProfile: (name: string, avatar: string, cardBackId?: string) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
   setSelectedDeck: (deck: SelectedDeck | null) => void;
@@ -91,6 +100,7 @@ interface NetStore {
   setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
   setLeaderMatchups: (data: MsgLeaderMatchups) => void;
   clearLeaderMatchups: () => void;
+  setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
@@ -107,6 +117,7 @@ const initialState = {
   account: "",
   playerName: "",
   avatar: "",
+  cardBackId: "classic",
   error: null as string | null,
   matchState: "idle" as MatchState,
   selectedDeck: null as SelectedDeck | null,
@@ -117,6 +128,7 @@ const initialState = {
   playerList: [] as PlayerInfo[],
   leaderLeaderboard: null as MsgLeaderLeaderboard | null,
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
+  playerProfileStats: null as MsgPlayerProfileStats | null,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
@@ -140,7 +152,11 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setPlayerName: (name) => set({ playerName: name }),
 
-  setProfile: (playerName, avatar) => set({ playerName, avatar }),
+  setProfile: (playerName, avatar, cardBackId) => set((state) => ({
+    playerName,
+    avatar,
+    cardBackId: cardBackId ?? state.cardBackId,
+  })),
 
   setError: (msg) => set({ error: msg }),
 
@@ -168,6 +184,8 @@ export const useNetStore = create<NetStore>((set) => ({
   })),
 
   clearLeaderMatchups: () => set({ leaderMatchups: {} }),
+
+  setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
 
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 

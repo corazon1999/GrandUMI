@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { eventBus } from "@/net/eventBus";
 import { GameRequest } from "@/net/GameRequest";
 import { useNetStore } from "@/store/netStore";
+import { useGameStore } from "@/store/gameStore";
 
 /**
  * 局内聊天（房间内：对战双方 + 观战者）。
@@ -22,14 +23,17 @@ interface ChatItem {
   fromRole: "player" | "spectator";
 }
 
-export default function GameChatPanel({ isPlayback }: { isPlayback: boolean }) {
+export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: boolean; isObserver: boolean }) {
   const myAccount = useNetStore((s) => s.account);
+  const spectatorNames = useGameStore((s) => s.spectatorNames);
   const [open, setOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [coolingDown, setCoolingDown] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [spectatorHovered, setSpectatorHovered] = useState(false);
+  const [spectatorPinned, setSpectatorPinned] = useState(false);
   // 最近一条用于"冒泡"展示（关闭面板时也能看到对方说话）
   const [toast, setToast] = useState<ChatItem | null>(null);
 
@@ -44,6 +48,9 @@ export default function GameChatPanel({ isPlayback }: { isPlayback: boolean }) {
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { accountRef.current = myAccount; }, [myAccount]);
   useEffect(() => { openRef.current = open; if (open) setUnread(0); }, [open]);
+  useEffect(() => {
+    if (spectatorNames.length === 0) setSpectatorPinned(false);
+  }, [spectatorNames.length]);
 
   // 订阅服务器推送的局内聊天
   useEffect(() => {
@@ -84,6 +91,9 @@ export default function GameChatPanel({ isPlayback }: { isPlayback: boolean }) {
   }, [messages, open]);
 
   if (isPlayback) return null;
+
+  const showSpectatorIndicator = !isObserver && spectatorNames.length > 0;
+  const showSpectatorList = showSpectatorIndicator && (spectatorHovered || spectatorPinned);
 
   const fireCooldown = () => {
     setCoolingDown(true);
@@ -180,19 +190,65 @@ export default function GameChatPanel({ isPlayback }: { isPlayback: boolean }) {
         </div>
       )}
 
-      {/* 切换按钮 */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="pointer-events-auto relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
-        title="局内聊天"
-      >
-        💬
-        {!open && unread > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
-            {unread > 9 ? "9+" : unread}
-          </span>
+      {/* 左下角控制按钮 */}
+      <div className="pointer-events-auto flex items-center gap-2">
+        <button
+          onClick={() => {
+            setSpectatorPinned(false);
+            setOpen((v) => !v);
+          }}
+          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
+          title="局内聊天"
+        >
+          💬
+          {!open && unread > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </button>
+
+        {showSpectatorIndicator && (
+          <div
+            className="relative"
+            onMouseEnter={() => setSpectatorHovered(true)}
+            onMouseLeave={() => setSpectatorHovered(false)}
+          >
+            {showSpectatorList && (
+              <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl bg-slate-900/95 p-3 text-xs text-white shadow-2xl ring-1 ring-purple-300/25">
+                <p className="mb-2 font-bold text-purple-200">
+                  {spectatorNames.length} 人正在观战
+                </p>
+                <div className="max-h-40 space-y-1 overflow-y-auto">
+                  {spectatorNames.map((name, index) => (
+                    <div key={`${name}:${index}`} className="truncate rounded-md bg-white/5 px-2 py-1 text-slate-200">
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setOpen(false);
+                setSpectatorPinned((v) => !v);
+              }}
+              className="relative flex h-10 w-10 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
+              title={`${spectatorNames.length} 人正在观战`}
+              aria-label={`查看正在观战的 ${spectatorNames.length} 人`}
+              aria-expanded={showSpectatorList}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-2">
+                <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                <circle cx="12" cy="12" r="2.75" />
+              </svg>
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
+                {spectatorNames.length > 99 ? "99+" : spectatorNames.length}
+              </span>
+            </button>
+          </div>
         )}
-      </button>
+      </div>
     </div>
   );
 }

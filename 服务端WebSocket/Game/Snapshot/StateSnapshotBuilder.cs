@@ -9,10 +9,10 @@ public static class StateSnapshotBuilder
 
     /// <summary>单视角构建，供重连和单个观战者加入时使用。</summary>
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
-        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null)
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
-        return BuildForViewer(state, viewerIndex, lastAction, ComputePayload(actionPayload), boards, queuedLogEvents);
+        return BuildForViewer(state, viewerIndex, lastAction, ComputePayload(actionPayload), boards, queuedLogEvents, requestId);
     }
 
     /// <summary>
@@ -20,18 +20,19 @@ public static class StateSnapshotBuilder
     /// 每个玩家只计算一次，避免原先三份快照各自重复遍历。
     /// </summary>
     public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
-        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null)
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents));
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId));
     }
 
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
-        PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents)
+        PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
+        string? requestId)
     {
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? 0 : viewerIndex;
@@ -77,6 +78,7 @@ public static class StateSnapshotBuilder
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
             gameOverReason = state.GameOverReason,
             viewerKind = isSpectator ? "spectator" : "player",
+            requestId,
             lastAction = lastAction ?? "",
             actionPayload = payload.Json,
             logLine,
@@ -119,9 +121,11 @@ public static class StateSnapshotBuilder
     }
 
     private static PayloadComputed ComputePayload(object? actionPayload)
-        => actionPayload is null
-            ? new PayloadComputed(default, "")
-            : new PayloadComputed(JsonSerializer.SerializeToElement(actionPayload), JsonSerializer.Serialize(actionPayload));
+    {
+        if (actionPayload is null) return new PayloadComputed(default, "");
+        var element = JsonSerializer.SerializeToElement(actionPayload);
+        return new PayloadComputed(element, element.GetRawText());
+    }
 
     private static PlayerBoardComputed ComputePlayerBoard(GameState state, int idx)
     {
@@ -147,6 +151,7 @@ public static class StateSnapshotBuilder
 
         return new PlayerBoardComputed(
             p.AccountName,
+            p.CardBackId,
             p.Hand.Count,
             fieldCards,
             p.StageCard?.Info.Number,
@@ -183,6 +188,7 @@ public static class StateSnapshotBuilder
         return new
         {
             name = board.Name,
+            cardBackId = board.CardBackId,
             handCardNumbers = asSelf ? p.Hand.Select(c => c.Info.Number).ToArray() : Array.Empty<string>(),
             handCardCosts = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
             handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),
@@ -216,6 +222,7 @@ public static class StateSnapshotBuilder
 
     private sealed record PlayerBoardComputed(
         string Name,
+        string CardBackId,
         int HandCount,
         object[] FieldCards,
         string? StageNumber,

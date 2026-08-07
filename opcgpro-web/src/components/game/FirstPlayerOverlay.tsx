@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
+import { getCard } from "@/data/CardLoader";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
 function Die({ value, rolling, label }: { value: number; rolling: boolean; label: string }) {
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex shrink-0 flex-col items-center gap-2 sm:gap-3">
       <span className="text-xs font-bold tracking-widest text-slate-400">{label}</span>
       <motion.div
-        className="flex h-28 w-28 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-white to-slate-200 text-7xl text-slate-950 shadow-2xl shadow-black/50"
+        className="flex h-[clamp(76px,9vw,112px)] w-[clamp(76px,9vw,112px)] items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-white to-slate-200 text-[clamp(48px,6vw,72px)] text-slate-950 shadow-2xl shadow-black/50"
         animate={rolling ? { rotate: 360, scale: 0.82 } : { rotate: 0, scale: 1 }}
         transition={rolling
           ? { duration: 0.35, repeat: Infinity, ease: "linear" }
@@ -21,6 +23,49 @@ function Die({ value, rolling, label }: { value: number; rolling: boolean; label
         {rolling ? "?" : DIE_FACES[value]}
       </motion.div>
       <span className="h-6 text-lg font-black text-white">{rolling ? "" : `${value} 点`}</span>
+    </div>
+  );
+}
+
+function LeaderPreview({
+  leaderNumber,
+  side,
+}: {
+  leaderNumber: string;
+  side: "my" | "opponent";
+}) {
+  const card = getCard(leaderNumber);
+  const isMine = side === "my";
+  const rawSprite = card?.sprite || CARD_BACK_SRC;
+
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-1.5">
+      <span className={`text-[10px] font-black tracking-[0.18em] ${isMine ? "text-cyan-200" : "text-orange-200"}`}>
+        {isMine ? "我方领袖" : "对方领袖"}
+      </span>
+      <div
+        className={`relative aspect-[5/7] w-[clamp(68px,8vw,108px)] overflow-hidden rounded-lg border-2 bg-slate-900 shadow-xl ${
+          isMine
+            ? "border-cyan-300/75 shadow-cyan-500/20"
+            : "border-orange-300/75 shadow-orange-500/20"
+        }`}
+      >
+        <img
+          src={thumbSrc(rawSprite)}
+          alt={`${card?.name || leaderNumber || (isMine ? "我方" : "对方")}领袖卡图`}
+          className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+          onError={(event) => {
+            advanceImageFallback(event.currentTarget, [rawSprite, card?.image]);
+          }}
+        />
+      </div>
+      <div className="max-w-[clamp(90px,12vw,150px)] text-center leading-tight">
+        <p className="truncate text-[clamp(10px,1vw,13px)] font-black text-white">
+          {card?.name || leaderNumber || "未知领袖"}
+        </p>
+        <p className="mt-0.5 text-[9px] font-bold tracking-wider text-white/50">{leaderNumber}</p>
+      </div>
     </div>
   );
 }
@@ -82,7 +127,7 @@ export default function FirstPlayerOverlay() {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-7 bg-slate-950/95 px-4"
+        className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-[clamp(12px,3vh,28px)] bg-slate-950/95 px-3 py-2 sm:px-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -95,10 +140,16 @@ export default function FirstPlayerOverlay() {
         </div>
 
         {currentRoll && (
-          <div className="flex items-center gap-10 sm:gap-16">
-            <Die value={currentRoll.my} rolling={!settled} label={my.name || "我方"} />
-            <span className="mt-4 text-lg font-black text-slate-500">VS</span>
-            <Die value={currentRoll.opponent} rolling={!settled} label={opponent?.name || "对手"} />
+          <div className="grid w-full max-w-5xl grid-cols-[1fr_auto_1fr] items-center gap-[clamp(10px,3vw,48px)]">
+            <div className="flex min-w-0 items-center justify-end gap-[clamp(8px,2vw,24px)]">
+              <LeaderPreview leaderNumber={my.leaderNumber} side="my" />
+              <Die value={currentRoll.my} rolling={!settled} label={my.name || "我方"} />
+            </div>
+            <span className="text-base font-black text-slate-500 sm:text-lg">VS</span>
+            <div className="flex min-w-0 items-center gap-[clamp(8px,2vw,24px)]">
+              <Die value={currentRoll.opponent} rolling={!settled} label={opponent?.name || "对手"} />
+              <LeaderPreview leaderNumber={opponent?.leaderNumber ?? ""} side="opponent" />
+            </div>
           </div>
         )}
 

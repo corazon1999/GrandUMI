@@ -60,6 +60,39 @@ public sealed record LeaderMatchupSnapshot(
     string LeaderNumber,
     IReadOnlyList<LeaderMatchupItem> Items);
 
+public sealed record PlayerLeaderStatsItem(
+    string LeaderNumber,
+    int Games,
+    int Wins,
+    int Losses,
+    double WinRate,
+    double UsageRate,
+    int FirstGames,
+    double? FirstWinRate,
+    int SecondGames,
+    double? SecondWinRate);
+
+public sealed record PlayerStatsTrendPoint(
+    string Label,
+    int Games,
+    int Wins,
+    double? WinRate);
+
+public sealed record PlayerProfileStatsSnapshot(
+    string Period,
+    DateTime GeneratedAtUtc,
+    DateTime? SinceUtc,
+    int Games,
+    int Wins,
+    int Losses,
+    double WinRate,
+    int FirstGames,
+    double? FirstWinRate,
+    int SecondGames,
+    double? SecondWinRate,
+    IReadOnlyList<PlayerLeaderStatsItem> TopLeaders,
+    IReadOnlyList<PlayerStatsTrendPoint> Trend);
+
 /// <summary>
 /// Leader 排行榜的逐局事实存储。以 match_id 幂等写入，榜单按时间窗口即时聚合。
 /// </summary>
@@ -74,6 +107,7 @@ public sealed class LeaderStatsStore
     private readonly string _leaderboardDatabasePath;
     private readonly string _writeConnectionString;
     private readonly string _leaderboardConnectionString;
+    private readonly Dictionary<string, CachedLeaderboard> _leaderboardCache = new(StringComparer.Ordinal);
     private bool _initialized;
 
     public static LeaderStatsStore Default { get; } = new();
@@ -193,7 +227,9 @@ public sealed class LeaderStatsStore
             command.Parameters.AddWithValue("$counted", counted ? 1 : 0);
             command.Parameters.AddWithValue("$excludeReason", (object?)excludeReason ?? DBNull.Value);
             command.Parameters.AddWithValue("$statsVersion", StatsVersion);
-            return command.ExecuteNonQuery() == 1;
+            var inserted = command.ExecuteNonQuery() == 1;
+            if (inserted) _leaderboardCache.Clear();
+            return inserted;
         }
     }
 
@@ -211,6 +247,10 @@ public sealed class LeaderStatsStore
         lock (_lock)
         {
             Initialize();
+            if (nowUtc is null
+                && _leaderboardCache.TryGetValue(period, out var cached)
+                && generatedAtUtc - cached.CreatedAtUtc < TimeSpan.FromSeconds(15))
+                return cached.Snapshot;
             if (!File.Exists(_leaderboardDatabasePath))
                 throw new FileNotFoundException("排行榜数据源不存在。", _leaderboardDatabasePath);
 
@@ -246,13 +286,15 @@ public sealed class LeaderStatsStore
                     insufficient);
             }).ToArray();
 
-            return new LeaderLeaderboardSnapshot(
+            var snapshot = new LeaderLeaderboardSnapshot(
                 period,
                 generatedAtUtc,
                 sinceUtc,
                 totalMatches,
                 MinimumRankedGames,
                 items);
+            if (nowUtc is null) _leaderboardCache[period] = new CachedLeaderboard(generatedAtUtc, snapshot);
+            return snapshot;
         }
     }
 
@@ -318,6 +360,79 @@ public sealed class LeaderStatsStore
                 leaderboard.SinceUtc,
                 normalizedLeader,
                 items);
+        }
+    }
+
+    /// <summary>按当前登录账号聚合个人战绩；账号只在服务端哈希后参与查询。</summary>
+    public PlayerProfileStatsSnapshot GetPlayerProfile(string account, string? requestedPeriod, DateTime? nowUtc = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(account);
+        var period = NormalizePeriod(requestedPeriod);
+        var generatedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        DateTime? sinceUtc = period switch
+        {
+            "7d" => generatedAtUtc.AddDays(-7),
+            "30d" => generatedAtUtc.AddDays(-30),
+            _ => null,
+        };
+
+        lock (_lock)
+        {
+            Initialize();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("个人统计数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
+            var appearances = ReadPlayerAppearances(connection, HashAccount(account), sinceUtc);
+            var games = appearances.Count;
+            var wins = appearances.Count(x => x.Won);
+            var firstGames = appearances.Count(x => x.WentFirst);
+            var firstWins = appearances.Count(x => x.WentFirst && x.Won);
+            var secondGames = games - firstGames;
+            var secondWins = wins - firstWins;
+
+            var topLeaders = appearances
+                .GroupBy(x => x.LeaderNumber, StringComparer.Ordinal)
+                .Select(group =>
+                {
+                    var leaderGames = group.Count();
+                    var leaderWins = group.Count(x => x.Won);
+                    var leaderFirstGames = group.Count(x => x.WentFirst);
+                    var leaderFirstWins = group.Count(x => x.WentFirst && x.Won);
+                    var leaderSecondGames = leaderGames - leaderFirstGames;
+                    var leaderSecondWins = leaderWins - leaderFirstWins;
+                    return new PlayerLeaderStatsItem(
+                        group.Key,
+                        leaderGames,
+                        leaderWins,
+                        leaderGames - leaderWins,
+                        leaderWins / (double)leaderGames,
+                        games == 0 ? 0 : leaderGames / (double)games,
+                        leaderFirstGames,
+                        leaderFirstGames == 0 ? null : leaderFirstWins / (double)leaderFirstGames,
+                        leaderSecondGames,
+                        leaderSecondGames == 0 ? null : leaderSecondWins / (double)leaderSecondGames);
+                })
+                .OrderByDescending(x => x.Games)
+                .ThenByDescending(x => x.WinRate)
+                .ThenBy(x => x.LeaderNumber, StringComparer.Ordinal)
+                .Take(3)
+                .ToArray();
+
+            return new PlayerProfileStatsSnapshot(
+                period,
+                generatedAtUtc,
+                sinceUtc,
+                games,
+                wins,
+                games - wins,
+                games == 0 ? 0 : wins / (double)games,
+                firstGames,
+                firstGames == 0 ? null : firstWins / (double)firstGames,
+                secondGames,
+                secondGames == 0 ? null : secondWins / (double)secondGames,
+                topLeaders,
+                BuildPlayerTrend(appearances, period, generatedAtUtc));
         }
     }
 
@@ -517,6 +632,96 @@ public sealed class LeaderStatsStore
         return new MirrorAggregateRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2));
     }
 
+    private static List<PlayerAppearanceRow> ReadPlayerAppearances(
+        SqliteConnection connection,
+        string playerKey,
+        DateTime? sinceUtc)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                ended_at_utc,
+                CASE WHEN player0_key = $playerKey THEN player0_leader ELSE player1_leader END AS leader_number,
+                CASE
+                    WHEN player0_key = $playerKey AND winner_index = 0 THEN 1
+                    WHEN player1_key = $playerKey AND winner_index = 1 THEN 1
+                    ELSE 0
+                END AS won,
+                CASE
+                    WHEN player0_key = $playerKey AND first_player_index = 0 THEN 1
+                    WHEN player1_key = $playerKey AND first_player_index = 1 THEN 1
+                    ELSE 0
+                END AS went_first
+            FROM match_results
+            WHERE counted = 1
+              AND (player0_key = $playerKey OR player1_key = $playerKey)
+              AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
+            ORDER BY ended_at_utc;
+            """;
+        command.Parameters.AddWithValue("$playerKey", playerKey);
+        command.Parameters.AddWithValue("$sinceUtc", sinceUtc is null ? DBNull.Value : ToDatabaseUtc(sinceUtc.Value));
+
+        var rows = new List<PlayerAppearanceRow>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var endedAtUtc = DateTime.Parse(
+                reader.GetString(0),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind).ToUniversalTime();
+            rows.Add(new PlayerAppearanceRow(
+                endedAtUtc,
+                reader.GetString(1),
+                reader.GetInt32(2) == 1,
+                reader.GetInt32(3) == 1));
+        }
+        return rows;
+    }
+
+    private static IReadOnlyList<PlayerStatsTrendPoint> BuildPlayerTrend(
+        IReadOnlyList<PlayerAppearanceRow> appearances,
+        string period,
+        DateTime generatedAtUtc)
+    {
+        if (period == "all")
+        {
+            return appearances
+                .GroupBy(x => new DateTime(x.EndedAtUtc.Year, x.EndedAtUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc))
+                .OrderBy(group => group.Key)
+                .TakeLast(12)
+                .Select(group => BuildTrendPoint(group.Key.ToString("yyyy/MM", CultureInfo.InvariantCulture), group))
+                .ToArray();
+        }
+
+        var bucketDays = period == "7d" ? 1 : 3;
+        var bucketCount = period == "7d" ? 7 : 10;
+        var startUtc = generatedAtUtc.Date.AddDays(-(bucketDays * bucketCount - 1));
+        var buckets = Enumerable.Range(0, bucketCount)
+            .Select(index => new List<PlayerAppearanceRow>())
+            .ToArray();
+        foreach (var appearance in appearances)
+        {
+            var bucket = (appearance.EndedAtUtc.Date - startUtc).Days / bucketDays;
+            if (bucket >= 0 && bucket < bucketCount) buckets[bucket].Add(appearance);
+        }
+
+        return buckets.Select((bucket, index) =>
+        {
+            var bucketStart = startUtc.AddDays(index * bucketDays);
+            return BuildTrendPoint(bucketStart.ToString("MM/dd", CultureInfo.InvariantCulture), bucket);
+        }).ToArray();
+    }
+
+    private static PlayerStatsTrendPoint BuildTrendPoint(
+        string label,
+        IEnumerable<PlayerAppearanceRow> source)
+    {
+        var rows = source.ToArray();
+        var games = rows.Length;
+        var wins = rows.Count(x => x.Won);
+        return new PlayerStatsTrendPoint(label, games, wins, games == 0 ? null : wins / (double)games);
+    }
+
     private static string NormalizePeriod(string? period)
         => period?.ToLowerInvariant() switch
         {
@@ -573,4 +778,12 @@ public sealed class LeaderStatsStore
         int SecondWins);
 
     private sealed record MirrorAggregateRow(int Games, int FirstWins, int SecondWins);
+
+    private sealed record PlayerAppearanceRow(
+        DateTime EndedAtUtc,
+        string LeaderNumber,
+        bool Won,
+        bool WentFirst);
+
+    private sealed record CachedLeaderboard(DateTime CreatedAtUtc, LeaderLeaderboardSnapshot Snapshot);
 }

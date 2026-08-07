@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 反击 +1000 后的“废弃区≥10 时检索”为脚本内条件分支。
-///   - “黑色”按 ColorList 含“暗”判定（黑色元素色）。
+///   - “黑色”按 ColorList 含“黑”判定。
 /// </summary>
 public class OP11_097_TotallyRegressed : IScriptedEffect
 {
@@ -41,7 +41,7 @@ public class OP11_097_TotallyRegressed : IScriptedEffect
         var cands = me.Trash.Where(c =>
             c.Info.Kind == CardKind.Character &&
             c.Info.Cost <= 3 &&
-            c.Info.ColorList.Contains("紫")).ToList();
+            c.Info.ColorList.Contains("黑")).ToList();
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

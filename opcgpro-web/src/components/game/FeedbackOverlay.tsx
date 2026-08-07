@@ -146,6 +146,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
         account: netState.account,
         playerName: netState.playerName,
         connectionState: netState.connState,
+        networkDiagnostics: NetManager.getDiagnostics(),
         ...(gameState
           ? {
               mode: gameState.mode,

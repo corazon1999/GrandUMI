@@ -3,7 +3,7 @@
  *
  * 由 GameProtocol 在每收到一份玩家视角 MsgGameState 时调用 onSnapshot()。
  * 职责：
- *   - 按 tick 去重累积当前对局的快照流（重连/Resync 重发同 tick 不重复）
+ *   - 按 tick 去重并每 16 帧异步写入 IndexedDB（重连/Resync 重发同 tick 不重复）
  *   - tick 明显回退 → 视为新对局开始，重置缓冲
  *   - 收到 isGameOver 快照 → 组装 MatchMeta 并连同快照流落盘 IndexedDB（仅落一次）
  *
@@ -12,14 +12,24 @@
  */
 
 import type { MsgGameState } from "@/types/net";
-import { saveMatch, type MatchMeta } from "./matchHistoryDB";
+import {
+  appendSnapshotChunk,
+  deleteMatch,
+  saveMatchMeta,
+  type MatchMeta,
+} from "./matchHistoryDB";
+
+const SNAPSHOT_CHUNK_SIZE = 16;
 
 interface Session {
   id: string;
   startedAt: number;
-  snapshots: Map<number, MsgGameState>; // tick → 快照
+  pendingSnapshots: MsgGameState[];
+  nextChunkIndex: number;
+  snapshotCount: number;
   maxTick: number;
   saved: boolean;
+  writeChain: Promise<void>;
 }
 
 let current: Session | null = null;
@@ -28,18 +38,19 @@ function startSession(gs: MsgGameState): Session {
   return {
     id: `${Date.now()}_${gs.opponent?.name || "opp"}`,
     startedAt: Date.now(),
-    snapshots: new Map(),
+    pendingSnapshots: [],
+    nextChunkIndex: 0,
+    snapshotCount: 0,
     maxTick: -1,
     saved: false,
+    writeChain: Promise.resolve(),
   };
 }
 
 function finalize(s: Session, last: MsgGameState): void {
   if (s.saved) return;
   s.saved = true;
-  const snapshots = [...s.snapshots.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([, v]) => v);
+  flushChunk(s);
   const meta: MatchMeta = {
     id: s.id,
     startedAt: s.startedAt,
@@ -50,25 +61,51 @@ function finalize(s: Session, last: MsgGameState): void {
     winnerIsMe: last.winnerIsMe ?? false,
     gameOverReason: last.gameOverReason ?? "",
     turnCount: last.turnCount ?? 0,
-    snapshotCount: snapshots.length,
+    snapshotCount: s.snapshotCount,
   };
-  saveMatch(meta, snapshots).catch((e) => {
-    console.warn("[matchRecorder] 保存对局失败:", e);
-  });
+  enqueueWrite(s, () => saveMatchMeta(meta));
+}
+
+function flushChunk(s: Session): void {
+  if (s.pendingSnapshots.length === 0) return;
+  const snapshots = s.pendingSnapshots;
+  s.pendingSnapshots = [];
+  const chunkIndex = s.nextChunkIndex++;
+  enqueueWrite(s, () => appendSnapshotChunk(s.id, chunkIndex, snapshots));
+}
+
+function enqueueWrite(s: Session, write: () => Promise<void>) {
+  s.writeChain = s.writeChain
+    .catch(() => {})
+    .then(write)
+    .catch((e) => {
+      console.warn("[matchRecorder] 保存对局失败:", e);
+    });
+}
+
+function discardIncomplete(s: Session) {
+  s.pendingSnapshots = [];
+  enqueueWrite(s, () => deleteMatch(s.id));
 }
 
 export const matchRecorder = {
   onSnapshot(gs: MsgGameState): void {
     if (gs.viewerKind !== "player") return;
     const tick = gs.tick ?? 0;
+    if (current?.saved && gs.isGameOver && tick === current.maxTick) return;
 
     // 新对局判定：尚无会话，或 tick 明显回退（新房间引擎从 0 重新计数）
-    if (!current || tick + 1 < current.maxTick) {
+    if (!current || (current.saved && tick <= current.maxTick) || tick + 1 < current.maxTick) {
+      if (current && !current.saved) discardIncomplete(current);
       current = startSession(gs);
     }
 
-    current.snapshots.set(tick, gs);
-    if (tick > current.maxTick) current.maxTick = tick;
+    // 重连 Resync 可能重复最后一个 tick；已落盘帧不可原地覆盖，直接忽略等价重复。
+    if (tick <= current.maxTick) return;
+    current.pendingSnapshots.push(gs);
+    current.snapshotCount++;
+    current.maxTick = tick;
+    if (current.pendingSnapshots.length >= SNAPSHOT_CHUNK_SIZE) flushChunk(current);
 
     if (gs.isGameOver) {
       finalize(current, gs);
@@ -77,6 +114,7 @@ export const matchRecorder = {
 
   /** 测试/手动复位（一般无需调用，新对局靠 tick 回退自动识别）。 */
   reset(): void {
+    if (current && !current.saved) discardIncomplete(current);
     current = null;
   },
 };

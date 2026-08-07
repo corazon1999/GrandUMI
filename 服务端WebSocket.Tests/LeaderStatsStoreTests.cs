@@ -186,6 +186,41 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Equal(0.4, mirrorRow.SecondWinRate!.Value, precision: 8);
     }
 
+    [Fact]
+    public void 个人详情按账号聚合胜负常用领航和趋势()
+    {
+        var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        store.RecordMatch(new LeaderMatchResult(
+            "profile-1", now.AddDays(-1), MatchKind.Matchmaking,
+            "Alice", "Bob", "L-A", "L-B", 0, 0, 10, "胜利"));
+        store.RecordMatch(new LeaderMatchResult(
+            "profile-2", now.AddDays(-2), MatchKind.RoomCode,
+            "Bob", "Alice", "L-C", "L-A", 0, 0, 12, "失败"));
+        store.RecordMatch(new LeaderMatchResult(
+            "profile-3", now.AddDays(-3), MatchKind.Friendly,
+            "Alice", "Carol", "L-D", "L-C", 0, 1, 15, "胜利"));
+        store.RecordMatch(new LeaderMatchResult(
+            "profile-old", now.AddDays(-40), MatchKind.Matchmaking,
+            "Alice", "Bob", "L-A", "L-B", 0, 0, 10, "旧对局"));
+
+        var result = store.GetPlayerProfile("alice", "30d", now);
+
+        Assert.Equal(3, result.Games);
+        Assert.Equal(2, result.Wins);
+        Assert.Equal(1, result.Losses);
+        Assert.Equal(2d / 3d, result.WinRate, precision: 8);
+        var favorite = Assert.Single(result.TopLeaders, item => item.LeaderNumber == "L-A");
+        Assert.Equal(2, favorite.Games);
+        Assert.Equal(1, favorite.Wins);
+        Assert.Equal(10, result.Trend.Count);
+        Assert.Equal(3, result.Trend.Sum(point => point.Games));
+
+        var bob = store.GetPlayerProfile("Bob", "30d", now);
+        Assert.Equal(2, bob.Games);
+        Assert.Equal(2, bob.TopLeaders.Count);
+    }
+
     private LeaderStatsStore CreateStore()
     {
         Directory.CreateDirectory(_tempDir);

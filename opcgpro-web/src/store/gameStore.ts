@@ -35,6 +35,7 @@ export interface FieldCardView {
 
 export interface PlayerView {
   name: string;
+  cardBackId?: string;         // 旧回放缺失时由卡背组件回退经典款
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
@@ -70,15 +71,17 @@ function clonePlayerView(player: PlayerView | null): PlayerView | null {
   if (!player) return null;
   return {
     ...player,
-    handCardNumbers: [...player.handCardNumbers],
-    handCardCosts: [...player.handCardCosts],
-    handCardCounters: [...player.handCardCounters],
-    fieldCards: player.fieldCards.map((card) => ({
+    // IndexedDB 中的旧回放可能缺少后来新增的手牌费用、反击值等字段。
+    // 在同步入口统一补齐，避免旧快照中断回放或让手牌区域无法渲染。
+    handCardNumbers: [...(player.handCardNumbers ?? [])],
+    handCardCosts: [...(player.handCardCosts ?? [])],
+    handCardCounters: [...(player.handCardCounters ?? [])],
+    fieldCards: (player.fieldCards ?? []).map((card) => ({
       ...card,
-      gainedKeywords: [...card.gainedKeywords],
+      gainedKeywords: [...(card.gainedKeywords ?? [])],
     })),
-    trashNumbers: [...player.trashNumbers],
-    lifeNumbers: [...player.lifeNumbers],
+    trashNumbers: [...(player.trashNumbers ?? [])],
+    lifeNumbers: [...(player.lifeNumbers ?? [])],
     lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),
   };
 }
@@ -162,6 +165,7 @@ interface GameStore {
   // 名字
   myName: string;
   opponentName: string;
+  spectatorNames: string[];
 
   // ── 唯一写入路径 ─────────────────────────────────────────────────────
   syncFromServer: (msg: MsgGameState) => void;
@@ -180,6 +184,7 @@ interface GameStore {
   setSelectedHand: (idx: number | null) => void;
   setSelectedField: (id: string | null) => void;
   setSelectedDon: (idx: number | null) => void;
+  setSpectatorNames: (names: string[]) => void;
   setMode: (m: GameMode) => void;
   resetGame: () => void;
 }
@@ -223,15 +228,21 @@ export const useGameStore = create<GameStore>()(
     selectedDonIndex: null,
     myName: "",
     opponentName: "",
+    spectatorNames: [],
 
     syncFromServer: (msg) =>
       set((s) => {
+        const firstPlayer = msg.firstPlayer ?? -1;
+        const my = clonePlayerView(msg.my ?? null);
+        const opponent = clonePlayerView(msg.opponent ?? null);
         s.tick = msg.tick ?? s.tick + 1;
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
         s.turnCount = msg.turnCount;
-        s.firstPlayer = msg.firstPlayer ?? -1;
-        s.firstPlayerChosen = msg.firstPlayerChosen ?? false;
+        s.firstPlayer = firstPlayer;
+        // firstPlayerChosen 是骰点流程上线后新增的字段。旧回放虽没有该字段，
+        // 但 firstPlayer 已是 0/1；据此兼容推断，避免 HandArea 把整局手牌隐藏。
+        s.firstPlayerChosen = msg.firstPlayerChosen ?? (firstPlayer === 0 || firstPlayer === 1);
         s.isFirstPlayer = msg.isFirstPlayer ?? false;
         s.canChooseFirstPlayer = msg.canChooseFirstPlayer ?? false;
         s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
@@ -242,9 +253,9 @@ export const useGameStore = create<GameStore>()(
         s.winnerIsMe = msg.winnerIsMe ?? false;
         s.gameOverReason = msg.gameOverReason ?? "";
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
-        s.my = msg.my ?? null;
-        s.opponent = msg.opponent ?? null;
-        s.authoritativeMy = clonePlayerView(msg.my ?? null);
+        s.my = my;
+        s.opponent = opponent;
+        s.authoritativeMy = clonePlayerView(my);
         s.pendingPrompt = msg.pendingPrompt ?? null;
         s.localOverflowHandIndex = null;
         s.battle = msg.battle ?? null;
@@ -277,8 +288,8 @@ export const useGameStore = create<GameStore>()(
           s.reveal = { ...msg.reveal, nonce: (s.reveal?.nonce ?? 0) + 1 };
         }
         s.isPending = false;
-        s.myName = msg.my?.name ?? "";
-        s.opponentName = msg.opponent?.name ?? "";
+        s.myName = my?.name ?? "";
+        s.opponentName = opponent?.name ?? "";
         // 收到新快照后清掉选中
         s.selectedHandIndex = null;
         s.selectedFieldId = null;
@@ -346,6 +357,7 @@ export const useGameStore = create<GameStore>()(
       s.selectedHandIndex = null;
       s.selectedFieldId = null;
     }),
+    setSpectatorNames: (names) => set((s) => { s.spectatorNames = names; }),
     setMode: (m) => set((s) => { s.mode = m; }),
     resetGame: () => set((s) => {
       s.tick = 0;
@@ -381,6 +393,7 @@ export const useGameStore = create<GameStore>()(
       s.selectedDonIndex = null;
       s.myName = "";
       s.opponentName = "";
+      s.spectatorNames = [];
     }),
   })),
 );

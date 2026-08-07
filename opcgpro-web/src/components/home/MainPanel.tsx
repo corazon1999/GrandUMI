@@ -24,6 +24,7 @@ import { advanceImageFallback, thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
+import ProfilePanel from "./ProfilePanel";
 
 type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
@@ -315,69 +316,6 @@ function MobileNavIcon({ view }: { view: Exclude<View, "history"> }) {
   return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
 }
 
-function MobileProfilePanel({
-  onOpenPlayers,
-  onOpenHistory,
-  onOpenChangelog,
-  onOpenSettings,
-}: {
-  onOpenPlayers: () => void;
-  onOpenHistory: () => void;
-  onOpenChangelog: () => void;
-  onOpenSettings: () => void;
-}) {
-  const onlineCount = useNetStore((s) => s.onlineCount);
-
-  return (
-    <section className="h-full overflow-y-auto px-4 py-5">
-      <h1 className="mb-4 text-xl font-bold text-white">我的</h1>
-      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
-        <PlayerAvatar variant="profile" />
-        <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
-          <span className="text-sm text-gray-500">服务器状态</span>
-          <NetStatePanel />
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={onOpenPlayers}
-          className="min-h-20 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-green-700 active:bg-gray-800"
-        >
-          <span className="block text-lg font-bold text-green-400">{onlineCount}</span>
-          <span className="mt-1 block text-sm text-gray-300">在线玩家</span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenHistory}
-          className="min-h-20 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-orange-700 active:bg-gray-800"
-        >
-          <span className="block text-lg font-bold text-orange-300">回放</span>
-          <span className="mt-1 block text-sm text-gray-300">对局记录</span>
-        </button>
-      </div>
-
-      <button
-        type="button"
-        onClick={onOpenChangelog}
-        className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 text-sm text-gray-300 transition-colors hover:border-orange-700 active:bg-gray-800"
-      >
-        <span>更新日志</span>
-        <span className="text-gray-600" aria-hidden="true">›</span>
-      </button>
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 text-sm text-gray-300 transition-colors hover:border-orange-700 active:bg-gray-800"
-      >
-        <span>设置</span>
-        <span className="text-gray-600" aria-hidden="true">›</span>
-      </button>
-    </section>
-  );
-}
-
 function changelogSeenKey(account: string): string {
   return `grandumi_changelog_seen_${encodeURIComponent(account)}`;
 }
@@ -403,10 +341,6 @@ export default function MainPanel() {
       setShowChangelog(true);
     }
   }, [account]);
-
-  useEffect(() => {
-    if (layoutMode === "desktop" && view === "profile") setView("lobby");
-  }, [layoutMode, view]);
 
   const closeChangelog = () => {
     if (account && LATEST_CHANGELOG) {
@@ -511,6 +445,12 @@ export default function MainPanel() {
             Leader榜
           </button>
           <button
+            onClick={() => setView("profile")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "profile" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            我的
+          </button>
+          <button
             onClick={() => setView("history")}
             className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
           >
@@ -543,7 +483,8 @@ export default function MainPanel() {
           {view === "leaderboard" && <LeaderLeaderboardPanel />}
           {view === "history" && <HistoryPanel />}
           {view === "profile" && (
-            <MobileProfilePanel
+            <ProfilePanel
+              profileEditor={<PlayerAvatar variant="profile" />}
               onOpenPlayers={() => setShowPlayerList(true)}
               onOpenHistory={() => setView("history")}
               onOpenChangelog={() => setShowChangelog(true)}

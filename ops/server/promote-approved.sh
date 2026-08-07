@@ -16,6 +16,15 @@ die() {
   exit 1
 }
 
+backend_ready() {
+  curl -fsS --retry 10 --retry-delay 1 --retry-connrefused \
+    -o /dev/null http://127.0.0.1:8080/ready
+}
+
+backend_matches_approved() {
+  curl -fsS http://127.0.0.1:8080/version | grep -Fq "$approved"
+}
+
 [[ -s "$approved_file" ]] || { log "没有已批准版本，本次不发布。"; exit 0; }
 [[ -s "$test_file" ]] || die "没有测试服部署记录。"
 approved="$(tr -d '\r\n' < "$approved_file")"
@@ -69,7 +78,9 @@ next_publish="$repo/服务端WebSocket/publish.next"
 if [[ "$need_back" == 1 ]]; then
   log "在临时目录构建正式服后端"
   rm -rf "$next_publish"
-  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo
+  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
+    -p:InformationalVersion="1.0.0+$approved" \
+    -p:IncludeSourceRevisionInInformationalVersion=false
 
   log "增量回填正式服 Leader 排行榜数据"
   production_stats_db="$repo/服务端WebSocket/Data/leader-stats.db"
@@ -98,11 +109,15 @@ if [[ "$need_back" == 1 ]]; then
   rm -rf "$previous_publish"
   [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
   mv "$next_publish" "$repo/服务端WebSocket/publish"
-  if ! systemctl restart grandumi-backend.service || ! systemctl is-active --quiet grandumi-backend.service; then
+  if ! systemctl restart grandumi-backend.service \
+      || ! systemctl is-active --quiet grandumi-backend.service \
+      || ! backend_ready \
+      || ! backend_matches_approved; then
     rm -rf "$repo/服务端WebSocket/publish"
     [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
     systemctl restart grandumi-backend.service || true
-    die "正式服后端启动失败，已尝试回滚。"
+    backend_ready || true
+    die "正式服后端启动或就绪检查失败，已尝试回滚。"
   fi
 fi
 
@@ -117,6 +132,7 @@ if [[ "$need_front" == 1 ]]; then
 fi
 
 sleep 3
+[[ "$need_back" == 0 ]] || backend_ready
 curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3000/
 echo "$approved" > "$deployed_file.next"
 mv "$deployed_file.next" "$deployed_file"

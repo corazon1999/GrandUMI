@@ -4,7 +4,8 @@
  * 用 IndexedDB 保存本账号每局收到的服务端快照流，用于首页「战绩」列表与回放。
  * 分两个 objectStore：
  *   - "meta"      : 轻量元信息（列表用，getAll 不会拖出沉重的快照）
- *   - "snapshots" : 完整 MsgGameState[] 快照流（仅回放时按 id 取）
+ *   - "snapshots" : 旧版完整 MsgGameState[] 快照流（只读兼容）
+ *   - "snapshotChunks" : 新版分块快照流，对局中持续写入，避免整局常驻内存
  *
  * 纯本地存储：清浏览器数据 / 换设备即丢失（路线二固有取舍）。
  */
@@ -12,9 +13,11 @@
 import type { MsgGameState } from "@/types/net";
 
 const DB_NAME = "grandumi-history";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_META = "meta";
 const STORE_SNAP = "snapshots";
+const STORE_CHUNKS = "snapshotChunks";
+const INDEX_CHUNKS_BY_MATCH = "byMatch";
 
 /** 保留上限：超出后按开始时间删最旧 */
 export const MAX_MATCHES = 30;
@@ -38,6 +41,12 @@ interface SnapshotRecord {
   snapshots: MsgGameState[];
 }
 
+interface SnapshotChunkRecord {
+  matchId: string;
+  chunkIndex: number;
+  snapshots: MsgGameState[];
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDB(): Promise<IDBDatabase> {
@@ -55,6 +64,10 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_SNAP)) {
         db.createObjectStore(STORE_SNAP, { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains(STORE_CHUNKS)) {
+        const chunks = db.createObjectStore(STORE_CHUNKS, { keyPath: ["matchId", "chunkIndex"] });
+        chunks.createIndex(INDEX_CHUNKS_BY_MATCH, "matchId", { unique: false });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -69,13 +82,36 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-/** 保存一局（meta + snapshots 同事务写入），并裁剪到上限。 */
+/** 兼容旧调用方式：把整局作为单个新版分块写入，再保存元信息。 */
 export async function saveMatch(meta: MatchMeta, snapshots: MsgGameState[]): Promise<void> {
+  await appendSnapshotChunk(meta.id, 0, snapshots);
+  await saveMatchMeta(meta);
+}
+
+/** 对局进行中追加一个小快照分块。 */
+export async function appendSnapshotChunk(
+  matchId: string,
+  chunkIndex: number,
+  snapshots: MsgGameState[],
+): Promise<void> {
+  if (snapshots.length === 0) return;
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_CHUNKS, "readwrite");
+    tx.objectStore(STORE_CHUNKS).put({ matchId, chunkIndex, snapshots } as SnapshotChunkRecord);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** 对局结束后只写轻量元信息；快照已在过程中分块落盘。 */
+export async function saveMatchMeta(meta: MatchMeta): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE_META, STORE_SNAP], "readwrite");
     tx.objectStore(STORE_META).put(meta);
-    tx.objectStore(STORE_SNAP).put({ id: meta.id, snapshots } as SnapshotRecord);
+    // 若同 ID 曾由旧接口保存，移除旧版整块，避免双份占用。
+    tx.objectStore(STORE_SNAP).delete(meta.id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -93,18 +129,31 @@ export async function listMeta(): Promise<MatchMeta[]> {
 /** 取某局完整快照流。 */
 export async function getSnapshots(id: string): Promise<MsgGameState[] | null> {
   const db = await openDB();
-  const tx = db.transaction(STORE_SNAP, "readonly");
-  const rec = await reqToPromise(tx.objectStore(STORE_SNAP).get(id) as IDBRequest<SnapshotRecord | undefined>);
-  return rec?.snapshots ?? null;
+  const tx = db.transaction([STORE_SNAP, STORE_CHUNKS], "readonly");
+  const legacyRequest = tx.objectStore(STORE_SNAP).get(id) as IDBRequest<SnapshotRecord | undefined>;
+  const chunksRequest = tx.objectStore(STORE_CHUNKS)
+    .index(INDEX_CHUNKS_BY_MATCH)
+    .getAll(IDBKeyRange.only(id)) as IDBRequest<SnapshotChunkRecord[]>;
+  const [legacy, chunks] = await Promise.all([
+    reqToPromise(legacyRequest),
+    reqToPromise(chunksRequest),
+  ]);
+  if (chunks.length > 0) {
+    return chunks
+      .sort((a, b) => a.chunkIndex - b.chunkIndex)
+      .flatMap((chunk) => chunk.snapshots);
+  }
+  return legacy?.snapshots ?? null;
 }
 
 /** 删除一局（meta + snapshots）。 */
 export async function deleteMatch(id: string): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction([STORE_META, STORE_SNAP], "readwrite");
+    const tx = db.transaction([STORE_META, STORE_SNAP, STORE_CHUNKS], "readwrite");
     tx.objectStore(STORE_META).delete(id);
     tx.objectStore(STORE_SNAP).delete(id);
+    deleteChunksInTransaction(tx.objectStore(STORE_CHUNKS), id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -114,9 +163,10 @@ export async function deleteMatch(id: string): Promise<void> {
 export async function clearAll(): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction([STORE_META, STORE_SNAP], "readwrite");
+    const tx = db.transaction([STORE_META, STORE_SNAP, STORE_CHUNKS], "readwrite");
     tx.objectStore(STORE_META).clear();
     tx.objectStore(STORE_SNAP).clear();
+    tx.objectStore(STORE_CHUNKS).clear();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -130,4 +180,14 @@ async function prune(): Promise<void> {
   for (const m of toDelete) {
     await deleteMatch(m.id).catch(() => {});
   }
+}
+
+function deleteChunksInTransaction(store: IDBObjectStore, matchId: string) {
+  const request = store.index(INDEX_CHUNKS_BY_MATCH).openKeyCursor(IDBKeyRange.only(matchId));
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (!cursor) return;
+    store.delete(cursor.primaryKey);
+    cursor.continue();
+  };
 }

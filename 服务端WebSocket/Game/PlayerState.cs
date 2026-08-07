@@ -9,6 +9,8 @@ public class PlayerState
 {
     public required string SessionId   { get; set; }
     public required string AccountName { get; set; }
+    /// <summary>公开外观信息：用于该玩家所有暗置主卡的卡背。</summary>
+    public string CardBackId { get; set; } = "classic";
 
     public required CardInstance Leader  { get; init; }
     public List<CardInstance> Hand       { get; } = new();

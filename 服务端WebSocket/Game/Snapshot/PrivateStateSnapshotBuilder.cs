@@ -78,6 +78,7 @@ public static class PrivateStateSnapshotBuilder
         {
             index = playerIndex,
             accountName = player.AccountName,
+            cardBackId = player.CardBackId,
             leader = SnapshotCard(state, playerIndex, player.Leader),
             hand = player.Hand.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             characters = player.Characters.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),

@@ -10,8 +10,16 @@ public static class ReplayRecorder
 {
     private static readonly AsyncJsonlWriter Writer = new();
 
+    public static int QueueDepth => Writer.QueueDepth;
+    public static long DroppedEntries => Writer.DroppedEntries;
+
     public static string GetReplayDir()
     {
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_REPLAY_DIR");
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "Replays"));
+
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
@@ -51,6 +59,9 @@ public static class ReplayRecorder
     /// <summary>关闭前会等待该房间已经入队的录像全部落盘。</summary>
     public static void Close(string roomId)
         => Writer.Close(roomId);
+
+    public static Task CloseDeferred(string roomId)
+        => Writer.CloseDeferred(roomId);
 
     /// <summary>正常关服时排空队列并关闭全部录像文件。</summary>
     public static void Shutdown() => Writer.Shutdown();

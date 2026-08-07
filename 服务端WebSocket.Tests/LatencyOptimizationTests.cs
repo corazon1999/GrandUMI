@@ -1,6 +1,8 @@
 using System.Text.Json;
 using GrandUMI.Cards;
+using GrandUMI.Cluster;
 using GrandUMI.Game;
+using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 using Xunit;
 
@@ -8,6 +10,112 @@ namespace GrandUMI.Tests;
 
 public class LatencyOptimizationTests
 {
+    [Fact]
+    public async Task WebSocket发送队列_有界且关键消息可淘汰低优先级消息()
+    {
+        var senderEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSender = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new List<string>();
+        var session = new WsSession { Socket = null! };
+        session.StartSender(async message =>
+        {
+            var value = (string)message.Data;
+            received.Add(value);
+            if (value == "gate")
+            {
+                senderEntered.TrySetResult();
+                await releaseSender.Task;
+            }
+        });
+
+        Assert.True(session.Enqueue("gate", null, WsSession.OutboundPriority.Critical));
+        await senderEntered.Task;
+        for (var i = 0; i < WsSession.MaxOutboundMessages - 1; i++)
+            Assert.True(session.Enqueue($"normal-{i}", null, WsSession.OutboundPriority.Normal));
+        Assert.True(session.Enqueue("discardable", "presence", WsSession.OutboundPriority.BestEffort));
+
+        Assert.Equal(WsSession.MaxOutboundMessages, session.OutboundDepth);
+        Assert.False(session.Enqueue("best-effort-overflow", null, WsSession.OutboundPriority.BestEffort));
+        Assert.True(session.Enqueue("critical", null, WsSession.OutboundPriority.Critical));
+        Assert.Equal(WsSession.MaxOutboundMessages, session.OutboundDepth);
+        Assert.Equal(2, session.DroppedOutboundCount);
+
+        releaseSender.TrySetResult();
+        await session.StopSenderAsync();
+
+        Assert.Contains("critical", received);
+        Assert.DoesNotContain("discardable", received);
+        Assert.DoesNotContain("best-effort-overflow", received);
+        Assert.True(session.MaxOutboundDepth <= WsSession.MaxOutboundMessages);
+    }
+
+    [Fact]
+    public void WebSocket限流_令牌耗尽后拒绝并按桶隔离()
+    {
+        var session = new WsSession { Socket = null! };
+
+        Assert.True(session.TryConsumeRateLimit("chat", capacity: 2, refillPerSecond: 0));
+        Assert.True(session.TryConsumeRateLimit("chat", capacity: 2, refillPerSecond: 0));
+        Assert.False(session.TryConsumeRateLimit("chat", capacity: 2, refillPerSecond: 0));
+        Assert.True(session.TryConsumeRateLimit("player-list", capacity: 1, refillPerSecond: 0));
+        Assert.False(session.TryConsumeRateLimit("player-list", capacity: 1, refillPerSecond: 0));
+    }
+
+    [Fact]
+    public void 房间目录_注册解析快照与注销保持一致()
+    {
+        var directory = new LocalRoomPlacementDirectory();
+        var roomId = $"placement-{Guid.NewGuid():N}";
+
+        directory.RegisterLocal(roomId);
+
+        Assert.True(directory.TryResolve(roomId, out var placement));
+        Assert.Equal(roomId, placement.RoomId);
+        Assert.Equal(directory.LocalNodeId, placement.NodeId);
+        Assert.Contains(directory.Snapshot(), item => item.RoomId == roomId);
+
+        directory.Unregister(roomId);
+        Assert.False(directory.TryResolve(roomId, out _));
+    }
+
+    [Fact]
+    public async Task 批量录像生命周期_打开与异步关闭保持有序且不占满调用线程()
+    {
+        var items = Enumerable.Range(0, 64)
+            .Select(index => new
+            {
+                RoomId = $"async-lifecycle-{Guid.NewGuid():N}",
+                Index = index,
+                Path = "",
+            })
+            .ToArray();
+
+        var opened = items.AsParallel().Select(item => new
+        {
+            item.RoomId,
+            item.Index,
+            Path = ReplayRecorder.Open(item.RoomId),
+        }).ToArray();
+
+        try
+        {
+            foreach (var item in opened)
+                ReplayRecorder.Append(item.RoomId, new { index = item.Index });
+
+            await Task.WhenAll(opened.Select(item => ReplayRecorder.CloseDeferred(item.RoomId)));
+
+            foreach (var item in opened)
+            {
+                var line = Assert.Single(File.ReadLines(item.Path));
+                Assert.Equal(item.Index, JsonDocument.Parse(line).RootElement.GetProperty("index").GetInt32());
+            }
+        }
+        finally
+        {
+            foreach (var item in opened) TryDelete(item.Path);
+        }
+    }
+
     [Fact]
     public async Task WebSocket发送队列_只合并连续普通快照且保持控制消息顺序()
     {
@@ -65,6 +173,83 @@ public class LatencyOptimizationTests
 
         using var spectator = JsonDocument.Parse(JsonSerializer.Serialize(all.Spectator));
         Assert.Equal(JsonValueKind.Null, spectator.RootElement.GetProperty("pendingPrompt").ValueKind);
+    }
+
+    [Fact]
+    public void 增量快照_可按实际发送基线逐字段重建且旧客户端保持完整快照()
+    {
+        var state = TestScene.MaxScenario();
+        state.Tick = 30;
+        var first = StateSnapshotBuilder.Build(state, 0, "GameStart", requestId: "req-first");
+        var firstEncoded = SnapshotWireCodec.Encode(first, true, null, -1, 0);
+
+        Assert.True(firstEncoded.IsStateSnapshot);
+        Assert.False(firstEncoded.IsDelta);
+        Assert.NotNull(firstEncoded.NewBaseline);
+        var sameSnapshotForAnotherConnection = SnapshotWireCodec.Encode(first, false, null, -1, 0);
+        Assert.Same(firstEncoded.Bytes, sameSnapshotForAnotherConnection.Bytes);
+
+        state.Tick = 31;
+        state.TurnCount++;
+        var second = StateSnapshotBuilder.Build(state, 0, "EndTurn", requestId: "req-second");
+        var secondEncoded = SnapshotWireCodec.Encode(
+            second,
+            true,
+            firstEncoded.NewBaseline,
+            firstEncoded.Tick,
+            firstEncoded.DeltasSinceFull);
+
+        Assert.True(secondEncoded.IsDelta);
+        Assert.True(secondEncoded.Bytes.Length < JsonSerializer.SerializeToUtf8Bytes(second).Length);
+        using var deltaDocument = JsonDocument.Parse(secondEncoded.Bytes);
+        Assert.Equal(30, deltaDocument.RootElement.GetProperty("baseTick").GetInt32());
+        var reconstructed = SnapshotWireCodec.ApplyDelta(firstEncoded.NewBaseline!.Value, deltaDocument.RootElement);
+        Assert.True(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(second), reconstructed));
+
+        var legacyEncoded = SnapshotWireCodec.Encode(
+            second,
+            false,
+            firstEncoded.NewBaseline,
+            firstEncoded.Tick,
+            firstEncoded.DeltasSinceFull);
+        Assert.False(legacyEncoded.IsDelta);
+        Assert.Equal("MsgGameState", JsonDocument.Parse(legacyEncoded.Bytes).RootElement.GetProperty("proto").GetString());
+
+        var periodicFull = SnapshotWireCodec.Encode(second, true, firstEncoded.NewBaseline, firstEncoded.Tick, 32);
+        Assert.False(periodicFull.IsDelta);
+    }
+
+    [Fact]
+    public void 公开快照_回放与训练日志共享一次JSON物化()
+    {
+        var shared = new SharedJsonValue(new { proto = "MsgGameState", tick = 9, values = Enumerable.Range(1, 20).ToArray() });
+
+        var replay = JsonSerializer.Serialize(new { kind = "state", snapshot = shared });
+        var matchLog = JsonSerializer.Serialize(new { kind = "public_snapshot", payload = shared });
+
+        Assert.Contains("\"tick\":9", replay);
+        Assert.Contains("\"tick\":9", matchLog);
+        Assert.Equal(1, shared.MaterializationCount);
+    }
+
+    [Fact]
+    public void 动作拒绝_回包携带对应请求编号()
+    {
+        TestScene.New();
+        var deck = BuildLegalDeck("OP15-001");
+        var engine = new GameEngine(
+            "request-id-test",
+            ("s0", "alice", deck),
+            ("s1", "bob", deck),
+            firstPlayer: 0,
+            rngSeed: 123456);
+        object? response = null;
+        engine.OnSendToPlayer = (_, payload) => response = payload;
+
+        Assert.False(engine.HandleAction(1, "EndTurn", JsonSerializer.SerializeToElement(new { }), "req-rejected"));
+
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(response));
+        Assert.Equal("req-rejected", document.RootElement.GetProperty("requestId").GetString());
     }
 
     [Fact]

@@ -21,6 +21,7 @@ public sealed class PlayerDataStoreTests : IDisposable
 
         Assert.Equal("Alice", first.Account);
         Assert.Equal("Alice", first.DisplayName);
+        Assert.Equal(PlayerDataStore.DefaultCardBackId, first.CardBackId);
         Assert.Empty(first.Decks);
 
         var restartedStore = CreateStore();
@@ -92,6 +93,35 @@ public sealed class PlayerDataStoreTests : IDisposable
         Assert.Equal("航海士", updated.DisplayName);
         Assert.Equal("航海士", reloaded.DisplayName);
         Assert.Equal("/sprites-thumb/OP15/OP15-001.webp", reloaded.Avatar);
+    }
+
+    [Fact]
+    public void UpdateCardBack_只接受内置卡背并跨登录持久化()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+
+        var updated = store.UpdateCardBack("Alice", "straw-hat");
+        var reloaded = store.Login("alice");
+
+        Assert.Equal("straw-hat", updated.CardBackId);
+        Assert.Equal("straw-hat", reloaded.CardBackId);
+        Assert.Throws<PlayerDataValidationException>(() => store.UpdateCardBack("Alice", "https://example.com/back.png"));
+    }
+
+    [Fact]
+    public void DeferredLoginWrites_同一玩家重复登录只保留一次待写并在关服排空()
+    {
+        var store = new PlayerDataStore(_databasePath, deferLoginWrites: true);
+        store.Initialize();
+        store.Login("Alice");
+
+        store.Login("alice");
+        store.Login("ALICE");
+
+        Assert.Equal(1, store.PendingLoginWrites);
+        store.Shutdown();
+        Assert.Equal(0, store.PendingLoginWrites);
     }
 
     private PlayerDataStore CreateStore()

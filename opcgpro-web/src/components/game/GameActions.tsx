@@ -71,6 +71,25 @@ export default function GameActions() {
     selectedHasActivated &&
     !selectedActivatedUsed;
 
+  // 贴咚采用“目标优先”操作：先选中领袖/角色，再直接选择要赋予的张数。
+  // 领袖在协议中使用固定标识 "leader"；角色沿用场上实例 ID，舞台不可贴咚。
+  const attachTargetId =
+    my && selectedFieldId !== null
+      ? selectedFieldId === my.leaderId
+        ? "leader"
+        : my.fieldCards.some((card) => card.id === selectedFieldId)
+          ? selectedFieldId
+          : null
+      : null;
+  const canAttachDon =
+    currentTurn &&
+    phase === "Main" &&
+    !battle &&
+    !isSelectingTarget &&
+    attachTargetId !== null &&
+    (my?.costActive ?? 0) > 0;
+  const attachDonCounts = Array.from({ length: my?.costActive ?? 0 }, (_, index) => index + 1);
+
   const btn =
     "w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
 
@@ -91,6 +110,12 @@ export default function GameActions() {
       return;
     }
     GameRequest.playCard(selectedHandIndex);
+  };
+
+  const attachDon = (count: number) => {
+    if (!attachTargetId) return;
+    GameRequest.attachDon(attachTargetId, count);
+    setSelectedField(null);
   };
 
   return (
@@ -133,6 +158,39 @@ export default function GameActions() {
         >
           启动效果
         </button>
+      )}
+
+      {canAttachDon && (
+        <div className="rounded-md border border-amber-300/25 bg-amber-950/25 p-2 shadow-inner shadow-black/20">
+          <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-black">
+            <span className="text-amber-100">贴咚</span>
+            <span className="text-amber-300/80">可用 {my?.costActive ?? 0}</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {attachDonCounts.map((count) => (
+              <button
+                key={count}
+                type="button"
+                onClick={() => attachDon(count)}
+                disabled={isPending}
+                title={`赋予 ${count} 张咚!!`}
+                className="rounded bg-amber-500/85 py-1 text-xs font-black text-black shadow transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300"
+              >
+                {count}
+              </button>
+            ))}
+          </div>
+          {attachDonCounts.length > 1 && (
+            <button
+              type="button"
+              onClick={() => attachDon(attachDonCounts.length)}
+              disabled={isPending}
+              className="mt-1.5 w-full rounded bg-amber-700/80 py-1 text-[11px] font-black text-amber-50 shadow transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-600"
+            >
+              全部（{attachDonCounts.length}）
+            </button>
+          )}
+        </div>
       )}
 
       {canPassCounter && (

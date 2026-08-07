@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Threading.Channels;
+using GrandUMI.Diagnostics;
 
 namespace GrandUMI.Game.Logging;
 
@@ -11,44 +12,76 @@ internal sealed class AsyncJsonlWriter
 {
     private const int BatchDelayMs = 20;
     private const int MaxBatchSize = 256;
+    private const int DefaultCapacity = 16_384;
 
-    private readonly Channel<Command> _queue = Channel.CreateUnbounded<Command>(new UnboundedChannelOptions
-    {
-        SingleReader = true,
-        SingleWriter = false,
-        AllowSynchronousContinuations = false,
-    });
+    private readonly Channel<Command> _queue;
     private readonly Dictionary<string, StreamWriter> _writers = new();
     private readonly JsonSerializerOptions? _jsonOptions;
     private readonly Task _worker;
     private int _stopped;
+    private int _queueDepth;
+    private long _droppedEntries;
 
-    public AsyncJsonlWriter(JsonSerializerOptions? jsonOptions = null)
+    public AsyncJsonlWriter(JsonSerializerOptions? jsonOptions = null, int capacity = DefaultCapacity)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(capacity, MaxBatchSize);
         _jsonOptions = jsonOptions;
+        _queue = Channel.CreateBounded<Command>(new BoundedChannelOptions(capacity)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+            FullMode = BoundedChannelFullMode.Wait,
+        });
         _worker = Task.Run(ProcessLoopAsync);
     }
+
+    public int QueueDepth => Math.Max(0, Volatile.Read(ref _queueDepth));
+    public long DroppedEntries => Interlocked.Read(ref _droppedEntries);
 
     public void Open(string key, string path, bool append)
     {
         ThrowIfStopped();
-        var completion = NewCompletion();
-        Enqueue(new OpenCommand(key, path, append, completion));
-        completion.Task.GetAwaiter().GetResult();
+        EnqueueRequired(new OpenCommand(key, path, append));
+        // 打开命令与后续 Append 由同一 Channel 保序；房间创建线程无需等待磁盘真正打开。
+        // 否则数百房间同时创建时会占满线程池，连健康检查也无法及时执行。
     }
 
-    public void Append(string key, object entry)
+    public bool Append(string key, object entry)
     {
-        if (Volatile.Read(ref _stopped) != 0) return;
-        Enqueue(new AppendCommand(key, entry));
+        if (Volatile.Read(ref _stopped) != 0) return false;
+        var depth = Interlocked.Increment(ref _queueDepth);
+        if (_queue.Writer.TryWrite(new AppendCommand(key, entry)))
+        {
+            LatencyDiagnostics.RecordMetric("JSONL 日志队列深度", depth, "条");
+            return true;
+        }
+
+        Interlocked.Decrement(ref _queueDepth);
+        Interlocked.Increment(ref _droppedEntries);
+        LatencyDiagnostics.RecordMetric("JSONL 日志丢弃", 1, "条");
+        return false;
     }
 
     public void Close(string key)
+        => CloseDeferred(key).GetAwaiter().GetResult();
+
+    /// <summary>有序排入关闭命令并返回完成任务，供高并发房间清理异步收尾。</summary>
+    public Task CloseDeferred(string key)
     {
-        if (Volatile.Read(ref _stopped) != 0) return;
+        if (Volatile.Read(ref _stopped) != 0) return Task.CompletedTask;
         var completion = NewCompletion();
-        Enqueue(new CloseCommand(key, completion));
-        completion.Task.GetAwaiter().GetResult();
+        EnqueueRequired(new CloseCommand(key, completion));
+        return completion.Task;
+    }
+
+    /// <summary>关闭文件后在同一写入线程删除，保证删除不会早于此前追加，也会被 Shutdown 排空。</summary>
+    public Task DeleteDeferred(string key, string path)
+    {
+        if (Volatile.Read(ref _stopped) != 0) return Task.CompletedTask;
+        var completion = NewCompletion();
+        EnqueueRequired(new DeleteCommand(key, path, completion));
+        return completion.Task;
     }
 
     public void Shutdown()
@@ -58,10 +91,19 @@ internal sealed class AsyncJsonlWriter
         _worker.GetAwaiter().GetResult();
     }
 
-    private void Enqueue(Command command)
+    private void EnqueueRequired(Command command)
     {
-        if (!_queue.Writer.TryWrite(command))
-            throw new InvalidOperationException("日志后台队列已停止");
+        ThrowIfStopped();
+        Interlocked.Increment(ref _queueDepth);
+        try
+        {
+            _queue.Writer.WriteAsync(command).AsTask().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            Interlocked.Decrement(ref _queueDepth);
+            throw;
+        }
     }
 
     private async Task ProcessLoopAsync()
@@ -72,6 +114,7 @@ internal sealed class AsyncJsonlWriter
             {
                 var batch = new List<Command>(MaxBatchSize);
                 if (!_queue.Reader.TryRead(out var first)) continue;
+                Interlocked.Decrement(ref _queueDepth);
                 batch.Add(first);
 
                 // 只有普通追加才等待合并；打开/关闭文件不人为增加房间创建和清理延迟。
@@ -79,7 +122,10 @@ internal sealed class AsyncJsonlWriter
                     await Task.Delay(BatchDelayMs);
 
                 while (batch.Count < MaxBatchSize && _queue.Reader.TryRead(out var command))
+                {
+                    Interlocked.Decrement(ref _queueDepth);
                     batch.Add(command);
+                }
 
                 ProcessBatch(batch);
             }
@@ -91,7 +137,10 @@ internal sealed class AsyncJsonlWriter
         finally
         {
             while (_queue.Reader.TryRead(out var command))
+            {
+                Interlocked.Decrement(ref _queueDepth);
                 ProcessBatch(new[] { command });
+            }
 
             foreach (var writer in _writers.Values)
             {
@@ -119,11 +168,10 @@ internal sealed class AsyncJsonlWriter
                             oldWriter.Dispose();
                         }
                         _writers[open.Key] = new StreamWriter(open.Path, append: open.Append);
-                        open.Completion.TrySetResult();
                     }
                     catch (Exception ex)
                     {
-                        open.Completion.TrySetException(ex);
+                        Console.Error.WriteLine($"[日志] 打开 {open.Key} 失败：{ex.Message}");
                     }
                     break;
 
@@ -156,6 +204,24 @@ internal sealed class AsyncJsonlWriter
                         close.Completion.TrySetException(ex);
                     }
                     break;
+
+                case DeleteCommand delete:
+                    try
+                    {
+                        if (_writers.Remove(delete.Key, out var deleteWriter))
+                        {
+                            deleteWriter.Flush();
+                            deleteWriter.Dispose();
+                            touched.Remove(deleteWriter);
+                        }
+                        File.Delete(delete.Path);
+                        delete.Completion.TrySetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        delete.Completion.TrySetException(ex);
+                    }
+                    break;
             }
         }
 
@@ -176,7 +242,8 @@ internal sealed class AsyncJsonlWriter
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private abstract record Command;
-    private sealed record OpenCommand(string Key, string Path, bool Append, TaskCompletionSource Completion) : Command;
+    private sealed record OpenCommand(string Key, string Path, bool Append) : Command;
     private sealed record AppendCommand(string Key, object Entry) : Command;
     private sealed record CloseCommand(string Key, TaskCompletionSource Completion) : Command;
+    private sealed record DeleteCommand(string Key, string Path, TaskCompletionSource Completion) : Command;
 }

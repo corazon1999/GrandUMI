@@ -10,6 +10,74 @@ public class OP14_120_CrocodileTests
     private static CardInstance Card(string number) => new() { Info = CardDatabase.Get(number)! };
 
     [Fact]
+    public async Task OnEnter_UsesCurrentCostForLock_AndDrawsForCostZero()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP15-003")
+            .Build();
+        var me = state.Players[0];
+        var opponent = state.Players[1];
+        var crocodile = Card("OP14-120");
+        var reducedCostCharacter = Card("OP17-022");
+        reducedCostCharacter.CostModThisTurn = -10;
+        opponent.Characters.Add(reducedCostCharacter);
+        var drawCard = me.Deck[0];
+        var prompts = new MockPromptService()
+            .QueueChoose(reducedCostCharacter.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, crocodile, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(0, state.CurrentCostOf(1, reducedCostCharacter));
+        var restriction = Assert.Single(reducedCostCharacter.Restrictions,
+            item => item.Kind == RestrictionKind.CannotAttack);
+        Assert.Equal(KeywordDuration.UntilNextOpponentEndPhase, restriction.Duration);
+        Assert.Equal(0, restriction.AppliedBySide);
+        Assert.Contains(drawCard, me.Hand);
+        Assert.Empty(me.Deck);
+        Assert.Contains(reducedCostCharacter.Id.ToString(), prompts.ChooseHistory.Single().choices);
+    }
+
+    [Fact]
+    public async Task OnEnter_DrawsWhenOpponentHasCurrentCostEightOrMore()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP15-003")
+            .Build();
+        var me = state.Players[0];
+        var opponent = state.Players[1];
+        var crocodile = Card("OP14-120");
+        opponent.Characters.Add(Card("OP17-022"));
+        var drawCard = me.Deck[0];
+        var prompts = new MockPromptService();
+
+        await EffectRuntime.Resolve(state, 0, crocodile, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Contains(drawCard, me.Hand);
+        Assert.Empty(me.Deck);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
+    public async Task OnEnter_DoesNotDrawWhenOpponentOnlyHasCurrentCostOneToSeven()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP15-003")
+            .Build();
+        var me = state.Players[0];
+        var opponent = state.Players[1];
+        var crocodile = Card("OP14-120");
+        var middleCostCharacter = Card("ST32-003");
+        opponent.Characters.Add(middleCostCharacter);
+        var prompts = new MockPromptService().QueueChooseEmpty();
+
+        await EffectRuntime.Resolve(state, 0, crocodile, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Empty(me.Hand);
+        Assert.Single(me.Deck);
+        Assert.Empty(middleCostCharacter.Restrictions);
+    }
+
+    [Fact]
     public async Task OnKO_DiscardsOneHandCard_AndPlaysSelfFromTrash()
     {
         var state = TestScene.New().Build();

@@ -9,6 +9,7 @@ import { clsx } from "clsx";
 import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardHoverPreview";
 import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/CardKeywordEffects";
+import CardBack from "@/components/ui/CardBack";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
@@ -21,6 +22,8 @@ interface Props {
   costBuff?: number;
   attachedDonCount?: number;
   faceDown?: boolean;
+  /** 暗置时使用的公开卡背外观；旧快照或无效值自动回退经典款。 */
+  cardBackId?: string;
   /** 隐藏反击值徽标（卡牌在场上时反击值无意义，仅手牌防御时显示） */
   hideCounter?: boolean;
   /** 当前有效反击值（含场上静态效果）；未提供时使用卡牌印刷值 */
@@ -63,6 +66,7 @@ export default function CardItem({
   costBuff = 0,
   attachedDonCount = 0,
   faceDown = false,
+  cardBackId,
   hideCounter = false,
   counterValue,
   hidePower = false,
@@ -182,9 +186,7 @@ export default function CardItem({
       whileHover={!isSelected ? { scale: 1.03 } : {}}
     >
       {showFaceDown ? (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-sky-950 via-blue-950 to-slate-950 ring-1 ring-inset ring-sky-300/20">
-          <span className="text-xs font-black tracking-normal text-sky-300">CARD</span>
-        </div>
+        <CardBack cardBackId={cardBackId} />
       ) : (
         <>
           <NextImage

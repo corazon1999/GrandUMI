@@ -130,22 +130,26 @@ git push
 
 ## 测试服与正式服发布
 
-发布前先处理更新日志缓存：
-
-1. 检查 `changelog-cache/pending/` 下的全部修复记录。
-2. 将所有玩家可见说明按“新增 / 修复 / 优化”汇总到 `opcgpro-web/src/data/changelog.ts` 的新版本条目。
-3. 将已汇总记录归档到 `changelog-cache/published/<版本号>/`，确认待发布缓存没有遗漏。
-4. 完成相关测试后，再按下面的流程部署测试服并批准正式发布。
-
-缓存记录和发布检查清单详见 [`changelog-cache/README.md`](changelog-cache/README.md)。`pending/` 仍有本次应发布的记录时，不得批准正式发布。
-
-日常改动先部署到 `https://test.grand-umi.com`：
+所有已经实现并通过相关验证的新功能、新需求和 Bug 修复，完成后都应先在
+`changelog-cache/pending/` 中留下记录，再提交当前任务涉及的文件并自动部署到测试服：
 
 ```powershell
 .\deploy-test.ps1
 ```
 
-确认测试正常后，批准当前测试服版本：
+日常自动部署测试服不要求提前清空 `pending/`。不得把无关工作区改动混入提交；部署脚本执行成功且
+`https://test.grand-umi.com` 的 HTTP 验证通过后，才算已经提交到测试服。测试服部署不等于正式发布批准。
+
+准备正式发布时，再集中处理更新日志缓存：
+
+1. 检查 `changelog-cache/pending/` 下的全部修复记录。
+2. 将所有玩家可见说明按“新增 / 修复 / 优化”汇总到 `opcgpro-web/src/data/changelog.ts` 的新版本条目。
+3. 将已汇总记录归档到 `changelog-cache/published/<版本号>/`，确认待发布缓存没有遗漏。
+4. 确认正式发布候选提交已经通过测试服验证，再批准正式发布。
+
+缓存记录和发布检查清单详见 [`changelog-cache/README.md`](changelog-cache/README.md)。`pending/` 仍有本次应发布的记录时，不得批准正式发布。
+
+确认当前测试服版本可以正式发布后，单独执行批准命令：
 
 ```powershell
 .\approve-release.ps1

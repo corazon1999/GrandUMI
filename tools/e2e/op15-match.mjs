@@ -22,6 +22,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const OP15_PATH = path.join(ROOT, "卡牌数据", "OP15.json");
 
 const WS_URL = process.env.WS_URL ?? "ws://localhost:8080/ws";
+const RUN_ID = (process.env.E2E_RUN_ID ?? Date.now().toString(36)).replace(/[^0-9A-Za-z_-]/g, "");
 
 const op15 = JSON.parse(fs.readFileSync(OP15_PATH, "utf8"));
 
@@ -123,8 +124,8 @@ async function main() {
     makeClient("A", deck),
     makeClient("B", deck),
   ]);
-  await login(a, "test_alice");
-  await login(b, "test_bob");
+  await login(a, `test_alice_${RUN_ID}`);
+  await login(b, `test_bob_${RUN_ID}`);
 
   await Promise.all([startMatch(a), startMatch(b)]);
   console.log("匹配中...");
@@ -141,11 +142,22 @@ async function main() {
   ]);
 
   // 等收到首份 GameState
-  await Promise.all([
+  const [aInitial, bInitial] = await Promise.all([
     a.wait(m => m.proto === "MsgGameState"),
     b.wait(m => m.proto === "MsgGameState"),
   ]);
   console.log("收到初始 GameState");
+
+  // 当前规则先由骰点胜者选择先后手，再进入调度手牌阶段。
+  const chooser = aInitial.canChooseFirstPlayer ? a : bInitial.canChooseFirstPlayer ? b : null;
+  if (chooser) {
+    chooser.send({ proto: "MsgGameAction", action: "ChooseFirstPlayer", data: { goFirst: true } });
+    await Promise.all([
+      a.wait(m => m.proto === "MsgGameState" && m.firstPlayerChosen === true),
+      b.wait(m => m.proto === "MsgGameState" && m.firstPlayerChosen === true),
+    ]);
+    console.log(`${chooser.name} 已选择先手`);
+  }
 
   // 双方 mulligan 不重抽
   a.send({ proto: "MsgGameAction", action: "Mulligan", data: { redraw: false } });

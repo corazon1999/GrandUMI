@@ -20,6 +20,7 @@ import type {
   MsgDeleteDeck,
   MsgSelectDeck,
   MsgUpdateProfile,
+  MsgUpdateCardBack,
   MsgImportDecks,
   MsgAddAccount,
   MsgUpdatePs,
@@ -36,6 +37,7 @@ import type {
   MsgPlayerList,
   MsgLeaderLeaderboard,
   MsgLeaderMatchups,
+  MsgPlayerProfileStats,
   LeaderboardPeriod,
   MsgInvitePlayer,
   MsgInviteNotify,
@@ -67,6 +69,7 @@ let registered = false;
 let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
+const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
 
 function clearSpectateRequestTimer() {
   if (spectateRequestTimer) clearTimeout(spectateRequestTimer);
@@ -154,6 +157,9 @@ export function registerHomeProtocols() {
       case "MsgLeaderMatchups":
         handleLeaderMatchups(msg as MsgLeaderMatchups);
         break;
+      case "MsgPlayerProfileStats":
+        handlePlayerProfileStats(msg as MsgPlayerProfileStats);
+        break;
       case "MsgInvitePlayer":
         handleInvitePlayer(msg as MsgInvitePlayer);
         break;
@@ -178,8 +184,17 @@ export function registerHomeProtocols() {
     }
   });
 
-  // 仅在已登录会话发生网络断线时自动重新登录。
-  // 整页刷新会重建 store，此时必须由玩家在登录页确认账号后再恢复对局。
+  // 对局页整页刷新会以全新 SessionId 首次握手；只消费一次性恢复标记，
+  // 避免普通首页访问静默登录，同时让服务端 TryReclaim 能自动找回原房间。
+  eventBus.on("connectSucc", () => {
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem(GAME_REFRESH_RESUME_KEY) !== "1") return;
+    const savedAccount = localStorage.getItem("grandumi_account")?.trim();
+    if (savedAccount) HomeRequest.login(savedAccount);
+    else sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+  });
+
+  // 已登录会话发生普通网络断线时继续沿用当前账号自动恢复。
   eventBus.on("reconnected", () => {
     const { loggedIn, account } = useNetStore.getState();
     if (loggedIn && account) HomeRequest.login(account);
@@ -232,6 +247,8 @@ function handleSecret(msg: MsgSecret) {
  */
 function handleLogin(msg: MsgLogin) {
   const store = useNetStore.getState();
+  // 收到明确登录结果后才消费标记；若握手后、回包前再次断线，下一次连接仍可继续恢复。
+  if (typeof window !== "undefined") sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
   if (msg.result === true) {
     const account = msg.account ?? "";
     const displayName = msg.name || account;
@@ -240,11 +257,18 @@ function handleLogin(msg: MsgLogin) {
       ? localStorage.getItem("grandumi_selected_deck")
       : null;
 
-    applyPlayerData(account, displayName, msg.avatar ?? "", msg.selectedDeckName ?? null, msg.decks ?? []);
+    applyPlayerData(
+      account,
+      displayName,
+      msg.avatar ?? "",
+      msg.cardBackId ?? "classic",
+      msg.selectedDeckName ?? null,
+      msg.decks ?? [],
+    );
     store.setLoggedIn(true, displayName, account);
     store.setError(null);
     NetManager.finishRecovery();
-    // 持久化账号仅用于下次打开登录页时预填；刷新后仍需玩家主动确认
+    // 持久化账号用于登录页预填，以及对局页刷新时的一次性自动恢复。
     if (typeof window !== "undefined" && account) {
       localStorage.setItem("grandumi_account", account);
     }
@@ -266,6 +290,7 @@ function applyPlayerData(
   account: string,
   displayName: string,
   avatar: string,
+  cardBackId: string,
   selectedDeckName: string | null,
   decks: SavedDeck[],
 ) {
@@ -274,7 +299,7 @@ function applyPlayerData(
   setSelectedDeckName(selectedDeckName);
 
   const store = useNetStore.getState();
-  store.setProfile(displayName, avatar);
+  store.setProfile(displayName, avatar, cardBackId);
   const selected = selectedDeckName
     ? decks.find((deck) => deck.name === selectedDeckName)
     : undefined;
@@ -304,7 +329,14 @@ function handlePlayerData(msg: MsgPlayerData) {
     return;
   }
 
-  applyPlayerData(account, msg.displayName, msg.avatar ?? "", msg.selectedDeckName ?? null, msg.decks);
+  applyPlayerData(
+    account,
+    msg.displayName,
+    msg.avatar ?? "",
+    msg.cardBackId ?? current.cardBackId,
+    msg.selectedDeckName ?? null,
+    msg.decks,
+  );
 
   if (pendingLegacyImport?.account === account) {
     const desiredSelection = pendingLegacyImport.selectedDeckName;
@@ -470,6 +502,12 @@ function handleLeaderMatchups(msg: MsgLeaderMatchups) {
   useNetStore.getState().setLeaderMatchups(msg);
 }
 
+/** MsgPlayerProfileStats — 当前登录账号的周期战绩。 */
+function handlePlayerProfileStats(msg: MsgPlayerProfileStats) {
+  useNetStore.getState().setPlayerProfileStats(msg);
+  if (msg.result === false && msg.error) showMessage(msg.error, "error");
+}
+
 /** MsgInvitePlayer — 发起邀请的回执（给发起方） */
 function handleInvitePlayer(msg: MsgInvitePlayer) {
   if (msg.result === false) {
@@ -589,6 +627,10 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgUpdateProfile", displayName, avatar } as MsgUpdateProfile);
   },
 
+  updateCardBack(cardBackId: string) {
+    return NetManager.send({ proto: "MsgUpdateCardBack", cardBackId } as MsgUpdateCardBack);
+  },
+
   importDecks(decks: SavedDeck[]) {
     return NetManager.send({ proto: "MsgImportDecks", decks } as MsgImportDecks);
   },
@@ -656,8 +698,8 @@ export const HomeRequest = {
     } as MsgChatMsg);
   },
 
-  requestPlayerList() {
-    return NetManager.send({ proto: "MsgPlayerList" } as MsgPlayerList);
+  requestPlayerList(offset = 0, limit = 200) {
+    return NetManager.send({ proto: "MsgPlayerList", offset, limit } as MsgPlayerList);
   },
 
   requestLeaderLeaderboard(period: LeaderboardPeriod) {
@@ -674,6 +716,11 @@ export const HomeRequest = {
       leaderNumber,
     });
     return NetManager.send({ proto: "MsgLeaderMatchups", period, leaderNumber } as MsgLeaderMatchups);
+  },
+
+  requestPlayerProfileStats(period: LeaderboardPeriod) {
+    useNetStore.getState().setPlayerProfileStats(null);
+    return NetManager.send({ proto: "MsgPlayerProfileStats", period } as MsgPlayerProfileStats);
   },
 
   invitePlayer(toAccount: string) {

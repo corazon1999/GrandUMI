@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using System.Net;
+using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -18,13 +18,22 @@ namespace GrandUMI;
 /// </summary>
 public static class WebSocketBridge
 {
-    private const int MaxInboundMessageChars = 1_000_000;
+    private const int MaxInboundMessageBytes = 524_288;
     private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
     {
         "GameStart", "Resync", "SpectateJoin", "FirstPlayerChosen",
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
+    };
+    private static readonly HashSet<string> CriticalOutboundProtocols = new(StringComparer.Ordinal)
+    {
+        "MsgLogin", "MsgSecret", "MsgPlayerData", "MsgActionRejected", "MsgDuelOver",
+        "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected",
+    };
+    private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
+    {
+        "MsgOnlineCount", "MsgPlayerList", "MsgChatMsg", "MsgRateLimited",
     };
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
@@ -40,12 +49,15 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, DateTime> GameChatAt = new(); // sessionId → 上次局内聊天时间(限频防刷屏)
     private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
+    private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
 
-    private static HttpListener?          _listener;
     private static CancellationTokenSource _cts = new();
     private static PlayerDataStore _playerDataStore = null!;
+    private static int _accepting;
+    private static int _onlineBroadcastScheduled;
+    private static int _onlineBroadcastVersion;
 
     // ── JSON 工具 ─────────────────────────────────────────────────────────
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -64,68 +76,57 @@ public static class WebSocketBridge
         return def;
     }
 
-    private static string Json(object obj) => JsonSerializer.Serialize(obj, JsonOpts);
-
     // ── 生命周期 ──────────────────────────────────────────────────────────
-    public static void Start(int port, PlayerDataStore playerDataStore)
+    public static void Initialize(PlayerDataStore playerDataStore)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
-        _cts      = new CancellationTokenSource();
-        _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://localhost:{port}/ws/");
-        _listener.Start();
-        _ = AcceptLoop(_cts.Token);
-        Log($"监听 ws://localhost:{port}/ws/");
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+        Volatile.Write(ref _accepting, 1);
     }
 
     public static void Stop()
     {
+        Volatile.Write(ref _accepting, 0);
         _cts.Cancel();
-        _listener?.Stop();
     }
 
     // ── 连接接受 ──────────────────────────────────────────────────────────
-    private static async Task AcceptLoop(CancellationToken ct)
+    public static bool IsReady => Volatile.Read(ref _accepting) != 0;
+    public static int ConnectionCount => Sessions.Count;
+    public static int LoggedInCount => Sessions.Count(item => item.Value.IsLoggedIn);
+    public static long DroppedOutboundCount => Sessions.Values.Sum(item => item.DroppedOutboundCount);
+    public static int MaxCurrentOutboundDepth => Sessions.IsEmpty ? 0 : Sessions.Values.Max(item => item.OutboundDepth);
+
+    public static async Task AcceptClientAsync(WebSocket socket, CancellationToken requestAborted)
     {
-        while (!ct.IsCancellationRequested)
+        ArgumentNullException.ThrowIfNull(socket);
+        if (!IsReady)
         {
-            try
-            {
-                var ctx = await _listener!.GetContextAsync();
-                if (ctx.Request.IsWebSocketRequest)
-                    _ = HandleClient(ctx, ct);
-                else { ctx.Response.StatusCode = 400; ctx.Response.Close(); }
-            }
-            catch when (ct.IsCancellationRequested) { break; }
-            catch (Exception ex) { LogErr($"AcceptLoop: {ex.Message}"); }
+            await socket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "服务器尚未就绪", CancellationToken.None);
+            return;
         }
-    }
 
-    private static async Task HandleClient(HttpListenerContext ctx, CancellationToken ct)
-    {
-        WebSocketContext wsCtx;
-        try { wsCtx = await ctx.AcceptWebSocketAsync(null); }
-        catch (Exception ex) { LogErr($"握手失败: {ex.Message}"); return; }
-
-        var session = new WsSession { Socket = wsCtx.WebSocket };
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, requestAborted);
+        var session = new WsSession { Socket = socket };
         session.StartSender(message => SendDirectAsync(session, message));
         Sessions[session.SessionId] = session;
         Log($"连接 {session.SessionId}");
 
-        await ReceiveLoop(session, ct);
+        await ReceiveLoop(session, linked.Token);
         await session.StopSenderAsync();
         CloseSession(session);
     }
 
     private static async Task ReceiveLoop(WsSession session, CancellationToken ct)
     {
-        var buffer = new byte[32768];
+        var buffer = new byte[16384];
         var ws     = session.Socket;
         try
         {
             while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
             {
-                var sb     = new StringBuilder();
+                var payload = new ArrayBufferWriter<byte>(16_384);
                 WebSocketReceiveResult result;
                 do
                 {
@@ -135,8 +136,9 @@ public static class WebSocketBridge
                         await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
                         return;
                     }
-                    sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                    if (sb.Length > MaxInboundMessageChars)
+                    buffer.AsSpan(0, result.Count).CopyTo(payload.GetSpan(result.Count));
+                    payload.Advance(result.Count);
+                    if (payload.WrittenCount > MaxInboundMessageBytes)
                     {
                         await ws.CloseAsync(WebSocketCloseStatus.MessageTooBig, "消息体过大", CancellationToken.None);
                         return;
@@ -145,7 +147,7 @@ public static class WebSocketBridge
 
                 // 单连接按接收顺序路由；游戏动作进入房间队列后会立即返回，
                 // 无需再为每条消息创建可能乱序的独立线程池任务。
-                Route(session.SessionId, sb.ToString());
+                Route(session.SessionId, Encoding.UTF8.GetString(payload.WrittenSpan));
             }
         }
         catch (OperationCanceledException) { }
@@ -195,12 +197,22 @@ public static class WebSocketBridge
         var proto = Str(msg, "proto");
         if (proto is null) return;
 
-        Log($"← {proto,-20} ({session.Account ?? session.SessionId[..8]})");
+        var allowed = proto == "MsgPing"
+            ? session.TryConsumeRateLimit("ping", capacity: 6, refillPerSecond: 0.5)
+            : session.TryConsumeRateLimit("messages", capacity: 120, refillPerSecond: 40);
+        if (!allowed)
+        {
+            LatencyDiagnostics.RecordMetric("WebSocket 入口限流", 1, "条");
+            return;
+        }
+
+        if (ProtocolLogEnabled && proto != "MsgPing")
+            Log($"← {proto,-20} ({session.Account ?? session.SessionId[..8]})");
 
         switch (proto)
         {
             case "MsgSecret":      OnSecret(session, msg);      break;
-            case "MsgPing":        OnPing(session);              break;
+            case "MsgPing":        OnPing(session, msg);         break;
             case "MsgLogin":       OnLogin(session, msg);        break;
             case "MsgAddAccount":  OnAddAccount(session, msg);   break;
             case "MsgUpdatePs":    OnUpdatePs(session, msg);     break;
@@ -208,6 +220,7 @@ public static class WebSocketBridge
             case "MsgDeleteDeck":  OnDeleteDeck(session, msg);   break;
             case "MsgSelectDeck":  OnSelectDeck(session, msg);   break;
             case "MsgUpdateProfile": OnUpdateProfile(session, msg); break;
+            case "MsgUpdateCardBack": OnUpdateCardBack(session, msg); break;
             case "MsgImportDecks": OnImportDecks(session, msg);  break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
@@ -215,9 +228,10 @@ public static class WebSocketBridge
             case "MsgCreateRoom":  OnCreateRoom(session, msg);   break;
             case "MsgJoinRoom":    OnJoinRoom(session, msg);     break;
             case "MsgCancelRoom":  OnCancelRoom(session, msg);   break;
-            case "MsgPlayerList":  OnPlayerList(session);        break;
+            case "MsgPlayerList":  OnPlayerList(session, msg);   break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
             case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
+            case "MsgPlayerProfileStats": OnPlayerProfileStats(session, msg); break;
             case "MsgInvitePlayer": OnInvitePlayer(session, msg); break;
             case "MsgInviteResponse": OnInviteResponse(session, msg); break;
             case "MsgFriendlySelectDeck": OnFriendlySelectDeck(session, msg); break;
@@ -245,11 +259,19 @@ public static class WebSocketBridge
     private static void OnSecret(WsSession s, Dictionary<string, JsonElement> msg)
     {
         // 版本校验（目前全部放行，可在此处比对版本号）
-        Send(s.SessionId, new { proto = "MsgSecret", Secret = "", result = true, vesion = "0.998" });
+        s.SupportsDeltaSnapshots = Bool(msg, "supportsStateDelta");
+        Send(s.SessionId, new
+        {
+            proto = "MsgSecret",
+            Secret = "",
+            result = true,
+            vesion = "0.999",
+            stateDeltaEnabled = s.SupportsDeltaSnapshots,
+        });
     }
 
-    private static void OnPing(WsSession s)
-        => Send(s.SessionId, new { proto = "MsgPing" });
+    private static void OnPing(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+        => Send(s.SessionId, new { proto = "MsgPing", id = Str(msg, "id") });
 
     private static void OnLogin(WsSession s, Dictionary<string, JsonElement> msg)
     {
@@ -273,6 +295,7 @@ public static class WebSocketBridge
 
                 s.Account = playerData.Account;
                 s.PlayerName = playerData.DisplayName;
+                s.CardBackId = playerData.CardBackId;
                 AccountIndex[playerData.Account] = s.SessionId;
             }
 
@@ -282,6 +305,7 @@ public static class WebSocketBridge
                 account = playerData.Account,
                 name = playerData.DisplayName,
                 avatar = playerData.Avatar,
+                cardBackId = playerData.CardBackId,
                 selectedDeckName = playerData.SelectedDeckName,
                 decks = playerData.Decks,
                 result = true,
@@ -304,7 +328,7 @@ public static class WebSocketBridge
             }
 
             // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复。
-            if (GameRoomManager.TryReclaim(s.SessionId, playerData.Account))
+            if (GameRoomManager.TryReclaim(s.SessionId, playerData.Account, playerData.CardBackId))
                 Log($"断线重连成功 {playerData.Account}");
             else
                 TryRestoreFriendlyRoom(s, playerData.Account);
@@ -411,6 +435,18 @@ public static class WebSocketBridge
         catch (Exception ex) { SendPlayerDataError(s, ex, "更新玩家资料失败"); }
     }
 
+    private static void OnUpdateCardBack(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var snapshot = _playerDataStore.UpdateCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
+            s.CardBackId = snapshot.CardBackId;
+            SendPlayerData(s, snapshot, "卡背已保存");
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "保存卡背失败"); }
+    }
+
     private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequirePlayer(s)) return;
@@ -486,26 +522,29 @@ public static class WebSocketBridge
         var botSid = "BOT-" + Guid.NewGuid().ToString("N")[..8];
         const string botName = "测试机器人";
 
-        Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = true });
-        Send(s.SessionId, new { proto = "MsgMatchFound", opponentName = botName });
-        Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst });
-
         try
         {
-            GameRoomManager.CreateRoom(
+            var room = GameRoomManager.CreateRoom(
                 s.SessionId, s.Account ?? "玩家", deck,
                 botSid, botName, deck,        // 机器人用同一套卡组
                 p0First: goFirst,             // 单人测试先后手（前端可选，默认先手）
                 p0AlwaysPrompt: s.AlwaysPromptOnLifeReveal,
                 p1AlwaysPrompt: false,
+                p0CardBackId: s.CardBackId,
+                p1CardBackId: PlayerDataStore.DefaultCardBackId,
                 vsBot: true,
-                matchKind: MatchKind.Bot);
+                matchKind: MatchKind.Bot,
+                broadcastInitialState: false);
+            Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = true });
+            Send(s.SessionId, new { proto = "MsgMatchFound", opponentName = botName });
+            Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst });
+            room.Engine.BroadcastInitialState();
             Log($"单人测试开局 {s.Account} vs 机器人");
         }
         catch (Exception ex)
         {
             LogErr($"单人测试建房失败: {ex.Message}");
-            Send(s.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+            Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
         }
     }
 
@@ -520,42 +559,41 @@ public static class WebSocketBridge
 
     private static void TryMatch()
     {
-        while (MatchQueue.Count >= 2)
+        while (TryTakeMatchingSession(out var p1))
         {
-            if (!MatchQueue.TryDequeue(out var p1) || !MatchQueue.TryDequeue(out var p2))
-                break;
-
-            if (!p1.IsMatching || !p2.IsMatching) continue;
+            if (!TryTakeMatchingSession(out var p2))
+            {
+                if (p1.IsMatching) MatchQueue.Enqueue(p1);
+                return;
+            }
 
             var deck1 = p1.Deck ?? "";
             var deck2 = p2.Deck ?? "";
-            // 记录对局对手关系
-            GameOpponent[p1.SessionId] = p2.SessionId;
-            GameOpponent[p2.SessionId] = p1.SessionId;
-
-            // 通知匹配成功
-            Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?" });
-            Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?" });
-
-            // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
-            Send(p1.SessionId, new { proto = "MsgGameStart" });
-            Send(p2.SessionId, new { proto = "MsgGameStart" });
-
-            // 创建引擎并广播首份快照
             try
             {
-                GameRoomManager.CreateRoom(
+                var room = GameRoomManager.CreateRoom(
                     p1.SessionId, p1.Account ?? "?", deck1,
                     p2.SessionId, p2.Account ?? "?", deck2,
                     p0AlwaysPrompt: p1.AlwaysPromptOnLifeReveal,
                     p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal,
-                    matchKind: MatchKind.Matchmaking);
+                    p0CardBackId: p1.CardBackId,
+                    p1CardBackId: p2.CardBackId,
+                    matchKind: MatchKind.Matchmaking,
+                    broadcastInitialState: false);
+
+                GameOpponent[p1.SessionId] = p2.SessionId;
+                GameOpponent[p2.SessionId] = p1.SessionId;
+                Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?" });
+                Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?" });
+                Send(p1.SessionId, new { proto = "MsgGameStart" });
+                Send(p2.SessionId, new { proto = "MsgGameStart" });
+                room.Engine.BroadcastInitialState();
             }
             catch (Exception ex)
             {
                 LogErr($"创建房间失败: {ex.Message}");
-                Send(p1.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
-                Send(p2.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "服务端错误" });
+                Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
+                Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
             }
 
             p1.IsMatching = false;
@@ -564,14 +602,23 @@ public static class WebSocketBridge
         }
     }
 
+    private static bool TryTakeMatchingSession(out WsSession session)
+    {
+        while (MatchQueue.TryDequeue(out var candidate))
+        {
+            if (!candidate.IsMatching || candidate.Socket.State != WebSocketState.Open) continue;
+            session = candidate;
+            return true;
+        }
+        session = null!;
+        return false;
+    }
+
     private static void RebuildMatchQueue(WsSession exclude)
     {
-        var remaining = new ConcurrentQueue<WsSession>();
-        while (MatchQueue.TryDequeue(out var s))
-            if (s.SessionId != exclude.SessionId && s.IsMatching)
-                remaining.Enqueue(s);
-        while (remaining.TryDequeue(out var s))
-            MatchQueue.Enqueue(s);
+        // ConcurrentQueue 不支持按项删除；把取消项标记为墓碑，由下一次匹配 O(1) 跳过。
+        // 避免每次取消或断线都重建整条队列，形成高峰期 O(N²) 开销。
+        exclude.IsMatching = false;
     }
 
     // ── 房间码对战 ────────────────────────────────────────────────────────
@@ -785,15 +832,33 @@ public static class WebSocketBridge
         return "idle";
     }
 
-    private static void OnPlayerList(WsSession s)
+    private static void OnPlayerList(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn)
         {
-            Send(s.SessionId, new { proto = "MsgPlayerList", players = Array.Empty<object>() });
+            Send(s.SessionId, new { proto = "MsgPlayerList", players = Array.Empty<object>(), offset = 0, total = 0, hasMore = false });
             return;
         }
-        var players = Sessions.Values
+
+        if (!s.TryConsumeRateLimit("player-list", capacity: 2, refillPerSecond: 0.25))
+        {
+            Send(s.SessionId, new { proto = "MsgRateLimited", scope = "player-list", retryAfterMs = 4_000 });
+            return;
+        }
+
+        var offset = msg.TryGetValue("offset", out var offsetValue) && offsetValue.TryGetInt32(out var parsedOffset)
+            ? Math.Max(0, parsedOffset)
+            : 0;
+        var limit = msg.TryGetValue("limit", out var limitValue) && limitValue.TryGetInt32(out var parsedLimit)
+            ? Math.Clamp(parsedLimit, 1, 200)
+            : 100;
+        var loggedIn = Sessions.Values
             .Where(x => x.IsLoggedIn)
+            .OrderBy(x => x.Account, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var players = loggedIn
+            .Skip(offset)
+            .Take(limit)
             .Select(x =>
             {
                 var status = StatusOf(x);
@@ -805,7 +870,15 @@ public static class WebSocketBridge
                 return new { account = x.Account, name = x.PlayerName ?? x.Account, status, roomId };
             })
             .ToArray();
-        Send(s.SessionId, new { proto = "MsgPlayerList", players });
+        Send(s.SessionId, new
+        {
+            proto = "MsgPlayerList",
+            players,
+            offset,
+            limit,
+            total = loggedIn.Length,
+            hasMore = offset + players.Length < loggedIn.Length,
+        });
     }
 
     private static void OnLeaderLeaderboard(WsSession s, Dictionary<string, JsonElement> msg)
@@ -919,6 +992,56 @@ public static class WebSocketBridge
                 period = requestedPeriod,
                 leaderNumber = requestedLeader,
                 error = "对战统计暂时不可用",
+            });
+        }
+    }
+
+    private static void OnPlayerProfileStats(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var requestedPeriod = Str(msg, "period") ?? "30d";
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgPlayerProfileStats",
+                result = false,
+                period = requestedPeriod,
+                error = "请先登录",
+            });
+            return;
+        }
+
+        try
+        {
+            var snapshot = LeaderStatsStore.Default.GetPlayerProfile(s.Account!, requestedPeriod);
+            Send(s.SessionId, new
+            {
+                proto = "MsgPlayerProfileStats",
+                result = true,
+                period = snapshot.Period,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
+                sinceUtc = snapshot.SinceUtc,
+                games = snapshot.Games,
+                wins = snapshot.Wins,
+                losses = snapshot.Losses,
+                winRate = snapshot.WinRate,
+                firstGames = snapshot.FirstGames,
+                firstWinRate = snapshot.FirstWinRate,
+                secondGames = snapshot.SecondGames,
+                secondWinRate = snapshot.SecondWinRate,
+                topLeaders = snapshot.TopLeaders,
+                trend = snapshot.Trend,
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取个人统计失败: {ex.Message}");
+            Send(s.SessionId, new
+            {
+                proto = "MsgPlayerProfileStats",
+                result = false,
+                period = requestedPeriod,
+                error = "个人统计暂时不可用",
             });
         }
     }
@@ -1037,6 +1160,8 @@ public static class WebSocketBridge
                 guest.SessionId, guest.Account ?? "?", guestDeck,
                 p0AlwaysPrompt: host.AlwaysPromptOnLifeReveal,
                 p1AlwaysPrompt: guest.AlwaysPromptOnLifeReveal,
+                p0CardBackId: host.CardBackId,
+                p1CardBackId: guest.CardBackId,
                 friendlyRoomId: friendlyRoomId,
                 matchKind: matchKind,
                 broadcastInitialState: false);
@@ -1408,10 +1533,13 @@ public static class WebSocketBridge
     /// </summary>
     private static void OnGameAction(WsSession s, Dictionary<string, JsonElement> msg)
     {
+        var receivedAt = LatencyDiagnostics.Start();
         var action = Str(msg, "action") ?? "";
+        var requestId = Str(msg, "requestId");
         var data   = msg.TryGetValue("data", out var d) ? d : default;
-        GameRoomManager.HandleAction(s.SessionId, action, data);
-        Log($"GameAction {s.Account ?? "?"} action={action}");
+        GameRoomManager.HandleAction(s.SessionId, action, data, requestId, receivedAt);
+        if (ProtocolLogEnabled)
+            Log($"GameAction {s.Account ?? "?"} action={action}");
     }
 
     /// <summary>
@@ -1527,11 +1655,30 @@ public static class WebSocketBridge
         GameRoomManager.RemoveSpectator(s.SessionId);
     }
 
+    /// <summary>向对战双方推送当前观战者名称列表。</summary>
+    public static void BroadcastSpectatorList(GameRoomManager.RoomEntry room)
+    {
+        var spectators = new List<string>();
+        foreach (var sid in room.Spectators.Keys)
+        {
+            if (!Sessions.TryGetValue(sid, out var session) || !session.IsLoggedIn) continue;
+            var name = session.PlayerName ?? session.Account;
+            if (!string.IsNullOrWhiteSpace(name)) spectators.Add(name);
+        }
+        spectators.Sort(StringComparer.OrdinalIgnoreCase);
+
+        var packet = new { proto = "MsgSpectatorList", spectators = spectators.ToArray() };
+        Send(room.PlayerSessionIds[0], packet);
+        Send(room.PlayerSessionIds[1], packet);
+    }
+
     /// <summary>MsgPromptResponse — 玩家响应服务端 prompt</summary>
     private static void OnPromptResponse(WsSession s, Dictionary<string, JsonElement> msg)
     {
+        var receivedAt = LatencyDiagnostics.Start();
+        var requestId = Str(msg, "requestId");
         var data = JsonSerializer.SerializeToElement(msg);
-        GameRoomManager.HandleAction(s.SessionId, "PromptResponse", data);
+        GameRoomManager.HandleAction(s.SessionId, "PromptResponse", data, requestId, receivedAt);
     }
 
     /// <summary>MsgUpdateSettings — 同步玩家设置到服务端（防触发信息泄露等）</summary>
@@ -1552,9 +1699,18 @@ public static class WebSocketBridge
 
     private static void OnChatMsg(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        int type = msg.TryGetValue("type", out var t) ? t.GetInt32() : 0;
+        if (!s.IsLoggedIn) return;
+        if (!s.TryConsumeRateLimit("lobby-chat", capacity: 3, refillPerSecond: 0.5))
+        {
+            Send(s.SessionId, new { proto = "MsgRateLimited", scope = "lobby-chat", retryAfterMs = 2_000 });
+            return;
+        }
+
+        int type = msg.TryGetValue("type", out var t) && t.TryGetInt32(out var parsedType) ? parsedType : 0;
         var name = s.PlayerName ?? s.Account ?? "";
-        var text = Str(msg, "Msg")  ?? "";
+        var text = (Str(msg, "Msg") ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > 200) text = text[..200];
         var pkt  = new { proto = "MsgChatMsg", type, Name = name, Msg = text };
 
         BroadcastAll(pkt);
@@ -1627,8 +1783,9 @@ public static class WebSocketBridge
             logStr,
             account = snapshot.Account,
             displayName = snapshot.DisplayName,
-            avatar = snapshot.Avatar,
-            selectedDeckName = snapshot.SelectedDeckName,
+                avatar = snapshot.Avatar,
+                cardBackId = snapshot.CardBackId,
+                selectedDeckName = snapshot.SelectedDeckName,
             decks = snapshot.Decks,
         });
     }
@@ -1665,20 +1822,90 @@ public static class WebSocketBridge
     public static void Send(string sessionId, object data)
     {
         if (Sessions.TryGetValue(sessionId, out var s))
-            s.Enqueue(data, IsReplaceableStateSnapshot(data));
+            EnqueueForSession(s, data);
     }
 
     private static void BroadcastAll(object data)
     {
-        var isStateSnapshot = IsReplaceableStateSnapshot(data);
-        foreach (var kv in Sessions) kv.Value.Enqueue(data, isStateSnapshot);
+        foreach (var kv in Sessions) EnqueueForSession(kv.Value, data);
+    }
+
+    private static void EnqueueForSession(WsSession session, object data)
+    {
+        var type = data.GetType();
+        var proto = type.GetProperty("proto")?.GetValue(data) as string ?? "";
+        var isStateSnapshot = string.Equals(proto, "MsgGameState", StringComparison.Ordinal);
+        string? coalesceKey = null;
+        // 除明确标记为可丢弃的通知外，协议回包默认必须可靠送达；
+        // 如果关键消息已积压到上限，断开慢连接比静默制造客户端状态分叉更安全。
+        var priority = WsSession.OutboundPriority.Critical;
+
+        if (isStateSnapshot)
+        {
+            if (IsReplaceableStateSnapshot(data))
+            {
+                coalesceKey = WsSession.GameStateCoalesceKey;
+                priority = WsSession.OutboundPriority.BestEffort;
+            }
+            else
+            {
+                priority = WsSession.OutboundPriority.Critical;
+            }
+        }
+        else if (string.Equals(proto, "MsgOnlineCount", StringComparison.Ordinal))
+        {
+            coalesceKey = "online-count";
+            priority = WsSession.OutboundPriority.BestEffort;
+        }
+        else if (string.Equals(proto, "MsgPlayerList", StringComparison.Ordinal))
+        {
+            coalesceKey = "player-list";
+            priority = WsSession.OutboundPriority.BestEffort;
+        }
+        else if (CriticalOutboundProtocols.Contains(proto))
+        {
+            priority = WsSession.OutboundPriority.Critical;
+        }
+        else if (BestEffortOutboundProtocols.Contains(proto))
+        {
+            priority = WsSession.OutboundPriority.BestEffort;
+        }
+
+        if (!session.Enqueue(data, coalesceKey, priority, isStateSnapshot)
+            && priority == WsSession.OutboundPriority.Critical)
+        {
+            try { session.Socket.Abort(); } catch { }
+        }
     }
 
     /// <summary>广播当前在线人数（已登录会话数）给所有客户端</summary>
     private static void BroadcastOnlineCount()
     {
-        int count = Sessions.Count(kv => kv.Value.IsLoggedIn);
-        BroadcastAll(new { proto = "MsgOnlineCount", count });
+        Interlocked.Increment(ref _onlineBroadcastVersion);
+        if (Interlocked.Exchange(ref _onlineBroadcastScheduled, 1) != 0) return;
+        _ = Task.Run(async () =>
+        {
+            var deliveredVersion = 0;
+            try
+            {
+                while (!_cts.IsCancellationRequested)
+                {
+                    deliveredVersion = Volatile.Read(ref _onlineBroadcastVersion);
+                    await Task.Delay(500, _cts.Token);
+                    int count = Sessions.Count(kv => kv.Value.IsLoggedIn);
+                    BroadcastAll(new { proto = "MsgOnlineCount", count });
+                    if (deliveredVersion == Volatile.Read(ref _onlineBroadcastVersion)) break;
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                Interlocked.Exchange(ref _onlineBroadcastScheduled, 0);
+                if (!_cts.IsCancellationRequested
+                    && deliveredVersion != Volatile.Read(ref _onlineBroadcastVersion))
+                    BroadcastOnlineCount();
+            }
+        });
     }
 
     private static bool IsReplaceableStateSnapshot(object data)
@@ -1695,12 +1922,20 @@ public static class WebSocketBridge
         if (s.Socket.State != WebSocketState.Open) return;
         var totalStartedAt = LatencyDiagnostics.Start();
         var serializeStartedAt = totalStartedAt;
-        var bytes = Encoding.UTF8.GetBytes(Json(message.Data));
+        var encoded = SnapshotWireCodec.Encode(
+            message.Data,
+            s.SupportsDeltaSnapshots,
+            s.SnapshotBaseline,
+            s.SnapshotBaselineTick,
+            s.SnapshotDeltasSinceFull);
+        var bytes = encoded.Bytes;
         LatencyDiagnostics.Observe("WebSocket 序列化", serializeStartedAt, $"会话={s.SessionId[..8]}，字节={bytes.Length}");
+        LatencyDiagnostics.RecordMetric("WebSocket 消息大小", bytes.Length / 1024d, "KB");
         try
         {
             using var sendTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await s.Socket.SendAsync(bytes, WebSocketMessageType.Text, true, sendTimeout.Token);
+            s.CommitSnapshotBaseline(encoded);
         }
         catch (OperationCanceledException)
         {
@@ -1709,6 +1944,13 @@ public static class WebSocketBridge
         }
         catch (Exception ex) { LogErr($"Send {s.SessionId}: {ex.Message}"); }
         LatencyDiagnostics.Observe("WebSocket 发送总耗时", totalStartedAt, $"会话={s.SessionId[..8]}，字节={bytes.Length}");
+    }
+
+    private static bool ReadBooleanEnvironment(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     // ── 日志工具 ──────────────────────────────────────────────────────────

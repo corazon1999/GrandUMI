@@ -156,7 +156,7 @@ public class OverflowPlayOptimizationTests
     }
 
     [Fact]
-    public async Task 无交互战斗_保留Attack屏障并合并内部过渡快照()
+    public async Task 无阻挡者战斗_保留Attack与AwaitCounter屏障并等待手动结束反击()
     {
         TestScene.New();
         var engine = CreateEngine();
@@ -184,10 +184,19 @@ public class OverflowPlayOptimizationTests
         await engine.WaitSettledAsync();
 
         Assert.Equal("Attack", actions[0]);
-        Assert.Equal("BattleEnd", actions[^1]);
+        Assert.Equal("AwaitCounter", actions[^1]);
         Assert.DoesNotContain("AutoPassBlock", actions);
         Assert.DoesNotContain("ResolveBattle", actions);
         Assert.Equal(2, actions.Count);
+        Assert.Equal(Phase.BattleCounter, state.Phase);
+        Assert.NotNull(state.CurrentBattle);
+
+        engine.HandleAction(1, "PassCounter", JsonSerializer.SerializeToElement(new { }));
+        await engine.WaitSettledAsync();
+
+        Assert.Equal("BattleEnd", actions[^1]);
+        Assert.Equal(3, actions.Count);
+        Assert.Null(state.CurrentBattle);
     }
 
     private static List<string> CaptureActions(GameEngine engine)

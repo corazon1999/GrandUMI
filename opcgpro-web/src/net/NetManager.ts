@@ -1,11 +1,24 @@
 import { eventBus, type ConnectionState } from "./eventBus";
-import type { MsgBase, MsgPing } from "@/types/net";
+import type { MsgBase, MsgGameState, MsgGameStateDelta, MsgPing, MsgRequestState } from "@/types/net";
 
 // 客户端版本号，与服务器 MsgSecret 握手时校验
-export const CLIENT_VERSION = "0.998";
+export const CLIENT_VERSION = "0.999";
 
 // WebSocket 服务器地址，通过环境变量配置
 const DEFAULT_WS_URL = "ws://localhost:8080/ws";
+
+export interface NetworkDiagnostics {
+  rttMs: number | null;
+  rttP95Ms: number | null;
+  parseMaxMs: number;
+  handlerMaxMs: number;
+  actionRoundTripMs: number | null;
+  actionRoundTripP95Ms: number | null;
+  maxMessageQueueDepth: number;
+  stateDeltaEnabled: boolean;
+  stateDeltaCount: number;
+  fullStateCount: number;
+}
 
 class NetManagerClass {
   private ws: WebSocket | null = null;
@@ -27,6 +40,18 @@ class NetManagerClass {
   private socketGeneration = 0;
   private lossNotified = false;
   private lastPongAt = 0;
+  private pingSequence = 0;
+  private pendingPings = new Map<string, number>();
+  private rttSamples: number[] = [];
+  private actionLatencySamples: number[] = [];
+  private parseMaxMs = 0;
+  private handlerMaxMs = 0;
+  private maxMessageQueueDepth = 0;
+  private stateBaseline: MsgGameState | null = null;
+  private deltaResyncRequested = false;
+  private stateDeltaEnabled = false;
+  private stateDeltaCount = 0;
+  private fullStateCount = 0;
 
   get state(): ConnectionState {
     return this._state;
@@ -38,6 +63,25 @@ class NetManagerClass {
 
   get isHandshaking(): boolean {
     return this._state === "handshaking";
+  }
+
+  getDiagnostics(): NetworkDiagnostics {
+    return {
+      rttMs: this.rttSamples.at(-1) ?? null,
+      rttP95Ms: percentile(this.rttSamples, 0.95),
+      parseMaxMs: this.parseMaxMs,
+      handlerMaxMs: this.handlerMaxMs,
+      actionRoundTripMs: this.actionLatencySamples.at(-1) ?? null,
+      actionRoundTripP95Ms: percentile(this.actionLatencySamples, 0.95),
+      maxMessageQueueDepth: this.maxMessageQueueDepth,
+      stateDeltaEnabled: this.stateDeltaEnabled,
+      stateDeltaCount: this.stateDeltaCount,
+      fullStateCount: this.fullStateCount,
+    };
+  }
+
+  recordActionLatency(elapsedMs: number) {
+    pushBounded(this.actionLatencySamples, elapsedMs);
   }
 
   connect(url: string = DEFAULT_WS_URL) {
@@ -56,6 +100,7 @@ class NetManagerClass {
     this.setState(isReconnectAttempt ? "reconnecting" : "connecting");
 
     const generation = ++this.socketGeneration;
+    this.resetConnectionMeasurements();
     let socket: WebSocket;
 
     try {
@@ -70,13 +115,19 @@ class NetManagerClass {
       if (!this.isCurrentSocket(socket, generation)) return;
       this.setState(isReconnectAttempt ? "recovering" : "handshaking");
       // 连接后立即发送握手消息（对应 C# ConnectCallback 中的 SecretRequest）
-      this.sendOn(socket, { proto: "MsgSecret", vesion: CLIENT_VERSION } as MsgBase);
+      this.sendOn(socket, {
+        proto: "MsgSecret",
+        vesion: CLIENT_VERSION,
+        supportsStateDelta: true,
+      } as MsgBase);
     };
 
     socket.onclose = () => {
       if (!this.isCurrentSocket(socket, generation)) return;
       this.ws = null;
       this.stopHeartbeat();
+      this.stateBaseline = null;
+      this.pendingPings.clear();
       if (this.manualClose) {
         this.setState("disconnected");
         return;
@@ -96,8 +147,25 @@ class NetManagerClass {
 
     socket.onmessage = (e: MessageEvent<string>) => {
       if (!this.isCurrentSocket(socket, generation)) return;
+      const parseStartedAt = now();
       try {
-        const msg = JSON.parse(e.data) as MsgBase;
+        let msg = JSON.parse(e.data) as MsgBase;
+        const parseElapsed = now() - parseStartedAt;
+        this.parseMaxMs = Math.max(this.parseMaxMs, parseElapsed);
+        if (parseElapsed >= 8) {
+          console.info(`[延迟] WebSocket JSON 解析 ${parseElapsed.toFixed(1)}ms，字节=${e.data.length}`);
+        }
+
+        if (msg.proto === "MsgGameStateDelta") {
+          const materialized = this.materializeStateDelta(socket, msg as MsgGameStateDelta);
+          if (!materialized) return;
+          msg = materialized;
+          this.stateDeltaCount++;
+        } else if (msg.proto === "MsgGameState") {
+          this.stateBaseline = msg as MsgGameState;
+          this.deltaResyncRequested = false;
+          this.fullStateCount++;
+        }
         this.onMessage(msg);
       } catch {
         console.warn("[NetManager] 消息解析失败:", e.data.slice(0, 200));
@@ -109,6 +177,16 @@ class NetManagerClass {
     // 心跳回包：直接处理，不入队
     if (msg.proto === "MsgPing") {
       this.lastPongAt = Date.now();
+      const ping = msg as MsgPing;
+      if (ping.id) {
+        const startedAt = this.pendingPings.get(ping.id);
+        this.pendingPings.delete(ping.id);
+        if (startedAt !== undefined) {
+          const rtt = now() - startedAt;
+          pushBounded(this.rttSamples, rtt);
+          if (rtt >= 80) console.info(`[延迟] WebSocket RTT ${rtt.toFixed(1)}ms`);
+        }
+      }
       return;
     }
 
@@ -120,6 +198,7 @@ class NetManagerClass {
         this.wasConnectedBefore = true;
         this.lossNotified = false;
         this.lastPongAt = Date.now();
+        this.stateDeltaEnabled = Boolean((msg as { stateDeltaEnabled?: boolean }).stateDeltaEnabled);
         this.startHeartbeat();
         this.setState(isReconnect ? "recovering" : "connected");
         eventBus.emit("connectSucc");
@@ -129,6 +208,7 @@ class NetManagerClass {
 
     // 所有消息（含 MsgSecret）推入队列分发给协议处理器
     this.msgQueue.push(msg);
+    this.maxMessageQueueDepth = Math.max(this.maxMessageQueueDepth, this.msgQueue.length);
     this.flushQueue();
   }
 
@@ -136,11 +216,19 @@ class NetManagerClass {
     if (this.isProcessing) return;
     this.isProcessing = true;
     while (this.msgQueue.length > 0) {
-      const msg = this.msgQueue.shift()!;
-      try {
-        eventBus.emit("message", msg);
-      } catch (err) {
-        console.error("[NetManager] 协议处理异常:", err);
+      const batch = this.msgQueue;
+      this.msgQueue = [];
+      for (const msg of batch) {
+        const handlerStartedAt = now();
+        try {
+          eventBus.emit("message", msg);
+        } catch (err) {
+          console.error("[NetManager] 协议处理异常:", err);
+        } finally {
+          const elapsed = now() - handlerStartedAt;
+          this.handlerMaxMs = Math.max(this.handlerMaxMs, elapsed);
+          if (elapsed >= 16) console.info(`[延迟] 协议处理 ${msg.proto} ${elapsed.toFixed(1)}ms`);
+        }
       }
     }
     this.isProcessing = false;
@@ -177,6 +265,8 @@ class NetManagerClass {
     const socket = this.ws;
     this.ws = null;
     this.socketGeneration++;
+    this.stateBaseline = null;
+    this.pendingPings.clear();
     socket?.close(1000, "主动断开");
     this.setState("disconnected");
   }
@@ -221,7 +311,14 @@ class NetManagerClass {
         socket.close(4000, "心跳超时");
         return;
       }
-      this.sendOn(socket, { proto: "MsgPing" } as MsgPing);
+      const id = `${this.socketGeneration}-${++this.pingSequence}`;
+      const sentAt = now();
+      if (this.sendOn(socket, { proto: "MsgPing", id } as MsgPing)) {
+        this.pendingPings.set(id, sentAt);
+        for (const [pendingId, pendingAt] of this.pendingPings) {
+          if (sentAt - pendingAt > 30_000) this.pendingPings.delete(pendingId);
+        }
+      }
     }, 10_000);
   }
 
@@ -256,6 +353,53 @@ class NetManagerClass {
     this._state = state;
     eventBus.emit("stateChange", state);
   }
+
+  private materializeStateDelta(socket: WebSocket, delta: MsgGameStateDelta): MsgGameState | null {
+    const baseline = this.stateBaseline;
+    if (!baseline || baseline.tick !== delta.baseTick) {
+      if (!this.deltaResyncRequested) {
+        this.deltaResyncRequested = true;
+        this.sendOn(socket, { proto: "MsgRequestState" } as MsgRequestState);
+      }
+      console.warn(`[NetManager] 增量快照基线不匹配，本地=${baseline?.tick ?? "无"}，服务端=${delta.baseTick}`);
+      return null;
+    }
+
+    const changes = delta.changes;
+    const next = {
+      ...baseline,
+      ...changes,
+      proto: "MsgGameState" as const,
+      tick: delta.tick,
+      my: changes.my ? { ...baseline.my, ...changes.my } : baseline.my,
+      opponent: changes.opponent ? { ...baseline.opponent, ...changes.opponent } : baseline.opponent,
+    } as MsgGameState;
+    this.stateBaseline = next;
+    return next;
+  }
+
+  private resetConnectionMeasurements() {
+    this.stateBaseline = null;
+    this.deltaResyncRequested = false;
+    this.stateDeltaEnabled = false;
+    this.pendingPings.clear();
+    this.pingSequence = 0;
+  }
 }
 
 export const NetManager = new NetManagerClass();
+
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function pushBounded(values: number[], value: number, limit = 120) {
+  values.push(value);
+  if (values.length > limit) values.splice(0, values.length - limit);
+}
+
+function percentile(values: number[], ratio: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
+}

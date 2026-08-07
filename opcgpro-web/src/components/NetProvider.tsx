@@ -7,6 +7,8 @@ import { useNetStore } from "@/store/netStore";
 import LoginPanel from "@/components/home/LoginPanel";
 import MessageBox from "@/components/ui/MessageBox";
 
+const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
+
 export default function NetProvider({ children }: { children: ReactNode }) {
   useNet();
   const router = useRouter();
@@ -16,12 +18,16 @@ export default function NetProvider({ children }: { children: ReactNode }) {
   const requiresLogin = pathname === "/game" || pathname === "/spectate";
 
   useEffect(() => {
-    // 在线页面整页刷新后必须先回到登录页，由玩家确认账号。
-    // 回放和卡组编辑器是本地功能，不强制登录。
+    // 对局页整页刷新会重建内存登录态；先留下仅本标签页生效的一次性恢复标记，
+    // 握手完成后再用已保存账号自动登录，由服务端按账号找回原房间。
     if (!loggedIn && requiresLogin) {
+      if (pathname === "/game") {
+        const savedAccount = localStorage.getItem("grandumi_account")?.trim();
+        if (savedAccount) sessionStorage.setItem(GAME_REFRESH_RESUME_KEY, "1");
+      }
       router.replace("/home");
     }
-  }, [loggedIn, requiresLogin, router]);
+  }, [loggedIn, pathname, requiresLogin, router]);
 
   useEffect(() => {
     if (navigateTo) {

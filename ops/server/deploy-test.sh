@@ -11,6 +11,15 @@ die() {
   exit 1
 }
 
+backend_ready() {
+  curl -fsS --retry 10 --retry-delay 1 --retry-connrefused \
+    -o /dev/null http://127.0.0.1:8081/ready
+}
+
+backend_matches_target() {
+  curl -fsS http://127.0.0.1:8081/version | grep -Fq "$target"
+}
+
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供完整的 40 位提交号。"
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "测试服仓库中不存在提交 $target。"
 
@@ -46,7 +55,9 @@ if [[ "$need_back" == 1 ]]; then
   next_publish="$repo/服务端WebSocket/publish.next"
   previous_publish="$repo/服务端WebSocket/publish.previous"
   rm -rf "$next_publish"
-  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo
+  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
+    -p:InformationalVersion="1.0.0+$target" \
+    -p:IncludeSourceRevisionInInformationalVersion=false
 
   echo "增量回填正式服 Leader 排行榜数据"
   production_stats_db="/opt/grandumi/服务端WebSocket/Data/leader-stats.db"
@@ -63,11 +74,15 @@ if [[ "$need_back" == 1 ]]; then
   rm -rf "$previous_publish"
   [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
   mv "$next_publish" "$repo/服务端WebSocket/publish"
-  if ! systemctl restart grandumi-test-backend.service || ! systemctl is-active --quiet grandumi-test-backend.service; then
+  if ! systemctl restart grandumi-test-backend.service \
+      || ! systemctl is-active --quiet grandumi-test-backend.service \
+      || ! backend_ready \
+      || ! backend_matches_target; then
     rm -rf "$repo/服务端WebSocket/publish"
     [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
     systemctl restart grandumi-test-backend.service || true
-    die "测试服后端启动失败，已尝试回滚。"
+    backend_ready || true
+    die "测试服后端启动或就绪检查失败，已尝试回滚。"
   fi
 fi
 
@@ -90,6 +105,7 @@ if [[ "$need_front" == 1 ]]; then
 fi
 
 sleep 3
+backend_ready
 curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3001/
 echo "$target" > "$state_dir/test-deployed.next"
 mv "$state_dir/test-deployed.next" "$state_dir/test-deployed"

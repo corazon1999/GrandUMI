@@ -52,6 +52,7 @@ public class OP07_077_GoingToFindTheGreatTreasure : IScriptedEffect
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
+                ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { picked.Info.Number });
             }
         }
 

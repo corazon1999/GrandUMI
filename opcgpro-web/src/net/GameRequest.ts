@@ -9,23 +9,46 @@ import { NetManager } from "./NetManager";
 import type { MsgBase, MsgGameAction, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 
-type PendingLatency = { action: string; startedAt: number };
-let pendingLatency: PendingLatency | null = null;
+type PendingLatency = { requestId: string; action: string; startedAt: number };
+const pendingLatencies = new Map<string, PendingLatency>();
+let requestSequence = 0;
 
-function markActionSent(action: string) {
-  if (typeof performance !== "undefined") {
-    pendingLatency = { action, startedAt: performance.now() };
+function createRequestId(): string {
+  return `${Date.now().toString(36)}-${(++requestSequence).toString(36)}`;
+}
+
+function markActionSent(requestId: string, action: string) {
+  if (typeof performance === "undefined") return;
+  const startedAt = performance.now();
+  pendingLatencies.set(requestId, { requestId, action, startedAt });
+  for (const [id, pending] of pendingLatencies) {
+    if (startedAt - pending.startedAt > 60_000) pendingLatencies.delete(id);
   }
 }
 
-/** 收到下一份权威快照时结束本次客户端→服务端→客户端计时。 */
-export function completePendingActionLatency(tick: number) {
-  if (!pendingLatency || typeof performance === "undefined") return;
-  const elapsed = performance.now() - pendingLatency.startedAt;
+/** 收到对应权威快照时结束本次客户端→服务端→客户端计时。 */
+export function completePendingActionLatency(requestId: string | null | undefined, tick: number) {
+  completeLatency(requestId, `到快照 Tick=${tick}`);
+}
+
+/** 动作被拒绝时也完成对应计时，避免污染下一次正常动作。 */
+export function completeRejectedActionLatency(requestId: string | null | undefined) {
+  completeLatency(requestId, "到拒绝回包");
+}
+
+function completeLatency(requestId: string | null | undefined, suffix: string) {
+  if (typeof performance === "undefined") return;
+  const pending = requestId
+    ? pendingLatencies.get(requestId)
+    : pendingLatencies.values().next().value as PendingLatency | undefined;
+  if (!pending) return;
+
+  pendingLatencies.delete(pending.requestId);
+  const elapsed = performance.now() - pending.startedAt;
+  NetManager.recordActionLatency(elapsed);
   if (elapsed >= 80) {
-    console.info(`[延迟] ${pendingLatency.action} 到快照 ${elapsed.toFixed(1)}ms，Tick=${tick}`);
+    console.info(`[延迟] ${pending.action} ${suffix} ${elapsed.toFixed(1)}ms`);
   }
-  pendingLatency = null;
 }
 
 function send(
@@ -36,14 +59,16 @@ function send(
   const store = useGameStore.getState();
   store.setPending(true);
   optimistic?.();
+  const requestId = createRequestId();
   const sent = NetManager.send({
     proto: "MsgGameAction",
     action,
     data,
+    requestId,
   } as MsgGameAction);
-  if (sent) markActionSent(action);
+  if (sent) markActionSent(requestId, action);
   else {
-    pendingLatency = null;
+    pendingLatencies.delete(requestId);
     useGameStore.getState().rollbackOptimistic();
     useGameStore.getState().setPending(false);
   }
@@ -121,10 +146,11 @@ export const GameRequest = {
   /** 响应服务器发起的 Prompt */
   respondPrompt: (promptId: string, chosen: string[]) => {
     useGameStore.getState().setPending(true);
-    const sent = NetManager.send({ proto: "MsgPromptResponse", promptId, chosen } as MsgPromptResponse);
-    if (sent) markActionSent("PromptResponse");
+    const requestId = createRequestId();
+    const sent = NetManager.send({ proto: "MsgPromptResponse", promptId, chosen, requestId } as MsgPromptResponse);
+    if (sent) markActionSent(requestId, "PromptResponse");
     else {
-      pendingLatency = null;
+      pendingLatencies.delete(requestId);
       useGameStore.getState().rollbackOptimistic();
       useGameStore.getState().setPending(false);
     }
