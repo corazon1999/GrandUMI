@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { getCard } from "@/data/CardLoader";
 import { useGameStore } from "@/store/gameStore";
+import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
-const CARD_BACK = "/sprites/CardBack.png";
 const IMPACT_SHARDS = [-78, -52, -29, -11, 14, 33, 57, 82, 108, 137, 164, 191];
 
 interface Props {
@@ -75,12 +75,12 @@ function FighterCard({
         }`}
       >
         <img
-          src={sprite}
+          src={displaySrc(sprite)}
           alt={`${leaderName} Leader 卡图`}
           className="absolute inset-0 h-full w-full object-cover"
           draggable={false}
           onError={(event) => {
-            if (!event.currentTarget.src.endsWith(CARD_BACK)) event.currentTarget.src = CARD_BACK;
+            advanceImageFallback(event.currentTarget, [sprite]);
           }}
         />
         <div
@@ -142,8 +142,8 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
 
   const myLeader = getCard(myLeaderNumber);
   const opponentLeader = getCard(opponentLeaderNumber);
-  const mySprite = myLeader?.sprite || CARD_BACK;
-  const opponentSprite = opponentLeader?.sprite || CARD_BACK;
+  const mySprite = myLeader?.sprite || CARD_BACK_SRC;
+  const opponentSprite = opponentLeader?.sprite || CARD_BACK_SRC;
 
   const introKey = useMemo(() => {
     if (!myLeaderId || !opponentLeaderId) return "";
@@ -204,7 +204,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
       if (image.complete) resolve();
     });
 
-    void Promise.all([preload(mySprite), preload(opponentSprite)]).then(begin);
+    void Promise.all([preload(displaySrc(mySprite)), preload(displaySrc(opponentSprite))]).then(begin);
     const fallbackTimer = window.setTimeout(begin, 900);
 
     return () => {

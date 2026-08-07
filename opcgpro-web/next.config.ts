@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
       // 卡图与缩略图文件名稳定、内容不变,可永久缓存,重复浏览走磁盘缓存秒出
       { source: "/cards/:path*", headers: [immutable] },
       { source: "/cards-thumb/:path*", headers: [immutable] },
+      { source: "/cards-webp/:path*", headers: [immutable] },
+      { source: "/sprites-thumb/:path*", headers: [immutable] },
+      { source: "/status-icons/:path*", headers: [immutable] },
     ];
   },
 };

@@ -9,6 +9,7 @@ import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName,
 import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
 
 const HOVER_DELAY = 180;
@@ -242,10 +243,10 @@ export default function DeckInfoPanel() {
                 {/* 领航头像 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={deck.leaderSprite || "/sprites/CardBack.png"}
+                  src={thumbSrc(deck.leaderSprite || CARD_BACK_SRC)}
                   alt={deck.leaderName}
                   className="w-8 h-11 object-cover rounded border border-gray-700 shrink-0"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+                  onError={(e) => advanceImageFallback(e.currentTarget, [deck.leaderSprite])}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-xs font-medium truncate">{name}</p>
@@ -399,10 +400,10 @@ export default function DeckInfoPanel() {
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={leader.sprite ?? "/sprites/CardBack.png"}
+                  src={thumbSrc(leader.sprite ?? CARD_BACK_SRC)}
                   alt={leader.name}
                   className="w-10 h-14 object-cover rounded border border-gray-700"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+                  onError={(e) => advanceImageFallback(e.currentTarget, [leader.sprite, leader.image])}
                 />
                 <div className="min-w-0">
                   <p className="text-white text-xs font-medium truncate">{leader.name}</p>
@@ -611,7 +612,7 @@ function DeckEntryRow({
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
   onMouseLeave: () => void;
 }) {
-  const sprite      = entry.card.sprite ?? "/sprites/CardBack.png";
+  const sprite      = entry.card.sprite ?? CARD_BACK_SRC;
   const primary     = primaryDisplayColor(entry.card.color);
   const colorStyle  = COLOR_STYLES[primary];
 
@@ -619,7 +620,7 @@ function DeckEntryRow({
     <div
       className="flex items-center gap-1.5 py-1.5 px-2 border-b border-gray-800/60 group relative rounded-md overflow-hidden cursor-pointer"
       style={{
-        backgroundImage: `url(${sprite})`,
+        backgroundImage: `url(${thumbSrc(sprite)})`,
         backgroundSize: "cover",
         backgroundPosition: "center 30%",
       }}

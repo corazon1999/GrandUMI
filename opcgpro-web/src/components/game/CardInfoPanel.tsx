@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
+import { CARD_BACK_SRC, displaySrc, nextCardImageSrc } from "@/lib/sprite";
 
 interface Props {
   card: CardData | null;
   onClose: () => void;
   mobileSheet?: boolean;
+  initialArtwork?: "default" | "latest";
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -18,7 +20,12 @@ const TYPE_LABELS: Record<string, string> = {
   Event:     "事件",
 };
 
-export default function CardInfoPanel({ card, onClose, mobileSheet = false }: Props) {
+export default function CardInfoPanel({
+  card,
+  onClose,
+  mobileSheet = false,
+  initialArtwork = "default",
+}: Props) {
   return (
     <Modal
       open={!!card}
@@ -27,31 +34,38 @@ export default function CardInfoPanel({ card, onClose, mobileSheet = false }: Pr
       maxWidthClass="w-[calc(100vw-2rem)] max-w-4xl"
       mobileSheet={mobileSheet}
     >
-      {card && <CardInfoContent card={card} />}
+      {card && <CardInfoContent card={card} initialArtwork={initialArtwork} />}
     </Modal>
   );
 }
 
-function CardInfoContent({ card }: { card: CardData }) {
+function CardInfoContent({
+  card,
+  initialArtwork,
+}: {
+  card: CardData;
+  initialArtwork: NonNullable<Props["initialArtwork"]>;
+}) {
   const displayColor = toDisplayColor(card.color);
   const primary      = primaryDisplayColor(card.color);
   const colorStyle   = COLOR_STYLES[primary];
   const sprites = card.sprites?.length
     ? card.sprites
-    : [card.sprite ?? card.image ?? "/sprites/CardBack.png"];
-  const [spriteIndex, setSpriteIndex] = useState(0);
-  const [imageSrc, setImageSrc] = useState(sprites[0]);
+    : [card.sprite ?? card.image ?? CARD_BACK_SRC];
+  const initialSpriteIndex = initialArtwork === "latest" ? sprites.length - 1 : 0;
+  const [spriteIndex, setSpriteIndex] = useState(initialSpriteIndex);
+  const [imageSrc, setImageSrc] = useState(displaySrc(sprites[initialSpriteIndex]));
 
   useEffect(() => {
-    setSpriteIndex(0);
-    setImageSrc(sprites[0]);
-    // 卡号变化即代表切换到另一张卡，重置为正画
+    setSpriteIndex(initialSpriteIndex);
+    setImageSrc(displaySrc(sprites[initialSpriteIndex]));
+    // 卡号或入口默认画面变化时，重置为对应版本
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card.number]);
+  }, [card.number, initialArtwork]);
 
   const selectSprite = (index: number) => {
     setSpriteIndex(index);
-    setImageSrc(sprites[index]);
+    setImageSrc(displaySrc(sprites[index]));
   };
 
   const moveSprite = (direction: -1 | 1) => {
@@ -70,9 +84,10 @@ function CardInfoContent({ card }: { card: CardData }) {
             alt={card.name}
             className="w-full h-full object-cover"
             onError={() =>
-              setImageSrc((current) =>
-                card.image && current !== card.image ? card.image : "/sprites/CardBack.png",
-              )
+              setImageSrc((current) => {
+                const rawSprite = sprites[spriteIndex] ?? CARD_BACK_SRC;
+                return nextCardImageSrc(current, rawSprite, card.image, "display");
+              })
             }
           />
           {/* 颜色条 */}

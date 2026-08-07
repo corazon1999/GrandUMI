@@ -5,6 +5,7 @@ import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
 import ChatPanel from "./ChatPanel";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 // 从导出卡组码（exportDeckString 格式 A）统计主卡组张数：
 // 卡牌行形如「<数量> <卡号>」，跳过「# 注释」与「领航:」行。
@@ -137,10 +138,10 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
               <div className="flex items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={selectedDeck.leaderSprite || "/sprites/CardBack.png"}
+                  src={thumbSrc(selectedDeck.leaderSprite || CARD_BACK_SRC)}
                   alt={selectedDeck.leaderName}
                   className="h-16 w-11 shrink-0 rounded-lg border border-gray-700 object-cover"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+                  onError={(e) => advanceImageFallback(e.currentTarget, [selectedDeck.leaderSprite])}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-gray-500">当前卡组</p>

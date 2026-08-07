@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CardData } from "@/types/card";
 import { getAllCachedCards, loadAllCards } from "@/data/CardLoader";
 import { useVirtualList } from "@/hooks/useVirtualList";
-import { thumbSrc } from "@/lib/sprite";
+import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
 import {
   CARD_COSTS,
@@ -315,7 +315,12 @@ export default function CardCatalogPanel() {
         ].join("\0")}
       />
 
-      <CardInfoPanel card={selectedCard} onClose={() => setSelectedCard(null)} mobileSheet />
+      <CardInfoPanel
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
+        mobileSheet
+        initialArtwork="latest"
+      />
     </section>
   );
 }
@@ -474,7 +479,7 @@ function FilterSelect({
 }
 
 function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void }) {
-  const rawSprite = card.sprite ?? card.image ?? "/sprites/CardBack.png";
+  const rawSprite = card.sprites[card.sprites.length - 1] ?? card.sprite ?? card.image ?? CARD_BACK_SRC;
   const [imageSrc, setImageSrc] = useState(thumbSrc(rawSprite));
 
   useEffect(() => {
@@ -482,11 +487,7 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
   }, [rawSprite]);
 
   const handleImageError = () => {
-    setImageSrc((current) => {
-      if (current !== rawSprite) return rawSprite;
-      if (card.image && current !== card.image) return card.image;
-      return "/sprites/CardBack.png";
-    });
+    setImageSrc((current) => nextCardImageSrc(current, rawSprite, card.image, "thumb"));
   };
 
   return (

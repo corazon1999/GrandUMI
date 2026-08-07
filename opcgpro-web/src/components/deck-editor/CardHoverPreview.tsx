@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import NextImage from "next/image";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
-import { thumbSrc } from "@/lib/sprite";
+import { CARD_BACK_SRC, displaySrc, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
 export const PREVIEW_W = 240;
 const PREVIEW_H_APPROX = 480;
@@ -40,13 +40,14 @@ export default function CardHoverPreview({
 }) {
   const { card, rect, currentSprite } = info;
   const displayCounter = counterValue ?? card.counter;
-  const rawSprite = currentSprite ?? card.sprite ?? "/sprites/CardBack.png";
-  // 大图直接用原图(454px,约87KB)而非256px缩略图,避免高DPI屏放大发糊;悬停一次仅一张,负担可忽略
-  const [imgSrc, setImgSrc] = useState(rawSprite);
+  const rawSprite = currentSprite ?? card.sprite ?? CARD_BACK_SRC;
+  // 先显示 128px 小图，再由高质量 WebP 平滑覆盖；派生图缺失时才回退原图。
+  const [imgSrc, setImgSrc] = useState(displaySrc(rawSprite));
   const [loadedImageSrc, setLoadedImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    setImgSrc(rawSprite);
+    setImgSrc(displaySrc(rawSprite));
+    setLoadedImageSrc(null);
   }, [rawSprite]);
 
   const spaceRight = window.innerWidth - rect.right;
@@ -93,7 +94,7 @@ export default function CardHoverPreview({
           onLoad={() => setLoadedImageSrc(imgSrc)}
           onError={() => {
             setLoadedImageSrc(null);
-            setImgSrc((prev) => (card.image && prev !== card.image) ? card.image : "/sprites/CardBack.png");
+            setImgSrc((prev) => nextCardImageSrc(prev, rawSprite, card.image, "display"));
           }}
         />
         {colorStyle && (

@@ -14,6 +14,7 @@ import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import Link from "next/link";
 import Modal from "@/components/ui/Modal";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: () => void }) {
   const [decks, setDecks] = useState<Record<string, SavedDeck>>({});
@@ -127,10 +128,10 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={deck.leaderSprite || "/sprites/CardBack.png"}
+                    src={thumbSrc(deck.leaderSprite || CARD_BACK_SRC)}
                     alt={deck.leaderName}
                     className="h-14 w-10 shrink-0 rounded border border-gray-600 object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+                    onError={(e) => advanceImageFallback(e.currentTarget, [deck.leaderSprite])}
                   />
 
                   <div className="min-w-0 flex-1">

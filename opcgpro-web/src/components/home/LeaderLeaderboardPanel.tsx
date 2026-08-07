@@ -5,7 +5,7 @@ import Image from "next/image";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
-import { thumbSrc } from "@/lib/sprite";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import type { LeaderboardPeriod } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 
@@ -38,7 +38,7 @@ function latestLeaderSprite(card: ReturnType<typeof getCard>): string {
   if (card?.sprites?.length) {
     return card.sprites[card.sprites.length - 1];
   }
-  return card?.sprite ?? "/sprites/CardBack.png";
+  return card?.sprite ?? CARD_BACK_SRC;
 }
 
 function colorClasses(color?: string): string {
@@ -210,7 +210,14 @@ export default function LeaderLeaderboardPanel() {
                       {item.rank ?? "—"}
                     </span>
                     <div className="relative h-[62px] w-11 shrink-0 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-                      <Image src={thumbSrc(latestLeaderSprite(card))} alt={card?.name ?? item.leaderNumber} fill sizes="44px" className="object-cover" />
+                      <Image
+                        src={thumbSrc(latestLeaderSprite(card))}
+                        alt={card?.name ?? item.leaderNumber}
+                        fill
+                        sizes="44px"
+                        className="object-cover"
+                        onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card)])}
+                      />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-white">{card?.name ?? item.leaderNumber}</p>
@@ -296,6 +303,7 @@ export default function LeaderLeaderboardPanel() {
                             fill
                             sizes="44px"
                             className="object-cover"
+                            onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card)])}
                           />
                         </div>
                         <div className="min-w-0">

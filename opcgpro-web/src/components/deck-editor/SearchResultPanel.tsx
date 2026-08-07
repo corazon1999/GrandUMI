@@ -8,7 +8,7 @@ import { useDeckStore, FORMAT_RULES, UNLIMITED_COPY_CARDS } from "@/store/deckSt
 import type { CardData } from "@/types/card";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
 import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPreview";
-import { thumbSrc } from "@/lib/sprite";
+import { CARD_BACK_SRC, displaySrc, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import { compareCatalogCards, filterAndSortCards } from "@/lib/cardSearch";
 
@@ -20,11 +20,12 @@ const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 // 加载失败时移出缓存集合，后续悬停仍可重试。
 const preloadedSprites = new Set<string>();
 function preloadSprite(src: string) {
-  if (!src || preloadedSprites.has(src)) return;
-  preloadedSprites.add(src);
+  const optimizedSrc = displaySrc(src);
+  if (!optimizedSrc || preloadedSprites.has(optimizedSrc)) return;
+  preloadedSprites.add(optimizedSrc);
   const image = new window.Image();
-  image.onerror = () => preloadedSprites.delete(src);
-  image.src = src;
+  image.onerror = () => preloadedSprites.delete(optimizedSrc);
+  image.src = optimizedSrc;
 }
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
@@ -207,13 +208,15 @@ function CardGridItem({
   const isFull    = !isLeaderMode && deckCount >= 4 && !UNLIMITED_COPY_CARDS.has(card.number);
   const hasInDeck = deckCount > 0;
 
-  const sprites   = card.sprites?.length ? card.sprites : [card.sprite ?? "/sprites/CardBack.png"];
+  const sprites   = card.sprites?.length ? card.sprites : [card.sprite ?? CARD_BACK_SRC];
   const hasAlts   = sprites.length > 1;
   const [spriteIdx, setSpriteIdx] = useState(sprites.length - 1);
-  const [imgFailed, setImgFailed] = useState(false);
-  const rawSrc = sprites[spriteIdx] ?? "/sprites/CardBack.png";
-  // 默认用缩略图;加载失败(缺缩略图)回退原图
-  const currentSrc = imgFailed ? (card.image ?? rawSrc) : thumbSrc(rawSrc);
+  const rawSrc = sprites[spriteIdx] ?? CARD_BACK_SRC;
+  const [currentSrc, setCurrentSrc] = useState(thumbSrc(rawSrc));
+
+  useEffect(() => {
+    setCurrentSrc(thumbSrc(rawSrc));
+  }, [rawSrc]);
 
   // 初始化时同步默认异画的 sprite 到 card 对象，确保添加卡牌时使用正确的异画
   useEffect(() => {
@@ -227,14 +230,12 @@ function CardGridItem({
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setImgFailed(false);
     const next = (spriteIdx - 1 + sprites.length) % sprites.length;
     setSpriteIdx(next);
     onSpriteChange(sprites[next]);
   };
   const goNext = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setImgFailed(false);
     const next = (spriteIdx + 1) % sprites.length;
     setSpriteIdx(next);
     onSpriteChange(sprites[next]);
@@ -271,7 +272,9 @@ function CardGridItem({
           sizes="64px"
           className="object-cover"
           draggable={false}
-          onError={() => setImgFailed(true)}
+          onError={() =>
+            setCurrentSrc((current) => nextCardImageSrc(current, rawSrc, card.image, "thumb"))
+          }
         />
 
         {/* 异画切换箭头（仅有多版本时显示） */}

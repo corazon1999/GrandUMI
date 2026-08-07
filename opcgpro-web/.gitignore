@@ -45,3 +45,4 @@ next-env.d.ts
 
 # 卡图缩略图（由 scripts/gen-card-thumbs.mjs 生成,派生自本地版权卡图,本地保留）
 /public/cards-thumb
+/public/cards-webp

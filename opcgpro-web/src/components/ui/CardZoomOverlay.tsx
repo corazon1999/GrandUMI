@@ -6,6 +6,7 @@ import NextImage from "next/image";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { RARITY_STYLES } from "@/components/deck-editor/CardHoverPreview";
+import { CARD_BACK_SRC, displaySrc, nextCardImageSrc } from "@/lib/sprite";
 
 const TYPE_LABELS: Record<string, string> = {
   Leader: "领航", Character: "角色", Stage: "舞台", Event: "事件",
@@ -27,12 +28,12 @@ export default function CardZoomOverlay({
   counterValue?: number;
   onClose: () => void;
 }) {
-  const rawSprite = sprite ?? card.sprite ?? "/sprites/CardBack.png";
+  const rawSprite = sprite ?? card.sprite ?? CARD_BACK_SRC;
   const displayCounter = counterValue ?? card.counter;
-  const [imgSrc, setImgSrc] = useState(rawSprite);
+  const [imgSrc, setImgSrc] = useState(displaySrc(rawSprite));
 
   useEffect(() => {
-    setImgSrc(rawSprite);
+    setImgSrc(displaySrc(rawSprite));
   }, [rawSprite]);
 
   // Esc 关闭
@@ -79,9 +80,7 @@ export default function CardZoomOverlay({
             className="object-cover"
             priority
             onError={() =>
-              setImgSrc((prev) =>
-                card.image && prev !== card.image ? card.image : "/sprites/CardBack.png",
-              )
+              setImgSrc((prev) => nextCardImageSrc(prev, rawSprite, card.image, "display"))
             }
           />
         </div>

@@ -10,6 +10,7 @@ import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardH
 import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/CardKeywordEffects";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
+import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
 interface Props {
   card: CardData | null;
@@ -84,10 +85,11 @@ export default function CardItem({
   const displayPower = (card?.power ?? 0) + powerBuff + donPower;
   const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);
   const displayCounter = counterValue ?? card?.counter ?? 0;
-  const [imgSrc, setImgSrc] = useState(card?.sprite ?? "/sprites/CardBack.png");
+  const rawSprite = card?.sprite ?? CARD_BACK_SRC;
+  const [imgSrc, setImgSrc] = useState(thumbSrc(rawSprite));
   const leaderBreathingEffect =
     !showFaceDown && card?.type === "Leader"
-      ? getLeaderBreathingEffect(card.number, imgSrc)
+      ? getLeaderBreathingEffect(card.number, rawSprite)
       : null;
   const leaderBreathingStyle = leaderBreathingEffect
     ? ({
@@ -109,7 +111,7 @@ export default function CardItem({
   // 卡牌/异画变化时重新同步图源并重试加载（修复曾因服务器暂时不可用 onError 回退到
   // 卡背后、即使图恢复也一直卡在卡背的问题）
   useEffect(() => {
-    setImgSrc(card?.sprite ?? "/sprites/CardBack.png");
+    setImgSrc(thumbSrc(rawSprite));
   }, [card?.sprite]);
 
   // 悬停详情预览（仅正面且有卡牌数据时显示，避免泄露对手暗置手牌）
@@ -129,7 +131,7 @@ export default function CardItem({
     const rect = e.currentTarget.getBoundingClientRect();
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     hoverTimer.current = setTimeout(
-      () => setHoverInfo({ card, rect, currentSprite: imgSrc }),
+      () => setHoverInfo({ card, rect, currentSprite: rawSprite }),
       HOVER_DELAY,
     );
   };
@@ -196,9 +198,7 @@ export default function CardItem({
             )}
             draggable={false}
             onError={() =>
-              setImgSrc((cur) =>
-                card?.image && cur !== card.image ? card.image : "/sprites/CardBack.png",
-              )
+              setImgSrc((cur) => nextCardImageSrc(cur, rawSprite, card?.image, "thumb"))
             }
           />
           {leaderBreathingEffect && (
@@ -309,7 +309,7 @@ export default function CardItem({
               title="无法攻击"
             >
               <NextImage
-                src="/status-icons/cannot-attack.png"
+                src="/status-icons/cannot-attack.webp"
                 alt=""
                 width={24}
                 height={24}
@@ -328,7 +328,7 @@ export default function CardItem({
             {zoomOpen && card && (
               <CardZoomOverlay
                 card={card}
-                sprite={imgSrc}
+                sprite={rawSprite}
                 counterValue={displayCounter}
                 onClose={() => setZoomOpen(false)}
               />

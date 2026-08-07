@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { loadAllDecks, getSpriteMap, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
+import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 export default function FriendlyRoomPanel() {
   const room    = useNetStore((s) => s.friendlyRoom);
@@ -124,10 +125,10 @@ export default function FriendlyRoomPanel() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={d.leaderSprite || "/sprites/CardBack.png"}
+                    src={thumbSrc(d.leaderSprite || CARD_BACK_SRC)}
                     alt={d.leaderName}
                     className="w-7 h-10 object-cover rounded border border-gray-700 shrink-0"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/sprites/CardBack.png"; }}
+                    onError={(e) => advanceImageFallback(e.currentTarget, [d.leaderSprite])}
                   />
                   <div className="min-w-0">
                     <p className="text-white text-xs truncate">{name}</p>

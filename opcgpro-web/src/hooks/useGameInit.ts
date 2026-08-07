@@ -59,11 +59,18 @@ export function useGameInit() {
         });
     }
 
-    // 2) 后台一次性全量加载全部卡数据：牌库内容不在快照里，抽到/获得未加载卡集的卡时
-    //    getCard 会返回空而显示卡背。预先全量加载杜绝此问题；allCards.json 内容哈希
-    //    永久缓存，仅首次真正下载。完成后 bump 触发重渲染刷出卡图。
-    if (!kickedFullLoad.current) {
-      kickedFullLoad.current = true;
+  }, [my, opp]);
+
+  // 首屏所需卡集就绪后再后台加载 1.3MB 全卡包，避免它与第一批卡图争抢带宽。
+  // 先留出 800ms 给对战界面和 WebP 小图，再利用空闲时段启动；最迟约 2 秒执行。
+  useEffect(() => {
+    if (!ready || kickedFullLoad.current) return;
+    kickedFullLoad.current = true;
+
+    let idleId: number | null = null;
+    let started = false;
+    const startFullLoad = () => {
+      started = true;
       loadAllCards()
         .then(() => {
           if (!mounted.current) return;
@@ -71,8 +78,24 @@ export function useGameInit() {
           bumpCardData((v) => v + 1);
         })
         .catch(() => { kickedFullLoad.current = false; });
-    }
-  }, [my, opp]);
+    };
+
+    const delayId = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(startFullLoad, { timeout: 1200 });
+      } else {
+        startFullLoad();
+      }
+    }, 800);
+
+    return () => {
+      window.clearTimeout(delayId);
+      if (idleId !== null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (!started) kickedFullLoad.current = false;
+    };
+  }, [ready]);
 
   return ready;
 }

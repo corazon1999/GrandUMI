@@ -20,7 +20,7 @@ import { getAllCachedCards, loadCardSet } from "@/data/CardLoader";
 import { DEFAULT_SEARCH_SETS } from "@/data/cardSets";
 import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
-import { thumbSrc } from "@/lib/sprite";
+import { advanceImageFallback, thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
@@ -123,14 +123,14 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
           >
             {avatarSrc ? (
               <NextImage
-                src={avatarSrc}
+                src={thumbSrc(avatarSrc)}
                 alt="头像"
                 fill
                 sizes={imageSize}
                 className="object-cover object-top rounded-full"
                 style={{ transform: "scale(1.1)" }}
                 draggable={false}
-                onError={() => setAvatarSrc("")}
+                onError={(event) => advanceImageFallback(event.currentTarget, [avatarSrc])}
               />
             ) : (
               <span className="text-white text-xs font-bold">
@@ -269,10 +269,7 @@ function AvatarGrid({
                 draggable={false}
                 className="h-full w-full object-cover object-top"
                 style={{ transform: "scale(1.1)" }}
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  if (img.src.includes("-thumb/") && sprite) img.src = sprite;
-                }}
+                onError={(event) => advanceImageFallback(event.currentTarget, [sprite, card.image])}
               />
             </button>
           );
