@@ -192,9 +192,9 @@ _OWNER_REPLY_RE = re.compile(r"^\s*#回复(?:\s+|[:：])?(.*)$", re.DOTALL)
 
 
 async def handle_owner_reply(ws, cfg, event) -> bool:
-    """只接受指定管理员 @ 机器人后的“#回复 …”。"""
+    """只接受指定管理员在原群发送的“#回复 …”，无需真实 @。"""
     owner_qq = str(cfg.get("agent_owner_qq", "651846226"))
-    if str(event.get("user_id", "")) != owner_qq or not is_at_self(event):
+    if str(event.get("user_id", "")) != owner_qq:
         return False
     match = _OWNER_REPLY_RE.match(extract_plain_text(event))
     if not match:
@@ -264,7 +264,7 @@ async def notification_loop(ws, cfg) -> None:
                 text = (
                     f"反馈 #{question['id']} 需要确认\n"
                     f"玩家反馈：{content}\n\n{detail}\n\n"
-                    "请 @机器人 并发送：#回复 你的判断或补充说明"
+                    "请发送：#回复 你的判断或补充说明（无需 @机器人）"
                 )
                 await send_group_msg(
                     ws, question["group_id"], at_message(owner_qq, text)

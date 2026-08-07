@@ -35,6 +35,31 @@ class WorkerError(RuntimeError):
     pass
 
 
+def resolve_codex_command(command: str) -> str:
+    """Windows 下绕过 npm 的 .cmd，避免多行提示词被 cmd.exe 截断。"""
+    resolved = shutil.which(command)
+    if not resolved:
+        candidate = Path(command).resolve()
+        if not candidate.is_file():
+            raise WorkerError(f"未找到 Codex 命令: {command}")
+        resolved = str(candidate)
+    path = Path(resolved)
+    if os.name != "nt" or path.suffix.lower() not in (".cmd", ".bat"):
+        return str(path)
+
+    package_root = path.parent / "node_modules" / "@openai" / "codex"
+    native = sorted(
+        package_root.glob(
+            "node_modules/@openai/codex-win32-*/vendor/*/bin/codex.exe"
+        )
+    )
+    if not native:
+        raise WorkerError(
+            f"Codex 的 Windows 原生执行文件不存在，拒绝通过批处理传递多行提示词: {package_root}"
+        )
+    return str(native[0].resolve())
+
+
 def load_config(path: Path) -> dict:
     # Windows PowerShell 5.1 的 Set-Content -Encoding UTF8 会写入 BOM。
     with path.open("r", encoding="utf-8-sig") as file:
@@ -209,7 +234,7 @@ class AgentWorker:
     ) -> tuple[dict, list[dict]]:
         schema = worktree / "qq-bug-bot" / "schemas" / schema_name
         args = [
-            str(self.cfg.get("codex_command") or "codex"),
+            resolve_codex_command(str(self.cfg.get("codex_command") or "codex")),
             "--ask-for-approval", "never",
             "exec", "--ephemeral", "--json",
             "--sandbox", sandbox,
@@ -698,9 +723,10 @@ class AgentWorker:
             self.cleanup(worktree, branch, merged)
 
     def self_check(self) -> None:
-        for name in ("git", "ssh", "powershell", str(self.cfg.get("codex_command") or "codex")):
+        for name in ("git", "ssh", "powershell"):
             if shutil.which(name) is None:
                 raise WorkerError(f"未找到命令: {name}")
+        resolve_codex_command(str(self.cfg.get("codex_command") or "codex"))
         if not (self.repo / ".git").exists():
             raise WorkerError(f"repository_root 不是独立 Git 仓库: {self.repo}")
         self.bridge("status")

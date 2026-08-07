@@ -75,6 +75,30 @@ class AgentWorkerGateTests(unittest.TestCase):
             agent_worker.run_process(["codex", "--version"])
         self.assertEqual(r"C:\tools\codex.CMD", run_mock.call_args.args[0][0])
 
+    @unittest.skipUnless(os.name == "nt", "仅验证 Windows Codex 原生入口")
+    def test_WindowsCodex绕过会截断多行提示词的cmd(self):
+        npm = Path(self.temp.name) / "npm"
+        wrapper = npm / "codex.cmd"
+        native = (
+            npm
+            / "node_modules"
+            / "@openai"
+            / "codex"
+            / "node_modules"
+            / "@openai"
+            / "codex-win32-x64"
+            / "vendor"
+            / "x86_64-pc-windows-msvc"
+            / "bin"
+            / "codex.exe"
+        )
+        native.parent.mkdir(parents=True)
+        wrapper.write_text("@echo off\n", encoding="utf-8")
+        native.write_bytes(b"native")
+        with mock.patch.object(agent_worker.shutil, "which", return_value=str(wrapper)):
+            resolved = agent_worker.resolve_codex_command("codex")
+        self.assertEqual(native.resolve(), Path(resolved))
+
     def test允许小范围前端修复并要求构建(self):
         (self.repo / "opcgpro-web" / "src" / "a.ts").write_text(
             "export const a = 2;\n", encoding="utf-8"

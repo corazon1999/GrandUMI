@@ -58,7 +58,7 @@ class BotAgentReplyTests(unittest.TestCase):
             "raw_message": "[CQ:at,qq=9999] " + text,
         }
 
-    def test只接受指定管理员且必须at机器人(self):
+    def test接受指定管理员并使用安全消息段回执(self):
         ws = FakeWebSocket()
         cfg = {"agent_owner_qq": 651846226}
         handled = asyncio.run(bot.handle_owner_reply(ws, cfg, self.event()))
@@ -70,7 +70,7 @@ class BotAgentReplyTests(unittest.TestCase):
         self.assertEqual("at", message[0]["type"])
         self.assertEqual("651846226", message[0]["data"]["qq"])
 
-    def test冒充或未at会被忽略(self):
+    def test冒充被忽略但指定管理员无需at(self):
         cfg = {"agent_owner_qq": 651846226}
         self.assertFalse(
             asyncio.run(
@@ -79,14 +79,13 @@ class BotAgentReplyTests(unittest.TestCase):
                 )
             )
         )
-        self.assertFalse(
+        self.assertEqual("waiting_owner", storage.get_feedback(1)["agent_state"])
+        self.assertTrue(
             asyncio.run(
-                bot.handle_owner_reply(
-                    FakeWebSocket(), cfg, self.event(include_at=False)
-                )
+                bot.handle_owner_reply(FakeWebSocket(), cfg, self.event(include_at=False))
             )
         )
-        self.assertEqual("waiting_owner", storage.get_feedback(1)["agent_state"])
+        self.assertEqual("owner_answered", storage.get_feedback(1)["agent_state"])
 
     def test纯文本抽取不会保留cq码(self):
         event = self.event()
