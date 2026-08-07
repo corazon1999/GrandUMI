@@ -26,10 +26,6 @@ $python = (& $pythonLauncher -c "import sys; print(sys.executable)").Trim()
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $python)) {
     throw "无法解析 Python 解释器。"
 }
-$pythonw = Join-Path (Split-Path -Parent $python) "pythonw.exe"
-if (-not (Test-Path -LiteralPath $pythonw)) {
-    throw "找不到无窗口 Python 解释器：$pythonw"
-}
 [void](Get-Command codex -ErrorAction Stop)
 [void](Get-Command git.exe -ErrorAction Stop)
 [void](Get-Command ssh.exe -ErrorAction Stop)
@@ -51,7 +47,7 @@ Write-Host "正在执行本机 Agent 工作器自检……" -ForegroundColor Cya
 if ($LASTEXITCODE -ne 0) { throw "工作器自检失败，未注册计划任务。" }
 
 $action = New-ScheduledTaskAction `
-    -Execute $pythonw `
+    -Execute $python `
     -Argument ('"' + $worker + '" --config "' + $config + '"') `
     -WorkingDirectory (Split-Path -Parent $worker)
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
