@@ -22,11 +22,8 @@ import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
-import LayoutPreviewFrame, {
-  type LayoutPreviewMode,
-  useLayoutPreviewMode,
-} from "./LayoutPreviewFrame";
-import SettingsModal from "./SettingsModal";
+import LayoutPreviewFrame from "./LayoutPreviewFrame";
+import { useLayoutSettings } from "./LayoutSettingsProvider";
 
 type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
@@ -393,8 +390,7 @@ export default function MainPanel() {
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [layoutMode, setLayoutMode] = useLayoutPreviewMode();
+  const { mode: layoutMode, openSettings } = useLayoutSettings();
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
   const onlineCount = useNetStore((s) => s.onlineCount);
@@ -411,6 +407,10 @@ export default function MainPanel() {
     }
   }, [account]);
 
+  useEffect(() => {
+    if (layoutMode === "desktop" && view === "profile") setView("lobby");
+  }, [layoutMode, view]);
+
   const closeChangelog = () => {
     if (account && LATEST_CHANGELOG) {
       try {
@@ -422,11 +422,6 @@ export default function MainPanel() {
     setShowChangelog(false);
   };
 
-  const changeLayoutMode = (next: LayoutPreviewMode) => {
-    if (next === "desktop" && view === "profile") setView("lobby");
-    setLayoutMode(next);
-  };
-
   // 进入友谊战房间后，大厅整体切换为房间界面
   if (friendlyRoom) {
     return (
@@ -435,12 +430,6 @@ export default function MainPanel() {
           <FriendlyRoomPanel />
           <InviteNotifyOverlay />
           <ChangelogModal open={showChangelog} onClose={closeChangelog} />
-          <SettingsModal
-            open={showSettings}
-            mode={layoutMode}
-            onChange={changeLayoutMode}
-            onClose={() => setShowSettings(false)}
-          />
         </div>
       </LayoutPreviewFrame>
     );
@@ -466,7 +455,7 @@ export default function MainPanel() {
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 @[1024px]:hidden">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 pr-16 @[1024px]:hidden">
         <div>
           <p className="text-base font-black tracking-tight text-white">GrandUMI</p>
           <p className="text-xs text-gray-500">海贼王卡牌对战</p>
@@ -533,7 +522,7 @@ export default function MainPanel() {
           <div className="mt-auto flex w-full flex-col gap-2">
             <button
               type="button"
-              onClick={() => setShowSettings(true)}
+              onClick={openSettings}
               className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
             >
               设置
@@ -561,7 +550,7 @@ export default function MainPanel() {
               onOpenPlayers={() => setShowPlayerList(true)}
               onOpenHistory={() => setView("history")}
               onOpenChangelog={() => setShowChangelog(true)}
-              onOpenSettings={() => setShowSettings(true)}
+              onOpenSettings={openSettings}
             />
           )}
         </main>
@@ -600,12 +589,6 @@ export default function MainPanel() {
       </Modal>
       <InviteNotifyOverlay />
       <ChangelogModal open={showChangelog} onClose={closeChangelog} />
-      <SettingsModal
-        open={showSettings}
-        mode={layoutMode}
-        onChange={changeLayoutMode}
-        onClose={() => setShowSettings(false)}
-      />
       </div>
     </LayoutPreviewFrame>
   );

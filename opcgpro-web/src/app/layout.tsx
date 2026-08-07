@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NetProvider from "@/components/NetProvider";
+import LayoutSettingsProvider from "@/components/home/LayoutSettingsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="zh" className="h-full">
       <body className="min-h-full bg-gray-950 text-white antialiased">
-        <NetProvider>{children}</NetProvider>
+        <LayoutSettingsProvider>
+          <NetProvider>{children}</NetProvider>
+        </LayoutSettingsProvider>
       </body>
     </html>
   );

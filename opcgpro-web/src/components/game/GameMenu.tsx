@@ -23,7 +23,7 @@ export default function GameMenu() {
       <button
         onClick={() => setOpen(true)}
         disabled={isPending}
-        className="absolute right-4 top-4 z-20 h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+        className="absolute right-16 top-4 z-20 h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-gray-600"
         aria-label="打开游戏菜单"
       >
         ≡
