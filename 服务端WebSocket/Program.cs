@@ -4,6 +4,27 @@ using GrandUMI.Game.Stats;
 using GrandUMI.Persistence;
 using System.Runtime.Loader;
 
+if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringComparison.Ordinal))
+{
+    if (args.Length != 3)
+    {
+        Console.Error.WriteLine("用法：GrandUMIServer --backfill-leader-stats <对局日志目录> <排行榜数据库路径>");
+        Environment.ExitCode = 2;
+        return;
+    }
+
+    var backfillStore = new LeaderStatsStore(args[2]);
+    backfillStore.Initialize();
+    var report = LeaderStatsBackfill.ImportDirectory(args[1], backfillStore);
+    Console.WriteLine(
+        $"[LeaderStats 回填] 扫描 {report.FilesScanned}，新增 {report.Imported}，已存在 {report.AlreadyRecorded}，" +
+        $"未结束 {report.SkippedIncomplete}，无效 {report.SkippedInvalid}，错误 {report.Errors.Count}");
+    foreach (var error in report.Errors.Take(20))
+        Console.Error.WriteLine($"[LeaderStats 回填错误] {error}");
+    if (report.Errors.Count > 0) Environment.ExitCode = 1;
+    return;
+}
+
 Console.Title = "GrandUMI WebSocket 服务器";
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -30,7 +51,8 @@ GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(dslDir);
 
 // Leader 排行榜使用独立 SQLite；线上可用 GRANDUMI_DATA_DIR 指向持久化目录。
 LeaderStatsStore.Default.Initialize();
-Console.WriteLine($"[LeaderStats] SQLite: {LeaderStatsStore.Default.DatabasePath}");
+Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
+Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
 
 // 重启恢复：把 TTL 内未结束的 PvP 对局重放重建回内存（须在卡库/DSL 加载之后、开监听之前）
 await GrandUMI.Game.GameRoomManager.RestoreAll();

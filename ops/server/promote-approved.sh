@@ -70,6 +70,14 @@ if [[ "$need_back" == 1 ]]; then
   log "在临时目录构建正式服后端"
   rm -rf "$next_publish"
   dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo
+
+  log "增量回填正式服 Leader 排行榜数据"
+  production_stats_db="$repo/服务端WebSocket/Data/leader-stats.db"
+  mkdir -p "$(dirname "$production_stats_db")"
+  dotnet "$next_publish/GrandUMIServer.dll" \
+    --backfill-leader-stats \
+    "$repo/服务端WebSocket/MatchLogs" \
+    "$production_stats_db"
 fi
 
 if [[ "$need_front" == 1 ]]; then

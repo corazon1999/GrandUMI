@@ -47,6 +47,19 @@ if [[ "$need_back" == 1 ]]; then
   previous_publish="$repo/服务端WebSocket/publish.previous"
   rm -rf "$next_publish"
   dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo
+
+  echo "增量回填正式服 Leader 排行榜数据"
+  production_stats_db="/opt/grandumi/服务端WebSocket/Data/leader-stats.db"
+  mkdir -p "$(dirname "$production_stats_db")"
+  dotnet "$next_publish/GrandUMIServer.dll" \
+    --backfill-leader-stats \
+    "/opt/grandumi/服务端WebSocket/MatchLogs" \
+    "$production_stats_db"
+
+  install -m 0644 "$repo/ops/server/grandumi-test-backend.service" \
+    /etc/systemd/system/grandumi-test-backend.service
+  systemctl daemon-reload
+
   rm -rf "$previous_publish"
   [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
   mv "$next_publish" "$repo/服务端WebSocket/publish"

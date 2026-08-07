@@ -9,6 +9,7 @@ ExecStart=/usr/bin/dotnet /opt/grandumi-test/服务端WebSocket/publish/GrandUMI
 Restart=always
 RestartSec=3
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+Environment=GRANDUMI_LEADER_STATS_READ_PATH=/opt/grandumi/服务端WebSocket/Data/leader-stats.db
 CPUQuota=50%
 MemoryMax=768M
 

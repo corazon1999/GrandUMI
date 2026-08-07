@@ -91,6 +91,31 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.True(Assert.Single(all.Items, x => x.LeaderNumber == "L-C").InsufficientSample);
     }
 
+    [Fact]
+    public void 测试服可独立写入但榜单只读取正式服数据库()
+    {
+        var now = new DateTime(2026, 8, 7, 8, 0, 0, DateTimeKind.Utc);
+        Directory.CreateDirectory(_tempDir);
+        var productionPath = Path.Combine(_tempDir, "production.db");
+        var testPath = Path.Combine(_tempDir, "test.db");
+        var productionStore = new LeaderStatsStore(productionPath);
+        var testStore = new LeaderStatsStore(testPath, productionPath);
+
+        productionStore.RecordMatch(Match(
+            "production-match", now, MatchKind.Matchmaking, "L-PROD-A", "L-PROD-B", 0, 0, 8));
+        testStore.RecordMatch(Match(
+            "test-match", now, MatchKind.Matchmaking, "L-TEST-A", "L-TEST-B", 0, 0, 8));
+
+        var result = testStore.GetLeaderboard("all", now);
+
+        Assert.Equal(productionPath, testStore.LeaderboardDatabasePath);
+        Assert.Equal(1, result.TotalMatches);
+        Assert.Contains(result.Items, x => x.LeaderNumber == "L-PROD-A");
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "L-TEST-A");
+        Assert.True(testStore.ContainsMatch("test-match"));
+        Assert.False(testStore.ContainsMatch("production-match"));
+    }
+
     private LeaderStatsStore CreateStore()
     {
         Directory.CreateDirectory(_tempDir);

@@ -51,15 +51,22 @@ public sealed class LeaderStatsStore
 
     private readonly object _lock = new();
     private readonly string _databasePath;
-    private readonly string _connectionString;
+    private readonly string _leaderboardDatabasePath;
+    private readonly string _writeConnectionString;
+    private readonly string _leaderboardConnectionString;
     private bool _initialized;
 
     public static LeaderStatsStore Default { get; } = new();
 
-    public LeaderStatsStore(string? databasePath = null)
+    public LeaderStatsStore(string? databasePath = null, string? leaderboardDatabasePath = null)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultDatabasePath());
-        _connectionString = new SqliteConnectionStringBuilder
+        var configuredLeaderboardPath = leaderboardDatabasePath;
+        if (string.IsNullOrWhiteSpace(configuredLeaderboardPath) && databasePath is null)
+            configuredLeaderboardPath = Environment.GetEnvironmentVariable("GRANDUMI_LEADER_STATS_READ_PATH");
+        _leaderboardDatabasePath = Path.GetFullPath(configuredLeaderboardPath ?? _databasePath);
+
+        _writeConnectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
@@ -67,9 +74,23 @@ public sealed class LeaderStatsStore
             Pooling = false,
             DefaultTimeout = 5,
         }.ToString();
+        _leaderboardConnectionString = string.Equals(
+            _databasePath,
+            _leaderboardDatabasePath,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+            ? _writeConnectionString
+            : new SqliteConnectionStringBuilder
+            {
+                DataSource = _leaderboardDatabasePath,
+                Mode = SqliteOpenMode.ReadOnly,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false,
+                DefaultTimeout = 5,
+            }.ToString();
     }
 
     public string DatabasePath => _databasePath;
+    public string LeaderboardDatabasePath => _leaderboardDatabasePath;
 
     public void Initialize()
     {
@@ -80,7 +101,7 @@ public sealed class LeaderStatsStore
             var parent = Path.GetDirectoryName(_databasePath);
             if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
 
-            using var connection = OpenConnection();
+            using var connection = OpenWriteConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 PRAGMA journal_mode = WAL;
@@ -123,7 +144,7 @@ public sealed class LeaderStatsStore
             Initialize();
             var (counted, excludeReason) = EvaluateEligibility(result);
 
-            using var connection = OpenConnection();
+            using var connection = OpenWriteConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT OR IGNORE INTO match_results (
@@ -170,7 +191,10 @@ public sealed class LeaderStatsStore
         lock (_lock)
         {
             Initialize();
-            using var connection = OpenConnection();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("排行榜数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
 
             var totalMatches = ReadTotalMatches(connection, sinceUtc);
             var rows = ReadLeaderboardRows(connection, sinceUtc);
@@ -212,9 +236,31 @@ public sealed class LeaderStatsStore
         }
     }
 
-    private SqliteConnection OpenConnection()
+    /// <summary>回填工具用于按对局 ID 跳过已经导入的日志。</summary>
+    public bool ContainsMatch(string matchId)
     {
-        var connection = new SqliteConnection(_connectionString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(matchId);
+        lock (_lock)
+        {
+            Initialize();
+            using var connection = OpenWriteConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1 FROM match_results WHERE match_id = $matchId LIMIT 1;";
+            command.Parameters.AddWithValue("$matchId", matchId);
+            return command.ExecuteScalar() is not null;
+        }
+    }
+
+    private SqliteConnection OpenWriteConnection()
+    {
+        var connection = new SqliteConnection(_writeConnectionString);
+        connection.Open();
+        return connection;
+    }
+
+    private SqliteConnection OpenLeaderboardConnection()
+    {
+        var connection = new SqliteConnection(_leaderboardConnectionString);
         connection.Open();
         return connection;
     }
