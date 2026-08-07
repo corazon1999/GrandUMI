@@ -902,7 +902,6 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         var top = Me(c).Deck.Take(2).ToList();
         if (top.Count == 0) return;
-        c.Engine?.BroadcastReveal(c.OwnerIndex, top.Select(x => x.Info.Number).ToList());
         var order = await Pick(c, c.OwnerIndex, "OrderDeckTop", "选择卡牌排列顺序（先选者在上/先放入）", top, top.Count, top.Count);
         if (order.Count != top.Count) order = top;
         int where = await c.Prompts.ChooseOption(c.OwnerIndex, "将这组卡牌放置到哪里？", new[] { "卡组最上方", "卡组最下方" });
