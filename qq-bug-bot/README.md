@@ -76,7 +76,8 @@ cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
 ```
 
 安装器会先运行队列、Git 同步和 Codex 自检；全部通过后才注册并启动当前用户的
-`GrandUMI-Bug-Agent` 登录任务。运行配置位于
+`GrandUMI-Bug-Agent` 登录任务。工作器使用 `pythonw.exe` 在后台运行，不需要保留
+命令行窗口。运行配置位于
 `D:\Self\GrandUMI-agent-runtime\agent-worker.json`，日志位于其 `logs` 子目录。
 
 ### 部署并启用服务器机器人

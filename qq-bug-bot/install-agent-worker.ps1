@@ -21,7 +21,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $repo ".git"))) {
     throw "RepositoryRoot 不是独立 Git 仓库：$repo"
 }
 
-$python = (Get-Command py.exe -ErrorAction Stop).Source
+$pythonLauncher = (Get-Command py.exe -ErrorAction Stop).Source
+$python = (& $pythonLauncher -c "import sys; print(sys.executable)").Trim()
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $python)) {
+    throw "无法解析 Python 解释器。"
+}
+$pythonw = Join-Path (Split-Path -Parent $python) "pythonw.exe"
+if (-not (Test-Path -LiteralPath $pythonw)) {
+    throw "找不到无窗口 Python 解释器：$pythonw"
+}
 [void](Get-Command codex -ErrorAction Stop)
 [void](Get-Command git.exe -ErrorAction Stop)
 [void](Get-Command ssh.exe -ErrorAction Stop)
@@ -43,7 +51,7 @@ Write-Host "正在执行本机 Agent 工作器自检……" -ForegroundColor Cya
 if ($LASTEXITCODE -ne 0) { throw "工作器自检失败，未注册计划任务。" }
 
 $action = New-ScheduledTaskAction `
-    -Execute $python `
+    -Execute $pythonw `
     -Argument ('"' + $worker + '" --config "' + $config + '"') `
     -WorkingDirectory (Split-Path -Parent $worker)
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
@@ -58,6 +66,14 @@ $principal = New-ScheduledTaskPrincipal `
     -RunLevel Limited
 
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    for ($i = 0; $i -lt 20; $i++) {
+        if ((Get-ScheduledTask -TaskName $TaskName).State -ne "Running") { break }
+        Start-Sleep -Milliseconds 250
+    }
+    if ((Get-ScheduledTask -TaskName $TaskName).State -eq "Running") {
+        throw "旧 Agent 工作器未能停止，拒绝启动重复实例。"
+    }
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
 }
 Register-ScheduledTask `

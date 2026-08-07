@@ -36,6 +36,14 @@ class DeployFileTests(unittest.TestCase):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
         self.assertGreaterEqual(shell.count("--force-recreate bug-bot"), 2)
 
+    def test_本机工作器使用无窗口Python且停止旧实例(self):
+        installer = (BOT_DIR / "install-agent-worker.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        self.assertIn('"pythonw.exe"', installer)
+        self.assertIn("-Execute $pythonw", installer)
+        self.assertIn("Stop-ScheduledTask", installer)
+
 
 if __name__ == "__main__":
     unittest.main()
