@@ -56,9 +56,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -317,9 +315,7 @@
       "OnKO",
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,
@@ -341,9 +337,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,

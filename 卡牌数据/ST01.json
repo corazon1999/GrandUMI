@@ -34,9 +34,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -78,9 +76,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -251,7 +247,6 @@
       "OnAttackDeclare"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",
@@ -341,9 +336,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,

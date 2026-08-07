@@ -17,11 +17,32 @@ public class OP04_093_GumGumKingKongGun : IScriptedEffect
 {
     public string CardNumber => "OP04-093";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.EventMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.EventMain || t == EffectTrigger.OnLifeRevealTrigger;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+
+        if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
+        {
+            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 3);
+            int discardCount = Math.Min(2, me.Hand.Count);
+            if (discardCount == 0) return;
+            var discardedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard",
+                $"丢弃 {discardCount} 张手牌",
+                me.Hand.Select(card => card.Id.ToString()).ToList(), discardCount, discardCount,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = me.Hand.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                });
+            foreach (var id in discardedIds.Take(discardCount).ToList())
+            {
+                var card = me.Hand.FirstOrDefault(item => item.Id.ToString() == id);
+                if (card is not null) AtomicOps.DiscardHand(me, card);
+            }
+            return;
+        }
 
         var cands = me.Characters.Where(c => c.Info.HasKeyword("德莱斯罗兹")).ToList();
         if (cands.Count == 0) return;

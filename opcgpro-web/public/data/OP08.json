@@ -166,9 +166,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -271,10 +269,10 @@
     "cost": "3",
     "keyWords": "动物/铁桶王国",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -600,9 +598,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -621,7 +617,9 @@
     "cost": "4",
     "keyWords": "纯毛族/大妈海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -975,7 +973,8 @@
     "effectTags": [
       "PreKO",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1063,9 +1062,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1309,9 +1306,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1619,7 +1614,8 @@
     "keyWords": "百兽海盗团",
     "counter": "2000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1835,7 +1831,8 @@
     "keyWords": "百兽海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2032,7 +2029,9 @@
     "cost": "4",
     "keyWords": "海军/德雷克海盗团/百兽海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -2206,7 +2205,8 @@
     "keyWords": "大妈海盗团",
     "counter": "1000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2425,9 +2425,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -2489,7 +2487,8 @@
     "keyWords": "艾格赫德/炽天使",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",

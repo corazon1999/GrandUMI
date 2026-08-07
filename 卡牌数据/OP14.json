@@ -78,9 +78,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -996,11 +994,10 @@
     "keyWords": "鱼人族/太阳海盗团",
     "counter": "1000",
     "effectTags": [
-      "OnKO"
+      "OnKO",
+      "OnHandDiscarded"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -1088,11 +1085,10 @@
     "keyWords": "鱼人族/王下七武海/太阳海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnHandDiscarded"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,

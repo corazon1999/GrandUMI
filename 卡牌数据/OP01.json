@@ -164,9 +164,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -507,7 +505,8 @@
     "counter": "1000",
     "effectTags": [
       "PreKO",
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1448,9 +1447,7 @@
     "keyWords": "王下七武海/恐怖之船海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -2083,9 +2080,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -2582,7 +2577,6 @@
       "OnAttackDeclare"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",

@@ -34,9 +34,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -75,10 +73,10 @@
     "cost": "2",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -249,7 +247,6 @@
       "OnAttackDeclare"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",
@@ -339,9 +336,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,

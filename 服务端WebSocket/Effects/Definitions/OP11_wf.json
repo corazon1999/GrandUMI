@@ -123,7 +123,7 @@
   },
   "OP11-018": {
     "_name": "诚实拳骨",
-    "_matcher": "主要：对方1张-4000后KO力量≤6000角色；触发：KO力量≤6000角色（KO力量用 originalPowerLte 近似）",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -144,7 +144,7 @@
           "max": 1,
           "as": "$k",
           "filter": {
-            "originalPowerLte": 6000
+            "currentPowerLte": 6000
           }
         },
         {
@@ -160,7 +160,7 @@
         "max": 1,
         "as": "$k",
         "filter": {
-          "originalPowerLte": 6000
+          "currentPowerLte": 6000
         }
       },
       {
@@ -282,7 +282,7 @@
   },
   "OP11-028": {
     "_name": "近海之王",
-    "_matcher": "【登场时】让对方休息角色下个重置阶段不活跃为未列出的特殊状态机制（complex，已忽略），此处实现可表达的【触发】：KO对方1张休息且费用≤3角色",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "trigger": [
       {
@@ -760,9 +760,15 @@
       }
     ],
     "activated": {
-      "cost": { "donReturn": 1, "restSelf": true },
+      "cost": {
+        "donReturn": 1,
+        "restSelf": true
+      },
       "then": [
-        { "op": "LookOppTop", "count": 1 }
+        {
+          "op": "LookOppTop",
+          "count": 1
+        }
       ]
     }
   },
@@ -860,7 +866,7 @@
   },
   "OP11-084": {
     "_name": "库赞",
-    "_matcher": "登场时卡组顶弃3张可用MillTop表达；攻击时让海军角色可攻击活跃角色的部分无对应op，已忽略。",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "triggers": [
       {

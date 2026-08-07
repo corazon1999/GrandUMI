@@ -10,7 +10,8 @@
     "keyWords": "海军/利刃",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -34,7 +35,8 @@
     "effectTags": [
       "OnAttackDeclare",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "PreKO",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -125,7 +127,9 @@
     "cost": "4",
     "keyWords": "超新星/草帽一伙",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnCharRested"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -331,7 +335,8 @@
     "keyWords": "黑胡子海盗团",
     "counter": "1000",
     "effectTags": [
-      "OnKO"
+      "OnKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",

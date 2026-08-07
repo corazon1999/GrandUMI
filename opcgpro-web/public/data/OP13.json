@@ -32,7 +32,9 @@
     "keyWords": "白胡子海盗团",
     "counter": "",
     "effectTags": [
-      "OnOppAttackDeclare"
+      "OnOppAttackDeclare",
+      "OnDamageToLeader",
+      "OnAnyCharKOd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -182,10 +184,10 @@
     "cost": "1",
     "keyWords": "山贼",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "双重攻击"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -354,7 +356,8 @@
     "counter": "1000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -508,7 +511,8 @@
     "keyWords": "FILM",
     "counter": "2000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnMyTurnEnd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -998,7 +1002,7 @@
     "effectTags": [
       "PreKO",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillLeaveField"
     ],
     "abilities": [
       "双重攻击"
@@ -1155,9 +1159,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1246,9 +1248,7 @@
       "EventMain",
       "EventCounter"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1449,7 +1449,8 @@
     "keyWords": "罗杰海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnMyTurnEnd"
     ],
     "abilities": [
       "速攻"
@@ -1758,11 +1759,10 @@
     "keyWords": "天龙人/五老星",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1847,7 +1847,9 @@
     "cost": "7",
     "keyWords": "天龙人/五老星",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "PreKO"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -2370,9 +2372,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -2393,7 +2393,8 @@
     "counter": "1000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2458,7 +2459,9 @@
     "cost": "1",
     "keyWords": "艾格赫德/科学家",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -2616,9 +2619,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 4,

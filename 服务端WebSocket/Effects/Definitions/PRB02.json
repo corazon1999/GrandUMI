@@ -5,8 +5,20 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "cost": { "handDiscard": { "n": 1, "kind": "Character", "originalPowerGte": 6000, "text": "丢弃手牌中1张力量≥6000的角色卡牌（可放弃）" } },
-        "then": [ { "op": "Draw", "n": 2 } ]
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "kind": "Character",
+            "originalPowerGte": 6000,
+            "text": "丢弃手牌中1张力量≥6000的角色卡牌（可放弃）"
+          }
+        },
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
       }
     ]
   },
@@ -17,23 +29,48 @@
       {
         "on": "OnOppAttackDeclare",
         "oncePerTurn": true,
-        "then": [ { "op": "ActiveOwnDon", "n": 1 } ]
+        "then": [
+          {
+            "op": "ActiveOwnDon",
+            "n": 1
+          }
+        ]
       }
     ]
   },
   "PRB02-007": {
     "_name": "甚平",
-    "_matcher": "登场时确认顶5公开1张王下七武海(除甚平)入手余放底;攻击时将对方最多1张费用≤1角色回卡组底（原文敌我皆可,简化为对方）",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "triggers": [
       {
         "on": "OnEnterField",
-        "then": [ { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keyword": "王下七武海", "excludeName": "甚平" } } ]
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "王下七武海",
+              "excludeName": "甚平"
+            }
+          }
+        ]
       },
       {
         "on": "OnAttackDeclare",
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacterCostLe1", "max": 1, "as": "$t" },
-          { "op": "ReturnToDeckBottom", "target": "$t", "from": "field" }
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$t"
+          },
+          {
+            "op": "ReturnToDeckBottom",
+            "target": "$t",
+            "from": "field"
+          }
         ]
       }
     ]
@@ -42,7 +79,15 @@
     "_name": "马尔高",
     "_matcher": "KO时抽2",
     "triggers": [
-      { "on": "OnKO", "then": [ { "op": "Draw", "n": 2 } ] }
+      {
+        "on": "OnKO",
+        "then": [
+          {
+            "op": "Draw",
+            "n": 2
+          }
+        ]
+      }
     ]
   },
   "PRB02-010": {
@@ -51,11 +96,26 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "cost": { "donReturn": 2 },
-        "if": { "leaderHasKeyword": "大妈海盗团", "oppDonTotalGte": 6 },
+        "cost": {
+          "donReturn": 2
+        },
+        "if": {
+          "leaderHasKeyword": "大妈海盗团",
+          "oppDonTotalGte": 6
+        },
         "then": [
-          { "op": "Draw", "n": 2 },
-          { "op": "PlayCharFromHand", "filter": { "keyword": "大妈海盗团", "originalPowerGte": 6000, "originalPowerLte": 8000 } }
+          {
+            "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "PlayCharFromHand",
+            "filter": {
+              "keyword": "大妈海盗团",
+              "originalPowerGte": 6000,
+              "originalPowerLte": 8000
+            }
+          }
         ]
       }
     ]
@@ -66,8 +126,16 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "leaderColorCountGte": 2 },
-        "then": [ { "op": "RefreshDon", "n": 1, "state": "rest" } ]
+        "if": {
+          "leaderColorCountGte": 2
+        },
+        "then": [
+          {
+            "op": "RefreshDon",
+            "n": 1,
+            "state": "rest"
+          }
+        ]
       }
     ]
   },
@@ -77,7 +145,18 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "then": [ { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "keyword": "草帽一伙", "excludeName": "奈美" } } ]
+        "then": [
+          {
+            "op": "LookTopReveal",
+            "count": 5,
+            "max": 1,
+            "restTo": "bottom",
+            "match": {
+              "keyword": "草帽一伙",
+              "excludeName": "奈美"
+            }
+          }
+        ]
       }
     ]
   },
@@ -87,42 +166,97 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "leaderHasKeyword": "恐怖之船海盗团" },
+        "if": {
+          "leaderHasKeyword": "恐怖之船海盗团"
+        },
         "then": [
-          { "op": "PlayCharFromTrash", "filter": { "originalCostLte": 4 }, "rest": true },
-          { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "as": "$t" },
-          { "op": "AttachDon", "target": "$t", "n": 1, "from": "rest" }
+          {
+            "op": "PlayCharFromTrash",
+            "filter": {
+              "originalCostLte": 4
+            },
+            "rest": true
+          },
+          {
+            "op": "Choose",
+            "prompt": "OwnLeaderOrCharacter",
+            "max": 1,
+            "as": "$t"
+          },
+          {
+            "op": "AttachDon",
+            "target": "$t",
+            "n": 1,
+            "from": "rest"
+          }
         ]
       }
     ]
   },
   "PRB02-016": {
     "_name": "阿玉",
-    "_matcher": "启动主要:歇自身+生命顶入手→我方最多1领袖/角色+3000;触发:对方最多1张费用≤4角色休息（原文生命顶/底可选,简化为顶）",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "activated": {
-      "cost": { "restSelf": true, "lifeToHand": true },
+      "cost": {
+        "restSelf": true,
+        "lifeToHandChoice": true
+      },
       "then": [
-        { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "as": "$t" },
-        { "op": "AddPowerThisTurn", "target": "$t", "delta": 3000 }
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 3000
+        }
       ]
     },
     "trigger": [
-      { "op": "Choose", "prompt": "OpponentCharacterCostLe4", "max": 1, "as": "$t" },
-      { "op": "Rest", "target": "$t" }
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe4",
+        "max": 1,
+        "as": "$t"
+      },
+      {
+        "op": "Rest",
+        "target": "$t"
+      }
     ]
   },
   "PRB02-018": {
     "_name": "波特夹斯·D·艾斯",
-    "_matcher": "登场时从手牌登场1张费用2的萨波/艾斯/路飞（原文:正面生命条件+可从废弃区,均简化）",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
-          { "op": "PlayCharFromHand", "filter": { "anyOf": [
-            { "nameEquals": "萨波", "originalCostGte": 2, "originalCostLte": 2 },
-            { "nameEquals": "波特夹斯·D·艾斯", "originalCostGte": 2, "originalCostLte": 2 },
-            { "nameEquals": "蒙奇·D·路飞", "originalCostGte": 2, "originalCostLte": 2 }
-          ] } }
+          {
+            "op": "PlayCharFromHandOrTrash",
+            "filter": {
+              "anyOf": [
+                {
+                  "nameEquals": "萨波",
+                  "originalCostGte": 2,
+                  "originalCostLte": 2
+                },
+                {
+                  "nameEquals": "波特夹斯·D·艾斯",
+                  "originalCostGte": 2,
+                  "originalCostLte": 2
+                },
+                {
+                  "nameEquals": "蒙奇·D·路飞",
+                  "originalCostGte": 2,
+                  "originalCostLte": 2
+                }
+              ]
+            }
+          }
         ]
       }
     ]

@@ -166,9 +166,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -274,9 +272,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -602,9 +598,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -1068,9 +1062,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1314,9 +1306,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1841,7 +1831,8 @@
     "keyWords": "百兽海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2434,9 +2425,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,

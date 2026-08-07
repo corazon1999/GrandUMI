@@ -78,9 +78,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -647,9 +645,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -1217,9 +1213,7 @@
       "EventMain",
       "EventCounter"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,
@@ -1720,9 +1714,7 @@
     "keyWords": "埃鲁巴夫,四皇,草帽一伙",
     "counter": "",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 5,
@@ -1808,9 +1800,7 @@
     "keyWords": "鱼人族,埃鲁巴夫,草帽一伙",
     "counter": "反击+1000",
     "effectTags": [],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -1832,9 +1822,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 5,
@@ -2010,9 +1998,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,
@@ -2359,9 +2345,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -2472,9 +2456,7 @@
       "EventMain",
       "EventCounter"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,

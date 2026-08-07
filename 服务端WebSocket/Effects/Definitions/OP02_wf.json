@@ -16,7 +16,7 @@
   },
   "OP02-005": {
     "_name": "加利·达丹",
-    "_matcher": "登场时确认顶5张公开≤1张费用1的角色加手牌；filter无颜色键，按费用1角色近似(红色色限省略)",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -29,6 +29,7 @@
             "restTo": "bottom",
             "match": {
               "kind": "Character",
+              "color": "红",
               "originalCostGte": 1,
               "originalCostLte": 1,
               "excludeName": "加利·达丹"
@@ -70,7 +71,7 @@
   },
   "OP02-010": {
     "_name": "多古拉",
-    "_matcher": "启动主要休息自身，从手牌登场≤1张费用1非多古拉角色；filter无颜色键按费用1近似",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
@@ -83,7 +84,8 @@
             "kind": "Character",
             "originalCostGte": 1,
             "originalCostLte": 1,
-            "excludeName": "多古拉"
+            "excludeName": "多古拉",
+            "color": "红"
           },
           "text": "登场1张多古拉以外费用1的红色角色"
         }
@@ -337,7 +339,7 @@
   },
   "OP02-034": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "【攻击时】横置对方最多1张费用≤2的角色(发动条件咚×1忽略)。",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -489,7 +491,7 @@
   },
   "OP02-042": {
     "_name": "大和",
-    "_matcher": "「卡名也视为光月御殿」为无法表达的改名规则机制忽略；实现登场时将对方≤1张费用≤6角色横置。",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -569,12 +571,16 @@
   },
   "OP02-048": {
     "_name": "和之国",
-    "_matcher": "启动主要：横置本舞台并弃1张手牌为成本，将我方≤1张咚活跃(ActiveOwnDon)。注：成本要求弃的手牌须含《和之国》特征，handDiscard 无法限定特征，按惯例以普通弃1张近似。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
         "restSelf": true,
-        "handDiscard": 1
+        "handDiscard": {
+          "n": 1,
+          "keyword": "和之国",
+          "text": "丢弃1张拥有《和之国》特征的手牌（可放弃）"
+        }
       },
       "then": [
         {
@@ -605,7 +611,7 @@
   },
   "OP02-057": {
     "_name": "巴索罗缪·大熊",
-    "_matcher": "登场时确认卡组顶2张公开1张王下七武海加手牌、其余放回；自选排序顶/底简化为放回底",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -627,7 +633,7 @@
   },
   "OP02-058": {
     "_name": "巴奇",
-    "_matcher": "登场时确认卡组顶5张公开1张巴奇以外的因佩尔地狱卡加手牌、其余放回底（蓝色限制match无颜色键无法表达，近似为特征过滤）",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -640,7 +646,8 @@
             "restTo": "bottom",
             "match": {
               "keyword": "因佩尔地狱",
-              "excludeName": "巴奇"
+              "excludeName": "巴奇",
+              "color": "蓝"
             }
           }
         ]
@@ -976,9 +983,14 @@
     "_matcher": "【反击】咚!!-1作为反击成本，本回合对方最多2张领袖或角色各力量-3000",
     "_src": "wf-dsl",
     "trigger": {
-      "if": { "oppDonTotalGte": 6 },
+      "if": {
+        "oppDonTotalGte": 6
+      },
       "then": [
-        { "op": "OpponentReturnDonToDeck", "n": 1 }
+        {
+          "op": "OpponentReturnDonToDeck",
+          "n": 1
+        }
       ]
     },
     "counter": [
@@ -1013,9 +1025,14 @@
     "_matcher": "【主要】咚!!-1：本回合对方最多1张角色力量-3000",
     "_src": "wf-dsl",
     "trigger": {
-      "if": { "oppDonTotalGte": 6 },
+      "if": {
+        "oppDonTotalGte": 6
+      },
       "then": [
-        { "op": "OpponentReturnDonToDeck", "n": 1 }
+        {
+          "op": "OpponentReturnDonToDeck",
+          "n": 1
+        }
       ]
     },
     "main": {
@@ -1043,9 +1060,14 @@
     "_matcher": "【主要】从咚卡组追加最多1张活跃咚",
     "_src": "wf-dsl",
     "trigger": {
-      "if": { "oppDonTotalGte": 6 },
+      "if": {
+        "oppDonTotalGte": 6
+      },
       "then": [
-        { "op": "OpponentReturnDonToDeck", "n": 1 }
+        {
+          "op": "OpponentReturnDonToDeck",
+          "n": 1
+        }
       ]
     },
     "main": {

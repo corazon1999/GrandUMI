@@ -6,15 +6,25 @@ namespace GrandUMI.Effects.Scripted;
 /// <summary>
 /// ST05-010 泽法（角色）
 /// 当此角色与拥有属性(打)的角色战斗时，本回合中，此角色力量+3000。（持续，战斗条件）
-/// （【启动主要】咚-1：此角色+2000 由 DSL ST05.json 实现，本脚本只处理登场注册持续战斗加成）
 /// </summary>
 public class ST05_010_Zephyr : IScriptedEffect
 {
     public string CardNumber => "ST05-010";
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnEnterField || t == EffectTrigger.ActivatedMain;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
+        if (ctx.Trigger == EffectTrigger.ActivatedMain)
+        {
+            var me = ctx.State.Players[ctx.OwnerIndex];
+            string key = $"ST05-010-act:{ctx.Source.Id}";
+            if (me.TurnOnceUsed.Contains(key)) return;
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1, optional: true)) return;
+            me.TurnOnceUsed.Add(key);
+            AtomicOps.AddPowerThisTurn(ctx.Source, 2000);
+            return;
+        }
         var selfId = ctx.Source.Id;
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
@@ -44,6 +54,5 @@ public class ST05_010_Zephyr : IScriptedEffect
                 return foe is not null && foe.Info.Property.Split('/').Contains("打");
             },
         });
-        return Task.CompletedTask;
     }
 }

@@ -188,9 +188,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -503,7 +501,9 @@
     "cost": "4",
     "keyWords": "超新星/卡里布海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -633,7 +633,9 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -654,7 +656,9 @@
     "cost": "2",
     "keyWords": "动物",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -720,7 +724,9 @@
     "cost": "5",
     "keyWords": "超新星/草帽一伙",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -918,7 +924,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1254,9 +1261,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1517,7 +1522,9 @@
     "cost": "3",
     "keyWords": "福克斯海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -1560,7 +1567,8 @@
     "keyWords": "福克斯海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1824,9 +1832,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -2128,7 +2134,8 @@
     "keyWords": "科学家/艾格赫德",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnTurnStart"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2149,7 +2156,9 @@
     "cost": "5",
     "keyWords": "科学家/艾格赫德",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "PreKO"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -2599,9 +2608,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 2,

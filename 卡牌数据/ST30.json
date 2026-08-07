@@ -141,9 +141,7 @@
       "OnEnterField",
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,

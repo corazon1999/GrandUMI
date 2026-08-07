@@ -76,9 +76,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,

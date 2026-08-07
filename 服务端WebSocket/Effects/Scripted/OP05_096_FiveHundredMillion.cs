@@ -17,13 +17,31 @@ public class OP05_096_FiveHundredMillion : IScriptedEffect
 {
     public string CardNumber => "OP05-096";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.EventMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.EventMain || t == EffectTrigger.OnLifeRevealTrigger;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         int oppIdx = 1 - ctx.OwnerIndex;
+
+        if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
+        {
+            var triggerCandidates = opp.Characters
+                .Where(card => ctx.State.CurrentCostOf(oppIdx, card) <= 6).ToList();
+            if (triggerCandidates.Count == 0) return;
+            var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
+                "选择对方最多 1 张费用不高于 6 的角色",
+                triggerCandidates.Select(card => card.Id.ToString()).ToList(), 0, 1);
+            if (selected.Count == 0) return;
+            var target = triggerCandidates.First(card => card.Id.ToString() == selected[0]);
+            int mode = await ctx.Prompts.ChooseOption(ctx.OwnerIndex, "选择处置方式",
+                new[] { "KO", "放回持有者手牌" });
+            if (mode == 0) AtomicOps.KO(ctx.State, oppIdx, target);
+            else AtomicOps.BounceToHand(ctx.State, oppIdx, target);
+            return;
+        }
 
         var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count > 0)

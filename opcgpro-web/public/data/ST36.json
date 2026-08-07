@@ -9,7 +9,10 @@
     "cost": "3",
     "keyWords": "德莱斯罗兹,超新星,俊美海盗团",
     "counter": "反击+2000",
-    "effectText": "【KO时】可以丢弃我方的1张手牌：将我方卡组最上方的最多1张卡牌加入生命区最上方。",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -28,7 +31,10 @@
     "cost": "4",
     "keyWords": "超新星,基德海盗团",
     "counter": "",
-    "effectText": "【我方的回合中】【登场时】我方领袖拥有《基德海盗团》特征的场合，将我方卡组最上方的最多1张卡牌加入生命区最上方。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,
@@ -47,7 +53,8 @@
     "cost": "4",
     "keyWords": "超新星,广播海盗团",
     "counter": "反击+2000",
-    "effectText": "-",
+    "effectTags": [],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -66,7 +73,10 @@
     "cost": "1",
     "keyWords": "德莱斯罗兹,超新星,巴尔托俱乐部",
     "counter": "反击+1000",
-    "effectText": "【登场时】可以丢弃我方手牌中1张拥有《超新星》特征的卡牌：抽取2张卡牌。",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -85,7 +95,11 @@
     "cost": "6",
     "keyWords": "超新星,基德海盗团",
     "counter": "",
-    "effectText": "【对方的攻击时】【每回合1次】可以将我方生命区最上方或最下方的1张卡牌翻至正面朝下：将攻击对象变更为我方原本的力量为5000或更高的“尤斯塔斯·基德”。\n【启动主要】【每回合1次】可以将我方生命区最上方或最下方的1张卡牌翻至正面朝上：赋予我方领袖最多1张休息状态的咚!!。",
+    "effectTags": [
+      "OnOppAttackDeclare",
+      "ActivatedMain"
+    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,

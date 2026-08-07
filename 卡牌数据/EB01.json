@@ -977,9 +977,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1021,7 +1019,9 @@
     "cost": "2",
     "keyWords": "动物",
     "counter": "",
-    "effectTags": ["OnAnyCharKOd"],
+    "effectTags": [
+      "OnAnyCharKOd"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

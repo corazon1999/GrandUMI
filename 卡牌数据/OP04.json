@@ -12,7 +12,9 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [],
+    "abilities": [
+      "此角色无法攻击"
+    ],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 1,
@@ -443,7 +445,9 @@
     "cost": "3",
     "keyWords": "堂吉诃德海盗团",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -528,7 +532,9 @@
     "cost": "4",
     "keyWords": "堂吉诃德海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -639,7 +645,8 @@
     "keyWords": "堂吉诃德海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnOppAttackDeclare"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -840,7 +847,9 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [],
+    "abilities": [
+      "此角色无法攻击"
+    ],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 1,
@@ -1275,7 +1284,9 @@
     "cost": "1",
     "keyWords": "七水之城/卡雷拉公司",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1296,7 +1307,8 @@
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnOppAttackDeclare"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1359,7 +1371,9 @@
     "cost": "1",
     "keyWords": "七水之城/弗兰奇一家",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -1491,7 +1505,9 @@
     "cost": "3",
     "keyWords": "巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1511,7 +1527,9 @@
     "cost": "3",
     "keyWords": "巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1531,7 +1549,9 @@
     "cost": "5",
     "keyWords": "巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1551,7 +1571,9 @@
     "cost": "7",
     "keyWords": "巴洛克工作室",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -2015,9 +2037,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -2337,9 +2357,7 @@
     "keyWords": "大妈海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -2491,9 +2509,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -2557,9 +2573,7 @@
     "keyWords": "阿拉巴斯坦王国",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 1,

@@ -53,7 +53,9 @@
     "cost": "1",
     "keyWords": "超新星/火焰坦克海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "PreKO"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -73,10 +75,10 @@
     "cost": "2",
     "keyWords": "德莱斯罗兹/超新星/俊美海盗团",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -225,7 +227,9 @@
     "cost": "2",
     "keyWords": "德莱斯罗兹/超新星/巴尔托俱乐部",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -628,7 +632,8 @@
     "effectTags": [
       "ActivatedMain",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -897,7 +902,8 @@
     "keyWords": "王下七武海/九蛇海盗团",
     "counter": "",
     "effectTags": [
-      "OnAllyCharEnter"
+      "OnAllyCharEnter",
+      "OnAnyCharKOd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -988,11 +994,10 @@
     "keyWords": "鱼人族/太阳海盗团",
     "counter": "1000",
     "effectTags": [
-      "OnKO"
+      "OnKO",
+      "OnHandDiscarded"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -1080,11 +1085,10 @@
     "keyWords": "鱼人族/王下七武海/太阳海盗团",
     "counter": "",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnHandDiscarded"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -1236,7 +1240,9 @@
     "cost": "3",
     "keyWords": "鱼人族/太阳海盗团",
     "counter": "2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnHandDiscarded"
+    ],
     "abilities": [
       "此角色无法攻击"
     ],
@@ -1350,7 +1356,8 @@
     "effectTags": [
       "OnAttackDeclare",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1903,7 +1910,9 @@
     "cost": "5",
     "keyWords": "巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

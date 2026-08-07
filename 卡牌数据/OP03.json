@@ -9,7 +9,10 @@
     "cost": "5",
     "keyWords": "白胡子海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -32,9 +35,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -340,9 +341,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -539,9 +538,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,
@@ -1287,9 +1284,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -1533,9 +1528,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -2011,9 +2004,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,
@@ -2357,9 +2348,7 @@
     "keyWords": "大妈海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,
@@ -2672,7 +2661,10 @@
     "trigger": "",
     "set": "豪华补充包 历代典藏合集【PRBC-01】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1726626190472OP03-122_05.png",
-    "cartograph": "漫画"
+    "cartograph": "漫画",
+    "alsoNames": [
+      "撒谎布"
+    ]
   },
   {
     "number": "OP03-123",

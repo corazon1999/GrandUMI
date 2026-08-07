@@ -54,10 +54,10 @@
     "cost": "3",
     "keyWords": "革命军",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -344,9 +344,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1365,7 +1363,9 @@
     "cost": "1",
     "keyWords": "草帽一伙",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1537,10 +1537,10 @@
     "cost": "5",
     "keyWords": "草帽一伙",
     "counter": "2000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -1762,9 +1762,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -1891,7 +1889,9 @@
     "cost": "1",
     "keyWords": "阿拉巴斯坦王国",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -2200,7 +2200,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [
       "速攻"
@@ -2395,7 +2396,9 @@
     "cost": "1",
     "keyWords": "空岛",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnTriggerActivated"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

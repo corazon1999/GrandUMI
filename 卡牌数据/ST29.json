@@ -292,7 +292,9 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [],
+    "abilities": [
+      "速攻：角色"
+    ],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -337,9 +339,7 @@
       "EventMain",
       "EventCounter"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,

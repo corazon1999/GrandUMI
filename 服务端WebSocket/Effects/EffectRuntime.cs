@@ -1,4 +1,5 @@
 using GrandUMI.Cards;
+using GrandUMI.Effects.Scripted;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects;
@@ -110,6 +111,13 @@ public static class EffectRuntime
         HashSet<Guid>? lifeBefore1 = isRootResolve
             ? s.Players[1].LifeArea.Select(c => c.Id).ToHashSet()
             : null;
+        // EB04-016：限制建立后的后续角色效果不得把既有休息咚转为活跃。
+        // 只记录本次解析前已存在的咚，避免误伤“从咚卡组追加活跃咚”。
+        bool blockCharacterDonActivation = source.Info.Kind == CardKind.Character
+            && s.NoActivateDonByCharacterEffectThisTurn.Contains(ownerIdx);
+        Dictionary<Guid, DonState>? donBefore = blockCharacterDonActivation
+            ? s.Players[ownerIdx].CostArea.ToDictionary(d => d.Id, d => d.State)
+            : null;
         var prevAmbient = _ambient;
         var prevSource = _currentSourceAL.Value;
         var prevActing = _actingSideAL.Value;
@@ -153,11 +161,25 @@ public static class EffectRuntime
                 return;
             }
 
-            // 2. 退回 DSL
+            // 2. 已确认省略项的前置补齐层：支付旧 DSL 无法表达的成本、注册持续效果，
+            // 或在旧定义不精确时完整接管该触发。返回 false 表示本次已处理/取消，不再执行 DSL。
+            if (!await DeclaredOmissionEffects.BeforeDsl(ctx)) return;
+
+            // 3. 退回 DSL
             await Dsl.DslInterpreter.TryResolve(ctx);
+
+            // 4. 后置补齐层：依赖 DSL 刚选中的同一目标，补结算条件加成、关键字或后续动作。
+            await DeclaredOmissionEffects.AfterDsl(ctx);
         }
         finally
         {
+            if (donBefore is not null)
+            {
+                foreach (var don in s.Players[ownerIdx].CostArea)
+                    if (donBefore.TryGetValue(don.Id, out var before)
+                        && before == DonState.Rest && don.State == DonState.Active)
+                        don.State = DonState.Rest;
+            }
             _depth--;
             if (isRootResolve)
                 EnqueueLifeLeaveWatchers(s, lifeBefore0!, lifeBefore1!);
@@ -284,7 +306,14 @@ public static class EffectRuntime
         await Resolve(s, ef.Owner, card, EffectTrigger.OnEnterField, prompts);
         if (!s.IsGameOver && card.Info.Kind == CardKind.Character)
             await TriggerEvent(s, EffectTrigger.OnAllyCharEnter, prompts,
-                new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ef.Owner, ["from"] = ef.From });
+                new Dictionary<string, object?>
+                {
+                    ["cardId"] = card.Id.ToString(),
+                    ["owner"] = ef.Owner,
+                    ["from"] = ef.From,
+                    ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
+                    ["effectSourceNumber"] = ef.EffectSourceNumber,
+                });
     }
 
     private record Candidate(int OwnerIdx, CardInstance Source);

@@ -116,9 +116,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,
@@ -343,7 +341,10 @@
     "trigger": "",
     "set": "特别补充包 Anime 25th Collection【EBC-02】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1741313756690EB02-016.png",
-    "cartograph": "画师原创"
+    "cartograph": "画师原创",
+    "alsoNames": [
+      "托尼托尼·乔巴"
+    ]
   },
   {
     "number": "EB02-017",
@@ -380,9 +381,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,
@@ -489,7 +488,9 @@
     "cost": "4",
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnCharLeaveField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -1127,9 +1128,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,
@@ -1330,9 +1329,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 3,

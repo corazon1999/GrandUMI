@@ -31,10 +31,10 @@
     "cost": "4",
     "keyWords": "革命军",
     "counter": "1000",
-    "effectTags": [],
-    "abilities": [
-      "流放"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -206,7 +206,9 @@
     "cost": "6",
     "keyWords": "FILM/航海世博会",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -249,7 +251,8 @@
     "keyWords": "FILM/扑克牌海盗团",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1046,11 +1049,10 @@
     "keyWords": "东海",
     "counter": "1000",
     "effectTags": [
-      "OnOppBlocker"
+      "OnOppBlocker",
+      "OnOppEventPlayed"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1134,7 +1136,8 @@
     "keyWords": "海军",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1177,7 +1180,9 @@
     "cost": "2",
     "keyWords": "海军",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1200,9 +1205,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1334,9 +1337,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1466,7 +1467,9 @@
     "cost": "4",
     "keyWords": "温思默克家/GERMA 66",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -1574,7 +1577,9 @@
     "cost": "1",
     "keyWords": "GERMA王国",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -1927,7 +1932,9 @@
     "cost": "3",
     "keyWords": "德莱斯罗兹/八宝水军",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -2215,9 +2222,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -2472,7 +2477,9 @@
     "cost": "1",
     "keyWords": "空岛/山迪亚战士",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

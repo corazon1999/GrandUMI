@@ -9,7 +9,9 @@
     "cost": "5",
     "keyWords": "超新星/基德海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",

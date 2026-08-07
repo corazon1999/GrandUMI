@@ -280,9 +280,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,
@@ -915,9 +913,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1271,8 +1267,7 @@
       "OnEnterField"
     ],
     "abilities": [
-      "阻挡者",
-      "此角色无法攻击"
+      "阻挡者"
     ],
     "effectEvent": "",
     "rarity": "UC",
@@ -1603,9 +1598,7 @@
     "effectTags": [
       "OnOppAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,

@@ -171,9 +171,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -913,9 +911,7 @@
       "OnKO",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -938,9 +934,7 @@
       "OnEnterField",
       "OnKO"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1057,8 +1051,7 @@
       "OnEnterField"
     ],
     "abilities": [
-      "阻挡者",
-      "不可阻挡"
+      "阻挡者"
     ],
     "effectEvent": "",
     "rarity": "R",
@@ -1256,9 +1249,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1345,7 +1336,8 @@
     "keyWords": "空岛",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1502,9 +1494,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1570,9 +1560,7 @@
     "keyWords": "动物,空岛",
     "counter": "反击+1000",
     "effectTags": [],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1592,9 +1580,7 @@
     "keyWords": "动物,空岛",
     "counter": "反击+1000",
     "effectTags": [],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -1934,9 +1920,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 4,
@@ -2231,9 +2215,7 @@
       "OnEnterField",
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 4,
@@ -2493,9 +2475,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -2677,10 +2657,7 @@
       "OnEnterField",
       "OnOppBlocker"
     ],
-    "abilities": [
-      "阻挡者",
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 4,

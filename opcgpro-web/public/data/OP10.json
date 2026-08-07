@@ -692,7 +692,8 @@
     "counter": "2000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -805,7 +806,8 @@
     "effectTags": [
       "OnMyTurnEnd",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -938,9 +940,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1071,7 +1071,8 @@
     "counter": "2000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1158,7 +1159,9 @@
     "cost": "1",
     "keyWords": "东踏踏族/德莱斯罗兹",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -1622,7 +1625,8 @@
     "counter": "1000",
     "effectTags": [
       "PreKO",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1864,10 +1868,10 @@
     "cost": "5",
     "keyWords": "德莱斯罗兹/黑胡子海盗团",
     "counter": "",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2062,10 +2066,10 @@
     "cost": "4",
     "keyWords": "和之国/恐怖之船海盗团",
     "counter": "",
-    "effectTags": [],
-    "abilities": [
-      "双重攻击"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2131,9 +2135,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -2283,7 +2285,8 @@
     "keyWords": "超新星/卡里布海盗团",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2370,7 +2373,9 @@
     "cost": "1",
     "keyWords": "超新星/广播海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -2480,9 +2485,7 @@
     "keyWords": "超新星/草帽一伙",
     "counter": "",
     "effectTags": [],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2590,7 +2593,8 @@
     "keyWords": "德莱斯罗兹/超新星/草帽一伙",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",

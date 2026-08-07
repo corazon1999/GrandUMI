@@ -10,7 +10,8 @@
     "keyWords": "艾格赫德/邦妮海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnGameStart"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -98,9 +99,7 @@
     "keyWords": "王下七武海/超新星/心脏海盗团",
     "counter": "2000",
     "effectTags": [],
-    "abilities": [
-      "此角色无法攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -235,7 +234,9 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "速攻：角色"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -531,9 +532,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,
@@ -642,7 +641,8 @@
     "keyWords": "班克禁区/草帽一伙",
     "counter": "",
     "effectTags": [
-      "EventMain"
+      "EventMain",
+      "EventCounter"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -668,9 +668,7 @@
       "PreKO",
       "OnAllyWillBeKOd"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 4,
@@ -1150,9 +1148,7 @@
     "keyWords": "艾格赫德",
     "counter": "",
     "effectTags": [],
-    "abilities": [
-      "此角色无法攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,

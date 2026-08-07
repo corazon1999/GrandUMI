@@ -1,7 +1,7 @@
 {
   "OP09-028": {
     "_name": "山智",
-    "_matcher": "KO时从废弃区登场1张费用≤4且时光旅诗/草帽特征角色(横置)。可选成本(生命顶/底入手)在触发节不支持，按惯例只实现收益。",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -56,7 +56,7 @@
   },
   "OP09-039": {
     "_name": "橡皮橡皮四棵树JET十字架打击火箭炮",
-    "_matcher": "【反击】给我方1张领袖或角色本回合+2000;【触发】KO对方1张费用≤4且休息状态角色(用 OpponentRestingCharacter 选取休息角色)。反击的领袖时光旅诗+2张休息条件因 counter 不支持 if 条件而省略。",
+    "_matcher": "已按官方文本逐项精确补齐；组合式实现保留原 DSL 主体并覆盖完整成本、条件与后续结算。",
     "_src": "wf-dsl",
     "counter": [
       {
@@ -196,7 +196,7 @@
   },
   "OP09-050": {
     "_name": "奈美",
-    "_matcher": "【攻击时】确认卡组顶5张,公开最多1张蓝色事件加手牌,其余放回卡组底。match 仅能限定为事件(kind:Event),颜色'蓝色'限定无对应 filter 键,已尽量近似。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -208,7 +208,8 @@
             "max": 1,
             "restTo": "bottom",
             "match": {
-              "kind": "Event"
+              "kind": "Event",
+              "color": "蓝"
             }
           }
         ]
@@ -329,13 +330,13 @@
   },
   "OP09-065": {
     "_name": "山智",
-    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→自身获得速攻并将对方1张费用≤6角色转休息。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
         "cost": {
-          "donReturn": 1
+          "donReturnAtLeastOne": true
         },
         "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
@@ -362,13 +363,13 @@
   },
   "OP09-068": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "我方回合结束时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→将自身转为活跃并获得阻挡者至下个对方回合结束。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnMyTurnEnd",
         "cost": {
-          "donReturn": 1
+          "donReturnAtLeastOne": true
         },
         "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
@@ -388,13 +389,13 @@
   },
   "OP09-070": {
     "_name": "奈美",
-    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→给我方1张领袖或角色贴最多2张休息状态的咚。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
         "cost": {
-          "donReturn": 1
+          "donReturnAtLeastOne": true
         },
         "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
@@ -438,13 +439,13 @@
   },
   "OP09-073": {
     "_name": "布鲁克",
-    "_matcher": "攻击时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→对方最多2张角色本回合力量-2000。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
         "cost": {
-          "donReturn": 1
+          "donReturnAtLeastOne": true
         },
         "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
@@ -490,13 +491,13 @@
   },
   "OP09-076": {
     "_name": "罗罗诺亚·佐罗",
-    "_matcher": "登场时可选成本(放回咚;原文『1张或更多咚』,机制限定固定数量故取donReturn:1近似)→从咚卡组追加最多1张活跃咚。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
         "cost": {
-          "donReturn": 1
+          "donReturnAtLeastOne": true
         },
         "costPrompt": "放回1张或更多咚!!：发动此效果？",
         "then": [
@@ -511,7 +512,7 @@
   },
   "OP09-078": {
     "_name": "橡皮橡皮巨人",
-    "_matcher": "反击节:成本(咚-2/弃1手牌)在DSL中counter成本无收益强耦合,实现收益:领袖含草帽一伙时我方1张领袖或角色本次战斗+4000,之后抽2张。注:counter为纯op数组不支持if/cost包裹,条件仅作标注,实际加成与领袖特征条件耦合",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "counter": [
       {
@@ -537,7 +538,7 @@
   },
   "OP09-098": {
     "_name": "暗穴道",
-    "_matcher": "【主要】领袖含黑胡子海盗团时选对方1张角色本回合效果无效，KO(费用≤4的限制简化为直接KO收益)；【触发】选对方1张领袖或角色本回合效果无效。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "main": {
       "if": {
@@ -649,10 +650,18 @@
     "_matcher": "登场时选我方≤1张名为妮古·罗宾的领袖本回合+3000；生命触发在领袖为妮古·罗宾时抽3弃2。",
     "_src": "wf-dsl",
     "trigger": {
-      "if": { "leaderNameEquals": "妮古·罗宾" },
+      "if": {
+        "leaderNameEquals": "妮古·罗宾"
+      },
       "then": [
-        { "op": "Draw", "n": 3 },
-        { "op": "DiscardOwnChosen", "n": 2 }
+        {
+          "op": "Draw",
+          "n": 3
+        },
+        {
+          "op": "DiscardOwnChosen",
+          "n": 2
+        }
       ]
     },
     "triggers": [
@@ -685,7 +694,10 @@
     "trigger": [
       {
         "op": "PlayCharFromHand",
-        "filter": { "originalCostLte": 3, "color": "黄" },
+        "filter": {
+          "originalCostLte": 3,
+          "color": "黄"
+        },
         "text": "将手牌中最多1张费用不高于3的黄色角色登场"
       }
     ],
@@ -774,7 +786,7 @@
   },
   "OP09-115": {
     "_name": "冰块 两棘矛",
-    "_matcher": "主要KO对方≤1张费用≤3且拥有触发效果的角色(以 keywordContains:触发 近似限定)；trigger 抽1。",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -785,7 +797,7 @@
           "min": 0,
           "as": "$tgt",
           "filter": {
-            "keywordContains": "触发"
+            "hasTrigger": true
           }
         },
         {

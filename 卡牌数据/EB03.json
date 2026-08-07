@@ -15,9 +15,7 @@
       "ActivatedMain",
       "OnAllyWillBeKOd"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 4,
@@ -1118,9 +1116,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 4,

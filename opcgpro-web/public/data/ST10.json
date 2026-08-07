@@ -78,9 +78,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -125,7 +123,6 @@
       "OnOppBlocker"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",

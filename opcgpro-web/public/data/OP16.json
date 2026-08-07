@@ -12,9 +12,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 5,
@@ -58,9 +56,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 5,
@@ -192,9 +188,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -307,7 +301,8 @@
     "effectTags": [
       "OnKO",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -525,7 +520,9 @@
     "cost": "2",
     "keyWords": "因佩尔地狱,革命军",
     "counter": "反击+1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnKO"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -591,7 +588,9 @@
     "cost": "2",
     "keyWords": "鱼人族,因佩尔地狱,太阳海盗团",
     "counter": "反击+2000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -862,9 +861,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -907,7 +904,8 @@
     "keyWords": "因佩尔地狱,巴奇海盗团",
     "counter": "",
     "effectTags": [
-      "OnCharLeaveField"
+      "OnCharLeaveField",
+      "OnAnyCharKOd"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1758,9 +1756,7 @@
     "effectTags": [
       "OnAllyCharEnter"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 5,
@@ -1982,7 +1978,9 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "速攻：角色"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -2115,9 +2113,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,

@@ -99,7 +99,9 @@
     "keyWords": "白胡子海盗团",
     "counter": "1000",
     "effectTags": [
-      "OnEnterField"
+      "OnEnterField",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

@@ -140,9 +140,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -188,9 +186,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,
@@ -450,7 +446,9 @@
     "cost": "3",
     "keyWords": "东海",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -515,7 +513,8 @@
     "keyWords": "动物/和之国",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -780,9 +779,12 @@
     "keyWords": "超新星/草帽一伙",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "无法通过效果登场"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -869,7 +871,9 @@
     "cost": "5",
     "keyWords": "海军",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnHandDiscarded"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -1113,9 +1117,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -1156,7 +1158,8 @@
     "counter": "1000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1266,9 +1269,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1528,7 +1529,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1574,9 +1576,7 @@
     "effectTags": [
       "OnDonReturnedToDeck"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -1684,9 +1684,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1771,7 +1769,10 @@
     "cost": "4",
     "keyWords": "德莱斯罗兹/革命军",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnAllyCharEnter"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -2228,7 +2229,8 @@
     "counter": "1000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -2336,9 +2338,7 @@
     "effectTags": [
       "OnKO"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,

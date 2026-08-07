@@ -9,7 +9,9 @@
     "cost": "5",
     "keyWords": "四皇/红发海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -73,7 +75,9 @@
     "cost": "10",
     "keyWords": "四皇/红发海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "速攻"
     ],
@@ -301,9 +305,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -366,10 +368,10 @@
     "cost": "4",
     "keyWords": "基德海盗团",
     "counter": "2000",
-    "effectTags": [],
-    "abilities": [
-      "速攻"
+    "effectTags": [
+      "OnEnterField"
     ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -544,7 +546,8 @@
     "keyWords": "时光旅诗/王下七武海/巴洛克工作室",
     "counter": "1000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -987,7 +990,8 @@
     "keyWords": "十字公会",
     "counter": "2000",
     "effectTags": [
-      "PreKO"
+      "PreKO",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1427,9 +1431,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 3,
@@ -1847,11 +1849,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "阻挡者",
-      "双重攻击",
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -1892,7 +1890,9 @@
     "cost": "4",
     "keyWords": "黑胡子海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
@@ -2593,7 +2593,6 @@
       "OnOppBlocker"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",
@@ -2617,9 +2616,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 3,

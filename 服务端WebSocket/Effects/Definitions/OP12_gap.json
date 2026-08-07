@@ -19,10 +19,6 @@
     "_name": "罗罗诺亚·佐罗",
     "complex": true
   },
-  "OP12-021": {
-    "_name": "一本松",
-    "complex": true
-  },
   "OP12-023": {
     "_name": "河松",
     "noEffect": true
@@ -38,10 +34,6 @@
   "OP12-035": {
     "_name": "摩根",
     "noEffect": true
-  },
-  "OP12-036": {
-    "_name": "罗罗诺亚·佐罗",
-    "complex": true
   },
   "OP12-040": {
     "_name": "库赞",
@@ -108,17 +100,9 @@
     "_name": "阿金",
     "noEffect": true
   },
-  "OP12-072": {
-    "_name": "卓夫",
-    "complex": true
-  },
   "OP12-076": {
     "_name": "莫奈",
     "noEffect": true
-  },
-  "OP12-081": {
-    "_name": "克尔拉",
-    "complex": true
   },
   "OP12-082": {
     "_name": "一生",
@@ -166,10 +150,6 @@
       }
     ]
   },
-  "OP12-109": {
-    "_name": "和平主义者",
-    "complex": true
-  },
   "OP12-110": {
     "_name": "巴法罗",
     "noEffect": true
@@ -185,9 +165,5 @@
   "OP12-114": {
     "_name": "瓦帕",
     "noEffect": true
-  },
-  "OP12-117": {
-    "_name": "破坏之弦",
-    "complex": true
   }
 }

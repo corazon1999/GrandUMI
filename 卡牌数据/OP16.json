@@ -12,9 +12,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 5,
@@ -190,9 +188,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -865,9 +861,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -1762,9 +1756,7 @@
     "effectTags": [
       "OnAllyCharEnter"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 5,
@@ -1986,7 +1978,9 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "速攻：角色"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 5,
@@ -2119,9 +2113,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "不可阻挡"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 5,

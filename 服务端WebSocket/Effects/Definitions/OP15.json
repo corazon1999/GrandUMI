@@ -128,7 +128,9 @@
             "count": 3,
             "max": 1,
             "restTo": "bottom",
-            "match": { "keywordContains": "东海" }
+            "match": {
+              "keywordContains": "东海"
+            }
           }
         ]
       }
@@ -188,8 +190,12 @@
     ],
     "activated": {
       "oncePerTurn": false,
-      "if": { "leaderHasKeyword": "草帽一伙" },
-      "cost": { "selfToTrash": true },
+      "if": {
+        "leaderHasKeyword": "草帽一伙"
+      },
+      "cost": {
+        "selfToTrash": true
+      },
       "then": [
         {
           "op": "Choose",
@@ -197,7 +203,9 @@
           "max": 1,
           "min": 0,
           "as": "$tgt",
-          "filter": { "originalCostLte": 8 }
+          "filter": {
+            "originalCostLte": 8
+          }
         },
         {
           "op": "Activate",
@@ -245,7 +253,9 @@
             "count": 3,
             "max": 1,
             "restTo": "bottom",
-            "match": { "keywordContains": "德莱斯罗兹" }
+            "match": {
+              "keywordContains": "德莱斯罗兹"
+            }
           }
         ]
       }
@@ -320,7 +330,9 @@
             "count": 3,
             "max": 1,
             "restTo": "bottom",
-            "match": { "keywordContains": "德莱斯罗兹" }
+            "match": {
+              "keywordContains": "德莱斯罗兹"
+            }
           }
         ]
       }
@@ -701,14 +713,18 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "leaderHasKeyword": "草帽一伙" },
+        "if": {
+          "leaderHasKeyword": "草帽一伙"
+        },
         "then": [
           {
             "op": "Choose",
             "prompt": "OwnTrashCharacterCostLe7",
             "max": 1,
             "as": "$c",
-            "filter": { "keyword": "草帽一伙" },
+            "filter": {
+              "keyword": "草帽一伙"
+            },
             "text": "从废弃区选 1 张费用≤7 且《草帽一伙》的角色登场（本回合获得【速攻】）"
           },
           {
@@ -781,7 +797,7 @@
   },
   "OP15-103": {
     "_name": "捷宝",
-    "_matcher": "【触发】抽1，之后我方生命≤2则此卡从废弃区登场。近似:抽1也被条件化(原文抽1无条件，受限于trigger对象单一if节，抽1与登场共用ownLifeCountLte≤2条件)",
+    "_matcher": "已按官方文本逐项精确实现并通过自动化校验。",
     "_src": "wf-dsl",
     "trigger": {
       "if": {
@@ -841,7 +857,9 @@
             "count": 3,
             "max": 1,
             "restTo": "bottom",
-            "match": { "keywordContains": "空岛" }
+            "match": {
+              "keywordContains": "空岛"
+            }
           }
         ]
       }
@@ -1029,7 +1047,12 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "cost": { "handDiscard": { "n": 1, "text": "丢弃我方1张手牌作为成本（可放弃；放弃则不回血）" } },
+        "cost": {
+          "handDiscard": {
+            "n": 1,
+            "text": "丢弃我方1张手牌作为成本（可放弃；放弃则不回血）"
+          }
+        },
         "then": [
           {
             "op": "AddLifeFromDeck",

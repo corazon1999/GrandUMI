@@ -806,7 +806,8 @@
     "effectTags": [
       "OnMyTurnEnd",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -939,9 +940,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -1872,9 +1871,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2072,9 +2069,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2140,9 +2135,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -2492,9 +2485,7 @@
     "keyWords": "超新星/草帽一伙",
     "counter": "",
     "effectTags": [],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 3,
@@ -2602,7 +2593,8 @@
     "keyWords": "德莱斯罗兹/超新星/草帽一伙",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare"
+      "OnAttackDeclare",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",

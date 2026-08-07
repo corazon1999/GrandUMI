@@ -164,9 +164,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,
@@ -507,7 +505,8 @@
     "counter": "1000",
     "effectTags": [
       "PreKO",
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1101,6 +1100,7 @@
     "keyWords": "超新星/基德海盗团",
     "counter": "",
     "effectTags": [
+      "OnEnterField",
       "ActivatedMain"
     ],
     "abilities": [],
@@ -1296,7 +1296,9 @@
     "cost": "4",
     "keyWords": "四皇/百兽海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnAnyCharKOd"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -1316,7 +1318,9 @@
     "cost": "4",
     "keyWords": "王下七武海/巴洛克工作室",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppEventPlayed"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -1443,9 +1447,7 @@
     "keyWords": "王下七武海/恐怖之船海盗团",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -2078,9 +2080,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -2577,7 +2577,6 @@
       "OnAttackDeclare"
     ],
     "abilities": [
-      "阻挡者",
       "速攻"
     ],
     "effectEvent": "",

@@ -8,21 +8,37 @@ namespace GrandUMI.Effects.Scripted;
 /// 【登场时】我方领袖拥有《鱼人族》或《人鱼族》特征的场合，将对方最多 1 张费用不高于 5 的角色转为休息状态。
 /// 【启动主要】【每回合1次】我方最多 1 张拥有《鱼人族》或《人鱼族》特征的角色可以在登场的回合中攻击角色。
 ///
-/// 实现说明 / 简化点：
-///   - 仅实现可表达的【登场时】部分：领袖具《鱼人族》/《人鱼族》时，横置对方最多 1 张费用≤5 的角色。
-///   - 【启动主要】"在登场回合中攻击角色"属于召唤病/可攻击角色的特殊状态机制，引擎无对应通道，未实现。
 /// </summary>
 public class OP11_031_Jinbe : IScriptedEffect
 {
     public string CardNumber => "OP11-031";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnEnterField || t == EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
+
+        if (ctx.Trigger == EffectTrigger.ActivatedMain)
+        {
+            string key = $"OP11-031-act:{ctx.Source.Id}";
+            if (me.TurnOnceUsed.Contains(key)) return;
+            var targets = me.Characters
+                .Where(card => card.Info.HasKeyword("鱼人族") || card.Info.HasKeyword("人鱼族"))
+                .ToList();
+            if (targets.Count == 0) return;
+            var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
+                "选择最多 1 张《鱼人族》或《人鱼族》角色，使其可在登场回合攻击角色",
+                targets.Select(card => card.Id.ToString()).ToList(), 0, 1);
+            if (selected.Count == 0) return;
+            var target = targets.First(card => card.Id.ToString() == selected[0]);
+            AtomicOps.GiveKeyword(target, "登场回合可攻击角色", KeywordDuration.ThisTurn, ctx.OwnerIndex);
+            me.TurnOnceUsed.Add(key);
+            return;
+        }
 
         // 条件：我方领袖拥有《鱼人族》或《人鱼族》特征
         bool ok = me.Leader.Info.HasKeyword("鱼人族") || me.Leader.Info.HasKeyword("人鱼族");

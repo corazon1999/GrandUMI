@@ -11,7 +11,8 @@
     "counter": "",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -97,7 +98,9 @@
     "cost": "4",
     "keyWords": "海军",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -277,9 +280,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,
@@ -514,7 +515,9 @@
     "cost": "4",
     "keyWords": "人鱼族/鱼人岛/太阳海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnKO"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -576,7 +579,9 @@
     "cost": "4",
     "keyWords": "海王类",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -860,7 +865,9 @@
     "cost": "3",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "OnTurnStart"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "L",
@@ -882,7 +889,6 @@
     "counter": "",
     "effectTags": [
       "OnOppAttackDeclare",
-      "OnCharLeaveField",
       "OnLifeLeaveField"
     ],
     "abilities": [],
@@ -907,9 +913,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,
@@ -994,7 +998,9 @@
     "cost": "4",
     "keyWords": "温思默克家/GERMA 66",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -1235,7 +1241,9 @@
     "cost": "1",
     "keyWords": "纯毛族",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
@@ -1255,10 +1263,11 @@
     "cost": "5",
     "keyWords": "草帽一伙",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [
-      "阻挡者",
-      "此角色无法攻击"
+      "阻挡者"
     ],
     "effectEvent": "",
     "rarity": "UC",
@@ -1409,7 +1418,9 @@
     "cost": "1",
     "keyWords": "大妈海盗团",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -1587,9 +1598,7 @@
     "effectTags": [
       "OnOppAttackDeclare"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 3,
@@ -1919,7 +1928,9 @@
     "cost": "4",
     "keyWords": "海军",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
     "abilities": [
       "阻挡者"
     ],
@@ -2089,7 +2100,9 @@
     "cost": "1",
     "keyWords": "东海/海军",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "OnEnterField"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -2199,7 +2212,8 @@
     "counter": "1000",
     "effectTags": [
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [
       "阻挡者"
@@ -2333,7 +2347,8 @@
     "keyWords": "海王类",
     "counter": "1000",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnMyTurnEnd"
     ],
     "abilities": [
       "阻挡者"

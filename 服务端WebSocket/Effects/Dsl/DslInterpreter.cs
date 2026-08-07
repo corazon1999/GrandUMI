@@ -244,6 +244,11 @@ public static class DslInterpreter
             if (!await AtomicOps.PromptReturnDonToDeck(ctx, n)) return false;
         }
 
+        if (cost.TryGetProperty("donReturnAtLeastOne", out var dra) && dra.ValueKind == JsonValueKind.True)
+        {
+            if (!await AtomicOps.PromptReturnAtLeastOneDonToDeck(ctx)) return false;
+        }
+
         // restSelf: 把自身转休息
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
         {
@@ -573,6 +578,8 @@ public static class DslInterpreter
             // donReturn 实际支付走 PromptReturnDonToDeck，可放回活跃/休息/附着任意咚，
             // 故预检口径须用费用区总咚数而非仅活跃咚，否则高费角色登场后效果被误判不可支付而静默跳过。
             if (me.TotalDonInCostArea < dr.GetInt32()) return false;
+        if (cost.TryGetProperty("donReturnAtLeastOne", out var dra) && dra.ValueKind == JsonValueKind.True
+            && me.TotalDonInCostArea < 1) return false;
 
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
             if (ctx.Source.IsTapped) return false;

@@ -399,6 +399,44 @@ public static class AtomicOps
     public static Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
         => PromptReturnDonToDeck(ctx, ctx.OwnerIndex, n, optional);
 
+    /// <summary>“将 1 张或更多咚!!放回咚!!卡组”成本：玩家可选择费用区任意正数张咚，0 张视为放弃。</summary>
+    public static async Task<bool> PromptReturnAtLeastOneDonToDeck(EffectContext ctx)
+    {
+        var player = ctx.State.Players[ctx.OwnerIndex];
+        var eligible = player.CostArea
+            .Where(don => don.State is DonState.Active or DonState.Rest or DonState.Attached)
+            .ToList();
+        if (eligible.Count == 0) return false;
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
+            "选择 1 张或更多咚!!放回咚!!卡组，或取消发动",
+            eligible.Select(don => don.Id.ToString()).ToList(), 0, eligible.Count,
+            new Dictionary<string, object?>
+            {
+                ["donChoices"] = eligible.Select(don => new
+                {
+                    id = don.Id.ToString(),
+                    state = don.State.ToString(),
+                    attachedToCardId = don.AttachedToCardId?.ToString(),
+                }).ToList(),
+                ["canCancel"] = true,
+            });
+        if (chosen.Count == 0) return false;
+        int returned = 0;
+        foreach (var id in chosen.Distinct())
+        {
+            var don = eligible.FirstOrDefault(item => item.Id.ToString() == id);
+            if (don is null || !player.CostArea.Remove(don)) continue;
+            don.State = DonState.InDeck;
+            don.AttachedToCardId = null;
+            player.DonDeck.Add(don);
+            returned++;
+        }
+        if (returned == 0) return false;
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
+            new Dictionary<string, object?> { ["count"] = returned, ["owner"] = ctx.OwnerIndex });
+        return true;
+    }
+
     /// <summary>
     /// 让指定玩家从其场上选择咚!!放回咚!!卡组。除支付己方“咚!!-N”外，也用于
     /// “对方将其场上的咚!!放回咚!!卡组”这类强制效果。
@@ -537,6 +575,8 @@ public static class AtomicOps
     public static async Task PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
     {
         var p = s.Players[playerIdx];
+        // OP12-036：该能力只限制“手牌中的此卡牌”被效果登场，正常支付费用登场不受影响。
+        if (card.Info.Abilities.Contains("无法通过效果登场")) return;
         if (!p.Hand.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {

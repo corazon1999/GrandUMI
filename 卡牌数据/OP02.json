@@ -159,9 +159,7 @@
     "keyWords": "白胡子海盗团",
     "counter": "2000",
     "effectTags": [],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 1,
@@ -271,9 +269,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,
@@ -906,7 +902,10 @@
     "trigger": "",
     "set": "补充包 顶尖决战【OPC-02】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1675997795804OP02-042.jpg",
-    "cartograph": "画师原创"
+    "cartograph": "画师原创",
+    "alsoNames": [
+      "光月御殿"
+    ]
   },
   {
     "number": "OP02-043",
@@ -1308,9 +1307,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -1333,9 +1330,7 @@
       "OnEnterField",
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 1,
@@ -2054,9 +2049,7 @@
     "keyWords": "海军",
     "counter": "1000",
     "effectTags": [],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 1,
@@ -2185,9 +2178,7 @@
     "effectTags": [
       "OnAttackDeclare"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 1,

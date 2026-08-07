@@ -9,23 +9,30 @@ namespace GrandUMI.Effects.Scripted;
 /// 【攻击时】可以将我方废弃区中的2张卡牌自选顺序放回卡组最下方：
 ///   直到下个对方的回合结束时为止，我方最多1张领袖或角色力量+1000。
 ///
-/// 实现说明 / 简化点：
-///   - 【登场时】"使我方角色可以攻击对方活跃角色"：引擎攻击校验硬性禁止攻击活跃状态角色，
-///     且无"允许攻击活跃角色"的开关通道（参见 OP11_wf.json 注记），该段无法表达，已忽略。
-///   - 故本脚本仅实现【攻击时】段：
-///     成本"将废弃区 2 张自选顺序放回卡组最下方"用 ReturnTrashToDeckBottom 实现
-///     （需废弃区≥2 张方可支付；"自选顺序"简化为玩家逐张选择，按选择先后放底）。
-///     收益"+1000 持续到下个对方回合结束"用 AddPowerThisTurn 近似（引擎无该持续时长的力量通道）。
 /// </summary>
 public class OP11_119_Koby : IScriptedEffect
 {
     public string CardNumber => "OP11-119";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnAttackDeclare;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnEnterField || t == EffectTrigger.OnAttackDeclare;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+
+        if (ctx.Trigger == EffectTrigger.OnEnterField)
+        {
+            var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
+                "选择我方最多 1 张角色，本回合可以攻击对方活跃角色",
+                me.Characters.Select(card => card.Id.ToString()).ToList(), 0, 1);
+            if (selected.Count > 0)
+            {
+                var target = me.Characters.First(card => card.Id.ToString() == selected[0]);
+                AtomicOps.GiveKeyword(target, "可攻击活跃", KeywordDuration.ThisTurn, ctx.OwnerIndex);
+            }
+            return;
+        }
 
         // 成本前提：废弃区≥2 张
         if (me.Trash.Count < 2) return;
@@ -59,6 +66,6 @@ public class OP11_119_Koby : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var tgt = targets.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.AddPowerThisTurn(tgt, 1000);
+        AtomicOps.AddPowerUntilOppEnd(tgt, 1000, ctx.OwnerIndex);
     }
 }

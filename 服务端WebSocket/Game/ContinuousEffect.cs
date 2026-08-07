@@ -14,11 +14,17 @@ public class ContinuousEffect
     public required ContinuousScope Scope { get; init; }
     public int PowerDelta { get; init; }
 
+    /// <summary>按当前牌局动态计算力量修正；与 PowerDelta 相加。用于“废弃区每 N 张 +X”等实时比例效果。</summary>
+    public Func<GameState, int, CardInstance, int>? PowerDeltaResolver { get; init; }
+
     /// <summary>持续“原本力量变为 X”覆盖；与 PowerDelta 不同，多条相同覆盖不会重复累加。</summary>
     public int? OriginalPowerOverride { get; init; }
 
     /// <summary>持续费用修正（影响 KO/选择判定与卡面显示，正数表示费用升高）</summary>
     public int CostDelta { get; init; }
+
+    /// <summary>按当前牌局动态计算费用修正；与 CostDelta 相加。</summary>
+    public Func<GameState, int, CardInstance, int>? CostDeltaResolver { get; init; }
 
     /// <summary>持续/条件赋予的关键词（如 "速攻"/"阻挡者"/"双重攻击"/"不可阻挡"/"流放"）；
     /// 非空时 Predicate 成立期间使 scope 内卡牌视为拥有该关键词（由 ActionValidator.HasKeyword 查询）。</summary>

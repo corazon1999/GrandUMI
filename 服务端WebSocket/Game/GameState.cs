@@ -104,6 +104,9 @@ public class GameState
     /// <summary>本回合无法通过"我方的效果"将生命卡牌加入手牌的玩家集合（ST15-001）</summary>
     public HashSet<int> NoEffectLifeToHandThisTurn { get; } = new();
 
+    /// <summary>本回合无法通过角色效果将咚!!转为活跃状态的玩家集合（EB04-016）。</summary>
+    public HashSet<int> NoActivateDonByCharacterEffectThisTurn { get; } = new();
+
     /// <summary>攻击前置弃牌税：该玩家所有角色攻击前需弃 N 张手牌（OP08-043）。0=无</summary>
     public int[] AttackTaxDiscard { get; } = new int[2];
 
@@ -144,7 +147,14 @@ public class GameState
     /// <summary>入队一张"被效果登场"的卡牌（由 AtomicOps.Play*Free 调用），稍后定向触发其【登场时】效果。
     /// from = 来源区("hand"/"trash"/"deck"/"life")，供 OnAllyCharEnter 监听卡区分（如 OP16-079 仅废弃区登场赋速攻）。</summary>
     public void EnqueueEnterField(int owner, CardInstance card, string? from = null)
-        => PendingEnterFields.Add(new PendingEnterField { Owner = owner, CardId = card.Id, From = from });
+        => PendingEnterFields.Add(new PendingEnterField
+        {
+            Owner = owner,
+            CardId = card.Id,
+            From = from,
+            EffectSourceKind = Effects.EffectRuntime.CurrentSource?.Info.Kind,
+            EffectSourceNumber = Effects.EffectRuntime.CurrentSource?.Info.Number,
+        });
 
     /// <summary>评估指定卡当前从 ContinuousEffects 获得的总力量加成</summary>
     public int ContinuousPowerBonus(int sideIdx, CardInstance card)
@@ -154,9 +164,9 @@ public class GameState
         {
             // 先按维度短路再调谓词：零力量增量的效果对力量无贡献，求值它的谓词不仅浪费、
             // 还会引发递归（如 OP16-017 力量谓词内查费用，若此处不跳过则费用查询又回调它）。
-            if (eff.PowerDelta == 0) continue;
+            if (eff.PowerDelta == 0 && eff.PowerDeltaResolver is null) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
-            sum += eff.PowerDelta;
+            sum += eff.PowerDelta + (eff.PowerDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
         return sum;
     }
@@ -198,9 +208,9 @@ public class GameState
         {
             // 先按维度短路再调谓词：零费用增量的效果对费用无贡献，跳过其谓词求值，
             // 同时切断"力量谓词 → 查费用 → 又求值该力量谓词"的递归（OP16-017）。
-            if (eff.CostDelta == 0) continue;
+            if (eff.CostDelta == 0 && eff.CostDeltaResolver is null) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
-            sum += eff.CostDelta;
+            sum += eff.CostDelta + (eff.CostDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
         return sum;
     }
@@ -409,6 +419,10 @@ public class PendingEnterField
     public required Guid CardId { get; init; }
     /// <summary>来源区("hand"/"trash"/"deck"/"life")，供 OnAllyCharEnter 监听卡区分来源</summary>
     public string? From { get; init; }
+    /// <summary>使其登场的效果源类型；普通从手牌打出时为空。</summary>
+    public Cards.CardKind? EffectSourceKind { get; init; }
+    /// <summary>使其登场的效果源卡号；普通从手牌打出时为空。</summary>
+    public string? EffectSourceNumber { get; init; }
 }
 
 /// <summary>检索/公开牌的瞬时信息：哪一方公开了哪些卡号</summary>

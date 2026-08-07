@@ -143,6 +143,7 @@ public static class TurnEngine
         // 清除回合级玩家状态
         state.NoPlayCharacterThisTurn.Clear();
         state.NoEffectLifeToHandThisTurn.Clear();
+        state.NoActivateDonByCharacterEffectThisTurn.Clear();
         state.OneShotPlayDiscounts.Clear();   // OP02-025：一次性减费仅"本回合下次"
         state.AttackTaxDiscard[state.CurrentTurnPlayer] = 0; // 本回合方被课的攻击税到期
 

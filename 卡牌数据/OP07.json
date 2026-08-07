@@ -188,9 +188,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "双重攻击"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
@@ -1263,9 +1261,7 @@
     "effectTags": [
       "EventMain"
     ],
-    "abilities": [
-      "阻挡者"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
@@ -1571,7 +1567,8 @@
     "keyWords": "福克斯海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "OnEnterField"
     ],
     "abilities": [],
     "effectEvent": "",
@@ -1835,9 +1832,7 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [
-      "流放"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
@@ -2161,7 +2156,9 @@
     "cost": "5",
     "keyWords": "科学家/艾格赫德",
     "counter": "1000",
-    "effectTags": [],
+    "effectTags": [
+      "PreKO"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "UC",
@@ -2611,9 +2608,7 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [
-      "速攻"
-    ],
+    "abilities": [],
     "effectEvent": "",
     "rarity": "SEC",
     "subscript": 2,
