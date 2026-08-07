@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-07-prompt-queue-latency",
+    version: "2026.08.07.2",
+    date: "2026-08-07",
+    title: "对局延迟与选择稳定性修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复对局进行较久后操作延迟不断升高的问题；取消效果或提交无效选择时，不会再阻塞后续正常操作。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "效果选择、生命区触发和选项按钮提交后会立即锁定，减少网络延迟时重复发送操作。",
+          "优化反馈机器人服务的容器权限与数据目录配置，减少部署后因权限问题无法读取配置或保存反馈的情况。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-07-friendly-lobby-leader-stats-and-triggers",
     version: "2026.08.07.1",
     date: "2026-08-07",

@@ -72,7 +72,10 @@ cd /opt/qq-bug-bot
 cp .env.example .env
 cp config.server.example.json config.server.json
 mkdir -p data
-chmod 600 .env config.server.json
+chmod 600 .env
+chown root:10001 config.server.json
+chmod 640 config.server.json
+chown -R 10001:10001 data
 ```
 
 编辑 `.env`：

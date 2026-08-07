@@ -14,7 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY bot.py storage.py github_issue.py export_by_date.py mark.py dedup.py ./
 
-RUN useradd --create-home --uid 10001 bugbot \
+RUN groupadd --gid 10001 bugbot \
+    && useradd --create-home --uid 10001 --gid bugbot bugbot \
     && mkdir -p /data/reports \
     && chown -R bugbot:bugbot /app /data
 
