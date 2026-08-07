@@ -35,7 +35,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
           <p className="my-auto text-center text-sm text-gray-600">还没有消息，来打个招呼吧</p>
         )}
         {chatMessages.map((msg, i) => (
-          <div key={i} className="text-sm leading-5 lg:text-xs">
+          <div key={i} className="text-sm leading-5 @[1024px]:text-xs">
             {/* 字段名与 C# MsgChatMsg.Name / MsgChatMsg.Msg 一致 */}
             <span
               className={
@@ -52,7 +52,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
 
       <div className="flex gap-2 border-t border-gray-800 p-2">
         <input
-          className="h-12 min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-800 px-3 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 lg:h-10 lg:text-sm"
+          className="h-12 min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-800 px-3 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 @[1024px]:h-10 @[1024px]:text-sm"
           placeholder="输入消息"
           aria-label="聊天消息"
           value={input}
@@ -64,7 +64,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
           type="button"
           onClick={send}
           disabled={!input.trim()}
-          className="h-12 min-w-16 rounded-xl bg-orange-500 px-3 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:bg-gray-800 disabled:text-gray-600 lg:h-10"
+          className="h-12 min-w-16 rounded-xl bg-orange-500 px-3 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:bg-gray-800 disabled:text-gray-600 @[1024px]:h-10"
         >
           发送
         </button>

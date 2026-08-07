@@ -71,7 +71,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
           aria-label="搜索在线玩家"
           className="h-12 w-full rounded-xl border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500"
         />
-        <div className="mt-2 flex max-h-[55dvh] flex-col gap-1 overflow-y-auto lg:max-h-96">
+        <div className="mt-2 flex max-h-[55cqh] flex-col gap-1 overflow-y-auto @[1024px]:max-h-96">
           {players.length === 0 ? (
             <p className="py-8 text-center text-xs text-gray-600">暂无在线玩家</p>
           ) : visiblePlayers.length === 0 ? (

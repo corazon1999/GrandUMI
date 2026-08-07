@@ -26,7 +26,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
       maxWidthClass="max-w-xl"
       mobileSheet
     >
-      <div className="max-h-[65vh] space-y-6 overflow-y-auto pr-2">
+      <div className="max-h-[65cqh] space-y-6 overflow-y-auto pr-2">
         {CHANGELOG.map((entry, index) => (
           <section
             key={entry.id}

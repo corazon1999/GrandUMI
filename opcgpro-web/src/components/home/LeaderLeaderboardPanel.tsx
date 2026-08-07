@@ -85,22 +85,22 @@ export default function LeaderLeaderboardPanel() {
   const failed = !loading && leaderboard.result === false;
 
   return (
-    <section className="flex h-full min-h-0 flex-col p-3 sm:p-6">
+    <section className="flex h-full min-h-0 flex-col p-3 @[640px]:p-6">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
-          <p className="mt-1 text-sm leading-5 text-gray-500 sm:text-xs">
+          <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
             统计全部真人对局；第 7 回合及以前结束的对局不计入数据
           </p>
         </div>
-        <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex @[640px]:w-auto">
           <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
             {PERIODS.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setPeriod(option.value)}
-                className={`min-h-11 rounded-md px-2 text-xs font-bold transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 ${
+                className={`min-h-11 rounded-md px-2 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:px-3 @[640px]:py-1.5 ${
                   period === option.value
                     ? "bg-orange-500 text-white"
                     : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
@@ -113,15 +113,15 @@ export default function LeaderLeaderboardPanel() {
           <button
             type="button"
             onClick={() => request(period)}
-            className="min-h-11 rounded-lg border border-gray-800 bg-gray-950 px-3 text-sm text-gray-400 transition-colors hover:border-orange-500 hover:text-white sm:min-h-0 sm:py-2 sm:text-xs"
+            className="min-h-11 rounded-lg border border-gray-800 bg-gray-950 px-3 text-sm text-gray-400 transition-colors hover:border-orange-500 hover:text-white @[640px]:min-h-0 @[640px]:py-2 @[640px]:text-xs"
           >
             刷新
           </button>
         </div>
       </header>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 sm:px-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 sm:text-xs">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 @[640px]:px-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
           <span>
             有效对局 <strong className="ml-1 text-white">{leaderboard?.totalMatches ?? 0}</strong>
           </span>
@@ -129,7 +129,7 @@ export default function LeaderLeaderboardPanel() {
             排名门槛 <strong className="ml-1 text-white">{leaderboard?.minimumGames ?? 20} 场</strong>
           </span>
           {leaderboard?.generatedAtUtc && (
-            <span className="hidden text-gray-600 sm:inline">
+            <span className="hidden text-gray-600 @[640px]:inline">
               更新于 {formatGeneratedAt(leaderboard.generatedAtUtc)}
             </span>
           )}
@@ -138,7 +138,7 @@ export default function LeaderLeaderboardPanel() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="搜索 Leader 名称或卡号"
-          className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 sm:h-auto sm:w-56 sm:py-1.5 sm:text-xs"
+          className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 @[640px]:h-auto @[640px]:w-56 @[640px]:py-1.5 @[640px]:text-xs"
         />
       </div>
 
@@ -162,7 +162,7 @@ export default function LeaderLeaderboardPanel() {
           </p>
         ) : (
           <>
-          <ul className="divide-y divide-gray-800/80 lg:hidden">
+          <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
             {items.map((item) => {
               const card = getCard(item.leaderNumber);
               return (
@@ -200,7 +200,7 @@ export default function LeaderLeaderboardPanel() {
               );
             })}
           </ul>
-          <table className="hidden w-full min-w-[920px] border-collapse text-left lg:table">
+          <table className="hidden w-full min-w-[920px] border-collapse text-left @[1024px]:table">
             <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="w-16 px-4 py-3 text-center">排名</th>

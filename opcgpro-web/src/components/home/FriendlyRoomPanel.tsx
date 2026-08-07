@@ -55,13 +55,13 @@ export default function FriendlyRoomPanel() {
 
   return (
     <main
-      className="flex h-[100dvh] flex-col items-center gap-5 overflow-y-auto bg-gray-950 px-4 py-5 sm:justify-center sm:p-8"
+      className="flex h-full flex-col items-center gap-5 overflow-y-auto bg-gray-950 px-4 py-5 @[640px]:justify-center @[640px]:p-8"
       style={{
         paddingTop: "calc(1.25rem + env(safe-area-inset-top))",
         paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
       }}
     >
-      <h1 className="text-center text-xl font-bold text-white sm:text-2xl">
+      <h1 className="text-center text-xl font-bold text-white @[640px]:text-2xl">
         {room.origin === "roomCode" ? "房间码友谊战" : "友谊战房间"}
       </h1>
 
@@ -95,7 +95,7 @@ export default function FriendlyRoomPanel() {
       </div>
 
       {/* 双方状态卡 */}
-      <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid w-full max-w-md grid-cols-1 gap-3 @[640px]:grid-cols-2">
         <PlayerCard title="我"   name={me?.name}  deckName={me?.deckName}  ready={me?.ready} connected={me?.connected} mine />
         <PlayerCard title="对手" name={opp?.name} deckName={opp?.deckName} ready={opp?.ready} connected={opp?.connected} waiting={!opp} />
       </div>

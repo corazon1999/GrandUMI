@@ -84,10 +84,10 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
   const deckEntries = Object.entries(decks);
 
   return (
-    <div className="flex h-full flex-col gap-3 p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex h-full flex-col gap-3 p-3 @[640px]:p-4">
+      <div className="flex flex-col gap-3 @[640px]:flex-row @[640px]:items-center @[640px]:justify-between">
         <h2 className="text-white font-bold text-lg">我的卡组</h2>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+        <div className="grid grid-cols-2 gap-2 @[640px]:flex @[640px]:items-center">
           <Link
             href="/deck-editor?new=1"
             className="flex min-h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition-colors hover:bg-emerald-500"
@@ -114,7 +114,7 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
             return (
               <div
                 key={name}
-                className={`flex items-center gap-2 rounded-xl border-2 px-2 py-2 transition-all sm:gap-3 sm:px-4 sm:py-3 ${
+                className={`flex items-center gap-2 rounded-xl border-2 px-2 py-2 transition-all @[640px]:gap-3 @[640px]:px-4 @[640px]:py-3 ${
                   isSelected
                     ? "bg-orange-500/10 border-orange-500 shadow-lg shadow-orange-500/20"
                     : "bg-gray-800 border-gray-700 hover:border-gray-500"

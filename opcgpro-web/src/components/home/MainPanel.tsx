@@ -22,6 +22,11 @@ import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
+import LayoutPreviewFrame, {
+  type LayoutPreviewMode,
+  useLayoutPreviewMode,
+} from "./LayoutPreviewFrame";
+import SettingsModal from "./SettingsModal";
 
 type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
@@ -320,10 +325,12 @@ function MobileProfilePanel({
   onOpenPlayers,
   onOpenHistory,
   onOpenChangelog,
+  onOpenSettings,
 }: {
   onOpenPlayers: () => void;
   onOpenHistory: () => void;
   onOpenChangelog: () => void;
+  onOpenSettings: () => void;
 }) {
   const onlineCount = useNetStore((s) => s.onlineCount);
 
@@ -365,6 +372,14 @@ function MobileProfilePanel({
         <span>更新日志</span>
         <span className="text-gray-600" aria-hidden="true">›</span>
       </button>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 text-sm text-gray-300 transition-colors hover:border-orange-700 active:bg-gray-800"
+      >
+        <span>设置</span>
+        <span className="text-gray-600" aria-hidden="true">›</span>
+      </button>
     </section>
   );
 }
@@ -378,6 +393,8 @@ export default function MainPanel() {
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [layoutMode, setLayoutMode] = useLayoutPreviewMode();
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
   const onlineCount = useNetStore((s) => s.onlineCount);
@@ -405,14 +422,27 @@ export default function MainPanel() {
     setShowChangelog(false);
   };
 
+  const changeLayoutMode = (next: LayoutPreviewMode) => {
+    if (next === "desktop" && view === "profile") setView("lobby");
+    setLayoutMode(next);
+  };
+
   // 进入友谊战房间后，大厅整体切换为房间界面
   if (friendlyRoom) {
     return (
-      <>
-        <FriendlyRoomPanel />
-        <InviteNotifyOverlay />
-        <ChangelogModal open={showChangelog} onClose={closeChangelog} />
-      </>
+      <LayoutPreviewFrame mode={layoutMode}>
+        <div className="h-full">
+          <FriendlyRoomPanel />
+          <InviteNotifyOverlay />
+          <ChangelogModal open={showChangelog} onClose={closeChangelog} />
+          <SettingsModal
+            open={showSettings}
+            mode={layoutMode}
+            onChange={changeLayoutMode}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
+      </LayoutPreviewFrame>
     );
   }
 
@@ -426,16 +456,17 @@ export default function MainPanel() {
   ];
 
   return (
-    <div
-      className="flex h-[100dvh] flex-col overflow-hidden bg-gray-950"
-      style={{
-        paddingTop: "env(safe-area-inset-top)",
-        paddingLeft: "env(safe-area-inset-left)",
-        paddingRight: "env(safe-area-inset-right)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 lg:hidden">
+    <LayoutPreviewFrame mode={layoutMode}>
+      <div
+        className="flex h-full flex-col overflow-hidden bg-gray-950"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 @[1024px]:hidden">
         <div>
           <p className="text-base font-black tracking-tight text-white">GrandUMI</p>
           <p className="text-xs text-gray-500">海贼王卡牌对战</p>
@@ -467,7 +498,7 @@ export default function MainPanel() {
 
       <div className="flex min-h-0 flex-1">
         {/* 桌面侧边导航 */}
-        <nav className="hidden w-28 shrink-0 flex-col items-center gap-3 border-r border-gray-800 bg-gray-900 px-3 py-4 lg:flex">
+        <nav className="hidden w-28 shrink-0 flex-col items-center gap-3 border-r border-gray-800 bg-gray-900 px-3 py-4 @[1024px]:flex">
           <PlayerAvatar />
           <button
             onClick={() => setView("lobby")}
@@ -502,6 +533,13 @@ export default function MainPanel() {
           <div className="mt-auto flex w-full flex-col gap-2">
             <button
               type="button"
+              onClick={() => setShowSettings(true)}
+              className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
+            >
+              设置
+            </button>
+            <button
+              type="button"
               onClick={() => setShowChangelog(true)}
               className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
             >
@@ -523,6 +561,7 @@ export default function MainPanel() {
               onOpenPlayers={() => setShowPlayerList(true)}
               onOpenHistory={() => setView("history")}
               onOpenChangelog={() => setShowChangelog(true)}
+              onOpenSettings={() => setShowSettings(true)}
             />
           )}
         </main>
@@ -530,7 +569,7 @@ export default function MainPanel() {
 
       <nav
         aria-label="主要导航"
-        className="grid h-16 shrink-0 grid-cols-5 border-t border-gray-800 bg-gray-900/95 lg:hidden"
+        className="grid h-16 shrink-0 grid-cols-5 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
       >
         {mobileNavItems.map((item) => {
           const active = activeMobileView === item.view;
@@ -555,12 +594,19 @@ export default function MainPanel() {
 
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
       <Modal open={showChat} onClose={() => setShowChat(false)} title="大厅聊天" mobileSheet maxWidthClass="max-w-lg">
-        <div className="h-[min(70dvh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+        <div className="h-[min(70cqh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
           <ChatPanel showHeader={false} />
         </div>
       </Modal>
       <InviteNotifyOverlay />
       <ChangelogModal open={showChangelog} onClose={closeChangelog} />
-    </div>
+      <SettingsModal
+        open={showSettings}
+        mode={layoutMode}
+        onChange={changeLayoutMode}
+        onClose={() => setShowSettings(false)}
+      />
+      </div>
+    </LayoutPreviewFrame>
   );
 }

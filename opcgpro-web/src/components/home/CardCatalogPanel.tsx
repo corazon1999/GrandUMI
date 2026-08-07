@@ -145,7 +145,7 @@ export default function CardCatalogPanel() {
 
   return (
     <section className="flex h-full min-w-0 flex-col bg-gray-950">
-      <header className="shrink-0 border-b border-gray-800 bg-gray-900/70 px-3 py-3 sm:px-4">
+      <header className="shrink-0 border-b border-gray-800 bg-gray-900/70 px-3 py-3 @[640px]:px-4">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-white">卡牌图鉴</h1>
@@ -157,14 +157,14 @@ export default function CardCatalogPanel() {
             <button
               type="button"
               onClick={resetFilters}
-              className="min-h-11 shrink-0 rounded-lg px-3 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white lg:min-h-0 lg:px-0 lg:text-xs"
+              className="min-h-11 shrink-0 rounded-lg px-3 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white @[1024px]:min-h-0 @[1024px]:px-0 @[1024px]:text-xs"
             >
               重置筛选
             </button>
           )}
         </div>
 
-        <div className="space-y-2 lg:hidden">
+        <div className="space-y-2 @[1024px]:hidden">
           <label>
             <span className="sr-only">搜索卡名、卡号或关键词</span>
             <input
@@ -210,7 +210,7 @@ export default function CardCatalogPanel() {
           </details>
         </div>
 
-        <div className="hidden gap-2 lg:grid lg:grid-cols-[minmax(220px,2fr)_repeat(6,minmax(96px,1fr))]">
+        <div className="hidden gap-2 @[1024px]:grid @[1024px]:grid-cols-[minmax(220px,2fr)_repeat(6,minmax(96px,1fr))]">
           <label>
             <span className="sr-only">搜索卡名、卡号或关键词</span>
             <input
@@ -280,7 +280,7 @@ export default function CardCatalogPanel() {
           </FilterSelect>
         </div>
 
-        <div className="mt-2 hidden flex-wrap items-center gap-2 lg:flex">
+        <div className="mt-2 hidden flex-wrap items-center gap-2 @[1024px]:flex">
           <button
             type="button"
             onClick={() => setFilterShowSub1((current) => !current)}
@@ -399,7 +399,7 @@ function CardSetFilter({
 }) {
   return (
     <details className="group relative">
-      <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors hover:border-gray-600 focus:border-orange-500 lg:h-9 lg:text-xs [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors hover:border-gray-600 focus:border-orange-500 @[1024px]:h-9 @[1024px]:text-xs [&::-webkit-details-marker]:hidden">
         <span>{selectedSets.length === 0 ? "弹数：全部" : `弹数：已选 ${selectedSets.length}`}</span>
         <span className="text-gray-500 transition-transform group-open:rotate-180">▾</span>
       </summary>
@@ -464,7 +464,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors focus:border-orange-500 lg:h-9 lg:text-xs"
+        className="h-11 w-full rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors focus:border-orange-500 @[1024px]:h-9 @[1024px]:text-xs"
       >
         <option value="">{label}：全部</option>
         {children}

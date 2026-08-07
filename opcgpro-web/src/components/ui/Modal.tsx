@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useId, useRef } from "react";
+import { useContainerResponsive } from "./ResponsiveScope";
 
 interface Props {
   open: boolean;
@@ -25,6 +26,15 @@ export default function Modal({
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const containerResponsive = useContainerResponsive();
+  const largeSheetClasses = containerResponsive
+    ? "@[1024px]:items-center @[1024px]:justify-center @[1024px]:p-4"
+    : "lg:items-center lg:justify-center lg:p-4";
+  const largeDialogClasses = containerResponsive
+    ? "@[1024px]:w-[calc(100cqw-2rem)] @[1024px]:rounded-xl @[1024px]:border-b @[1024px]:p-6"
+    : "lg:w-[calc(100vw-2rem)] lg:rounded-xl lg:border-b lg:p-6";
+  const mediumDialogPadding = containerResponsive ? "@[640px]:p-6" : "sm:p-6";
+  const maxHeightClass = containerResponsive ? "max-h-[calc(100cqh-2rem)]" : "max-h-[calc(100dvh-2rem)]";
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -83,7 +93,7 @@ export default function Modal({
       {open && (
         <motion.div
           className={`fixed inset-0 z-50 flex p-4 ${
-            mobileSheet ? "items-end px-0 pb-0 lg:items-center lg:justify-center lg:p-4" : "items-center justify-center"
+            mobileSheet ? `items-end px-0 pb-0 ${largeSheetClasses}` : "items-center justify-center"
           }`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -99,10 +109,10 @@ export default function Modal({
             aria-modal="true"
             aria-labelledby={title ? titleId : undefined}
             tabIndex={-1}
-            className={`relative z-10 max-h-[calc(100dvh-2rem)] overflow-hidden border border-gray-700 bg-gray-900 shadow-2xl outline-none ${
+            className={`relative z-10 ${maxHeightClass} overflow-hidden border border-gray-700 bg-gray-900 shadow-2xl outline-none ${
               mobileSheet
-                ? "w-full rounded-t-2xl border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:w-[calc(100vw-2rem)] lg:rounded-xl lg:border-b lg:p-6"
-                : "w-[calc(100vw-2rem)] rounded-xl p-4 sm:p-6"
+                ? `w-full rounded-t-2xl border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ${largeDialogClasses}`
+                : `w-[calc(100vw-2rem)] rounded-xl p-4 ${mediumDialogPadding}`
             } ${maxWidthClass}`}
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}

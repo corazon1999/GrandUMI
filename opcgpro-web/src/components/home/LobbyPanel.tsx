@@ -121,10 +121,10 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   return (
     <div className="flex h-full min-w-0">
-      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:flex lg:flex-col lg:items-center lg:justify-center lg:px-8 lg:py-8">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-4 lg:gap-5">
+      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-5 @[640px]:px-6 @[1024px]:flex @[1024px]:flex-col @[1024px]:items-center @[1024px]:justify-center @[1024px]:px-8 @[1024px]:py-8">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-4 @[1024px]:gap-5">
           <div>
-            <h1 className="text-xl font-bold text-white lg:text-2xl">开始对战</h1>
+            <h1 className="text-xl font-bold text-white @[1024px]:text-2xl">开始对战</h1>
             <p className="mt-1 text-sm text-gray-500">选择模式，准备好后即可进入牌桌。</p>
           </div>
 
@@ -187,7 +187,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             ))}
           </div>
 
-          <section className="rounded-2xl border border-gray-800 bg-gray-900 p-4 sm:p-5">
+          <section className="rounded-2xl border border-gray-800 bg-gray-900 p-4 @[640px]:p-5">
             {playMode === "match" && (
               <div className="flex flex-col gap-3">
                 {matchState === "idle" && (
@@ -315,7 +315,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
         </div>
       </div>
 
-      <div className="hidden w-72 shrink-0 border-l border-gray-800 lg:block">
+      <div className="hidden w-72 shrink-0 border-l border-gray-800 @[1024px]:block">
         <ChatPanel />
       </div>
     </div>

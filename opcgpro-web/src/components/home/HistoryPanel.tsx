@@ -56,7 +56,7 @@ export default function HistoryPanel() {
   };
 
   return (
-    <div className="flex h-full flex-col p-3 sm:p-6">
+    <div className="flex h-full flex-col p-3 @[640px]:p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">对局记录</h2>
@@ -67,7 +67,7 @@ export default function HistoryPanel() {
         {list.length > 0 && (
           <button
             onClick={handleClear}
-            className="min-h-11 rounded-lg border border-gray-700 px-3 text-sm text-gray-400 transition-colors hover:border-red-600 hover:text-red-400 sm:min-h-0 sm:py-1.5 sm:text-xs"
+            className="min-h-11 rounded-lg border border-gray-700 px-3 text-sm text-gray-400 transition-colors hover:border-red-600 hover:text-red-400 @[640px]:min-h-0 @[640px]:py-1.5 @[640px]:text-xs"
           >
             清空
           </button>
@@ -86,7 +86,7 @@ export default function HistoryPanel() {
             {list.map((m) => (
               <li
                 key={m.id}
-                className="group flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-2 py-2 transition-colors hover:border-orange-600/60 sm:gap-3 sm:px-4 sm:py-3"
+                className="group flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-2 py-2 transition-colors hover:border-orange-600/60 @[640px]:gap-3 @[640px]:px-4 @[640px]:py-3"
               >
                 <button
                   onClick={() => router.push(`/replay/${encodeURIComponent(m.id)}`)}
@@ -113,7 +113,7 @@ export default function HistoryPanel() {
                     </p>
                   </div>
                   <span className="shrink-0 text-sm text-gray-600 transition-colors group-hover:text-orange-400">
-                    ▶ <span className="hidden sm:inline">回放</span>
+                    ▶ <span className="hidden @[640px]:inline">回放</span>
                   </span>
                 </button>
                 <button
