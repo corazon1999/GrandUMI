@@ -8,6 +8,7 @@ import type { CardData } from "@/types/card";
 import { clsx } from "clsx";
 import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardHoverPreview";
 import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
+import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/CardKeywordEffects";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 
 interface Props {
@@ -33,9 +34,9 @@ interface Props {
    * 仅靠黄框+抬层+轻放大标识选中，不向上溢出。
    */
   liftOnSelect?: boolean;
-  /** 是否显示阻挡者「能量护盾」特效（仅场上角色区传 true，手牌/预览等不传） */
-  showBlockerFx?: boolean;
-  /** 快照下发的动态获得关键词（贴咚/条件/回合内授予的阻挡者等），与静态卡面 abilities 一并判定特效 */
+  /** 是否显示战斗关键词图标与特效（仅场上角色区传 true，手牌/预览等不传） */
+  showKeywordFx?: boolean;
+  /** 快照下发的动态获得关键词，与静态卡面 abilities 一并判定图标与特效 */
   gainedKeywords?: string[];
   /** 攻击状态标识：can=可攻击 sick=本回合登场不可攻击 blocked=受到禁攻状态 none=不显示 */
   attackState?: "can" | "sick" | "blocked" | "none";
@@ -66,7 +67,7 @@ export default function CardItem({
   hidePower = false,
   hideCost = false,
   liftOnSelect = true,
-  showBlockerFx = false,
+  showKeywordFx = false,
   gainedKeywords,
   attackState = "none",
   battleHighlight,
@@ -74,12 +75,11 @@ export default function CardItem({
   size = "md",
 }: Props) {
   const showFaceDown = faceDown || !card;
-  // 阻挡者：仅场上角色（showBlockerFx）且正面、静态能力或动态获得关键词含「阻挡者」时显示能量护盾特效
-  // （动态授予如 OP16-073 回合末获得、OP15-053 贴咚获得——此前只看静态 abilities，玩家看不到任何变化，反馈#242/#253）
-  const isBlocker =
-    showBlockerFx &&
-    !showFaceDown &&
-    (!!card?.abilities?.includes("阻挡者") || !!gainedKeywords?.includes("阻挡者"));
+  // 仅场上正面角色展示；同时识别卡面固有词条和服务端快照下发的动态词条。
+  const visibleKeywords =
+    showKeywordFx && !showFaceDown
+      ? resolveVisibleKeywords(card?.abilities, gainedKeywords)
+      : [];
   const donPower = attachedDonCount * 1000;
   const displayPower = (card?.power ?? 0) + powerBuff + donPower;
   const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);
@@ -282,39 +282,7 @@ export default function CardItem({
             </span>
           )}
 
-          {/* 阻挡者「能量护盾」特效：常驻辉光 + 旋转流光边框 + 立体盾牌徽标 */}
-          {isBlocker && (
-            <>
-              {/* 打底常驻青光（呼吸） */}
-              <div className="blocker-glow pointer-events-none absolute inset-0 z-10 rounded-md" />
-              {/* 旋转流光边框（高光沿四边流动） */}
-              <div className="blocker-aura pointer-events-none absolute inset-0 z-20 rounded-md" />
-              {/* 名称栏旁的小盾牌徽标（贴卡面最底，不压插画） */}
-              <span
-                className="pointer-events-none absolute bottom-0.5 left-0.5 z-30 flex items-center justify-center rounded bg-gradient-to-br from-cyan-400/95 to-blue-700/95 p-[1.5px] shadow-[0_0_4px_rgba(34,211,238,0.8)] ring-1 ring-cyan-100/70"
-                title="阻挡者"
-              >
-                {/* 背后柔和径向光晕 */}
-                <span className="pointer-events-none absolute inset-0 -z-10 rounded bg-cyan-300/40 blur-[2px]" />
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-2.5 w-2.5 drop-shadow-[0_0_1px_rgba(255,255,255,0.9)]"
-                  fill="white"
-                  stroke="rgba(255,255,255,0.95)"
-                  strokeWidth="0.6"
-                  aria-hidden
-                >
-                  <path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5l-8-3Z" />
-                  {/* 盾面顶部高光 */}
-                  <path
-                    d="M12 4 6 6.3v4.7c0 1.4.4 2.6 1 3.7C8.4 11.5 10 8 12 4Z"
-                    fill="rgba(255,255,255,0.45)"
-                    stroke="none"
-                  />
-                </svg>
-              </span>
-            </>
-          )}
+          <CardKeywordEffects keywords={visibleKeywords} />
 
           {/* 攻击状态标识 → 左侧边中部（避开所有现有徽标），仅我方回合显示 */}
           {attackState === "can" && (

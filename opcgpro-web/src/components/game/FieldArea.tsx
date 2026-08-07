@@ -103,7 +103,7 @@ export default function FieldArea({ side }: Props) {
                 attachedDonCount={attachedCount}
                 hideCounter
                 liftOnSelect={false}
-                showBlockerFx
+                showKeywordFx
                 gainedKeywords={fc.gainedKeywords}
                 attackState={attackState}
                 size={cardSize}
