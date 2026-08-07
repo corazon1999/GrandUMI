@@ -60,7 +60,72 @@ py bot.py
 
 > GitHub Issue 是通过本机 `gh issue create` 创建的,所以机器人必须跑在已 `gh auth login` 的这台机器上。
 
-## 四、查看反馈数据
+## 四、Linux 服务器 Docker 部署
+
+推荐把 NapCat 和机器人放在同一个 Compose 项目中。NapCat 的 OneBot 端口只在
+Docker 内网开放,宿主机仅在 `127.0.0.1:6099` 提供 WebUI,避免管理端口暴露到公网。
+
+### 1. 创建服务器配置
+
+```bash
+cd /opt/qq-bug-bot
+cp .env.example .env
+cp config.server.example.json config.server.json
+mkdir -p data
+chmod 600 .env config.server.json
+```
+
+编辑 `.env`：
+
+- `GH_TOKEN` 使用只允许目标仓库创建 Issue 的细粒度 GitHub Token。
+- `TZ` 使用服务器业务时区。
+
+编辑 `config.server.json`：
+
+- `ws_url` 保持 `ws://napcat:3001`。
+- `access_token` 设置随机长字符串,并在 NapCat 的正向 WebSocket 配置中填写相同值。
+- `allowed_groups` 填实际群号白名单,不要留空开放所有群。
+
+### 2. 启动和查看日志
+
+```bash
+docker compose config
+docker compose build
+docker compose up -d
+docker compose logs -f --tail=200
+```
+
+NapCat 首次启动后,从部署电脑建立 SSH 隧道：
+
+```powershell
+ssh -L 6099:127.0.0.1:6099 root@服务器地址
+```
+
+然后在浏览器打开 `http://127.0.0.1:6099/webui` 完成 QQ 登录,新增监听
+`0.0.0.0:3001` 的正向 WebSocket 服务端,并配置与机器人一致的访问令牌。
+
+### 3. 迁移和维护数据
+
+正式切换前先停止本机机器人,再把旧库复制为服务器的
+`/opt/qq-bug-bot/data/feedback.db`,避免两端同时消费同一条消息。
+
+```bash
+# 导出日报
+docker compose exec bug-bot python export_by_date.py
+
+# 查看反馈
+docker compose exec bug-bot python -c \
+  "import sqlite3; print(sqlite3.connect('/data/feedback.db').execute('select count(*) from feedback').fetchone())"
+
+# 更新镜像并重启
+docker compose pull napcat
+docker compose up -d --build
+```
+
+必须备份 `data/` 目录和 NapCat 的三个命名卷。不要提交 `.env`、
+`config.server.json`、`feedback.db` 或任何登录信息。
+
+## 五、查看反馈数据
 
 所有反馈都存在同目录的 `feedback.db`(SQLite)。即使 GitHub 建 issue 失败,本地也一定有记录。
 

@@ -102,6 +102,88 @@ public class LatencyOptimizationTests
     }
 
     [Fact]
+    public async Task 房间动作队列_拒绝的PromptResponse不会阻塞后续合法响应()
+    {
+        TestScene.New();
+        var deck = BuildLegalDeck("OP15-001");
+        var suffix = Guid.NewGuid().ToString("N");
+        var player0Session = $"rejected-prompt-s0-{suffix}";
+        var player1Session = $"rejected-prompt-s1-{suffix}";
+        var room = GameRoomManager.CreateRoom(
+            player0Session, "rejected-prompt-alice", deck,
+            player1Session, "rejected-prompt-bob", deck,
+            p0First: true);
+
+        try
+        {
+            var state = room.Engine.State;
+            var me = state.Players[0];
+            var playable = CardDatabase.GetBySet("OP15")
+                .First(c => c.Kind == CardKind.Character && !c.EffectTags.Contains("OnEnterField"));
+            var filler = CardDatabase.GetBySet("OP15").First(c => c.Kind == CardKind.Character);
+
+            state.CurrentTurnPlayer = 0;
+            state.TurnCount = 2;
+            state.Phase = Phase.Main;
+            me.Hand.Clear();
+            me.Hand.Add(new CardInstance { Info = playable });
+            me.Characters.Clear();
+            for (var i = 0; i < 5; i++)
+                me.Characters.Add(new CardInstance { Info = filler });
+            me.Trash.Clear();
+            me.CostArea.Clear();
+            for (var i = 0; i < 10; i++)
+                me.CostArea.Add(new DonCard { State = DonState.Active });
+
+            GameRoomManager.HandleAction(
+                player0Session,
+                "PlayCard",
+                JsonSerializer.SerializeToElement(new { handIndex = 0 }));
+
+            for (var i = 0; i < 300 && state.PendingPrompt?.Kind != "OverflowTrash"; i++)
+                await Task.Delay(10);
+
+            var prompt = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+            Assert.Equal("OverflowTrash", prompt.Kind);
+            var victim = me.Characters[0];
+            var emptyResponse = JsonSerializer.SerializeToElement(new
+            {
+                promptId = prompt.PromptId,
+                chosen = Array.Empty<string>(),
+            });
+
+            // 引擎必须明确标记这个回包被拒绝，且保留原 Prompt。
+            Assert.False(room.Engine.HandleAction(0, "PromptResponse", emptyResponse));
+            Assert.Equal(prompt.PromptId, state.PendingPrompt?.PromptId);
+
+            // 再走真实房间队列：非法回包后紧跟合法回包。旧实现会在第一个回包上卡 15 秒。
+            GameRoomManager.HandleAction(player0Session, "PromptResponse", emptyResponse);
+            GameRoomManager.HandleAction(
+                player0Session,
+                "PromptResponse",
+                JsonSerializer.SerializeToElement(new
+                {
+                    promptId = prompt.PromptId,
+                    chosen = new[] { victim.Id.ToString() },
+                }));
+
+            for (var i = 0; i < 300 && (state.PendingPrompt is not null || me.Hand.Count != 0); i++)
+                await Task.Delay(10);
+
+            Assert.Null(state.PendingPrompt);
+            Assert.Empty(me.Hand);
+            Assert.Contains(victim, me.Trash);
+            Assert.DoesNotContain(victim, me.Characters);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(room.RoomId);
+            TryDelete(room.ReplayPath);
+            TryDelete(room.MatchLogPath);
+        }
+    }
+
+    [Fact]
     public void ReplayRecorder_Close会按顺序排空后台队列()
     {
         var roomId = $"async-log-test-{Guid.NewGuid():N}";

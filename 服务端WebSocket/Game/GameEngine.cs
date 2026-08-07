@@ -145,9 +145,9 @@ public class GameEngine
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
 
-    public void HandleAction(int playerIndex, string action, JsonElement data)
+    public bool HandleAction(int playerIndex, string action, JsonElement data)
     {
-        if (State.IsGameOver) return;
+        if (State.IsGameOver) return false;
 
         var dispatchStartedAt = LatencyDiagnostics.Start();
         BeginSnapshotBatch();
@@ -203,7 +203,8 @@ public class GameEngine
                 break;
         }
 
-        if (!_activeActionRejected)
+        var accepted = !_activeActionRejected;
+        if (accepted)
         {
             RecordMatchLog("player_action_accepted", playerIndex, new { action });
             OnPersistAction?.Invoke(playerIndex, action, data); // 仅持久化被接受的动作
@@ -214,6 +215,7 @@ public class GameEngine
         if (Volatile.Read(ref _trackedOperations) == 0)
             EndSnapshotBatch();
         LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
+        return accepted;
     }
 
     // ── 开局骰点与先后手选择 ─────────────────────────────────────────────

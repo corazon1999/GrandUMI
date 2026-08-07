@@ -202,30 +202,43 @@ export default function PromptOverlay() {
     });
   };
 
-  const canConfirm = selected.length >= prompt.minChoose && selected.length <= prompt.maxChoose;
+  // ReturnOwnDon 的 0 张仅表示“不发动”；点击“确认放回”仍必须选满指定数量。
+  const canConfirm = isReturnDon
+    ? selected.length === prompt.maxChoose
+    : selected.length >= prompt.minChoose && selected.length <= prompt.maxChoose;
+
+  const submitServerPrompt = (chosen: string[], showSuccess = false) => {
+    if (submittingPromptId === prompt.promptId) return false;
+    const sent = GameRequest.respondPrompt(prompt.promptId, chosen);
+    if (!sent) return false;
+    setSubmittingPromptId(prompt.promptId);
+    if (showSuccess) flashPromptSuccess();
+    return true;
+  };
 
   const handleConfirm = () => {
     const victimId = selected[0];
     const isLocalOverflow = prompt.kind === "LocalOverflowTrash";
-    const sent = isLocalOverflow
-      ? GameRequest.playCard(localOverflowHandIndex!, victimId)
-      : GameRequest.respondPrompt(prompt.promptId, selected);
+    if (!isLocalOverflow) {
+      submitServerPrompt(selected, true);
+      return;
+    }
+
+    const sent = GameRequest.playCard(localOverflowHandIndex!, victimId);
     if (!sent) return;
 
     // 立即收起弹窗；场上角色和废弃区只等待服务端权威快照更新，
     // 避免本地提前移牌与后续效果/拒绝响应叠加时出现视觉错位。
     setSubmittingPromptId(prompt.promptId);
-    if (isLocalOverflow) clearLocalOverflow();
+    clearLocalOverflow();
     // #241 目标确认后弹一个"选择成功"瞬时提示（弹窗随即由服务器快照关闭）
     flashPromptSuccess();
   };
   const handleSkip = () => {
-    GameRequest.respondPrompt(prompt.promptId, []);
+    submitServerPrompt([]);
   };
   const handleCancelReturnDon = () => {
-    const sent = GameRequest.respondPrompt(prompt.promptId, []);
-    if (!sent) return;
-    setSubmittingPromptId(prompt.promptId);
+    submitServerPrompt([]);
   };
 
   return (
@@ -262,13 +275,13 @@ export default function PromptOverlay() {
             )}
             <div className="flex gap-3">
               <button
-                onClick={() => GameRequest.respondPrompt(prompt.promptId, ["trigger"])}
+                onClick={() => submitServerPrompt(["trigger"])}
                 className="bg-orange-500 hover:bg-orange-400 text-white px-6 py-2 rounded-lg font-bold"
               >
                 发动触发
               </button>
               <button
-                onClick={() => GameRequest.respondPrompt(prompt.promptId, ["hand"])}
+                onClick={() => submitServerPrompt(["hand"])}
                 className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg font-bold"
               >
                 加入手牌
@@ -281,7 +294,7 @@ export default function PromptOverlay() {
           <div className="flex flex-col gap-2">
             {options.map((opt, i) => (
               <button key={i}
-                onClick={() => GameRequest.respondPrompt(prompt.promptId, [i.toString()])}
+                onClick={() => submitServerPrompt([i.toString()])}
                 className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg">
                 {opt}
               </button>

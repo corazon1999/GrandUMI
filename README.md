@@ -130,6 +130,15 @@ git push
 
 ## 测试服与正式服发布
 
+发布前先处理更新日志缓存：
+
+1. 检查 `changelog-cache/pending/` 下的全部修复记录。
+2. 将所有玩家可见说明按“新增 / 修复 / 优化”汇总到 `opcgpro-web/src/data/changelog.ts` 的新版本条目。
+3. 将已汇总记录归档到 `changelog-cache/published/<版本号>/`，确认待发布缓存没有遗漏。
+4. 完成相关测试后，再按下面的流程部署测试服并批准正式发布。
+
+缓存记录和发布检查清单详见 [`changelog-cache/README.md`](changelog-cache/README.md)。`pending/` 仍有本次应发布的记录时，不得批准正式发布。
+
 日常改动先部署到 `https://test.grand-umi.com`：
 
 ```powershell

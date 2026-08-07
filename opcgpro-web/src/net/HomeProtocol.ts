@@ -15,6 +15,12 @@ import type {
   MsgBase,
   MsgSecret,
   MsgLogin,
+  MsgPlayerData,
+  MsgSaveDeck,
+  MsgDeleteDeck,
+  MsgSelectDeck,
+  MsgUpdateProfile,
+  MsgImportDecks,
   MsgAddAccount,
   MsgUpdatePs,
   MsgEnterMatch,
@@ -28,6 +34,8 @@ import type {
   MsgChatMsg,
   MsgOnlineCount,
   MsgPlayerList,
+  MsgLeaderLeaderboard,
+  LeaderboardPeriod,
   MsgInvitePlayer,
   MsgInviteNotify,
   MsgInviteResponse,
@@ -40,18 +48,44 @@ import type {
   MsgSpectateRoom,
   MsgLeaveSpectate,
 } from "@/types/net";
+import type { SavedDeck } from "@/types/deck";
 import { useNetStore } from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
 import { showMessage } from "@/components/ui/MessageBox";
+import {
+  loadLegacyDecksForMigration,
+  markLegacyDecksMigrated,
+  replaceAllDecks,
+  setDeckStorageAccount,
+  setSelectedDeckName,
+} from "@/data/DeckMapper";
 
 // ── 协议注册 ────────────────────────────────────────────────────────────
 
 let registered = false;
 let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
+let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
 
 function clearSpectateRequestTimer() {
   if (spectateRequestTimer) clearTimeout(spectateRequestTimer);
   spectateRequestTimer = null;
+}
+
+function clearRoomRequestTimer() {
+  if (roomRequestTimer) clearTimeout(roomRequestTimer);
+  roomRequestTimer = null;
+}
+
+function armRoomRequestTimer() {
+  clearRoomRequestTimer();
+  roomRequestTimer = setTimeout(() => {
+    roomRequestTimer = null;
+    const store = useNetStore.getState();
+    if (store.roomOperation === "idle") return;
+    store.setRoomOperation("idle");
+    showMessage("房间请求超时，请检查连接后重试", "error");
+  }, 8_000);
 }
 
 /**
@@ -70,6 +104,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgLogin":
         handleLogin(msg as MsgLogin);
+        break;
+      case "MsgPlayerData":
+        handlePlayerData(msg as MsgPlayerData);
         break;
       case "MsgAddAccount":
         handleAddAccount(msg as MsgAddAccount);
@@ -110,6 +147,9 @@ export function registerHomeProtocols() {
       case "MsgPlayerList":
         handlePlayerList(msg as MsgPlayerList);
         break;
+      case "MsgLeaderLeaderboard":
+        handleLeaderLeaderboard(msg as MsgLeaderLeaderboard);
+        break;
       case "MsgInvitePlayer":
         handleInvitePlayer(msg as MsgInvitePlayer);
         break;
@@ -139,10 +179,17 @@ export function registerHomeProtocols() {
   eventBus.on("reconnected", () => {
     const { loggedIn, account } = useNetStore.getState();
     if (loggedIn && account) HomeRequest.login(account);
+    else NetManager.finishRecovery();
   });
 
   eventBus.on("close", () => {
-    const { spectateState } = useNetStore.getState();
+    const store = useNetStore.getState();
+    const { spectateState, roomOperation } = store;
+    if (roomOperation !== "idle") {
+      clearRoomRequestTimer();
+      store.setRoomOperation("idle");
+      showMessage("网络已断开，房间请求尚未完成，请重连后重试", "error");
+    }
     if (spectateState === "idle") return;
 
     clearSpectateRequestTimer();
@@ -183,22 +230,88 @@ function handleLogin(msg: MsgLogin) {
   const store = useNetStore.getState();
   if (msg.result === true) {
     const account = msg.account ?? "";
-    // 优先用本地存档昵称，其次服务器返回的 name，最后 fallback 到 account
-    const saved = typeof window !== "undefined"
-      ? (localStorage.getItem(`grandumi_nick_${account}`) ?? "")
-      : "";
-    const displayName = saved || msg.name || account;
+    const displayName = msg.name || account;
+    const legacyDecks = loadLegacyDecksForMigration(account);
+    const legacySelectedDeck = typeof window !== "undefined"
+      ? localStorage.getItem("grandumi_selected_deck")
+      : null;
+
+    applyPlayerData(account, displayName, msg.avatar ?? "", msg.selectedDeckName ?? null, msg.decks ?? []);
     store.setLoggedIn(true, displayName, account);
     store.setError(null);
+    NetManager.finishRecovery();
     // 持久化账号仅用于下次打开登录页时预填；刷新后仍需玩家主动确认
     if (typeof window !== "undefined" && account) {
       localStorage.setItem("grandumi_account", account);
     }
+    if (legacyDecks.length > 0) {
+      pendingLegacyImport = { account, selectedDeckName: legacySelectedDeck };
+      if (!HomeRequest.importDecks(legacyDecks)) pendingLegacyImport = null;
+    } else {
+      markLegacyDecksMigrated(account);
+    }
     if (msg.logStr) showMessage(msg.logStr, "info");
   } else {
+    NetManager.finishRecovery();
     store.setError(msg.logStr ?? "账号或密码错误");
     if (msg.logStr) showMessage(msg.logStr, "error");
   }
+}
+
+function applyPlayerData(
+  account: string,
+  displayName: string,
+  avatar: string,
+  selectedDeckName: string | null,
+  decks: SavedDeck[],
+) {
+  setDeckStorageAccount(account);
+  replaceAllDecks(decks);
+  setSelectedDeckName(selectedDeckName);
+
+  const store = useNetStore.getState();
+  store.setProfile(displayName, avatar);
+  const selected = selectedDeckName
+    ? decks.find((deck) => deck.name === selectedDeckName)
+    : undefined;
+  store.setSelectedDeck(selected ? {
+    name: selected.name,
+    leader: selected.leader,
+    leaderName: selected.leaderName,
+    leaderSprite: selected.leaderSprite,
+    cards: [selected.leader, ...selected.cards].join("\n"),
+  } : null);
+
+  if (typeof window !== "undefined" && selected?.spriteMap) {
+    sessionStorage.setItem("grandumi_spriteMap", JSON.stringify(selected.spriteMap));
+  }
+}
+
+function handlePlayerData(msg: MsgPlayerData) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "云端数据同步失败", "error");
+    return;
+  }
+
+  const current = useNetStore.getState();
+  const account = msg.account ?? current.account;
+  if (!account || !msg.displayName || !msg.decks) {
+    showMessage("服务端返回的玩家数据不完整", "error");
+    return;
+  }
+
+  applyPlayerData(account, msg.displayName, msg.avatar ?? "", msg.selectedDeckName ?? null, msg.decks);
+
+  if (pendingLegacyImport?.account === account) {
+    const desiredSelection = pendingLegacyImport.selectedDeckName;
+    pendingLegacyImport = null;
+    markLegacyDecksMigrated(account);
+    if (desiredSelection && msg.decks.some((deck) => deck.name === desiredSelection)) {
+      HomeRequest.selectDeck(desiredSelection);
+    }
+  }
+
+  if (msg.logStr) showMessage(msg.logStr, "info");
 }
 
 /**
@@ -259,11 +372,15 @@ function handleMatchFound(msg: MsgMatchFound) {
  * 服务器返回房间码
  */
 function handleCreateRoom(msg: MsgCreateRoom) {
+  clearRoomRequestTimer();
+  const store = useNetStore.getState();
+  store.setRoomOperation("idle");
   if (msg.result === false) {
-    showMessage("创建房间失败", "error");
+    store.setRoomCode(null);
+    showMessage(msg.logStr ?? "创建房间失败", "error");
     return;
   }
-  useNetStore.getState().setRoomCode(msg.roomCode ?? null);
+  store.setRoomCode(msg.roomCode ?? null);
   showMessage("房间创建成功，等待对手加入", "info");
 }
 
@@ -271,6 +388,8 @@ function handleCreateRoom(msg: MsgCreateRoom) {
  * MsgJoinRoom — 加入房间回包
  */
 function handleJoinRoom(msg: MsgJoinRoom) {
+  clearRoomRequestTimer();
+  useNetStore.getState().setRoomOperation("idle");
   if (msg.result === false) {
     showMessage(msg.logStr ?? "加入房间失败", "error");
     return;
@@ -284,7 +403,10 @@ function handleJoinRoom(msg: MsgJoinRoom) {
  * MsgCancelRoom — 取消房间回包
  */
 function handleCancelRoom(_msg: MsgCancelRoom) {
-  useNetStore.getState().setRoomCode(null);
+  clearRoomRequestTimer();
+  const store = useNetStore.getState();
+  store.setRoomCode(null);
+  store.setRoomOperation("idle");
 }
 
 /**
@@ -333,6 +455,12 @@ function handlePlayerList(msg: MsgPlayerList) {
   useNetStore.getState().setPlayerList(msg.players ?? []);
 }
 
+/** MsgLeaderLeaderboard — 服务端 Leader 聚合榜单。 */
+function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
+  useNetStore.getState().setLeaderLeaderboard(msg);
+  if (msg.result === false && msg.error) showMessage(msg.error, "error");
+}
+
 /** MsgInvitePlayer — 发起邀请的回执（给发起方） */
 function handleInvitePlayer(msg: MsgInvitePlayer) {
   if (msg.result === false) {
@@ -359,16 +487,23 @@ function handleInviteResult(msg: MsgInviteResult) {
 function handleFriendlyRoom(msg: MsgFriendlyRoom) {
   useNetStore.getState().setFriendlyRoom({
     roomId: msg.roomId,
+    origin: msg.origin ?? "invite",
+    roomCode: msg.roomCode ?? null,
     players: msg.players,
     scores: msg.scores,
     state: msg.state,
   });
+  useNetStore.getState().setRoomCode(msg.roomCode ?? null);
+  useNetStore.getState().setRoomOperation("idle");
   if (msg.error) showMessage(msg.error, "error");
 }
 
 /** MsgFriendlyLeft — 房间已解散/自己已退出 */
 function handleFriendlyLeft(msg: MsgFriendlyLeft) {
-  useNetStore.getState().setFriendlyRoom(null);
+  const store = useNetStore.getState();
+  store.setFriendlyRoom(null);
+  store.setRoomCode(null);
+  store.setRoomOperation("idle");
   if (msg.logStr) showMessage(msg.logStr, "info");
 }
 
@@ -429,6 +564,26 @@ export const HomeRequest = {
     } as MsgUpdatePs);
   },
 
+  saveDeck(deck: SavedDeck) {
+    return NetManager.send({ proto: "MsgSaveDeck", deck } as MsgSaveDeck);
+  },
+
+  deleteDeck(name: string) {
+    return NetManager.send({ proto: "MsgDeleteDeck", name } as MsgDeleteDeck);
+  },
+
+  selectDeck(name: string | null) {
+    return NetManager.send({ proto: "MsgSelectDeck", name } as MsgSelectDeck);
+  },
+
+  updateProfile(displayName: string, avatar: string) {
+    return NetManager.send({ proto: "MsgUpdateProfile", displayName, avatar } as MsgUpdateProfile);
+  },
+
+  importDecks(decks: SavedDeck[]) {
+    return NetManager.send({ proto: "MsgImportDecks", decks } as MsgImportDecks);
+  },
+
   enterMatch(deck: string) {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     return NetManager.send({
@@ -453,25 +608,32 @@ export const HomeRequest = {
     } as MsgCancelMatch);
   },
 
-  createRoom(deck: string) {
+  createRoom(deck: string, deckName: string) {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
-    return NetManager.send({
+    const sent = NetManager.send({
       proto: "MsgCreateRoom",
       deck,
+      deckName,
     } as MsgCreateRoom);
+    if (sent) armRoomRequestTimer();
+    return sent;
   },
 
-  joinRoom(roomCode: string, deck: string) {
+  joinRoom(roomCode: string, deck: string, deckName: string) {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
-    NetManager.send({
+    const sent = NetManager.send({
       proto: "MsgJoinRoom",
       roomCode,
       deck,
+      deckName,
     } as MsgJoinRoom);
+    if (sent) armRoomRequestTimer();
+    return sent;
   },
 
   cancelRoom() {
-    NetManager.send({
+    clearRoomRequestTimer();
+    return NetManager.send({
       proto: "MsgCancelRoom",
     } as MsgCancelRoom);
   },
@@ -487,6 +649,11 @@ export const HomeRequest = {
 
   requestPlayerList() {
     return NetManager.send({ proto: "MsgPlayerList" } as MsgPlayerList);
+  },
+
+  requestLeaderLeaderboard(period: LeaderboardPeriod) {
+    useNetStore.getState().setLeaderLeaderboard(null);
+    return NetManager.send({ proto: "MsgLeaderLeaderboard", period } as MsgLeaderLeaderboard);
   },
 
   invitePlayer(toAccount: string) {

@@ -1,0 +1,292 @@
+{
+  "EB01-026": {
+    "_name": "贝莱特王子",
+    "trigger": {
+      "cost": { "lifeToHandChoice": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnHand", "min": 0, "max": 1, "as": "$card", "text": "将我方最多1张手牌加入生命区最上方" },
+        { "op": "HandToLife", "target": "$card" }
+      ]
+    }
+  },
+  "EB01-028": {
+    "_name": "橡皮橡皮冠军回转弹",
+    "trigger": [
+      { "op": "Choose", "prompt": "AnyCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 3 }, "as": "$target", "text": "将最多1张费用不高于3的角色放回其持有者的卡组最下方" },
+      { "op": "ReturnToDeckBottom", "target": "$target" }
+    ]
+  },
+  "EB01-029": {
+    "_name": "抱歉！！我要死了！！",
+    "trigger": [
+      { "op": "Choose", "prompt": "AnyCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 8 }, "as": "$target", "text": "将最多1张费用不高于8的角色放回其持有者的手牌" },
+      { "op": "BounceToHand", "target": "$target" }
+    ]
+  },
+  "EB01-038": {
+    "_name": "人妖之道",
+    "trigger": {
+      "cost": { "donReturn": 1 },
+      "then": [
+        { "op": "Draw", "n": 2 }
+      ]
+    }
+  },
+  "EB01-053": {
+    "_name": "瓦斯蒂诺",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "min": 0, "max": 2, "as": "$targets", "text": "本回合中，对方合计最多2张领袖或角色力量-3000" },
+      { "op": "AddPowerThisTurn", "target": "$targets", "delta": -3000 }
+    ]
+  },
+  "EB01-060": {
+    "_name": "我是……神！！",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "EB02-018": {
+    "_name": "巴奇",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张费用不高于4的角色转为休息状态" },
+      { "op": "Rest", "target": "$target" }
+    ]
+  },
+  "EB02-056": {
+    "_name": "贝加班克",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "EB03-059": {
+    "_name": "S-蛇女",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 6, "excludeName": "蒙奇·D·路飞" }, "as": "$target", "text": "本回合中，对方最多1张“蒙奇·D·路飞”以外、费用不高于6的角色无法攻击" },
+      { "op": "AddRestriction", "target": "$target", "kind": "CannotAttack" }
+    ]
+  },
+  "EB04-028": {
+    "_name": "冰冻时刻",
+    "trigger": [
+      { "op": "Choose", "prompt": "AnyCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 5 }, "as": "$target", "text": "将最多1张费用不高于5的角色放回其持有者的手牌" },
+      { "op": "BounceToHand", "target": "$target" }
+    ]
+  },
+  "EB04-041": {
+    "_name": "隐形·黑",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "EB04-059": {
+    "_name": "黑绳大龙卷风",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "EB04-060": {
+    "_name": "橡皮橡皮猎鹰机关枪",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP02-069": {
+    "_name": "DEATH WINK",
+    "trigger": [
+      { "op": "Choose", "prompt": "AnyCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 7 }, "as": "$target", "text": "将最多1张费用不高于7的角色放回其持有者的手牌" },
+      { "op": "BounceToHand", "target": "$target" }
+    ]
+  },
+  "OP03-119": {
+    "_name": "斩・切・麻糬",
+    "trigger": [
+      { "op": "PlayCharFromHand", "filter": { "originalCostLte": 4, "hasTrigger": true }, "text": "将手牌中最多1张费用不高于4且拥有【触发】效果的角色登场" }
+    ]
+  },
+  "OP04-037": {
+    "_name": "羽击线",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentRestingCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张休息状态且费用不高于4的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ]
+  },
+  "OP05-094": {
+    "_name": "高级缝制 七彩★拼接",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP05-115": {
+    "_name": "2亿伏 雷神",
+    "trigger": {
+      "cost": { "handDiscard": 2 },
+      "then": [
+        { "op": "AddLifeFromDeck", "n": 1 }
+      ]
+    }
+  },
+  "OP06-023": {
+    "_name": "阿龙",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张费用不高于4的角色转为休息状态" },
+      { "op": "Rest", "target": "$target" }
+    ]
+  },
+  "OP06-038": {
+    "_name": "一大・三千・大千・世界",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentRestingCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 3 }, "as": "$target", "text": "将对方最多1张休息状态且费用不高于3的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ]
+  },
+  "OP06-057": {
+    "_name": "老子绝对不怀疑女人的眼泪！",
+    "trigger": [
+      { "op": "PlayCharFromHand", "filter": { "originalCostLte": 2, "originalCostGte": 2 }, "text": "将手牌中最多1张费用为2的角色登场" }
+    ]
+  },
+  "OP06-101": {
+    "_name": "阿奈美",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 5 }, "as": "$target", "text": "将对方最多1张费用不高于5的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ]
+  },
+  "OP06-116": {
+    "_name": "排击",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "OP07-036": {
+    "_name": "鬼气 九刀流 阿修罗 魔九闪",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张费用不高于4的角色转为休息状态" },
+      { "op": "Rest", "target": "$target" }
+    ]
+  },
+  "OP07-078": {
+    "_name": "百万吨九尾快攻",
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active", "optional": true }
+    ]
+  },
+  "OP07-116": {
+    "_name": "裂焰斩",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张费用不高于4的角色转为休息状态" },
+      { "op": "Rest", "target": "$target" }
+    ]
+  },
+  "OP08-115": {
+    "_name": "大地……不会失败!!",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP09-059": {
+    "_name": "水蒸气杀人事件",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "OP09-104": {
+    "_name": "萨波",
+    "trigger": {
+      "if": { "leaderColorCountGte": 2 },
+      "then": [
+        { "op": "Draw", "n": 2 }
+      ]
+    }
+  },
+  "OP10-080": {
+    "_name": "小熊玩具",
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active", "optional": true }
+    ]
+  },
+  "OP10-109": {
+    "_name": "巴基尔·霍金斯",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP10-116": {
+    "_name": "电磁炮",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP11-019": {
+    "_name": "粘土蛛网",
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "min": 0, "max": 1, "as": "$target", "text": "本回合中，我方最多1张领袖或角色力量+1000" },
+      { "op": "AddPowerThisTurn", "target": "$target", "delta": 1000 }
+    ]
+  },
+  "OP11-079": {
+    "_name": "男人之间的胜负……!!!别擅自提供这种肤浅的援助啊!!",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "OP11-081": {
+    "_name": "皇帝剑破破刃",
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active", "optional": true }
+    ]
+  },
+  "OP12-113": {
+    "_name": "罗罗诺亚·佐罗",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 1 }, "as": "$target", "text": "将对方最多1张费用不高于1的角色KO" },
+      { "op": "KO", "target": "$target" },
+      { "op": "TrashToHand", "target": "self" }
+    ]
+  },
+  "OP14-082": {
+    "_name": "噗嘻恰克",
+    "trigger": [
+      { "op": "PlayCharFromTrash", "filter": { "originalCostLte": 2, "keyword": "恐怖之船海盗团" }, "rest": true, "text": "将废弃区中最多1张费用不高于2的《恐怖之船海盗团》角色以休息状态登场" }
+    ]
+  },
+  "P-106": {
+    "_name": "蒙奇·D·路飞",
+    "trigger": [
+      { "op": "Draw", "n": 1 },
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 2 }, "as": "$target", "text": "将对方最多1张费用不高于2的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ]
+  },
+  "PRB02-017": {
+    "_name": "波尔·汉库珂",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 4 }, "as": "$target", "text": "将对方最多1张费用不高于4的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ]
+  },
+  "ST36-002": {
+    "_name": "基拉",
+    "trigger": {
+      "if": { "oppLifeCountLte": 3 },
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
+  },
+  "ST36-003": {
+    "_name": "打碟人·阿保",
+    "trigger": [
+      { "op": "Draw", "n": 1 },
+      { "op": "SetOriginalPower", "target": "selfLeader", "value": 7000 }
+    ]
+  }
+}

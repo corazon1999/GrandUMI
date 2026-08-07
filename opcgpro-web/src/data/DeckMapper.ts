@@ -1,27 +1,92 @@
 import type { CardData } from "@/types/card";
+import type { SavedDeck } from "@/types/deck";
 import { getCard, applyCachedSprite } from "./CardLoader";
 
-export interface SavedDeck {
-  name: string;
-  leader: string;
-  leaderName: string;
-  leaderSprite: string;
-  charCount: number;
-  eventCount: number;
-  stageCount: number;
-  cards: string[];
-  /** 异画映射：卡号 → 对应 sprite URL */
-  spriteMap: Record<string, string>;
-  updatedAt: number;
+export type { SavedDeck } from "@/types/deck";
+
+const LEGACY_STORAGE_KEY = "grandumi_decks";
+const LEGACY_SELECTED_KEY = "grandumi_selected_deck";
+const DECKS_UPDATED_EVENT = "grandumi:decks-updated";
+let activeAccount = "";
+
+function encodedAccount(account: string): string {
+  return encodeURIComponent(account.trim().toLocaleLowerCase());
 }
 
-const STORAGE_KEY = "grandumi_decks";
+function resolveAccount(): string {
+  if (activeAccount) return activeAccount;
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("grandumi_account") ?? "";
+}
+
+function storageKey(account = resolveAccount()): string {
+  return account ? `grandumi_decks_${encodedAccount(account)}` : LEGACY_STORAGE_KEY;
+}
+
+function selectedKey(account = resolveAccount()): string {
+  return account ? `grandumi_selected_deck_${encodedAccount(account)}` : LEGACY_SELECTED_KEY;
+}
+
+function migrationKey(account: string): string {
+  return `grandumi_decks_migrated_${encodedAccount(account)}`;
+}
+
+function notifyDecksUpdated(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(DECKS_UPDATED_EVENT));
+}
+
+export function subscribeDecksUpdated(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(DECKS_UPDATED_EVENT, listener);
+  return () => window.removeEventListener(DECKS_UPDATED_EVENT, listener);
+}
+
+export function setDeckStorageAccount(account: string): void {
+  activeAccount = account.trim();
+}
+
+export function replaceAllDecks(decks: SavedDeck[]): void {
+  if (typeof window === "undefined") return;
+  const mapped = Object.fromEntries(decks.map((deck) => [deck.name, deck]));
+  localStorage.setItem(storageKey(), JSON.stringify(mapped));
+  notifyDecksUpdated();
+}
+
+export function loadLegacyDecksForMigration(account: string): SavedDeck[] {
+  if (typeof window === "undefined" || !account || localStorage.getItem(migrationKey(account))) return [];
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const decks = raw ? JSON.parse(raw) as Record<string, SavedDeck> : {};
+    return Object.values(decks);
+  } catch {
+    return [];
+  }
+}
+
+export function markLegacyDecksMigrated(account: string): void {
+  if (typeof window !== "undefined" && account) localStorage.setItem(migrationKey(account), "1");
+}
+
+export function getSelectedDeckName(): string | null {
+  if (typeof window === "undefined") return null;
+  const account = resolveAccount();
+  const scoped = localStorage.getItem(selectedKey(account));
+  if (scoped) return scoped;
+  if (account && localStorage.getItem(migrationKey(account))) return null;
+  return localStorage.getItem(LEGACY_SELECTED_KEY);
+}
+
+export function setSelectedDeckName(name: string | null): void {
+  if (typeof window === "undefined") return;
+  if (name) localStorage.setItem(selectedKey(), name);
+  else localStorage.removeItem(selectedKey());
+}
 
 export function saveDeck(
   name: string,
   leader: CardData,
   cards: CardData[]
-): void {
+): SavedDeck {
   const decks = loadAllDecks();
   // 收集所有卡牌的异画选择（只记录非默认第一个版本的）
   const spriteMap: Record<string, string> = {};
@@ -45,12 +110,14 @@ export function saveDeck(
     updatedAt: Date.now(),
   };
   decks[name] = saved;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
+  localStorage.setItem(storageKey(), JSON.stringify(decks));
+  notifyDecksUpdated();
+  return saved;
 }
 
 export function loadAllDecks(): Record<string, SavedDeck> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -105,7 +172,8 @@ export function getSpriteMap(name: string): Record<string, string> {
 export function deleteDeck(name: string): void {
   const decks = loadAllDecks();
   delete decks[name];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
+  localStorage.setItem(storageKey(), JSON.stringify(decks));
+  notifyDecksUpdated();
 }
 
 function isAltSprite(c: CardData): boolean {

@@ -76,7 +76,11 @@
   },
   "ST01-016": {
     "_name": "恶魔风脚",
-    "_note": "【主要】选我方最多1张《草帽一伙》领袖或角色，本回合其攻击时对方不能发动【阻挡者】（=赋予【不可阻挡】本回合）。原文生命触发“KO对方费用≤3且拥有阻挡者的角色”因无阻挡者特征过滤已略去。",
+    "_note": "【主要】选我方最多1张《草帽一伙》领袖或角色，本回合其攻击时对方不能发动【阻挡者】；生命触发KO对方费用≤3且当前拥有【阻挡者】效果的角色。",
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentCharacter", "min": 0, "max": 1, "filter": { "currentCostLte": 3, "effectiveKeyword": "阻挡者" }, "as": "$target", "text": "将对方最多1张费用不高于3且拥有【阻挡者】效果的角色KO" },
+      { "op": "KO", "target": "$target" }
+    ],
     "main": {
       "then": [
         { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "本回合该《草帽一伙》领袖或角色攻击时对方不能发动【阻挡者】" },

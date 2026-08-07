@@ -5,7 +5,9 @@ using System.Text;
 using System.Text.Json;
 using GrandUMI.Diagnostics;
 using GrandUMI.Game;
+using GrandUMI.Game.Stats;
 using GrandUMI.Game.Validation;
+using GrandUMI.Persistence;
 
 namespace GrandUMI;
 
@@ -16,6 +18,7 @@ namespace GrandUMI;
 /// </summary>
 public static class WebSocketBridge
 {
+    private const int MaxInboundMessageChars = 1_000_000;
     private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
     {
         "GameStart", "Resync", "SpectateJoin", "FirstPlayerChosen",
@@ -26,30 +29,23 @@ public static class WebSocketBridge
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object                                  AccountIndexGate = new();
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
-    private static readonly ConcurrentDictionary<string, WsSession> PendingRooms = new(); // roomCode → 房主
+    private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
     private static readonly ConcurrentDictionary<string, InviteInfo> PendingInvites = new(); // inviteId → 邀请对战
-    private static readonly ConcurrentDictionary<string, FriendlyRoom> FriendlyRooms = new(); // roomId → 友谊战房间
+    private static readonly ConcurrentDictionary<string, DuelLobby> FriendlyRooms = new(); // roomId → 共用赛前房间
     private static readonly ConcurrentDictionary<string, string> FriendlyByAccount = new(StringComparer.OrdinalIgnoreCase); // account → roomId
+    private static readonly ConcurrentDictionary<string, CancellationTokenSource> FriendlyDisconnectGrace = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> GameChatAt = new(); // sessionId → 上次局内聊天时间(限频防刷屏)
+    private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
 
-    private sealed class FriendlyRoom
-    {
-        public required string RoomId;
-        public required string[] Accounts;    // [0]=host [1]=guest
-        public required string[] Names;
-        public string?[] Decks     = new string?[2];
-        public string?[] DeckNames = new string?[2];
-        public bool[]    Ready     = new bool[2];
-        public int[]     Scores    = new int[2];
-        public string    State     = "lobby"; // lobby(房内) / playing(对战中)
-    }
-
     private static HttpListener?          _listener;
     private static CancellationTokenSource _cts = new();
+    private static PlayerDataStore _playerDataStore = null!;
 
     // ── JSON 工具 ─────────────────────────────────────────────────────────
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -71,8 +67,9 @@ public static class WebSocketBridge
     private static string Json(object obj) => JsonSerializer.Serialize(obj, JsonOpts);
 
     // ── 生命周期 ──────────────────────────────────────────────────────────
-    public static void Start(int port = 8080)
+    public static void Start(int port, PlayerDataStore playerDataStore)
     {
+        _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _cts      = new CancellationTokenSource();
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{port}/ws/");
@@ -139,6 +136,11 @@ public static class WebSocketBridge
                         return;
                     }
                     sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                    if (sb.Length > MaxInboundMessageChars)
+                    {
+                        await ws.CloseAsync(WebSocketCloseStatus.MessageTooBig, "消息体过大", CancellationToken.None);
+                        return;
+                    }
                 } while (!result.EndOfMessage);
 
                 // 单连接按接收顺序路由；游戏动作进入房间队列后会立即返回，
@@ -153,14 +155,26 @@ public static class WebSocketBridge
     private static void CloseSession(WsSession session)
     {
         Sessions.TryRemove(session.SessionId, out _);
-        if (session.Account is not null) AccountIndex.TryRemove(session.Account, out _);
+        var wasCurrentAccountSession = false;
+        if (session.Account is not null)
+        {
+            lock (AccountIndexGate)
+            {
+                if (AccountIndex.TryGetValue(session.Account, out var indexedSession) &&
+                    indexedSession == session.SessionId)
+                {
+                    AccountIndex.TryRemove(session.Account, out _);
+                    wasCurrentAccountSession = true;
+                }
+            }
+        }
         if (session.IsMatching) RebuildMatchQueue(session);
-        if (session.CurrentRoomCode is not null) PendingRooms.TryRemove(session.CurrentRoomCode, out _);
         // 对局中的玩家断开 → 进入 90s 宽限期（M1）
         GameOpponent.TryRemove(session.SessionId, out _);
         GameChatAt.TryRemove(session.SessionId, out _);
         CleanupInvites(session.SessionId);
-        if (session.Account is not null) HandleFriendlyDisconnect(session.Account);
+        if (session.Account is not null && wasCurrentAccountSession)
+            HandleFriendlyDisconnect(session.Account);
         GameRoomManager.OnPlayerDisconnect(session.SessionId);
         Log($"断开 {session.SessionId} ({session.Account ?? "未登录"})");
         // 在线人数变化，广播给剩余客户端
@@ -171,6 +185,7 @@ public static class WebSocketBridge
     private static void Route(string sessionId, string json)
     {
         if (!Sessions.TryGetValue(sessionId, out var session)) return;
+        session.MarkSeen();
 
         Dictionary<string, JsonElement>? msg;
         try { msg = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, JsonOpts); }
@@ -189,6 +204,11 @@ public static class WebSocketBridge
             case "MsgLogin":       OnLogin(session, msg);        break;
             case "MsgAddAccount":  OnAddAccount(session, msg);   break;
             case "MsgUpdatePs":    OnUpdatePs(session, msg);     break;
+            case "MsgSaveDeck":    OnSaveDeck(session, msg);     break;
+            case "MsgDeleteDeck":  OnDeleteDeck(session, msg);   break;
+            case "MsgSelectDeck":  OnSelectDeck(session, msg);   break;
+            case "MsgUpdateProfile": OnUpdateProfile(session, msg); break;
+            case "MsgImportDecks": OnImportDecks(session, msg);  break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -196,6 +216,7 @@ public static class WebSocketBridge
             case "MsgJoinRoom":    OnJoinRoom(session, msg);     break;
             case "MsgCancelRoom":  OnCancelRoom(session, msg);   break;
             case "MsgPlayerList":  OnPlayerList(session);        break;
+            case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
             case "MsgInvitePlayer": OnInvitePlayer(session, msg); break;
             case "MsgInviteResponse": OnInviteResponse(session, msg); break;
             case "MsgFriendlySelectDeck": OnFriendlySelectDeck(session, msg); break;
@@ -230,6 +251,78 @@ public static class WebSocketBridge
         => Send(s.SessionId, new { proto = "MsgPing" });
 
     private static void OnLogin(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var requestedAccount = Str(msg, "account") ?? "";
+        try
+        {
+            var playerData = _playerDataStore.Login(requestedAccount);
+
+            string? supersededSessionId = null;
+            lock (AccountIndexGate)
+            {
+                if (s.Account is not null &&
+                    !string.Equals(s.Account, playerData.Account, StringComparison.OrdinalIgnoreCase) &&
+                    AccountIndex.TryGetValue(s.Account, out var previousForOldAccount) &&
+                    previousForOldAccount == s.SessionId)
+                    AccountIndex.TryRemove(s.Account, out _);
+
+                if (AccountIndex.TryGetValue(playerData.Account, out var previousForAccount) &&
+                    previousForAccount != s.SessionId)
+                    supersededSessionId = previousForAccount;
+
+                s.Account = playerData.Account;
+                s.PlayerName = playerData.DisplayName;
+                AccountIndex[playerData.Account] = s.SessionId;
+            }
+
+            Send(s.SessionId, new
+            {
+                proto = "MsgLogin",
+                account = playerData.Account,
+                name = playerData.DisplayName,
+                avatar = playerData.Avatar,
+                selectedDeckName = playerData.SelectedDeckName,
+                decks = playerData.Decks,
+                result = true,
+                logStr = "登录成功",
+            });
+            Log($"登录 ✅ {playerData.Account}");
+
+            // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
+            if (supersededSessionId is not null && Sessions.TryGetValue(supersededSessionId, out var superseded))
+            {
+                try { superseded.Socket.Abort(); } catch { }
+            }
+
+            // 两个登录请求并发时，只有当前账号索引指向的最新连接有权恢复房间。
+            lock (AccountIndexGate)
+            {
+                if (!AccountIndex.TryGetValue(playerData.Account, out var currentSessionId) ||
+                    currentSessionId != s.SessionId)
+                    return;
+            }
+
+            // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复。
+            if (GameRoomManager.TryReclaim(s.SessionId, playerData.Account))
+                Log($"断线重连成功 {playerData.Account}");
+            else
+                TryRestoreFriendlyRoom(s, playerData.Account);
+
+            BroadcastOnlineCount();
+        }
+        catch (PlayerDataValidationException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgLogin", account = requestedAccount, name = "", result = false, logStr = ex.Message });
+            Log($"登录 ❌ {requestedAccount}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Send(s.SessionId, new { proto = "MsgLogin", account = requestedAccount, name = "", result = false, logStr = "玩家数据库暂时不可用" });
+            LogErr($"登录数据库异常 {requestedAccount}: {ex.Message}");
+        }
+    }
+
+    private static void OnLegacyLogin(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var account  = Str(msg, "account")  ?? "";
 
@@ -270,11 +363,90 @@ public static class WebSocketBridge
         Send(s.SessionId, new { proto = "MsgUpdatePs", result = true, logStr = "密码修改成功" });
     }
 
+    private static void OnSaveDeck(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var deck = DeserializeDeck(msg, "deck");
+            ValidatePlayableDeck(deck);
+            SendPlayerData(s, _playerDataStore.SaveDeck(s.Account!, deck));
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "保存卡组失败"); }
+    }
+
+    private static void OnDeleteDeck(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            SendPlayerData(s, _playerDataStore.DeleteDeck(s.Account!, Str(msg, "name") ?? ""));
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "删除卡组失败"); }
+    }
+
+    private static void OnSelectDeck(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            SendPlayerData(s, _playerDataStore.SelectDeck(s.Account!, Str(msg, "name")));
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "选择卡组失败"); }
+    }
+
+    private static void OnUpdateProfile(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var snapshot = _playerDataStore.UpdateProfile(
+                s.Account!,
+                Str(msg, "displayName") ?? "",
+                Str(msg, "avatar") ?? "");
+            s.PlayerName = snapshot.DisplayName;
+            SendPlayerData(s, snapshot);
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "更新玩家资料失败"); }
+    }
+
+    private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            if (!msg.TryGetValue("decks", out var value) || value.ValueKind != JsonValueKind.Array)
+                throw new PlayerDataValidationException("导入卡组数据无效。");
+
+            var sourceDecks = JsonSerializer.Deserialize<List<StoredDeck>>(value.GetRawText(), JsonOpts) ?? [];
+            var validDecks = new List<StoredDeck>();
+            var invalid = 0;
+            foreach (var deck in sourceDecks.Take(PlayerDataStore.MaxDecksPerPlayer))
+            {
+                try
+                {
+                    ValidatePlayableDeck(deck);
+                    validDecks.Add(deck);
+                }
+                catch (PlayerDataValidationException) { invalid++; }
+            }
+
+            var result = _playerDataStore.ImportDecks(s.Account!, validDecks);
+            var details = $"已导入 {result.Imported} 副本地卡组";
+            if (result.Renamed > 0) details += $"，{result.Renamed} 副因重名已改名";
+            var skipped = result.Skipped + invalid;
+            if (skipped > 0) details += $"，跳过 {skipped} 副";
+            SendPlayerData(s, result.Snapshot, details);
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "导入本地卡组失败"); }
+    }
+
     // ── 匹配相关 ──────────────────────────────────────────────────────────
 
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "请先登录" }); return; }
+        if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
         var v    = DeckValidator.Validate(deck);
@@ -297,6 +469,7 @@ public static class WebSocketBridge
     private static void OnEnterBotMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "请先登录" }); return; }
+        if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
         // 单人测试先后手（前端可选）：默认人类先手，仅显式 goFirst=false 时人类后手
@@ -324,7 +497,8 @@ public static class WebSocketBridge
                 p0First: goFirst,             // 单人测试先后手（前端可选，默认先手）
                 p0AlwaysPrompt: s.AlwaysPromptOnLifeReveal,
                 p1AlwaysPrompt: false,
-                vsBot: true);
+                vsBot: true,
+                matchKind: MatchKind.Bot);
             Log($"单人测试开局 {s.Account} vs 机器人");
         }
         catch (Exception ex)
@@ -373,7 +547,8 @@ public static class WebSocketBridge
                     p1.SessionId, p1.Account ?? "?", deck1,
                     p2.SessionId, p2.Account ?? "?", deck2,
                     p0AlwaysPrompt: p1.AlwaysPromptOnLifeReveal,
-                    p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal);
+                    p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal,
+                    matchKind: MatchKind.Matchmaking);
             }
             catch (Exception ex)
             {
@@ -419,7 +594,21 @@ public static class WebSocketBridge
             return;
         }
 
+        var existingRoom = GetFriendlyRoomOf(s);
+        if (existingRoom is not null && existingRoom.IsRoomCode && existingRoom.State == "lobby")
+        {
+            Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = existingRoom.JoinCode, result = true });
+            PushFriendlyRoom(existingRoom);
+            return;
+        }
+        if (StatusOf(s) != "idle")
+        {
+            Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = "你正在匹配、房间或对局中" });
+            return;
+        }
+
         var deck = Str(msg, "deck") ?? "";
+        var deckName = Str(msg, "deckName") ?? "大厅所选卡组";
         var v    = DeckValidator.Validate(deck);
         if (!v.Ok)
         {
@@ -427,20 +616,32 @@ public static class WebSocketBridge
             Log($"创建房间拒绝 {s.Account}: {v.Reason}");
             return;
         }
-        s.Deck = deck;
+        var roomId = Guid.NewGuid().ToString("N")[..12];
+        var room = new DuelLobby
+        {
+            RoomId = roomId,
+            MatchKind = MatchKind.RoomCode,
+            JoinCode = GenerateRoomCode(),
+        };
+        room.Accounts[0] = s.Account!;
+        room.Names[0] = s.PlayerName ?? s.Account!;
+        room.Decks[0] = deck;
+        room.DeckNames[0] = deckName;
 
-        // 如果已在房间中则先退出旧房间
-        if (s.CurrentRoomCode is not null)
-            PendingRooms.TryRemove(s.CurrentRoomCode, out _);
+        FriendlyRooms[roomId] = room;
+        if (!FriendlyByAccount.TryAdd(s.Account!, roomId))
+        {
+            FriendlyRooms.TryRemove(roomId, out _);
+            Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = "你已经在其他房间中" });
+            return;
+        }
+        while (!PendingRooms.TryAdd(room.JoinCode!, roomId))
+            room = ReplaceRoomCode(room, GenerateRoomCode());
 
-        var code = GenerateRoomCode();
-        while (PendingRooms.ContainsKey(code)) code = GenerateRoomCode();
-
-        s.CurrentRoomCode = code;
-        PendingRooms[code] = s;
-
-        Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = code, result = true });
-        Log($"创建房间 {s.Account} → {code}");
+        Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = room.JoinCode, result = true });
+        PushFriendlyRoom(room);
+        ScheduleRoomCodeExpiry(room);
+        Log($"创建房间码友谊战 {s.Account} → {room.JoinCode} ({roomId})");
     }
 
     private static void OnJoinRoom(WsSession s, Dictionary<string, JsonElement> msg)
@@ -453,6 +654,13 @@ public static class WebSocketBridge
 
         var code = Str(msg, "roomCode")?.ToUpperInvariant() ?? "";
         var deck = Str(msg, "deck") ?? "";
+        var deckName = Str(msg, "deckName") ?? "大厅所选卡组";
+
+        if (code.Length != 6 || code.Any(ch => !RoomCodeChars.Contains(ch)))
+        {
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "房间码格式不正确" });
+            return;
+        }
 
         var v = DeckValidator.Validate(deck);
         if (!v.Ok)
@@ -461,48 +669,106 @@ public static class WebSocketBridge
             Log($"加入房间拒绝 {s.Account}: {v.Reason}");
             return;
         }
-        s.Deck = deck;
+        var existingRoom = GetFriendlyRoomOf(s);
+        if (existingRoom is not null)
+        {
+            if (existingRoom.IsRoomCode && string.Equals(existingRoom.JoinCode, code, StringComparison.OrdinalIgnoreCase))
+            {
+                Send(s.SessionId, new { proto = "MsgJoinRoom", result = true });
+                PushFriendlyRoom(existingRoom);
+                return;
+            }
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "你已经在其他房间中" });
+            return;
+        }
+        if (StatusOf(s) != "idle")
+        {
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "你正在匹配、观战或对局中" });
+            return;
+        }
 
-        if (!PendingRooms.TryRemove(code, out var host))
+        if (!PendingRooms.TryGetValue(code, out var roomId) ||
+            !FriendlyRooms.TryGetValue(roomId, out var room))
         {
             Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "房间不存在或已失效" });
             return;
         }
 
-        if (host.SessionId == s.SessionId)
+        string? joinError;
+        WsSession? host;
+        lock (room.Gate)
         {
-            // 自己加自己（极端情况）
-            PendingRooms[code] = host;
-            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "不能加入自己创建的房间" });
+            var hostAccount = room.Accounts[0];
+            if (hostAccount is null ||
+                !PendingRooms.TryGetValue(code, out var currentRoomId) || currentRoomId != room.RoomId)
+            {
+                joinError = "房间不存在或已失效";
+                host = null;
+            }
+            else if (!TryGetActiveSession(hostAccount, out host))
+            {
+                AbortInactiveSession(hostAccount);
+                joinError = "房主正在重连，请稍后重试";
+            }
+            else if (!room.TryAddGuest(s.Account!, s.PlayerName ?? s.Account!, deck, deckName, out joinError))
+            {
+                // TryAddGuest 已返回具体原因。
+            }
+            else if (!FriendlyByAccount.TryAdd(s.Account!, room.RoomId))
+            {
+                room.Accounts[1] = null;
+                room.Names[1] = null;
+                room.Decks[1] = null;
+                room.DeckNames[1] = null;
+                joinError = "你已经在其他房间中";
+            }
+            else
+            {
+                PendingRooms.TryRemove(code, out _);
+            }
+        }
+
+        if (joinError is not null)
+        {
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = joinError });
             return;
         }
 
-        host.CurrentRoomCode = null;
-        s.CurrentRoomCode    = null;
-
-        // 记录对局关系
-        var deck1   = host.Deck ?? "";
-        var deck2   = s.Deck ?? "";
-        // 通知双方加入成功(房间码流程特有,带对手名)
-        Send(host.SessionId, new { proto = "MsgJoinRoom", result = true,
-            opponentName = s.PlayerName ?? "?" });
         Send(s.SessionId, new { proto = "MsgJoinRoom", result = true,
-            opponentName = host.PlayerName ?? "?" });
-
-        // 建房开战(与邀请对战共用)
-        StartDuel(host, deck1, s, deck2);
-        Log($"房间对战: {host.Account} vs {s.Account} code={code}");
+            opponentName = host!.PlayerName ?? host.Account ?? "?" });
+        PushFriendlyRoom(room);
+        Log($"加入房间码友谊战: {host.Account} & {s.Account} code={code} ({room.RoomId})");
     }
 
     private static void OnCancelRoom(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (s.CurrentRoomCode is not null)
-        {
-            PendingRooms.TryRemove(s.CurrentRoomCode, out _);
-            s.CurrentRoomCode = null;
-        }
+        var room = GetFriendlyRoomOf(s);
+        if (room is not null && room.IsRoomCode && room.State == "lobby")
+            DisbandFriendlyRoom(room, leaverAccount: s.Account);
         Send(s.SessionId, new { proto = "MsgCancelRoom" });
         Log($"取消房间 {s.Account}");
+    }
+
+    private static DuelLobby ReplaceRoomCode(DuelLobby source, string roomCode)
+    {
+        var replacement = new DuelLobby
+        {
+            RoomId = source.RoomId,
+            MatchKind = source.MatchKind,
+            JoinCode = roomCode,
+            State = source.State,
+        };
+        for (var i = 0; i < 2; i++)
+        {
+            replacement.Accounts[i] = source.Accounts[i];
+            replacement.Names[i] = source.Names[i];
+            replacement.Decks[i] = source.Decks[i];
+            replacement.DeckNames[i] = source.DeckNames[i];
+            replacement.Ready[i] = source.Ready[i];
+            replacement.Scores[i] = source.Scores[i];
+        }
+        FriendlyRooms[source.RoomId] = replacement;
+        return replacement;
     }
 
     // ── 在线玩家列表 + 邀请对战 ──────────────────────────────────────────────
@@ -539,6 +805,50 @@ public static class WebSocketBridge
             })
             .ToArray();
         Send(s.SessionId, new { proto = "MsgPlayerList", players });
+    }
+
+    private static void OnLeaderLeaderboard(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new { proto = "MsgLeaderLeaderboard", result = false, error = "请先登录" });
+            return;
+        }
+
+        try
+        {
+            var snapshot = LeaderStatsStore.Default.GetLeaderboard(Str(msg, "period"));
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderLeaderboard",
+                result = true,
+                period = snapshot.Period,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
+                sinceUtc = snapshot.SinceUtc,
+                totalMatches = snapshot.TotalMatches,
+                minimumGames = snapshot.MinimumGames,
+                items = snapshot.Items.Select(x => new
+                {
+                    rank = x.Rank,
+                    leaderNumber = x.LeaderNumber,
+                    games = x.Games,
+                    wins = x.Wins,
+                    losses = x.Losses,
+                    winRate = x.WinRate,
+                    usageRate = x.UsageRate,
+                    firstGames = x.FirstGames,
+                    firstWinRate = x.FirstWinRate,
+                    secondGames = x.SecondGames,
+                    secondWinRate = x.SecondWinRate,
+                    insufficientSample = x.InsufficientSample,
+                }),
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取 Leader 排行榜失败: {ex.Message}");
+            Send(s.SessionId, new { proto = "MsgLeaderLeaderboard", result = false, error = "排行榜暂时不可用" });
+        }
     }
 
     private static void OnInvitePlayer(WsSession s, Dictionary<string, JsonElement> msg)
@@ -616,7 +926,12 @@ public static class WebSocketBridge
             return;
         }
 
-        CreateFriendlyRoom(from, s);
+        if (!CreateFriendlyRoom(from, s))
+        {
+            Send(s.SessionId, new { proto = "MsgInviteResult", accepted = false, logStr = "一方已进入其他房间" });
+            Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = "一方已进入其他房间" });
+            return;
+        }
         Log($"友谊战房间建立 {from.Account} & {s.Account}");
     }
 
@@ -634,18 +949,15 @@ public static class WebSocketBridge
         }
     }
 
-    /// <summary>建立对局(房间码/邀请/友谊战共用):双方进场 → 骰点选择先后手 → 建房。返回对局 roomId(失败 null)</summary>
-    private static string? StartDuel(WsSession host, string hostDeck, WsSession guest, string guestDeck, string? friendlyRoomId = null)
+    /// <summary>共用赛前房间开局：先注册权威对局，再通知双方切换页面并广播首份快照。</summary>
+    private static string? StartDuel(
+        WsSession host,
+        string hostDeck,
+        WsSession guest,
+        string guestDeck,
+        string friendlyRoomId,
+        MatchKind matchKind)
     {
-        host.CurrentRoomCode  = null;
-        guest.CurrentRoomCode = null;
-        GameOpponent[host.SessionId]  = guest.SessionId;
-        GameOpponent[guest.SessionId] = host.SessionId;
-
-        // MsgGameStart：客户端切换到游戏场景；具体牌面由后续 MsgGameState 推送
-        Send(host.SessionId,  new { proto = "MsgGameStart" });
-        Send(guest.SessionId, new { proto = "MsgGameStart" });
-
         try
         {
             var room = GameRoomManager.CreateRoom(
@@ -653,7 +965,14 @@ public static class WebSocketBridge
                 guest.SessionId, guest.Account ?? "?", guestDeck,
                 p0AlwaysPrompt: host.AlwaysPromptOnLifeReveal,
                 p1AlwaysPrompt: guest.AlwaysPromptOnLifeReveal,
-                friendlyRoomId: friendlyRoomId);
+                friendlyRoomId: friendlyRoomId,
+                matchKind: matchKind,
+                broadcastInitialState: false);
+            GameOpponent[host.SessionId]  = guest.SessionId;
+            GameOpponent[guest.SessionId] = host.SessionId;
+            Send(host.SessionId,  new { proto = "MsgGameStart" });
+            Send(guest.SessionId, new { proto = "MsgGameStart" });
+            room.Engine.BroadcastInitialState();
             return room.RoomId;
         }
         catch (Exception ex)
@@ -667,98 +986,158 @@ public static class WebSocketBridge
 
     // ── 友谊战房间 ──────────────────────────────────────────────────────────
 
-    private static int FriendlyIndexOf(FriendlyRoom room, string account)
+    private static int FriendlyIndexOf(DuelLobby room, string account)
         => Array.FindIndex(room.Accounts, a => string.Equals(a, account, StringComparison.OrdinalIgnoreCase));
 
-    private static FriendlyRoom? GetFriendlyRoomOf(WsSession s)
+    private static DuelLobby? GetFriendlyRoomOf(WsSession s)
         => s.Account is not null && FriendlyByAccount.TryGetValue(s.Account, out var rid)
            && FriendlyRooms.TryGetValue(rid, out var room) ? room : null;
 
-    private static object[] FriendlyPlayers(FriendlyRoom room)
+    private static object[] FriendlyPlayers(DuelLobby room)
     {
-        var players = new object[2];
+        var players = new List<object>(2);
         for (int i = 0; i < 2; i++)
-            players[i] = new { account = room.Accounts[i], name = room.Names[i],
-                               deckName = room.DeckNames[i], ready = room.Ready[i] };
-        return players;
+        {
+            var account = room.Accounts[i];
+            if (account is null) continue;
+            players.Add(new
+            {
+                account,
+                name = room.Names[i] ?? account,
+                deckName = room.DeckNames[i],
+                ready = room.Ready[i],
+                connected = TryGetActiveSession(account, out _),
+            });
+        }
+        return players.ToArray();
     }
 
-    private static void PushFriendlyRoom(FriendlyRoom room, string? error = null)
+    private static void PushFriendlyRoom(DuelLobby room, string? error = null)
     {
-        var payload = new { proto = "MsgFriendlyRoom", roomId = room.RoomId,
-                            players = FriendlyPlayers(room), scores = room.Scores,
-                            state = room.State, error };
-        foreach (var acc in room.Accounts)
-            if (AccountIndex.TryGetValue(acc, out var sid))
-                Send(sid, payload);
+        lock (room.Gate)
+        {
+            if (room.State == "closed" ||
+                !FriendlyRooms.TryGetValue(room.RoomId, out var current) ||
+                !ReferenceEquals(current, room))
+                return;
+
+            var payload = new
+            {
+                proto = "MsgFriendlyRoom",
+                roomId = room.RoomId,
+                origin = room.IsRoomCode ? "roomCode" : "invite",
+                roomCode = room.IsRoomCode && !room.IsFull ? room.JoinCode : null,
+                players = FriendlyPlayers(room),
+                scores = room.Scores.ToArray(),
+                state = room.State,
+                error,
+            };
+            foreach (var acc in room.Accounts)
+                if (acc is not null && AccountIndex.TryGetValue(acc, out var sid))
+                    Send(sid, payload);
+        }
     }
 
-    private static void CreateFriendlyRoom(WsSession host, WsSession guest)
+    private static bool CreateFriendlyRoom(WsSession host, WsSession guest)
     {
         var roomId = Guid.NewGuid().ToString("N")[..12];
-        var room = new FriendlyRoom
+        var room = new DuelLobby
         {
-            RoomId   = roomId,
-            Accounts = new[] { host.Account!, guest.Account! },
-            Names    = new[] { host.PlayerName ?? host.Account!, guest.PlayerName ?? guest.Account! },
+            RoomId = roomId,
+            MatchKind = MatchKind.Friendly,
         };
+        room.Accounts[0] = host.Account!;
+        room.Accounts[1] = guest.Account!;
+        room.Names[0] = host.PlayerName ?? host.Account!;
+        room.Names[1] = guest.PlayerName ?? guest.Account!;
         FriendlyRooms[roomId] = room;
-        FriendlyByAccount[host.Account!]  = roomId;
-        FriendlyByAccount[guest.Account!] = roomId;
+        if (!FriendlyByAccount.TryAdd(host.Account!, roomId))
+        {
+            FriendlyRooms.TryRemove(roomId, out _);
+            return false;
+        }
+        if (!FriendlyByAccount.TryAdd(guest.Account!, roomId))
+        {
+            if (FriendlyByAccount.TryGetValue(host.Account!, out var hostRoomId) && hostRoomId == roomId)
+                FriendlyByAccount.TryRemove(host.Account!, out _);
+            FriendlyRooms.TryRemove(roomId, out _);
+            return false;
+        }
         PushFriendlyRoom(room);
+        return true;
     }
 
     private static void OnFriendlySelectDeck(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var room = GetFriendlyRoomOf(s);
-        if (room is null || s.Account is null || room.State != "lobby") return;
-        int idx = FriendlyIndexOf(room, s.Account);
-        if (idx < 0) return;
+        if (room is null || s.Account is null) return;
 
         var deck = Str(msg, "deck") ?? "";
         var v = DeckValidator.Validate(deck);
         if (!v.Ok) { PushFriendlyRoom(room, $"卡组不合法: {v.Reason}"); return; }
 
-        room.Decks[idx]     = deck;
-        room.DeckNames[idx] = Str(msg, "deckName") ?? "卡组";
-        room.Ready[idx]     = false; // 换卡组需重新准备
+        lock (room.Gate)
+        {
+            if (room.State != "lobby") return;
+            int idx = FriendlyIndexOf(room, s.Account);
+            if (idx < 0) return;
+            room.Decks[idx]     = deck;
+            room.DeckNames[idx] = Str(msg, "deckName") ?? "卡组";
+            room.Ready[idx]     = false; // 换卡组需重新准备
+        }
         PushFriendlyRoom(room);
     }
 
     private static void OnFriendlyReady(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var room = GetFriendlyRoomOf(s);
-        if (room is null || s.Account is null || room.State != "lobby") return;
-        int idx = FriendlyIndexOf(room, s.Account);
-        if (idx < 0) return;
+        if (room is null || s.Account is null) return;
 
         bool ready = Bool(msg, "ready");
-        if (ready && room.Decks[idx] is null) { PushFriendlyRoom(room, "请先选择卡组"); return; }
-        room.Ready[idx] = ready;
+        lock (room.Gate)
+        {
+            if (room.State != "lobby") return;
+            int idx = FriendlyIndexOf(room, s.Account);
+            if (idx < 0) return;
+            if (ready && room.Decks[idx] is null) { PushFriendlyRoom(room, "请先选择卡组"); return; }
+            room.Ready[idx] = ready;
+        }
         PushFriendlyRoom(room);
         TryStartFriendlyGame(room);
     }
 
-    private static void TryStartFriendlyGame(FriendlyRoom room)
+    private static void TryStartFriendlyGame(DuelLobby room)
     {
-        if (room.State != "lobby") return;
-        if (!(room.Ready[0] && room.Ready[1])) return;
-        if (room.Decks[0] is null || room.Decks[1] is null) return;
-        if (!AccountIndex.TryGetValue(room.Accounts[0], out var sid0) || !Sessions.TryGetValue(sid0, out var host)) return;
-        if (!AccountIndex.TryGetValue(room.Accounts[1], out var sid1) || !Sessions.TryGetValue(sid1, out var guest)) return;
+        if (!room.TryBeginStart(out var start) || start is null) return;
+        if (!TryGetActiveSession(start.HostAccount, out var host) ||
+            !TryGetActiveSession(start.GuestAccount, out var guest))
+        {
+            room.CompleteStart(success: false);
+            PushFriendlyRoom(room, "有玩家连接中断，请等待重连后重新准备");
+            return;
+        }
 
-        room.State    = "playing";
-        room.Ready[0] = false;
-        room.Ready[1] = false;
-        var gameRoomId = StartDuel(host, room.Decks[0]!, guest, room.Decks[1]!, friendlyRoomId: room.RoomId);
-        if (gameRoomId is null) room.State = "lobby"; // 建房失败,退回房间
         PushFriendlyRoom(room);
+        var gameRoomId = StartDuel(host, start.HostDeck, guest, start.GuestDeck, room.RoomId, room.MatchKind);
+        room.CompleteStart(gameRoomId is not null);
+        PushFriendlyRoom(room);
+        if (gameRoomId is null)
+        {
+            foreach (var account in room.Accounts)
+                if (account is not null && !TryGetActiveSession(account, out _))
+                    HandleFriendlyDisconnect(account);
+        }
     }
 
     private static void OnFriendlyLeave(WsSession s)
     {
         var room = GetFriendlyRoomOf(s);
         if (room is null || s.Account is null) return;
+        if (room.State != "lobby")
+        {
+            PushFriendlyRoom(room, "对局正在开始或进行中，无法退出赛前房间");
+            return;
+        }
         Send(s.SessionId, new { proto = "MsgFriendlyLeft", logStr = "已退出房间" });
         DisbandFriendlyRoom(room, leaverAccount: s.Account);
     }
@@ -767,39 +1146,158 @@ public static class WebSocketBridge
     public static void OnFriendlyGameEnd(string friendlyRoomId, string? winnerAccount)
     {
         if (!FriendlyRooms.TryGetValue(friendlyRoomId, out var room)) return;
-        if (winnerAccount is not null)
+        lock (room.Gate)
         {
-            int wi = FriendlyIndexOf(room, winnerAccount);
-            if (wi >= 0) room.Scores[wi]++;
+            if (winnerAccount is not null)
+            {
+                int wi = FriendlyIndexOf(room, winnerAccount);
+                if (wi >= 0) room.Scores[wi]++;
+            }
+            room.State    = "lobby";
+            room.Ready[0] = false;
+            room.Ready[1] = false;
         }
-        room.State    = "lobby";
-        room.Ready[0] = false;
-        room.Ready[1] = false;
         // 确保对手映射清理,使双方能再次开战
         foreach (var acc in room.Accounts)
-            if (AccountIndex.TryGetValue(acc, out var sid))
+            if (acc is not null && AccountIndex.TryGetValue(acc, out var sid))
                 GameOpponent.TryRemove(sid, out _);
         PushFriendlyRoom(room);
     }
 
-    /// <summary>断线处理:房内(lobby)断线解散房间;对战中(playing)断线交给对局宽限期,房间保留</summary>
+    /// <summary>赛前房间断线保留 30 秒等待同账号重连；对战中由正式对局的 90 秒宽限期处理。</summary>
     private static void HandleFriendlyDisconnect(string account)
     {
         if (!FriendlyByAccount.TryGetValue(account, out var roomId)) return;
         if (!FriendlyRooms.TryGetValue(roomId, out var room)) return;
-        if (room.State == "playing") return;
-        DisbandFriendlyRoom(room, leaverAccount: account);
+        if (room.State is "playing" or "starting") return;
+
+        CancelFriendlyDisconnectGrace(account);
+        var cts = new CancellationTokenSource();
+        FriendlyDisconnectGrace[account] = cts;
+        PushFriendlyRoom(room);
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(LobbyReconnectGrace, cts.Token); }
+            catch (TaskCanceledException) { return; }
+
+            if (TryGetActiveSession(account, out _)) return;
+            if (!FriendlyByAccount.TryGetValue(account, out var currentRoomId) || currentRoomId != roomId) return;
+            if (!FriendlyRooms.TryGetValue(roomId, out var currentRoom) || currentRoom.State != "lobby") return;
+            DisbandFriendlyRoom(currentRoom, leaverAccount: account);
+        });
     }
 
-    private static void DisbandFriendlyRoom(FriendlyRoom room, string? leaverAccount)
+    private static void DisbandFriendlyRoom(
+        DuelLobby room,
+        string? leaverAccount,
+        string otherMessage = "对方已离开房间",
+        bool onlyIfWaitingForGuest = false)
     {
+        if (!room.TryClose(onlyIfWaitingForGuest)) return;
         FriendlyRooms.TryRemove(room.RoomId, out _);
-        foreach (var acc in room.Accounts) FriendlyByAccount.TryRemove(acc, out _);
+        if (room.JoinCode is not null &&
+            PendingRooms.TryGetValue(room.JoinCode, out var pendingRoomId) && pendingRoomId == room.RoomId)
+            PendingRooms.TryRemove(room.JoinCode, out _);
         foreach (var acc in room.Accounts)
         {
+            if (acc is null) continue;
+            CancelFriendlyDisconnectGrace(acc);
+            if (FriendlyByAccount.TryGetValue(acc, out var currentRoomId) && currentRoomId == room.RoomId)
+                FriendlyByAccount.TryRemove(acc, out _);
+        }
+        foreach (var acc in room.Accounts)
+        {
+            if (acc is null) continue;
             if (string.Equals(acc, leaverAccount, StringComparison.OrdinalIgnoreCase)) continue;
             if (AccountIndex.TryGetValue(acc, out var sid))
-                Send(sid, new { proto = "MsgFriendlyLeft", logStr = "对方已离开房间" });
+                Send(sid, new { proto = "MsgFriendlyLeft", logStr = otherMessage });
+        }
+    }
+
+    private static bool TryGetActiveSession(string account, out WsSession session)
+    {
+        session = null!;
+        if (!AccountIndex.TryGetValue(account, out var sid) ||
+            !Sessions.TryGetValue(sid, out var candidate) ||
+            candidate.Socket.State != WebSocketState.Open ||
+            !candidate.IsRecentlyActive(ActiveSessionMaxIdle))
+            return false;
+        session = candidate;
+        return true;
+    }
+
+    private static void AbortInactiveSession(string account)
+    {
+        if (!AccountIndex.TryGetValue(account, out var sid) || !Sessions.TryGetValue(sid, out var session)) return;
+        if (session.Socket.State == WebSocketState.Open && session.IsRecentlyActive(ActiveSessionMaxIdle)) return;
+        try { session.Socket.Abort(); } catch { }
+    }
+
+    private static void ScheduleRoomCodeExpiry(DuelLobby room)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromMinutes(10));
+            if (!FriendlyRooms.TryGetValue(room.RoomId, out var current) || !ReferenceEquals(current, room)) return;
+            if (room.JoinCode is null ||
+                !PendingRooms.TryGetValue(room.JoinCode, out var roomId) || roomId != room.RoomId)
+                return;
+            DisbandFriendlyRoom(
+                room,
+                leaverAccount: null,
+                otherMessage: "房间码已过期，请重新创建",
+                onlyIfWaitingForGuest: true);
+        });
+    }
+
+    private static void TryRestoreFriendlyRoom(WsSession session, string account)
+    {
+        CancelFriendlyDisconnectGrace(account);
+        if (!FriendlyByAccount.TryGetValue(account, out var roomId)) return;
+        if (!FriendlyRooms.TryGetValue(roomId, out var room))
+        {
+            FriendlyByAccount.TryRemove(account, out _);
+            return;
+        }
+        if (room.State == "lobby")
+        {
+            PushFriendlyRoom(room);
+            Log($"赛前房间重连成功 {account} → {roomId}");
+        }
+        else if (room.State == "starting")
+        {
+            // 开局注册与新连接登录可能恰好并发；短暂轮询权威对局，避免新连接错过开局后只能刷新。
+            _ = Task.Run(async () =>
+            {
+                for (var attempt = 0; attempt < 20; attempt++)
+                {
+                    await Task.Delay(100);
+                    if (!AccountIndex.TryGetValue(account, out var currentSessionId) ||
+                        currentSessionId != session.SessionId)
+                        return;
+                    if (GameRoomManager.TryReclaim(session.SessionId, account))
+                    {
+                        Log($"开局期间重连成功 {account} → {roomId}");
+                        return;
+                    }
+                    if (!FriendlyRooms.TryGetValue(roomId, out var currentRoom)) return;
+                    if (currentRoom.State == "lobby")
+                    {
+                        PushFriendlyRoom(currentRoom);
+                        return;
+                    }
+                    if (currentRoom.State == "closed") return;
+                }
+            });
+        }
+    }
+
+    private static void CancelFriendlyDisconnectGrace(string account)
+    {
+        if (FriendlyDisconnectGrace.TryRemove(account, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 
@@ -983,7 +1481,7 @@ public static class WebSocketBridge
     private static void OnChatMsg(WsSession s, Dictionary<string, JsonElement> msg)
     {
         int type = msg.TryGetValue("type", out var t) ? t.GetInt32() : 0;
-        var name = Str(msg, "Name") ?? s.PlayerName ?? "";
+        var name = s.PlayerName ?? s.Account ?? "";
         var text = Str(msg, "Msg")  ?? "";
         var pkt  = new { proto = "MsgChatMsg", type, Name = name, Msg = text };
 
@@ -1025,8 +1523,70 @@ public static class WebSocketBridge
 
     // ── 对手查找 ──────────────────────────────────────────────────────────
 
+    private static bool TryRequirePlayer(WsSession session)
+    {
+        if (session.IsLoggedIn) return true;
+        Send(session.SessionId, new { proto = "MsgPlayerData", result = false, logStr = "请先登录" });
+        return false;
+    }
+
+    private static StoredDeck DeserializeDeck(IReadOnlyDictionary<string, JsonElement> msg, string key)
+    {
+        if (!msg.TryGetValue(key, out var value) || value.ValueKind != JsonValueKind.Object)
+            throw new PlayerDataValidationException("卡组数据无效。");
+        return JsonSerializer.Deserialize<StoredDeck>(value.GetRawText(), JsonOpts)
+               ?? throw new PlayerDataValidationException("卡组数据无效。");
+    }
+
+    private static void ValidatePlayableDeck(StoredDeck deck)
+    {
+        var deckText = string.Join('\n', new[] { deck.Leader }.Concat(deck.Cards ?? []));
+        var validation = DeckValidator.Validate(deckText);
+        if (!validation.Ok)
+            throw new PlayerDataValidationException($"卡组不合法: {validation.Reason}");
+    }
+
+    private static void SendPlayerData(WsSession session, PlayerDataSnapshot snapshot, string? logStr = null)
+    {
+        Send(session.SessionId, new
+        {
+            proto = "MsgPlayerData",
+            result = true,
+            logStr,
+            account = snapshot.Account,
+            displayName = snapshot.DisplayName,
+            avatar = snapshot.Avatar,
+            selectedDeckName = snapshot.SelectedDeckName,
+            decks = snapshot.Decks,
+        });
+    }
+
+    private static void SendPlayerDataError(WsSession session, Exception exception, string fallback)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : fallback;
+        if (exception is not PlayerDataValidationException)
+            LogErr($"{fallback} {session.Account}: {exception.Message}");
+        Send(session.SessionId, new { proto = "MsgPlayerData", result = false, logStr = message });
+    }
+
     private static string? GetOpponentSid(string selfSid)
         => GameOpponent.TryGetValue(selfSid, out var opp) ? opp : null;
+
+    /// <summary>正式对局按账号恢复到新连接时同步会话级对手索引。</summary>
+    public static void OnGameSessionRebound(string oldSessionId, string newSessionId, string opponentSessionId)
+    {
+        GameOpponent.TryRemove(oldSessionId, out _);
+        GameOpponent[newSessionId] = opponentSessionId;
+        if (GameOpponent.TryGetValue(opponentSessionId, out var mappedOpponent) && mappedOpponent == oldSessionId)
+            GameOpponent[opponentSessionId] = newSessionId;
+    }
+
+    /// <summary>权威对局清理时同步清除会话级对手索引，避免玩家赛后仍显示忙碌。</summary>
+    public static void OnGameRoomClosed(IEnumerable<string> sessionIds)
+    {
+        foreach (var sessionId in sessionIds)
+            GameOpponent.TryRemove(sessionId, out _);
+    }
 
     // ── 发送工具 ──────────────────────────────────────────────────────────
 

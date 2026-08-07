@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { loadAllCards, loadCardSet } from "@/data/CardLoader";
-import { loadDeck } from "@/data/DeckMapper";
+import { getSelectedDeckName, loadDeck } from "@/data/DeckMapper";
 import { DEFAULT_SEARCH_SETS, ALL_SET_NAMES } from "@/data/cardSets";
 import { useDeckStore } from "@/store/deckStore";
 import SearchPanel from "@/components/deck-editor/SearchPanel";
@@ -49,7 +49,7 @@ export default function DeckEditorPage() {
           useDeckStore.getState().clearDeck();
         } else {
           // 自动加载主页已选中的卡组
-          const selectedDeck = localStorage.getItem("grandumi_selected_deck");
+          const selectedDeck = getSelectedDeckName();
           if (selectedDeck) {
             const deck = loadDeck(selectedDeck);
             if (deck) {

@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using GrandUMI.Diagnostics;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
+using GrandUMI.Game.Stats;
 
 namespace GrandUMI.Game;
 
@@ -46,6 +47,8 @@ public static class GameRoomManager
         public string? MatchLogPath { get; set; }
         /// <summary>是否为单人测试模式（P1 为机器人）</summary>
         public bool VsBot { get; init; }
+        /// <summary>对局来源，用于 Leader 统计与后续分模式分析。</summary>
+        public MatchKind MatchKind { get; init; }
         /// <summary>机器人思考是否已排队（去抖）</summary>
         public bool BotScheduled { get; set; }
         /// <summary>关联的友谊战房间 ID(非友谊战为 null);对局结束时回调更新比分并退回房间</summary>
@@ -67,10 +70,16 @@ public static class GameRoomManager
     public static RoomEntry CreateRoom(string p0Sid, string p0Account, string p0Deck,
                                         string p1Sid, string p1Account, string p1Deck,
                                         bool? p0First = null,
-                                        bool p0AlwaysPrompt = false, bool p1AlwaysPrompt = false,
-                                        bool vsBot = false,
-                                        string? friendlyRoomId = null)
+                                         bool p0AlwaysPrompt = false, bool p1AlwaysPrompt = false,
+                                          bool vsBot = false,
+                                          string? friendlyRoomId = null,
+                                          MatchKind matchKind = MatchKind.UnknownHuman,
+                                          bool broadcastInitialState = true)
     {
+        if (vsBot) matchKind = MatchKind.Bot;
+        else if (friendlyRoomId is not null && matchKind == MatchKind.UnknownHuman)
+            matchKind = MatchKind.Friendly;
+
         var roomId = Guid.NewGuid().ToString("N")[..12];
         var firstPlayer = p0First.HasValue ? (p0First.Value ? 0 : 1) : -1;
         var openingSetupAfterFirstPlayerChoice = firstPlayer < 0;
@@ -91,6 +100,7 @@ public static class GameRoomManager
             PlayerSessionIds = new[] { p0Sid, p1Sid },
             PlayerAccounts   = new[] { p0Account, p1Account },
             VsBot = vsBot,
+            MatchKind = matchKind,
             FriendlyRoomId = friendlyRoomId,
         };
 
@@ -124,6 +134,7 @@ public static class GameRoomManager
             startingDiceRolls = engine.State.StartingDiceRounds,
             rngSeed = engine.State.RngSeed,
             openingSetupAfterFirstPlayerChoice,
+            matchKind = matchKind.ToString(),
             rulesVersion = "opcg-grandumi-v1",
             cardDbVersion = "local-card-json",
         });
@@ -142,6 +153,7 @@ public static class GameRoomManager
                 p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt },
                 p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt },
                 vsBot,
+                matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
             });
             engine.OnPersistAction = (pi, act, data) => RoomJournal.Append(roomId, pi, act, data);
@@ -154,7 +166,8 @@ public static class GameRoomManager
         EnsureMulliganTimeout(entry);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
-        engine.BroadcastInitialState();
+        if (broadcastInitialState)
+            engine.BroadcastInitialState();
         return entry;
     }
 
@@ -193,8 +206,11 @@ public static class GameRoomManager
         return EnqueueWork(room, new RoomWork(action, LatencyDiagnostics.Start(), async () =>
         {
             room.Engine.RecordMatchLog("player_action_requested", playerIndex, new { action, data });
-            room.Engine.HandleAction(playerIndex, action, data);
-            await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
+            var accepted = room.Engine.HandleAction(playerIndex, action, data);
+            // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
+            // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
+            if (accepted)
+                await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
             EnsureMulliganTimeout(room);
             if (room.Engine.State.IsGameOver)
                 CleanupRoom(room.RoomId);
@@ -419,7 +435,7 @@ public static class GameRoomManager
             var r = kv.Value;
             for (int i = 0; i < 2; i++)
             {
-                if (r.PlayerAccounts[i] == accountName)
+                if (string.Equals(r.PlayerAccounts[i], accountName, StringComparison.OrdinalIgnoreCase))
                 {
                     var oldSid = r.PlayerSessionIds[i];
                     if (oldSid == newSessionId) return false; // 同 sid 不算重连
@@ -429,6 +445,7 @@ public static class GameRoomManager
                     _sessionRoom.TryRemove(oldSid, out _);
                     r.PlayerSessionIds[i] = newSessionId;
                     _sessionRoom[newSessionId] = r.RoomId;
+                    WebSocketBridge.OnGameSessionRebound(oldSid, newSessionId, r.PlayerSessionIds[1 - i]);
                     // 重新绑定引擎回调（PlayerIndex 编号未变，sid 已替换）
                     r.Engine.OnSendToPlayer = (idx, payload) =>
                         WebSocketBridge.Send(r.PlayerSessionIds[idx], payload);
@@ -529,13 +546,17 @@ public static class GameRoomManager
             r.ActionQueue.Writer.TryComplete();
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
+            WebSocketBridge.OnGameRoomClosed(r.PlayerSessionIds);
             r.Engine.RecordMatchLog("match_end", -1, new
             {
                 winnerIndex = r.Engine.State.WinnerIndex,
                 reason = r.Engine.State.GameOverReason,
                 turnCount = r.Engine.State.TurnCount,
                 finalTick = r.Engine.State.Tick,
+                matchKind = r.MatchKind.ToString(),
             });
+
+            TryRecordLeaderStats(r.RoomId, r.MatchKind, r.PlayerAccounts, r.Engine.State);
             ReplayRecorder.Close(roomId);
             MatchLogRecorder.Close(roomId);
             RoomJournal.Delete(roomId); // 对局结束 → 删除恢复日志，避免恢复已结束的局
@@ -597,6 +618,11 @@ public static class GameRoomManager
         var seed        = h.GetProperty("seed").GetInt32();
         var firstPlayer = h.GetProperty("firstPlayer").GetInt32();
         var vsBot       = h.TryGetProperty("vsBot", out var vb) && vb.GetBoolean();
+        var matchKind = MatchKind.UnknownHuman;
+        if (h.TryGetProperty("matchKind", out var mk)
+            && Enum.TryParse<MatchKind>(mk.GetString(), ignoreCase: true, out var parsedMatchKind))
+            matchKind = parsedMatchKind;
+        if (vsBot) matchKind = MatchKind.Bot;
         var p0          = h.GetProperty("p0");
         var p1          = h.GetProperty("p1");
         var p0Account   = p0.GetProperty("account").GetString()!;
@@ -648,7 +674,13 @@ public static class GameRoomManager
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
 
-        if (engine.State.IsGameOver) { TryDelete(file); return false; } // 已分胜负不恢复
+        if (engine.State.IsGameOver)
+        {
+            // 服务进程可能在胜负已产生、正常 CleanupRoom 尚未落盘时退出；恢复时补做幂等结算。
+            TryRecordLeaderStats(roomId, matchKind, new[] { p0Account, p1Account }, engine.State, lastActivity);
+            TryDelete(file);
+            return false;
+        }
 
         // 构造房间放回池：sid 用占位（真实 sid 由玩家重登时 TryReclaim 替换）
         var entry = new RoomEntry
@@ -658,6 +690,7 @@ public static class GameRoomManager
             PlayerSessionIds = new[] { "offline-0", "offline-1" },
             PlayerAccounts   = new[] { p0Account, p1Account },
             VsBot = false,
+            MatchKind = matchKind,
         };
 
         // 重新挂回回调（按当前 sid 发；日志/录像/动作日志均"续写"而非覆盖）
@@ -686,5 +719,37 @@ public static class GameRoomManager
     private static void TryDelete(string file)
     {
         try { File.Delete(file); } catch { }
+    }
+
+    private static void TryRecordLeaderStats(
+        string roomId,
+        MatchKind matchKind,
+        IReadOnlyList<string> playerAccounts,
+        GameState state,
+        DateTime? endedAtUtc = null)
+    {
+        // 未分胜负的手动清理、超 TTL 弃局不属于已完成对局，不进入事实表。
+        if (state.WinnerIndex is not (0 or 1)) return;
+
+        try
+        {
+            LeaderStatsStore.Default.RecordMatch(new LeaderMatchResult(
+                roomId,
+                endedAtUtc ?? DateTime.UtcNow,
+                matchKind,
+                playerAccounts[0],
+                playerAccounts[1],
+                state.Players[0].Leader.Info.Number,
+                state.Players[1].Leader.Info.Number,
+                state.WinnerIndex,
+                state.FirstPlayer,
+                state.TurnCount,
+                state.GameOverReason ?? ""));
+        }
+        catch (Exception ex)
+        {
+            // 排行榜落盘失败不能阻塞正常对局清理；保留明确日志供运维补录。
+            Console.Error.WriteLine($"[LeaderStats] 对局 {roomId} 写入失败：{ex.Message}");
+        }
     }
 }

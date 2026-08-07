@@ -3,15 +3,21 @@
 import { useEffect, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
-import { loadAllDecks, getSpriteMap, type SavedDeck } from "@/data/DeckMapper";
+import { loadAllDecks, getSpriteMap, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
 
 export default function FriendlyRoomPanel() {
   const room    = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
+  const connState = useNetStore((s) => s.connState);
   const [decks, setDecks]     = useState<Record<string, SavedDeck>>({});
   const [picking, setPicking] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { setDecks(loadAllDecks()); }, []);
+  useEffect(() => {
+    const refresh = () => setDecks(loadAllDecks());
+    refresh();
+    return subscribeDecksUpdated(refresh);
+  }, []);
 
   if (!room) return null;
 
@@ -35,12 +41,44 @@ export default function FriendlyRoomPanel() {
 
   const toggleReady = () => HomeRequest.friendlyReady(!me?.ready);
   const leave = () => HomeRequest.friendlyLeave();
+  const canReady = !!me?.deckName && !!opp && room.state === "lobby" && connState === "connected";
+
+  const copyRoomCode = () => {
+    if (!room.roomCode) return;
+    navigator.clipboard.writeText(room.roomCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
 
   const deckEntries = Object.entries(decks);
 
   return (
     <div className="flex h-screen flex-col items-center justify-center bg-gray-950 p-8 gap-6">
-      <h2 className="text-white font-bold text-2xl">友谊战房间</h2>
+      <h2 className="text-white font-bold text-2xl">
+        {room.origin === "roomCode" ? "房间码友谊战" : "友谊战房间"}
+      </h2>
+
+      {room.roomCode && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-800 bg-blue-950/30 px-5 py-3">
+          <div>
+            <p className="text-[10px] text-gray-500">等待对手加入，房间码</p>
+            <p className="font-mono text-2xl font-black tracking-widest text-blue-400">{room.roomCode}</p>
+          </div>
+          <button
+            onClick={copyRoomCode}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500"
+          >
+            {copied ? "已复制" : "复制"}
+          </button>
+        </div>
+      )}
+
+      {connState !== "connected" && (
+        <p className="rounded-lg border border-yellow-700/60 bg-yellow-950/30 px-4 py-2 text-xs text-yellow-300">
+          {connState === "recovering" ? "连接已恢复，正在同步房间状态…" : "连接中断，房间将保留 30 秒等待重连…"}
+        </p>
+      )}
 
       {/* 比分 */}
       <div className="flex items-center gap-4">
@@ -51,14 +89,15 @@ export default function FriendlyRoomPanel() {
 
       {/* 双方状态卡 */}
       <div className="flex gap-6">
-        <PlayerCard title="我"   name={me?.name}  deckName={me?.deckName}  ready={me?.ready}  mine />
-        <PlayerCard title="对手" name={opp?.name} deckName={opp?.deckName} ready={opp?.ready} />
+        <PlayerCard title="我"   name={me?.name}  deckName={me?.deckName}  ready={me?.ready} connected={me?.connected} mine />
+        <PlayerCard title="对手" name={opp?.name} deckName={opp?.deckName} ready={opp?.ready} connected={opp?.connected} waiting={!opp} />
       </div>
 
       {/* 操作区 */}
       <div className="flex flex-col items-center gap-3 w-full max-w-sm">
         <button
           onClick={() => setPicking((v) => !v)}
+          disabled={room.state !== "lobby" || connState !== "connected"}
           className="w-full py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm hover:border-orange-500 transition-colors"
         >
           {me?.deckName ? `已选：${me.deckName}（点击更换）` : "选择卡组"}
@@ -94,16 +133,16 @@ export default function FriendlyRoomPanel() {
 
         <button
           onClick={toggleReady}
-          disabled={!me?.deckName}
+          disabled={!canReady}
           className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
-            !me?.deckName
+            !canReady
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : me?.ready
                 ? "bg-green-600 hover:bg-green-500 text-white"
                 : "bg-orange-500 hover:bg-orange-400 text-white"
           }`}
         >
-          {me?.ready ? "✓ 已准备（点击取消）" : "准备"}
+          {!opp ? "等待对手加入" : room.state === "starting" ? "正在创建对局…" : me?.ready ? "✓ 已准备（点击取消）" : "准备"}
         </button>
 
         {me?.ready && opp?.ready && (
@@ -121,18 +160,24 @@ export default function FriendlyRoomPanel() {
   );
 }
 
-function PlayerCard({ title, name, deckName, ready, mine }: {
-  title: string; name?: string; deckName?: string | null; ready?: boolean; mine?: boolean;
+function PlayerCard({ title, name, deckName, ready, connected, mine, waiting }: {
+  title: string;
+  name?: string;
+  deckName?: string | null;
+  ready?: boolean;
+  connected?: boolean;
+  mine?: boolean;
+  waiting?: boolean;
 }) {
   return (
     <div className={`w-44 rounded-xl border-2 p-4 flex flex-col items-center gap-2 ${
       mine ? "border-orange-500/60 bg-orange-500/5" : "border-gray-700 bg-gray-900"
     }`}>
       <span className="text-gray-500 text-[10px]">{title}</span>
-      <p className="text-white font-bold text-sm truncate w-full text-center">{name ?? "?"}</p>
-      <p className="text-gray-400 text-xs truncate w-full text-center">{deckName ?? "未选卡组"}</p>
+      <p className="text-white font-bold text-sm truncate w-full text-center">{waiting ? "等待加入…" : (name ?? "?")}</p>
+      <p className="text-gray-400 text-xs truncate w-full text-center">{waiting ? "房间码已开放" : (deckName ?? "未选卡组")}</p>
       <span className={`text-[11px] font-bold ${ready ? "text-green-400" : "text-gray-600"}`}>
-        {ready ? "已准备" : "未准备"}
+        {waiting ? "等待中" : connected === false ? "重连中" : ready ? "已准备" : "未准备"}
       </span>
     </div>
   );

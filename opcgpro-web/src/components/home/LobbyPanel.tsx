@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
@@ -24,6 +24,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const opponentName  = useNetStore((s) => s.opponentName);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
+  const roomOperation = useNetStore((s) => s.roomOperation);
+  const connState     = useNetStore((s) => s.connState);
 
   const [roomMode, setRoomMode] = useState<"none" | "create" | "join">("none");
   const [joinInput, setJoinInput] = useState("");
@@ -35,7 +37,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   // mainCount === 0 表示解析失败/未知，fail-open 不拦截，交由后端校验兜底。
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
-  const canEnter      = !!selectedDeck && !deckIncomplete;
+  const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle";
+
+  useEffect(() => {
+    if (roomMode === "create" && roomOperation === "idle" && !roomCode) {
+      setRoomMode("none");
+    }
+  }, [roomCode, roomMode, roomOperation]);
 
   const handleMatch = () => {
     if (!selectedDeck) return;
@@ -61,9 +69,11 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const handleCreateRoom = () => {
     if (!selectedDeck) return;
     setRoomMode("create");
-    const sent = HomeRequest.createRoom(selectedDeck.cards);
+    useNetStore.getState().setRoomOperation("creating");
+    const sent = HomeRequest.createRoom(selectedDeck.cards, selectedDeck.name);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
+      useNetStore.getState().setRoomOperation("idle");
       setRoomMode("none");
     }
   };
@@ -76,12 +86,17 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const confirmJoinRoom = () => {
     const code = joinInput.trim().toUpperCase();
     if (code.length < 6 || !selectedDeck) return;
-    HomeRequest.joinRoom(code, selectedDeck.cards);
-    setJoinInput("");
+    useNetStore.getState().setRoomOperation("joining");
+    const sent = HomeRequest.joinRoom(code, selectedDeck.cards, selectedDeck.name);
+    if (!sent) {
+      useNetStore.getState().setRoomOperation("idle");
+      showMessage("服务器未连接，房间码已保留，请重连后重试", "error");
+    }
   };
 
   const handleCancelRoom = () => {
     HomeRequest.cancelRoom();
+    useNetStore.getState().setRoomOperation("idle");
     setRoomMode("none");
     setJoinInput("");
   };
@@ -253,7 +268,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
         )}
 
         {/* 等待服务器创建房间 */}
-        {!roomCode && roomMode === "create" && (
+        {!roomCode && roomMode === "create" && roomOperation === "creating" && (
           <div className="flex flex-col items-center gap-3 bg-gray-900 border border-blue-800 rounded-xl px-6 py-4">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <p className="text-blue-400 text-sm font-bold">正在创建房间...</p>
@@ -306,14 +321,14 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             <div className="flex gap-2">
               <button
                 onClick={confirmJoinRoom}
-                disabled={joinInput.trim().length < 6}
+                disabled={joinInput.trim().length < 6 || roomOperation === "joining" || connState !== "connected"}
                 className={`px-4 py-1 rounded text-xs font-bold transition-colors ${
-                  joinInput.trim().length >= 6
+                  joinInput.trim().length >= 6 && roomOperation !== "joining" && connState === "connected"
                     ? "bg-green-600 hover:bg-green-500 text-white"
                     : "bg-gray-800 text-gray-600 cursor-not-allowed"
                 }`}
               >
-                加入
+                {roomOperation === "joining" ? "正在加入…" : "加入"}
               </button>
               <button
                 onClick={handleCancelRoom}

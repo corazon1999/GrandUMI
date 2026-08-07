@@ -26,6 +26,9 @@ crashlytics-build.properties
 # =========================
 服务端WebSocket/bin/
 服务端WebSocket/obj/
+服务端WebSocket/PlayerData/
+服务端WebSocket/Data/
+服务端WebSocket/MatchLogs/
 *.user
 *.suo
 

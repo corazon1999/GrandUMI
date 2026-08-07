@@ -10,6 +10,9 @@ const STATE_LABEL: Record<string, string> = {
   connecting: "连接中...",
   handshaking: "握手中...",
   connected: "已连接",
+  reconnecting: "正在重连...",
+  recovering: "正在恢复...",
+  failed: "连接失败",
 };
 
 export default function LoginPanel() {

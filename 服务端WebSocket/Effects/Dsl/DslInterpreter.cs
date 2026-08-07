@@ -2,6 +2,7 @@ using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI.Effects.Dsl;
 
@@ -1072,6 +1073,26 @@ public static class DslInterpreter
                     {
                         var pred = BuildMatchPredicate(chFilter);
                         candidates = candidates.Where(pred).ToList();
+
+                        // 费用未写“原本的”时按当前费用判定。该判断需要对局与控制方上下文，
+                        // 因而放在 Choose 阶段，而不是无状态的 BuildCardFilter 中。
+                        if (chFilter.TryGetProperty("currentCostLte", out var ccl))
+                        {
+                            int limit = ccl.GetInt32();
+                            candidates = candidates.Where(c => CurrentCostOfCard(c, s) <= limit).ToList();
+                        }
+                        if (chFilter.TryGetProperty("currentCostGte", out var ccg))
+                        {
+                            int limit = ccg.GetInt32();
+                            candidates = candidates.Where(c => CurrentCostOfCard(c, s) >= limit).ToList();
+                        }
+
+                        // “拥有【阻挡者】效果”等条件按当前实际关键词判定，包含临时授予和持续效果。
+                        if (chFilter.TryGetProperty("effectiveKeyword", out var ek))
+                        {
+                            string keyword = ek.GetString() ?? "";
+                            candidates = candidates.Where(c => ActionValidator.HasKeyword(s, c, keyword)).ToList();
+                        }
                     }
                     var text = op.TryGetProperty("text", out var tx) ? tx.GetString() ?? promptKind : promptKind;
                     // 下发候选卡 {id,number}，让前端能解析"不在场上"区域（废弃区/卡组等）候选的卡图；
@@ -1120,6 +1141,10 @@ public static class DslInterpreter
                 }
             case "ReturnDonToDeck":
                 AtomicOps.ReturnDonToDeck(me, GetInt(op, "n", 1));
+                break;
+            case "OpponentReturnDonToDeck":
+                await AtomicOps.PromptReturnDonToDeck(ctx, 1 - ctx.OwnerIndex,
+                    GetInt(op, "n", 1), optional: false);
                 break;
 
             // ── A 阶段 P0 新增 op ─────────────────────────────────────
@@ -1246,6 +1271,15 @@ public static class DslInterpreter
                         AtomicOps.MoveCharToLife(s, owner, target, toTop: true);
                     break;
                 }
+            case "HandToLife":
+                {
+                    var target = ResolveTarget(op, "target", ctx);
+                    if (target is not null)
+                        AtomicOps.HandToLife(me, target,
+                            toTop: !op.TryGetProperty("to", out var to) || to.GetString() != "bottom",
+                            faceUp: op.TryGetProperty("faceUp", out var fu) && fu.ValueKind == JsonValueKind.True);
+                    break;
+                }
             case "SearchDeck":
                 {
                     if (ctx.Engine is null) break;
@@ -1337,6 +1371,32 @@ public static class DslInterpreter
                     string restTo = op.TryGetProperty("restTo", out var rt) ? rt.GetString() ?? "bottom" : "bottom";
                     var match = BuildMatchPredicate(op.TryGetProperty("match", out var mm) ? mm : default);
                     await LookTopRevealImpl(ctx, count, max, match, restTo);
+                    break;
+                }
+            // 查看卡组顶 count 张，玩家按点击顺序重排，再整体放回卡组顶或底。
+            case "LookTopReorder":
+                {
+                    int count = Math.Min(GetInt(op, "count", 5), me.Deck.Count);
+                    if (count <= 0) break;
+                    var top = me.Deck.Take(count).ToList();
+                    var extra = new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    };
+                    var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReorder",
+                        $"按希望的顺序依次选择卡组最上方的 {count} 张卡牌",
+                        top.Select(c => c.Id.ToString()).ToList(), count, count, extra);
+                    var order = chosen
+                        .Select(id => top.FirstOrDefault(c => c.Id.ToString() == id))
+                        .Where(c => c is not null)
+                        .Select(c => c!.Id)
+                        .Distinct()
+                        .ToList();
+                    // 防御无效或重复回传：未选牌按原相对顺序补齐，避免区域移动丢牌。
+                    order.AddRange(top.Where(c => !order.Contains(c.Id)).Select(c => c.Id));
+                    int where = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                        "将这些卡牌按所选顺序放到哪里？", new[] { "卡组最上方", "卡组最下方" });
+                    AtomicOps.ReorderTopK(me, order, toBottom: where == 1);
                     break;
                 }
             // 公开卡组顶 count 张（默认1，牌留在原位），若其中存在符合 match 的牌则执行 then，否则执行 else。
@@ -1709,6 +1769,13 @@ public static class DslInterpreter
         return side >= 0 ? st.CurrentPowerOf(side, c) : c.Info.Power;
     }
 
+    /// <summary>场上卡按当前费用判定；非场上候选回退卡面原本费用。</summary>
+    static int CurrentCostOfCard(CardInstance c, GameState state)
+    {
+        int side = state.SideOf(c);
+        return side >= 0 ? state.CurrentCostOf(side, c) : c.Info.Cost;
+    }
+
     /// <summary>
     /// 解析"匹配规格"：支持 anyOf（任一子过滤命中即可，用于"X或Y"）+ excludeName（"某名字以外"）。
     /// 无 anyOf 时把节点本身当单个 filter。
@@ -1803,6 +1870,7 @@ public static class DslInterpreter
         return promptKind switch
         {
             "OpponentCharacter"           => opp.Characters.ToList(),
+            "AnyCharacter"                => me.Characters.Concat(opp.Characters).ToList(),
             "OpponentCharacterWithDon"    => opp.Characters.Where(c => opp.AttachedDonCount(c.Id) >= 1).ToList(),
             "OpponentCharacterWithDonGe2" => opp.Characters.Where(c => opp.AttachedDonCount(c.Id) >= 2).ToList(),
             "OpponentRestingCharacter"    => opp.Characters.Where(c => c.IsTapped).ToList(),

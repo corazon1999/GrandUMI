@@ -77,6 +77,13 @@
   "ST13-017": {
     "_name": "火焰龙王",
     "_note": "【反击】我方最多1张领袖或角色+4000（原文后半“确认全部生命重排”无 scry op 已略去）。",
+    "trigger": {
+      "cost": { "lifeToHandChoice": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnHand", "min": 0, "max": 1, "as": "$card", "text": "将我方最多1张手牌加入生命区最上方" },
+        { "op": "HandToLife", "target": "$card" }
+      ]
+    },
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
@@ -85,6 +92,13 @@
   "ST13-018": {
     "_name": "橡皮橡皮JET枪",
     "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“生命0则抽1”因反击数组无条件分支已略去）。",
+    "trigger": {
+      "cost": { "lifeToHandChoice": true },
+      "then": [
+        { "op": "Choose", "prompt": "OwnHand", "min": 0, "max": 1, "as": "$card", "text": "将我方最多1张手牌加入生命区最上方" },
+        { "op": "HandToLife", "target": "$card" }
+      ]
+    },
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }

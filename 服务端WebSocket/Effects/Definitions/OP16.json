@@ -1450,6 +1450,10 @@
     ]
   },
   "OP16-101": {
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnTrash", "min": 0, "max": 1, "filter": { "nameEquals": "大和" }, "as": "$card", "text": "将废弃区中最多1张“大和”加入手牌" },
+      { "op": "TrashToHand", "target": "$card" }
+    ],
     "main": {
       "then": [
         {
@@ -1773,6 +1777,10 @@
     ]
   },
   "OP16-115": {
+    "trigger": [
+      { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "min": 0, "max": 1, "as": "$target", "text": "本回合中，对方最多1张领袖或角色的效果无效" },
+      { "op": "Nullify", "target": "$target" }
+    ],
     "main": {
       "then": [
         {
@@ -1822,6 +1830,10 @@
     ]
   },
   "OP16-117": {
+    "trigger": [
+      { "op": "Choose", "prompt": "OwnTrash", "min": 0, "max": 1, "filter": { "keyword": "黑胡子海盗团" }, "as": "$card", "text": "将废弃区中最多1张《黑胡子海盗团》卡牌加入手牌" },
+      { "op": "TrashToHand", "target": "$card" }
+    ],
     "main": {
       "then": [
         {

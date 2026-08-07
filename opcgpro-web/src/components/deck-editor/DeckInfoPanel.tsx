@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { useDeckStore, type DeckEntry } from "@/store/deckStore";
-import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName, exportDeckString, importDeckString, type SavedDeck } from "@/data/DeckMapper";
+import { useNetStore } from "@/store/netStore";
+import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName, exportDeckString, importDeckString, getSelectedDeckName, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
+import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
@@ -47,7 +49,9 @@ export default function DeckInfoPanel() {
 
   // 加载已有卡组列表
   useEffect(() => {
-    setSavedDecks(loadAllDecks());
+    const refresh = () => setSavedDecks(loadAllDecks());
+    refresh();
+    return subscribeDecksUpdated(refresh);
   }, []);
 
   // 初始化卡组名称：新建模式 → "新卡组"；否则带入当前已选卡组名
@@ -57,7 +61,7 @@ export default function DeckInfoPanel() {
       setDeckName(nextDeckName());
       setLoadedName(null); // 新建明确无来源卡组，防软导航残留旧 loadedName 导致保存时静默覆盖
     } else {
-      const sel = localStorage.getItem("grandumi_selected_deck");
+      const sel = getSelectedDeckName();
       if (sel) { setDeckName(sel); setLoadedName(sel); }
     }
   }, []);
@@ -82,7 +86,10 @@ export default function DeckInfoPanel() {
   const doSave = (name: string) => {
     try {
       const cards = entries.flatMap((e) => Array(e.count).fill(e.card) as CardData[]);
-      saveDeck(name, leader!, cards);
+      const saved = saveDeck(name, leader!, cards);
+      if (!useNetStore.getState().loggedIn || !HomeRequest.saveDeck(saved)) {
+        throw new Error("未登录，云端同步请求发送失败");
+      }
       setSavedDecks(loadAllDecks());
       setLoadedName(name);
       setSaveState("saved");
@@ -119,6 +126,7 @@ export default function DeckInfoPanel() {
 
   const handleDelete = (name: string) => {
     deleteDeck(name);
+    if (useNetStore.getState().loggedIn) HomeRequest.deleteDeck(name);
     setSavedDecks(loadAllDecks());
   };
 

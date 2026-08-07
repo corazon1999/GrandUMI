@@ -338,8 +338,14 @@
   },
   "EB01-035": {
     "_name": "Ms.星期一",
-    "_matcher": "登场时领袖含巴洛克工作室，本回合给我方最多1张领袖或角色+1000(触发节为咚-1登场自身，无需DSL)。",
+    "_matcher": "登场时领袖含巴洛克工作室，本回合给我方最多1张领袖或角色+1000；生命触发咚-1登场自身。",
     "_src": "wf-dsl",
+    "trigger": {
+      "cost": { "donReturn": 1 },
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    },
     "triggers": [
       {
         "on": "OnEnterField",

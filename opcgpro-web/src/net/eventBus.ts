@@ -1,7 +1,14 @@
 import mitt from "mitt";
 import type { MsgBase } from "@/types/net";
 
-export type ConnectionState = "disconnected" | "connecting" | "handshaking" | "connected";
+export type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "handshaking"
+  | "connected"
+  | "reconnecting"
+  | "recovering"
+  | "failed";
 
 type Events = {
   // 连接事件
@@ -10,6 +17,7 @@ type Events = {
   close: void;
   reconnected: void;        // 二次以后的握手完成（重连成功）
   stateChange: ConnectionState;
+  reconnectCountdown: number;
 
   // 消息分发（所有协议消息经此事件分发给各协议处理器）
   message: MsgBase;

@@ -1,5 +1,7 @@
 using GrandUMI;
 using GrandUMI.Cards;
+using GrandUMI.Game.Stats;
+using GrandUMI.Persistence;
 using System.Runtime.Loader;
 
 Console.Title = "GrandUMI WebSocket 服务器";
@@ -13,6 +15,11 @@ Console.WriteLine($"║    ws://localhost:{port}/ws/              ║");
 Console.WriteLine("║    按 Ctrl+C 停止                     ║");
 Console.WriteLine("╚══════════════════════════════════════╝\n");
 
+// 玩家数据存放在 publish 目录之外，避免发布替换程序时丢失。
+var playerDataStore = new PlayerDataStore(PlayerDataStore.ResolveDefaultPath());
+playerDataStore.Initialize();
+Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
+
 // 加载卡牌数据库（项目根目录下的"卡牌数据"目录）
 var cardDataPath = ResolveCardDataPath();
 CardDatabase.LoadFrom(cardDataPath);
@@ -21,10 +28,14 @@ CardDatabase.LoadFrom(cardDataPath);
 var dslDir = ResolveDslDir();
 GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(dslDir);
 
+// Leader 排行榜使用独立 SQLite；线上可用 GRANDUMI_DATA_DIR 指向持久化目录。
+LeaderStatsStore.Default.Initialize();
+Console.WriteLine($"[LeaderStats] SQLite: {LeaderStatsStore.Default.DatabasePath}");
+
 // 重启恢复：把 TTL 内未结束的 PvP 对局重放重建回内存（须在卡库/DSL 加载之后、开监听之前）
 await GrandUMI.Game.GameRoomManager.RestoreAll();
 
-WebSocketBridge.Start(port);
+WebSocketBridge.Start(port, playerDataStore);
 
 // 等待 Ctrl+C
 var tcs = new TaskCompletionSource();

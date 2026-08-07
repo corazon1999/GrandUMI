@@ -198,6 +198,13 @@
     ]
   },
   "OP14-018": {
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": { "originalPowerLte": 2000, "color": "红" },
+        "text": "将手牌中最多1张力量不高于2000的红色角色登场"
+      }
+    ],
     "counter": [
       {
         "op": "AddPowerThisBattle",
@@ -207,6 +214,9 @@
     ]
   },
   "OP14-019": {
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ],
     "main": {
       "then": [
         {
@@ -656,6 +666,9 @@
     ]
   },
   "OP14-057": {
+    "trigger": [
+      { "op": "Draw", "n": 2 }
+    ],
     "main": {
       "then": [
         {
@@ -1543,6 +1556,9 @@
     }
   },
   "OP14-116": {
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ],
     "counter": [
       {
         "op": "AddPowerThisBattle",
@@ -1576,6 +1592,14 @@
     ]
   },
   "OP14-117": {
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": { "originalCostLte": 4, "keyword": "恐怖之船海盗团" },
+        "rest": true,
+        "text": "将废弃区中最多1张费用不高于4的《恐怖之船海盗团》角色以休息状态登场"
+      }
+    ],
     "counter": [
       {
         "op": "AddPowerThisBattle",
@@ -1585,6 +1609,13 @@
     ]
   },
   "OP14-118": {
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": { "originalPowerLte": 6000, "hasTrigger": true },
+        "text": "将手牌中最多1张力量不高于6000且拥有【触发】效果的角色登场"
+      }
+    ],
     "counter": [
       {
         "op": "AddPowerThisBattle",

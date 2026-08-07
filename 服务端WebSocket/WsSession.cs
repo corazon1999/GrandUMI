@@ -18,6 +18,8 @@ public class WsSession
     /// <summary>玩家设置：是否对所有生命牌都弹"是否发动触发"窗口（反信息泄露）</summary>
     public bool      AlwaysPromptOnLifeReveal { get; set; }
 
+    private long _lastSeenUtcTicks = DateTime.UtcNow.Ticks;
+
     private readonly object _outboundGate = new();
     private readonly LinkedList<OutboundMessage> _outbound = new();
     private readonly SemaphoreSlim _outboundSignal = new(0);
@@ -29,6 +31,13 @@ public class WsSession
 
     public bool IsLoggedIn => Account is not null;
     public long MergedStateCount => Interlocked.Read(ref _mergedStateCount);
+    public DateTime LastSeenUtc => new(Interlocked.Read(ref _lastSeenUtcTicks), DateTimeKind.Utc);
+
+    /// <summary>收到任意客户端消息时刷新，用于识别 WebSocket 半开连接。</summary>
+    public void MarkSeen() => Interlocked.Exchange(ref _lastSeenUtcTicks, DateTime.UtcNow.Ticks);
+
+    public bool IsRecentlyActive(TimeSpan maxIdle)
+        => DateTime.UtcNow - LastSeenUtc <= maxIdle;
 
     public sealed record OutboundMessage(object Data, long EnqueuedAt, int QueueDepth, bool IsStateSnapshot);
 

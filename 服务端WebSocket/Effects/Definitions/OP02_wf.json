@@ -975,6 +975,12 @@
     "_name": "地狱之审判",
     "_matcher": "【反击】咚!!-1作为反击成本，本回合对方最多2张领袖或角色各力量-3000",
     "_src": "wf-dsl",
+    "trigger": {
+      "if": { "oppDonTotalGte": 6 },
+      "then": [
+        { "op": "OpponentReturnDonToDeck", "n": 1 }
+      ]
+    },
     "counter": [
       {
         "op": "Choose",
@@ -1006,6 +1012,12 @@
     "_name": "毒龙",
     "_matcher": "【主要】咚!!-1：本回合对方最多1张角色力量-3000",
     "_src": "wf-dsl",
+    "trigger": {
+      "if": { "oppDonTotalGte": 6 },
+      "then": [
+        { "op": "OpponentReturnDonToDeck", "n": 1 }
+      ]
+    },
     "main": {
       "cost": {
         "donReturn": 1
@@ -1030,6 +1042,12 @@
     "_name": "毒道",
     "_matcher": "【主要】从咚卡组追加最多1张活跃咚",
     "_src": "wf-dsl",
+    "trigger": {
+      "if": { "oppDonTotalGte": 6 },
+      "then": [
+        { "op": "OpponentReturnDonToDeck", "n": 1 }
+      ]
+    },
     "main": {
       "then": [
         {

@@ -7,23 +7,22 @@ import DeckChoosePanel from "./DeckChoosePanel";
 import PlayerListPanel from "./PlayerListPanel";
 import InviteNotifyOverlay from "./InviteNotifyOverlay";
 import FriendlyRoomPanel from "./FriendlyRoomPanel";
+import LeaderLeaderboardPanel from "./LeaderLeaderboardPanel";
 import HistoryPanel from "./HistoryPanel";
 import CardCatalogPanel from "./CardCatalogPanel";
 import ChangelogModal from "./ChangelogModal";
 import NetStatePanel from "@/components/ui/NetStatePanel";
 import { useNetStore } from "@/store/netStore";
+import { HomeRequest } from "@/net/HomeProtocol";
 import { LATEST_CHANGELOG } from "@/data/changelog";
 import { getAllCachedCards, loadCardSet } from "@/data/CardLoader";
-import { loadAllDecks } from "@/data/DeckMapper";
 import { DEFAULT_SEARCH_SETS } from "@/data/cardSets";
 import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 
-type View = "lobby" | "deck" | "catalog" | "history";
-
-const AVATAR_KEY = "grandumi_avatar";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
 function getDefaultAvatar(): string {
@@ -35,14 +34,9 @@ function getDefaultAvatar(): string {
   return luffy?.sprite ?? "";
 }
 
-function loadAvatar(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(AVATAR_KEY) || getDefaultAvatar();
-}
-
 function PlayerAvatar() {
   const playerName = useNetStore((s) => s.playerName);
-  const account = useNetStore((s) => s.account);
+  const cloudAvatar = useNetStore((s) => s.avatar);
   const setPlayerName = useNetStore((s) => s.setPlayerName);
 
   const [editing, setEditing] = useState(false);
@@ -53,8 +47,8 @@ function PlayerAvatar() {
   const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
-    setAvatarSrc(loadAvatar());
-  }, []);
+    setAvatarSrc(cloudAvatar || getDefaultAvatar());
+  }, [cloudAvatar]);
 
   const startEdit = () => {
     setDraft(playerName);
@@ -69,8 +63,8 @@ function PlayerAvatar() {
     const name = draft.trim();
     if (!name) { setEditing(false); return; }
     setPlayerName(name);
-    if (typeof window !== "undefined" && account) {
-      localStorage.setItem(`grandumi_nick_${account}`, name);
+    if (!HomeRequest.updateProfile(name, avatarSrc)) {
+      useNetStore.getState().setError("网络未连接，昵称仅在本次页面生效");
     }
     setEditing(false);
   };
@@ -82,7 +76,9 @@ function PlayerAvatar() {
       ? card.sprites[card.sprites.length - 1]
       : card.sprite ?? "";
     setAvatarSrc(sprite);
-    localStorage.setItem(AVATAR_KEY, sprite);
+    if (!HomeRequest.updateProfile(playerName, sprite)) {
+      useNetStore.getState().setError("网络未连接，头像仅在本次页面生效");
+    }
     setShowPicker(false);
   };
 
@@ -289,8 +285,6 @@ function OnlineCountBadge({ onClick }: { onClick: () => void }) {
   );
 }
 
-const SELECTED_DECK_KEY = "grandumi_selected_deck";
-
 function changelogSeenKey(account: string): string {
   return `grandumi_changelog_seen_${encodeURIComponent(account)}`;
 }
@@ -299,7 +293,6 @@ export default function MainPanel() {
   const [view, setView] = useState<View>("lobby");
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
-  const setGlobalDeck = useNetStore((s) => s.setSelectedDeck);
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
 
@@ -325,23 +318,6 @@ export default function MainPanel() {
     }
     setShowChangelog(false);
   };
-
-  // 启动时恢复已保存的卡组选择到全局 store
-  // 直接从 SavedDeck 构建卡组字符串，不依赖卡牌缓存（缓存可能尚未加载）
-  useEffect(() => {
-    const name = localStorage.getItem(SELECTED_DECK_KEY);
-    if (!name) return;
-    const allDecks = loadAllDecks();
-    const saved = allDecks[name];
-    if (!saved) return;
-    setGlobalDeck({
-      name,
-      leader: saved.leader,
-      leaderName: saved.leaderName,
-      leaderSprite: saved.leaderSprite,
-      cards: [saved.leader, ...saved.cards].join("\n"),
-    });
-  }, []);
 
   // 进入友谊战房间后，大厅整体切换为房间界面
   if (friendlyRoom) {
@@ -389,6 +365,13 @@ export default function MainPanel() {
           卡牌图鉴
         </button>
         <button
+          onClick={() => setView("leaderboard")}
+          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "leaderboard" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
+          title="Leader 胜率榜"
+        >
+          Leader榜
+        </button>
+        <button
           onClick={() => setView("history")}
           className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
           title="对局记录"
@@ -414,6 +397,7 @@ export default function MainPanel() {
         {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
         {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
         {view === "catalog" && <CardCatalogPanel />}
+        {view === "leaderboard" && <LeaderLeaderboardPanel />}
         {view === "history" && <HistoryPanel />}
       </main>
 

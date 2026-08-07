@@ -25,7 +25,10 @@ from websockets.legacy.client import connect as ws_connect
 import storage
 import github_issue
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.environ.get(
+    "BUG_BOT_CONFIG_PATH", os.path.join(BASE_DIR, "config.json")
+)
 
 
 def load_config() -> dict:
@@ -126,7 +129,13 @@ async def handle_feedback(ws, cfg, event, content) -> None:
             f"- 来源群: {group_id}\n\n"
             f"## 问题描述\n\n{content}\n"
         )
-        res = github_issue.create_issue(cfg["github_repo"], f"[反馈] {title}", body)
+        # gh 是同步命令且最长可能等待 30 秒，放进线程避免阻塞 WebSocket 心跳与收消息。
+        res = await asyncio.to_thread(
+            github_issue.create_issue,
+            cfg["github_repo"],
+            f"[反馈] {title}",
+            body,
+        )
         if res:
             issue_no, url = res
             storage.set_issue_no(fid, issue_no)

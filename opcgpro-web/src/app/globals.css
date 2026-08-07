@@ -88,6 +88,121 @@ body {
   animation: blocker-breathe 2.4s ease-in-out infinite;
 }
 
+/* ===== 领航首异画「动态呼吸图」特效 ===== */
+
+@keyframes leader-art-breathe {
+  0%,
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    filter: brightness(1) saturate(1);
+  }
+  48% {
+    transform: scale(var(--leader-breath-scale, 1.018)) translate3d(0, -0.15%, 0);
+    filter: brightness(1.075) saturate(1.06);
+  }
+}
+
+@keyframes leader-gaze-breathe {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  48% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+@keyframes leader-frame-breathe {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  48% {
+    opacity: 0.72;
+  }
+}
+
+.leader-breath-fx {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+  transition: filter 300ms ease, opacity 300ms ease;
+}
+
+/*
+ * 只露出人物插画的上半区，并在上下缘渐隐。
+ * 这样缩放不会牵动顶部力量值、下方技能文字和名称栏。
+ */
+.leader-breath-art-viewport {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(8.5% 4.8% 31% 5.1% round 1.5%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 7%,
+    #000 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 7%,
+    #000 88%,
+    transparent 100%
+  );
+}
+
+.leader-breath-art {
+  transform-origin: var(--leader-breath-focus-x, 50%) var(--leader-breath-focus-y, 35%);
+  animation: leader-art-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+/* 眼部附近的低强度双层辉光，screen 混合可保留原画线条。 */
+.leader-breath-gaze {
+  position: absolute;
+  left: var(--leader-breath-focus-x, 50%);
+  top: var(--leader-breath-focus-y, 35%);
+  width: 54%;
+  aspect-ratio: 2.4 / 1;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgb(var(--leader-breath-primary, 56 189 248) / 0.5) 0%,
+      rgb(var(--leader-breath-secondary, 99 102 241) / 0.24) 38%,
+      transparent 72%
+    );
+  mix-blend-mode: screen;
+  filter: blur(2px);
+  animation: leader-gaze-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* 框内光不向外溢出，避免与选中框、攻击框等战斗提示冲突。 */
+.leader-breath-frame {
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 8px rgb(var(--leader-breath-primary, 56 189 248) / 0.72),
+    inset 0 0 2px rgb(255 255 255 / 0.58);
+  animation: leader-frame-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* 横置卡牌沿用现有压暗语义，呼吸效果同步降亮度，避免出现彩色残光。 */
+.leader-breath-fx--tapped {
+  filter: grayscale(1) brightness(0.58);
+  opacity: 0.62;
+}
+
 /* ===== 战斗攻击关系特效 ===== */
 
 @keyframes battle-attacker-lunge-up {
@@ -139,10 +254,22 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .leader-breath-art,
+  .leader-breath-gaze,
+  .leader-breath-frame,
   .battle-attacker-lunge-up,
   .battle-attacker-lunge-down,
   .battle-target-impact,
   .battle-route-dash {
     animation: none;
+  }
+
+  .leader-breath-gaze {
+    opacity: 0.12;
+    transform: translate(-50%, -50%);
+  }
+
+  .leader-breath-frame {
+    opacity: 0.28;
   }
 }

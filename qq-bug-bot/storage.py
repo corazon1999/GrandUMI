@@ -8,12 +8,14 @@ import os
 import sqlite3
 from datetime import datetime
 
-# 数据库文件固定放在本模块同目录下的 feedback.db
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "feedback.db")
+# 默认沿用本地目录；容器部署时通过环境变量把数据库放进持久化卷。
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"))
 
 
 def init_db() -> None:
     """初始化数据库与表结构(幂等,可重复调用)。"""
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """

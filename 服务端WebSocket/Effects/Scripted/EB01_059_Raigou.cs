@@ -10,19 +10,38 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 先 KO 对方最多 1 张角色（玩家选择）。
 ///   - 之后循环将我方生命区最上方卡牌放入废弃区，直到生命剩 1 张（若已 ≤1 张则不操作）。
-///   - 【触发】另由触发系统处理，本脚本仅实现【主要】。
+///   - 【触发】按双方结算时生命总数动态计算可选角色的费用上限。
 /// </summary>
 public class EB01_059_Raigou : IScriptedEffect
 {
     public string CardNumber => "EB01-059";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.EventMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t is EffectTrigger.EventMain or EffectTrigger.OnLifeRevealTrigger;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
+
+        if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
+        {
+            int maxCost = me.LifeArea.Count + opp.LifeArea.Count;
+            var triggerTargets = opp.Characters
+                .Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= maxCost)
+                .ToList();
+            if (triggerTargets.Count == 0) return;
+
+            var picked = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
+                $"将对方最多1张费用不高于双方生命合计（{maxCost}）的角色KO",
+                triggerTargets.Select(c => c.Id.ToString()).ToList(), 0, 1);
+            if (picked.Count == 0) return;
+
+            var target = triggerTargets.First(c => c.Id.ToString() == picked[0]);
+            await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, target, ctx.Prompts, ctx.OwnerIndex);
+            return;
+        }
 
         // KO 对方最多 1 张角色
         var cands = opp.Characters.ToList();

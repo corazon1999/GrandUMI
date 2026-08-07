@@ -1,13 +1,17 @@
 import { create } from "zustand";
-import type { PlayerInfo, FriendlyPlayer } from "@/types/net";
+import type { PlayerInfo, FriendlyPlayer, MsgLeaderLeaderboard } from "@/types/net";
 
 export type IncomingInvite = { inviteId: string; fromName: string };
 export type FriendlyRoomState = {
   roomId: string;
+  origin: "roomCode" | "invite";
+  roomCode: string | null;
   players: FriendlyPlayer[];
   scores: number[];
-  state: "lobby" | "playing";
+  state: "lobby" | "starting" | "playing";
 };
+
+export type RoomOperation = "idle" | "creating" | "joining";
 
 export interface ChatMessage {
   Name: string;
@@ -36,6 +40,7 @@ interface NetStore {
   loggedIn: boolean;
   account: string;
   playerName: string;
+  avatar: string;
   // 错误提示
   error: string | null;
   // 匹配
@@ -44,10 +49,13 @@ interface NetStore {
   opponentName: string;
   // 房间码
   roomCode: string | null;
+  roomOperation: RoomOperation;
   // 在线人数（服务器广播的已登录人数）
   onlineCount: number;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
+  // 最近一次 Leader 排行榜回包
+  leaderLeaderboard: MsgLeaderLeaderboard | null;
   // 收到的对战邀请（被邀请方弹窗用）
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
@@ -65,13 +73,16 @@ interface NetStore {
   setReconnectCountdown: (n: number) => void;
   setLoggedIn: (v: boolean, name?: string, account?: string) => void;
   setPlayerName: (name: string) => void;
+  setProfile: (name: string, avatar: string) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
   setSelectedDeck: (deck: SelectedDeck | null) => void;
   setOpponentName: (name: string) => void;
   setRoomCode: (code: string | null) => void;
+  setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
+  setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
@@ -87,13 +98,16 @@ const initialState = {
   loggedIn: false,
   account: "",
   playerName: "",
+  avatar: "",
   error: null as string | null,
   matchState: "idle" as MatchState,
   selectedDeck: null as SelectedDeck | null,
   opponentName: "",
   roomCode: null as string | null,
+  roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
   playerList: [] as PlayerInfo[],
+  leaderLeaderboard: null as MsgLeaderLeaderboard | null,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
@@ -117,6 +131,8 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setPlayerName: (name) => set({ playerName: name }),
 
+  setProfile: (playerName, avatar) => set({ playerName, avatar }),
+
   setError: (msg) => set({ error: msg }),
 
   setMatchState: (s) => set({ matchState: s }),
@@ -127,9 +143,13 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setRoomCode: (code) => set({ roomCode: code }),
 
+  setRoomOperation: (roomOperation) => set({ roomOperation }),
+
   setOnlineCount: (n) => set({ onlineCount: n }),
 
   setPlayerList: (list) => set({ playerList: list }),
+
+  setLeaderLeaderboard: (leaderLeaderboard) => set({ leaderLeaderboard }),
 
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 

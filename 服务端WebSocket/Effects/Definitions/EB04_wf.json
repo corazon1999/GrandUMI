@@ -481,8 +481,15 @@
   },
   "EB04-027": {
     "_name": "波尔·汉库珂",
-    "_matcher": "登场时抽2弃1已用triggers实现；生命牌【触发】『登场≤1张力量≤5000且拥有【触发】效果的角色』中『拥有【触发】效果』无法用filter表达，故trigger节未实现。",
+    "_matcher": "登场时抽2弃1；生命触发从手牌登场力量≤5000且拥有【触发】效果的角色。",
     "_src": "wf-dsl",
+    "trigger": [
+      {
+        "op": "PlayCharFromHand",
+        "filter": { "originalPowerLte": 5000, "hasTrigger": true },
+        "text": "将手牌中最多1张力量不高于5000且拥有【触发】效果的角色登场"
+      }
+    ],
     "triggers": [
       {
         "on": "OnEnterField",

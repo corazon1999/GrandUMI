@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadAllDecks, deleteDeck, type SavedDeck } from "@/data/DeckMapper";
-import { getSpriteMap } from "@/data/DeckMapper";
+import {
+  loadAllDecks,
+  deleteDeck,
+  getSpriteMap,
+  getSelectedDeckName,
+  setSelectedDeckName,
+  subscribeDecksUpdated,
+  type SavedDeck,
+} from "@/data/DeckMapper";
 import { useNetStore } from "@/store/netStore";
+import { HomeRequest } from "@/net/HomeProtocol";
 import Link from "next/link";
-
-const SELECTED_KEY = "grandumi_selected_deck";
 
 export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: () => void }) {
   const [decks, setDecks] = useState<Record<string, SavedDeck>>({});
@@ -42,18 +48,21 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
   };
 
   useEffect(() => {
-    setDecks(loadAllDecks());
-    const saved = localStorage.getItem(SELECTED_KEY);
+    const refresh = () => setDecks(loadAllDecks());
+    refresh();
+    const saved = getSelectedDeckName();
     if (saved) {
       setSelected(saved);
       syncToGlobal(saved);
     }
+    return subscribeDecksUpdated(refresh);
   }, []);
 
   const handleSelect = (name: string) => {
     setSelected(name);
-    localStorage.setItem(SELECTED_KEY, name);
+    setSelectedDeckName(name);
     syncToGlobal(name);
+    HomeRequest.selectDeck(name);
     // 选择卡组后自动返回大厅
     onDeckSelected();
   };
@@ -61,9 +70,10 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
   const handleDeleteConfirm = () => {
     if (!deleteTarget) return;
     deleteDeck(deleteTarget);
+    HomeRequest.deleteDeck(deleteTarget);
     if (selected === deleteTarget) {
       setSelected("");
-      localStorage.removeItem(SELECTED_KEY);
+      setSelectedDeckName(null);
       setGlobalDeck(null);
     }
     setDecks(loadAllDecks());

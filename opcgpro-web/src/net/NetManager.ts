@@ -1,4 +1,4 @@
-import { eventBus } from "./eventBus";
+import { eventBus, type ConnectionState } from "./eventBus";
 import type { MsgBase, MsgPing } from "@/types/net";
 
 // 客户端版本号，与服务器 MsgSecret 握手时校验
@@ -7,16 +7,11 @@ export const CLIENT_VERSION = "0.998";
 // WebSocket 服务器地址，通过环境变量配置
 const DEFAULT_WS_URL = "ws://localhost:8080/ws";
 
-type ConnectionState =
-  | "disconnected"
-  | "connecting"
-  | "handshaking" // 已连接，等待 MsgSecret 握手完成
-  | "connected";  // 握手成功，可正常收发消息
-
 class NetManagerClass {
   private ws: WebSocket | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectCountdownTimer: ReturnType<typeof setInterval> | null = null;
   private msgQueue: MsgBase[] = [];
   private isProcessing = false;
   private _state: ConnectionState = "disconnected";
@@ -24,10 +19,14 @@ class NetManagerClass {
 
   // 重连参数
   private reconnectAttempts = 0;
-  private readonly MAX_RECONNECT = 6;
   private readonly RECONNECT_BASE_DELAY = 1500; // ms
+  private readonly RECONNECT_MAX_DELAY = 5000; // 赛前房保留 30 秒，重试间隔不能膨胀到窗口之外
   /// 标记重连：握手完成后会自动触发 reconnected 事件，由 NetProvider 决定是否重新登录 + 请求状态
   private wasConnectedBefore = false;
+  private manualClose = false;
+  private socketGeneration = 0;
+  private lossNotified = false;
+  private lastPongAt = 0;
 
   get state(): ConnectionState {
     return this._state;
@@ -42,51 +41,61 @@ class NetManagerClass {
   }
 
   connect(url: string = DEFAULT_WS_URL) {
-    if (this._state === "connecting" || this._state === "handshaking") {
+    if (["connecting", "handshaking", "connected", "reconnecting", "recovering"].includes(this._state)) {
       return;
     }
     this.url = url;
+    this.manualClose = false;
+    this.reconnectAttempts = 0;
     this.clearTimers();
     this.openSocket(url);
   }
 
   private openSocket(url: string) {
-    this._state = "connecting";
-    eventBus.emit("stateChange", "connecting");
+    const isReconnectAttempt = this.wasConnectedBefore || this.reconnectAttempts > 0;
+    this.setState(isReconnectAttempt ? "reconnecting" : "connecting");
+
+    const generation = ++this.socketGeneration;
+    let socket: WebSocket;
 
     try {
-      this.ws = new WebSocket(url);
+      socket = new WebSocket(url);
+      this.ws = socket;
     } catch {
       this.onConnectionFailed();
       return;
     }
 
-    this.ws.onopen = () => {
-      this._state = "handshaking";
-      eventBus.emit("stateChange", "handshaking");
+    socket.onopen = () => {
+      if (!this.isCurrentSocket(socket, generation)) return;
+      this.setState(isReconnectAttempt ? "recovering" : "handshaking");
       // 连接后立即发送握手消息（对应 C# ConnectCallback 中的 SecretRequest）
-      this.sendRaw({ proto: "MsgSecret", vesion: CLIENT_VERSION } as MsgBase);
+      this.sendOn(socket, { proto: "MsgSecret", vesion: CLIENT_VERSION } as MsgBase);
     };
 
-    this.ws.onclose = (ev) => {
-      const wasConnected = this._state === "connected" || this._state === "handshaking";
-      this._state = "disconnected";
+    socket.onclose = () => {
+      if (!this.isCurrentSocket(socket, generation)) return;
+      this.ws = null;
       this.stopHeartbeat();
-      eventBus.emit("stateChange", "disconnected");
-      eventBus.emit("close");
-
-      // 非主动关闭时自动重连
-      if (wasConnected && !ev.wasClean) {
-        this.scheduleReconnect();
+      if (this.manualClose) {
+        this.setState("disconnected");
+        return;
       }
+
+      if (this.wasConnectedBefore && !this.lossNotified) {
+        this.lossNotified = true;
+        eventBus.emit("close");
+      }
+      this.scheduleReconnect();
     };
 
-    this.ws.onerror = () => {
-      // onerror 后一定会触发 onclose，在 onclose 中处理重连
+    socket.onerror = () => {
+      if (!this.isCurrentSocket(socket, generation)) return;
       eventBus.emit("connectFail");
     };
 
-    this.ws.onmessage = (e: MessageEvent<string>) => {
+    socket.onmessage = (e: MessageEvent<string>) => {
+      if (!this.isCurrentSocket(socket, generation)) return;
       try {
         const msg = JSON.parse(e.data) as MsgBase;
         this.onMessage(msg);
@@ -99,18 +108,20 @@ class NetManagerClass {
   private onMessage(msg: MsgBase) {
     // 心跳回包：直接处理，不入队
     if (msg.proto === "MsgPing") {
+      this.lastPongAt = Date.now();
       return;
     }
 
     // 握手回包：更新状态后继续分发
     if (msg.proto === "MsgSecret") {
-      if (this._state === "handshaking") {
-        const isReconnect = this.wasConnectedBefore && this.reconnectAttempts > 0;
-        this._state = "connected";
+      if (this._state === "handshaking" || this._state === "recovering") {
+        const isReconnect = this.wasConnectedBefore;
         this.reconnectAttempts = 0;
         this.wasConnectedBefore = true;
+        this.lossNotified = false;
+        this.lastPongAt = Date.now();
         this.startHeartbeat();
-        eventBus.emit("stateChange", "connected");
+        this.setState(isReconnect ? "recovering" : "connected");
         eventBus.emit("connectSucc");
         if (isReconnect) eventBus.emit("reconnected");
       }
@@ -141,49 +152,76 @@ class NetManagerClass {
       console.warn("[NetManager] 发送失败，未连接:", msg.proto);
       return false;
     }
-    this.sendRaw(msg);
-    return true;
+    return this.sendOn(this.ws, msg);
   }
 
-  private sendRaw(msg: MsgBase) {
-    this.ws!.send(JSON.stringify(msg));
+  private sendOn(socket: WebSocket, msg: MsgBase) {
+    try {
+      socket.send(JSON.stringify(msg));
+      return true;
+    } catch {
+      console.warn("[NetManager] 发送异常:", msg.proto);
+      return false;
+    }
+  }
+
+  finishRecovery() {
+    if (this._state === "recovering") this.setState("connected");
   }
 
   disconnect() {
     this.clearTimers();
-    this.reconnectAttempts = this.MAX_RECONNECT; // 阻止自动重连
+    this.manualClose = true;
+    this.reconnectAttempts = 0;
     this.wasConnectedBefore = false;
-    this.ws?.close(1000, "主动断开");
+    const socket = this.ws;
     this.ws = null;
-    this._state = "disconnected";
+    this.socketGeneration++;
+    socket?.close(1000, "主动断开");
+    this.setState("disconnected");
   }
 
   private onConnectionFailed() {
-    this._state = "disconnected";
     eventBus.emit("connectFail");
     this.scheduleReconnect();
   }
 
   private scheduleReconnect() {
-    if (this.reconnectAttempts >= this.MAX_RECONNECT) {
-      console.warn("[NetManager] 已达最大重连次数，停止重连");
-      return;
-    }
-    // 指数退避：2s, 4s, 8s, 16s, 32s
-    const delay = this.RECONNECT_BASE_DELAY * Math.pow(2, this.reconnectAttempts);
+    this.clearReconnectTimers();
+    // 持续重试并封顶间隔，避免网络在房间宽限期内恢复后，客户端却因长退避或停止重试而必须刷新。
+    const delay = Math.min(
+      this.RECONNECT_BASE_DELAY * Math.pow(2, Math.min(this.reconnectAttempts, 8)),
+      this.RECONNECT_MAX_DELAY,
+    );
     this.reconnectAttempts++;
     console.log(`[NetManager] ${delay / 1000}s 后尝试第 ${this.reconnectAttempts} 次重连`);
+    this.setState("reconnecting");
+    eventBus.emit("reconnectCountdown", Math.ceil(delay / 1000));
+
+    let remaining = Math.ceil(delay / 1000);
+    this.reconnectCountdownTimer = setInterval(() => {
+      remaining = Math.max(0, remaining - 1);
+      eventBus.emit("reconnectCountdown", remaining);
+    }, 1000);
 
     this.reconnectTimer = setTimeout(() => {
+      this.clearReconnectTimers();
       this.openSocket(this.url);
     }, delay);
   }
 
   private startHeartbeat() {
     this.stopHeartbeat();
-    // 对战中更密：10 秒
+    const socket = this.ws;
+    if (!socket) return;
     this.pingTimer = setInterval(() => {
-      this.sendRaw({ proto: "MsgPing" } as MsgPing);
+      if (this.ws !== socket || socket.readyState !== WebSocket.OPEN) return;
+      if (Date.now() - this.lastPongAt > 30_000) {
+        console.warn("[NetManager] 心跳超时，主动重建连接");
+        socket.close(4000, "心跳超时");
+        return;
+      }
+      this.sendOn(socket, { proto: "MsgPing" } as MsgPing);
     }, 10_000);
   }
 
@@ -196,10 +234,27 @@ class NetManagerClass {
 
   private clearTimers() {
     this.stopHeartbeat();
+    this.clearReconnectTimers();
+  }
+
+  private clearReconnectTimers() {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.reconnectCountdownTimer) {
+      clearInterval(this.reconnectCountdownTimer);
+      this.reconnectCountdownTimer = null;
+    }
+  }
+
+  private isCurrentSocket(socket: WebSocket, generation: number) {
+    return this.ws === socket && this.socketGeneration === generation;
+  }
+
+  private setState(state: ConnectionState) {
+    this._state = state;
+    eventBus.emit("stateChange", state);
   }
 }
 

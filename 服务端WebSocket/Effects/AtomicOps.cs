@@ -396,12 +396,20 @@ public static class AtomicOps
     /// 玩家取消/超时返回 false。
     /// 放回附着咚会使对应角色/领袖失去贴咚加成(power 由 AttachedDonCount 派生，自动生效)。
     /// </summary>
-    public static async Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
+    public static Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
+        => PromptReturnDonToDeck(ctx, ctx.OwnerIndex, n, optional);
+
+    /// <summary>
+    /// 让指定玩家从其场上选择咚!!放回咚!!卡组。除支付己方“咚!!-N”外，也用于
+    /// “对方将其场上的咚!!放回咚!!卡组”这类强制效果。
+    /// </summary>
+    public static async Task<bool> PromptReturnDonToDeck(
+        EffectContext ctx, int playerIdx, int n, bool optional)
     {
         if (n <= 0) return true;
-        var me = ctx.State.Players[ctx.OwnerIndex];
+        var player = ctx.State.Players[playerIdx];
         // 合格咚 = 费用区全部(活跃 + 休息 + 附着)
-        var eligible = me.CostArea
+        var eligible = player.CostArea
             .Where(d => d.State is DonState.Active or DonState.Rest or DonState.Attached)
             .ToList();
         if (eligible.Count < n) return false;   // 凑不够 → 无法支付
@@ -422,9 +430,9 @@ public static class AtomicOps
                 string? num = null, name = null;
                 if (d.State == DonState.Attached && d.AttachedToCardId is { } tid)
                 {
-                    CardInstance? t = me.Leader.Id == tid
-                        ? me.Leader
-                        : me.Characters.FirstOrDefault(c => c.Id == tid);
+                    CardInstance? t = player.Leader.Id == tid
+                        ? player.Leader
+                        : player.Characters.FirstOrDefault(c => c.Id == tid);
                     if (t is not null) { num = t.Info.Number; name = t.Info.Name; }
                 }
                 return new
@@ -436,11 +444,11 @@ public static class AtomicOps
                 };
             }).ToList();
 
-            var ans = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
+            var ans = await ctx.Prompts.ChooseCards(playerIdx, "ReturnOwnDon",
                 optional
                     ? $"选择 {n} 张咚!! 放回咚!!卡组，或取消发动"
                     : $"选择 {n} 张咚!! 放回咚!!卡组",
-                eligible.Select(d => d.Id.ToString()).ToList(), n, n,
+                eligible.Select(d => d.Id.ToString()).ToList(), optional ? 0 : n, n,
                 new Dictionary<string, object?>
                 {
                     ["donChoices"] = donChoices,
@@ -462,11 +470,11 @@ public static class AtomicOps
         {
             d.State = DonState.InDeck;
             d.AttachedToCardId = null;
-            me.CostArea.Remove(d);
-            me.DonDeck.Add(d);
+            player.CostArea.Remove(d);
+            player.DonDeck.Add(d);
         }
         EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
-            new Dictionary<string, object?> { ["count"] = chosen.Count, ["owner"] = ctx.OwnerIndex });
+            new Dictionary<string, object?> { ["count"] = chosen.Count, ["owner"] = playerIdx });
         return true;
     }
 

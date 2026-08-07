@@ -1,0 +1,249 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { HomeRequest } from "@/net/HomeProtocol";
+import { useNetStore } from "@/store/netStore";
+import { getCard, loadAllCards } from "@/data/CardLoader";
+import { thumbSrc } from "@/lib/sprite";
+import type { LeaderboardPeriod } from "@/types/net";
+
+const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
+  { value: "7d", label: "近 7 天" },
+  { value: "30d", label: "近 30 天" },
+  { value: "all", label: "全部" },
+];
+
+function percent(value: number | null): string {
+  return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
+function formatGeneratedAt(value?: string): string {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function colorClasses(color?: string): string {
+  if (color?.includes("红")) return "bg-red-500/15 text-red-300 border-red-500/30";
+  if (color?.includes("绿")) return "bg-green-500/15 text-green-300 border-green-500/30";
+  if (color?.includes("蓝")) return "bg-blue-500/15 text-blue-300 border-blue-500/30";
+  if (color?.includes("紫")) return "bg-purple-500/15 text-purple-300 border-purple-500/30";
+  if (color?.includes("黑")) return "bg-gray-500/15 text-gray-300 border-gray-500/30";
+  if (color?.includes("黄")) return "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
+  return "bg-gray-800 text-gray-400 border-gray-700";
+}
+
+export default function LeaderLeaderboardPanel() {
+  const leaderboard = useNetStore((s) => s.leaderLeaderboard);
+  const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
+  const [search, setSearch] = useState("");
+  const [cardRevision, setCardRevision] = useState(0);
+
+  const request = (nextPeriod: LeaderboardPeriod) => {
+    HomeRequest.requestLeaderLeaderboard(nextPeriod);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    loadAllCards()
+      .then(() => {
+        if (!cancelled) setCardRevision((value) => value + 1);
+      })
+      .catch(() => {
+        // 卡牌总包不可用时仍展示卡号和统计，不阻断榜单。
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    HomeRequest.requestLeaderLeaderboard(period);
+  }, [period]);
+
+  const items = useMemo(() => {
+    const keyword = search.trim().toLocaleLowerCase("zh-CN");
+    const source = leaderboard?.period === period ? leaderboard.items ?? [] : [];
+    if (!keyword) return source;
+    return source.filter((item) => {
+      const card = getCard(item.leaderNumber);
+      return item.leaderNumber.toLocaleLowerCase("zh-CN").includes(keyword)
+        || card?.name.toLocaleLowerCase("zh-CN").includes(keyword);
+    });
+  }, [cardRevision, leaderboard, period, search]);
+
+  const loading = leaderboard == null || leaderboard.period !== period;
+  const failed = !loading && leaderboard.result === false;
+
+  return (
+    <section className="flex h-full min-h-0 flex-col p-6">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            统计全部真人对局；第 7 回合及以前结束的对局不计入数据
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-800 bg-gray-950 p-1">
+            {PERIODS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriod(option.value)}
+                className={`rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                  period === option.value
+                    ? "bg-orange-500 text-white"
+                    : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => request(period)}
+            className="rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-xs text-gray-400 transition-colors hover:border-orange-500 hover:text-white"
+          >
+            刷新
+          </button>
+        </div>
+      </header>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-4 py-3">
+        <div className="flex items-center gap-5 text-xs text-gray-400">
+          <span>
+            有效对局 <strong className="ml-1 text-white">{leaderboard?.totalMatches ?? 0}</strong>
+          </span>
+          <span>
+            排名门槛 <strong className="ml-1 text-white">{leaderboard?.minimumGames ?? 20} 场</strong>
+          </span>
+          {leaderboard?.generatedAtUtc && (
+            <span className="hidden text-gray-600 sm:inline">
+              更新于 {formatGeneratedAt(leaderboard.generatedAtUtc)}
+            </span>
+          )}
+        </div>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="搜索 Leader 名称或卡号"
+          className="w-56 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-xs text-white outline-none placeholder:text-gray-600 focus:border-orange-500"
+        />
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-gray-800 bg-gray-950/60">
+        {loading ? (
+          <p className="py-16 text-center text-sm text-gray-600">正在加载排行榜…</p>
+        ) : failed ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-red-400">{leaderboard.error ?? "排行榜暂时不可用"}</p>
+            <button
+              type="button"
+              onClick={() => request(period)}
+              className="mt-3 rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-orange-500"
+            >
+              重试
+            </button>
+          </div>
+        ) : items.length === 0 ? (
+          <p className="py-16 text-center text-sm text-gray-600">
+            {search ? "没有符合搜索条件的 Leader" : "当前时间范围暂无有效对局"}
+          </p>
+        ) : (
+          <table className="w-full min-w-[920px] border-collapse text-left">
+            <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="w-16 px-4 py-3 text-center">排名</th>
+                <th className="px-3 py-3">Leader</th>
+                <th className="px-3 py-3 text-right">场次</th>
+                <th className="px-3 py-3 text-right">战绩</th>
+                <th className="px-3 py-3 text-right">胜率</th>
+                <th className="px-3 py-3 text-right">使用率</th>
+                <th className="px-3 py-3 text-right">先攻</th>
+                <th className="px-4 py-3 text-right">后攻</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/80">
+              {items.map((item) => {
+                const card = getCard(item.leaderNumber);
+                return (
+                  <tr key={item.leaderNumber} className="transition-colors hover:bg-gray-900/80">
+                    <td className="px-4 py-2.5 text-center">
+                      {item.rank != null ? (
+                        <span className={`font-black ${item.rank <= 3 ? "text-orange-400" : "text-gray-300"}`}>
+                          {item.rank}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-700">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-[62px] w-11 shrink-0 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+                          <Image
+                            src={thumbSrc(card?.sprite)}
+                            alt={card?.name ?? item.leaderNumber}
+                            fill
+                            sizes="44px"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-white">
+                            {card?.name ?? item.leaderNumber}
+                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-[11px] text-gray-500">{item.leaderNumber}</span>
+                            {card?.color && (
+                              <span className={`rounded border px-1.5 py-0.5 text-[10px] ${colorClasses(card.color)}`}>
+                                {card.color}
+                              </span>
+                            )}
+                            {item.insufficientSample && (
+                              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
+                                样本不足
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-sm font-semibold text-gray-200">{item.games}</td>
+                    <td className="px-3 py-2.5 text-right text-sm">
+                      <span className="text-emerald-400">{item.wins}</span>
+                      <span className="mx-1 text-gray-700">-</span>
+                      <span className="text-red-400">{item.losses}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-sm font-black text-orange-300">
+                      {percent(item.winRate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-sm text-gray-300">{percent(item.usageRate)}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <p className="text-sm text-gray-200">{percent(item.firstWinRate)}</p>
+                      <p className="text-[10px] text-gray-600">{item.firstGames} 场</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <p className="text-sm text-gray-200">{percent(item.secondWinRate)}</p>
+                      <p className="text-[10px] text-gray-600">{item.secondGames} 场</p>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
+  );
+}

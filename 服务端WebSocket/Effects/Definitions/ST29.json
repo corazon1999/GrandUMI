@@ -130,6 +130,10 @@
   "ST29-017": {
     "_name": "死·狮子挽歌",
     "_note": "【反击】我方最多1张领袖或角色+4000（原文后半“生命≤2则KO对方费用≤3”因反击数组无条件分支已略去）。",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ],
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+4000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }

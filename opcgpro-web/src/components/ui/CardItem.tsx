@@ -2,12 +2,13 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { CardData } from "@/types/card";
 import { clsx } from "clsx";
 import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardHoverPreview";
 import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
+import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 
 interface Props {
   card: CardData | null;
@@ -84,6 +85,20 @@ export default function CardItem({
   const displayCost = Math.max(0, (card?.cost ?? 0) + costBuff);
   const displayCounter = counterValue ?? card?.counter ?? 0;
   const [imgSrc, setImgSrc] = useState(card?.sprite ?? "/sprites/CardBack.png");
+  const leaderBreathingEffect =
+    !showFaceDown && card?.type === "Leader"
+      ? getLeaderBreathingEffect(card.number, imgSrc)
+      : null;
+  const leaderBreathingStyle = leaderBreathingEffect
+    ? ({
+        "--leader-breath-focus-x": leaderBreathingEffect.focusX,
+        "--leader-breath-focus-y": leaderBreathingEffect.focusY,
+        "--leader-breath-duration": leaderBreathingEffect.duration,
+        "--leader-breath-scale": leaderBreathingEffect.scale,
+        "--leader-breath-primary": leaderBreathingEffect.primaryRgb,
+        "--leader-breath-secondary": leaderBreathingEffect.secondaryRgb,
+      } as CSSProperties)
+    : undefined;
 
   // 卡牌/异画变化时重新同步图源并重试加载（修复曾因服务器暂时不可用 onError 回退到
   // 卡背后、即使图恢复也一直卡在卡背的问题）
@@ -180,6 +195,30 @@ export default function CardItem({
               )
             }
           />
+          {leaderBreathingEffect && (
+            <div
+              className={clsx("leader-breath-fx", isTapped && "leader-breath-fx--tapped")}
+              style={leaderBreathingStyle}
+              aria-hidden="true"
+            >
+              {/*
+               * 原卡图是单层图片，因此只在插画上半区叠一份柔边副本并轻微缩放；
+               * 卡框、技能文字与名称栏继续使用下方静态原图，保证阅读稳定。
+               */}
+              <div className="leader-breath-art-viewport">
+                <NextImage
+                  src={imgSrc}
+                  alt=""
+                  fill
+                  sizes="180px"
+                  className="leader-breath-art object-cover"
+                  draggable={false}
+                />
+              </div>
+              <span className="leader-breath-gaze" />
+              <span className="leader-breath-frame" />
+            </div>
+          )}
           {/* 费用 → 左上角（与卡面一致）；保留 costBuff 升降色。领袖无费用→隐藏 */}
           {!hideCost && (
             <span

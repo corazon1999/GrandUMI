@@ -14,8 +14,10 @@ import sqlite3
 from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "feedback.db")
-REPORTS_DIR = os.path.join(BASE_DIR, "reports")
+DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"))
+REPORTS_DIR = os.environ.get(
+    "BUG_BOT_REPORTS_DIR", os.path.join(BASE_DIR, "reports")
+)
 # Issue 链接指向的仓库(与 bot 默认 github_repo 一致)
 GITHUB_REPO = "corazon1999/GrandUMI"
 

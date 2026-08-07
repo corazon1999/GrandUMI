@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "feedback.db")
+DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"))
 
 # 卡号:前缀(OP/ST/EB/PRB)+两位包号-编号,中间可能夹空格/全角,统一归一为 PRE##-###
 CARD_RE = re.compile(r"(OP|ST|EB|PRB)\s*0?(\d{2})\s*[-_·]\s*(\d{1,3})", re.I)

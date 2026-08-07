@@ -438,6 +438,8 @@ public class OP17EffectTests
         Assert.Equal("ReturnOwnDon", prompt.kind);
         Assert.Single(prompt.choices);
         Assert.Equal(state.Players[0].CostArea[0].Id.ToString(), prompt.choices[0]);
+        Assert.Equal(0, prompt.min);
+        Assert.Equal(1, prompt.max);
         Assert.True(Assert.IsType<bool>(prompt.extra!["canCancel"]));
     }
 
@@ -496,6 +498,27 @@ public class OP17EffectTests
         Assert.Empty(state.Players[0].CostArea);
         Assert.Single(state.Players[0].DonDeck);
         Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
+    public async Task OP08_074_RestedDonReturnPrompt_StillRequiresExactCount()
+    {
+        var state = TestScene.New().MyActiveDon(1).Build();
+        var don = state.Players[0].CostArea[0];
+        don.State = DonState.Rest;
+        var maria = Card("OP08-074");
+        maria.OncePerTurnUsedKeys.Add("OP08-074-PendingReturn");
+        state.Players[0].Characters.Add(maria);
+        var prompts = new MockPromptService().QueueChoose(don.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, maria, EffectTrigger.OnMyTurnEnd, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("ReturnOwnDon", prompt.kind);
+        Assert.Equal(1, prompt.min);
+        Assert.Equal(1, prompt.max);
+        Assert.Empty(state.Players[0].CostArea);
+        Assert.Single(state.Players[0].DonDeck);
     }
 
     [Fact]

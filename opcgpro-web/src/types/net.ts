@@ -1,3 +1,5 @@
+import type { SavedDeck } from "@/types/deck";
+
 // 协议枚举 — 与 C# ProtocolEnum.cs 完全一致
 export enum ProtocolEnum {
   None = 0,
@@ -32,6 +34,13 @@ export enum ProtocolEnum {
   MsgRequestState = 29,    // 客户端 → 服务器：重连后请求完整快照
   MsgPlayerDisconnected = 30, // 服务器 → 客户端：对手断线通知
   MsgPlayerReconnected = 31, // 服务器 → 客户端：对手重连通知
+  MsgPlayerData = 32,
+  MsgSaveDeck = 33,
+  MsgDeleteDeck = 34,
+  MsgSelectDeck = 35,
+  MsgUpdateProfile = 36,
+  MsgImportDecks = 37,
+  MsgLeaderLeaderboard = 38,
 }
 
 // WebSocket JSON 消息基类
@@ -62,6 +71,9 @@ export interface MsgLogin extends MsgBase {
   account: string;
   password?: string;  // 已不再校验密码，仅为兼容旧协议字段保留
   name?: string;     // 服务器返回的玩家昵称
+  avatar?: string;
+  selectedDeckName?: string | null;
+  decks?: SavedDeck[];
   result?: boolean;  // true = 成功（C# 中是 bool 不是 int）
   logStr?: string;   // 服务器提示文本
 }
@@ -78,6 +90,43 @@ export interface MsgUpdatePs extends MsgBase {
   newPs: string;
   result?: boolean;
   logStr?: string;
+}
+
+export interface MsgPlayerData extends MsgBase {
+  proto: "MsgPlayerData";
+  result: boolean;
+  logStr?: string | null;
+  account?: string;
+  displayName?: string;
+  avatar?: string;
+  selectedDeckName?: string | null;
+  decks?: SavedDeck[];
+}
+
+export interface MsgSaveDeck extends MsgBase {
+  proto: "MsgSaveDeck";
+  deck: SavedDeck;
+}
+
+export interface MsgDeleteDeck extends MsgBase {
+  proto: "MsgDeleteDeck";
+  name: string;
+}
+
+export interface MsgSelectDeck extends MsgBase {
+  proto: "MsgSelectDeck";
+  name: string | null;
+}
+
+export interface MsgUpdateProfile extends MsgBase {
+  proto: "MsgUpdateProfile";
+  displayName: string;
+  avatar: string;
+}
+
+export interface MsgImportDecks extends MsgBase {
+  proto: "MsgImportDecks";
+  decks: SavedDeck[];
 }
 
 // ── 匹配 ────────────────────────────────────────────────────────────────
@@ -110,8 +159,10 @@ export interface MsgMatchFound extends MsgBase {
 export interface MsgCreateRoom extends MsgBase {
   proto: "MsgCreateRoom";
   deck: string;
+  deckName?: string;
   roomCode?: string;  // 服务器返回的房间码
   result?: boolean;
+  logStr?: string;
 }
 
 export interface MsgCancelRoom extends MsgBase {
@@ -122,6 +173,7 @@ export interface MsgJoinRoom extends MsgBase {
   proto: "MsgJoinRoom";
   roomCode: string;
   deck: string;
+  deckName?: string;
   result?: boolean;
   logStr?: string;
   opponentName?: string;
@@ -216,6 +268,37 @@ export interface MsgPlayerList extends MsgBase {
   players?: PlayerInfo[];
 }
 
+// ── Leader 排行榜 ─────────────────────────────────────────────────────
+export type LeaderboardPeriod = "7d" | "30d" | "all";
+
+export interface LeaderLeaderboardItem {
+  rank: number | null;
+  leaderNumber: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  usageRate: number;
+  firstGames: number;
+  firstWinRate: number | null;
+  secondGames: number;
+  secondWinRate: number | null;
+  insufficientSample: boolean;
+}
+
+/** 客户端发送时只带 period；服务端回包附带聚合结果。 */
+export interface MsgLeaderLeaderboard extends MsgBase {
+  proto: "MsgLeaderLeaderboard";
+  period: LeaderboardPeriod;
+  result?: boolean;
+  error?: string;
+  generatedAtUtc?: string;
+  sinceUtc?: string | null;
+  totalMatches?: number;
+  minimumGames?: number;
+  items?: LeaderLeaderboardItem[];
+}
+
 // 客户端 → 服务器:邀请某玩家对战(带自己卡组);服务器 → 发起方:回执
 export interface MsgInvitePlayer extends MsgBase {
   proto: "MsgInvitePlayer";
@@ -255,15 +338,18 @@ export interface FriendlyPlayer {
   name: string;
   deckName: string | null;
   ready: boolean;
+  connected?: boolean;
 }
 
 // 服务器 → 客户端:友谊战房间完整状态
 export interface MsgFriendlyRoom extends MsgBase {
   proto: "MsgFriendlyRoom";
   roomId: string;
+  origin?: "roomCode" | "invite";
+  roomCode?: string | null;
   players: FriendlyPlayer[];
   scores: number[];
-  state: "lobby" | "playing";
+  state: "lobby" | "starting" | "playing";
   error?: string | null;
 }
 
@@ -499,6 +585,12 @@ export type AnyMsg =
   | MsgLogin
   | MsgAddAccount
   | MsgUpdatePs
+  | MsgPlayerData
+  | MsgSaveDeck
+  | MsgDeleteDeck
+  | MsgSelectDeck
+  | MsgUpdateProfile
+  | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch
   | MsgMatchFound
@@ -524,4 +616,5 @@ export type AnyMsg =
   | MsgBugReport
   | MsgChatMsg
   | MsgGameChat
+  | MsgLeaderLeaderboard
   | MsgOnlineCount;
