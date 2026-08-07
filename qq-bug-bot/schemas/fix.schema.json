@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {"type": "string", "enum": ["fixed", "unable"]},
+    "summary": {"type": "string"},
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string"},
+          "passed": {"type": "boolean"},
+          "evidence": {"type": "string"}
+        },
+        "required": ["command", "passed", "evidence"],
+        "additionalProperties": false
+      }
+    },
+    "files_changed": {"type": "array", "items": {"type": "string"}},
+    "changelog_file": {"type": "string"}
+  },
+  "required": ["status", "summary", "tests", "files_changed", "changelog_file"],
+  "additionalProperties": false
+}

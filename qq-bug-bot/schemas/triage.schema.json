@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "classification": {
+      "type": "string",
+      "enum": ["confirmed_bug", "feature_request", "uncertain", "not_bug"]
+    },
+    "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+    "resolution": {"type": "string", "enum": ["fix", "ask_owner", "reject"]},
+    "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
+    "reasoning_summary": {"type": "string"},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "expected_behavior": {"type": "string"},
+    "owner_question": {"type": "string"},
+    "player_summary": {"type": "string"}
+  },
+  "required": [
+    "classification", "confidence", "resolution", "risk_level",
+    "reasoning_summary", "evidence", "expected_behavior",
+    "owner_question", "player_summary"
+  ],
+  "additionalProperties": false
+}

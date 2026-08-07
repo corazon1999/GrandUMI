@@ -1,12 +1,13 @@
 # GrandUMI QQ 群 bug 反馈机器人
 
-监听 QQ 群里以 `#bug ` 开头的消息,把反馈**存到本地 SQLite** 并**自动提交到 GitHub Issues**,然后在群里 @ 上报人回执。
+监听 QQ 群里以 `#bug ` 开头的消息，把反馈**存到本地 SQLite**、**自动提交到 GitHub Issues**，并可调用所有者电脑上的 Codex Agent 自动分析和修复明确 Bug。
 
 ```
 QQ群用户:  #bug OP16-080 的减费光环没生效
         ↓
 机器人:    @某某 ✅ 已收到你的反馈 #5,感谢!
                   已同步到 Issue #23
+                  已进入 Agent 自动分析队列
 ```
 
 底层走 **OneBot 11** 协议,QQ 接入用 **NapCat**(正向 WebSocket)。
@@ -45,6 +46,55 @@ copy config.example.json config.json
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |
 | `reply_enabled` | 是否在群里回执 |
 | `min_content_length` | 反馈正文最少字数,过短不入库 |
+| `agent_enabled` | 是否把新反馈送入本机 Agent 队列 |
+| `agent_owner_qq` | 功能需求或不确定 Bug 需要确认时 @ 的管理员 QQ |
+| `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |
+
+## Agent 自动分析与修复
+
+启用后，服务端机器人只负责 QQ 会话、SQLite 队列和 GitHub Issue；本机
+`agent_worker.py` 通过 SSH 领取任务，在独立 Git worktree 内调用 `codex exec`：
+
+1. 只读分诊：只有明确违反既有规则/规格、置信度不低于 85 的 Bug 才自动修复。
+2. 功能需求、规则歧义、无法复现或安全门禁失败时，在原反馈群 @ `651846226`。
+3. 管理员必须 @ 当前机器人并发送 `#回复 具体判断`。问题全局串行，因此无需填写反馈编号。
+4. 修复 Agent 只能在 `workspace-write` 沙箱内修改代码和运行测试，不能提交或部署。
+5. 独立复核 Agent 重新检查 diff 并实际执行固定测试。
+6. 固定程序核对路径、文件数、行数、测试事件、更新日志、远端快进状态后，才提交并运行 `deploy-test.ps1`。
+7. 测试服外网验证成功后，机器人 @ 原玩家回复摘要、提交号和测试地址。
+
+以下内容永不自动修改：仓库治理文件、CI、`ops/`、部署/发布脚本、依赖与项目清单、机器人自身、密钥和配置。命中门禁后会询问管理员，不会擅自放宽权限。正式服发布不在本流程授权范围内。
+
+### 安装本机工作器
+
+前提：本机 `codex` 已登录且能访问模型，`git`、`ssh`、`py`、`powershell` 可用；
+`D:\Self\GrandUMI-agent-runtime\repo` 是独立、干净的 `main` 副本。
+
+```powershell
+cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
+.\install-agent-worker.ps1
+```
+
+安装器会先运行队列、Git 同步和 Codex 自检；全部通过后才注册并启动当前用户的
+`GrandUMI-Bug-Agent` 登录任务。运行配置位于
+`D:\Self\GrandUMI-agent-runtime\agent-worker.json`，日志位于其 `logs` 子目录。
+
+### 部署并启用服务器机器人
+
+先部署代码但保持 Agent 关闭：
+
+```powershell
+.\deploy-bot-server.ps1
+```
+
+本机工作器自检通过后，再原子启用：
+
+```powershell
+.\deploy-bot-server.ps1 -EnableAgent
+```
+
+部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
+它会构建并检查新容器，失败时恢复原文件与配置。
 
 ## 三、运行
 
@@ -150,5 +200,9 @@ py -c "import sqlite3; [print(r) for r in sqlite3.connect('feedback.db').execute
 | `bot.py` | 主程序:连 OneBot WS、识别指令、调存储/建 issue、回执 |
 | `storage.py` | SQLite 存储封装 |
 | `github_issue.py` | 通过 gh CLI 建 GitHub Issue |
+| `agent_bridge.py` | 服务器侧队列领取、问题和结果回写桥 |
+| `agent_worker.py` | 本机 Codex 分诊、修复、复核、提交和测试服部署工作器 |
+| `agent_protocol.py` | Agent 提示词和安全路径白名单 |
+| `schemas/` | Codex 结构化分诊、修复和复核结果定义 |
 | `config.json` | 你的实际配置(已 gitignore) |
 | `feedback.db` | 运行时生成的反馈数据库(已 gitignore) |

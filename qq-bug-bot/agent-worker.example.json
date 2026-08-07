@@ -1,0 +1,23 @@
+{
+  "server": "root@8.210.155.25",
+  "remote_bot_dir": "/opt/qq-bug-bot",
+  "repository_root": "D:\\Self\\GrandUMI-agent-runtime\\repo",
+  "jobs_root": "D:\\Self\\GrandUMI-agent-runtime\\jobs",
+  "logs_root": "D:\\Self\\GrandUMI-agent-runtime\\logs",
+  "worker_id": "grandumi-owner-pc",
+  "codex_command": "codex",
+  "codex_proxy": "http://127.0.0.1:7890",
+  "git_proxy": "http://127.0.0.1:7890",
+  "shared_node_modules_path": "D:\\Self\\GrandUMI\\opcgpro-web\\node_modules",
+  "model": "",
+  "poll_seconds": 30,
+  "lease_seconds": 10800,
+  "self_check_timeout_seconds": 300,
+  "triage_timeout_seconds": 1800,
+  "fix_timeout_seconds": 7200,
+  "review_timeout_seconds": 3600,
+  "test_timeout_seconds": 3600,
+  "deploy_timeout_seconds": 3600,
+  "max_changed_files": 30,
+  "max_diff_lines": 1500
+}

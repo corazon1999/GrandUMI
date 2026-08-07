@@ -7,10 +7,15 @@
 import os
 import sqlite3
 from datetime import datetime
+from datetime import timedelta
+from uuid import uuid4
 
 # 默认沿用本地目录；容器部署时通过环境变量把数据库放进持久化卷。
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"))
+
+AGENT_QUEUE_STATES = ("queued", "owner_answered")
+AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
 
 
 def init_db() -> None:
@@ -28,7 +33,20 @@ def init_db() -> None:
                 issue_no   INTEGER,            -- 对应的 GitHub Issue 编号,建失败为 NULL
                 created_at TEXT    NOT NULL,   -- ISO 时间
                 status     TEXT    NOT NULL DEFAULT 'open',  -- open(待修)/fixed(已修)/wontfix(非bug)
-                fix_note   TEXT                -- 修复备注(报告里展示)
+                fix_note   TEXT,               -- 修复备注(报告里展示)
+                agent_state TEXT NOT NULL DEFAULT 'none',
+                agent_question TEXT,
+                agent_question_sent_at TEXT,
+                agent_answer TEXT,
+                agent_summary TEXT,
+                agent_commit TEXT,
+                agent_result_url TEXT,
+                agent_claim_token TEXT,
+                agent_worker_id TEXT,
+                agent_claimed_at TEXT,
+                agent_attempts INTEGER NOT NULL DEFAULT 0,
+                agent_updated_at TEXT,
+                agent_reply_sent_at TEXT
             )
             """
         )
@@ -41,20 +59,339 @@ def init_db() -> None:
         if "dup_of" not in cols:
             # 重复指向:某条是另一条(主条目)的重复时,记主条目 id;为空表示它自己就是主条目
             conn.execute("ALTER TABLE feedback ADD COLUMN dup_of INTEGER")
+        migrations = {
+            "agent_state": "TEXT NOT NULL DEFAULT 'none'",
+            "agent_question": "TEXT",
+            "agent_question_sent_at": "TEXT",
+            "agent_answer": "TEXT",
+            "agent_summary": "TEXT",
+            "agent_commit": "TEXT",
+            "agent_result_url": "TEXT",
+            "agent_claim_token": "TEXT",
+            "agent_worker_id": "TEXT",
+            "agent_claimed_at": "TEXT",
+            "agent_attempts": "INTEGER NOT NULL DEFAULT 0",
+            "agent_updated_at": "TEXT",
+            "agent_reply_sent_at": "TEXT",
+        }
+        for name, declaration in migrations.items():
+            if name not in cols:
+                conn.execute(
+                    f"ALTER TABLE feedback ADD COLUMN {name} {declaration}"
+                )
         conn.commit()
 
 
-def add_feedback(qq: str, nickname: str, group_id: str, content: str) -> int:
+def add_feedback(
+    qq: str,
+    nickname: str,
+    group_id: str,
+    content: str,
+    agent_state: str = "none",
+) -> int:
     """插入一条反馈,返回自增主键 id(即群里回执显示的编号)。"""
     created_at = datetime.now().isoformat(timespec="seconds")
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
-            "INSERT INTO feedback (qq, nickname, group_id, content, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (str(qq), nickname or "", str(group_id), content, created_at),
+            "INSERT INTO feedback "
+            "(qq, nickname, group_id, content, created_at, agent_state, agent_updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                str(qq), nickname or "", str(group_id), content, created_at,
+                agent_state, created_at,
+            ),
         )
         conn.commit()
         return cur.lastrowid
+
+
+def get_feedback(feedback_id: int):
+    """读取单条反馈，供 Agent 桥接与通知流程使用。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM feedback WHERE id = ?", (feedback_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def claim_agent_job(worker_id: str, lease_seconds: int = 3600):
+    """原子领取一条待分析任务，并回收超时租约。"""
+    now = datetime.now()
+    now_text = now.isoformat(timespec="seconds")
+    stale_text = (now - timedelta(seconds=max(60, lease_seconds))).isoformat(
+        timespec="seconds"
+    )
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = CASE
+                       WHEN COALESCE(agent_answer, '') = '' THEN 'queued'
+                       ELSE 'owner_answered'
+                   END,
+                   agent_claim_token = NULL,
+                   agent_worker_id = NULL,
+                   agent_claimed_at = NULL,
+                   agent_updated_at = ?
+             WHERE agent_state = 'claimed'
+               AND agent_claimed_at IS NOT NULL
+               AND agent_claimed_at < ?
+            """,
+            (now_text, stale_text),
+        )
+        row = conn.execute(
+            """
+            SELECT * FROM feedback
+             WHERE agent_state IN ('queued', 'owner_answered')
+             ORDER BY created_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        if not row:
+            conn.commit()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = 'claimed',
+                   agent_claim_token = ?,
+                   agent_worker_id = ?,
+                   agent_claimed_at = ?,
+                   agent_attempts = agent_attempts + 1,
+                   agent_updated_at = ?
+             WHERE id = ?
+               AND agent_state IN ('queued', 'owner_answered')
+            """,
+            (token, worker_id, now_text, now_text, row["id"]),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        claimed = conn.execute(
+            "SELECT * FROM feedback WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(claimed)
+
+
+def request_owner_question(
+    feedback_id: int,
+    claim_token: str,
+    question: str,
+    summary: str = "",
+) -> bool:
+    """把已领取任务转为等待管理员确认。问题由机器人串行发送。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = 'waiting_owner',
+                   agent_question = ?,
+                   agent_question_sent_at = NULL,
+                   agent_answer = NULL,
+                   agent_summary = ?,
+                   agent_claim_token = NULL,
+                   agent_worker_id = NULL,
+                   agent_claimed_at = NULL,
+                   agent_updated_at = ?
+             WHERE id = ?
+               AND agent_state = 'claimed'
+               AND agent_claim_token = ?
+            """,
+            (question, summary, now_text, feedback_id, claim_token),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def release_agent_job(feedback_id: int, claim_token: str, summary: str = "") -> bool:
+    """网络等瞬时故障时释放租约，保留管理员已给出的回答。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = CASE
+                       WHEN COALESCE(agent_answer, '') = '' THEN 'queued'
+                       ELSE 'owner_answered'
+                   END,
+                   agent_summary = ?,
+                   agent_claim_token = NULL,
+                   agent_worker_id = NULL,
+                   agent_claimed_at = NULL,
+                   agent_updated_at = ?
+             WHERE id = ?
+               AND agent_state = 'claimed'
+               AND agent_claim_token = ?
+            """,
+            (summary, now_text, feedback_id, claim_token),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def get_owner_question_to_send():
+    """全局一次只返回一个管理员问题，保证无编号的 #回复 不会串单。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        active = conn.execute(
+            """
+            SELECT 1 FROM feedback
+             WHERE agent_state = 'waiting_owner'
+               AND agent_question_sent_at IS NOT NULL
+               AND COALESCE(agent_answer, '') = ''
+             LIMIT 1
+            """
+        ).fetchone()
+        if active:
+            return None
+        row = conn.execute(
+            """
+            SELECT * FROM feedback
+             WHERE agent_state = 'waiting_owner'
+               AND agent_question_sent_at IS NULL
+             ORDER BY created_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def mark_owner_question_sent(feedback_id: int) -> bool:
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_question_sent_at = ?, agent_updated_at = ?
+             WHERE id = ?
+               AND agent_state = 'waiting_owner'
+               AND agent_question_sent_at IS NULL
+            """,
+            (now_text, now_text, feedback_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def answer_active_owner_question(group_id: str, answer: str):
+    """回答当前群内唯一已发出的管理员问题，返回被回答的反馈。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM feedback
+             WHERE agent_state = 'waiting_owner'
+               AND agent_question_sent_at IS NOT NULL
+               AND COALESCE(agent_answer, '') = ''
+             ORDER BY agent_question_sent_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        if not row or str(row["group_id"]) != str(group_id):
+            conn.rollback()
+            return None
+        conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = 'owner_answered',
+                   agent_answer = ?,
+                   agent_updated_at = ?
+             WHERE id = ?
+            """,
+            (answer, now_text, row["id"]),
+        )
+        updated = conn.execute(
+            "SELECT * FROM feedback WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(updated)
+
+
+def complete_agent_job(
+    feedback_id: int,
+    claim_token: str,
+    state: str,
+    summary: str,
+    commit: str = "",
+    result_url: str = "",
+) -> bool:
+    """完成 Agent 任务；仅测试服验证成功的任务可写 fixed。"""
+    if state not in AGENT_TERMINAL_STATES:
+        raise ValueError(f"未知 Agent 终态: {state}")
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_state = ?,
+                   agent_summary = ?,
+                   agent_commit = ?,
+                   agent_result_url = ?,
+                   agent_claim_token = NULL,
+                   agent_worker_id = NULL,
+                   agent_claimed_at = NULL,
+                   agent_updated_at = ?,
+                   agent_reply_sent_at = NULL,
+                   status = CASE
+                       WHEN ? = 'fixed' THEN 'fixed'
+                       WHEN ? = 'rejected' THEN 'wontfix'
+                       ELSE status
+                   END,
+                   fix_note = CASE
+                       WHEN ? IN ('fixed', 'rejected') THEN ?
+                       ELSE fix_note
+                   END
+             WHERE id = ?
+               AND agent_state = 'claimed'
+               AND agent_claim_token = ?
+            """,
+            (
+                state, summary, commit, result_url, now_text,
+                state, state, state, summary, feedback_id, claim_token,
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def get_agent_result_to_send():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT * FROM feedback
+             WHERE agent_state IN ('fixed', 'rejected', 'manual', 'failed')
+               AND agent_reply_sent_at IS NULL
+             ORDER BY agent_updated_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def mark_agent_result_sent(feedback_id: int) -> bool:
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE feedback
+               SET agent_reply_sent_at = ?, agent_updated_at = ?
+             WHERE id = ?
+               AND agent_state IN ('fixed', 'rejected', 'manual', 'failed')
+               AND agent_reply_sent_at IS NULL
+            """,
+            (now_text, now_text, feedback_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
 
 
 def set_issue_no(feedback_id: int, issue_no: int) -> None:

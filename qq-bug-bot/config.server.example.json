@@ -6,5 +6,8 @@
   "create_issue": true,
   "github_repo": "corazon1999/GrandUMI",
   "reply_enabled": true,
-  "min_content_length": 2
+  "min_content_length": 2,
+  "agent_enabled": true,
+  "agent_owner_qq": 651846226,
+  "agent_notification_interval_seconds": 3
 }

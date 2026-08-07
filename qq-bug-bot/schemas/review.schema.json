@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "approved": {"type": "boolean"},
+    "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
+    "summary": {"type": "string"},
+    "issues": {"type": "array", "items": {"type": "string"}},
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string"},
+          "passed": {"type": "boolean"},
+          "evidence": {"type": "string"}
+        },
+        "required": ["command", "passed", "evidence"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["approved", "risk_level", "summary", "issues", "tests"],
+  "additionalProperties": false
+}
