@@ -32,6 +32,14 @@ function formatGeneratedAt(value?: string): string {
   }
 }
 
+/** 榜单统一展示当前已收录的最后一张异画，与卡组编辑器的默认异画规则一致。 */
+function latestLeaderSprite(card: ReturnType<typeof getCard>): string {
+  if (card?.sprites?.length) {
+    return card.sprites[card.sprites.length - 1];
+  }
+  return card?.sprite ?? "/sprites/CardBack.png";
+}
+
 function colorClasses(color?: string): string {
   if (color?.includes("红")) return "bg-red-500/15 text-red-300 border-red-500/30";
   if (color?.includes("绿")) return "bg-green-500/15 text-green-300 border-green-500/30";
@@ -172,7 +180,7 @@ export default function LeaderLeaderboardPanel() {
                       {item.rank ?? "—"}
                     </span>
                     <div className="relative h-[62px] w-11 shrink-0 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-                      <Image src={thumbSrc(card?.sprite)} alt={card?.name ?? item.leaderNumber} fill sizes="44px" className="object-cover" />
+                      <Image src={thumbSrc(latestLeaderSprite(card))} alt={card?.name ?? item.leaderNumber} fill sizes="44px" className="object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-white">{card?.name ?? item.leaderNumber}</p>
@@ -231,7 +239,7 @@ export default function LeaderLeaderboardPanel() {
                       <div className="flex items-center gap-3">
                         <div className="relative h-[62px] w-11 shrink-0 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
                           <Image
-                            src={thumbSrc(card?.sprite)}
+                            src={thumbSrc(latestLeaderSprite(card))}
                             alt={card?.name ?? item.leaderNumber}
                             fill
                             sizes="44px"
