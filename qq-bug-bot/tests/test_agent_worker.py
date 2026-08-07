@@ -99,6 +99,21 @@ class AgentWorkerGateTests(unittest.TestCase):
             resolved = agent_worker.resolve_codex_command("codex")
         self.assertEqual(native.resolve(), Path(resolved))
 
+    @unittest.skipUnless(os.name == "nt", "仅验证 Windows SSH 初始化重试")
+    def test_桥接在Windows子进程初始化失败后自动重试(self):
+        failed = subprocess.CompletedProcess(
+            [], agent_worker.WINDOWS_DLL_INIT_FAILED, "", ""
+        )
+        succeeded = subprocess.CompletedProcess(
+            [], 0, 'AGENT_BRIDGE_JSON={"ok": true, "database": "test"}\n', ""
+        )
+        with mock.patch.object(
+            agent_worker, "run_process", side_effect=[failed, succeeded]
+        ) as run_mock, mock.patch.object(agent_worker.time, "sleep"):
+            result = self.worker.bridge("status")
+        self.assertEqual("test", result["database"])
+        self.assertEqual(2, run_mock.call_count)
+
     def test允许小范围前端修复并要求构建(self):
         (self.repo / "opcgpro-web" / "src" / "a.ts").write_text(
             "export const a = 2;\n", encoding="utf-8"

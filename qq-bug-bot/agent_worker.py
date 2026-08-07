@@ -29,10 +29,16 @@ DEFAULT_CONFIG = Path(
     )
 )
 BRIDGE_PREFIX = "AGENT_BRIDGE_JSON="
+WINDOWS_DLL_INIT_FAILED = 0xC0000142
 
 
 class WorkerError(RuntimeError):
     pass
+
+
+def is_windows_dll_init_failure(returncode: int) -> bool:
+    """识别 Windows 创建子进程前的 DLL 初始化失败；远端命令尚未执行。"""
+    return os.name == "nt" and (returncode & 0xFFFFFFFF) == WINDOWS_DLL_INIT_FAILED
 
 
 def resolve_codex_command(command: str) -> str:
@@ -153,14 +159,29 @@ class AgentWorker:
             f"cd '{self.cfg['remote_bot_dir']}' && "
             f"docker compose exec -T bug-bot python agent_bridge.py {suffix}"
         )
-        result = run_process(
-            [
-                "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-                self.cfg["server"], remote,
-            ],
-            timeout=90,
-            input_text=(json.dumps(payload, ensure_ascii=False) if payload else None),
-        )
+        result = None
+        for attempt in range(1, 4):
+            result = run_process(
+                [
+                    "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                    self.cfg["server"], remote,
+                ],
+                timeout=90,
+                input_text=(
+                    json.dumps(payload, ensure_ascii=False) if payload else None
+                ),
+            )
+            if result.returncode == 0:
+                break
+            if is_windows_dll_init_failure(result.returncode) and attempt < 3:
+                self.log(
+                    f"服务器桥接 {command} 遇到 Windows 子进程初始化失败，"
+                    f"正在重试（{attempt}/3）"
+                )
+                time.sleep(1)
+                continue
+            break
+        assert result is not None
         require_success(result, f"服务器桥接 {command}")
         for line in reversed(result.stdout.splitlines()):
             if line.startswith(BRIDGE_PREFIX):
@@ -628,6 +649,12 @@ class AgentWorker:
                 "triage.schema.json",
                 agent_protocol.build_triage_prompt(job),
                 int(self.cfg.get("triage_timeout_seconds", 1800)),
+            )
+            self.log(
+                f"反馈 #{feedback_id} 分诊完成："
+                f"classification={triage.get('classification')}，"
+                f"resolution={triage.get('resolution')}，"
+                f"confidence={triage.get('confidence')}"
             )
             owner_answered = bool(str(job.get("agent_answer") or "").strip())
             can_fix = (
