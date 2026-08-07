@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import GameBoard from "@/components/game/GameBoard";
@@ -8,6 +8,7 @@ import GameMenu from "@/components/game/GameMenu";
 import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
+import LeaderClashOverlay from "@/components/game/LeaderClashOverlay";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
 import PromptOverlay from "@/components/game/PromptOverlay";
 import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
@@ -24,6 +25,7 @@ import OrientationGate from "@/components/game/OrientationGate";
 export default function GamePage() {
   const router = useRouter();
   const [feedbackOpenRequest, setFeedbackOpenRequest] = useState(0);
+  const [leaderClashComplete, setLeaderClashComplete] = useState(false);
   // 只订阅页面壳实际使用的字段，避免每份完整牌桌快照都让整个页面树重新渲染。
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
@@ -34,7 +36,8 @@ export default function GamePage() {
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
 
-  useGameInit();
+  const gameReady = useGameInit();
+  const handleLeaderClashComplete = useCallback(() => setLeaderClashComplete(true), []);
 
   const playbackRecord = useMemo(() => {
     if (!isPlayback) return null;
@@ -68,8 +71,13 @@ export default function GamePage() {
       <OrientationGate />
       {!isObserver && !isPlayback && <ReconnectOverlay />}
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
-      {!isObserver && !isPlayback && <FirstPlayerOverlay />}
-      {!isObserver && !isPlayback && <MulliganOverlay />}
+      {!isObserver && !isPlayback && (
+        <>
+          <LeaderClashOverlay ready={gameReady} onComplete={handleLeaderClashComplete} />
+          {leaderClashComplete && <FirstPlayerOverlay />}
+        </>
+      )}
+      {!isObserver && !isPlayback && leaderClashComplete && <MulliganOverlay />}
       {!isObserver && !isPlayback && <PromptOverlay />}
       {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
