@@ -252,13 +252,11 @@ export default function BattleRelationLayer() {
                 transition={{ duration: reduceMotion ? 0 : 0.38, ease: "easeOut" }}
               />
               <motion.path
-                className="battle-route-dash"
                 d={path}
                 fill="none"
                 stroke={isBlocked ? "url(#battle-route-block)" : "url(#battle-route-attack)"}
                 strokeWidth="5"
                 strokeLinecap="round"
-                strokeDasharray="14 10"
                 filter="url(#battle-route-glow)"
                 initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
                 animate={{ opacity: 1, pathLength: 1 }}
@@ -272,12 +270,6 @@ export default function BattleRelationLayer() {
                 strokeWidth="5"
                 markerEnd={isBlocked ? "url(#battle-arrow-block)" : "url(#battle-arrow-attack)"}
               />
-
-              {!reduceMotion && (
-                <circle r="5" fill="#fff7cc" filter="url(#battle-route-glow)">
-                  <animateMotion path={path} dur="1.05s" repeatCount="indefinite" />
-                </circle>
-              )}
 
               <motion.circle
                 cx={points.target.x}

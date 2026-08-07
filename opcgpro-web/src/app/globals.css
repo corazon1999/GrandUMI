@@ -535,10 +535,6 @@ textarea {
   100% { transform: translate(0, 0); filter: brightness(1); }
 }
 
-@keyframes battle-route-flow {
-  to { stroke-dashoffset: -48; }
-}
-
 .battle-attacker-lunge-up {
   animation: battle-attacker-lunge-up 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transform-origin: center;
@@ -554,10 +550,6 @@ textarea {
   transform-origin: center;
 }
 
-.battle-route-dash {
-  animation: battle-route-flow 1.15s linear infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .leader-breath-depth,
   .leader-breath-subject,
@@ -569,8 +561,7 @@ textarea {
   .leader-breath-frame,
   .battle-attacker-lunge-up,
   .battle-attacker-lunge-down,
-  .battle-target-impact,
-  .battle-route-dash {
+  .battle-target-impact {
     animation: none;
   }
 
