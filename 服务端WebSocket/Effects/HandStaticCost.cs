@@ -87,6 +87,10 @@ public static class HandStaticCost
             case "PRB02-014":
                 return me.Trash.Count >= 15 ? -3 : 0;
 
+            // OP15-021 好好看着哦!艾斯!：我方废弃区中有 4 张或更多事件卡 → 费用-3
+            case "OP15-021":
+                return me.Trash.Count(c => c.Info.Kind == Cards.CardKind.Event) >= 4 ? -3 : 0;
+
             // OP15-013 剪刀：我方领袖力量不高于 0 → 费用-2
             case "OP15-013":
                 return state.CurrentPowerOf(playerIdx, me.Leader) <= 0 ? -2 : 0;
