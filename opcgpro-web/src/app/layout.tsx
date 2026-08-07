@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NetProvider from "@/components/NetProvider";
+import AudioProvider from "@/components/audio/AudioProvider";
 import LayoutSettingsProvider from "@/components/home/LayoutSettingsProvider";
 import "./globals.css";
 
@@ -24,9 +25,11 @@ export default function RootLayout({
   return (
     <html lang="zh" className="h-full">
       <body className="min-h-full bg-gray-950 text-white antialiased">
-        <LayoutSettingsProvider>
-          <NetProvider>{children}</NetProvider>
-        </LayoutSettingsProvider>
+        <AudioProvider>
+          <LayoutSettingsProvider>
+            <NetProvider>{children}</NetProvider>
+          </LayoutSettingsProvider>
+        </AudioProvider>
       </body>
     </html>
   );

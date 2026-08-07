@@ -1,25 +1,81 @@
 import { create } from "zustand";
 
-interface AudioStore {
-  bgmVolume: number;
+const STORAGE_KEY = "grandumi_audio_v1";
+const DEFAULT_VOLUME = 0.7;
+
+interface PersistedAudioSettings {
   sfxVolume: number;
   isMuted: boolean;
-  currentBgm: string | null;
-
-  setBgmVolume: (v: number) => void;
-  setSfxVolume: (v: number) => void;
-  toggleMute: () => void;
-  setCurrentBgm: (name: string | null) => void;
 }
 
-export const useAudioStore = create<AudioStore>((set) => ({
-  bgmVolume: 0.7,
-  sfxVolume: 1.0,
-  isMuted: false,
-  currentBgm: null,
+interface AudioStore extends PersistedAudioSettings {
+  isHydrated: boolean;
+  isUnlocked: boolean;
+  hydrate: () => void;
+  setSfxVolume: (volume: number) => void;
+  setMuted: (muted: boolean) => void;
+  toggleMute: () => void;
+  setUnlocked: (unlocked: boolean) => void;
+}
 
-  setBgmVolume: (v) => set({ bgmVolume: Math.max(0, Math.min(1, v)) }),
-  setSfxVolume: (v) => set({ sfxVolume: Math.max(0, Math.min(1, v)) }),
-  toggleMute: () => set((s) => ({ isMuted: !s.isMuted })),
-  setCurrentBgm: (name) => set({ currentBgm: name }),
+function clampVolume(volume: number): number {
+  return Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : DEFAULT_VOLUME));
+}
+
+function loadSettings(): PersistedAudioSettings {
+  if (typeof window === "undefined") {
+    return { sfxVolume: DEFAULT_VOLUME, isMuted: false };
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { sfxVolume: DEFAULT_VOLUME, isMuted: false };
+    const saved = JSON.parse(raw) as Partial<PersistedAudioSettings>;
+    return {
+      sfxVolume: clampVolume(saved.sfxVolume ?? DEFAULT_VOLUME),
+      isMuted: typeof saved.isMuted === "boolean" ? saved.isMuted : false,
+    };
+  } catch {
+    return { sfxVolume: DEFAULT_VOLUME, isMuted: false };
+  }
+}
+
+function saveSettings(settings: PersistedAudioSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // 禁用本地存储时只影响跨刷新记忆，不影响本次使用。
+  }
+}
+
+export const useAudioStore = create<AudioStore>((set, get) => ({
+  sfxVolume: DEFAULT_VOLUME,
+  isMuted: false,
+  isHydrated: false,
+  isUnlocked: false,
+
+  hydrate: () => {
+    if (get().isHydrated) return;
+    set({ ...loadSettings(), isHydrated: true });
+  },
+
+  setSfxVolume: (volume) => {
+    const sfxVolume = clampVolume(volume);
+    set({ sfxVolume });
+    saveSettings({ sfxVolume, isMuted: get().isMuted });
+  },
+
+  setMuted: (isMuted) => {
+    set({ isMuted });
+    saveSettings({ sfxVolume: get().sfxVolume, isMuted });
+  },
+
+  toggleMute: () => {
+    const isMuted = !get().isMuted;
+    set({ isMuted });
+    saveSettings({ sfxVolume: get().sfxVolume, isMuted });
+  },
+
+  setUnlocked: (isUnlocked) => set({ isUnlocked }),
 }));

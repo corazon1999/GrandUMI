@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameAnimation, type AnimationEvent } from "@/hooks/useGameAnimation";
-import { useGameAudio } from "@/hooks/useGameAudio";
 
 /**
  * AnimationLayer — 根据服务端 lastAction 驱动战斗动画特效
@@ -17,8 +16,6 @@ import { useGameAudio } from "@/hooks/useGameAudio";
  */
 export default function AnimationLayer() {
   const anim = useGameAnimation();
-  // 音效随动画自动播放
-  useGameAudio(anim);
 
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);

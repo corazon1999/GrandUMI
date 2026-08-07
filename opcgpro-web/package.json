@@ -8,6 +8,7 @@
     "prebuild": "node scripts/build-card-bundle.mjs",
     "build": "next build",
     "build:cards": "node scripts/build-card-bundle.mjs",
+    "check:audio": "node scripts/check-audio-assets.mjs",
     "gen:card-thumbs": "node scripts/gen-card-thumbs.mjs",
     "start": "next start"
   },

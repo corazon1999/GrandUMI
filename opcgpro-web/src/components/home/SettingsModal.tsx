@@ -1,6 +1,8 @@
 "use client";
 
 import Modal from "@/components/ui/Modal";
+import { useAudio } from "@/hooks/useAudio";
+import { useAudioStore } from "@/store/audioStore";
 import {
   LAYOUT_PREVIEW_OPTIONS,
   type LayoutPreviewMode,
@@ -42,6 +44,22 @@ export default function SettingsModal({
   onChange: (mode: LayoutPreviewMode) => void;
   onClose: () => void;
 }) {
+  const { play, unlock } = useAudio();
+  const sfxVolume = useAudioStore((state) => state.sfxVolume);
+  const isMuted = useAudioStore((state) => state.isMuted);
+  const isHydrated = useAudioStore((state) => state.isHydrated);
+  const isUnlocked = useAudioStore((state) => state.isUnlocked);
+  const setSfxVolume = useAudioStore((state) => state.setSfxVolume);
+  const toggleMute = useAudioStore((state) => state.toggleMute);
+  const setUnlocked = useAudioStore((state) => state.setUnlocked);
+  const volumePercent = Math.round(sfxVolume * 100);
+
+  const testSound = async () => {
+    const unlocked = isUnlocked || (await unlock());
+    setUnlocked(unlocked);
+    if (unlocked) play("message");
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="设置" mobileSheet maxWidthClass="max-w-lg">
       <section aria-labelledby="layout-preview-title">
@@ -71,6 +89,60 @@ export default function SettingsModal({
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="audio-settings-title">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 id="audio-settings-title" className="text-sm font-bold text-white">游戏音效</h3>
+            <p className="mt-1 text-sm leading-5 text-gray-500">控制出牌、战斗、回合和系统提示音，设置会保存在当前浏览器。</p>
+          </div>
+          <button
+            type="button"
+            aria-pressed={!isMuted}
+            onClick={toggleMute}
+            disabled={!isHydrated}
+            className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              isMuted
+                ? "border-gray-700 bg-gray-950 text-gray-400 hover:border-gray-500"
+                : "border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+            }`}
+          >
+            {isMuted ? "已静音" : "音效开启"}
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="sfx-volume" className="text-sm font-bold text-gray-200">音效音量</label>
+            <span className="font-mono text-sm tabular-nums text-orange-300">{volumePercent}%</span>
+          </div>
+          <input
+            id="sfx-volume"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={volumePercent}
+            disabled={!isHydrated}
+            onChange={(event) => setSfxVolume(Number(event.target.value) / 100)}
+            aria-valuetext={`${volumePercent}%`}
+            className="mt-3 h-2 w-full cursor-pointer accent-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">
+              {isUnlocked ? "音频已就绪" : "首次点击或按键后，浏览器才允许播放声音"}
+            </p>
+            <button
+              type="button"
+              onClick={() => void testSound()}
+              disabled={!isHydrated || isMuted || volumePercent === 0}
+              className="min-h-9 shrink-0 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+            >
+              试听
+            </button>
+          </div>
         </div>
       </section>
     </Modal>
