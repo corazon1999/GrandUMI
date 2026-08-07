@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 BOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BOT_DIR))
@@ -61,6 +63,17 @@ class AgentWorkerGateTests(unittest.TestCase):
         }
         path.write_text(json.dumps(data), encoding="utf-8-sig")
         self.assertEqual("root@example.com", agent_worker.load_config(path)["server"])
+
+    @unittest.skipUnless(os.name == "nt", "仅验证 Windows 命令入口解析")
+    def test_Windows优先调用可执行命令包装器(self):
+        completed = subprocess.CompletedProcess([], 0, "ok", "")
+        with mock.patch.object(
+            agent_worker.shutil, "which", return_value=r"C:\tools\codex.CMD"
+        ), mock.patch.object(
+            agent_worker.subprocess, "run", return_value=completed
+        ) as run_mock:
+            agent_worker.run_process(["codex", "--version"])
+        self.assertEqual(r"C:\tools\codex.CMD", run_mock.call_args.args[0][0])
 
     def test允许小范围前端修复并要求构建(self):
         (self.repo / "opcgpro-web" / "src" / "a.ts").write_text(

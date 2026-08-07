@@ -71,8 +71,15 @@ def run_process(
     env = subprocess_env(clear_proxy)
     if env_extra:
         env.update(env_extra)
+    prepared_args = list(args)
+    if os.name == "nt" and prepared_args:
+        # npm/codex 同时安装无扩展名 shim 和 .cmd；CreateProcess 直接命中前者会
+        # 报 WinError 5，因此使用 PATHEXT 解析后的实际可执行入口。
+        resolved = shutil.which(prepared_args[0])
+        if resolved:
+            prepared_args[0] = resolved
     return subprocess.run(
-        args,
+        prepared_args,
         cwd=str(cwd) if cwd else None,
         input=input_text,
         capture_output=True,
