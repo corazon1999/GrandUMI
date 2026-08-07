@@ -32,6 +32,10 @@ class DeployFileTests(unittest.TestCase):
         self.assertRegex(powershell, re.escape('".dockerignore"'))
         self.assertRegex(shell, r'files="[^"]*\.dockerignore(?: |")')
 
+    def test_配置切换和回滚均强制重建机器人(self):
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+        self.assertGreaterEqual(shell.count("--force-recreate bug-bot"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

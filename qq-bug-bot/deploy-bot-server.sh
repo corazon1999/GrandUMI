@@ -70,14 +70,14 @@ rollback() {
   fi
   cd "$deploy_dir"
   docker compose build bug-bot >/dev/null 2>&1 || true
-  docker compose up -d --no-deps bug-bot >/dev/null 2>&1 || true
+  docker compose up -d --no-deps --force-recreate bug-bot >/dev/null 2>&1 || true
   exit 1
 }
 
 cd "$deploy_dir"
 docker compose config -q || rollback
 docker compose build bug-bot || rollback
-docker compose up -d --no-deps bug-bot || rollback
+docker compose up -d --no-deps --force-recreate bug-bot || rollback
 sleep 5
 running=$(docker inspect -f '{{.State.Running}}' grandumi-qq-bug-bot 2>/dev/null || true)
 test "$running" = "true" || rollback
