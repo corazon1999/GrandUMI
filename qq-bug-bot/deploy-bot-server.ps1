@@ -19,6 +19,7 @@ if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{12}$') {
     throw "无法读取当前提交。"
 }
 $files = @(
+    ".dockerignore",
     "Dockerfile",
     "docker-compose.yml",
     "requirements.txt",

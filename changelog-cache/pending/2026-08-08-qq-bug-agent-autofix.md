@@ -15,7 +15,7 @@
 
 ## 验证结果
 
-- 16 项 Python Agent/机器人单元测试通过，覆盖状态机、老库迁移、管理员身份与 @ 校验、串行问题、路径门禁、测试事件、Windows BOM 和提示注入边界。
+- 18 项 Python Agent/机器人单元测试通过，覆盖状态机、老库迁移、管理员身份与 @ 校验、串行问题、路径门禁、测试事件、Windows BOM、Docker 部署清单和提示注入边界。
 - Codex JSON Schema、Python 语法、PowerShell 脚本语法和差异格式已通过静态验证；Posix Shell 脚本由测试服务器执行语法检查。
 - 本机 Codex CLI 已通过真实代理连通与结构化 JSON Schema 自检。
 - 服务器部署后检查容器运行状态与 `agent_bridge.py status`；只有本机 Codex 连通自检通过后才启用 Agent 队列。
