@@ -54,20 +54,27 @@ export default function FriendlyRoomPanel() {
   const deckEntries = Object.entries(decks);
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center bg-gray-950 p-8 gap-6">
-      <h2 className="text-white font-bold text-2xl">
+    <main
+      className="flex h-[100dvh] flex-col items-center gap-5 overflow-y-auto bg-gray-950 px-4 py-5 sm:justify-center sm:p-8"
+      style={{
+        paddingTop: "calc(1.25rem + env(safe-area-inset-top))",
+        paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
+      }}
+    >
+      <h1 className="text-center text-xl font-bold text-white sm:text-2xl">
         {room.origin === "roomCode" ? "房间码友谊战" : "友谊战房间"}
-      </h2>
+      </h1>
 
       {room.roomCode && (
-        <div className="flex items-center gap-3 rounded-xl border border-blue-800 bg-blue-950/30 px-5 py-3">
-          <div>
-            <p className="text-[10px] text-gray-500">等待对手加入，房间码</p>
-            <p className="font-mono text-2xl font-black tracking-widest text-blue-400">{room.roomCode}</p>
+        <div className="flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-blue-800 bg-blue-950/30 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm text-gray-500">等待对手加入，房间码</p>
+            <p className="select-all truncate font-mono text-2xl font-black tracking-widest text-blue-400">{room.roomCode}</p>
           </div>
           <button
+            type="button"
             onClick={copyRoomCode}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500"
+            className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-500"
           >
             {copied ? "已复制" : "复制"}
           </button>
@@ -75,36 +82,37 @@ export default function FriendlyRoomPanel() {
       )}
 
       {connState !== "connected" && (
-        <p className="rounded-lg border border-yellow-700/60 bg-yellow-950/30 px-4 py-2 text-xs text-yellow-300">
+        <p role="status" className="w-full max-w-md rounded-xl border border-yellow-700/60 bg-yellow-950/30 px-4 py-3 text-sm leading-5 text-yellow-300">
           {connState === "recovering" ? "连接已恢复，正在同步房间状态…" : "连接中断，房间将保留 30 秒等待重连…"}
         </p>
       )}
 
       {/* 比分 */}
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-400 truncate max-w-[8rem] text-right">{me?.name ?? "我"}</span>
+      <div className="flex w-full max-w-md items-center justify-center gap-3">
+        <span className="min-w-0 flex-1 truncate text-right text-sm text-gray-400">{me?.name ?? "我"}</span>
         <span className="text-3xl font-black text-orange-400">{myScore} : {oppScore}</span>
-        <span className="text-sm text-gray-400 truncate max-w-[8rem]">{opp?.name ?? "对方"}</span>
+        <span className="min-w-0 flex-1 truncate text-sm text-gray-400">{opp?.name ?? "对方"}</span>
       </div>
 
       {/* 双方状态卡 */}
-      <div className="flex gap-6">
+      <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
         <PlayerCard title="我"   name={me?.name}  deckName={me?.deckName}  ready={me?.ready} connected={me?.connected} mine />
         <PlayerCard title="对手" name={opp?.name} deckName={opp?.deckName} ready={opp?.ready} connected={opp?.connected} waiting={!opp} />
       </div>
 
       {/* 操作区 */}
-      <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+      <div className="flex w-full max-w-md flex-col items-center gap-3">
         <button
+          type="button"
           onClick={() => setPicking((v) => !v)}
           disabled={room.state !== "lobby" || connState !== "connected"}
-          className="w-full py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm hover:border-orange-500 transition-colors"
+          className="min-h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-3 text-sm text-white transition-colors hover:border-orange-500 disabled:text-gray-600"
         >
           {me?.deckName ? `已选：${me.deckName}（点击更换）` : "选择卡组"}
         </button>
 
         {picking && (
-          <div className="w-full max-h-48 overflow-y-auto flex flex-col gap-1 bg-gray-900 border border-gray-800 rounded-lg p-2">
+          <div className="flex max-h-52 w-full flex-col gap-1 overflow-y-auto rounded-xl border border-gray-800 bg-gray-900 p-2">
             {deckEntries.length === 0 ? (
               <p className="text-gray-600 text-xs text-center py-3">还没有卡组，去「卡组」面板创建</p>
             ) : (
@@ -112,7 +120,7 @@ export default function FriendlyRoomPanel() {
                 <button
                   key={name}
                   onClick={() => selectDeck(name)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-800 text-left"
+                  className="flex min-h-12 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-gray-800"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -132,9 +140,10 @@ export default function FriendlyRoomPanel() {
         )}
 
         <button
+          type="button"
           onClick={toggleReady}
           disabled={!canReady}
-          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
+          className={`min-h-12 w-full rounded-xl text-sm font-bold transition-all ${
             !canReady
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : me?.ready
@@ -150,13 +159,14 @@ export default function FriendlyRoomPanel() {
         )}
 
         <button
+          type="button"
           onClick={leave}
-          className="text-gray-500 hover:text-red-400 text-xs transition-colors mt-2"
+          className="mt-1 min-h-11 rounded-lg px-4 text-sm text-gray-500 transition-colors hover:bg-gray-900 hover:text-red-400"
         >
           退出房间
         </button>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -170,13 +180,13 @@ function PlayerCard({ title, name, deckName, ready, connected, mine, waiting }: 
   waiting?: boolean;
 }) {
   return (
-    <div className={`w-44 rounded-xl border-2 p-4 flex flex-col items-center gap-2 ${
+    <div className={`flex w-full flex-col items-center gap-2 rounded-xl border-2 p-4 ${
       mine ? "border-orange-500/60 bg-orange-500/5" : "border-gray-700 bg-gray-900"
     }`}>
-      <span className="text-gray-500 text-[10px]">{title}</span>
+      <span className="text-sm text-gray-500">{title}</span>
       <p className="text-white font-bold text-sm truncate w-full text-center">{waiting ? "等待加入…" : (name ?? "?")}</p>
       <p className="text-gray-400 text-xs truncate w-full text-center">{waiting ? "房间码已开放" : (deckName ?? "未选卡组")}</p>
-      <span className={`text-[11px] font-bold ${ready ? "text-green-400" : "text-gray-600"}`}>
+      <span className={`text-sm font-bold ${ready ? "text-green-400" : "text-gray-600"}`}>
         {waiting ? "等待中" : connected === false ? "重连中" : ready ? "已准备" : "未准备"}
       </span>
     </div>

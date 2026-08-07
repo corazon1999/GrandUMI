@@ -19,6 +19,7 @@ import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
 import { useGameInit } from "@/hooks/useGameInit";
 import { HomeRequest } from "@/net/HomeProtocol";
+import OrientationGate from "@/components/game/OrientationGate";
 
 export default function GamePage() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function GamePage() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
+      <OrientationGate />
       {!isObserver && !isPlayback && <ReconnectOverlay />}
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
       {!isObserver && !isPlayback && <FirstPlayerOverlay />}

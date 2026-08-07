@@ -56,7 +56,7 @@ export default function HistoryPanel() {
   };
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full flex-col p-3 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">对局记录</h2>
@@ -67,7 +67,7 @@ export default function HistoryPanel() {
         {list.length > 0 && (
           <button
             onClick={handleClear}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-red-600 hover:text-red-400"
+            className="min-h-11 rounded-lg border border-gray-700 px-3 text-sm text-gray-400 transition-colors hover:border-red-600 hover:text-red-400 sm:min-h-0 sm:py-1.5 sm:text-xs"
           >
             清空
           </button>
@@ -86,7 +86,7 @@ export default function HistoryPanel() {
             {list.map((m) => (
               <li
                 key={m.id}
-                className="group flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-900 px-4 py-3 transition-colors hover:border-orange-600/60"
+                className="group flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-2 py-2 transition-colors hover:border-orange-600/60 sm:gap-3 sm:px-4 sm:py-3"
               >
                 <button
                   onClick={() => router.push(`/replay/${encodeURIComponent(m.id)}`)}
@@ -108,17 +108,17 @@ export default function HistoryPanel() {
                       <span className="mx-1.5 text-gray-600">vs</span>
                       <span className="text-red-300">{leaderLabel(m.opponentLeader)}</span>
                     </p>
-                    <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                    <p className="mt-0.5 truncate text-xs text-gray-500">
                       对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt)}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs text-gray-600 transition-colors group-hover:text-orange-400">
-                    ▶ 回放
+                  <span className="shrink-0 text-sm text-gray-600 transition-colors group-hover:text-orange-400">
+                    ▶ <span className="hidden sm:inline">回放</span>
                   </span>
                 </button>
                 <button
                   onClick={() => handleDelete(m.id)}
-                  className="shrink-0 rounded-md px-2 py-1 text-xs text-gray-600 transition-colors hover:text-red-400"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm text-gray-600 transition-colors hover:bg-gray-800 hover:text-red-400"
                   title="删除此记录"
                 >
                   ✕

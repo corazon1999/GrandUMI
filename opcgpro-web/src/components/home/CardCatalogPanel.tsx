@@ -145,7 +145,7 @@ export default function CardCatalogPanel() {
 
   return (
     <section className="flex h-full min-w-0 flex-col bg-gray-950">
-      <header className="shrink-0 border-b border-gray-800 bg-gray-900/70 px-4 py-3">
+      <header className="shrink-0 border-b border-gray-800 bg-gray-900/70 px-3 py-3 sm:px-4">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-white">卡牌图鉴</h1>
@@ -157,15 +157,61 @@ export default function CardCatalogPanel() {
             <button
               type="button"
               onClick={resetFilters}
-              className="shrink-0 text-xs text-gray-400 transition-colors hover:text-white"
+              className="min-h-11 shrink-0 rounded-lg px-3 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white lg:min-h-0 lg:px-0 lg:text-xs"
             >
               重置筛选
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[minmax(220px,2fr)_repeat(6,minmax(96px,1fr))]">
-          <label className="col-span-2 sm:col-span-3 xl:col-span-1">
+        <div className="space-y-2 lg:hidden">
+          <label>
+            <span className="sr-only">搜索卡名、卡号或关键词</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索卡名、卡号或关键词"
+              className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-3 text-base text-white outline-none transition-colors placeholder:text-gray-500 focus:border-orange-500"
+            />
+          </label>
+          <details className="group rounded-xl border border-gray-800 bg-gray-950/50">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-gray-300 [&::-webkit-details-marker]:hidden">
+              <span>筛选条件{hasFilters ? "（已启用）" : ""}</span>
+              <span className="text-gray-500 transition-transform group-open:rotate-180">▾</span>
+            </summary>
+            <div className="grid grid-cols-2 gap-2 border-t border-gray-800 p-3">
+              <CardSetFilter selectedSets={filterSets} onToggle={toggleFilterSet} onClear={() => setFilterSets([])} />
+              <FilterSelect label="颜色" value={filterColor} onChange={setFilterColor}>
+                {COLOR_OPTIONS.map((color) => <option key={color} value={color}>{color}</option>)}
+              </FilterSelect>
+              <FilterSelect label="类型" value={filterType} onChange={setFilterType}>
+                {TYPE_OPTIONS.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+              </FilterSelect>
+              <FilterSelect label="属性" value={filterProperty} onChange={setFilterProperty}>
+                {CARD_PROPERTIES.filter(Boolean).map((property) => <option key={property} value={property}>{property}</option>)}
+              </FilterSelect>
+              <FilterSelect label="稀有度" value={filterRarity} onChange={(rarity) => { setFilterRarity(rarity); if (rarity === "L") setFilterType("Leader"); }}>
+                {CARD_RARITIES.filter(Boolean).map((rarity) => <option key={rarity} value={rarity}>{rarity}</option>)}
+              </FilterSelect>
+              <FilterSelect label="费用" value={filterCost ?? ""} onChange={(value) => setFilterCost(value === "" ? null : Number(value))}>
+                {CARD_COSTS.map((cost) => <option key={cost} value={cost}>{cost}</option>)}
+              </FilterSelect>
+              <button
+                type="button"
+                onClick={() => setFilterShowSub1((current) => !current)}
+                className={`col-span-2 min-h-11 rounded-lg border px-3 text-sm font-bold transition-colors ${
+                  filterShowSub1 ? "border-blue-600 bg-blue-600/40 text-blue-200" : "border-gray-700 bg-gray-800 text-gray-500"
+                }`}
+              >
+                {filterShowSub1 ? "✓ 显示角标 1 卡" : "显示角标 1 卡"}
+              </button>
+            </div>
+          </details>
+        </div>
+
+        <div className="hidden gap-2 lg:grid lg:grid-cols-[minmax(220px,2fr)_repeat(6,minmax(96px,1fr))]">
+          <label>
             <span className="sr-only">搜索卡名、卡号或关键词</span>
             <input
               type="search"
@@ -234,7 +280,7 @@ export default function CardCatalogPanel() {
           </FilterSelect>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 hidden flex-wrap items-center gap-2 lg:flex">
           <button
             type="button"
             onClick={() => setFilterShowSub1((current) => !current)}
@@ -269,7 +315,7 @@ export default function CardCatalogPanel() {
         ].join("\0")}
       />
 
-      <CardInfoPanel card={selectedCard} onClose={() => setSelectedCard(null)} />
+      <CardInfoPanel card={selectedCard} onClose={() => setSelectedCard(null)} mobileSheet />
     </section>
   );
 }
@@ -353,7 +399,7 @@ function CardSetFilter({
 }) {
   return (
     <details className="group relative">
-      <summary className="flex h-9 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-2 text-xs text-gray-200 outline-none transition-colors hover:border-gray-600 focus:border-orange-500 [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors hover:border-gray-600 focus:border-orange-500 lg:h-9 lg:text-xs [&::-webkit-details-marker]:hidden">
         <span>{selectedSets.length === 0 ? "弹数：全部" : `弹数：已选 ${selectedSets.length}`}</span>
         <span className="text-gray-500 transition-transform group-open:rotate-180">▾</span>
       </summary>
@@ -382,7 +428,7 @@ function CardSetFilter({
                       key={setName}
                       type="button"
                       onClick={() => onToggle(setName)}
-                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                      className={`min-h-9 rounded px-2 py-1 text-xs font-bold transition-colors ${
                         selected
                           ? "bg-orange-500 text-white"
                           : "bg-gray-800 text-gray-400 hover:text-white"
@@ -418,7 +464,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-lg border border-gray-700 bg-gray-800 px-2 text-xs text-gray-200 outline-none transition-colors focus:border-orange-500"
+        className="h-11 w-full rounded-lg border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200 outline-none transition-colors focus:border-orange-500 lg:h-9 lg:text-xs"
       >
         <option value="">{label}：全部</option>
         {children}
@@ -472,10 +518,10 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
           </span>
         )}
       </span>
-      <span className="mt-1 block w-full truncate text-[11px] font-medium text-gray-300 transition-colors group-hover:text-white">
+      <span className="mt-1 block w-full truncate text-xs font-medium text-gray-300 transition-colors group-hover:text-white">
         {card.name}
       </span>
-      <span className="block text-[9px] text-gray-600">{card.number}</span>
+      <span className="block text-xs text-gray-600">{card.number}</span>
     </button>
   );
 }

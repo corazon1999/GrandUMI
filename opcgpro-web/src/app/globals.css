@@ -15,11 +15,50 @@
   --foreground: #f9fafb;
 }
 
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
+  overscroll-behavior: none;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* 登录与大厅支持竖屏，只有实际牌桌在窄屏竖屏下提示旋转设备。 */
+.game-orientation-gate {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-width: 767px) {
+  .game-orientation-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    padding-top: calc(32px + env(safe-area-inset-top));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    background: #030712;
+    color: #f9fafb;
+    text-align: center;
+  }
 }
 
 /* ===== 阻挡者「能量护盾」特效 ===== */
@@ -90,37 +129,150 @@ body {
 
 /* ===== 领航首异画「动态呼吸图」特效 ===== */
 
-@keyframes leader-art-breathe {
+@keyframes leader-depth-breathe {
   0%,
   100% {
-    transform: scale(1) translate3d(0, 0, 0);
-    filter: brightness(1) saturate(1);
+    transform: scale(1.034) translate3d(0.25%, 0.15%, 0);
+    filter: brightness(0.94) saturate(1.04) contrast(1.02);
+  }
+  32% {
+    transform: scale(1.026) translate3d(-0.35%, 0.1%, 0);
+    filter: brightness(0.98) saturate(1.08) contrast(1.03);
+  }
+  56% {
+    transform: scale(1.018) translate3d(0.18%, -0.25%, 0);
+    filter: brightness(1.02) saturate(1.12) contrast(1.04);
+  }
+}
+
+@keyframes leader-subject-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    filter: brightness(1) saturate(1) contrast(1);
+  }
+  22% {
+    transform: translate3d(0, -0.6px, 0) scale(1.018) rotate(0.08deg);
+    filter: brightness(1.035) saturate(1.03) contrast(1.015);
   }
   48% {
-    transform: scale(var(--leader-breath-scale, 1.018)) translate3d(0, -0.15%, 0);
-    filter: brightness(1.075) saturate(1.06);
+    transform: translate3d(0, var(--leader-breath-lift, -3px), 0)
+      scale(var(--leader-breath-scale, 1.07)) rotate(-0.32deg);
+    filter: brightness(1.16) saturate(1.13) contrast(1.045);
+  }
+  62% {
+    transform: translate3d(0, -2px, 0) scale(1.055) rotate(-0.15deg);
+    filter: brightness(1.105) saturate(1.09) contrast(1.03);
   }
 }
 
 @keyframes leader-gaze-breathe {
   0%,
   100% {
-    opacity: 0.08;
-    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.14;
+    transform: translate(-50%, -50%) scale(0.88);
+    filter: blur(1.6px) brightness(1);
+  }
+  36% {
+    opacity: 0.32;
   }
   48% {
-    opacity: 0.42;
-    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 0.96;
+    transform: translate(-50%, -50%) scale(1.12);
+    filter: blur(0.8px) brightness(1.55);
+  }
+  58% {
+    opacity: 0.46;
+    transform: translate(-50%, -50%) scale(1.03);
   }
 }
 
 @keyframes leader-frame-breathe {
   0%,
   100% {
-    opacity: 0.2;
+    opacity: 0.3;
+  }
+  36% {
+    opacity: 0.48;
   }
   48% {
+    opacity: 1;
+  }
+  64% {
+    opacity: 0.58;
+  }
+}
+
+@keyframes leader-energy-rise {
+  0%,
+  100% {
+    opacity: 0.16;
+    background-position: 0 28px, 7px 48px, 0 0;
+  }
+  38% {
+    opacity: 0.3;
+  }
+  52% {
+    opacity: 0.9;
+    background-position: 5px -30px, 1px -22px, 0 0;
+  }
+  68% {
+    opacity: 0.36;
+    background-position: 8px -58px, -3px -74px, 0 0;
+  }
+}
+
+@keyframes leader-energy-arc-left {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: translate3d(-5px, 9px, 0) rotate(13deg) scale(0.88);
+  }
+  46% {
+    opacity: 0.82;
+    transform: translate3d(1px, -3px, 0) rotate(2deg) scale(1.05);
+  }
+  68% {
+    opacity: 0.26;
+    transform: translate3d(5px, -10px, 0) rotate(-7deg) scale(0.96);
+  }
+}
+
+@keyframes leader-energy-arc-right {
+  0%,
+  100% {
+    opacity: 0.05;
+    transform: translate3d(4px, 13px, 0) rotate(-15deg) scale(0.9);
+  }
+  54% {
     opacity: 0.72;
+    transform: translate3d(-1px, -1px, 0) rotate(-4deg) scale(1.04);
+  }
+  76% {
+    opacity: 0.18;
+    transform: translate3d(-5px, -12px, 0) rotate(5deg) scale(0.95);
+  }
+}
+
+@keyframes leader-sheen-sweep {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translate3d(-220%, 0, 0) skewX(-14deg);
+  }
+  45% {
+    opacity: 0.2;
+  }
+  53% {
+    opacity: 0.9;
+  }
+  62% {
+    opacity: 0;
+    transform: translate3d(500%, 0, 0) skewX(-14deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(500%, 0, 0) skewX(-14deg);
   }
 }
 
@@ -138,10 +290,14 @@ body {
  * 只露出人物插画的上半区，并在上下缘渐隐。
  * 这样缩放不会牵动顶部力量值、下方技能文字和名称栏。
  */
-.leader-breath-art-viewport {
+.leader-breath-art-viewport,
+.leader-breath-subject-viewport {
   position: absolute;
   inset: 0;
   clip-path: inset(8.5% 4.8% 31% 5.1% round 1.5%);
+}
+
+.leader-breath-art-viewport {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
@@ -158,42 +314,160 @@ body {
   );
 }
 
-.leader-breath-art {
+.leader-breath-subject-viewport {
+  z-index: 1;
+  -webkit-mask-image: radial-gradient(
+    ellipse var(--leader-subject-radius-x, 53%) var(--leader-subject-radius-y, 57%) at
+      var(--leader-subject-x, 66%) var(--leader-subject-y, 38%),
+    #000 0%,
+    #000 54%,
+    rgb(0 0 0 / 0.9) 68%,
+    rgb(0 0 0 / 0.48) 82%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse var(--leader-subject-radius-x, 53%) var(--leader-subject-radius-y, 57%) at
+      var(--leader-subject-x, 66%) var(--leader-subject-y, 38%),
+    #000 0%,
+    #000 54%,
+    rgb(0 0 0 / 0.9) 68%,
+    rgb(0 0 0 / 0.48) 82%,
+    transparent 100%
+  );
+}
+
+.leader-breath-depth,
+.leader-breath-subject {
   transform-origin: var(--leader-breath-focus-x, 50%) var(--leader-breath-focus-y, 35%);
-  animation: leader-art-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
   will-change: transform, filter;
 }
 
-/* 眼部附近的低强度双层辉光，screen 混合可保留原画线条。 */
+.leader-breath-depth {
+  animation: leader-depth-breathe var(--leader-breath-duration, 3.6s) ease-in-out infinite;
+}
+
+.leader-breath-subject {
+  animation: leader-subject-breathe var(--leader-breath-duration, 3.6s)
+    cubic-bezier(0.42, 0, 0.28, 1) infinite;
+}
+
+/* 两个径向光点分别追踪洛克斯双眼，在呼吸顶点短促提亮。 */
 .leader-breath-gaze {
   position: absolute;
+  z-index: 2;
   left: var(--leader-breath-focus-x, 50%);
   top: var(--leader-breath-focus-y, 35%);
-  width: 54%;
-  aspect-ratio: 2.4 / 1;
+  width: 48%;
+  aspect-ratio: 2.5 / 1;
   border-radius: 999px;
   background:
     radial-gradient(
+      circle at 21% 50%,
+      rgb(255 255 255 / 0.98) 0 2%,
+      rgb(var(--leader-breath-primary, 34 211 238) / 0.9) 7%,
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 78% 43%,
+      rgb(255 255 255 / 0.98) 0 2%,
+      rgb(var(--leader-breath-secondary, 129 140 248) / 0.88) 7%,
+      transparent 24%
+    ),
+    radial-gradient(
       ellipse at center,
-      rgb(var(--leader-breath-primary, 56 189 248) / 0.5) 0%,
-      rgb(var(--leader-breath-secondary, 99 102 241) / 0.24) 38%,
-      transparent 72%
+      rgb(var(--leader-breath-primary, 34 211 238) / 0.28),
+      transparent 68%
     );
   mix-blend-mode: screen;
-  filter: blur(2px);
-  animation: leader-gaze-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
+  animation: leader-gaze-breathe var(--leader-breath-duration, 3.6s) ease-in-out infinite;
   will-change: transform, opacity;
 }
 
-/* 框内光不向外溢出，避免与选中框、攻击框等战斗提示冲突。 */
+.leader-breath-sheen {
+  position: absolute;
+  z-index: 3;
+  top: 5%;
+  bottom: 29%;
+  left: 0;
+  width: 18%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--leader-breath-primary, 34 211 238) / 0.22) 28%,
+    rgb(255 255 255 / 0.82) 50%,
+    rgb(var(--leader-breath-secondary, 129 140 248) / 0.28) 72%,
+    transparent
+  );
+  mix-blend-mode: screen;
+  filter: blur(1px);
+  animation: leader-sheen-sweep var(--leader-energy-duration, 7.2s) ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* 上升粒子与两侧弧光构成独立能量层，周期和人物呼吸错开。 */
+.leader-breath-energy {
+  position: absolute;
+  z-index: 3;
+  inset: 8% 5% 30%;
+  overflow: hidden;
+  border-radius: 2%;
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 0.96) 0 0.7px, transparent 1.6px)
+      0 0 / 19px 31px,
+    radial-gradient(
+        circle,
+        rgb(var(--leader-breath-primary, 34 211 238) / 0.9) 0 0.9px,
+        transparent 1.8px
+      )
+      7px 12px / 27px 43px,
+    linear-gradient(
+      to top,
+      rgb(var(--leader-breath-primary, 34 211 238) / 0.16),
+      transparent 42%
+    );
+  mix-blend-mode: screen;
+  -webkit-mask-image: linear-gradient(to top, #000, rgb(0 0 0 / 0.74) 62%, transparent 100%);
+  mask-image: linear-gradient(to top, #000, rgb(0 0 0 / 0.74) 62%, transparent 100%);
+  animation: leader-energy-rise var(--leader-energy-duration, 7.2s) linear infinite;
+  will-change: background-position, opacity;
+}
+
+.leader-breath-energy::before,
+.leader-breath-energy::after {
+  content: "";
+  position: absolute;
+  top: 7%;
+  bottom: 2%;
+  width: 42%;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 3px rgb(var(--leader-breath-primary, 34 211 238) / 0.92));
+  will-change: transform, opacity;
+}
+
+.leader-breath-energy::before {
+  left: -14%;
+  border-left: 1px solid rgb(var(--leader-breath-primary, 34 211 238) / 0.82);
+  animation: leader-energy-arc-left var(--leader-energy-duration, 7.2s) ease-in-out infinite;
+}
+
+.leader-breath-energy::after {
+  right: -14%;
+  border-right: 1px solid rgb(var(--leader-breath-secondary, 129 140 248) / 0.78);
+  animation: leader-energy-arc-right var(--leader-energy-duration, 7.2s) ease-in-out infinite;
+}
+
+/* 框内光保持在卡牌内部，避免覆盖选中框和战斗目标提示。 */
 .leader-breath-frame {
   position: absolute;
+  z-index: 4;
   inset: 1px;
   border-radius: inherit;
+  border: 1px solid rgb(var(--leader-breath-primary, 34 211 238) / 0.55);
   box-shadow:
-    inset 0 0 8px rgb(var(--leader-breath-primary, 56 189 248) / 0.72),
-    inset 0 0 2px rgb(255 255 255 / 0.58);
-  animation: leader-frame-breathe var(--leader-breath-duration, 4.8s) ease-in-out infinite;
+    inset 0 0 12px rgb(var(--leader-breath-primary, 34 211 238) / 0.92),
+    inset 0 0 4px rgb(var(--leader-breath-secondary, 129 140 248) / 0.72),
+    inset 0 0 2px rgb(255 255 255 / 0.88);
+  animation: leader-frame-breathe var(--leader-breath-duration, 3.6s) ease-in-out infinite;
   will-change: opacity;
 }
 
@@ -201,6 +475,22 @@ body {
 .leader-breath-fx--tapped {
   filter: grayscale(1) brightness(0.58);
   opacity: 0.62;
+}
+
+.leader-breath-fx--tapped .leader-breath-depth,
+.leader-breath-fx--tapped .leader-breath-subject,
+.leader-breath-fx--tapped .leader-breath-gaze,
+.leader-breath-fx--tapped .leader-breath-sheen,
+.leader-breath-fx--tapped .leader-breath-energy,
+.leader-breath-fx--tapped .leader-breath-energy::before,
+.leader-breath-fx--tapped .leader-breath-energy::after,
+.leader-breath-fx--tapped .leader-breath-frame {
+  animation: none;
+}
+
+.leader-breath-fx--tapped .leader-breath-sheen,
+.leader-breath-fx--tapped .leader-breath-energy {
+  opacity: 0;
 }
 
 /* ===== 战斗攻击关系特效 ===== */
@@ -254,8 +544,13 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .leader-breath-art,
+  .leader-breath-depth,
+  .leader-breath-subject,
   .leader-breath-gaze,
+  .leader-breath-sheen,
+  .leader-breath-energy,
+  .leader-breath-energy::before,
+  .leader-breath-energy::after,
   .leader-breath-frame,
   .battle-attacker-lunge-up,
   .battle-attacker-lunge-down,
@@ -265,8 +560,17 @@ body {
   }
 
   .leader-breath-gaze {
-    opacity: 0.12;
+    opacity: 0.16;
     transform: translate(-50%, -50%);
+  }
+
+  .leader-breath-depth {
+    transform: scale(1.018);
+  }
+
+  .leader-breath-sheen,
+  .leader-breath-energy {
+    opacity: 0;
   }
 
   .leader-breath-frame {

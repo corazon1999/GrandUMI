@@ -8,6 +8,7 @@ import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMa
 interface Props {
   card: CardData | null;
   onClose: () => void;
+  mobileSheet?: boolean;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -17,13 +18,14 @@ const TYPE_LABELS: Record<string, string> = {
   Event:     "事件",
 };
 
-export default function CardInfoPanel({ card, onClose }: Props) {
+export default function CardInfoPanel({ card, onClose, mobileSheet = false }: Props) {
   return (
     <Modal
       open={!!card}
       onClose={onClose}
       title={card?.name}
       maxWidthClass="w-[calc(100vw-2rem)] max-w-4xl"
+      mobileSheet={mobileSheet}
     >
       {card && <CardInfoContent card={card} />}
     </Modal>

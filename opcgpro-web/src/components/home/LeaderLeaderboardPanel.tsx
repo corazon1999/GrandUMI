@@ -85,22 +85,22 @@ export default function LeaderLeaderboardPanel() {
   const failed = !loading && leaderboard.result === false;
 
   return (
-    <section className="flex h-full min-h-0 flex-col p-6">
+    <section className="flex h-full min-h-0 flex-col p-3 sm:p-6">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-sm leading-5 text-gray-500 sm:text-xs">
             统计全部真人对局；第 7 回合及以前结束的对局不计入数据
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-gray-800 bg-gray-950 p-1">
+        <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 sm:flex sm:w-auto">
+          <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
             {PERIODS.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setPeriod(option.value)}
-                className={`rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                className={`min-h-11 rounded-md px-2 text-xs font-bold transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 ${
                   period === option.value
                     ? "bg-orange-500 text-white"
                     : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
@@ -113,15 +113,15 @@ export default function LeaderLeaderboardPanel() {
           <button
             type="button"
             onClick={() => request(period)}
-            className="rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-xs text-gray-400 transition-colors hover:border-orange-500 hover:text-white"
+            className="min-h-11 rounded-lg border border-gray-800 bg-gray-950 px-3 text-sm text-gray-400 transition-colors hover:border-orange-500 hover:text-white sm:min-h-0 sm:py-2 sm:text-xs"
           >
             刷新
           </button>
         </div>
       </header>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-4 py-3">
-        <div className="flex items-center gap-5 text-xs text-gray-400">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 sm:px-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 sm:text-xs">
           <span>
             有效对局 <strong className="ml-1 text-white">{leaderboard?.totalMatches ?? 0}</strong>
           </span>
@@ -138,7 +138,7 @@ export default function LeaderLeaderboardPanel() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="搜索 Leader 名称或卡号"
-          className="w-56 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-xs text-white outline-none placeholder:text-gray-600 focus:border-orange-500"
+          className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 sm:h-auto sm:w-56 sm:py-1.5 sm:text-xs"
         />
       </div>
 
@@ -161,7 +161,46 @@ export default function LeaderLeaderboardPanel() {
             {search ? "没有符合搜索条件的 Leader" : "当前时间范围暂无有效对局"}
           </p>
         ) : (
-          <table className="w-full min-w-[920px] border-collapse text-left">
+          <>
+          <ul className="divide-y divide-gray-800/80 lg:hidden">
+            {items.map((item) => {
+              const card = getCard(item.leaderNumber);
+              return (
+                <li key={item.leaderNumber} className="p-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-7 shrink-0 text-center text-lg font-black ${item.rank != null && item.rank <= 3 ? "text-orange-400" : "text-gray-400"}`}>
+                      {item.rank ?? "—"}
+                    </span>
+                    <div className="relative h-[62px] w-11 shrink-0 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+                      <Image src={thumbSrc(card?.sprite)} alt={card?.name ?? item.leaderNumber} fill sizes="44px" className="object-cover" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-white">{card?.name ?? item.leaderNumber}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-gray-500">{item.leaderNumber}</span>
+                        {card?.color && <span className={`rounded border px-1.5 py-0.5 text-xs ${colorClasses(card.color)}`}>{card.color}</span>}
+                        {item.insufficientSample && <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500">样本不足</span>}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-lg font-black text-orange-300">{percent(item.winRate)}</p>
+                      <p className="text-xs text-gray-600">胜率</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center">
+                    <div><p className="text-sm font-bold text-gray-200">{item.games}</p><p className="text-xs text-gray-600">场次</p></div>
+                    <div><p className="text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.losses}</span></p><p className="text-xs text-gray-600">战绩</p></div>
+                    <div><p className="text-sm font-bold text-gray-200">{percent(item.usageRate)}</p><p className="text-xs text-gray-600">使用率</p></div>
+                  </div>
+                  <div className="mt-2 flex justify-between px-1 text-xs text-gray-500">
+                    <span>先攻 {percent(item.firstWinRate)} · {item.firstGames} 场</span>
+                    <span>后攻 {percent(item.secondWinRate)} · {item.secondGames} 场</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <table className="hidden w-full min-w-[920px] border-collapse text-left lg:table">
             <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="w-16 px-4 py-3 text-center">排名</th>
@@ -242,6 +281,7 @@ export default function LeaderLeaderboardPanel() {
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </section>

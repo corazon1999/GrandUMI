@@ -8,6 +8,15 @@ export interface LeaderBreathingEffect {
   duration: string;
   /** 呼吸顶点的缩放比例。 */
   scale: number;
+  /** 主体在呼吸顶点向上抬升的距离；使用像素保证小尺寸牌桌上仍清晰可见。 */
+  lift: string;
+  /** 主体柔边遮罩的中心与半径，用于把人物从扁平卡图中视觉分层。 */
+  subjectX: string;
+  subjectY: string;
+  subjectRadiusX: string;
+  subjectRadiusY: string;
+  /** 独立于呼吸周期的能量扫光周期，避免动画像机械循环。 */
+  energyDuration: string;
   /** 主辉光与辅助辉光的 RGB 分量，供 CSS 透明色复用。 */
   primaryRgb: string;
   secondaryRgb: string;
@@ -23,11 +32,17 @@ const LEADER_BREATHING_EFFECTS: Record<string, LeaderBreathingEffect> = {
   "OP17-039": {
     sprite: "/cards/op17/OP17-039.png",
     focusX: "66%",
-    focusY: "27%",
-    duration: "4.8s",
-    scale: 1.018,
-    primaryRgb: "56 189 248",
-    secondaryRgb: "99 102 241",
+    focusY: "28%",
+    duration: "3.6s",
+    scale: 1.07,
+    lift: "-3px",
+    subjectX: "66%",
+    subjectY: "38%",
+    subjectRadiusX: "53%",
+    subjectRadiusY: "57%",
+    energyDuration: "7.2s",
+    primaryRgb: "34 211 238",
+    secondaryRgb: "129 140 248",
   },
 };
 

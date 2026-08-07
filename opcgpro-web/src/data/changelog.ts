@@ -20,6 +20,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-07-test-leaderboard-mulligan-mobile-leader-fx",
+    version: "2026.08.07.3",
+    date: "2026-08-07",
+    title: "移动端体验、调度稳定性与领袖动效",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "测试服 Leader 胜率榜现与正式服读取同一份权威对局统计，同时继续排除测试服产生的测试对局。",
+          "修复开局调度阶段点击“更换”或“保留”后偶发整页加载失败的问题，并阻止网络延迟时重复提交。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "手机竖屏现可正常登录和使用大厅；匹配、好友房、聊天、卡组、图鉴、排行榜与个人中心均完成触屏和窄屏适配。",
+          "蓝色洛克斯首异画升级为更鲜明的立体呼吸效果，加入人物景深、双眼高光、上升能量、扫光和边框脉冲。",
+          "实际牌桌与回放仍会在手机竖屏时提示旋转设备，返回大厅后可继续竖屏使用。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-07-prompt-queue-latency",
     version: "2026.08.07.2",
     date: "2026-08-07",

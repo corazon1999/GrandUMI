@@ -61,17 +61,17 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="在线玩家">
-      <div className="w-80">
+    <Modal open={open} onClose={handleClose} title="在线玩家" mobileSheet maxWidthClass="max-w-md">
+      <div className="w-full">
         <input
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="搜索玩家名称或账号"
           aria-label="搜索在线玩家"
-          className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-orange-500"
+          className="h-12 w-full rounded-xl border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500"
         />
-        <div className="mt-2 flex max-h-96 flex-col gap-1 overflow-y-auto">
+        <div className="mt-2 flex max-h-[55dvh] flex-col gap-1 overflow-y-auto lg:max-h-96">
           {players.length === 0 ? (
             <p className="py-8 text-center text-xs text-gray-600">暂无在线玩家</p>
           ) : visiblePlayers.length === 0 ? (
@@ -83,7 +83,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
               return (
                 <div
                   key={p.account}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/60 border border-gray-800"
+                  className="flex min-h-14 items-center gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">
@@ -97,7 +97,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                       <button
                         onClick={() => handleSpectate(p)}
                         disabled={spectateState === "joining"}
-                        className="px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-purple-600 hover:bg-purple-500 disabled:bg-purple-950 disabled:text-purple-300 disabled:cursor-wait text-white"
+                        className="min-h-11 rounded-lg bg-purple-600 px-3 text-sm font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
                       >
                         {spectateState === "joining" && spectateRoomId === p.roomId ? "进入中…" : "观战"}
                       </button>
@@ -105,7 +105,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                       <button
                         onClick={() => handleInvite(p)}
                         disabled={p.status !== "idle"}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${
                           p.status === "idle"
                             ? "bg-orange-500 hover:bg-orange-400 text-white"
                             : "bg-gray-700 text-gray-500 cursor-not-allowed"
@@ -121,7 +121,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
           )}
         </div>
       </div>
-      <p className="text-gray-500 text-[10px] text-center mt-2">
+      <p className="mt-3 text-center text-sm leading-5 text-gray-500">
         邀请对方接受后，双方进入友谊战房间再选卡组
       </p>
     </Modal>

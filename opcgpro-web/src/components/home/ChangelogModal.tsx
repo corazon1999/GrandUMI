@@ -23,7 +23,8 @@ export default function ChangelogModal({ open, onClose }: Props) {
       open={open}
       onClose={onClose}
       title="更新日志"
-      maxWidthClass="max-w-xl w-[calc(100vw-2rem)]"
+      maxWidthClass="max-w-xl"
+      mobileSheet
     >
       <div className="max-h-[65vh] space-y-6 overflow-y-auto pr-2">
         {CHANGELOG.map((entry, index) => (

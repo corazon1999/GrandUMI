@@ -11,6 +11,7 @@ import LeaderLeaderboardPanel from "./LeaderLeaderboardPanel";
 import HistoryPanel from "./HistoryPanel";
 import CardCatalogPanel from "./CardCatalogPanel";
 import ChangelogModal from "./ChangelogModal";
+import ChatPanel from "./ChatPanel";
 import NetStatePanel from "@/components/ui/NetStatePanel";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
@@ -22,7 +23,8 @@ import Modal from "@/components/ui/Modal";
 import { thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 
-type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history" | "profile";
+type AvatarVariant = "sidebar" | "header" | "profile";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
 function getDefaultAvatar(): string {
@@ -34,7 +36,7 @@ function getDefaultAvatar(): string {
   return luffy?.sprite ?? "";
 }
 
-function PlayerAvatar() {
+function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
   const playerName = useNetStore((s) => s.playerName);
   const cloudAvatar = useNetStore((s) => s.avatar);
   const setPlayerName = useNetStore((s) => s.setPlayerName);
@@ -82,10 +84,13 @@ function PlayerAvatar() {
     setShowPicker(false);
   };
 
+  const avatarSize = variant === "profile" ? "h-16 w-16" : variant === "header" ? "h-11 w-11" : "h-10 w-10";
+  const imageSize = variant === "profile" ? "64px" : variant === "header" ? "44px" : "40px";
+
   return (
     <>
       {editing ? (
-        <div className="w-14 flex flex-col items-center gap-1 px-1">
+        <div className={variant === "profile" ? "flex w-full items-center gap-2" : "flex w-20 flex-col items-center gap-1 px-1"}>
           <input
             ref={inputRef}
             value={draft}
@@ -96,24 +101,30 @@ function PlayerAvatar() {
             }}
             onBlur={confirm}
             maxLength={16}
-            className="w-full bg-gray-800 text-white text-[10px] rounded px-1 py-0.5 outline-none border border-orange-500 text-center"
+            aria-label="玩家昵称"
+            className={`${variant === "profile" ? "h-11 flex-1 px-3 text-base" : "w-full px-1 py-1 text-xs"} rounded-lg border border-orange-500 bg-gray-800 text-center text-white outline-none`}
           />
-          <span className="text-gray-600 text-[8px]">Enter确认</span>
+          {variant !== "profile" && <span className="text-[10px] text-gray-600">Enter确认</span>}
+          {variant === "profile" && (
+            <button type="button" onClick={confirm} className="h-11 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white">
+              保存
+            </button>
+          )}
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-0.5 mb-1">
-          {/* 头像 */}
+        <div className={variant === "profile" ? "flex items-center gap-4" : variant === "header" ? "flex items-center" : "mb-1 flex flex-col items-center gap-1"}>
           <button
+            type="button"
             onClick={() => setShowPicker(true)}
-            className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-700 hover:border-orange-500 transition-colors bg-gray-800 shrink-0"
-            title="点击更换头像"
+            aria-label="更换头像"
+            className={`relative ${avatarSize} shrink-0 overflow-hidden rounded-full border-2 border-gray-700 bg-gray-800 transition-colors hover:border-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400`}
           >
             {avatarSrc ? (
               <NextImage
                 src={avatarSrc}
                 alt="头像"
                 fill
-                sizes="40px"
+                sizes={imageSize}
                 className="object-cover object-top rounded-full"
                 style={{ transform: "scale(1.1)" }}
                 draggable={false}
@@ -125,14 +136,18 @@ function PlayerAvatar() {
               </span>
             )}
           </button>
-          {/* 昵称 */}
-          <button
-            onClick={startEdit}
-            title="点击修改昵称"
-            className="text-gray-500 hover:text-gray-300 text-[9px] truncate w-14 text-center transition-colors"
-          >
-            {playerName || "未知"}
-          </button>
+          {variant !== "header" && (
+            <div className={variant === "profile" ? "min-w-0 flex-1" : "w-20"}>
+              {variant === "profile" && <p className="mb-1 text-sm text-gray-500">当前玩家</p>}
+              <button
+                type="button"
+                onClick={startEdit}
+                className={`${variant === "profile" ? "min-h-11 w-full text-left text-lg font-bold text-white" : "min-h-8 w-full text-center text-[11px] text-gray-500"} truncate rounded-lg transition-colors hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-orange-400`}
+              >
+                {playerName || "未知"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -182,8 +197,8 @@ function AvatarPicker({
   }, [open]);
 
   return (
-    <Modal open={open} onClose={onClose} title="选择头像">
-      <p className="text-gray-500 text-[10px] mb-2">所有领航卡</p>
+    <Modal open={open} onClose={onClose} title="选择头像" mobileSheet maxWidthClass="max-w-md">
+      <p className="mb-3 text-sm text-gray-500">从领航卡中选择头像</p>
       {loading ? (
         <p className="text-gray-600 text-xs text-center py-8">加载中...</p>
       ) : (
@@ -211,7 +226,7 @@ function AvatarGrid({
     itemCount: leaders.length,
     itemHeight: AVATAR_ITEM,
     rowWidth: AVATAR_ITEM,
-    columns: 5,
+    columns: 4,
     gap: AVATAR_GAP,
   });
 
@@ -275,13 +290,82 @@ function OnlineCountBadge({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       title="查看在线玩家"
-      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-1.5 text-[11px] transition-colors hover:border-green-600 hover:bg-gray-800"
+      className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs transition-colors hover:border-green-600 hover:bg-gray-800"
     >
       <span className="w-2 h-2 rounded-full bg-green-400" />
       <span className="text-gray-300">
         在线 <span className="text-green-400 font-bold">{onlineCount}</span>
       </span>
     </button>
+  );
+}
+
+function MobileNavIcon({ view }: { view: Exclude<View, "history"> }) {
+  if (view === "lobby") {
+    return <path d="M4 11.5 12 4l8 7.5M6.5 10v9h11v-9M10 19v-5h4v5" />;
+  }
+  if (view === "deck") {
+    return <><rect x="6" y="4" width="12" height="16" rx="2" /><path d="m9 8 3-2 3 2-1 4h-4L9 8Z" /></>;
+  }
+  if (view === "catalog") {
+    return <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>;
+  }
+  if (view === "leaderboard") {
+    return <><path d="M5 20v-6h4v6M10 20V8h4v12M15 20V4h4v16" /><path d="M3 20h18" /></>;
+  }
+  return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
+}
+
+function MobileProfilePanel({
+  onOpenPlayers,
+  onOpenHistory,
+  onOpenChangelog,
+}: {
+  onOpenPlayers: () => void;
+  onOpenHistory: () => void;
+  onOpenChangelog: () => void;
+}) {
+  const onlineCount = useNetStore((s) => s.onlineCount);
+
+  return (
+    <section className="h-full overflow-y-auto px-4 py-5">
+      <h1 className="mb-4 text-xl font-bold text-white">我的</h1>
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+        <PlayerAvatar variant="profile" />
+        <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
+          <span className="text-sm text-gray-500">服务器状态</span>
+          <NetStatePanel />
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onOpenPlayers}
+          className="min-h-20 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-green-700 active:bg-gray-800"
+        >
+          <span className="block text-lg font-bold text-green-400">{onlineCount}</span>
+          <span className="mt-1 block text-sm text-gray-300">在线玩家</span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          className="min-h-20 rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-orange-700 active:bg-gray-800"
+        >
+          <span className="block text-lg font-bold text-orange-300">回放</span>
+          <span className="mt-1 block text-sm text-gray-300">对局记录</span>
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpenChangelog}
+        className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900 px-4 text-sm text-gray-300 transition-colors hover:border-orange-700 active:bg-gray-800"
+      >
+        <span>更新日志</span>
+        <span className="text-gray-600" aria-hidden="true">›</span>
+      </button>
+    </section>
   );
 }
 
@@ -293,8 +377,10 @@ export default function MainPanel() {
   const [view, setView] = useState<View>("lobby");
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
+  const onlineCount = useNetStore((s) => s.onlineCount);
 
   // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
   useEffect(() => {
@@ -330,9 +416,18 @@ export default function MainPanel() {
     );
   }
 
+  const activeMobileView = view === "history" ? "profile" : view;
+  const mobileNavItems: Array<{ view: Exclude<View, "history">; label: string }> = [
+    { view: "lobby", label: "对战" },
+    { view: "deck", label: "卡组" },
+    { view: "catalog", label: "图鉴" },
+    { view: "leaderboard", label: "排行" },
+    { view: "profile", label: "我的" },
+  ];
+
   return (
     <div
-      className="flex h-screen bg-gray-950"
+      className="flex h-[100dvh] flex-col overflow-hidden bg-gray-950"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingLeft: "env(safe-area-inset-left)",
@@ -340,68 +435,130 @@ export default function MainPanel() {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      {/* 侧边导航 */}
-      <nav className="w-28 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-4 px-3 gap-3">
-        <PlayerAvatar />
-        <button
-          onClick={() => setView("lobby")}
-          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "lobby" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
-          title="大厅"
-        >
-          大厅
-        </button>
-        <button
-          onClick={() => setView("deck")}
-          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
-          title="卡组"
-        >
-          卡组
-        </button>
-        <button
-          onClick={() => setView("catalog")}
-          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
-          title="卡牌图鉴"
-        >
-          卡牌图鉴
-        </button>
-        <button
-          onClick={() => setView("leaderboard")}
-          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "leaderboard" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
-          title="Leader 胜率榜"
-        >
-          Leader榜
-        </button>
-        <button
-          onClick={() => setView("history")}
-          className={`w-full h-10 rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}
-          title="对局记录"
-        >
-          对局记录
-        </button>
-        <div className="mt-auto flex w-full flex-col gap-2">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 lg:hidden">
+        <div>
+          <p className="text-base font-black tracking-tight text-white">GrandUMI</p>
+          <p className="text-xs text-gray-500">海贼王卡牌对战</p>
+        </div>
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setShowChangelog(true)}
-            title="查看更新日志"
-            className="w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-1.5 text-[11px] text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
+            onClick={() => setShowPlayerList(true)}
+            aria-label={`查看 ${onlineCount} 名在线玩家`}
+            className="flex h-11 min-w-11 items-center justify-center gap-1 rounded-xl px-2 text-sm text-gray-300 transition-colors hover:bg-gray-800 active:bg-gray-700"
           >
-            更新日志
+            <span className="h-2 w-2 rounded-full bg-green-400" />
+            <span className="font-bold text-green-300">{onlineCount}</span>
           </button>
-          <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
-          <NetStatePanel />
+          <button
+            type="button"
+            onClick={() => setShowChat(true)}
+            aria-label="打开大厅聊天"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-300 transition-colors hover:bg-gray-800 active:bg-gray-700"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path d="M5 18.5 3.8 21l3.8-1.3c1.3.6 2.8.9 4.4.9 5 0 9-3.5 9-8s-4-8-9-8-9 3.5-9 8c0 2.3 1 4.4 2 6Z" />
+              <path d="M8 12h.01M12 12h.01M16 12h.01" />
+            </svg>
+          </button>
+          <PlayerAvatar variant="header" />
         </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        {/* 桌面侧边导航 */}
+        <nav className="hidden w-28 shrink-0 flex-col items-center gap-3 border-r border-gray-800 bg-gray-900 px-3 py-4 lg:flex">
+          <PlayerAvatar />
+          <button
+            onClick={() => setView("lobby")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "lobby" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            大厅
+          </button>
+          <button
+            onClick={() => setView("deck")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            卡组
+          </button>
+          <button
+            onClick={() => setView("catalog")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            卡牌图鉴
+          </button>
+          <button
+            onClick={() => setView("leaderboard")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "leaderboard" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            Leader榜
+          </button>
+          <button
+            onClick={() => setView("history")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            对局记录
+          </button>
+          <div className="mt-auto flex w-full flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowChangelog(true)}
+              className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
+            >
+              更新日志
+            </button>
+            <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
+            <NetStatePanel />
+          </div>
+        </nav>
+
+        <main className="relative min-w-0 flex-1 overflow-hidden">
+          {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
+          {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
+          {view === "catalog" && <CardCatalogPanel />}
+          {view === "leaderboard" && <LeaderLeaderboardPanel />}
+          {view === "history" && <HistoryPanel />}
+          {view === "profile" && (
+            <MobileProfilePanel
+              onOpenPlayers={() => setShowPlayerList(true)}
+              onOpenHistory={() => setView("history")}
+              onOpenChangelog={() => setShowChangelog(true)}
+            />
+          )}
+        </main>
+      </div>
+
+      <nav
+        aria-label="主要导航"
+        className="grid h-16 shrink-0 grid-cols-5 border-t border-gray-800 bg-gray-900/95 lg:hidden"
+      >
+        {mobileNavItems.map((item) => {
+          const active = activeMobileView === item.view;
+          return (
+            <button
+              key={item.view}
+              type="button"
+              onClick={() => setView(item.view)}
+              aria-current={active ? "page" : undefined}
+              className={`flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+                active ? "text-orange-400" : "text-gray-500 hover:text-gray-200 active:bg-gray-800"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <MobileNavIcon view={item.view} />
+              </svg>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      {/* 主内容区 */}
-      <main className="relative flex-1 overflow-hidden">
-        {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
-        {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
-        {view === "catalog" && <CardCatalogPanel />}
-        {view === "leaderboard" && <LeaderLeaderboardPanel />}
-        {view === "history" && <HistoryPanel />}
-      </main>
-
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
+      <Modal open={showChat} onClose={() => setShowChat(false)} title="大厅聊天" mobileSheet maxWidthClass="max-w-lg">
+        <div className="h-[min(70dvh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+          <ChatPanel showHeader={false} />
+        </div>
+      </Modal>
       <InviteNotifyOverlay />
       <ChangelogModal open={showChangelog} onClose={closeChangelog} />
     </div>

@@ -95,6 +95,12 @@ export default function CardItem({
         "--leader-breath-focus-y": leaderBreathingEffect.focusY,
         "--leader-breath-duration": leaderBreathingEffect.duration,
         "--leader-breath-scale": leaderBreathingEffect.scale,
+        "--leader-breath-lift": leaderBreathingEffect.lift,
+        "--leader-subject-x": leaderBreathingEffect.subjectX,
+        "--leader-subject-y": leaderBreathingEffect.subjectY,
+        "--leader-subject-radius-x": leaderBreathingEffect.subjectRadiusX,
+        "--leader-subject-radius-y": leaderBreathingEffect.subjectRadiusY,
+        "--leader-energy-duration": leaderBreathingEffect.energyDuration,
         "--leader-breath-primary": leaderBreathingEffect.primaryRgb,
         "--leader-breath-secondary": leaderBreathingEffect.secondaryRgb,
       } as CSSProperties)
@@ -201,21 +207,31 @@ export default function CardItem({
               style={leaderBreathingStyle}
               aria-hidden="true"
             >
-              {/*
-               * 原卡图是单层图片，因此只在插画上半区叠一份柔边副本并轻微缩放；
-               * 卡框、技能文字与名称栏继续使用下方静态原图，保证阅读稳定。
-               */}
+              {/* 背景层做轻微反向景深；卡框、技能文字和名称栏继续使用静态原图。 */}
               <div className="leader-breath-art-viewport">
                 <NextImage
                   src={imgSrc}
                   alt=""
                   fill
                   sizes="180px"
-                  className="leader-breath-art object-cover"
+                  className="leader-breath-depth object-cover"
+                  draggable={false}
+                />
+              </div>
+              {/* 柔边人物层承担主要呼吸，让脸部和肩部从背景中“浮”出来。 */}
+              <div className="leader-breath-subject-viewport">
+                <NextImage
+                  src={imgSrc}
+                  alt=""
+                  fill
+                  sizes="180px"
+                  className="leader-breath-subject object-cover"
                   draggable={false}
                 />
               </div>
               <span className="leader-breath-gaze" />
+              <span className="leader-breath-sheen" />
+              <span className="leader-breath-energy" />
               <span className="leader-breath-frame" />
             </div>
           )}

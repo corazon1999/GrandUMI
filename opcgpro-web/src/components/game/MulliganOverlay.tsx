@@ -15,8 +15,16 @@ export default function MulliganOverlay() {
   const isFirst = useGameStore((s) => s.isFirstPlayer);
   const mulliganBothDone = useGameStore((s) => s.mulliganBothDone);
   const mulliganDeadlineUtc = useGameStore((s) => s.mulliganDeadlineUtc);
+  const isPending = useGameStore((s) => s.isPending);
   const { cardSize } = useResponsive();
   const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!mulliganDeadlineUtc || mulliganBothDone) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [mulliganDeadlineUtc, mulliganBothDone]);
 
   if (!my) return null;
   if (!firstPlayerChosen) return null;
@@ -32,12 +40,10 @@ export default function MulliganOverlay() {
   const isExpiring = remainingSeconds <= 10;
   const timedOut = remainingSeconds === 0;
 
-  useEffect(() => {
-    if (!mulliganDeadlineUtc || mulliganBothDone) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [mulliganDeadlineUtc, mulliganBothDone]);
+  const submitMulligan = (redraw: boolean) => {
+    if (timedOut || useGameStore.getState().isPending) return;
+    GameRequest.mulligan(redraw);
+  };
 
   const handCards = my.handCardNumbers.map((n) => getCard(n) ?? null);
 
@@ -75,11 +81,11 @@ export default function MulliganOverlay() {
         {choosing && (
           <motion.div className="flex gap-4"
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}>
-            <button onClick={() => GameRequest.mulligan(true)} disabled={timedOut}
+            <button onClick={() => submitMulligan(true)} disabled={timedOut || isPending}
               className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors disabled:cursor-wait disabled:opacity-50">
               更换
             </button>
-            <button onClick={() => GameRequest.mulligan(false)} disabled={timedOut}
+            <button onClick={() => submitMulligan(false)} disabled={timedOut || isPending}
               className="bg-orange-500 hover:bg-orange-400 text-white px-8 py-3 rounded-lg font-bold text-base transition-colors disabled:cursor-wait disabled:opacity-50">
               保留
             </button>

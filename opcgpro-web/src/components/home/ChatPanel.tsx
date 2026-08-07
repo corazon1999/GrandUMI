@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 
-export default function ChatPanel() {
+export default function ChatPanel({ showHeader = true }: { showHeader?: boolean }) {
   const chatMessages = useNetStore((s) => s.chatMessages);
   const playerName = useNetStore((s) => s.playerName);
   const [input, setInput] = useState("");
@@ -23,14 +23,19 @@ export default function ChatPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b border-gray-800">
-        <h3 className="text-white text-sm font-bold">聊天</h3>
-      </div>
+    <div className="flex h-full min-h-0 flex-col">
+      {showHeader && (
+        <div className="border-b border-gray-800 px-3 py-3">
+          <h3 className="text-sm font-bold text-white">大厅聊天</h3>
+        </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3" aria-live="polite">
+        {chatMessages.length === 0 && (
+          <p className="my-auto text-center text-sm text-gray-600">还没有消息，来打个招呼吧</p>
+        )}
         {chatMessages.map((msg, i) => (
-          <div key={i} className="text-xs">
+          <div key={i} className="text-sm leading-5 lg:text-xs">
             {/* 字段名与 C# MsgChatMsg.Name / MsgChatMsg.Msg 一致 */}
             <span
               className={
@@ -45,20 +50,23 @@ export default function ChatPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="px-2 py-2 border-t border-gray-800 flex gap-1">
+      <div className="flex gap-2 border-t border-gray-800 p-2">
         <input
-          className="flex-1 bg-gray-800 text-white text-xs rounded px-2 py-1.5 outline-none border border-gray-700 focus:border-orange-500 transition-colors"
-          placeholder="发送消息..."
+          className="h-12 min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-800 px-3 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 lg:h-10 lg:text-sm"
+          placeholder="输入消息"
+          aria-label="聊天消息"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           maxLength={100}
         />
         <button
+          type="button"
           onClick={send}
-          className="bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold px-2 py-1.5 rounded transition-colors"
+          disabled={!input.trim()}
+          className="h-12 min-w-16 rounded-xl bg-orange-500 px-3 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:bg-gray-800 disabled:text-gray-600 lg:h-10"
         >
-          发
+          发送
         </button>
       </div>
     </div>
