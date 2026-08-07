@@ -47,6 +47,11 @@ public class OP11_106_Zeus : IScriptedEffect
         if (chosen.Count < 1) return;
 
         var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, tgt);
+        await AtomicOps.KOByEffectAsync(
+            ctx.State,
+            1 - ctx.OwnerIndex,
+            tgt,
+            ctx.Prompts,
+            ctx.OwnerIndex);
     }
 }

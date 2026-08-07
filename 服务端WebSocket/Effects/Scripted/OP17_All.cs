@@ -1404,7 +1404,7 @@ internal static class OP17Effects
             || !await DiscardOwn(c, 1, "选择丢弃1张手牌")) return;
         var options = new List<string>();
         if (Me(c).Hand.Count > 0) options.Add("效果控制者丢弃1张手牌，并将卡组顶1张加入生命");
-        if (Opp(c).Hand.Count > 0) options.Add("你丢弃1张手牌");
+        if (Opp(c).Hand.Count > 0) options.Add("随机丢弃你的1张手牌");
         if (options.Count == 0) return;
         int pick = options.Count == 1 ? 0 : await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的攻击时效果", options);
         if (options[pick].StartsWith("效果控制者"))
@@ -1412,7 +1412,15 @@ internal static class OP17Effects
             await DiscardOwn(c, 1, "选择丢弃1张手牌");
             AtomicOps.AddLifeFromDeckTop(Me(c), 1);
         }
-        else await DiscardOpponentChosen(c, 1);
+        else
+        {
+            if (c.Engine is not null) AtomicOps.OpponentDiscardRandom(c.Engine, 1 - c.OwnerIndex, 1);
+            else if (Opp(c).Hand.Count > 0)
+            {
+                int index = c.State.Rng.Next(Opp(c).Hand.Count);
+                AtomicOps.DiscardHand(Opp(c), Opp(c).Hand[index]);
+            }
+        }
     }
 
     private static async Task C101(EffectContext c)

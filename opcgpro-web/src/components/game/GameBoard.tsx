@@ -200,26 +200,13 @@ function PhaseTrack({
   );
 }
 
-function LeftRail({ onOpenFeedback }: { onOpenFeedback?: () => void }) {
+function LeftRail() {
   return (
-    <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 pb-28">
-      <section className="min-h-0 flex-1 rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30">
-        <h2 className="text-xs font-black text-slate-300">选中卡</h2>
-        <div className="mt-3 aspect-[5/7] rounded-md border border-dashed border-slate-600/70 bg-black/20" />
+    <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col pb-28">
+      <section className="relative min-h-0 flex-1 overflow-y-auto rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30">
+        <h2 className="text-xs font-black text-slate-300">对战日志</h2>
+        <GameLog />
       </section>
-      <section className="h-36 rounded-md border border-sky-200/15 bg-slate-950/55 p-3 shadow-inner shadow-black/30 xl:h-44">
-        <h2 className="text-xs font-black text-slate-300">记录</h2>
-      </section>
-      {onOpenFeedback && (
-        <button
-          type="button"
-          onClick={onOpenFeedback}
-          className="rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20"
-          aria-label="打开 Bug 和建议反馈（快捷键 F）"
-        >
-          F · 反馈 Bug 和建议
-        </button>
-      )}
     </aside>
   );
 }
@@ -229,11 +216,13 @@ function RightRail({
   opponentName,
   isObserver,
   isPlayback,
+  onOpenFeedback,
 }: {
   myName: string;
   opponentName: string;
   isObserver: boolean;
   isPlayback: boolean;
+  onOpenFeedback?: () => void;
 }) {
   return (
     <aside className="relative z-40 flex h-full min-h-0 w-44 shrink-0 flex-col gap-3">
@@ -244,26 +233,24 @@ function RightRail({
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
       </section>
-      {!isPlayback && (
-        <>
-          <section className="relative min-h-0 flex-1 overflow-y-auto rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
-            <h2 className="text-xs font-black text-slate-300">操作日志</h2>
-            <GameLog />
+      <div className="mt-auto flex flex-col gap-3">
+        {!isObserver && !isPlayback && (
+          <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
+            <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
+            <GameActions />
           </section>
-          {!isObserver && (
-            <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
-              <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
-              <GameActions />
-            </section>
-          )}
-        </>
-      )}
-      {isPlayback && (
-        <section className="relative min-h-0 flex-1 overflow-y-auto rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
-          <h2 className="text-xs font-black text-slate-300">操作日志</h2>
-          <GameLog />
-        </section>
-      )}
+        )}
+        {onOpenFeedback && (
+          <button
+            type="button"
+            onClick={onOpenFeedback}
+            className="rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20"
+            aria-label="打开 Bug 和建议反馈（快捷键 F）"
+          >
+            F · 反馈 Bug 和建议
+          </button>
+        )}
+      </div>
     </aside>
   );
 }
@@ -316,7 +303,7 @@ export default function GameBoard({
           >
             <BattleRelationLayer />
             <div className="absolute inset-3 flex gap-3">
-              <LeftRail onOpenFeedback={onOpenFeedback} />
+              <LeftRail />
 
               <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
                 <PlayerMat side="opponent" isObserver={isObserver} isPlayback={isPlayback} />
@@ -336,6 +323,7 @@ export default function GameBoard({
                 opponentName={opponentName}
                 isObserver={isObserver}
                 isPlayback={isPlayback}
+                onOpenFeedback={onOpenFeedback}
               />
             </div>
 

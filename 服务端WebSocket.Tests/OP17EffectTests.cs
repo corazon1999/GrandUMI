@@ -15,6 +15,60 @@ public class OP17EffectTests
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
     [Fact]
+    public async Task OP17_099_FirstChoice_DiscardsOwnersHandAndAddsDeckTopToLife()
+    {
+        var state = TestScene.New("OP17-099").MyDeckTop("OP17-100").Build();
+        var activationCost = Card("OP17-101");
+        var optionDiscard = Card("OP17-102");
+        var opponentCard = Card("OP17-103");
+        var lifeCard = Assert.Single(state.Players[0].Deck);
+        state.Players[0].Hand.AddRange([activationCost, optionDiscard]);
+        state.Players[1].Hand.Add(opponentCard);
+        int lifeBefore = state.Players[0].LifeArea.Count;
+        var prompts = new MockPromptService()
+            .QueueChoose(activationCost.Id.ToString())
+            .QueueOption(0)
+            .QueueChoose(optionDiscard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, state.Players[0].Leader,
+            EffectTrigger.OnAttackDeclare, prompts);
+
+        Assert.Empty(state.Players[0].Hand);
+        Assert.Contains(activationCost, state.Players[0].Trash);
+        Assert.Contains(optionDiscard, state.Players[0].Trash);
+        Assert.Equal(lifeBefore + 1, state.Players[0].LifeArea.Count);
+        Assert.Contains(lifeCard, state.Players[0].LifeArea);
+        Assert.Contains(opponentCard, state.Players[1].Hand);
+        Assert.Empty(state.Players[1].Trash);
+        Assert.Equal(2, prompts.ChooseHistory.Count);
+        Assert.All(prompts.ChooseHistory, prompt => Assert.Equal("OwnHandDiscard", prompt.kind));
+    }
+
+    [Fact]
+    public async Task OP17_099_SecondChoice_RandomlyDiscardsOpponentWithoutCardPrompt()
+    {
+        var state = TestScene.New("OP17-099").Build();
+        var activationCost = Card("OP17-101");
+        var remainingOwnerCard = Card("OP17-102");
+        state.Players[0].Hand.AddRange([activationCost, remainingOwnerCard]);
+        state.Players[1].Hand.AddRange([Card("OP17-103"), Card("OP17-104")]);
+        var prompts = new MockPromptService()
+            .QueueChoose(activationCost.Id.ToString())
+            .QueueOption(1);
+
+        await EffectRuntime.Resolve(state, 0, state.Players[0].Leader,
+            EffectTrigger.OnAttackDeclare, prompts);
+
+        Assert.Contains(remainingOwnerCard, state.Players[0].Hand);
+        Assert.Contains(activationCost, state.Players[0].Trash);
+        Assert.Single(state.Players[1].Hand);
+        Assert.Single(state.Players[1].Trash);
+        var discardPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnHandDiscard", discardPrompt.kind);
+        Assert.Equal("选择丢弃1张手牌", discardPrompt.text);
+    }
+
+    [Fact]
     public async Task OP17_091_MakesOpponentChooseWhichHandCardToDiscard()
     {
         var state = TestScene.New("OP17-039").Build();
