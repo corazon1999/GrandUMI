@@ -9,7 +9,6 @@ import { useGameInit } from "@/hooks/useGameInit";
 import { getSnapshots } from "@/data/matchHistoryDB";
 import type { MsgGameState } from "@/types/net";
 import type { PlaybackSpeed } from "@/types/playback";
-import OrientationGate from "@/components/game/OrientationGate";
 
 // 单帧基准时长（1x），按倍速缩放
 const STEP_MS = 900;
@@ -125,7 +124,6 @@ export default function ReplayPage() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
-      <OrientationGate />
       {/* 顶部返回与标识 */}
       <button
         onClick={() => router.push("/home")}

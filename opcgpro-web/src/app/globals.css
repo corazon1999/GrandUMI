@@ -37,39 +37,6 @@ textarea {
   touch-action: manipulation;
 }
 
-/* 登录与大厅支持竖屏，只有实际牌桌在窄屏竖屏下提示旋转设备。 */
-.game-orientation-gate {
-  display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 9999;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px;
-  padding-top: calc(32px + env(safe-area-inset-top));
-  padding-bottom: calc(32px + env(safe-area-inset-bottom));
-  background: #030712;
-  color: #f9fafb;
-  text-align: center;
-}
-
-@media (orientation: portrait) and (max-width: 767px) {
-  .game-orientation-gate {
-    display: flex;
-  }
-}
-
-/* 布局预览模式优先于浏览器窗口方向，切回横屏后应立即恢复牌桌。 */
-[data-layout-preview="mobile-landscape"] .game-orientation-gate {
-  display: none;
-}
-
-[data-layout-preview="mobile-portrait"] .game-orientation-gate {
-  display: flex;
-}
-
 /* 路由页面原有的视口尺寸类改为跟随布局预览画布。 */
 .layout-preview-route > * {
   width: 100%;
