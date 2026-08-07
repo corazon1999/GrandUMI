@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { PlayerInfo, FriendlyPlayer, MsgLeaderLeaderboard } from "@/types/net";
+import type { PlayerInfo, FriendlyPlayer, MsgLeaderLeaderboard, MsgLeaderMatchups } from "@/types/net";
+
+export function leaderMatchupKey(period: string, leaderNumber: string): string {
+  return `${period}:${leaderNumber}`;
+}
 
 export type IncomingInvite = { inviteId: string; fromName: string };
 export type FriendlyRoomState = {
@@ -56,6 +60,8 @@ interface NetStore {
   playerList: PlayerInfo[];
   // 最近一次 Leader 排行榜回包
   leaderLeaderboard: MsgLeaderLeaderboard | null;
+  // 点击榜单项后按“周期:Leader”保存的对战前十统计
+  leaderMatchups: Record<string, MsgLeaderMatchups>;
   // 收到的对战邀请（被邀请方弹窗用）
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
@@ -83,6 +89,8 @@ interface NetStore {
   setOnlineCount: (n: number) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
+  setLeaderMatchups: (data: MsgLeaderMatchups) => void;
+  clearLeaderMatchups: () => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
@@ -108,6 +116,7 @@ const initialState = {
   onlineCount: 0,
   playerList: [] as PlayerInfo[],
   leaderLeaderboard: null as MsgLeaderLeaderboard | null,
+  leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
@@ -150,6 +159,15 @@ export const useNetStore = create<NetStore>((set) => ({
   setPlayerList: (list) => set({ playerList: list }),
 
   setLeaderLeaderboard: (leaderLeaderboard) => set({ leaderLeaderboard }),
+
+  setLeaderMatchups: (data) => set((state) => ({
+    leaderMatchups: {
+      ...state.leaderMatchups,
+      [leaderMatchupKey(data.period, data.leaderNumber)]: data,
+    },
+  })),
+
+  clearLeaderMatchups: () => set({ leaderMatchups: {} }),
 
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 

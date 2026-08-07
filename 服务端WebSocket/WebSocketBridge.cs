@@ -217,6 +217,7 @@ public static class WebSocketBridge
             case "MsgCancelRoom":  OnCancelRoom(session, msg);   break;
             case "MsgPlayerList":  OnPlayerList(session);        break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
+            case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
             case "MsgInvitePlayer": OnInvitePlayer(session, msg); break;
             case "MsgInviteResponse": OnInviteResponse(session, msg); break;
             case "MsgFriendlySelectDeck": OnFriendlySelectDeck(session, msg); break;
@@ -848,6 +849,77 @@ public static class WebSocketBridge
         {
             LogErr($"读取 Leader 排行榜失败: {ex.Message}");
             Send(s.SessionId, new { proto = "MsgLeaderLeaderboard", result = false, error = "排行榜暂时不可用" });
+        }
+    }
+
+    private static void OnLeaderMatchups(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var requestedPeriod = Str(msg, "period") ?? "7d";
+        var requestedLeader = (Str(msg, "leaderNumber") ?? "").Trim();
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchups",
+                result = false,
+                period = requestedPeriod,
+                leaderNumber = requestedLeader,
+                error = "请先登录",
+            });
+            return;
+        }
+
+        if (requestedLeader.Length == 0)
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchups",
+                result = false,
+                period = requestedPeriod,
+                leaderNumber = requestedLeader,
+                error = "请选择有效的 Leader",
+            });
+            return;
+        }
+
+        try
+        {
+            var snapshot = LeaderStatsStore.Default.GetMatchups(requestedLeader, requestedPeriod);
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchups",
+                result = true,
+                period = snapshot.Period,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
+                sinceUtc = snapshot.SinceUtc,
+                leaderNumber = snapshot.LeaderNumber,
+                items = snapshot.Items.Select(x => new
+                {
+                    rank = x.Rank,
+                    leaderNumber = x.LeaderNumber,
+                    games = x.Games,
+                    wins = x.Wins,
+                    losses = x.Losses,
+                    winRate = x.WinRate,
+                    firstGames = x.FirstGames,
+                    firstWinRate = x.FirstWinRate,
+                    secondGames = x.SecondGames,
+                    secondWinRate = x.SecondWinRate,
+                    isMirror = x.IsMirror,
+                }),
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取 Leader 对战统计失败: {ex.Message}");
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchups",
+                result = false,
+                period = requestedPeriod,
+                leaderNumber = requestedLeader,
+                error = "对战统计暂时不可用",
+            });
         }
     }
 

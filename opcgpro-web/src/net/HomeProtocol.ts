@@ -35,6 +35,7 @@ import type {
   MsgOnlineCount,
   MsgPlayerList,
   MsgLeaderLeaderboard,
+  MsgLeaderMatchups,
   LeaderboardPeriod,
   MsgInvitePlayer,
   MsgInviteNotify,
@@ -149,6 +150,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgLeaderLeaderboard":
         handleLeaderLeaderboard(msg as MsgLeaderLeaderboard);
+        break;
+      case "MsgLeaderMatchups":
+        handleLeaderMatchups(msg as MsgLeaderMatchups);
         break;
       case "MsgInvitePlayer":
         handleInvitePlayer(msg as MsgInvitePlayer);
@@ -461,6 +465,11 @@ function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
   if (msg.result === false && msg.error) showMessage(msg.error, "error");
 }
 
+/** MsgLeaderMatchups — 指定 Leader 对阵当前周期榜前十的统计。 */
+function handleLeaderMatchups(msg: MsgLeaderMatchups) {
+  useNetStore.getState().setLeaderMatchups(msg);
+}
+
 /** MsgInvitePlayer — 发起邀请的回执（给发起方） */
 function handleInvitePlayer(msg: MsgInvitePlayer) {
   if (msg.result === false) {
@@ -652,8 +661,19 @@ export const HomeRequest = {
   },
 
   requestLeaderLeaderboard(period: LeaderboardPeriod) {
-    useNetStore.getState().setLeaderLeaderboard(null);
+    const store = useNetStore.getState();
+    store.setLeaderLeaderboard(null);
+    store.clearLeaderMatchups();
     return NetManager.send({ proto: "MsgLeaderLeaderboard", period } as MsgLeaderLeaderboard);
+  },
+
+  requestLeaderMatchups(period: LeaderboardPeriod, leaderNumber: string) {
+    useNetStore.getState().setLeaderMatchups({
+      proto: "MsgLeaderMatchups",
+      period,
+      leaderNumber,
+    });
+    return NetManager.send({ proto: "MsgLeaderMatchups", period, leaderNumber } as MsgLeaderMatchups);
   },
 
   invitePlayer(toAccount: string) {

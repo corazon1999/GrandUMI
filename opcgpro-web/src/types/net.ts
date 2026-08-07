@@ -299,6 +299,32 @@ export interface MsgLeaderLeaderboard extends MsgBase {
   items?: LeaderLeaderboardItem[];
 }
 
+export interface LeaderMatchupItem {
+  rank: number;
+  leaderNumber: string;
+  games: number;
+  wins: number | null;
+  losses: number | null;
+  winRate: number | null;
+  firstGames: number;
+  firstWinRate: number | null;
+  secondGames: number;
+  secondWinRate: number | null;
+  isMirror: boolean;
+}
+
+/** 点击榜单项后，查询该 Leader 对阵当前周期榜前十的统计。 */
+export interface MsgLeaderMatchups extends MsgBase {
+  proto: "MsgLeaderMatchups";
+  period: LeaderboardPeriod;
+  leaderNumber: string;
+  result?: boolean;
+  error?: string;
+  generatedAtUtc?: string;
+  sinceUtc?: string | null;
+  items?: LeaderMatchupItem[];
+}
+
 // 客户端 → 服务器:邀请某玩家对战(带自己卡组);服务器 → 发起方:回执
 export interface MsgInvitePlayer extends MsgBase {
   proto: "MsgInvitePlayer";
@@ -617,4 +643,5 @@ export type AnyMsg =
   | MsgChatMsg
   | MsgGameChat
   | MsgLeaderLeaderboard
+  | MsgLeaderMatchups
   | MsgOnlineCount;

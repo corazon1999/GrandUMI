@@ -116,6 +116,76 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.False(testStore.ContainsMatch("production-match"));
     }
 
+    [Fact]
+    public void 对战前十统计覆盖双方位置先后手镜像和排名边界()
+    {
+        var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        const string target = "L-TARGET";
+
+        for (var opponentIndex = 1; opponentIndex <= 9; opponentIndex++)
+        {
+            var opponent = $"L-{opponentIndex}";
+            for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
+            {
+                var targetIndex = gameIndex % 2;
+                var targetWon = gameIndex < 12;
+                var winner = targetWon ? targetIndex : 1 - targetIndex;
+                var targetWentFirst = gameIndex % 4 < 2;
+                var firstPlayer = targetWentFirst ? targetIndex : 1 - targetIndex;
+                store.RecordMatch(Match(
+                    $"top-{opponentIndex}-{gameIndex}",
+                    now,
+                    MatchKind.Matchmaking,
+                    targetIndex == 0 ? target : opponent,
+                    targetIndex == 1 ? target : opponent,
+                    winner,
+                    firstPlayer,
+                    8));
+            }
+        }
+
+        for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
+        {
+            var firstPlayer = gameIndex % 2;
+            var winner = gameIndex < 12 ? firstPlayer : 1 - firstPlayer;
+            store.RecordMatch(Match(
+                $"mirror-{gameIndex}", now, MatchKind.Friendly, target, target, winner, firstPlayer, 10));
+        }
+
+        for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames - 1; gameIndex++)
+        {
+            store.RecordMatch(Match(
+                $"unranked-{gameIndex}", now, MatchKind.RoomCode, target, "L-10", 1, gameIndex % 2, 12));
+        }
+
+        var result = store.GetMatchups(target, "all", now);
+
+        Assert.Equal(target, result.LeaderNumber);
+        Assert.Equal(10, result.Items.Count);
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "L-10");
+
+        var opponentRow = Assert.Single(result.Items, x => x.LeaderNumber == "L-1");
+        Assert.False(opponentRow.IsMirror);
+        Assert.Equal(20, opponentRow.Games);
+        Assert.Equal(12, opponentRow.Wins);
+        Assert.Equal(8, opponentRow.Losses);
+        Assert.Equal(0.6, opponentRow.WinRate!.Value, precision: 8);
+        Assert.Equal(10, opponentRow.FirstGames);
+        Assert.Equal(0.6, opponentRow.FirstWinRate!.Value, precision: 8);
+        Assert.Equal(10, opponentRow.SecondGames);
+        Assert.Equal(0.6, opponentRow.SecondWinRate!.Value, precision: 8);
+
+        var mirrorRow = Assert.Single(result.Items, x => x.LeaderNumber == target);
+        Assert.True(mirrorRow.IsMirror);
+        Assert.Equal(20, mirrorRow.Games);
+        Assert.Null(mirrorRow.WinRate);
+        Assert.Null(mirrorRow.Wins);
+        Assert.Null(mirrorRow.Losses);
+        Assert.Equal(0.6, mirrorRow.FirstWinRate!.Value, precision: 8);
+        Assert.Equal(0.4, mirrorRow.SecondWinRate!.Value, precision: 8);
+    }
+
     private LeaderStatsStore CreateStore()
     {
         Directory.CreateDirectory(_tempDir);

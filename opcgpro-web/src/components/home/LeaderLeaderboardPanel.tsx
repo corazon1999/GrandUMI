@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { HomeRequest } from "@/net/HomeProtocol";
-import { useNetStore } from "@/store/netStore";
+import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { thumbSrc } from "@/lib/sprite";
 import type { LeaderboardPeriod } from "@/types/net";
+import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 
 const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "7d", label: "近 7 天" },
@@ -52,12 +53,24 @@ function colorClasses(color?: string): string {
 
 export default function LeaderLeaderboardPanel() {
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
+  const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
   const [search, setSearch] = useState("");
   const [cardRevision, setCardRevision] = useState(0);
+  const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
 
   const request = (nextPeriod: LeaderboardPeriod) => {
+    setSelectedLeader(null);
     HomeRequest.requestLeaderLeaderboard(nextPeriod);
+  };
+
+  const toggleMatchups = (leaderNumber: string) => {
+    if (selectedLeader === leaderNumber) {
+      setSelectedLeader(null);
+      return;
+    }
+    setSelectedLeader(leaderNumber);
+    HomeRequest.requestLeaderMatchups(period, leaderNumber);
   };
 
   useEffect(() => {
@@ -75,6 +88,7 @@ export default function LeaderLeaderboardPanel() {
   }, []);
 
   useEffect(() => {
+    setSelectedLeader(null);
     HomeRequest.requestLeaderLeaderboard(period);
   }, [period]);
 
@@ -91,6 +105,9 @@ export default function LeaderLeaderboardPanel() {
 
   const loading = leaderboard == null || leaderboard.period !== period;
   const failed = !loading && leaderboard.result === false;
+  const selectedMatchups = selectedLeader
+    ? leaderMatchups[leaderMatchupKey(period, selectedLeader)]
+    : undefined;
 
   return (
     <section className="flex h-full min-h-0 flex-col p-3 @[640px]:p-6">
@@ -98,7 +115,7 @@ export default function LeaderLeaderboardPanel() {
         <div>
           <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
-            统计全部真人对局；第 7 回合及以前结束的对局不计入数据
+            统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 点击 Leader 查看对阵前十
           </p>
         </div>
         <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex @[640px]:w-auto">
@@ -173,9 +190,22 @@ export default function LeaderLeaderboardPanel() {
           <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
             {items.map((item) => {
               const card = getCard(item.leaderNumber);
+              const expanded = selectedLeader === item.leaderNumber;
               return (
-                <li key={item.leaderNumber} className="p-3">
-                  <div className="flex items-center gap-3">
+                <li key={item.leaderNumber} className={`p-3 transition-colors ${expanded ? "bg-orange-500/[0.04]" : ""}`}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expanded}
+                    onClick={() => toggleMatchups(item.leaderNumber)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleMatchups(item.leaderNumber);
+                      }
+                    }}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-orange-500/70"
+                  >
                     <span className={`w-7 shrink-0 text-center text-lg font-black ${item.rank != null && item.rank <= 3 ? "text-orange-400" : "text-gray-400"}`}>
                       {item.rank ?? "—"}
                     </span>
@@ -192,7 +222,7 @@ export default function LeaderLeaderboardPanel() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-lg font-black text-orange-300">{percent(item.winRate)}</p>
-                      <p className="text-xs text-gray-600">胜率</p>
+                      <p className="text-xs text-gray-600">胜率 <span className="ml-1">{expanded ? "▴" : "▾"}</span></p>
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center">
@@ -204,6 +234,14 @@ export default function LeaderLeaderboardPanel() {
                     <span>先攻 {percent(item.firstWinRate)} · {item.firstGames} 场</span>
                     <span>后攻 {percent(item.secondWinRate)} · {item.secondGames} 场</span>
                   </div>
+                  {expanded && (
+                    <div className="mt-3">
+                      <LeaderMatchupBreakdown
+                        data={selectedMatchups}
+                        onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber)}
+                      />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -224,8 +262,22 @@ export default function LeaderLeaderboardPanel() {
             <tbody className="divide-y divide-gray-800/80">
               {items.map((item) => {
                 const card = getCard(item.leaderNumber);
+                const expanded = selectedLeader === item.leaderNumber;
                 return (
-                  <tr key={item.leaderNumber} className="transition-colors hover:bg-gray-900/80">
+                  <Fragment key={item.leaderNumber}>
+                  <tr
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expanded}
+                    onClick={() => toggleMatchups(item.leaderNumber)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleMatchups(item.leaderNumber);
+                      }
+                    }}
+                    className={`cursor-pointer outline-none transition-colors hover:bg-gray-900/80 focus-visible:bg-gray-900 ${expanded ? "bg-orange-500/[0.04]" : ""}`}
+                  >
                     <td className="px-4 py-2.5 text-center">
                       {item.rank != null ? (
                         <span className={`font-black ${item.rank <= 3 ? "text-orange-400" : "text-gray-300"}`}>
@@ -264,6 +316,7 @@ export default function LeaderLeaderboardPanel() {
                             )}
                           </div>
                         </div>
+                        <span className={`ml-auto text-xs text-gray-600 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true">▾</span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-right text-sm font-semibold text-gray-200">{item.games}</td>
@@ -285,6 +338,17 @@ export default function LeaderLeaderboardPanel() {
                       <p className="text-[10px] text-gray-600">{item.secondGames} 场</p>
                     </td>
                   </tr>
+                  {expanded && (
+                    <tr className="bg-gray-950/80">
+                      <td colSpan={8} className="px-3 py-3">
+                        <LeaderMatchupBreakdown
+                          data={selectedMatchups}
+                          onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

@@ -40,6 +40,26 @@ public sealed record LeaderLeaderboardSnapshot(
     int MinimumGames,
     IReadOnlyList<LeaderLeaderboardItem> Items);
 
+public sealed record LeaderMatchupItem(
+    int Rank,
+    string LeaderNumber,
+    int Games,
+    int? Wins,
+    int? Losses,
+    double? WinRate,
+    int FirstGames,
+    double? FirstWinRate,
+    int SecondGames,
+    double? SecondWinRate,
+    bool IsMirror);
+
+public sealed record LeaderMatchupSnapshot(
+    string Period,
+    DateTime GeneratedAtUtc,
+    DateTime? SinceUtc,
+    string LeaderNumber,
+    IReadOnlyList<LeaderMatchupItem> Items);
+
 /// <summary>
 /// Leader 排行榜的逐局事实存储。以 match_id 幂等写入，榜单按时间窗口即时聚合。
 /// </summary>
@@ -236,6 +256,71 @@ public sealed class LeaderStatsStore
         }
     }
 
+    /// <summary>统计指定 Leader 对阵当前周期排行榜前十名的表现。</summary>
+    public LeaderMatchupSnapshot GetMatchups(string leaderNumber, string? requestedPeriod, DateTime? nowUtc = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaderNumber);
+        var normalizedLeader = leaderNumber.Trim();
+        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);
+        var topLeaders = leaderboard.Items
+            .Where(x => x.Rank is not null)
+            .Take(10)
+            .ToArray();
+
+        lock (_lock)
+        {
+            Initialize();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("排行榜数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
+            var rows = ReadMatchupRows(connection, normalizedLeader, leaderboard.SinceUtc);
+            var mirror = ReadMirrorRow(connection, normalizedLeader, leaderboard.SinceUtc);
+            var items = topLeaders.Select(opponent =>
+            {
+                var rank = opponent.Rank!.Value;
+                if (string.Equals(opponent.LeaderNumber, normalizedLeader, StringComparison.Ordinal))
+                {
+                    return new LeaderMatchupItem(
+                        rank,
+                        opponent.LeaderNumber,
+                        mirror.Games,
+                        null,
+                        null,
+                        null,
+                        mirror.Games,
+                        mirror.Games == 0 ? null : mirror.FirstWins / (double)mirror.Games,
+                        mirror.Games,
+                        mirror.Games == 0 ? null : mirror.SecondWins / (double)mirror.Games,
+                        true);
+                }
+
+                if (!rows.TryGetValue(opponent.LeaderNumber, out var row))
+                    row = new MatchupAggregateRow(opponent.LeaderNumber, 0, 0, 0, 0, 0, 0);
+
+                return new LeaderMatchupItem(
+                    rank,
+                    opponent.LeaderNumber,
+                    row.Games,
+                    row.Wins,
+                    row.Games - row.Wins,
+                    row.Games == 0 ? null : row.Wins / (double)row.Games,
+                    row.FirstGames,
+                    row.FirstGames == 0 ? null : row.FirstWins / (double)row.FirstGames,
+                    row.SecondGames,
+                    row.SecondGames == 0 ? null : row.SecondWins / (double)row.SecondGames,
+                    false);
+            }).ToArray();
+
+            return new LeaderMatchupSnapshot(
+                leaderboard.Period,
+                leaderboard.GeneratedAtUtc,
+                leaderboard.SinceUtc,
+                normalizedLeader,
+                items);
+        }
+    }
+
     /// <summary>回填工具用于按对局 ID 跳过已经导入的日志。</summary>
     public bool ContainsMatch(string matchId)
     {
@@ -345,6 +430,93 @@ public sealed class LeaderStatsStore
         return rows;
     }
 
+    private static Dictionary<string, MatchupAggregateRow> ReadMatchupRows(
+        SqliteConnection connection,
+        string leaderNumber,
+        DateTime? sinceUtc)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH filtered AS (
+                SELECT player0_leader, player1_leader, winner_index, first_player_index
+                FROM match_results
+                WHERE counted = 1
+                  AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
+                  AND (player0_leader = $leaderNumber OR player1_leader = $leaderNumber)
+            ),
+            appearances AS (
+                SELECT
+                    player1_leader AS opponent_leader,
+                    CASE WHEN winner_index = 0 THEN 1 ELSE 0 END AS won,
+                    CASE WHEN first_player_index = 0 THEN 1 ELSE 0 END AS went_first
+                FROM filtered
+                WHERE player0_leader = $leaderNumber
+                  AND player1_leader <> $leaderNumber
+                UNION ALL
+                SELECT
+                    player0_leader AS opponent_leader,
+                    CASE WHEN winner_index = 1 THEN 1 ELSE 0 END AS won,
+                    CASE WHEN first_player_index = 1 THEN 1 ELSE 0 END AS went_first
+                FROM filtered
+                WHERE player1_leader = $leaderNumber
+                  AND player0_leader <> $leaderNumber
+            )
+            SELECT
+                opponent_leader,
+                COUNT(*) AS games,
+                SUM(won) AS wins,
+                SUM(went_first) AS first_games,
+                SUM(CASE WHEN went_first = 1 AND won = 1 THEN 1 ELSE 0 END) AS first_wins,
+                SUM(CASE WHEN went_first = 0 THEN 1 ELSE 0 END) AS second_games,
+                SUM(CASE WHEN went_first = 0 AND won = 1 THEN 1 ELSE 0 END) AS second_wins
+            FROM appearances
+            GROUP BY opponent_leader;
+            """;
+        command.Parameters.AddWithValue("$leaderNumber", leaderNumber);
+        command.Parameters.AddWithValue("$sinceUtc", sinceUtc is null ? DBNull.Value : ToDatabaseUtc(sinceUtc.Value));
+
+        var rows = new Dictionary<string, MatchupAggregateRow>(StringComparer.Ordinal);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var row = new MatchupAggregateRow(
+                reader.GetString(0),
+                reader.GetInt32(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3),
+                reader.GetInt32(4),
+                reader.GetInt32(5),
+                reader.GetInt32(6));
+            rows[row.LeaderNumber] = row;
+        }
+        return rows;
+    }
+
+    private static MirrorAggregateRow ReadMirrorRow(
+        SqliteConnection connection,
+        string leaderNumber,
+        DateTime? sinceUtc)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                COUNT(*) AS games,
+                COALESCE(SUM(CASE WHEN winner_index = first_player_index THEN 1 ELSE 0 END), 0) AS first_wins,
+                COALESCE(SUM(CASE WHEN winner_index <> first_player_index THEN 1 ELSE 0 END), 0) AS second_wins
+            FROM match_results
+            WHERE counted = 1
+              AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
+              AND player0_leader = $leaderNumber
+              AND player1_leader = $leaderNumber;
+            """;
+        command.Parameters.AddWithValue("$leaderNumber", leaderNumber);
+        command.Parameters.AddWithValue("$sinceUtc", sinceUtc is null ? DBNull.Value : ToDatabaseUtc(sinceUtc.Value));
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) return new MirrorAggregateRow(0, 0, 0);
+        return new MirrorAggregateRow(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2));
+    }
+
     private static string NormalizePeriod(string? period)
         => period?.ToLowerInvariant() switch
         {
@@ -390,4 +562,15 @@ public sealed class LeaderStatsStore
         int FirstWins,
         int SecondGames,
         int SecondWins);
+
+    private sealed record MatchupAggregateRow(
+        string LeaderNumber,
+        int Games,
+        int Wins,
+        int FirstGames,
+        int FirstWins,
+        int SecondGames,
+        int SecondWins);
+
+    private sealed record MirrorAggregateRow(int Games, int FirstWins, int SecondWins);
 }
