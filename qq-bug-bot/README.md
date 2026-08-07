@@ -83,6 +83,13 @@ chown -R 10001:10001 data
 - `GH_TOKEN` 使用只允许目标仓库创建 Issue 的细粒度 GitHub Token。
 - `TZ` 使用服务器业务时区。
 
+在 Windows 部署电脑上也可以运行以下脚本。脚本会隐藏输入、先验证目标仓库与
+Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token 放进命令行：
+
+```powershell
+.\configure-github-token.ps1
+```
+
 编辑 `config.server.json`：
 
 - `ws_url` 保持 `ws://napcat:3001`。

@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-07-qq-bug-bot-production-migration",
+    version: "2026.08.07.4",
+    date: "2026-08-07",
+    title: "反馈服务稳定性升级",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "QQ 群 Bug 反馈机器人已迁移至正式服务器持续运行，反馈保存、GitHub Issue 同步和日报生成不再依赖部署电脑保持开机。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-07-test-leaderboard-mulligan-mobile-leader-fx",
     version: "2026.08.07.3",
     date: "2026-08-07",
