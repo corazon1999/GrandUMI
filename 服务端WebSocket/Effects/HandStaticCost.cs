@@ -24,6 +24,10 @@ public static class HandStaticCost
 
         switch (card.Info.Number)
         {
+            // P-120 山智：对方生命牌本回合曾离开生命区时，手牌中的此卡费用-2。
+            case "P-120":
+                return state.LifeLeftThisTurn.Contains(1 - playerIdx) ? -2 : 0;
+
             // OP17-005 爱德华·纽哥特：对方存在力量≥10000角色 → 手牌费用-4
             case "OP17-005":
                 return state.Players[1 - playerIdx].Characters.Any(c =>

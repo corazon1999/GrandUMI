@@ -4,6 +4,7 @@
  *
  * 用法：
  *   node tools/sync-card-set-images-cn.mjs OP16
+ *   node tools/sync-card-set-images-cn.mjs P --numbers=P-120,P-121
  *
  * 数据源：简中官网卡表接口与图片 CDN。
  */
@@ -14,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const API_BASE = "https://onepieceserve.windoent.com";
+const API_BASE = "https://webadmin.windoent.com/op-public";
 const REFERER = "https://www.onepiece-cardgame.cn/";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
@@ -23,10 +24,20 @@ const CONCURRENCY = 6;
 const MAX_RETRY = 3;
 
 const setCode = process.argv[2]?.toUpperCase();
-if (!setCode || !/^[A-Z]+\d+$/.test(setCode)) {
+if (!setCode || !/^(?:[A-Z]+\d+|P)$/.test(setCode)) {
   console.error("用法：node tools/sync-card-set-images-cn.mjs <卡集编号>");
   console.error("示例：node tools/sync-card-set-images-cn.mjs OP16");
+  console.error("宣传卡：node tools/sync-card-set-images-cn.mjs P");
   process.exit(1);
+}
+
+const numbersArg = process.argv.find((arg) => arg.startsWith("--numbers="));
+const requestedNumbers = numbersArg
+  ? new Set(numbersArg.slice("--numbers=".length).split(",").map((value) => value.trim().toUpperCase()).filter(Boolean))
+  : null;
+
+function canonicalCardNumber(value) {
+  return String(value ?? "").toUpperCase().match(/^([A-Z]{1,5}\d{0,2}-\d{3,})/)?.[1] ?? null;
 }
 
 const outputDir = path.join(ROOT, "CardImages", setCode.toLowerCase());
@@ -77,6 +88,8 @@ async function scanCardRows() {
   const byId = new Map();
   for (const item of pages.flat()) {
     if (!String(item.cardNumber ?? "").startsWith(`${setCode}-`)) continue;
+    const canonical = canonicalCardNumber(item.cardNumber);
+    if (!canonical || (requestedNumbers && !requestedNumbers.has(canonical))) continue;
     byId.set(String(item.id), item);
   }
   return [...byId.values()].sort((a, b) =>
@@ -166,6 +179,7 @@ async function updateManifest() {
   for (const filename of files) {
     const number = canonicalNumber(filename);
     if (!number) continue;
+    if (requestedNumbers && !requestedNumbers.has(number)) continue;
     const sprites = groups.get(number) ?? [];
     sprites.push(`/cards/${setCode.toLowerCase()}/${filename}`);
     groups.set(number, sprites);
@@ -178,28 +192,60 @@ async function updateManifest() {
     .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
     .map(([number, sprites]) => [number, sprites.sort(spriteSort)]);
 
-  // 保持原清单顺序，只在同系列的下一卡集前插入当前卡集，避免重排其他卡集。
+  // 按卡号过滤同步时，仅原位替换指定卡号，并把新增卡号接在该卡集末尾。
+  // 这样补少量宣传卡不会顺带重写整个 P 卡集的异画清单。
   const updatedManifest = {};
-  let inserted = false;
-  for (const [key, sprites] of Object.entries(manifest)) {
-    if (key.startsWith(`${setCode}-`)) continue;
-    const keySet = key.split("-")[0];
-    const keyMatch = keySet.match(/^([A-Z]+)(\d+)$/);
-    if (
-      !inserted &&
-      keyMatch?.[1] === setFamily &&
-      Number(keyMatch[2]) > setIndex
-    ) {
+  if (requestedNumbers) {
+    const entries = Object.entries(manifest);
+    const lastSetIndex = entries.findLastIndex(([key]) => key.startsWith(`${setCode}-`));
+    const written = new Set();
+    entries.forEach(([key, sprites], index) => {
+      if (groups.has(key)) {
+        updatedManifest[key] = groups.get(key).sort(spriteSort);
+        written.add(key);
+      } else {
+        updatedManifest[key] = sprites;
+      }
+      if (index === lastSetIndex) {
+        for (const [number, setSprites] of setEntries) {
+          if (!written.has(number)) updatedManifest[number] = setSprites;
+        }
+      }
+    });
+    if (lastSetIndex < 0) {
+      for (const [number, setSprites] of setEntries) updatedManifest[number] = setSprites;
+    }
+  } else {
+    // 已存在的整套卡集保持原位置；新卡集才按同系列编号插入。
+    let inserted = false;
+    for (const [key, sprites] of Object.entries(manifest)) {
+      if (key.startsWith(`${setCode}-`)) {
+        if (!inserted) {
+          for (const [number, setSprites] of setEntries) {
+            updatedManifest[number] = setSprites;
+          }
+          inserted = true;
+        }
+        continue;
+      }
+      const keySet = key.split("-")[0];
+      const keyMatch = keySet.match(/^([A-Z]+)(\d+)$/);
+      if (
+        !inserted &&
+        keyMatch?.[1] === setFamily &&
+        Number(keyMatch[2]) > setIndex
+      ) {
+        for (const [number, setSprites] of setEntries) {
+          updatedManifest[number] = setSprites;
+        }
+        inserted = true;
+      }
+      updatedManifest[key] = sprites;
+    }
+    if (!inserted) {
       for (const [number, setSprites] of setEntries) {
         updatedManifest[number] = setSprites;
       }
-      inserted = true;
-    }
-    updatedManifest[key] = sprites;
-  }
-  if (!inserted) {
-    for (const [number, setSprites] of setEntries) {
-      updatedManifest[number] = setSprites;
     }
   }
   await fs.writeFile(

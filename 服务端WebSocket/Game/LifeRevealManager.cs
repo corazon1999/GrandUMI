@@ -60,6 +60,7 @@ public static class LifeRevealManager
 
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
+            s.LifeLeftThisTurn.Add(targetPlayerIdx);
             dealt++;
 
             if (exile)
@@ -188,6 +189,7 @@ public static class LifeRevealManagerSync
                 break;
             var top = p.LifeArea[0];
             p.LifeArea.RemoveAt(0);
+            s.LifeLeftThisTurn.Add(targetPlayerIdx);
             p.Hand.Add(top);
         }
     }

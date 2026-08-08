@@ -546,6 +546,32 @@ public static class AtomicOps
             new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
     }
 
+    /// <summary>把场上一张角色/舞台放置到废弃区（非 KO，不触发【KO时】）。</summary>
+    public static void TrashFieldCard(GameState s, int ownerIdx, CardInstance card)
+    {
+        if (s.IsLeaveGuarded(card, "effect")) return;
+        var p = s.Players[ownerIdx];
+        bool removed = p.Characters.Remove(card);
+        if (ReferenceEquals(p.StageCard, card))
+        {
+            p.StageCard = null;
+            removed = true;
+        }
+        if (!removed) return;
+        foreach (var don in p.CostArea)
+        {
+            if (don.State == DonState.Attached && don.AttachedToCardId == card.Id)
+            {
+                don.State = DonState.Rest;
+                don.AttachedToCardId = null;
+            }
+        }
+        ResetCardEphemeralState(card);
+        p.Trash.Add(card);
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
+            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+    }
+
     /// <summary>把手牌中的角色卡免费登场</summary>
     /// <summary>角色区满员（5张）时为效果登场腾位：有效果 Prompt 上下文则让登场方自选 1 张角色送废弃区
     /// （与正常出牌的 OverflowTrash 流程一致，非 KO、不触发【K.O.时】）；无上下文时回退旧行为（挤最左）。

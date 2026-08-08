@@ -107,6 +107,9 @@ public class GameState
     /// <summary>本回合无法通过角色效果将咚!!转为活跃状态的玩家集合（EB04-016）。</summary>
     public HashSet<int> NoActivateDonByCharacterEffectThisTurn { get; } = new();
 
+    /// <summary>本回合中生命牌曾离开过生命区的玩家。供 P-120 等手牌静态减费实时判定。</summary>
+    public HashSet<int> LifeLeftThisTurn { get; } = new();
+
     /// <summary>攻击前置弃牌税：该玩家所有角色攻击前需弃 N 张手牌（OP08-043）。0=无</summary>
     public int[] AttackTaxDiscard { get; } = new int[2];
 

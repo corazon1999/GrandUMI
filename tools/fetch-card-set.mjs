@@ -7,8 +7,8 @@
  *   node tools/fetch-card-set.mjs OP16 --out=./tmp.json
  *
  * 数据源：
- *   列表：https://onepieceserve.windoent.com/cardList/cardlist/weblist?limit=N&page=K
- *   详情：https://onepieceserve.windoent.com/cardList/cardlist/webInfo/{id}
+ *   列表：https://webadmin.windoent.com/op-public/cardList/cardlist/weblist?limit=N&page=K
+ *   详情：https://webadmin.windoent.com/op-public/cardList/cardlist/webInfo/{id}
  *
  * 输出字段与现有 卡牌数据/OP15.json 完全一致（便于直接替换/合并）。
  */
@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT       = path.resolve(__dirname, "..");
 const OUT_DIR    = path.join(ROOT, "卡牌数据");
 
-const API_BASE   = "https://onepieceserve.windoent.com";
+const API_BASE   = "https://webadmin.windoent.com/op-public";
 const REFERER    = "https://www.onepiece-cardgame.cn/";
 const UA         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
 // 官网列表接口经本地代理传输超大响应时可能被中途切断；500 条/页既能
@@ -61,6 +61,11 @@ function mapCounter(raw) {
   if (/^\d+$/.test(raw)) return `反击+${raw}`;
   return raw;
 }
+function mapRarity(raw) {
+  if (!raw) return "";
+  const value = String(raw);
+  return value.match(/[（(]([A-Z]+)[）)]/)?.[1] ?? value;
+}
 
 // ── HTTP 工具 ─────────────────────────────────────────────────────────────
 async function fetchJson(url, retry = 0) {
@@ -99,7 +104,11 @@ async function fetchCardSet(setCode) {
     totalPage = data.page.totalPage;
     for (const item of data.page.list) {
       if (item.cardNumber && item.cardNumber.startsWith(setPrefix)) {
-        const canonicalNumber = item.cardNumber.replace(/_[A-Za-z0-9-]+$/i, "");
+        // 官网的异画编号同时存在 _01、P、SP、LP 等后缀，
+        // 卡牌数据只保留标准卡号。
+        const match = String(item.cardNumber).toUpperCase().match(/^([A-Z]{1,5}\d{0,2}-\d{3,})/);
+        if (!match) continue;
+        const canonicalNumber = match[1];
         const ids = byNumber.get(canonicalNumber) ?? [];
         if (ids.length > 0) dupCount++;
         ids.push(item.id);
@@ -162,7 +171,7 @@ function toSchemaCard(info) {
     counter:     mapCounter(info.cardAttack),
     effectText:  info.cardTextDesc     ?? "",
     effectEvent: "",
-    rarity:      info.cardRarity       ?? "",
+    rarity:      mapRarity(info.cardRarity),
     subscript:   info.subscript        ?? 0,
     trigger:     info.cardTrigger      ?? "",
     set:         info.cardOfferType    ?? "",

@@ -42,5 +42,75 @@
     "set": "豪华补充包 历代典藏合集Vol.2【PRBC-02】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1755138895791ST19-002_02.png",
     "cartograph": "画师原创"
+  },
+  {
+    "number": "ST19-003",
+    "name": "达斯琪",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "海军",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887431ST19-003.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST19-004",
+    "name": "日奈",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "4",
+    "keyWords": "海军",
+    "counter": "",
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887433ST19-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST19-005",
+    "name": "蒙奇·D·戈普",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "海军",
+    "counter": "1000",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887434ST19-005.png",
+    "cartograph": "画师原创"
   }
 ]

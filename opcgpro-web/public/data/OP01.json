@@ -1287,6 +1287,28 @@
     "cartograph": "漫画"
   },
   {
+    "number": "OP01-060",
+    "name": "堂吉诃德·多弗拉门戈",
+    "color": "蓝",
+    "type": "领航",
+    "property": "特",
+    "power": "5000",
+    "cost": "5",
+    "keyWords": "王下七武海/堂吉诃德海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 1,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732686519085OP01-060_02.png",
+    "cartograph": "画师原创"
+  },
+  {
     "number": "OP01-061",
     "name": "盖德",
     "color": "蓝/紫",

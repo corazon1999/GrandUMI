@@ -65,5 +65,49 @@
     "set": "豪华补充包 历代典藏合集Vol.2【PRBC-02】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1755138895793ST20-003_01.png",
     "cartograph": "画师原创"
+  },
+  {
+    "number": "ST20-004",
+    "name": "夏洛特·布玲",
+    "color": "黄",
+    "type": "角色",
+    "property": "知",
+    "power": "2000",
+    "cost": "3",
+    "keyWords": "大妈海盗团",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 3,
+    "trigger": "【触发】将对方最多1张费用不高于3的角色转为休息状态。",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887439ST20-004.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "ST20-005",
+    "name": "夏洛特·玲玲",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "7000",
+    "cost": "6",
+    "keyWords": "四皇/大妈海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 3,
+    "trigger": "",
+    "set": "豪华训练套装",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/1732685887439ST20-005.png",
+    "cartograph": "画师原创"
   }
 ]

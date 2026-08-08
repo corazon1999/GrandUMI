@@ -214,6 +214,7 @@ public static class EffectRuntime
         {
             var after = s.Players[owner].LifeArea.Select(c => c.Id).ToHashSet();
             int leftCount = before.Count(id => !after.Contains(id));
+            if (leftCount > 0) s.LifeLeftThisTurn.Add(owner);
             for (int i = 0; i < leftCount; i++)
             {
                 s.EnqueueWatcher(EffectTrigger.OnLifeLeaveField,

@@ -138,12 +138,19 @@ public static class TurnEngine
                     owner.Hand.Add(self);
                 }
             }
+            else if (task.Kind == "RefreshAllFilmCharacters")
+            {
+                // P-058：本回合结束时，将我方所有《FILM》角色转为活跃状态。
+                foreach (var card in state.Players[task.Owner].Characters.Where(c => c.Info.HasKeyword("FILM")))
+                    card.IsTapped = false;
+            }
         }
         state.EndOfTurnTasks.Clear();
         // 清除回合级玩家状态
         state.NoPlayCharacterThisTurn.Clear();
         state.NoEffectLifeToHandThisTurn.Clear();
         state.NoActivateDonByCharacterEffectThisTurn.Clear();
+        state.LifeLeftThisTurn.Clear();
         state.OneShotPlayDiscounts.Clear();   // OP02-025：一次性减费仅"本回合下次"
         state.AttackTaxDiscard[state.CurrentTurnPlayer] = 0; // 本回合方被课的攻击税到期
 
