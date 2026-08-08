@@ -103,7 +103,18 @@ export default function ProfilePanel({
     HomeRequest.requestPlayerProfileStats(period);
   }, [period]);
 
-  const topLeaders = useMemo(() => stats?.topLeaders ?? [], [stats?.topLeaders]);
+  const topLeaders = useMemo(
+    () => Array.isArray(stats?.topLeaders)
+      ? stats.topLeaders.filter((item) => typeof item?.leaderNumber === "string" && item.leaderNumber.length > 0)
+      : [],
+    [stats?.topLeaders],
+  );
+  const trend = useMemo(
+    () => Array.isArray(stats?.trend)
+      ? stats.trend.filter((point) => typeof point?.label === "string")
+      : [],
+    [stats?.trend],
+  );
 
   useEffect(() => {
     setSelectedLeaderNumber(topLeaders[0]?.leaderNumber ?? "");
@@ -212,7 +223,7 @@ export default function ProfilePanel({
               </div>
             </div>
             <div className="mt-5 flex h-40 items-end gap-1.5 border-b border-gray-700 px-1" role="img" aria-label="个人胜率趋势图">
-              {(dataReady ? stats.trend ?? [] : []).map((point) => {
+              {(dataReady ? trend : []).map((point) => {
                 const height = point.winRate == null ? 5 : Math.max(12, point.winRate * 100);
                 return (
                   <div key={point.label} className="flex h-full min-w-0 flex-1 items-end">
@@ -225,10 +236,10 @@ export default function ProfilePanel({
                 );
               })}
               {!dataReady && <div className="m-auto text-sm text-gray-600">正在读取统计…</div>}
-              {dataReady && (stats.trend?.length ?? 0) === 0 && <div className="m-auto text-sm text-gray-600">当前周期暂无有效对局</div>}
+              {dataReady && trend.length === 0 && <div className="m-auto text-sm text-gray-600">当前周期暂无有效对局</div>}
             </div>
-            {dataReady && (stats.trend?.length ?? 0) > 0 && (
-              <div className="mt-2 flex justify-between text-[10px] text-gray-600"><span>{stats.trend?.[0]?.label}</span><span>{stats.trend?.at(-1)?.label}</span></div>
+            {dataReady && trend.length > 0 && (
+              <div className="mt-2 flex justify-between text-[10px] text-gray-600"><span>{trend[0]?.label}</span><span>{trend.at(-1)?.label}</span></div>
             )}
           </article>
 

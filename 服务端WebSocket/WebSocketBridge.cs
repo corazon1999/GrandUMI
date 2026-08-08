@@ -1081,24 +1081,7 @@ public static class WebSocketBridge
         try
         {
             var snapshot = LeaderStatsStore.Default.GetPlayerProfile(s.Account!, requestedPeriod);
-            Send(s.SessionId, new
-            {
-                proto = "MsgPlayerProfileStats",
-                result = true,
-                period = snapshot.Period,
-                generatedAtUtc = snapshot.GeneratedAtUtc,
-                sinceUtc = snapshot.SinceUtc,
-                games = snapshot.Games,
-                wins = snapshot.Wins,
-                losses = snapshot.Losses,
-                winRate = snapshot.WinRate,
-                firstGames = snapshot.FirstGames,
-                firstWinRate = snapshot.FirstWinRate,
-                secondGames = snapshot.SecondGames,
-                secondWinRate = snapshot.SecondWinRate,
-                topLeaders = snapshot.TopLeaders,
-                trend = snapshot.Trend,
-            });
+            Send(s.SessionId, BuildPlayerProfileStatsResponse(snapshot));
         }
         catch (Exception ex)
         {
@@ -1112,6 +1095,45 @@ public static class WebSocketBridge
             });
         }
     }
+
+    /// <summary>显式映射嵌套字段，确保 WebSocket 响应与前端 camelCase 协议一致。</summary>
+    private static object BuildPlayerProfileStatsResponse(PlayerProfileStatsSnapshot snapshot)
+        => new
+        {
+            proto = "MsgPlayerProfileStats",
+            result = true,
+            period = snapshot.Period,
+            generatedAtUtc = snapshot.GeneratedAtUtc,
+            sinceUtc = snapshot.SinceUtc,
+            games = snapshot.Games,
+            wins = snapshot.Wins,
+            losses = snapshot.Losses,
+            winRate = snapshot.WinRate,
+            firstGames = snapshot.FirstGames,
+            firstWinRate = snapshot.FirstWinRate,
+            secondGames = snapshot.SecondGames,
+            secondWinRate = snapshot.SecondWinRate,
+            topLeaders = snapshot.TopLeaders.Select(item => new
+            {
+                leaderNumber = item.LeaderNumber,
+                games = item.Games,
+                wins = item.Wins,
+                losses = item.Losses,
+                winRate = item.WinRate,
+                usageRate = item.UsageRate,
+                firstGames = item.FirstGames,
+                firstWinRate = item.FirstWinRate,
+                secondGames = item.SecondGames,
+                secondWinRate = item.SecondWinRate,
+            }),
+            trend = snapshot.Trend.Select(point => new
+            {
+                label = point.Label,
+                games = point.Games,
+                wins = point.Wins,
+                winRate = point.WinRate,
+            }),
+        };
 
     private static void OnInvitePlayer(WsSession s, Dictionary<string, JsonElement> msg)
     {

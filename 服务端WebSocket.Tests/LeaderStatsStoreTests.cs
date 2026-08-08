@@ -1,5 +1,7 @@
 using GrandUMI.Game;
 using GrandUMI.Game.Stats;
+using System.Reflection;
+using System.Text.Json;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -219,6 +221,47 @@ public sealed class LeaderStatsStoreTests : IDisposable
         var bob = store.GetPlayerProfile("Bob", "30d", now);
         Assert.Equal(2, bob.Games);
         Assert.Equal(2, bob.TopLeaders.Count);
+    }
+
+    [Fact]
+    public void 个人详情响应使用前端约定的驼峰字段()
+    {
+        var method = typeof(WebSocketBridge).GetMethod(
+            "BuildPlayerProfileStatsResponse",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var snapshot = new PlayerProfileStatsSnapshot(
+            "30d",
+            new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 7, 9, 8, 0, 0, DateTimeKind.Utc),
+            3,
+            2,
+            1,
+            2d / 3d,
+            2,
+            0.5,
+            1,
+            1,
+            new[]
+            {
+                new PlayerLeaderStatsItem("OP01-001", 3, 2, 1, 2d / 3d, 1, 2, 0.5, 1, 1),
+            },
+            new[]
+            {
+                new PlayerStatsTrendPoint("08/08", 3, 2, 2d / 3d),
+            });
+
+        var payload = method.Invoke(null, new object[] { snapshot });
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = document.RootElement;
+        var leader = root.GetProperty("topLeaders").EnumerateArray().Single();
+        var trend = root.GetProperty("trend").EnumerateArray().Single();
+
+        Assert.Equal("OP01-001", leader.GetProperty("leaderNumber").GetString());
+        Assert.False(leader.TryGetProperty("LeaderNumber", out _));
+        Assert.Equal("08/08", trend.GetProperty("label").GetString());
+        Assert.False(trend.TryGetProperty("Label", out _));
     }
 
     private LeaderStatsStore CreateStore()
