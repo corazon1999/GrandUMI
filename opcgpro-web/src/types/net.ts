@@ -565,6 +565,13 @@ export interface BattleSnapshot {
   defenderBonus: number;
 }
 
+/** 对局结束后附带的回放手牌变化帧；实时对局与观战不会收到内容。 */
+export interface ReplayHandFrameSnapshot {
+  tick: number;
+  myCardNumbers: string[];
+  opponentCardNumbers: string[];
+}
+
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
@@ -596,6 +603,8 @@ export interface MsgGameState extends MsgBase {
   logLines?: string[];
   /** 自上一份快照以来进入解析的卡牌效果；按实际结算顺序排列。 */
   effectActivations?: EffectActivationSnapshot[];
+  /** 仅终局玩家快照携带，用于回放时明示双方手牌。 */
+  replayHands?: ReplayHandFrameSnapshot[] | null;
   pendingPrompt: PromptSnapshot | null;
   battle: BattleSnapshot | null;
   /** 检索/公开牌的瞬时展示（side 已按视角换算），仅在公开那一刻的快照里非空 */

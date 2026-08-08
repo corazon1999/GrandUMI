@@ -5,6 +5,12 @@ namespace GrandUMI.Game.Snapshot;
 /// <summary>把 GameState 编码为按视角脱敏的客户端快照。</summary>
 public static class StateSnapshotBuilder
 {
+    /// <summary>
+    /// 回放专用的双方手牌变化帧。只保存牌号与发生变化的 Tick，
+    /// 对局结束前不得下发给客户端。
+    /// </summary>
+    public sealed record ReplayHandFrame(int Tick, string[] Player0CardNumbers, string[] Player1CardNumbers);
+
     public sealed record SnapshotSet(object Player0, object Player1, object Spectator)
     {
         public object? SpectatorPlayer1 { get; init; }
@@ -34,24 +40,26 @@ public static class StateSnapshotBuilder
     /// </summary>
     public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
-        IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false)
+        IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false,
+        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0))
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline))
         {
             SpectatorPlayer1 = includePlayer1Spectator
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, replayHandTimeline)
                 : null,
         };
     }
 
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
         PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
-        string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex)
+        string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex,
+        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null)
     {
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
@@ -109,6 +117,15 @@ public static class StateSnapshotBuilder
                 trigger = item.Trigger,
                 side = item.OwnerIndex == myIdx ? "my" : "opponent",
             }).ToArray() ?? [],
+            // 仅在胜负已分后向参战玩家下发回放手牌时间线；实时对局与观战都保持隐藏区脱敏。
+            replayHands = !isSpectator && state.IsGameOver && replayHandTimeline is not null
+                ? replayHandTimeline.Select(frame => new
+                {
+                    tick = frame.Tick,
+                    myCardNumbers = myIdx == 0 ? frame.Player0CardNumbers : frame.Player1CardNumbers,
+                    opponentCardNumbers = myIdx == 0 ? frame.Player1CardNumbers : frame.Player0CardNumbers,
+                }).ToArray()
+                : null,
             my,
             opponent,
             // 观战者永远不能拿到选择候选，避免隐藏区信息泄露。

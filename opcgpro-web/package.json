@@ -10,6 +10,7 @@
     "build:cards": "node scripts/build-card-bundle.mjs",
     "check:audio": "node scripts/check-audio-assets.mjs",
     "test:zone-transitions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/card-zone-transitions.test.mjs",
+    "test:replay-hands": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/replay-hands.test.mjs",
     "gen:card-thumbs": "node scripts/gen-card-thumbs.mjs",
     "start": "next start"
   },

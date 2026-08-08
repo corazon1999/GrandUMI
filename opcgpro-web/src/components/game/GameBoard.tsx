@@ -75,7 +75,7 @@ function PlayerMat({
       <div className="grid h-full min-w-0 grid-rows-[1fr_auto_1fr] gap-2 p-3 pr-32 md:pr-36">
         {isOpponent ? (
           <div className="relative min-h-0 min-w-0 pl-24 md:pl-28">
-            <HandArea side={side} hidden />
+            <HandArea side={side} hidden={!isPlayback} />
           </div>
         ) : (
           <div className="relative flex min-h-0 min-w-0 items-stretch gap-4 pl-24 md:pl-28">

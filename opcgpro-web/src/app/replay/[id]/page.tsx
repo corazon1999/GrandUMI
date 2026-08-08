@@ -7,6 +7,7 @@ import PlaybackControls from "@/components/game/PlaybackControls";
 import { useGameStore } from "@/store/gameStore";
 import { useGameInit } from "@/hooks/useGameInit";
 import { getSnapshots } from "@/data/matchHistoryDB";
+import { revealReplayHands } from "@/lib/replayHands";
 import type { MsgGameState } from "@/types/net";
 import type { PlaybackSpeed } from "@/types/playback";
 
@@ -50,9 +51,10 @@ export default function ReplayPage() {
     getSnapshots(decodeURIComponent(id))
       .then((s) => {
         if (!alive) return;
-        setSnapshots(s ?? []);
-        if (s && s.length > 0) {
-          useGameStore.getState().syncFromServer(s[0]);
+        const replaySnapshots = revealReplayHands(s ?? []);
+        setSnapshots(replaySnapshots);
+        if (replaySnapshots.length > 0) {
+          useGameStore.getState().syncFromServer(replaySnapshots[0]);
           setPlaying(true);
         }
       })

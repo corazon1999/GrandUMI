@@ -166,4 +166,65 @@ public class ReplayEquivalenceTests
             e1.State.Players[1].Hand.Select(c => c.Id),
             e2.State.Players[1].Hand.Select(c => c.Id));
     }
+
+    [Fact]
+    public void 回放手牌时间线_仅在终局向参战玩家公开且观战始终脱敏()
+    {
+        EnsureLoaded();
+        var engine = new GameEngine("replay-hands",
+            ("s0", "alice", Deck), ("s1", "bob", Deck), firstPlayer: 0, rngSeed: 24680);
+
+        JsonElement? player0Snapshot = null;
+        JsonElement? player1Snapshot = null;
+        JsonElement? spectatorSnapshot = null;
+        engine.OnSendToPlayer = (index, payload) =>
+        {
+            var serialized = JsonSerializer.SerializeToElement(payload);
+            if (index == 0) player0Snapshot = serialized;
+            else player1Snapshot = serialized;
+        };
+        engine.OnSendToSpectators = (_, payload) =>
+            spectatorSnapshot = JsonSerializer.SerializeToElement(payload);
+
+        engine.BroadcastInitialState();
+        Assert.Equal(JsonValueKind.Null, player0Snapshot!.Value.GetProperty("replayHands").ValueKind);
+        Assert.Empty(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+
+        // 普通状态广播以及手牌变化都不得在对局进行中泄露时间线。
+        engine.Broadcast("NoHandChange");
+        var removed = engine.State.Players[0].Hand[0];
+        engine.State.Players[0].Hand.RemoveAt(0);
+        engine.State.Players[0].Trash.Add(removed);
+        engine.Broadcast("HandChanged");
+        var handChangedTick = engine.State.Tick;
+        Assert.Equal(JsonValueKind.Null, player0Snapshot!.Value.GetProperty("replayHands").ValueKind);
+
+        var expectedPlayer0 = engine.State.Players[0].Hand.Select(card => card.Info.Number).ToArray();
+        var expectedPlayer1 = engine.State.Players[1].Hand.Select(card => card.Info.Number).ToArray();
+        engine.State.WinnerIndex = 0;
+        engine.State.GameOverReason = "测试终局";
+        engine.Broadcast("DuelOver");
+
+        var player0Timeline = player0Snapshot!.Value.GetProperty("replayHands");
+        var player1Timeline = player1Snapshot!.Value.GetProperty("replayHands");
+        Assert.Equal(2, player0Timeline.GetArrayLength());
+        Assert.Equal(2, player1Timeline.GetArrayLength());
+
+        var player0Last = player0Timeline[player0Timeline.GetArrayLength() - 1];
+        var player1Last = player1Timeline[player1Timeline.GetArrayLength() - 1];
+        Assert.Equal(handChangedTick, player0Last.GetProperty("tick").GetInt32());
+        Assert.Equal(expectedPlayer0, ReadStrings(player0Last.GetProperty("myCardNumbers")));
+        Assert.Equal(expectedPlayer1, ReadStrings(player0Last.GetProperty("opponentCardNumbers")));
+        Assert.Equal(expectedPlayer1, ReadStrings(player1Last.GetProperty("myCardNumbers")));
+        Assert.Equal(expectedPlayer0, ReadStrings(player1Last.GetProperty("opponentCardNumbers")));
+
+        // 即使终局携带了回放时间线，常规对手字段与观战快照仍保持脱敏。
+        Assert.Empty(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, spectatorSnapshot!.Value.GetProperty("replayHands").ValueKind);
+        Assert.Empty(spectatorSnapshot.Value.GetProperty("my").GetProperty("handCardNumbers").EnumerateArray());
+        Assert.Empty(spectatorSnapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+    }
+
+    private static string[] ReadStrings(JsonElement array)
+        => array.EnumerateArray().Select(item => item.GetString() ?? "").ToArray();
 }

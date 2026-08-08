@@ -45,6 +45,7 @@ public class GameEngine
     private readonly List<(string Kind, int? Actor, object? Payload)> _pendingMatchLogs = new();
     private readonly List<ActionLogEvent> _pendingActionLogs = new();
     private readonly List<EffectActivationEvent> _pendingEffectActivations = new();
+    private readonly List<StateSnapshotBuilder.ReplayHandFrame> _replayHandTimeline = new();
 
     /// <summary>本局确定性卡实例 ID 工厂（由 RngSeed 派生，全局唯一计数器）。重放重建依赖它。</summary>
     private readonly Func<Guid> _idFactory;
@@ -145,6 +146,7 @@ public class GameEngine
         Prompts = new PromptSystem(this);
         if (State.StartingPlayerChosen)
             BeginMulliganPhase();
+        CaptureReplayHands();
     }
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
@@ -986,10 +988,12 @@ public class GameEngine
     {
         var startedAt = LatencyDiagnostics.Start();
         State.Tick++;
+        CaptureReplayHands();
         var snapshots = StateSnapshotBuilder.BuildAll(
             State,
             "GameStart",
-            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true);
+            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
+            replayHandTimeline: _replayHandTimeline);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
@@ -1106,6 +1110,7 @@ public class GameEngine
             _pendingEffectActivations.Clear();
         }
         State.Tick++;
+        CaptureReplayHands();
         var snapshots = StateSnapshotBuilder.BuildAll(
             State,
             lastAction,
@@ -1113,7 +1118,8 @@ public class GameEngine
             queuedLogEvents,
             requestId: _latencyRequestId,
             effectActivations: queuedEffectActivations,
-            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true);
+            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
+            replayHandTimeline: _replayHandTimeline);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
@@ -1131,6 +1137,23 @@ public class GameEngine
         LatencyDiagnostics.Observe("快照构建与入队", startedAt, $"房间={State.RoomId}，Tick={State.Tick}，事件={lastAction}");
         if (_latencyActionStartedAt != 0)
             LatencyDiagnostics.Observe("动作到快照", _latencyActionStartedAt, $"房间={State.RoomId}，动作={_latencyAction}，事件={lastAction}");
+    }
+
+    /// <summary>
+    /// 记录当前双方手牌；仅在牌号或顺序变化时追加，避免终局回放数据随普通状态快照膨胀。
+    /// 重启恢复重放同样会经过广播路径，因此能自然重建完整时间线。
+    /// </summary>
+    private void CaptureReplayHands()
+    {
+        var player0 = State.Players[0].Hand.Select(card => card.Info.Number).ToArray();
+        var player1 = State.Players[1].Hand.Select(card => card.Info.Number).ToArray();
+        var previous = _replayHandTimeline.LastOrDefault();
+        if (previous is not null
+            && previous.Player0CardNumbers.SequenceEqual(player0)
+            && previous.Player1CardNumbers.SequenceEqual(player1))
+            return;
+
+        _replayHandTimeline.Add(new StateSnapshotBuilder.ReplayHandFrame(State.Tick, player0, player1));
     }
 
     /// <summary>短暂向双方公开 ownerIndex 检索到的牌（搭一次广播即清空），客户端弹出展示浮层</summary>
