@@ -40,6 +40,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object                                  AccountIndexGate = new();
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
+    private static readonly object                                  MatchQueueGate = new();
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
     private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
     private static readonly ConcurrentDictionary<string, InviteInfo> PendingInvites = new(); // inviteId → 邀请对战
@@ -486,6 +487,12 @@ public static class WebSocketBridge
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "请先登录" }); return; }
+        if (!IsCurrentAccountSession(s))
+        {
+            s.IsMatching = false;
+            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "登录会话已失效，请重新连接" });
+            return;
+        }
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
@@ -562,14 +569,8 @@ public static class WebSocketBridge
 
     private static void TryMatch()
     {
-        while (TryTakeMatchingSession(out var p1))
+        while (TryTakeMatchPair(out var p1, out var p2))
         {
-            if (!TryTakeMatchingSession(out var p2))
-            {
-                if (p1.IsMatching) MatchQueue.Enqueue(p1);
-                return;
-            }
-
             var deck1 = p1.Deck ?? "";
             var deck2 = p2.Deck ?? "";
             try
@@ -591,6 +592,7 @@ public static class WebSocketBridge
                 Send(p1.SessionId, new { proto = "MsgGameStart" });
                 Send(p2.SessionId, new { proto = "MsgGameStart" });
                 room.Engine.BroadcastInitialState();
+                Log($"匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
             }
             catch (Exception ex)
             {
@@ -598,11 +600,48 @@ public static class WebSocketBridge
                 Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
                 Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
             }
-
-            p1.IsMatching = false;
-            p2.IsMatching = false;
-            Log($"匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
         }
+    }
+
+    /// <summary>
+    /// 在同一临界区内取出并占用一对不同玩家，避免并发 TryMatch 或重复队列项让同一会话进入两个座位。
+    /// 若暂时没有合法对手，只把第一名玩家重新入队一次。
+    /// </summary>
+    private static bool TryTakeMatchPair(out WsSession p1, out WsSession p2)
+    {
+        lock (MatchQueueGate)
+        {
+            while (TryTakeMatchingSession(out var first))
+            {
+                while (TryTakeMatchingSession(out var second))
+                {
+                    if (first.SessionId == second.SessionId || ReferenceEquals(first, second))
+                        continue;
+
+                    if (string.Equals(first.Account, second.Account, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 同账号只能有一个当前有效连接；异常残留项直接失效，不能作为另一名玩家。
+                        second.IsMatching = false;
+                        continue;
+                    }
+
+                    // 在持锁状态下先占用双方，其他并发匹配线程不能再次取到同一玩家。
+                    first.IsMatching = false;
+                    second.IsMatching = false;
+                    p1 = first;
+                    p2 = second;
+                    return true;
+                }
+
+                if (first.IsMatching && IsCurrentAccountSession(first))
+                    MatchQueue.Enqueue(first);
+                break;
+            }
+        }
+
+        p1 = null!;
+        p2 = null!;
+        return false;
     }
 
     private static bool TryTakeMatchingSession(out WsSession session)
@@ -610,11 +649,26 @@ public static class WebSocketBridge
         while (MatchQueue.TryDequeue(out var candidate))
         {
             if (!candidate.IsMatching || candidate.Socket.State != WebSocketState.Open) continue;
+            if (!IsCurrentAccountSession(candidate))
+            {
+                candidate.IsMatching = false;
+                continue;
+            }
             session = candidate;
             return true;
         }
         session = null!;
         return false;
+    }
+
+    private static bool IsCurrentAccountSession(WsSession session)
+    {
+        if (session.Account is null) return false;
+        lock (AccountIndexGate)
+        {
+            return AccountIndex.TryGetValue(session.Account, out var currentSessionId)
+                   && currentSessionId == session.SessionId;
+        }
     }
 
     private static void RebuildMatchQueue(WsSession exclude)

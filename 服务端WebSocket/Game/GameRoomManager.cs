@@ -89,6 +89,11 @@ public static class GameRoomManager
                                           MatchKind matchKind = MatchKind.UnknownHuman,
                                           bool broadcastInitialState = true)
     {
+        if (string.Equals(p0Sid, p1Sid, StringComparison.Ordinal))
+            throw new InvalidOperationException("同一连接不能同时作为对局双方");
+        if (!vsBot && string.Equals(p0Account, p1Account, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("同一账号不能同时作为真人对局双方");
+
         if (!ServerCapacity.CanCreateRoom(out var overloadReason))
             throw new InvalidOperationException($"服务器暂时无法创建新对局：{overloadReason}");
         using var roomAdmission = ReserveRoomCreation();
