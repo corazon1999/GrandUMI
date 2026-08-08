@@ -241,7 +241,7 @@ export default function CardItem({
           {!hideCost && (
             <span
               className={clsx(
-                "absolute left-1 top-1 z-10 rounded bg-black/85 px-1.5 text-[11px] font-bold leading-tight ring-1 ring-white/15",
+                "absolute left-[2px] top-[2px] z-10 rounded bg-black/85 px-1.5 text-[11px] font-bold leading-tight ring-1 ring-white/15",
                 costBuff > 0
                   ? "text-orange-300"
                   : costBuff < 0
