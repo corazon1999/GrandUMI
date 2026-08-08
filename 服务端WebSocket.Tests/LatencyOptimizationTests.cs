@@ -149,6 +149,31 @@ public class LatencyOptimizationTests
     }
 
     [Fact]
+    public void 含效果发动事件的状态快照_不可被后续普通快照合并()
+    {
+        var method = typeof(WebSocketBridge).GetMethod(
+            "IsReplaceableStateSnapshot",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var ordinary = new
+        {
+            proto = "MsgGameState",
+            lastAction = "EffectResolved",
+            effectActivations = Array.Empty<object>(),
+        };
+        var withActivation = new
+        {
+            proto = "MsgGameState",
+            lastAction = "EffectResolved",
+            effectActivations = new[] { new { sourceId = "card-1" } },
+        };
+
+        Assert.True((bool)method.Invoke(null, new object[] { ordinary })!);
+        Assert.False((bool)method.Invoke(null, new object[] { withActivation })!);
+    }
+
+    [Fact]
     public void BuildAll_与单视角快照逐字节等价且观战不泄露Prompt()
     {
         var state = TestScene.MaxScenario();

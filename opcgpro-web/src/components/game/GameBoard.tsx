@@ -14,6 +14,7 @@ import GameLog from "@/components/game/GameLog";
 import GameActions from "@/components/game/GameActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import BattleRelationLayer from "@/components/game/BattleRelationLayer";
+import EffectActivationLayer from "@/components/game/EffectActivationLayer";
 import RevealOverlay from "@/components/game/RevealOverlay";
 import GameChatPanel from "@/components/game/GameChatPanel";
 import { useGameStore } from "@/store/gameStore";
@@ -302,6 +303,7 @@ export default function GameBoard({
             }}
           >
             <BattleRelationLayer />
+            <EffectActivationLayer />
             <div className="absolute inset-3 flex gap-3">
               <LeftRail />
 

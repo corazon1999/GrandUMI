@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
@@ -1960,6 +1960,10 @@ public static class WebSocketBridge
     {
         var type = data.GetType();
         if (!string.Equals(type.GetProperty("proto")?.GetValue(data) as string, "MsgGameState", StringComparison.Ordinal))
+            return false;
+        // 效果发动表现是一次性事件；若与普通状态一起被后续快照合并，客户端将永远无法补播。
+        // 因此只要队列非空，就与攻击、Prompt 等关键动画屏障一样可靠保留。
+        if (type.GetProperty("effectActivations")?.GetValue(data) is Array { Length: > 0 })
             return false;
         var lastAction = type.GetProperty("lastAction")?.GetValue(data) as string ?? "";
         return !NonReplaceableStateActions.Contains(lastAction);

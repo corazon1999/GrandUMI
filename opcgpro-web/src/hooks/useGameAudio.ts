@@ -100,10 +100,6 @@ export function useGameAudio(): void {
       case "CounterIcon":
         play("counter");
         break;
-      case "UseEffect":
-      case "EffectResolved":
-        play("effect");
-        break;
       case "RevealCards":
         play("reveal");
         break;

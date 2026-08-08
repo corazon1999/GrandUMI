@@ -1,4 +1,4 @@
-﻿import type { SavedDeck } from "@/types/deck";
+import type { SavedDeck } from "@/types/deck";
 
 // 协议枚举 — 与 C# ProtocolEnum.cs 完全一致
 export enum ProtocolEnum {
@@ -594,6 +594,8 @@ export interface MsgGameState extends MsgBase {
   logLine?: string;
   /** 本次快照附带的全部操作日志；用于一次效果结算中连续记录多个选择。 */
   logLines?: string[];
+  /** 自上一份快照以来进入解析的卡牌效果；按实际结算顺序排列。 */
+  effectActivations?: EffectActivationSnapshot[];
   pendingPrompt: PromptSnapshot | null;
   battle: BattleSnapshot | null;
   /** 检索/公开牌的瞬时展示（side 已按视角换算），仅在公开那一刻的快照里非空 */
@@ -619,6 +621,14 @@ export interface MsgGameStateDelta extends MsgBase {
 export interface RevealSnapshot {
   side: "my" | "opponent";
   cardNumbers: string[];
+}
+
+/** 卡牌进入效果解析时下发的瞬时表现事件。 */
+export interface EffectActivationSnapshot {
+  sourceId: string;
+  cardNumber: string;
+  trigger: string;
+  side: "my" | "opponent";
 }
 
 /** 客户端 → 服务器：响应 Prompt */

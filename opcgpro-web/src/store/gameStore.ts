@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { MsgGameState, RevealSnapshot } from "@/types/net";
+import type { EffectActivationSnapshot, MsgGameState, RevealSnapshot } from "@/types/net";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -106,6 +106,10 @@ export interface BattleView {
   defenderBonus: number;
 }
 
+export interface QueuedEffectActivation extends EffectActivationSnapshot {
+  id: string;
+}
+
 interface GameStore {
   // 元信息
   mode: GameMode;
@@ -140,6 +144,8 @@ interface GameStore {
   // 动作驱动动画
   lastAction: string;
   lastActionPayloadObj: Record<string, unknown> | null;
+  effectActivationQueue: QueuedEffectActivation[];
+  lastEffectActivationTick: number;
 
   // 操作日志（按 tick 去重累积）
   logLines: { id: string; text: string }[];
@@ -170,6 +176,7 @@ interface GameStore {
   // ── 唯一写入路径 ─────────────────────────────────────────────────────
   syncFromServer: (msg: MsgGameState) => void;
   clearReveal: () => void;
+  shiftEffectActivation: () => void;
   flashPromptSuccess: () => void;
   openLocalOverflow: (handIndex: number) => void;
   clearLocalOverflow: () => void;
@@ -215,6 +222,8 @@ export const useGameStore = create<GameStore>()(
     battle: null,
     lastAction: "",
     lastActionPayloadObj: null,
+    effectActivationQueue: [],
+    lastEffectActivationTick: -1,
     logLines: [],
     lastLogTick: -1,
     reveal: null,
@@ -232,10 +241,12 @@ export const useGameStore = create<GameStore>()(
 
     syncFromServer: (msg) =>
       set((s) => {
+        const previousTick = s.tick;
+        const incomingTick = msg.tick ?? previousTick + 1;
         const firstPlayer = msg.firstPlayer ?? -1;
         const my = clonePlayerView(msg.my ?? null);
         const opponent = clonePlayerView(msg.opponent ?? null);
-        s.tick = msg.tick ?? s.tick + 1;
+        s.tick = incomingTick;
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
         s.turnCount = msg.turnCount;
@@ -267,6 +278,24 @@ export const useGameStore = create<GameStore>()(
               catch { return null; }
             })()
           : null;
+        // 回放倒退或同 Tick 重放时先丢弃旧的本地播放队列，确保重新向前播放仍能看到特效。
+        if (incomingTick <= previousTick) {
+          s.effectActivationQueue = [];
+          s.lastEffectActivationTick = incomingTick - 1;
+        }
+        if (incomingTick > s.lastEffectActivationTick) {
+          (msg.effectActivations ?? []).forEach((activation, index) => {
+            s.effectActivationQueue.push({
+              ...activation,
+              id: `${incomingTick}:${index}:${activation.sourceId}`,
+            });
+          });
+          // 防止极端连锁或后台标签页积累无限队列；保留最近 40 次表现。
+          if (s.effectActivationQueue.length > 40) {
+            s.effectActivationQueue.splice(0, s.effectActivationQueue.length - 40);
+          }
+          s.lastEffectActivationTick = incomingTick;
+        }
         // 操作日志：同一快照可携带多条效果选择记录；仍按 tick 去重，避免重连重复追加。
         {
           const lines = msg.logLines?.length
@@ -297,6 +326,7 @@ export const useGameStore = create<GameStore>()(
       }),
 
     clearReveal: () => set((s) => { s.reveal = null; }),
+    shiftEffectActivation: () => set((s) => { s.effectActivationQueue.shift(); }),
     flashPromptSuccess: () => set((s) => { s.promptFlash = s.promptFlash + 1; }),
     openLocalOverflow: (handIndex) => set((s) => { s.localOverflowHandIndex = handIndex; }),
     clearLocalOverflow: () => set((s) => { s.localOverflowHandIndex = null; }),
@@ -381,6 +411,8 @@ export const useGameStore = create<GameStore>()(
       s.battle = null;
       s.lastAction = "";
       s.lastActionPayloadObj = null;
+      s.effectActivationQueue = [];
+      s.lastEffectActivationTick = -1;
       s.logLines = [];
       s.lastLogTick = -1;
       s.reveal = null;

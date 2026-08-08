@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
 using GrandUMI.Game.Debug;
@@ -44,6 +44,7 @@ public class GameEngine
     private string? _latencyRequestId;
     private readonly List<(string Kind, int? Actor, object? Payload)> _pendingMatchLogs = new();
     private readonly List<ActionLogEvent> _pendingActionLogs = new();
+    private readonly List<EffectActivationEvent> _pendingEffectActivations = new();
 
     /// <summary>本局确定性卡实例 ID 工厂（由 RngSeed 派生，全局唯一计数器）。重放重建依赖它。</summary>
     private readonly Func<Guid> _idFactory;
@@ -1073,14 +1074,36 @@ public class GameEngine
             _pendingActionLogs.Add(new ActionLogEvent(action, payload));
     }
 
+    /// <summary>
+    /// 把卡牌效果发动表现暂存到下一份快照。一个结算批次内可记录多张来源卡，
+    /// 防止只保留 lastAction 时连锁效果的中间来源被覆盖。
+    /// </summary>
+    public void QueueEffectActivation(int ownerIndex, CardInstance source, EffectTrigger trigger)
+    {
+        // 对局开始效果用于注册静态被动，不应在开局阶段播放发动特效。
+        if (trigger == EffectTrigger.OnGameStart) return;
+
+        lock (_snapshotBatchGate)
+        {
+            _pendingEffectActivations.Add(new EffectActivationEvent(
+                ownerIndex,
+                source.Id,
+                source.Info.Number,
+                trigger.ToString()));
+        }
+    }
+
     private void BroadcastNow(string lastAction, object? payload)
     {
         var startedAt = LatencyDiagnostics.Start();
         ActionLogEvent[] queuedLogEvents;
+        EffectActivationEvent[] queuedEffectActivations;
         lock (_snapshotBatchGate)
         {
             queuedLogEvents = _pendingActionLogs.ToArray();
             _pendingActionLogs.Clear();
+            queuedEffectActivations = _pendingEffectActivations.ToArray();
+            _pendingEffectActivations.Clear();
         }
         State.Tick++;
         var snapshots = StateSnapshotBuilder.BuildAll(
@@ -1089,6 +1112,7 @@ public class GameEngine
             payload,
             queuedLogEvents,
             requestId: _latencyRequestId,
+            effectActivations: queuedEffectActivations,
             includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);

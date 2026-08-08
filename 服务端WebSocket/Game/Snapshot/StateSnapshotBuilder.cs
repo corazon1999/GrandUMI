@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace GrandUMI.Game.Snapshot;
 
@@ -13,7 +13,7 @@ public static class StateSnapshotBuilder
     /// <summary>单视角构建，供重连和单个观战者加入时使用。</summary>
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
-        int spectatorPlayerIndex = 0)
+        IReadOnlyList<EffectActivationEvent>? effectActivations = null, int spectatorPlayerIndex = 0)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         return BuildForViewer(
@@ -24,6 +24,7 @@ public static class StateSnapshotBuilder
             boards,
             queuedLogEvents,
             requestId,
+            effectActivations,
             spectatorPlayerIndex);
     }
 
@@ -33,24 +34,24 @@ public static class StateSnapshotBuilder
     /// </summary>
     public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
-        bool includePlayer1Spectator = false)
+        IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, 0),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, 0),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, 0))
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0))
         {
             SpectatorPlayer1 = includePlayer1Spectator
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, 1)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1)
                 : null,
         };
     }
 
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
         PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
-        string? requestId, int spectatorPlayerIndex)
+        string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex)
     {
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
@@ -101,6 +102,13 @@ public static class StateSnapshotBuilder
             actionPayload = payload.Json,
             logLine,
             logLines = logLines.ToArray(),
+            effectActivations = effectActivations?.Select(item => new
+            {
+                sourceId = item.SourceId.ToString(),
+                cardNumber = item.CardNumber,
+                trigger = item.Trigger,
+                side = item.OwnerIndex == myIdx ? "my" : "opponent",
+            }).ToArray() ?? [],
             my,
             opponent,
             // 观战者永远不能拿到选择候选，避免隐藏区信息泄露。

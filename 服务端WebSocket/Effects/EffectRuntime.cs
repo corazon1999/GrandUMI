@@ -153,6 +153,12 @@ public static class EffectRuntime
             // 持续"效果无效"：被持续无效化的卡（整卡或该类触发），其效果不发动
             if (source.IsEffectsNullified || s.IsContinuouslyNullified(source) || s.IsTriggerNullified(source, trigger)) return;
 
+            // 出牌流程会统一调用 OnEnterField，即使卡牌没有该时点效果；只为确实声明了
+            // 当前触发时机的卡记录表现，避免无效果卡登场时误播“效果发动”。
+            // 提示型快照会立即带走事件，无交互效果则随本批次最终快照发送。
+            if (HasEffectForTrigger(source, trigger))
+                ctx.Engine?.QueueEffectActivation(ownerIdx, source, trigger);
+
             // 1. 优先用手写脚本
             var scripted = ScriptedEffectRegistry.TryGet(source.Info.Number);
             if (scripted is not null && scripted.HandlesTrigger(trigger))
