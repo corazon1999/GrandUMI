@@ -14,6 +14,40 @@ public class OP17EffectTests
     private static CardInstance Card(string number, int turnPlayed = 0)
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
+    [Theory]
+    [InlineData("OP08-051", true)]
+    [InlineData("OP07-049", false)]
+    public async Task OP17_039_DrawsOnlyWhenRevealedTypeContainsRocksPirates(
+        string revealedNumber, bool shouldDraw)
+    {
+        var state = TestScene.New("OP17-039").Build();
+        var me = state.Players[0];
+        var discard = Card("OP17-040");
+        var revealed = Card(revealedNumber);
+        var next = Card("OP17-041");
+        me.Hand.Add(discard);
+        me.Deck.AddRange([revealed, next]);
+        var prompts = new MockPromptService().QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, me.Leader,
+            EffectTrigger.OnAttackDeclare, prompts);
+
+        Assert.Contains(discard, me.Trash);
+        if (shouldDraw)
+        {
+            Assert.Empty(me.Deck);
+            Assert.Equal(2, me.Hand.Count);
+            Assert.Contains(revealed, me.Hand);
+            Assert.Contains(next, me.Hand);
+        }
+        else
+        {
+            Assert.Empty(me.Hand);
+            Assert.Equal(2, me.Deck.Count);
+            Assert.Same(revealed, me.Deck[0]);
+        }
+    }
+
     [Fact]
     public async Task OP17_099_FirstChoice_DiscardsOwnersHandAndAddsDeckTopToLife()
     {

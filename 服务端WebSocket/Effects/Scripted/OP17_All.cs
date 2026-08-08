@@ -756,7 +756,7 @@ internal static class OP17Effects
         var top = Me(c).Deck.FirstOrDefault();
         if (top is null) return;
         c.Engine?.BroadcastReveal(c.OwnerIndex, new[] { top.Info.Number });
-        if (top.Info.HasKeyword("洛克斯海盗团")) AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+        if (top.Info.HasKeywordContaining("洛克斯海盗团")) AtomicOps.Draw(c.State, c.OwnerIndex, 2);
     }
 
     private static async Task C040(EffectContext c)
