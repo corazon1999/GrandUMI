@@ -9,6 +9,34 @@ namespace GrandUMI.Tests;
 public class OP08_OP14RegressionTests
 {
     [Fact]
+    public async Task OP08_117_LifeTrigger_SwapsTopLifeWithSelectedHandCard()
+    {
+        var state = TestScene.New()
+            .MyHandAdd("OP15-050")
+            .Build();
+        var me = state.Players[0];
+        var handCard = Assert.Single(me.Hand);
+        var lifeCard = new CardInstance { Info = CardDatabase.Get("OP15-051")! };
+        me.LifeArea.Add(lifeCard);
+        var source = new CardInstance { Info = CardDatabase.Get("OP08-117")! };
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(handCard.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            source,
+            EffectTrigger.OnLifeRevealTrigger,
+            prompts);
+
+        Assert.Contains(lifeCard, me.Hand);
+        Assert.DoesNotContain(handCard, me.Hand);
+        Assert.Same(handCard, Assert.Single(me.LifeArea));
+        Assert.False(handCard.IsLifeFaceUp);
+    }
+
+    [Fact]
     public async Task OP08_050_WhenOnlyOneCardCanBeDrawn_ReturnsThatOneCard()
     {
         var state = TestScene.New().Build();

@@ -8,6 +8,34 @@ namespace GrandUMI.Tests;
 public class OP13EffectTests
 {
     [Fact]
+    public async Task OP13_113_CanSearchBurningSwordWithPrintedLifeTrigger()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP08-117", "OP15-003")
+            .Build();
+        var me = state.Players[0];
+        var source = new CardInstance { Info = CardDatabase.Get("OP13-113")! };
+        var burningSword = me.Deck[0];
+        me.Characters.Add(source);
+        var prompts = new MockPromptService()
+            .QueueChoose(burningSword.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            source,
+            EffectTrigger.OnEnterField,
+            prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("LilithReveal", prompt.kind);
+        Assert.Contains(burningSword.Id.ToString(), prompt.choices);
+        Assert.False(string.IsNullOrWhiteSpace(burningSword.Info.Trigger));
+        Assert.Contains(burningSword, me.Hand);
+        Assert.DoesNotContain(burningSword, me.Deck);
+    }
+
+    [Fact]
     public async Task OP13_004_CurrentCostAtLeast8_BuffsLeaderAndAllOwnCharacters()
     {
         var state = TestScene.New("OP13-004")
