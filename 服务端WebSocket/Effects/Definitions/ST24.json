@@ -44,7 +44,7 @@
   },
   "ST24-004": {
     "_name": "罗&贝宝",
-    "_note": "【登场时】将对方最多1张角色转休息，且其下个对方重置阶段不活跃。之后，对方有2张或更多休息角色时，本回合我方领袖力量+2000。",
+    "_note": "【登场时】将对方最多1张角色转休息，且其下个对方重置阶段不活跃。之后，对方有2张或更多休息角色时，直到下个对方的回合结束时为止，我方领袖力量+2000。",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -52,7 +52,7 @@
           { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "将对方最多1张角色转为休息状态" },
           { "op": "Rest", "target": "$tgt" },
           { "op": "PreventActivateNextReset", "target": "$tgt" },
-          { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 2000, "if": { "oppRestedCharCountGte": 2 } }
+          { "op": "AddPowerUntilOppEnd", "target": "selfLeader", "delta": 2000, "if": { "oppRestedCharCountGte": 2 } }
         ]
       }
     ]
