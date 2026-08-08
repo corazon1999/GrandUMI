@@ -746,7 +746,7 @@ export const HomeRequest = {
   },
 
   /** 申请观战指定房间（观战者由后端注册，随后每帧收到脱敏快照） */
-  spectateRoom(roomId: string) {
+  spectateRoom(roomId: string, viewPlayerIndex: 0 | 1 = 0) {
     const normalizedRoomId = roomId.trim();
     if (!normalizedRoomId) {
       showMessage("请输入有效的房间 ID", "error");
@@ -757,7 +757,11 @@ export const HomeRequest = {
     if (netStore.spectateState === "joining") return false;
 
     netStore.setSpectate("joining", normalizedRoomId);
-    const sent = NetManager.send({ proto: "MsgSpectateRoom", roomId: normalizedRoomId } as MsgSpectateRoom);
+    const sent = NetManager.send({
+      proto: "MsgSpectateRoom",
+      roomId: normalizedRoomId,
+      viewPlayerIndex,
+    } as MsgSpectateRoom);
     if (!sent) {
       netStore.setSpectate("idle");
       showMessage("网络未连接，无法进入观战", "error");

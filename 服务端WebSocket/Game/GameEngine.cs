@@ -1,4 +1,4 @@
-using GrandUMI.Cards;
+﻿using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
 using GrandUMI.Game.Debug;
@@ -25,6 +25,7 @@ public class GameEngine
     public Action<string, int?, object?>? OnMatchLog { get; set; }
     public Action<int, object>? OnSendToSpectators { get; set; } // 观战推送（spectator 视角）
     public Func<bool>? HasSpectators { get; set; }
+    public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Action<int, string, JsonElement>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
     /// <summary>
     /// 是否记录含双方完整牌库的私有快照。直接构造引擎时默认开启以兼容测试；
@@ -984,12 +985,19 @@ public class GameEngine
     {
         var startedAt = LatencyDiagnostics.Start();
         State.Tick++;
-        var snapshots = StateSnapshotBuilder.BuildAll(State, "GameStart");
+        var snapshots = StateSnapshotBuilder.BuildAll(
+            State,
+            "GameStart",
+            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
-            OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        {
+            OnSendToSpectators?.Invoke(0, publicSnapshot);
+            if (snapshots.SpectatorPlayer1 is not null)
+                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1);
+        }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = sharedPublicSnapshot });
         RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);
@@ -1076,12 +1084,21 @@ public class GameEngine
         }
         State.Tick++;
         var snapshots = StateSnapshotBuilder.BuildAll(
-            State, lastAction, payload, queuedLogEvents, requestId: _latencyRequestId);
+            State,
+            lastAction,
+            payload,
+            queuedLogEvents,
+            requestId: _latencyRequestId,
+            includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
-            OnSendToSpectators?.Invoke(-1, publicSnapshot);
+        {
+            OnSendToSpectators?.Invoke(0, publicSnapshot);
+            if (snapshots.SpectatorPlayer1 is not null)
+                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1);
+        }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = sharedPublicSnapshot });
         RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);

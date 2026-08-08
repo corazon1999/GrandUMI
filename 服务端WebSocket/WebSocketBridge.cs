@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
@@ -867,10 +867,20 @@ public static class WebSocketBridge
                 var status = StatusOf(x);
                 // 仅对战中玩家附带其所在对局房间ID，供前端一键观战；
                 // 友谊战房内(lobby)虽也判为 playing，但尚无对局房间，GetRoomBySession 返回 null。
-                var roomId = status == "playing"
-                    ? GameRoomManager.GetRoomBySession(x.SessionId)?.RoomId
+                var gameRoom = status == "playing"
+                    ? GameRoomManager.GetRoomBySession(x.SessionId)
                     : null;
-                return new { account = x.Account, name = x.PlayerName ?? x.Account, status, roomId };
+                var seatIndex = gameRoom is null
+                    ? (int?)null
+                    : Array.IndexOf(gameRoom.PlayerSessionIds, x.SessionId);
+                return new
+                {
+                    account = x.Account,
+                    name = x.PlayerName ?? x.Account,
+                    status,
+                    roomId = gameRoom?.RoomId,
+                    seatIndex = seatIndex is >= 0 ? seatIndex : null,
+                };
             })
             .ToArray();
         Send(s.SessionId, new
@@ -1649,7 +1659,12 @@ public static class WebSocketBridge
         }
 
         var roomId = Str(msg, "roomId") ?? "";
-        GameRoomManager.AddSpectator(roomId, s.SessionId);
+        var viewPlayerIndex = msg.TryGetValue("viewPlayerIndex", out var viewPlayerIndexValue)
+            && viewPlayerIndexValue.TryGetInt32(out var parsedViewPlayerIndex)
+            && parsedViewPlayerIndex == 1
+                ? 1
+                : 0;
+        GameRoomManager.AddSpectator(roomId, s.SessionId, viewPlayerIndex);
     }
 
     /// <summary>MsgLeaveSpectate — 主动退出观战</summary>

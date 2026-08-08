@@ -48,7 +48,8 @@ public static class GameRoomManager
         public required GameEngine Engine { get; init; }
         public required string[] PlayerSessionIds { get; init; }  // [P0, P1]
         public required string[] PlayerAccounts   { get; init; }
-        public ConcurrentDictionary<string, byte> Spectators { get; } = new();
+        /// <summary>观战会话及其主视角座位（0/1）。</summary>
+        public ConcurrentDictionary<string, int> Spectators { get; } = new();
         public DateTime CreatedAt { get; } = DateTime.UtcNow;
         public string? ReplayPath { get; set; }
         public string? MatchLogPath { get; set; }
@@ -125,12 +126,17 @@ public static class GameRoomManager
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
         };
 
-        engine.OnSendToSpectators = (_, payload) =>
+        engine.OnSendToSpectators = (viewPlayerIndex, payload) =>
         {
-            foreach (var sid in entry.Spectators.Keys)
-                WebSocketBridge.Send(sid, payload);
+            foreach (var spectator in entry.Spectators)
+            {
+                if (spectator.Value == viewPlayerIndex)
+                    WebSocketBridge.Send(spectator.Key, payload);
+            }
         };
         engine.HasSpectators = () => !entry.Spectators.IsEmpty;
+        engine.HasSpectatorsForPerspective = viewPlayerIndex =>
+            entry.Spectators.Values.Any(value => value == viewPlayerIndex);
         entry.ReplayPath = ReplayRecorder.Open(roomId);
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
         engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
@@ -431,7 +437,14 @@ public static class GameRoomManager
             EnsureMulliganTimeout(room);
             if (idx < 0)
             {
-                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, -1, "Resync"));
+                var viewPlayerIndex = room.Spectators.TryGetValue(sessionId, out var storedViewPlayerIndex)
+                    ? storedViewPlayerIndex
+                    : 0;
+                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
+                    room.Engine.State,
+                    -1,
+                    "Resync",
+                    spectatorPlayerIndex: viewPlayerIndex));
                 return;
             }
             if (_grace.TryRemove(room.RoomId + ":" + sessionId, out var cts)) cts.Cancel();
@@ -559,7 +572,7 @@ public static class GameRoomManager
         return false;
     }
 
-    public static void AddSpectator(string roomId, string sessionId)
+    public static void AddSpectator(string roomId, string sessionId, int viewPlayerIndex = 0)
     {
         if (string.IsNullOrWhiteSpace(roomId))
         {
@@ -593,7 +606,8 @@ public static class GameRoomManager
             }
         }
 
-        r.Spectators.TryAdd(sessionId, 0);
+        var normalizedViewPlayerIndex = viewPlayerIndex == 1 ? 1 : 0;
+        r.Spectators[sessionId] = normalizedViewPlayerIndex;
         _sessionRoom[sessionId] = roomId;
         if (!_rooms.TryGetValue(roomId, out var activeRoom) || !ReferenceEquals(activeRoom, r))
         {
@@ -607,8 +621,12 @@ public static class GameRoomManager
         WebSocketBridge.BroadcastSpectatorList(r);
         EnqueueWork(r, new RoomWork("SpectateJoin", LatencyDiagnostics.Start(), () =>
         {
-            if (r.Spectators.ContainsKey(sessionId))
-                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(r.Engine.State, -1, "SpectateJoin"));
+            if (r.Spectators.TryGetValue(sessionId, out var storedViewPlayerIndex))
+                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
+                    r.Engine.State,
+                    -1,
+                    "SpectateJoin",
+                    spectatorPlayerIndex: storedViewPlayerIndex));
             return Task.CompletedTask;
         }));
     }
@@ -811,11 +829,17 @@ public static class GameRoomManager
         // 重新挂回回调（按当前 sid 发；日志/录像/动作日志均"续写"而非覆盖）
         engine.OnSendToPlayer = (idx, payload) =>
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
-        engine.OnSendToSpectators = (_, payload) =>
+        engine.OnSendToSpectators = (viewPlayerIndex, payload) =>
         {
-            foreach (var sid in entry.Spectators.Keys) WebSocketBridge.Send(sid, payload);
+            foreach (var spectator in entry.Spectators)
+            {
+                if (spectator.Value == viewPlayerIndex)
+                    WebSocketBridge.Send(spectator.Key, payload);
+            }
         };
         engine.HasSpectators = () => !entry.Spectators.IsEmpty;
+        engine.HasSpectatorsForPerspective = viewPlayerIndex =>
+            entry.Spectators.Values.Any(value => value == viewPlayerIndex);
         entry.ReplayPath   = ReplayRecorder.OpenAppend(roomId);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
         engine.OnReplay        = (entryObj) => ReplayRecorder.Append(roomId, entryObj);

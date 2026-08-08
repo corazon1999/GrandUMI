@@ -1,4 +1,4 @@
-import type { SavedDeck } from "@/types/deck";
+﻿import type { SavedDeck } from "@/types/deck";
 
 // 协议枚举 — 与 C# ProtocolEnum.cs 完全一致
 export enum ProtocolEnum {
@@ -277,6 +277,7 @@ export interface PlayerInfo {
   name: string;
   status: "idle" | "matching" | "playing" | "spectating";
   roomId?: string | null;   // 对战中玩家所在的对局房间ID，供一键观战；无对局房间时为 null
+  seatIndex?: 0 | 1 | null; // 对战中的座位，用于让一键观战保持被点击玩家为主视角
 }
 
 // 客户端 → 服务器:请求在线玩家列表;服务器 → 客户端:返回列表
@@ -632,6 +633,7 @@ export interface MsgPromptResponse extends MsgBase {
 export interface MsgSpectateRoom extends MsgBase {
   proto: "MsgSpectateRoom";
   roomId: string;
+  viewPlayerIndex?: 0 | 1;
   result?: boolean;
   logStr?: string;
 }

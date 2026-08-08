@@ -50,7 +50,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
   // 等服务端确认房间有效后再进入对战页，失败时保留弹窗并显示原因
   const handleSpectate = (p: PlayerInfo) => {
     if (!p.roomId) return;
-    HomeRequest.spectateRoom(p.roomId);
+    HomeRequest.spectateRoom(p.roomId, p.seatIndex ?? 0);
   };
 
   const handleClose = () => {

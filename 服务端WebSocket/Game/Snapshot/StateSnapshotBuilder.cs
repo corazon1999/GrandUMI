@@ -1,18 +1,30 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace GrandUMI.Game.Snapshot;
 
 /// <summary>把 GameState 编码为按视角脱敏的客户端快照。</summary>
 public static class StateSnapshotBuilder
 {
-    public sealed record SnapshotSet(object Player0, object Player1, object Spectator);
+    public sealed record SnapshotSet(object Player0, object Player1, object Spectator)
+    {
+        public object? SpectatorPlayer1 { get; init; }
+    }
 
     /// <summary>单视角构建，供重连和单个观战者加入时使用。</summary>
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
-        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null)
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
+        int spectatorPlayerIndex = 0)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
-        return BuildForViewer(state, viewerIndex, lastAction, ComputePayload(actionPayload), boards, queuedLogEvents, requestId);
+        return BuildForViewer(
+            state,
+            viewerIndex,
+            lastAction,
+            ComputePayload(actionPayload),
+            boards,
+            queuedLogEvents,
+            requestId,
+            spectatorPlayerIndex);
     }
 
     /// <summary>
@@ -20,23 +32,29 @@ public static class StateSnapshotBuilder
     /// 每个玩家只计算一次，避免原先三份快照各自重复遍历。
     /// </summary>
     public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
-        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null)
+        IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
+        bool includePlayer1Spectator = false)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId));
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, 0),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, 0),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, 0))
+        {
+            SpectatorPlayer1 = includePlayer1Spectator
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, 1)
+                : null,
+        };
     }
 
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
         PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
-        string? requestId)
+        string? requestId, int spectatorPlayerIndex)
     {
         var isSpectator = viewerIndex < 0;
-        var myIdx = isSpectator ? 0 : viewerIndex;
-        var oppIdx = isSpectator ? 1 : 1 - viewerIndex;
+        var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
+        var oppIdx = 1 - myIdx;
         var my = BuildPlayerSnapshot(state, myIdx, asSelf: !isSpectator, boards[myIdx]);
         var opponent = BuildPlayerSnapshot(state, oppIdx, asSelf: false, boards[oppIdx]);
 
@@ -101,7 +119,7 @@ public static class StateSnapshotBuilder
             reveal = state.PendingReveal is { } rv
                 ? new
                 {
-                    side = (!isSpectator && rv.OwnerIndex == myIdx) ? "my" : "opponent",
+                    side = rv.OwnerIndex == myIdx ? "my" : "opponent",
                     cardNumbers = rv.CardNumbers,
                 }
                 : null,
