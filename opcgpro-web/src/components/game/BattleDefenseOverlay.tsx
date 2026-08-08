@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
@@ -23,6 +24,14 @@ export default function BattleDefenseOverlay() {
   const opp = useGameStore((s) => s.opponent);
   const isPending = useGameStore((s) => s.isPending);
   const isDefender = useIsDefender();
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // 每次离开阻挡决策都恢复默认展开，避免下一次攻击沿用上一次的隐藏状态。
+  useEffect(() => {
+    if (phase !== "Block" || !battle || !isDefender) {
+      setIsMinimized(false);
+    }
+  }, [battle, isDefender, phase]);
 
   // 仅防守方、战斗进行中、且处于阻挡步骤时显示
   // 用 isDefender（攻击者属于对手）而非 !currentTurn，兼容 GM「对手领袖攻击」场景
@@ -64,60 +73,83 @@ export default function BattleDefenseOverlay() {
   );
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-3 border-t border-sky-200/20 bg-slate-950/95 px-6 py-4 shadow-2xl shadow-black/60"
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 240, damping: 28 }}
-      >
-        <div className="flex items-center gap-4">
-          <span className="rounded-full bg-red-600/80 px-3 py-1 text-sm font-black text-white">
-            阻挡步骤
-          </span>
-          <span className="text-sm font-bold text-slate-200">
-            {attackerName} 攻击 {battle.targetIsLeader ? "你的领袖" : targetName}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 text-sm font-black">
-          <span className="text-red-300">攻击 {attackerPower}</span>
-          <span className="text-slate-500">vs</span>
-          <span className="text-sky-300">防御 {targetPower}</span>
-          <span className={willLose ? "text-red-400" : "text-green-400"}>
-            {willLose ? "（当前会被击败）" : "（当前可挡住）"}
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          {blockers.length > 0 ? (
-            <div className="flex flex-wrap justify-center gap-2">
-              {blockers.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => GameRequest.declareBlocker(b.id)}
-                  className="rounded-md ring-2 ring-transparent transition hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CardItem card={getCard(b.number) ?? null} size="sm" isTapped={b.isTapped} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs text-slate-400">没有可用的【阻挡者】</span>
-          )}
+    <AnimatePresence mode="wait">
+      {isMinimized ? (
+        <motion.button
+          key="restore-block-panel"
+          type="button"
+          onClick={() => setIsMinimized(false)}
+          className="fixed bottom-4 right-4 z-50 rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/30 transition-colors hover:bg-slate-700"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 20, opacity: 0 }}
+        >
+          ↑ 展开阻挡面板
+        </motion.button>
+      ) : (
+        <motion.div
+          key="block-panel"
+          className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-3 border-t border-sky-200/20 bg-slate-950/95 px-6 py-4 shadow-2xl shadow-black/60"
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", stiffness: 240, damping: 28 }}
+        >
           <button
             type="button"
-            disabled={isPending}
-            onClick={() => GameRequest.passBlock()}
-            className="rounded-md bg-slate-700 px-6 py-2 text-sm font-bold text-white transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setIsMinimized(true)}
+            className="absolute right-4 top-4 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 ring-1 ring-white/20 transition-colors hover:bg-slate-700 hover:text-white"
           >
-            不阻挡
+            隐藏 ↓
           </button>
-        </div>
-      </motion.div>
+
+          <div className="flex items-center gap-4">
+            <span className="rounded-full bg-red-600/80 px-3 py-1 text-sm font-black text-white">
+              阻挡步骤
+            </span>
+            <span className="text-sm font-bold text-slate-200">
+              {attackerName} 攻击 {battle.targetIsLeader ? "你的领袖" : targetName}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 text-sm font-black">
+            <span className="text-red-300">攻击 {attackerPower}</span>
+            <span className="text-slate-500">vs</span>
+            <span className="text-sky-300">防御 {targetPower}</span>
+            <span className={willLose ? "text-red-400" : "text-green-400"}>
+              {willLose ? "（当前会被击败）" : "（当前可挡住）"}
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            {blockers.length > 0 ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                {blockers.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => GameRequest.declareBlocker(b.id)}
+                    className="rounded-md ring-2 ring-transparent transition hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <CardItem card={getCard(b.number) ?? null} size="sm" isTapped={b.isTapped} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs text-slate-400">没有可用的【阻挡者】</span>
+            )}
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => GameRequest.passBlock()}
+              className="rounded-md bg-slate-700 px-6 py-2 text-sm font-bold text-white transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              不阻挡
+            </button>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }
