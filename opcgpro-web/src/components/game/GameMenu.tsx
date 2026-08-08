@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
 import Modal from "@/components/ui/Modal";
 
@@ -11,7 +10,6 @@ import Modal from "@/components/ui/Modal";
  */
 export default function GameMenu() {
   const [open, setOpen] = useState(false);
-  const isPending = useGameStore((s) => s.isPending);
 
   const handleSurrender = () => {
     setOpen(false);
@@ -22,8 +20,7 @@ export default function GameMenu() {
     <>
       <button
         onClick={() => setOpen(true)}
-        disabled={isPending}
-        className="absolute right-16 top-4 z-20 h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+        className="fixed right-16 top-4 z-[70] h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700"
         aria-label="打开游戏菜单"
       >
         ≡

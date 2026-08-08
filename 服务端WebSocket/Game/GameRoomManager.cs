@@ -40,7 +40,11 @@ public static class GameRoomManager
 
     /// <summary>roomId → 调度手牌超时任务；实际结算仍排入房间串行队列。</summary>
     private static readonly ConcurrentDictionary<string, MulliganTimeout> _mulliganTimeouts = new();
-    private sealed record MulliganTimeout(DateTime DeadlineUtc, CancellationTokenSource Cancellation);
+    private sealed record MulliganTimeout(
+        DateTime DeadlineUtc,
+        CancellationTokenSource Cancellation,
+        CancellationToken Token,
+        int RetryAttempt);
 
     public class RoomEntry
     {
@@ -272,7 +276,7 @@ public static class GameRoomManager
     }
 
     /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
-    private static void EnsureMulliganTimeout(RoomEntry room)
+    private static void EnsureMulliganTimeout(RoomEntry room, int retryAttempt = 0)
     {
         var deadline = room.Engine.State.MulliganDeadlineUtc;
         if (deadline is null || room.Engine.State.MulliganBothDone)
@@ -285,7 +289,8 @@ public static class GameRoomManager
             && current.DeadlineUtc == deadline.Value)
             return;
 
-        var next = new MulliganTimeout(deadline.Value, new CancellationTokenSource());
+        var cancellation = new CancellationTokenSource();
+        var next = new MulliganTimeout(deadline.Value, cancellation, cancellation.Token, retryAttempt);
         while (true)
         {
             if (_mulliganTimeouts.TryGetValue(room.RoomId, out current))
@@ -313,30 +318,63 @@ public static class GameRoomManager
     {
         _ = Task.Run(async () =>
         {
-            // 系统时钟校准或计时器精度可能让 Task.Delay 提前极短时间返回；
-            // 必须重新核对服务端权威截止时间，避免唯一一次超时任务被提前消费。
-            while (true)
+            try
             {
-                var delay = timer.DeadlineUtc - DateTime.UtcNow;
-                if (delay <= TimeSpan.Zero) break;
-                try { await Task.Delay(delay, timer.Cancellation.Token); }
-                catch (OperationCanceledException) { return; }
+                // 系统时钟校准或计时器精度可能让 Task.Delay 提前极短时间返回；
+                // 必须重新核对服务端权威截止时间，避免唯一一次超时任务被提前消费。
+                while (true)
+                {
+                    var delay = timer.DeadlineUtc - DateTime.UtcNow;
+                    if (delay <= TimeSpan.Zero) break;
+                    await Task.Delay(delay, timer.Token);
+                }
+
+                if (timer.Token.IsCancellationRequested) return;
+                var active = GetRoom(room.RoomId);
+                if (active is null || !ReferenceEquals(active, room)) return;
+
+                // 超时结算属于不可丢失的房间控制动作。普通 TryWrite 在队列暂满时会返回 false，
+                // 如果忽略该结果，客户端就会永久停在“剩余 0 秒”。这里等待到成功入队或房间关闭。
+                await EnqueueCriticalWorkAsync(active, new RoomWork("MulliganTimeout", LatencyDiagnostics.Start(), async () =>
+                {
+                    if (active.Engine.State.MulliganDeadlineUtc == timer.DeadlineUtc)
+                        await ResolveExpiredMulliganAsync(active, DateTime.UtcNow);
+                    EnsureMulliganTimeout(active);
+                }), timer.Token);
             }
-
-            if (timer.Cancellation.IsCancellationRequested) return;
-            var active = GetRoom(room.RoomId);
-            if (active is null || !ReferenceEquals(active, room)) return;
-
-            // 超时结算属于不可丢失的房间控制动作。普通 TryWrite 在队列暂满时会返回 false，
-            // 如果忽略该结果，客户端就会永久停在“剩余 0 秒”。这里等待到成功入队或房间关闭。
-            await EnqueueCriticalWorkAsync(active, new RoomWork("MulliganTimeout", LatencyDiagnostics.Start(), async () =>
+            catch (OperationCanceledException) when (timer.Token.IsCancellationRequested)
             {
-                if (active.Engine.State.MulliganDeadlineUtc == timer.DeadlineUtc)
-                    await ResolveExpiredMulliganAsync(active, DateTime.UtcNow);
-                EnsureMulliganTimeout(active);
-            }), timer.Cancellation.Token);
+                // 房间已结束、截止时间已更换或调度已正常完成。
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[调度超时] 房间 {room.RoomId} 第 {timer.RetryAttempt + 1} 次计时任务异常: {ex.Message}");
+                if (!TryRemoveMulliganTimeout(room.RoomId, timer)) return;
+
+                timer.Cancellation.Dispose();
+                var active = GetRoom(room.RoomId);
+                if (active is null
+                    || !ReferenceEquals(active, room)
+                    || active.Engine.State.MulliganDeadlineUtc != timer.DeadlineUtc
+                    || active.Engine.State.MulliganBothDone)
+                    return;
+
+                // 避免瞬时运行时异常把唯一一次超时结算永久吞掉；有限重试防止持续故障形成忙循环。
+                if (timer.RetryAttempt >= 2) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * (timer.RetryAttempt + 1)));
+                var retryRoom = GetRoom(room.RoomId);
+                if (retryRoom is not null
+                    && ReferenceEquals(retryRoom, room)
+                    && retryRoom.Engine.State.MulliganDeadlineUtc == timer.DeadlineUtc
+                    && !retryRoom.Engine.State.MulliganBothDone)
+                    EnsureMulliganTimeout(retryRoom, timer.RetryAttempt + 1);
+            }
         });
     }
+
+    private static bool TryRemoveMulliganTimeout(string roomId, MulliganTimeout expected)
+        => ((ICollection<KeyValuePair<string, MulliganTimeout>>)_mulliganTimeouts)
+            .Remove(new KeyValuePair<string, MulliganTimeout>(roomId, expected));
 
     /// <summary>补做已过期的调度选择；供计时器、刷新取状态和账号重绑共同复用。</summary>
     private static async Task<IReadOnlyList<int>> ResolveExpiredMulliganAsync(RoomEntry room, DateTime utcNow)
@@ -369,6 +407,13 @@ public static class GameRoomManager
         if (room.ActionQueue.Writer.TryWrite(work)) return true;
         Interlocked.Decrement(ref room.ActionQueueDepth);
         return false;
+    }
+
+    /// <summary>状态恢复属于客户端脱困入口；队列暂满时等待写入，不能像普通操作一样静默丢弃。</summary>
+    private static void EnqueueRecoveryWork(RoomEntry room, RoomWork work)
+    {
+        if (EnqueueWork(room, work)) return;
+        _ = EnqueueCriticalWorkAsync(room, work, CancellationToken.None);
     }
 
     private static async Task<bool> EnqueueCriticalWorkAsync(
@@ -431,7 +476,7 @@ public static class GameRoomManager
             return;
         }
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
-        EnqueueWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
+        EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
             await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
             EnsureMulliganTimeout(room);
@@ -557,7 +602,7 @@ public static class GameRoomManager
                     r.Engine.OnSendToPlayer = (idx, payload) =>
                         WebSocketBridge.Send(r.PlayerSessionIds[idx], payload);
                     var playerIndex = i;
-                    EnqueueWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), async () =>
+                    EnqueueRecoveryWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), async () =>
                     {
                         await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
                         EnsureMulliganTimeout(r);

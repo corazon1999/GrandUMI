@@ -1,3 +1,4 @@
+using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Game;
 using Xunit;
@@ -58,6 +59,41 @@ public class MulliganRecoveryTests
             await WaitUntilAsync(() => room.Engine.State.MulliganBothDone);
 
             Assert.Same(room, GameRoomManager.GetRoomBySession(newSession));
+            Assert.Equal(1, room.Engine.State.TurnCount);
+            Assert.Null(room.Engine.State.MulliganDeadlineUtc);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 单方已完成调度_取状态会为超时对手自动保留并进入第一回合()
+    {
+        TestScene.New();
+        var suffix = Guid.NewGuid().ToString("N");
+        var player0Session = $"mulligan-one-sided-s0-{suffix}";
+        var player1Session = $"mulligan-one-sided-s1-{suffix}";
+        var room = GameRoomManager.CreateRoom(
+            player0Session, $"mulligan-one-sided-a-{suffix}", BuildLegalDeck("OP15-001"),
+            player1Session, $"mulligan-one-sided-b-{suffix}", BuildLegalDeck("OP15-001"),
+            p0First: true);
+
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = true }));
+            Assert.True(room.Engine.State.Players[0].MulliganDone);
+            Assert.False(room.Engine.State.Players[1].MulliganDone);
+            Assert.False(room.Engine.State.Players[0].HasReDraw);
+
+            room.Engine.State.MulliganDeadlineUtc = DateTime.UtcNow.AddSeconds(-1);
+            GameRoomManager.HandleRequestState(player0Session);
+            await WaitUntilAsync(() => room.Engine.State.MulliganBothDone);
+
+            Assert.True(room.Engine.State.Players[1].MulliganDone);
+            Assert.True(room.Engine.State.Players[1].HasReDraw);
+            Assert.False(room.Engine.State.Players[0].HasReDraw);
             Assert.Equal(1, room.Engine.State.TurnCount);
             Assert.Null(room.Engine.State.MulliganDeadlineUtc);
         }
