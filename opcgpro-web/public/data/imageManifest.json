@@ -9803,8 +9803,11 @@
   "OP17-008": [
     "/cards/op17/OP17-008.png"
   ],
+  "OP17-009": [
+    "/cards/op17/OP17-009.png?v=51be5e495e63"
+  ],
   "OP17-010": [
-    "/cards/op17/OP17-010.png"
+    "/cards/op17/OP17-010.png?v=0f3cc775798a"
   ],
   "OP17-011": [
     "/cards/op17/OP17-011.png?v=d3707ea9a4f"
@@ -9815,17 +9818,29 @@
   "OP17-013": [
     "/cards/op17/OP17-013.png"
   ],
+  "OP17-014": [
+    "/cards/op17/OP17-014.png"
+  ],
   "OP17-015": [
     "/cards/op17/OP17-015.png"
   ],
+  "OP17-016": [
+    "/cards/op17/OP17-016.png"
+  ],
+  "OP17-017": [
+    "/cards/op17/OP17-017.png?v=6d2855375eaa"
+  ],
   "OP17-018": [
-    "/cards/op17/OP17-018.png"
+    "/cards/op17/OP17-018.png?v=4492564aaa22"
   ],
   "OP17-019": [
     "/cards/op17/OP17-019.png"
   ],
   "OP17-020": [
     "/cards/op17/OP17-020.png"
+  ],
+  "OP17-021": [
+    "/cards/op17/OP17-021.png"
   ],
   "OP17-022": [
     "/cards/op17/OP17-022.png"
@@ -9963,13 +9978,16 @@
     "/cards/op17/OP17-066.png"
   ],
   "OP17-067": [
-    "/cards/op17/OP17-067.png"
+    "/cards/op17/OP17-067.png?v=6a0c49498d4f"
   ],
   "OP17-068": [
-    "/cards/op17/OP17-068.png"
+    "/cards/op17/OP17-068.png?v=eb5d0342667b"
+  ],
+  "OP17-069": [
+    "/cards/op17/OP17-069.png?v=9175155313f3"
   ],
   "OP17-070": [
-    "/cards/op17/OP17-070.png"
+    "/cards/op17/OP17-070.png?v=db92ce172410"
   ],
   "OP17-071": [
     "/cards/op17/OP17-071.png"
@@ -9978,10 +9996,13 @@
     "/cards/op17/OP17-072.jpg"
   ],
   "OP17-073": [
-    "/cards/op17/OP17-073.png"
+    "/cards/op17/OP17-073.png?v=ff692d3d9f0d"
   ],
   "OP17-074": [
     "/cards/op17/OP17-074.png"
+  ],
+  "OP17-075": [
+    "/cards/op17/OP17-075.jpg?v=51028e0e57dc"
   ],
   "OP17-076": [
     "/cards/op17/OP17-076.png"
@@ -10019,6 +10040,9 @@
   "OP17-087": [
     "/cards/op17/OP17-087.png"
   ],
+  "OP17-088": [
+    "/cards/op17/OP17-088.png?v=4f0e2fa6f7bc"
+  ],
   "OP17-089": [
     "/cards/op17/OP17-089.png"
   ],
@@ -10040,11 +10064,20 @@
   "OP17-095": [
     "/cards/op17/OP17-095.png"
   ],
+  "OP17-096": [
+    "/cards/op17/OP17-096.png"
+  ],
+  "OP17-097": [
+    "/cards/op17/OP17-097.png?v=4e62bb0218df"
+  ],
   "OP17-098": [
     "/cards/op17/OP17-098.png"
   ],
   "OP17-099": [
     "/cards/op17/OP17-099.png"
+  ],
+  "OP17-100": [
+    "/cards/op17/OP17-100.png"
   ],
   "OP17-101": [
     "/cards/op17/OP17-101.png"

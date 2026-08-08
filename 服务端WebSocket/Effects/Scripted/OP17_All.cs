@@ -265,6 +265,7 @@ internal static class OP17Effects
             case "OP17-005": C005(c); break;
             case "OP17-007": await C007(c); break;
             case "OP17-008": C008(c); break;
+            case "OP17-009": await C009(c); break;
             case "OP17-010": await C010(c); break;
             case "OP17-011": await C011(c); break;
             case "OP17-012": await C012(c); break;
@@ -322,11 +323,12 @@ internal static class OP17Effects
             case "OP17-066": await C066(c); break;
             case "OP17-067": await C067(c); break;
             case "OP17-068": await C068(c); break;
-            case "OP17-070": await C070(c); break;
+            case "OP17-069": await C069(c); break;
             case "OP17-071": await C071(c); break;
             case "OP17-072": await C072(c); break;
             case "OP17-073": await C073(c); break;
             case "OP17-074": C074(c); break;
+            case "OP17-075": await C075(c); break;
             case "OP17-076": await C076(c); break;
             case "OP17-077": await C077(c); break;
             case "OP17-078": await C078(c); break;
@@ -347,6 +349,7 @@ internal static class OP17Effects
             case "OP17-094": C094(c); break;
             case "OP17-095": await C095(c); break;
             case "OP17-096": await C096(c); break;
+            case "OP17-097": await C097(c); break;
             case "OP17-098": await C098(c); break;
             case "OP17-099": await C099(c); break;
             case "OP17-101": await C101(c); break;
@@ -427,13 +430,27 @@ internal static class OP17Effects
             AtomicOps.SetOriginalPowerUntilOppEnd(Me(c).Leader, 8000, c.OwnerIndex);
     }
 
-    private static async Task C010(EffectContext c)
+    private static async Task C009(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         int owner = c.OwnerIndex;
         RegisterContinuous(c, SelfPower(c, 3000, s => s.CurrentTurnPlayer != owner));
         var pick = await ChooseOppChars(c, x => x.Info.Power <= 2000, 1, "选择原本力量≤2000的角色KO");
         await KOByEffect(c, pick);
+    }
+
+    private static async Task C010(EffectContext c)
+    {
+        if (c.Trigger != EffectTrigger.ActivatedMain || !Me(c).Characters.Contains(c.Source)) return;
+        string key = $"OP17-010-act:{c.Source.Id}";
+        if (Me(c).TurnOnceUsed.Contains(key)
+            || !Opp(c).Characters.Any(x => c.State.CurrentPowerOf(1 - c.OwnerIndex, x) >= 10000)
+            || Me(c).Characters.Any(x => x.Id != c.Source.Id && x.MatchesName("佛萨"))) return;
+
+        AtomicOps.GiveKeyword(c.Source, "阻挡者", KeywordDuration.UntilNextOpponentEndPhase, c.OwnerIndex);
+        AtomicOps.AddPowerUntilOppEnd(c.Source, 2000, c.OwnerIndex);
+        Me(c).TurnOnceUsed.Add(key);
+        await Task.CompletedTask;
     }
 
     private static async Task C011(EffectContext c)
@@ -463,7 +480,7 @@ internal static class OP17Effects
         await KOByEffect(c, await ChooseOppChars(c, x => x.Info.Power <= 2000, 2, "选择最多2张原本力量≤2000的角色KO"));
     }
 
-    private static async Task C017(EffectContext c)
+    private static async Task C018(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.EventMain)
         {
@@ -511,7 +528,7 @@ internal static class OP17Effects
             await PlaySelfFromTrash(c);
     }
 
-    private static async Task C018(EffectContext c)
+    private static async Task C017(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.EventCounter) return;
         var own = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择《白胡子海盗团》领袖或角色，本次战斗力量+2000",
@@ -1099,20 +1116,29 @@ internal static class OP17Effects
 
     private static async Task C067(EffectContext c)
     {
+        if (c.Trigger != EffectTrigger.OnEnterField
+            || !Me(c).Characters.Any(x => c.State.CurrentCostOf(x) >= 10)
+            || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
+        var target = await ChooseOppChars(c, x => !x.IsTapped, 1, "选择对方最多1张角色转为休息状态");
+        if (target.Count > 0) AtomicOps.RestCard(target[0]);
+    }
+
+    private static async Task C068(EffectContext c)
+    {
         if (c.Trigger != EffectTrigger.OnAttackDeclare || !LeaderHas(c, "百兽海盗团") || Me(c).Hand.Count < 2) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃2张手牌，从咚!!卡组追加最多2张休息咚？")
             || !await DiscardOwn(c, 2, "选择丢弃2张手牌")) return;
         AtomicOps.RefreshDonFromDeck(Me(c), 2, DonState.Rest);
     }
 
-    private static async Task C068(EffectContext c)
+    private static async Task C069(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 1) || !LeaderHas(c, "百兽海盗团")) return;
         var pick = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-2000");
         if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -2000);
     }
 
-    private static async Task C070(EffectContext c)
+    private static async Task C073(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !LeaderHas(c, "百兽海盗团") || Me(c).Hand.Count == 0) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃1张手牌，从咚!!卡组追加1张活跃咚？")
@@ -1139,7 +1165,7 @@ internal static class OP17Effects
         Me(c).TurnOnceUsed.Add(key);
     }
 
-    private static async Task C073(EffectContext c)
+    private static async Task C075(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 2)) return;
         if (c.Engine is not null) AtomicOps.OpponentDiscardRandom(c.Engine, 1 - c.OwnerIndex, 1);
@@ -1381,6 +1407,19 @@ internal static class OP17Effects
         var target = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择本次战斗力量+4000的卡牌",
             OwnLeaderAndCharacters(c), 0, 1);
         if (target.Count > 0) AtomicOps.AddPowerThisBattle(target[0], 4000);
+    }
+
+    private static async Task C097(EffectContext c)
+    {
+        if (c.Trigger == EffectTrigger.EventCounter)
+        {
+            AtomicOps.AddPowerThisBattle(Me(c).Leader, 3000);
+            return;
+        }
+        if (c.Trigger != EffectTrigger.EventMain) return;
+        foreach (var character in Opp(c).Characters)
+            AtomicOps.AddCostModifier(character, -1, KeywordDuration.ThisTurn);
+        await Task.CompletedTask;
     }
 
     private static async Task C098(EffectContext c)
@@ -1662,6 +1701,7 @@ public sealed class OP17_004_Effect : OP17CardEffect { protected override string
 public sealed class OP17_005_Effect : OP17CardEffect { protected override string Number => "OP17-005"; }
 public sealed class OP17_007_Effect : OP17CardEffect { protected override string Number => "OP17-007"; }
 public sealed class OP17_008_Effect : OP17CardEffect { protected override string Number => "OP17-008"; }
+public sealed class OP17_009_Effect : OP17CardEffect { protected override string Number => "OP17-009"; }
 public sealed class OP17_010_Effect : OP17CardEffect { protected override string Number => "OP17-010"; }
 public sealed class OP17_011_Effect : OP17CardEffect { protected override string Number => "OP17-011"; }
 public sealed class OP17_012_Effect : OP17CardEffect { protected override string Number => "OP17-012"; }
@@ -1719,11 +1759,12 @@ public sealed class OP17_065_Effect : OP17CardEffect { protected override string
 public sealed class OP17_066_Effect : OP17CardEffect { protected override string Number => "OP17-066"; }
 public sealed class OP17_067_Effect : OP17CardEffect { protected override string Number => "OP17-067"; }
 public sealed class OP17_068_Effect : OP17CardEffect { protected override string Number => "OP17-068"; }
-public sealed class OP17_070_Effect : OP17CardEffect { protected override string Number => "OP17-070"; }
+public sealed class OP17_069_Effect : OP17CardEffect { protected override string Number => "OP17-069"; }
 public sealed class OP17_071_Effect : OP17CardEffect { protected override string Number => "OP17-071"; }
 public sealed class OP17_072_Effect : OP17CardEffect { protected override string Number => "OP17-072"; }
 public sealed class OP17_073_Effect : OP17CardEffect { protected override string Number => "OP17-073"; }
 public sealed class OP17_074_Effect : OP17CardEffect { protected override string Number => "OP17-074"; }
+public sealed class OP17_075_Effect : OP17CardEffect { protected override string Number => "OP17-075"; }
 public sealed class OP17_076_Effect : OP17CardEffect { protected override string Number => "OP17-076"; }
 public sealed class OP17_077_Effect : OP17CardEffect { protected override string Number => "OP17-077"; }
 public sealed class OP17_078_Effect : OP17CardEffect { protected override string Number => "OP17-078"; }
@@ -1744,6 +1785,7 @@ public sealed class OP17_093_Effect : OP17CardEffect { protected override string
 public sealed class OP17_094_Effect : OP17CardEffect { protected override string Number => "OP17-094"; }
 public sealed class OP17_095_Effect : OP17CardEffect { protected override string Number => "OP17-095"; }
 public sealed class OP17_096_Effect : OP17CardEffect { protected override string Number => "OP17-096"; }
+public sealed class OP17_097_Effect : OP17CardEffect { protected override string Number => "OP17-097"; }
 public sealed class OP17_098_Effect : OP17CardEffect { protected override string Number => "OP17-098"; }
 public sealed class OP17_099_Effect : OP17CardEffect { protected override string Number => "OP17-099"; }
 public sealed class OP17_101_Effect : OP17CardEffect { protected override string Number => "OP17-101"; }
