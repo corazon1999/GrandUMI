@@ -78,6 +78,31 @@ public class OP08_OP14RegressionTests
     }
 
     [Fact]
+    public async Task OP14_027_OpponentTurn_ReducesOnlyOpponentCharactersPower()
+    {
+        var state = TestScene.New()
+            .MyCharacter("OP15-050")
+            .OppCharacter("OP15-051")
+            .Build();
+        var source = new CardInstance { Info = CardDatabase.Get("OP14-027")!, IsTapped = true };
+        state.Players[0].Characters.Add(source);
+        state.CurrentTurnPlayer = 1;
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            source,
+            EffectTrigger.OnEnterField,
+            new MockPromptService());
+
+        Assert.Equal(0, state.ContinuousPowerBonus(0, state.Players[0].Leader));
+        Assert.Equal(0, state.ContinuousPowerBonus(1, state.Players[1].Leader));
+        Assert.Equal(0, state.ContinuousPowerBonus(0, state.Players[0].Characters[0]));
+        Assert.Equal(0, state.ContinuousPowerBonus(0, source));
+        Assert.Equal(-1000, state.ContinuousPowerBonus(1, state.Players[1].Characters[0]));
+    }
+
+    [Fact]
     public async Task OP08_036_LifeTrigger_RestsSelectedOpponentCharacter()
     {
         var state = TestScene.New()

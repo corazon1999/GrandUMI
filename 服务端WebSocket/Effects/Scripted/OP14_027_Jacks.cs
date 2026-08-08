@@ -40,7 +40,10 @@ public class OP14_027_Jacks : IScriptedEffect
                 Scope = new ContinuousScope { Side = 1, IncludeLeader = false, IncludeCharacters = true },
                 PowerDelta = -1000,
                 Predicate = (s, sideIdx, card) =>
-                    s.CurrentTurnPlayer != owner && self.IsTapped,
+                    s.CurrentTurnPlayer != owner
+                    && self.IsTapped
+                    && sideIdx == 1 - owner
+                    && s.Players[sideIdx].Characters.Contains(card),
             });
             return;
         }
