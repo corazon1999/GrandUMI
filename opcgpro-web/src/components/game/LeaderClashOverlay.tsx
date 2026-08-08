@@ -3,12 +3,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { getCard } from "@/data/CardLoader";
+import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
 const IMPACT_SHARDS = [-78, -52, -29, -11, 14, 33, 57, 82, 108, 137, 164, 191];
+
+interface LeaderIntroQuoteData {
+  fallback: string;
+  byName: Record<string, string>;
+  byNumber: Record<string, string>;
+}
+
+const INTRO_QUOTES = leaderIntroQuotes as LeaderIntroQuoteData;
+
+function getLeaderIntroQuote(leaderNumber: string, leaderName: string): string {
+  return INTRO_QUOTES.byNumber[leaderNumber]
+    ?? INTRO_QUOTES.byName[leaderName]
+    ?? INTRO_QUOTES.fallback;
+}
 
 interface Props {
   ready: boolean;
@@ -20,6 +35,7 @@ interface FighterCardProps {
   playerName: string;
   leaderName: string;
   leaderNumber: string;
+  quote: string;
   sprite: string;
   playing: boolean;
   reducedMotion: boolean;
@@ -30,6 +46,7 @@ function FighterCard({
   playerName,
   leaderName,
   leaderNumber,
+  quote,
   sprite,
   playing,
   reducedMotion,
@@ -122,6 +139,25 @@ function FighterCard({
         </p>
         <p className="text-[clamp(9px,1vw,12px)] font-bold tracking-wider text-white/55">{leaderNumber}</p>
       </motion.div>
+
+      <motion.blockquote
+        className={`relative mt-3 w-[clamp(150px,26vw,320px)] rounded-xl border px-3 py-2 text-[clamp(10px,1.35vw,15px)] font-bold leading-relaxed text-white shadow-xl backdrop-blur-md ${
+          isLeft
+            ? "border-cyan-200/35 bg-cyan-950/75 shadow-cyan-950/50"
+            : "border-orange-200/35 bg-orange-950/75 shadow-orange-950/50"
+        }`}
+        initial={{ opacity: 0, y: 10, scale: 0.96 }}
+        animate={playing ? { opacity: 1, y: 0, scale: 1 } : undefined}
+        transition={{
+          delay: reducedMotion ? (isLeft ? 0.18 : 0.55) : (isLeft ? 1.5 : 2.35),
+          duration: reducedMotion ? 0.16 : 0.32,
+          ease: "easeOut",
+        }}
+      >
+        <span className={isLeft ? "text-cyan-200" : "text-orange-200"} aria-hidden="true">“</span>
+        {quote}
+        <span className={isLeft ? "text-cyan-200" : "text-orange-200"} aria-hidden="true">”</span>
+      </motion.blockquote>
     </motion.article>
   );
 }
@@ -144,6 +180,10 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const opponentLeader = getCard(opponentLeaderNumber);
   const mySprite = myLeader?.sprite || CARD_BACK_SRC;
   const opponentSprite = opponentLeader?.sprite || CARD_BACK_SRC;
+  const myLeaderName = myLeader?.name || myLeaderNumber;
+  const opponentLeaderName = opponentLeader?.name || opponentLeaderNumber;
+  const myQuote = getLeaderIntroQuote(myLeaderNumber, myLeaderName);
+  const opponentQuote = getLeaderIntroQuote(opponentLeaderNumber, opponentLeaderName);
 
   const introKey = useMemo(() => {
     if (!myLeaderId || !opponentLeaderId) return "";
@@ -226,7 +266,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
 
   useEffect(() => {
     if (phase !== "playing") return;
-    const timer = window.setTimeout(() => setPhase("exiting"), reducedMotion ? 620 : 3000);
+    const timer = window.setTimeout(() => setPhase("exiting"), reducedMotion ? 2800 : 4800);
     return () => window.clearTimeout(timer);
   }, [phase, reducedMotion]);
 
@@ -321,8 +361,9 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
           <FighterCard
             side="left"
             playerName={myName}
-            leaderName={myLeader?.name || myLeaderNumber}
+            leaderName={myLeaderName}
             leaderNumber={myLeaderNumber}
+            quote={myQuote}
             sprite={mySprite}
             playing={playing}
             reducedMotion={reducedMotion}
@@ -330,8 +371,9 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
           <FighterCard
             side="right"
             playerName={opponentName}
-            leaderName={opponentLeader?.name || opponentLeaderNumber}
+            leaderName={opponentLeaderName}
             leaderNumber={opponentLeaderNumber}
+            quote={opponentQuote}
             sprite={opponentSprite}
             playing={playing}
             reducedMotion={reducedMotion}
