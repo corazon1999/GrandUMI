@@ -175,6 +175,8 @@ public static class GameRoomManager
 
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
+        WebSocketBridge.OnGameChatParticipantJoined(p0Sid);
+        WebSocketBridge.OnGameChatParticipantJoined(p1Sid);
         _sessionRoom[p0Sid] = roomId;
         _sessionRoom[p1Sid] = roomId;
         WebSocketBridge.BroadcastSpectatorList(entry);
@@ -600,6 +602,7 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "对局刚刚结束" });
             return;
         }
+        WebSocketBridge.OnGameChatParticipantJoined(sessionId);
         WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = true, roomId });
         WebSocketBridge.BroadcastSpectatorList(r);
         EnqueueWork(r, new RoomWork("SpectateJoin", LatencyDiagnostics.Start(), () =>
@@ -638,12 +641,15 @@ public static class GameRoomManager
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
+            WebSocketBridge.OnGameRoomClosed(
+                r.PlayerSessionIds,
+                r.Spectators.Keys,
+                preservePostGameChat: r.Engine.State.IsGameOver);
             RoomDirectory.Unregister(roomId);
             CancelMulliganTimeout(roomId);
             r.ActionQueue.Writer.TryComplete();
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
-            WebSocketBridge.OnGameRoomClosed(r.PlayerSessionIds);
             r.Engine.RecordMatchLog("match_end", -1, new
             {
                 winnerIndex = r.Engine.State.WinnerIndex,

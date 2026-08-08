@@ -6,7 +6,7 @@
  */
 
 import { NetManager } from "./NetManager";
-import type { MsgBase, MsgGameAction, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
+import type { MsgBase, MsgGameAction, MsgLeaveGameChat, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 
 type PendingLatency = { requestId: string; action: string; startedAt: number };
@@ -172,5 +172,10 @@ export const GameRequest = {
     const t = text.trim();
     if (!t) return;
     NetManager.send({ proto: "MsgGameChat", Text: t.slice(0, 100), Code: code ?? null } as unknown as MsgBase);
+  },
+
+  /** 返回大厅时退出上一场对局的赛后聊天组。 */
+  leaveGameChat: () => {
+    NetManager.send({ proto: "MsgLeaveGameChat" } as MsgLeaveGameChat);
   },
 };

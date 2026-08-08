@@ -116,7 +116,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-3 left-3 z-40 flex flex-col items-start gap-2 max-md:bottom-2 max-md:left-2">
+    <div className="pointer-events-none fixed bottom-3 left-3 z-50 flex flex-col items-start gap-2 max-md:bottom-2 max-md:left-2">
       {/* 关闭时的新消息冒泡 */}
       {!open && toast && (
         <div className="pointer-events-none max-w-[220px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15">

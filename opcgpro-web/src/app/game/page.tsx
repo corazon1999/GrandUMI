@@ -20,6 +20,7 @@ import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
 import { useGameInit } from "@/hooks/useGameInit";
 import { HomeRequest } from "@/net/HomeProtocol";
+import { GameRequest } from "@/net/GameRequest";
 
 export default function GamePage() {
   const router = useRouter();
@@ -57,6 +58,7 @@ export default function GamePage() {
   }, [isPlayback, playback]);
 
   const returnToHome = () => {
+    GameRequest.leaveGameChat();
     if (isObserver) HomeRequest.leaveSpectate();
     useGameStore.getState().resetGame();
     useGameStore.getState().setMode("Player");

@@ -47,6 +47,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string> FriendlyByAccount = new(StringComparer.OrdinalIgnoreCase); // account → roomId
     private static readonly ConcurrentDictionary<string, CancellationTokenSource> FriendlyDisconnectGrace = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> GameChatAt = new(); // sessionId → 上次局内聊天时间(限频防刷屏)
+    private static readonly PostGameChatRegistry PostGameChats = new(TimeSpan.FromMinutes(30));
     private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
     private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
@@ -174,6 +175,7 @@ public static class WebSocketBridge
         // 对局中的玩家断开 → 进入 90s 宽限期（M1）
         GameOpponent.TryRemove(session.SessionId, out _);
         GameChatAt.TryRemove(session.SessionId, out _);
+        PostGameChats.Leave(session.SessionId);
         CleanupInvites(session.SessionId);
         if (session.Account is not null && wasCurrentAccountSession)
             HandleFriendlyDisconnect(session.Account);
@@ -241,6 +243,7 @@ public static class WebSocketBridge
             case "MsgSurrender":   OnSurrender(session);         break;
             case "MsgChatMsg":     OnChatMsg(session, msg);      break;
             case "MsgGameChat":    OnGameChat(session, msg);     break;
+            case "MsgLeaveGameChat": OnLeaveGameChat(session);   break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -1652,6 +1655,7 @@ public static class WebSocketBridge
     /// <summary>MsgLeaveSpectate — 主动退出观战</summary>
     private static void OnLeaveSpectate(WsSession s)
     {
+        PostGameChats.Leave(s.SessionId);
         GameRoomManager.RemoveSpectator(s.SessionId);
     }
 
@@ -1721,7 +1725,20 @@ public static class WebSocketBridge
     private static void OnGameChat(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var room = GameRoomManager.GetRoomBySession(s.SessionId);
-        if (room is null) return;
+        string[] playerSessionIds;
+        string[] recipients;
+        if (room is not null)
+        {
+            playerSessionIds = room.PlayerSessionIds;
+            recipients = room.PlayerSessionIds.Concat(room.Spectators.Keys).Distinct(StringComparer.Ordinal).ToArray();
+        }
+        else
+        {
+            var audience = PostGameChats.GetAudience(s.SessionId);
+            if (audience is null) return;
+            playerSessionIds = audience.PlayerSessionIds;
+            recipients = audience.RecipientSessionIds;
+        }
 
         var now = DateTime.UtcNow;
         if (GameChatAt.TryGetValue(s.SessionId, out var last) && (now - last).TotalMilliseconds < 1200) return;
@@ -1733,7 +1750,7 @@ public static class WebSocketBridge
 
         GameChatAt[s.SessionId] = now;
 
-        int seat = Array.IndexOf(room.PlayerSessionIds, s.SessionId); // 0/1=玩家, -1=观战
+        int seat = Array.IndexOf(playerSessionIds, s.SessionId); // 0/1=玩家, -1=观战
         var pkt = new
         {
             proto = "MsgGameChat",
@@ -1744,9 +1761,13 @@ public static class WebSocketBridge
             fromName = s.PlayerName ?? s.Account ?? "玩家",
             fromRole = seat >= 0 ? "player" : "spectator",
         };
-        Send(room.PlayerSessionIds[0], pkt);
-        Send(room.PlayerSessionIds[1], pkt);
-        foreach (var spec in room.Spectators.Keys) Send(spec, pkt);
+        foreach (var recipient in recipients) Send(recipient, pkt);
+    }
+
+    /// <summary>客户端离开结算页后主动解绑，避免旧对局消息串入后续页面。</summary>
+    private static void OnLeaveGameChat(WsSession s)
+    {
+        PostGameChats.Leave(s.SessionId);
     }
 
     // ── 对手查找 ──────────────────────────────────────────────────────────
@@ -1810,10 +1831,22 @@ public static class WebSocketBridge
             GameOpponent[opponentSessionId] = newSessionId;
     }
 
-    /// <summary>权威对局清理时同步清除会话级对手索引，避免玩家赛后仍显示忙碌。</summary>
-    public static void OnGameRoomClosed(IEnumerable<string> sessionIds)
+    /// <summary>加入新对局或新观战时，先退出旧的赛后聊天组。</summary>
+    public static void OnGameChatParticipantJoined(string sessionId)
     {
-        foreach (var sessionId in sessionIds)
+        PostGameChats.Leave(sessionId);
+    }
+
+    /// <summary>权威对局清理时保留轻量赛后聊天组，并清除会话级对手索引。</summary>
+    public static void OnGameRoomClosed(
+        IEnumerable<string> playerSessionIds,
+        IEnumerable<string> spectatorSessionIds,
+        bool preservePostGameChat)
+    {
+        var players = playerSessionIds.ToArray();
+        if (preservePostGameChat)
+            PostGameChats.Register(players, spectatorSessionIds);
+        foreach (var sessionId in players)
             GameOpponent.TryRemove(sessionId, out _);
     }
 

@@ -259,6 +259,11 @@ export interface MsgGameChat extends MsgBase {
   fromRole?: "player" | "spectator";
 }
 
+/** 客户端 → 服务器：离开结算页时退出上一场对局的赛后聊天组。 */
+export interface MsgLeaveGameChat extends MsgBase {
+  proto: "MsgLeaveGameChat";
+}
+
 // ── 在线人数 ──────────────────────────────────────────────────────────────
 // 服务器 → 客户端：当前在线（已登录）人数，登录/断开时广播
 export interface MsgOnlineCount extends MsgBase {
@@ -728,6 +733,7 @@ export type AnyMsg =
   | MsgBugReport
   | MsgChatMsg
   | MsgGameChat
+  | MsgLeaveGameChat
   | MsgLeaderLeaderboard
   | MsgLeaderMatchups
   | MsgPlayerProfileStats
