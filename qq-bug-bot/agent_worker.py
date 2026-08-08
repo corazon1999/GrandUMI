@@ -18,6 +18,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 import agent_protocol
 
@@ -463,6 +464,75 @@ class AgentWorker:
         data = require_success(result, "生成审查指纹")
         return hashlib.sha256(data.encode("utf-8", errors="replace")).hexdigest()
 
+    def create_review_worktree(
+        self,
+        worktree: Path,
+        feedback_id: int,
+        base_ref: str = "HEAD",
+    ) -> Path:
+        """把待审 diff 复制到可丢弃 worktree，避免复核污染原修复。"""
+        committed = base_ref != "HEAD"
+        files = self.changed_files(
+            worktree, committed_base=base_ref if committed else None
+        )
+        if not files:
+            raise WorkerError("复核前未找到待审改动")
+        range_arg = f"{base_ref}..HEAD" if committed else "HEAD"
+        patch = require_success(
+            run_process(
+                ["git", "diff", "--binary", range_arg],
+                cwd=worktree,
+                timeout=120,
+            ),
+            "生成复核副本补丁",
+        )
+        if not patch.strip():
+            raise WorkerError("待审改动无法生成复核补丁")
+        base = require_success(
+            run_process(["git", "rev-parse", base_ref], cwd=worktree),
+            "读取复核基线",
+        ).strip()
+        stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        reviewtree = self.jobs_root / (
+            f"review-{feedback_id}-{stamp}-{uuid4().hex[:8]}"
+        )
+        add = run_process(
+            ["git", "worktree", "add", "--detach", str(reviewtree), base],
+            cwd=self.repo,
+            timeout=120,
+        )
+        require_success(add, "创建隔离复核工作区")
+        try:
+            apply = run_process(
+                ["git", "apply", "--whitespace=nowarn", "-"],
+                cwd=reviewtree,
+                timeout=120,
+                input_text=patch,
+            )
+            require_success(apply, "复制待审改动")
+            intent = run_process(
+                ["git", "add", "--intent-to-add", "--", *files],
+                cwd=reviewtree,
+                timeout=120,
+            )
+            require_success(intent, "登记复核副本新文件")
+            return reviewtree
+        except Exception:
+            self.cleanup_review_worktree(reviewtree)
+            raise
+
+    def cleanup_review_worktree(self, reviewtree: Path) -> None:
+        result = run_process(
+            ["git", "worktree", "remove", "--force", str(reviewtree)],
+            cwd=self.repo,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            self.log(
+                f"复核工作区清理失败，已保留 {reviewtree}: "
+                f"{result.stderr.strip()}"
+            )
+
     @staticmethod
     def verify_review_events(
         review: dict, events: list[dict], required_tests: list[str]
@@ -494,21 +564,37 @@ class AgentWorker:
         required_tests: list[str],
         base_ref: str = "HEAD",
     ) -> dict:
-        before = self.diff_fingerprint(worktree, base_ref)
-        review, events = self.run_codex(
-            worktree,
-            "workspace-write",
-            "review.schema.json",
-            agent_protocol.build_review_prompt(job, triage, required_tests),
-            int(self.cfg.get("review_timeout_seconds", 3600)),
+        reviewtree = self.create_review_worktree(
+            worktree, int(job["id"]), base_ref
         )
-        after = self.diff_fingerprint(worktree, base_ref)
-        if before != after:
-            raise WorkerError("只读复核 Agent 修改了受审代码")
-        if not review.get("approved") or review.get("risk_level") == "high":
-            raise ReviewRejected(review)
-        self.verify_review_events(review, events, required_tests)
-        return review
+        try:
+            before = self.diff_fingerprint(reviewtree)
+            review, events = self.run_codex(
+                reviewtree,
+                "workspace-write",
+                "review.schema.json",
+                agent_protocol.build_review_prompt(job, triage, required_tests),
+                int(self.cfg.get("review_timeout_seconds", 3600)),
+            )
+            after = self.diff_fingerprint(reviewtree)
+            if before != after:
+                isolated = dict(review)
+                issues = [
+                    str(issue) for issue in isolated.get("issues", [])
+                ]
+                issues.append(
+                    "独立复核修改了隔离副本；该修改已丢弃，"
+                    "请修复 Agent 在原工作区根据复核意见完成修订"
+                )
+                isolated["approved"] = False
+                isolated["issues"] = issues
+                raise ReviewRejected(isolated)
+            if not review.get("approved") or review.get("risk_level") == "high":
+                raise ReviewRejected(review)
+            self.verify_review_events(review, events, required_tests)
+            return review
+        finally:
+            self.cleanup_review_worktree(reviewtree)
 
     def validate_review_and_test(
         self,

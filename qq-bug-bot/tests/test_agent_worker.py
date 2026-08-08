@@ -179,6 +179,71 @@ class AgentWorkerGateTests(unittest.TestCase):
         with self.assertRaises(agent_worker.WorkerError):
             self.worker.verify_review_events(review, [], [command])
 
+    def test独立复核在可丢弃工作区通过(self):
+        source = self.repo / "opcgpro-web" / "src" / "a.ts"
+        source.write_text("export const a = 2;\n", encoding="utf-8")
+        command = "git diff --check"
+        review = {
+            "approved": True,
+            "risk_level": "low",
+            "summary": "通过",
+            "issues": [],
+            "tests": [{"command": command, "passed": True, "evidence": "ok"}],
+        }
+        events = [{
+            "type": "item.completed",
+            "item": {"type": "command_execution", "command": command, "exit_code": 0},
+        }]
+
+        def inspect_copy(reviewtree, *_args):
+            self.assertNotEqual(self.repo, reviewtree)
+            self.assertEqual(
+                "export const a = 2;\n",
+                (reviewtree / "opcgpro-web" / "src" / "a.ts").read_text(
+                    encoding="utf-8"
+                ),
+            )
+            return review, events
+
+        with mock.patch.object(
+            self.worker, "run_codex", side_effect=inspect_copy
+        ):
+            result = self.worker.review(
+                self.repo, {"id": 263}, {"resolution": "fix"}, [command]
+            )
+        self.assertEqual(review, result)
+        self.assertEqual("export const a = 2;\n", source.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.worker.jobs_root.glob("review-*")))
+
+    def test独立复核修改隔离副本时保护原修复(self):
+        source = self.repo / "opcgpro-web" / "src" / "a.ts"
+        source.write_text("export const a = 2;\n", encoding="utf-8")
+        review = {
+            "approved": True,
+            "risk_level": "low",
+            "summary": "通过",
+            "issues": [],
+            "tests": [],
+        }
+
+        def modify_copy(reviewtree, *_args):
+            (reviewtree / "opcgpro-web" / "src" / "a.ts").write_text(
+                "export const a = 99;\n", encoding="utf-8"
+            )
+            return review, []
+
+        with mock.patch.object(
+            self.worker, "run_codex", side_effect=modify_copy
+        ):
+            with self.assertRaisesRegex(
+                agent_worker.ReviewRejected, "修改了隔离副本"
+            ):
+                self.worker.review(
+                    self.repo, {"id": 263}, {"resolution": "fix"}, []
+                )
+        self.assertEqual("export const a = 2;\n", source.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.worker.jobs_root.glob("review-*")))
+
     def test可信工作器拒绝模型自定义测试命令(self):
         with self.assertRaisesRegex(agent_worker.WorkerError, "可信测试映射"):
             self.worker.run_required_tests(self.repo, ["echo 假装测试通过"])
