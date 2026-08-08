@@ -18,6 +18,8 @@
   "review_timeout_seconds": 3600,
   "test_timeout_seconds": 3600,
   "deploy_timeout_seconds": 3600,
+  "max_review_revisions": 1,
+  "max_transient_attempts": 3,
   "max_changed_files": 30,
   "max_diff_lines": 1500
 }

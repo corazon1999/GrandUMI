@@ -36,6 +36,15 @@ class WorkerError(RuntimeError):
     pass
 
 
+class ReviewRejected(WorkerError):
+    """独立复核发现可用于修订的问题。"""
+
+    def __init__(self, review: dict):
+        self.review = review
+        issues = "；".join(str(x) for x in review.get("issues", []))
+        super().__init__(f"独立复核未通过: {issues or review.get('summary')}")
+
+
 def is_windows_dll_init_failure(returncode: int) -> bool:
     """识别 Windows 创建子进程前的 DLL 初始化失败；远端命令尚未执行。"""
     return os.name == "nt" and (returncode & 0xFFFFFFFF) == WINDOWS_DLL_INIT_FAILED
@@ -436,7 +445,12 @@ class AgentWorker:
         ):
             tests.append("dotnet test 服务端WebSocket.Tests/GrandUMIServer.Tests.csproj")
         if any(name.startswith("opcgpro-web/") for name in files):
-            tests.append("npm --prefix opcgpro-web run build")
+            tests.extend(
+                f"node {name}"
+                for name in files
+                if name.startswith("opcgpro-web/") and name.endswith(".test.mjs")
+            )
+            tests.append("npm.cmd --prefix opcgpro-web run build")
         if not tests:
             tests.append("git diff --check")
         return tests
@@ -492,13 +506,50 @@ class AgentWorker:
         if before != after:
             raise WorkerError("只读复核 Agent 修改了受审代码")
         if not review.get("approved") or review.get("risk_level") == "high":
-            issues = "；".join(str(x) for x in review.get("issues", []))
-            raise WorkerError(f"独立复核未通过: {issues or review.get('summary')}")
+            raise ReviewRejected(review)
         self.verify_review_events(review, events, required_tests)
         return review
 
+    def validate_review_and_test(
+        self,
+        worktree: Path,
+        job: dict,
+        triage: dict,
+    ) -> tuple[list[str], list[str]]:
+        """在同一工作区内完成门禁、复核和一次有界修订。"""
+        max_revisions = max(0, int(self.cfg.get("max_review_revisions", 1)))
+        revision_count = 0
+        while True:
+            files, tests = self.validate_changes(worktree)
+            self.prepare_test_environment(tests)
+            try:
+                self.review(worktree, job, triage, tests)
+            except ReviewRejected as exc:
+                if revision_count >= max_revisions:
+                    raise
+                revision_count += 1
+                self.log(
+                    f"反馈 #{int(job['id'])} 独立复核未通过，"
+                    f"在当前工作区自动修订（{revision_count}/{max_revisions}）"
+                )
+                revision, _ = self.run_codex(
+                    worktree,
+                    "workspace-write",
+                    "fix.schema.json",
+                    agent_protocol.build_revision_prompt(job, triage, exc.review),
+                    int(self.cfg.get("fix_timeout_seconds", 7200)),
+                )
+                if revision.get("status") != "fixed":
+                    raise WorkerError(
+                        "复核修订未完成: "
+                        + str(revision.get("summary") or "Agent 返回 unable")
+                    )
+                continue
+            self.run_required_tests(worktree, tests)
+            return files, tests
+
     def prepare_test_environment(self, required_tests: list[str]) -> None:
-        if "npm --prefix opcgpro-web run build" in required_tests:
+        if "npm.cmd --prefix opcgpro-web run build" in required_tests:
             shared = str(self.cfg.get("shared_node_modules_path") or "").strip()
             if not shared or not (Path(shared) / ".bin" / "next.cmd").exists():
                 raise WorkerError("前端共享 node_modules 未准备完成，无法安全运行构建")
@@ -509,8 +560,8 @@ class AgentWorker:
             "dotnet test 服务端WebSocket.Tests/GrandUMIServer.Tests.csproj": [
                 "dotnet", "test", "服务端WebSocket.Tests/GrandUMIServer.Tests.csproj",
             ],
-            "npm --prefix opcgpro-web run build": [
-                "npm", "--prefix", "opcgpro-web", "run", "build",
+            "npm.cmd --prefix opcgpro-web run build": [
+                "npm.cmd", "--prefix", "opcgpro-web", "run", "build",
             ],
             "git diff --check": ["git", "diff", "--check"],
         }
@@ -526,6 +577,13 @@ class AgentWorker:
             )
         for command in required_tests:
             args = commands.get(command)
+            if args is None and command.startswith("node "):
+                test_path = command[5:]
+                if (
+                    re.fullmatch(r"opcgpro-web/[A-Za-z0-9_./-]+\.test\.mjs", test_path)
+                    and ".." not in Path(test_path).parts
+                ):
+                    args = ["node", test_path]
             if args is None:
                 raise WorkerError(f"没有可信测试映射: {command}")
             result = run_process(
@@ -678,6 +736,13 @@ class AgentWorker:
                         "Agent 无法在现有证据下确认这是明确 Bug。"
                         "请说明预期行为，以及是否需要继续修改。"
                     )
+                if owner_answered:
+                    self.complete(
+                        job,
+                        "manual",
+                        str(triage.get("reasoning_summary") or question)[:1800],
+                    )
+                    return
                 self.ask_owner(
                     job, question, str(triage.get("reasoning_summary") or "等待确认")
                 )
@@ -691,17 +756,18 @@ class AgentWorker:
                 int(self.cfg.get("fix_timeout_seconds", 7200)),
             )
             if fix.get("status") != "fixed":
+                summary = str(fix.get("summary") or "自动修复未完成")
+                if owner_answered:
+                    self.complete(job, "manual", summary[:1800])
+                    return
                 self.ask_owner(
                     job,
                     "Agent 已确认问题，但无法在安全边界内可靠修复。"
                     "请补充复现方式或指定处理方向。",
-                    str(fix.get("summary") or "自动修复未完成"),
+                    summary,
                 )
                 return
-            files, tests = self.validate_changes(worktree)
-            self.prepare_test_environment(tests)
-            self.review(worktree, job, triage, tests)
-            self.run_required_tests(worktree, tests)
+            files, tests = self.validate_review_and_test(worktree, job, triage)
             self.commit_changes(worktree, files, feedback_id)
 
             latest = self.sync_origin()
@@ -729,21 +795,26 @@ class AgentWorker:
                 or "Codex 没有返回" in detail
                 or "模型" in detail and "连接" in detail
             )
-            if transient and int(job.get("agent_attempts") or 0) < 3:
+            max_transient_attempts = max(
+                1, int(self.cfg.get("max_transient_attempts", 3))
+            )
+            if (
+                transient
+                and int(job.get("agent_attempts") or 0) < max_transient_attempts
+            ):
                 self.log(f"反馈 #{feedback_id} 遇到瞬时模型故障，将重新排队：{detail}")
                 try:
                     self.release(job, detail)
                 except Exception as bridge_exc:
                     self.log(f"反馈 #{feedback_id} 释放租约失败：{bridge_exc}")
                 return
-            self.log(f"反馈 #{feedback_id} 需要管理员确认：{detail}")
+            final_state = "failed" if transient else "manual"
+            self.log(
+                f"反馈 #{feedback_id} 自动处理终止，"
+                f"状态={final_state}：{detail}"
+            )
             try:
-                self.ask_owner(
-                    job,
-                    "自动处理未通过安全门禁或验证。请决定是否补充信息、转人工处理，"
-                    "或允许在说明的风险下继续。",
-                    str(exc)[:1800],
-                )
+                self.complete(job, final_state, str(exc)[:1800])
             except Exception as bridge_exc:
                 self.log(f"反馈 #{feedback_id} 状态回写失败：{bridge_exc}")
         finally:
