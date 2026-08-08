@@ -140,6 +140,9 @@
         { "op": "Rest", "target": "$tgt" },
         { "op": "RefreshDon", "n": 1, "state": "rest" }
       ]
-    }
+    },
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
   }
 }

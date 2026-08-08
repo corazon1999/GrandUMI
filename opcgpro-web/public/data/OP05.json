@@ -839,7 +839,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将对方最多1张领袖或费用不高于3的角色转为休息状态。",
     "set": "补充包 新纪元的主角【OPC-05】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1697799658828OP05-038.png",
     "cartograph": "漫画"
@@ -861,7 +861,7 @@
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将对方最多1张处于休息状态且费用不高于5的角色KO。",
     "set": "补充包 新纪元的主角【OPC-05】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1697799658829OP05-039.png",
     "cartograph": "漫画"

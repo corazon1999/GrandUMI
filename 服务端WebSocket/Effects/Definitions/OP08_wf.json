@@ -1,4 +1,108 @@
 {
+  "OP08-037": {
+    "_name": "卡鲁秋",
+    "_matcher": "【触发】抽取1张卡牌",
+    "_src": "card-image-audit",
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
+  },
+  "OP08-038": {
+    "_name": "我们不会把『伙伴』出卖给敌人的!!!",
+    "_matcher": "【触发】将对方最多1张费用不高于3的角色转为休息状态",
+    "_src": "card-image-audit",
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe3",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      { "op": "Rest", "target": "$tgt" }
+    ]
+  },
+  "OP08-096": {
+    "_name": "人的梦想!!是不会终止的!!",
+    "_matcher": "【触发】将废弃区最多1张费用不高于3的黑色角色登场",
+    "_src": "card-image-audit",
+    "trigger": [
+      {
+        "op": "PlayCharFromTrash",
+        "filter": { "originalCostLte": 3, "color": "黑" },
+        "text": "将废弃区最多1张费用不高于3的黑色角色卡牌登场"
+      }
+    ]
+  },
+  "OP08-104": {
+    "_name": "夏洛特·波瓦尔",
+    "_matcher": "【触发】弃1张手牌：自身登场，之后抽1张",
+    "_src": "card-image-audit",
+    "trigger": {
+      "cost": { "handDiscard": { "n": 1 } },
+      "costPrompt": "丢弃我方的1张手牌：此卡牌登场。之后，抽取1张卡牌。",
+      "then": [
+        { "op": "PlaySelf" },
+        { "op": "Draw", "n": 1 }
+      ]
+    }
+  },
+  "OP08-105": {
+    "_name": "杰丽·邦妮",
+    "_matcher": "【触发】抽取2张卡牌，丢弃1张手牌",
+    "_src": "card-image-audit",
+    "trigger": [
+      { "op": "Draw", "n": 2 },
+      { "op": "DiscardOwnChosen", "n": 1 }
+    ]
+  },
+  "OP08-111": {
+    "_name": "S-鲨鱼",
+    "_matcher": "【触发】弃1张手牌，生命不多于2张时自身登场",
+    "_src": "card-image-audit",
+    "trigger": {
+      "if": { "ownLifeCountLte": 2 },
+      "cost": { "handDiscard": { "n": 1 } },
+      "costPrompt": "丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场。",
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
+  },
+  "OP08-113": {
+    "_name": "S-小熊",
+    "_matcher": "【触发】弃1张手牌，生命不多于2张时自身登场并KO费用不高于3的角色",
+    "_src": "card-image-audit",
+    "trigger": {
+      "if": { "ownLifeCountLte": 2 },
+      "cost": { "handDiscard": { "n": 1 } },
+      "costPrompt": "丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场，并将对方最多1张费用不高于3的角色KO。",
+      "then": [
+        { "op": "PlaySelf" },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacterCostLe3",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt"
+        },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
+  },
+  "OP08-114": {
+    "_name": "S-老鹰",
+    "_matcher": "【触发】弃1张手牌，生命不多于2张时自身登场",
+    "_src": "card-image-audit",
+    "trigger": {
+      "if": { "ownLifeCountLte": 2 },
+      "cost": { "handDiscard": { "n": 1 } },
+      "costPrompt": "丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场。",
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
+  },
   "OP08-008": {
     "_name": "",
     "_matcher": "登场时对方1张角色力量-1000;启动主要(咚!!-1并生命顶1张入手为成本)本回合赋予自身速攻。",
@@ -479,7 +583,10 @@
           }
         }
       ]
-    }
+    },
+    "trigger": [
+      { "op": "Draw", "n": 1 }
+    ]
   },
   "OP08-059": {
     "_name": "",
@@ -629,7 +736,14 @@
           }
         ]
       }
-    ]
+    ],
+    "trigger": {
+      "cost": { "donReturn": 1 },
+      "costPrompt": "咚!!-1：此卡牌登场。",
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
   },
   "OP08-070": {
     "_name": "",
@@ -675,7 +789,10 @@
           "target": "$tgt"
         }
       ]
-    }
+    },
+    "trigger": [
+      { "op": "RefreshDon", "n": 1, "state": "active" }
+    ]
   },
   "OP08-076": {
     "_name": "",
@@ -871,6 +988,16 @@
           }
         }
       }
+    ],
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe3",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      { "op": "KO", "target": "$tgt" }
     ]
   },
   "OP08-092": {
@@ -915,7 +1042,17 @@
           "delta": 2000
         }
       ]
-    }
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OwnLeaderOrCharacter",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": 2000 }
+    ]
   },
   "OP08-097": {
     "_name": "",
@@ -949,7 +1086,17 @@
           "target": "$tgt"
         }
       ]
-    }
+    },
+    "trigger": [
+      {
+        "op": "Choose",
+        "prompt": "OpponentCharacterCostLe3",
+        "max": 1,
+        "min": 0,
+        "as": "$tgt"
+      },
+      { "op": "KO", "target": "$tgt" }
+    ]
   },
   "OP08-103": {
     "_name": "",

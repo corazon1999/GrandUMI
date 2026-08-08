@@ -1,4 +1,18 @@
 {
+  "OP10-100": {
+    "_name": "闪电",
+    "_matcher": "【触发】领袖拥有革命军且双方生命合计不多于5张时自身登场",
+    "_src": "card-image-audit",
+    "trigger": {
+      "if": {
+        "leaderHasKeyword": "革命军",
+        "bothLifeTotalLte": 5
+      },
+      "then": [
+        { "op": "PlaySelf" }
+      ]
+    }
+  },
   "OP10-004": {
     "_name": "维尔高",
     "_matcher": "【登场时】确认卡组顶5张、公开最多1张‘维尔高’以外的《班克禁区》特征卡加入手牌，其余放回卡组底。",

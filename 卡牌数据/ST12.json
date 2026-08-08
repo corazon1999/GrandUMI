@@ -38,7 +38,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】此卡牌登场。",
     "set": "基本卡组 佐罗＆山智【STC-12】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1704855448878ST12-002.png",
     "cartograph": "画师原创"
@@ -343,7 +343,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】发动此卡牌的【主要】效果。",
     "set": "基本卡组 佐罗＆山智【STC-12】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1704855448884ST12-016.png",
     "cartograph": "画师原创"

@@ -14,16 +14,24 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 仅在我方回合、每回合1次生效；离场卡需为我方所属且特征含<白胡子海盗团>。
 ///   - 离场卡已不在场上，故按 payload 的 cardId 在我方各区(废弃/手牌/卡组/生命)查回该卡判定其特征。
 ///   - "放回卡组最上方或最下方"用 ChooseOption 让玩家二选一。
+///   - 【触发】发动时此卡已进入废弃区，直接免费登场到舞台区；已有舞台按通用登场规则送入废弃区。
 /// </summary>
 public class OP08_056_MobyDick : IScriptedEffect
 {
     public string CardNumber => "OP08-056";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnCharLeaveField;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnCharLeaveField || t == EffectTrigger.OnLifeRevealTrigger;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+
+        if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
+        {
+            await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
+            return;
+        }
 
         // 【我方的回合中】
         if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;

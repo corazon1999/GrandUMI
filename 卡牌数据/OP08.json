@@ -800,7 +800,7 @@
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】抽取1张卡牌。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299268OP08-037.png",
     "cartograph": "漫画"
@@ -822,7 +822,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将对方最多1张费用不高于3的角色转为休息状态。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299268OP08-038.png",
     "cartograph": "漫画"
@@ -1156,7 +1156,7 @@
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】抽取1张卡牌。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299274OP08-053.png",
     "cartograph": "漫画"
@@ -1222,7 +1222,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】此卡牌登场。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299275OP08-056.png",
     "cartograph": "漫画"
@@ -1486,7 +1486,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】咚!!-1（可以将我方场上指定数量的咚!!放回咚!!卡组）：此卡牌登场。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299279OP08-068.png",
     "cartograph": "画师原创"
@@ -1643,7 +1643,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】从咚!!卡组中追加最多1张活跃状态的咚!!。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299283OP08-075.png",
     "cartograph": "漫画"
@@ -1992,7 +1992,7 @@
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将对方最多1张费用不高于3的角色KO。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299289OP08-091.png",
     "cartograph": "画师原创"
@@ -2059,7 +2059,7 @@
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】发动此卡牌的【主要】效果。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299290OP08-094.png",
     "cartograph": "漫画"
@@ -2081,7 +2081,7 @@
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】本回合中，我方最多1张领袖或角色力量+2000。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299291OP08-095.png",
     "cartograph": "漫画"
@@ -2103,7 +2103,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将我方废弃区最多1张费用不高于3的黑色角色卡牌登场。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299291OP08-096.png",
     "cartograph": "漫画"
@@ -2125,7 +2125,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】将对方最多1张费用不高于3的角色KO。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299291OP08-097.png",
     "cartograph": "漫画"
@@ -2276,7 +2276,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】可以丢弃我方的1张手牌：此卡牌登场。之后，抽取1张卡牌。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299293OP08-104.png",
     "cartograph": "画师原创"
@@ -2299,7 +2299,7 @@
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】抽取2张卡牌，丢弃我方的1张手牌。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299293OP08-105.png",
     "cartograph": "画师原创"
@@ -2429,7 +2429,7 @@
     "effectEvent": "",
     "rarity": "UC",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】可以丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299296OP08-111.png",
     "cartograph": "画师原创"
@@ -2451,7 +2451,7 @@
     "effectEvent": "",
     "rarity": "SR",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】发动此卡牌的【登场时】效果。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299297OP08-112.png",
     "cartograph": "画师原创"
@@ -2471,7 +2471,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】可以丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场，并将对方最多1张费用不高于3的角色KO。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299297OP08-113.png",
     "cartograph": "画师原创"
@@ -2494,7 +2494,7 @@
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】可以丢弃我方的1张手牌：我方生命卡牌不多于2张的场合，此卡牌登场。",
     "set": "补充包 传说的强者【OPC-08】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1720666299298OP08-114.png",
     "cartograph": "画师原创"

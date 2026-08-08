@@ -330,7 +330,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "【反击】本次战斗中，我方最多1张领袖或角色力量+2000，并将对方最多1张力量不高于2000的角色KO。",
+    "trigger": "",
     "set": "究极进阶卡组 “三方船长”集结【STC-10】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1698374966839ST10-015.png",
     "cartograph": "漫画"
@@ -352,7 +352,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】直到下个我方的回合结束时为止，我方最多1张领袖力量+1000。",
     "set": "究极进阶卡组 “三方船长”集结【STC-10】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1698374966840ST10-016.png",
     "cartograph": "漫画"
@@ -374,7 +374,7 @@
     "effectEvent": "",
     "rarity": "C",
     "subscript": 2,
-    "trigger": "",
+    "trigger": "【触发】从咚!!卡组中追加最多1张活跃状态的咚!!。",
     "set": "究极进阶卡组 “三方船长”集结【STC-10】",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1698374966841ST10-017.png",
     "cartograph": "漫画"
