@@ -2,7 +2,14 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import AttributeAttackEffect from "@/components/game/AttributeAttackEffect";
 import { getCard } from "@/data/CardLoader";
+import {
+  ATTACK_ATTRIBUTE_THEMES,
+  composeAttackTheme,
+  normalizeAttackAttributes,
+  type AttackAttribute,
+} from "@/lib/attackAttributeEffects";
 import { useGameStore, type PlayerView } from "@/store/gameStore";
 
 interface Point {
@@ -15,6 +22,7 @@ interface Combatant {
   name: string;
   power: number;
   side: "my" | "opponent";
+  attributes: AttackAttribute[];
 }
 
 function findCombatant(id: string | null, my: PlayerView | null, opponent: PlayerView | null): Combatant | null {
@@ -23,20 +31,24 @@ function findCombatant(id: string | null, my: PlayerView | null, opponent: Playe
   for (const [side, player] of [["my", my], ["opponent", opponent]] as const) {
     if (!player) continue;
     if (player.leaderId === id) {
+      const card = getCard(player.leaderNumber);
       return {
         id,
-        name: getCard(player.leaderNumber)?.name ?? "领袖",
+        name: card?.name ?? "领袖",
         power: player.leaderPower,
         side,
+        attributes: normalizeAttackAttributes(card?.property),
       };
     }
     const fieldCard = player.fieldCards.find((card) => card.id === id);
     if (fieldCard) {
+      const card = getCard(fieldCard.number);
       return {
         id,
-        name: getCard(fieldCard.number)?.name ?? "角色",
+        name: card?.name ?? "角色",
         power: fieldCard.powerCurrent,
         side,
+        attributes: normalizeAttackAttributes(card?.property),
       };
     }
   }
@@ -172,6 +184,8 @@ export default function BattleRelationLayer() {
   const path = points ? attackPath(points.source, points.target) : "";
   const attackerPower = attacker && battle ? attacker.power + battle.attackerBonus : 0;
   const targetPower = target && battle ? target.power + battle.defenderBonus : 0;
+  const attackTheme = composeAttackTheme(attacker?.attributes ?? ["?"]);
+  const shouldReduceMotion = Boolean(reduceMotion);
 
   return (
     <div ref={layerRef} className="pointer-events-none absolute inset-0 z-30" aria-hidden={!battle}>
@@ -192,6 +206,24 @@ export default function BattleRelationLayer() {
             </span>
             <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-red-100">
               {powerLabel(attackerPower)}
+            </span>
+            <span className="flex items-center gap-1" aria-label={`攻击属性 ${attackTheme.label}`}>
+              {attackTheme.attributes.map((attribute) => {
+                const theme = ATTACK_ATTRIBUTE_THEMES[attribute];
+                return (
+                  <span
+                    key={attribute}
+                    className="rounded-full border px-1.5 py-0.5 text-[10px] leading-none shadow-sm"
+                    style={{
+                      color: theme.accent,
+                      borderColor: `${theme.primary}70`,
+                      backgroundColor: `${theme.secondary}28`,
+                    }}
+                  >
+                    {theme.label}
+                  </span>
+                );
+              })}
             </span>
             <span className="text-base text-orange-300">⚔</span>
             <span className="max-w-40 truncate text-amber-100">
@@ -218,10 +250,14 @@ export default function BattleRelationLayer() {
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <linearGradient id="battle-route-attack" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#ef4444" />
-            <stop offset="0.55" stopColor="#fb923c" />
-            <stop offset="1" stopColor="#fde047" />
+          <linearGradient id="battle-route-attribute" x1="0" y1="0" x2="1" y2="0">
+            {attackTheme.colors.map((color, index) => (
+              <stop
+                key={`${color}:${index}`}
+                offset={`${(index / Math.max(1, attackTheme.colors.length - 1)) * 100}%`}
+                stopColor={color}
+              />
+            ))}
           </linearGradient>
           <linearGradient id="battle-route-block" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#f97316" />
@@ -229,7 +265,7 @@ export default function BattleRelationLayer() {
             <stop offset="1" stopColor="#67e8f9" />
           </linearGradient>
           <marker id="battle-arrow-attack" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
-            <path d="M 0 0 L 11 5.5 L 0 11 z" fill="#fde047" />
+            <path d="M 0 0 L 11 5.5 L 0 11 z" fill={attackTheme.accent} />
           </marker>
           <marker id="battle-arrow-block" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
             <path d="M 0 0 L 11 5.5 L 0 11 z" fill="#67e8f9" />
@@ -242,7 +278,7 @@ export default function BattleRelationLayer() {
               <motion.path
                 d={path}
                 fill="none"
-                stroke={isBlocked ? "#22d3ee" : "#f97316"}
+                stroke={isBlocked ? "#22d3ee" : attackTheme.primary}
                 strokeWidth="13"
                 strokeLinecap="round"
                 opacity="0.2"
@@ -254,7 +290,7 @@ export default function BattleRelationLayer() {
               <motion.path
                 d={path}
                 fill="none"
-                stroke={isBlocked ? "url(#battle-route-block)" : "url(#battle-route-attack)"}
+                stroke={isBlocked ? "url(#battle-route-block)" : "url(#battle-route-attribute)"}
                 strokeWidth="5"
                 strokeLinecap="round"
                 filter="url(#battle-route-glow)"
@@ -271,11 +307,19 @@ export default function BattleRelationLayer() {
                 markerEnd={isBlocked ? "url(#battle-arrow-block)" : "url(#battle-arrow-attack)"}
               />
 
+              <AttributeAttackEffect
+                attributes={attackTheme.attributes}
+                path={path}
+                source={points.source}
+                target={points.target}
+                reduceMotion={shouldReduceMotion}
+              />
+
               <motion.circle
                 cx={points.target.x}
                 cy={points.target.y}
                 fill="none"
-                stroke={isBlocked ? "#67e8f9" : "#fef08a"}
+                stroke={isBlocked ? "#67e8f9" : attackTheme.accent}
                 strokeWidth="5"
                 initial={reduceMotion ? false : { r: 12, opacity: 1 }}
                 animate={{ r: reduceMotion ? 28 : 48, opacity: 0 }}

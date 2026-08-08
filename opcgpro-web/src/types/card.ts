@@ -1,6 +1,12 @@
 export type CardType = "Leader" | "Character" | "Stage" | "Event";
 export type CardColor = "红" | "绿" | "蓝" | "紫" | "黑" | "黄" | string;
-export type CardProperty = "斩" | "打" | "射" | "智" | "特";
+export type CanonicalCardProperty = "斩" | "打" | "射" | "特" | "知" | "?";
+export type CardProperty =
+  | CanonicalCardProperty
+  | "智"
+  | "？"
+  | "-"
+  | `${CanonicalCardProperty}/${string}`;
 
 export interface CardData {
   number: string;
