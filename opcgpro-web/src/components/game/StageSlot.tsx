@@ -34,7 +34,12 @@ export default function StageSlot({ side }: Props) {
   };
 
   return (
-    <div className={`${dimensions} relative flex items-center justify-center rounded-md border border-dashed border-sky-200/25 bg-black/20 shadow-inner shadow-black/30`}>
+    <div
+      className={`${dimensions} relative flex items-center justify-center rounded-md border border-dashed border-sky-200/25 bg-black/20 shadow-inner shadow-black/30`}
+      data-zone="stage"
+      data-zone-side={side}
+      data-zone-card-id={stageId ?? undefined}
+    >
       {stageNumber ? (
         <CardItem
           card={getCard(stageNumber) ?? null}

@@ -38,6 +38,8 @@ export default function TrashPile({ side }: Props) {
       <span className="text-[11px] font-semibold text-slate-300">墓地</span>
       <div
         className={`relative cursor-pointer ${pileSizes[cardSize]}`}
+        data-zone="trash"
+        data-zone-side={side}
         onClick={() => setOpen(true)}
         title={count > 0 ? `查看墓地（${count} 张）` : "墓地为空"}
       >

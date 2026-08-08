@@ -118,6 +118,8 @@ export default function HandArea({ side, hidden = false }: Props) {
     <div
       ref={wrapRef}
       className="relative z-30 h-full w-full min-w-0 overflow-visible"
+      data-zone="hand"
+      data-zone-side={side}
     >
       <AnimatePresence>
         {cards.map((card, i) => {
@@ -126,6 +128,9 @@ export default function HandArea({ side, hidden = false }: Props) {
           return (
             <motion.div
               key={stableKeys[i]}
+              data-zone="hand"
+              data-zone-side={side}
+              data-zone-index={i}
               initial={{ x: xOf(i), y: side === "my" ? 36 : -24, opacity: 0 }}
               animate={{ x: xOf(i), y: 0, opacity: 1 }}
               exit={{ y: side === "my" ? -24 : 24, opacity: 0 }}

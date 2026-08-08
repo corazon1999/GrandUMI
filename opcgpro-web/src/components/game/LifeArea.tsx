@@ -55,6 +55,8 @@ export default function LifeArea({ side }: Props) {
             ? "cursor-pointer ring-2 ring-amber-300/45 hover:ring-amber-200 focus-visible:ring-amber-200"
             : ""
         }`}
+        data-zone="life"
+        data-zone-side={side}
         onClick={openInspector}
         onKeyDown={(event) => {
           if (!canInspect || (event.key !== "Enter" && event.key !== " ")) return;

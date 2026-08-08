@@ -22,7 +22,11 @@ export default function DeckPile({ side }: Props) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-md border border-sky-200/15 bg-black/30 px-2.5 py-2 shadow-lg shadow-black/25">
       <span className="text-[11px] font-semibold text-slate-300">牌库</span>
-      <div className={`relative ${pileSizes[cardSize]}`}>
+      <div
+        className={`relative ${pileSizes[cardSize]}`}
+        data-zone="deck"
+        data-zone-side={side}
+      >
         <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-md border border-sky-300/20 bg-slate-950" />
         <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-md border border-sky-300/30 bg-blue-950" />
         <div className="absolute inset-0 overflow-hidden rounded-md shadow-xl shadow-black/40">

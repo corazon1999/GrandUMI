@@ -50,7 +50,11 @@ export default function FieldArea({ side }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 items-center justify-center gap-8 overflow-visible rounded-md border border-sky-200/15 bg-black/15 px-4 py-3 shadow-inner shadow-black/30">
+    <div
+      className="flex h-full min-h-0 min-w-0 items-center justify-center gap-8 overflow-visible rounded-md border border-sky-200/15 bg-black/15 px-4 py-3 shadow-inner shadow-black/30"
+      data-zone="field"
+      data-zone-side={side}
+    >
       {player.fieldCards.map((fc) => {
         const cardData = getCard(fc.number) ?? null;
         const attachedCount = fc.attachedDon;
@@ -77,6 +81,9 @@ export default function FieldArea({ side }: Props) {
           <div key={fc.id} className="relative flex h-full min-h-0 shrink-0 items-center">
             <div
               data-battle-card-id={fc.id}
+              data-zone="field"
+              data-zone-side={side}
+              data-zone-card-id={fc.id}
               className={[
                 "relative",
                 isAttacker ? (side === "my" ? "battle-attacker-lunge-up" : "battle-attacker-lunge-down") : "",
