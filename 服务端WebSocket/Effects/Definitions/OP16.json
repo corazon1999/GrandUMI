@@ -1695,6 +1695,9 @@
           {
             "op": "Choose",
             "prompt": "OpponentCharacterCostLe6",
+            "filter": {
+              "currentCostLte": 6
+            },
             "max": 1,
             "min": 0,
             "as": "$t",
@@ -1715,6 +1718,9 @@
       {
         "op": "Choose",
         "prompt": "OpponentCharacterCostLe6",
+        "filter": {
+          "currentCostLte": 6
+        },
         "max": 1,
         "min": 0,
         "as": "$t",
