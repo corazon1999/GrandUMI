@@ -56,6 +56,7 @@ export interface PlayerView {
   leaderTapped: boolean;
   leaderPower: number;
   leaderAttachedDon: number;
+  leaderGainedKeywords: string[]; // 领袖动态获得的关键词（含持续效果）
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
   leaderCannotAttack: boolean; // 领袖是否存在明确的“无法攻击”状态
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
@@ -82,6 +83,7 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
       ...card,
       gainedKeywords: [...(card.gainedKeywords ?? [])],
     })),
+    leaderGainedKeywords: [...(player.leaderGainedKeywords ?? [])],
     trashNumbers: [...(player.trashNumbers ?? [])],
     lifeNumbers: [...(player.lifeNumbers ?? [])],
     lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),
