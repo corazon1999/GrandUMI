@@ -144,7 +144,7 @@ public sealed class OP12_081_Koala : IScriptedEffect
         {
             var battle = ctx.State.CurrentBattle;
             if (battle?.AttackerCardId != ctx.Source.Id || !battle.TargetIsLeader) return;
-            if (me.Characters.Count(card => card.Info.Cost >= 8) >= 2)
+            if (me.Characters.Count(card => ctx.State.CurrentCostOf(ctx.OwnerIndex, card) >= 8) >= 2)
                 AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
