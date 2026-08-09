@@ -129,6 +129,39 @@ public class OP16EffectTests
     }
 
     [Fact]
+    public async Task OP16_082_ContinuouslyAddsThreeToOwnCost_WithoutStacking()
+    {
+        var state = TestScene.New().Build();
+        var kinemon = Card("OP16-082");
+        var otherCharacter = Card("OP16-083");
+        state.Players[0].Characters.AddRange([kinemon, otherCharacter]);
+
+        Assert.Equal(4, state.CurrentCostOf(0, kinemon));
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            kinemon,
+            EffectTrigger.OnEnterField,
+            new MockPromptService());
+
+        Assert.Equal(7, state.CurrentCostOf(0, kinemon));
+        Assert.Equal(otherCharacter.Info.Cost, state.CurrentCostOf(0, otherCharacter));
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            kinemon,
+            EffectTrigger.OnEnterField,
+            new MockPromptService());
+
+        Assert.Equal(7, state.CurrentCostOf(0, kinemon));
+
+        kinemon.IsEffectsNullified = true;
+        Assert.Equal(4, state.CurrentCostOf(0, kinemon));
+    }
+
+    [Fact]
     public void OP16_118_Changes8000PowerCharactersInHandToCounter2000()
     {
         var state = TestScene.New("OP16-001").Build();
