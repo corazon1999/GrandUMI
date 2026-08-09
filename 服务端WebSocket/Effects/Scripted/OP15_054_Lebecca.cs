@@ -1,3 +1,4 @@
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -5,7 +6,7 @@ namespace GrandUMI.Effects.Scripted;
 /// <summary>
 /// OP15-054 多分支选项事件示例
 /// 【主要】我方领袖为"路西"的场合，选择以下的 1 项：
-///   · 抽取 2 张卡牌，丢弃我方的 1 张手牌。
+///   · 抽取 2 张卡牌，丢弃我方的 1 张手牌。之后，从手牌将最多 1 张费用不高于 4 的《德莱斯罗兹》角色登场。
 ///   · 将最多 1 张舞台放回其持有者的手牌。
 /// </summary>
 public class OP15_054_Lebecca : IScriptedEffect
@@ -36,6 +37,28 @@ public class OP15_054_Lebecca : IScriptedEffect
                     var dc = me.Hand.First(c => c.Id.ToString() == chosen[0]);
                     AtomicOps.DiscardHand(me, dc);
                 }
+            }
+
+            var playable = me.Hand
+                .Where(c => c.Info.Kind == CardKind.Character &&
+                            c.Info.Cost <= 4 &&
+                            c.Info.HasKeyword("德莱斯罗兹"))
+                .ToList();
+            if (playable.Count == 0) return;
+
+            var extra = new Dictionary<string, object?>
+            {
+                ["choiceCards"] = playable
+                    .Select(c => new { id = c.Id.ToString(), number = c.Info.Number })
+                    .ToList(),
+            };
+            var playChosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDressrosaCostLe4",
+                "选择最多 1 张费用不高于 4 的《德莱斯罗兹》角色登场",
+                playable.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
+            if (playChosen.Count > 0)
+            {
+                var card = playable.First(c => c.Id.ToString() == playChosen[0]);
+                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
             }
         }
         else if (opt == 1)
