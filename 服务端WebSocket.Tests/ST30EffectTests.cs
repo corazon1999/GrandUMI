@@ -2,6 +2,7 @@ using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Validation;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -29,6 +30,32 @@ public class ST30EffectTests
         await EffectRuntime.Resolve(withDon, 0, paidLuffy, EffectTrigger.OnEnterField, new MockPromptService());
         Assert.Contains(paidLuffy.GainedKeywords, keyword => keyword.Keyword == "速攻");
         Assert.Equal(0, withDon.Players[0].ActiveDonCount);
+    }
+
+    [Fact]
+    public async Task ST30_012_OnAttack_CanRest_OP13_031_WithDynamicBlockerAtOneLife()
+    {
+        var state = TestScene.New().Build();
+        var luffy = Card("ST30-012");
+        var law = Card("OP13-031");
+        state.Players[0].Characters.Add(luffy);
+        state.Players[1].Characters.Add(law);
+        state.Players[1].LifeArea.Add(Card("ST30-002"));
+
+        await EffectRuntime.Resolve(
+            state,
+            1,
+            law,
+            EffectTrigger.OnEnterField,
+            new MockPromptService().QueueChooseEmpty());
+        Assert.True(ActionValidator.HasKeyword(state, law, "阻挡者"));
+
+        var prompts = new MockPromptService().QueueChoose(law.Id.ToString());
+        await EffectRuntime.Resolve(state, 0, luffy, EffectTrigger.OnAttackDeclare, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(h => h.kind == "OpponentCharacter"));
+        Assert.Contains(law.Id.ToString(), targetPrompt.choices);
+        Assert.True(law.IsTapped);
     }
 
     [Fact]

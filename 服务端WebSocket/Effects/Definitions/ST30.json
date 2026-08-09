@@ -110,7 +110,7 @@
       {
         "on": "OnAttackDeclare",
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "keyword": "阻挡者" }, "text": "将对方最多1张拥有【阻挡者】的角色转为休息状态" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "effectiveKeyword": "阻挡者" }, "text": "将对方最多1张拥有【阻挡者】的角色转为休息状态" },
           { "op": "Rest", "target": "$tgt" }
         ]
       }
