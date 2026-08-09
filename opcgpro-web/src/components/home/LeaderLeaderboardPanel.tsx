@@ -6,6 +6,12 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import {
+  nextLeaderLeaderboardSort,
+  sortLeaderLeaderboardItems,
+  type LeaderLeaderboardSortKey,
+  type LeaderLeaderboardSortState,
+} from "@/lib/leaderLeaderboardSort";
 import type { LeaderboardPeriod } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
@@ -52,6 +58,55 @@ function colorClasses(color?: string): string {
   return "bg-gray-800 text-gray-400 border-gray-700";
 }
 
+const SORT_LABELS: Record<LeaderLeaderboardSortKey, string> = {
+  games: "场次",
+  record: "战绩",
+  winRate: "胜率",
+  usageRate: "使用率",
+  firstWinRate: "先攻",
+  secondWinRate: "后攻",
+};
+
+function SortableHeader({
+  column,
+  sort,
+  onSort,
+  className = "px-3",
+}: {
+  column: LeaderLeaderboardSortKey;
+  sort: LeaderLeaderboardSortState | null;
+  onSort: (column: LeaderLeaderboardSortKey) => void;
+  className?: string;
+}) {
+  const activeDirection = sort?.key === column ? sort.direction : null;
+  const nextDirection = activeDirection === "desc" ? "从低到高" : activeDirection === "asc" ? "默认" : "从高到低";
+  const label = SORT_LABELS[column];
+
+  return (
+    <th
+      className={`${className} py-1 text-right`}
+      aria-sort={activeDirection === "desc" ? "descending" : activeDirection === "asc" ? "ascending" : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        title={`${label}：${activeDirection === "desc" ? "从高到低" : activeDirection === "asc" ? "从低到高" : "默认顺序"}，点击切换为${nextDirection}`}
+        className={`flex min-h-10 w-full items-center justify-end gap-1 rounded px-1 font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/70 ${
+          activeDirection ? "text-orange-300" : "text-gray-500 hover:text-gray-200"
+        }`}
+      >
+        <span>{label}</span>
+        <span className={`w-3 text-center text-[10px] ${activeDirection ? "text-orange-400" : "text-gray-700"}`} aria-hidden="true">
+          {activeDirection === "desc" ? "▼" : activeDirection === "asc" ? "▲" : "↕"}
+        </span>
+        <span className="sr-only">
+          {activeDirection === "desc" ? "，当前从高到低" : activeDirection === "asc" ? "，当前从低到高" : "，当前默认顺序"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 export default function LeaderLeaderboardPanel() {
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
@@ -61,6 +116,7 @@ export default function LeaderLeaderboardPanel() {
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
+  const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
 
   const request = (nextPeriod: LeaderboardPeriod) => {
     setSelectedLeader(null);
@@ -109,13 +165,13 @@ export default function LeaderLeaderboardPanel() {
   const items = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("zh-CN");
     const source = leaderboard?.period === period ? leaderboard.items ?? [] : [];
-    if (!keyword) return source;
-    return source.filter((item) => {
+    const filtered = !keyword ? source : source.filter((item) => {
       const card = getCard(item.leaderNumber);
       return item.leaderNumber.toLocaleLowerCase("zh-CN").includes(keyword)
         || card?.name.toLocaleLowerCase("zh-CN").includes(keyword);
     });
-  }, [cardRevision, leaderboard, period, search]);
+    return sortLeaderLeaderboardItems(filtered, sort);
+  }, [cardRevision, leaderboard, period, search, sort]);
 
   const loading = leaderboard == null || leaderboard.period !== period;
   const failed = !loading && leaderboard.result === false;
@@ -302,12 +358,15 @@ export default function LeaderLeaderboardPanel() {
               <tr>
                 <th className="w-16 px-4 py-3 text-center">排名</th>
                 <th className="px-3 py-3">Leader</th>
-                <th className="px-3 py-3 text-right">场次</th>
-                <th className="px-3 py-3 text-right">战绩</th>
-                <th className="px-3 py-3 text-right">胜率</th>
-                <th className="px-3 py-3 text-right">使用率</th>
-                <th className="px-3 py-3 text-right">先攻</th>
-                <th className="px-4 py-3 text-right">后攻</th>
+                {(["games", "record", "winRate", "usageRate", "firstWinRate", "secondWinRate"] as const).map((column) => (
+                  <SortableHeader
+                    key={column}
+                    column={column}
+                    sort={sort}
+                    onSort={(nextColumn) => setSort((current) => nextLeaderLeaderboardSort(current, nextColumn))}
+                    className={column === "secondWinRate" ? "px-4" : "px-3"}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/80">
