@@ -49,6 +49,28 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task OP17_042_OnPlay_CanDeclineWithoutRevealingHandOrReducingPower()
+    {
+        var state = TestScene.New("OP17-039").OppCharacter("OP17-011").Build();
+        var source = Card("OP17-042");
+        var target = Assert.Single(state.Players[1].Characters);
+        state.Players[0].Characters.Add(source);
+        state.Players[0].Hand.AddRange([
+            Card("OP17-040"),
+            Card("OP17-041"),
+            Card("OP17-044"),
+        ]);
+        var prompts = new MockPromptService().QueueConfirm(false);
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(0, target.PowerModThisTurn);
+        Assert.Equal(3, state.Players[0].Hand.Count);
+        Assert.Single(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
     public async Task OP17_099_FirstChoice_DiscardsOwnersHandAndAddsDeckTopToLife()
     {
         var state = TestScene.New("OP17-099").MyDeckTop("OP17-100").Build();

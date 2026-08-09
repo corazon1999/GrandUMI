@@ -811,6 +811,9 @@ internal static class OP17Effects
     private static async Task C042(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
+        var revealable = Me(c).Hand.Count(x => x.Info.HasKeyword("洛克斯海盗团"));
+        if (revealable < 3 || !await c.Prompts.ConfirmOptional(c.OwnerIndex,
+            "公开手牌中3张《洛克斯海盗团》卡牌，使对方1张角色本回合力量-3000？")) return;
         if (!await DiscardOwnFiltered(c, x => x.Info.HasKeyword("洛克斯海盗团"), 3,
             "公开手牌中3张《洛克斯海盗团》卡牌", revealOnly: true)) return;
         var pick = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-3000");
