@@ -19,7 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 const COL_PRESETS = [4, 5, 6, 7, 8, 9, 10, 12];
 
-export default function SearchPanel() {
+export default function SearchPanel({ onClose }: { onClose?: () => void }) {
   const {
     leader,
     searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost,
@@ -47,8 +47,17 @@ export default function SearchPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* 标题 */}
-      <div className="px-3 pt-3 pb-2 border-b border-gray-800 shrink-0">
+      <div className="flex items-center justify-between border-b border-gray-800 px-3 pb-2 pt-3 shrink-0">
         <h2 className="text-white font-bold text-sm">搜索卡牌</h2>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-gray-800 px-3 py-1 text-xs font-bold text-gray-300 transition-colors hover:bg-gray-700 hover:text-white md:hidden"
+          >
+            完成
+          </button>
+        )}
       </div>
 
       {/* 筛选区（可滚动） */}

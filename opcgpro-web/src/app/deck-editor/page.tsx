@@ -10,12 +10,15 @@ import SearchResultPanel from "@/components/deck-editor/SearchResultPanel";
 import DeckInfoPanel from "@/components/deck-editor/DeckInfoPanel";
 
 type LoadState = "loading" | "done" | "error";
+type MobilePanel = "cards" | "deck";
 
 const GRID_COLS_KEY = "deckEditor_gridCols";
 
 export default function DeckEditorPage() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loaded, setLoaded]       = useState(0);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("cards");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const total = DEFAULT_SEARCH_SETS.length;
 
   useEffect(() => {
@@ -90,20 +93,67 @@ export default function DeckEditorPage() {
   }
 
   return (
-    <div className="flex h-screen h-[100dvh] bg-gray-950 overflow-hidden">
-      {/* SearchPanel 宽度减少 1/4：原 w-64(256px) → w-48(192px) */}
-      <div className="w-48 border-r border-gray-800 shrink-0">
-        <SearchPanel />
-      </div>
-      <div className="flex-1 overflow-hidden">
+    <div className="relative flex h-screen h-[100dvh] flex-col overflow-hidden bg-gray-950 md:flex-row">
+      {/* 手机竖屏主导航：牌池与卡组各自占满可用宽度，避免三栏互相挤压。 */}
+      <nav
+        data-deck-mobile-nav
+        className="grid h-12 shrink-0 grid-cols-[auto_1fr_1fr] border-b border-gray-800 bg-gray-950 md:hidden"
+        aria-label="卡组编辑视图"
+      >
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen(true)}
+          className="px-4 text-xs font-bold text-orange-300 transition-colors hover:bg-gray-900"
+          aria-expanded={mobileFiltersOpen}
+          aria-controls="deck-mobile-filters"
+        >
+          ☰ 筛选
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePanel("cards")}
+          className={`border-l border-gray-800 text-sm font-bold transition-colors ${
+            mobilePanel === "cards" ? "bg-gray-900 text-white" : "text-gray-500"
+          }`}
+          aria-pressed={mobilePanel === "cards"}
+        >
+          牌池
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePanel("deck")}
+          className={`border-l border-gray-800 text-sm font-bold transition-colors ${
+            mobilePanel === "deck" ? "bg-gray-900 text-white" : "text-gray-500"
+          }`}
+          aria-pressed={mobilePanel === "deck"}
+        >
+          卡组
+        </button>
+      </nav>
+
+      {/* 桌面保持左侧筛选栏；手机端按需覆盖展开。 */}
+      <aside
+        id="deck-mobile-filters"
+        data-deck-search-panel
+        className={`${mobileFiltersOpen ? "absolute inset-x-0 bottom-0 top-12 z-40 flex" : "hidden"} w-full shrink-0 border-r border-gray-800 bg-gray-950 md:static md:flex md:w-48`}
+      >
+        <div className="min-h-0 min-w-0 flex-1">
+          <SearchPanel onClose={() => setMobileFiltersOpen(false)} />
+        </div>
+      </aside>
+
+      <main
+        data-deck-card-pool
+        className={`${mobilePanel === "cards" ? "block" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)] md:block md:pb-0`}
+      >
         <SearchResultPanel />
-      </div>
-      <div
+      </main>
+      <aside
         data-deck-editor-panel
-        className="w-80 border-l border-gray-800 shrink-0 pb-[env(safe-area-inset-bottom)]"
+        className={`${mobilePanel === "deck" ? "block" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden border-gray-800 pb-[env(safe-area-inset-bottom)] md:block md:w-80 md:flex-none md:border-l`}
       >
         <DeckInfoPanel />
-      </div>
+      </aside>
     </div>
   );
 }
