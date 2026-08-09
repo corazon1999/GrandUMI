@@ -144,6 +144,24 @@ public static class BattleEngine
         s.Phase = Phase.BattleDamage;
     }
 
+    /// <summary>
+    /// Returns whether the attacking card and the current attack target are still on the field.
+    /// At a battle step boundary, the battle ends if either participating Character moved away.
+    /// </summary>
+    public static bool AreBattleParticipantsOnField(GameState s)
+    {
+        if (s.CurrentBattle is not { } b) return false;
+
+        var attackerSide = s.Players[b.AttackerPlayerIndex];
+        bool attackerPresent = attackerSide.Leader.Id == b.AttackerCardId
+            || attackerSide.Characters.Any(card => card.Id == b.AttackerCardId);
+        if (!attackerPresent) return false;
+
+        if (b.TargetIsLeader) return true;
+        return b.TargetCardId is { } targetId
+            && s.Players[b.DefenderPlayerIndex].Characters.Any(card => card.Id == targetId);
+    }
+
     /// <summary>异步伤害结算：角色 KO 走 KOCardAsync（可被 PreKO 拦截），领袖伤害量返回给调用方处理生命牌</summary>
     public static async Task<int> ResolveDamageAsync(GameState s, IPromptService prompts)
     {
@@ -152,7 +170,8 @@ public static class BattleEngine
         var def = s.Players[b.DefenderPlayerIndex];
 
         var attacker = atk.Leader.Id == b.AttackerCardId ? atk.Leader
-            : atk.Characters.First(c => c.Id == b.AttackerCardId);
+            : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
+        if (attacker is null) return 0;
         int attackerPower = s.CurrentPowerOf(b.AttackerPlayerIndex, attacker) + b.AttackerBattleBonus;
 
         bool attackerWins;
@@ -167,7 +186,8 @@ public static class BattleEngine
         }
         else
         {
-            var target = def.Characters.First(c => c.Id == b.TargetCardId);
+            var target = def.Characters.FirstOrDefault(c => c.Id == b.TargetCardId);
+            if (target is null) return 0;
             int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, target) + b.DefenderBattleBonus;
             attackerWins = attackerPower >= defenderPower;
             if (attackerWins)

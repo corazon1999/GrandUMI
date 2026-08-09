@@ -806,6 +806,11 @@ public class GameEngine
         {
             await BattleEngine.TriggerAttackDeclareAsync(State, Prompts);
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+            if (!BattleEngine.AreBattleParticipantsOnField(State))
+            {
+                await CompleteBattleAsync();
+                return;
+            }
 
             // 若防守方无可用【阻挡者】（攻击者带【不可阻挡】也跳过 Block）
             var def = State.Players[1 - attackerIdx];
@@ -856,11 +861,21 @@ public class GameEngine
         {
             await BattleEngine.TriggerBlockDeclareAsync(State, Prompts);
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+            if (!BattleEngine.AreBattleParticipantsOnField(State))
+            {
+                await CompleteBattleAsync();
+                return;
+            }
             // 旁观者：当对方发动【阻挡者】时（监听卡为攻击方，脚本内判 blockerOwner != self）
             int blockerOwner = State.CurrentBattle.DefenderPlayerIndex;
             await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppBlocker, Prompts,
                 new Dictionary<string, object?> { ["blockerOwner"] = blockerOwner });
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+            if (!BattleEngine.AreBattleParticipantsOnField(State))
+            {
+                await CompleteBattleAsync();
+                return;
+            }
             await AdvanceBattleAfterBlockAsync();
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Battle] BlockDeclare 异常: {ex.Message}"); }
@@ -930,6 +945,11 @@ public class GameEngine
             await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventCounter, Prompts);
             Broadcast("EffectResolved", new { cardNumber });
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
+            if (!BattleEngine.AreBattleParticipantsOnField(State))
+            {
+                await CompleteBattleAsync();
+                return;
+            }
             Broadcast("AwaitCounter");   // 仍在反击步骤，等待继续反击或 PassCounter
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Battle] 反击事件异常: {ex.Message}"); }
@@ -955,27 +975,32 @@ public class GameEngine
             int leaderDamage = await BattleEngine.ResolveDamageAsync(State, Prompts);
             if (leaderDamage > 0 && defenderIdx >= 0)
                 await LifeRevealManager.DealDamageToLeader(this, defenderIdx, leaderDamage);
-            // 【战斗结束时】触发：在 EndBattle 清除 CurrentBattle 前派发（监听卡可读 CurrentBattle 判断是否参战）
-            if (!State.IsGameOver && State.CurrentBattle is { } bend)
-            {
-                await EffectRuntime.TriggerEvent(State, EffectTrigger.OnBattleEnd, Prompts,
-                    new Dictionary<string, object?>
-                    {
-                        ["attackerId"] = bend.AttackerCardId.ToString(),
-                        ["attackerPlayerIdx"] = bend.AttackerPlayerIndex,
-                        ["defenderPlayerIdx"] = bend.DefenderPlayerIndex,
-                        ["targetIsLeader"] = bend.TargetIsLeader,
-                        ["targetCardId"] = (bend.ReplacedByBlockerCardId ?? bend.TargetCardId)?.ToString(),
-                    });
-            }
-            BattleEngine.EndBattle(State);
-            Broadcast("BattleEnd");
-            CheckGameOver();
+            await CompleteBattleAsync();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[Battle] 异步伤害处理异常: {ex.Message}");
         }
+    }
+
+    private async Task CompleteBattleAsync()
+    {
+        // 【战斗结束时】触发：在 EndBattle 清除 CurrentBattle 前派发（监听卡可读 CurrentBattle 判断是否参战）
+        if (!State.IsGameOver && State.CurrentBattle is { } battle)
+        {
+            await EffectRuntime.TriggerEvent(State, EffectTrigger.OnBattleEnd, Prompts,
+                new Dictionary<string, object?>
+                {
+                    ["attackerId"] = battle.AttackerCardId.ToString(),
+                    ["attackerPlayerIdx"] = battle.AttackerPlayerIndex,
+                    ["defenderPlayerIdx"] = battle.DefenderPlayerIndex,
+                    ["targetIsLeader"] = battle.TargetIsLeader,
+                    ["targetCardId"] = (battle.ReplacedByBlockerCardId ?? battle.TargetCardId)?.ToString(),
+                });
+        }
+        BattleEngine.EndBattle(State);
+        Broadcast("BattleEnd");
+        CheckGameOver();
     }
 
     private void CheckGameOver()
