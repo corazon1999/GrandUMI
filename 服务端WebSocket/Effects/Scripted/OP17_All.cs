@@ -490,7 +490,8 @@ internal static class OP17Effects
             if (Opp(c).StageCard is { } stage) AtomicOps.KO(c.State, 1 - c.OwnerIndex, stage);
             return;
         }
-        if (c.Trigger != EffectTrigger.EventCounter || Me(c).Characters.Count(x => x.Info.Power >= 8000) < 2) return;
+        if (c.Trigger != EffectTrigger.EventCounter
+            || Me(c).Characters.Count(x => c.State.CurrentPowerOf(c.OwnerIndex, x) >= 8000) < 2) return;
         var pick = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择本次战斗力量+4000的卡牌",
             OwnLeaderAndCharacters(c), 0, 1);
         if (pick.Count > 0) AtomicOps.AddPowerThisBattle(pick[0], 4000);

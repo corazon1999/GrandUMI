@@ -557,6 +557,33 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task OP17_018_Counter_UsesCurrentPowerForCondition()
+    {
+        var boosted = TestScene.New().Build();
+        var first = Card("OP17-003");
+        var second = Card("OP17-003");
+        first.PowerModThisTurn = 2000;
+        second.PowerModThisTurn = 2000;
+        boosted.Players[0].Characters.Add(first);
+        boosted.Players[0].Characters.Add(second);
+
+        await EffectRuntime.Resolve(boosted, 0, Card("OP17-018"), EffectTrigger.EventCounter, new MockPromptService());
+
+        Assert.Equal(4000, boosted.Players[0].Leader.PowerModThisBattle);
+
+        var reduced = TestScene.New().Build();
+        first = Card("OP17-005");
+        second = Card("OP17-022");
+        first.PowerModThisTurn = -5000;
+        reduced.Players[0].Characters.Add(first);
+        reduced.Players[0].Characters.Add(second);
+
+        await EffectRuntime.Resolve(reduced, 0, Card("OP17-018"), EffectTrigger.EventCounter, new MockPromptService());
+
+        Assert.Equal(0, reduced.Players[0].Leader.PowerModThisBattle);
+    }
+
+    [Fact]
     public async Task OP17_017_Counter_BoostsWhitebeardCardAndReducesOpponentPower()
     {
         var state = TestScene.New().Build();
