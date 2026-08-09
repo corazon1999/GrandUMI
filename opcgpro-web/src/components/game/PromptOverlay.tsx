@@ -15,11 +15,15 @@ export default function PromptOverlay() {
   const localOverflowHandIndex = useGameStore((s) => s.localOverflowHandIndex);
   const my = useGameStore((s) => s.my);
   const opp = useGameStore((s) => s.opponent);
+  const spectatorNames = useGameStore((s) => s.spectatorNames);
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const promptTogglePosition = spectatorNames.length > 0
+    ? "left-[6.75rem] max-md:left-[6.5rem]"
+    : "left-[3.75rem] max-md:left-[3.5rem]";
 
   const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
     ? {
@@ -60,9 +64,11 @@ export default function PromptOverlay() {
           <button
             type="button"
             onClick={() => setIsMinimized(false)}
-            className="pointer-events-auto fixed bottom-4 right-4 rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+            className={`pointer-events-auto fixed bottom-3 ${promptTogglePosition} flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700 max-md:bottom-2`}
+            title="恢复选择面板"
+            aria-label="恢复选择面板"
           >
-            恢复选择
+            恢复
           </button>
         </motion.div>
       </AnimatePresence>
@@ -250,7 +256,9 @@ export default function PromptOverlay() {
         <button
           type="button"
           onClick={() => setIsMinimized(true)}
-          className="fixed right-4 top-4 z-[60] rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+          className={`fixed bottom-3 ${promptTogglePosition} z-[60] flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700 max-md:bottom-2`}
+          title="隐藏选择面板"
+          aria-label="隐藏选择面板"
         >
           隐藏
         </button>
