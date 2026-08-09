@@ -234,6 +234,7 @@ public static class WebSocketBridge
             case "MsgPlayerList":  OnPlayerList(session, msg);   break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
             case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
+            case "MsgLeaderMatchupMatrix": OnLeaderMatchupMatrix(session, msg); break;
             case "MsgPlayerProfileStats": OnPlayerProfileStats(session, msg); break;
             case "MsgInvitePlayer": OnInvitePlayer(session, msg); break;
             case "MsgInviteResponse": OnInviteResponse(session, msg); break;
@@ -1059,6 +1060,64 @@ public static class WebSocketBridge
                 period = requestedPeriod,
                 leaderNumber = requestedLeader,
                 error = "对战统计暂时不可用",
+            });
+        }
+    }
+
+    private static void OnLeaderMatchupMatrix(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var requestedPeriod = Str(msg, "period") ?? "7d";
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchupMatrix",
+                result = false,
+                period = requestedPeriod,
+                error = "请先登录",
+            });
+            return;
+        }
+
+        try
+        {
+            var snapshot = LeaderStatsStore.Default.GetMatchupMatrix(requestedPeriod);
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchupMatrix",
+                result = true,
+                period = snapshot.Period,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
+                sinceUtc = snapshot.SinceUtc,
+                rows = snapshot.Rows.Select(row => new
+                {
+                    leaderNumber = row.LeaderNumber,
+                    items = row.Items.Select(x => new
+                    {
+                        rank = x.Rank,
+                        leaderNumber = x.LeaderNumber,
+                        games = x.Games,
+                        wins = x.Wins,
+                        losses = x.Losses,
+                        winRate = x.WinRate,
+                        firstGames = x.FirstGames,
+                        firstWinRate = x.FirstWinRate,
+                        secondGames = x.SecondGames,
+                        secondWinRate = x.SecondWinRate,
+                        isMirror = x.IsMirror,
+                    }),
+                }),
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取 Leader 对阵矩阵失败: {ex.Message}");
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderMatchupMatrix",
+                result = false,
+                period = requestedPeriod,
+                error = "对阵矩阵暂时不可用",
             });
         }
     }

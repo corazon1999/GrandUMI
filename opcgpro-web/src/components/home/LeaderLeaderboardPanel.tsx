@@ -8,6 +8,7 @@ import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import type { LeaderboardPeriod } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
+import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
 
 const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "7d", label: "近 7 天" },
@@ -54,10 +55,12 @@ function colorClasses(color?: string): string {
 export default function LeaderLeaderboardPanel() {
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
+  const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
   const [search, setSearch] = useState("");
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
 
   const request = (nextPeriod: LeaderboardPeriod) => {
     setSelectedLeader(null);
@@ -92,6 +95,17 @@ export default function LeaderLeaderboardPanel() {
     HomeRequest.requestLeaderLeaderboard(period);
   }, [period]);
 
+  useEffect(() => {
+    if (
+      viewMode === "matrix"
+      && leaderboard?.period === period
+      && leaderboard.result !== false
+      && (leaderMatchupMatrix == null || leaderMatchupMatrix.period !== period)
+    ) {
+      HomeRequest.requestLeaderMatchupMatrix(period);
+    }
+  }, [leaderboard, leaderMatchupMatrix, period, viewMode]);
+
   const items = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("zh-CN");
     const source = leaderboard?.period === period ? leaderboard.items ?? [] : [];
@@ -115,7 +129,7 @@ export default function LeaderLeaderboardPanel() {
         <div>
           <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
-            统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 点击 Leader 查看对阵前十
+            统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 支持排行榜与对阵一图流
           </p>
         </div>
         <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex @[640px]:w-auto">
@@ -159,12 +173,36 @@ export default function LeaderLeaderboardPanel() {
             </span>
           )}
         </div>
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="搜索 Leader 名称或卡号"
-          className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 @[640px]:h-auto @[640px]:w-56 @[640px]:py-1.5 @[640px]:text-xs"
-        />
+        <div className="flex w-full flex-wrap items-center gap-2 @[640px]:w-auto">
+          <div className="grid flex-1 grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:flex-none">
+            <button
+              type="button"
+              onClick={() => setViewMode("ranking")}
+              className={`min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${
+                viewMode === "ranking" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-200"
+              }`}
+            >
+              排行榜
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("matrix")}
+              className={`min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${
+                viewMode === "matrix" ? "bg-orange-500 text-white" : "text-gray-500 hover:text-gray-200"
+              }`}
+            >
+              对阵一图流
+            </button>
+          </div>
+          {viewMode === "ranking" && (
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="搜索 Leader 名称或卡号"
+              className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 @[640px]:h-auto @[640px]:w-56 @[640px]:py-1.5 @[640px]:text-xs"
+            />
+          )}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-gray-800 bg-gray-950/60">
@@ -181,6 +219,12 @@ export default function LeaderLeaderboardPanel() {
               重试
             </button>
           </div>
+        ) : viewMode === "matrix" ? (
+          <LeaderMatchupMatrix
+            data={leaderMatchupMatrix?.period === period ? leaderMatchupMatrix : null}
+            leaderboardItems={leaderboard.items ?? []}
+            onRetry={() => HomeRequest.requestLeaderMatchupMatrix(period)}
+          />
         ) : items.length === 0 ? (
           <p className="py-16 text-center text-sm text-gray-600">
             {search ? "没有符合搜索条件的 Leader" : "当前时间范围暂无有效对局"}

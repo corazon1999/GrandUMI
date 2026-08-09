@@ -189,6 +189,55 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
+    public void 对阵矩阵取胜率榜前十五且双方胜率互补()
+    {
+        var now = new DateTime(2026, 8, 9, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+
+        for (var leaderIndex = 0; leaderIndex < 16; leaderIndex++)
+        {
+            var leader = $"L-{leaderIndex:D2}";
+            var opponent = $"L-{(leaderIndex + 1) % 16:D2}";
+            for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
+            {
+                store.RecordMatch(Match(
+                    $"matrix-{leaderIndex}-{gameIndex}",
+                    now,
+                    MatchKind.Matchmaking,
+                    leader,
+                    opponent,
+                    0,
+                    gameIndex % 2,
+                    8));
+            }
+        }
+
+        var leaderboard = store.GetLeaderboard("all", now);
+        var result = store.GetMatchupMatrix("all", now);
+        var expectedLeaders = leaderboard.Items
+            .Where(item => item.Rank is not null)
+            .Take(LeaderStatsStore.MatchupMatrixLeaderLimit)
+            .Select(item => item.LeaderNumber)
+            .ToArray();
+
+        Assert.Equal(LeaderStatsStore.MatchupMatrixLeaderLimit, result.Rows.Count);
+        Assert.Equal(expectedLeaders, result.Rows.Select(row => row.LeaderNumber));
+        Assert.All(result.Rows, row => Assert.Equal(LeaderStatsStore.MatchupMatrixLeaderLimit, row.Items.Count));
+
+        var leader0 = Assert.Single(result.Rows, row => row.LeaderNumber == "L-00");
+        var leader1 = Assert.Single(result.Rows, row => row.LeaderNumber == "L-01");
+        Assert.Equal(1, Assert.Single(leader0.Items, item => item.LeaderNumber == "L-01").WinRate);
+        Assert.Equal(0, Assert.Single(leader1.Items, item => item.LeaderNumber == "L-00").WinRate);
+        Assert.True(Assert.Single(leader0.Items, item => item.LeaderNumber == "L-00").IsMirror);
+        var excludedLeader = leaderboard.Items
+            .Where(item => item.Rank is not null)
+            .Skip(LeaderStatsStore.MatchupMatrixLeaderLimit)
+            .First()
+            .LeaderNumber;
+        Assert.DoesNotContain(result.Rows, row => row.LeaderNumber == excludedLeader);
+    }
+
+    [Fact]
     public void 个人详情按账号聚合胜负常用领航和趋势()
     {
         var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);

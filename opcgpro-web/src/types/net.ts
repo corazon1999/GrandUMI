@@ -347,6 +347,22 @@ export interface MsgLeaderMatchups extends MsgBase {
   items?: LeaderMatchupItem[];
 }
 
+export interface LeaderMatchupMatrixRow {
+  leaderNumber: string;
+  items: LeaderMatchupItem[];
+}
+
+/** 当前周期胜率榜前十五名的完整对阵矩阵。 */
+export interface MsgLeaderMatchupMatrix extends MsgBase {
+  proto: "MsgLeaderMatchupMatrix";
+  period: LeaderboardPeriod;
+  result?: boolean;
+  error?: string;
+  generatedAtUtc?: string;
+  sinceUtc?: string | null;
+  rows?: LeaderMatchupMatrixRow[];
+}
+
 export interface PlayerLeaderStatsItem {
   leaderNumber: string;
   games: number;
@@ -757,5 +773,6 @@ export type AnyMsg =
   | MsgLeaveGameChat
   | MsgLeaderLeaderboard
   | MsgLeaderMatchups
+  | MsgLeaderMatchupMatrix
   | MsgPlayerProfileStats
   | MsgOnlineCount;

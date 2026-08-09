@@ -60,6 +60,16 @@ public sealed record LeaderMatchupSnapshot(
     string LeaderNumber,
     IReadOnlyList<LeaderMatchupItem> Items);
 
+public sealed record LeaderMatchupMatrixRow(
+    string LeaderNumber,
+    IReadOnlyList<LeaderMatchupItem> Items);
+
+public sealed record LeaderMatchupMatrixSnapshot(
+    string Period,
+    DateTime GeneratedAtUtc,
+    DateTime? SinceUtc,
+    IReadOnlyList<LeaderMatchupMatrixRow> Rows);
+
 public sealed record PlayerLeaderStatsItem(
     string LeaderNumber,
     int Games,
@@ -100,6 +110,7 @@ public sealed class LeaderStatsStore
 {
     public const int MinimumRankedGames = 20;
     public const int MinimumCountedTurn = 8;
+    public const int MatchupMatrixLeaderLimit = 15;
     public const int StatsVersion = 1;
 
     private readonly object _lock = new();
@@ -360,6 +371,73 @@ public sealed class LeaderStatsStore
                 leaderboard.SinceUtc,
                 normalizedLeader,
                 items);
+        }
+    }
+
+    /// <summary>按综合胜率降序统计榜前十五 Leader 的完整对阵矩阵。</summary>
+    public LeaderMatchupMatrixSnapshot GetMatchupMatrix(string? requestedPeriod, DateTime? nowUtc = null)
+    {
+        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);
+        var leaders = leaderboard.Items
+            .Where(x => x.Rank is not null)
+            .Take(MatchupMatrixLeaderLimit)
+            .ToArray();
+
+        lock (_lock)
+        {
+            Initialize();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("排行榜数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
+            var rows = leaders.Select(leader =>
+            {
+                var matchupRows = ReadMatchupRows(connection, leader.LeaderNumber, leaderboard.SinceUtc);
+                var mirror = ReadMirrorRow(connection, leader.LeaderNumber, leaderboard.SinceUtc);
+                var items = leaders.Select(opponent =>
+                {
+                    var rank = opponent.Rank!.Value;
+                    if (string.Equals(opponent.LeaderNumber, leader.LeaderNumber, StringComparison.Ordinal))
+                    {
+                        return new LeaderMatchupItem(
+                            rank,
+                            opponent.LeaderNumber,
+                            mirror.Games,
+                            null,
+                            null,
+                            null,
+                            mirror.Games,
+                            mirror.Games == 0 ? null : mirror.FirstWins / (double)mirror.Games,
+                            mirror.Games,
+                            mirror.Games == 0 ? null : mirror.SecondWins / (double)mirror.Games,
+                            true);
+                    }
+
+                    if (!matchupRows.TryGetValue(opponent.LeaderNumber, out var matchup))
+                        matchup = new MatchupAggregateRow(opponent.LeaderNumber, 0, 0, 0, 0, 0, 0);
+
+                    return new LeaderMatchupItem(
+                        rank,
+                        opponent.LeaderNumber,
+                        matchup.Games,
+                        matchup.Wins,
+                        matchup.Games - matchup.Wins,
+                        matchup.Games == 0 ? null : matchup.Wins / (double)matchup.Games,
+                        matchup.FirstGames,
+                        matchup.FirstGames == 0 ? null : matchup.FirstWins / (double)matchup.FirstGames,
+                        matchup.SecondGames,
+                        matchup.SecondGames == 0 ? null : matchup.SecondWins / (double)matchup.SecondGames,
+                        false);
+                }).ToArray();
+
+                return new LeaderMatchupMatrixRow(leader.LeaderNumber, items);
+            }).ToArray();
+
+            return new LeaderMatchupMatrixSnapshot(
+                leaderboard.Period,
+                leaderboard.GeneratedAtUtc,
+                leaderboard.SinceUtc,
+                rows);
         }
     }
 

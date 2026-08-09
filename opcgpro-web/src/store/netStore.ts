@@ -3,6 +3,7 @@ import type {
   PlayerInfo,
   FriendlyPlayer,
   MsgLeaderLeaderboard,
+  MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
 } from "@/types/net";
@@ -69,6 +70,8 @@ interface NetStore {
   leaderLeaderboard: MsgLeaderLeaderboard | null;
   // 点击榜单项后按“周期:Leader”保存的对战前十统计
   leaderMatchups: Record<string, MsgLeaderMatchups>;
+  // 当前周期榜前十五的完整对阵矩阵
+  leaderMatchupMatrix: MsgLeaderMatchupMatrix | null;
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
   // 收到的对战邀请（被邀请方弹窗用）
@@ -100,6 +103,7 @@ interface NetStore {
   setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
   setLeaderMatchups: (data: MsgLeaderMatchups) => void;
   clearLeaderMatchups: () => void;
+  setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
@@ -128,6 +132,7 @@ const initialState = {
   playerList: [] as PlayerInfo[],
   leaderLeaderboard: null as MsgLeaderLeaderboard | null,
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
+  leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
@@ -184,6 +189,8 @@ export const useNetStore = create<NetStore>((set) => ({
   })),
 
   clearLeaderMatchups: () => set({ leaderMatchups: {} }),
+
+  setLeaderMatchupMatrix: (leaderMatchupMatrix) => set({ leaderMatchupMatrix }),
 
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
 

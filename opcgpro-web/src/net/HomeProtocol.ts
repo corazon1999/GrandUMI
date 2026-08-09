@@ -36,6 +36,7 @@ import type {
   MsgOnlineCount,
   MsgPlayerList,
   MsgLeaderLeaderboard,
+  MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   LeaderboardPeriod,
@@ -156,6 +157,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgLeaderMatchups":
         handleLeaderMatchups(msg as MsgLeaderMatchups);
+        break;
+      case "MsgLeaderMatchupMatrix":
+        handleLeaderMatchupMatrix(msg as MsgLeaderMatchupMatrix);
         break;
       case "MsgPlayerProfileStats":
         handlePlayerProfileStats(msg as MsgPlayerProfileStats);
@@ -502,6 +506,11 @@ function handleLeaderMatchups(msg: MsgLeaderMatchups) {
   useNetStore.getState().setLeaderMatchups(msg);
 }
 
+/** MsgLeaderMatchupMatrix — 当前周期榜前十五的完整对阵矩阵。 */
+function handleLeaderMatchupMatrix(msg: MsgLeaderMatchupMatrix) {
+  useNetStore.getState().setLeaderMatchupMatrix(msg);
+}
+
 /** MsgPlayerProfileStats — 当前登录账号的周期战绩。 */
 function handlePlayerProfileStats(msg: MsgPlayerProfileStats) {
   useNetStore.getState().setPlayerProfileStats(msg);
@@ -706,6 +715,7 @@ export const HomeRequest = {
     const store = useNetStore.getState();
     store.setLeaderLeaderboard(null);
     store.clearLeaderMatchups();
+    store.setLeaderMatchupMatrix(null);
     return NetManager.send({ proto: "MsgLeaderLeaderboard", period } as MsgLeaderLeaderboard);
   },
 
@@ -716,6 +726,14 @@ export const HomeRequest = {
       leaderNumber,
     });
     return NetManager.send({ proto: "MsgLeaderMatchups", period, leaderNumber } as MsgLeaderMatchups);
+  },
+
+  requestLeaderMatchupMatrix(period: LeaderboardPeriod) {
+    useNetStore.getState().setLeaderMatchupMatrix({
+      proto: "MsgLeaderMatchupMatrix",
+      period,
+    });
+    return NetManager.send({ proto: "MsgLeaderMatchupMatrix", period } as MsgLeaderMatchupMatrix);
   },
 
   requestPlayerProfileStats(period: LeaderboardPeriod) {
