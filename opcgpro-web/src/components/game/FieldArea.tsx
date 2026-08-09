@@ -4,7 +4,7 @@ import { useGameStore } from "@/store/gameStore";
 import { useBattleStore } from "@/store/battleStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
 
 interface Props {
@@ -56,7 +56,7 @@ export default function FieldArea({ side }: Props) {
       data-zone-side={side}
     >
       {player.fieldCards.map((fc) => {
-        const cardData = getCard(fc.number) ?? null;
+        const cardData = getGameCard(fc.number, player.spriteMap) ?? null;
         const attachedCount = fc.attachedDon;
         const isAttacker = !!battle && fc.id === battle.attackerCardId;
         const isBlocker = !!battle && fc.id === battle.blockerCardId;

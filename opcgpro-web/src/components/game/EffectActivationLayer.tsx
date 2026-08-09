@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { useGameStore, type QueuedEffectActivation } from "@/store/gameStore";
 
@@ -162,7 +162,10 @@ function CardCutIn({
   activation: QueuedEffectActivation;
   reduceMotion: boolean;
 }) {
-  const card = getCard(activation.cardNumber) ?? null;
+  const spriteMap = useGameStore((state) =>
+    activation.side === "my" ? state.my?.spriteMap : state.opponent?.spriteMap,
+  );
+  const card = getGameCard(activation.cardNumber, spriteMap) ?? null;
   const name = card?.name ?? activation.cardNumber;
   const trigger = TRIGGER_LABELS[activation.trigger] ?? "卡牌效果";
 

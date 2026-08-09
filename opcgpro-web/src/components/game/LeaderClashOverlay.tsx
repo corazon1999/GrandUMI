@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
@@ -166,9 +166,11 @@ function FighterCard({
 export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const myLeaderId = useGameStore((state) => state.my?.leaderId ?? "");
   const myLeaderNumber = useGameStore((state) => state.my?.leaderNumber ?? "");
+  const mySpriteMap = useGameStore((state) => state.my?.spriteMap);
   const myName = useGameStore((state) => state.my?.name ?? "");
   const opponentLeaderId = useGameStore((state) => state.opponent?.leaderId ?? "");
   const opponentLeaderNumber = useGameStore((state) => state.opponent?.leaderNumber ?? "");
+  const opponentSpriteMap = useGameStore((state) => state.opponent?.spriteMap);
   const opponentName = useGameStore((state) => state.opponent?.name ?? "");
   const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
   const turnCount = useGameStore((state) => state.turnCount);
@@ -176,8 +178,8 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const [phase, setPhase] = useState<IntroPhase>("waiting");
   const completedRef = useRef(false);
 
-  const myLeader = getCard(myLeaderNumber);
-  const opponentLeader = getCard(opponentLeaderNumber);
+  const myLeader = getGameCard(myLeaderNumber, mySpriteMap);
+  const opponentLeader = getGameCard(opponentLeaderNumber, opponentSpriteMap);
   const mySprite = myLeader?.sprite || CARD_BACK_SRC;
   const opponentSprite = opponentLeader?.sprite || CARD_BACK_SRC;
   const myLeaderName = myLeader?.name || myLeaderNumber;

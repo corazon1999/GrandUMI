@@ -4,7 +4,7 @@ import { useGameStore } from "@/store/gameStore";
 import { useBattleStore } from "@/store/battleStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
 
 interface Props {
@@ -77,7 +77,7 @@ export default function LeaderCard({ side }: Props) {
     }
   };
 
-  const leader = getCard(player.leaderNumber);
+  const leader = getGameCard(player.leaderNumber, player.spriteMap);
   if (!leader) {
     return (
       <div className={`${dimensions} relative flex items-center justify-center rounded-md border border-dashed border-sky-200/25 bg-black/20 shadow-inner shadow-black/30`}>

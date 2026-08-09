@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
-import { getCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 
 /**
@@ -132,7 +132,7 @@ export default function BattleDefenseOverlay() {
                     onClick={() => GameRequest.declareBlocker(b.id)}
                     className="rounded-md ring-2 ring-transparent transition hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <CardItem card={getCard(b.number) ?? null} size="sm" isTapped={b.isTapped} />
+                    <CardItem card={getGameCard(b.number, my.spriteMap) ?? null} size="sm" isTapped={b.isTapped} />
                   </button>
                 ))}
               </div>

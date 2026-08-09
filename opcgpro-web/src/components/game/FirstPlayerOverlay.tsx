@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
@@ -34,7 +34,10 @@ function LeaderPreview({
   leaderNumber: string;
   side: "my" | "opponent";
 }) {
-  const card = getCard(leaderNumber);
+  const spriteMap = useGameStore((state) =>
+    side === "my" ? state.my?.spriteMap : state.opponent?.spriteMap,
+  );
+  const card = getGameCard(leaderNumber, spriteMap);
   const isMine = side === "my";
   const rawSprite = card?.sprite || CARD_BACK_SRC;
 

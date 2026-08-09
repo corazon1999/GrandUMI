@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import {
   detectCardZoneTransitions,
   type CardZone,
@@ -41,6 +41,7 @@ interface Flight extends CardZoneTransition {
   start: { x: number; y: number };
   end: { x: number; y: number };
   cardBackId?: string;
+  spriteMap?: Record<string, string>;
 }
 
 function genericAnchorKey(side: CardZoneSide, zone: CardZone) {
@@ -148,7 +149,7 @@ function FlyingCard({
   reducedMotion: boolean;
   onComplete: (id: string) => void;
 }) {
-  const card = flight.cardNumber ? getCard(flight.cardNumber) ?? null : null;
+  const card = flight.cardNumber ? getGameCard(flight.cardNumber, flight.spriteMap) ?? null : null;
   const bend = bendPoint(flight.start, flight.end, flight.order);
   const startX = flight.start.x - CARD_WIDTH / 2;
   const startY = flight.start.y - CARD_HEIGHT / 2;
@@ -310,6 +311,7 @@ export default function CardZoneTransitionLayer() {
           start: center(source),
           end: center(target),
           cardBackId: transition.side === "my" ? my.cardBackId : opponent.cardBackId,
+          spriteMap: transition.side === "my" ? my.spriteMap : opponent.spriteMap,
         }];
       });
       if (nextFlights.length > 0) {

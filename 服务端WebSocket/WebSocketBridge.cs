@@ -583,6 +583,7 @@ public static class WebSocketBridge
         }
 
         s.Deck       = deck;
+        s.DeckName   = Str(msg, "deckName");
         s.IsMatching = true;
         MatchQueue.Enqueue(s);
         Send(s.SessionId, new { proto = "MsgEnterMatch", result = true });
@@ -597,6 +598,7 @@ public static class WebSocketBridge
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
+        var deckName = Str(msg, "deckName");
         // 单人测试先后手（前端可选）：默认人类先手，仅显式 goFirst=false 时人类后手
         bool goFirst = !(msg.TryGetValue("goFirst", out var gfEl) && gfEl.ValueKind == JsonValueKind.False);
         var v = DeckValidator.Validate(deck);
@@ -620,6 +622,8 @@ public static class WebSocketBridge
                 p1AlwaysPrompt: false,
                 p0CardBackId: s.CardBackId,
                 p1CardBackId: PlayerDataStore.DefaultCardBackId,
+                p0SpriteMap: ResolveDeckSpriteMap(s.Account ?? "", deckName, deck),
+                p1SpriteMap: ResolveDeckSpriteMap(s.Account ?? "", deckName, deck),
                 vsBot: true,
                 matchKind: MatchKind.Bot,
                 broadcastInitialState: false);
@@ -640,6 +644,7 @@ public static class WebSocketBridge
     {
         s.IsMatching = false;
         s.Deck       = null;
+        s.DeckName   = null;
         RebuildMatchQueue(s);
         Send(s.SessionId, new { proto = "MsgCancelMatch" });
         Log($"匹配取消 {s.Account}");
@@ -660,6 +665,8 @@ public static class WebSocketBridge
                     p1AlwaysPrompt: p2.AlwaysPromptOnLifeReveal,
                     p0CardBackId: p1.CardBackId,
                     p1CardBackId: p2.CardBackId,
+                    p0SpriteMap: ResolveDeckSpriteMap(p1.Account ?? "", p1.DeckName, deck1),
+                    p1SpriteMap: ResolveDeckSpriteMap(p2.Account ?? "", p2.DeckName, deck2),
                     matchKind: MatchKind.Matchmaking,
                     broadcastInitialState: false);
 
@@ -1533,11 +1540,56 @@ public static class WebSocketBridge
     }
 
     /// <summary>共用赛前房间开局：先注册权威对局，再通知双方切换页面并广播首份快照。</summary>
+    private static IReadOnlyDictionary<string, string> ResolveDeckSpriteMap(
+        string account,
+        string? deckName,
+        string deckRaw)
+    {
+        if (string.IsNullOrWhiteSpace(account))
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var snapshot = _playerDataStore.GetPlayerData(account);
+            var matchingDecks = snapshot.Decks
+                .Where(deck => DeckContentsMatch(deck, deckRaw))
+                .ToArray();
+            var selected = matchingDecks.FirstOrDefault(deck =>
+                    !string.IsNullOrWhiteSpace(deckName)
+                    && string.Equals(deck.Name, deckName, StringComparison.OrdinalIgnoreCase))
+                ?? matchingDecks.FirstOrDefault(deck =>
+                    !string.IsNullOrWhiteSpace(snapshot.SelectedDeckName)
+                    && string.Equals(deck.Name, snapshot.SelectedDeckName, StringComparison.OrdinalIgnoreCase))
+                ?? matchingDecks.FirstOrDefault();
+
+            return selected is null
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(selected.SpriteMap, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取 {account} 的异画选择失败: {ex.Message}");
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static bool DeckContentsMatch(StoredDeck deck, string deckRaw)
+    {
+        var submitted = deckRaw
+            .Replace("\r", "", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (submitted.Length != deck.Cards.Length + 1) return false;
+        if (!string.Equals(submitted[0], deck.Leader, StringComparison.OrdinalIgnoreCase)) return false;
+        return submitted.Skip(1).SequenceEqual(deck.Cards, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static string? StartDuel(
         WsSession host,
         string hostDeck,
+        string? hostDeckName,
         WsSession guest,
         string guestDeck,
+        string? guestDeckName,
         string friendlyRoomId,
         MatchKind matchKind)
     {
@@ -1550,6 +1602,8 @@ public static class WebSocketBridge
                 p1AlwaysPrompt: guest.AlwaysPromptOnLifeReveal,
                 p0CardBackId: host.CardBackId,
                 p1CardBackId: guest.CardBackId,
+                p0SpriteMap: ResolveDeckSpriteMap(host.Account ?? "", hostDeckName, hostDeck),
+                p1SpriteMap: ResolveDeckSpriteMap(guest.Account ?? "", guestDeckName, guestDeck),
                 friendlyRoomId: friendlyRoomId,
                 matchKind: matchKind,
                 broadcastInitialState: false);
@@ -1703,7 +1757,10 @@ public static class WebSocketBridge
         }
 
         PushFriendlyRoom(room);
-        var gameRoomId = StartDuel(host, start.HostDeck, guest, start.GuestDeck, room.RoomId, room.MatchKind);
+        var gameRoomId = StartDuel(
+            host, start.HostDeck, start.HostDeckName,
+            guest, start.GuestDeck, start.GuestDeckName,
+            room.RoomId, room.MatchKind);
         room.CompleteStart(gameRoomId is not null);
         PushFriendlyRoom(room);
         if (gameRoomId is null)

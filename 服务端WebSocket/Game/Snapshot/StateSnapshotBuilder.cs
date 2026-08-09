@@ -232,6 +232,7 @@ public static class StateSnapshotBuilder
         {
             name = board.Name,
             cardBackId = board.CardBackId,
+            spriteMap = p.SpriteMap,
             handCardNumbers = asSelf ? p.Hand.Select(c => c.Info.Number).ToArray() : Array.Empty<string>(),
             handCardCosts = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
             handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),

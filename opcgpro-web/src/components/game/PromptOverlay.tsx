@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
-import { getCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 
 function PromptChevron({ expanded }: { expanded: boolean }) {
@@ -193,9 +193,9 @@ export default function PromptOverlay() {
 
   // 服务端注入的效果源卡号：让玩家知道当前在结算哪张卡的效果
   const sourceNumber = prompt.extra?.sourceNumber as string | undefined;
-  const sourceCard = sourceNumber ? getCard(sourceNumber) ?? null : null;
+  const sourceCard = sourceNumber ? getGameCard(sourceNumber, my?.spriteMap) ?? null : null;
   const lifeCardNumber = prompt.extra?.lifeCardNumber as string | undefined;
-  const lifeCard = lifeCardNumber ? getCard(lifeCardNumber) ?? null : null;
+  const lifeCard = lifeCardNumber ? getGameCard(lifeCardNumber, my?.spriteMap) ?? null : null;
   const hasRealTrigger = prompt.extra?.hasRealTrigger === true;
 
   // 观星 / 卡组重排等"自选顺序"提示：按点选先后决定相对顺序，
@@ -225,23 +225,21 @@ export default function PromptOverlay() {
   // 把 cardId 反查成显示用 CardData（优先 extra.choiceCards，再领袖，最后退回自己/对手场上）
   const findCardById = (id: string) => {
     const numFromExtra = choiceMap.get(id);
-    if (numFromExtra) return getCard(numFromExtra) ?? null;
+    if (numFromExtra) return getGameCard(numFromExtra, my?.spriteMap) ?? null;
     // 领袖不在 fieldCards 里，需单独识别（候选 id 为领袖 GUID 或字面 "leader"），否则卡图无法加载
     if (id === "leader" || id === my?.leaderId)
-      return my?.leaderNumber ? getCard(my.leaderNumber) ?? null : null;
+      return my?.leaderNumber ? getGameCard(my.leaderNumber, my.spriteMap) ?? null : null;
     if (id === opp?.leaderId)
-      return opp?.leaderNumber ? getCard(opp.leaderNumber) ?? null : null;
+      return opp?.leaderNumber ? getGameCard(opp.leaderNumber, opp.spriteMap) ?? null : null;
     // 舞台不在 fieldCards 里（stageId/stageNumber 扁平字段），需单独识别，否则候选卡图加载不出
     if (my && id === my.stageId)
-      return my.stageNumber ? getCard(my.stageNumber) ?? null : null;
+      return my.stageNumber ? getGameCard(my.stageNumber, my.spriteMap) ?? null : null;
     if (opp && id === opp.stageId)
-      return opp.stageNumber ? getCard(opp.stageNumber) ?? null : null;
-    const allCards = [
-      ...(my?.fieldCards ?? []),
-      ...(opp?.fieldCards ?? []),
-    ];
-    const found = allCards.find((c) => c.id === id);
-    return found ? getCard(found.number) ?? null : null;
+      return opp.stageNumber ? getGameCard(opp.stageNumber, opp.spriteMap) ?? null : null;
+    const myCard = my?.fieldCards.find((c) => c.id === id);
+    if (myCard) return getGameCard(myCard.number, my?.spriteMap) ?? null;
+    const opponentCard = opp?.fieldCards.find((c) => c.id === id);
+    return opponentCard ? getGameCard(opponentCard.number, opp?.spriteMap) ?? null : null;
   };
 
   // 场上目标需要明确所属阵营，避免双方存在同名或同卡图角色时无法分辨。
@@ -493,7 +491,7 @@ export default function PromptOverlay() {
             <div className="flex flex-wrap gap-3 max-w-2xl justify-center">
               {donChoices.map((d) => {
                 const isSel = selected.includes(d.id);
-                const attachedCard = d.attachedToNumber ? getCard(d.attachedToNumber) ?? null : null;
+                const attachedCard = d.attachedToNumber ? getGameCard(d.attachedToNumber, my?.spriteMap) ?? null : null;
                 const stateLabel = d.state === "Active" ? "活跃" : d.state === "Rest" ? "休息" : "附着";
                 return (
                   <div

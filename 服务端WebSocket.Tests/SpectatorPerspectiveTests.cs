@@ -43,4 +43,28 @@ public class SpectatorPerspectiveTests
             state.Players[1].AccountName,
             alternate.GetProperty("my").GetProperty("name").GetString());
     }
+
+    [Fact]
+    public void 观战快照_按主视角同步双方各自异画选择()
+    {
+        var state = TestScene.MaxScenario();
+        state.Players[0].SpriteMap["OP01-001"] = "/sprites/OP01/OP01-001_p0.png";
+        state.Players[1].SpriteMap["OP01-001"] = "/sprites/OP01/OP01-001_p1.png";
+
+        var playerSnapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, viewerIndex: 1));
+        var spectatorSnapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(
+            state,
+            viewerIndex: -1,
+            spectatorPlayerIndex: 1));
+
+        Assert.Equal(
+            playerSnapshot.GetProperty("my").GetProperty("spriteMap").GetProperty("OP01-001").GetString(),
+            spectatorSnapshot.GetProperty("my").GetProperty("spriteMap").GetProperty("OP01-001").GetString());
+        Assert.Equal(
+            playerSnapshot.GetProperty("opponent").GetProperty("spriteMap").GetProperty("OP01-001").GetString(),
+            spectatorSnapshot.GetProperty("opponent").GetProperty("spriteMap").GetProperty("OP01-001").GetString());
+        Assert.NotEqual(
+            spectatorSnapshot.GetProperty("my").GetProperty("spriteMap").GetProperty("OP01-001").GetString(),
+            spectatorSnapshot.GetProperty("opponent").GetProperty("spriteMap").GetProperty("OP01-001").GetString());
+    }
 }

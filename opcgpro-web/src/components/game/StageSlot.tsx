@@ -3,7 +3,7 @@
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 
 interface Props {
   side: "my" | "opponent";
@@ -42,7 +42,7 @@ export default function StageSlot({ side }: Props) {
     >
       {stageNumber ? (
         <CardItem
-          card={getCard(stageNumber) ?? null}
+          card={getGameCard(stageNumber, player?.spriteMap) ?? null}
           size={cardSize}
           isSelected={selectedFieldId === stageId}
           isTapped={stageTapped}

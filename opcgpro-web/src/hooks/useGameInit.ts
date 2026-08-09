@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
-import { getCard, loadCardSet, loadAllCards, applySpriteMap } from "@/data/CardLoader";
+import { getCard, loadCardSet, loadAllCards } from "@/data/CardLoader";
 import { CARD_SET_PATHS } from "@/data/cardSets";
 
 /**
@@ -47,13 +47,11 @@ export function useGameInit() {
     }
 
     if (missing.size === 0) {
-      applySessionSpriteMap();
       setReady(true);
     } else {
       Promise.all([...missing].map((p) => loadCardSet(p).catch(() => {})))
         .then(() => {
           if (!mounted.current) return;
-          applySessionSpriteMap();
           setReady(true);
           bumpCardData((v) => v + 1);
         });
@@ -74,7 +72,6 @@ export function useGameInit() {
       loadAllCards()
         .then(() => {
           if (!mounted.current) return;
-          applySessionSpriteMap();
           bumpCardData((v) => v + 1);
         })
         .catch(() => { kickedFullLoad.current = false; });
@@ -98,17 +95,4 @@ export function useGameInit() {
   }, [ready]);
 
   return ready;
-}
-
-/** 从 sessionStorage 读取异画映射并应用到卡牌缓存 */
-function applySessionSpriteMap() {
-  try {
-    const raw = sessionStorage.getItem("grandumi_spriteMap");
-    if (raw) {
-      const map = JSON.parse(raw) as Record<string, string>;
-      applySpriteMap(map);
-    }
-  } catch {
-    // 解析失败时忽略，使用默认原画
-  }
 }

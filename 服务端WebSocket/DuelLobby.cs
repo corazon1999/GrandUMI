@@ -69,7 +69,7 @@ public sealed class DuelLobby
 
             State = "starting";
             start = new DuelLobbyStartData(
-                Accounts[0]!, Accounts[1]!, Decks[0]!, Decks[1]!);
+                Accounts[0]!, Accounts[1]!, Decks[0]!, Decks[1]!, DeckNames[0], DeckNames[1]);
             return true;
         }
     }
@@ -101,4 +101,6 @@ public sealed record DuelLobbyStartData(
     string HostAccount,
     string GuestAccount,
     string HostDeck,
-    string GuestDeck);
+    string GuestDeck,
+    string? HostDeckName,
+    string? GuestDeckName);

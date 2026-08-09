@@ -49,7 +49,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const handleMatch = () => {
     if (!selectedDeck) return;
-    const sent = HomeRequest.enterMatch(selectedDeck.cards);
+    const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
     }
@@ -62,7 +62,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   // 单人测试：与机器人对战，方便测试单卡效果（机器人轮到自己会自动结束回合）
   const handleBotMatch = () => {
     if (!selectedDeck) return;
-    const sent = HomeRequest.enterBotMatch(selectedDeck.cards, botGoFirst);
+    const sent = HomeRequest.enterBotMatch(selectedDeck.cards, botGoFirst, selectedDeck.name);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
     }

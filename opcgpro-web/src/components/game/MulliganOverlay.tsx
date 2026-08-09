@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 import { useResponsive } from "@/hooks/useResponsive";
 
@@ -75,7 +75,7 @@ export default function MulliganOverlay() {
     GameRequest.mulligan(redraw);
   };
 
-  const handCards = my.handCardNumbers.map((n) => getCard(n) ?? null);
+  const handCards = my.handCardNumbers.map((n) => getGameCard(n, my.spriteMap) ?? null);
 
   return (
     <AnimatePresence>

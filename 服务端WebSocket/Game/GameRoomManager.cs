@@ -84,6 +84,8 @@ public static class GameRoomManager
                                         bool? p0First = null,
                                          bool p0AlwaysPrompt = false, bool p1AlwaysPrompt = false,
                                           string p0CardBackId = "classic", string p1CardBackId = "classic",
+                                          IReadOnlyDictionary<string, string>? p0SpriteMap = null,
+                                          IReadOnlyDictionary<string, string>? p1SpriteMap = null,
                                           bool vsBot = false,
                                           string? friendlyRoomId = null,
                                           MatchKind matchKind = MatchKind.UnknownHuman,
@@ -116,6 +118,8 @@ public static class GameRoomManager
         engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
         engine.State.Players[0].CardBackId = p0CardBackId;
         engine.State.Players[1].CardBackId = p1CardBackId;
+        CopySpriteMap(p0SpriteMap, engine.State.Players[0].SpriteMap);
+        CopySpriteMap(p1SpriteMap, engine.State.Players[1].SpriteMap);
 
         var entry = new RoomEntry
         {
@@ -179,8 +183,8 @@ public static class GameRoomManager
                 seed = engine.State.RngSeed,
                 firstPlayer,
                 openingSetupAfterFirstPlayerChoice,
-                p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId },
-                p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId },
+                p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap },
+                p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap },
                 vsBot,
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
@@ -202,6 +206,15 @@ public static class GameRoomManager
         if (broadcastInitialState)
             engine.BroadcastInitialState();
         return entry;
+    }
+
+    private static void CopySpriteMap(
+        IReadOnlyDictionary<string, string>? source,
+        IDictionary<string, string> target)
+    {
+        if (source is null) return;
+        foreach (var (number, sprite) in source)
+            target[number] = sprite;
     }
 
     private static IDisposable ReserveRoomCreation()
@@ -812,6 +825,8 @@ public static class GameRoomManager
         var p1Always    = p1.TryGetProperty("alwaysPrompt", out var a1) && a1.GetBoolean();
         var p0CardBackId = p0.TryGetProperty("cardBackId", out var cb0) ? cb0.GetString() ?? "classic" : "classic";
         var p1CardBackId = p1.TryGetProperty("cardBackId", out var cb1) ? cb1.GetString() ?? "classic" : "classic";
+        var p0SpriteMap = ReadSpriteMap(p0);
+        var p1SpriteMap = ReadSpriteMap(p1);
         // 旧日志没有此字段，默认 false，保持升级前“构造时发牌”的随机序列以便正确恢复。
         var openingSetupAfterFirstPlayerChoice =
             h.TryGetProperty("openingSetupAfterFirstPlayerChoice", out var deferredSetup)
@@ -856,6 +871,8 @@ public static class GameRoomManager
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].CardBackId = p0CardBackId;
         engine.State.Players[1].CardBackId = p1CardBackId;
+        CopySpriteMap(p0SpriteMap, engine.State.Players[0].SpriteMap);
+        CopySpriteMap(p1SpriteMap, engine.State.Players[1].SpriteMap);
 
         if (engine.State.IsGameOver)
         {
@@ -909,6 +926,14 @@ public static class GameRoomManager
     private static void TryDelete(string file)
     {
         try { File.Delete(file); } catch { }
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadSpriteMap(JsonElement player)
+    {
+        if (!player.TryGetProperty("spriteMap", out var element) || element.ValueKind != JsonValueKind.Object)
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(element.GetRawText())
+               ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
 
     private static void TryRecordLeaderStats(

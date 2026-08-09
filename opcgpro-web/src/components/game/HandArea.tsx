@@ -7,7 +7,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
 
 interface Props {
   side: "my" | "opponent";
@@ -56,7 +56,7 @@ export default function HandArea({ side, hidden = false }: Props) {
     : hidden
       ? Array.from({ length: player.handCount }, () => null)
       : hasCompleteHandIdentity
-        ? player.handCardNumbers.map((n) => getCard(n) ?? null)
+        ? player.handCardNumbers.map((n) => getGameCard(n, player.spriteMap) ?? null)
         : Array.from({ length: player.handCount }, () => null);
 
   // 稳定 key：按卡号 + 同名出现次序，不含数组下标。

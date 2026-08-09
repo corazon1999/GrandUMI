@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 import type { CardData } from "@/types/card";
 
@@ -23,12 +23,15 @@ type Shown = { cards: CardData[]; label: string };
 export default function RevealOverlay() {
   const reveal = useGameStore((s) => s.reveal);
   const clearReveal = useGameStore((s) => s.clearReveal);
+  const mySpriteMap = useGameStore((s) => s.my?.spriteMap);
+  const opponentSpriteMap = useGameStore((s) => s.opponent?.spriteMap);
   const [shown, setShown] = useState<Shown | null>(null);
 
   useEffect(() => {
     if (!reveal) return;
+    const spriteMap = reveal.side === "my" ? mySpriteMap : opponentSpriteMap;
     const cards = reveal.cardNumbers
-      .map((n) => getCard(n))
+      .map((n) => getGameCard(n, spriteMap))
       .filter((c): c is CardData => !!c);
     if (cards.length === 0) {
       clearReveal();
@@ -41,7 +44,7 @@ export default function RevealOverlay() {
     }, REVEAL_DURATION);
     return () => clearTimeout(t);
     // nonce 变化即重新触发一次展示
-  }, [reveal?.nonce, reveal, clearReveal]);
+  }, [reveal?.nonce, reveal, clearReveal, mySpriteMap, opponentSpriteMap]);
 
   return (
     <AnimatePresence>

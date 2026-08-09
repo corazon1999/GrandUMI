@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { EffectActivationSnapshot, MsgGameState, RevealSnapshot } from "@/types/net";
+import type { EffectActivationSnapshot, MsgGameState, PlayerSnapshot, RevealSnapshot } from "@/types/net";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -36,6 +36,7 @@ export interface FieldCardView {
 export interface PlayerView {
   name: string;
   cardBackId?: string;         // 旧回放缺失时由卡背组件回退经典款
+  spriteMap: Record<string, string>;
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
@@ -67,10 +68,11 @@ export interface PlayerView {
   mulliganDone: boolean;
 }
 
-function clonePlayerView(player: PlayerView | null): PlayerView | null {
+function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView | null {
   if (!player) return null;
   return {
     ...player,
+    spriteMap: { ...(player.spriteMap ?? {}) },
     // IndexedDB 中的旧回放可能缺少后来新增的手牌费用、反击值等字段。
     // 在同步入口统一补齐，避免旧快照中断回放或让手牌区域无法渲染。
     handCardNumbers: [...(player.handCardNumbers ?? [])],

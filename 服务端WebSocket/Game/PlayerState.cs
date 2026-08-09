@@ -11,6 +11,8 @@ public class PlayerState
     public required string AccountName { get; set; }
     /// <summary>公开外观信息：用于该玩家所有暗置主卡的卡背。</summary>
     public string CardBackId { get; set; } = "classic";
+    /// <summary>该玩家卡组公开的异画选择（卡号 → 站内图片路径）。</summary>
+    public Dictionary<string, string> SpriteMap { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public required CardInstance Leader  { get; init; }
     public List<CardInstance> Hand       { get; } = new();

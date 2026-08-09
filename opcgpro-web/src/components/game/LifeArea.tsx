@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import CardBack from "@/components/ui/CardBack";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 
@@ -88,7 +88,7 @@ export default function LifeArea({ side }: Props) {
               >
                 {isFaceUp ? (
                   <CardItem
-                    card={getCard(info!.number!) ?? null}
+                    card={getGameCard(info!.number!, player?.spriteMap) ?? null}
                     size={cardSize}
                     hideCounter
                     hidePower
@@ -151,7 +151,7 @@ export default function LifeArea({ side }: Props) {
                     return (
                       <div key={`${info?.number ?? "hidden"}-${index}`} className="flex flex-col items-center gap-1.5">
                         <CardItem
-                          card={isFaceUp ? getCard(info!.number!) ?? null : null}
+                          card={isFaceUp ? getGameCard(info!.number!, player?.spriteMap) ?? null : null}
                           faceDown={!isFaceUp}
                           cardBackId={player?.cardBackId}
                           size="md"

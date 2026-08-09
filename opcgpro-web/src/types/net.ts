@@ -191,6 +191,7 @@ export interface MsgImportDecks extends MsgBase {
 export interface MsgEnterMatch extends MsgBase {
   proto: "MsgEnterMatch";
   deck: string;
+  deckName?: string;
   result?: boolean;
   logStr?: string;
 }
@@ -203,6 +204,7 @@ export interface MsgCancelMatch extends MsgBase {
 export interface MsgEnterBotMatch extends MsgBase {
   proto: "MsgEnterBotMatch";
   deck: string;
+  deckName?: string;
   goFirst?: boolean;   // 单人测试先后手：true=人类先手(默认)，false=后手
   result?: boolean;
   logStr?: string;
@@ -656,6 +658,8 @@ export interface PlayerSnapshot {
   name: string;
   /** 旧回放没有该字段时回退经典卡背。 */
   cardBackId?: string;
+  /** 该玩家卡组公开的卡面选择；旧回放缺失时使用正画。 */
+  spriteMap?: Record<string, string>;
   handCardNumbers: string[];  // 仅自己有内容
   handCardCosts: number[];    // 每张手牌的有效费用（含静态减费），仅自己有内容；对手为空
   handCardCounters: number[]; // 每张手牌的有效反击值（含静态光环），仅自己有内容；对手为空
@@ -668,6 +672,7 @@ export interface PlayerSnapshot {
   deckCount: number;
   lifeCount: number;
   lifeNumbers: string[];      // 始终为空，由 Prompt 单独公开
+  lifeFaceUp?: { faceUp: boolean; number: string | null }[];
   leaderId: string;
   leaderNumber: string;
   leaderTapped: boolean;

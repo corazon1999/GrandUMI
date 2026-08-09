@@ -25,6 +25,7 @@ public class WsSession
     public string    CardBackId { get; set; } = Persistence.PlayerDataStore.DefaultCardBackId;
 
     public string?   Deck       { get; set; }
+    public string?   DeckName   { get; set; }
     public bool      IsMatching       { get; set; }
     public string?   CurrentRoomCode  { get; set; }
 

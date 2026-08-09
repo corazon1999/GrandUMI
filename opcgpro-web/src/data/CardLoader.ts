@@ -131,6 +131,20 @@ export function getCard(number: string): CardData | undefined {
   return cardCache.get(number);
 }
 
+/**
+ * 按对局中某一方的卡组选择返回卡面，避免全局卡牌缓存让双方或观战视角串用异画。
+ * 旧快照没有 spriteMap 时固定回退该卡正画，不继承组卡器曾写入缓存的临时选择。
+ */
+export function getGameCard(
+  number: string,
+  spriteMap?: Record<string, string>,
+): CardData | undefined {
+  const card = getCard(number);
+  if (!card) return undefined;
+  const sprite = spriteMap?.[number] ?? card.sprites?.[0] ?? card.image ?? card.sprite;
+  return sprite === card.sprite ? card : { ...card, sprite };
+}
+
 /** 覆盖缓存中指定卡号的 sprite（用于还原异画选择） */
 export function applyCachedSprite(number: string, sprite: string): void {
   const card = cardCache.get(number);

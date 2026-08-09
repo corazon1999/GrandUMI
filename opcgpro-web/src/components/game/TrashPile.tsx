@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
-import { getCard } from "@/data/CardLoader";
+import { getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 
@@ -26,12 +26,13 @@ const pileSizes = {
 export default function TrashPile({ side }: Props) {
   // 订阅完整墓地数组：数组最后一张 = 最近送入墓地的卡（服务端 Trash.Add 逐张追加）
   const trash = useGameStore((s) => (side === "my" ? s.my?.trashNumbers : s.opponent?.trashNumbers) ?? EMPTY);
+  const spriteMap = useGameStore((s) => (side === "my" ? s.my?.spriteMap : s.opponent?.spriteMap));
   const { cardSize } = useResponsive();
   const [open, setOpen] = useState(false);
 
   const count = trash.length;
   const topNumber = count > 0 ? trash[count - 1] : null; // 封面 = 最近送入的卡
-  const topCard = topNumber ? getCard(topNumber) ?? null : null;
+  const topCard = topNumber ? getGameCard(topNumber, spriteMap) ?? null : null;
 
   return (
     <div className="flex flex-col items-center gap-2 rounded-md border border-zinc-300/15 bg-black/30 px-2.5 py-2 shadow-lg shadow-black/25">
@@ -90,7 +91,7 @@ export default function TrashPile({ side }: Props) {
                       .slice()
                       .reverse()
                       .map((num, i) => (
-                        <CardItem key={`${num}-${i}`} card={getCard(num) ?? null} size="md" />
+                        <CardItem key={`${num}-${i}`} card={getGameCard(num, spriteMap) ?? null} size="md" />
                       ))
                   )}
                 </div>

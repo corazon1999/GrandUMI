@@ -736,21 +736,23 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgImportDecks", decks } as MsgImportDecks);
   },
 
-  enterMatch(deck: string) {
+  enterMatch(deck: string, deckName?: string) {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     return NetManager.send({
       proto: "MsgEnterMatch",
       deck,
+      deckName,
     } as MsgEnterMatch);
   },
 
-  enterBotMatch(deck: string, goFirst: boolean = true) {
+  enterBotMatch(deck: string, goFirst: boolean = true, deckName?: string) {
     // 单人测试：标记本局为机器人对战，对战页据此显示 GM 按钮
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "1");
     return NetManager.send({
       proto: "MsgEnterBotMatch",
       deck,
       goFirst,
+      deckName,
     } as MsgEnterBotMatch);
   },
 
