@@ -252,6 +252,28 @@ public static class DeclaredOmissionEffects
                 await ResolveOP14_049(ctx);
                 return false;
 
+            case ("OP14-090", EffectTrigger.OnEnterField):
+            {
+                var sourceId = ctx.Source.Id;
+                int owner = ctx.OwnerIndex;
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = sourceId.ToString(),
+                    Scope = OwnSourceScope(),
+                    GrantKeyword = "速攻",
+                    Predicate = (state, side, card) =>
+                        side == owner
+                        && card.Id == sourceId
+                        && Enumerable.Range(0, state.Players.Length).Any(playerIndex =>
+                            state.Players[playerIndex].Characters.Any(character =>
+                            {
+                                int currentCost = state.CurrentCostOf(playerIndex, character);
+                                return currentCost == 0 || currentCost >= 8;
+                            })),
+                });
+                break;
+            }
+
             case ("OP15-060", EffectTrigger.OnEnterField):
                 Register(ctx, new ContinuousEffect
                 {
