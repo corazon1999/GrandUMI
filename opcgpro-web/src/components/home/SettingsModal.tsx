@@ -3,6 +3,8 @@
 import Modal from "@/components/ui/Modal";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioStore } from "@/store/audioStore";
+import { useLanguage, type Locale } from "@/i18n/LanguageProvider";
+import { LANGUAGE_OPTIONS } from "@/i18n/core.mjs";
 import {
   LAYOUT_PREVIEW_OPTIONS,
   type LayoutPreviewMode,
@@ -45,6 +47,7 @@ export default function SettingsModal({
   onClose: () => void;
 }) {
   const { play, unlock } = useAudio();
+  const { locale, setLocale } = useLanguage();
   const sfxVolume = useAudioStore((state) => state.sfxVolume);
   const isMuted = useAudioStore((state) => state.isMuted);
   const isHydrated = useAudioStore((state) => state.isHydrated);
@@ -62,7 +65,33 @@ export default function SettingsModal({
 
   return (
     <Modal open={open} onClose={onClose} title="设置" mobileSheet maxWidthClass="max-w-lg">
-      <section aria-labelledby="layout-preview-title">
+      <section aria-labelledby="language-settings-title">
+        <h3 id="language-settings-title" className="text-sm font-bold text-white">界面语言</h3>
+        <p className="mt-1 text-sm leading-5 text-gray-500">切换后立即应用，并保存在当前浏览器。</p>
+        <div className="mt-4 grid grid-cols-3 gap-2" data-no-i18n>
+          {LANGUAGE_OPTIONS.map((option) => {
+            const active = option.value === locale;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                lang={option.value}
+                aria-pressed={active}
+                onClick={() => setLocale(option.value as Locale)}
+                className={`min-h-11 rounded-xl border px-2 text-sm font-bold transition-colors ${
+                  active
+                    ? "border-orange-500 bg-orange-500/10 text-orange-200"
+                    : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="layout-preview-title">
         <h3 id="layout-preview-title" className="text-sm font-bold text-white">界面布局</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">手机竖屏模式下大厅保持竖屏，对局与回放会自动旋转为横屏，无需切换系统方向。</p>
 

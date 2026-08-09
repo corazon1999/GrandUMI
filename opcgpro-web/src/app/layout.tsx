@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import NetProvider from "@/components/NetProvider";
 import AudioProvider from "@/components/audio/AudioProvider";
 import LayoutSettingsProvider from "@/components/home/LayoutSettingsProvider";
+import LanguageProvider from "@/i18n/LanguageProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,13 +24,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh" className="h-full">
+    <html lang="zh-CN" className="h-full">
       <body className="min-h-full bg-gray-950 text-white antialiased">
-        <AudioProvider>
-          <LayoutSettingsProvider>
-            <NetProvider>{children}</NetProvider>
-          </LayoutSettingsProvider>
-        </AudioProvider>
+        <LanguageProvider>
+          <AudioProvider>
+            <LayoutSettingsProvider>
+              <NetProvider>{children}</NetProvider>
+            </LayoutSettingsProvider>
+          </AudioProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
