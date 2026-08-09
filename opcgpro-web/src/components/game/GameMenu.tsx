@@ -4,8 +4,25 @@ import { useState } from "react";
 import { GameRequest } from "@/net/GameRequest";
 import Modal from "@/components/ui/Modal";
 
+function SurrenderFlagIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d="M6.5 21V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M7 4.5c3-2 6 2 10.5 0v9c-4.5 2-7.5-2-10.5 0v-9Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 /**
- * 全局游戏菜单：右上角 ≡ 按钮，打开后可投降。
+ * 全局游戏菜单：右上角白旗按钮，打开后可投降。
  * 上下文操作（攻击/出牌/结束反击/结束回合）已迁至 GameActions。
  */
 export default function GameMenu() {
@@ -20,10 +37,11 @@ export default function GameMenu() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed right-16 top-4 z-[70] h-9 w-9 rounded-md bg-slate-800 text-lg leading-none text-slate-300 transition-colors hover:bg-slate-700"
-        aria-label="打开游戏菜单"
+        className="fixed right-16 top-4 z-[70] flex h-9 w-9 items-center justify-center rounded-md bg-slate-800 text-white transition-colors hover:bg-slate-700"
+        aria-label="打开投降菜单"
+        title="投降"
       >
-        ≡
+        <SurrenderFlagIcon />
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="游戏菜单">
