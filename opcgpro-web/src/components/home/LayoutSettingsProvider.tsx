@@ -19,6 +19,7 @@ interface LayoutSettingsContextValue {
   mode: LayoutPreviewMode;
   setMode: (mode: LayoutPreviewMode) => void;
   openSettings: () => void;
+  gameOverlayHost: HTMLDivElement | null;
   setGameOverlayHost: (host: HTMLDivElement | null) => void;
 }
 
@@ -41,8 +42,8 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
     setGameOverlayHostState(host);
   }, []);
   const contextValue = useMemo(
-    () => ({ mode, setMode, openSettings, setGameOverlayHost }),
-    [mode, openSettings, setGameOverlayHost, setMode],
+    () => ({ mode, setMode, openSettings, gameOverlayHost, setGameOverlayHost }),
+    [gameOverlayHost, mode, openSettings, setGameOverlayHost, setMode],
   );
 
   const settingsUi = (

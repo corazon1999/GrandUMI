@@ -2,12 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
 import { getCard } from "@/data/CardLoader";
 import CardBack from "@/components/ui/CardBack";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 
 interface Props {
   side: "my" | "opponent";
@@ -116,17 +116,16 @@ export default function LifeArea({ side }: Props) {
         </div>
       </div>
 
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open && (
-              <motion.div
-                className="fixed inset-0 z-[110] flex flex-col items-center justify-center gap-4 bg-black/80 p-4 sm:p-8"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setOpen(false)}
-              >
+      <GameOverlayPortal>
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="pointer-events-auto fixed inset-0 z-[110] flex flex-col items-center justify-center gap-4 bg-black/80 p-4 sm:p-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            >
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <p className="text-center text-lg font-bold text-white">
                     {side === "my" ? "我方" : "对手"}生命区（{count} 张，{faceUpCount} 张正面）
@@ -166,11 +165,10 @@ export default function LifeArea({ side }: Props) {
                     );
                   })}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GameOverlayPortal>
     </>
   );
 }

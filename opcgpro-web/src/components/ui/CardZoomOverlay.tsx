@@ -51,7 +51,7 @@ export default function CardZoomOverlay({
 
   return (
     <motion.div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-sm"
       onClick={onClose}
       onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       initial={{ opacity: 0 }}

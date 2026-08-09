@@ -10,6 +10,7 @@ import CardHoverPreview, { type HoverInfo } from "@/components/deck-editor/CardH
 import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/CardKeywordEffects";
 import CardBack from "@/components/ui/CardBack";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
@@ -327,17 +328,21 @@ export default function CardItem({
         createPortal(
           <AnimatePresence>
             {hoverInfo && <CardHoverPreview info={hoverInfo} counterValue={displayCounter} />}
-            {zoomOpen && card && (
-              <CardZoomOverlay
-                card={card}
-                sprite={rawSprite}
-                counterValue={displayCounter}
-                onClose={() => setZoomOpen(false)}
-              />
-            )}
           </AnimatePresence>,
           document.body,
         )}
+      <GameOverlayPortal>
+        <AnimatePresence>
+          {zoomOpen && card && (
+            <CardZoomOverlay
+              card={card}
+              sprite={rawSprite}
+              counterValue={displayCounter}
+              onClose={() => setZoomOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+      </GameOverlayPortal>
     </motion.div>
   );
 }

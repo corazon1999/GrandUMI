@@ -2,11 +2,11 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import { getCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 
 interface Props {
   side: "my" | "opponent";
@@ -56,17 +56,16 @@ export default function TrashPile({ side }: Props) {
         </div>
       </div>
 
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open && (
-              <motion.div
-                className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/80 p-8"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setOpen(false)}
-              >
+      <GameOverlayPortal>
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/80 p-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            >
                 <div className="flex items-center gap-4">
                   <p className="text-lg font-bold text-white">
                     {side === "my" ? "我方" : "对手"}墓地（{count} 张）
@@ -95,11 +94,10 @@ export default function TrashPile({ side }: Props) {
                       ))
                   )}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GameOverlayPortal>
     </div>
   );
 }
