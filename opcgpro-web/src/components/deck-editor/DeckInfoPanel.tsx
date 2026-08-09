@@ -184,45 +184,53 @@ export default function DeckInfoPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push("/home")}
-            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-            title="返回大厅"
-          >
-            ← 返回
-          </button>
-          <span className="text-white font-bold text-sm">卡组</span>
+      <div className="border-b border-gray-800 shrink-0">
+        <div
+          data-deck-toolbar-heading
+          className="flex items-center px-3 pt-2 pr-16"
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push("/home")}
+              className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+              title="返回大厅"
+            >
+              ← 返回
+            </button>
+            <span className="text-white font-bold text-sm">卡组</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div
+          data-deck-toolbar-actions
+          className="grid grid-cols-5 gap-1 px-3 pb-2 pr-16"
+        >
           <button
             onClick={handleNew}
-            className="text-emerald-400 hover:text-emerald-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+            className="w-full text-emerald-400 hover:text-emerald-300 text-xs px-1 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             新建
           </button>
           <button
             onClick={() => setShowLoad(!showLoad)}
-            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+            className="w-full text-gray-400 hover:text-white text-xs px-1 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             读取
           </button>
           <button
             onClick={clearDeck}
-            className="text-gray-400 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+            className="w-full text-gray-400 hover:text-red-400 text-xs px-1 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             清空
           </button>
           <button
             onClick={handleExport}
-            className="text-sky-400 hover:text-sky-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+            className="w-full text-sky-400 hover:text-sky-300 text-xs px-1 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             导出
           </button>
           <button
             onClick={() => { setShowImport((v) => !v); setShowExport(false); setShowLoad(false); setImportMsg(null); }}
-            className="text-sky-400 hover:text-sky-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+            className="w-full text-sky-400 hover:text-sky-300 text-xs px-1 py-1 rounded hover:bg-gray-800 transition-colors"
           >
             导入
           </button>
