@@ -53,6 +53,40 @@ public class PromptContinuationTests
     }
 
     [Fact]
+    public async Task LookTopReveal_ShouldWaitUntilPlayerResponds()
+    {
+        var deck = LegalOp17Deck();
+        var engine = new GameEngine(
+            "look-top-no-timeout",
+            ("s0", "alice", deck),
+            ("s1", "bob", deck),
+            firstPlayer: 0,
+            rngSeed: 20260810);
+        var prompts = new PromptSystem(engine, TimeSpan.FromMilliseconds(30));
+        var choice = engine.State.Players[0].Deck[0].Id.ToString();
+
+        var chooseTask = prompts.ChooseCards(
+            0,
+            "LookTopReveal",
+            "确认卡组顶 5 张，公开最多 1 张加入手牌",
+            new[] { choice },
+            min: 0,
+            max: 1);
+        var pending = await WaitForPrompt(engine, p => p.Kind == "LookTopReveal");
+
+        await Task.Delay(120);
+
+        Assert.False(chooseTask.IsCompleted);
+        Assert.Equal(pending.PromptId, engine.State.PendingPrompt?.PromptId);
+
+        prompts.Resolve(pending.PromptId, new[] { choice });
+        var chosen = await chooseTask;
+
+        Assert.Equal(new[] { choice }, chosen);
+        Assert.Null(engine.State.PendingPrompt);
+    }
+
+    [Fact]
     public async Task PromptResponse_ThenOverflowPrompt_ShouldNotWaitForTimeout()
     {
         var deck = LegalOp17Deck();

@@ -8,8 +8,9 @@ namespace GrandUMI.Effects;
 /// </summary>
 public class PromptSystem : IPromptService
 {
-    private const int TimeoutSeconds = 30;
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
     private readonly GameEngine _engine;
+    private readonly TimeSpan _timeout;
     private readonly Dictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
 
     /// <summary>本局 prompt 单调序号。promptId 必须确定性（按执行序生成），否则重放重建时
@@ -18,7 +19,11 @@ public class PromptSystem : IPromptService
 
     public GameEngine Engine => _engine;
 
-    public PromptSystem(GameEngine engine) { _engine = engine; }
+    public PromptSystem(GameEngine engine, TimeSpan? timeout = null)
+    {
+        _engine = engine;
+        _timeout = timeout ?? DefaultTimeout;
+    }
 
     public async Task<List<string>> ChooseCards(int playerIdx, string kind, string text,
         IReadOnlyList<string> validChoices, int min, int max,
@@ -103,15 +108,20 @@ public class PromptSystem : IPromptService
         _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
         try
         {
-            var timeout = Task.Delay(TimeSpan.FromSeconds(TimeoutSeconds));
-            var done = await Task.WhenAny(tcs.Task, timeout);
-            if (done == timeout)
+            // “确认卡组顶 N 张，公开最多 1 张加入手牌”需要由玩家明确选择或跳过，
+            // 不能因为通用 Prompt 超时而自动当作跳过。
+            if (kind != "LookTopReveal")
             {
-                _pending.Remove(promptId);
-                _engine.State.PendingPrompt = null;
-                _engine.RecordMatchLog("prompt_timeout", playerIdx, new { promptId });
-                _engine.Broadcast("PromptTimeout", new { promptId });
-                return new List<string>();  // 超时视为不选
+                var timeout = Task.Delay(_timeout);
+                var done = await Task.WhenAny(tcs.Task, timeout);
+                if (done == timeout)
+                {
+                    _pending.Remove(promptId);
+                    _engine.State.PendingPrompt = null;
+                    _engine.RecordMatchLog("prompt_timeout", playerIdx, new { promptId });
+                    _engine.Broadcast("PromptTimeout", new { promptId });
+                    return new List<string>();  // 超时视为不选
+                }
             }
             var ans = await tcs.Task;
             _engine.State.PendingPrompt = null;
