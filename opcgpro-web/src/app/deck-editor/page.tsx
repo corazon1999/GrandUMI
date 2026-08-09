@@ -70,7 +70,7 @@ export default function DeckEditorPage() {
   if (loadState === "loading") {
     const pct = Math.round((loaded / total) * 100);
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-950 gap-4">
+      <div className="flex h-screen h-[100dvh] flex-col items-center justify-center bg-gray-950 gap-4">
         <p className="text-white font-bold text-lg">加载卡牌数据...</p>
         <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
           <div className="h-full bg-orange-500 rounded-full transition-all duration-300"
@@ -83,14 +83,14 @@ export default function DeckEditorPage() {
 
   if (loadState === "error") {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
+      <div className="flex h-screen h-[100dvh] items-center justify-center bg-gray-950">
         <p className="text-red-400">卡牌数据加载失败，请刷新页面重试</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden">
+    <div className="flex h-screen h-[100dvh] bg-gray-950 overflow-hidden">
       {/* SearchPanel 宽度减少 1/4：原 w-64(256px) → w-48(192px) */}
       <div className="w-48 border-r border-gray-800 shrink-0">
         <SearchPanel />
@@ -98,7 +98,10 @@ export default function DeckEditorPage() {
       <div className="flex-1 overflow-hidden">
         <SearchResultPanel />
       </div>
-      <div className="w-80 border-l border-gray-800 shrink-0">
+      <div
+        data-deck-editor-panel
+        className="w-80 border-l border-gray-800 shrink-0 pb-[env(safe-area-inset-bottom)]"
+      >
         <DeckInfoPanel />
       </div>
     </div>
