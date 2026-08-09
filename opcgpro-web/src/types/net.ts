@@ -43,6 +43,12 @@ export enum ProtocolEnum {
   MsgLeaderLeaderboard = 38,
   MsgPlayerProfileStats = 39,
   MsgUpdateCardBack = 40,
+  MsgFriendList = 41,
+  MsgFriendSearch = 42,
+  MsgFriendRequest = 43,
+  MsgFriendRespond = 44,
+  MsgFriendRemove = 45,
+  MsgFriendCancel = 46,
 }
 
 // WebSocket JSON 消息基类
@@ -288,6 +294,86 @@ export interface MsgPlayerList extends MsgBase {
   limit?: number;
   total?: number;
   hasMore?: boolean;
+}
+
+// ── 好友系统 ──────────────────────────────────────────────────────────────
+export type FriendPresenceStatus = PlayerInfo["status"] | "offline";
+
+export interface FriendInfo {
+  account: string;
+  name: string;
+  avatar: string;
+  friendsSince: number;
+  online: boolean;
+  status: FriendPresenceStatus;
+}
+
+export interface FriendRequestInfo {
+  id: number;
+  account: string;
+  name: string;
+  avatar: string;
+  createdAt: number;
+  online: boolean;
+}
+
+export type FriendRelationship = "none" | "friend" | "incoming" | "outgoing";
+
+export interface FriendSearchPlayer {
+  account: string;
+  name: string;
+  avatar: string;
+  relationship: FriendRelationship;
+  online: boolean;
+  status: FriendPresenceStatus;
+}
+
+export interface MsgFriendList extends MsgBase {
+  proto: "MsgFriendList";
+  result?: boolean;
+  logStr?: string;
+  friends?: FriendInfo[];
+  incomingRequests?: FriendRequestInfo[];
+  outgoingRequests?: FriendRequestInfo[];
+}
+
+export interface MsgFriendSearch extends MsgBase {
+  proto: "MsgFriendSearch";
+  query?: string;
+  result?: boolean;
+  logStr?: string;
+  players?: FriendSearchPlayer[];
+}
+
+export interface MsgFriendRequest extends MsgBase {
+  proto: "MsgFriendRequest";
+  toAccount?: string;
+  result?: boolean;
+  autoAccepted?: boolean;
+  logStr?: string;
+}
+
+export interface MsgFriendRespond extends MsgBase {
+  proto: "MsgFriendRespond";
+  requestId?: number;
+  accept?: boolean;
+  accepted?: boolean;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgFriendRemove extends MsgBase {
+  proto: "MsgFriendRemove";
+  account?: string;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgFriendCancel extends MsgBase {
+  proto: "MsgFriendCancel";
+  requestId?: number;
+  result?: boolean;
+  logStr?: string;
 }
 
 // ── Leader 排行榜 ─────────────────────────────────────────────────────
@@ -775,4 +861,15 @@ export type AnyMsg =
   | MsgLeaderMatchups
   | MsgLeaderMatchupMatrix
   | MsgPlayerProfileStats
-  | MsgOnlineCount;
+  | MsgOnlineCount
+  | MsgPlayerList
+  | MsgFriendList
+  | MsgFriendSearch
+  | MsgFriendRequest
+  | MsgFriendRespond
+  | MsgFriendRemove
+  | MsgFriendCancel
+  | MsgInvitePlayer
+  | MsgInviteNotify
+  | MsgInviteResponse
+  | MsgInviteResult;

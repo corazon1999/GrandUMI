@@ -124,6 +124,105 @@ public sealed class PlayerDataStoreTests : IDisposable
         Assert.Equal(0, store.PendingLoginWrites);
     }
 
+    [Fact]
+    public void FriendRequest_Accept_Remove_完整关系持久化闭环()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+
+        var sent = store.SendFriendRequest("Alice", "bob");
+        Assert.Single(sent.Snapshot.OutgoingRequests);
+        Assert.Equal("Bob", sent.OtherAccount);
+
+        var bobBefore = store.GetFriendData("Bob");
+        var request = Assert.Single(bobBefore.IncomingRequests);
+        Assert.Equal("Alice", request.Account);
+
+        var accepted = store.RespondFriendRequest("Bob", request.Id, accept: true);
+        Assert.Single(accepted.Snapshot.Friends);
+        Assert.Empty(accepted.Snapshot.IncomingRequests);
+        Assert.Equal("Alice", accepted.OtherAccount);
+
+        var afterRestart = CreateStore().GetFriendData("Alice");
+        Assert.Equal("Bob", Assert.Single(afterRestart.Friends).Account);
+
+        var removed = store.RemoveFriend("Alice", "BOB");
+        Assert.Empty(removed.Snapshot.Friends);
+        Assert.Empty(store.GetFriendData("Bob").Friends);
+    }
+
+    [Fact]
+    public void FriendRequest_反向申请会自动互加且阻止重复与自己添加()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.SendFriendRequest("Alice", "Bob");
+
+        var autoAccepted = store.SendFriendRequest("Bob", "Alice");
+
+        Assert.True(autoAccepted.AutoAccepted);
+        Assert.Equal("Alice", Assert.Single(autoAccepted.Snapshot.Friends).Account);
+        Assert.Empty(autoAccepted.Snapshot.IncomingRequests);
+        Assert.Empty(autoAccepted.Snapshot.OutgoingRequests);
+        Assert.Throws<PlayerDataValidationException>(() => store.SendFriendRequest("Alice", "Bob"));
+        Assert.Throws<PlayerDataValidationException>(() => store.SendFriendRequest("Alice", "alice"));
+        Assert.Throws<PlayerDataValidationException>(() => store.SendFriendRequest("Alice", "Nobody"));
+    }
+
+    [Fact]
+    public void FriendRequest_拒绝后双方申请列表清空()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.SendFriendRequest("Alice", "Bob");
+        var request = Assert.Single(store.GetFriendData("Bob").IncomingRequests);
+
+        store.RespondFriendRequest("Bob", request.Id, accept: false);
+
+        Assert.Empty(store.GetFriendData("Alice").OutgoingRequests);
+        Assert.Empty(store.GetFriendData("Bob").IncomingRequests);
+        Assert.Empty(store.GetFriendData("Alice").Friends);
+    }
+
+    [Fact]
+    public void FriendRequest_发送方可以撤回申请但接收方不能冒充撤回()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        var sent = store.SendFriendRequest("Alice", "Bob");
+        var request = Assert.Single(sent.Snapshot.OutgoingRequests);
+
+        Assert.Throws<PlayerDataValidationException>(() => store.CancelFriendRequest("Bob", request.Id));
+        store.CancelFriendRequest("Alice", request.Id);
+
+        Assert.Empty(store.GetFriendData("Alice").OutgoingRequests);
+        Assert.Empty(store.GetFriendData("Bob").IncomingRequests);
+    }
+
+    [Fact]
+    public void SearchPlayers_返回账号昵称匹配及当前好友关系()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.Login("Bobby");
+        store.UpdateProfile("Bob", "航海士波波", "");
+        store.SendFriendRequest("Alice", "Bob");
+
+        var byName = store.SearchPlayers("Alice", "航海士");
+        var bob = Assert.Single(byName);
+        Assert.Equal("Bob", bob.Account);
+        Assert.Equal("outgoing", bob.Relationship);
+
+        var byAccount = store.SearchPlayers("Alice", "bobb");
+        Assert.Equal("Bobby", Assert.Single(byAccount).Account);
+        Assert.DoesNotContain(store.SearchPlayers("Alice", "Alice"), player => player.Account == "Alice");
+    }
+
     private PlayerDataStore CreateStore()
     {
         var store = new PlayerDataStore(_databasePath);

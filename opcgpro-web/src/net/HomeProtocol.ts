@@ -35,6 +35,12 @@ import type {
   MsgChatMsg,
   MsgOnlineCount,
   MsgPlayerList,
+  MsgFriendList,
+  MsgFriendSearch,
+  MsgFriendRequest,
+  MsgFriendRespond,
+  MsgFriendRemove,
+  MsgFriendCancel,
   MsgLeaderLeaderboard,
   MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
@@ -151,6 +157,24 @@ export function registerHomeProtocols() {
         break;
       case "MsgPlayerList":
         handlePlayerList(msg as MsgPlayerList);
+        break;
+      case "MsgFriendList":
+        handleFriendList(msg as MsgFriendList);
+        break;
+      case "MsgFriendSearch":
+        handleFriendSearch(msg as MsgFriendSearch);
+        break;
+      case "MsgFriendRequest":
+        handleFriendMutation(msg as MsgFriendRequest);
+        break;
+      case "MsgFriendRespond":
+        handleFriendMutation(msg as MsgFriendRespond);
+        break;
+      case "MsgFriendRemove":
+        handleFriendMutation(msg as MsgFriendRemove);
+        break;
+      case "MsgFriendCancel":
+        handleFriendMutation(msg as MsgFriendCancel);
         break;
       case "MsgLeaderLeaderboard":
         handleLeaderLeaderboard(msg as MsgLeaderLeaderboard);
@@ -495,6 +519,35 @@ function handlePlayerList(msg: MsgPlayerList) {
   useNetStore.getState().setPlayerList(msg.players ?? []);
 }
 
+function handleFriendList(msg: MsgFriendList) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "好友列表加载失败", "error");
+    return;
+  }
+  useNetStore.getState().setFriendData(
+    msg.friends ?? [],
+    msg.incomingRequests ?? [],
+    msg.outgoingRequests ?? [],
+  );
+  if (msg.logStr) showMessage(msg.logStr, "info");
+}
+
+function handleFriendSearch(msg: MsgFriendSearch) {
+  if (msg.result === false) {
+    useNetStore.getState().setFriendSearchResults([]);
+    showMessage(msg.logStr ?? "搜索玩家失败", "error");
+    return;
+  }
+  useNetStore.getState().setFriendSearchResults(msg.players ?? []);
+}
+
+function handleFriendMutation(msg: MsgFriendRequest | MsgFriendRespond | MsgFriendRemove | MsgFriendCancel) {
+  showMessage(
+    msg.logStr ?? (msg.result === false ? "好友操作失败" : "好友状态已更新"),
+    msg.result === false ? "error" : "info",
+  );
+}
+
 /** MsgLeaderLeaderboard — 服务端 Leader 聚合榜单。 */
 function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
   useNetStore.getState().setLeaderLeaderboard(msg);
@@ -709,6 +762,31 @@ export const HomeRequest = {
 
   requestPlayerList(offset = 0, limit = 200) {
     return NetManager.send({ proto: "MsgPlayerList", offset, limit } as MsgPlayerList);
+  },
+
+  requestFriendList() {
+    return NetManager.send({ proto: "MsgFriendList" } as MsgFriendList);
+  },
+
+  searchFriends(query: string) {
+    useNetStore.getState().setFriendSearchResults([]);
+    return NetManager.send({ proto: "MsgFriendSearch", query } as MsgFriendSearch);
+  },
+
+  sendFriendRequest(toAccount: string) {
+    return NetManager.send({ proto: "MsgFriendRequest", toAccount } as MsgFriendRequest);
+  },
+
+  respondFriendRequest(requestId: number, accept: boolean) {
+    return NetManager.send({ proto: "MsgFriendRespond", requestId, accept } as MsgFriendRespond);
+  },
+
+  cancelFriendRequest(requestId: number) {
+    return NetManager.send({ proto: "MsgFriendCancel", requestId } as MsgFriendCancel);
+  },
+
+  removeFriend(account: string) {
+    return NetManager.send({ proto: "MsgFriendRemove", account } as MsgFriendRemove);
   },
 
   requestLeaderLeaderboard(period: LeaderboardPeriod) {

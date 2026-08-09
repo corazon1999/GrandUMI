@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import type {
   PlayerInfo,
+  FriendInfo,
+  FriendRequestInfo,
+  FriendSearchPlayer,
   FriendlyPlayer,
   MsgLeaderLeaderboard,
   MsgLeaderMatchupMatrix,
@@ -66,6 +69,10 @@ interface NetStore {
   onlineCount: number;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
+  friends: FriendInfo[];
+  incomingFriendRequests: FriendRequestInfo[];
+  outgoingFriendRequests: FriendRequestInfo[];
+  friendSearchResults: FriendSearchPlayer[];
   // 最近一次 Leader 排行榜回包
   leaderLeaderboard: MsgLeaderLeaderboard | null;
   // 点击榜单项后按“周期:Leader”保存的对战前十统计
@@ -100,6 +107,8 @@ interface NetStore {
   setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
+  setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
+  setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
   setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
   setLeaderMatchups: (data: MsgLeaderMatchups) => void;
   clearLeaderMatchups: () => void;
@@ -130,6 +139,10 @@ const initialState = {
   roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
   playerList: [] as PlayerInfo[],
+  friends: [] as FriendInfo[],
+  incomingFriendRequests: [] as FriendRequestInfo[],
+  outgoingFriendRequests: [] as FriendRequestInfo[],
+  friendSearchResults: [] as FriendSearchPlayer[],
   leaderLeaderboard: null as MsgLeaderLeaderboard | null,
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
@@ -178,6 +191,14 @@ export const useNetStore = create<NetStore>((set) => ({
   setOnlineCount: (n) => set({ onlineCount: n }),
 
   setPlayerList: (list) => set({ playerList: list }),
+
+  setFriendData: (friends, incomingFriendRequests, outgoingFriendRequests) => set({
+    friends,
+    incomingFriendRequests,
+    outgoingFriendRequests,
+  }),
+
+  setFriendSearchResults: (friendSearchResults) => set({ friendSearchResults }),
 
   setLeaderLeaderboard: (leaderLeaderboard) => set({ leaderLeaderboard }),
 

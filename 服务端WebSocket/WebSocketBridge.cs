@@ -184,6 +184,8 @@ public static class WebSocketBridge
         Log($"断开 {session.SessionId} ({session.Account ?? "未登录"})");
         // 在线人数变化，广播给剩余客户端
         BroadcastOnlineCount();
+        if (session.Account is not null && wasCurrentAccountSession)
+            PushFriendPresenceToFriends(session.Account);
     }
 
     // ── 消息路由 ──────────────────────────────────────────────────────────
@@ -232,6 +234,12 @@ public static class WebSocketBridge
             case "MsgJoinRoom":    OnJoinRoom(session, msg);     break;
             case "MsgCancelRoom":  OnCancelRoom(session, msg);   break;
             case "MsgPlayerList":  OnPlayerList(session, msg);   break;
+            case "MsgFriendList": OnFriendList(session); break;
+            case "MsgFriendSearch": OnFriendSearch(session, msg); break;
+            case "MsgFriendRequest": OnFriendRequest(session, msg); break;
+            case "MsgFriendRespond": OnFriendRespond(session, msg); break;
+            case "MsgFriendCancel": OnFriendCancel(session, msg); break;
+            case "MsgFriendRemove": OnFriendRemove(session, msg); break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
             case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
             case "MsgLeaderMatchupMatrix": OnLeaderMatchupMatrix(session, msg); break;
@@ -316,6 +324,7 @@ public static class WebSocketBridge
                 result = true,
                 logStr = "登录成功",
             });
+            SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
             Log($"登录 ✅ {playerData.Account}");
 
             // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
@@ -339,6 +348,7 @@ public static class WebSocketBridge
                 TryRestoreFriendlyRoom(s, playerData.Account);
 
             BroadcastOnlineCount();
+            PushFriendPresenceToFriends(playerData.Account);
         }
         catch (PlayerDataValidationException ex)
         {
@@ -947,6 +957,169 @@ public static class WebSocketBridge
             total = loggedIn.Length,
             hasMore = offset + players.Length < loggedIn.Length,
         });
+    }
+
+    private static void OnFriendList(WsSession s)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendList", result = false, logStr = "请先登录" });
+            return;
+        }
+
+        try
+        {
+            SendFriendData(s, _playerDataStore.GetFriendData(s.Account));
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendList", ex, "好友列表暂时不可用");
+        }
+    }
+
+    private static void OnFriendSearch(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendSearch", result = false, logStr = "请先登录", players = Array.Empty<object>() });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("friend-search", capacity: 4, refillPerSecond: 0.5))
+        {
+            Send(s.SessionId, new { proto = "MsgFriendSearch", result = false, logStr = "搜索过于频繁，请稍后再试", players = Array.Empty<object>() });
+            return;
+        }
+
+        try
+        {
+            var players = _playerDataStore.SearchPlayers(s.Account, Str(msg, "query") ?? "")
+                .Select(player =>
+                {
+                    var presence = PresenceOf(player.Account);
+                    return new
+                    {
+                        account = player.Account,
+                        name = player.DisplayName,
+                        avatar = player.Avatar,
+                        relationship = player.Relationship,
+                        online = presence.Online,
+                        status = presence.Status,
+                    };
+                })
+                .ToArray();
+            Send(s.SessionId, new { proto = "MsgFriendSearch", result = true, players });
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendSearch", ex, "搜索玩家失败");
+        }
+    }
+
+    private static void OnFriendRequest(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendRequest", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("friend-request", capacity: 4, refillPerSecond: 0.2))
+        {
+            Send(s.SessionId, new { proto = "MsgFriendRequest", result = false, logStr = "操作过于频繁，请稍后再试" });
+            return;
+        }
+
+        try
+        {
+            var result = _playerDataStore.SendFriendRequest(s.Account, Str(msg, "toAccount") ?? "");
+            var text = result.AutoAccepted ? "对方也申请了你，已自动成为好友" : "好友申请已发送";
+            Send(s.SessionId, new { proto = "MsgFriendRequest", result = true, autoAccepted = result.AutoAccepted, logStr = text });
+            SendFriendData(s, result.Snapshot);
+            PushFriendDataToAccount(
+                result.OtherAccount,
+                result.AutoAccepted ? $"你和 {s.PlayerName ?? s.Account} 已成为好友" : $"收到来自 {s.PlayerName ?? s.Account} 的好友申请");
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendRequest", ex, "发送好友申请失败");
+        }
+    }
+
+    private static void OnFriendRespond(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendRespond", result = false, logStr = "请先登录" });
+            return;
+        }
+
+        var requestId = msg.TryGetValue("requestId", out var requestValue) && requestValue.TryGetInt64(out var parsedId)
+            ? parsedId
+            : 0;
+        var accept = Bool(msg, "accept");
+        try
+        {
+            var result = _playerDataStore.RespondFriendRequest(s.Account, requestId, accept);
+            Send(s.SessionId, new
+            {
+                proto = "MsgFriendRespond",
+                result = true,
+                accepted = accept,
+                logStr = accept ? "已添加好友" : "已拒绝好友申请",
+            });
+            SendFriendData(s, result.Snapshot);
+            PushFriendDataToAccount(
+                result.OtherAccount,
+                accept ? $"{s.PlayerName ?? s.Account} 接受了你的好友申请" : $"{s.PlayerName ?? s.Account} 拒绝了你的好友申请");
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendRespond", ex, "处理好友申请失败");
+        }
+    }
+
+    private static void OnFriendRemove(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendRemove", result = false, logStr = "请先登录" });
+            return;
+        }
+
+        try
+        {
+            var result = _playerDataStore.RemoveFriend(s.Account, Str(msg, "account") ?? "");
+            Send(s.SessionId, new { proto = "MsgFriendRemove", result = true, logStr = "好友已删除" });
+            SendFriendData(s, result.Snapshot);
+            PushFriendDataToAccount(result.OtherAccount);
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendRemove", ex, "删除好友失败");
+        }
+    }
+
+    private static void OnFriendCancel(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null)
+        {
+            Send(s.SessionId, new { proto = "MsgFriendCancel", result = false, logStr = "请先登录" });
+            return;
+        }
+
+        var requestId = msg.TryGetValue("requestId", out var requestValue) && requestValue.TryGetInt64(out var parsedId)
+            ? parsedId
+            : 0;
+        try
+        {
+            var result = _playerDataStore.CancelFriendRequest(s.Account, requestId);
+            Send(s.SessionId, new { proto = "MsgFriendCancel", result = true, logStr = "好友申请已撤回" });
+            SendFriendData(s, result.Snapshot);
+            PushFriendDataToAccount(result.OtherAccount);
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendCancel", ex, "撤回好友申请失败");
+        }
     }
 
     private static void OnLeaderLeaderboard(WsSession s, Dictionary<string, JsonElement> msg)
@@ -1959,6 +2132,100 @@ public static class WebSocketBridge
                 selectedDeckName = snapshot.SelectedDeckName,
             decks = snapshot.Decks,
         });
+    }
+
+    private static (bool Online, string Status) PresenceOf(string account)
+    {
+        if (!TryGetActiveSession(account, out var session)) return (false, "offline");
+        return (true, StatusOf(session));
+    }
+
+    private static void SendFriendData(WsSession session, FriendDataSnapshot snapshot, string? logStr = null)
+    {
+        var friends = snapshot.Friends.Select(friend =>
+        {
+            var presence = PresenceOf(friend.Account);
+            return new
+            {
+                account = friend.Account,
+                name = friend.DisplayName,
+                avatar = friend.Avatar,
+                friendsSince = friend.FriendsSince,
+                online = presence.Online,
+                status = presence.Status,
+            };
+        }).ToArray();
+        var incomingRequests = snapshot.IncomingRequests.Select(request =>
+        {
+            var presence = PresenceOf(request.Account);
+            return new
+            {
+                id = request.Id,
+                account = request.Account,
+                name = request.DisplayName,
+                avatar = request.Avatar,
+                createdAt = request.CreatedAt,
+                online = presence.Online,
+            };
+        }).ToArray();
+        var outgoingRequests = snapshot.OutgoingRequests.Select(request =>
+        {
+            var presence = PresenceOf(request.Account);
+            return new
+            {
+                id = request.Id,
+                account = request.Account,
+                name = request.DisplayName,
+                avatar = request.Avatar,
+                createdAt = request.CreatedAt,
+                online = presence.Online,
+            };
+        }).ToArray();
+
+        Send(session.SessionId, new
+        {
+            proto = "MsgFriendList",
+            result = true,
+            logStr,
+            friends,
+            incomingRequests,
+            outgoingRequests,
+        });
+    }
+
+    private static void PushFriendDataToAccount(string account, string? logStr = null)
+    {
+        if (!TryGetActiveSession(account, out var session)) return;
+        try
+        {
+            SendFriendData(session, _playerDataStore.GetFriendData(account), logStr);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"推送好友状态失败 {account}: {ex.Message}");
+        }
+    }
+
+    private static void PushFriendPresenceToFriends(string account)
+    {
+        try
+        {
+            var snapshot = _playerDataStore.GetFriendData(account);
+            foreach (var friend in snapshot.Friends)
+                PushFriendDataToAccount(friend.Account);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"更新好友在线状态失败 {account}: {ex.Message}");
+        }
+    }
+
+    private static void SendFriendError(WsSession session, string proto, Exception exception, string fallback)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : fallback;
+        if (exception is not PlayerDataValidationException)
+            LogErr($"{fallback} {session.Account}: {exception.Message}");
+        Send(session.SessionId, new { proto, result = false, logStr = message });
     }
 
     private static void SendPlayerDataError(WsSession session, Exception exception, string fallback)

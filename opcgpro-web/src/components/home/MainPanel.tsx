@@ -5,6 +5,7 @@ import NextImage from "next/image";
 import LobbyPanel from "./LobbyPanel";
 import DeckChoosePanel from "./DeckChoosePanel";
 import PlayerListPanel from "./PlayerListPanel";
+import FriendsPanel from "./FriendsPanel";
 import InviteNotifyOverlay from "./InviteNotifyOverlay";
 import FriendlyRoomPanel from "./FriendlyRoomPanel";
 import LeaderLeaderboardPanel from "./LeaderLeaderboardPanel";
@@ -323,12 +324,14 @@ function changelogSeenKey(account: string): string {
 export default function MainPanel() {
   const [view, setView] = useState<View>("lobby");
   const [showPlayerList, setShowPlayerList] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const { mode: layoutMode, openSettings } = useLayoutSettings();
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
   const onlineCount = useNetStore((s) => s.onlineCount);
+  const incomingFriendCount = useNetStore((s) => s.incomingFriendRequests.length);
 
   // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
   useEffect(() => {
@@ -403,6 +406,17 @@ export default function MainPanel() {
           </button>
           <button
             type="button"
+            onClick={() => setShowFriends(true)}
+            aria-label={`打开好友中心${incomingFriendCount ? `，${incomingFriendCount} 条新申请` : ""}`}
+            className="relative flex h-11 w-11 items-center justify-center rounded-xl text-gray-300 transition-colors hover:bg-gray-800 active:bg-gray-700"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="9" cy="8" r="3" /><path d="M3.5 19c.6-3.5 2.4-5 5.5-5s4.9 1.5 5.5 5M16 8h5M18.5 5.5v5" />
+            </svg>
+            {incomingFriendCount > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-red-500 px-1 text-[9px] font-black leading-4 text-white">{incomingFriendCount}</span>}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowChat(true)}
             aria-label="打开大厅聊天"
             className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-300 transition-colors hover:bg-gray-800 active:bg-gray-700"
@@ -431,6 +445,14 @@ export default function MainPanel() {
             className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
           >
             卡组
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFriends(true)}
+            className="relative h-10 w-full rounded-xl text-sm font-bold text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+          >
+            好友
+            {incomingFriendCount > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-red-500 px-1 text-[9px] leading-4 text-white">{incomingFriendCount}</span>}
           </button>
           <button
             onClick={() => setView("catalog")}
@@ -520,6 +542,7 @@ export default function MainPanel() {
       </nav>
 
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
+      <FriendsPanel open={showFriends} onClose={() => setShowFriends(false)} />
       <Modal open={showChat} onClose={() => setShowChat(false)} title="大厅聊天" mobileSheet maxWidthClass="max-w-lg">
         <div className="h-[min(70cqh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
           <ChatPanel showHeader={false} />

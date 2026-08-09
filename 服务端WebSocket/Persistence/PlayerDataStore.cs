@@ -122,7 +122,32 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_decks_player_updated
                 ON decks(player_id, updated_at DESC);
 
-            PRAGMA user_version=1;
+            CREATE TABLE IF NOT EXISTS friendships (
+                player_low_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                player_high_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                created_at     INTEGER NOT NULL,
+                PRIMARY KEY(player_low_id, player_high_id),
+                CHECK(player_low_id < player_high_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS friend_requests (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_low_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                player_high_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                sender_id      INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                receiver_id    INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                created_at     INTEGER NOT NULL,
+                UNIQUE(player_low_id, player_high_id),
+                CHECK(player_low_id < player_high_id),
+                CHECK(sender_id <> receiver_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_friend_requests_receiver
+                ON friend_requests(receiver_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS ix_friend_requests_sender
+                ON friend_requests(sender_id, created_at DESC);
+
+            PRAGMA user_version=2;
             """;
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
@@ -171,6 +196,212 @@ public sealed class PlayerDataStore
         var snapshot = LoadSnapshot(connection, transaction, playerId.Value);
         transaction.Commit();
         return snapshot;
+    }
+
+    public FriendDataSnapshot GetFriendData(string account)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var snapshot = LoadFriendData(connection, transaction, playerId);
+        transaction.Commit();
+        return snapshot;
+    }
+
+    public IReadOnlyList<FriendSearchPlayer> SearchPlayers(string account, string query, int limit = 20)
+    {
+        var normalizedQuery = (query ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalizedQuery.Length is < 1 or > MaxAccountLength)
+            throw new PlayerDataValidationException($"请输入 1–{MaxAccountLength} 个字符进行搜索。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var relationships = LoadFriendData(connection, transaction, playerId);
+        var friendAccounts = relationships.Friends.Select(x => x.Account).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var incomingAccounts = relationships.IncomingRequests.Select(x => x.Account).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var outgoingAccounts = relationships.OutgoingRequests.Select(x => x.Account).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT account, display_name, avatar
+            FROM players
+            WHERE id<>$playerId
+              AND (account_key LIKE $pattern ESCAPE '\' COLLATE NOCASE
+                   OR display_name LIKE $pattern ESCAPE '\' COLLATE NOCASE)
+            ORDER BY CASE WHEN account_key=$exact COLLATE NOCASE THEN 0 ELSE 1 END,
+                     display_name COLLATE NOCASE,
+                     account_key
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$pattern", $"%{EscapeLike(normalizedQuery)}%");
+        command.Parameters.AddWithValue("$exact", NormalizeAccountKey(normalizedQuery));
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 20));
+
+        var results = new List<FriendSearchPlayer>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var resultAccount = reader.GetString(0);
+            var relationship = friendAccounts.Contains(resultAccount) ? "friend"
+                : incomingAccounts.Contains(resultAccount) ? "incoming"
+                : outgoingAccounts.Contains(resultAccount) ? "outgoing"
+                : "none";
+            results.Add(new FriendSearchPlayer(
+                resultAccount,
+                reader.GetString(1),
+                reader.GetString(2),
+                relationship));
+        }
+        transaction.Commit();
+        return results;
+    }
+
+    public FriendMutationResult SendFriendRequest(string account, string toAccount)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var targetId = FindPlayerId(connection, transaction, NormalizeAccountKey(toAccount));
+        if (targetId is null) throw new PlayerDataValidationException("未找到该玩家。");
+        if (playerId == targetId.Value) throw new PlayerDataValidationException("不能添加自己为好友。");
+
+        var (low, high) = OrderedPair(playerId, targetId.Value);
+        if (FriendshipExists(connection, transaction, low, high))
+            throw new PlayerDataValidationException("你们已经是好友了。");
+
+        var autoAccepted = false;
+        using (var inspect = connection.CreateCommand())
+        {
+            inspect.Transaction = transaction;
+            inspect.CommandText = "SELECT sender_id FROM friend_requests WHERE player_low_id=$low AND player_high_id=$high;";
+            inspect.Parameters.AddWithValue("$low", low);
+            inspect.Parameters.AddWithValue("$high", high);
+            var existingSender = inspect.ExecuteScalar();
+            if (existingSender is not null)
+            {
+                if (Convert.ToInt64(existingSender, CultureInfo.InvariantCulture) == playerId)
+                    throw new PlayerDataValidationException("好友申请已经发送，请等待对方处理。");
+
+                DeleteFriendRequestPair(connection, transaction, low, high);
+                InsertFriendship(connection, transaction, low, high);
+                autoAccepted = true;
+            }
+        }
+
+        if (!autoAccepted)
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO friend_requests(player_low_id, player_high_id, sender_id, receiver_id, created_at)
+                VALUES($low, $high, $sender, $receiver, $now);
+                """;
+            insert.Parameters.AddWithValue("$low", low);
+            insert.Parameters.AddWithValue("$high", high);
+            insert.Parameters.AddWithValue("$sender", playerId);
+            insert.Parameters.AddWithValue("$receiver", targetId.Value);
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            insert.ExecuteNonQuery();
+        }
+
+        var snapshot = LoadFriendData(connection, transaction, playerId);
+        var otherAccount = GetAccount(connection, transaction, targetId.Value);
+        transaction.Commit();
+        return new FriendMutationResult(snapshot, otherAccount, autoAccepted);
+    }
+
+    public FriendMutationResult RespondFriendRequest(string account, long requestId, bool accept)
+    {
+        if (requestId <= 0) throw new PlayerDataValidationException("好友申请无效或已处理。");
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        long senderId;
+        long low;
+        long high;
+        using (var inspect = connection.CreateCommand())
+        {
+            inspect.Transaction = transaction;
+            inspect.CommandText = """
+                SELECT sender_id, player_low_id, player_high_id
+                FROM friend_requests WHERE id=$id AND receiver_id=$receiver;
+                """;
+            inspect.Parameters.AddWithValue("$id", requestId);
+            inspect.Parameters.AddWithValue("$receiver", playerId);
+            using var reader = inspect.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("好友申请无效或已处理。");
+            senderId = reader.GetInt64(0);
+            low = reader.GetInt64(1);
+            high = reader.GetInt64(2);
+        }
+
+        DeleteFriendRequestPair(connection, transaction, low, high);
+        if (accept) InsertFriendship(connection, transaction, low, high);
+
+        var snapshot = LoadFriendData(connection, transaction, playerId);
+        var otherAccount = GetAccount(connection, transaction, senderId);
+        transaction.Commit();
+        return new FriendMutationResult(snapshot, otherAccount);
+    }
+
+    public FriendMutationResult CancelFriendRequest(string account, long requestId)
+    {
+        if (requestId <= 0) throw new PlayerDataValidationException("好友申请无效或已处理。");
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        long receiverId;
+        long low;
+        long high;
+        using (var inspect = connection.CreateCommand())
+        {
+            inspect.Transaction = transaction;
+            inspect.CommandText = """
+                SELECT receiver_id, player_low_id, player_high_id
+                FROM friend_requests WHERE id=$id AND sender_id=$sender;
+                """;
+            inspect.Parameters.AddWithValue("$id", requestId);
+            inspect.Parameters.AddWithValue("$sender", playerId);
+            using var reader = inspect.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("好友申请无效或已处理。");
+            receiverId = reader.GetInt64(0);
+            low = reader.GetInt64(1);
+            high = reader.GetInt64(2);
+        }
+
+        DeleteFriendRequestPair(connection, transaction, low, high);
+        var snapshot = LoadFriendData(connection, transaction, playerId);
+        var otherAccount = GetAccount(connection, transaction, receiverId);
+        transaction.Commit();
+        return new FriendMutationResult(snapshot, otherAccount);
+    }
+
+    public FriendMutationResult RemoveFriend(string account, string otherAccount)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var otherId = FindPlayerId(connection, transaction, NormalizeAccountKey(otherAccount));
+        if (otherId is null || otherId.Value == playerId)
+            throw new PlayerDataValidationException("好友不存在。");
+
+        var (low, high) = OrderedPair(playerId, otherId.Value);
+        using var delete = connection.CreateCommand();
+        delete.Transaction = transaction;
+        delete.CommandText = "DELETE FROM friendships WHERE player_low_id=$low AND player_high_id=$high;";
+        delete.Parameters.AddWithValue("$low", low);
+        delete.Parameters.AddWithValue("$high", high);
+        if (delete.ExecuteNonQuery() == 0) throw new PlayerDataValidationException("好友不存在。");
+
+        var snapshot = LoadFriendData(connection, transaction, playerId);
+        var normalizedOtherAccount = GetAccount(connection, transaction, otherId.Value);
+        transaction.Commit();
+        return new FriendMutationResult(snapshot, normalizedOtherAccount);
     }
 
     public PlayerDataSnapshot SaveDeck(string account, StoredDeck deck)
@@ -496,6 +727,146 @@ public sealed class PlayerDataStore
     private static long RequirePlayerId(SqliteConnection connection, SqliteTransaction transaction, string account)
         => FindPlayerId(connection, transaction, NormalizeAccountKey(account))
            ?? throw new PlayerDataValidationException("玩家账号不存在，请重新登录。");
+
+    private static string EscapeLike(string value)
+        => value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
+
+    private static (long Low, long High) OrderedPair(long first, long second)
+        => first < second ? (first, second) : (second, first);
+
+    private static bool FriendshipExists(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long low,
+        long high)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT 1 FROM friendships WHERE player_low_id=$low AND player_high_id=$high LIMIT 1;";
+        command.Parameters.AddWithValue("$low", low);
+        command.Parameters.AddWithValue("$high", high);
+        return command.ExecuteScalar() is not null;
+    }
+
+    private static void InsertFriendship(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long low,
+        long high)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT OR IGNORE INTO friendships(player_low_id, player_high_id, created_at)
+            VALUES($low, $high, $now);
+            """;
+        command.Parameters.AddWithValue("$low", low);
+        command.Parameters.AddWithValue("$high", high);
+        command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        command.ExecuteNonQuery();
+    }
+
+    private static void DeleteFriendRequestPair(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long low,
+        long high)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM friend_requests WHERE player_low_id=$low AND player_high_id=$high;";
+        command.Parameters.AddWithValue("$low", low);
+        command.Parameters.AddWithValue("$high", high);
+        command.ExecuteNonQuery();
+    }
+
+    private static string GetAccount(SqliteConnection connection, SqliteTransaction transaction, long playerId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT account FROM players WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", playerId);
+        return command.ExecuteScalar() as string
+               ?? throw new PlayerDataValidationException("玩家不存在。");
+    }
+
+    private static FriendDataSnapshot LoadFriendData(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId)
+    {
+        var friends = new List<FriendProfile>();
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                SELECT other.id, other.account, other.display_name, other.avatar, relation.created_at
+                FROM friendships relation
+                JOIN players other
+                  ON other.id=CASE
+                      WHEN relation.player_low_id=$playerId THEN relation.player_high_id
+                      ELSE relation.player_low_id
+                    END
+                WHERE relation.player_low_id=$playerId OR relation.player_high_id=$playerId
+                ORDER BY other.display_name COLLATE NOCASE, other.account_key;
+                """;
+            command.Parameters.AddWithValue("$playerId", playerId);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                friends.Add(new FriendProfile(
+                    reader.GetInt64(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetInt64(4)));
+            }
+        }
+
+        var incoming = LoadFriendRequests(connection, transaction, playerId, incoming: true);
+        var outgoing = LoadFriendRequests(connection, transaction, playerId, incoming: false);
+        return new FriendDataSnapshot(friends, incoming, outgoing);
+    }
+
+    private static IReadOnlyList<FriendRequestSnapshot> LoadFriendRequests(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId,
+        bool incoming)
+    {
+        var requests = new List<FriendRequestSnapshot>();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = incoming
+            ? """
+                SELECT request.id, sender.account, sender.display_name, sender.avatar, request.created_at
+                FROM friend_requests request
+                JOIN players sender ON sender.id=request.sender_id
+                WHERE request.receiver_id=$playerId
+                ORDER BY request.created_at DESC;
+                """
+            : """
+                SELECT request.id, receiver.account, receiver.display_name, receiver.avatar, request.created_at
+                FROM friend_requests request
+                JOIN players receiver ON receiver.id=request.receiver_id
+                WHERE request.sender_id=$playerId
+                ORDER BY request.created_at DESC;
+                """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            requests.Add(new FriendRequestSnapshot(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetInt64(4)));
+        }
+        return requests;
+    }
 
     private static int CountDecks(SqliteConnection connection, SqliteTransaction transaction, long playerId)
     {

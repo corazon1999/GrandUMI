@@ -47,4 +47,39 @@ public sealed record PlayerDataSnapshot(
 
 public sealed record DeckImportResult(PlayerDataSnapshot Snapshot, int Imported, int Renamed, int Skipped);
 
+/// <summary>好友列表中的持久化玩家资料。</summary>
+public sealed record FriendProfile(
+    long PlayerId,
+    string Account,
+    string DisplayName,
+    string Avatar,
+    long FriendsSince);
+
+/// <summary>待处理好友申请。</summary>
+public sealed record FriendRequestSnapshot(
+    long Id,
+    string Account,
+    string DisplayName,
+    string Avatar,
+    long CreatedAt);
+
+/// <summary>某个玩家的完整好友状态。</summary>
+public sealed record FriendDataSnapshot(
+    IReadOnlyList<FriendProfile> Friends,
+    IReadOnlyList<FriendRequestSnapshot> IncomingRequests,
+    IReadOnlyList<FriendRequestSnapshot> OutgoingRequests);
+
+/// <summary>好友搜索结果及其与当前玩家的关系。</summary>
+public sealed record FriendSearchPlayer(
+    string Account,
+    string DisplayName,
+    string Avatar,
+    string Relationship);
+
+/// <summary>好友关系写操作结果。</summary>
+public sealed record FriendMutationResult(
+    FriendDataSnapshot Snapshot,
+    string OtherAccount,
+    bool AutoAccepted = false);
+
 public sealed class PlayerDataValidationException(string message) : Exception(message);
