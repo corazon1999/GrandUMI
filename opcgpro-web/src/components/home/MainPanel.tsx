@@ -13,7 +13,6 @@ import HistoryPanel from "./HistoryPanel";
 import CardCatalogPanel from "./CardCatalogPanel";
 import ChangelogModal from "./ChangelogModal";
 import ChatPanel from "./ChatPanel";
-import NetStatePanel from "@/components/ui/NetStatePanel";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { LATEST_CHANGELOG } from "@/data/changelog";
@@ -95,7 +94,7 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
   return (
     <>
       {editing ? (
-        <div className={variant === "profile" ? "flex w-full items-center gap-2" : "flex w-20 flex-col items-center gap-1 px-1"}>
+        <div className={variant === "profile" ? "flex w-full items-center gap-2" : variant === "header" ? "flex w-20 flex-col items-center gap-1 px-1" : "flex w-16 flex-col items-center gap-1 px-1"}>
           <input
             ref={inputRef}
             value={draft}
@@ -142,7 +141,7 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
             )}
           </button>
           {variant !== "header" && (
-            <div className={variant === "profile" ? "min-w-0 flex-1" : "w-20"}>
+            <div className={variant === "profile" ? "min-w-0 flex-1" : "w-16"}>
               {variant === "profile" && <p className="mb-1 text-sm text-gray-500">当前玩家</p>}
               <button
                 type="button"
@@ -282,43 +281,107 @@ function AvatarGrid({
   );
 }
 
-// ── 左侧常驻在线人数入口 ──────────────────────────────────────────────────
+type NavIconName = View | "friends" | "settings" | "changelog" | "online" | "connection";
 
-function OnlineCountBadge({ onClick }: { onClick: () => void }) {
-  const onlineCount = useNetStore((s) => s.onlineCount);
+function NavIcon({ name }: { name: NavIconName }) {
+  if (name === "lobby") {
+    return <path d="M4 11.5 12 4l8 7.5M6.5 10v9h11v-9M10 19v-5h4v5" />;
+  }
+  if (name === "deck") {
+    return <><rect x="6" y="4" width="12" height="16" rx="2" /><path d="m9 8 3-2 3 2-1 4h-4L9 8Z" /></>;
+  }
+  if (name === "catalog") {
+    return <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>;
+  }
+  if (name === "leaderboard") {
+    return <><path d="M5 20v-6h4v6M10 20V8h4v12M15 20V4h4v16" /><path d="M3 20h18" /></>;
+  }
+  if (name === "cardBackPlaza") {
+    return <><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 16h6" /><path d="M12 10.5c-1.7-2-4.5.6 0 4 4.5-3.4 1.7-6 0-4Z" /></>;
+  }
+  if (name === "profile") {
+    return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
+  }
+  if (name === "friends") {
+    return <><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.6-3.5 2.4-5 5.5-5s4.9 1.5 5.5 5M16 8h5M18.5 5.5v5" /></>;
+  }
+  if (name === "online") {
+    return <><circle cx="9" cy="9" r="3" /><circle cx="17" cy="10" r="2.5" /><path d="M3.5 20c.6-3.7 2.4-5.3 5.5-5.3s4.9 1.6 5.5 5.3M14.5 15.5c3.3-.7 5.3.7 6 3.5" /></>;
+  }
+  if (name === "history") {
+    return <><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5" /><path d="M4 4v4.5h4.5M12 8v4l2.8 1.7" /></>;
+  }
+  if (name === "settings") {
+    return <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></>;
+  }
+  if (name === "changelog") {
+    return <><path d="M6 3h9l3 3v15H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M14 3v4h4M8 11h6M8 15h6" /></>;
+  }
+  if (name === "connection") {
+    return <><path d="M4.5 9.5a11 11 0 0 1 15 0M7.5 12.5a6.8 6.8 0 0 1 9 0M10.5 15.5a2.7 2.7 0 0 1 3 0" /><circle cx="12" cy="19" r=".8" fill="currentColor" stroke="none" /></>;
+  }
+  return null;
+}
+
+function SidebarButton({
+  label,
+  icon,
+  onClick,
+  active = false,
+  badge,
+  iconClassName = "",
+}: {
+  label: string;
+  icon: NavIconName;
+  onClick?: () => void;
+  active?: boolean;
+  badge?: number;
+  iconClassName?: string;
+}) {
+  const itemClassName = `group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 ${
+    active
+      ? "border-orange-400 bg-orange-500 text-white shadow-lg shadow-orange-950/30"
+      : "border-transparent text-gray-400 hover:border-gray-700 hover:bg-gray-800 hover:text-white"
+  }`;
+  const content = (
+    <>
+      <svg viewBox="0 0 24 24" className={`h-5 w-5 ${iconClassName}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <NavIcon name={icon} />
+      </svg>
+      {typeof badge === "number" && badge > 0 && (
+        <span className="absolute right-0 top-0 min-w-4 rounded-full bg-red-500 px-1 text-[9px] font-black leading-4 text-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs font-semibold text-gray-100 opacity-0 shadow-xl shadow-black/30 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus:translate-x-0 group-focus:opacity-100"
+      >
+        {label}
+      </span>
+    </>
+  );
+
+  if (!onClick) {
+    return (
+      <div role="status" tabIndex={0} aria-label={label} className={itemClassName}>
+        {content}
+      </div>
+    );
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
-      title="查看在线玩家"
-      className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs transition-colors hover:border-green-600 hover:bg-gray-800"
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      className={itemClassName}
     >
-      <span className="w-2 h-2 rounded-full bg-green-400" />
-      <span className="text-gray-300">
-        在线 <span className="text-green-400 font-bold">{onlineCount}</span>
-      </span>
+      {content}
     </button>
   );
-}
-
-function MobileNavIcon({ view }: { view: Exclude<View, "history"> }) {
-  if (view === "lobby") {
-    return <path d="M4 11.5 12 4l8 7.5M6.5 10v9h11v-9M10 19v-5h4v5" />;
-  }
-  if (view === "deck") {
-    return <><rect x="6" y="4" width="12" height="16" rx="2" /><path d="m9 8 3-2 3 2-1 4h-4L9 8Z" /></>;
-  }
-  if (view === "catalog") {
-    return <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>;
-  }
-  if (view === "leaderboard") {
-    return <><path d="M5 20v-6h4v6M10 20V8h4v12M15 20V4h4v16" /><path d="M3 20h18" /></>;
-  }
-  if (view === "cardBackPlaza") {
-    return <><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 16h6" /><path d="M12 10.5c-1.7-2-4.5.6 0 4 4.5-3.4 1.7-6 0-4Z" /></>;
-  }
-  return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
 }
 
 function changelogSeenKey(account: string): string {
@@ -335,7 +398,18 @@ export default function MainPanel() {
   const friendlyRoom = useNetStore((s) => s.friendlyRoom);
   const account = useNetStore((s) => s.account);
   const onlineCount = useNetStore((s) => s.onlineCount);
+  const connState = useNetStore((s) => s.connState);
   const incomingFriendCount = useNetStore((s) => s.incomingFriendRequests.length);
+  const connectionLabel = connState === "connected"
+    ? "服务器已连接"
+    : connState === "connecting" || connState === "handshaking"
+      ? "服务器连接中"
+      : "服务器未连接";
+  const connectionColor = connState === "connected"
+    ? "text-green-400"
+    : connState === "connecting" || connState === "handshaking"
+      ? "text-yellow-400"
+      : "text-red-400";
 
   // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
   useEffect(() => {
@@ -437,75 +511,23 @@ export default function MainPanel() {
 
       <div className="flex min-h-0 flex-1">
         {/* 桌面侧边导航 */}
-        <nav className="hidden w-28 shrink-0 flex-col items-center gap-3 border-r border-gray-800 bg-gray-900 px-3 py-4 @[1024px]:flex">
+        <nav aria-label="桌面主要导航" className="hidden w-20 shrink-0 flex-col items-center gap-2 border-r border-gray-800 bg-gray-900 px-2 py-3 @[1024px]:flex">
           <PlayerAvatar />
-          <button
-            onClick={() => setView("lobby")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "lobby" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            大厅
-          </button>
-          <button
-            onClick={() => setView("deck")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "deck" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            卡组
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowFriends(true)}
-            className="relative h-10 w-full rounded-xl text-sm font-bold text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-          >
-            好友
-            {incomingFriendCount > 0 && <span className="absolute right-1 top-1 min-w-4 rounded-full bg-red-500 px-1 text-[9px] leading-4 text-white">{incomingFriendCount}</span>}
-          </button>
-          <button
-            onClick={() => setView("catalog")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "catalog" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            卡牌图鉴
-          </button>
-          <button
-            onClick={() => setView("leaderboard")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "leaderboard" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            Leader榜
-          </button>
-          <button
-            onClick={() => setView("cardBackPlaza")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "cardBackPlaza" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            卡背广场
-          </button>
-          <button
-            onClick={() => setView("profile")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "profile" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            我的
-          </button>
-          <button
-            onClick={() => setView("history")}
-            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "history" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
-          >
-            对局记录
-          </button>
-          <div className="mt-auto flex w-full flex-col gap-2">
-            <button
-              type="button"
-              onClick={openSettings}
-              className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
-            >
-              设置
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowChangelog(true)}
-              className="min-h-11 w-full rounded-lg border border-gray-800 bg-gray-950/60 px-2 py-2 text-xs text-gray-300 transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white"
-            >
-              更新日志
-            </button>
-            <OnlineCountBadge onClick={() => setShowPlayerList(true)} />
-            <NetStatePanel />
+          <div className="flex w-full flex-col items-center gap-1.5">
+            <SidebarButton label="大厅" icon="lobby" active={view === "lobby"} onClick={() => setView("lobby")} />
+            <SidebarButton label="卡组" icon="deck" active={view === "deck"} onClick={() => setView("deck")} />
+            <SidebarButton label={incomingFriendCount ? `好友 · ${incomingFriendCount} 条新申请` : "好友"} icon="friends" badge={incomingFriendCount} onClick={() => setShowFriends(true)} />
+            <SidebarButton label="卡牌图鉴" icon="catalog" active={view === "catalog"} onClick={() => setView("catalog")} />
+            <SidebarButton label="Leader榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
+            <SidebarButton label="卡背广场" icon="cardBackPlaza" active={view === "cardBackPlaza"} onClick={() => setView("cardBackPlaza")} />
+            <SidebarButton label="我的" icon="profile" active={view === "profile"} onClick={() => setView("profile")} />
+            <SidebarButton label="对局记录" icon="history" active={view === "history"} onClick={() => setView("history")} />
+          </div>
+          <div className="mt-auto flex w-full flex-col items-center gap-1.5 border-t border-gray-800 pt-2">
+            <SidebarButton label="设置" icon="settings" onClick={openSettings} />
+            <SidebarButton label="更新日志" icon="changelog" onClick={() => setShowChangelog(true)} />
+            <SidebarButton label={`在线玩家 · ${onlineCount} 人`} icon="online" iconClassName="text-green-400" onClick={() => setShowPlayerList(true)} />
+            <SidebarButton label={connectionLabel} icon="connection" iconClassName={connectionColor} />
           </div>
         </nav>
 
@@ -545,7 +567,7 @@ export default function MainPanel() {
               }`}
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <MobileNavIcon view={item.view} />
+                <NavIcon name={item.view} />
               </svg>
               <span>{item.label}</span>
             </button>
