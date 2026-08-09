@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <circle cx="32" cy="32" r="30" fill="#09090b" />
   <path fill="#ffffff" d="M31 12h3v29h-3z" />
-  <path fill="#ffffff" d="M35 13v10l16-5-16-5z" />
   <path fill="#ffffff" d="M28.5 17.5 14 36h14.5V17.5z" />
   <path fill="#ffffff" d="M36.5 22v14H50L36.5 22z" />
   <path fill="#ffffff" d="M11.5 39h41L47 50H18l-6.5-11z" />
