@@ -89,6 +89,20 @@ fi
 if [[ "$need_front" == 1 ]]; then
   echo "构建测试服前端"
   cd "$repo/opcgpro-web"
+
+  # 卡图派生资源不进入 Git。每次前端部署先从正式服的只读资源库增量补齐测试服，
+  # 再核对 manifest 中每张多画卡的最新异画，避免清单已更新但图鉴只能回退到正画。
+  production_assets=/opt/grandumi/opcgpro-web/public
+  test_assets=/opt/grandumi-test-assets
+  for asset_dir in cards-thumb cards-webp; do
+    source_dir="$production_assets/$asset_dir"
+    target_dir="$test_assets/$asset_dir"
+    [[ -d "$source_dir" ]] || die "正式服卡图资源目录不存在：$source_dir"
+    mkdir -p "$target_dir"
+    rsync -a "$source_dir/" "$target_dir/"
+  done
+  node scripts/check-latest-card-art.mjs
+
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
