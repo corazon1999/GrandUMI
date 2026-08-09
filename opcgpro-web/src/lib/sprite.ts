@@ -1,3 +1,5 @@
+import { DATA_VERSION } from "@/data/dataVersion";
+
 // 浏览器统一使用 WebP 派生图；PNG/JPG 原图仅作为缺失派生图时的回退。
 // - /cards-thumb/：宽 128，小卡、网格和列表使用。
 // - /cards-webp/：最大宽 960，悬停、详情和全屏大图使用。
@@ -15,12 +17,12 @@ function mapLocalSource(
 ): string {
   const cardMatch = src.match(CARD_SOURCE_RE);
   if (cardMatch) {
-    return `/${cardDirectory}/${cardMatch[1]}.webp${cardMatch[3] ?? ""}`;
+    return `/${cardDirectory}/${cardMatch[1]}.webp${cardMatch[3] ?? `?v=${DATA_VERSION}`}`;
   }
 
   const spriteMatch = src.match(SPRITE_SOURCE_RE);
   if (spriteMatch) {
-    return `/sprites-thumb/${spriteMatch[1]}.webp${spriteMatch[3] ?? ""}`;
+    return `/sprites-thumb/${spriteMatch[1]}.webp${spriteMatch[3] ?? `?v=${DATA_VERSION}`}`;
   }
 
   return src;
