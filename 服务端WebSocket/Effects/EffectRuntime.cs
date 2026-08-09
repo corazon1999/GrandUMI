@@ -75,13 +75,13 @@ public static class EffectRuntime
         => _ambient?.EnqueueWatcher(trigger, payload);
 
     /// <summary>是否正在支付效果成本（DSL PayActivationCost 内为 true）。
-    /// 成本丢手牌 ≠「因效果丢弃」，供 OnHandDiscarded 消费端（如 OP12-040 青雉）区分。</summary>
+    /// 供 OnHandDiscarded 消费端按各自规则区分成本与收益阶段；OP12-040 两者均会触发。</summary>
     private static readonly AsyncLocal<bool> _payingCostAL = new();
     public static bool PayingCost { get => _payingCostAL.Value; set => _payingCostAL.Value = value; }
 
     /// <summary>手牌因效果被丢弃时入队 OnHandDiscarded（owner=该手牌所属方）；仅效果上下文内有效。
     /// payload 额外携带丢弃来源：sourceNumber=当前结算效果的来源卡番号、actingSide=效果控制方、
-    /// isCost=是否成本支付（供"通过X特征卡牌的效果丢弃"类监听判定，如 OP12-040）。</summary>
+    /// isCost=是否成本支付，供只关心收益阶段或只关心成本阶段的监听按各自规则判定。</summary>
     public static void NotifyHandDiscarded(PlayerState p)
     {
         var s = _ambient;

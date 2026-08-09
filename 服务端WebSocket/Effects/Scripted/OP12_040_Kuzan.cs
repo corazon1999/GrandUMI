@@ -12,8 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///     即等价"丢几张抽几张"。
 ///   - payload 判定三要素（见 EffectRuntime.NotifyHandDiscarded）：
 ///       owner==我方（丢的是我方手牌）；actingSide==我方 且来源卡含《海军》（"通过我方《海军》卡牌的效果"）；
-///       isCost==false（支付成本的丢弃不算"效果丢弃"，官方裁定口径）。
-///   - 简化点：脚本卡手写成本丢弃未走 PayingCost 标记的场景会被当作效果丢弃（偏宽松）。
+///       成本与收益阶段的丢弃都属于"通过该《海军》卡牌的效果丢弃"，因此不排除 isCost=true。
 /// </summary>
 public class OP12_040_Kuzan : IScriptedEffect
 {
@@ -25,9 +24,6 @@ public class OP12_040_Kuzan : IScriptedEffect
     {
         // 丢弃的须是我方手牌
         if (!ctx.Vars.TryGetValue("owner", out var ov) || ov is not int owner || owner != ctx.OwnerIndex)
-            return Task.CompletedTask;
-        // 成本丢弃不触发
-        if (ctx.Vars.TryGetValue("isCost", out var ic) && ic is bool isCost && isCost)
             return Task.CompletedTask;
         // 丢弃来源须是我方控制的效果
         if (ctx.Vars.TryGetValue("actingSide", out var asd) && asd is int acting && acting != ctx.OwnerIndex)

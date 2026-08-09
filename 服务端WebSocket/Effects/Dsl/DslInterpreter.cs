@@ -220,7 +220,7 @@ public static class DslInterpreter
     static async Task<bool> PayActivationCost(JsonElement node, EffectContext ctx)
     {
         if (!node.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) return true;
-        // 标记"正在支付成本"：成本丢手牌不算"因效果丢弃"（如 OP12-040 青雉只吃效果丢弃）
+        // 标记"正在支付成本"：监听方可按各自规则区分成本与收益阶段（OP12-040 两者均触发）
         EffectRuntime.PayingCost = true;
         try
         {
