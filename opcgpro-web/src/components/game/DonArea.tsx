@@ -14,6 +14,12 @@ const slotSizes = {
   lg: "h-[11.2rem] w-[8rem]",
 };
 
+const restSlotSizes = {
+  sm: "h-[4.5rem] w-[6.3rem]",
+  md: "h-[6rem] w-[8.4rem]",
+  lg: "h-[8rem] w-[11.2rem]",
+};
+
 function DonCountSlot({
   label,
   count,
@@ -38,7 +44,7 @@ function DonCountSlot({
       type="button"
       onClick={count > 0 && canInteract ? onClick : undefined}
       disabled={count <= 0 || !canInteract}
-      className={`${slotSizes[cardSize]} relative shrink-0 rounded-md border border-sky-200/15 bg-black/15 text-left shadow-inner shadow-black/25 disabled:cursor-default`}
+      className={`${state === "rest" ? restSlotSizes[cardSize] : slotSizes[cardSize]} relative shrink-0 rounded-md border border-sky-200/15 bg-black/15 text-left shadow-inner shadow-black/25 disabled:cursor-default`}
     >
       <span className={`absolute left-2 top-2 z-20 text-[11px] font-black drop-shadow ${state === "active" ? "text-yellow-200" : "text-zinc-200"}`}>
         {label}

@@ -18,6 +18,12 @@ const sizeClass = {
   lg: "w-[8rem] h-[11.2rem]",
 };
 
+const restSizeClass = {
+  sm: "w-[6.3rem] h-[4.5rem]",
+  md: "w-[8.4rem] h-[6rem]",
+  lg: "w-[11.2rem] h-[8rem]",
+};
+
 const textClass = {
   sm: "text-xs",
   md: "text-sm",
@@ -42,7 +48,7 @@ export default function DonCardItem({
   return (
     <motion.div
       className={clsx(
-        sizeClass[size],
+        state === "rest" ? restSizeClass[size] : sizeClass[size],
         "relative shrink-0 overflow-hidden rounded-md border-2 shadow-xl shadow-black/35 transition-all",
         stateStyle[state],
         isSelected && "ring-2 ring-white",
@@ -55,7 +61,13 @@ export default function DonCardItem({
     >
       <div className="absolute inset-2 rounded border border-current/25" />
       <div className="flex h-full w-full items-center justify-center px-2">
-        <span className={clsx("font-black leading-none tracking-normal", textClass[size])}>
+        <span
+          className={clsx(
+            "font-black leading-none tracking-normal",
+            textClass[size],
+            state === "rest" && "rotate-90",
+          )}
+        >
           DON
         </span>
       </div>
