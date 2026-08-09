@@ -10,13 +10,20 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
-import { downloadDeckImage } from "@/lib/deckImageExport";
+import { downloadGeneratedDeckImage, generateDeckImage } from "@/lib/deckImageExport";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
 
 const HOVER_DELAY = 180;
 
 type SaveState = "idle" | "saved" | "error";
-type ImageExportState = "idle" | "exporting" | "success" | "error";
+type ImageExportState = "idle" | "exporting" | "error";
+
+interface DeckImagePreview {
+  url: string;
+  filename: string;
+  width: number;
+  height: number;
+}
 
 export default function DeckInfoPanel() {
   const router = useRouter();
@@ -38,6 +45,8 @@ export default function DeckInfoPanel() {
   const [importMsg, setImportMsg]   = useState<string | null>(null);
   const [copied, setCopied]         = useState(false);
   const [imageExportState, setImageExportState] = useState<ImageExportState>("idle");
+  const [imagePreview, setImagePreview] = useState<DeckImagePreview | null>(null);
+  const imagePreviewUrl             = useRef<string | null>(null);
   const noticeTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hover, setHover]           = useState<HoverInfo | null>(null);
   const hoverTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,6 +87,10 @@ export default function DeckInfoPanel() {
       setHover(null);
     }
   }, [entries, hover]);
+
+  useEffect(() => () => {
+    if (imagePreviewUrl.current) URL.revokeObjectURL(imagePreviewUrl.current);
+  }, []);
 
   const handleNew = () => {
     clearDeck();
@@ -161,14 +174,33 @@ export default function DeckInfoPanel() {
     if (!leader || entries.length === 0 || imageExportState === "exporting") return;
     setImageExportState("exporting");
     try {
-      await downloadDeckImage({ deckName, leader, entries });
-      setImageExportState("success");
-      window.setTimeout(() => setImageExportState("idle"), 2200);
+      const generated = await generateDeckImage({ deckName, leader, entries });
+      const url = URL.createObjectURL(generated.blob);
+      if (imagePreviewUrl.current) URL.revokeObjectURL(imagePreviewUrl.current);
+      imagePreviewUrl.current = url;
+      setImagePreview({
+        url,
+        filename: generated.filename,
+        width: generated.width,
+        height: generated.height,
+      });
+      setImageExportState("idle");
     } catch (error) {
       console.error("导出卡组一图流失败", error);
       setImageExportState("error");
       window.setTimeout(() => setImageExportState("idle"), 3000);
     }
+  };
+
+  const closeImagePreview = () => {
+    if (imagePreviewUrl.current) URL.revokeObjectURL(imagePreviewUrl.current);
+    imagePreviewUrl.current = null;
+    setImagePreview(null);
+  };
+
+  const handleImageDownload = () => {
+    if (!imagePreview) return;
+    downloadGeneratedDeckImage(imagePreview.url, imagePreview.filename);
   };
 
   const handleImportApply = () => {
@@ -356,6 +388,70 @@ export default function DeckInfoPanel() {
         </div>
       )}
 
+      {/* 一图流预览弹窗 */}
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 sm:p-6"
+          onClick={closeImagePreview}
+          data-testid="deck-image-preview-backdrop"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-image-preview-title"
+            className="flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-950 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            data-testid="deck-image-preview"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
+              <div className="min-w-0">
+                <h2 id="deck-image-preview-title" className="truncate text-sm font-bold text-white">
+                  一图流预览 · {deckName.trim() || "未命名卡组"}
+                </h2>
+                <p className="mt-0.5 text-[10px] text-gray-500">
+                  {imagePreview.width} × {imagePreview.height} PNG
+                </p>
+              </div>
+              <button
+                onClick={closeImagePreview}
+                aria-label="关闭一图流预览"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gray-900 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto bg-black/40 p-3 sm:p-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreview.url}
+                alt={`${deckName.trim() || "未命名卡组"} 一图流预览`}
+                className="mx-auto block h-auto w-full max-w-[1440px] rounded-lg shadow-xl"
+              />
+            </div>
+
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-800 bg-gray-950 px-4 py-3">
+              <p className="hidden text-[11px] text-gray-500 sm:block">预览不会自动下载，确认后可保存 PNG</p>
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={closeImagePreview}
+                  className="rounded-lg bg-gray-800 px-4 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-700"
+                >
+                  关闭
+                </button>
+                <button
+                  onClick={handleImageDownload}
+                  className="rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-orange-400"
+                  data-testid="deck-image-download"
+                >
+                  下载 PNG
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 删除确认弹窗 */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -517,21 +613,17 @@ export default function DeckInfoPanel() {
           title="把当前异画、卡牌数量和卡号导出为一张 PNG 图片"
           className={`w-full py-2 rounded-xl border text-xs font-bold transition-all ${
             leader && entries.length > 0 && imageExportState !== "exporting"
-              ? imageExportState === "success"
-                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
-                : imageExportState === "error"
-                  ? "border-red-500/60 bg-red-500/10 text-red-300"
-                  : "border-sky-500/40 bg-sky-500/10 text-sky-300 hover:border-sky-400 hover:bg-sky-500/20"
+              ? imageExportState === "error"
+                ? "border-red-500/60 bg-red-500/10 text-red-300"
+                : "border-sky-500/40 bg-sky-500/10 text-sky-300 hover:border-sky-400 hover:bg-sky-500/20"
               : "border-gray-800 bg-gray-900 text-gray-600 cursor-not-allowed"
           }`}
         >
           {imageExportState === "exporting"
-            ? "正在生成一图流…"
-            : imageExportState === "success"
-              ? "✓ 一图流已下载"
-              : imageExportState === "error"
-                ? "导出失败，请重试"
-                : "▦ 导出一图流"}
+            ? "正在生成预览…"
+            : imageExportState === "error"
+              ? "生成失败，请重试"
+              : "▦ 导出一图流"}
         </button>
         <button
           onClick={handleSave}

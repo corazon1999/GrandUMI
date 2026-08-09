@@ -28,6 +28,13 @@ interface DeckImageOptions {
   entries: DeckEntry[];
 }
 
+export interface GeneratedDeckImage {
+  blob: Blob;
+  filename: string;
+  width: number;
+  height: number;
+}
+
 interface SectionLayout {
   barY: number;
   cardsY: number;
@@ -296,15 +303,22 @@ export async function renderDeckImage({
   return canvas;
 }
 
-export async function downloadDeckImage(options: DeckImageOptions): Promise<void> {
+export async function generateDeckImage(options: DeckImageOptions): Promise<GeneratedDeckImage> {
   const canvas = await renderDeckImage(options);
   const blob = await canvasToBlob(canvas);
-  const url = URL.createObjectURL(blob);
+  return {
+    blob,
+    filename: safeFilename(options.deckName),
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+export function downloadGeneratedDeckImage(url: string, filename: string): void {
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = safeFilename(options.deckName);
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
