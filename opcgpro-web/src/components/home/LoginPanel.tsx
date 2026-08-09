@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
@@ -18,6 +18,24 @@ const STATE_LABEL: Record<string, string> = {
   failed: "连接失败",
 };
 
+const PASSWORD_STORAGE_PREFIX = "grandumi_password:";
+
+function passwordStorageKey(account: string) {
+  return `${PASSWORD_STORAGE_PREFIX}${account.trim().toLocaleLowerCase("zh-CN")}`;
+}
+
+function loadRememberedPassword(account: string) {
+  const normalized = account.trim();
+  if (!normalized) return "";
+  return localStorage.getItem(passwordStorageKey(normalized)) ?? "";
+}
+
+function rememberPassword(account: string, password: string) {
+  const normalized = account.trim();
+  if (!normalized || !password) return;
+  localStorage.setItem(passwordStorageKey(normalized), password);
+}
+
 export default function LoginPanel() {
   const [account, setAccount] = useState("");
   const [storedAccount, setStoredAccount] = useState("");
@@ -25,7 +43,9 @@ export default function LoginPanel() {
   const [authStep, setAuthStep] = useState<"account" | "password" | "setup">("account");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
+  const submittedLoginRef = useRef<{ account: string; password?: string } | null>(null);
   const connState = useNetStore((s) => s.connState);
   const error = useNetStore((s) => s.error);
   const canLogin = connState === "connected";
@@ -46,13 +66,19 @@ export default function LoginPanel() {
       const login = message as MsgLogin;
       setPending(false);
       if (login.result) {
-        setPassword("");
+        const submitted = submittedLoginRef.current;
+        if (submitted?.password) rememberPassword(submitted.account, submitted.password);
         setConfirmPassword("");
         return;
       }
       if (login.needsPassword) {
-        if (login.account) setAccount(login.account);
-        setAuthStep(login.needsPasswordSetup ? "setup" : "password");
+        const nextAccount = (login.account || submittedLoginRef.current?.account || "").trim();
+        if (nextAccount) setAccount(nextAccount);
+        const nextStep = login.needsPasswordSetup ? "setup" : "password";
+        setAuthStep(nextStep);
+        setPassword(nextStep === "setup" ? "" : loadRememberedPassword(nextAccount));
+        setConfirmPassword("");
+        setShowPassword(false);
       }
     };
     const onClose = () => setPending(false);
@@ -84,8 +110,13 @@ export default function LoginPanel() {
       }
     }
 
-    const sent = HomeRequest.login(account.trim(), authStep === "account" ? undefined : password);
-    if (sent) setPending(true);
+    const normalizedAccount = account.trim();
+    const submittedPassword = authStep === "account" ? undefined : password;
+    const sent = HomeRequest.login(normalizedAccount, submittedPassword);
+    if (sent) {
+      submittedLoginRef.current = { account: normalizedAccount, password: submittedPassword };
+      setPending(true);
+    }
   };
 
   const handleRetry = () => {
@@ -98,6 +129,7 @@ export default function LoginPanel() {
     setAuthStep("account");
     setPassword("");
     setConfirmPassword("");
+    setShowPassword(false);
     setPending(false);
     useNetStore.getState().setError(null);
   };
@@ -147,18 +179,42 @@ export default function LoginPanel() {
               <label htmlFor="login-password" className="mb-2 block text-sm font-medium text-gray-300">
                 {authStep === "setup" ? "设置密码" : "密码"}
               </label>
-              <input
-                id="login-password"
-                type="password"
-                className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
-                placeholder={authStep === "setup" ? "8–128 个字符" : "请输入密码"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && authStep === "password" && handleLogin()}
-                autoComplete={authStep === "setup" ? "new-password" : "current-password"}
-                maxLength={128}
-                autoFocus
-              />
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 pr-12 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                  placeholder={authStep === "setup" ? "8–128 个字符" : "请输入密码"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && authStep === "password" && handleLogin()}
+                  autoComplete={authStep === "setup" ? "new-password" : "current-password"}
+                  maxLength={128}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  aria-pressed={showPassword}
+                  className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-orange-400"
+                >
+                  {showPassword ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8">
+                      <path d="M3 3l18 18" strokeLinecap="round" />
+                      <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.3A10.8 10.8 0 0 1 12 4c5.5 0 9 5.5 9 8a10.4 10.4 0 0 1-2.1 3.4M6.2 6.2C4.1 7.7 3 10.3 3 12c0 2.5 3.5 8 9 8 1.4 0 2.7-.4 3.8-1" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8">
+                      <path d="M3 12c0-2.5 3.5-8 9-8s9 5.5 9 8-3.5 8-9 8-9-5.5-9-8Z" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="2.5" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {authStep === "password" && (
+                <p className="mt-2 text-xs leading-5 text-gray-500">密码会保存在当前浏览器，下次刷新自动填入。</p>
+              )}
             </div>
 
             {authStep === "setup" && (
@@ -168,7 +224,7 @@ export default function LoginPanel() {
                 </label>
                 <input
                   id="login-password-confirm"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
                   placeholder="再输入一次密码"
                   value={confirmPassword}

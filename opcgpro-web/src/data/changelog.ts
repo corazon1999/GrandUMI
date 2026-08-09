@@ -20,6 +20,21 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-10-login-password-memory",
+    version: "2026.08.10.2",
+    date: "2026-08-10",
+    title: "登录体验优化",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "成功登录后，当前浏览器会按账号记住上一次使用的密码；刷新页面再次登录时会自动填入，无需重复输入。",
+          "密码框新增眼睛按钮，可随时切换显示或隐藏密码内容；设置密码时确认框会同步切换。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-10-account-community-mobile-and-card-effects",
     version: "2026.08.10.1",
     date: "2026-08-10",
