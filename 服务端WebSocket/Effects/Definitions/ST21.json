@@ -115,16 +115,20 @@
   },
   "ST21-017": {
     "_name": "橡皮橡皮鼹鼠枪",
-    "_note": "【主要】本回合对方最多1张角色力量-5000（原文“之后我方有力量≥6000角色则KO对方力量≤2000”因 then 无条件分支已略去）；【触发】同主要。",
+    "_note": "【主要】本回合对方最多1张角色力量-5000，之后我方有当前力量≥6000角色时，KO对方最多1张当前力量≤2000角色；【触发】同主要。",
     "main": {
       "then": [
         { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-5000" },
-        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 }
+        { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$ko", "filter": { "currentPowerLte": 2000 }, "if": { "ownHasCharPowerGte": 6000 }, "text": "KO 对方最多1张当前力量≤2000的角色" },
+        { "op": "KO", "target": "$ko", "if": { "ownHasCharPowerGte": 6000 } }
       ]
     },
     "trigger": [
       { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "text": "本回合对方最多1张角色力量-5000" },
-      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 }
+      { "op": "AddPowerThisTurn", "target": "$tgt", "delta": -5000 },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$ko", "filter": { "currentPowerLte": 2000 }, "if": { "ownHasCharPowerGte": 6000 }, "text": "KO 对方最多1张当前力量≤2000的角色" },
+      { "op": "KO", "target": "$ko", "if": { "ownHasCharPowerGte": 6000 } }
     ]
   }
 }

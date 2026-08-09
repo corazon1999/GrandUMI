@@ -848,6 +848,10 @@ public static class DslInterpreter
                     // 我方场上存在当前费用 ≥ N 的角色（包含临时及持续费用修正）。
                     if (!me.Characters.Any(c => s.CurrentCostOf(ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
                     break;
+                case "ownHasCharPowerGte":
+                    // 我方场上存在当前力量 ≥ N 的角色（包含咚!!、临时修正及持续效果）。
+                    if (!me.Characters.Any(c => s.CurrentPowerOf(ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
+                    break;
                 case "oppHasCharPowerGte":
                     // 对方场上存在当前力量 ≥ N 的角色
                     if (!opp.Characters.Any(c => s.CurrentPowerOf(1 - ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
