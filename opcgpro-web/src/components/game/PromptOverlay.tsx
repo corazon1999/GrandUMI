@@ -1,11 +1,81 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
-import { getCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
+
+function PromptChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={`h-5 w-5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+    >
+      <path
+        d="m6.75 14.25 5.25-5.25 5.25 5.25"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.4"
+      />
+    </svg>
+  );
+}
+
+function EffectDecisionButton({
+  tone,
+  label,
+  symbol,
+  onClick,
+  reduceMotion,
+}: {
+  tone: "confirm" | "cancel";
+  label: string;
+  symbol: string;
+  onClick: () => void;
+  reduceMotion: boolean;
+}) {
+  const isConfirm = tone === "confirm";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-w-24 flex-col items-center gap-2 text-xs font-black tracking-[0.2em] text-slate-100 focus-visible:outline-none"
+      aria-label={label}
+    >
+      <span
+        className={`relative flex h-16 w-16 items-center justify-center rounded-full border bg-slate-950/95 shadow-[0_0_24px_rgba(0,0,0,.75)] transition-transform duration-200 group-hover:scale-105 group-active:scale-95 ${
+          isConfirm
+            ? "border-cyan-300/70 text-cyan-100 group-hover:shadow-[0_0_28px_rgba(34,211,238,.55)]"
+            : "border-rose-300/70 text-rose-100 group-hover:shadow-[0_0_28px_rgba(251,113,133,.5)]"
+        }`}
+      >
+        <motion.span
+          className={`absolute inset-1 rounded-full border-2 border-dashed ${
+            isConfirm ? "border-cyan-300/75" : "border-rose-300/75"
+          }`}
+          animate={reduceMotion ? undefined : { rotate: isConfirm ? 360 : -360 }}
+          transition={{ duration: 5, ease: "linear", repeat: Infinity }}
+        />
+        <motion.span
+          className={`absolute inset-2 rounded-full border ${
+            isConfirm
+              ? "border-cyan-100/50 border-r-transparent"
+              : "border-rose-100/50 border-l-transparent"
+          }`}
+          animate={reduceMotion ? undefined : { rotate: isConfirm ? -360 : 360 }}
+          transition={{ duration: 3.5, ease: "linear", repeat: Infinity }}
+        />
+        <span className="relative text-3xl leading-none drop-shadow-[0_0_8px_currentColor]">{symbol}</span>
+      </span>
+      <span className={isConfirm ? "text-cyan-100" : "text-rose-100"}>{label}</span>
+    </button>
+  );
+}
 
 /**
  * 服务端 Prompt 弹窗：处理选择目标 / 选项 / 生命牌触发等交互
@@ -18,6 +88,7 @@ export default function PromptOverlay() {
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
+  const reduceMotion = useReducedMotion() ?? false;
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -37,6 +108,12 @@ export default function PromptOverlay() {
       }
     : null;
   const prompt = serverPrompt ?? localPrompt;
+  const options = prompt?.extra?.options as string[] | undefined;
+  const isEffectConfirm =
+    prompt?.kind === "Option" &&
+    options?.length === 2 &&
+    options[0] === "是" &&
+    options[1] === "否";
 
   useEffect(() => {
     setSelected([]);
@@ -54,6 +131,34 @@ export default function PromptOverlay() {
   if (!prompt || submittingPromptId === prompt.promptId) return null;
 
   if (isMinimized) {
+    if (isEffectConfirm) {
+      return (
+        <AnimatePresence>
+          <motion.div
+            className="pointer-events-none fixed inset-0 z-[60]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <motion.button
+              type="button"
+              onClick={() => setIsMinimized(false)}
+              className="pointer-events-auto fixed bottom-[clamp(1rem,5vh,3rem)] left-1/2 flex max-w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 border border-cyan-300/50 bg-slate-950/95 py-2 pl-4 pr-2 text-left text-xs font-bold text-slate-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-md"
+              initial={{ y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              title="展开效果确认框"
+              aria-label="展开效果确认框"
+              aria-expanded="false"
+            >
+              <span className="min-w-0 truncate">等待确认：{prompt.text}</span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-cyan-300/40 bg-cyan-400/10 text-cyan-100">
+                <PromptChevron expanded={false} />
+              </span>
+            </motion.button>
+          </motion.div>
+        </AnimatePresence>
+      );
+    }
+
     return (
       <AnimatePresence>
         <motion.div
@@ -88,10 +193,9 @@ export default function PromptOverlay() {
 
   // 服务端注入的效果源卡号：让玩家知道当前在结算哪张卡的效果
   const sourceNumber = prompt.extra?.sourceNumber as string | undefined;
-  const sourceCard = sourceNumber ? getCard(sourceNumber) ?? null : null;
-  const options = prompt.extra?.options as string[] | undefined;
+  const sourceCard = sourceNumber ? getGameCard(sourceNumber, my?.spriteMap) ?? null : null;
   const lifeCardNumber = prompt.extra?.lifeCardNumber as string | undefined;
-  const lifeCard = lifeCardNumber ? getCard(lifeCardNumber) ?? null : null;
+  const lifeCard = lifeCardNumber ? getGameCard(lifeCardNumber, my?.spriteMap) ?? null : null;
   const hasRealTrigger = prompt.extra?.hasRealTrigger === true;
 
   // 观星 / 卡组重排等"自选顺序"提示：按点选先后决定相对顺序，
@@ -121,23 +225,21 @@ export default function PromptOverlay() {
   // 把 cardId 反查成显示用 CardData（优先 extra.choiceCards，再领袖，最后退回自己/对手场上）
   const findCardById = (id: string) => {
     const numFromExtra = choiceMap.get(id);
-    if (numFromExtra) return getCard(numFromExtra) ?? null;
+    if (numFromExtra) return getGameCard(numFromExtra, my?.spriteMap) ?? null;
     // 领袖不在 fieldCards 里，需单独识别（候选 id 为领袖 GUID 或字面 "leader"），否则卡图无法加载
     if (id === "leader" || id === my?.leaderId)
-      return my?.leaderNumber ? getCard(my.leaderNumber) ?? null : null;
+      return my?.leaderNumber ? getGameCard(my.leaderNumber, my.spriteMap) ?? null : null;
     if (id === opp?.leaderId)
-      return opp?.leaderNumber ? getCard(opp.leaderNumber) ?? null : null;
+      return opp?.leaderNumber ? getGameCard(opp.leaderNumber, opp.spriteMap) ?? null : null;
     // 舞台不在 fieldCards 里（stageId/stageNumber 扁平字段），需单独识别，否则候选卡图加载不出
     if (my && id === my.stageId)
-      return my.stageNumber ? getCard(my.stageNumber) ?? null : null;
+      return my.stageNumber ? getGameCard(my.stageNumber, my.spriteMap) ?? null : null;
     if (opp && id === opp.stageId)
-      return opp.stageNumber ? getCard(opp.stageNumber) ?? null : null;
-    const allCards = [
-      ...(my?.fieldCards ?? []),
-      ...(opp?.fieldCards ?? []),
-    ];
-    const found = allCards.find((c) => c.id === id);
-    return found ? getCard(found.number) ?? null : null;
+      return opp.stageNumber ? getGameCard(opp.stageNumber, opp.spriteMap) ?? null : null;
+    const myCard = my?.fieldCards.find((c) => c.id === id);
+    if (myCard) return getGameCard(myCard.number, my?.spriteMap) ?? null;
+    const opponentCard = opp?.fieldCards.find((c) => c.id === id);
+    return opponentCard ? getGameCard(opponentCard.number, opp?.spriteMap) ?? null : null;
   };
 
   // 场上目标需要明确所属阵营，避免双方存在同名或同卡图角色时无法分辨。
@@ -247,6 +349,80 @@ export default function PromptOverlay() {
     submitServerPrompt([]);
   };
 
+  if (isEffectConfirm) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          className="pointer-events-none fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          data-effect-confirm-layer
+        >
+          <motion.section
+            className="pointer-events-auto fixed bottom-[clamp(1rem,7vh,4.5rem)] left-1/2 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden border border-cyan-200/55 bg-[linear-gradient(180deg,rgba(8,15,27,.97),rgba(2,6,12,.94))] text-white shadow-[0_18px_60px_rgba(0,0,0,.72),0_0_36px_rgba(14,165,233,.16)] backdrop-blur-md"
+            initial={{ y: 36, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 24, opacity: 0, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="effect-confirm-title"
+            data-effect-confirm-dialog
+          >
+            <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(125,211,252,.08)_4px)]" />
+            <div className="relative flex min-h-12 items-center border-b border-cyan-200/20 bg-slate-950/70 px-5 pr-14">
+              <span className="mr-2 h-2 w-2 rotate-45 bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
+              <h2 id="effect-confirm-title" className="text-sm font-black tracking-[0.18em] text-cyan-50">
+                效果发动确认
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsMinimized(true)}
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center border border-cyan-200/30 bg-cyan-300/10 text-cyan-100 transition-colors hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                title="收起效果确认框"
+                aria-label="收起效果确认框"
+                aria-expanded="true"
+              >
+                <PromptChevron expanded />
+              </button>
+            </div>
+
+            <div className="relative grid max-h-[70vh] grid-cols-[1fr_auto] items-center gap-5 overflow-y-auto px-6 py-5 max-sm:grid-cols-1 max-sm:gap-3 max-sm:py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold tracking-[0.2em] text-cyan-300/80">是否发动以下效果？</p>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-50 sm:text-base">{prompt.text}</p>
+              </div>
+              {sourceCard && (
+                <div className="flex shrink-0 flex-col items-center gap-1.5">
+                  <CardItem card={sourceCard} size="sm" />
+                  <span className="text-[10px] font-bold tracking-wider text-amber-200">效果源</span>
+                </div>
+              )}
+            </div>
+
+            <div className="relative flex items-center justify-center gap-14 border-t border-white/10 bg-black/20 px-6 py-4 max-sm:gap-8">
+              <EffectDecisionButton
+                tone="cancel"
+                label="取消"
+                symbol="×"
+                onClick={() => submitServerPrompt(["1"])}
+                reduceMotion={reduceMotion}
+              />
+              <EffectDecisionButton
+                tone="confirm"
+                label="确认"
+                symbol="✓"
+                onClick={() => submitServerPrompt(["0"], true)}
+                reduceMotion={reduceMotion}
+              />
+            </div>
+          </motion.section>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
   return (
     <AnimatePresence>
       <motion.div
@@ -315,7 +491,7 @@ export default function PromptOverlay() {
             <div className="flex flex-wrap gap-3 max-w-2xl justify-center">
               {donChoices.map((d) => {
                 const isSel = selected.includes(d.id);
-                const attachedCard = d.attachedToNumber ? getCard(d.attachedToNumber) ?? null : null;
+                const attachedCard = d.attachedToNumber ? getGameCard(d.attachedToNumber, my?.spriteMap) ?? null : null;
                 const stateLabel = d.state === "Active" ? "活跃" : d.state === "Rest" ? "休息" : "附着";
                 return (
                   <div
