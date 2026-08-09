@@ -84,6 +84,12 @@ class NetManagerClass {
     pushBounded(this.actionLatencySamples, elapsedMs);
   }
 
+  /** 新对局开始时丢弃上一局的增量快照基线，等待服务端首份完整状态。 */
+  resetGameStateBaseline() {
+    this.stateBaseline = null;
+    this.deltaResyncRequested = false;
+  }
+
   connect(url: string = DEFAULT_WS_URL) {
     if (["connecting", "handshaking", "connected", "reconnecting", "recovering"].includes(this._state)) {
       return;

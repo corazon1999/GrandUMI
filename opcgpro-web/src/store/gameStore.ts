@@ -390,6 +390,7 @@ export const useGameStore = create<GameStore>()(
     setSpectatorNames: (names) => set((s) => { s.spectatorNames = names; }),
     setMode: (m) => set((s) => { s.mode = m; }),
     resetGame: () => set((s) => {
+      s.isStart = false;
       s.tick = 0;
       s.currentTurn = false;
       s.turnCount = 0;

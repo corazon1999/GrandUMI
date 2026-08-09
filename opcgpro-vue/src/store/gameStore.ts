@@ -239,6 +239,7 @@ export const useGameStore = createStore<GameStore>()(
     setMode: (m) => set((s) => { s.mode = m; }),
     setIsStart: (v) => set((s) => { s.isStart = v; }),
     resetGame: () => set((s) => {
+      s.isStart = false;
       s.tick = 0;
       s.currentTurn = false;
       s.turnCount = 0;

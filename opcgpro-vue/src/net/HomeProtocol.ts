@@ -251,6 +251,8 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
  */
 function handleGameStart(msg: MsgGameStart) {
   const gameStore = useGameStore.getState();
+  // 新对局首份快照可能比 MsgGameStart 稍晚到达，先清掉上一局的终局状态与牌桌镜像。
+  gameStore.resetGame();
   gameStore.setIsStart(msg.IsFirst ?? false);
   gameStore.setMode("Player");
 
