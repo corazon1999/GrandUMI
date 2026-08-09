@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 import {
   ATTACK_ATTRIBUTES,
@@ -51,4 +52,43 @@ test("单属性主题保留主色、辅色和高光色", () => {
     ATTACK_ATTRIBUTE_THEMES.射.secondary,
     ATTACK_ATTRIBUTE_THEMES.射.accent,
   ]);
+});
+
+test("未知属性使用青粉色差主题", () => {
+  assert.equal(ATTACK_ATTRIBUTE_THEMES["?"].secondary, "#22d3ee");
+  assert.equal(ATTACK_ATTRIBUTE_THEMES["?"].accent, "#f472b6");
+});
+
+test("电影级视觉层包含六类独立命中结构和分层动画", async () => {
+  const component = await readFile(
+    new URL("../src/components/game/AttributeAttackEffect.tsx", import.meta.url),
+    "utf8",
+  );
+
+  for (const signature of [
+    "SlashImpact",
+    "StrikeImpact",
+    "ShotImpact",
+    "SpecialImpact",
+    "KnowledgeImpact",
+    "UnknownImpact",
+  ]) {
+    assert.match(component, new RegExp(`function ${signature}\\b`));
+  }
+
+  assert.match(component, /data-attack-vfx="cinematic"/);
+  assert.match(component, /feGaussianBlur/);
+  assert.match(component, /animateMotion/);
+  assert.match(component, /AttributeTrail/);
+  assert.match(component, /CinematicTexture/);
+  assert.match(component, /PARTICLE_ANGLES/);
+});
+
+test("六种属性的电影级材质图均已生成并接入", async () => {
+  const names = ["slash", "strike", "shot", "special", "knowledge", "unknown"];
+  const files = await Promise.all(names.map((name) => (
+    stat(new URL(`../public/vfx/attack-${name}.webp`, import.meta.url))
+  )));
+
+  assert.ok(files.every((file) => file.size > 40_000));
 });

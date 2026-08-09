@@ -244,11 +244,14 @@ export default function BattleRelationLayer() {
       <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 1280 720">
         <defs>
           <filter id="battle-route-glow" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feGaussianBlur stdDeviation="5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
+          </filter>
+          <filter id="battle-route-bloom" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="11" />
           </filter>
           <linearGradient id="battle-route-attribute" x1="0" y1="0" x2="1" y2="0">
             {attackTheme.colors.map((color, index) => (
@@ -264,12 +267,6 @@ export default function BattleRelationLayer() {
             <stop offset="0.58" stopColor="#facc15" />
             <stop offset="1" stopColor="#67e8f9" />
           </linearGradient>
-          <marker id="battle-arrow-attack" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
-            <path d="M 0 0 L 11 5.5 L 0 11 z" fill={attackTheme.accent} />
-          </marker>
-          <marker id="battle-arrow-block" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
-            <path d="M 0 0 L 11 5.5 L 0 11 z" fill="#67e8f9" />
-          </marker>
         </defs>
 
         <AnimatePresence mode="popLayout">
@@ -279,32 +276,36 @@ export default function BattleRelationLayer() {
                 d={path}
                 fill="none"
                 stroke={isBlocked ? "#22d3ee" : attackTheme.primary}
-                strokeWidth="13"
+                strokeWidth="30"
                 strokeLinecap="round"
-                opacity="0.2"
-                filter="url(#battle-route-glow)"
+                opacity="0.085"
+                filter="url(#battle-route-bloom)"
                 initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
-                animate={{ opacity: 0.2, pathLength: 1 }}
+                animate={{ opacity: 0.085, pathLength: 1 }}
                 transition={{ duration: reduceMotion ? 0 : 0.38, ease: "easeOut" }}
               />
               <motion.path
                 d={path}
                 fill="none"
                 stroke={isBlocked ? "url(#battle-route-block)" : "url(#battle-route-attribute)"}
-                strokeWidth="5"
+                strokeWidth="9"
                 strokeLinecap="round"
                 filter="url(#battle-route-glow)"
                 initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
-                animate={{ opacity: 1, pathLength: 1 }}
+                animate={{ opacity: 0.3, pathLength: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.42, ease: "easeOut" }}
               />
-              <path
+              <motion.path
                 d={path}
                 fill="none"
-                stroke="transparent"
-                strokeWidth="5"
-                markerEnd={isBlocked ? "url(#battle-arrow-block)" : "url(#battle-arrow-attack)"}
+                stroke={isBlocked ? "#ecfeff" : "url(#battle-route-attribute)"}
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
+                animate={{ opacity: 0.94, pathLength: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.46, ease: "easeOut" }}
               />
 
               <AttributeAttackEffect
@@ -320,10 +321,10 @@ export default function BattleRelationLayer() {
                 cy={points.target.y}
                 fill="none"
                 stroke={isBlocked ? "#67e8f9" : attackTheme.accent}
-                strokeWidth="5"
+                strokeWidth="2.5"
                 initial={reduceMotion ? false : { r: 12, opacity: 1 }}
-                animate={{ r: reduceMotion ? 28 : 48, opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.58, ease: "easeOut" }}
+                animate={{ r: reduceMotion ? 34 : 66, opacity: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.68, ease: "easeOut" }}
               />
             </motion.g>
           )}

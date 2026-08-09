@@ -52,8 +52,8 @@ export const ATTACK_ATTRIBUTE_THEMES: Record<AttackAttribute, AttackAttributeThe
   "?": {
     label: "?",
     primary: "#e2e8f0",
-    secondary: "#94a3b8",
-    accent: "#f8fafc",
+    secondary: "#22d3ee",
+    accent: "#f472b6",
   },
 };
 
