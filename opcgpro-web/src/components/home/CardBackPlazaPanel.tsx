@@ -17,6 +17,8 @@ type PreparedImage = {
   size: number;
 };
 
+type GalleryView = "popular" | "mine";
+
 function canvasBlob(canvas: HTMLCanvasElement, type: "image/webp" | "image/jpeg", quality: number) {
   return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
 }
@@ -82,6 +84,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const [preparing, setPreparing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [galleryView, setGalleryView] = useState<GalleryView>("popular");
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +122,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
       setError("网络未连接，暂时无法上传");
       return;
     }
+    setGalleryView("mine");
     setName("");
     setPrepared(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -133,6 +137,9 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
       setError("网络未连接，暂时无法删除");
     }
   };
+
+  const ownedCardBacks = gallery?.filter((item) => item.owned) ?? [];
+  const displayedCardBacks = galleryView === "mine" ? ownedCardBacks : gallery;
 
   return (
     <section className="h-full overflow-y-auto px-4 py-5 @[720px]:px-6 @[720px]:py-6" data-testid="card-back-plaza">
@@ -177,24 +184,51 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
         </div>
       </article>
 
-      <div className="mt-6 flex items-end justify-between gap-3">
-        <div><h2 className="text-lg font-bold text-white">热门卡背</h2><p className="mt-1 text-xs text-gray-600">按红心数量排序，同票时新发布的在前。</p></div>
-        <span className="text-xs text-gray-600">{gallery?.length ?? 0} 款</span>
+      <div className="mt-6 flex flex-col gap-3 @[560px]:flex-row @[560px]:items-end @[560px]:justify-between">
+        <div>
+          <div role="tablist" aria-label="卡背广场分类" className="inline-flex rounded-xl border border-gray-800 bg-gray-900 p-1">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={galleryView === "popular"}
+              onClick={() => setGalleryView("popular")}
+              className={`min-h-10 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "popular" ? "bg-orange-500 text-white" : "text-gray-500 hover:text-white"}`}
+            >
+              热门卡背
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={galleryView === "mine"}
+              onClick={() => setGalleryView("mine")}
+              className={`min-h-10 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "mine" ? "bg-rose-500 text-white" : "text-gray-500 hover:text-white"}`}
+            >
+              我发布的卡背
+              {ownedCardBacks.length > 0 && <span className="ml-1.5 text-xs opacity-75">{ownedCardBacks.length}</span>}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            {galleryView === "popular" ? "按红心数量排序，同票时新发布的在前。" : "在这里查看和删除你发布到广场的卡背。"}
+          </p>
+        </div>
+        <span className="text-xs text-gray-600">{displayedCardBacks?.length ?? 0} 款</span>
       </div>
 
       {gallery === null ? (
         <div className="mt-4 rounded-2xl border border-gray-800 bg-gray-900 py-16 text-center text-sm text-gray-500">正在读取卡背广场…</div>
-      ) : gallery.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-gray-700 py-16 text-center text-sm text-gray-500">广场还没有投稿，来发布第一款卡背吧。</div>
+      ) : displayedCardBacks?.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-gray-700 py-16 text-center text-sm text-gray-500">
+          {galleryView === "mine" ? "你还没有发布卡背，可以在上方发布第一款作品。" : "广场还没有投稿，来发布第一款卡背吧。"}
+        </div>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 @[560px]:grid-cols-3 @[820px]:grid-cols-4 @[1120px]:grid-cols-5">
-          {gallery.map((item, index) => {
+          {displayedCardBacks?.map((item, index) => {
             const active = currentCardBackId === item.id;
             return (
               <article key={item.id} className={`overflow-hidden rounded-2xl border bg-gray-900 p-3 ${active ? "border-orange-500 ring-1 ring-orange-500/30" : "border-gray-800"}`}>
                 <div className="relative mx-auto aspect-[5/7] w-full max-w-40 overflow-hidden rounded-xl bg-gray-950 shadow-xl">
                   <CardBack cardBackId={item.id} decorative />
-                  <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">#{index + 1}</span>
+                  {galleryView === "popular" && <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">#{index + 1}</span>}
                   {active && <span className="absolute bottom-2 left-2 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-bold text-white">使用中</span>}
                 </div>
                 <h3 className="mt-3 truncate text-sm font-bold text-white" title={item.name}>{item.name}</h3>
@@ -212,7 +246,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
                   <button type="button" disabled={active} onClick={() => HomeRequest.updateCardBack(item.id)} className="min-h-11 rounded-xl bg-orange-500 px-2 text-xs font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500">
                     {active ? "已选用" : "选用并点♥"}
                   </button>
-                  {item.owned && (
+                  {galleryView === "mine" && item.owned && (
                     <button
                       type="button"
                       disabled={deletingId === item.id}
