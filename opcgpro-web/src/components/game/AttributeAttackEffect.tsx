@@ -30,15 +30,6 @@ interface ImpactProps {
 
 const PARTICLE_ANGLES = [-158, -132, -102, -72, -40, -15, 17, 43, 71, 104, 137, 168] as const;
 
-const ATTACK_ATTRIBUTE_TEXTURES: Record<AttackAttribute, string> = {
-  斩: "/vfx/attack-slash.webp",
-  打: "/vfx/attack-strike.webp",
-  射: "/vfx/attack-shot.webp",
-  特: "/vfx/attack-special.webp",
-  知: "/vfx/attack-knowledge.webp",
-  "?": "/vfx/attack-unknown.webp",
-};
-
 function polygonPoints(center: Point, radius: number, sides: number, rotation = -90) {
   return Array.from({ length: sides }, (_, index) => {
     const angle = ((rotation + (360 / sides) * index) * Math.PI) / 180;
@@ -501,53 +492,8 @@ function AttributeTrail({ attribute, path, index, reduceMotion, glowId }: { attr
   );
 }
 
-function CinematicTexture({
-  attribute,
-  source,
-  target,
-  index,
-  reduceMotion,
-}: {
-  attribute: AttackAttribute;
-  source: Point;
-  target: Point;
-  index: number;
-  reduceMotion: boolean;
-}) {
-  const dx = target.x - source.x;
-  const dy = target.y - source.y;
-  const distance = Math.max(1, Math.hypot(dx, dy));
-  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-  // 材质图中发射点与命中点分别位于画幅约 12% / 86%，据此反推动态画幅。
-  const width = distance / 0.74;
-  const height = width * (314 / 836);
-  const x = source.x - width * 0.12;
-  const y = source.y - height * 0.5;
-  const opacity = Math.max(0.58, 0.9 - index * 0.12);
-
-  return (
-    <motion.g
-      transform={`rotate(${angle} ${source.x} ${source.y})`}
-      initial={reduceMotion ? false : { opacity: 0 }}
-      animate={{ opacity }}
-      transition={{ duration: reduceMotion ? 0 : 0.34, delay: index * 0.055, ease: "easeOut" }}
-      style={{ mixBlendMode: "screen" }}
-    >
-      <image
-        href={ATTACK_ATTRIBUTE_TEXTURES[attribute]}
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        preserveAspectRatio="none"
-        opacity={reduceMotion ? 0.68 : 0.95}
-      />
-    </motion.g>
-  );
-}
-
 /**
- * 电影级属性攻击视觉：每个子属性拥有独立的轨迹材质、运动粒子、空间辉光和命中结构。
+ * 程序化属性攻击视觉：每个子属性拥有独立的透明轨迹、运动粒子、空间辉光和命中结构。
  * 多属性卡会逐层组合全部子属性；所有坐标仍由战斗关系层提供，因此阻挡改向和响应式缩放保持有效。
  */
 export default function AttributeAttackEffect({
@@ -563,7 +509,7 @@ export default function AttributeAttackEffect({
   const direction = Math.atan2(target.y - source.y, target.x - source.x) * (180 / Math.PI);
 
   return (
-    <g data-attack-vfx="cinematic">
+    <g data-attack-vfx="procedural">
       <defs>
         <filter id={softGlowId} x="-100%" y="-100%" width="300%" height="300%" colorInterpolationFilters="sRGB">
           <feGaussianBlur stdDeviation="6" result="wideGlow" />
@@ -582,17 +528,6 @@ export default function AttributeAttackEffect({
           </feMerge>
         </filter>
       </defs>
-
-      {attributes.map((attribute, index) => (
-        <CinematicTexture
-          key={`texture:${attribute}`}
-          attribute={attribute}
-          source={source}
-          target={target}
-          index={index}
-          reduceMotion={reduceMotion}
-        />
-      ))}
 
       {attributes.map((attribute, index) => (
         <AttributeTrail

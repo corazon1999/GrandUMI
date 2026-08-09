@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   ATTACK_ATTRIBUTES,
@@ -59,7 +59,7 @@ test("未知属性使用青粉色差主题", () => {
   assert.equal(ATTACK_ATTRIBUTE_THEMES["?"].accent, "#f472b6");
 });
 
-test("电影级视觉层包含六类独立命中结构和分层动画", async () => {
+test("程序化视觉层包含六类独立命中结构和分层动画", async () => {
   const component = await readFile(
     new URL("../src/components/game/AttributeAttackEffect.tsx", import.meta.url),
     "utf8",
@@ -76,19 +76,21 @@ test("电影级视觉层包含六类独立命中结构和分层动画", async ()
     assert.match(component, new RegExp(`function ${signature}\\b`));
   }
 
-  assert.match(component, /data-attack-vfx="cinematic"/);
+  assert.match(component, /data-attack-vfx="procedural"/);
   assert.match(component, /feGaussianBlur/);
   assert.match(component, /animateMotion/);
   assert.match(component, /AttributeTrail/);
-  assert.match(component, /CinematicTexture/);
   assert.match(component, /PARTICLE_ANGLES/);
+  assert.doesNotMatch(component, /<image\b/);
+  assert.doesNotMatch(component, /\/vfx\/attack-/);
 });
 
-test("六种属性的电影级材质图均已生成并接入", async () => {
-  const names = ["slash", "strike", "shot", "special", "knowledge", "unknown"];
-  const files = await Promise.all(names.map((name) => (
-    stat(new URL(`../public/vfx/attack-${name}.webp`, import.meta.url))
-  )));
+test("战斗关系层只挂载一套属性攻击视觉", async () => {
+  const layer = await readFile(
+    new URL("../src/components/game/BattleRelationLayer.tsx", import.meta.url),
+    "utf8",
+  );
 
-  assert.ok(files.every((file) => file.size > 40_000));
+  assert.equal(layer.match(/<AttributeAttackEffect\b/g)?.length, 1);
+  assert.doesNotMatch(layer, /battle-route-(?:glow|bloom|attribute|block)/);
 });

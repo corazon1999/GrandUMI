@@ -242,89 +242,15 @@ export default function BattleRelationLayer() {
       </AnimatePresence>
 
       <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 1280 720">
-        <defs>
-          <filter id="battle-route-glow" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="battle-route-bloom" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="11" />
-          </filter>
-          <linearGradient id="battle-route-attribute" x1="0" y1="0" x2="1" y2="0">
-            {attackTheme.colors.map((color, index) => (
-              <stop
-                key={`${color}:${index}`}
-                offset={`${(index / Math.max(1, attackTheme.colors.length - 1)) * 100}%`}
-                stopColor={color}
-              />
-            ))}
-          </linearGradient>
-          <linearGradient id="battle-route-block" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#f97316" />
-            <stop offset="0.58" stopColor="#facc15" />
-            <stop offset="1" stopColor="#67e8f9" />
-          </linearGradient>
-        </defs>
-
         <AnimatePresence mode="popLayout">
           {points && path && (
             <motion.g key={routeKey}>
-              <motion.path
-                d={path}
-                fill="none"
-                stroke={isBlocked ? "#22d3ee" : attackTheme.primary}
-                strokeWidth="30"
-                strokeLinecap="round"
-                opacity="0.085"
-                filter="url(#battle-route-bloom)"
-                initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
-                animate={{ opacity: 0.085, pathLength: 1 }}
-                transition={{ duration: reduceMotion ? 0 : 0.38, ease: "easeOut" }}
-              />
-              <motion.path
-                d={path}
-                fill="none"
-                stroke={isBlocked ? "url(#battle-route-block)" : "url(#battle-route-attribute)"}
-                strokeWidth="9"
-                strokeLinecap="round"
-                filter="url(#battle-route-glow)"
-                initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
-                animate={{ opacity: 0.3, pathLength: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.42, ease: "easeOut" }}
-              />
-              <motion.path
-                d={path}
-                fill="none"
-                stroke={isBlocked ? "#ecfeff" : "url(#battle-route-attribute)"}
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                initial={reduceMotion ? false : { opacity: 0, pathLength: 0 }}
-                animate={{ opacity: 0.94, pathLength: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.46, ease: "easeOut" }}
-              />
-
               <AttributeAttackEffect
                 attributes={attackTheme.attributes}
                 path={path}
                 source={points.source}
                 target={points.target}
                 reduceMotion={shouldReduceMotion}
-              />
-
-              <motion.circle
-                cx={points.target.x}
-                cy={points.target.y}
-                fill="none"
-                stroke={isBlocked ? "#67e8f9" : attackTheme.accent}
-                strokeWidth="2.5"
-                initial={reduceMotion ? false : { r: 12, opacity: 1 }}
-                animate={{ r: reduceMotion ? 34 : 66, opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.68, ease: "easeOut" }}
               />
             </motion.g>
           )}
