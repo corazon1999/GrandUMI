@@ -191,8 +191,7 @@ public static class StateSnapshotBuilder
             powerCurrent = state.CurrentPowerOf(idx, c),
             cost = state.CurrentCostOf(idx, c),
             attachedDon = p.AttachedDonCount(c.Id),
-            gainedKeywords = c.GainedKeywords.Select(k => k.Keyword)
-                .Concat(ContinuousGrantedKeywords(state, c)).Distinct().ToArray(),
+            gainedKeywords = GrantedKeywords(state, c),
             cannotActivateNextReset = c.CannotActivateNextReset,
             cannotBeRested = c.HasRestriction(RestrictionKind.CannotBeRested)
                 || state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested),
@@ -224,6 +223,7 @@ public static class StateSnapshotBuilder
             p.Leader.IsTapped,
             state.CurrentPowerOf(idx, p.Leader),
             p.AttachedDonCount(p.Leader.Id),
+            GrantedKeywords(state, p.Leader),
             Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
             HasCannotAttackStatus(state, p.Leader),
             ActivatedUsedThisTurn(p, p.Leader),
@@ -269,6 +269,7 @@ public static class StateSnapshotBuilder
             leaderTapped = board.LeaderTapped,
             leaderPower = board.LeaderPower,
             leaderAttachedDon = board.LeaderAttachedDon,
+            leaderGainedKeywords = board.LeaderGainedKeywords,
             leaderCanAttack = board.LeaderCanAttack,
             leaderCannotAttack = board.LeaderCannotAttack,
             leaderActivatedUsedThisTurn = board.LeaderActivatedUsedThisTurn,
@@ -299,6 +300,7 @@ public static class StateSnapshotBuilder
         bool LeaderTapped,
         int LeaderPower,
         int LeaderAttachedDon,
+        string[] LeaderGainedKeywords,
         bool LeaderCanAttack,
         bool LeaderCannotAttack,
         bool LeaderActivatedUsedThisTurn,
@@ -330,4 +332,10 @@ public static class StateSnapshotBuilder
 
     private static IEnumerable<string> ContinuousGrantedKeywords(GameState state, CardInstance c)
         => GrantableKeywords.Where(kw => state.HasContinuousKeyword(c, kw));
+
+    private static string[] GrantedKeywords(GameState state, CardInstance c)
+        => c.GainedKeywords.Select(k => k.Keyword)
+            .Concat(ContinuousGrantedKeywords(state, c))
+            .Distinct()
+            .ToArray();
 }

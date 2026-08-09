@@ -1,7 +1,9 @@
+using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
 using Xunit;
 
@@ -57,11 +59,42 @@ public class OP16EffectTests
         Assert.Equal(7000, state.CurrentPowerOf(0, leader));
         Assert.Equal(10000, state.CurrentPowerOf(0, newgate));
 
+        using (var ownerSnapshot = JsonDocument.Parse(JsonSerializer.Serialize(
+                   StateSnapshotBuilder.Build(state, viewerIndex: 0))))
+        {
+            var leaderKeywords = ownerSnapshot.RootElement
+                .GetProperty("my")
+                .GetProperty("leaderGainedKeywords")
+                .EnumerateArray()
+                .Select(keyword => keyword.GetString())
+                .ToArray();
+            Assert.Contains("双重攻击", leaderKeywords);
+        }
+
+        using (var opponentViewSnapshot = JsonDocument.Parse(JsonSerializer.Serialize(
+                   StateSnapshotBuilder.Build(state, viewerIndex: 1))))
+        {
+            var leaderKeywords = opponentViewSnapshot.RootElement
+                .GetProperty("opponent")
+                .GetProperty("leaderGainedKeywords")
+                .EnumerateArray()
+                .Select(keyword => keyword.GetString())
+                .ToArray();
+            Assert.Contains("双重攻击", leaderKeywords);
+        }
+
         state.CurrentTurnPlayer = 1;
 
         Assert.False(ActionValidator.HasKeyword(state, leader, "双重攻击"));
         Assert.Equal(5000, state.CurrentPowerOf(0, leader));
         Assert.Equal(10000, state.CurrentPowerOf(0, newgate));
+
+        using var opponentTurnSnapshot = JsonDocument.Parse(JsonSerializer.Serialize(
+            StateSnapshotBuilder.Build(state, viewerIndex: 0)));
+        Assert.Empty(opponentTurnSnapshot.RootElement
+            .GetProperty("my")
+            .GetProperty("leaderGainedKeywords")
+            .EnumerateArray());
     }
 
     [Fact]

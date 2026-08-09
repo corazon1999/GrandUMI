@@ -115,6 +115,8 @@ export default function LeaderCard({ side }: Props) {
         attachedDonCount={player.leaderAttachedDon}
         powerBuff={player.leaderPower - (leader.power ?? 0) - player.leaderAttachedDon * 1000}
         hideCost
+        showKeywordFx
+        gainedKeywords={player.leaderGainedKeywords}
         attackState={
           player.leaderCannotAttack
             ? "blocked"
