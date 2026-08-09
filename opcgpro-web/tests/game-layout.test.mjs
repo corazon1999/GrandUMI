@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateLayoutScale, resolveGameLayout } from "../src/lib/gameLayout.ts";
+import {
+  LAYOUT_CANVAS_SIZES,
+  LAYOUT_PREVIEW_OPTIONS,
+  normalizeStoredLayoutPreviewMode,
+} from "../src/lib/layoutSettings.ts";
+
+test("布局设置只提供电脑和手机竖屏", () => {
+  assert.deepEqual(
+    LAYOUT_PREVIEW_OPTIONS.map((option) => option.value),
+    ["desktop", "mobile-portrait"],
+  );
+  assert.deepEqual(LAYOUT_CANVAS_SIZES["mobile-landscape"], { width: 844, height: 390 });
+});
+
+test("旧手机横屏设置自动迁移为电脑布局", () => {
+  assert.equal(normalizeStoredLayoutPreviewMode("mobile-landscape"), "desktop");
+  assert.equal(normalizeStoredLayoutPreviewMode("mobile-portrait"), "mobile-portrait");
+  assert.equal(normalizeStoredLayoutPreviewMode("desktop"), "desktop");
+});
 
 test("真实手机竖屏会使用铺满屏幕的旋转横屏画布", () => {
   assert.deepEqual(resolveGameLayout("desktop", true), {
@@ -14,11 +33,6 @@ test("手动手机竖屏只在对局路由转换为旋转横屏预览", () => {
   assert.deepEqual(resolveGameLayout("mobile-portrait", false), {
     mode: "mobile-landscape",
     rotateQuarterTurn: true,
-    edgeToEdge: false,
-  });
-  assert.deepEqual(resolveGameLayout("mobile-landscape", false), {
-    mode: "mobile-landscape",
-    rotateQuarterTurn: false,
     edgeToEdge: false,
   });
 });

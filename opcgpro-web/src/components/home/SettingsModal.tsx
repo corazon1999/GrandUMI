@@ -7,10 +7,10 @@ import { useLanguage, type Locale } from "@/i18n/LanguageProvider";
 import { LANGUAGE_OPTIONS } from "@/i18n/core.mjs";
 import {
   LAYOUT_PREVIEW_OPTIONS,
-  type LayoutPreviewMode,
+  type SelectableLayoutPreviewMode,
 } from "./LayoutPreviewFrame";
 
-function LayoutIcon({ mode }: { mode: LayoutPreviewMode }) {
+function LayoutIcon({ mode }: { mode: SelectableLayoutPreviewMode }) {
   if (mode === "desktop") {
     return (
       <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -20,17 +20,16 @@ function LayoutIcon({ mode }: { mode: LayoutPreviewMode }) {
     );
   }
 
-  const landscape = mode === "mobile-landscape";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
       <rect
-        x={landscape ? 2.5 : 6.5}
-        y={landscape ? 6.5 : 2.5}
-        width={landscape ? 19 : 11}
-        height={landscape ? 11 : 19}
+        x="6.5"
+        y="2.5"
+        width="11"
+        height="19"
         rx="2"
       />
-      <path d={landscape ? "M18.5 12h.01" : "M12 18.5h.01"} />
+      <path d="M12 18.5h.01" />
     </svg>
   );
 }
@@ -42,8 +41,8 @@ export default function SettingsModal({
   onClose,
 }: {
   open: boolean;
-  mode: LayoutPreviewMode;
-  onChange: (mode: LayoutPreviewMode) => void;
+  mode: SelectableLayoutPreviewMode;
+  onChange: (mode: SelectableLayoutPreviewMode) => void;
   onClose: () => void;
 }) {
   const { play, unlock } = useAudio();
@@ -95,7 +94,7 @@ export default function SettingsModal({
         <h3 id="layout-preview-title" className="text-sm font-bold text-white">界面布局</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">手机竖屏模式下大厅保持竖屏，对局与回放会自动旋转为横屏，无需切换系统方向。</p>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 @[640px]:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 @[640px]:grid-cols-2">
           {LAYOUT_PREVIEW_OPTIONS.map((option) => {
             const active = option.value === mode;
             return (

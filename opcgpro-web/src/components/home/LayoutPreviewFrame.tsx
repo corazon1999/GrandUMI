@@ -6,56 +6,39 @@ import {
   LayoutQuarterTurnProvider,
 } from "@/components/ui/ResponsiveScope";
 import { calculateLayoutScale } from "@/lib/gameLayout";
+import {
+  LAYOUT_CANVAS_SIZES,
+  LAYOUT_PREVIEW_OPTIONS,
+  LAYOUT_PREVIEW_STORAGE_KEY,
+  normalizeStoredLayoutPreviewMode,
+  type LayoutPreviewMode,
+  type SelectableLayoutPreviewMode,
+} from "@/lib/layoutSettings";
 
-export type LayoutPreviewMode = "desktop" | "mobile-landscape" | "mobile-portrait";
-
-export const LAYOUT_PREVIEW_STORAGE_KEY = "grandumi_home_layout_preview";
-
-export const LAYOUT_PREVIEW_OPTIONS: Array<{
-  value: LayoutPreviewMode;
-  label: string;
-  description: string;
-  width?: number;
-  height?: number;
-}> = [
-  {
-    value: "desktop",
-    label: "电脑",
-    description: "占满当前浏览器窗口",
-  },
-  {
-    value: "mobile-landscape",
-    label: "手机横屏",
-    description: "844 × 390",
-    width: 844,
-    height: 390,
-  },
-  {
-    value: "mobile-portrait",
-    label: "手机竖屏",
-    description: "大厅竖屏；对局自动旋转横屏",
-    width: 390,
-    height: 844,
-  },
-];
-
-export function isLayoutPreviewMode(value: string | null): value is LayoutPreviewMode {
-  return LAYOUT_PREVIEW_OPTIONS.some((option) => option.value === value);
-}
+export {
+  LAYOUT_PREVIEW_OPTIONS,
+  LAYOUT_PREVIEW_STORAGE_KEY,
+  type LayoutPreviewMode,
+  type SelectableLayoutPreviewMode,
+} from "@/lib/layoutSettings";
 
 export function useLayoutPreviewMode() {
-  const [mode, setModeState] = useState<LayoutPreviewMode>("desktop");
+  const [mode, setModeState] = useState<SelectableLayoutPreviewMode>("desktop");
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAYOUT_PREVIEW_STORAGE_KEY);
-      if (isLayoutPreviewMode(saved)) setModeState(saved);
+      const normalized = normalizeStoredLayoutPreviewMode(saved);
+      setModeState(normalized);
+      if (saved && saved !== normalized) {
+        localStorage.setItem(LAYOUT_PREVIEW_STORAGE_KEY, normalized);
+      }
     } catch {
       // 本地存储不可用时使用默认电脑布局。
     }
   }, []);
 
-  const setMode = useCallback((next: LayoutPreviewMode) => {
+  const setMode = useCallback((next: SelectableLayoutPreviewMode) => {
     setModeState(next);
     try {
       localStorage.setItem(LAYOUT_PREVIEW_STORAGE_KEY, next);
@@ -80,7 +63,7 @@ export default function LayoutPreviewFrame({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const option = LAYOUT_PREVIEW_OPTIONS.find((item) => item.value === mode) ?? LAYOUT_PREVIEW_OPTIONS[0];
+  const option = LAYOUT_CANVAS_SIZES[mode];
   const isDesktop = mode === "desktop";
 
   useEffect(() => {

@@ -1,4 +1,7 @@
-import type { LayoutPreviewMode } from "@/components/home/LayoutPreviewFrame";
+import type {
+  LayoutPreviewMode,
+  SelectableLayoutPreviewMode,
+} from "@/lib/layoutSettings";
 
 export interface GameLayoutResolution {
   mode: LayoutPreviewMode;
@@ -11,7 +14,7 @@ export interface GameLayoutResolution {
  * 大厅仍保留原始布局设置，只有对局/回放路由使用该解析结果。
  */
 export function resolveGameLayout(
-  mode: LayoutPreviewMode,
+  mode: SelectableLayoutPreviewMode,
   isPhonePortrait: boolean,
 ): GameLayoutResolution {
   const rotateQuarterTurn = isPhonePortrait || mode === "mobile-portrait";

@@ -12,12 +12,12 @@ import { createPortal } from "react-dom";
 import SettingsModal from "./SettingsModal";
 import {
   useLayoutPreviewMode,
-  type LayoutPreviewMode,
+  type SelectableLayoutPreviewMode,
 } from "./LayoutPreviewFrame";
 
 interface LayoutSettingsContextValue {
-  mode: LayoutPreviewMode;
-  setMode: (mode: LayoutPreviewMode) => void;
+  mode: SelectableLayoutPreviewMode;
+  setMode: (mode: SelectableLayoutPreviewMode) => void;
   openSettings: () => void;
   gameOverlayHost: HTMLDivElement | null;
   setGameOverlayHost: (host: HTMLDivElement | null) => void;
