@@ -10,6 +10,7 @@ import type {
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   CardBackGalleryItem,
+  DeckPlazaItem,
   FriendChatMessage,
 } from "@/types/net";
 
@@ -84,6 +85,8 @@ interface NetStore {
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
   cardBackGallery: CardBackGalleryItem[] | null;
+  deckPlazaPage: { items: DeckPlazaItem[]; page: number; pageSize: number; total: number; hasMore: boolean } | null;
+  deckPlazaRevision: number;
   // 收到的对战邀请（被邀请方弹窗用）
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
@@ -119,6 +122,8 @@ interface NetStore {
   setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
   setCardBackGallery: (items: CardBackGalleryItem[] | null) => void;
+  setDeckPlazaPage: (page: NetStore["deckPlazaPage"]) => void;
+  refreshDeckPlaza: () => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
@@ -154,6 +159,8 @@ const initialState = {
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
   cardBackGallery: null as CardBackGalleryItem[] | null,
+  deckPlazaPage: null as NetStore["deckPlazaPage"],
+  deckPlazaRevision: 0,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
@@ -224,6 +231,8 @@ export const useNetStore = create<NetStore>((set) => ({
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
 
   setCardBackGallery: (cardBackGallery) => set({ cardBackGallery }),
+  setDeckPlazaPage: (deckPlazaPage) => set({ deckPlazaPage }),
+  refreshDeckPlaza: () => set((state) => ({ deckPlazaRevision: state.deckPlazaRevision + 1 })),
 
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 

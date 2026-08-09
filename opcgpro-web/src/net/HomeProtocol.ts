@@ -26,6 +26,11 @@ import type {
   MsgLikeCardBack,
   MsgDeleteCardBack,
   MsgImportDecks,
+  MsgDeckPlazaList,
+  MsgPublishDeckPlaza,
+  MsgLikeDeckPlaza,
+  MsgCopyDeckPlaza,
+  MsgDeleteDeckPlaza,
   MsgAddAccount,
   MsgUpdatePs,
   MsgEnterMatch,
@@ -81,6 +86,29 @@ let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
+const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
+const AUTH_TOKEN_KEY = "grandumi_auth_token";
+
+function readAuthToken(account: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  if (sessionStorage.getItem(AUTH_ACCOUNT_KEY)?.toLocaleLowerCase("zh-CN") !== account.toLocaleLowerCase("zh-CN")) {
+    return undefined;
+  }
+  return sessionStorage.getItem(AUTH_TOKEN_KEY) || undefined;
+}
+
+function saveAuthToken(account: string, token?: string) {
+  if (typeof window === "undefined" || !token) return;
+  sessionStorage.setItem(AUTH_ACCOUNT_KEY, account);
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function clearAuthToken(account: string) {
+  if (typeof window === "undefined") return;
+  if (sessionStorage.getItem(AUTH_ACCOUNT_KEY)?.toLocaleLowerCase("zh-CN") !== account.toLocaleLowerCase("zh-CN")) return;
+  sessionStorage.removeItem(AUTH_ACCOUNT_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+}
 
 function clearSpectateRequestTimer() {
   if (spectateRequestTimer) clearTimeout(spectateRequestTimer);
@@ -195,6 +223,15 @@ export function registerHomeProtocols() {
       case "MsgCardBackGallery":
         handleCardBackGallery(msg as MsgCardBackGallery);
         break;
+      case "MsgDeckPlazaList":
+        handleDeckPlazaList(msg as MsgDeckPlazaList);
+        break;
+      case "MsgPublishDeckPlaza":
+      case "MsgLikeDeckPlaza":
+      case "MsgCopyDeckPlaza":
+      case "MsgDeleteDeckPlaza":
+        handleDeckPlazaMutation(msg as MsgPublishDeckPlaza | MsgLikeDeckPlaza | MsgCopyDeckPlaza | MsgDeleteDeckPlaza);
+        break;
       case "MsgInvitePlayer":
         handleInvitePlayer(msg as MsgInvitePlayer);
         break;
@@ -307,6 +344,7 @@ function handleLogin(msg: MsgLogin) {
     if (typeof window !== "undefined" && account) {
       localStorage.setItem("grandumi_account", account);
     }
+    saveAuthToken(account, msg.authToken);
     if (legacyDecks.length > 0) {
       pendingLegacyImport = { account, selectedDeckName: legacySelectedDeck };
       if (!HomeRequest.importDecks(legacyDecks)) pendingLegacyImport = null;
@@ -316,8 +354,19 @@ function handleLogin(msg: MsgLogin) {
     if (msg.logStr) showMessage(msg.logStr, "info");
   } else {
     NetManager.finishRecovery();
-    store.setError(msg.logStr ?? "账号或密码错误");
-    if (msg.logStr) showMessage(msg.logStr, "error");
+    if (msg.needsPassword) {
+      clearAuthToken(msg.account ?? "");
+      store.setLoggedIn(false);
+      if (typeof window !== "undefined" && window.location.pathname === "/game") {
+        store.setNavigateTo("/home");
+      }
+    }
+    if (msg.authChallenge) {
+      store.setError(null);
+    } else {
+      store.setError(msg.logStr ?? "账号或密码错误");
+      if (msg.logStr) showMessage(msg.logStr, "error");
+    }
   }
 }
 
@@ -396,6 +445,7 @@ function handleAddAccount(_msg: MsgAddAccount) {}
  */
 function handleUpdatePs(msg: MsgUpdatePs) {
   if (msg.result) {
+    saveAuthToken(useNetStore.getState().account, msg.authToken);
     showMessage(msg.logStr ?? "密码修改成功", "info");
   } else {
     showMessage(msg.logStr ?? "密码修改失败", "error");
@@ -487,8 +537,8 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
 function handleGameStart(msg: MsgGameStart) {
   const { useGameStore } = require("@/store/gameStore");
   const gameStore = useGameStore.getState();
-  // MsgGameStart ??????????????????????????????????
-  // ???????????? isGameOver/??????????
+  // MsgGameStart 是新对局的生命周期边界。必须在首份权威快照到达前清掉上一局终局状态，
+  // 否则连续匹配时会先用旧的 isGameOver/牌桌镜像渲染新对局。
   gameStore.resetGame();
   NetManager.resetGameStateBaseline();
   // 先后手信息由服务端 MsgGameState 决定，这里仅切换为对战模式。
@@ -592,6 +642,31 @@ function handleCardBackGallery(msg: MsgCardBackGallery) {
   if (msg.logStr) showMessage(msg.logStr, "info");
 }
 
+function handleDeckPlazaList(msg: MsgDeckPlazaList) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "读取卡组广场失败", "error");
+    return;
+  }
+  useNetStore.getState().setDeckPlazaPage({
+    items: Array.isArray(msg.items) ? msg.items : [],
+    page: msg.page ?? 1,
+    pageSize: msg.pageSize ?? 20,
+    total: msg.total ?? 0,
+    hasMore: Boolean(msg.hasMore),
+  });
+}
+
+function handleDeckPlazaMutation(
+  msg: MsgPublishDeckPlaza | MsgLikeDeckPlaza | MsgCopyDeckPlaza | MsgDeleteDeckPlaza,
+) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "卡组广场操作失败", "error");
+    return;
+  }
+  if (msg.logStr) showMessage(msg.logStr, "info");
+  useNetStore.getState().refreshDeckPlaza();
+}
+
 /** MsgInvitePlayer — 发起邀请的回执（给发起方） */
 function handleInvitePlayer(msg: MsgInvitePlayer) {
   if (msg.result === false) {
@@ -671,11 +746,13 @@ function handleLeaveSpectate(msg: MsgLeaveSpectate) {
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
 export const HomeRequest = {
-  login(account: string) {
-    NetManager.send({
+  login(account: string, password?: string) {
+    return NetManager.send({
       proto: "MsgLogin",
       account,
-      password: "",
+      ...(password === undefined
+        ? { authToken: readAuthToken(account) }
+        : { password }),
     } as MsgLogin);
   },
 
@@ -688,10 +765,11 @@ export const HomeRequest = {
     } as MsgAddAccount);
   },
 
-  updatePassword(newPs: string) {
-    NetManager.send({
+  updatePassword(currentPassword: string, newPassword: string) {
+    return NetManager.send({
       proto: "MsgUpdatePs",
-      newPs,
+      currentPassword,
+      newPassword,
     } as MsgUpdatePs);
   },
 
@@ -734,6 +812,39 @@ export const HomeRequest = {
 
   importDecks(decks: SavedDeck[]) {
     return NetManager.send({ proto: "MsgImportDecks", decks } as MsgImportDecks);
+  },
+
+  requestDeckPlaza(options: {
+    page?: number;
+    pageSize?: number;
+    sort?: MsgDeckPlazaList["sort"];
+    query?: string;
+    color?: string;
+    mineOnly?: boolean;
+  } = {}) {
+    useNetStore.getState().setDeckPlazaPage(null);
+    return NetManager.send({ proto: "MsgDeckPlazaList", ...options } as MsgDeckPlazaList);
+  },
+
+  publishDeckPlaza(sourceDeckName: string, title: string, publicationId?: string) {
+    return NetManager.send({
+      proto: "MsgPublishDeckPlaza",
+      sourceDeckName,
+      title,
+      publicationId,
+    } as MsgPublishDeckPlaza);
+  },
+
+  toggleDeckPlazaLike(publicationId: string) {
+    return NetManager.send({ proto: "MsgLikeDeckPlaza", publicationId } as MsgLikeDeckPlaza);
+  },
+
+  copyDeckPlaza(publicationId: string) {
+    return NetManager.send({ proto: "MsgCopyDeckPlaza", publicationId } as MsgCopyDeckPlaza);
+  },
+
+  deleteDeckPlaza(publicationId: string) {
+    return NetManager.send({ proto: "MsgDeleteDeckPlaza", publicationId } as MsgDeleteDeckPlaza);
   },
 
   enterMatch(deck: string, deckName?: string) {

@@ -36,6 +36,8 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 var port = args.Length > 0 && int.TryParse(args[0], out var parsedPort) ? parsedPort : 8080;
 var playerDataStore = new PlayerDataStore(PlayerDataStore.ResolveDefaultPath(), deferLoginWrites: true);
 playerDataStore.Initialize();
+var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore);
+accountAuthenticationStore.Initialize();
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
 
 CardDatabase.LoadFrom(ResolveCardDataPath());
@@ -45,7 +47,7 @@ Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.Datab
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
 
 await GameRoomManager.RestoreAll();
-WebSocketBridge.Initialize(playerDataStore);
+WebSocketBridge.Initialize(playerDataStore, accountAuthenticationStore);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
 builder.Logging.ClearProviders();

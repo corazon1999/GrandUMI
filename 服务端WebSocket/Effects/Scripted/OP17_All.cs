@@ -889,9 +889,9 @@ internal static class OP17Effects
         if (c.Trigger is not (EffectTrigger.OnAttackDeclare or EffectTrigger.OnOppAttackDeclare)) return;
         string key = $"OP17-048-battle:{c.Source.Id}";
         if (Me(c).TurnOnceUsed.Contains(key)) return;
-        var costs = Me(c).Hand.Where(x => x.Info.HasKeyword("洛克斯海盗团")).ToList();
+        var costs = Me(c).Hand.Where(x => x.Info.HasKeywordContaining("洛克斯海盗团")).ToList();
         if (costs.Count == 0 || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃1张《洛克斯海盗团》卡牌，使对方1张角色力量-3000？")
-            || !await DiscardOwnFiltered(c, x => x.Info.HasKeyword("洛克斯海盗团"), 1, "选择丢弃1张《洛克斯海盗团》卡牌")) return;
+            || !await DiscardOwnFiltered(c, x => x.Info.HasKeywordContaining("洛克斯海盗团"), 1, "选择丢弃1张特征中包含《洛克斯海盗团》的卡牌")) return;
         var pick = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-3000");
         if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -3000);
         Me(c).TurnOnceUsed.Add(key);
@@ -1526,8 +1526,7 @@ internal static class OP17Effects
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，将卡组顶1张加入生命并使对方丢弃1张手牌？")) return;
         RestActiveDon(c, 2);
         AtomicOps.AddLifeFromDeckTop(Me(c), 1);
-        if (c.Engine is not null) AtomicOps.OpponentDiscardRandom(c.Engine, 1 - c.OwnerIndex, 1);
-        else if (Opp(c).Hand.Count > 0) AtomicOps.DiscardHand(Opp(c), Opp(c).Hand[0]);
+        await DiscardOpponentChosen(c, 1);
     }
 
     private static async Task C107(EffectContext c)

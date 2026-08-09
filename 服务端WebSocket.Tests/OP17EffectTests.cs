@@ -147,6 +147,35 @@ public class OP17EffectTests
         Assert.Equal("OwnHandDiscard", discard.kind);
     }
 
+    [Fact]
+    public async Task OP17_106_OnPlay_MakesOpponentChooseWhichHandCardToDiscard()
+    {
+        var state = TestScene.New()
+            .MyActiveDon(2)
+            .MyDeckTop("OP17-107")
+            .Build();
+        var smoothie = Card("OP17-106");
+        var kept = Card("OP17-044");
+        var chosen = Card("OP17-085");
+        state.Players[0].Characters.Add(smoothie);
+        state.Players[1].Hand.AddRange([kept, chosen]);
+        int lifeBefore = state.Players[0].LifeArea.Count;
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(chosen.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, smoothie, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(0, state.Players[0].ActiveDonCount);
+        Assert.Equal(lifeBefore + 1, state.Players[0].LifeArea.Count);
+        Assert.Contains(kept, state.Players[1].Hand);
+        Assert.DoesNotContain(chosen, state.Players[1].Hand);
+        Assert.Contains(chosen, state.Players[1].Trash);
+        var discard = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnHandDiscard", discard.kind);
+        Assert.Equal(new[] { kept.Id.ToString(), chosen.Id.ToString() }, discard.choices);
+    }
+
     private static string LegalOp17Deck(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
@@ -598,6 +627,33 @@ public class OP17EffectTests
 
         Assert.DoesNotContain(returned, state.Players[1].Hand);
         Assert.Same(returned, state.Players[1].Deck[^1]);
+    }
+
+    [Fact]
+    public async Task OP17_048_AttackTrigger_AcceptsFormerRocksPiratesHandCard()
+    {
+        var state = TestScene.New().OppCharacter("OP17-011").Build();
+        var source = Card("OP17-048");
+        var formerRocksPirate = Card("OP08-051");
+        var unrelated = Card("OP17-023");
+        var target = state.Players[1].Characters[0];
+        state.Players[0].Characters.Add(source);
+        state.Players[0].Hand.AddRange([formerRocksPirate, unrelated]);
+        var prompts = new MockPromptService()
+            .QueueChoose(formerRocksPirate.Id.ToString())
+            .QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, source, EffectTrigger.OnOppAttackDeclare, prompts);
+
+        Assert.DoesNotContain(formerRocksPirate, state.Players[0].Hand);
+        Assert.Contains(formerRocksPirate, state.Players[0].Trash);
+        Assert.Contains(unrelated, state.Players[0].Hand);
+        Assert.Equal(-3000, target.PowerModThisTurn);
+        Assert.Equal(2, prompts.ChooseHistory.Count);
+        Assert.Equal(
+            new[] { formerRocksPirate.Id.ToString() },
+            prompts.ChooseHistory[0].choices);
     }
 
     [Fact]

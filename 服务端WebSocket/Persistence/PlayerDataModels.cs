@@ -69,6 +69,36 @@ public sealed record CardBackDeletionResult(
 
 public sealed record DeckImportResult(PlayerDataSnapshot Snapshot, int Imported, int Renamed, int Skipped);
 
+/// <summary>卡组广场中的公开构筑快照。</summary>
+public sealed record DeckPlazaItem(
+    string Id,
+    string Title,
+    string AuthorName,
+    string Leader,
+    string LeaderName,
+    string LeaderSprite,
+    string LeaderColor,
+    int CharCount,
+    int EventCount,
+    int StageCount,
+    string[] Cards,
+    Dictionary<string, string> SpriteMap,
+    int Likes,
+    bool Liked,
+    bool Owned,
+    int Copies,
+    long CreatedAt,
+    long UpdatedAt);
+
+public sealed record DeckPlazaPage(
+    IReadOnlyList<DeckPlazaItem> Items,
+    int Page,
+    int PageSize,
+    int Total,
+    bool HasMore);
+
+public sealed record DeckPlazaCopyResult(PlayerDataSnapshot Snapshot, string DeckName);
+
 /// <summary>好友列表中的持久化玩家资料。</summary>
 public sealed record FriendProfile(
     long PlayerId,

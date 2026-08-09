@@ -7,8 +7,9 @@ import { getCard, loadCardSet } from "@/data/CardLoader";
 import { CARD_BACK_OPTIONS, cardBackName, normalizeCardBackId, type CardBackId } from "@/lib/cardBacks";
 import { advanceImageFallback, thumbSrc } from "@/lib/sprite";
 import { HomeRequest } from "@/net/HomeProtocol";
+import { eventBus } from "@/net/eventBus";
 import { useNetStore } from "@/store/netStore";
-import type { LeaderboardPeriod, PlayerLeaderStatsItem } from "@/types/net";
+import type { LeaderboardPeriod, MsgUpdatePs, PlayerLeaderStatsItem } from "@/types/net";
 
 const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "7d", label: "近 7 天" },
@@ -97,6 +98,11 @@ export default function ProfilePanel({
   const [selectedLeaderNumber, setSelectedLeaderNumber] = useState("");
   const [selectedCardBackId, setSelectedCardBackId] = useState<CardBackId>(() => normalizeCardBackId(cloudCardBackId));
   const [savingCardBack, setSavingCardBack] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
   const [, setCardVersion] = useState(0);
 
   useEffect(() => {
@@ -133,6 +139,24 @@ export default function ProfilePanel({
     setSavingCardBack(false);
   }, [cloudCardBackId]);
 
+  useEffect(() => {
+    const onMessage = (message: { proto: string }) => {
+      if (message.proto !== "MsgUpdatePs") return;
+      const result = message as MsgUpdatePs;
+      setSavingPassword(false);
+      if (result.result) {
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordError("");
+      } else {
+        setPasswordError(result.logStr ?? "密码修改失败，请重试。");
+      }
+    };
+    eventBus.on("message", onMessage);
+    return () => eventBus.off("message", onMessage);
+  }, []);
+
   const selectedLeader = topLeaders.find((item) => item.leaderNumber === selectedLeaderNumber) ?? topLeaders[0];
   const selectedLeaderCard = selectedLeader ? getCard(selectedLeader.leaderNumber) : undefined;
   const selectedLeaderName = selectedLeaderCard?.name ?? selectedLeader?.leaderNumber ?? "暂无数据";
@@ -142,6 +166,32 @@ export default function ProfilePanel({
     if (selectedCardBackId === normalizeCardBackId(cloudCardBackId)) return;
     setSavingCardBack(true);
     if (!HomeRequest.updateCardBack(selectedCardBackId)) setSavingCardBack(false);
+  };
+
+  const changePassword = () => {
+    setPasswordError("");
+    if (!currentPassword) {
+      setPasswordError("请输入当前密码。");
+      return;
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setPasswordError("新密码长度需为 8–128 个字符。");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("两次输入的新密码不一致。");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPasswordError("新密码不能与当前密码相同。");
+      return;
+    }
+
+    setSavingPassword(true);
+    if (!HomeRequest.updatePassword(currentPassword, newPassword)) {
+      setSavingPassword(false);
+      setPasswordError("网络未连接，请稍后再试。");
+    }
   };
 
   const shortcutClass = "flex min-h-20 items-center justify-between rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-orange-600 active:bg-gray-800";
@@ -314,6 +364,66 @@ export default function ProfilePanel({
                 className="min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-default disabled:bg-gray-700 disabled:text-gray-500"
               >
                 {savingCardBack ? "保存中…" : selectedCardBackId === normalizeCardBackId(cloudCardBackId) ? "已保存" : "保存卡背"}
+              </button>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-gray-800 bg-gray-900 p-4 @[720px]:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-white">账户安全</h3>
+                <p className="mt-1 text-xs text-gray-500">修改后，其他已登录会话将失效</p>
+              </div>
+              <span className="rounded-full border border-green-900/70 bg-green-950/30 px-2 py-1 text-[10px] text-green-400">密码已保护</span>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-1.5 text-xs font-medium text-gray-400">
+                当前密码
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  autoComplete="current-password"
+                  maxLength={128}
+                  className="h-11 rounded-xl border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                />
+              </label>
+              <div className="grid gap-3 @[560px]:grid-cols-2">
+                <label className="grid gap-1.5 text-xs font-medium text-gray-400">
+                  新密码
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    autoComplete="new-password"
+                    maxLength={128}
+                    placeholder="8–128 个字符"
+                    className="h-11 rounded-xl border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none placeholder:text-gray-700 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium text-gray-400">
+                  确认新密码
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    onKeyDown={(event) => event.key === "Enter" && changePassword()}
+                    autoComplete="new-password"
+                    maxLength={128}
+                    className="h-11 rounded-xl border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                  />
+                </label>
+              </div>
+            </div>
+            {passwordError && <p role="alert" className="mt-3 text-xs text-red-300">{passwordError}</p>}
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={changePassword}
+                disabled={savingPassword}
+                className="min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-wait disabled:bg-gray-700 disabled:text-gray-500"
+              >
+                {savingPassword ? "修改中…" : "修改密码"}
               </button>
             </div>
           </article>

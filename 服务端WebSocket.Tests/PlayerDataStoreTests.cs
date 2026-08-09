@@ -180,6 +180,65 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void DeckPlaza_发布筛选点赞更新复制与删除形成完整闭环()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.SaveDeck("Alice", Deck("红发控制", "OP15-003"));
+        store.SaveDeck("Alice", Deck("红发快攻", "OP15-004"));
+
+        var publicationId = store.PublishDeckToPlaza("Alice", "红发控制", "红发控制", "红");
+        var firstPage = store.GetDeckPlaza("Bob");
+        var published = Assert.Single(firstPage.Items);
+        Assert.Equal(publicationId, published.Id);
+        Assert.False(published.Liked);
+        Assert.False(published.Owned);
+        Assert.Equal(50, published.Cards.Length);
+
+        store.ToggleDeckPlazaLike("Bob", publicationId);
+        var liked = Assert.Single(store.GetDeckPlaza("Bob", query: "Alice", color: "红").Items);
+        Assert.True(liked.Liked);
+        Assert.Equal(1, liked.Likes);
+
+        var copied = store.CopyDeckFromPlaza("Bob", publicationId);
+        Assert.Equal("红发控制", copied.DeckName);
+        var copiedAgain = store.CopyDeckFromPlaza("Bob", publicationId);
+        Assert.Equal("红发控制（来自广场）", copiedAgain.DeckName);
+
+        var updatedId = store.PublishDeckToPlaza("Alice", "红发快攻", "红发快攻", "红", publicationId);
+        Assert.Equal(publicationId, updatedId);
+        var updated = Assert.Single(store.GetDeckPlaza("Alice", mineOnly: true).Items);
+        Assert.Equal("红发快攻", updated.Title);
+        Assert.Equal(1, updated.Likes);
+        Assert.Equal(2, updated.Copies);
+        Assert.True(updated.Owned);
+
+        store.DeleteDeck("Alice", "红发快攻");
+        Assert.Single(store.GetDeckPlaza("Bob").Items);
+        Assert.Throws<PlayerDataValidationException>(() => store.DeleteDeckPublication("Bob", publicationId));
+        store.DeleteDeckPublication("Alice", publicationId);
+        Assert.Empty(store.GetDeckPlaza("Bob").Items);
+    }
+
+    [Fact]
+    public void DeckPlaza_拒绝重复构筑无效标题与超过发布上限()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.SaveDeck("Alice", Deck("第一副"));
+        store.SaveDeck("Alice", Deck("同构筑"));
+        store.PublishDeckToPlaza("Alice", "第一副", "公开构筑", "红");
+
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.PublishDeckToPlaza("Alice", "同构筑", "重复构筑", "红"));
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.PublishDeckToPlaza("Alice", "第一副", "", "红"));
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.CopyDeckFromPlaza("Alice", "deck-999999"));
+    }
+
+    [Fact]
     public void DeferredLoginWrites_同一玩家重复登录只保留一次待写并在关服排空()
     {
         var store = new PlayerDataStore(_databasePath, deferLoginWrites: true);

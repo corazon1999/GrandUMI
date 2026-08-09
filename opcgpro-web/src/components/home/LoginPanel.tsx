@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { NetManager } from "@/net/NetManager";
+import { eventBus } from "@/net/eventBus";
+import type { MsgLogin } from "@/types/net";
 
 const STATE_LABEL: Record<string, string> = {
   disconnected: "未连接",
@@ -20,6 +22,10 @@ export default function LoginPanel() {
   const [account, setAccount] = useState("");
   const [storedAccount, setStoredAccount] = useState("");
   const [editingAccount, setEditingAccount] = useState(true);
+  const [authStep, setAuthStep] = useState<"account" | "password" | "setup">("account");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pending, setPending] = useState(false);
   const connState = useNetStore((s) => s.connState);
   const error = useNetStore((s) => s.error);
   const canLogin = connState === "connected";
@@ -34,10 +40,52 @@ export default function LoginPanel() {
     setEditingAccount(!saved);
   }, []);
 
+  useEffect(() => {
+    const onMessage = (message: { proto: string }) => {
+      if (message.proto !== "MsgLogin") return;
+      const login = message as MsgLogin;
+      setPending(false);
+      if (login.result) {
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+      if (login.needsPassword) {
+        if (login.account) setAccount(login.account);
+        setAuthStep(login.needsPasswordSetup ? "setup" : "password");
+      }
+    };
+    const onClose = () => setPending(false);
+    eventBus.on("message", onMessage);
+    eventBus.on("close", onClose);
+    return () => {
+      eventBus.off("message", onMessage);
+      eventBus.off("close", onClose);
+    };
+  }, []);
+
   const handleLogin = () => {
-    if (!canLogin || !account.trim()) return;
-    useNetStore.getState().setError(null);
-    HomeRequest.login(account.trim());
+    if (!canLogin || pending || !account.trim()) return;
+    const store = useNetStore.getState();
+    store.setError(null);
+
+    if (authStep !== "account" && !password) {
+      store.setError("请输入密码。");
+      return;
+    }
+    if (authStep === "setup") {
+      if (password.length < 8 || password.length > 128) {
+        store.setError("密码长度需为 8–128 个字符。");
+        return;
+      }
+      if (password !== confirmPassword) {
+        store.setError("两次输入的密码不一致。");
+        return;
+      }
+    }
+
+    const sent = HomeRequest.login(account.trim(), authStep === "account" ? undefined : password);
+    if (sent) setPending(true);
   };
 
   const handleRetry = () => {
@@ -47,6 +95,10 @@ export default function LoginPanel() {
 
   const startChangingAccount = () => {
     setEditingAccount(true);
+    setAuthStep("account");
+    setPassword("");
+    setConfirmPassword("");
+    setPending(false);
     useNetStore.getState().setError(null);
   };
 
@@ -74,28 +126,80 @@ export default function LoginPanel() {
           One Piece Card Game Online
         </p>
 
-        {storedAccount && !editingAccount ? (
+        {authStep === "account" && storedAccount && !editingAccount ? (
           <div className="mb-5 rounded-2xl border border-gray-800 bg-gray-950/70 px-4 py-4 text-center">
             <p className="text-sm text-gray-500">欢迎回来</p>
             <p className="mt-1 truncate text-lg font-bold text-white">{storedAccount}</p>
           </div>
+        ) : authStep !== "account" ? (
+          <div className="mb-5 space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-950/70 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500">登录账号</p>
+                <p className="truncate font-bold text-white">{account}</p>
+              </div>
+              <button type="button" onClick={startChangingAccount} className="min-h-10 shrink-0 px-3 text-sm text-orange-300 hover:text-orange-200">
+                更换账号
+              </button>
+            </div>
+
+            <div>
+              <label htmlFor="login-password" className="mb-2 block text-sm font-medium text-gray-300">
+                {authStep === "setup" ? "设置密码" : "密码"}
+              </label>
+              <input
+                id="login-password"
+                type="password"
+                className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                placeholder={authStep === "setup" ? "8–128 个字符" : "请输入密码"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && authStep === "password" && handleLogin()}
+                autoComplete={authStep === "setup" ? "new-password" : "current-password"}
+                maxLength={128}
+                autoFocus
+              />
+            </div>
+
+            {authStep === "setup" && (
+              <div>
+                <label htmlFor="login-password-confirm" className="mb-2 block text-sm font-medium text-gray-300">
+                  确认密码
+                </label>
+                <input
+                  id="login-password-confirm"
+                  type="password"
+                  className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                  placeholder="再输入一次密码"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && handleLogin()}
+                  autoComplete="new-password"
+                  maxLength={128}
+                />
+                <p className="mt-2 text-sm leading-5 text-gray-500">
+                  新账号和尚未设密的旧账号，将从本次起使用该密码登录。
+                </p>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="mb-5">
             <label htmlFor="login-account" className="mb-2 block text-sm font-medium text-gray-300">
-              玩家昵称
+              玩家账号
             </label>
             <input
               id="login-account"
               className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
-              placeholder="请输入昵称"
+              placeholder="请输入账号"
               value={account}
               onChange={(e) => setAccount(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               autoComplete="username"
-              maxLength={16}
+              maxLength={32}
             />
             <p className="mt-2 text-sm leading-5 text-gray-500">
-              无需注册，首次进入会自动创建玩家资料。
+              首次使用的账号会在设置密码后自动创建。
             </p>
           </div>
         )}
@@ -111,24 +215,30 @@ export default function LoginPanel() {
 
         <button
           onClick={handleLogin}
-          disabled={!canLogin || !accountReady}
-          aria-busy={isConnecting}
+          disabled={!canLogin || !accountReady || pending}
+          aria-busy={isConnecting || pending}
           className="h-12 w-full rounded-xl bg-orange-500 text-base font-bold text-white transition-colors hover:bg-orange-400 active:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
         >
           {canLogin
-            ? storedAccount && !editingAccount
-              ? `以 ${storedAccount} 继续`
-              : "进入 GrandUMI"
+            ? pending
+              ? "正在验证..."
+              : authStep === "setup"
+                ? "设置密码并登录"
+                : authStep === "password"
+                  ? "登录"
+                  : storedAccount && !editingAccount
+                    ? `以 ${storedAccount} 继续`
+                    : "继续"
             : STATE_LABEL[connState]}
         </button>
 
-        {storedAccount && !editingAccount && (
+        {authStep === "account" && storedAccount && !editingAccount && (
           <button
             type="button"
             onClick={startChangingAccount}
             className="mt-2 h-11 w-full rounded-xl text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
           >
-            更换昵称
+            更换账号
           </button>
         )}
 

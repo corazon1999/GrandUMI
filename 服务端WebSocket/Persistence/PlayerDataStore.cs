@@ -30,7 +30,11 @@ public sealed class PlayerDataStore
     public const int MaxCardBackImageBytes = 240 * 1024;
     public const int MaxCardBacksPerPlayer = 20;
     public const int MaxCardBackGalleryItems = 100;
+    public const int MaxDeckPublicationsPerPlayer = 10;
+    public const int MaxDeckPlazaTitleLength = 50;
+    public const int MaxDeckPlazaPageSize = 30;
     private const string CustomCardBackPrefix = "custom-";
+    private const string DeckPublicationPrefix = "deck-";
 
     private readonly string _databasePath;
     private readonly string _connectionString;
@@ -174,7 +178,39 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_card_backs_created
                 ON card_backs(created_at DESC);
 
-            PRAGMA user_version=3;
+            CREATE TABLE IF NOT EXISTS deck_publications (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                title           TEXT NOT NULL,
+                leader          TEXT NOT NULL,
+                leader_name     TEXT NOT NULL,
+                leader_sprite   TEXT NOT NULL DEFAULT '',
+                leader_color    TEXT NOT NULL,
+                char_count      INTEGER NOT NULL,
+                event_count     INTEGER NOT NULL,
+                stage_count     INTEGER NOT NULL,
+                cards_json      TEXT NOT NULL,
+                sprite_map_json TEXT NOT NULL DEFAULT '{}',
+                copy_count      INTEGER NOT NULL DEFAULT 0,
+                created_at      INTEGER NOT NULL,
+                updated_at      INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS deck_publication_likes (
+                publication_id INTEGER NOT NULL REFERENCES deck_publications(id) ON DELETE CASCADE,
+                player_id      INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                created_at     INTEGER NOT NULL,
+                PRIMARY KEY(publication_id, player_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_deck_publications_updated
+                ON deck_publications(updated_at DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS ix_deck_publications_owner
+                ON deck_publications(owner_player_id, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS ix_deck_publication_likes_publication
+                ON deck_publication_likes(publication_id);
+
+            PRAGMA user_version=4;
             """;
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
@@ -560,6 +596,231 @@ public sealed class PlayerDataStore
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
         return snapshot;
+    }
+
+    public DeckPlazaPage GetDeckPlaza(
+        string account,
+        int page = 1,
+        int pageSize = 20,
+        string sort = "popular",
+        string? query = null,
+        string? color = null,
+        bool mineOnly = false)
+    {
+        var normalizedPage = Math.Max(1, page);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, MaxDeckPlazaPageSize);
+        var normalizedSort = (sort ?? "popular").Trim().ToLowerInvariant();
+        if (normalizedSort is not ("popular" or "newest" or "copies")) normalizedSort = "popular";
+        var normalizedQuery = (query ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalizedQuery.Length > MaxDeckPlazaTitleLength) normalizedQuery = normalizedQuery[..MaxDeckPlazaTitleLength];
+        var normalizedColor = (color ?? "").Trim();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        var conditions = new List<string>();
+        if (normalizedQuery.Length > 0)
+            conditions.Add("(dp.title LIKE $query ESCAPE '\\' OR p.display_name LIKE $query ESCAPE '\\')");
+        if (normalizedColor.Length > 0) conditions.Add("instr(dp.leader_color, $color) > 0");
+        if (mineOnly) conditions.Add("dp.owner_player_id=$playerId");
+        var where = conditions.Count == 0 ? "" : "WHERE " + string.Join(" AND ", conditions);
+
+        using var count = connection.CreateCommand();
+        count.Transaction = transaction;
+        count.CommandText = $"SELECT COUNT(*) FROM deck_publications dp JOIN players p ON p.id=dp.owner_player_id {where};";
+        AddDeckPlazaFilterParameters(count, playerId, normalizedQuery, normalizedColor);
+        var total = Convert.ToInt32(count.ExecuteScalar(), CultureInfo.InvariantCulture);
+
+        var orderBy = normalizedSort switch
+        {
+            "newest" => "dp.updated_at DESC, dp.id DESC",
+            "copies" => "dp.copy_count DESC, likes DESC, dp.updated_at DESC, dp.id DESC",
+            _ => "likes DESC, dp.copy_count DESC, dp.updated_at DESC, dp.id DESC",
+        };
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            SELECT dp.id, dp.title, p.display_name,
+                   dp.leader, dp.leader_name, dp.leader_sprite, dp.leader_color,
+                   dp.char_count, dp.event_count, dp.stage_count,
+                   dp.cards_json, dp.sprite_map_json,
+                   (SELECT COUNT(*) FROM deck_publication_likes likes WHERE likes.publication_id=dp.id) AS likes,
+                   EXISTS(SELECT 1 FROM deck_publication_likes mine WHERE mine.publication_id=dp.id AND mine.player_id=$playerId) AS liked,
+                   CASE WHEN dp.owner_player_id=$playerId THEN 1 ELSE 0 END AS owned,
+                   dp.copy_count, dp.created_at, dp.updated_at
+            FROM deck_publications dp
+            JOIN players p ON p.id=dp.owner_player_id
+            {where}
+            ORDER BY {orderBy}
+            LIMIT $limit OFFSET $offset;
+            """;
+        AddDeckPlazaFilterParameters(command, playerId, normalizedQuery, normalizedColor);
+        command.Parameters.AddWithValue("$limit", normalizedPageSize);
+        command.Parameters.AddWithValue("$offset", (normalizedPage - 1) * normalizedPageSize);
+        var items = new List<DeckPlazaItem>();
+        using (var reader = command.ExecuteReader())
+            while (reader.Read()) items.Add(ReadDeckPlazaItem(reader));
+
+        transaction.Commit();
+        return new DeckPlazaPage(items, normalizedPage, normalizedPageSize, total, normalizedPage * normalizedPageSize < total);
+    }
+
+    public string PublishDeckToPlaza(
+        string account,
+        string sourceDeckName,
+        string title,
+        string leaderColor,
+        string? publicationId = null)
+    {
+        var normalizedTitle = ValidateDeckPlazaTitle(title);
+        var normalizedColor = (leaderColor ?? "").Trim();
+        if (normalizedColor.Length is < 1 or > 20 || normalizedColor.Any(char.IsControl))
+            throw new PlayerDataValidationException("领航颜色无效。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var deck = LoadStoredDeck(connection, transaction, playerId, ValidateDeckName(sourceDeckName))
+                   ?? throw new PlayerDataValidationException("要发布的卡组不存在。");
+        var cardsJson = JsonSerializer.Serialize(deck.Cards);
+        var publicationKey = string.IsNullOrWhiteSpace(publicationId) ? (long?)null : ParseDeckPublicationId(publicationId);
+
+        using (var duplicate = connection.CreateCommand())
+        {
+            duplicate.Transaction = transaction;
+            duplicate.CommandText = """
+                SELECT 1 FROM deck_publications
+                WHERE owner_player_id=$playerId AND leader=$leader AND cards_json=$cards
+                  AND ($publicationId IS NULL OR id<>$publicationId)
+                LIMIT 1;
+                """;
+            duplicate.Parameters.AddWithValue("$playerId", playerId);
+            duplicate.Parameters.AddWithValue("$leader", deck.Leader);
+            duplicate.Parameters.AddWithValue("$cards", cardsJson);
+            duplicate.Parameters.AddWithValue("$publicationId", (object?)publicationKey ?? DBNull.Value);
+            if (duplicate.ExecuteScalar() is not null)
+                throw new PlayerDataValidationException("这套构筑已经发布过了。");
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (publicationKey is null)
+        {
+            using var count = connection.CreateCommand();
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(*) FROM deck_publications WHERE owner_player_id=$playerId;";
+            count.Parameters.AddWithValue("$playerId", playerId);
+            if (Convert.ToInt32(count.ExecuteScalar(), CultureInfo.InvariantCulture) >= MaxDeckPublicationsPerPlayer)
+                throw new PlayerDataValidationException($"每位玩家最多发布 {MaxDeckPublicationsPerPlayer} 副卡组。");
+
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO deck_publications(
+                    owner_player_id, title, leader, leader_name, leader_sprite, leader_color,
+                    char_count, event_count, stage_count, cards_json, sprite_map_json,
+                    copy_count, created_at, updated_at)
+                VALUES(
+                    $playerId, $title, $leader, $leaderName, $leaderSprite, $leaderColor,
+                    $charCount, $eventCount, $stageCount, $cardsJson, $spriteMapJson,
+                    0, $now, $now);
+                SELECT last_insert_rowid();
+                """;
+            AddDeckPublicationParameters(insert, playerId, normalizedTitle, normalizedColor, deck, now);
+            publicationKey = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            RequireOwnedDeckPublication(connection, transaction, publicationKey.Value, playerId);
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE deck_publications SET
+                    title=$title, leader=$leader, leader_name=$leaderName,
+                    leader_sprite=$leaderSprite, leader_color=$leaderColor,
+                    char_count=$charCount, event_count=$eventCount, stage_count=$stageCount,
+                    cards_json=$cardsJson, sprite_map_json=$spriteMapJson, updated_at=$now
+                WHERE id=$publicationId AND owner_player_id=$playerId;
+                """;
+            AddDeckPublicationParameters(update, playerId, normalizedTitle, normalizedColor, deck, now);
+            update.Parameters.AddWithValue("$publicationId", publicationKey.Value);
+            update.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return $"{DeckPublicationPrefix}{publicationKey.Value}";
+    }
+
+    public void ToggleDeckPlazaLike(string account, string publicationId)
+    {
+        var publicationKey = ParseDeckPublicationId(publicationId);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        RequireDeckPublication(connection, transaction, publicationKey);
+
+        using var remove = connection.CreateCommand();
+        remove.Transaction = transaction;
+        remove.CommandText = "DELETE FROM deck_publication_likes WHERE publication_id=$id AND player_id=$playerId;";
+        remove.Parameters.AddWithValue("$id", publicationKey);
+        remove.Parameters.AddWithValue("$playerId", playerId);
+        if (remove.ExecuteNonQuery() == 0)
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO deck_publication_likes(publication_id, player_id, created_at)
+                VALUES($id, $playerId, $now);
+                """;
+            insert.Parameters.AddWithValue("$id", publicationKey);
+            insert.Parameters.AddWithValue("$playerId", playerId);
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            insert.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    public DeckPlazaCopyResult CopyDeckFromPlaza(string account, string publicationId)
+    {
+        var publicationKey = ParseDeckPublicationId(publicationId);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        if (CountDecks(connection, transaction, playerId) >= MaxDecksPerPlayer)
+            throw new PlayerDataValidationException($"每个账号最多保存 {MaxDecksPerPlayer} 副卡组。");
+
+        var (title, deck) = LoadDeckPublicationDeck(connection, transaction, publicationKey);
+        var candidate = DeckExists(connection, transaction, playerId, title)
+            ? NextPlazaDeckName(connection, transaction, playerId, title)
+            : title;
+        var copied = ValidateDeck(deck with { Name = candidate, UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+        InsertDeck(connection, transaction, playerId, copied);
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = "UPDATE deck_publications SET copy_count=copy_count+1 WHERE id=$id;";
+        update.Parameters.AddWithValue("$id", publicationKey);
+        update.ExecuteNonQuery();
+
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        transaction.Commit();
+        return new DeckPlazaCopyResult(snapshot, candidate);
+    }
+
+    public void DeleteDeckPublication(string account, string publicationId)
+    {
+        var publicationKey = ParseDeckPublicationId(publicationId);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        RequireOwnedDeckPublication(connection, transaction, publicationKey, playerId);
+        using var delete = connection.CreateCommand();
+        delete.Transaction = transaction;
+        delete.CommandText = "DELETE FROM deck_publications WHERE id=$id AND owner_player_id=$playerId;";
+        delete.Parameters.AddWithValue("$id", publicationKey);
+        delete.Parameters.AddWithValue("$playerId", playerId);
+        delete.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     public PlayerDataSnapshot UpdateProfile(string account, string displayName, string avatar)
@@ -1174,6 +1435,187 @@ public sealed class PlayerDataStore
                 reader.GetInt64(4)));
         }
         return requests;
+    }
+
+    private static string ValidateDeckPlazaTitle(string? title)
+    {
+        var normalized = (title ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalized.Length is < 1 or > MaxDeckPlazaTitleLength)
+            throw new PlayerDataValidationException($"广场标题长度需为 1–{MaxDeckPlazaTitleLength} 个字符。");
+        if (normalized.Any(char.IsControl)) throw new PlayerDataValidationException("广场标题不能包含控制字符。");
+        return normalized;
+    }
+
+    private static long ParseDeckPublicationId(string? publicationId)
+    {
+        var normalized = (publicationId ?? "").Trim().ToLowerInvariant();
+        if (!normalized.StartsWith(DeckPublicationPrefix, StringComparison.Ordinal)
+            || !long.TryParse(normalized.AsSpan(DeckPublicationPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var id)
+            || id <= 0)
+            throw new PlayerDataValidationException("卡组投稿不存在或已下架。");
+        return id;
+    }
+
+    private static void AddDeckPlazaFilterParameters(
+        SqliteCommand command,
+        long playerId,
+        string query,
+        string color)
+    {
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$query", $"%{EscapeLike(query)}%");
+        command.Parameters.AddWithValue("$color", color);
+    }
+
+    private static DeckPlazaItem ReadDeckPlazaItem(SqliteDataReader reader)
+        => new(
+            $"{DeckPublicationPrefix}{reader.GetInt64(0)}",
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.GetInt32(7),
+            reader.GetInt32(8),
+            reader.GetInt32(9),
+            JsonSerializer.Deserialize<string[]>(reader.GetString(10)) ?? [],
+            JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(11))
+                ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            reader.GetInt32(12),
+            reader.GetInt32(13) != 0,
+            reader.GetInt32(14) != 0,
+            reader.GetInt32(15),
+            reader.GetInt64(16),
+            reader.GetInt64(17));
+
+    private static void AddDeckPublicationParameters(
+        SqliteCommand command,
+        long playerId,
+        string title,
+        string leaderColor,
+        StoredDeck deck,
+        long now)
+    {
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$title", title);
+        command.Parameters.AddWithValue("$leader", deck.Leader);
+        command.Parameters.AddWithValue("$leaderName", deck.LeaderName);
+        command.Parameters.AddWithValue("$leaderSprite", deck.LeaderSprite);
+        command.Parameters.AddWithValue("$leaderColor", leaderColor);
+        command.Parameters.AddWithValue("$charCount", deck.CharCount);
+        command.Parameters.AddWithValue("$eventCount", deck.EventCount);
+        command.Parameters.AddWithValue("$stageCount", deck.StageCount);
+        command.Parameters.AddWithValue("$cardsJson", JsonSerializer.Serialize(deck.Cards));
+        command.Parameters.AddWithValue("$spriteMapJson", JsonSerializer.Serialize(deck.SpriteMap));
+        command.Parameters.AddWithValue("$now", now);
+    }
+
+    private static void RequireDeckPublication(SqliteConnection connection, SqliteTransaction transaction, long publicationId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT 1 FROM deck_publications WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", publicationId);
+        if (command.ExecuteScalar() is null) throw new PlayerDataValidationException("卡组投稿不存在或已下架。");
+    }
+
+    private static void RequireOwnedDeckPublication(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long publicationId,
+        long playerId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT owner_player_id FROM deck_publications WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", publicationId);
+        var owner = command.ExecuteScalar();
+        if (owner is null) throw new PlayerDataValidationException("卡组投稿不存在或已下架。");
+        if (Convert.ToInt64(owner, CultureInfo.InvariantCulture) != playerId)
+            throw new PlayerDataValidationException("只能修改自己的卡组投稿。");
+    }
+
+    private static StoredDeck? LoadStoredDeck(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId,
+        string name)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT name, leader, leader_name, leader_sprite,
+                   char_count, event_count, stage_count,
+                   cards_json, sprite_map_json, client_updated_at
+            FROM decks WHERE player_id=$playerId AND name=$name COLLATE NOCASE LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$name", name);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) return null;
+        return new StoredDeck
+        {
+            Name = reader.GetString(0),
+            Leader = reader.GetString(1),
+            LeaderName = reader.GetString(2),
+            LeaderSprite = reader.GetString(3),
+            CharCount = reader.GetInt32(4),
+            EventCount = reader.GetInt32(5),
+            StageCount = reader.GetInt32(6),
+            Cards = JsonSerializer.Deserialize<string[]>(reader.GetString(7)) ?? [],
+            SpriteMap = JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(8))
+                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            UpdatedAt = reader.GetInt64(9),
+        };
+    }
+
+    private static (string Title, StoredDeck Deck) LoadDeckPublicationDeck(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long publicationId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT title, leader, leader_name, leader_sprite,
+                   char_count, event_count, stage_count, cards_json, sprite_map_json
+            FROM deck_publications WHERE id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", publicationId);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) throw new PlayerDataValidationException("卡组投稿不存在或已下架。");
+        var title = reader.GetString(0);
+        return (title, new StoredDeck
+        {
+            Name = title,
+            Leader = reader.GetString(1),
+            LeaderName = reader.GetString(2),
+            LeaderSprite = reader.GetString(3),
+            CharCount = reader.GetInt32(4),
+            EventCount = reader.GetInt32(5),
+            StageCount = reader.GetInt32(6),
+            Cards = JsonSerializer.Deserialize<string[]>(reader.GetString(7)) ?? [],
+            SpriteMap = JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(8))
+                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+    }
+
+    private static string NextPlazaDeckName(SqliteConnection connection, SqliteTransaction transaction, long playerId, string baseName)
+    {
+        const string suffix = "（来自广场）";
+        var maxBaseLength = Math.Max(1, MaxDeckNameLength - suffix.Length);
+        var candidate = baseName[..Math.Min(baseName.Length, maxBaseLength)] + suffix;
+        if (!DeckExists(connection, transaction, playerId, candidate)) return candidate;
+        for (var i = 2; i <= 999; i++)
+        {
+            var number = i.ToString(CultureInfo.InvariantCulture);
+            var allowed = Math.Max(1, MaxDeckNameLength - suffix.Length - number.Length);
+            candidate = baseName[..Math.Min(baseName.Length, allowed)] + suffix + number;
+            if (!DeckExists(connection, transaction, playerId, candidate)) return candidate;
+        }
+        throw new PlayerDataValidationException("无法为广场卡组生成唯一名称。");
     }
 
     private static int CountDecks(SqliteConnection connection, SqliteTransaction transaction, long playerId)

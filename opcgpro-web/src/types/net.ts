@@ -54,6 +54,11 @@ export enum ProtocolEnum {
   MsgLikeCardBack = 49,
   MsgDeleteCardBack = 50,
   MsgFriendChat = 51,
+  MsgDeckPlazaList = 52,
+  MsgPublishDeckPlaza = 53,
+  MsgLikeDeckPlaza = 54,
+  MsgCopyDeckPlaza = 55,
+  MsgDeleteDeckPlaza = 56,
 }
 
 // WebSocket JSON 消息基类
@@ -85,7 +90,11 @@ export interface MsgPing extends MsgBase {
 export interface MsgLogin extends MsgBase {
   proto: "MsgLogin";
   account: string;
-  password?: string;  // 已不再校验密码，仅为兼容旧协议字段保留
+  password?: string;
+  authToken?: string;
+  needsPassword?: boolean;
+  needsPasswordSetup?: boolean;
+  authChallenge?: boolean;
   name?: string;     // 服务器返回的玩家昵称
   avatar?: string;
   cardBackId?: string;
@@ -104,7 +113,9 @@ export interface MsgAddAccount extends MsgBase {
 
 export interface MsgUpdatePs extends MsgBase {
   proto: "MsgUpdatePs";
-  newPs: string;
+  currentPassword: string;
+  newPassword: string;
+  authToken?: string;
   result?: boolean;
   logStr?: string;
 }
@@ -186,6 +197,75 @@ export interface MsgDeleteCardBack extends MsgBase {
 export interface MsgImportDecks extends MsgBase {
   proto: "MsgImportDecks";
   decks: SavedDeck[];
+}
+
+export type DeckPlazaSort = "popular" | "newest" | "copies";
+
+export interface DeckPlazaItem {
+  id: string;
+  title: string;
+  authorName: string;
+  leader: string;
+  leaderName: string;
+  leaderSprite: string;
+  leaderColor: string;
+  charCount: number;
+  eventCount: number;
+  stageCount: number;
+  cards: string[];
+  spriteMap: Record<string, string>;
+  likes: number;
+  liked: boolean;
+  owned: boolean;
+  copies: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MsgDeckPlazaList extends MsgBase {
+  proto: "MsgDeckPlazaList";
+  result?: boolean;
+  logStr?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: DeckPlazaSort;
+  query?: string;
+  color?: string;
+  mineOnly?: boolean;
+  total?: number;
+  hasMore?: boolean;
+  items?: DeckPlazaItem[];
+}
+
+export interface MsgPublishDeckPlaza extends MsgBase {
+  proto: "MsgPublishDeckPlaza";
+  sourceDeckName: string;
+  title: string;
+  publicationId?: string;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgLikeDeckPlaza extends MsgBase {
+  proto: "MsgLikeDeckPlaza";
+  publicationId: string;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgCopyDeckPlaza extends MsgBase {
+  proto: "MsgCopyDeckPlaza";
+  publicationId: string;
+  result?: boolean;
+  logStr?: string;
+  deckName?: string;
+}
+
+export interface MsgDeleteDeckPlaza extends MsgBase {
+  proto: "MsgDeleteDeckPlaza";
+  publicationId: string;
+  result?: boolean;
+  logStr?: string;
 }
 
 // ── 匹配 ────────────────────────────────────────────────────────────────
@@ -904,6 +984,11 @@ export type AnyMsg =
   | MsgUploadCardBack
   | MsgLikeCardBack
   | MsgDeleteCardBack
+  | MsgDeckPlazaList
+  | MsgPublishDeckPlaza
+  | MsgLikeDeckPlaza
+  | MsgCopyDeckPlaza
+  | MsgDeleteDeckPlaza
   | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch

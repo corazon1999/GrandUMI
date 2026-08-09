@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Game;
 using GrandUMI.Game.Stats;
@@ -57,6 +58,7 @@ public static class WebSocketBridge
 
     private static CancellationTokenSource _cts = new();
     private static PlayerDataStore _playerDataStore = null!;
+    private static AccountAuthenticationStore _accountAuthenticationStore = null!;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
     private static int _onlineBroadcastVersion;
@@ -78,10 +80,19 @@ public static class WebSocketBridge
         return def;
     }
 
+    private static int Int(IReadOnlyDictionary<string, JsonElement> d, string key, int def = 0)
+        => d.TryGetValue(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var result)
+            ? result
+            : def;
+
     // ── 生命周期 ──────────────────────────────────────────────────────────
-    public static void Initialize(PlayerDataStore playerDataStore)
+    public static void Initialize(
+        PlayerDataStore playerDataStore,
+        AccountAuthenticationStore accountAuthenticationStore)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
+        _accountAuthenticationStore = accountAuthenticationStore
+            ?? throw new ArgumentNullException(nameof(accountAuthenticationStore));
         _cts.Dispose();
         _cts = new CancellationTokenSource();
         Volatile.Write(ref _accepting, 1);
@@ -231,6 +242,11 @@ public static class WebSocketBridge
             case "MsgLikeCardBack": OnLikeCardBack(session, msg); break;
             case "MsgDeleteCardBack": OnDeleteCardBack(session, msg); break;
             case "MsgImportDecks": OnImportDecks(session, msg);  break;
+            case "MsgDeckPlazaList": OnDeckPlazaList(session, msg); break;
+            case "MsgPublishDeckPlaza": OnPublishDeckPlaza(session, msg); break;
+            case "MsgLikeDeckPlaza": OnLikeDeckPlaza(session, msg); break;
+            case "MsgCopyDeckPlaza": OnCopyDeckPlaza(session, msg); break;
+            case "MsgDeleteDeckPlaza": OnDeleteDeckPlaza(session, msg); break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -294,9 +310,42 @@ public static class WebSocketBridge
     private static void OnLogin(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var requestedAccount = Str(msg, "account") ?? "";
+        if (!s.TryConsumeRateLimit("account-login", capacity: 6, refillPerSecond: 0.1))
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLogin",
+                account = requestedAccount,
+                result = false,
+                needsPassword = true,
+                needsPasswordSetup = false,
+                authChallenge = false,
+                logStr = "登录尝试过于频繁，请稍后再试。",
+            });
+            return;
+        }
         try
         {
-            var playerData = _playerDataStore.Login(requestedAccount);
+            var authentication = _accountAuthenticationStore.Authenticate(
+                requestedAccount,
+                Str(msg, "password"),
+                Str(msg, "authToken"));
+            if (!authentication.Success)
+            {
+                Send(s.SessionId, new
+                {
+                    proto = "MsgLogin",
+                    account = authentication.Account,
+                    result = false,
+                    needsPassword = authentication.NeedsPassword,
+                    needsPasswordSetup = authentication.NeedsPasswordSetup,
+                    authChallenge = authentication.IsChallenge,
+                    logStr = authentication.Message,
+                });
+                return;
+            }
+
+            var playerData = _playerDataStore.Login(authentication.Account);
 
             string? supersededSessionId = null;
             lock (AccountIndexGate)
@@ -326,8 +375,9 @@ public static class WebSocketBridge
                 cardBackId = playerData.CardBackId,
                 selectedDeckName = playerData.SelectedDeckName,
                 decks = playerData.Decks,
+                authToken = authentication.AuthToken,
                 result = true,
-                logStr = "登录成功",
+                logStr = authentication.Message,
             });
             SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
             Log($"登录 ✅ {playerData.Account}");
@@ -404,8 +454,32 @@ public static class WebSocketBridge
 
     private static void OnUpdatePs(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        // TODO: 修改密码逻辑
-        Send(s.SessionId, new { proto = "MsgUpdatePs", result = true, logStr = "密码修改成功" });
+        if (!TryRequirePlayer(s)) return;
+        if (!s.TryConsumeRateLimit("password-change", capacity: 4, refillPerSecond: 0.05))
+        {
+            Send(s.SessionId, new { proto = "MsgUpdatePs", result = false, logStr = "尝试过于频繁，请稍后再试。" });
+            return;
+        }
+
+        try
+        {
+            var result = _accountAuthenticationStore.ChangePassword(
+                s.Account!,
+                Str(msg, "currentPassword") ?? "",
+                Str(msg, "newPassword") ?? Str(msg, "newPs") ?? "");
+            Send(s.SessionId, new
+            {
+                proto = "MsgUpdatePs",
+                result = result.Success,
+                authToken = result.AuthToken,
+                logStr = result.Message,
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"修改密码异常 {s.Account}: {ex.Message}");
+            Send(s.SessionId, new { proto = "MsgUpdatePs", result = false, logStr = "密码修改失败，请稍后再试。" });
+        }
     }
 
     private static void OnSaveDeck(WsSession s, Dictionary<string, JsonElement> msg)
@@ -559,6 +633,98 @@ public static class WebSocketBridge
             SendPlayerData(s, result.Snapshot, details);
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "导入本地卡组失败"); }
+    }
+
+    private static void OnDeckPlazaList(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var page = _playerDataStore.GetDeckPlaza(
+                s.Account!,
+                Int(msg, "page", 1),
+                Int(msg, "pageSize", 20),
+                Str(msg, "sort") ?? "popular",
+                Str(msg, "query"),
+                Str(msg, "color"),
+                Bool(msg, "mineOnly"));
+            SendDeckPlazaPage(s, page);
+        }
+        catch (Exception ex) { SendDeckPlazaError(s, "MsgDeckPlazaList", ex, "读取卡组广场失败"); }
+    }
+
+    private static void OnPublishDeckPlaza(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        if (!s.TryConsumeRateLimit("deck-plaza-publish", capacity: 4, refillPerSecond: 0.1))
+        {
+            Send(s.SessionId, new { proto = "MsgPublishDeckPlaza", result = false, logStr = "操作过于频繁，请稍后再试" });
+            return;
+        }
+        try
+        {
+            var sourceDeckName = Str(msg, "sourceDeckName") ?? "";
+            var deck = _playerDataStore.GetPlayerData(s.Account!).Decks
+                .FirstOrDefault(item => string.Equals(item.Name, sourceDeckName, StringComparison.OrdinalIgnoreCase))
+                ?? throw new PlayerDataValidationException("要发布的卡组不存在。");
+            ValidatePlayableDeck(deck);
+            var leader = CardDatabase.Get(deck.Leader)
+                ?? throw new PlayerDataValidationException("领航卡不存在。");
+            var id = _playerDataStore.PublishDeckToPlaza(
+                s.Account!,
+                sourceDeckName,
+                Str(msg, "title") ?? sourceDeckName,
+                leader.Color,
+                Str(msg, "publicationId"));
+            Send(s.SessionId, new
+            {
+                proto = "MsgPublishDeckPlaza",
+                result = true,
+                publicationId = id,
+                logStr = string.IsNullOrWhiteSpace(Str(msg, "publicationId")) ? "卡组已发布到广场" : "广场卡组已更新",
+            });
+        }
+        catch (Exception ex) { SendDeckPlazaError(s, "MsgPublishDeckPlaza", ex, "发布卡组失败"); }
+    }
+
+    private static void OnLikeDeckPlaza(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            _playerDataStore.ToggleDeckPlazaLike(s.Account!, Str(msg, "publicationId") ?? "");
+            Send(s.SessionId, new { proto = "MsgLikeDeckPlaza", result = true });
+        }
+        catch (Exception ex) { SendDeckPlazaError(s, "MsgLikeDeckPlaza", ex, "更新点赞失败"); }
+    }
+
+    private static void OnCopyDeckPlaza(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var result = _playerDataStore.CopyDeckFromPlaza(s.Account!, Str(msg, "publicationId") ?? "");
+            SendPlayerData(s, result.Snapshot);
+            Send(s.SessionId, new
+            {
+                proto = "MsgCopyDeckPlaza",
+                result = true,
+                deckName = result.DeckName,
+                logStr = $"已复制到我的卡组：{result.DeckName}",
+            });
+        }
+        catch (Exception ex) { SendDeckPlazaError(s, "MsgCopyDeckPlaza", ex, "复制卡组失败"); }
+    }
+
+    private static void OnDeleteDeckPlaza(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            _playerDataStore.DeleteDeckPublication(s.Account!, Str(msg, "publicationId") ?? "");
+            Send(s.SessionId, new { proto = "MsgDeleteDeckPlaza", result = true, logStr = "卡组投稿已删除" });
+        }
+        catch (Exception ex) { SendDeckPlazaError(s, "MsgDeleteDeckPlaza", ex, "删除卡组投稿失败"); }
     }
 
     // ── 匹配相关 ──────────────────────────────────────────────────────────
@@ -2437,6 +2603,49 @@ public static class WebSocketBridge
         if (exception is not PlayerDataValidationException)
             LogErr($"{fallback} {session.Account}: {exception.Message}");
         Send(session.SessionId, new { proto = "MsgCardBackGallery", result = false, logStr = message });
+    }
+
+    private static void SendDeckPlazaPage(WsSession session, DeckPlazaPage page)
+    {
+        var items = page.Items.Select(item => new
+        {
+            id = item.Id,
+            title = item.Title,
+            authorName = item.AuthorName,
+            leader = item.Leader,
+            leaderName = item.LeaderName,
+            leaderSprite = item.LeaderSprite,
+            leaderColor = item.LeaderColor,
+            charCount = item.CharCount,
+            eventCount = item.EventCount,
+            stageCount = item.StageCount,
+            cards = item.Cards,
+            spriteMap = item.SpriteMap,
+            likes = item.Likes,
+            liked = item.Liked,
+            owned = item.Owned,
+            copies = item.Copies,
+            createdAt = item.CreatedAt,
+            updatedAt = item.UpdatedAt,
+        }).ToArray();
+        Send(session.SessionId, new
+        {
+            proto = "MsgDeckPlazaList",
+            result = true,
+            items,
+            page = page.Page,
+            pageSize = page.PageSize,
+            total = page.Total,
+            hasMore = page.HasMore,
+        });
+    }
+
+    private static void SendDeckPlazaError(WsSession session, string proto, Exception exception, string fallback)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : fallback;
+        if (exception is not PlayerDataValidationException)
+            LogErr($"{fallback} {session.Account}: {exception.Message}");
+        Send(session.SessionId, new { proto, result = false, logStr = message });
     }
 
     private static void SendPlayerDataError(WsSession session, Exception exception, string fallback)

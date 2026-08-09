@@ -15,8 +15,39 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import Link from "next/link";
 import Modal from "@/components/ui/Modal";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import DeckPlazaPanel from "./DeckPlazaPanel";
 
 export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: () => void }) {
+  const [tab, setTab] = useState<"mine" | "plaza">("mine");
+  const [publishDeckName, setPublishDeckName] = useState<string | null>(null);
+
+  const openPublish = (name: string) => {
+    setPublishDeckName(name);
+    setTab("plaza");
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid shrink-0 grid-cols-2 border-b border-gray-800 bg-gray-900/60 p-2">
+        <button type="button" onClick={() => setTab("mine")} className={`min-h-11 rounded-xl text-sm font-bold transition-colors ${tab === "mine" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>我的卡组</button>
+        <button type="button" onClick={() => setTab("plaza")} className={`min-h-11 rounded-xl text-sm font-bold transition-colors ${tab === "plaza" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>卡组广场</button>
+      </div>
+      <div className="min-h-0 flex-1">
+        {tab === "mine" ? (
+          <MyDeckPanel onDeckSelected={onDeckSelected} onPublishDeck={openPublish} />
+        ) : (
+          <DeckPlazaPanel
+            publishDeckName={publishDeckName}
+            onPublishOpened={() => setPublishDeckName(null)}
+            onGoMine={() => setTab("mine")}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MyDeckPanel({ onDeckSelected, onPublishDeck }: { onDeckSelected: () => void; onPublishDeck: (name: string) => void }) {
   const [decks, setDecks] = useState<Record<string, SavedDeck>>({});
   const [selected, setSelected] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -151,6 +182,16 @@ export default function DeckChoosePanel({ onDeckSelected }: { onDeckSelected: ()
                       已选择
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPublishDeck(name);
+                    }}
+                    className="min-h-10 rounded-lg px-3 text-xs font-bold text-orange-300 transition-colors hover:bg-orange-500/10"
+                  >
+                    发布
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {

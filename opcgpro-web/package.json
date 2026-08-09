@@ -15,6 +15,7 @@
     "test:card-hover": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/card-hover-placement.test.mjs",
     "test:game-overlays": "node --test tests/game-overlay-portals.test.mjs",
     "test:effect-confirm": "node --test tests/effect-confirm-prompt-layout.test.mjs",
+    "test:deck-plaza": "node --test tests/deck-plaza.test.mjs",
     "gen:card-thumbs": "node scripts/gen-card-thumbs.mjs",
     "start": "next start"
   },
