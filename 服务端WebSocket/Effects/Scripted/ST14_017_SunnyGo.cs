@@ -28,7 +28,7 @@ public class ST14_017_SunnyGo : IScriptedEffect
                 sideIdx == owner &&
                 card.Id != s.Players[owner].Leader.Id &&
                 card.Info.HasKeyword("草帽一伙") &&
-                card.Info.ColorList.Contains("紫"),
+                card.Info.ColorList.Contains("黑"),
         });
         // 登场时抽牌部分委托 DSL 执行
         await DslInterpreter.TryResolve(ctx);

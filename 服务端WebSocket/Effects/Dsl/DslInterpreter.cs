@@ -845,8 +845,8 @@ public static class DslInterpreter
                     break;
                 // ── ST 阶段新增条件 ──────────────────────────────────────
                 case "ownHasCharCostGte":
-                    // 我方场上存在原本费用 ≥ N 的角色（ST14 “费用为8或更高的角色”等）
-                    if (!me.Characters.Any(c => c.Info.Cost >= p.Value.GetInt32())) return false;
+                    // 我方场上存在当前费用 ≥ N 的角色（包含临时及持续费用修正）。
+                    if (!me.Characters.Any(c => s.CurrentCostOf(ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
                     break;
                 case "oppHasCharPowerGte":
                     // 对方场上存在当前力量 ≥ N 的角色
