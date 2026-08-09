@@ -168,7 +168,7 @@ public class ReplayEquivalenceTests
     }
 
     [Fact]
-    public void 回放手牌时间线_仅在终局向参战玩家公开且观战始终脱敏()
+    public void 回放手牌时间线_终局向参战玩家提供且终局快照向所有视角公开双方手牌()
     {
         EnsureLoaded();
         var engine = new GameEngine("replay-hands",
@@ -218,11 +218,14 @@ public class ReplayEquivalenceTests
         Assert.Equal(expectedPlayer1, ReadStrings(player1Last.GetProperty("myCardNumbers")));
         Assert.Equal(expectedPlayer0, ReadStrings(player1Last.GetProperty("opponentCardNumbers")));
 
-        // 即使终局携带了回放时间线，常规对手字段与观战快照仍保持脱敏。
-        Assert.Empty(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+        // 回放时间线仍只下发给参战玩家；终局当前手牌则向参战玩家和观战者共同公开。
+        Assert.Equal(expectedPlayer1,
+            ReadStrings(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers")));
         Assert.Equal(JsonValueKind.Null, spectatorSnapshot!.Value.GetProperty("replayHands").ValueKind);
-        Assert.Empty(spectatorSnapshot.Value.GetProperty("my").GetProperty("handCardNumbers").EnumerateArray());
-        Assert.Empty(spectatorSnapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+        Assert.Equal(expectedPlayer0,
+            ReadStrings(spectatorSnapshot.Value.GetProperty("my").GetProperty("handCardNumbers")));
+        Assert.Equal(expectedPlayer1,
+            ReadStrings(spectatorSnapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers")));
     }
 
     private static string[] ReadStrings(JsonElement array)

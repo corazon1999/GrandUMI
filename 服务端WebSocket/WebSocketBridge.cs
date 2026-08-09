@@ -33,7 +33,7 @@ public static class WebSocketBridge
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
-        "MsgOnlineCount", "MsgPlayerList", "MsgChatMsg", "MsgRateLimited",
+        "MsgOnlineCount", "MsgPlayerList", "MsgChatMsg", "MsgFriendChat", "MsgRateLimited",
     };
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
@@ -257,6 +257,7 @@ public static class WebSocketBridge
             case "MsgSurrender":   OnSurrender(session);         break;
             case "MsgChatMsg":     OnChatMsg(session, msg);      break;
             case "MsgGameChat":    OnGameChat(session, msg);     break;
+            case "MsgFriendChat":  OnFriendChat(session, msg);   break;
             case "MsgLeaveGameChat": OnLeaveGameChat(session);   break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
@@ -2209,6 +2210,59 @@ public static class WebSocketBridge
             fromRole = seat >= 0 ? "player" : "spectator",
         };
         foreach (var recipient in recipients) Send(recipient, pkt);
+    }
+
+    /// <summary>好友实时私聊：仅允许已建立好友关系的双方互发，消息不会广播给对局或大厅。</summary>
+    private static void OnFriendChat(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("friend-chat", capacity: 4, refillPerSecond: 0.75))
+        {
+            Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "消息发送过于频繁，请稍后再试" });
+            return;
+        }
+
+        var toAccount = (Str(msg, "toAccount") ?? "").Trim();
+        var text = (Str(msg, "text") ?? "").Trim();
+        if (toAccount.Length == 0 || text.Length == 0) return;
+        if (text.Length > 100) text = text[..100];
+
+        try
+        {
+            if (!_playerDataStore.AreFriends(s.Account!, toAccount))
+            {
+                Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "只能给好友发送消息" });
+                return;
+            }
+            if (!TryGetActiveSession(toAccount, out var target))
+            {
+                Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "好友当前不在线" });
+                return;
+            }
+
+            var packet = new
+            {
+                proto = "MsgFriendChat",
+                result = true,
+                id = Guid.NewGuid().ToString("N"),
+                text,
+                fromAccount = s.Account,
+                fromName = s.PlayerName ?? s.Account ?? "玩家",
+                toAccount = target.Account,
+                toName = target.PlayerName ?? target.Account ?? "好友",
+                sentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            };
+            Send(s.SessionId, packet);
+            Send(target.SessionId, packet);
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgFriendChat", ex, "好友消息发送失败");
+        }
     }
 
     /// <summary>客户端离开结算页后主动解绑，避免旧对局消息串入后续页面。</summary>

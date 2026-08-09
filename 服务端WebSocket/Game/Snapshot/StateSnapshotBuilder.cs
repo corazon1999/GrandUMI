@@ -64,8 +64,18 @@ public static class StateSnapshotBuilder
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
         var oppIdx = 1 - myIdx;
-        var my = BuildPlayerSnapshot(state, myIdx, asSelf: !isSpectator, boards[myIdx]);
-        var opponent = BuildPlayerSnapshot(state, oppIdx, asSelf: false, boards[oppIdx]);
+        var my = BuildPlayerSnapshot(
+            state,
+            myIdx,
+            asSelf: !isSpectator,
+            revealHand: state.IsGameOver,
+            board: boards[myIdx]);
+        var opponent = BuildPlayerSnapshot(
+            state,
+            oppIdx,
+            asSelf: false,
+            revealHand: state.IsGameOver,
+            board: boards[oppIdx]);
 
         var logLines = new List<string>();
         if (queuedLogEvents is not null)
@@ -225,7 +235,12 @@ public static class StateSnapshotBuilder
             p.MulliganDone);
     }
 
-    private static object BuildPlayerSnapshot(GameState state, int idx, bool asSelf, PlayerBoardComputed board)
+    private static object BuildPlayerSnapshot(
+        GameState state,
+        int idx,
+        bool asSelf,
+        bool revealHand,
+        PlayerBoardComputed board)
     {
         var p = state.Players[idx];
         return new
@@ -233,7 +248,9 @@ public static class StateSnapshotBuilder
             name = board.Name,
             cardBackId = board.CardBackId,
             spriteMap = p.SpriteMap,
-            handCardNumbers = asSelf ? p.Hand.Select(c => c.Info.Number).ToArray() : Array.Empty<string>(),
+            handCardNumbers = asSelf || revealHand
+                ? p.Hand.Select(c => c.Info.Number).ToArray()
+                : Array.Empty<string>(),
             handCardCosts = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
             handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),
             handCount = board.HandCount,

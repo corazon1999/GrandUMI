@@ -235,6 +235,20 @@ public sealed class PlayerDataStore
         return snapshot;
     }
 
+    public bool AreFriends(string account, string otherAccount)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var otherId = FindPlayerId(connection, transaction, NormalizeAccountKey(otherAccount));
+        if (otherId is null || otherId.Value == playerId) return false;
+
+        var (low, high) = OrderedPair(playerId, otherId.Value);
+        var areFriends = FriendshipExists(connection, transaction, low, high);
+        transaction.Commit();
+        return areFriends;
+    }
+
     public IReadOnlyList<FriendSearchPlayer> SearchPlayers(string account, string query, int limit = 20)
     {
         var normalizedQuery = (query ?? "").Trim().Normalize(NormalizationForm.FormKC);

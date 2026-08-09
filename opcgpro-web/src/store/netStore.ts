@@ -10,6 +10,7 @@ import type {
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   CardBackGalleryItem,
+  FriendChatMessage,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -92,6 +93,7 @@ interface NetStore {
   spectateRoomId: string | null;
   // 聊天
   chatMessages: ChatMessage[];
+  friendChatMessages: FriendChatMessage[];
   // 客户端路由导航（避免 window.location.href 导致整页刷新断开 WebSocket）
   navigateTo: string | null;
 
@@ -122,6 +124,7 @@ interface NetStore {
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
   setNavigateTo: (path: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
+  addFriendChatMessage: (msg: FriendChatMessage) => void;
   clearChat: () => void;
   reset: () => void;
 }
@@ -156,6 +159,7 @@ const initialState = {
   spectateState: "idle" as SpectateState,
   spectateRoomId: null as string | null,
   chatMessages: [] as ChatMessage[],
+  friendChatMessages: [] as FriendChatMessage[],
   navigateTo: null as string | null,
 };
 
@@ -232,6 +236,11 @@ export const useNetStore = create<NetStore>((set) => ({
   addChatMessage: (msg) =>
     set((s) => ({
       chatMessages: [...s.chatMessages.slice(-99), msg],
+    })),
+
+  addFriendChatMessage: (msg) =>
+    set((s) => ({
+      friendChatMessages: [...s.friendChatMessages.slice(-199), msg],
     })),
 
   clearChat: () => set({ chatMessages: [] }),
