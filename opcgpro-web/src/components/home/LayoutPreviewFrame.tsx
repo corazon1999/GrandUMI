@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContainerResponsiveProvider } from "@/components/ui/ResponsiveScope";
+import { calculateLayoutScale } from "@/lib/gameLayout";
 
 export type LayoutPreviewMode = "desktop" | "mobile-landscape" | "mobile-portrait";
 
@@ -29,7 +30,7 @@ export const LAYOUT_PREVIEW_OPTIONS: Array<{
   {
     value: "mobile-portrait",
     label: "手机竖屏",
-    description: "390 × 844",
+    description: "大厅竖屏；对局自动旋转横屏",
     width: 390,
     height: 844,
   },
@@ -65,9 +66,13 @@ export function useLayoutPreviewMode() {
 
 export default function LayoutPreviewFrame({
   mode,
+  rotateQuarterTurn = false,
+  edgeToEdge = false,
   children,
 }: {
   mode: LayoutPreviewMode;
+  rotateQuarterTurn?: boolean;
+  edgeToEdge?: boolean;
   children: React.ReactNode;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -85,34 +90,57 @@ export default function LayoutPreviewFrame({
     if (!host || !option.width || !option.height) return;
 
     const updateScale = () => {
-      const availableWidth = Math.max(1, host.clientWidth - 32);
-      const availableHeight = Math.max(1, host.clientHeight - 32);
-      setScale(Math.min(1, availableWidth / option.width!, availableHeight / option.height!));
+      setScale(calculateLayoutScale({
+        hostWidth: host.clientWidth,
+        hostHeight: host.clientHeight,
+        canvasWidth: option.width!,
+        canvasHeight: option.height!,
+        rotateQuarterTurn,
+        edgeToEdge,
+      }));
     };
 
     updateScale();
     const observer = new ResizeObserver(updateScale);
     observer.observe(host);
     return () => observer.disconnect();
-  }, [isDesktop, option.height, option.width]);
+  }, [edgeToEdge, isDesktop, option.height, option.width, rotateQuarterTurn]);
+
+  const transformed = !isDesktop || rotateQuarterTurn;
+  const safeAreaStyle = {
+    "--layout-safe-top": rotateQuarterTurn
+      ? "env(safe-area-inset-right)"
+      : "env(safe-area-inset-top)",
+    "--layout-safe-right": rotateQuarterTurn
+      ? "env(safe-area-inset-bottom)"
+      : "env(safe-area-inset-right)",
+    "--layout-safe-bottom": rotateQuarterTurn
+      ? "env(safe-area-inset-left)"
+      : "env(safe-area-inset-bottom)",
+    "--layout-safe-left": rotateQuarterTurn
+      ? "env(safe-area-inset-top)"
+      : "env(safe-area-inset-left)",
+  } as React.CSSProperties;
 
   return (
     <div ref={hostRef} className="relative h-[100dvh] w-full overflow-hidden bg-black">
       <div
         data-layout-preview={mode}
+        data-layout-rotated={rotateQuarterTurn ? "true" : "false"}
         className={`@container overflow-hidden bg-gray-950 ${
-          isDesktop
+          !transformed
             ? "h-full w-full"
-            : "absolute left-1/2 top-1/2 rounded-2xl ring-1 ring-gray-700 shadow-2xl"
+            : `absolute left-1/2 top-1/2 ${edgeToEdge ? "" : "rounded-2xl ring-1 ring-gray-700 shadow-2xl"}`
         }`}
         style={
-          isDesktop
-            ? { containerType: "size", transform: "translateZ(0)" }
+          !transformed
+            ? { ...safeAreaStyle, containerType: "size", transform: "translateZ(0)" }
             : {
+                ...safeAreaStyle,
                 containerType: "size",
                 width: option.width,
                 height: option.height,
-                transform: `translate(-50%, -50%) scale(${scale})`,
+                transform: `translate(-50%, -50%) ${rotateQuarterTurn ? "rotate(90deg) " : ""}scale(${scale})`,
                 transformOrigin: "center",
               }
         }

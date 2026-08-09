@@ -3,26 +3,38 @@
 import { useEffect, useState, type ReactNode } from "react";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
+import { resolveGameLayout } from "@/lib/gameLayout";
 
 export default function LayoutPreviewRoute({ children }: { children: ReactNode }) {
-  const { mode } = useLayoutSettings();
-  const [isNarrowPortrait, setIsNarrowPortrait] = useState(false);
+  const { mode, setGameOverlayHost } = useLayoutSettings();
+  const [isPhonePortrait, setIsPhonePortrait] = useState(false);
 
   useEffect(() => {
-    const query = window.matchMedia("(orientation: portrait) and (max-width: 767px)");
-    const update = () => setIsNarrowPortrait(query.matches);
+    const query = window.matchMedia(
+      "(orientation: portrait) and (max-width: 767px), (orientation: portrait) and (max-width: 1024px) and (pointer: coarse)",
+    );
+    const update = () => setIsPhonePortrait(query.matches);
 
     update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
 
-  // 实际设备保持竖屏时，牌桌临时使用手机横屏画布；不覆盖大厅保存的布局偏好。
-  const effectiveMode = isNarrowPortrait ? "mobile-landscape" : mode;
+  const layout = resolveGameLayout(mode, isPhonePortrait);
 
   return (
-    <LayoutPreviewFrame mode={effectiveMode}>
-      <div className="layout-preview-route h-full w-full overflow-hidden">{children}</div>
+    <LayoutPreviewFrame
+      mode={layout.mode}
+      rotateQuarterTurn={layout.rotateQuarterTurn}
+      edgeToEdge={layout.edgeToEdge}
+    >
+      <div className="layout-preview-route relative h-full w-full overflow-hidden">
+        {children}
+        <div
+          ref={setGameOverlayHost}
+          className="pointer-events-none absolute inset-0 z-[10000]"
+        />
+      </div>
     </LayoutPreviewFrame>
   );
 }

@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import SettingsModal from "./SettingsModal";
 import {
   useLayoutPreviewMode,
@@ -18,6 +19,7 @@ interface LayoutSettingsContextValue {
   mode: LayoutPreviewMode;
   setMode: (mode: LayoutPreviewMode) => void;
   openSettings: () => void;
+  setGameOverlayHost: (host: HTMLDivElement | null) => void;
 }
 
 const LayoutSettingsContext = createContext<LayoutSettingsContextValue | null>(null);
@@ -33,22 +35,29 @@ export function useLayoutSettings(): LayoutSettingsContextValue {
 export default function LayoutSettingsProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useLayoutPreviewMode();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gameOverlayHost, setGameOverlayHostState] = useState<HTMLDivElement | null>(null);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const setGameOverlayHost = useCallback((host: HTMLDivElement | null) => {
+    setGameOverlayHostState(host);
+  }, []);
   const contextValue = useMemo(
-    () => ({ mode, setMode, openSettings }),
-    [mode, openSettings, setMode],
+    () => ({ mode, setMode, openSettings, setGameOverlayHost }),
+    [mode, openSettings, setGameOverlayHost, setMode],
   );
 
-  return (
-    <LayoutSettingsContext.Provider value={contextValue}>
-      {children}
+  const settingsUi = (
+    <>
       {!settingsOpen && (
         <button
           type="button"
           onClick={openSettings}
           aria-label="打开设置"
           title="设置"
-          className="fixed right-[calc(0.625rem+env(safe-area-inset-right))] top-[calc(0.625rem+env(safe-area-inset-top))] z-[10000] flex h-11 w-11 items-center justify-center rounded-xl border border-gray-700/80 bg-gray-900/90 text-gray-300 shadow-lg backdrop-blur-md transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white active:bg-gray-700 focus-visible:outline-2 focus-visible:outline-orange-400"
+          style={{
+            right: "calc(0.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+            top: "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          }}
+          className="pointer-events-auto fixed z-[10000] flex h-11 w-11 items-center justify-center rounded-xl border border-gray-700/80 bg-gray-900/90 text-gray-300 shadow-lg backdrop-blur-md transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white active:bg-gray-700 focus-visible:outline-2 focus-visible:outline-orange-400"
         >
           <svg
             viewBox="0 0 24 24"
@@ -65,12 +74,21 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
           </svg>
         </button>
       )}
-      <SettingsModal
-        open={settingsOpen}
-        mode={mode}
-        onChange={setMode}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <div className="pointer-events-auto contents">
+        <SettingsModal
+          open={settingsOpen}
+          mode={mode}
+          onChange={setMode}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </div>
+    </>
+  );
+
+  return (
+    <LayoutSettingsContext.Provider value={contextValue}>
+      {children}
+      {gameOverlayHost ? createPortal(settingsUi, gameOverlayHost) : settingsUi}
     </LayoutSettingsContext.Provider>
   );
 }

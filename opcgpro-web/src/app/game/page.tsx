@@ -68,7 +68,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
+    <div className="relative h-full w-full overflow-hidden bg-[#07111f] text-white select-none">
       {!isObserver && !isPlayback && <ReconnectOverlay />}
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
       {!isObserver && !isPlayback && (

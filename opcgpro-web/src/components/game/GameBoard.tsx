@@ -279,7 +279,8 @@ export default function GameBoard({
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
 
-  const stageScale = useStageScale(STAGE_W, STAGE_H);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const stageScale = useStageScale(STAGE_W, STAGE_H, viewportRef);
   const stageRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -291,7 +292,7 @@ export default function GameBoard({
       <RevealOverlay />
 
       {/* 固定设计画布 + 整体等比缩放居中（scale-to-fit），保证任何宽高比下比例恒定、不裁切 */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center">
+      <div ref={viewportRef} className="absolute inset-0 z-10 flex items-center justify-center">
         <CardSizeOverride.Provider value="sm">
           <div
             ref={stageRef}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 /**
  * 计算固定设计画布(baseW×baseH)等比铺满当前视口的缩放系数。
@@ -11,15 +11,20 @@ import { useEffect, useState } from "react";
  *   - 优先用 window.visualViewport 测量（移动端工具栏伸缩时它才是真实可视尺寸）。
  *   - orientationchange 触发瞬间 iOS/夸克会返回旋转前的旧尺寸，故延迟 + 双 rAF 重测。
  */
-export function useStageScale(baseW: number, baseH: number) {
+export function useStageScale(
+  baseW: number,
+  baseH: number,
+  containerRef?: RefObject<HTMLElement | null>,
+) {
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
     const vv = window.visualViewport;
 
     function measure() {
-      const w = vv?.width ?? window.innerWidth;
-      const h = vv?.height ?? window.innerHeight;
+      const container = containerRef?.current;
+      const w = container?.clientWidth ?? vv?.width ?? window.innerWidth;
+      const h = container?.clientHeight ?? vv?.height ?? window.innerHeight;
       setScale(Math.min(w / baseW, h / baseH));
     }
 
@@ -39,16 +44,19 @@ export function useStageScale(baseW: number, baseH: number) {
     window.addEventListener("resize", measure);
     window.addEventListener("orientationchange", remeasureDeferred);
     vv?.addEventListener("resize", measure);
+    const observer = containerRef?.current ? new ResizeObserver(remeasureDeferred) : null;
+    if (containerRef?.current) observer?.observe(containerRef.current);
 
     return () => {
       window.removeEventListener("resize", measure);
       window.removeEventListener("orientationchange", remeasureDeferred);
       vv?.removeEventListener("resize", measure);
+      observer?.disconnect();
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       clearTimeout(timer);
     };
-  }, [baseW, baseH]);
+  }, [baseW, baseH, containerRef]);
 
   return scale;
 }

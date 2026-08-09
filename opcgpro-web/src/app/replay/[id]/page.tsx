@@ -105,14 +105,14 @@ export default function ReplayPage() {
   };
 
   if (!id) {
-    return <div className="flex h-screen items-center justify-center bg-[#07111f] text-white">无效的回放 ID</div>;
+    return <div className="flex h-full w-full items-center justify-center bg-[#07111f] text-white">无效的回放 ID</div>;
   }
   if (snapshots === null) {
-    return <div className="flex h-screen items-center justify-center bg-[#07111f] text-white">加载中…</div>;
+    return <div className="flex h-full w-full items-center justify-center bg-[#07111f] text-white">加载中…</div>;
   }
   if (snapshots.length === 0) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#07111f] text-white">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#07111f] text-white">
         <p>未找到该回放数据（可能已被清理或在其它设备录制）</p>
         <button
           onClick={() => router.push("/home")}
@@ -125,7 +125,7 @@ export default function ReplayPage() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#07111f] text-white select-none">
+    <div className="relative h-full w-full overflow-hidden bg-[#07111f] text-white select-none">
       {/* 顶部返回与标识 */}
       <button
         onClick={() => router.push("/home")}

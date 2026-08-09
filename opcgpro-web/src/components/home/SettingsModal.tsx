@@ -64,7 +64,7 @@ export default function SettingsModal({
     <Modal open={open} onClose={onClose} title="设置" mobileSheet maxWidthClass="max-w-lg">
       <section aria-labelledby="layout-preview-title">
         <h3 id="layout-preview-title" className="text-sm font-bold text-white">界面布局</h3>
-        <p className="mt-1 text-sm leading-5 text-gray-500">切换电脑或手机画布，方便检查不同方向下的界面排版。</p>
+        <p className="mt-1 text-sm leading-5 text-gray-500">手机竖屏模式下大厅保持竖屏，对局与回放会自动旋转为横屏，无需切换系统方向。</p>
 
         <div className="mt-4 grid grid-cols-1 gap-3 @[640px]:grid-cols-3">
           {LAYOUT_PREVIEW_OPTIONS.map((option) => {
