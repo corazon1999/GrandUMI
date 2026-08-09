@@ -10,11 +10,13 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { downloadDeckImage } from "@/lib/deckImageExport";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
 
 const HOVER_DELAY = 180;
 
 type SaveState = "idle" | "saved" | "error";
+type ImageExportState = "idle" | "exporting" | "success" | "error";
 
 export default function DeckInfoPanel() {
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function DeckInfoPanel() {
   const [importText, setImportText] = useState("");
   const [importMsg, setImportMsg]   = useState<string | null>(null);
   const [copied, setCopied]         = useState(false);
+  const [imageExportState, setImageExportState] = useState<ImageExportState>("idle");
   const noticeTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hover, setHover]           = useState<HoverInfo | null>(null);
   const hoverTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,6 +154,20 @@ export default function DeckInfoPanel() {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
+    }
+  };
+
+  const handleImageExport = async () => {
+    if (!leader || entries.length === 0 || imageExportState === "exporting") return;
+    setImageExportState("exporting");
+    try {
+      await downloadDeckImage({ deckName, leader, entries });
+      setImageExportState("success");
+      window.setTimeout(() => setImageExportState("idle"), 2200);
+    } catch (error) {
+      console.error("导出卡组一图流失败", error);
+      setImageExportState("error");
+      window.setTimeout(() => setImageExportState("idle"), 3000);
     }
   };
 
@@ -492,8 +509,30 @@ export default function DeckInfoPanel() {
         {hover && <CardHoverPreview info={hover} />}
       </AnimatePresence>
 
-      {/* 保存按钮 */}
-      <div className="px-3 py-3 border-t border-gray-800 shrink-0">
+      {/* 图片导出与保存 */}
+      <div className="px-3 py-3 border-t border-gray-800 shrink-0 flex flex-col gap-2">
+        <button
+          onClick={handleImageExport}
+          disabled={!leader || entries.length === 0 || imageExportState === "exporting"}
+          title="把当前异画、卡牌数量和卡号导出为一张 PNG 图片"
+          className={`w-full py-2 rounded-xl border text-xs font-bold transition-all ${
+            leader && entries.length > 0 && imageExportState !== "exporting"
+              ? imageExportState === "success"
+                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                : imageExportState === "error"
+                  ? "border-red-500/60 bg-red-500/10 text-red-300"
+                  : "border-sky-500/40 bg-sky-500/10 text-sky-300 hover:border-sky-400 hover:bg-sky-500/20"
+              : "border-gray-800 bg-gray-900 text-gray-600 cursor-not-allowed"
+          }`}
+        >
+          {imageExportState === "exporting"
+            ? "正在生成一图流…"
+            : imageExportState === "success"
+              ? "✓ 一图流已下载"
+              : imageExportState === "error"
+                ? "导出失败，请重试"
+                : "▦ 导出一图流"}
+        </button>
         <button
           onClick={handleSave}
           disabled={!isValid()}
