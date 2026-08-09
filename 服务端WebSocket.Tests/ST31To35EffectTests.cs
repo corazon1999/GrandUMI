@@ -77,6 +77,30 @@ public class ST31To35EffectTests
     }
 
     [Fact]
+    public async Task ST31_005_ActivatedMain_DoesNotTreatLuffyAceLeaderAsLuffy()
+    {
+        var s = TestScene.New(myLeaderNumber: "ST30-001")
+            .MyCharacter("OP01-024")
+            .Build();
+        var me = s.Players[0];
+        var luffy = Assert.Single(me.Characters);
+        var source = new CardInstance { Info = CardDatabase.Get("ST31-005")! };
+        me.StageCard = source;
+        me.CostArea.Add(new DonCard { State = DonState.Rest });
+        var prompts = new MockPromptService().QueueChoose(luffy.Id.ToString());
+
+        await EffectRuntime.Resolve(s, 0, source, EffectTrigger.ActivatedMain, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnLeaderOrCharacter", prompt.kind);
+        Assert.Equal(new[] { luffy.Id.ToString() }, prompt.choices);
+        Assert.DoesNotContain(me.Leader.Id.ToString(), prompt.choices);
+        Assert.True(source.IsTapped);
+        Assert.Equal(1, me.AttachedDonCount(luffy.Id));
+        Assert.Equal(0, me.AttachedDonCount(me.Leader.Id));
+    }
+
+    [Fact]
     public async Task ST31_003_BlockerAndPowerAreConditionalDuringOpponentTurn()
     {
         var s = TestScene.New().Build();

@@ -241,8 +241,8 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         }
         if (ctx.Source.IsTapped || !me.CostArea.Any(d => d.State == DonState.Rest)) return;
         var targets = new List<CardInstance>();
-        if (me.Leader.Info.NameContains("路飞")) targets.Add(me.Leader);
-        targets.AddRange(me.Characters.Where(c => c.Info.NameContains("路飞")));
+        if (me.Leader.MatchesName("蒙奇·D·路飞")) targets.Add(me.Leader);
+        targets.AddRange(me.Characters.Where(c => c.MatchesName("蒙奇·D·路飞")));
         if (targets.Count == 0) return;
         AtomicOps.RestCard(ctx.Source);
         var target = await Choose(ctx, ctx.OwnerIndex, "OwnLeaderOrCharacter", "赋予1张路飞最多1张休息咚!!", targets);
