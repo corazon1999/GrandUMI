@@ -260,7 +260,7 @@ export default function LeaderLeaderboardPanel() {
                         fill
                         sizes="44px"
                         className="object-cover"
-                        onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card)])}
+                        onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card), card?.image])}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -347,7 +347,7 @@ export default function LeaderLeaderboardPanel() {
                             fill
                             sizes="44px"
                             className="object-cover"
-                            onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card)])}
+                            onError={(event) => advanceImageFallback(event.currentTarget, [latestLeaderSprite(card), card?.image])}
                           />
                         </div>
                         <div className="min-w-0">

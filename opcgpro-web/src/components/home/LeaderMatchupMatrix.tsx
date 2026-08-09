@@ -115,7 +115,7 @@ export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }:
                         fill
                         sizes="44px"
                         className="object-cover"
-                        onError={(event) => advanceImageFallback(event.currentTarget, [sprite])}
+                        onError={(event) => advanceImageFallback(event.currentTarget, [sprite, card?.image])}
                       />
                     </div>
                     <p className="mt-1 truncate text-[9px] font-medium text-gray-400" title={card?.name ?? leader.leaderNumber}>
@@ -149,7 +149,7 @@ export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }:
                         fill
                         sizes="34px"
                         className="object-cover"
-                        onError={(event) => advanceImageFallback(event.currentTarget, [sprite])}
+                        onError={(event) => advanceImageFallback(event.currentTarget, [sprite, card?.image])}
                       />
                     </div>
                     <div className="min-w-0">
