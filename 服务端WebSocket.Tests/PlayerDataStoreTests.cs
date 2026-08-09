@@ -158,6 +158,28 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void CardBackGallery_只有发布者可删除且删除后重置所有选用者()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.UploadCardBack("Alice", "待删除卡背", "image/png", TinyPngBase64());
+        var cardBack = Assert.Single(store.GetCardBackGallery("Alice"));
+        store.UpdateCardBack("Alice", cardBack.Id);
+        store.UpdateCardBack("Bob", cardBack.Id);
+
+        Assert.Throws<PlayerDataValidationException>(() => store.DeleteCardBack("Bob", cardBack.Id));
+
+        var deleted = store.DeleteCardBack("Alice", cardBack.Id);
+        Assert.Equal(cardBack.Id, deleted.DeletedCardBackId);
+        Assert.Equal(PlayerDataStore.DefaultCardBackId, deleted.Snapshot.CardBackId);
+        Assert.Empty(deleted.Gallery);
+        Assert.Equal(PlayerDataStore.DefaultCardBackId, store.GetPlayerData("Bob").CardBackId);
+        Assert.Null(store.GetCardBackImage(long.Parse(cardBack.Id["custom-".Length..])));
+        Assert.Throws<PlayerDataValidationException>(() => store.DeleteCardBack("Alice", cardBack.Id));
+    }
+
+    [Fact]
     public void DeferredLoginWrites_同一玩家重复登录只保留一次待写并在关服排空()
     {
         var store = new PlayerDataStore(_databasePath, deferLoginWrites: true);

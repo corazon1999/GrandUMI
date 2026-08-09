@@ -24,6 +24,7 @@ import type {
   MsgCardBackGallery,
   MsgUploadCardBack,
   MsgLikeCardBack,
+  MsgDeleteCardBack,
   MsgImportDecks,
   MsgAddAccount,
   MsgUpdatePs,
@@ -725,6 +726,10 @@ export const HomeRequest = {
 
   toggleCardBackLike(cardBackId: string) {
     return NetManager.send({ proto: "MsgLikeCardBack", cardBackId } as MsgLikeCardBack);
+  },
+
+  deleteCardBack(cardBackId: string) {
+    return NetManager.send({ proto: "MsgDeleteCardBack", cardBackId } as MsgDeleteCardBack);
   },
 
   importDecks(decks: SavedDeck[]) {

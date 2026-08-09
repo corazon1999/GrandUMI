@@ -700,6 +700,61 @@ public sealed class PlayerDataStore
         return gallery;
     }
 
+    public CardBackDeletionResult DeleteCardBack(string account, string cardBackId)
+    {
+        var normalized = NormalizeCardBackReference(cardBackId);
+        if (!TryParseCustomCardBackId(normalized, out var customId))
+            throw new PlayerDataValidationException("只能删除你在广场发布的玩家卡背。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        using (var ownership = connection.CreateCommand())
+        {
+            ownership.Transaction = transaction;
+            ownership.CommandText = "SELECT owner_player_id FROM card_backs WHERE id=$id;";
+            ownership.Parameters.AddWithValue("$id", customId);
+            var owner = ownership.ExecuteScalar();
+            if (owner is null) throw new PlayerDataValidationException("该卡背不存在或已下架。");
+            if (Convert.ToInt64(owner, CultureInfo.InvariantCulture) != playerId)
+                throw new PlayerDataValidationException("只能删除自己发布的卡背。");
+        }
+
+        using (var resetSelections = connection.CreateCommand())
+        {
+            resetSelections.Transaction = transaction;
+            resetSelections.CommandText = "UPDATE players SET card_back_id=$defaultId, updated_at=$now WHERE card_back_id=$cardBackId;";
+            resetSelections.Parameters.AddWithValue("$defaultId", DefaultCardBackId);
+            resetSelections.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            resetSelections.Parameters.AddWithValue("$cardBackId", normalized);
+            resetSelections.ExecuteNonQuery();
+        }
+
+        using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM card_backs WHERE id=$id;";
+            delete.Parameters.AddWithValue("$id", customId);
+            delete.ExecuteNonQuery();
+        }
+
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
+        transaction.Commit();
+        return new CardBackDeletionResult(normalized, snapshot, gallery);
+    }
+
+    public PlayerDataSnapshot GetPlayerData(string account)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        transaction.Commit();
+        return snapshot;
+    }
+
     public CardBackImage? GetCardBackImage(long id)
     {
         if (id <= 0) return null;

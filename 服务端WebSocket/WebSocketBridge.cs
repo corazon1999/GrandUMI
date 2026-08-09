@@ -229,6 +229,7 @@ public static class WebSocketBridge
             case "MsgCardBackGallery": OnCardBackGallery(session); break;
             case "MsgUploadCardBack": OnUploadCardBack(session, msg); break;
             case "MsgLikeCardBack": OnLikeCardBack(session, msg); break;
+            case "MsgDeleteCardBack": OnDeleteCardBack(session, msg); break;
             case "MsgImportDecks": OnImportDecks(session, msg);  break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
@@ -497,6 +498,35 @@ public static class WebSocketBridge
             SendCardBackGallery(s, gallery);
         }
         catch (Exception ex) { SendCardBackGalleryError(s, ex, "更新红心失败"); }
+    }
+
+    private static void OnDeleteCardBack(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var result = _playerDataStore.DeleteCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
+            s.CardBackId = result.Snapshot.CardBackId;
+            SendPlayerData(s, result.Snapshot, "卡背投稿已删除");
+            SendCardBackGallery(s, result.Gallery);
+
+            foreach (var session in Sessions.Values.Where(IsCurrentAccountSession))
+            {
+                if (session.SessionId == s.SessionId || session.Account is null) continue;
+                try
+                {
+                    if (session.CardBackId == result.DeletedCardBackId)
+                    {
+                        var snapshot = _playerDataStore.GetPlayerData(session.Account);
+                        session.CardBackId = snapshot.CardBackId;
+                        SendPlayerData(session, snapshot, "正在使用的卡背已由发布者删除，已恢复为经典卡背");
+                    }
+                    SendCardBackGallery(session, _playerDataStore.GetCardBackGallery(session.Account));
+                }
+                catch (Exception ex) { LogErr($"同步卡背删除结果 {session.Account}: {ex.Message}"); }
+            }
+        }
+        catch (Exception ex) { SendCardBackGalleryError(s, ex, "删除卡背失败"); }
     }
 
     private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)

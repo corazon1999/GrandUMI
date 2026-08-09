@@ -62,6 +62,11 @@ public sealed record CardBackSelectionResult(
     PlayerDataSnapshot Snapshot,
     IReadOnlyList<CardBackGalleryItem> Gallery);
 
+public sealed record CardBackDeletionResult(
+    string DeletedCardBackId,
+    PlayerDataSnapshot Snapshot,
+    IReadOnlyList<CardBackGalleryItem> Gallery);
+
 public sealed record DeckImportResult(PlayerDataSnapshot Snapshot, int Imported, int Renamed, int Skipped);
 
 /// <summary>好友列表中的持久化玩家资料。</summary>

@@ -52,6 +52,7 @@ export enum ProtocolEnum {
   MsgCardBackGallery = 47,
   MsgUploadCardBack = 48,
   MsgLikeCardBack = 49,
+  MsgDeleteCardBack = 50,
 }
 
 // WebSocket JSON 消息基类
@@ -173,6 +174,11 @@ export interface MsgUploadCardBack extends MsgBase {
 
 export interface MsgLikeCardBack extends MsgBase {
   proto: "MsgLikeCardBack";
+  cardBackId: string;
+}
+
+export interface MsgDeleteCardBack extends MsgBase {
+  proto: "MsgDeleteCardBack";
   cardBackId: string;
 }
 
@@ -866,6 +872,7 @@ export type AnyMsg =
   | MsgCardBackGallery
   | MsgUploadCardBack
   | MsgLikeCardBack
+  | MsgDeleteCardBack
   | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch

@@ -81,13 +81,14 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (connState === "connected") HomeRequest.requestCardBackGallery();
   }, [connState]);
-  useEffect(() => { setSubmitting(false); }, [gallery]);
+  useEffect(() => { setSubmitting(false); setDeletingId(null); }, [gallery]);
   useEffect(() => () => { if (prepared) URL.revokeObjectURL(prepared.previewUrl); }, [prepared]);
 
   const chooseFile = async (file: File | undefined) => {
@@ -121,6 +122,16 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
     setName("");
     setPrepared(null);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const deleteCardBack = (cardBackId: string, cardBackName: string) => {
+    if (!window.confirm(`确定删除卡背“${cardBackName}”吗？删除后无法恢复。`)) return;
+    setDeletingId(cardBackId);
+    setError("");
+    if (!HomeRequest.deleteCardBack(cardBackId)) {
+      setDeletingId(null);
+      setError("网络未连接，暂时无法删除");
+    }
   };
 
   return (
@@ -201,6 +212,16 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
                   <button type="button" disabled={active} onClick={() => HomeRequest.updateCardBack(item.id)} className="min-h-11 rounded-xl bg-orange-500 px-2 text-xs font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500">
                     {active ? "已选用" : "选用并点♥"}
                   </button>
+                  {item.owned && (
+                    <button
+                      type="button"
+                      disabled={deletingId === item.id}
+                      onClick={() => deleteCardBack(item.id, item.name)}
+                      className="col-span-2 min-h-11 rounded-xl border border-red-500/50 px-3 text-xs font-bold text-red-300 hover:border-red-400 hover:bg-red-500/10 disabled:border-gray-700 disabled:text-gray-600"
+                    >
+                      {deletingId === item.id ? "删除中…" : "删除投稿"}
+                    </button>
+                  )}
                 </div>
               </article>
             );
