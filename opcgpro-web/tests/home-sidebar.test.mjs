@@ -23,3 +23,11 @@ test("侧栏图标在悬停和键盘聚焦时显示文字提示", () => {
   assert.match(source, /group-focus:opacity-100/);
   assert.match(source, /aria-label=\{label\}/);
 });
+
+test("卡牌图鉴使用图鉴卡册图标而不是搜索图标", () => {
+  const catalogIcon = source.match(/if \(name === "catalog"\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+
+  assert.match(catalogIcon, /<rect/);
+  assert.match(catalogIcon, /M7 7H5/);
+  assert.doesNotMatch(catalogIcon, /<circle/);
+});

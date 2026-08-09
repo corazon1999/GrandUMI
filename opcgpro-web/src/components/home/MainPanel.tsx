@@ -291,7 +291,7 @@ function NavIcon({ name }: { name: NavIconName }) {
     return <><rect x="6" y="4" width="12" height="16" rx="2" /><path d="m9 8 3-2 3 2-1 4h-4L9 8Z" /></>;
   }
   if (name === "catalog") {
-    return <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>;
+    return <><rect x="7" y="3" width="12" height="16" rx="2" /><path d="M7 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2M10 7h6M10 11h6M10 15h3" /></>;
   }
   if (name === "leaderboard") {
     return <><path d="M5 20v-6h4v6M10 20V8h4v12M15 20V4h4v16" /><path d="M3 20h18" /></>;
