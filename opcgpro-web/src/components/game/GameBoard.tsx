@@ -31,10 +31,12 @@ function PlayerMat({
   side,
   isObserver,
   isPlayback,
+  revealHands,
 }: {
   side: "my" | "opponent";
   isObserver: boolean;
   isPlayback: boolean;
+  revealHands: boolean;
 }) {
   const isOpponent = side === "opponent";
   const canShowDon = !isPlayback;
@@ -75,7 +77,7 @@ function PlayerMat({
       <div className="grid h-full min-w-0 grid-rows-[1fr_auto_1fr] gap-2 p-3 pr-32 md:pr-36">
         {isOpponent ? (
           <div className="relative min-h-0 min-w-0 pl-24 md:pl-28">
-            <HandArea side={side} hidden={!isPlayback} />
+            <HandArea side={side} hidden={!isPlayback && !revealHands} />
           </div>
         ) : (
           <div className="relative flex min-h-0 min-w-0 items-stretch gap-4 pl-24 md:pl-28">
@@ -100,7 +102,7 @@ function PlayerMat({
           </div>
         ) : (
           <div className="relative -ml-[233px] min-h-0 min-w-0">
-            <HandArea side={side} hidden={isObserver} />
+            <HandArea side={side} hidden={isObserver && !revealHands} />
           </div>
         )}
       </div>
@@ -276,6 +278,7 @@ export default function GameBoard({
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
   const turnCount = useGameStore((s) => s.turnCount);
+  const isGameOver = useGameStore((s) => s.isGameOver);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
 
@@ -311,7 +314,12 @@ export default function GameBoard({
               <LeftRail />
 
               <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
-                <PlayerMat side="opponent" isObserver={isObserver} isPlayback={isPlayback} />
+                <PlayerMat
+                  side="opponent"
+                  isObserver={isObserver}
+                  isPlayback={isPlayback}
+                  revealHands={isGameOver}
+                />
 
                 <PhaseTrack
                   currentTurn={currentTurn}
@@ -320,7 +328,12 @@ export default function GameBoard({
                   live={!isObserver && !isPlayback}
                 />
 
-                <PlayerMat side="my" isObserver={isObserver} isPlayback={isPlayback} />
+                <PlayerMat
+                  side="my"
+                  isObserver={isObserver}
+                  isPlayback={isPlayback}
+                  revealHands={isGameOver}
+                />
               </main>
 
               <RightRail

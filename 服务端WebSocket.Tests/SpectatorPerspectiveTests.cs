@@ -28,6 +28,26 @@ public class SpectatorPerspectiveTests
     }
 
     [Fact]
+    public void 观战快照_对局结束后公开双方手牌()
+    {
+        var state = TestScene.MaxScenario();
+        state.WinnerIndex = 0;
+        state.GameOverReason = "测试终局";
+
+        var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(
+            state,
+            viewerIndex: -1,
+            spectatorPlayerIndex: 1));
+
+        Assert.Equal(
+            state.Players[1].Hand.Select(card => card.Info.Number),
+            ReadStrings(snapshot.GetProperty("my").GetProperty("handCardNumbers")));
+        Assert.Equal(
+            state.Players[0].Hand.Select(card => card.Info.Number),
+            ReadStrings(snapshot.GetProperty("opponent").GetProperty("handCardNumbers")));
+    }
+
+    [Fact]
     public void 批量快照_仅按需生成一号座位观战视角()
     {
         var state = TestScene.MaxScenario();
@@ -67,4 +87,7 @@ public class SpectatorPerspectiveTests
             spectatorSnapshot.GetProperty("my").GetProperty("spriteMap").GetProperty("OP01-001").GetString(),
             spectatorSnapshot.GetProperty("opponent").GetProperty("spriteMap").GetProperty("OP01-001").GetString());
     }
+
+    private static string[] ReadStrings(JsonElement array)
+        => array.EnumerateArray().Select(item => item.GetString() ?? "").ToArray();
 }
