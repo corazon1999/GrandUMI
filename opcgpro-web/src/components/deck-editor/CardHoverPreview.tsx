@@ -6,6 +6,8 @@ import NextImage from "next/image";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
+import { calculateCardHoverPlacement } from "@/lib/cardHoverPlacement";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 export const PREVIEW_W = 240;
 const PREVIEW_H_APPROX = 480;
@@ -39,6 +41,7 @@ export default function CardHoverPreview({
   counterValue?: number;
 }) {
   const { card, rect, currentSprite } = info;
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const displayCounter = counterValue ?? card.counter;
   const rawSprite = currentSprite ?? card.sprite ?? CARD_BACK_SRC;
   // 先显示 128px 小图，再由高质量 WebP 平滑覆盖；派生图缺失时才回退原图。
@@ -50,30 +53,50 @@ export default function CardHoverPreview({
     setLoadedImageSrc(null);
   }, [rawSprite]);
 
-  const spaceRight = window.innerWidth - rect.right;
-  const showRight  = spaceRight >= PREVIEW_W + 16;
-  const x = showRight
-    ? rect.right + 12
-    : rect.left - 12 - PREVIEW_W;
-
-  const cardCenterY = rect.top + rect.height / 2;
-  const rawY        = cardCenterY - PREVIEW_H_APPROX / 2;
-  const y           = Math.max(8, Math.min(rawY, window.innerHeight - PREVIEW_H_APPROX - 8));
+  const placement = calculateCardHoverPlacement({
+    rect,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    previewWidth: PREVIEW_W,
+    previewHeight: PREVIEW_H_APPROX,
+    rotateQuarterTurn,
+  });
 
   const displayColor = toDisplayColor(card.color);
   const primary      = primaryDisplayColor(card.color);
   const colorStyle   = COLOR_STYLES[primary];
 
   return (
-    <motion.div
-      className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-gray-700"
-      style={{ width: PREVIEW_W, left: x, top: y, pointerEvents: "none" }}
-      initial={{ opacity: 0, scale: 0.93, x: showRight ? -8 : 8 }}
-      animate={{ opacity: 1, scale: 1,   x: 0 }}
-      exit={{    opacity: 0, scale: 0.93, x: showRight ? -8 : 8 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+    <div
+      className="pointer-events-none fixed z-50"
+      style={{
+        width: placement.footprintWidth,
+        height: placement.footprintHeight,
+        left: placement.left,
+        top: placement.top,
+      }}
     >
-      <div className="relative bg-gray-900" style={{ height: PREVIEW_W * 1.4 }}>
+      <motion.div
+        className="absolute left-1/2 top-1/2 overflow-hidden rounded-xl border border-gray-700 shadow-2xl"
+        style={{ width: PREVIEW_W, x: "-50%", y: "-50%" }}
+        initial={{
+          opacity: 0,
+          scale: placement.scale * 0.93,
+          rotate: rotateQuarterTurn ? 90 : 0,
+        }}
+        animate={{
+          opacity: 1,
+          scale: placement.scale,
+          rotate: rotateQuarterTurn ? 90 : 0,
+        }}
+        exit={{
+          opacity: 0,
+          scale: placement.scale * 0.93,
+          rotate: rotateQuarterTurn ? 90 : 0,
+        }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
+      >
+        <div className="relative bg-gray-900" style={{ height: PREVIEW_W * 1.4 }}>
         {/* 网格缩略图仅约 6KB，先即时显示；原图就绪后再平滑覆盖。 */}
         <NextImage
           src={thumbSrc(rawSprite)}
@@ -100,9 +123,9 @@ export default function CardHoverPreview({
         {colorStyle && (
           <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${colorStyle.bg}`} />
         )}
-      </div>
+        </div>
 
-      <div className="bg-gray-900 p-2.5 flex flex-col gap-1.5">
+        <div className="bg-gray-900 p-2.5 flex flex-col gap-1.5">
         <p className="text-white font-bold text-sm leading-tight">{card.name}</p>
 
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -152,7 +175,8 @@ export default function CardHoverPreview({
             ))}
           </div>
         )}
-      </div>
-    </motion.div>
+        </div>
+      </motion.div>
+    </div>
   );
 }

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ContainerResponsiveProvider } from "@/components/ui/ResponsiveScope";
+import {
+  ContainerResponsiveProvider,
+  LayoutQuarterTurnProvider,
+} from "@/components/ui/ResponsiveScope";
 import { calculateLayoutScale } from "@/lib/gameLayout";
 
 export type LayoutPreviewMode = "desktop" | "mobile-landscape" | "mobile-portrait";
@@ -145,7 +148,9 @@ export default function LayoutPreviewFrame({
               }
         }
       >
-        <ContainerResponsiveProvider>{children}</ContainerResponsiveProvider>
+        <LayoutQuarterTurnProvider rotateQuarterTurn={rotateQuarterTurn}>
+          <ContainerResponsiveProvider>{children}</ContainerResponsiveProvider>
+        </LayoutQuarterTurnProvider>
       </div>
     </div>
   );
