@@ -9,6 +9,7 @@ import type {
   MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
+  CardBackGalleryItem,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -81,6 +82,7 @@ interface NetStore {
   leaderMatchupMatrix: MsgLeaderMatchupMatrix | null;
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
+  cardBackGallery: CardBackGalleryItem[] | null;
   // 收到的对战邀请（被邀请方弹窗用）
   incomingInvite: IncomingInvite | null;
   // 友谊战房间（非 null 时大厅显示房间界面）
@@ -114,6 +116,7 @@ interface NetStore {
   clearLeaderMatchups: () => void;
   setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
+  setCardBackGallery: (items: CardBackGalleryItem[] | null) => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
@@ -147,6 +150,7 @@ const initialState = {
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
+  cardBackGallery: null as CardBackGalleryItem[] | null,
   incomingInvite: null as IncomingInvite | null,
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
@@ -214,6 +218,8 @@ export const useNetStore = create<NetStore>((set) => ({
   setLeaderMatchupMatrix: (leaderMatchupMatrix) => set({ leaderMatchupMatrix }),
 
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
+
+  setCardBackGallery: (cardBackGallery) => set({ cardBackGallery }),
 
   setIncomingInvite: (inv) => set({ incomingInvite: inv }),
 

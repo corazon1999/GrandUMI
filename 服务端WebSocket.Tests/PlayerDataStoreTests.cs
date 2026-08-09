@@ -101,12 +101,60 @@ public sealed class PlayerDataStoreTests : IDisposable
         var store = CreateStore();
         store.Login("Alice");
 
-        var updated = store.UpdateCardBack("Alice", "straw-hat");
+        var updated = store.UpdateCardBack("Alice", "straw-hat").Snapshot;
         var reloaded = store.Login("alice");
 
         Assert.Equal("straw-hat", updated.CardBackId);
         Assert.Equal("straw-hat", reloaded.CardBackId);
         Assert.Throws<PlayerDataValidationException>(() => store.UpdateCardBack("Alice", "https://example.com/back.png"));
+    }
+
+    [Fact]
+    public void CardBackGallery_上传命名点赞排序与选用自动点赞形成闭环()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+
+        store.UploadCardBack("Alice", "海上日出", "image/png", TinyPngBase64());
+        store.UploadCardBack("Bob", "月下航路", "image/png", TinyPngBase64());
+        var before = store.GetCardBackGallery("Alice");
+        var aliceBack = Assert.Single(before, item => item.Name == "海上日出");
+        var bobBack = Assert.Single(before, item => item.Name == "月下航路");
+        Assert.True(aliceBack.Owned);
+        Assert.False(bobBack.Liked);
+
+        var selected = store.UpdateCardBack("Alice", bobBack.Id);
+        Assert.Equal(bobBack.Id, selected.Snapshot.CardBackId);
+        var selectedItem = Assert.Single(selected.Gallery, item => item.Id == bobBack.Id);
+        Assert.True(selectedItem.Liked);
+        Assert.Equal(1, selectedItem.Likes);
+
+        store.ToggleCardBackLike("Bob", bobBack.Id);
+        var ranked = store.GetCardBackGallery("Alice");
+        Assert.Equal(bobBack.Id, ranked[0].Id);
+        Assert.Equal(2, ranked[0].Likes);
+        Assert.Equal(bobBack.Id, store.Login("alice").CardBackId);
+
+        var numericId = long.Parse(bobBack.Id["custom-".Length..]);
+        var image = store.GetCardBackImage(numericId);
+        Assert.NotNull(image);
+        Assert.Equal("image/png", image.MimeType);
+        Assert.NotEmpty(image.Data);
+    }
+
+    [Fact]
+    public void CardBackGallery_拒绝重名伪造类型过大图片与不存在卡背()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.UploadCardBack("Alice", "远航", "image/png", TinyPngBase64());
+
+        Assert.Throws<PlayerDataValidationException>(() => store.UploadCardBack("Alice", "远航", "image/png", TinyPngBase64()));
+        Assert.Throws<PlayerDataValidationException>(() => store.UploadCardBack("Alice", "伪图", "image/jpeg", TinyPngBase64()));
+        Assert.Throws<PlayerDataValidationException>(() => store.UploadCardBack(
+            "Alice", "过大", "image/png", Convert.ToBase64String(new byte[PlayerDataStore.MaxCardBackImageBytes + 1])));
+        Assert.Throws<PlayerDataValidationException>(() => store.UpdateCardBack("Alice", "custom-999999"));
     }
 
     [Fact]
@@ -246,5 +294,14 @@ public sealed class PlayerDataStoreTests : IDisposable
     public void Dispose()
     {
         if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);
+    }
+
+    private static string TinyPngBase64()
+    {
+        byte[] bytes = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        ];
+        return Convert.ToBase64String(bytes);
     }
 }

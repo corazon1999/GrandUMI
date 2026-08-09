@@ -226,6 +226,9 @@ public static class WebSocketBridge
             case "MsgSelectDeck":  OnSelectDeck(session, msg);   break;
             case "MsgUpdateProfile": OnUpdateProfile(session, msg); break;
             case "MsgUpdateCardBack": OnUpdateCardBack(session, msg); break;
+            case "MsgCardBackGallery": OnCardBackGallery(session); break;
+            case "MsgUploadCardBack": OnUploadCardBack(session, msg); break;
+            case "MsgLikeCardBack": OnLikeCardBack(session, msg); break;
             case "MsgImportDecks": OnImportDecks(session, msg);  break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
@@ -455,11 +458,45 @@ public static class WebSocketBridge
         if (!TryRequirePlayer(s)) return;
         try
         {
-            var snapshot = _playerDataStore.UpdateCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
-            s.CardBackId = snapshot.CardBackId;
-            SendPlayerData(s, snapshot, "卡背已保存");
+            var result = _playerDataStore.UpdateCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
+            s.CardBackId = result.Snapshot.CardBackId;
+            SendPlayerData(s, result.Snapshot, "卡背已保存并点亮了红心");
+            SendCardBackGallery(s, result.Gallery);
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "保存卡背失败"); }
+    }
+
+    private static void OnCardBackGallery(WsSession s)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try { SendCardBackGallery(s, _playerDataStore.GetCardBackGallery(s.Account!)); }
+        catch (Exception ex) { SendCardBackGalleryError(s, ex, "读取卡背广场失败"); }
+    }
+
+    private static void OnUploadCardBack(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var gallery = _playerDataStore.UploadCardBack(
+                s.Account!,
+                Str(msg, "name") ?? "",
+                Str(msg, "mimeType") ?? "",
+                Str(msg, "imageBase64") ?? "");
+            SendCardBackGallery(s, gallery, "卡背已发布到广场");
+        }
+        catch (Exception ex) { SendCardBackGalleryError(s, ex, "上传卡背失败"); }
+    }
+
+    private static void OnLikeCardBack(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            var gallery = _playerDataStore.ToggleCardBackLike(s.Account!, Str(msg, "cardBackId") ?? "");
+            SendCardBackGallery(s, gallery);
+        }
+        catch (Exception ex) { SendCardBackGalleryError(s, ex, "更新红心失败"); }
     }
 
     private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)
@@ -2226,6 +2263,39 @@ public static class WebSocketBridge
         if (exception is not PlayerDataValidationException)
             LogErr($"{fallback} {session.Account}: {exception.Message}");
         Send(session.SessionId, new { proto, result = false, logStr = message });
+    }
+
+    private static void SendCardBackGallery(
+        WsSession session,
+        IReadOnlyList<CardBackGalleryItem> items,
+        string? logStr = null)
+    {
+        var payloadItems = items.Select(item => new
+        {
+            id = item.Id,
+            name = item.Name,
+            authorName = item.AuthorName,
+            imageUrl = item.ImageUrl,
+            likes = item.Likes,
+            liked = item.Liked,
+            owned = item.Owned,
+            createdAt = item.CreatedAt,
+        }).ToArray();
+        Send(session.SessionId, new
+        {
+            proto = "MsgCardBackGallery",
+            result = true,
+            logStr,
+            items = payloadItems,
+        });
+    }
+
+    private static void SendCardBackGalleryError(WsSession session, Exception exception, string fallback)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : fallback;
+        if (exception is not PlayerDataValidationException)
+            LogErr($"{fallback} {session.Account}: {exception.Message}");
+        Send(session.SessionId, new { proto = "MsgCardBackGallery", result = false, logStr = message });
     }
 
     private static void SendPlayerDataError(WsSession session, Exception exception, string fallback)

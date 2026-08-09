@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
     deviceSizes: [64, 112, 160, 256, 384],
     imageSizes: [64, 112, 160, 256],
   },
+  async rewrites() {
+    const cardBackApiUrl = process.env.CARD_BACK_API_URL ?? "http://127.0.0.1:8080";
+    return [
+      {
+        source: "/card-back-images/:id(\\d+)",
+        destination: `${cardBackApiUrl}/card-back-images/:id`,
+      },
+    ];
+  },
   // 卡牌总包用「内容哈希 ?v= 做缓存击穿」，可永久缓存：
   // 内容不变浏览器走磁盘缓存（零网络），改卡后哈希变会自动重新下载。
   async headers() {

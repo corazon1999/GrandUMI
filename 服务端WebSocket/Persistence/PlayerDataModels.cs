@@ -45,6 +45,23 @@ public sealed record PlayerDataSnapshot(
     string? SelectedDeckName,
     IReadOnlyList<StoredDeck> Decks);
 
+/// <summary>卡背广场中的玩家投稿（图片本体通过只读 HTTP 地址按需获取）。</summary>
+public sealed record CardBackGalleryItem(
+    string Id,
+    string Name,
+    string AuthorName,
+    string ImageUrl,
+    int Likes,
+    bool Liked,
+    bool Owned,
+    long CreatedAt);
+
+public sealed record CardBackImage(string MimeType, byte[] Data);
+
+public sealed record CardBackSelectionResult(
+    PlayerDataSnapshot Snapshot,
+    IReadOnlyList<CardBackGalleryItem> Gallery);
+
 public sealed record DeckImportResult(PlayerDataSnapshot Snapshot, int Imported, int Renamed, int Skipped);
 
 /// <summary>好友列表中的持久化玩家资料。</summary>

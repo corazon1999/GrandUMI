@@ -106,7 +106,7 @@ if [[ "$need_front" == 1 ]]; then
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
-  if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' npm run build; then
+  if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' CARD_BACK_API_URL='http://127.0.0.1:8081' npm run build; then
     systemctl restart grandumi-test-frontend.service
     systemctl is-active --quiet grandumi-test-frontend.service || die "测试服前端启动失败。"
     rm -rf .next.previous

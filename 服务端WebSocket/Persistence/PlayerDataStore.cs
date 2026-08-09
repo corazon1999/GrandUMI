@@ -26,6 +26,11 @@ public sealed class PlayerDataStore
     public const int MaxDeckNameLength = 50;
     public const int MaxAvatarLength = 300;
     public const int MaxSpritePathLength = 500;
+    public const int MaxCardBackNameLength = 30;
+    public const int MaxCardBackImageBytes = 240 * 1024;
+    public const int MaxCardBacksPerPlayer = 20;
+    public const int MaxCardBackGalleryItems = 100;
+    private const string CustomCardBackPrefix = "custom-";
 
     private readonly string _databasePath;
     private readonly string _connectionString;
@@ -147,7 +152,29 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_friend_requests_sender
                 ON friend_requests(sender_id, created_at DESC);
 
-            PRAGMA user_version=2;
+            CREATE TABLE IF NOT EXISTS card_backs (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                name            TEXT NOT NULL COLLATE NOCASE,
+                image_mime      TEXT NOT NULL,
+                image_data      BLOB NOT NULL,
+                created_at      INTEGER NOT NULL,
+                UNIQUE(owner_player_id, name)
+            );
+
+            CREATE TABLE IF NOT EXISTS card_back_likes (
+                card_back_id INTEGER NOT NULL REFERENCES card_backs(id) ON DELETE CASCADE,
+                player_id    INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                created_at   INTEGER NOT NULL,
+                PRIMARY KEY(card_back_id, player_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_card_back_likes_card
+                ON card_back_likes(card_back_id);
+            CREATE INDEX IF NOT EXISTS ix_card_backs_created
+                ON card_backs(created_at DESC);
+
+            PRAGMA user_version=3;
             """;
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
@@ -553,13 +580,19 @@ public sealed class PlayerDataStore
         return snapshot;
     }
 
-    /// <summary>保存账号卡背；只接受服务端内置 ID，禁止客户端注入任意资源路径。</summary>
-    public PlayerDataSnapshot UpdateCardBack(string account, string cardBackId)
+    /// <summary>保存账号卡背；选用玩家投稿时会幂等地补上点赞。</summary>
+    public CardBackSelectionResult UpdateCardBack(string account, string cardBackId)
     {
-        var normalizedCardBackId = NormalizeCardBackId(cardBackId);
+        var normalizedCardBackId = NormalizeCardBackReference(cardBackId);
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         var playerId = RequirePlayerId(connection, transaction, account);
+
+        if (TryParseCustomCardBackId(normalizedCardBackId, out var customId))
+        {
+            RequireCardBack(connection, transaction, customId);
+            AddCardBackLike(connection, transaction, customId, playerId);
+        }
 
         using var update = connection.CreateCommand();
         update.Transaction = transaction;
@@ -570,8 +603,9 @@ public sealed class PlayerDataStore
         update.ExecuteNonQuery();
 
         var snapshot = LoadSnapshot(connection, transaction, playerId);
+        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
         transaction.Commit();
-        return snapshot;
+        return new CardBackSelectionResult(snapshot, gallery);
     }
 
     public static string NormalizeCardBackId(string? cardBackId)
@@ -580,6 +614,211 @@ public sealed class PlayerDataStore
         if (!ValidCardBackIds.Contains(normalized))
             throw new PlayerDataValidationException("请选择有效的卡背。");
         return normalized;
+    }
+
+    public IReadOnlyList<CardBackGalleryItem> GetCardBackGallery(string account, int limit = MaxCardBackGalleryItems)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        var gallery = LoadCardBackGallery(connection, transaction, playerId, Math.Clamp(limit, 1, MaxCardBackGalleryItems));
+        transaction.Commit();
+        return gallery;
+    }
+
+    public IReadOnlyList<CardBackGalleryItem> UploadCardBack(
+        string account,
+        string name,
+        string mimeType,
+        string imageBase64)
+    {
+        var normalizedName = ValidateCardBackName(name);
+        var normalizedMime = NormalizeCardBackMime(mimeType);
+        byte[] imageData;
+        try { imageData = Convert.FromBase64String((imageBase64 ?? "").Trim()); }
+        catch (FormatException) { throw new PlayerDataValidationException("卡背图片数据无效。"); }
+        ValidateCardBackImage(normalizedMime, imageData);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        using (var count = connection.CreateCommand())
+        {
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(*) FROM card_backs WHERE owner_player_id=$playerId;";
+            count.Parameters.AddWithValue("$playerId", playerId);
+            if (Convert.ToInt32(count.ExecuteScalar(), CultureInfo.InvariantCulture) >= MaxCardBacksPerPlayer)
+                throw new PlayerDataValidationException($"每位玩家最多上传 {MaxCardBacksPerPlayer} 款卡背。");
+        }
+
+        try
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO card_backs(owner_player_id, name, image_mime, image_data, created_at)
+                VALUES($playerId, $name, $mime, $data, $now);
+                """;
+            insert.Parameters.AddWithValue("$playerId", playerId);
+            insert.Parameters.AddWithValue("$name", normalizedName);
+            insert.Parameters.AddWithValue("$mime", normalizedMime);
+            insert.Parameters.Add("$data", SqliteType.Blob).Value = imageData;
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            insert.ExecuteNonQuery();
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
+        {
+            throw new PlayerDataValidationException("你已经上传过同名卡背，请换一个名字。");
+        }
+
+        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
+        transaction.Commit();
+        return gallery;
+    }
+
+    public IReadOnlyList<CardBackGalleryItem> ToggleCardBackLike(string account, string cardBackId)
+    {
+        var normalized = NormalizeCardBackReference(cardBackId);
+        if (!TryParseCustomCardBackId(normalized, out var customId))
+            throw new PlayerDataValidationException("只能为广场中的玩家卡背点赞。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        RequireCardBack(connection, transaction, customId);
+
+        using var remove = connection.CreateCommand();
+        remove.Transaction = transaction;
+        remove.CommandText = "DELETE FROM card_back_likes WHERE card_back_id=$cardBackId AND player_id=$playerId;";
+        remove.Parameters.AddWithValue("$cardBackId", customId);
+        remove.Parameters.AddWithValue("$playerId", playerId);
+        if (remove.ExecuteNonQuery() == 0) AddCardBackLike(connection, transaction, customId, playerId);
+
+        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
+        transaction.Commit();
+        return gallery;
+    }
+
+    public CardBackImage? GetCardBackImage(long id)
+    {
+        if (id <= 0) return null;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT image_mime, image_data FROM card_backs WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", id);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new CardBackImage(reader.GetString(0), (byte[])reader[1]) : null;
+    }
+
+    private static string NormalizeCardBackReference(string? cardBackId)
+    {
+        var normalized = (cardBackId ?? "").Trim().ToLowerInvariant();
+        if (ValidCardBackIds.Contains(normalized) || TryParseCustomCardBackId(normalized, out _)) return normalized;
+        throw new PlayerDataValidationException("请选择有效的卡背。");
+    }
+
+    private static bool TryParseCustomCardBackId(string value, out long id)
+    {
+        id = 0;
+        return value.StartsWith(CustomCardBackPrefix, StringComparison.Ordinal)
+            && long.TryParse(value.AsSpan(CustomCardBackPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out id)
+            && id > 0;
+    }
+
+    private static string ValidateCardBackName(string? name)
+    {
+        var normalized = (name ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalized.Length is < 1 or > MaxCardBackNameLength)
+            throw new PlayerDataValidationException($"卡背名字长度需为 1–{MaxCardBackNameLength} 个字符。");
+        if (normalized.Any(char.IsControl)) throw new PlayerDataValidationException("卡背名字不能包含控制字符。");
+        return normalized;
+    }
+
+    private static string NormalizeCardBackMime(string? mimeType) => (mimeType ?? "").Trim().ToLowerInvariant() switch
+    {
+        "image/png" => "image/png",
+        "image/jpeg" => "image/jpeg",
+        "image/webp" => "image/webp",
+        _ => throw new PlayerDataValidationException("卡背图片仅支持 PNG、JPEG 或 WebP。"),
+    };
+
+    private static void ValidateCardBackImage(string mimeType, byte[] data)
+    {
+        if (data.Length is < 16 or > MaxCardBackImageBytes)
+            throw new PlayerDataValidationException($"卡背图片需小于 {MaxCardBackImageBytes / 1024}KB。");
+        var valid = mimeType switch
+        {
+            "image/png" => data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47
+                && data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A,
+            "image/jpeg" => data[0] == 0xFF && data[1] == 0xD8 && data[^2] == 0xFF && data[^1] == 0xD9,
+            "image/webp" => data.AsSpan(0, 4).SequenceEqual("RIFF"u8) && data.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+            _ => false,
+        };
+        if (!valid) throw new PlayerDataValidationException("卡背图片内容与文件类型不匹配。");
+    }
+
+    private static void RequireCardBack(SqliteConnection connection, SqliteTransaction transaction, long cardBackId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT 1 FROM card_backs WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", cardBackId);
+        if (command.ExecuteScalar() is null) throw new PlayerDataValidationException("该卡背不存在或已下架。");
+    }
+
+    private static void AddCardBackLike(SqliteConnection connection, SqliteTransaction transaction, long cardBackId, long playerId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT OR IGNORE INTO card_back_likes(card_back_id, player_id, created_at)
+            VALUES($cardBackId, $playerId, $now);
+            """;
+        command.Parameters.AddWithValue("$cardBackId", cardBackId);
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        command.ExecuteNonQuery();
+    }
+
+    private static IReadOnlyList<CardBackGalleryItem> LoadCardBackGallery(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId,
+        int limit)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT cb.id, cb.name, p.display_name, cb.created_at,
+                   COUNT(l.player_id) AS likes,
+                   MAX(CASE WHEN l.player_id=$playerId THEN 1 ELSE 0 END) AS liked,
+                   CASE WHEN cb.owner_player_id=$playerId THEN 1 ELSE 0 END AS owned
+            FROM card_backs cb
+            JOIN players p ON p.id=cb.owner_player_id
+            LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
+            GROUP BY cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id
+            ORDER BY likes DESC, cb.created_at DESC, cb.id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$limit", limit);
+        var items = new List<CardBackGalleryItem>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var id = reader.GetInt64(0);
+            items.Add(new CardBackGalleryItem(
+                $"{CustomCardBackPrefix}{id}",
+                reader.GetString(1),
+                reader.GetString(2),
+                $"/card-back-images/{id}",
+                reader.GetInt32(4),
+                reader.GetInt32(5) != 0,
+                reader.GetInt32(6) != 0,
+                reader.GetInt64(3)));
+        }
+        return items;
     }
 
     public int PendingLoginWrites => _pendingLoginTouches.Count;

@@ -49,6 +49,9 @@ export enum ProtocolEnum {
   MsgFriendRespond = 44,
   MsgFriendRemove = 45,
   MsgFriendCancel = 46,
+  MsgCardBackGallery = 47,
+  MsgUploadCardBack = 48,
+  MsgLikeCardBack = 49,
 }
 
 // WebSocket JSON 消息基类
@@ -139,6 +142,37 @@ export interface MsgUpdateProfile extends MsgBase {
 
 export interface MsgUpdateCardBack extends MsgBase {
   proto: "MsgUpdateCardBack";
+  cardBackId: string;
+}
+
+export interface CardBackGalleryItem {
+  id: string;
+  name: string;
+  authorName: string;
+  imageUrl: string;
+  likes: number;
+  liked: boolean;
+  owned: boolean;
+  createdAt: number;
+}
+
+/** 客户端空请求读取广场；服务端返回按红心数量排序后的投稿。 */
+export interface MsgCardBackGallery extends MsgBase {
+  proto: "MsgCardBackGallery";
+  result?: boolean;
+  logStr?: string;
+  items?: CardBackGalleryItem[];
+}
+
+export interface MsgUploadCardBack extends MsgBase {
+  proto: "MsgUploadCardBack";
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  imageBase64: string;
+}
+
+export interface MsgLikeCardBack extends MsgBase {
+  proto: "MsgLikeCardBack";
   cardBackId: string;
 }
 
@@ -829,6 +863,9 @@ export type AnyMsg =
   | MsgSelectDeck
   | MsgUpdateProfile
   | MsgUpdateCardBack
+  | MsgCardBackGallery
+  | MsgUploadCardBack
+  | MsgLikeCardBack
   | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch

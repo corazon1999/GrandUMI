@@ -21,16 +21,24 @@ export const CARD_BACK_OPTIONS = [
   },
 ] as const;
 
-export type CardBackId = (typeof CARD_BACK_OPTIONS)[number]["id"];
-export const DEFAULT_CARD_BACK_ID: CardBackId = "classic";
+export type CardBackId = string;
+export const DEFAULT_CARD_BACK_ID = "classic";
 
 const CARD_BACK_IDS = new Set<string>(CARD_BACK_OPTIONS.map((option) => option.id));
 
 export function normalizeCardBackId(value: string | null | undefined): CardBackId {
-  return CARD_BACK_IDS.has(value ?? "") ? (value as CardBackId) : DEFAULT_CARD_BACK_ID;
+  return CARD_BACK_IDS.has(value ?? "") || /^custom-[1-9]\d*$/.test(value ?? "")
+    ? (value as CardBackId)
+    : DEFAULT_CARD_BACK_ID;
 }
 
 export function cardBackName(value: string | null | undefined): string {
   const id = normalizeCardBackId(value);
-  return CARD_BACK_OPTIONS.find((option) => option.id === id)?.name ?? "经典";
+  return CARD_BACK_OPTIONS.find((option) => option.id === id)?.name ?? "玩家卡背";
+}
+
+export function cardBackImageSrc(value: string | null | undefined): string | null {
+  const id = normalizeCardBackId(value);
+  const match = /^custom-([1-9]\d*)$/.exec(id);
+  return match ? `/card-back-images/${match[1]}` : null;
 }

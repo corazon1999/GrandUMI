@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { cardBackName, normalizeCardBackId } from "@/lib/cardBacks";
+import { cardBackImageSrc, cardBackName, normalizeCardBackId } from "@/lib/cardBacks";
 
 const themes = {
   classic: {
@@ -46,7 +46,21 @@ export default function CardBack({
   decorative?: boolean;
 }) {
   const id = normalizeCardBackId(cardBackId);
-  const theme = themes[id];
+  const customImage = cardBackImageSrc(id);
+  if (customImage) {
+    return (
+      <div
+        className={clsx("relative h-full w-full overflow-hidden rounded-[inherit] border-2 border-white/35 bg-gray-950 shadow-inner", className)}
+        role={decorative ? undefined : "img"}
+        aria-hidden={decorative || undefined}
+        aria-label={decorative ? undefined : `${cardBackName(id)}卡背`}
+      >
+        <img src={customImage} alt="" draggable={false} className="h-full w-full object-cover" />
+        <div className="pointer-events-none absolute inset-[4%] rounded-[8%] border border-white/20" />
+      </div>
+    );
+  }
+  const theme = themes[id as keyof typeof themes] ?? themes.classic;
 
   return (
     <div

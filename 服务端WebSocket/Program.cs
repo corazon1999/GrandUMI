@@ -99,6 +99,19 @@ app.MapGet("/metrics", () => Results.Text(
     ServerMetrics.RenderPrometheus(playerDataStore),
     "text/plain; version=0.0.4; charset=utf-8"));
 
+app.MapGet("/card-back-images/{id:long}", (long id, HttpContext context) =>
+{
+    var image = playerDataStore.GetCardBackImage(id);
+    if (image is not null)
+    {
+        context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+    }
+    return image is null
+        ? Results.NotFound()
+        : Results.File(image.Data, image.MimeType, lastModified: null, entityTag: null, enableRangeProcessing: false);
+});
+
 app.Map("/ws", async context =>
 {
     if (!context.WebSockets.IsWebSocketRequest)

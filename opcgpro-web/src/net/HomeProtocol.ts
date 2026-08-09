@@ -21,6 +21,9 @@ import type {
   MsgSelectDeck,
   MsgUpdateProfile,
   MsgUpdateCardBack,
+  MsgCardBackGallery,
+  MsgUploadCardBack,
+  MsgLikeCardBack,
   MsgImportDecks,
   MsgAddAccount,
   MsgUpdatePs,
@@ -187,6 +190,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgPlayerProfileStats":
         handlePlayerProfileStats(msg as MsgPlayerProfileStats);
+        break;
+      case "MsgCardBackGallery":
+        handleCardBackGallery(msg as MsgCardBackGallery);
         break;
       case "MsgInvitePlayer":
         handleInvitePlayer(msg as MsgInvitePlayer);
@@ -574,6 +580,17 @@ function handlePlayerProfileStats(msg: MsgPlayerProfileStats) {
   if (msg.result === false && msg.error) showMessage(msg.error, "error");
 }
 
+function handleCardBackGallery(msg: MsgCardBackGallery) {
+  if (msg.result === false) {
+    const current = useNetStore.getState().cardBackGallery;
+    useNetStore.getState().setCardBackGallery(current ? [...current] : []);
+    showMessage(msg.logStr ?? "卡背广场操作失败", "error");
+    return;
+  }
+  useNetStore.getState().setCardBackGallery(Array.isArray(msg.items) ? msg.items : []);
+  if (msg.logStr) showMessage(msg.logStr, "info");
+}
+
 /** MsgInvitePlayer — 发起邀请的回执（给发起方） */
 function handleInvitePlayer(msg: MsgInvitePlayer) {
   if (msg.result === false) {
@@ -695,6 +712,19 @@ export const HomeRequest = {
 
   updateCardBack(cardBackId: string) {
     return NetManager.send({ proto: "MsgUpdateCardBack", cardBackId } as MsgUpdateCardBack);
+  },
+
+  requestCardBackGallery() {
+    useNetStore.getState().setCardBackGallery(null);
+    return NetManager.send({ proto: "MsgCardBackGallery" } as MsgCardBackGallery);
+  },
+
+  uploadCardBack(name: string, mimeType: MsgUploadCardBack["mimeType"], imageBase64: string) {
+    return NetManager.send({ proto: "MsgUploadCardBack", name, mimeType, imageBase64 } as MsgUploadCardBack);
+  },
+
+  toggleCardBackLike(cardBackId: string) {
+    return NetManager.send({ proto: "MsgLikeCardBack", cardBackId } as MsgLikeCardBack);
   },
 
   importDecks(decks: SavedDeck[]) {

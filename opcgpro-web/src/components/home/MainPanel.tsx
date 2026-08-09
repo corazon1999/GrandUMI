@@ -26,8 +26,9 @@ import { useVirtualList } from "@/hooks/useVirtualList";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
 import ProfilePanel from "./ProfilePanel";
+import CardBackPlazaPanel from "./CardBackPlazaPanel";
 
-type View = "lobby" | "deck" | "catalog" | "leaderboard" | "history" | "profile";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
@@ -314,6 +315,9 @@ function MobileNavIcon({ view }: { view: Exclude<View, "history"> }) {
   if (view === "leaderboard") {
     return <><path d="M5 20v-6h4v6M10 20V8h4v12M15 20V4h4v16" /><path d="M3 20h18" /></>;
   }
+  if (view === "cardBackPlaza") {
+    return <><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 16h6" /><path d="M12 10.5c-1.7-2-4.5.6 0 4 4.5-3.4 1.7-6 0-4Z" /></>;
+  }
   return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
 }
 
@@ -375,6 +379,7 @@ export default function MainPanel() {
     { view: "deck", label: "卡组" },
     { view: "catalog", label: "图鉴" },
     { view: "leaderboard", label: "排行" },
+    { view: "cardBackPlaza", label: "卡背" },
     { view: "profile", label: "我的" },
   ];
 
@@ -467,6 +472,12 @@ export default function MainPanel() {
             Leader榜
           </button>
           <button
+            onClick={() => setView("cardBackPlaza")}
+            className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "cardBackPlaza" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+          >
+            卡背广场
+          </button>
+          <button
             onClick={() => setView("profile")}
             className={`h-10 w-full rounded-xl text-sm font-bold transition-colors ${view === "profile" ? "bg-orange-500 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
           >
@@ -503,6 +514,7 @@ export default function MainPanel() {
           {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
           {view === "catalog" && <CardCatalogPanel />}
           {view === "leaderboard" && <LeaderLeaderboardPanel />}
+          {view === "cardBackPlaza" && <CardBackPlazaPanel onOpenProfile={() => setView("profile")} />}
           {view === "history" && <HistoryPanel />}
           {view === "profile" && (
             <ProfilePanel
@@ -518,7 +530,7 @@ export default function MainPanel() {
 
       <nav
         aria-label="主要导航"
-        className="grid h-16 shrink-0 grid-cols-5 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
+        className="grid h-16 shrink-0 grid-cols-6 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
       >
         {mobileNavItems.map((item) => {
           const active = activeMobileView === item.view;
