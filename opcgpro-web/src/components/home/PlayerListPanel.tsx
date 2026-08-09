@@ -16,6 +16,9 @@ const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> 
 export default function PlayerListPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const players = useNetStore((s) => s.playerList);
   const account = useNetStore((s) => s.account);
+  const friends = useNetStore((s) => s.friends);
+  const incomingRequests = useNetStore((s) => s.incomingFriendRequests);
+  const outgoingRequests = useNetStore((s) => s.outgoingFriendRequests);
   const spectateState = useNetStore((s) => s.spectateState);
   const spectateRoomId = useNetStore((s) => s.spectateRoomId);
   const [search, setSearch] = useState("");
@@ -42,6 +45,14 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
       })
       .map(({ player }) => player);
   }, [players, search]);
+
+  const relationships = useMemo(() => {
+    const result = new Map<string, { kind: "friend" | "incoming" | "outgoing"; requestId?: number }>();
+    for (const friend of friends) result.set(friend.account.toLocaleLowerCase("zh-CN"), { kind: "friend" });
+    for (const request of incomingRequests) result.set(request.account.toLocaleLowerCase("zh-CN"), { kind: "incoming", requestId: request.id });
+    for (const request of outgoingRequests) result.set(request.account.toLocaleLowerCase("zh-CN"), { kind: "outgoing", requestId: request.id });
+    return result;
+  }, [friends, incomingRequests, outgoingRequests]);
 
   const handleInvite = (p: PlayerInfo) => {
     HomeRequest.invitePlayer(p.account);
@@ -78,6 +89,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
             visiblePlayers.map((p) => {
               const isMe = p.account === account;
               const st = STATUS_LABEL[p.status] ?? STATUS_LABEL.idle;
+              const relationship = relationships.get(p.account.toLocaleLowerCase("zh-CN"));
               return (
                 <div
                   key={p.account}
@@ -88,30 +100,55 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                       {p.name}
                       {isMe && <span className="text-orange-400 text-[10px] ml-1">（我）</span>}
                     </p>
+                    <p className="truncate text-[10px] text-gray-500">@{p.account}</p>
                     <p className={`text-[10px] ${st.cls}`}>{st.text}</p>
                   </div>
                   {!isMe && (
-                    p.status === "playing" && p.roomId ? (
-                      <button
-                        onClick={() => handleSpectate(p)}
-                        disabled={spectateState === "joining"}
-                        className="min-h-11 rounded-lg bg-purple-600 px-3 text-sm font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
-                      >
-                        {spectateState === "joining" && spectateRoomId === p.roomId ? "进入中…" : "观战"}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleInvite(p)}
-                        disabled={p.status !== "idle"}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${
-                          p.status === "idle"
-                            ? "bg-orange-500 hover:bg-orange-400 text-white"
-                            : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        邀请对战
-                      </button>
-                    )
+                    <div className="flex max-w-48 flex-wrap justify-end gap-1">
+                      {!relationship && (
+                        <button
+                          type="button"
+                          onClick={() => HomeRequest.sendFriendRequest(p.account)}
+                          className="min-h-11 rounded-lg bg-sky-700 px-3 text-xs font-bold text-white transition-colors hover:bg-sky-600"
+                        >
+                          添加好友
+                        </button>
+                      )}
+                      {relationship?.kind === "friend" && <span className="flex min-h-11 items-center px-2 text-xs font-bold text-emerald-400">已是好友</span>}
+                      {relationship?.kind === "outgoing" && <span className="flex min-h-11 items-center px-2 text-xs font-bold text-amber-400">已申请</span>}
+                      {relationship?.kind === "incoming" && relationship.requestId && (
+                        <button
+                          type="button"
+                          onClick={() => HomeRequest.respondFriendRequest(relationship.requestId!, true)}
+                          className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white transition-colors hover:bg-emerald-600"
+                        >
+                          接受好友
+                        </button>
+                      )}
+                      {p.status === "playing" && p.roomId ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSpectate(p)}
+                          disabled={spectateState === "joining"}
+                          className="min-h-11 rounded-lg bg-purple-600 px-3 text-sm font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
+                        >
+                          {spectateState === "joining" && spectateRoomId === p.roomId ? "进入中…" : "观战"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleInvite(p)}
+                          disabled={p.status !== "idle"}
+                          className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${
+                            p.status === "idle"
+                              ? "bg-orange-500 hover:bg-orange-400 text-white"
+                              : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          邀请对战
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -120,7 +157,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
         </div>
       </div>
       <p className="mt-3 text-center text-sm leading-5 text-gray-500">
-        邀请对方接受后，双方进入友谊战房间再选卡组
+        可以直接添加好友；邀请对方接受后，双方进入友谊战房间再选卡组
       </p>
     </Modal>
   );

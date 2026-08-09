@@ -201,6 +201,8 @@ public sealed class PlayerDataStoreTests : IDisposable
         store.Login("Alice");
         store.Login("Bob");
 
+        Assert.False(store.AreFriends("Alice", "Bob"));
+
         var sent = store.SendFriendRequest("Alice", "bob");
         Assert.Single(sent.Snapshot.OutgoingRequests);
         Assert.Equal("Bob", sent.OtherAccount);
@@ -213,6 +215,8 @@ public sealed class PlayerDataStoreTests : IDisposable
         Assert.Single(accepted.Snapshot.Friends);
         Assert.Empty(accepted.Snapshot.IncomingRequests);
         Assert.Equal("Alice", accepted.OtherAccount);
+        Assert.True(store.AreFriends("Alice", "BOB"));
+        Assert.True(store.AreFriends("Bob", "alice"));
 
         var afterRestart = CreateStore().GetFriendData("Alice");
         Assert.Equal("Bob", Assert.Single(afterRestart.Friends).Account);
@@ -220,6 +224,9 @@ public sealed class PlayerDataStoreTests : IDisposable
         var removed = store.RemoveFriend("Alice", "BOB");
         Assert.Empty(removed.Snapshot.Friends);
         Assert.Empty(store.GetFriendData("Bob").Friends);
+        Assert.False(store.AreFriends("Alice", "Bob"));
+        Assert.False(store.AreFriends("Alice", "Alice"));
+        Assert.False(store.AreFriends("Alice", "Nobody"));
     }
 
     [Fact]

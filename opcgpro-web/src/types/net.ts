@@ -53,6 +53,7 @@ export enum ProtocolEnum {
   MsgUploadCardBack = 48,
   MsgLikeCardBack = 49,
   MsgDeleteCardBack = 50,
+  MsgFriendChat = 51,
 }
 
 // WebSocket JSON 消息基类
@@ -310,6 +311,30 @@ export interface MsgGameChat extends MsgBase {
 /** 客户端 → 服务器：离开结算页时退出上一场对局的赛后聊天组。 */
 export interface MsgLeaveGameChat extends MsgBase {
   proto: "MsgLeaveGameChat";
+}
+
+// 好友实时私聊。客户端只发送 toAccount/text；服务端校验好友关系后向双方回显完整消息。
+export interface MsgFriendChat extends MsgBase {
+  proto: "MsgFriendChat";
+  toAccount?: string;
+  text?: string;
+  result?: boolean;
+  logStr?: string;
+  id?: string;
+  fromAccount?: string;
+  fromName?: string;
+  toName?: string;
+  sentAt?: number;
+}
+
+export interface FriendChatMessage {
+  id: string;
+  text: string;
+  fromAccount: string;
+  fromName: string;
+  toAccount: string;
+  toName: string;
+  sentAt: number;
 }
 
 // ── 在线人数 ──────────────────────────────────────────────────────────────
@@ -905,6 +930,7 @@ export type AnyMsg =
   | MsgBugReport
   | MsgChatMsg
   | MsgGameChat
+  | MsgFriendChat
   | MsgLeaveGameChat
   | MsgLeaderLeaderboard
   | MsgLeaderMatchups

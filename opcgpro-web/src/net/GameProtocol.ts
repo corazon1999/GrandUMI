@@ -14,12 +14,14 @@ import type {
   MsgDuelOver,
   MsgActionRejected,
   MsgGameChat,
+  MsgFriendChat,
   MsgSpectatorList,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { matchRecorder } from "@/data/matchRecorder";
 import { completePendingActionLatency, completeRejectedActionLatency } from "./GameRequest";
+import { showMessage } from "@/components/ui/MessageBox";
 
 let registered = false;
 
@@ -86,6 +88,25 @@ export function registerGameProtocols() {
           fromAccount: m.fromAccount,
           fromName: m.fromName ?? "玩家",
           fromRole: m.fromRole ?? "spectator",
+        });
+        break;
+      }
+
+      case "MsgFriendChat": {
+        const m = msg as MsgFriendChat;
+        if (m.result === false) {
+          showMessage(m.logStr ?? "好友消息发送失败", "error");
+          break;
+        }
+        if (!m.id || !m.text || !m.fromAccount || !m.toAccount) break;
+        useNetStore.getState().addFriendChatMessage({
+          id: m.id,
+          text: m.text,
+          fromAccount: m.fromAccount,
+          fromName: m.fromName ?? m.fromAccount,
+          toAccount: m.toAccount,
+          toName: m.toName ?? m.toAccount,
+          sentAt: m.sentAt ?? Date.now(),
         });
         break;
       }
