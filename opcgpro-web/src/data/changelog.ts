@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-10-mobile-deck-save-viewport-release",
+    version: "2026.08.10.3",
+    date: "2026-08-10",
+    title: "手机端卡组保存修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "手机浏览器地址栏展开时，卡组编辑器底部也会同时显示“一图流导出”和“保存卡组”，保存按钮不再被裁出屏幕。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-10-login-password-memory",
     version: "2026.08.10.2",
     date: "2026-08-10",
