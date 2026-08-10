@@ -453,6 +453,8 @@ export interface FriendInfo {
   friendsSince: number;
   online: boolean;
   status: FriendPresenceStatus;
+  roomId?: string | null;
+  seatIndex?: 0 | 1 | null;
 }
 
 export interface FriendRequestInfo {

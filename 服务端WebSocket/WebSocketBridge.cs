@@ -2489,6 +2489,20 @@ public static class WebSocketBridge
         var friends = snapshot.Friends.Select(friend =>
         {
             var presence = PresenceOf(friend.Account);
+            string? roomId = null;
+            int? seatIndex = null;
+            if (presence.Status == "playing" && TryGetActiveSession(friend.Account, out var friendSession))
+            {
+                var gameRoom = GameRoomManager.GetRoomBySession(friendSession.SessionId);
+                var resolvedSeatIndex = gameRoom is null
+                    ? -1
+                    : Array.IndexOf(gameRoom.PlayerSessionIds, friendSession.SessionId);
+                if (gameRoom is not null && resolvedSeatIndex >= 0)
+                {
+                    roomId = gameRoom.RoomId;
+                    seatIndex = resolvedSeatIndex;
+                }
+            }
             return new
             {
                 account = friend.Account,
@@ -2497,6 +2511,8 @@ public static class WebSocketBridge
                 friendsSince = friend.FriendsSince,
                 online = presence.Online,
                 status = presence.Status,
+                roomId,
+                seatIndex,
             };
         }).ToArray();
         var incomingRequests = snapshot.IncomingRequests.Select(request =>

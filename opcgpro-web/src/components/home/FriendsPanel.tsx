@@ -61,6 +61,8 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
   const incoming = useNetStore((state) => state.incomingFriendRequests);
   const outgoing = useNetStore((state) => state.outgoingFriendRequests);
   const searchResults = useNetStore((state) => state.friendSearchResults);
+  const spectateState = useNetStore((state) => state.spectateState);
+  const spectateRoomId = useNetStore((state) => state.spectateRoomId);
   const [tab, setTab] = useState<Tab>("friends");
   const [query, setQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
@@ -101,6 +103,11 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
     setRemoveConfirm(null);
   };
 
+  const spectateFriend = (friend: FriendInfo) => {
+    if (!friend.roomId) return;
+    HomeRequest.spectateRoom(friend.roomId, friend.seatIndex ?? 0);
+  };
+
   const switchTab = (next: Tab) => {
     setTab(next);
     setRemoveConfirm(null);
@@ -128,14 +135,25 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
               {sortedFriends.length === 0 ? <EmptyState>还没有好友，去“添加好友”搜索账号或昵称吧</EmptyState> : sortedFriends.map((friend) => (
                 <div key={friend.account} className="flex min-h-16 items-center gap-3 rounded-xl border border-gray-800 bg-gray-900/70 p-3">
                   <PlayerIdentity name={friend.name} account={friend.account} online={friend.online} status={friend.status} />
-                  <button
-                    type="button"
-                    onClick={() => HomeRequest.invitePlayer(friend.account)}
-                    disabled={!friend.online || friend.status !== "idle"}
-                    className="min-h-11 rounded-lg bg-orange-500 px-3 text-xs font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
-                  >
-                    邀请对战
-                  </button>
+                  {friend.status === "playing" && friend.roomId ? (
+                    <button
+                      type="button"
+                      onClick={() => spectateFriend(friend)}
+                      disabled={spectateState === "joining"}
+                      className="min-h-11 rounded-lg bg-purple-600 px-3 text-xs font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
+                    >
+                      {spectateState === "joining" && spectateRoomId === friend.roomId ? "进入中…" : "观战"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => HomeRequest.invitePlayer(friend.account)}
+                      disabled={!friend.online || friend.status !== "idle"}
+                      className="min-h-11 rounded-lg bg-orange-500 px-3 text-xs font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+                    >
+                      邀请对战
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeFriend(friend)}
