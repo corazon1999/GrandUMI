@@ -412,6 +412,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
           {entryHint && matchState === "idle" && roomOperation === "idle" && (
             <p className="pb-2 text-center text-sm text-gray-500">{entryHint}</p>
           )}
+
+          <aside
+            aria-label="平台声明"
+            className="rounded-xl border border-gray-800 bg-gray-950/50 px-3 py-2.5 text-center text-xs leading-5 text-gray-500 @[640px]:px-4"
+          >
+            平台声明：本平台仅供技术学习与交流使用，不提供商品、服务或任何商业交易，亦不参与或支持任何形式的商业行为。
+          </aside>
         </div>
       </div>
 
