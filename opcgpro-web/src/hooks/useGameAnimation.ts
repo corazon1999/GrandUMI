@@ -16,7 +16,7 @@ export type AnimationEvent =
   | { type: "counter"; handIndex: number }
   | { type: "damage"; target: "leader" | "character"; success: boolean }
   | { type: "koUnit"; side: "my" | "opponent"; cardIndex: number }
-  | { type: "turnStart"; side: "my" | "opponent" }
+  | { type: "turnStart"; side: "my" | "opponent"; turnCount: number }
   | { type: "turnEnd" }
   | { type: "gameOver"; isWin: boolean };
 
@@ -31,6 +31,8 @@ export function useGameAnimation(): AnimationEvent {
   const lastAction = useGameStore((s) => s.lastAction);
   const lastActionPayload = useGameStore((s) => s.lastActionPayloadObj);
   const tick = useGameStore((s) => s.tick);
+  const currentTurn = useGameStore((s) => s.currentTurn);
+  const turnCount = useGameStore((s) => s.turnCount);
   const [event, setEvent] = useState<AnimationEvent>({ type: "none" });
   const prevTickRef = useRef<number>(-1);
 
@@ -80,8 +82,16 @@ export function useGameAnimation(): AnimationEvent {
           cardIndex: (payload.cardIndex as number) ?? 0,
         });
         break;
+      // 首回合由 MulliganComplete 开始，后续回合由 EndTurn 完成切换。
+      // 保留 TurnStart 兼容旧回放，并统一使用当前快照中的玩家视角判断回合归属。
+      case "MulliganComplete":
+      case "EndTurn":
       case "TurnStart":
-        setEvent({ type: "turnStart", side: payload.currentTurn ? "my" : "opponent" });
+        setEvent({
+          type: "turnStart",
+          side: currentTurn ? "my" : "opponent",
+          turnCount,
+        });
         break;
       case "TurnEnd":
         setEvent({ type: "turnEnd" });
@@ -92,7 +102,7 @@ export function useGameAnimation(): AnimationEvent {
       default:
         setEvent({ type: "none" });
     }
-  }, [tick, lastAction, lastActionPayload]);
+  }, [currentTurn, lastAction, lastActionPayload, tick, turnCount]);
 
   return event;
 }
