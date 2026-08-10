@@ -117,6 +117,24 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void DisplayName_MustBeUnique_ForRenamesAndNewAccounts()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        var bob = store.Login("Bob");
+        store.UpdateProfile("Alice", "Navigator", "");
+
+        var renameError = Assert.Throws<PlayerDataValidationException>(() =>
+            store.UpdateProfile("Bob", "navigator", ""));
+        Assert.Contains("昵称已被其他玩家使用", renameError.Message);
+        Assert.True(store.GetPlayerData("Bob").CanChangeDisplayName);
+
+        var accountError = Assert.Throws<PlayerDataValidationException>(() => store.Login("Navigator"));
+        Assert.Contains("昵称已被其他玩家使用", accountError.Message);
+        Assert.Equal("Bob", bob.DisplayName);
+    }
+
+    [Fact]
     public void UpdateCardBack_只接受内置卡背并跨登录持久化()
     {
         var store = CreateStore();

@@ -226,11 +226,14 @@ public sealed class PlayerDataStore
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         using var connection = OpenConnection();
-        using var transaction = connection.BeginTransaction();
+        using var transaction = connection.BeginTransaction(deferred: false);
 
         var playerId = FindPlayerId(connection, transaction, accountKey);
         if (playerId is null)
         {
+            if (DisplayNameInUse(connection, transaction, normalizedAccount))
+                throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换账号名后重试。");
+
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
             insert.CommandText = """
@@ -861,8 +864,10 @@ public sealed class PlayerDataStore
             throw new PlayerDataValidationException("头像必须使用站内资源路径。");
 
         using var connection = OpenConnection();
-        using var transaction = connection.BeginTransaction();
+        using var transaction = connection.BeginTransaction(deferred: false);
         var playerId = RequirePlayerId(connection, transaction, account);
+        if (DisplayNameInUse(connection, transaction, name, playerId))
+            throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换一个昵称。");
 
         using var update = connection.CreateCommand();
         update.Transaction = transaction;
@@ -1790,6 +1795,23 @@ public sealed class PlayerDataStore
         using var alter = connection.CreateCommand();
         alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
         alter.ExecuteNonQuery();
+    }
+
+    private static bool DisplayNameInUse(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string displayName,
+        long? excludingPlayerId = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = excludingPlayerId is null
+            ? "SELECT EXISTS(SELECT 1 FROM players WHERE display_name=$displayName COLLATE NOCASE);"
+            : "SELECT EXISTS(SELECT 1 FROM players WHERE display_name=$displayName COLLATE NOCASE AND id<>$playerId);";
+        command.Parameters.AddWithValue("$displayName", displayName);
+        if (excludingPlayerId is not null)
+            command.Parameters.AddWithValue("$playerId", excludingPlayerId.Value);
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
     }
 
     private static PlayerDataSnapshot LoadSnapshot(SqliteConnection connection, SqliteTransaction transaction, long playerId)
