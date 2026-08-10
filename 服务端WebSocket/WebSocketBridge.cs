@@ -382,6 +382,7 @@ public static class WebSocketBridge
                 name = playerData.DisplayName,
                 avatar = playerData.Avatar,
                 cardBackId = playerData.CardBackId,
+                canChangeDisplayName = playerData.CanChangeDisplayName,
                 selectedDeckName = playerData.SelectedDeckName,
                 decks = playerData.Decks,
                 authToken = authentication.AuthToken,
@@ -2766,9 +2767,10 @@ public static class WebSocketBridge
             logStr,
             account = snapshot.Account,
             displayName = snapshot.DisplayName,
-                avatar = snapshot.Avatar,
-                cardBackId = snapshot.CardBackId,
-                selectedDeckName = snapshot.SelectedDeckName,
+            avatar = snapshot.Avatar,
+            cardBackId = snapshot.CardBackId,
+            canChangeDisplayName = snapshot.CanChangeDisplayName,
+            selectedDeckName = snapshot.SelectedDeckName,
             decks = snapshot.Decks,
         });
     }

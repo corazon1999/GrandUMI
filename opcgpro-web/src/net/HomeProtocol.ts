@@ -356,6 +356,7 @@ function handleLogin(msg: MsgLogin) {
       displayName,
       msg.avatar ?? "",
       msg.cardBackId ?? "classic",
+      msg.canChangeDisplayName ?? false,
       msg.selectedDeckName ?? null,
       msg.decks ?? [],
     );
@@ -397,6 +398,7 @@ function applyPlayerData(
   displayName: string,
   avatar: string,
   cardBackId: string,
+  canChangeDisplayName: boolean,
   selectedDeckName: string | null,
   decks: SavedDeck[],
 ) {
@@ -405,7 +407,7 @@ function applyPlayerData(
   setSelectedDeckName(selectedDeckName);
 
   const store = useNetStore.getState();
-  store.setProfile(displayName, avatar, cardBackId);
+  store.setProfile(displayName, avatar, cardBackId, canChangeDisplayName);
   const selected = selectedDeckName
     ? decks.find((deck) => deck.name === selectedDeckName)
     : undefined;
@@ -440,6 +442,7 @@ function handlePlayerData(msg: MsgPlayerData) {
     msg.displayName,
     msg.avatar ?? "",
     msg.cardBackId ?? current.cardBackId,
+    msg.canChangeDisplayName ?? current.canChangeDisplayName,
     msg.selectedDeckName ?? null,
     msg.decks,
   );

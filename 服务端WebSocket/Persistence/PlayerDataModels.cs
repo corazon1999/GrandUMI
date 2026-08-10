@@ -42,6 +42,7 @@ public sealed record PlayerDataSnapshot(
     string DisplayName,
     string Avatar,
     string CardBackId,
+    bool CanChangeDisplayName,
     string? SelectedDeckName,
     IReadOnlyList<StoredDeck> Decks);
 

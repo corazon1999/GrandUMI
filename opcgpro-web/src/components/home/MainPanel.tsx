@@ -43,7 +43,7 @@ function getDefaultAvatar(): string {
 function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
   const playerName = useNetStore((s) => s.playerName);
   const cloudAvatar = useNetStore((s) => s.avatar);
-  const setPlayerName = useNetStore((s) => s.setPlayerName);
+  const canChangeDisplayName = useNetStore((s) => s.canChangeDisplayName);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -57,6 +57,10 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
   }, [cloudAvatar]);
 
   const startEdit = () => {
+    if (!canChangeDisplayName) {
+      useNetStore.getState().setError("昵称仅可修改一次，当前账号已使用改名机会");
+      return;
+    }
     setDraft(playerName);
     setEditing(true);
   };
@@ -68,9 +72,9 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
   const confirm = () => {
     const name = draft.trim();
     if (!name) { setEditing(false); return; }
-    setPlayerName(name);
+    if (name === playerName) { setEditing(false); return; }
     if (!HomeRequest.updateProfile(name, avatarSrc)) {
-      useNetStore.getState().setError("网络未连接，昵称仅在本次页面生效");
+      useNetStore.getState().setError("网络未连接，昵称未修改，请连接后重试");
     }
     setEditing(false);
   };
@@ -146,10 +150,17 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
               <button
                 type="button"
                 onClick={startEdit}
-                className={`${variant === "profile" ? "min-h-11 w-full text-left text-lg font-bold text-white" : "min-h-8 w-full text-center text-[11px] text-gray-500"} truncate rounded-lg transition-colors hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-orange-400`}
+                disabled={!canChangeDisplayName}
+                title={canChangeDisplayName ? "更改昵称（仅限一次）" : "昵称已修改，无法再次更改"}
+                className={`${variant === "profile" ? "min-h-11 w-full text-left text-lg font-bold text-white" : "min-h-8 w-full text-center text-[11px] text-gray-500"} truncate rounded-lg transition-colors hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:text-gray-500`}
               >
                 {playerName || "未知"}
               </button>
+              {variant === "profile" && (
+                <p className={`mt-1 text-xs ${canChangeDisplayName ? "text-amber-300" : "text-gray-500"}`}>
+                  {canChangeDisplayName ? "昵称可修改 1 次，确认后无法再次修改" : "昵称已修改，无法再次更改"}
+                </p>
+              )}
             </div>
           )}
         </div>

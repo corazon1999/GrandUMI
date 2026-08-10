@@ -98,6 +98,7 @@ export interface MsgLogin extends MsgBase {
   name?: string;     // 服务器返回的玩家昵称
   avatar?: string;
   cardBackId?: string;
+  canChangeDisplayName?: boolean;
   selectedDeckName?: string | null;
   decks?: SavedDeck[];
   result?: boolean;  // true = 成功（C# 中是 bool 不是 int）
@@ -128,6 +129,7 @@ export interface MsgPlayerData extends MsgBase {
   displayName?: string;
   avatar?: string;
   cardBackId?: string;
+  canChangeDisplayName?: boolean;
   selectedDeckName?: string | null;
   decks?: SavedDeck[];
 }

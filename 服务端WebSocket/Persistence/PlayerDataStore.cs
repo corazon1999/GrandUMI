@@ -104,6 +104,7 @@ public sealed class PlayerDataStore
                 account_key        TEXT NOT NULL UNIQUE,
                 account            TEXT NOT NULL,
                 display_name       TEXT NOT NULL,
+                display_name_change_used INTEGER NOT NULL DEFAULT 0,
                 avatar             TEXT NOT NULL DEFAULT '',
                 card_back_id       TEXT NOT NULL DEFAULT 'classic',
                 selected_deck_name TEXT NULL,
@@ -211,10 +212,11 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_deck_publication_likes_publication
                 ON deck_publication_likes(publication_id);
 
-            PRAGMA user_version=4;
+            PRAGMA user_version=5;
             """;
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
+        EnsureColumn(connection, "players", "display_name_change_used", "INTEGER NOT NULL DEFAULT 0");
     }
 
     public PlayerDataSnapshot Login(string account)
@@ -865,13 +867,20 @@ public sealed class PlayerDataStore
         using var update = connection.CreateCommand();
         update.Transaction = transaction;
         update.CommandText = """
-            UPDATE players SET display_name=$displayName, avatar=$avatar, updated_at=$now WHERE id=$id;
+            UPDATE players
+            SET display_name=$displayName,
+                display_name_change_used=CASE WHEN display_name <> $displayName THEN 1 ELSE display_name_change_used END,
+                avatar=$avatar,
+                updated_at=$now
+            WHERE id=$id
+              AND (display_name=$displayName OR display_name_change_used=0);
             """;
         update.Parameters.AddWithValue("$displayName", name);
         update.Parameters.AddWithValue("$avatar", normalizedAvatar);
         update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         update.Parameters.AddWithValue("$id", playerId);
-        update.ExecuteNonQuery();
+        if (update.ExecuteNonQuery() == 0)
+            throw new PlayerDataValidationException("昵称仅可修改一次，当前账号已使用改名机会。");
 
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
@@ -1789,13 +1798,15 @@ public sealed class PlayerDataStore
         string displayName;
         string avatar;
         string cardBackId;
+        bool canChangeDisplayName;
         string? selectedDeckName;
 
         using (var player = connection.CreateCommand())
         {
             player.Transaction = transaction;
             player.CommandText = """
-                SELECT account, display_name, avatar, card_back_id, selected_deck_name FROM players WHERE id=$id;
+                SELECT account, display_name, avatar, card_back_id, display_name_change_used, selected_deck_name
+                FROM players WHERE id=$id;
                 """;
             player.Parameters.AddWithValue("$id", playerId);
             using var reader = player.ExecuteReader();
@@ -1804,7 +1815,8 @@ public sealed class PlayerDataStore
             displayName = reader.GetString(1);
             avatar = reader.GetString(2);
             cardBackId = reader.IsDBNull(3) ? DefaultCardBackId : reader.GetString(3);
-            selectedDeckName = reader.IsDBNull(4) ? null : reader.GetString(4);
+            canChangeDisplayName = reader.GetInt64(4) == 0;
+            selectedDeckName = reader.IsDBNull(5) ? null : reader.GetString(5);
         }
 
         var decks = new List<StoredDeck>();
@@ -1839,6 +1851,6 @@ public sealed class PlayerDataStore
             }
         }
 
-        return new PlayerDataSnapshot(account, displayName, avatar, cardBackId, selectedDeckName, decks);
+        return new PlayerDataSnapshot(account, displayName, avatar, cardBackId, canChangeDisplayName, selectedDeckName, decks);
     }
 }

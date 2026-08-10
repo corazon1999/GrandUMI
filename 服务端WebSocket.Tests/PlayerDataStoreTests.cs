@@ -91,8 +91,29 @@ public sealed class PlayerDataStoreTests : IDisposable
         var reloaded = store.Login("ALICE");
 
         Assert.Equal("航海士", updated.DisplayName);
+        Assert.False(updated.CanChangeDisplayName);
         Assert.Equal("航海士", reloaded.DisplayName);
         Assert.Equal("/sprites-thumb/OP15/OP15-001.webp", reloaded.Avatar);
+    }
+
+    [Fact]
+    public void UpdateProfile_AllowsOneDisplayNameChange_WithoutBlockingAvatarUpdates()
+    {
+        var store = CreateStore();
+        var initial = store.Login("Alice");
+
+        Assert.True(initial.CanChangeDisplayName);
+
+        var avatarOnly = store.UpdateProfile("Alice", "Alice", "/sprites-thumb/OP15/OP15-001.webp");
+        Assert.True(avatarOnly.CanChangeDisplayName);
+
+        var renamed = store.UpdateProfile("Alice", "航海士", "/sprites-thumb/OP15/OP15-002.webp");
+        Assert.False(renamed.CanChangeDisplayName);
+
+        var updatedAvatar = store.UpdateProfile("Alice", "航海士", "/sprites-thumb/OP15/OP15-003.webp");
+        Assert.Equal("/sprites-thumb/OP15/OP15-003.webp", updatedAvatar.Avatar);
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.UpdateProfile("Alice", "第二个昵称", updatedAvatar.Avatar));
     }
 
     [Fact]

@@ -63,6 +63,7 @@ interface NetStore {
   playerName: string;
   avatar: string;
   cardBackId: string;
+  canChangeDisplayName: boolean;
   // 错误提示
   error: string | null;
   // 匹配
@@ -116,7 +117,7 @@ interface NetStore {
   setReconnectCountdown: (n: number) => void;
   setLoggedIn: (v: boolean, name?: string, account?: string) => void;
   setPlayerName: (name: string) => void;
-  setProfile: (name: string, avatar: string, cardBackId?: string) => void;
+  setProfile: (name: string, avatar: string, cardBackId?: string, canChangeDisplayName?: boolean) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
   setMatchQueueKind: (kind: "ranked" | "casual") => void;
@@ -157,6 +158,7 @@ const initialState = {
   playerName: "",
   avatar: "",
   cardBackId: "classic",
+  canChangeDisplayName: false,
   error: null as string | null,
   matchState: "idle" as MatchState,
   matchQueueKind: "casual" as const,
@@ -207,10 +209,11 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setPlayerName: (name) => set({ playerName: name }),
 
-  setProfile: (playerName, avatar, cardBackId) => set((state) => ({
+  setProfile: (playerName, avatar, cardBackId, canChangeDisplayName) => set((state) => ({
     playerName,
     avatar,
     cardBackId: cardBackId ?? state.cardBackId,
+    canChangeDisplayName: canChangeDisplayName ?? state.canChangeDisplayName,
   })),
 
   setError: (msg) => set({ error: msg }),
