@@ -32,6 +32,7 @@ public class OP11_079_OtokoNoShoubu : IScriptedEffect
         // 公开对方卡组最上方 1 张
         if (opp.Deck.Count == 0) return;
         var revealed = opp.Deck[0];
+        ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { revealed.Info.Number });
 
         // 命中：公开卡的原本费用 == 宣言费用
         if (revealed.Info.Cost != declared) return;

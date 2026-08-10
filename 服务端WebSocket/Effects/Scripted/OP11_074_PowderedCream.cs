@@ -48,6 +48,7 @@ public class OP11_074_PowderedCream : IScriptedEffect
         // 公开对方卡组最上方 1 张
         if (opp.Deck.Count == 0) return;
         var revealed = opp.Deck[0];
+        ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { revealed.Info.Number });
         if (revealed.Info.Cost != declared) return; // 未命中
 
         // 命中：将对方最多 1 张当前费用 ≤4 的角色转为休息状态
