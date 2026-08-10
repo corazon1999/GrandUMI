@@ -709,15 +709,7 @@
         },
         "then": [
           {
-            "op": "Choose",
-            "prompt": "OpponentLifeAll",
-            "max": 1,
-            "min": 0,
-            "as": "$tgt"
-          },
-          {
-            "op": "KO",
-            "target": "$tgt"
+            "op": "OppLifeToTrash"
           }
         ]
       }
