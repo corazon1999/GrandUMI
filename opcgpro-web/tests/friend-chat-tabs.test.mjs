@@ -10,7 +10,8 @@ test("在线玩家列表可直接申请或接受好友", async () => {
   assert.match(playerList, /HomeRequest\.sendFriendRequest\(p\.account\)/);
   assert.match(playerList, /HomeRequest\.respondFriendRequest\(relationship\.requestId!, true\)/);
   assert.match(playerList, /添加好友/);
-  assert.match(playerList, /已是好友/);
+  assert.match(playerList, /aria-label="已是好友"/);
+  assert.match(playerList, /<svg[\s\S]*?m14\.5 17 2 2 4-5/);
 });
 
 test("局内聊天面板提供局内与好友分页并保留各自消息流", async () => {

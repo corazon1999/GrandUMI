@@ -114,7 +114,28 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                           添加好友
                         </button>
                       )}
-                      {relationship?.kind === "friend" && <span className="flex min-h-11 items-center px-2 text-xs font-bold text-emerald-400">已是好友</span>}
+                      {relationship?.kind === "friend" && (
+                        <span
+                          className="flex min-h-11 min-w-11 items-center justify-center text-emerald-400"
+                          aria-label="已是好友"
+                          title="已是好友"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <circle cx="8.5" cy="8" r="3" />
+                            <path d="M3.5 19c.6-3.5 2.3-5 5-5 1.7 0 3 .5 3.9 1.5" />
+                            <path d="m14.5 17 2 2 4-5" />
+                          </svg>
+                        </span>
+                      )}
                       {relationship?.kind === "outgoing" && <span className="flex min-h-11 items-center px-2 text-xs font-bold text-amber-400">已申请</span>}
                       {relationship?.kind === "incoming" && relationship.requestId && (
                         <button
