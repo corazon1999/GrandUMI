@@ -36,6 +36,8 @@ import type {
   MsgEnterMatch,
   MsgEnterBotMatch,
   MsgCancelMatch,
+  MsgSelectRankFaction,
+  RankFaction,
   MsgMatchFound,
   MsgRankSnapshot,
   MsgRankResult,
@@ -167,6 +169,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgCancelMatch":
         handleCancelMatch(msg as MsgCancelMatch);
+        break;
+      case "MsgSelectRankFaction":
+        handleSelectRankFaction(msg as MsgSelectRankFaction);
         break;
       case "MsgMatchFound":
         handleMatchFound(msg as MsgMatchFound);
@@ -486,6 +491,15 @@ function handleEnterBotMatch(msg: MsgEnterBotMatch) {
  */
 function handleCancelMatch(_msg: MsgCancelMatch) {
   useNetStore.getState().setMatchState("idle");
+}
+
+function handleSelectRankFaction(msg: MsgSelectRankFaction) {
+  if (!msg.result || !msg.profile) {
+    showMessage(msg.logStr ?? "阵营选择失败", "error");
+    return;
+  }
+  useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+  showMessage("阵营已选定，之后不能更换", "info");
 }
 
 /**
@@ -900,6 +914,13 @@ export const HomeRequest = {
     NetManager.send({
       proto: "MsgCancelMatch",
     } as MsgCancelMatch);
+  },
+
+  selectRankFaction(faction: RankFaction) {
+    return NetManager.send({
+      proto: "MsgSelectRankFaction",
+      faction,
+    } as MsgSelectRankFaction);
   },
 
   createRoom(deck: string, deckName: string) {

@@ -12,6 +12,7 @@ public sealed record RankProfileSnapshot(
     int PlacementGames,
     int PlacementRequired,
     int RankPoints,
+    string? Faction,
     string Tier,
     int? Division,
     int Games,
@@ -23,6 +24,7 @@ public sealed record RankLeaderboardItem(
     int Rank,
     string DisplayName,
     int RankPoints,
+    string Faction,
     string Tier,
     int? Division,
     int Games,
@@ -38,6 +40,7 @@ public sealed record RankPlayerSettlement(
     int RankPointsBefore,
     int RankPointsAfter,
     int RankPointDelta,
+    string Faction,
     string Tier,
     int? Division,
     int PlacementGames,
@@ -59,6 +62,7 @@ public static class RankWire
         placementGames = value.PlacementGames,
         placementRequired = value.PlacementRequired,
         rankPoints = value.RankPoints,
+        faction = value.Faction,
         tier = value.Tier,
         division = value.Division,
         games = value.Games,
@@ -73,6 +77,7 @@ public static class RankWire
             rank = value.Rank,
             displayName = value.DisplayName,
             rankPoints = value.RankPoints,
+            faction = value.Faction,
             tier = value.Tier,
             division = value.Division,
             games = value.Games,
@@ -86,6 +91,7 @@ public static class RankWire
         rankPointsBefore = value.RankPointsBefore,
         rankPointsAfter = value.RankPointsAfter,
         rankPointDelta = value.RankPointDelta,
+        faction = value.Faction,
         tier = value.Tier,
         division = value.Division,
         placementGames = value.PlacementGames,
@@ -100,6 +106,9 @@ public static class RankWire
 /// </summary>
 public sealed class RankedStore
 {
+    public const string PirateFaction = "pirate";
+    public const string MarineFaction = "marine";
+    public const string GovernmentFaction = "government";
     public const int PlacementRequired = 5;
     private const double InitialRating = 1500;
     private const double InitialDeviation = 350;
@@ -169,6 +178,12 @@ public sealed class RankedStore
                     PRIMARY KEY(season_id, account_key)
                 );
 
+                CREATE TABLE IF NOT EXISTS rank_factions (
+                    account_key        TEXT PRIMARY KEY,
+                    faction            TEXT NOT NULL,
+                    selected_at_utc    TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS ranked_matches (
                     match_id            TEXT PRIMARY KEY,
                     season_id           TEXT NOT NULL,
@@ -215,8 +230,41 @@ public sealed class RankedStore
                 profile = profile with { DisplayName = displayName ?? account };
                 Save(connection, transaction, profile);
             }
+            var faction = ReadFaction(connection, transaction, profile.AccountKey);
+            var leaderboard = ReadLeaderboard(connection, season);
             transaction.Commit();
-            return new RankSnapshot(ToSnapshot(profile, season), ReadLeaderboard(connection, season));
+            return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction)), leaderboard);
+        }
+    }
+
+    /// <summary>选择阵营后永久锁定；阵营仅影响称号和阵营排行榜，不影响匹配或积分。</summary>
+    public RankSnapshot? SelectFaction(string account, string? displayName, string faction, DateTime? nowUtc = null)
+    {
+        faction = NormalizeFaction(faction) ?? string.Empty;
+        if (faction.Length == 0) return null;
+
+        lock (_gate)
+        {
+            Initialize();
+            var season = SeasonAt(nowUtc ?? DateTime.UtcNow);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
+            var selected = ReadFaction(connection, transaction, profile.AccountKey);
+            if (selected is null)
+            {
+                using var insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = "INSERT INTO rank_factions(account_key,faction,selected_at_utc) VALUES($key,$faction,$selected);";
+                insert.Parameters.AddWithValue("$key", profile.AccountKey);
+                insert.Parameters.AddWithValue("$faction", faction);
+                insert.Parameters.AddWithValue("$selected", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                insert.ExecuteNonQuery();
+                selected = faction;
+            }
+            var leaderboard = ReadLeaderboard(connection, season);
+            transaction.Commit();
+            return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected)), leaderboard);
         }
     }
 
@@ -270,12 +318,13 @@ public sealed class RankedStore
                 after1.RankPoints - before1.RankPoints);
             InsertEvent(connection, transaction, matchId, season.Id, before0, after0, endedAtUtc);
             InsertEvent(connection, transaction, matchId, season.Id, before1, after1, endedAtUtc);
+            var faction0 = ReadFaction(connection, transaction, after0.AccountKey);
+            var faction1 = ReadFaction(connection, transaction, after1.AccountKey);
             transaction.Commit();
-
             return new RankedMatchSettlement(
                 matchId,
-                ToSettlement(player0Account, before0, after0),
-                ToSettlement(player1Account, before1, after1));
+                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0)),
+                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1)));
         }
     }
 
@@ -378,30 +427,55 @@ public sealed class RankedStore
     private static double Expected(double self, double opponent)
         => 1 / (1 + Math.Pow(10, (opponent - self) / 400));
 
-    private static RankPlayerSettlement ToSettlement(string account, Profile before, Profile after)
+    private static RankPlayerSettlement ToSettlement(string account, Profile before, Profile after, string? faction, int? factionRank)
     {
-        var (tier, division) = RankLabel(after.RankPoints);
+        var (tier, division) = RankLabel(after.RankPoints, faction, factionRank);
         return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
-            after.RankPoints - before.RankPoints, tier, division, after.PlacementGames,
+            after.RankPoints - before.RankPoints, faction ?? string.Empty, tier, division, after.PlacementGames,
             PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired);
     }
 
-    private static RankProfileSnapshot ToSnapshot(Profile profile, Season season)
+    private static RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank)
     {
-        var (tier, division) = RankLabel(profile.RankPoints);
+        var (tier, division) = RankLabel(profile.RankPoints, faction, factionRank);
         return new RankProfileSnapshot(season.Id, season.StartsAtUtc, season.EndsAtUtc,
-            profile.PlacementGames, PlacementRequired, profile.RankPoints, tier, division,
+            profile.PlacementGames, PlacementRequired, profile.RankPoints, faction, tier, division,
             profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints);
     }
 
-    public static (string Tier, int? Division) RankLabel(int rankPoints)
+    public static (string Tier, int? Division) RankLabel(int rankPoints, string? faction = null, int? factionRank = null)
     {
-        if (rankPoints >= 1500) return ("传奇", null);
-        var tiers = new[] { "青铜", "白银", "黄金", "白金", "钻石" };
+        if (rankPoints >= 1500) return (NewWorldTitle(faction, factionRank), null);
+        var tiers = faction switch
+        {
+            PirateFaction => new[] { "见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长" },
+            MarineFaction => new[] { "海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将" },
+            GovernmentFaction => new[] { "政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团" },
+            _ => new[] { "未选择阵营", "未选择阵营", "未选择阵营", "未选择阵营", "未选择阵营" },
+        };
         var tierIndex = Math.Clamp(rankPoints / 300, 0, tiers.Length - 1);
         var within = Math.Clamp(rankPoints - tierIndex * 300, 0, 299);
         return (tiers[tierIndex], 3 - within / 100);
     }
+
+    private static string NewWorldTitle(string? faction, int? factionRank) => (faction, factionRank) switch
+    {
+        (PirateFaction, 1) => "海贼王",
+        (PirateFaction, >= 2 and <= 5) => "四皇",
+        (MarineFaction, 1) => "海军元帅",
+        (MarineFaction, >= 2 and <= 4) => "海军大将",
+        (GovernmentFaction, 1) => "世界之王",
+        (GovernmentFaction, >= 2 and <= 6) => "五老星",
+        _ => "新世界",
+    };
+
+    private static string? NormalizeFaction(string? faction) => faction?.Trim().ToLowerInvariant() switch
+    {
+        PirateFaction => PirateFaction,
+        MarineFaction => MarineFaction,
+        GovernmentFaction => GovernmentFaction,
+        _ => null,
+    };
 
     private static Season SeasonAt(DateTime utc)
     {
@@ -415,26 +489,73 @@ public sealed class RankedStore
     {
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT display_name, rank_points, games, wins
-            FROM rank_profiles
-            WHERE season_id=$season AND placement_games >= $placements
-            ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC
-            LIMIT 50;
+            WITH eligible AS (
+                SELECT p.account_key, p.display_name, p.rank_points, p.games, p.wins, f.faction,
+                       p.rating, p.rating_deviation, p.updated_at_utc
+                FROM rank_profiles p
+                JOIN rank_factions f ON f.account_key=p.account_key
+                WHERE p.season_id=$season AND p.placement_games >= $placements
+            ), ranked AS (
+                SELECT *,
+                       ROW_NUMBER() OVER (ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC) AS global_rank,
+                       ROW_NUMBER() OVER (PARTITION BY faction ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC) AS faction_rank
+                FROM eligible
+            )
+            SELECT account_key, display_name, rank_points, games, wins, faction, global_rank, faction_rank
+            FROM ranked
+            WHERE global_rank <= 50 OR faction_rank <= 6
+            ORDER BY global_rank ASC;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
         command.Parameters.AddWithValue("$placements", PlacementRequired);
         using var reader = command.ExecuteReader();
-        var result = new List<RankLeaderboardItem>();
+        var entries = new List<(string AccountKey, string DisplayName, int RankPoints, int Games, int Wins, string Faction, int GlobalRank, int FactionRank)>();
         while (reader.Read())
         {
-            var points = reader.GetInt32(1);
-            var games = reader.GetInt32(2);
-            var wins = reader.GetInt32(3);
-            var label = RankLabel(points);
-            result.Add(new RankLeaderboardItem(result.Count + 1, reader.GetString(0), points,
-                label.Tier, label.Division, games, wins, games == 0 ? 0 : Math.Round(wins * 100d / games, 1)));
+            entries.Add((reader.GetString(0), reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetString(5), reader.GetInt32(6), reader.GetInt32(7)));
+        }
+        var result = new List<RankLeaderboardItem>();
+        foreach (var entry in entries)
+        {
+            var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
+            result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.DisplayName, entry.RankPoints, entry.Faction,
+                label.Tier, label.Division, entry.Games, entry.Wins,
+                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1)));
         }
         return result;
+    }
+
+    private static int? FactionRank(SqliteConnection connection, Season season, Profile profile, string? faction)
+    {
+        if (faction is null || profile.PlacementGames < PlacementRequired) return null;
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(*) + 1
+            FROM rank_profiles p
+            JOIN rank_factions f ON f.account_key=p.account_key
+            WHERE p.season_id=$season AND f.faction=$faction AND p.placement_games >= $placements
+              AND (
+                p.rank_points > $points
+                OR (p.rank_points = $points AND (p.rating - 2 * p.rating_deviation) > $conservativeRating)
+                OR (p.rank_points = $points AND (p.rating - 2 * p.rating_deviation) = $conservativeRating AND p.updated_at_utc < $updated)
+              );
+            """;
+        command.Parameters.AddWithValue("$season", season.Id);
+        command.Parameters.AddWithValue("$faction", faction);
+        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        command.Parameters.AddWithValue("$points", profile.RankPoints);
+        command.Parameters.AddWithValue("$conservativeRating", profile.Rating - 2 * profile.RatingDeviation);
+        command.Parameters.AddWithValue("$updated", profile.UpdatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        return Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private static string? ReadFaction(SqliteConnection connection, SqliteTransaction transaction, string accountKey)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT faction FROM rank_factions WHERE account_key=$key LIMIT 1;";
+        command.Parameters.AddWithValue("$key", accountKey);
+        return command.ExecuteScalar() as string;
     }
 
     private Profile LoadOrCreate(SqliteConnection connection, SqliteTransaction transaction, Season season,

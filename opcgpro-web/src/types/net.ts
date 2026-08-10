@@ -282,6 +282,17 @@ export interface MsgCancelMatch extends MsgBase {
   proto: "MsgCancelMatch";
 }
 
+export type RankFaction = "pirate" | "marine" | "government";
+
+export interface MsgSelectRankFaction extends MsgBase {
+  proto: "MsgSelectRankFaction";
+  faction: RankFaction;
+  result?: boolean;
+  logStr?: string;
+  profile?: RankProfileSnapshot;
+  leaderboard?: RankLeaderboardItem[];
+}
+
 // 单人测试模式：与机器人对战
 export interface MsgEnterBotMatch extends MsgBase {
   proto: "MsgEnterBotMatch";
@@ -305,6 +316,7 @@ export interface RankProfileSnapshot {
   placementGames: number;
   placementRequired: number;
   rankPoints: number;
+  faction: RankFaction | null;
   tier: string;
   division: number | null;
   games: number;
@@ -317,6 +329,7 @@ export interface RankLeaderboardItem {
   rank: number;
   displayName: string;
   rankPoints: number;
+  faction: RankFaction;
   tier: string;
   division: number | null;
   games: number;
@@ -329,6 +342,7 @@ export interface RankPlayerSettlement {
   rankPointsBefore: number;
   rankPointsAfter: number;
   rankPointDelta: number;
+  faction: RankFaction;
   tier: string;
   division: number | null;
   placementGames: number;
@@ -1055,6 +1069,7 @@ export type AnyMsg =
   | MsgImportDecks
   | MsgEnterMatch
   | MsgCancelMatch
+  | MsgSelectRankFaction
   | MsgMatchFound
   | MsgRankSnapshot
   | MsgRankResult

@@ -251,6 +251,7 @@ public static class WebSocketBridge
             case "MsgCopyDeckPlaza": OnCopyDeckPlaza(session, msg); break;
             case "MsgDeleteDeckPlaza": OnDeleteDeckPlaza(session, msg); break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
+            case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
             case "MsgCreateRoom":  OnCreateRoom(session, msg);   break;
@@ -756,6 +757,11 @@ public static class WebSocketBridge
         var queueKind = string.Equals(Str(msg, "queueKind"), "ranked", StringComparison.OrdinalIgnoreCase)
             ? "ranked"
             : "casual";
+        if (queueKind == "ranked" && RankedStore.Default.GetSnapshot(s.Account!, s.PlayerName).Profile.Faction is null)
+        {
+            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择阵营，阵营选定后不可更改" });
+            return;
+        }
         s.Deck = deck;
         s.DeckName = Str(msg, "deckName");
         s.MatchQueueKind = queueKind;
@@ -1010,6 +1016,48 @@ public static class WebSocketBridge
         catch (Exception ex)
         {
             LogErr($"排位资料读取失败 {session.Account}: {ex.Message}");
+        }
+    }
+
+    private static void OnSelectRankFaction(WsSession session, Dictionary<string, JsonElement> msg)
+    {
+        if (!session.IsLoggedIn || session.Account is null)
+        {
+            Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (StatusOf(session) != "idle")
+        {
+            Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "请在开始匹配前选择阵营" });
+            return;
+        }
+
+        var requested = Str(msg, "faction") ?? string.Empty;
+        try
+        {
+            var snapshot = RankedStore.Default.SelectFaction(session.Account, session.PlayerName, requested);
+            if (snapshot is null)
+            {
+                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "无效的阵营选择" });
+                return;
+            }
+            if (!string.Equals(snapshot.Profile.Faction, requested, StringComparison.OrdinalIgnoreCase))
+            {
+                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "阵营已经选定，不能更换" });
+                return;
+            }
+            Send(session.SessionId, new
+            {
+                proto = "MsgSelectRankFaction",
+                result = true,
+                profile = RankWire.Profile(snapshot.Profile),
+                leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"排位阵营选择失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "阵营选择暂时不可用，请稍后重试" });
         }
     }
 

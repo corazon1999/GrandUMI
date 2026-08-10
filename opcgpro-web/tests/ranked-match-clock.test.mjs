@@ -19,6 +19,31 @@ test("公开匹配明确保留排位与休闲两个入口", async () => {
   assert.match(types, /queueKind\?: "ranked" \| "casual"/);
 });
 
+test("排位前必须选择且永久锁定一个阵营", async () => {
+  const [lobby, protocol, types, rankedStore] = await Promise.all([
+    readSource("../src/components/home/LobbyPanel.tsx"),
+    readSource("../src/net/HomeProtocol.ts"),
+    readSource("../src/types/net.ts"),
+    readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs"),
+  ]);
+
+  assert.match(lobby, /选择你的排位阵营/);
+  assert.match(lobby, /HomeRequest\.selectRankFaction\(faction\.id\)/);
+  assert.match(lobby, /Boolean\(rankProfile\?\.faction\)/);
+  assert.match(protocol, /selectRankFaction\(faction: RankFaction\)/);
+  assert.match(types, /type RankFaction = "pirate" \| "marine" \| "government"/);
+  assert.match(rankedStore, /INSERT INTO rank_factions/);
+  assert.match(rankedStore, /阵营仅影响称号和阵营排行榜，不影响匹配或积分/);
+});
+
+test("三阵营称号和新世界榜首称号按约定映射", async () => {
+  const rankedStore = await readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs");
+
+  for (const label of ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长", "海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将", "政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团", "新世界", "海贼王", "四皇", "海军元帅", "海军大将", "世界之王", "五老星"]) {
+    assert.match(rankedStore, new RegExp(label));
+  }
+});
+
 test("对局界面展示双方独立的权威操作棋钟", async () => {
   const [board, store, netTypes] = await Promise.all([
     readSource("../src/components/game/GameBoard.tsx"),

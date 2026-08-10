@@ -6,6 +6,19 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
 import ChatPanel from "./ChatPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import type { RankFaction } from "@/types/net";
+
+const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; description: string; className: string }> = [
+  { id: "pirate", name: "海贼阵营", description: "见习海贼 → 船长", className: "border-rose-700/70 bg-rose-950/30 hover:border-rose-400" },
+  { id: "marine", name: "海军阵营", description: "海军三等兵 → 海军中将", className: "border-sky-700/70 bg-sky-950/30 hover:border-sky-400" },
+  { id: "government", name: "世界政府阵营", description: "政府线人 → 神之骑士团", className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
+];
+
+const RANK_FACTION_NAMES: Record<RankFaction, string> = {
+  pirate: "海贼阵营",
+  marine: "海军阵营",
+  government: "世界政府阵营",
+};
 
 // 从导出卡组码（exportDeckString 格式 A）统计主卡组张数：
 // 卡牌行形如「<数量> <卡号>」，跳过「# 注释」与「领航:」行。
@@ -43,6 +56,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
   const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle";
+  const canQueue = canEnter && (matchQueueKind !== "ranked" || Boolean(rankProfile?.faction));
 
   useEffect(() => {
     if (roomMode === "create" && roomOperation === "idle" && !roomCode) {
@@ -52,6 +66,10 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const handleMatch = () => {
     if (!selectedDeck) return;
+    if (matchQueueKind === "ranked" && !rankProfile?.faction) {
+      showMessage("开始排位前请先选择阵营，阵营选定后不可更换", "error");
+      return;
+    }
     const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
@@ -221,44 +239,67 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
                     {matchQueueKind === "ranked" && rankProfile && (
                       <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
-                        <div className="flex items-center justify-between gap-3">
+                        {!rankProfile.faction ? (
                           <div>
-                            <p className="text-xs font-bold text-violet-300">{rankProfile.seasonId} 当前段位</p>
-                            <p className="mt-1 text-lg font-black text-white">
-                              {rankProfile.placementGames < rankProfile.placementRequired
-                                ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
-                                : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
-                            </p>
-                          </div>
-                          {rankProfile.placementGames >= rankProfile.placementRequired && (
-                            <div className="text-right">
-                              <p className="text-2xl font-black text-violet-200">{rankProfile.rankPoints}</p>
-                              <p className="text-[11px] text-gray-500">RP</p>
+                            <p className="text-sm font-black text-violet-200">选择你的排位阵营</p>
+                            <p className="mt-1 text-xs leading-5 text-gray-400">阵营只影响称号和阵营榜名次，不影响积分或匹配；选定后不能更换。</p>
+                            <div className="mt-3 grid gap-2 @[640px]:grid-cols-3">
+                              {RANK_FACTIONS.map((faction) => (
+                                <button
+                                  key={faction.id}
+                                  type="button"
+                                  onClick={() => HomeRequest.selectRankFaction(faction.id)}
+                                  className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors ${faction.className}`}
+                                >
+                                  <span className="block text-sm font-black text-white">{faction.name}</span>
+                                  <span className="mt-1 block text-[11px] text-gray-300">{faction.description}</span>
+                                </button>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
-                        <details className="mt-2 border-t border-violet-900/60 pt-2">
-                          <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">查看排位榜</summary>
-                          <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
-                            {rankLeaderboard.length === 0 ? (
-                              <p className="py-2 text-xs text-gray-500">本赛季暂时还没有完成定级的玩家。</p>
-                            ) : rankLeaderboard.slice(0, 20).map((item) => (
-                              <div key={`${item.rank}-${item.displayName}`} className="flex items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-xs">
-                                <span className="w-6 text-center font-black text-violet-300">#{item.rank}</span>
-                                <span className="min-w-0 flex-1 truncate text-gray-200">{item.displayName}</span>
-                                <span className="text-gray-400">{item.tier}{item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}</span>
-                                <span className="w-12 text-right font-bold text-white">{item.rankPoints}</span>
-                              </div>
-                            ))}
                           </div>
-                        </details>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-bold text-violet-300">{RANK_FACTION_NAMES[rankProfile.faction]} · {rankProfile.seasonId} 当前段位</p>
+                                <p className="mt-1 text-lg font-black text-white">
+                                  {rankProfile.placementGames < rankProfile.placementRequired
+                                    ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
+                                    : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
+                                </p>
+                              </div>
+                              {rankProfile.placementGames >= rankProfile.placementRequired && (
+                                <div className="text-right">
+                                  <p className="text-2xl font-black text-violet-200">{rankProfile.rankPoints}</p>
+                                  <p className="text-[11px] text-gray-500">RP</p>
+                                </div>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
+                            <details className="mt-2 border-t border-violet-900/60 pt-2">
+                              <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">查看排位榜</summary>
+                              <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                                {rankLeaderboard.length === 0 ? (
+                                  <p className="py-2 text-xs text-gray-500">本赛季暂时还没有完成定级的玩家。</p>
+                                ) : rankLeaderboard.slice(0, 20).map((item) => (
+                                  <div key={`${item.rank}-${item.displayName}`} className="flex items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-xs">
+                                    <span className="w-6 text-center font-black text-violet-300">#{item.rank}</span>
+                                    <span className="min-w-0 flex-1 truncate text-gray-200">{item.displayName}</span>
+                                    <span className="text-gray-500">{RANK_FACTION_NAMES[item.faction]}</span>
+                                    <span className="text-gray-400">{item.tier}{item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}</span>
+                                    <span className="w-12 text-right font-bold text-white">{item.rankPoints}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          </>
+                        )}
                       </div>
                     )}
                     <button
                       type="button"
                       onClick={handleMatch}
-                      disabled={!canEnter}
+                      disabled={!canQueue}
                       className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${matchQueueKind === "ranked" ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
                     >
                       开始{matchQueueKind === "ranked" ? "排位" : "休闲"}匹配
