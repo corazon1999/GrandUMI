@@ -30,6 +30,24 @@ test("局内聊天面板提供局内与好友分页并保留各自消息流", as
   assert.match(store, /friendChatMessages/);
 });
 
+test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async () => {
+  const [panel, mainPanel] = await Promise.all([
+    readSource("../src/components/home/ChatPanel.tsx"),
+    readSource("../src/components/home/MainPanel.tsx"),
+  ]);
+
+  assert.match(panel, /type ChatTab = "lobby" \| "friends"/);
+  assert.match(panel, /大厅/);
+  assert.match(panel, /好友/);
+  assert.match(panel, /HomeRequest\.requestFriendList\(\)/);
+  assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
+  assert.match(panel, /selectedFriendMessages/);
+  assert.match(panel, /selectedFriend\?\.online/);
+  assert.match(panel, /条未读/);
+  assert.match(mainPanel, /title="聊天"/);
+  assert.match(mainPanel, /aria-label="打开聊天"/);
+});
+
 test("好友私聊由服务端验证好友关系且只回显给双方", async () => {
   const bridge = await readSource("../../服务端WebSocket/WebSocketBridge.cs");
 

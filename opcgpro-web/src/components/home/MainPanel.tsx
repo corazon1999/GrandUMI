@@ -497,7 +497,7 @@ export default function MainPanel() {
           <button
             type="button"
             onClick={() => setShowChat(true)}
-            aria-label="打开大厅聊天"
+            aria-label="打开聊天"
             className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-300 transition-colors hover:bg-gray-800 active:bg-gray-700"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -577,7 +577,7 @@ export default function MainPanel() {
 
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
       <FriendsPanel open={showFriends} onClose={() => setShowFriends(false)} />
-      <Modal open={showChat} onClose={() => setShowChat(false)} title="大厅聊天" mobileSheet maxWidthClass="max-w-lg">
+      <Modal open={showChat} onClose={() => setShowChat(false)} title="聊天" mobileSheet maxWidthClass="max-w-lg">
         <div className="h-[min(70cqh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
           <ChatPanel showHeader={false} />
         </div>
