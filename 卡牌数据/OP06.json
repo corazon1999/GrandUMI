@@ -6,7 +6,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "FILM",
     "counter": "",
     "effectTags": [
@@ -447,7 +447,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "恐怖之船海盗团",
     "counter": "",
     "effectTags": [
@@ -469,7 +469,7 @@
     "type": "领航",
     "property": "打",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "和之国",
     "counter": "",
     "effectTags": [
@@ -911,7 +911,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "温思默克家/GERMA 66",
     "counter": "",
     "effectTags": [

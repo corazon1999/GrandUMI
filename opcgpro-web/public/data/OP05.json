@@ -6,7 +6,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "革命军",
     "counter": "",
     "effectTags": [
@@ -29,7 +29,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "革命军",
     "counter": "",
     "effectTags": [
@@ -470,7 +470,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "海军/堂吉诃德海盗团",
     "counter": "",
     "effectTags": [

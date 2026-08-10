@@ -6,14 +6,25 @@ namespace GrandUMI.Tests;
 
 public class LeaderStartingLifeTests
 {
-    [Fact]
-    public void OP05_098_开局生命数为4()
+    [Theory]
+    [InlineData("OP05-001")]
+    [InlineData("OP05-002")]
+    [InlineData("OP05-022")]
+    [InlineData("OP05-098")]
+    [InlineData("OP06-001")]
+    [InlineData("OP06-021")]
+    [InlineData("OP06-022")]
+    [InlineData("OP06-042")]
+    [InlineData("OP08-001")]
+    [InlineData("OP08-002")]
+    [InlineData("OP08-057")]
+    public void 指定领航_开局生命数为4(string leaderNumber)
     {
         TestScene.New(); // 加载卡牌数据库
-        var deck = BuildLegalDeck("OP05-098");
+        var deck = BuildLegalDeck(leaderNumber);
 
         var engine = new GameEngine(
-            "op05-098-starting-life",
+            $"{leaderNumber.ToLowerInvariant()}-starting-life",
             ("s0", "player0", deck),
             ("s1", "player1", deck),
             firstPlayer: 0,
@@ -26,7 +37,7 @@ public class LeaderStartingLifeTests
     private static string BuildLegalDeck(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
-        var pool = CardDatabase.GetBySet("OP05")
+        var pool = CardDatabase.GetBySet(leader.SetCode)
             .Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leader))
             .ToList();
         var lines = new List<string> { leaderNumber };

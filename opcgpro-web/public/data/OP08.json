@@ -6,7 +6,7 @@
     "type": "领航",
     "property": "打",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "动物/铁桶王国/草帽一伙",
     "counter": "",
     "effectTags": [
@@ -28,7 +28,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "白胡子海盗团",
     "counter": "",
     "effectTags": [
@@ -1234,7 +1234,7 @@
     "type": "领航",
     "property": "特",
     "power": "5000",
-    "cost": "-",
+    "cost": "4",
     "keyWords": "百兽海盗团",
     "counter": "",
     "effectTags": [
