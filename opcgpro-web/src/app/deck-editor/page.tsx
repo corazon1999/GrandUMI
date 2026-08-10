@@ -73,7 +73,10 @@ export default function DeckEditorPage() {
   if (loadState === "loading") {
     const pct = Math.round((loaded / total) * 100);
     return (
-      <div className="flex h-screen h-[100dvh] flex-col items-center justify-center bg-gray-950 gap-4">
+      <div
+        className="flex h-screen flex-col items-center justify-center bg-gray-950 gap-4"
+        style={{ height: "100dvh" }}
+      >
         <p className="text-white font-bold text-lg">加载卡牌数据...</p>
         <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
           <div className="h-full bg-orange-500 rounded-full transition-all duration-300"
@@ -86,14 +89,20 @@ export default function DeckEditorPage() {
 
   if (loadState === "error") {
     return (
-      <div className="flex h-screen h-[100dvh] items-center justify-center bg-gray-950">
+      <div
+        className="flex h-screen items-center justify-center bg-gray-950"
+        style={{ height: "100dvh" }}
+      >
         <p className="text-red-400">卡牌数据加载失败，请刷新页面重试</p>
       </div>
     );
   }
 
   return (
-    <div className="relative flex h-screen h-[100dvh] flex-col overflow-hidden bg-gray-950 md:flex-row">
+    <div
+      className="relative flex h-screen flex-col overflow-hidden bg-gray-950 md:flex-row"
+      style={{ height: "100dvh" }}
+    >
       {/* 手机竖屏主导航：牌池与卡组各自占满可用宽度，避免三栏互相挤压。 */}
       <nav
         data-deck-mobile-nav
