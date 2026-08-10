@@ -1044,8 +1044,8 @@ public static class DslInterpreter
                 break;
             case "Activate":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is not null) AtomicOps.ActivateCard(target);
+                    foreach (var target in ResolveTargets(op, "target", ctx))
+                        AtomicOps.ActivateCard(target);
                     break;
                 }
             case "GiveKeyword":
