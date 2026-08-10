@@ -101,7 +101,7 @@ export default function GamePage() {
           {!isGameOver && (
             <button
               onClick={returnToHome}
-              className="min-h-11 rounded-lg border border-white/20 bg-gray-950/80 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-gray-800"
+              className="min-h-12 rounded-lg border border-white/20 bg-gray-950/80 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-gray-800"
             >
               退出观战
             </button>

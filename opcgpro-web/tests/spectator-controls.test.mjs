@@ -35,7 +35,13 @@ test("手牌申请、审批、冷却与踢出都有局内交互", async () => {
 });
 
 test("局内新增固定控件使用安全区变量", async () => {
-  const panel = await read("src/components/game/GameChatPanel.tsx");
+  const [panel, page] = await Promise.all([
+    read("src/components/game/GameChatPanel.tsx"),
+    read("src/app/game/page.tsx"),
+  ]);
   assert.match(panel, /var\(--layout-safe-left, env\(safe-area-inset-left\)\)/);
   assert.match(panel, /var\(--layout-safe-bottom, env\(safe-area-inset-bottom\)\)/);
+  assert.match(panel, /h-12 w-12/);
+  assert.match(panel, /min-h-12 rounded-full/);
+  assert.match(page, /min-h-12[\s\S]*退出观战/);
 });

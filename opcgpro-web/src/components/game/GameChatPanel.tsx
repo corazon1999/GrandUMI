@@ -258,8 +258,8 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
           <p className="font-bold text-purple-200">{request.spectatorName} 申请查看你的手牌</p>
           <p className="mt-1 text-slate-400">只会向这名观战者公开你当前及后续手牌。</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => respondHandRequest(request.requestId, false)} className="min-h-11 rounded-lg bg-slate-700 font-bold text-slate-200 hover:bg-slate-600">拒绝</button>
-            <button type="button" onClick={() => respondHandRequest(request.requestId, true)} className="min-h-11 rounded-lg bg-emerald-700 font-bold text-white hover:bg-emerald-600">同意公开</button>
+            <button type="button" onClick={() => respondHandRequest(request.requestId, false)} className="min-h-12 rounded-lg bg-slate-700 font-bold text-slate-200 hover:bg-slate-600">拒绝</button>
+            <button type="button" onClick={() => respondHandRequest(request.requestId, true)} className="min-h-12 rounded-lg bg-emerald-700 font-bold text-white hover:bg-emerald-600">同意公开</button>
           </div>
         </div>
       ))}
@@ -385,7 +385,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
               setFriendUnread((previous) => ({ ...previous, [selectedFriendAccount]: 0 }));
             }
           }}
-          className="relative flex h-11 w-11 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
+          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
           title="聊天"
           aria-label="打开聊天"
         >
@@ -407,7 +407,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                     ? spectatorDetails
                     : spectatorNames.map((name) => ({ account: name, name, viewingYou: false, handVisible: false })))
                     .map((spectator, index) => (
-                      <div key={`${spectator.account}:${index}`} className="flex min-h-11 items-center gap-2 rounded-md bg-white/5 px-2 py-1 text-slate-200">
+                      <div key={`${spectator.account}:${index}`} className="flex min-h-12 items-center gap-2 rounded-md bg-white/5 px-2 py-1 text-slate-200">
                         <div className="min-w-0 flex-1">
                           <p className="truncate">{spectator.name}</p>
                           {spectator.viewingYou && <p className="text-[10px] text-purple-300">主视角：你{spectator.handVisible ? " · 已公开手牌" : ""}</p>}
@@ -416,7 +416,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                           <button
                             type="button"
                             onClick={() => kickSpectator(spectator.account)}
-                            className={`min-h-11 rounded-md px-2 text-[10px] font-bold ${kickConfirm === spectator.account ? "bg-red-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-red-900 hover:text-red-200"}`}
+                            className={`min-h-12 rounded-md px-2 text-[10px] font-bold ${kickConfirm === spectator.account ? "bg-red-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-red-900 hover:text-red-200"}`}
                           >
                             {kickConfirm === spectator.account ? "确认踢出" : "踢出"}
                           </button>
@@ -432,7 +432,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                 setOpen(false);
                 setSpectatorPinned((value) => !value);
               }}
-              className="relative flex h-11 w-11 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
+              className="relative flex h-12 w-12 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
               title={`${spectatorNames.length} 人正在观战`}
               aria-label={`查看正在观战的 ${spectatorNames.length} 人`}
               aria-expanded={showSpectatorList}
@@ -452,7 +452,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
             type="button"
             onClick={requestHand}
             disabled={observerHandRequestStatus !== "idle"}
-            className="min-h-11 rounded-full bg-purple-900/90 px-4 text-xs font-bold text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+            className="min-h-12 rounded-full bg-purple-900/90 px-4 text-xs font-bold text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
           >
             {observerHandRequestStatus === "pending"
               ? "等待玩家同意…"

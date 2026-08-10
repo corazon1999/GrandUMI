@@ -18,12 +18,16 @@ test("好友列表协议附带可观战房间与好友座位", async () => {
 });
 
 test("好友面板可从正在进行的好友对局直接进入观战", async () => {
-  const panel = await readSource("../src/components/home/FriendsPanel.tsx");
+  const [panel, joinButton] = await Promise.all([
+    readSource("../src/components/home/FriendsPanel.tsx"),
+    readSource("../src/components/home/SpectateJoinButton.tsx"),
+  ]);
 
   assert.match(panel, /friend\.status === "playing" && friend\.roomId/);
-  assert.match(panel, /HomeRequest\.spectateRoom\(friend\.roomId, friend\.seatIndex \?\? 0\)/);
-  assert.match(panel, /spectateState === "joining"/);
-  assert.match(panel, /spectateRoomId === friend\.roomId \? "进入中…" : "观战"/);
+  assert.match(panel, /<SpectateJoinButton[\s\S]*roomId=\{friend\.roomId\}[\s\S]*seatIndex=\{friend\.seatIndex \?\? 0\}/);
+  assert.match(joinButton, /HomeRequest\.spectateRoom\(roomId, seatIndex, spectateCode\)/);
+  assert.match(joinButton, /spectateState === "joining" && spectateRoomId === roomId/);
+  assert.match(joinButton, /normalizedMode === "password"/);
 });
 
 test("移动端好友列表在受限高度内支持纵向触摸滚动", async () => {
