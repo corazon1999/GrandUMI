@@ -9,13 +9,29 @@ import { advanceImageFallback, thumbSrc } from "@/lib/sprite";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { eventBus } from "@/net/eventBus";
 import { useNetStore } from "@/store/netStore";
-import type { LeaderboardPeriod, MsgUpdatePs, PlayerLeaderStatsItem } from "@/types/net";
+import type { LeaderboardPeriod, MsgUpdatePs, PlayerLeaderStatsItem, RankFaction } from "@/types/net";
 
 const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "7d", label: "近 7 天" },
   { value: "30d", label: "近 30 天" },
   { value: "all", label: "全部" },
 ];
+
+const RANK_FACTION_NAMES: Record<RankFaction, string> = {
+  pirate: "海贼阵营",
+  marine: "海军阵营",
+  government: "世界政府阵营",
+};
+
+function rankLabel(tier: string, division: number | null, placementGames: number, placementRequired: number): string {
+  if (placementGames < placementRequired) return `定级中 ${placementGames}/${placementRequired}`;
+  return `${tier}${division ? ` ${["", "I", "II", "III"][division]}` : ""}`;
+}
+
+function dateLabel(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("zh-CN");
+}
 
 function percent(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -93,6 +109,7 @@ export default function ProfilePanel({
   const account = useNetStore((state) => state.account);
   const cloudCardBackId = useNetStore((state) => state.cardBackId);
   const stats = useNetStore((state) => state.playerProfileStats);
+  const rankProfile = useNetStore((state) => state.rankProfile);
   const onlineCount = useNetStore((state) => state.onlineCount);
   const [period, setPeriod] = useState<LeaderboardPeriod>("30d");
   const [selectedLeaderNumber, setSelectedLeaderNumber] = useState("");
@@ -227,6 +244,55 @@ export default function ProfilePanel({
           </div>
         </div>
       </div>
+
+      <article
+        data-testid="profile-ranked-info"
+        aria-labelledby="profile-rank-heading"
+        className="mt-5 rounded-2xl border border-violet-800/60 bg-[radial-gradient(circle_at_100%_0%,rgba(124,58,237,0.18),transparent_38%),linear-gradient(135deg,rgba(46,16,101,0.36),rgba(17,24,39,0.96))] p-4 @[720px]:p-5"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="profile-rank-heading" className="text-lg font-bold text-white">排位信息</h2>
+            <p className="mt-1 text-xs text-gray-400">展示当前赛季的阵营、段位与排位战绩</p>
+          </div>
+          {rankProfile && (
+            <span className="rounded-full border border-violet-700/70 bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">
+              {rankProfile.seasonId}
+            </span>
+          )}
+        </div>
+
+        {!rankProfile ? (
+          <div className="mt-4 rounded-xl border border-dashed border-violet-800/60 bg-black/15 px-4 py-6 text-center text-sm text-gray-500">
+            正在读取排位信息…
+          </div>
+        ) : !rankProfile.faction ? (
+          <div className="mt-4 rounded-xl border border-dashed border-violet-700/60 bg-violet-950/20 px-4 py-5">
+            <p className="font-bold text-violet-100">尚未选择排位阵营</p>
+            <p className="mt-1 text-xs leading-5 text-gray-400">前往大厅的排位匹配选择阵营后，这里会显示你的当前段位与赛季战绩。</p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 grid gap-2 @[560px]:grid-cols-3">
+              <section className="rounded-xl border border-violet-600/60 bg-violet-950/40 p-4">
+                <p className="text-xs font-bold text-violet-300">当前段位</p>
+                <p className="mt-2 text-xl font-black text-white">
+                  {rankLabel(rankProfile.tier, rankProfile.division, rankProfile.placementGames, rankProfile.placementRequired)}
+                </p>
+              </section>
+              <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">
+                <p className="text-xs text-gray-500">所属阵营</p>
+                <p className="mt-2 text-base font-black text-violet-100">{RANK_FACTION_NAMES[rankProfile.faction]}</p>
+              </section>
+              <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">
+                <p className="text-xs text-gray-500">本赛季战绩</p>
+                <p className="mt-2 text-base font-black text-white">{rankProfile.wins} 胜 / {rankProfile.losses} 负</p>
+              </section>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">赛季结束：{dateLabel(rankProfile.seasonEndsAtUtc)}</p>
+          </>
+        )}
+      </article>
 
       <div className="mt-5 flex flex-col gap-3 @[640px]:flex-row @[640px]:items-end @[640px]:justify-between">
         <div>
