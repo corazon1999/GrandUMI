@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { loadAllDecks, subscribeDecksUpdated } from "@/data/DeckMapper";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { generateDeckImage } from "@/lib/deckImageExport";
 import { HomeRequest } from "@/net/HomeProtocol";
+import type { DeckEntry } from "@/store/deckStore";
 import { useNetStore } from "@/store/netStore";
 import type { DeckPlazaItem, DeckPlazaSort } from "@/types/net";
 
@@ -28,81 +30,77 @@ function countedCards(cards: string[]) {
   return [...counts.entries()];
 }
 
-function CostCurve({ item }: { item: DeckPlazaItem }) {
-  const data = useMemo(() => {
-    const costs = Array.from({ length: 11 }, () => 0);
-    for (const number of item.cards) {
-      const cost = Math.min(10, Math.max(0, getCard(number)?.cost ?? 0));
-      costs[cost] += 1;
-    }
-    return costs;
-  }, [item]);
-  const max = Math.max(1, ...data);
-  return (
-    <div>
-      <p className="mb-2 text-xs font-bold text-gray-400">费用曲线</p>
-      <div className="flex h-20 items-end gap-1 rounded-xl bg-gray-950 p-2">
-        {data.map((count, cost) => (
-          <div key={cost} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <span className="text-[9px] text-gray-400">{count || ""}</span>
-            <span className="w-full rounded-t bg-orange-500/80" style={{ height: `${Math.max(count ? 4 : 0, (count / max) * 42)}px` }} />
-            <span className="text-[9px] text-gray-600">{cost === 10 ? "10+" : cost}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+type DeckImagePreview = { url: string; width: number; height: number };
+type DeckImageState = "loading" | "ready" | "error";
 
-function DeckDetail({ item }: { item: DeckPlazaItem }) {
+function DeckDetail({ item, cardsReady }: { item: DeckPlazaItem; cardsReady: boolean }) {
   const { locale } = useLanguage();
-  const entries = countedCards(item.cards);
+  const [preview, setPreview] = useState<DeckImagePreview | null>(null);
+  const [previewState, setPreviewState] = useState<DeckImageState>("loading");
+
+  useEffect(() => {
+    let disposed = false;
+    let previewUrl = "";
+    setPreview(null);
+    setPreviewState("loading");
+
+    if (!cardsReady) return () => { disposed = true; };
+
+    const leader = getCard(item.leader);
+    const entries: Array<DeckEntry | null> = countedCards(item.cards).map(([number, count]) => {
+      const card = getCard(number);
+      return card
+        ? { card: { ...card, sprite: item.spriteMap[number] || card.sprite }, count }
+        : null;
+    });
+    const mainEntries = entries.filter((entry): entry is DeckEntry => entry !== null);
+    if (!leader || mainEntries.length !== entries.length) {
+      setPreviewState("error");
+      return () => { disposed = true; };
+    }
+
+    void generateDeckImage({
+      deckName: item.title,
+      leader: { ...leader, sprite: item.leaderSprite || leader.sprite },
+      entries: mainEntries,
+    }).then((generated) => {
+      previewUrl = URL.createObjectURL(generated.blob);
+      if (disposed) {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      setPreview({ url: previewUrl, width: generated.width, height: generated.height });
+      setPreviewState("ready");
+    }).catch(() => {
+      if (!disposed) setPreviewState("error");
+    });
+
+    return () => {
+      disposed = true;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [cardsReady, item]);
+
   return (
-    <div className="space-y-5">
-      <div className="flex gap-4 rounded-2xl border border-gray-800 bg-gray-950 p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-gray-500">
+        <p>作者：{item.authorName} · 更新于 {formatDate(item.updatedAt, locale)}</p>
+        <p>{item.leaderName} · {item.leaderColor}</p>
+      </div>
+      {previewState === "loading" && <div className="grid h-48 place-items-center rounded-2xl bg-gray-950 text-sm text-gray-500">正在生成预览…</div>}
+      {previewState === "error" && <div className="grid h-48 place-items-center rounded-2xl bg-gray-950 text-sm text-red-300">生成失败，请重试</div>}
+      {preview && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={thumbSrc(item.leaderSprite || CARD_BACK_SRC)}
-          alt={item.leaderName}
-          className="h-28 w-20 shrink-0 rounded-lg border border-gray-700 object-cover"
-          onError={(event) => advanceImageFallback(event.currentTarget, [item.leaderSprite])}
+          src={preview.url}
+          alt={`${item.title} 一图流预览`}
+          width={preview.width}
+          height={preview.height}
+          className="mx-auto block h-auto max-h-[calc(100dvh-15rem)] w-auto max-w-full rounded-xl object-contain shadow-xl"
+          data-testid="deck-plaza-image-preview"
         />
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-black text-white">{item.title}</h2>
-          <p className="mt-1 text-sm text-gray-400">{item.leaderName} · {item.leaderColor}</p>
-          <p className="mt-1 text-xs text-gray-600">作者：{item.authorName} · 更新于 {formatDate(item.updatedAt, locale)}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-yellow-500/10 px-2 py-1 text-yellow-400">角色 {item.charCount}</span>
-            <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-400">事件 {item.eventCount}</span>
-            <span className="rounded-full bg-purple-500/10 px-2 py-1 text-purple-400">舞台 {item.stageCount}</span>
-          </div>
-        </div>
+      )}
       </div>
-      <CostCurve item={item} />
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-bold text-gray-400">主卡组构筑</p>
-          <span className="text-xs text-gray-600">共 50 张</span>
-        </div>
-        <div className="grid gap-2 @[640px]:grid-cols-2">
-          {entries.map(([number, count]) => {
-            const card = getCard(number);
-            const sprite = item.spriteMap[number] || card?.sprite || CARD_BACK_SRC;
-            return (
-              <div key={number} className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950 p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={thumbSrc(sprite)} alt={card?.name ?? number} className="h-14 w-10 rounded object-cover" onError={(event) => advanceImageFallback(event.currentTarget, [sprite])} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-gray-200">{card?.name ?? number}</p>
-                  <p className="mt-1 text-[11px] text-gray-600">{number}{card ? ` · 费用 ${card.cost}` : ""}</p>
-                </div>
-                <span className="rounded-lg bg-orange-500/15 px-2 py-1 text-xs font-black text-orange-300">×{count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -238,10 +236,10 @@ export default function DeckPlazaPanel({
         )}
       </div>
 
-      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="卡组详情" mobileSheet maxWidthClass="max-w-3xl">
+      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="卡组详情" mobileSheet maxWidthClass="max-w-6xl">
         {detail && (
           <>
-            <div className="max-h-[65vh] overflow-y-auto pr-1"><DeckDetail item={detail} key={`${detail.id}-${cardsReady}`} /></div>
+            <DeckDetail item={detail} cardsReady={cardsReady} key={`${detail.id}-${cardsReady}`} />
             <div className="mt-4 grid grid-cols-2 gap-2 @[640px]:grid-cols-4">
               <button type="button" onClick={() => HomeRequest.toggleDeckPlazaLike(detail.id)} className="min-h-11 rounded-xl border border-rose-500/40 text-sm font-bold text-rose-300">{detail.liked ? "取消点赞" : "点赞"}</button>
               <button type="button" onClick={() => HomeRequest.copyDeckPlaza(detail.id)} className="min-h-11 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-500">复制到我的卡组</button>

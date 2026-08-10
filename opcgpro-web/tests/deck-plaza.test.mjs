@@ -26,6 +26,17 @@ test("卡组广场提供筛选、详情、点赞、复制和作者管理闭环",
   assert.match(plaza, /HomeRequest\.publishDeckPlaza/);
 });
 
+test("卡组广场详情复用一图流预览并保留投稿异画", () => {
+  assert.match(plaza, /generateDeckImage/);
+  assert.match(plaza, /item\.spriteMap\[number\] \|\| card\.sprite/);
+  assert.match(plaza, /item\.leaderSprite \|\| leader\.sprite/);
+  assert.match(plaza, /URL\.createObjectURL\(generated\.blob\)/);
+  assert.match(plaza, /URL\.revokeObjectURL\(previewUrl\)/);
+  assert.match(plaza, /data-testid="deck-plaza-image-preview"/);
+  assert.match(plaza, /max-h-\[calc\(100dvh-15rem\)\]/);
+  assert.match(plaza, /max-w-6xl/);
+});
+
 test("卡组广场协议支持分页读取和全部写操作", () => {
   for (const proto of ["MsgDeckPlazaList", "MsgPublishDeckPlaza", "MsgLikeDeckPlaza", "MsgCopyDeckPlaza", "MsgDeleteDeckPlaza"]) {
     assert.match(types, new RegExp(proto));
