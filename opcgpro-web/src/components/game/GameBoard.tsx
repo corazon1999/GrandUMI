@@ -39,21 +39,21 @@ function PlayerMat({
   revealHands: boolean;
 }) {
   const isOpponent = side === "opponent";
-  const canShowDon = !isPlayback;
   const leaderStage = (
     <div className="flex items-end justify-center gap-4 md:gap-5">
       <LeaderCard side={side} />
       <StageSlot side={side} />
     </div>
   );
-  const donZone = canShowDon ? (
+  // 回放快照同样携带双方费用区与咚卡组数量；保持可见才能完整复盘出牌和贴咚。
+  const donZone = (
     <div className="flex w-full max-w-[32rem] items-center gap-2">
       <DonDeckPile side={side} />
       <div className="min-w-0 flex-1">
         <DonArea side={side} />
       </div>
     </div>
-  ) : null;
+  );
   const fieldZone = (
     <div className="min-w-0 flex-1 self-stretch">
       <FieldArea side={side} />
