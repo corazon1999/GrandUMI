@@ -40,6 +40,20 @@ test("排位前必须选择阵营，更换阵营须确认并清空排位进度",
   assert.match(rankedStore, /ResetRankProgress/);
 });
 
+test("排位卡片只显示当前段位并可展开阵营规则", async () => {
+  const lobby = await readSource("../src/components/home/LobbyPanel.tsx");
+
+  assert.doesNotMatch(lobby, /查看排位榜/);
+  assert.doesNotMatch(lobby, /rankLeaderboard/);
+  assert.doesNotMatch(lobby, /见习海贼 → 船长/);
+  assert.match(lobby, /当前段位/);
+  assert.match(lobby, /aria-label="排位阵营操作"/);
+  assert.match(lobby, /aria-expanded=\{rankRulesOpen\}/);
+  assert.match(lobby, />\s*阵营规则\s*</);
+  assert.match(lobby, /先完成 5 场定级赛/);
+  assert.match(lobby, /每 100 RP 变化一个小段，每 300 RP 进入下一称号/);
+});
+
 test("三阵营称号和新世界榜首称号按约定映射", async () => {
   const rankedStore = await readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs");
 

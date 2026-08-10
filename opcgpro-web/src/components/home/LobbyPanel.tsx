@@ -10,10 +10,10 @@ import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import type { RankFaction } from "@/types/net";
 
-const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; description: string; className: string }> = [
-  { id: "pirate", name: "海贼阵营", description: "见习海贼 → 船长", className: "border-rose-700/70 bg-rose-950/30 hover:border-rose-400" },
-  { id: "marine", name: "海军阵营", description: "海军三等兵 → 海军中将", className: "border-sky-700/70 bg-sky-950/30 hover:border-sky-400" },
-  { id: "government", name: "世界政府阵营", description: "政府线人 → 神之骑士团", className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
+const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; titles: readonly string[]; className: string }> = [
+  { id: "pirate", name: "海贼阵营", titles: ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长"], className: "border-rose-700/70 bg-rose-950/30 hover:border-rose-400" },
+  { id: "marine", name: "海军阵营", titles: ["海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将"], className: "border-sky-700/70 bg-sky-950/30 hover:border-sky-400" },
+  { id: "government", name: "世界政府阵营", titles: ["政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团"], className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
 ];
 
 const RANK_FACTION_NAMES: Record<RankFaction, string> = {
@@ -21,6 +21,32 @@ const RANK_FACTION_NAMES: Record<RankFaction, string> = {
   marine: "海军阵营",
   government: "世界政府阵营",
 };
+
+function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | null }) {
+  return (
+    <div id="rank-faction-rules" className="mt-2 rounded-xl border border-violet-800/60 bg-black/20 p-3 text-xs leading-5 text-gray-300">
+      <p className="font-bold text-violet-200">阵营只改变排位称号，不影响匹配范围或 RP 结算。</p>
+      <div className="mt-3 grid gap-2 @[640px]:grid-cols-3">
+        {RANK_FACTIONS.map((faction) => (
+          <section
+            key={faction.id}
+            className={`rounded-lg border p-2.5 ${faction.id === currentFaction ? "border-violet-400 bg-violet-950/40" : "border-gray-800 bg-gray-950/60"}`}
+          >
+            <h3 className="font-black text-white">{faction.name}{faction.id === currentFaction ? "（当前）" : ""}</h3>
+            <p className="mt-1 text-gray-400">{faction.titles.join("、")}</p>
+          </section>
+        ))}
+      </div>
+      <ul className="mt-3 list-disc space-y-1 pl-4 text-gray-400">
+        <li>先完成 5 场定级赛；定级结果最高为各阵营第三阶 I。</li>
+        <li>每个称号分 III、II、I 三个小段；每 100 RP 变化一个小段，每 300 RP 进入下一称号。</li>
+        <li>定级后胜局增加 12–30 RP，负局扣除 12–30 RP；第一阶不因失败扣除显示 RP，第二、三阶拥有大段保护。</li>
+        <li>达到 1500 RP 后进入“新世界”，阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
+        <li>更换阵营会清空本赛季 RP、定级进度和战绩，并重新开始定级。</li>
+      </ul>
+    </div>
+  );
+}
 
 // 从导出卡组码（exportDeckString 格式 A）统计主卡组张数：
 // 卡牌行形如「<数量> <卡号>」，跳过「# 注释」与「领航:」行。
@@ -40,7 +66,6 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const opponentName  = useNetStore((s) => s.opponentName);
   const matchQueueKind = useNetStore((s) => s.matchQueueKind);
   const rankProfile = useNetStore((s) => s.rankProfile);
-  const rankLeaderboard = useNetStore((s) => s.rankLeaderboard);
   const account       = useNetStore((s) => s.account);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
@@ -54,6 +79,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [botGoFirst, setBotGoFirst] = useState(true);
   const [announcementInput, setAnnouncementInput] = useState("");
   const [pendingFaction, setPendingFaction] = useState<RankFaction | null>(null);
+  const [factionEditorOpen, setFactionEditorOpen] = useState(false);
+  const [rankRulesOpen, setRankRulesOpen] = useState(false);
 
   // 主卡组须恰好 50 张（后端 DeckValidator 强制，不满会被拒，bug #183）。
   // 这里前置拦截：未满 50 时置灰按钮并提示，避免「点了没反应」。
@@ -284,64 +311,69 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                                   className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors ${faction.className}`}
                                 >
                                   <span className="block text-sm font-black text-white">{faction.name}</span>
-                                  <span className="mt-1 block text-[11px] text-gray-300">{faction.description}</span>
+                                  <span className="mt-1 block text-[11px] text-gray-300">完成定级后获得对应阵营称号</span>
                                 </button>
                               ))}
                             </div>
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-xs font-bold text-violet-300">{RANK_FACTION_NAMES[rankProfile.faction]} · {rankProfile.seasonId} 当前段位</p>
-                                <p className="mt-1 text-lg font-black text-white">
-                                  {rankProfile.placementGames < rankProfile.placementRequired
-                                    ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
-                                    : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
-                                </p>
-                              </div>
-                              {rankProfile.placementGames >= rankProfile.placementRequired && (
-                                <div className="text-right">
-                                  <p className="text-2xl font-black text-violet-200">{rankProfile.rankPoints}</p>
-                                  <p className="text-[11px] text-gray-500">RP</p>
-                                </div>
-                              )}
+                            <div>
+                              <p className="text-xs font-bold text-violet-300">{RANK_FACTION_NAMES[rankProfile.faction]} · {rankProfile.seasonId}</p>
+                              <p className="mt-1 text-[11px] font-bold text-gray-500">当前段位</p>
+                              <p className="mt-0.5 text-lg font-black text-white">
+                                {rankProfile.placementGames < rankProfile.placementRequired
+                                  ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
+                                  : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
+                              </p>
                             </div>
                             <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
-                            <details className="mt-2 border-t border-violet-900/60 pt-2">
-                              <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">更换阵营</summary>
-                              <p className="mb-2 text-xs leading-5 text-gray-400">更换后将清空本赛季 RP、定级进度和战绩，并从头定级。</p>
-                              <div className="grid gap-2 @[640px]:grid-cols-3">
-                                {RANK_FACTIONS.map((faction) => (
-                                  <button
-                                    key={faction.id}
-                                    type="button"
-                                    disabled={faction.id === rankProfile.faction}
-                                    onClick={() => requestFactionChange(faction.id)}
-                                    className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${faction.className}`}
-                                  >
-                                    <span className="block text-sm font-black text-white">{faction.id === rankProfile.faction ? `${faction.name}（当前）` : faction.name}</span>
-                                    <span className="mt-1 block text-[11px] text-gray-300">{faction.description}</span>
-                                  </button>
-                                ))}
+                            <div className="mt-2 grid grid-cols-2 border-y border-violet-900/60" aria-label="排位阵营操作">
+                              <button
+                                type="button"
+                                aria-expanded={factionEditorOpen}
+                                aria-controls="rank-faction-editor"
+                                onClick={() => {
+                                  setFactionEditorOpen((open) => !open);
+                                  setRankRulesOpen(false);
+                                }}
+                                className="min-h-11 px-2 text-left text-sm font-bold text-violet-300 transition-colors hover:bg-violet-900/30"
+                              >
+                                更换阵营
+                              </button>
+                              <button
+                                type="button"
+                                aria-expanded={rankRulesOpen}
+                                aria-controls="rank-faction-rules"
+                                onClick={() => {
+                                  setRankRulesOpen((open) => !open);
+                                  setFactionEditorOpen(false);
+                                }}
+                                className="min-h-11 border-l border-violet-900/60 px-2 text-left text-sm font-bold text-violet-300 transition-colors hover:bg-violet-900/30"
+                              >
+                                阵营规则
+                              </button>
+                            </div>
+                            {factionEditorOpen && (
+                              <div id="rank-faction-editor" className="mt-2">
+                                <p className="mb-2 text-xs leading-5 text-gray-400">更换后将清空本赛季 RP、定级进度和战绩，并从头定级。</p>
+                                <div className="grid gap-2 @[640px]:grid-cols-3">
+                                  {RANK_FACTIONS.map((faction) => (
+                                    <button
+                                      key={faction.id}
+                                      type="button"
+                                      disabled={faction.id === rankProfile.faction}
+                                      onClick={() => requestFactionChange(faction.id)}
+                                      className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${faction.className}`}
+                                    >
+                                      <span className="block text-sm font-black text-white">{faction.id === rankProfile.faction ? `${faction.name}（当前）` : faction.name}</span>
+                                      <span className="mt-1 block text-[11px] text-gray-300">{faction.id === rankProfile.faction ? `当前段位：${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}` : "更换后重新参加定级赛"}</span>
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
-                            </details>
-                            <details className="mt-2 border-t border-violet-900/60 pt-2">
-                              <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">查看排位榜</summary>
-                              <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
-                                {rankLeaderboard.length === 0 ? (
-                                  <p className="py-2 text-xs text-gray-500">本赛季暂时还没有完成定级的玩家。</p>
-                                ) : rankLeaderboard.slice(0, 20).map((item) => (
-                                  <div key={`${item.rank}-${item.displayName}`} className="flex items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-xs">
-                                    <span className="w-6 text-center font-black text-violet-300">#{item.rank}</span>
-                                    <span className="min-w-0 flex-1 truncate text-gray-200">{item.displayName}</span>
-                                    <span className="text-gray-500">{RANK_FACTION_NAMES[item.faction]}</span>
-                                    <span className="text-gray-400">{item.tier}{item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}</span>
-                                    <span className="w-12 text-right font-bold text-white">{item.rankPoints}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </details>
+                            )}
+                            {rankRulesOpen && <RankFactionRules currentFaction={rankProfile.faction} />}
                           </>
                         )}
                       </div>
