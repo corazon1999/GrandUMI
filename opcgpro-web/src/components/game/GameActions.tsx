@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useBattleStore } from "@/store/battleStore";
 import { useIsDefender } from "@/hooks/useIsDefender";
@@ -11,6 +12,7 @@ import { getCard } from "@/data/CardLoader";
  * 放在右侧栏"操作"小区，与"操作日志"区分隔。
  */
 export default function GameActions() {
+  const [isEndTurnConfirming, setIsEndTurnConfirming] = useState(false);
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
   const isPending = useGameStore((s) => s.isPending);
@@ -89,6 +91,23 @@ export default function GameActions() {
     attachTargetId !== null &&
     (my?.costActive ?? 0) > 0;
   const attachDonCounts = Array.from({ length: my?.costActive ?? 0 }, (_, index) => index + 1);
+  const hasOtherAction =
+    canAttack ||
+    isSelectingTarget ||
+    canPlay ||
+    canActivate ||
+    canAttachDon ||
+    canPassCounter;
+
+  useEffect(() => {
+    if (!isEndTurnConfirming) return;
+    const timer = window.setTimeout(() => setIsEndTurnConfirming(false), 3_000);
+    return () => window.clearTimeout(timer);
+  }, [isEndTurnConfirming]);
+
+  useEffect(() => {
+    setIsEndTurnConfirming(false);
+  }, [currentTurn, phase, turnCount, selectedHandIndex, selectedFieldId, isSelectingTarget]);
 
   const btn =
     "w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
@@ -116,6 +135,19 @@ export default function GameActions() {
     if (!attachTargetId) return;
     GameRequest.attachDon(attachTargetId, count);
     setSelectedField(null);
+  };
+
+  const requestEndTurn = () => {
+    if (hasOtherAction) {
+      setIsEndTurnConfirming(true);
+      return;
+    }
+    endTurn();
+  };
+
+  const confirmEndTurn = () => {
+    setIsEndTurnConfirming(false);
+    endTurn();
   };
 
   return (
@@ -204,13 +236,49 @@ export default function GameActions() {
       )}
 
       {currentTurn && (
-        <button
-          onClick={endTurn}
-          disabled={isPending}
-          className={`${btn} bg-orange-500 hover:bg-orange-400`}
-        >
-          结束回合
-        </button>
+        <div className="mt-2 border-t border-rose-200/20 pt-4">
+          <p className="mb-2 text-[10px] font-black tracking-[0.18em] text-slate-500">
+            回合控制
+          </p>
+          {isEndTurnConfirming ? (
+            <div
+              className="rounded-md border border-rose-300/30 bg-rose-950/35 p-2"
+              role="group"
+              aria-label="确认结束回合"
+            >
+              <p className="mb-2 text-center text-[11px] font-bold text-rose-100">
+                仍有可用操作，确认结束？
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEndTurnConfirming(false)}
+                  disabled={isPending}
+                  className="rounded-md bg-slate-700 px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-gray-600"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmEndTurn}
+                  disabled={isPending}
+                  className="rounded-md bg-rose-600 px-2 py-2 text-xs font-bold text-white shadow transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+                >
+                  确认结束
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={requestEndTurn}
+              disabled={isPending}
+              className={`${btn} border border-rose-300/35 bg-rose-950/65 text-rose-50 hover:bg-rose-900/80`}
+            >
+              结束回合
+            </button>
+          )}
+        </div>
       )}
 
       {!hasAny && (
