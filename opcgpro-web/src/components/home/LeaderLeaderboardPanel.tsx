@@ -49,16 +49,17 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
                 <p className="mt-1 truncate text-xs text-gray-500">{RANK_FACTION_NAMES[item.faction]} · {rankTierLabel(item)}</p>
+                <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-lg font-black text-violet-200">{item.rankPoints}</p>
-                <p className="text-[11px] text-gray-600">RP</p>
+                <p className="text-[11px] text-gray-600">PT</p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center text-xs">
               <div><p className="font-bold text-gray-200">{item.games}</p><p className="mt-1 text-gray-600">场次</p></div>
               <div><p><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></p><p className="mt-1 text-gray-600">战绩</p></div>
-              <div><p className="font-bold text-violet-200">{(item.winRate * 100).toFixed(1)}%</p><p className="mt-1 text-gray-600">胜率</p></div>
+              <div><p className="font-bold text-violet-200">{item.winRate.toFixed(1)}%</p><p className="mt-1 text-gray-600">胜率</p></div>
             </div>
           </li>
         ))}
@@ -67,10 +68,11 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
         <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
           <tr>
             <th className="w-20 px-4 py-3 text-center">排名</th>
-            <th className="px-3 py-3">玩家</th>
+            <th className="px-3 py-3">昵称</th>
             <th className="px-3 py-3">阵营</th>
             <th className="px-3 py-3">段位</th>
-            <th className="px-3 py-3 text-right">RP</th>
+            <th className="px-3 py-3">最擅长 Leader</th>
+            <th className="px-3 py-3 text-right">PT</th>
             <th className="px-3 py-3 text-right">场次</th>
             <th className="px-3 py-3 text-right">战绩</th>
             <th className="px-4 py-3 text-right">胜率</th>
@@ -83,10 +85,11 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
               <td className="px-3 py-3 text-sm font-bold text-white">{item.displayName}</td>
               <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
               <td className="px-3 py-3 text-sm text-gray-300">{rankTierLabel(item)}</td>
+              <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
               <td className="px-3 py-3 text-right text-sm font-black text-violet-200">{item.rankPoints}</td>
               <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
               <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
-              <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{(item.winRate * 100).toFixed(1)}%</td>
+              <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{item.winRate.toFixed(1)}%</td>
             </tr>
           ))}
         </tbody>

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.Sqlite;
+using GrandUMI.Game.Stats;
 
 namespace GrandUMI.Game.Ranked;
 
@@ -29,7 +30,8 @@ public sealed record RankLeaderboardItem(
     int? Division,
     int Games,
     int Wins,
-    double WinRate);
+    double WinRate,
+    string? FavoriteLeader);
 
 public sealed record RankSnapshot(
     RankProfileSnapshot Profile,
@@ -84,6 +86,7 @@ public static class RankWire
             games = value.Games,
             wins = value.Wins,
             winRate = value.WinRate,
+            favoriteLeader = value.FavoriteLeader,
         }).ToArray();
 
     public static object Settlement(RankPlayerSettlement value) => new
@@ -571,13 +574,25 @@ public sealed class RankedStore
         {
             entries.Add((reader.GetString(0), reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetString(5), reader.GetInt32(6), reader.GetInt32(7)));
         }
+        IReadOnlyDictionary<string, PlayerFavoriteLeader> favoriteLeaders;
+        try
+        {
+            favoriteLeaders = LeaderStatsStore.Default.GetFavoriteLeaders(entries.Select(entry => entry.AccountKey));
+        }
+        catch
+        {
+            // 排位数据库仍需在 Leader 统计源暂不可用时正常工作。
+            favoriteLeaders = new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
+        }
+
         var result = new List<RankLeaderboardItem>();
         foreach (var entry in entries)
         {
             var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
+            favoriteLeaders.TryGetValue(entry.AccountKey, out var favoriteLeader);
             result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.DisplayName, entry.RankPoints, entry.Faction,
                 label.Tier, label.Division, entry.Games, entry.Wins,
-                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1)));
+                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber));
         }
         return result;
     }

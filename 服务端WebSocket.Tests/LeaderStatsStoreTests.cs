@@ -2,6 +2,8 @@ using GrandUMI.Game;
 using GrandUMI.Game.Stats;
 using Microsoft.Data.Sqlite;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Xunit;
 
@@ -274,6 +276,25 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
+    public void 公开排位榜可按账号哈希读取最常使用的Leader()
+    {
+        var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        store.RecordMatch(Match("favorite-1", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
+        store.RecordMatch(Match("favorite-2", now.AddMinutes(1), MatchKind.Matchmaking, "L-A", "L-C", 1, 0, 8));
+        store.RecordMatch(Match("favorite-3", now.AddMinutes(2), MatchKind.Matchmaking, "L-D", "L-B", 0, 0, 8));
+
+        var favorites = store.GetFavoriteLeaders(new[] { HashAccount("Alice"), HashAccount("Bob"), "missing" });
+
+        var alice = favorites[HashAccount("Alice")];
+        Assert.Equal("L-A", alice.LeaderNumber);
+        Assert.Equal(2, alice.Games);
+        Assert.Equal(1, alice.Wins);
+        Assert.Equal("L-B", favorites[HashAccount("Bob")].LeaderNumber);
+        Assert.DoesNotContain("missing", favorites.Keys);
+    }
+
+    [Fact]
     public void 个人详情响应使用前端约定的驼峰字段()
     {
         var method = typeof(WebSocketBridge).GetMethod(
@@ -374,6 +395,9 @@ public sealed class LeaderStatsStoreTests : IDisposable
             firstPlayer,
             turnCount,
             "测试结束");
+
+    private static string HashAccount(string account)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant()))).ToLowerInvariant();
 
     public void Dispose()
     {

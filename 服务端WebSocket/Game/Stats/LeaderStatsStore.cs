@@ -82,6 +82,11 @@ public sealed record PlayerLeaderStatsItem(
     int SecondGames,
     double? SecondWinRate);
 
+public sealed record PlayerFavoriteLeader(
+    string LeaderNumber,
+    int Games,
+    int Wins);
+
 public sealed record PlayerStatsTrendPoint(
     string Label,
     int Games,
@@ -511,6 +516,59 @@ public sealed class LeaderStatsStore
                 secondGames == 0 ? null : secondWins / (double)secondGames,
                 topLeaders,
                 BuildPlayerTrend(appearances, period, generatedAtUtc));
+        }
+    }
+
+    /// <summary>按账号哈希批量读取最常使用的有效对局 Leader，供公开排位榜展示。</summary>
+    public IReadOnlyDictionary<string, PlayerFavoriteLeader> GetFavoriteLeaders(IEnumerable<string> playerKeys)
+    {
+        var keys = playerKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (keys.Length == 0) return new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
+
+        lock (_lock)
+        {
+            Initialize();
+            if (!File.Exists(_leaderboardDatabasePath))
+                return new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
+
+            using var connection = OpenLeaderboardConnection();
+            using var command = connection.CreateCommand();
+            var parameters = keys.Select((_, index) => $"$key{index}").ToArray();
+            command.CommandText = $"""
+                WITH appearances AS (
+                    SELECT player0_key AS player_key, player0_leader AS leader_number,
+                           CASE WHEN winner_index = 0 THEN 1 ELSE 0 END AS won
+                    FROM match_results
+                    WHERE counted = 1 AND player0_key IN ({string.Join(",", parameters)})
+                    UNION ALL
+                    SELECT player1_key AS player_key, player1_leader AS leader_number,
+                           CASE WHEN winner_index = 1 THEN 1 ELSE 0 END AS won
+                    FROM match_results
+                    WHERE counted = 1 AND player1_key IN ({string.Join(",", parameters)})
+                ), grouped AS (
+                    SELECT player_key, leader_number, COUNT(*) AS games, SUM(won) AS wins,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY player_key
+                               ORDER BY COUNT(*) DESC, SUM(won) * 1.0 / COUNT(*) DESC, leader_number ASC
+                           ) AS leader_rank
+                    FROM appearances
+                    GROUP BY player_key, leader_number
+                )
+                SELECT player_key, leader_number, games, wins
+                FROM grouped
+                WHERE leader_rank = 1;
+                """;
+            for (var index = 0; index < keys.Length; index++)
+                command.Parameters.AddWithValue(parameters[index], keys[index]);
+
+            var result = new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                result[reader.GetString(0)] = new PlayerFavoriteLeader(reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3));
+            return result;
         }
     }
 
