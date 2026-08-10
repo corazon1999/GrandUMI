@@ -25,3 +25,13 @@ test("好友面板可从正在进行的好友对局直接进入观战", async ()
   assert.match(panel, /spectateState === "joining"/);
   assert.match(panel, /spectateRoomId === friend\.roomId \? "进入中…" : "观战"/);
 });
+
+test("移动端好友列表在受限高度内支持纵向触摸滚动", async () => {
+  const panel = await readSource("../src/components/home/FriendsPanel.tsx");
+
+  assert.match(panel, /h-\[min\(70cqh,36rem\)\]/);
+  assert.match(panel, /max-h-\[calc\(100cqh-7rem\)\]/);
+  assert.match(panel, /min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain/);
+  assert.match(panel, /\[-webkit-overflow-scrolling:touch\]/);
+  assert.doesNotMatch(panel, /min-h-\[28rem\]/);
+});

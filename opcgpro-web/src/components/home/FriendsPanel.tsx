@@ -115,7 +115,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
 
   return (
     <Modal open={open} onClose={onClose} title="好友中心" mobileSheet maxWidthClass="max-w-2xl">
-      <div className="flex min-h-[28rem] flex-col" data-testid="friends-panel">
+      <div className="flex h-[min(70cqh,36rem)] min-h-0 max-h-[calc(100cqh-7rem)] flex-col" data-testid="friends-panel">
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-gray-950 p-1">
           <button type="button" onClick={() => switchTab("friends")} className={`min-h-11 rounded-lg text-sm font-bold transition-colors ${tab === "friends" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
             好友 {friends.length > 0 ? `(${friends.length})` : ""}
@@ -129,7 +129,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
           </button>
         </div>
 
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="mt-3 min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
           {tab === "friends" && (
             <div className="flex flex-col gap-2">
               {sortedFriends.length === 0 ? <EmptyState>还没有好友，去“添加好友”搜索账号或昵称吧</EmptyState> : sortedFriends.map((friend) => (
