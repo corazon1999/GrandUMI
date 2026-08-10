@@ -452,7 +452,7 @@ export default function MainPanel() {
     { view: "lobby", label: "对战" },
     { view: "deck", label: "卡组" },
     { view: "catalog", label: "图鉴" },
-    { view: "leaderboard", label: "排行" },
+    { view: "leaderboard", label: "排行榜" },
     { view: "cardBackPlaza", label: "卡背" },
     { view: "profile", label: "我的" },
   ];
@@ -518,7 +518,7 @@ export default function MainPanel() {
             <SidebarButton label="卡组" icon="deck" active={view === "deck"} onClick={() => setView("deck")} />
             <SidebarButton label={incomingFriendCount ? `好友 · ${incomingFriendCount} 条新申请` : "好友"} icon="friends" badge={incomingFriendCount} onClick={() => setShowFriends(true)} />
             <SidebarButton label="卡牌图鉴" icon="catalog" active={view === "catalog"} onClick={() => setView("catalog")} />
-            <SidebarButton label="Leader榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
+            <SidebarButton label="排行榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
             <SidebarButton label="卡背广场" icon="cardBackPlaza" active={view === "cardBackPlaza"} onClick={() => setView("cardBackPlaza")} />
             <SidebarButton label="我的" icon="profile" active={view === "profile"} onClick={() => setView("profile")} />
             <SidebarButton label="对局记录" icon="history" active={view === "history"} onClick={() => setView("history")} />

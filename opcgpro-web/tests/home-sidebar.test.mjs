@@ -12,7 +12,7 @@ test("桌面侧栏使用紧凑图标导航并保留当前页状态", () => {
   assert.match(source, /function SidebarButton/);
   assert.match(source, /aria-current=\{active \? "page" : undefined\}/);
 
-  for (const label of ["大厅", "卡组", "卡牌图鉴", "Leader榜", "卡背广场", "我的", "对局记录"]) {
+  for (const label of ["大厅", "卡组", "卡牌图鉴", "排行榜", "卡背广场", "我的", "对局记录"]) {
     assert.match(source, new RegExp(`SidebarButton label="${label}"`));
   }
 });

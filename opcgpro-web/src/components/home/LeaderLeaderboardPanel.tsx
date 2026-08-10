@@ -14,7 +14,7 @@ import {
   type LeaderLeaderboardSortKey,
   type LeaderLeaderboardSortState,
 } from "@/lib/leaderLeaderboardSort";
-import type { LeaderboardPeriod, LeaderLeaderboardItem } from "@/types/net";
+import type { LeaderboardPeriod, LeaderLeaderboardItem, RankFaction, RankLeaderboardItem } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
 
@@ -23,6 +23,77 @@ const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "30d", label: "近 30 天" },
   { value: "all", label: "全部" },
 ];
+
+const RANK_FACTION_NAMES: Record<RankFaction, string> = {
+  pirate: "海贼",
+  marine: "海军",
+  government: "世界政府",
+};
+
+function rankTierLabel(item: RankLeaderboardItem): string {
+  return `${item.tier}${item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}`;
+}
+
+function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
+  if (items.length === 0) {
+    return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有完成定级的玩家。</p>;
+  }
+
+  return (
+    <>
+      <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
+        {items.map((item) => (
+          <li key={`${item.rank}-${item.displayName}`} className="p-3">
+            <div className="flex items-center gap-3">
+              <span className={`w-7 shrink-0 text-center text-lg font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-400"}`}>#{item.rank}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
+                <p className="mt-1 truncate text-xs text-gray-500">{RANK_FACTION_NAMES[item.faction]} · {rankTierLabel(item)}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-lg font-black text-violet-200">{item.rankPoints}</p>
+                <p className="text-[11px] text-gray-600">RP</p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center text-xs">
+              <div><p className="font-bold text-gray-200">{item.games}</p><p className="mt-1 text-gray-600">场次</p></div>
+              <div><p><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></p><p className="mt-1 text-gray-600">战绩</p></div>
+              <div><p className="font-bold text-violet-200">{(item.winRate * 100).toFixed(1)}%</p><p className="mt-1 text-gray-600">胜率</p></div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <table className="hidden w-full min-w-[720px] border-collapse text-left @[1024px]:table">
+        <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
+          <tr>
+            <th className="w-20 px-4 py-3 text-center">排名</th>
+            <th className="px-3 py-3">玩家</th>
+            <th className="px-3 py-3">阵营</th>
+            <th className="px-3 py-3">段位</th>
+            <th className="px-3 py-3 text-right">RP</th>
+            <th className="px-3 py-3 text-right">场次</th>
+            <th className="px-3 py-3 text-right">战绩</th>
+            <th className="px-4 py-3 text-right">胜率</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-800/80">
+          {items.map((item) => (
+            <tr key={`${item.rank}-${item.displayName}`} className="transition-colors hover:bg-gray-900/80">
+              <td className={`px-4 py-3 text-center font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</td>
+              <td className="px-3 py-3 text-sm font-bold text-white">{item.displayName}</td>
+              <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
+              <td className="px-3 py-3 text-sm text-gray-300">{rankTierLabel(item)}</td>
+              <td className="px-3 py-3 text-right text-sm font-black text-violet-200">{item.rankPoints}</td>
+              <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
+              <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
+              <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{(item.winRate * 100).toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -136,12 +207,15 @@ function SortableHeader({
 export default function LeaderLeaderboardPanel() {
   const { locale } = useLanguage();
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
+  const rankProfile = useNetStore((s) => s.rankProfile);
+  const rankLeaderboard = useNetStore((s) => s.rankLeaderboard);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
   const [search, setSearch] = useState("");
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
+  const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("leader");
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
 
@@ -174,9 +248,10 @@ export default function LeaderLeaderboardPanel() {
   }, []);
 
   useEffect(() => {
+    if (rankingTab !== "leader") return;
     setSelectedLeader(null);
     HomeRequest.requestLeaderLeaderboard(period);
-  }, [period]);
+  }, [period, rankingTab]);
 
   useEffect(() => {
     if (
@@ -210,12 +285,33 @@ export default function LeaderLeaderboardPanel() {
     <section className="flex h-full min-h-0 flex-col p-3 @[640px]:p-6">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
+          <h2 className="text-xl font-bold text-white">排行榜</h2>
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
-            统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流
+            {rankingTab === "leader"
+              ? "统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流"
+              : "展示本赛季已完成定级的玩家排名，按 RP 与隐藏分排序。"}
           </p>
         </div>
-        <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex @[640px]:w-auto">
+        <div className="flex w-full flex-col gap-2 @[640px]:w-auto @[640px]:items-end">
+          <div className="grid w-full grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:w-auto">
+            <button
+              type="button"
+              onClick={() => setRankingTab("leader")}
+              aria-pressed={rankingTab === "leader"}
+              className={`min-h-11 rounded-md px-3 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankingTab === "leader" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+            >
+              Leader榜
+            </button>
+            <button
+              type="button"
+              onClick={() => setRankingTab("ranked")}
+              aria-pressed={rankingTab === "ranked"}
+              className={`min-h-11 rounded-md px-3 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankingTab === "ranked" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+            >
+              排位榜
+            </button>
+          </div>
+          {rankingTab === "leader" && <div className="grid grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex">
           <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
             {PERIODS.map((option) => (
               <button
@@ -239,11 +335,12 @@ export default function LeaderLeaderboardPanel() {
           >
             刷新
           </button>
+          </div>}
         </div>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 @[640px]:px-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
+        {rankingTab === "leader" ? <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
           <span>
             有效对局 <strong className="ml-1 text-white">{leaderboard?.totalMatches ?? 0}</strong>
           </span>
@@ -255,8 +352,12 @@ export default function LeaderLeaderboardPanel() {
               更新于 {formatGeneratedAt(leaderboard.generatedAtUtc, locale)}
             </span>
           )}
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 @[640px]:w-auto">
+        </div> : <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
+          <span>赛季 <strong className="ml-1 text-white">{rankProfile?.seasonId ?? "加载中"}</strong></span>
+          <span>已上榜 <strong className="ml-1 text-white">{rankLeaderboard.length}</strong> 名玩家</span>
+          <span className="text-gray-600">完成定级后进入排行榜</span>
+        </div>}
+        {rankingTab === "leader" && <div className="flex w-full flex-wrap items-center gap-2 @[640px]:w-auto">
           <div className="grid flex-1 grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:flex-none">
             <button
               type="button"
@@ -285,11 +386,11 @@ export default function LeaderLeaderboardPanel() {
               className="h-11 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 text-base text-white outline-none placeholder:text-gray-600 focus:border-orange-500 @[640px]:h-auto @[640px]:w-56 @[640px]:py-1.5 @[640px]:text-xs"
             />
           )}
-        </div>
+        </div>}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-gray-800 bg-gray-950/60">
-        {loading ? (
+        {rankingTab === "ranked" ? <RankedLeaderboard items={rankLeaderboard} /> : loading ? (
           <p className="py-16 text-center text-sm text-gray-600">正在加载排行榜…</p>
         ) : failed ? (
           <div className="py-16 text-center">
