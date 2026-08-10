@@ -91,14 +91,6 @@ export default function GameActions() {
     attachTargetId !== null &&
     (my?.costActive ?? 0) > 0;
   const attachDonCounts = Array.from({ length: my?.costActive ?? 0 }, (_, index) => index + 1);
-  const hasOtherAction =
-    canAttack ||
-    isSelectingTarget ||
-    canPlay ||
-    canActivate ||
-    canAttachDon ||
-    canPassCounter;
-
   useEffect(() => {
     if (!isEndTurnConfirming) return;
     const timer = window.setTimeout(() => setIsEndTurnConfirming(false), 3_000);
@@ -138,11 +130,7 @@ export default function GameActions() {
   };
 
   const requestEndTurn = () => {
-    if (hasOtherAction) {
-      setIsEndTurnConfirming(true);
-      return;
-    }
-    endTurn();
+    setIsEndTurnConfirming(true);
   };
 
   const confirmEndTurn = () => {
@@ -247,7 +235,7 @@ export default function GameActions() {
               aria-label="确认结束回合"
             >
               <p className="mb-2 text-center text-[11px] font-bold text-rose-100">
-                仍有可用操作，确认结束？
+                确定结束回合？
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
