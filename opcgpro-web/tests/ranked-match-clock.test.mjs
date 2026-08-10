@@ -58,6 +58,15 @@ test("对局界面展示双方独立的权威操作棋钟", async () => {
   assert.match(netTypes, /operationClockActive\?: "my" \| "opponent" \| null/);
 });
 
+test("休闲公开匹配也使用双方各二十分钟的操作棋钟", async () => {
+  const manager = await readSource("../../服务端WebSocket/Game/GameRoomManager.cs");
+
+  assert.match(manager, /private const long OperationTimeLimitMs = 20 \* 60 \* 1000/);
+  assert.match(manager, /OperationClockEnabled = matchKind is MatchKind\.Ranked or MatchKind\.Casual or MatchKind\.Matchmaking/);
+  assert.match(manager, /OperationClockRemainingMs\[0\] = OperationTimeLimitMs/);
+  assert.match(manager, /OperationClockRemainingMs\[1\] = OperationTimeLimitMs/);
+});
+
 test("断线提示只展示服务端两分钟宽限且不能提前判负", async () => {
   const [banner, manager] = await Promise.all([
     readSource("../src/components/game/OpponentDisconnectBanner.tsx"),

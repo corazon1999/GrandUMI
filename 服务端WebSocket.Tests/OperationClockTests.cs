@@ -66,6 +66,30 @@ public class OperationClockTests
     }
 
     [Fact]
+    public async Task 休闲对局同样启用双方二十分钟操作棋钟()
+    {
+        TestScene.New();
+        var room = CreateTimedRoom(MatchKind.Casual);
+        try
+        {
+            Assert.True(room.Engine.State.OperationClockEnabled);
+            Assert.All(room.Engine.State.OperationClockRemainingMs, value => Assert.Equal(1_200_000, value));
+
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+
+            Assert.Equal(room.Engine.State.CurrentTurnPlayer, room.Engine.State.OperationClockActivePlayer);
+            Assert.InRange(room.Engine.State.OperationClockRemainingMs[0], 1_199_000, 1_200_000);
+            Assert.Equal(1_200_000, room.Engine.State.OperationClockRemainingMs[1]);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public async Task 断线宽限为每局累计两分钟_重连不会重置额度()
     {
         TestScene.New();
@@ -98,13 +122,16 @@ public class OperationClockTests
     }
 
     private static GameRoomManager.RoomEntry CreateRankedRoom()
+        => CreateTimedRoom(MatchKind.Ranked);
+
+    private static GameRoomManager.RoomEntry CreateTimedRoom(MatchKind matchKind)
     {
         var suffix = Guid.NewGuid().ToString("N");
         return GameRoomManager.CreateRoom(
             $"clock-s0-{suffix}", $"clock-a-{suffix}", BuildLegalDeck("OP15-001"),
             $"clock-s1-{suffix}", $"clock-b-{suffix}", BuildLegalDeck("OP15-001"),
             p0First: true,
-            matchKind: MatchKind.Ranked,
+            matchKind: matchKind,
             broadcastInitialState: false);
     }
 
