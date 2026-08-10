@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import CardItem from "@/components/ui/CardItem";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import { getGameCard } from "@/data/CardLoader";
 import {
   detectCardZoneTransitions,
@@ -11,6 +12,7 @@ import {
   type CardZoneSide,
   type CardZoneTransition,
 } from "@/lib/cardZoneTransitions";
+import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type PlayerView } from "@/store/gameStore";
 
 const CARD_WIDTH = 72;
@@ -59,20 +61,20 @@ function specificAnchorKey(
   return genericAnchorKey(side, zone);
 }
 
-function toStageBounds(layer: HTMLElement, element: HTMLElement): Bounds {
-  const layerRect = layer.getBoundingClientRect();
-  const elementRect = element.getBoundingClientRect();
-  const scaleX = layerRect.width / layer.clientWidth || 1;
-  const scaleY = layerRect.height / layer.clientHeight || 1;
-  return {
-    left: (elementRect.left - layerRect.left) / scaleX,
-    top: (elementRect.top - layerRect.top) / scaleY,
-    width: elementRect.width / scaleX,
-    height: elementRect.height / scaleY,
-  };
+function toStageBounds(
+  layer: HTMLElement,
+  element: HTMLElement,
+  rotateQuarterTurn: boolean,
+): Bounds {
+  return viewportRectToLayerBounds({
+    layerRect: layer.getBoundingClientRect(),
+    layerWidth: layer.clientWidth,
+    layerHeight: layer.clientHeight,
+    rotateQuarterTurn,
+  }, element.getBoundingClientRect());
 }
 
-function collectBounds(layer: HTMLElement) {
+function collectBounds(layer: HTMLElement, rotateQuarterTurn: boolean) {
   const stage = layer.parentElement;
   const bounds = new Map<string, Bounds>();
   if (!stage) return bounds;
@@ -81,7 +83,7 @@ function collectBounds(layer: HTMLElement) {
     const side = element.dataset.zoneSide as CardZoneSide | undefined;
     const zone = element.dataset.zone as CardZone | undefined;
     if (!side || !zone) return;
-    const measured = toStageBounds(layer, element);
+    const measured = toStageBounds(layer, element, rotateQuarterTurn);
     const genericKey = genericAnchorKey(side, zone);
     if (!bounds.has(genericKey)) bounds.set(genericKey, measured);
     if (element.dataset.zoneCardId) {
@@ -225,6 +227,7 @@ function FlyingCard({
  */
 export default function CardZoneTransitionLayer() {
   const layerRef = useRef<HTMLDivElement>(null);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const previousFrameRef = useRef<BoardFrame | null>(null);
   const previousBoundsRef = useRef(new Map<string, Bounds>());
   const sequenceRef = useRef(0);
@@ -243,7 +246,7 @@ export default function CardZoneTransitionLayer() {
   useLayoutEffect(() => {
     const layer = layerRef.current;
     if (!layer) return;
-    const currentBounds = collectBounds(layer);
+    const currentBounds = collectBounds(layer, rotateQuarterTurn);
     const currentFrame: BoardFrame = {
       tick,
       my,
@@ -262,7 +265,7 @@ export default function CardZoneTransitionLayer() {
           const state = useGameStore.getState();
           // 只刷新同一份权威快照；若期间发生乐观更新，必须保留动作前坐标。
           if (state.tick === tick && state.my === my && state.opponent === opponent) {
-            previousBoundsRef.current = collectBounds(layer);
+            previousBoundsRef.current = collectBounds(layer, rotateQuarterTurn);
           }
         });
       });
@@ -329,6 +332,7 @@ export default function CardZoneTransitionLayer() {
     mulliganBothDone,
     my,
     opponent,
+    rotateQuarterTurn,
     tick,
     turnCount,
   ]);

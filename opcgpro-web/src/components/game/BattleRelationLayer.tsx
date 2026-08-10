@@ -10,6 +10,8 @@ import {
   normalizeAttackAttributes,
   type AttackAttribute,
 } from "@/lib/attackAttributeEffects";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
+import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type PlayerView } from "@/store/gameStore";
 
 interface Point {
@@ -56,7 +58,11 @@ function findCombatant(id: string | null, my: PlayerView | null, opponent: Playe
   return null;
 }
 
-function cardCenter(layer: HTMLElement, cardId: string): Point | null {
+function cardCenter(
+  layer: HTMLElement,
+  cardId: string,
+  rotateQuarterTurn: boolean,
+): Point | null {
   const stage = layer.parentElement;
   if (!stage) return null;
 
@@ -64,14 +70,16 @@ function cardCenter(layer: HTMLElement, cardId: string): Point | null {
     .find((element) => element.dataset.battleCardId === cardId);
   if (!card) return null;
 
-  const layerRect = layer.getBoundingClientRect();
-  const cardRect = card.getBoundingClientRect();
-  const scaleX = layerRect.width / layer.clientWidth || 1;
-  const scaleY = layerRect.height / layer.clientHeight || 1;
+  const bounds = viewportRectToLayerBounds({
+    layerRect: layer.getBoundingClientRect(),
+    layerWidth: layer.clientWidth,
+    layerHeight: layer.clientHeight,
+    rotateQuarterTurn,
+  }, card.getBoundingClientRect());
 
   return {
-    x: (cardRect.left - layerRect.left + cardRect.width / 2) / scaleX,
-    y: (cardRect.top - layerRect.top + cardRect.height / 2) / scaleY,
+    x: bounds.left + bounds.width / 2,
+    y: bounds.top + bounds.height / 2,
   };
 }
 
@@ -104,6 +112,7 @@ function powerLabel(value: number) {
 export default function BattleRelationLayer() {
   const layerRef = useRef<HTMLDivElement>(null);
   const previousRouteRef = useRef("");
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const battle = useGameStore((state) => state.battle);
   const my = useGameStore((state) => state.my);
   const opponent = useGameStore((state) => state.opponent);
@@ -147,8 +156,8 @@ export default function BattleRelationLayer() {
 
     let frame = 0;
     const update = () => {
-      const source = cardCenter(layer, battle.attackerCardId);
-      const targetPoint = cardCenter(layer, effectiveTargetId);
+      const source = cardCenter(layer, battle.attackerCardId, rotateQuarterTurn);
+      const targetPoint = cardCenter(layer, effectiveTargetId, rotateQuarterTurn);
       setPoints(source && targetPoint ? { source, target: targetPoint } : null);
     };
     const scheduleUpdate = () => {
@@ -166,7 +175,7 @@ export default function BattleRelationLayer() {
       window.removeEventListener("resize", scheduleUpdate);
       observer.disconnect();
     };
-  }, [battle, effectiveTargetId, routeKey, tick]);
+  }, [battle, effectiveTargetId, rotateQuarterTurn, routeKey, tick]);
 
   // 卡牌横置动画会改变可见外形；在声明/阻挡快照渲染完成后再校准一次端点。
   useEffect(() => {
@@ -174,12 +183,12 @@ export default function BattleRelationLayer() {
     const timeout = window.setTimeout(() => {
       const layer = layerRef.current;
       if (!layer || !effectiveTargetId) return;
-      const source = cardCenter(layer, battle.attackerCardId);
-      const targetPoint = cardCenter(layer, effectiveTargetId);
+      const source = cardCenter(layer, battle.attackerCardId, rotateQuarterTurn);
+      const targetPoint = cardCenter(layer, effectiveTargetId, rotateQuarterTurn);
       if (source && targetPoint) setPoints({ source, target: targetPoint });
     }, 760);
     return () => window.clearTimeout(timeout);
-  }, [battle, effectiveTargetId, tick]);
+  }, [battle, effectiveTargetId, rotateQuarterTurn, tick]);
 
   const path = points ? attackPath(points.source, points.target) : "";
   const attackerPower = attacker && battle ? attacker.power + battle.attackerBonus : 0;

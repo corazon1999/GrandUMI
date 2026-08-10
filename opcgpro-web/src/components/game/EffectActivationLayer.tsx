@@ -3,8 +3,10 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CardItem from "@/components/ui/CardItem";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import { getCard, getGameCard } from "@/data/CardLoader";
 import { useAudio } from "@/hooks/useAudio";
+import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type QueuedEffectActivation } from "@/store/gameStore";
 
 const EFFECT_DURATION_MS = 880;
@@ -62,7 +64,11 @@ const TRIGGER_LABELS: Record<string, string> = {
   EventCounter: "反击",
 };
 
-function findCardBounds(layer: HTMLElement, sourceId: string): CardBounds | null {
+function findCardBounds(
+  layer: HTMLElement,
+  sourceId: string,
+  rotateQuarterTurn: boolean,
+): CardBounds | null {
   const stage = layer.parentElement;
   if (!stage) return null;
 
@@ -72,17 +78,12 @@ function findCardBounds(layer: HTMLElement, sourceId: string): CardBounds | null
 
   // CardItem 自身承担横置旋转；读取它的实际包围盒，光环才能贴合横置后的外形。
   const surface = source.querySelector<HTMLElement>(".overflow-hidden.rounded-md.border-2") ?? source;
-  const layerRect = layer.getBoundingClientRect();
-  const surfaceRect = surface.getBoundingClientRect();
-  const scaleX = layerRect.width / layer.clientWidth || 1;
-  const scaleY = layerRect.height / layer.clientHeight || 1;
-
-  return {
-    left: (surfaceRect.left - layerRect.left) / scaleX,
-    top: (surfaceRect.top - layerRect.top) / scaleY,
-    width: surfaceRect.width / scaleX,
-    height: surfaceRect.height / scaleY,
-  };
+  return viewportRectToLayerBounds({
+    layerRect: layer.getBoundingClientRect(),
+    layerWidth: layer.clientWidth,
+    layerHeight: layer.clientHeight,
+    rotateQuarterTurn,
+  }, surface.getBoundingClientRect());
 }
 
 function SourceAura({
@@ -206,6 +207,7 @@ function CardCutIn({
  */
 export default function EffectActivationLayer() {
   const layerRef = useRef<HTMLDivElement>(null);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const queued = useGameStore((state) => state.effectActivationQueue[0] ?? null);
   const shiftEffectActivation = useGameStore((state) => state.shiftEffectActivation);
   const tick = useGameStore((state) => state.tick);
@@ -237,7 +239,7 @@ export default function EffectActivationLayer() {
     }
 
     let frame = 0;
-    const update = () => setBounds(findCardBounds(layer, active.sourceId));
+    const update = () => setBounds(findCardBounds(layer, active.sourceId, rotateQuarterTurn));
     const scheduleUpdate = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(update);
@@ -252,7 +254,7 @@ export default function EffectActivationLayer() {
       window.removeEventListener("resize", scheduleUpdate);
       observer.disconnect();
     };
-  }, [active, tick]);
+  }, [active, rotateQuarterTurn, tick]);
 
   const statusText = useMemo(() => {
     if (!active) return "";
