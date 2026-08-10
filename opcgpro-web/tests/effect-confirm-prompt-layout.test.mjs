@@ -28,3 +28,11 @@ test("效果确认框提供旋转确认取消按钮与右上角收起箭头", as
   assert.match(source, /<PromptChevron expanded \/>/);
   assert.match(source, /<PromptChevron expanded=\{false\} \/>/);
 });
+
+test("领袖目标在通用选择面板中显示明确标识", async () => {
+  const source = await readSource("../src/components/game/PromptOverlay.tsx");
+
+  assert.match(source, /const isLeaderChoice =/);
+  assert.match(source, /choiceZone === "leader"/);
+  assert.match(source, /isLeaderChoice \? " · 领袖"/);
+});

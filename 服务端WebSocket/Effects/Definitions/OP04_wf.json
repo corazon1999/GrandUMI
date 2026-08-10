@@ -179,7 +179,8 @@
           "prompt": "OwnLeaderOrCharacter",
           "max": 1,
           "min": 0,
-          "as": "$t"
+          "as": "$t",
+          "text": "选择己方最多1张领袖或角色，本次战斗力量+3000"
         },
         {
           "op": "AddPowerThisBattle",

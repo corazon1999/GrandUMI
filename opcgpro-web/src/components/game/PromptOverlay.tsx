@@ -633,6 +633,8 @@ export default function PromptOverlay() {
                   : fieldSide === "opponent"
                     ? (opp?.fieldCards.findIndex((c) => c.id === id) ?? -1)
                     : -1;
+                const isLeaderChoice =
+                  id === "leader" || id === my?.leaderId || id === opp?.leaderId || choiceZone === "leader";
                 const orderIdx = isOrdered ? selected.indexOf(id) : -1;
                 return (
                   <div
@@ -657,7 +659,7 @@ export default function PromptOverlay() {
                         }`}
                       >
                         {fieldSide === "my" ? "己方" : "对方"}
-                        {fieldIndex >= 0 ? ` · 第${fieldIndex + 1}位` : ""}
+                        {isLeaderChoice ? " · 领袖" : fieldIndex >= 0 ? ` · 第${fieldIndex + 1}位` : ""}
                       </span>
                     )}
                     {zoneLabel && (
