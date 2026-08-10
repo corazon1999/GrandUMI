@@ -6,6 +6,7 @@ using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Game;
+using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Validation;
 using GrandUMI.Persistence;
@@ -26,10 +27,11 @@ public static class WebSocketBridge
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
+        "OperationTimeout", "PlayerDisconnected", "PlayerReconnected",
     };
     private static readonly HashSet<string> CriticalOutboundProtocols = new(StringComparer.Ordinal)
     {
-        "MsgLogin", "MsgSecret", "MsgPlayerData", "MsgActionRejected", "MsgDuelOver",
+        "MsgLogin", "MsgSecret", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
@@ -41,6 +43,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object                                  AccountIndexGate = new();
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
+    private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
     private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
@@ -380,6 +383,7 @@ public static class WebSocketBridge
                 logStr = authentication.Message,
             });
             SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
+            SendRankSnapshot(s);
             Log($"登录 ✅ {playerData.Account}");
 
             // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
@@ -749,13 +753,23 @@ public static class WebSocketBridge
             return;
         }
 
-        s.Deck       = deck;
-        s.DeckName   = Str(msg, "deckName");
+        var queueKind = string.Equals(Str(msg, "queueKind"), "ranked", StringComparison.OrdinalIgnoreCase)
+            ? "ranked"
+            : "casual";
+        s.Deck = deck;
+        s.DeckName = Str(msg, "deckName");
+        s.MatchQueueKind = queueKind;
+        s.MatchEnqueuedAtUtc = DateTime.UtcNow;
+        s.MatchRating = queueKind == "ranked"
+            ? RankedStore.Default.GetMatchRating(s.Account!, s.PlayerName)
+            : 1500;
         s.IsMatching = true;
-        MatchQueue.Enqueue(s);
-        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true });
-        Log($"匹配加入 {s.Account}");
-        TryMatch();
+        var queue = queueKind == "ranked" ? RankedMatchQueue : MatchQueue;
+        queue.Enqueue(s);
+        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind });
+        Log($"{(queueKind == "ranked" ? "排位" : "休闲")}匹配加入 {s.Account}");
+        TryMatch(queueKind);
+        if (queueKind == "ranked") _ = RetryRankedMatchAsync(s);
     }
 
     /// <summary>单人测试模式：人类(P0,先手) vs 机器人(P1,同卡组)，立即建房</summary>
@@ -817,9 +831,11 @@ public static class WebSocketBridge
         Log($"匹配取消 {s.Account}");
     }
 
-    private static void TryMatch()
+    private static void TryMatch(string queueKind)
     {
-        while (TryTakeMatchPair(out var p1, out var p2))
+        var ranked = queueKind == "ranked";
+        var queue = ranked ? RankedMatchQueue : MatchQueue;
+        while (TryTakeMatchPairFromQueue(queue, ranked, out var p1, out var p2))
         {
             var deck1 = p1.Deck ?? "";
             var deck2 = p2.Deck ?? "";
@@ -834,17 +850,19 @@ public static class WebSocketBridge
                     p1CardBackId: p2.CardBackId,
                     p0SpriteMap: ResolveDeckSpriteMap(p1.Account ?? "", p1.DeckName, deck1),
                     p1SpriteMap: ResolveDeckSpriteMap(p2.Account ?? "", p2.DeckName, deck2),
-                    matchKind: MatchKind.Matchmaking,
-                    broadcastInitialState: false);
+                    matchKind: ranked ? MatchKind.Ranked : MatchKind.Casual,
+                    broadcastInitialState: false,
+                    p0DisplayName: p1.PlayerName,
+                    p1DisplayName: p2.PlayerName);
 
                 GameOpponent[p1.SessionId] = p2.SessionId;
                 GameOpponent[p2.SessionId] = p1.SessionId;
-                Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?" });
-                Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?" });
+                Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?", queueKind });
+                Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?", queueKind });
                 Send(p1.SessionId, new { proto = "MsgGameStart" });
                 Send(p2.SessionId, new { proto = "MsgGameStart" });
                 room.Engine.BroadcastInitialState();
-                Log($"匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
+                Log($"{(ranked ? "排位" : "休闲")}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
             }
             catch (Exception ex)
             {
@@ -855,40 +873,75 @@ public static class WebSocketBridge
         }
     }
 
+    private static async Task RetryRankedMatchAsync(WsSession session)
+    {
+        foreach (var delay in new[] { 15, 15, 30, 30 })
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(delay), _cts.Token); }
+            catch (OperationCanceledException) { return; }
+            if (!session.IsMatching || session.MatchQueueKind != "ranked") return;
+            TryMatch("ranked");
+        }
+    }
+
     /// <summary>
     /// 在同一临界区内取出并占用一对不同玩家，避免并发 TryMatch 或重复队列项让同一会话进入两个座位。
     /// 若暂时没有合法对手，只把第一名玩家重新入队一次。
     /// </summary>
     private static bool TryTakeMatchPair(out WsSession p1, out WsSession p2)
+        => TryTakeMatchPairFromQueue(MatchQueue, ranked: false, out p1, out p2);
+
+    private static bool TryTakeMatchPairFromQueue(
+        ConcurrentQueue<WsSession> queue,
+        bool ranked,
+        out WsSession p1,
+        out WsSession p2)
     {
         lock (MatchQueueGate)
         {
-            while (TryTakeMatchingSession(out var first))
+            var waiting = new List<WsSession>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            while (TryTakeMatchingSession(queue, out var candidate))
             {
-                while (TryTakeMatchingSession(out var second))
+                if (seen.Add(candidate.SessionId)) waiting.Add(candidate);
+            }
+
+            waiting.Sort((left, right) => left.MatchEnqueuedAtUtc.CompareTo(right.MatchEnqueuedAtUtc));
+            for (var firstIndex = 0; firstIndex < waiting.Count; firstIndex++)
+            {
+                var first = waiting[firstIndex];
+                var bestIndex = -1;
+                var bestGap = double.MaxValue;
+                for (var secondIndex = firstIndex + 1; secondIndex < waiting.Count; secondIndex++)
                 {
+                    var second = waiting[secondIndex];
                     if (first.SessionId == second.SessionId || ReferenceEquals(first, second))
                         continue;
-
                     if (string.Equals(first.Account, second.Account, StringComparison.OrdinalIgnoreCase))
                     {
-                        // 同账号只能有一个当前有效连接；异常残留项直接失效，不能作为另一名玩家。
                         second.IsMatching = false;
                         continue;
                     }
-
-                    // 在持锁状态下先占用双方，其他并发匹配线程不能再次取到同一玩家。
-                    first.IsMatching = false;
-                    second.IsMatching = false;
-                    p1 = first;
-                    p2 = second;
-                    return true;
+                    var gap = Math.Abs(first.MatchRating - second.MatchRating);
+                    if (ranked && gap > AllowedRankGap(first, second)) continue;
+                    if (!ranked) { bestIndex = secondIndex; break; }
+                    if (gap < bestGap) { bestGap = gap; bestIndex = secondIndex; }
                 }
+                if (bestIndex < 0) continue;
 
-                if (first.IsMatching && IsCurrentAccountSession(first))
-                    MatchQueue.Enqueue(first);
-                break;
+                var secondPlayer = waiting[bestIndex];
+                first.IsMatching = false;
+                secondPlayer.IsMatching = false;
+                for (var i = 0; i < waiting.Count; i++)
+                    if (i != firstIndex && i != bestIndex && waiting[i].IsMatching)
+                        queue.Enqueue(waiting[i]);
+                p1 = first;
+                p2 = secondPlayer;
+                return true;
             }
+
+            foreach (var session in waiting.Where(item => item.IsMatching && IsCurrentAccountSession(item)))
+                queue.Enqueue(session);
         }
 
         p1 = null!;
@@ -896,9 +949,20 @@ public static class WebSocketBridge
         return false;
     }
 
-    private static bool TryTakeMatchingSession(out WsSession session)
+    private static double AllowedRankGap(WsSession first, WsSession second)
     {
-        while (MatchQueue.TryDequeue(out var candidate))
+        var waited = Math.Max(
+            (DateTime.UtcNow - first.MatchEnqueuedAtUtc).TotalSeconds,
+            (DateTime.UtcNow - second.MatchEnqueuedAtUtc).TotalSeconds);
+        return waited switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => double.MaxValue };
+    }
+
+    private static bool TryTakeMatchingSession(out WsSession session)
+        => TryTakeMatchingSession(MatchQueue, out session);
+
+    private static bool TryTakeMatchingSession(ConcurrentQueue<WsSession> queue, out WsSession session)
+    {
+        while (queue.TryDequeue(out var candidate))
         {
             if (!candidate.IsMatching || candidate.Socket.State != WebSocketState.Open) continue;
             if (!IsCurrentAccountSession(candidate))
@@ -928,6 +992,25 @@ public static class WebSocketBridge
         // ConcurrentQueue 不支持按项删除；把取消项标记为墓碑，由下一次匹配 O(1) 跳过。
         // 避免每次取消或断线都重建整条队列，形成高峰期 O(N²) 开销。
         exclude.IsMatching = false;
+    }
+
+    private static void SendRankSnapshot(WsSession session)
+    {
+        if (session.Account is null) return;
+        try
+        {
+            var snapshot = RankedStore.Default.GetSnapshot(session.Account, session.PlayerName);
+            Send(session.SessionId, new
+            {
+                proto = "MsgRankSnapshot",
+                profile = RankWire.Profile(snapshot.Profile),
+                leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"排位资料读取失败 {session.Account}: {ex.Message}");
+        }
     }
 
     // ── 房间码对战 ────────────────────────────────────────────────────────
@@ -1973,7 +2056,7 @@ public static class WebSocketBridge
         PushFriendlyRoom(room);
     }
 
-    /// <summary>赛前房间断线保留 30 秒等待同账号重连；对战中由正式对局的 90 秒宽限期处理。</summary>
+    /// <summary>赛前房间断线保留 30 秒等待同账号重连；对战中由正式对局的 2 分钟宽限期处理。</summary>
     private static void HandleFriendlyDisconnect(string account)
     {
         if (!FriendlyByAccount.TryGetValue(account, out var roomId)) return;

@@ -59,6 +59,14 @@ public class GameState
     public string? GameOverReason { get; set; }
     public bool IsGameOver => WinnerIndex.HasValue;
 
+    /// <summary>公开匹配的双方独立操作棋钟；选择先后手与调度手牌阶段不启用。</summary>
+    public bool OperationClockEnabled { get; set; }
+    public long[] OperationClockRemainingMs { get; } = [1_200_000, 1_200_000];
+    public int OperationClockActivePlayer { get; set; } = -1;
+    public DateTime? OperationClockSyncUtc { get; set; }
+    public bool OperationClockPaused { get; set; }
+    public MatchKind MatchKind { get; set; } = MatchKind.UnknownHuman;
+
     /// <summary>序号（每次状态变化 +1，便于客户端识别快照新旧）</summary>
     public int Tick { get; set; }
 

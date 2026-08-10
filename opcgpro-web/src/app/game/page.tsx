@@ -32,6 +32,8 @@ export default function GamePage() {
   const isGameOver = useGameStore((s) => s.isGameOver);
   const winnerIsMe = useGameStore((s) => s.winnerIsMe);
   const gameOverReason = useGameStore((s) => s.gameOverReason);
+  const matchKind = useGameStore((s) => s.matchKind);
+  const rankResult = useNetStore((s) => s.lastRankResult);
 
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
@@ -152,6 +154,26 @@ export default function GamePage() {
               >
                 结束原因：{gameOverReason}
               </motion.p>
+            )}
+            {matchKind === "Ranked" && rankResult && (
+              <motion.div
+                className="mt-4 min-w-64 rounded-xl border border-violet-400/40 bg-violet-950/70 px-5 py-3 text-center"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+              >
+                <p className="text-xs font-bold text-violet-300">排位结算</p>
+                <p className="mt-1 text-lg font-black text-white">
+                  {rankResult.placementGames < rankResult.placementRequired
+                    ? `定级进度 ${rankResult.placementGames}/${rankResult.placementRequired}`
+                    : `${rankResult.tier}${rankResult.division ? ` ${["", "I", "II", "III"][rankResult.division]}` : ""}`}
+                </p>
+                {rankResult.placementGames >= rankResult.placementRequired && (
+                  <p className={`mt-1 text-2xl font-black ${rankResult.rankPointDelta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    {rankResult.rankPointDelta >= 0 ? "+" : ""}{rankResult.rankPointDelta} RP
+                  </p>
+                )}
+              </motion.div>
             )}
             <motion.button
               onClick={returnToHome}

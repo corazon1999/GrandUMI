@@ -7,9 +7,9 @@ using Xunit;
 namespace GrandUMI.Tests;
 
 /// <summary>
-/// 覆盖“响应一个效果选择后，续程立即触发满场挤位选择”的真实并发路径。
+/// 覆盖 Prompt 必须等待玩家明确响应，以及响应后续程立即触发满场挤位选择的真实并发路径。
 /// 默认 TaskCompletionSource 会把续程内联到持有房间锁的 PromptResponse 中，
-/// 导致第二个 PromptResponse 无法取得房间锁，只能等待 30 秒超时。
+/// 导致第二个 PromptResponse 无法取得房间锁。
 /// </summary>
 public class PromptContinuationTests
 {
@@ -53,26 +53,26 @@ public class PromptContinuationTests
     }
 
     [Fact]
-    public async Task LookTopReveal_ShouldWaitUntilPlayerResponds()
+    public async Task RegularPrompt_ShouldWaitUntilPlayerResponds()
     {
         var deck = LegalOp17Deck();
         var engine = new GameEngine(
-            "look-top-no-timeout",
+            "regular-prompt-no-timeout",
             ("s0", "alice", deck),
             ("s1", "bob", deck),
             firstPlayer: 0,
             rngSeed: 20260810);
-        var prompts = new PromptSystem(engine, TimeSpan.FromMilliseconds(30));
+        var prompts = new PromptSystem(engine);
         var choice = engine.State.Players[0].Deck[0].Id.ToString();
 
         var chooseTask = prompts.ChooseCards(
             0,
-            "LookTopReveal",
-            "确认卡组顶 5 张，公开最多 1 张加入手牌",
+            "OwnHandDiscard",
+            "选择要丢弃的手牌",
             new[] { choice },
-            min: 0,
+            min: 1,
             max: 1);
-        var pending = await WaitForPrompt(engine, p => p.Kind == "LookTopReveal");
+        var pending = await WaitForPrompt(engine, p => p.Kind == "OwnHandDiscard");
 
         await Task.Delay(120);
 

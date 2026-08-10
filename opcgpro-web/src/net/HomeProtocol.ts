@@ -37,6 +37,8 @@ import type {
   MsgEnterBotMatch,
   MsgCancelMatch,
   MsgMatchFound,
+  MsgRankSnapshot,
+  MsgRankResult,
   MsgCreateRoom,
   MsgJoinRoom,
   MsgCancelRoom,
@@ -168,6 +170,12 @@ export function registerHomeProtocols() {
         break;
       case "MsgMatchFound":
         handleMatchFound(msg as MsgMatchFound);
+        break;
+      case "MsgRankSnapshot":
+        handleRankSnapshot(msg as MsgRankSnapshot);
+        break;
+      case "MsgRankResult":
+        handleRankResult(msg as MsgRankResult);
         break;
       case "MsgCreateRoom":
         handleCreateRoom(msg as MsgCreateRoom);
@@ -460,6 +468,7 @@ function handleEnterMatch(msg: MsgEnterMatch) {
     showMessage(msg.logStr ?? "加入匹配失败", "error");
     return;
   }
+  if (msg.queueKind) useNetStore.getState().setMatchQueueKind(msg.queueKind);
   useNetStore.getState().setMatchState("matching");
 }
 
@@ -483,9 +492,26 @@ function handleCancelMatch(_msg: MsgCancelMatch) {
  * MsgMatchFound — 匹配成功
  */
 function handleMatchFound(msg: MsgMatchFound) {
+  if (msg.queueKind) {
+    useNetStore.getState().setMatchQueueKind(msg.queueKind);
+    if (typeof window !== "undefined") sessionStorage.setItem("grandumi_match_queue_kind", msg.queueKind);
+  }
   useNetStore.getState().setOpponentName(msg.opponentName);
   useNetStore.getState().setMatchState("matched");
   showMessage(`匹配成功！对手：${msg.opponentName}`, "info");
+}
+
+function handleRankSnapshot(msg: MsgRankSnapshot) {
+  useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+}
+
+function handleRankResult(msg: MsgRankResult) {
+  if (msg.error) {
+    showMessage(msg.error, "error");
+    return;
+  }
+  if (msg.profile) useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+  if (msg.result) useNetStore.getState().setLastRankResult(msg.result);
 }
 
 /**
@@ -847,12 +873,15 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgDeleteDeckPlaza", publicationId } as MsgDeleteDeckPlaza);
   },
 
-  enterMatch(deck: string, deckName?: string) {
+  enterMatch(deck: string, deckName?: string, queueKind: "ranked" | "casual" = "casual") {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
+    useNetStore.getState().setMatchQueueKind(queueKind);
+    useNetStore.getState().setLastRankResult(null);
     return NetManager.send({
       proto: "MsgEnterMatch",
       deck,
       deckName,
+      queueKind,
     } as MsgEnterMatch);
   },
 

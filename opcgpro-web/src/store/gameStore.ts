@@ -129,6 +129,13 @@ interface GameStore {
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc: string | null;
+  operationClockEnabled: boolean;
+  myOperationTimeMs: number;
+  opponentOperationTimeMs: number;
+  operationClockActive: "my" | "opponent" | null;
+  operationClockSyncUtc: string | null;
+  operationClockPaused: boolean;
+  matchKind: MsgGameState["matchKind"];
   phase: BattlePhase;
   viewerKind: "player" | "spectator";
 
@@ -215,6 +222,13 @@ export const useGameStore = create<GameStore>()(
     startingDiceRolls: [],
     mulliganBothDone: false,
     mulliganDeadlineUtc: null,
+    operationClockEnabled: false,
+    myOperationTimeMs: 1_200_000,
+    opponentOperationTimeMs: 1_200_000,
+    operationClockActive: null,
+    operationClockSyncUtc: null,
+    operationClockPaused: false,
+    matchKind: "UnknownHuman",
     phase: "Main",
     viewerKind: "player",
     my: null,
@@ -264,6 +278,13 @@ export const useGameStore = create<GameStore>()(
         s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
         s.mulliganDeadlineUtc = msg.mulliganDeadlineUtc ?? null;
+        s.operationClockEnabled = msg.operationClockEnabled ?? false;
+        s.myOperationTimeMs = msg.myOperationTimeMs ?? 1_200_000;
+        s.opponentOperationTimeMs = msg.opponentOperationTimeMs ?? 1_200_000;
+        s.operationClockActive = msg.operationClockActive ?? null;
+        s.operationClockSyncUtc = msg.operationClockSyncUtc ?? null;
+        s.operationClockPaused = msg.operationClockPaused ?? false;
+        s.matchKind = msg.matchKind ?? "UnknownHuman";
         s.isGameOver = msg.isGameOver ?? false;
         s.winnerIsMe = msg.winnerIsMe ?? false;
         s.gameOverReason = msg.gameOverReason ?? "";
@@ -406,6 +427,13 @@ export const useGameStore = create<GameStore>()(
       s.startingDiceRolls = [];
       s.mulliganBothDone = false;
       s.mulliganDeadlineUtc = null;
+      s.operationClockEnabled = false;
+      s.myOperationTimeMs = 1_200_000;
+      s.opponentOperationTimeMs = 1_200_000;
+      s.operationClockActive = null;
+      s.operationClockSyncUtc = null;
+      s.operationClockPaused = false;
+      s.matchKind = "UnknownHuman";
       s.phase = "Main";
       s.my = null;
       s.opponent = null;

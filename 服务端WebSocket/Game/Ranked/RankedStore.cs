@@ -1,0 +1,566 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Data.Sqlite;
+
+namespace GrandUMI.Game.Ranked;
+
+public sealed record RankProfileSnapshot(
+    string SeasonId,
+    DateTime SeasonStartsAtUtc,
+    DateTime SeasonEndsAtUtc,
+    int PlacementGames,
+    int PlacementRequired,
+    int RankPoints,
+    string Tier,
+    int? Division,
+    int Games,
+    int Wins,
+    int Losses,
+    int HighestRankPoints);
+
+public sealed record RankLeaderboardItem(
+    int Rank,
+    string DisplayName,
+    int RankPoints,
+    string Tier,
+    int? Division,
+    int Games,
+    int Wins,
+    double WinRate);
+
+public sealed record RankSnapshot(
+    RankProfileSnapshot Profile,
+    IReadOnlyList<RankLeaderboardItem> Leaderboard);
+
+public sealed record RankPlayerSettlement(
+    string Account,
+    int RankPointsBefore,
+    int RankPointsAfter,
+    int RankPointDelta,
+    string Tier,
+    int? Division,
+    int PlacementGames,
+    int PlacementRequired,
+    bool PlacementCompleted);
+
+public sealed record RankedMatchSettlement(
+    string MatchId,
+    RankPlayerSettlement Player0,
+    RankPlayerSettlement Player1);
+
+public static class RankWire
+{
+    public static object Profile(RankProfileSnapshot value) => new
+    {
+        seasonId = value.SeasonId,
+        seasonStartsAtUtc = value.SeasonStartsAtUtc,
+        seasonEndsAtUtc = value.SeasonEndsAtUtc,
+        placementGames = value.PlacementGames,
+        placementRequired = value.PlacementRequired,
+        rankPoints = value.RankPoints,
+        tier = value.Tier,
+        division = value.Division,
+        games = value.Games,
+        wins = value.Wins,
+        losses = value.Losses,
+        highestRankPoints = value.HighestRankPoints,
+    };
+
+    public static object[] Leaderboard(IReadOnlyList<RankLeaderboardItem> values)
+        => values.Select(value => (object)new
+        {
+            rank = value.Rank,
+            displayName = value.DisplayName,
+            rankPoints = value.RankPoints,
+            tier = value.Tier,
+            division = value.Division,
+            games = value.Games,
+            wins = value.Wins,
+            winRate = value.WinRate,
+        }).ToArray();
+
+    public static object Settlement(RankPlayerSettlement value) => new
+    {
+        account = value.Account,
+        rankPointsBefore = value.RankPointsBefore,
+        rankPointsAfter = value.RankPointsAfter,
+        rankPointDelta = value.RankPointDelta,
+        tier = value.Tier,
+        division = value.Division,
+        placementGames = value.PlacementGames,
+        placementRequired = value.PlacementRequired,
+        placementCompleted = value.PlacementCompleted,
+    };
+}
+
+/// <summary>
+/// 排位赛独立 SQLite。测试服和正式服可能共用玩家资料库，因此排位数据必须通过
+/// GRANDUMI_RANKED_DB 按环境隔离，不能写入 players.db。
+/// </summary>
+public sealed class RankedStore
+{
+    public const int PlacementRequired = 5;
+    private const double InitialRating = 1500;
+    private const double InitialDeviation = 350;
+    private const double InitialVolatility = 0.06;
+    private const double GlickoScale = 173.7178;
+    private const double Tau = 0.5;
+    private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
+    private readonly object _gate = new();
+    private readonly string _databasePath;
+    private readonly string _connectionString;
+    private bool _initialized;
+
+    public static RankedStore Default { get; } = new();
+
+    public RankedStore(string? databasePath = null)
+    {
+        _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
+        _connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            Pooling = false,
+            DefaultTimeout = 5,
+        }.ToString();
+    }
+
+    public string DatabasePath => _databasePath;
+
+    public static string ResolveDefaultPath()
+    {
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_RANKED_DB");
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "ranked.db"));
+        return Path.Combine(Path.GetDirectoryName(Persistence.PlayerDataStore.ResolveDefaultPath())!, "ranked.db");
+    }
+
+    public void Initialize()
+    {
+        lock (_gate)
+        {
+            if (_initialized) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                PRAGMA busy_timeout=5000;
+
+                CREATE TABLE IF NOT EXISTS rank_profiles (
+                    season_id          TEXT NOT NULL,
+                    account_key        TEXT NOT NULL,
+                    display_name       TEXT NOT NULL,
+                    rating             REAL NOT NULL,
+                    rating_deviation   REAL NOT NULL,
+                    volatility         REAL NOT NULL,
+                    rank_points        INTEGER NOT NULL,
+                    highest_rank_points INTEGER NOT NULL,
+                    placement_games    INTEGER NOT NULL,
+                    games              INTEGER NOT NULL,
+                    wins               INTEGER NOT NULL,
+                    losses             INTEGER NOT NULL,
+                    updated_at_utc     TEXT NOT NULL,
+                    PRIMARY KEY(season_id, account_key)
+                );
+
+                CREATE TABLE IF NOT EXISTS ranked_matches (
+                    match_id            TEXT PRIMARY KEY,
+                    season_id           TEXT NOT NULL,
+                    ended_at_utc         TEXT NOT NULL,
+                    player0_key          TEXT NOT NULL,
+                    player1_key          TEXT NOT NULL,
+                    winner_index         INTEGER NOT NULL,
+                    player0_rp_delta     INTEGER NOT NULL,
+                    player1_rp_delta     INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS rank_rating_events (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    match_id            TEXT NOT NULL,
+                    season_id           TEXT NOT NULL,
+                    account_key         TEXT NOT NULL,
+                    rating_before       REAL NOT NULL,
+                    rating_after        REAL NOT NULL,
+                    rp_before           INTEGER NOT NULL,
+                    rp_after            INTEGER NOT NULL,
+                    created_at_utc      TEXT NOT NULL,
+                    UNIQUE(match_id, account_key)
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_rank_profiles_leaderboard
+                    ON rank_profiles(season_id, placement_games, rank_points DESC);
+                """;
+            command.ExecuteNonQuery();
+            _initialized = true;
+        }
+    }
+
+    public RankSnapshot GetSnapshot(string account, string? displayName = null, DateTime? nowUtc = null)
+    {
+        lock (_gate)
+        {
+            Initialize();
+            var season = SeasonAt(nowUtc ?? DateTime.UtcNow);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
+            if (!string.Equals(profile.DisplayName, displayName ?? account, StringComparison.Ordinal))
+            {
+                profile = profile with { DisplayName = displayName ?? account };
+                Save(connection, transaction, profile);
+            }
+            transaction.Commit();
+            return new RankSnapshot(ToSnapshot(profile, season), ReadLeaderboard(connection, season));
+        }
+    }
+
+    public double GetMatchRating(string account, string? displayName = null, DateTime? nowUtc = null)
+    {
+        lock (_gate)
+        {
+            Initialize();
+            var season = SeasonAt(nowUtc ?? DateTime.UtcNow);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
+            transaction.Commit();
+            return profile.Rating;
+        }
+    }
+
+    public RankedMatchSettlement? RecordMatch(
+        string matchId,
+        DateTime endedAtUtc,
+        string player0Account,
+        string player0Name,
+        string player1Account,
+        string player1Name,
+        int winnerIndex)
+    {
+        if (winnerIndex is not (0 or 1)) return null;
+        lock (_gate)
+        {
+            Initialize();
+            var season = SeasonAt(endedAtUtc);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            if (MatchExists(connection, transaction, matchId)) return null;
+
+            var before0 = LoadOrCreate(connection, transaction, season, player0Account, player0Name);
+            var before1 = LoadOrCreate(connection, transaction, season, player1Account, player1Name);
+            var score0 = winnerIndex == 0 ? 1d : 0d;
+            var score1 = 1d - score0;
+            var afterRating0 = UpdateRating(before0, before1, score0);
+            var afterRating1 = UpdateRating(before1, before0, score1);
+            var expected0 = Expected(before0.Rating, before1.Rating);
+            var expected1 = 1d - expected0;
+            var after0 = ApplyResult(before0, afterRating0, score0, expected0);
+            var after1 = ApplyResult(before1, afterRating1, score1, expected1);
+
+            Save(connection, transaction, after0);
+            Save(connection, transaction, after1);
+            InsertMatch(connection, transaction, matchId, season.Id, endedAtUtc, before0.AccountKey,
+                before1.AccountKey, winnerIndex, after0.RankPoints - before0.RankPoints,
+                after1.RankPoints - before1.RankPoints);
+            InsertEvent(connection, transaction, matchId, season.Id, before0, after0, endedAtUtc);
+            InsertEvent(connection, transaction, matchId, season.Id, before1, after1, endedAtUtc);
+            transaction.Commit();
+
+            return new RankedMatchSettlement(
+                matchId,
+                ToSettlement(player0Account, before0, after0),
+                ToSettlement(player1Account, before1, after1));
+        }
+    }
+
+    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score, double expected)
+    {
+        var placementGames = Math.Min(PlacementRequired, before.PlacementGames + 1);
+        var games = before.Games + 1;
+        var wins = before.Wins + (score > 0.5 ? 1 : 0);
+        var losses = before.Losses + (score < 0.5 ? 1 : 0);
+        var rankPoints = before.RankPoints;
+
+        if (placementGames == PlacementRequired && before.PlacementGames < PlacementRequired)
+        {
+            // 定级最高黄金 I；隐藏分继续保留真实水平并用于后续追赶。
+            rankPoints = Math.Clamp((int)Math.Round((afterRating.Rating - 1200) * 2), 0, 899);
+        }
+        else if (before.PlacementGames >= PlacementRequired)
+        {
+            var raw = (int)Math.Round(40 * (score - expected));
+            var delta = score > 0.5 ? Math.Clamp(raw, 12, 30) : Math.Clamp(raw, -30, -12);
+            if (score < 0.5 && before.RankPoints < 300) delta = 0; // 青铜不扣可见分
+            rankPoints = Math.Max(0, before.RankPoints + delta);
+            // 白银、黄金为大段地板；白金起恢复完整升降。
+            if (before.HighestRankPoints >= 600 && before.HighestRankPoints < 900) rankPoints = Math.Max(600, rankPoints);
+            else if (before.HighestRankPoints >= 300 && before.HighestRankPoints < 600) rankPoints = Math.Max(300, rankPoints);
+        }
+
+        return before with
+        {
+            Rating = afterRating.Rating,
+            RatingDeviation = afterRating.Deviation,
+            Volatility = afterRating.Volatility,
+            RankPoints = rankPoints,
+            HighestRankPoints = Math.Max(before.HighestRankPoints, rankPoints),
+            PlacementGames = placementGames,
+            Games = games,
+            Wins = wins,
+            Losses = losses,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+    }
+
+    private static RatingUpdate UpdateRating(Profile self, Profile opponent, double score)
+    {
+        var mu = (self.Rating - 1500) / GlickoScale;
+        var phi = self.RatingDeviation / GlickoScale;
+        var muJ = (opponent.Rating - 1500) / GlickoScale;
+        var phiJ = opponent.RatingDeviation / GlickoScale;
+        var g = 1 / Math.Sqrt(1 + 3 * phiJ * phiJ / (Math.PI * Math.PI));
+        var e = 1 / (1 + Math.Exp(-g * (mu - muJ)));
+        var v = 1 / (g * g * e * (1 - e));
+        var delta = v * g * (score - e);
+        var sigmaPrime = SolveVolatility(phi, self.Volatility, delta, v);
+        var phiStar = Math.Sqrt(phi * phi + sigmaPrime * sigmaPrime);
+        var phiPrime = 1 / Math.Sqrt(1 / (phiStar * phiStar) + 1 / v);
+        var muPrime = mu + phiPrime * phiPrime * g * (score - e);
+        return new RatingUpdate(
+            1500 + GlickoScale * muPrime,
+            Math.Clamp(GlickoScale * phiPrime, 30, 350),
+            sigmaPrime);
+    }
+
+    private static double SolveVolatility(double phi, double sigma, double delta, double v)
+    {
+        const double epsilon = 0.000001;
+        var a = Math.Log(sigma * sigma);
+        double F(double x)
+        {
+            var ex = Math.Exp(x);
+            var top = ex * (delta * delta - phi * phi - v - ex);
+            var bottom = 2 * Math.Pow(phi * phi + v + ex, 2);
+            return top / bottom - (x - a) / (Tau * Tau);
+        }
+
+        var A = a;
+        double B;
+        if (delta * delta > phi * phi + v)
+            B = Math.Log(delta * delta - phi * phi - v);
+        else
+        {
+            var k = 1;
+            while (F(a - k * Tau) < 0) k++;
+            B = a - k * Tau;
+        }
+
+        var fA = F(A);
+        var fB = F(B);
+        while (Math.Abs(B - A) > epsilon)
+        {
+            var C = A + (A - B) * fA / (fB - fA);
+            var fC = F(C);
+            if (fC * fB <= 0) { A = B; fA = fB; }
+            else fA /= 2;
+            B = C;
+            fB = fC;
+        }
+        return Math.Exp(A / 2);
+    }
+
+    private static double Expected(double self, double opponent)
+        => 1 / (1 + Math.Pow(10, (opponent - self) / 400));
+
+    private static RankPlayerSettlement ToSettlement(string account, Profile before, Profile after)
+    {
+        var (tier, division) = RankLabel(after.RankPoints);
+        return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
+            after.RankPoints - before.RankPoints, tier, division, after.PlacementGames,
+            PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired);
+    }
+
+    private static RankProfileSnapshot ToSnapshot(Profile profile, Season season)
+    {
+        var (tier, division) = RankLabel(profile.RankPoints);
+        return new RankProfileSnapshot(season.Id, season.StartsAtUtc, season.EndsAtUtc,
+            profile.PlacementGames, PlacementRequired, profile.RankPoints, tier, division,
+            profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints);
+    }
+
+    public static (string Tier, int? Division) RankLabel(int rankPoints)
+    {
+        if (rankPoints >= 1500) return ("传奇", null);
+        var tiers = new[] { "青铜", "白银", "黄金", "白金", "钻石" };
+        var tierIndex = Math.Clamp(rankPoints / 300, 0, tiers.Length - 1);
+        var within = Math.Clamp(rankPoints - tierIndex * 300, 0, 299);
+        return (tiers[tierIndex], 3 - within / 100);
+    }
+
+    private static Season SeasonAt(DateTime utc)
+    {
+        utc = utc.ToUniversalTime();
+        var index = Math.Max(1, (int)Math.Floor((utc - SeasonAnchorUtc).TotalDays / SeasonLength.TotalDays) + 1);
+        var start = SeasonAnchorUtc.AddTicks(SeasonLength.Ticks * (index - 1L));
+        return new Season($"S{index}", start, start.Add(SeasonLength));
+    }
+
+    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(SqliteConnection connection, Season season)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT display_name, rank_points, games, wins
+            FROM rank_profiles
+            WHERE season_id=$season AND placement_games >= $placements
+            ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC
+            LIMIT 50;
+            """;
+        command.Parameters.AddWithValue("$season", season.Id);
+        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        using var reader = command.ExecuteReader();
+        var result = new List<RankLeaderboardItem>();
+        while (reader.Read())
+        {
+            var points = reader.GetInt32(1);
+            var games = reader.GetInt32(2);
+            var wins = reader.GetInt32(3);
+            var label = RankLabel(points);
+            result.Add(new RankLeaderboardItem(result.Count + 1, reader.GetString(0), points,
+                label.Tier, label.Division, games, wins, games == 0 ? 0 : Math.Round(wins * 100d / games, 1)));
+        }
+        return result;
+    }
+
+    private Profile LoadOrCreate(SqliteConnection connection, SqliteTransaction transaction, Season season,
+        string account, string displayName)
+    {
+        var key = HashAccount(account);
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = """
+                SELECT display_name, rating, rating_deviation, volatility, rank_points,
+                       highest_rank_points, placement_games, games, wins, losses, updated_at_utc
+                FROM rank_profiles WHERE season_id=$season AND account_key=$key;
+                """;
+            read.Parameters.AddWithValue("$season", season.Id);
+            read.Parameters.AddWithValue("$key", key);
+            using var reader = read.ExecuteReader();
+            if (reader.Read())
+                return new Profile(season.Id, key, reader.GetString(0), reader.GetDouble(1), reader.GetDouble(2),
+                    reader.GetDouble(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6),
+                    reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9),
+                    DateTime.Parse(reader.GetString(10), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+        }
+
+        var created = new Profile(season.Id, key, displayName, InitialRating, InitialDeviation,
+            InitialVolatility, 0, 0, 0, 0, 0, 0, DateTime.UtcNow);
+        Save(connection, transaction, created);
+        return created;
+    }
+
+    private static void Save(SqliteConnection connection, SqliteTransaction transaction, Profile profile)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO rank_profiles (
+                season_id, account_key, display_name, rating, rating_deviation, volatility,
+                rank_points, highest_rank_points, placement_games, games, wins, losses, updated_at_utc)
+            VALUES ($season,$key,$name,$rating,$rd,$volatility,$rp,$highest,$placements,$games,$wins,$losses,$updated)
+            ON CONFLICT(season_id, account_key) DO UPDATE SET
+                display_name=excluded.display_name, rating=excluded.rating,
+                rating_deviation=excluded.rating_deviation, volatility=excluded.volatility,
+                rank_points=excluded.rank_points, highest_rank_points=excluded.highest_rank_points,
+                placement_games=excluded.placement_games, games=excluded.games,
+                wins=excluded.wins, losses=excluded.losses, updated_at_utc=excluded.updated_at_utc;
+            """;
+        command.Parameters.AddWithValue("$season", profile.SeasonId);
+        command.Parameters.AddWithValue("$key", profile.AccountKey);
+        command.Parameters.AddWithValue("$name", profile.DisplayName);
+        command.Parameters.AddWithValue("$rating", profile.Rating);
+        command.Parameters.AddWithValue("$rd", profile.RatingDeviation);
+        command.Parameters.AddWithValue("$volatility", profile.Volatility);
+        command.Parameters.AddWithValue("$rp", profile.RankPoints);
+        command.Parameters.AddWithValue("$highest", profile.HighestRankPoints);
+        command.Parameters.AddWithValue("$placements", profile.PlacementGames);
+        command.Parameters.AddWithValue("$games", profile.Games);
+        command.Parameters.AddWithValue("$wins", profile.Wins);
+        command.Parameters.AddWithValue("$losses", profile.Losses);
+        command.Parameters.AddWithValue("$updated", profile.UpdatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    private static bool MatchExists(SqliteConnection connection, SqliteTransaction transaction, string matchId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT 1 FROM ranked_matches WHERE match_id=$match LIMIT 1;";
+        command.Parameters.AddWithValue("$match", matchId);
+        return command.ExecuteScalar() is not null;
+    }
+
+    private static void InsertMatch(SqliteConnection connection, SqliteTransaction transaction, string matchId,
+        string seasonId, DateTime endedAtUtc, string p0, string p1, int winner, int delta0, int delta1)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO ranked_matches(match_id,season_id,ended_at_utc,player0_key,player1_key,winner_index,player0_rp_delta,player1_rp_delta)
+            VALUES($match,$season,$ended,$p0,$p1,$winner,$d0,$d1);
+            """;
+        command.Parameters.AddWithValue("$match", matchId);
+        command.Parameters.AddWithValue("$season", seasonId);
+        command.Parameters.AddWithValue("$ended", endedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$p0", p0);
+        command.Parameters.AddWithValue("$p1", p1);
+        command.Parameters.AddWithValue("$winner", winner);
+        command.Parameters.AddWithValue("$d0", delta0);
+        command.Parameters.AddWithValue("$d1", delta1);
+        command.ExecuteNonQuery();
+    }
+
+    private static void InsertEvent(SqliteConnection connection, SqliteTransaction transaction, string matchId,
+        string seasonId, Profile before, Profile after, DateTime endedAtUtc)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO rank_rating_events(match_id,season_id,account_key,rating_before,rating_after,rp_before,rp_after,created_at_utc)
+            VALUES($match,$season,$key,$rb,$ra,$pb,$pa,$created);
+            """;
+        command.Parameters.AddWithValue("$match", matchId);
+        command.Parameters.AddWithValue("$season", seasonId);
+        command.Parameters.AddWithValue("$key", before.AccountKey);
+        command.Parameters.AddWithValue("$rb", before.Rating);
+        command.Parameters.AddWithValue("$ra", after.Rating);
+        command.Parameters.AddWithValue("$pb", before.RankPoints);
+        command.Parameters.AddWithValue("$pa", after.RankPoints);
+        command.Parameters.AddWithValue("$created", endedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    private SqliteConnection Open()
+    {
+        var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        return connection;
+    }
+
+    private static string HashAccount(string account)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant()))).ToLowerInvariant();
+
+    private sealed record Season(string Id, DateTime StartsAtUtc, DateTime EndsAtUtc);
+    private sealed record RatingUpdate(double Rating, double Deviation, double Volatility);
+    private sealed record Profile(
+        string SeasonId, string AccountKey, string DisplayName,
+        double Rating, double RatingDeviation, double Volatility,
+        int RankPoints, int HighestRankPoints, int PlacementGames,
+        int Games, int Wins, int Losses, DateTime UpdatedAtUtc);
+}

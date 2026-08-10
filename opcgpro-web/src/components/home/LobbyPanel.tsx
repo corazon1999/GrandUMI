@@ -23,6 +23,9 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const matchState    = useNetStore((s) => s.matchState);
   const selectedDeck  = useNetStore((s) => s.selectedDeck);
   const opponentName  = useNetStore((s) => s.opponentName);
+  const matchQueueKind = useNetStore((s) => s.matchQueueKind);
+  const rankProfile = useNetStore((s) => s.rankProfile);
+  const rankLeaderboard = useNetStore((s) => s.rankLeaderboard);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
   const roomOperation = useNetStore((s) => s.roomOperation);
@@ -49,7 +52,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const handleMatch = () => {
     if (!selectedDeck) return;
-    const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name);
+    const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
     }
@@ -195,22 +198,77 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <>
                     <div>
                       <h2 className="font-bold text-white">公开匹配</h2>
-                      <p className="mt-1 text-sm leading-5 text-gray-500">系统会自动寻找在线对手。</p>
+                      <p className="mt-1 text-sm leading-5 text-gray-500">排位计入段位积分，休闲不影响排名。</p>
                     </div>
+                    <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
+                      <button
+                        type="button"
+                        onClick={() => useNetStore.getState().setMatchQueueKind("ranked")}
+                        aria-pressed={matchQueueKind === "ranked"}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${matchQueueKind === "ranked" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                      >
+                        排位匹配
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => useNetStore.getState().setMatchQueueKind("casual")}
+                        aria-pressed={matchQueueKind === "casual"}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${matchQueueKind === "casual" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                      >
+                        休闲匹配
+                      </button>
+                    </div>
+
+                    {matchQueueKind === "ranked" && rankProfile && (
+                      <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold text-violet-300">{rankProfile.seasonId} 当前段位</p>
+                            <p className="mt-1 text-lg font-black text-white">
+                              {rankProfile.placementGames < rankProfile.placementRequired
+                                ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
+                                : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
+                            </p>
+                          </div>
+                          {rankProfile.placementGames >= rankProfile.placementRequired && (
+                            <div className="text-right">
+                              <p className="text-2xl font-black text-violet-200">{rankProfile.rankPoints}</p>
+                              <p className="text-[11px] text-gray-500">RP</p>
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
+                        <details className="mt-2 border-t border-violet-900/60 pt-2">
+                          <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">查看排位榜</summary>
+                          <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                            {rankLeaderboard.length === 0 ? (
+                              <p className="py-2 text-xs text-gray-500">本赛季暂时还没有完成定级的玩家。</p>
+                            ) : rankLeaderboard.slice(0, 20).map((item) => (
+                              <div key={`${item.rank}-${item.displayName}`} className="flex items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-xs">
+                                <span className="w-6 text-center font-black text-violet-300">#{item.rank}</span>
+                                <span className="min-w-0 flex-1 truncate text-gray-200">{item.displayName}</span>
+                                <span className="text-gray-400">{item.tier}{item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}</span>
+                                <span className="w-12 text-right font-bold text-white">{item.rankPoints}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={handleMatch}
                       disabled={!canEnter}
-                      className="h-12 w-full rounded-xl bg-orange-500 text-base font-bold text-white transition-colors hover:bg-orange-400 active:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+                      className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${matchQueueKind === "ranked" ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
                     >
-                      开始匹配
+                      开始{matchQueueKind === "ranked" ? "排位" : "休闲"}匹配
                     </button>
                   </>
                 )}
                 {matchState === "matching" && (
                   <div className="flex flex-col items-center gap-3 py-2" role="status">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                    <p className="font-bold text-orange-300">正在寻找对手…</p>
+                    <p className="font-bold text-orange-300">正在寻找{matchQueueKind === "ranked" ? "排位" : "休闲"}对手…</p>
                     <button type="button" onClick={handleCancelMatch} className="min-h-11 rounded-lg px-4 text-sm text-gray-400 hover:bg-gray-800 hover:text-white">
                       取消匹配
                     </button>

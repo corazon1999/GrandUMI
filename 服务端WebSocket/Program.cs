@@ -3,6 +3,7 @@ using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Game;
 using GrandUMI.Game.Logging;
+using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
 using GrandUMI.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -45,6 +46,8 @@ GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(ResolveDslDir());
 LeaderStatsStore.Default.Initialize();
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
+RankedStore.Default.Initialize();
+Console.WriteLine($"[排位] SQLite: {RankedStore.Default.DatabasePath}");
 
 await GameRoomManager.RestoreAll();
 WebSocketBridge.Initialize(playerDataStore, accountAuthenticationStore);

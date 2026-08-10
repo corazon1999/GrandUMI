@@ -5,7 +5,10 @@ public enum MatchKind
 {
     /// <summary>旧恢复日志或未显式标注来源的真人对局。</summary>
     UnknownHuman,
+    /// <summary>旧客户端进入的普通公开匹配，按休闲对局处理。</summary>
     Matchmaking,
+    Casual,
+    Ranked,
     RoomCode,
     Friendly,
     Bot,

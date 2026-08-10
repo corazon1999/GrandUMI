@@ -27,6 +27,8 @@ public class GameEngine
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Action<int, string, JsonElement>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
+    /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
+    public Action? BeforeSnapshot { get; set; }
     /// <summary>
     /// 是否记录含双方完整牌库的私有快照。直接构造引擎时默认开启以兼容测试；
     /// 线上房间由 GameRoomManager 按环境变量显式配置，默认关闭。
@@ -82,7 +84,7 @@ public class GameEngine
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
-        "DuelOver", "Surrender",
+        "DuelOver", "Surrender", "OperationTimeout", "PlayerDisconnected", "PlayerReconnected",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
 
@@ -1012,6 +1014,7 @@ public class GameEngine
     public void BroadcastInitialState()
     {
         var startedAt = LatencyDiagnostics.Start();
+        BeforeSnapshot?.Invoke();
         State.Tick++;
         CaptureReplayHands();
         var snapshots = StateSnapshotBuilder.BuildAll(
@@ -1125,6 +1128,7 @@ public class GameEngine
     private void BroadcastNow(string lastAction, object? payload)
     {
         var startedAt = LatencyDiagnostics.Start();
+        BeforeSnapshot?.Invoke();
         ActionLogEvent[] queuedLogEvents;
         EffectActivationEvent[] queuedEffectActivations;
         lock (_snapshotBatchGate)

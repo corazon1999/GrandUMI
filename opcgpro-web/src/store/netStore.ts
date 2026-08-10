@@ -12,6 +12,9 @@ import type {
   CardBackGalleryItem,
   DeckPlazaItem,
   FriendChatMessage,
+  RankProfileSnapshot,
+  RankLeaderboardItem,
+  RankPlayerSettlement,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -63,8 +66,12 @@ interface NetStore {
   error: string | null;
   // 匹配
   matchState: MatchState;
+  matchQueueKind: "ranked" | "casual";
   selectedDeck: SelectedDeck | null;
   opponentName: string;
+  rankProfile: RankProfileSnapshot | null;
+  rankLeaderboard: RankLeaderboardItem[];
+  lastRankResult: RankPlayerSettlement | null;
   // 房间码
   roomCode: string | null;
   roomOperation: RoomOperation;
@@ -108,8 +115,11 @@ interface NetStore {
   setProfile: (name: string, avatar: string, cardBackId?: string) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
+  setMatchQueueKind: (kind: "ranked" | "casual") => void;
   setSelectedDeck: (deck: SelectedDeck | null) => void;
   setOpponentName: (name: string) => void;
+  setRankSnapshot: (profile: RankProfileSnapshot, leaderboard: RankLeaderboardItem[]) => void;
+  setLastRankResult: (result: RankPlayerSettlement | null) => void;
   setRoomCode: (code: string | null) => void;
   setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
@@ -144,8 +154,12 @@ const initialState = {
   cardBackId: "classic",
   error: null as string | null,
   matchState: "idle" as MatchState,
+  matchQueueKind: "casual" as const,
   selectedDeck: null as SelectedDeck | null,
   opponentName: "",
+  rankProfile: null as RankProfileSnapshot | null,
+  rankLeaderboard: [] as RankLeaderboardItem[],
+  lastRankResult: null as RankPlayerSettlement | null,
   roomCode: null as string | null,
   roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
@@ -194,10 +208,13 @@ export const useNetStore = create<NetStore>((set) => ({
   setError: (msg) => set({ error: msg }),
 
   setMatchState: (s) => set({ matchState: s }),
+  setMatchQueueKind: (matchQueueKind) => set({ matchQueueKind }),
 
   setSelectedDeck: (deck) => set({ selectedDeck: deck }),
 
   setOpponentName: (name) => set({ opponentName: name }),
+  setRankSnapshot: (rankProfile, rankLeaderboard) => set({ rankProfile, rankLeaderboard }),
+  setLastRankResult: (lastRankResult) => set({ lastRankResult }),
 
   setRoomCode: (code) => set({ roomCode: code }),
 

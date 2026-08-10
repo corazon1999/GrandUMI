@@ -111,6 +111,15 @@ public static class StateSnapshotBuilder
             }).ToArray(),
             mulliganBothDone = state.MulliganBothDone,
             mulliganDeadlineUtc = state.MulliganDeadlineUtc,
+            operationClockEnabled = state.OperationClockEnabled,
+            myOperationTimeMs = state.OperationClockRemainingMs[myIdx],
+            opponentOperationTimeMs = state.OperationClockRemainingMs[oppIdx],
+            operationClockActive = state.OperationClockActivePlayer < 0
+                ? null
+                : state.OperationClockActivePlayer == myIdx ? "my" : "opponent",
+            operationClockSyncUtc = state.OperationClockSyncUtc,
+            operationClockPaused = state.OperationClockPaused,
+            matchKind = state.MatchKind.ToString(),
             isGameOver = state.IsGameOver,
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
             gameOverReason = state.GameOverReason,

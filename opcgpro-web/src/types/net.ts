@@ -273,6 +273,7 @@ export interface MsgEnterMatch extends MsgBase {
   proto: "MsgEnterMatch";
   deck: string;
   deckName?: string;
+  queueKind?: "ranked" | "casual";
   result?: boolean;
   logStr?: string;
 }
@@ -294,6 +295,59 @@ export interface MsgEnterBotMatch extends MsgBase {
 export interface MsgMatchFound extends MsgBase {
   proto: "MsgMatchFound";
   opponentName: string;
+  queueKind?: "ranked" | "casual";
+}
+
+export interface RankProfileSnapshot {
+  seasonId: string;
+  seasonStartsAtUtc: string;
+  seasonEndsAtUtc: string;
+  placementGames: number;
+  placementRequired: number;
+  rankPoints: number;
+  tier: string;
+  division: number | null;
+  games: number;
+  wins: number;
+  losses: number;
+  highestRankPoints: number;
+}
+
+export interface RankLeaderboardItem {
+  rank: number;
+  displayName: string;
+  rankPoints: number;
+  tier: string;
+  division: number | null;
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
+export interface RankPlayerSettlement {
+  account: string;
+  rankPointsBefore: number;
+  rankPointsAfter: number;
+  rankPointDelta: number;
+  tier: string;
+  division: number | null;
+  placementGames: number;
+  placementRequired: number;
+  placementCompleted: boolean;
+}
+
+export interface MsgRankSnapshot extends MsgBase {
+  proto: "MsgRankSnapshot";
+  profile: RankProfileSnapshot;
+  leaderboard: RankLeaderboardItem[];
+}
+
+export interface MsgRankResult extends MsgBase {
+  proto: "MsgRankResult";
+  result?: RankPlayerSettlement;
+  profile?: RankProfileSnapshot;
+  leaderboard?: RankLeaderboardItem[];
+  error?: string;
 }
 
 // ── 房间码对战 ──────────────────────────────────────────────────────────
@@ -844,6 +898,13 @@ export interface MsgGameState extends MsgBase {
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc?: string | null;
+  operationClockEnabled?: boolean;
+  myOperationTimeMs?: number;
+  opponentOperationTimeMs?: number;
+  operationClockActive?: "my" | "opponent" | null;
+  operationClockSyncUtc?: string | null;
+  operationClockPaused?: boolean;
+  matchKind?: "Ranked" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
   isGameOver: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;
@@ -995,6 +1056,8 @@ export type AnyMsg =
   | MsgEnterMatch
   | MsgCancelMatch
   | MsgMatchFound
+  | MsgRankSnapshot
+  | MsgRankResult
   | MsgCreateRoom
   | MsgJoinRoom
   | MsgCancelRoom

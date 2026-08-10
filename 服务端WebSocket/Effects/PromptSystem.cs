@@ -8,9 +8,7 @@ namespace GrandUMI.Effects;
 /// </summary>
 public class PromptSystem : IPromptService
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
     private readonly GameEngine _engine;
-    private readonly TimeSpan _timeout;
     private readonly Dictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
 
     /// <summary>本局 prompt 单调序号。promptId 必须确定性（按执行序生成），否则重放重建时
@@ -19,10 +17,9 @@ public class PromptSystem : IPromptService
 
     public GameEngine Engine => _engine;
 
-    public PromptSystem(GameEngine engine, TimeSpan? timeout = null)
+    public PromptSystem(GameEngine engine)
     {
         _engine = engine;
-        _timeout = timeout ?? DefaultTimeout;
     }
 
     public async Task<List<string>> ChooseCards(int playerIdx, string kind, string text,
@@ -108,21 +105,8 @@ public class PromptSystem : IPromptService
         _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
         try
         {
-            // “确认卡组顶 N 张，公开最多 1 张加入手牌”需要由玩家明确选择或跳过，
-            // 不能因为通用 Prompt 超时而自动当作跳过。
-            if (kind != "LookTopReveal")
-            {
-                var timeout = Task.Delay(_timeout);
-                var done = await Task.WhenAny(tcs.Task, timeout);
-                if (done == timeout)
-                {
-                    _pending.Remove(promptId);
-                    _engine.State.PendingPrompt = null;
-                    _engine.RecordMatchLog("prompt_timeout", playerIdx, new { promptId });
-                    _engine.Broadcast("PromptTimeout", new { promptId });
-                    return new List<string>();  // 超时视为不选
-                }
-            }
+            // 对局中的选择均等待玩家明确响应；PendingPrompt 会随权威快照保留，
+            // 玩家重连后仍可继续完成当前选择，不再因固定时限跳过效果。
             var ans = await tcs.Task;
             _engine.State.PendingPrompt = null;
             QueueResolvedLog(playerIdx, kind, text, ans.Chosen, extra, sourceNumber);
@@ -240,7 +224,7 @@ public class PromptSystem : IPromptService
         var ans = await ChooseCards(playerIdx, "LifeTrigger",
             hasRealTrigger ? "是否发动触发效果？" : "是否发动触发效果？",
             new[] { "trigger", "hand" }, 1, 1, extra);
-        if (ans.Count == 0) return false; // 超时默认加入手牌
+        if (ans.Count == 0) return false;
         return ans[0] == "trigger" && hasRealTrigger;
     }
 

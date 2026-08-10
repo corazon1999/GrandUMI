@@ -74,6 +74,23 @@ public static class RoomJournal
         catch { /* 不影响主流程 */ }
     }
 
+    /// <summary>保存最近一次正式操作后的双方剩余棋钟；服务重启期间不继续扣时。</summary>
+    public static void AppendClock(string roomId, IReadOnlyList<long> remainingMs)
+    {
+        if (remainingMs.Count < 2) return;
+        try
+        {
+            Writer.Append(roomId, new
+            {
+                kind = "clock",
+                player0RemainingMs = remainingMs[0],
+                player1RemainingMs = remainingMs[1],
+                tsUtc = DateTime.UtcNow,
+            });
+        }
+        catch { /* 不影响主流程 */ }
+    }
+
     /// <summary>关闭并删除该房间的日志（分胜负/结束时调用）。</summary>
     public static void Delete(string roomId)
         => DeleteDeferred(roomId).GetAwaiter().GetResult();

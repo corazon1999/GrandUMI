@@ -115,60 +115,18 @@ const TURN_FLOW = ["Reset", "Draw", "Don", "Main", "End"];
 // 战斗子流程（攻击宣言后显示后端真实的 4 个步骤）
 const BATTLE_FLOW = ["Attack", "Block", "Counter", "Damage"];
 const BATTLE_PHASES = new Set(BATTLE_FLOW);
-// #238 每回合倒计时基准秒数（纯前端提示，不判负；后端无权威计时）
-const TURN_SECONDS = 300;
-
-// #238 回合倒计时徽章：每次 turnCount 变化即从 TURN_SECONDS 重新倒数；仅对局中（live）走秒
-function TurnTimer({ turnCount, live }: { turnCount: number; live: boolean }) {
-  const [remain, setRemain] = useState(TURN_SECONDS);
-
-  // 回合切换即重置（turnCount 由后端权威快照驱动，天然与实际回合对齐）
-  useEffect(() => {
-    setRemain(TURN_SECONDS);
-  }, [turnCount]);
-
-  useEffect(() => {
-    if (!live) return;
-    const id = setInterval(() => {
-      setRemain((r) => (r > 0 ? r - 1 : 0));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [live, turnCount]);
-
-  const mm = Math.floor(remain / 60);
-  const ss = remain % 60;
-  const low = remain <= 30;
-  return (
-    <span
-      className={[
-        "shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-black tabular-nums",
-        low
-          ? "bg-red-500/25 text-red-200 ring-1 ring-red-400/50"
-          : "bg-slate-700/50 text-slate-200 ring-1 ring-white/10",
-      ].join(" ")}
-      title="本回合计时（前端提示，不判负）"
-    >
-      ⏱ {mm}:{ss.toString().padStart(2, "0")}
-    </span>
-  );
-}
 
 function PhaseTrack({
   currentTurn,
   phase,
-  turnCount,
-  live,
 }: {
   currentTurn: boolean;
   phase: string;
-  turnCount: number;
-  live: boolean;
 }) {
   const inBattle = BATTLE_PHASES.has(phase);
   const flow = inBattle ? BATTLE_FLOW : TURN_FLOW;
   return (
     <div className="flex shrink-0 items-center justify-center gap-2 py-0.5">
-      <TurnTimer turnCount={turnCount} live={live} />
       <span
         className={[
           "shrink-0 rounded-md px-2.5 py-1 text-[11px] font-black",
@@ -233,9 +191,11 @@ function RightRail({
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+        <OperationClock side="opponent" />
         <div className="my-3 h-px bg-white/10" />
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
+        <OperationClock side="my" />
       </section>
       <div className="mt-auto flex flex-col gap-3">
         {!isObserver && !isPlayback && (
@@ -259,6 +219,48 @@ function RightRail({
   );
 }
 
+function formatOperationTime(milliseconds: number): string {
+  const safe = Math.max(0, milliseconds);
+  const minutes = Math.floor(safe / 60_000);
+  const seconds = Math.floor((safe % 60_000) / 1000);
+  if (safe < 10_000) return `${minutes}:${String(seconds).padStart(2, "0")}.${Math.floor((safe % 1000) / 100)}`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function OperationClock({ side }: { side: "my" | "opponent" }) {
+  const enabled = useGameStore((s) => s.operationClockEnabled);
+  const base = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
+  const active = useGameStore((s) => s.operationClockActive);
+  const syncUtc = useGameStore((s) => s.operationClockSyncUtc);
+  const paused = useGameStore((s) => s.operationClockPaused);
+  const matchKind = useGameStore((s) => s.matchKind);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled || active !== side || paused) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), base < 12_000 ? 100 : 500);
+    return () => window.clearInterval(timer);
+  }, [active, base, enabled, paused, side, syncUtc]);
+
+  if (!enabled) return null;
+  const elapsed = active === side && !paused && syncUtc
+    ? Math.max(0, now - Date.parse(syncUtc))
+    : 0;
+  const remaining = Math.max(0, base - elapsed);
+  const urgent = remaining <= 60_000;
+  return (
+    <div className={`mt-1.5 flex items-center justify-between rounded border px-2 py-1 font-mono text-sm font-black tabular-nums ${
+      active === side && !paused
+        ? urgent ? "border-red-400/70 bg-red-500/20 text-red-200" : "border-sky-400/60 bg-sky-500/15 text-sky-100"
+        : "border-white/10 bg-black/20 text-slate-400"
+    }`}>
+      <span className="text-[9px] font-bold tracking-wide">{matchKind === "Ranked" ? "排位" : "休闲"}</span>
+      <span>{formatOperationTime(remaining)}</span>
+    </div>
+  );
+}
+
 /**
  * GameBoard — 牌桌渲染（对战页与回放页共用）
  *
@@ -277,7 +279,6 @@ export default function GameBoard({
 }) {
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
-  const turnCount = useGameStore((s) => s.turnCount);
   const isGameOver = useGameStore((s) => s.isGameOver);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
@@ -324,8 +325,6 @@ export default function GameBoard({
                 <PhaseTrack
                   currentTurn={currentTurn}
                   phase={phase}
-                  turnCount={turnCount}
-                  live={!isObserver && !isPlayback}
                 />
 
                 <PlayerMat
