@@ -473,6 +473,40 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task OP17_032_OnPlay_ShowsLookTopPrompt_WhenNoEligibleCardIsFound()
+    {
+        _ = TestScene.New().Build();
+        var deck = LegalOp17Deck("OP17-039");
+        var engine = new GameEngine("op17-032-empty-search", ("s0", "alice", deck), ("s1", "bob", deck), 0, 17);
+        var player = engine.State.Players[0];
+        var looked = CardDatabase.GetBySet("OP17")
+            .Where(card => card.Kind != CardKind.Leader && !card.HasKeywordContaining("红发海盗团"))
+            .Take(3)
+            .Select(info => new CardInstance { Info = info })
+            .ToList();
+        Assert.Equal(3, looked.Count);
+        player.Deck.Clear();
+        player.Deck.AddRange(looked);
+
+        var resolveTask = EffectRuntime.Resolve(
+            engine.State, 0, Card("OP17-032"), EffectTrigger.OnEnterField, engine.Prompts);
+
+        for (int i = 0; i < 100 && engine.State.PendingPrompt is null; i++)
+            await Task.Delay(10);
+
+        var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
+        Assert.Equal("LookTop", prompt.Kind);
+        Assert.Empty(prompt.ValidChoices);
+        using (var choiceCards = JsonDocument.Parse(JsonSerializer.Serialize(prompt.Extra["choiceCards"])))
+            Assert.Equal(3, choiceCards.RootElement.GetArrayLength());
+
+        engine.Prompts.Resolve(prompt.PromptId, Array.Empty<string>());
+        await resolveTask;
+
+        Assert.Equal(looked, player.Deck);
+    }
+
+    [Fact]
     public void OP17_NewCards_HaveExpectedPrintedValues()
     {
         _ = TestScene.New().Build();

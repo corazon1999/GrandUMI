@@ -121,8 +121,19 @@ internal static class OP17Effects
         var top = me.Deck.Take(count).ToList();
         if (top.Count == 0) return;
         var candidates = top.Where(filter).ToList();
-        var picked = await Pick(c, c.OwnerIndex, "LookTop", text, candidates,
-            requireOne && candidates.Count > 0 ? 1 : 0, 1, top);
+        // 即使没有符合条件的牌，也必须让玩家确认看过的牌。
+        // 若直接跳过 Prompt，客户端不会收到 choiceCards，表现为【登场时】检索
+        // 偶发未发动（恰好顶牌没有可加入手牌的目标时）。
+        var pickedIds = await c.Prompts.ChooseCards(c.OwnerIndex, "LookTop", text,
+            candidates.Select(card => card.Id.ToString()).ToList(),
+            requireOne && candidates.Count > 0 ? 1 : 0, 1, ChoiceCards(top));
+        var picked = pickedIds
+            .Select(id => candidates.FirstOrDefault(card => card.Id.ToString() == id))
+            .Where(card => card is not null)
+            .Cast<CardInstance>()
+            .DistinctBy(card => card.Id)
+            .Take(1)
+            .ToList();
 
         foreach (var card in top) me.Deck.Remove(card);
         if (picked.Count > 0)
