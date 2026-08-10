@@ -350,6 +350,7 @@ export interface RankPlayerSettlement {
   placementGames: number;
   placementRequired: number;
   placementCompleted: boolean;
+  winStreak: number;
 }
 
 export interface MsgRankSnapshot extends MsgBase {

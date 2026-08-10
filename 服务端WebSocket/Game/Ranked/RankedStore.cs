@@ -45,7 +45,8 @@ public sealed record RankPlayerSettlement(
     int? Division,
     int PlacementGames,
     int PlacementRequired,
-    bool PlacementCompleted);
+    bool PlacementCompleted,
+    int WinStreak);
 
 public sealed record RankedMatchSettlement(
     string MatchId,
@@ -97,6 +98,7 @@ public static class RankWire
         placementGames = value.PlacementGames,
         placementRequired = value.PlacementRequired,
         placementCompleted = value.PlacementCompleted,
+        winStreak = value.WinStreak,
     };
 }
 
@@ -210,6 +212,10 @@ public sealed class RankedStore
 
                 CREATE INDEX IF NOT EXISTS ix_rank_profiles_leaderboard
                     ON rank_profiles(season_id, placement_games, rank_points DESC);
+                CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player0_ended
+                    ON ranked_matches(season_id, player0_key, ended_at_utc DESC);
+                CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player1_ended
+                    ON ranked_matches(season_id, player1_key, ended_at_utc DESC);
                 """;
             command.ExecuteNonQuery();
             _initialized = true;
@@ -344,11 +350,17 @@ public sealed class RankedStore
             InsertEvent(connection, transaction, matchId, season.Id, before1, after1, endedAtUtc);
             var faction0 = ReadFaction(connection, transaction, after0.AccountKey);
             var faction1 = ReadFaction(connection, transaction, after1.AccountKey);
+            var winStreak0 = winnerIndex == 0
+                ? CurrentWinStreak(connection, transaction, season.Id, after0.AccountKey)
+                : 0;
+            var winStreak1 = winnerIndex == 1
+                ? CurrentWinStreak(connection, transaction, season.Id, after1.AccountKey)
+                : 0;
             transaction.Commit();
             return new RankedMatchSettlement(
                 matchId,
-                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0)),
-                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1)));
+                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0), winStreak0),
+                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1), winStreak1));
         }
     }
 
@@ -466,12 +478,18 @@ public sealed class RankedStore
     private static double Expected(double self, double opponent)
         => 1 / (1 + Math.Pow(10, (opponent - self) / 400));
 
-    private static RankPlayerSettlement ToSettlement(string account, Profile before, Profile after, string? faction, int? factionRank)
+    private static RankPlayerSettlement ToSettlement(
+        string account,
+        Profile before,
+        Profile after,
+        string? faction,
+        int? factionRank,
+        int winStreak)
     {
         var (tier, division) = RankLabel(after.RankPoints, faction, factionRank);
         return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
             after.RankPoints - before.RankPoints, faction ?? string.Empty, tier, division, after.PlacementGames,
-            PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired);
+            PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired, winStreak);
     }
 
     private static RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank)
@@ -664,6 +682,37 @@ public sealed class RankedStore
         command.CommandText = "SELECT 1 FROM ranked_matches WHERE match_id=$match LIMIT 1;";
         command.Parameters.AddWithValue("$match", matchId);
         return command.ExecuteScalar() is not null;
+    }
+
+    /// <summary>读取本赛季从最新一局向前连续获胜的场数；一场失利即中断。</summary>
+    private static int CurrentWinStreak(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string seasonId,
+        string accountKey)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT winner_index, player0_key, player1_key
+            FROM ranked_matches
+            WHERE season_id=$season AND (player0_key=$key OR player1_key=$key)
+            ORDER BY ended_at_utc DESC, rowid DESC;
+            """;
+        command.Parameters.AddWithValue("$season", seasonId);
+        command.Parameters.AddWithValue("$key", accountKey);
+
+        using var reader = command.ExecuteReader();
+        var streak = 0;
+        while (reader.Read())
+        {
+            var winnerIndex = reader.GetInt32(0);
+            var won = (winnerIndex == 0 && string.Equals(reader.GetString(1), accountKey, StringComparison.Ordinal))
+                || (winnerIndex == 1 && string.Equals(reader.GetString(2), accountKey, StringComparison.Ordinal));
+            if (!won) break;
+            streak++;
+        }
+        return streak;
     }
 
     private static void InsertMatch(SqliteConnection connection, SqliteTransaction transaction, string matchId,

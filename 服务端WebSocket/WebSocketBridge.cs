@@ -3010,6 +3010,19 @@ public static class WebSocketBridge
             EnqueueForSession(s, data);
     }
 
+    /// <summary>排位连胜达到门槛后，向所有在线会话发送滚动公告。</summary>
+    public static void BroadcastRankedWinStreak(string? playerName, int winStreak)
+    {
+        var content = GlobalAnnouncementPolicy.FormatRankedWinStreak(playerName, winStreak);
+        if (content is null) return;
+        BroadcastAll(new
+        {
+            proto = "MsgGlobalAnnouncement",
+            content,
+            issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+    }
+
     private static void BroadcastAll(object data)
     {
         foreach (var kv in Sessions) EnqueueForSession(kv.Value, data);

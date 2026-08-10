@@ -106,6 +106,43 @@ public class RankedStoreTests
         }
     }
 
+    [Fact]
+    public void 排位结算_连续获胜三场后记录连胜且失败会中断()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc);
+
+            for (var i = 1; i <= 3; i++)
+            {
+                var result = store.RecordMatch($"streak-win-{i}", now.AddMinutes(i),
+                    "alice", "爱丽丝", $"bob-{i}", $"对手{i}", winnerIndex: 0);
+                Assert.NotNull(result);
+                Assert.Equal(i, result!.Player0.WinStreak);
+                Assert.Equal(0, result.Player1.WinStreak);
+            }
+
+            var loss = store.RecordMatch("streak-loss", now.AddMinutes(4),
+                "alice", "爱丽丝", "bob-loss", "对手", winnerIndex: 1);
+            Assert.NotNull(loss);
+            Assert.Equal(0, loss!.Player0.WinStreak);
+            Assert.Equal(1, loss.Player1.WinStreak);
+
+            var winAfterLoss = store.RecordMatch("streak-restart", now.AddMinutes(5),
+                "alice", "爱丽丝", "bob-restart", "对手", winnerIndex: 0);
+            Assert.NotNull(winAfterLoss);
+            Assert.Equal(1, winAfterLoss!.Player0.WinStreak);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
     private static void TryDelete(string path)
     {
         try { File.Delete(path); } catch { }

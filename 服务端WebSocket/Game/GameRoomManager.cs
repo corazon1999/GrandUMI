@@ -1236,6 +1236,11 @@ public static class GameRoomManager
                     leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
                 });
             }
+
+            var winnerIndex = room.Engine.State.WinnerIndex.Value;
+            WebSocketBridge.BroadcastRankedWinStreak(
+                room.PlayerDisplayNames[winnerIndex],
+                players[winnerIndex].WinStreak);
         }
         catch (Exception ex)
         {
