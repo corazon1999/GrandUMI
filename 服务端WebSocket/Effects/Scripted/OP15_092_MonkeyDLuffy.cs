@@ -9,10 +9,9 @@ namespace GrandUMI.Effects.Scripted;
 ///   ・废弃区 ≥10 张：此角色原本的力量变为 9000、费用 +10
 ///       （PowerDelta = 9000 - 卡面 7000 = 2000；CostDelta = +10）
 ///   ・废弃区 ≥20 张：对方的回合中，我方领袖原本的力量变为 7000
-///       （对领袖 PowerDelta = 7000 - 领袖卡面力量，Predicate 限对方回合）
+///       （对领袖使用 OriginalPowerOverride，Predicate 限对方回合）
 ///   ・废弃区 ≥30 张：此角色的力量 +1000
 /// 三条共用同一 SourceCardId，离场时引擎一并清理。
-/// 说明：「原本力量变为 N」以「PowerDelta = N - 卡面 Power」近似实现。
 /// </summary>
 public class OP15_092_MonkeyDLuffy : IScriptedEffect
 {
@@ -25,7 +24,6 @@ public class OP15_092_MonkeyDLuffy : IScriptedEffect
         var self = ctx.Source;
         var selfId = self.Id;
         int owner = ctx.OwnerIndex;
-        var leaderBasePower = ctx.State.Players[owner].Leader.Info.Power;
 
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
 
@@ -56,7 +54,7 @@ public class OP15_092_MonkeyDLuffy : IScriptedEffect
         {
             SourceCardId = selfId.ToString(),
             Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = false },
-            PowerDelta = 7000 - leaderBasePower,
+            OriginalPowerOverride = 7000,
             Predicate = (s, sideIdx, card) =>
                 card.Id == s.Players[owner].Leader.Id &&
                 s.CurrentTurnPlayer != owner &&
