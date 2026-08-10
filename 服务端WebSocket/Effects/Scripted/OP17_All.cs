@@ -530,7 +530,7 @@ internal static class OP17Effects
             if (victimId == c.Source.Id || !Me(c).Characters.Contains(c.Source)) return;
             if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "KO马尔高，使将要因对方效果离场的角色不离场？")) return;
             bool ko = await AtomicOps.KOByEffectAsync(c.State, c.OwnerIndex, c.Source, c.Prompts, c.OwnerIndex);
-            if (ko) c.State.MarkPreventLeave(victimId);
+            if (ko) c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victimId, _ => true);
             return;
         }
         if (c.Trigger != EffectTrigger.OnKO || !Me(c).Trash.Contains(c.Source)) return;
@@ -594,7 +594,8 @@ internal static class OP17Effects
         if (victim is null || !victim.Info.HasKeywordContaining("红发海盗团")) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方1张卡牌转为休息状态，使《红发海盗团》角色不离场？")) return;
         if (await AtomicOps.PromptRestOwnCards(c, 1, "选择我方1张卡牌转为休息状态", optional: true))
-            c.State.MarkPreventLeave(victimId);
+            c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victimId,
+                x => x.Info.HasKeywordContaining("红发海盗团"));
     }
 
     private static async Task C023(EffectContext c)
@@ -611,7 +612,8 @@ internal static class OP17Effects
         if (victim is null || !(victim.Info.HasKeyword("东海") || victim.Info.HasKeyword("草帽一伙"))) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将奈美转为休息状态，使该角色不被KO？")) return;
         AtomicOps.RestCard(c.Source);
-        c.State.MarkPreventKO(victim.Id);
+        c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victim.Id,
+            x => x.Info.HasKeyword("东海") || x.Info.HasKeyword("草帽一伙"), isKoReplacement: true);
     }
 
     private static async Task C024(EffectContext c)
@@ -872,7 +874,7 @@ internal static class OP17Effects
             || !c.Vars.TryGetValue("victimId", out var raw) || raw is not string id || !Guid.TryParse(id, out var victimId)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃2张手牌，使我方角色不离场？")
             || !await DiscardOwn(c, 2, "选择丢弃2张手牌")) return;
-        c.State.MarkPreventLeave(victimId);
+        c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victimId, _ => true);
     }
 
     private static async Task C046(EffectContext c)
@@ -1402,7 +1404,7 @@ internal static class OP17Effects
             Me(c).Trash, 3, 3);
         if (order.Count < 3) return;
         foreach (var card in order) AtomicOps.ReturnTrashToDeckBottom(Me(c), card);
-        c.State.MarkPreventLeave(victimId);
+        c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victimId, _ => true);
     }
 
     private static async Task C096(EffectContext c)

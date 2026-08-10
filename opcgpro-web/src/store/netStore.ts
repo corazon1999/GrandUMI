@@ -15,6 +15,7 @@ import type {
   RankProfileSnapshot,
   RankLeaderboardItem,
   RankPlayerSettlement,
+  SpectateMode,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -101,6 +102,9 @@ interface NetStore {
   // 观战申请与当前观战房间
   spectateState: SpectateState;
   spectateRoomId: string | null;
+  spectateMode: SpectateMode;
+  spectatorHandsPublic: boolean;
+  spectateCode: string | null;
   // 聊天
   chatMessages: ChatMessage[];
   friendChatMessages: FriendChatMessage[];
@@ -137,6 +141,7 @@ interface NetStore {
   setIncomingInvite: (inv: IncomingInvite | null) => void;
   setFriendlyRoom: (room: FriendlyRoomState | null) => void;
   setSpectate: (state: SpectateState, roomId?: string | null) => void;
+  setSpectateSettings: (mode: SpectateMode, handsPublic: boolean, code?: string | null) => void;
   setNavigateTo: (path: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addFriendChatMessage: (msg: FriendChatMessage) => void;
@@ -179,6 +184,9 @@ const initialState = {
   friendlyRoom: null as FriendlyRoomState | null,
   spectateState: "idle" as SpectateState,
   spectateRoomId: null as string | null,
+  spectateMode: "open" as SpectateMode,
+  spectatorHandsPublic: false,
+  spectateCode: null as string | null,
   chatMessages: [] as ChatMessage[],
   friendChatMessages: [] as FriendChatMessage[],
   navigateTo: null as string | null,
@@ -256,6 +264,11 @@ export const useNetStore = create<NetStore>((set) => ({
   setFriendlyRoom: (room) => set({ friendlyRoom: room }),
 
   setSpectate: (spectateState, roomId = null) => set({ spectateState, spectateRoomId: roomId }),
+  setSpectateSettings: (spectateMode, spectatorHandsPublic, spectateCode = null) => set({
+    spectateMode,
+    spectatorHandsPublic,
+    spectateCode,
+  }),
 
   setNavigateTo: (path) => set({ navigateTo: path }),
 

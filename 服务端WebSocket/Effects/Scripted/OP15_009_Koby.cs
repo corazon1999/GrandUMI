@@ -26,6 +26,7 @@ public class OP15_009_Koby : IScriptedEffect
             $"可比：本回合我方领袖力量-2000，使「{victim.Info.Name}」不离场？");
         if (!use) return;
         AtomicOps.AddPowerThisTurn(me.Leader, -2000);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.Power <= 7000);
     }
 }

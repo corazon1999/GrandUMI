@@ -22,6 +22,7 @@ import { useGameStore } from "@/store/gameStore";
 import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
 import { PHASE_LABELS } from "@/game/battle/BattlePhase";
+import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -176,12 +177,16 @@ function LeftRail() {
 function RightRail({
   myName,
   opponentName,
+  myChampionLeaderNumber,
+  opponentChampionLeaderNumber,
   isObserver,
   isPlayback,
   onOpenFeedback,
 }: {
   myName: string;
   opponentName: string;
+  myChampionLeaderNumber?: string | null;
+  opponentChampionLeaderNumber?: string | null;
   isObserver: boolean;
   isPlayback: boolean;
   onOpenFeedback?: () => void;
@@ -191,10 +196,12 @@ function RightRail({
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+        <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
         <OperationClock side="opponent" />
         <div className="my-3 h-px bg-white/10" />
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
+        <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
         <OperationClock side="my" />
       </section>
       <div className="mt-auto flex flex-col gap-3">
@@ -282,6 +289,8 @@ export default function GameBoard({
   const isGameOver = useGameStore((s) => s.isGameOver);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
+  const myChampionLeaderNumber = useGameStore((s) => s.my?.championLeaderNumber);
+  const opponentChampionLeaderNumber = useGameStore((s) => s.opponent?.championLeaderNumber);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageScale = useStageScale(STAGE_W, STAGE_H, viewportRef);
@@ -338,6 +347,8 @@ export default function GameBoard({
               <RightRail
                 myName={myName}
                 opponentName={opponentName}
+                myChampionLeaderNumber={myChampionLeaderNumber}
+                opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                 isObserver={isObserver}
                 isPlayback={isPlayback}
                 onOpenFeedback={onOpenFeedback}

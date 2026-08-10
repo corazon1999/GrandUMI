@@ -291,6 +291,12 @@ public static class AtomicOps
     {
         int acting = EffectRuntime.CurrentActingSide;
         if (acting < 0 || acting == victimOwner) return false; // 非"对方效果"(或无效果上下文)
+
+        // A replacement that has already paid for the current simultaneous leave
+        // process covers this victim without prompting or paying a second time.
+        if (s.SimultaneousLeaveVictimIds?.Contains(card.Id) == true && s.PreventLeaveCardIds.Remove(card.Id))
+            return true;
+
         var side = s.Players[victimOwner];
         var guardians = new List<CardInstance> { side.Leader };
         guardians.AddRange(side.Characters);
@@ -305,6 +311,56 @@ public static class AtomicOps
             if (s.PreventLeaveCardIds.Contains(card.Id)) { s.PreventLeaveCardIds.Remove(card.Id); return true; }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Resolves a group of characters leaving from the same effect. All replacement
+    /// checks happen while the complete group is still on the field, allowing a
+    /// single replacement cost to cover every matching character in that process.
+    /// </summary>
+    public static async Task<int> ProcessEffectLeavesAsync(
+        GameState s,
+        int victimOwner,
+        IReadOnlyCollection<CardInstance> cards,
+        IPromptService prompts,
+        string kind,
+        Action<GameState, int, CardInstance> leave)
+    {
+        var victims = cards
+            .Where(card => s.Players[victimOwner].Characters.Contains(card))
+            .DistinctBy(card => card.Id)
+            .ToList();
+        if (victims.Count == 0) return 0;
+
+        var previousBatch = s.SimultaneousLeaveVictimIds;
+        var victimIds = victims.Select(card => card.Id).ToHashSet();
+        s.SimultaneousLeaveVictimIds = victimIds;
+        foreach (var id in victimIds) s.PreventLeaveCardIds.Remove(id);
+
+        try
+        {
+            var protectedIds = new HashSet<Guid>();
+            foreach (var card in victims)
+            {
+                if (!s.Players[victimOwner].Characters.Contains(card)) continue;
+                if (await TryEffectLeaveGuard(s, victimOwner, card, prompts, kind))
+                    protectedIds.Add(card.Id);
+            }
+
+            int count = 0;
+            foreach (var card in victims)
+            {
+                if (protectedIds.Contains(card.Id) || !s.Players[victimOwner].Characters.Contains(card)) continue;
+                leave(s, victimOwner, card);
+                count++;
+            }
+            return count;
+        }
+        finally
+        {
+            foreach (var id in victimIds) s.PreventLeaveCardIds.Remove(id);
+            s.SimultaneousLeaveVictimIds = previousBatch;
+        }
     }
 
     // ── 关键字 ────────────────────────────────────────────────────────────

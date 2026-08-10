@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import Modal from "@/components/ui/Modal";
+import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import type { PlayerInfo } from "@/types/net";
+import SpectateJoinButton from "./SpectateJoinButton";
 
 const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> = {
   idle:     { text: "空闲",   cls: "text-green-400" },
@@ -19,8 +21,6 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
   const friends = useNetStore((s) => s.friends);
   const incomingRequests = useNetStore((s) => s.incomingFriendRequests);
   const outgoingRequests = useNetStore((s) => s.outgoingFriendRequests);
-  const spectateState = useNetStore((s) => s.spectateState);
-  const spectateRoomId = useNetStore((s) => s.spectateRoomId);
   const [search, setSearch] = useState("");
 
   // 打开时拉取一页。在线人数由服务端主动推送，避免大量客户端轮询形成平方级流量。
@@ -56,12 +56,6 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
 
   const handleInvite = (p: PlayerInfo) => {
     HomeRequest.invitePlayer(p.account);
-  };
-
-  // 等服务端确认房间有效后再进入对战页，失败时保留弹窗并显示原因
-  const handleSpectate = (p: PlayerInfo) => {
-    if (!p.roomId) return;
-    HomeRequest.spectateRoom(p.roomId, p.seatIndex ?? 0);
   };
 
   const handleClose = () => {
@@ -100,6 +94,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                       {p.name}
                       {isMe && <span className="text-orange-400 text-[10px] ml-1">（我）</span>}
                     </p>
+                    <LeaderChampionBadgeList leaderNumbers={p.championLeaderNumbers} className="mt-1" />
                     <p className="truncate text-[10px] text-gray-500">@{p.account}</p>
                     <p className={`text-[10px] ${st.cls}`}>{st.text}</p>
                   </div>
@@ -147,14 +142,12 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                         </button>
                       )}
                       {p.status === "playing" && p.roomId ? (
-                        <button
-                          type="button"
-                          onClick={() => handleSpectate(p)}
-                          disabled={spectateState === "joining"}
-                          className="min-h-11 rounded-lg bg-purple-600 px-3 text-sm font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
-                        >
-                          {spectateState === "joining" && spectateRoomId === p.roomId ? "进入中…" : "观战"}
-                        </button>
+                        <SpectateJoinButton
+                          roomId={p.roomId}
+                          seatIndex={p.seatIndex ?? 0}
+                          mode={p.spectateMode}
+                          isFriend={relationship?.kind === "friend"}
+                        />
                       ) : (
                         <button
                           type="button"

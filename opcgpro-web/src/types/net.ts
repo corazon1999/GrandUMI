@@ -444,6 +444,14 @@ export interface MsgChatMsg extends MsgBase {
   Msg?: string;
 }
 
+export interface MsgGlobalAnnouncement extends MsgBase {
+  proto: "MsgGlobalAnnouncement";
+  content?: string;
+  issuedAt?: number;
+  result?: boolean;
+  logStr?: string;
+}
+
 // 局内聊天（房间内：对战双方 + 观战者）。区别于大厅全局 MsgChatMsg。
 // 客户端→服务器只需带 Text（+可选 Code 预设短语编号）；服务器→客户端回带发送者信息。
 export interface MsgGameChat extends MsgBase {
@@ -496,9 +504,11 @@ export interface MsgOnlineCount extends MsgBase {
 export interface PlayerInfo {
   account: string;
   name: string;
+  championLeaderNumbers?: string[];
   status: "idle" | "matching" | "playing" | "spectating";
   roomId?: string | null;   // 对战中玩家所在的对局房间ID，供一键观战；无对局房间时为 null
   seatIndex?: 0 | 1 | null; // 对战中的座位，用于让一键观战保持被点击玩家为主视角
+  spectateMode?: SpectateMode | null;
 }
 
 // 客户端 → 服务器:请求在线玩家列表;服务器 → 客户端:返回列表
@@ -517,12 +527,14 @@ export type FriendPresenceStatus = PlayerInfo["status"] | "offline";
 export interface FriendInfo {
   account: string;
   name: string;
+  championLeaderNumbers?: string[];
   avatar: string;
   friendsSince: number;
   online: boolean;
   status: FriendPresenceStatus;
   roomId?: string | null;
   seatIndex?: 0 | 1 | null;
+  spectateMode?: SpectateMode | null;
 }
 
 export interface FriendRequestInfo {
@@ -540,6 +552,7 @@ export interface FriendSearchPlayer {
   account: string;
   name: string;
   avatar: string;
+  championLeaderNumbers?: string[];
   relationship: FriendRelationship;
   online: boolean;
   status: FriendPresenceStatus;
@@ -596,6 +609,13 @@ export interface MsgFriendCancel extends MsgBase {
 // ── Leader 排行榜 ─────────────────────────────────────────────────────
 export type LeaderboardPeriod = "7d" | "30d" | "all";
 
+export interface LeaderChampionInfo {
+  displayName: string;
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
 export interface LeaderLeaderboardItem {
   rank: number | null;
   leaderNumber: string;
@@ -609,6 +629,8 @@ export interface LeaderLeaderboardItem {
   secondGames: number;
   secondWinRate: number | null;
   insufficientSample: boolean;
+  /** 当前全服最强使用者；按统一的近 30 日称号规则计算。 */
+  champion?: LeaderChampionInfo | null;
 }
 
 /** 客户端发送时只带 period；服务端回包附带聚合结果。 */
@@ -850,6 +872,8 @@ export interface PlayerSnapshot {
   lifeFaceUp?: { faceUp: boolean; number: string | null }[];
   leaderId: string;
   leaderNumber: string;
+  /** 当且仅当该玩家正使用自己全服最强的 Leader 时返回对应卡号。 */
+  championLeaderNumber?: string | null;
   leaderTapped: boolean;
   leaderPower: number;
   leaderAttachedDon: number;
@@ -923,6 +947,7 @@ export interface MsgGameState extends MsgBase {
   winnerIsMe: boolean;
   gameOverReason: string;
   viewerKind: "player" | "spectator";
+  spectatorHandVisible?: boolean;
   /** 对应触发本次状态变化的客户端请求；无客户端请求时为空。 */
   requestId?: string | null;
   lastAction: string;
@@ -979,10 +1004,14 @@ export interface MsgPromptResponse extends MsgBase {
 }
 
 /** 客户端 → 服务器：申请观战 */
+export type SpectateMode = "open" | "closed" | "friends" | "password";
+
 export interface MsgSpectateRoom extends MsgBase {
   proto: "MsgSpectateRoom";
   roomId: string;
   viewPlayerIndex?: 0 | 1;
+  spectateCode?: string;
+  spectatorHandVisible?: boolean;
   result?: boolean;
   logStr?: string;
 }
@@ -998,6 +1027,56 @@ export interface MsgLeaveSpectate extends MsgBase {
 export interface MsgSpectatorList extends MsgBase {
   proto: "MsgSpectatorList";
   spectators: string[];
+  details?: Array<{
+    account: string;
+    name: string;
+    viewingYou: boolean;
+    handVisible: boolean;
+  }>;
+}
+
+export interface MsgUpdateSpectateSettings extends MsgBase {
+  proto: "MsgUpdateSpectateSettings";
+  mode: SpectateMode;
+  handsPublic: boolean;
+  regenerateCode?: boolean;
+  spectateCode?: string | null;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgSpectatorHandRequest extends MsgBase {
+  proto: "MsgSpectatorHandRequest";
+  requestId: string;
+  spectatorAccount: string;
+  spectatorName: string;
+}
+
+export interface MsgSpectatorHandStatus extends MsgBase {
+  proto: "MsgSpectatorHandStatus";
+  status: "pending" | "approved" | "denied";
+  logStr?: string;
+  retryAfterMs?: number;
+}
+
+export interface MsgSpectatorHandResponse extends MsgBase {
+  proto: "MsgSpectatorHandResponse";
+  requestId?: string;
+  result?: boolean;
+  accepted?: boolean;
+  logStr?: string;
+}
+
+export interface MsgKickSpectator extends MsgBase {
+  proto: "MsgKickSpectator";
+  spectatorAccount: string;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgSpectatorKicked extends MsgBase {
+  proto: "MsgSpectatorKicked";
+  logStr?: string;
 }
 
 /** 服务端 → 客户端：动作被拒绝（不发对手） */
@@ -1089,12 +1168,19 @@ export type AnyMsg =
   | MsgSpectateRoom
   | MsgLeaveSpectate
   | MsgSpectatorList
+  | MsgUpdateSpectateSettings
+  | MsgSpectatorHandRequest
+  | MsgSpectatorHandStatus
+  | MsgSpectatorHandResponse
+  | MsgKickSpectator
+  | MsgSpectatorKicked
   | MsgActionRejected
   | MsgRequestState
   | MsgPlayerDisconnected
   | MsgPlayerReconnected
   | MsgBugReport
   | MsgChatMsg
+  | MsgGlobalAnnouncement
   | MsgGameChat
   | MsgFriendChat
   | MsgLeaveGameChat

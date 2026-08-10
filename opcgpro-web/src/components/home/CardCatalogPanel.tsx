@@ -478,6 +478,10 @@ function FilterSelect({
   );
 }
 
+function leaderLife(card: CardData) {
+  return card.cost > 0 ? card.cost : 5;
+}
+
 function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void }) {
   const rawSprite = card.sprites[card.sprites.length - 1] ?? card.sprite ?? card.image ?? CARD_BACK_SRC;
   const [imageSrc, setImageSrc] = useState(thumbSrc(rawSprite));
@@ -508,6 +512,11 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
           onError={handleImageError}
           className="h-full w-full object-cover"
         />
+        {card.type === "Leader" && (
+          <span className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
+            {leaderLife(card)}
+          </span>
+        )}
         {card.rarity && (
           <span className="absolute right-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
             {card.rarity}

@@ -23,9 +23,10 @@ public class GameEngine
     public Action<object>?      OnBroadcast    { get; set; }   // 双方都收到
     public Action<object>?      OnReplay       { get; set; }   // 写入回放
     public Action<string, int?, object?>? OnMatchLog { get; set; }
-    public Action<int, object>? OnSendToSpectators { get; set; } // 观战推送（spectator 视角）
+    public Action<int, object, object?>? OnSendToSpectators { get; set; } // (主视角, 脱敏快照, 可选手牌快照)
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
+    public Func<int, bool>? HasSpectatorsWithHandForPerspective { get; set; }
     public Action<int, string, JsonElement>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
     /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
     public Action? BeforeSnapshot { get; set; }
@@ -1021,15 +1022,17 @@ public class GameEngine
             State,
             "GameStart",
             includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
+            includePlayer0SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(0) == true,
+            includePlayer1SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(1) == true,
             replayHandTimeline: _replayHandTimeline);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
         {
-            OnSendToSpectators?.Invoke(0, publicSnapshot);
+            OnSendToSpectators?.Invoke(0, publicSnapshot, snapshots.SpectatorPlayer0Hand);
             if (snapshots.SpectatorPlayer1 is not null)
-                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1);
+                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1, snapshots.SpectatorPlayer1Hand);
         }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = sharedPublicSnapshot });
@@ -1148,15 +1151,17 @@ public class GameEngine
             requestId: _latencyRequestId,
             effectActivations: queuedEffectActivations,
             includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
+            includePlayer0SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(0) == true,
+            includePlayer1SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(1) == true,
             replayHandTimeline: _replayHandTimeline);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
         if (HasSpectators?.Invoke() != false)
         {
-            OnSendToSpectators?.Invoke(0, publicSnapshot);
+            OnSendToSpectators?.Invoke(0, publicSnapshot, snapshots.SpectatorPlayer0Hand);
             if (snapshots.SpectatorPlayer1 is not null)
-                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1);
+                OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1, snapshots.SpectatorPlayer1Hand);
         }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
         OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = sharedPublicSnapshot });

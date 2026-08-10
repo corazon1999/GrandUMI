@@ -31,6 +31,7 @@ public class OP15_090_Perona : IScriptedEffect
         var card = me.Hand.FirstOrDefault(c => c.Id.ToString() == ch[0]);
         if (card is null) return;
         AtomicOps.DiscardHand(me, card);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.Power <= 7000);
     }
 }

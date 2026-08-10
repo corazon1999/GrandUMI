@@ -53,6 +53,7 @@ export interface PlayerView {
   lifeFaceUp?: { faceUp: boolean; number: string | null }[];
   leaderId: string;
   leaderNumber: string;
+  championLeaderNumber?: string | null;
   leaderTapped: boolean;
   leaderPower: number;
   leaderAttachedDon: number;
@@ -138,6 +139,11 @@ interface GameStore {
   matchKind: MsgGameState["matchKind"];
   phase: BattlePhase;
   viewerKind: "player" | "spectator";
+  spectatorHandVisible: boolean;
+  observerHandRequestStatus: "idle" | "pending" | "cooldown";
+  observerHandRequestRetryAt: number;
+  spectatorDetails: Array<{ account: string; name: string; viewingYou: boolean; handVisible: boolean }>;
+  spectatorHandRequests: Array<{ requestId: string; spectatorAccount: string; spectatorName: string }>;
 
   // 双方
   my: PlayerView | null;
@@ -203,6 +209,10 @@ interface GameStore {
   setSelectedField: (id: string | null) => void;
   setSelectedDon: (idx: number | null) => void;
   setSpectatorNames: (names: string[]) => void;
+  setSpectatorDetails: (details: GameStore["spectatorDetails"]) => void;
+  addSpectatorHandRequest: (request: GameStore["spectatorHandRequests"][number]) => void;
+  removeSpectatorHandRequest: (requestId: string) => void;
+  setObserverHandRequestStatus: (status: GameStore["observerHandRequestStatus"], retryAt?: number) => void;
   setMode: (m: GameMode) => void;
   resetGame: () => void;
 }
@@ -231,6 +241,9 @@ export const useGameStore = create<GameStore>()(
     matchKind: "UnknownHuman",
     phase: "Main",
     viewerKind: "player",
+    spectatorHandVisible: false,
+    observerHandRequestStatus: "idle",
+    observerHandRequestRetryAt: 0,
     my: null,
     opponent: null,
     authoritativeMy: null,
@@ -256,6 +269,8 @@ export const useGameStore = create<GameStore>()(
     myName: "",
     opponentName: "",
     spectatorNames: [],
+    spectatorDetails: [],
+    spectatorHandRequests: [],
 
     syncFromServer: (msg) =>
       set((s) => {
@@ -289,6 +304,11 @@ export const useGameStore = create<GameStore>()(
         s.winnerIsMe = msg.winnerIsMe ?? false;
         s.gameOverReason = msg.gameOverReason ?? "";
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
+        s.spectatorHandVisible = msg.spectatorHandVisible ?? false;
+        if (s.spectatorHandVisible) {
+          s.observerHandRequestStatus = "idle";
+          s.observerHandRequestRetryAt = 0;
+        }
         s.my = my;
         s.opponent = opponent;
         s.authoritativeMy = clonePlayerView(my);
@@ -413,6 +433,19 @@ export const useGameStore = create<GameStore>()(
       s.selectedFieldId = null;
     }),
     setSpectatorNames: (names) => set((s) => { s.spectatorNames = names; }),
+    setSpectatorDetails: (details) => set((s) => { s.spectatorDetails = details; }),
+    addSpectatorHandRequest: (request) => set((s) => {
+      if (!s.spectatorHandRequests.some((item) => item.requestId === request.requestId)) {
+        s.spectatorHandRequests.push(request);
+      }
+    }),
+    removeSpectatorHandRequest: (requestId) => set((s) => {
+      s.spectatorHandRequests = s.spectatorHandRequests.filter((item) => item.requestId !== requestId);
+    }),
+    setObserverHandRequestStatus: (status, retryAt = 0) => set((s) => {
+      s.observerHandRequestStatus = status;
+      s.observerHandRequestRetryAt = retryAt;
+    }),
     setMode: (m) => set((s) => { s.mode = m; }),
     resetGame: () => set((s) => {
       s.isStart = false;
@@ -459,6 +492,11 @@ export const useGameStore = create<GameStore>()(
       s.myName = "";
       s.opponentName = "";
       s.spectatorNames = [];
+      s.spectatorDetails = [];
+      s.spectatorHandRequests = [];
+      s.spectatorHandVisible = false;
+      s.observerHandRequestStatus = "idle";
+      s.observerHandRequestRetryAt = 0;
     }),
   })),
 );

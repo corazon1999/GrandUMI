@@ -46,8 +46,8 @@ public class OP16_014_Marco : IScriptedEffect
                 new Dictionary<string, object?> { ["cardId"] = self.Id.ToString(), ["owner"] = ctx.OwnerIndex, ["reason"] = "effect" });
             await EffectRuntime.Resolve(ctx.State, ctx.OwnerIndex, self, EffectTrigger.OnKO, ctx.Prompts);
 
-            if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
-            else ctx.State.MarkPreventKO(victim.Id);
+            ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+                card => card.Id != self.Id, isKoReplacement: !nonKoLeave);
             return;
         }
 

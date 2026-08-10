@@ -34,7 +34,7 @@ public class OP15_098_Luffy : IScriptedEffect
         me.LifeArea.RemoveAt(0);
         top.IsLifeFaceUp = false;
         me.Hand.Add(top);
-        if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
-        else ctx.State.MarkPreventKO(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.HasKeyword("空岛") && card.Info.Power >= 6000, isKoReplacement: !nonKoLeave);
     }
 }

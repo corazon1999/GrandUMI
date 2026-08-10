@@ -39,8 +39,8 @@ public class OP14_061_Vergo : IScriptedEffect
             if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "维尔高：支付咚!!-1，使该《堂吉诃德海盗团》角色不离场？")) return;
             if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-            if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
-            else ctx.State.MarkPreventKO(victim.Id);
+            ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+                card => card.Info.HasKeyword("堂吉诃德海贼团"), isKoReplacement: !nonKoLeave);
             return;
         }
 

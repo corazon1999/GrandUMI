@@ -547,11 +547,17 @@ public sealed class LeaderStatsStore
     {
         if (result.MatchKind == MatchKind.Bot) return (false, "bot");
         if (result.WinnerIndex is not (0 or 1)) return (false, "no_winner");
+        if (IsDisconnectFinish(result.FinishReason)) return (false, "disconnect");
         if (result.TurnCount < MinimumCountedTurn) return (false, "too_short");
         if (string.Equals(result.Player0Account, result.Player1Account, StringComparison.OrdinalIgnoreCase))
             return (false, "same_account");
         return (true, null);
     }
+
+    private static bool IsDisconnectFinish(string? finishReason)
+        => !string.IsNullOrWhiteSpace(finishReason)
+           && (finishReason.Contains("断线", StringComparison.Ordinal)
+               || finishReason.Contains("disconnect", StringComparison.OrdinalIgnoreCase));
 
     private static int ReadTotalMatches(SqliteConnection connection, DateTime? sinceUtc)
     {
@@ -560,6 +566,8 @@ public sealed class LeaderStatsStore
             SELECT COUNT(*)
             FROM match_results
             WHERE counted = 1
+              AND finish_reason NOT LIKE '%断线%'
+              AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc);
             """;
         command.Parameters.AddWithValue("$sinceUtc", sinceUtc is null ? DBNull.Value : ToDatabaseUtc(sinceUtc.Value));
@@ -574,6 +582,8 @@ public sealed class LeaderStatsStore
                 SELECT player0_leader, player1_leader, winner_index, first_player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND finish_reason NOT LIKE '%断线%'
+                  AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
             ),
             appearances AS (
@@ -634,6 +644,8 @@ public sealed class LeaderStatsStore
                 SELECT player0_leader, player1_leader, winner_index, first_player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND finish_reason NOT LIKE '%断线%'
+                  AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
                   AND (player0_leader = $leaderNumber OR player1_leader = $leaderNumber)
             ),
@@ -698,6 +710,8 @@ public sealed class LeaderStatsStore
                 COALESCE(SUM(CASE WHEN winner_index <> first_player_index THEN 1 ELSE 0 END), 0) AS second_wins
             FROM match_results
             WHERE counted = 1
+              AND finish_reason NOT LIKE '%断线%'
+              AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
               AND player0_leader = $leaderNumber
               AND player1_leader = $leaderNumber;
@@ -732,6 +746,8 @@ public sealed class LeaderStatsStore
                 END AS went_first
             FROM match_results
             WHERE counted = 1
+              AND finish_reason NOT LIKE '%断线%'
+              AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND (player0_key = $playerKey OR player1_key = $playerKey)
               AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
             ORDER BY ended_at_utc;

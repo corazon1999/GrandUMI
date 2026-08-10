@@ -33,6 +33,11 @@ public class WsSession
     public double    MatchRating      { get; set; } = 1500;
     public string?   CurrentRoomCode  { get; set; }
 
+    /// <summary>本连接的默认观战权限；建局时固化到对局。</summary>
+    public string    SpectateMode { get; set; } = Game.SpectatingRules.Open;
+    public bool      SpectatorHandsPublic { get; set; }
+    public string?   SpectateCode { get; set; }
+
     /// <summary>玩家设置：是否对所有生命牌都弹"是否发动触发"窗口（反信息泄露）</summary>
     public bool      AlwaysPromptOnLifeReveal { get; set; }
 

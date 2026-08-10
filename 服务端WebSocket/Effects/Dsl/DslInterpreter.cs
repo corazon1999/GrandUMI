@@ -1881,6 +1881,7 @@ public static class DslInterpreter
         return promptKind switch
         {
             "OpponentCharacter"           => opp.Characters.ToList(),
+            "OpponentActiveCharacter"     => opp.Characters.Where(c => !c.IsTapped).ToList(),
             "AnyCharacter"                => me.Characters.Concat(opp.Characters).ToList(),
             "OpponentCharacterWithDon"    => opp.Characters.Where(c => opp.AttachedDonCount(c.Id) >= 1).ToList(),
             "OpponentCharacterWithDonGe2" => opp.Characters.Where(c => opp.AttachedDonCount(c.Id) >= 2).ToList(),

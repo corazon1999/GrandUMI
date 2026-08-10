@@ -356,9 +356,10 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var cards = ctx.State.Players[oppIdx].Characters
             .Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 2).ToList();
-        foreach (var card in await ChooseMany(ctx, ctx.OwnerIndex, "OpponentCharacter",
-                     "将对方最多2张费用不高于2的角色放回卡组最下方", cards, 2))
-            AtomicOps.ReturnFieldToDeckBottom(ctx.State, oppIdx, card);
+        var selected = await ChooseMany(ctx, ctx.OwnerIndex, "OpponentCharacter",
+            "将对方最多2张费用不高于2的角色放回卡组最下方", cards, 2);
+        await AtomicOps.ProcessEffectLeavesAsync(ctx.State, oppIdx, selected, ctx.Prompts, "deck-bottom",
+            AtomicOps.ReturnFieldToDeckBottom);
     }
 
     private static async Task ST33_005(EffectContext ctx)

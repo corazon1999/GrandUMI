@@ -250,7 +250,11 @@ public static class BattleEngine
         var previousBatch = s.SimultaneousKOVictimIds;
         var victimIds = victims.Select(card => card.Id).ToHashSet();
         s.SimultaneousKOVictimIds = victimIds;
-        foreach (var id in victimIds) s.PreventKOCardIds.Remove(id);
+        foreach (var id in victimIds)
+        {
+            s.PreventKOCardIds.Remove(id);
+            s.PreventLeaveCardIds.Remove(id);
+        }
 
         try
         {
@@ -275,7 +279,11 @@ public static class BattleEngine
         }
         finally
         {
-            foreach (var id in victimIds) s.PreventKOCardIds.Remove(id);
+            foreach (var id in victimIds)
+            {
+                s.PreventKOCardIds.Remove(id);
+                s.PreventLeaveCardIds.Remove(id);
+            }
             s.SimultaneousKOVictimIds = previousBatch;
         }
     }
@@ -284,7 +292,8 @@ public static class BattleEngine
         GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
         // A replacement may already cover this card as part of the active simultaneous process.
-        if (s.SimultaneousKOVictimIds?.Contains(card.Id) == true && s.PreventKOCardIds.Remove(card.Id))
+        if (s.SimultaneousKOVictimIds?.Contains(card.Id) == true
+            && (s.PreventKOCardIds.Remove(card.Id) || s.PreventLeaveCardIds.Remove(card.Id)))
             return true;
 
         // PreKO 触发：仅本卡的效果有机会拦截（缩小范围避免误触发其他卡）

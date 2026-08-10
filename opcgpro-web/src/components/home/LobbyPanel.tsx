@@ -5,6 +5,7 @@ import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
 import ChatPanel from "./ChatPanel";
+import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import type { RankFaction } from "@/types/net";
 
@@ -39,6 +40,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const matchQueueKind = useNetStore((s) => s.matchQueueKind);
   const rankProfile = useNetStore((s) => s.rankProfile);
   const rankLeaderboard = useNetStore((s) => s.rankLeaderboard);
+  const account       = useNetStore((s) => s.account);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
   const roomOperation = useNetStore((s) => s.roomOperation);
@@ -49,6 +51,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [joinInput, setJoinInput] = useState("");
   const [copied, setCopied] = useState(false);
   const [botGoFirst, setBotGoFirst] = useState(true);
+  const [announcementInput, setAnnouncementInput] = useState("");
 
   // 主卡组须恰好 50 张（后端 DeckValidator 强制，不满会被拒，bug #183）。
   // 这里前置拦截：未满 50 时置灰按钮并提示，避免「点了没反应」。
@@ -130,6 +133,19 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
+  };
+
+  const sendGlobalAnnouncement = () => {
+    const content = announcementInput.trim();
+    if (!content) {
+      showMessage("请输入公告内容", "error");
+      return;
+    }
+    if (!HomeRequest.sendGlobalAnnouncement(content)) {
+      showMessage("服务器未连接，请稍后再试", "error");
+      return;
+    }
+    setAnnouncementInput("");
   };
 
   const modeLocked = matchState !== "idle" || roomOperation !== "idle" || Boolean(roomCode);
@@ -409,8 +425,38 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             )}
           </section>
 
+          <SpectateSettingsPanel locked={modeLocked} />
+
           {entryHint && matchState === "idle" && roomOperation === "idle" && (
             <p className="pb-2 text-center text-sm text-gray-500">{entryHint}</p>
+          )}
+
+          {account === "释迦" && (
+            <section aria-label="全服公告" className="rounded-2xl border border-amber-700/70 bg-amber-950/25 p-3 @[640px]:p-4">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-black text-amber-200">全服滚动公告</h2>
+                <span className="text-xs text-amber-400/80">仅管理员可见</span>
+              </div>
+              <div className="flex flex-col gap-2 @[480px]:flex-row">
+                <input
+                  aria-label="公告内容"
+                  value={announcementInput}
+                  onChange={(event) => setAnnouncementInput(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && sendGlobalAnnouncement()}
+                  placeholder="输入要发送给全服玩家的公告"
+                  maxLength={200}
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-amber-800/80 bg-gray-950 px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={sendGlobalAnnouncement}
+                  disabled={!announcementInput.trim() || connState !== "connected"}
+                  className="min-h-11 shrink-0 rounded-xl bg-amber-500 px-4 text-sm font-black text-gray-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+                >
+                  发送公告
+                </button>
+              </div>
+            </section>
           )}
 
           <aside

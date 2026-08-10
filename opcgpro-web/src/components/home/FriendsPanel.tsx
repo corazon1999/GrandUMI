@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Modal from "@/components/ui/Modal";
 import { HomeRequest } from "@/net/HomeProtocol";
+import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import { useNetStore } from "@/store/netStore";
 import type { FriendInfo, FriendPresenceStatus, FriendRequestInfo, FriendSearchPlayer } from "@/types/net";
+import SpectateJoinButton from "./SpectateJoinButton";
 
 type Tab = "friends" | "requests" | "search";
 
@@ -29,11 +31,12 @@ function PlayerAvatar({ name, online }: { name: string; online: boolean }) {
   );
 }
 
-function PlayerIdentity({ name, account, online, status }: {
+function PlayerIdentity({ name, account, online, status, championLeaderNumbers }: {
   name: string;
   account: string;
   online: boolean;
   status?: FriendPresenceStatus;
+  championLeaderNumbers?: string[];
 }) {
   const statusView = STATUS_LABEL[status ?? (online ? "idle" : "offline")];
   return (
@@ -41,6 +44,7 @@ function PlayerIdentity({ name, account, online, status }: {
       <PlayerAvatar name={name} online={online} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white">{name}</p>
+        <LeaderChampionBadgeList leaderNumbers={championLeaderNumbers} className="mt-1" />
         <p className="truncate text-[11px] text-gray-500">@{account}</p>
         <p className={`mt-0.5 text-[10px] ${statusView.cls}`}>{statusView.text}</p>
       </div>
@@ -61,8 +65,6 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
   const incoming = useNetStore((state) => state.incomingFriendRequests);
   const outgoing = useNetStore((state) => state.outgoingFriendRequests);
   const searchResults = useNetStore((state) => state.friendSearchResults);
-  const spectateState = useNetStore((state) => state.spectateState);
-  const spectateRoomId = useNetStore((state) => state.spectateRoomId);
   const [tab, setTab] = useState<Tab>("friends");
   const [query, setQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
@@ -103,11 +105,6 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
     setRemoveConfirm(null);
   };
 
-  const spectateFriend = (friend: FriendInfo) => {
-    if (!friend.roomId) return;
-    HomeRequest.spectateRoom(friend.roomId, friend.seatIndex ?? 0);
-  };
-
   const switchTab = (next: Tab) => {
     setTab(next);
     setRemoveConfirm(null);
@@ -134,16 +131,14 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
             <div className="flex flex-col gap-2">
               {sortedFriends.length === 0 ? <EmptyState>还没有好友，去“添加好友”搜索账号或昵称吧</EmptyState> : sortedFriends.map((friend) => (
                 <div key={friend.account} className="flex min-h-16 items-center gap-3 rounded-xl border border-gray-800 bg-gray-900/70 p-3">
-                  <PlayerIdentity name={friend.name} account={friend.account} online={friend.online} status={friend.status} />
+                  <PlayerIdentity name={friend.name} account={friend.account} online={friend.online} status={friend.status} championLeaderNumbers={friend.championLeaderNumbers} />
                   {friend.status === "playing" && friend.roomId ? (
-                    <button
-                      type="button"
-                      onClick={() => spectateFriend(friend)}
-                      disabled={spectateState === "joining"}
-                      className="min-h-11 rounded-lg bg-purple-600 px-3 text-xs font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-wait disabled:bg-purple-950 disabled:text-purple-300"
-                    >
-                      {spectateState === "joining" && spectateRoomId === friend.roomId ? "进入中…" : "观战"}
-                    </button>
+                    <SpectateJoinButton
+                      roomId={friend.roomId}
+                      seatIndex={friend.seatIndex ?? 0}
+                      mode={friend.spectateMode}
+                      isFriend
+                    />
                   ) : (
                     <button
                       type="button"
@@ -225,7 +220,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
                   const relationship = currentRelationships.get(player.account) ?? player.relationship;
                   return (
                     <div key={player.account} className="flex min-h-16 items-center gap-3 rounded-xl border border-gray-800 bg-gray-900/70 p-3">
-                      <PlayerIdentity name={player.name} account={player.account} online={player.online} status={player.status} />
+                      <PlayerIdentity name={player.name} account={player.account} online={player.online} status={player.status} championLeaderNumbers={player.championLeaderNumbers} />
                       {relationship === "none" && <button type="button" onClick={() => HomeRequest.sendFriendRequest(player.account)} className="min-h-11 rounded-lg bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-400">添加好友</button>}
                       {relationship === "friend" && <span className="text-xs font-bold text-emerald-400">已是好友</span>}
                       {relationship === "outgoing" && <span className="text-xs font-bold text-amber-400">已申请</span>}

@@ -46,6 +46,7 @@ import type {
   MsgCancelRoom,
   MsgGameStart,
   MsgChatMsg,
+  MsgGlobalAnnouncement,
   MsgOnlineCount,
   MsgPlayerList,
   MsgFriendList,
@@ -70,6 +71,8 @@ import type {
   MsgFriendlyLeft,
   MsgSpectateRoom,
   MsgLeaveSpectate,
+  MsgUpdateSpectateSettings,
+  SpectateMode,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
 import { useNetStore } from "@/store/netStore";
@@ -197,6 +200,9 @@ export function registerHomeProtocols() {
       case "MsgChatMsg":
         handleChatMsg(msg as MsgChatMsg);
         break;
+      case "MsgGlobalAnnouncement":
+        handleGlobalAnnouncement(msg as MsgGlobalAnnouncement);
+        break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
         break;
@@ -265,6 +271,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgLeaveSpectate":
         handleLeaveSpectate(msg as MsgLeaveSpectate);
+        break;
+      case "MsgUpdateSpectateSettings":
+        handleUpdateSpectateSettings(msg as MsgUpdateSpectateSettings);
         break;
     }
   });
@@ -607,6 +616,11 @@ function handleChatMsg(msg: MsgChatMsg) {
   });
 }
 
+function handleGlobalAnnouncement(msg: MsgGlobalAnnouncement) {
+  if (msg.result === undefined) return;
+  showMessage(msg.logStr ?? (msg.result ? "全服公告已发送" : "全服公告发送失败"), msg.result ? "info" : "error");
+}
+
 /**
  * MsgOnlineCount — 在线人数广播
  * 服务器在有人登录/断开时推送，更新角落徽标
@@ -780,6 +794,19 @@ function handleSpectateRoom(msg: MsgSpectateRoom) {
 function handleLeaveSpectate(msg: MsgLeaveSpectate) {
   useNetStore.getState().setSpectate("idle");
   if (msg.result === false && msg.logStr) showMessage(msg.logStr, "error");
+}
+
+function handleUpdateSpectateSettings(msg: MsgUpdateSpectateSettings) {
+  if (msg.result === false) {
+    showMessage(msg.logStr ?? "观战设置保存失败", "error");
+    return;
+  }
+  const mode = msg.mode ?? "open";
+  const handsPublic = msg.handsPublic === true;
+  useNetStore.getState().setSpectateSettings(mode, handsPublic, msg.spectateCode ?? null);
+  if (typeof window !== "undefined") {
+    localStorage.setItem("grandumi_spectate_settings", JSON.stringify({ mode, handsPublic }));
+  }
 }
 
 // ── 请求发送 ────────────────────────────────────────────────────────────
@@ -962,6 +989,13 @@ export const HomeRequest = {
     } as MsgChatMsg);
   },
 
+  sendGlobalAnnouncement(content: string) {
+    return NetManager.send({
+      proto: "MsgGlobalAnnouncement",
+      content,
+    } as MsgGlobalAnnouncement);
+  },
+
   requestPlayerList(offset = 0, limit = 200) {
     return NetManager.send({ proto: "MsgPlayerList", offset, limit } as MsgPlayerList);
   },
@@ -1044,7 +1078,7 @@ export const HomeRequest = {
   },
 
   /** 申请观战指定房间（观战者由后端注册，随后每帧收到脱敏快照） */
-  spectateRoom(roomId: string, viewPlayerIndex: 0 | 1 = 0) {
+  spectateRoom(roomId: string, viewPlayerIndex: 0 | 1 = 0, spectateCode?: string) {
     const normalizedRoomId = roomId.trim();
     if (!normalizedRoomId) {
       showMessage("请输入有效的房间 ID", "error");
@@ -1059,6 +1093,7 @@ export const HomeRequest = {
       proto: "MsgSpectateRoom",
       roomId: normalizedRoomId,
       viewPlayerIndex,
+      spectateCode: spectateCode?.trim(),
     } as MsgSpectateRoom);
     if (!sent) {
       netStore.setSpectate("idle");
@@ -1074,6 +1109,18 @@ export const HomeRequest = {
       showMessage("进入观战超时，请确认对局仍在进行后重试", "error");
     }, 8_000);
     return sent;
+  },
+
+  updateSpectateSettings(mode: SpectateMode, handsPublic: boolean, regenerateCode = false) {
+    useNetStore.getState().setSpectateSettings(mode, handsPublic, mode === "password"
+      ? useNetStore.getState().spectateCode
+      : null);
+    return NetManager.send({
+      proto: "MsgUpdateSpectateSettings",
+      mode,
+      handsPublic,
+      regenerateCode,
+    } as MsgUpdateSpectateSettings);
   },
 
   /** 主动退出观战；本地立即恢复大厅状态，服务端回执用于最终确认 */

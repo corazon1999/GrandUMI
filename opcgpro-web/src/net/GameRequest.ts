@@ -185,4 +185,14 @@ export const GameRequest = {
   leaveGameChat: () => {
     NetManager.send({ proto: "MsgLeaveGameChat" } as MsgLeaveGameChat);
   },
+
+  requestSpectatorHand: () => NetManager.send({ proto: "MsgRequestSpectatorHand" } as MsgBase),
+
+  respondSpectatorHand: (requestId: string, accept: boolean) => {
+    NetManager.send({ proto: "MsgRespondSpectatorHand", requestId, accept } as MsgBase);
+  },
+
+  kickSpectator: (spectatorAccount: string) => {
+    NetManager.send({ proto: "MsgKickSpectator", spectatorAccount } as MsgBase);
+  },
 };

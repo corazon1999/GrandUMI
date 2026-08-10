@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useNet } from "@/hooks/useNet";
 import { useNetStore } from "@/store/netStore";
 import LoginPanel from "@/components/home/LoginPanel";
+import GlobalAnnouncementBanner from "@/components/ui/GlobalAnnouncementBanner";
 import MessageBox from "@/components/ui/MessageBox";
 
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
@@ -39,6 +40,7 @@ export default function NetProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {!loggedIn && requiresLogin ? <LoginPanel /> : children}
+      <GlobalAnnouncementBanner />
       <MessageBox />
     </>
   );

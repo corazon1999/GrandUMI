@@ -16,6 +16,11 @@ import type {
   MsgGameChat,
   MsgFriendChat,
   MsgSpectatorList,
+  MsgSpectatorHandRequest,
+  MsgSpectatorHandStatus,
+  MsgSpectatorHandResponse,
+  MsgKickSpectator,
+  MsgSpectatorKicked,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
@@ -111,9 +116,57 @@ export function registerGameProtocols() {
         break;
       }
 
-      case "MsgSpectatorList":
-        useGameStore.getState().setSpectatorNames((msg as MsgSpectatorList).spectators ?? []);
+      case "MsgSpectatorList": {
+        const spectatorList = msg as MsgSpectatorList;
+        useGameStore.getState().setSpectatorNames(spectatorList.spectators ?? []);
+        useGameStore.getState().setSpectatorDetails(spectatorList.details ?? []);
         break;
+      }
+
+      case "MsgSpectatorHandRequest": {
+        const request = msg as MsgSpectatorHandRequest;
+        useGameStore.getState().addSpectatorHandRequest(request);
+        showMessage(`${request.spectatorName} 申请查看你的手牌`, "info");
+        break;
+      }
+
+      case "MsgSpectatorHandStatus": {
+        const status = msg as MsgSpectatorHandStatus;
+        if (status.status === "pending") {
+          useGameStore.getState().setObserverHandRequestStatus("pending");
+        } else if (status.status === "approved") {
+          useGameStore.getState().setObserverHandRequestStatus("idle");
+        } else {
+          useGameStore.getState().setObserverHandRequestStatus(
+            status.retryAfterMs ? "cooldown" : "idle",
+            status.retryAfterMs ? Date.now() + status.retryAfterMs : 0,
+          );
+        }
+        if (status.logStr) showMessage(status.logStr, status.status === "denied" ? "error" : "info");
+        break;
+      }
+
+      case "MsgSpectatorHandResponse": {
+        const response = msg as MsgSpectatorHandResponse;
+        if (response.requestId) useGameStore.getState().removeSpectatorHandRequest(response.requestId);
+        if (response.result === false) showMessage(response.logStr ?? "手牌申请处理失败", "error");
+        break;
+      }
+
+      case "MsgKickSpectator": {
+        const response = msg as MsgKickSpectator;
+        if (response.result === false) showMessage(response.logStr ?? "移出观战者失败", "error");
+        break;
+      }
+
+      case "MsgSpectatorKicked": {
+        const kicked = msg as MsgSpectatorKicked;
+        useNetStore.getState().setSpectate("idle");
+        useGameStore.getState().resetGame();
+        useNetStore.getState().setNavigateTo("/home");
+        showMessage(kicked.logStr ?? "你已被移出观战", "error");
+        break;
+      }
     }
   });
 

@@ -33,6 +33,11 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   const friends = useNetStore((s) => s.friends);
   const friendChatMessages = useNetStore((s) => s.friendChatMessages);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
+  const spectatorDetails = useGameStore((s) => s.spectatorDetails);
+  const spectatorHandRequests = useGameStore((s) => s.spectatorHandRequests);
+  const spectatorHandVisible = useGameStore((s) => s.spectatorHandVisible);
+  const observerHandRequestStatus = useGameStore((s) => s.observerHandRequestStatus);
+  const observerHandRequestRetryAt = useGameStore((s) => s.observerHandRequestRetryAt);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>("game");
   const [muted, setMuted] = useState(false);
@@ -46,6 +51,8 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   const [spectatorHovered, setSpectatorHovered] = useState(false);
   const [spectatorPinned, setSpectatorPinned] = useState(false);
   const [toast, setToast] = useState<ChatToast | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [kickConfirm, setKickConfirm] = useState("");
 
   const idRef = useRef(0);
   const mutedRef = useRef(muted);
@@ -97,6 +104,21 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   useEffect(() => {
     if (spectatorNames.length === 0) setSpectatorPinned(false);
   }, [spectatorNames.length]);
+
+  useEffect(() => {
+    if (observerHandRequestStatus !== "cooldown") {
+      setCooldownSeconds(0);
+      return;
+    }
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((observerHandRequestRetryAt - Date.now()) / 1000));
+      setCooldownSeconds(remaining);
+      if (remaining === 0) useGameStore.getState().setObserverHandRequestStatus("idle");
+    };
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [observerHandRequestRetryAt, observerHandRequestStatus]);
 
   const showToast = (nextToast: ChatToast) => {
     setToast(nextToast);
@@ -202,8 +224,45 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
     fireCooldown();
   };
 
+  const requestHand = () => {
+    if (observerHandRequestStatus !== "idle") return;
+    if (GameRequest.requestSpectatorHand()) {
+      useGameStore.getState().setObserverHandRequestStatus("pending");
+    }
+  };
+
+  const respondHandRequest = (requestId: string, accept: boolean) => {
+    GameRequest.respondSpectatorHand(requestId, accept);
+    useGameStore.getState().removeSpectatorHandRequest(requestId);
+  };
+
+  const kickSpectator = (account: string) => {
+    if (kickConfirm !== account) {
+      setKickConfirm(account);
+      return;
+    }
+    GameRequest.kickSpectator(account);
+    setKickConfirm("");
+  };
+
   return (
-    <div className="pointer-events-none fixed bottom-3 left-3 z-50 flex flex-col items-start gap-2 max-md:bottom-2 max-md:left-2">
+    <div
+      className="pointer-events-none fixed z-50 flex flex-col items-start gap-2"
+      style={{
+        left: "calc(0.75rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+        bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
+      }}
+    >
+      {!isObserver && spectatorHandRequests.map((request) => (
+        <div key={request.requestId} className="pointer-events-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-purple-400/30 bg-slate-900/95 p-3 text-xs text-white shadow-2xl">
+          <p className="font-bold text-purple-200">{request.spectatorName} 申请查看你的手牌</p>
+          <p className="mt-1 text-slate-400">只会向这名观战者公开你当前及后续手牌。</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => respondHandRequest(request.requestId, false)} className="min-h-11 rounded-lg bg-slate-700 font-bold text-slate-200 hover:bg-slate-600">拒绝</button>
+            <button type="button" onClick={() => respondHandRequest(request.requestId, true)} className="min-h-11 rounded-lg bg-emerald-700 font-bold text-white hover:bg-emerald-600">同意公开</button>
+          </div>
+        </div>
+      ))}
       {!open && toast && (
         <div className="pointer-events-none max-w-[240px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15">
           <span className={`font-bold ${toast.kind === "friends" ? "text-sky-300" : "text-amber-300"}`}>
@@ -326,7 +385,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
               setFriendUnread((previous) => ({ ...previous, [selectedFriendAccount]: 0 }));
             }
           }}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
+          className="relative flex h-11 w-11 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
           title="聊天"
           aria-label="打开聊天"
         >
@@ -344,9 +403,26 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
               <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl bg-slate-900/95 p-3 text-xs text-white shadow-2xl ring-1 ring-purple-300/25">
                 <p className="mb-2 font-bold text-purple-200">{spectatorNames.length} 人正在观战</p>
                 <div className="max-h-40 space-y-1 overflow-y-auto">
-                  {spectatorNames.map((name, index) => (
-                    <div key={`${name}:${index}`} className="truncate rounded-md bg-white/5 px-2 py-1 text-slate-200">{name}</div>
-                  ))}
+                  {(spectatorDetails.length > 0
+                    ? spectatorDetails
+                    : spectatorNames.map((name) => ({ account: name, name, viewingYou: false, handVisible: false })))
+                    .map((spectator, index) => (
+                      <div key={`${spectator.account}:${index}`} className="flex min-h-11 items-center gap-2 rounded-md bg-white/5 px-2 py-1 text-slate-200">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate">{spectator.name}</p>
+                          {spectator.viewingYou && <p className="text-[10px] text-purple-300">主视角：你{spectator.handVisible ? " · 已公开手牌" : ""}</p>}
+                        </div>
+                        {spectatorDetails.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => kickSpectator(spectator.account)}
+                            className={`min-h-11 rounded-md px-2 text-[10px] font-bold ${kickConfirm === spectator.account ? "bg-red-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-red-900 hover:text-red-200"}`}
+                          >
+                            {kickConfirm === spectator.account ? "确认踢出" : "踢出"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
@@ -356,7 +432,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                 setOpen(false);
                 setSpectatorPinned((value) => !value);
               }}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
               title={`${spectatorNames.length} 人正在观战`}
               aria-label={`查看正在观战的 ${spectatorNames.length} 人`}
               aria-expanded={showSpectatorList}
@@ -370,6 +446,20 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
               </span>
             </button>
           </div>
+        )}
+        {isObserver && !spectatorHandVisible && (
+          <button
+            type="button"
+            onClick={requestHand}
+            disabled={observerHandRequestStatus !== "idle"}
+            className="min-h-11 rounded-full bg-purple-900/90 px-4 text-xs font-bold text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+          >
+            {observerHandRequestStatus === "pending"
+              ? "等待玩家同意…"
+              : observerHandRequestStatus === "cooldown"
+                ? `${cooldownSeconds || 1} 秒后可再申请`
+                : "申请查看主视角手牌"}
+          </button>
         )}
       </div>
     </div>

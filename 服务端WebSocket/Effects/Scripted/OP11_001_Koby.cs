@@ -66,8 +66,8 @@ public class OP11_001_Koby : IScriptedEffect
             if (card is not null) AtomicOps.ReturnTrashToDeckBottom(me, card);
         }
 
-        if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
-        else ctx.State.MarkPreventKO(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
+            card => card.Info.Power <= 7000 && card.Info.HasKeyword("海军"), isKoReplacement: !nonKoLeave);
         me.TurnOnceUsed.Add(key);
     }
 }

@@ -227,6 +227,62 @@ public class ST30EffectTests
     }
 
     [Fact]
+    public async Task ST30_009_OneSelfKOProtectsAllPower6000CharactersFromSimultaneousKO()
+    {
+        var s = TestScene.New().MyDeckTop("ST30-002").Build();
+        var me = s.Players[0];
+        var guard = Card("ST30-009");
+        var first = Card("ST30-006");
+        var second = Card("ST30-007");
+        me.Characters.AddRange([guard, first, second]);
+        var prompts = new MockPromptService().QueueConfirm(true);
+        s.KOReason = "effect";
+        s.KOActingSide = 1;
+
+        var koCount = await BattleEngine.KOCardsSimultaneouslyAsync(
+            s, 0, me.Characters.ToList(), prompts);
+
+        // The substitute's KO is paid during replacement resolution, so it is not
+        // counted as an original effect target KO.
+        Assert.Equal(0, koCount);
+        Assert.Contains(first, me.Characters);
+        Assert.Contains(second, me.Characters);
+        Assert.Contains(guard, me.Trash);
+        Assert.Single(prompts.ConfirmHistory);
+    }
+
+    [Fact]
+    public async Task ST30_011_OneRestProtectsAllPower6000CharactersFromSimultaneousDeckReturn()
+    {
+        var s = TestScene.New().Build();
+        var me = s.Players[0];
+        var opp = s.Players[1];
+        var guard = Card("ST30-011");
+        var first = Card("ST30-006");
+        var second = Card("ST30-007");
+        var source = Card("ST33-003");
+        var discardCost = Card("ST30-002");
+        first.CostModThisTurn = -3;
+        second.CostModThisTurn = -2;
+        me.Characters.AddRange([guard, first, second]);
+        opp.Characters.Add(source);
+        opp.Hand.Add(discardCost);
+        var prompts = new MockPromptService()
+            .QueueChoose(discardCost.Id.ToString())
+            .QueueChoose(first.Id.ToString(), second.Id.ToString())
+            .QueueConfirm(true);
+
+        await EffectRuntime.Resolve(s, 1, source, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Contains(first, me.Characters);
+        Assert.Contains(second, me.Characters);
+        Assert.DoesNotContain(first, me.Deck);
+        Assert.DoesNotContain(second, me.Deck);
+        Assert.True(guard.IsTapped);
+        Assert.Single(prompts.ConfirmHistory);
+    }
+
+    [Fact]
     public async Task ST30_015_CounterRequiresTwoOriginalPower6000Characters()
     {
         var eligible = TestScene.New()

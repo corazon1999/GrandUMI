@@ -48,6 +48,24 @@ public class SpectatorPerspectiveTests
     }
 
     [Fact]
+    public void 观战快照_授权后仅公开主视角手牌()
+    {
+        var state = TestScene.MaxScenario();
+
+        var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(
+            state,
+            viewerIndex: -1,
+            spectatorPlayerIndex: 1,
+            revealSpectatorMainHand: true));
+
+        Assert.True(snapshot.GetProperty("spectatorHandVisible").GetBoolean());
+        Assert.Equal(
+            state.Players[1].Hand.Select(card => card.Info.Number),
+            ReadStrings(snapshot.GetProperty("my").GetProperty("handCardNumbers")));
+        Assert.Empty(snapshot.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+    }
+
+    [Fact]
     public void 批量快照_仅按需生成一号座位观战视角()
     {
         var state = TestScene.MaxScenario();

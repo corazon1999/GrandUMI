@@ -31,6 +31,7 @@ public class P_111_NicoRobin : IScriptedEffect
         if (!use) return;
         me.TurnOnceUsed.Add(key);
         don.State = DonState.Rest;
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.HasKeyword("草帽一伙"));
     }
 }

@@ -61,8 +61,8 @@ public class OP12_102_Shirahoshi : IScriptedEffect
         if (!await ctx.Prompts.ConfirmOptional(owner,
             "白星：将生命区最上方1张翻至正面，使该费用不高于6的角色不离场？")) return;
         AtomicOps.FlipTopLifeFaceUp(me);
-        if (nonKoLeave) ctx.State.MarkPreventLeave(victim.Id);
-        else ctx.State.MarkPreventKO(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
+            card => card.Info.Cost <= 6, isKoReplacement: !nonKoLeave);
 
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
@@ -334,6 +335,28 @@ public sealed class PlayerDataStore
         }
         transaction.Commit();
         return results;
+    }
+
+    /// <summary>将战绩库的不可逆账号哈希映射为当前公开昵称；未命中的账号不会返回。</summary>
+    public IReadOnlyDictionary<string, string> GetDisplayNamesByLeaderStatKeys(IEnumerable<string> leaderStatKeys)
+    {
+        var wanted = new HashSet<string>(
+            leaderStatKeys.Where(value => !string.IsNullOrWhiteSpace(value)),
+            StringComparer.OrdinalIgnoreCase);
+        if (wanted.Count == 0) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT account, display_name FROM players;";
+        using var reader = command.ExecuteReader();
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read())
+        {
+            var account = reader.GetString(0);
+            var key = HashLeaderStatsAccount(account);
+            if (wanted.Contains(key)) result[key] = reader.GetString(1);
+        }
+        return result;
     }
 
     public FriendMutationResult SendFriendRequest(string account, string toAccount)
@@ -1224,6 +1247,12 @@ public sealed class PlayerDataStore
 
     private static string NormalizeAccountKey(string account)
         => ValidateAccount(account).ToUpperInvariant();
+
+    private static string HashLeaderStatsAccount(string account)
+    {
+        var normalized = account.Trim().ToUpperInvariant();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
+    }
 
     private static string ValidateDeckName(string name)
     {

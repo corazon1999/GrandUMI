@@ -46,6 +46,8 @@ GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(ResolveDslDir());
 LeaderStatsStore.Default.Initialize();
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
+LeaderChampionStore.Default.Initialize();
+Console.WriteLine($"[LeaderChampion] SQLite: {LeaderChampionStore.Default.DatabasePath}");
 RankedStore.Default.Initialize();
 Console.WriteLine($"[排位] SQLite: {RankedStore.Default.DatabasePath}");
 

@@ -28,7 +28,8 @@ public class OP15_094_Zoro : IScriptedEffect
             $"佐罗：将此角色放入废弃区，使「{victim.Info.Name}」不离场？");
         if (!use) return;
 
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Id != self.Id && card.Info.HasKeyword("草帽一伙"));
         // 成本：佐罗自身放入废弃区（归还附着咚）
         foreach (var d in me.CostArea)
             if (d.State == DonState.Attached && d.AttachedToCardId == self.Id)

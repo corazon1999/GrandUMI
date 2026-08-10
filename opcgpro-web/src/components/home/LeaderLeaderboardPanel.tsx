@@ -7,13 +7,14 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 import {
   nextLeaderLeaderboardSort,
   sortLeaderLeaderboardItems,
   type LeaderLeaderboardSortKey,
   type LeaderLeaderboardSortState,
 } from "@/lib/leaderLeaderboardSort";
-import type { LeaderboardPeriod } from "@/types/net";
+import type { LeaderboardPeriod, LeaderLeaderboardItem } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
 
@@ -25,6 +26,30 @@ const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
+function ChampionOwner({
+  item,
+  compact = false,
+}: {
+  item: LeaderLeaderboardItem;
+  compact?: boolean;
+}) {
+  if (!item.champion) {
+    return <span className="text-xs text-gray-600">最强使用者待诞生</span>;
+  }
+
+  return (
+    <div className={`flex min-w-0 items-center gap-2 ${compact ? "" : "py-1"}`}>
+      <LeaderChampionBadge leaderNumber={item.leaderNumber} />
+      <div className="min-w-0">
+        <p className="truncate text-xs font-black text-amber-100">{item.champion.displayName}</p>
+        <p className="mt-0.5 whitespace-nowrap text-[10px] text-amber-200/65">
+          近 30 日 {item.champion.wins}/{item.champion.games} · {percent(item.champion.winRate)}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function formatGeneratedAt(value: string | undefined, locale: string): string {
@@ -187,7 +212,7 @@ export default function LeaderLeaderboardPanel() {
         <div>
           <h2 className="text-xl font-bold text-white">Leader 胜率榜</h2>
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
-            统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 支持排行榜与对阵一图流
+            统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流
           </p>
         </div>
         <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex @[640px]:w-auto">
@@ -328,6 +353,9 @@ export default function LeaderLeaderboardPanel() {
                         {card?.color && <span className={`rounded border px-1.5 py-0.5 text-xs ${colorClasses(card.color)}`}>{card.color}</span>}
                         {item.insufficientSample && <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500">样本不足</span>}
                       </div>
+                      <div className="mt-2">
+                        <ChampionOwner item={item} compact />
+                      </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-lg font-black text-orange-300">{percent(item.winRate)}</p>
@@ -355,11 +383,12 @@ export default function LeaderLeaderboardPanel() {
               );
             })}
           </ul>
-          <table className="hidden w-full min-w-[920px] border-collapse text-left @[1024px]:table">
+          <table className="hidden w-full min-w-[1120px] border-collapse text-left @[1024px]:table">
             <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="w-16 px-4 py-3 text-center">排名</th>
                 <th className="px-3 py-3">Leader</th>
+                <th className="w-56 px-3 py-3">最强使用者</th>
                 {(["games", "record", "winRate", "usageRate", "firstWinRate", "secondWinRate"] as const).map((column) => (
                   <SortableHeader
                     key={column}
@@ -432,6 +461,9 @@ export default function LeaderLeaderboardPanel() {
                         <span className={`ml-auto text-xs text-gray-600 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true">▾</span>
                       </div>
                     </td>
+                    <td className="px-3 py-2.5">
+                      <ChampionOwner item={item} />
+                    </td>
                     <td className="px-3 py-2.5 text-right text-sm font-semibold text-gray-200">{item.games}</td>
                     <td className="px-3 py-2.5 text-right text-sm">
                       <span className="text-emerald-400">{item.wins}</span>
@@ -453,7 +485,7 @@ export default function LeaderLeaderboardPanel() {
                   </tr>
                   {expanded && (
                     <tr className="bg-gray-950/80">
-                      <td colSpan={8} className="px-3 py-3">
+                      <td colSpan={9} className="px-3 py-3">
                         <LeaderMatchupBreakdown
                           data={selectedMatchups}
                           onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber)}

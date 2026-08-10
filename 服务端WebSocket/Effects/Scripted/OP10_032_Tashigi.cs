@@ -30,6 +30,7 @@ public class OP10_032_Tashigi : IScriptedEffect
             $"达斯琪：将此角色转为休息状态，使「{victim.Info.Name}」不离场？");
         if (!use) return;
         AtomicOps.RestCard(self);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Id != self.Id && card.Info.ColorList.Contains("绿"));
     }
 }

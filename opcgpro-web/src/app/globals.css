@@ -37,6 +37,17 @@ textarea {
   touch-action: manipulation;
 }
 
+@keyframes global-announcement-scroll {
+  from { transform: translateX(100vw); }
+  to { transform: translateX(-100%); }
+}
+
+.global-announcement-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: global-announcement-scroll 14s linear both;
+}
+
 /* 路由页面原有的视口尺寸类改为跟随布局预览画布。 */
 .layout-preview-route > * {
   width: 100%;
@@ -518,6 +529,14 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .global-announcement-marquee {
+    display: block;
+    overflow: hidden;
+    padding: 0 0.75rem;
+    text-overflow: ellipsis;
+    animation: none;
+  }
+
   .leader-breath-depth,
   .leader-breath-subject,
   .leader-breath-gaze,

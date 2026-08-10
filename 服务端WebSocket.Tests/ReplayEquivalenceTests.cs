@@ -183,7 +183,7 @@ public class ReplayEquivalenceTests
             if (index == 0) player0Snapshot = serialized;
             else player1Snapshot = serialized;
         };
-        engine.OnSendToSpectators = (_, payload) =>
+        engine.OnSendToSpectators = (_, payload, _) =>
             spectatorSnapshot = JsonSerializer.SerializeToElement(payload);
 
         engine.BroadcastInitialState();

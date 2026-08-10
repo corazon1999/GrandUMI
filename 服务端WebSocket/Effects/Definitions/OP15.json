@@ -1018,13 +1018,21 @@
         }
       ]
     },
-    "counter": [
-      {
-        "op": "AddPowerThisBattle",
-        "target": "selfLeader",
-        "delta": 3000
-      }
-    ]
+    "counter": {
+      "cost": {
+        "handDiscard": {
+          "n": 1,
+          "text": "丢弃 1 张手牌以发动反击效果（可放弃）"
+        }
+      },
+      "then": [
+        {
+          "op": "AddPowerThisBattle",
+          "target": "selfLeader",
+          "delta": 3000
+        }
+      ]
+    }
   },
   "OP15-110": {
     "triggers": [

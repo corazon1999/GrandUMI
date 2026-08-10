@@ -32,6 +32,7 @@ public class OP15_052_Leo : IScriptedEffect
         var cost = me.Characters.FirstOrDefault(c => c.Id.ToString() == ch[0]);
         if (cost is null) return;
         AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, cost);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.Power <= 7000);
     }
 }

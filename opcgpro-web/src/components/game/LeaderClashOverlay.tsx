@@ -6,6 +6,7 @@ import { getGameCard } from "@/data/CardLoader";
 import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
+import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
@@ -35,6 +36,7 @@ interface FighterCardProps {
   playerName: string;
   leaderName: string;
   leaderNumber: string;
+  championLeaderNumber?: string | null;
   quote: string;
   sprite: string;
   playing: boolean;
@@ -46,6 +48,7 @@ function FighterCard({
   playerName,
   leaderName,
   leaderNumber,
+  championLeaderNumber,
   quote,
   sprite,
   playing,
@@ -134,6 +137,7 @@ function FighterCard({
         <p className={`truncate text-[clamp(9px,1.1vw,13px)] font-bold tracking-widest ${isLeft ? "text-cyan-200" : "text-orange-200"}`}>
           {playerName || (isLeft ? "我方" : "对手")}
         </p>
+        <LeaderChampionBadge leaderNumber={championLeaderNumber} className={`mt-1 ${isLeft ? "ml-auto" : "mr-auto"}`} />
         <p className="truncate text-[clamp(14px,2vw,24px)] font-black italic text-white drop-shadow-lg">
           {leaderName}
         </p>
@@ -168,10 +172,12 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const myLeaderNumber = useGameStore((state) => state.my?.leaderNumber ?? "");
   const mySpriteMap = useGameStore((state) => state.my?.spriteMap);
   const myName = useGameStore((state) => state.my?.name ?? "");
+  const myChampionLeaderNumber = useGameStore((state) => state.my?.championLeaderNumber);
   const opponentLeaderId = useGameStore((state) => state.opponent?.leaderId ?? "");
   const opponentLeaderNumber = useGameStore((state) => state.opponent?.leaderNumber ?? "");
   const opponentSpriteMap = useGameStore((state) => state.opponent?.spriteMap);
   const opponentName = useGameStore((state) => state.opponent?.name ?? "");
+  const opponentChampionLeaderNumber = useGameStore((state) => state.opponent?.championLeaderNumber);
   const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
   const turnCount = useGameStore((state) => state.turnCount);
   const reducedMotion = useReducedMotion() ?? false;
@@ -365,6 +371,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
             playerName={myName}
             leaderName={myLeaderName}
             leaderNumber={myLeaderNumber}
+            championLeaderNumber={myChampionLeaderNumber}
             quote={myQuote}
             sprite={mySprite}
             playing={playing}
@@ -375,6 +382,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
             playerName={opponentName}
             leaderName={opponentLeaderName}
             leaderNumber={opponentLeaderNumber}
+            championLeaderNumber={opponentChampionLeaderNumber}
             quote={opponentQuote}
             sprite={opponentSprite}
             playing={playing}

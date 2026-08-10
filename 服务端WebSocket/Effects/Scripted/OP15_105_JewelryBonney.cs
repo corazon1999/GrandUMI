@@ -28,6 +28,7 @@ public class OP15_105_JewelryBonney : IScriptedEffect
         var top = me.LifeArea[0];
         me.LifeArea.RemoveAt(0);
         me.Hand.Add(top);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.Power <= 7000);
     }
 }

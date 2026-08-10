@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 【登场时】对所选对方角色施加 RestrictionKind.CannotBeRested，持续期
 ///     KeywordDuration.UntilNextOpponentEndPhase（即"直到下个对方结束阶段"）。RestCard 对被标记者 no-op。
-///   - 【KO时】可选效果：成本为将我方 1 张活跃卡牌(领袖/角色)转为休息状态；收益为从手牌登场
+///   - 【KO时】可选效果：成本为将我方 1 张活跃卡牌(领袖/角色/舞台/咚!!)转为休息状态；收益为从手牌登场
 ///     1 张费用≤5 的绿色("绿")角色。绿色在本卡库中对应元素色 "绿"。
 ///   - "费用不高于" 用 ctx.State.CurrentCostOf(side, card) 评估（含持续费用修正）。
 /// </summary>
@@ -57,22 +57,15 @@ public class OP14_033_Perona : IScriptedEffect
         ).ToList();
         if (playable.Count == 0) return;
 
-        var costCands = new List<CardInstance>();
-        if (!me.Leader.IsTapped) costCands.Add(me.Leader);
-        costCands.AddRange(me.Characters.Where(c => !c.IsTapped));
-        if (costCands.Count == 0) return; // 无法支付成本
+        if (AtomicOps.RestableCount(me) < 1) return; // 无法支付成本
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "佩罗娜【KO时】：将我方 1 张卡牌转为休息状态，登场 1 张费用≤5 的绿色角色？");
         if (!use) return;
 
-        // 成本：将我方 1 张活跃卡牌转为休息状态
-        var costPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
-            "将我方 1 张卡牌转为休息状态（成本）",
-            costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
-        if (costPick.Count == 0) return;
-        var costCard = costCands.First(c => c.Id.ToString() == costPick[0]);
-        AtomicOps.RestCard(costCard);
+        // 成本：将我方 1 张活跃的领袖/角色/舞台/咚!! 转为休息状态
+        if (!await AtomicOps.PromptRestOwnCards(ctx, 1,
+            "将我方 1 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
 
         // 收益：从手牌登场最多 1 张费用≤5 的绿色角色
         var extra = new Dictionary<string, object?>

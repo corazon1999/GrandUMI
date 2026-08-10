@@ -27,7 +27,8 @@ public class OP10_049_Sabo : IScriptedEffect
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             $"萨波：将此角色放回手牌，使「{victim.Info.Name}」不离场？");
         if (!use) return;
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Id != self.Id && card.Info.Cost <= 7);
         AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, self);    // 成本：萨波自身回手牌
     }
 }

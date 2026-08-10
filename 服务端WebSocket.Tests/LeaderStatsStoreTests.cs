@@ -1,5 +1,6 @@
 using GrandUMI.Game;
 using GrandUMI.Game.Stats;
+using Microsoft.Data.Sqlite;
 using System.Reflection;
 using System.Text.Json;
 using Xunit;
@@ -311,6 +312,39 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.False(leader.TryGetProperty("LeaderNumber", out _));
         Assert.Equal("08/08", trend.GetProperty("label").GetString());
         Assert.False(trend.TryGetProperty("Label", out _));
+    }
+
+    [Fact]
+    public void DisconnectFinishedMatchesAreExcludedFromLeaderboardAndPlayerStats()
+    {
+        var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
+        Directory.CreateDirectory(_tempDir);
+        var databasePath = Path.Combine(_tempDir, "disconnect-filter.db");
+        var store = new LeaderStatsStore(databasePath);
+
+        store.RecordMatch(Match("normal", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
+        store.RecordMatch(new LeaderMatchResult(
+            "disconnect", now, MatchKind.Matchmaking,
+            "Alice", "Carol", "L-A", "L-C", 0, 0, 12, "Carol 断线超时"));
+        store.RecordMatch(new LeaderMatchResult(
+            "legacy-disconnect", now, MatchKind.Matchmaking,
+            "Alice", "Dave", "L-A", "L-D", 0, 0, 12, "DisconnectTimeout"));
+        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE match_results SET counted = 1 WHERE match_id = 'legacy-disconnect';";
+            command.ExecuteNonQuery();
+        }
+
+        var leaderboard = store.GetLeaderboard("all", now);
+        var profile = store.GetPlayerProfile("Alice", "all", now);
+
+        Assert.Equal(1, leaderboard.TotalMatches);
+        Assert.Equal(1, Assert.Single(leaderboard.Items, x => x.LeaderNumber == "L-A").Games);
+        Assert.DoesNotContain(leaderboard.Items, x => x.LeaderNumber is "L-C" or "L-D");
+        Assert.Equal(1, profile.Games);
+        Assert.Equal(1, profile.Wins);
     }
 
     private LeaderStatsStore CreateStore()

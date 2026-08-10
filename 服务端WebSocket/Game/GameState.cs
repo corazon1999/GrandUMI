@@ -85,9 +85,41 @@ public class GameState
     /// </summary>
     public IReadOnlySet<Guid>? SimultaneousKOVictimIds { get; internal set; }
 
+    /// <summary>
+    /// Cards leaving the field together as the result of one effect.  Replacement
+    /// effects can use this to replace every matching leave with one payment.
+    /// </summary>
+    public IReadOnlySet<Guid>? SimultaneousLeaveVictimIds { get; internal set; }
+
     /// <summary>"代替离场使其不离场"置换守护写入的卡集合：离场路径(KO/退手牌/回卡组/置入生命)检查后取消该卡本次离场。</summary>
     public HashSet<Guid> PreventLeaveCardIds { get; } = new();
     public void MarkPreventLeave(Guid cardId) => PreventLeaveCardIds.Add(cardId);
+
+    /// <summary>Apply one replacement to every matching victim in the active simultaneous process.</summary>
+    public void MarkPreventEffectLeaveBatch(int ownerIdx, Guid currentVictimId,
+        Func<CardInstance, bool> matches, bool isKoReplacement = false)
+    {
+        if (SimultaneousKOVictimIds is { } koVictims)
+        {
+            foreach (var card in Players[ownerIdx].Characters)
+            {
+                if (!koVictims.Contains(card.Id) || !matches(card)) continue;
+                MarkPreventKO(card.Id);
+                MarkPreventLeave(card.Id);
+            }
+            return;
+        }
+
+        if (SimultaneousLeaveVictimIds is { } leaveVictims)
+        {
+            foreach (var card in Players[ownerIdx].Characters)
+                if (leaveVictims.Contains(card.Id) && matches(card)) MarkPreventLeave(card.Id);
+            return;
+        }
+
+        if (isKoReplacement) MarkPreventKO(currentVictimId);
+        else MarkPreventLeave(currentVictimId);
+    }
 
     /// <summary>永续效果列表（来源卡离场时由 ContinuousEffectRegistry 清理）</summary>
     public List<ContinuousEffect> ContinuousEffects { get; } = new();

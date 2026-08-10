@@ -15,6 +15,34 @@ public class OP17EffectTests
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
     [Fact]
+    public async Task OP17_095_ReturnsThreeTrashOnceToProtectAllSimultaneousEffectKOs()
+    {
+        var state = TestScene.New().Build();
+        var me = state.Players[0];
+        var guard = Card("OP17-095");
+        var first = Card("ST30-006");
+        var second = Card("ST30-007");
+        var trash = new[] { Card("ST30-002"), Card("ST30-003"), Card("ST30-004") };
+        me.Characters.AddRange([guard, first, second]);
+        me.Trash.AddRange(trash);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(trash.Select(card => card.Id.ToString()).ToArray());
+        state.KOReason = "effect";
+        state.KOActingSide = 1;
+
+        var koCount = await BattleEngine.KOCardsSimultaneouslyAsync(
+            state, 0, [first, second], prompts);
+
+        Assert.Equal(0, koCount);
+        Assert.Contains(first, me.Characters);
+        Assert.Contains(second, me.Characters);
+        Assert.Empty(me.Trash);
+        Assert.Equal(trash, me.Deck);
+        Assert.Single(prompts.ConfirmHistory);
+    }
+
+    [Fact]
     public async Task OP17_036_EventMain_CannotUseCharactersToCompleteDonCost()
     {
         var state = TestScene.New("OP17-001")

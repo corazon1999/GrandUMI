@@ -45,6 +45,7 @@ public class OP12_048_Rosinante : IScriptedEffect
 
         AtomicOps.RestCard(self);
         AtomicOps.DiscardHand(me, disc);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
+            card => card.Info.HasKeyword("海军") && card.Info.ColorList.Contains("蓝"));
     }
 }

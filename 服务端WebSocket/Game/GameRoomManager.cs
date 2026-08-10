@@ -56,8 +56,14 @@ public static class GameRoomManager
         public required string[] PlayerSessionIds { get; init; }  // [P0, P1]
         public required string[] PlayerAccounts   { get; init; }
         public required string[] PlayerDisplayNames { get; init; }
-        /// <summary>观战会话及其主视角座位（0/1）。</summary>
-        public ConcurrentDictionary<string, int> Spectators { get; } = new();
+        /// <summary>观战会话、主视角与个人手牌授权。</summary>
+        public ConcurrentDictionary<string, SpectatorConnection> Spectators { get; } = new();
+        public string[] SpectateModes { get; init; } = [SpectatingRules.Open, SpectatingRules.Open];
+        public bool[] SpectatorHandsPublic { get; init; } = [false, false];
+        public string?[] SpectateCodes { get; init; } = [null, null];
+        public ConcurrentDictionary<string, byte> KickedSpectatorAccounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+        internal object SpectatorGate { get; } = new();
+        internal Dictionary<string, SpectatorHandRequest> PendingHandRequests { get; } = new(StringComparer.Ordinal);
         public DateTime CreatedAt { get; } = DateTime.UtcNow;
         public string? ReplayPath { get; set; }
         public string? MatchLogPath { get; set; }
@@ -102,7 +108,13 @@ public static class GameRoomManager
                                           MatchKind matchKind = MatchKind.UnknownHuman,
                                           bool broadcastInitialState = true,
                                           string? p0DisplayName = null,
-                                          string? p1DisplayName = null)
+                                          string? p1DisplayName = null,
+                                          string? p0SpectateMode = null,
+                                          string? p1SpectateMode = null,
+                                          bool p0SpectatorHandsPublic = false,
+                                          bool p1SpectatorHandsPublic = false,
+                                          string? p0SpectateCode = null,
+                                          string? p1SpectateCode = null)
     {
         if (string.Equals(p0Sid, p1Sid, StringComparison.Ordinal))
             throw new InvalidOperationException("同一连接不能同时作为对局双方");
@@ -141,6 +153,9 @@ public static class GameRoomManager
             PlayerSessionIds = new[] { p0Sid, p1Sid },
             PlayerAccounts   = new[] { p0Account, p1Account },
             PlayerDisplayNames = new[] { p0DisplayName ?? p0Account, p1DisplayName ?? p1Account },
+            SpectateModes = [SpectatingRules.NormalizeMode(p0SpectateMode), SpectatingRules.NormalizeMode(p1SpectateMode)],
+            SpectatorHandsPublic = [p0SpectatorHandsPublic, p1SpectatorHandsPublic],
+            SpectateCodes = [p0SpectateCode, p1SpectateCode],
             VsBot = vsBot,
             MatchKind = matchKind,
             FriendlyRoomId = friendlyRoomId,
@@ -158,17 +173,20 @@ public static class GameRoomManager
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
         };
 
-        engine.OnSendToSpectators = (viewPlayerIndex, payload) =>
+        engine.OnSendToSpectators = (viewPlayerIndex, payload, handPayload) =>
         {
             foreach (var spectator in entry.Spectators)
             {
-                if (spectator.Value == viewPlayerIndex)
-                    WebSocketBridge.Send(spectator.Key, payload);
+                if (spectator.Value.ViewPlayerIndex == viewPlayerIndex)
+                    WebSocketBridge.Send(spectator.Key,
+                        spectator.Value.HandVisible && handPayload is not null ? handPayload : payload);
             }
         };
         engine.HasSpectators = () => !entry.Spectators.IsEmpty;
         engine.HasSpectatorsForPerspective = viewPlayerIndex =>
-            entry.Spectators.Values.Any(value => value == viewPlayerIndex);
+            entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex);
+        engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
+            entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
         entry.ReplayPath = ReplayRecorder.Open(roomId);
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
         engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
@@ -202,8 +220,8 @@ public static class GameRoomManager
                 seed = engine.State.RngSeed,
                 firstPlayer,
                 openingSetupAfterFirstPlayerChoice,
-                p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap },
-                p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap },
+                p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
+                p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
                 vsBot,
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
@@ -672,14 +690,15 @@ public static class GameRoomManager
             EnsureMulliganTimeout(room);
             if (idx < 0)
             {
-                var viewPlayerIndex = room.Spectators.TryGetValue(sessionId, out var storedViewPlayerIndex)
-                    ? storedViewPlayerIndex
-                    : 0;
+                var spectator = room.Spectators.TryGetValue(sessionId, out var storedSpectator)
+                    ? storedSpectator
+                    : null;
                 WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
                     room.Engine.State,
                     -1,
                     "Resync",
-                    spectatorPlayerIndex: viewPlayerIndex));
+                    spectatorPlayerIndex: spectator?.ViewPlayerIndex ?? 0,
+                    revealSpectatorMainHand: spectator?.HandVisible == true));
                 return;
             }
             CompleteDisconnectGrace(room, idx, sessionId);
@@ -698,7 +717,11 @@ public static class GameRoomManager
         if (idx < 0)
         {
             // 观战者直接移除
-            var removed = room.Spectators.TryRemove(sessionId, out _);
+            var removed = room.Spectators.TryRemove(sessionId, out var spectator);
+            if (spectator?.PendingRequestId is { } pendingId)
+            {
+                lock (room.SpectatorGate) room.PendingHandRequests.Remove(pendingId);
+            }
             _sessionRoom.TryRemove(sessionId, out _);
             if (removed) WebSocketBridge.BroadcastSpectatorList(room);
             return;
@@ -863,7 +886,14 @@ public static class GameRoomManager
         }
     }
 
-    public static void AddSpectator(string roomId, string sessionId, int viewPlayerIndex = 0)
+    public static void AddSpectator(
+        string roomId,
+        string sessionId,
+        string account,
+        string displayName,
+        int viewPlayerIndex = 0,
+        string? spectateCode = null,
+        bool isFriend = false)
     {
         if (string.IsNullOrWhiteSpace(roomId))
         {
@@ -873,6 +903,20 @@ public static class GameRoomManager
         if (!_rooms.TryGetValue(roomId, out var r))
         {
             WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "房间不存在" });
+            return;
+        }
+
+        var normalizedViewPlayerIndex = viewPlayerIndex == 1 ? 1 : 0;
+        var mode = r.SpectateModes[normalizedViewPlayerIndex];
+        var access = SpectatingRules.CheckAccess(
+            mode,
+            isFriend,
+            r.SpectateCodes[normalizedViewPlayerIndex],
+            spectateCode,
+            r.KickedSpectatorAccounts.ContainsKey(account));
+        if (!access.Allowed)
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = access.Error });
             return;
         }
 
@@ -897,8 +941,15 @@ public static class GameRoomManager
             }
         }
 
-        var normalizedViewPlayerIndex = viewPlayerIndex == 1 ? 1 : 0;
-        r.Spectators[sessionId] = normalizedViewPlayerIndex;
+        var spectator = new SpectatorConnection
+        {
+            SessionId = sessionId,
+            Account = account,
+            DisplayName = displayName,
+            ViewPlayerIndex = normalizedViewPlayerIndex,
+            HandVisible = r.SpectatorHandsPublic[normalizedViewPlayerIndex],
+        };
+        r.Spectators[sessionId] = spectator;
         _sessionRoom[sessionId] = roomId;
         if (!_rooms.TryGetValue(roomId, out var activeRoom) || !ReferenceEquals(activeRoom, r))
         {
@@ -908,18 +959,178 @@ public static class GameRoomManager
             return;
         }
         WebSocketBridge.OnGameChatParticipantJoined(sessionId);
-        WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = true, roomId });
+        WebSocketBridge.Send(sessionId, new
+        {
+            proto = "MsgSpectateRoom",
+            result = true,
+            roomId,
+            spectatorHandVisible = spectator.HandVisible,
+        });
         WebSocketBridge.BroadcastSpectatorList(r);
         EnqueueWork(r, new RoomWork("SpectateJoin", LatencyDiagnostics.Start(), () =>
         {
-            if (r.Spectators.TryGetValue(sessionId, out var storedViewPlayerIndex))
+            if (r.Spectators.TryGetValue(sessionId, out var storedSpectator))
                 WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
                     r.Engine.State,
                     -1,
                     "SpectateJoin",
-                    spectatorPlayerIndex: storedViewPlayerIndex));
+                    spectatorPlayerIndex: storedSpectator.ViewPlayerIndex,
+                    revealSpectatorMainHand: storedSpectator.HandVisible));
             return Task.CompletedTask;
         }));
+    }
+
+    public static void RequestSpectatorHand(string sessionId)
+    {
+        var room = GetRoomBySession(sessionId);
+        if (room is null || !room.Spectators.TryGetValue(sessionId, out var spectator))
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "denied", logStr = "你当前不在观战" });
+            return;
+        }
+
+        SpectatorHandRequest? request = null;
+        string? error = null;
+        var retryAfterMs = 0;
+        lock (room.SpectatorGate)
+        {
+            if (spectator.HandVisible)
+            {
+                WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "approved" });
+                return;
+            }
+            if (spectator.PendingRequestId is not null)
+            {
+                error = "已有申请正在等待玩家处理";
+            }
+            else
+            {
+                var elapsed = DateTime.UtcNow - spectator.LastHandRequestUtc;
+                if (elapsed < SpectatingRules.HandRequestCooldown)
+                {
+                    retryAfterMs = Math.Max(1, (int)Math.Ceiling((SpectatingRules.HandRequestCooldown - elapsed).TotalMilliseconds));
+                    error = "申请过于频繁，请稍后再试";
+                }
+                else
+                {
+                    var requestId = Guid.NewGuid().ToString("N");
+                    request = new SpectatorHandRequest(
+                        requestId,
+                        sessionId,
+                        spectator.Account,
+                        spectator.DisplayName,
+                        spectator.ViewPlayerIndex);
+                    spectator.LastHandRequestUtc = DateTime.UtcNow;
+                    spectator.PendingRequestId = requestId;
+                    room.PendingHandRequests[requestId] = request;
+                }
+            }
+        }
+
+        if (request is null)
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "denied", logStr = error, retryAfterMs });
+            return;
+        }
+
+        WebSocketBridge.Send(room.PlayerSessionIds[request.PlayerIndex], new
+        {
+            proto = "MsgSpectatorHandRequest",
+            requestId = request.RequestId,
+            spectatorAccount = request.SpectatorAccount,
+            spectatorName = request.SpectatorName,
+        });
+        WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "pending" });
+    }
+
+    public static void RespondSpectatorHand(string playerSessionId, string requestId, bool accept)
+    {
+        var room = GetRoomBySession(playerSessionId);
+        var playerIndex = room is null ? -1 : Array.IndexOf(room.PlayerSessionIds, playerSessionId);
+        if (room is null || playerIndex < 0)
+        {
+            WebSocketBridge.Send(playerSessionId, new { proto = "MsgSpectatorHandResponse", result = false, logStr = "你当前不在对局中" });
+            return;
+        }
+
+        SpectatorHandRequest? request;
+        SpectatorConnection? spectator = null;
+        lock (room.SpectatorGate)
+        {
+            if (!room.PendingHandRequests.TryGetValue(requestId, out request) || request.PlayerIndex != playerIndex)
+            {
+                WebSocketBridge.Send(playerSessionId, new { proto = "MsgSpectatorHandResponse", result = false, logStr = "该申请已失效" });
+                return;
+            }
+            room.PendingHandRequests.Remove(requestId);
+            if (room.Spectators.TryGetValue(request.SpectatorSessionId, out spectator)
+                && spectator.PendingRequestId == requestId)
+            {
+                spectator.PendingRequestId = null;
+                if (accept) spectator.HandVisible = true;
+            }
+        }
+
+        WebSocketBridge.Send(playerSessionId, new { proto = "MsgSpectatorHandResponse", result = true, requestId, accepted = accept });
+        if (spectator is null) return;
+
+        WebSocketBridge.Send(spectator.SessionId, new
+        {
+            proto = "MsgSpectatorHandStatus",
+            status = accept ? "approved" : "denied",
+            logStr = accept ? "玩家已同意公开主视角手牌" : "玩家拒绝了手牌查看申请",
+            retryAfterMs = accept ? 0 : (int)SpectatingRules.HandRequestCooldown.TotalMilliseconds,
+        });
+        if (accept)
+        {
+            EnqueueWork(room, new RoomWork("SpectatorHandApproved", LatencyDiagnostics.Start(), () =>
+            {
+                if (room.Spectators.TryGetValue(spectator.SessionId, out var activeSpectator) && activeSpectator.HandVisible)
+                    WebSocketBridge.Send(spectator.SessionId, StateSnapshotBuilder.Build(
+                        room.Engine.State,
+                        -1,
+                        "SpectatorHandApproved",
+                        spectatorPlayerIndex: activeSpectator.ViewPlayerIndex,
+                        revealSpectatorMainHand: true));
+                return Task.CompletedTask;
+            }));
+        }
+        WebSocketBridge.BroadcastSpectatorList(room);
+    }
+
+    public static void KickSpectator(string playerSessionId, string spectatorAccount)
+    {
+        var room = GetRoomBySession(playerSessionId);
+        if (room is null || Array.IndexOf(room.PlayerSessionIds, playerSessionId) < 0)
+        {
+            WebSocketBridge.Send(playerSessionId, new { proto = "MsgKickSpectator", result = false, logStr = "你当前不在对局中" });
+            return;
+        }
+
+        var normalizedAccount = spectatorAccount.Trim();
+        var targets = room.Spectators
+            .Where(pair => string.Equals(pair.Value.Account, normalizedAccount, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (targets.Length == 0)
+        {
+            WebSocketBridge.Send(playerSessionId, new { proto = "MsgKickSpectator", result = false, logStr = "该观战者已经离开" });
+            return;
+        }
+
+        room.KickedSpectatorAccounts[targets[0].Value.Account] = 0;
+        foreach (var (sid, target) in targets)
+        {
+            room.Spectators.TryRemove(sid, out _);
+            _sessionRoom.TryRemove(sid, out _);
+            lock (room.SpectatorGate)
+            {
+                if (target.PendingRequestId is { } pendingId)
+                    room.PendingHandRequests.Remove(pendingId);
+            }
+            WebSocketBridge.Send(sid, new { proto = "MsgSpectatorKicked", logStr = "你已被玩家移出观战，本局无法再次进入" });
+        }
+        WebSocketBridge.Send(playerSessionId, new { proto = "MsgKickSpectator", result = true, spectatorAccount = targets[0].Value.Account });
+        WebSocketBridge.BroadcastSpectatorList(room);
     }
 
     /// <summary>主动退出观战。重复退出按成功处理，保证客户端可以安全返回大厅。</summary>
@@ -938,7 +1149,11 @@ public static class GameRoomManager
                 WebSocketBridge.Send(sessionId, new { proto = "MsgLeaveSpectate", result = false, logStr = "对战玩家不能退出观战" });
                 return;
             }
-            var removed = room.Spectators.TryRemove(sessionId, out _);
+            var removed = room.Spectators.TryRemove(sessionId, out var spectator);
+            if (spectator?.PendingRequestId is { } pendingId)
+            {
+                lock (room.SpectatorGate) room.PendingHandRequests.Remove(pendingId);
+            }
             if (removed) WebSocketBridge.BroadcastSpectatorList(room);
         }
 
@@ -1092,6 +1307,12 @@ public static class GameRoomManager
         var p1Always    = p1.TryGetProperty("alwaysPrompt", out var a1) && a1.GetBoolean();
         var p0CardBackId = p0.TryGetProperty("cardBackId", out var cb0) ? cb0.GetString() ?? "classic" : "classic";
         var p1CardBackId = p1.TryGetProperty("cardBackId", out var cb1) ? cb1.GetString() ?? "classic" : "classic";
+        var p0SpectateMode = p0.TryGetProperty("spectateMode", out var sm0) ? SpectatingRules.NormalizeMode(sm0.GetString()) : SpectatingRules.Open;
+        var p1SpectateMode = p1.TryGetProperty("spectateMode", out var sm1) ? SpectatingRules.NormalizeMode(sm1.GetString()) : SpectatingRules.Open;
+        var p0SpectatorHandsPublic = p0.TryGetProperty("spectatorHandsPublic", out var shp0) && shp0.GetBoolean();
+        var p1SpectatorHandsPublic = p1.TryGetProperty("spectatorHandsPublic", out var shp1) && shp1.GetBoolean();
+        var p0SpectateCode = p0.TryGetProperty("spectateCode", out var sc0) ? sc0.GetString() : null;
+        var p1SpectateCode = p1.TryGetProperty("spectateCode", out var sc1) ? sc1.GetString() : null;
         var p0SpriteMap = ReadSpriteMap(p0);
         var p1SpriteMap = ReadSpriteMap(p1);
         // 旧日志没有此字段，默认 false，保持升级前“构造时发牌”的随机序列以便正确恢复。
@@ -1169,6 +1390,9 @@ public static class GameRoomManager
             PlayerSessionIds = new[] { "offline-0", "offline-1" },
             PlayerAccounts   = new[] { p0Account, p1Account },
             PlayerDisplayNames = new[] { p0Account, p1Account },
+            SpectateModes = [p0SpectateMode, p1SpectateMode],
+            SpectatorHandsPublic = [p0SpectatorHandsPublic, p1SpectatorHandsPublic],
+            SpectateCodes = [p0SpectateCode, p1SpectateCode],
             VsBot = false,
             MatchKind = matchKind,
         };
@@ -1183,17 +1407,20 @@ public static class GameRoomManager
         // 重新挂回回调（按当前 sid 发；日志/录像/动作日志均"续写"而非覆盖）
         engine.OnSendToPlayer = (idx, payload) =>
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
-        engine.OnSendToSpectators = (viewPlayerIndex, payload) =>
+        engine.OnSendToSpectators = (viewPlayerIndex, payload, handPayload) =>
         {
             foreach (var spectator in entry.Spectators)
             {
-                if (spectator.Value == viewPlayerIndex)
-                    WebSocketBridge.Send(spectator.Key, payload);
+                if (spectator.Value.ViewPlayerIndex == viewPlayerIndex)
+                    WebSocketBridge.Send(spectator.Key,
+                        spectator.Value.HandVisible && handPayload is not null ? handPayload : payload);
             }
         };
         engine.HasSpectators = () => !entry.Spectators.IsEmpty;
         engine.HasSpectatorsForPerspective = viewPlayerIndex =>
-            entry.Spectators.Values.Any(value => value == viewPlayerIndex);
+            entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex);
+        engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
+            entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
         entry.ReplayPath   = ReplayRecorder.OpenAppend(roomId);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
         engine.OnReplay        = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
@@ -1235,7 +1462,7 @@ public static class GameRoomManager
 
         try
         {
-            LeaderStatsStore.Default.RecordMatch(new LeaderMatchResult(
+            var result = new LeaderMatchResult(
                 roomId,
                 endedAtUtc ?? DateTime.UtcNow,
                 matchKind,
@@ -1246,7 +1473,9 @@ public static class GameRoomManager
                 state.WinnerIndex,
                 state.FirstPlayer,
                 state.TurnCount,
-                state.GameOverReason ?? ""));
+                state.GameOverReason ?? "");
+            LeaderStatsStore.Default.RecordMatch(result);
+            LeaderChampionStore.Default.RecordMatch(result);
         }
         catch (Exception ex)
         {

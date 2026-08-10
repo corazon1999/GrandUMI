@@ -28,6 +28,7 @@ public class OP15_035_Laboon : IScriptedEffect
         if (!use) return;
         if (!await AtomicOps.PromptRestOwnCards(ctx, 2,
             "将我方 2 张卡牌转为休息状态（成本，可选活跃 领袖/角色/舞台/咚!!）")) return;
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.Power <= 7000);
     }
 }

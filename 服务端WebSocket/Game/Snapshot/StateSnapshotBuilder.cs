@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GrandUMI.Game.Stats;
 
 namespace GrandUMI.Game.Snapshot;
 
@@ -14,12 +15,15 @@ public static class StateSnapshotBuilder
     public sealed record SnapshotSet(object Player0, object Player1, object Spectator)
     {
         public object? SpectatorPlayer1 { get; init; }
+        public object? SpectatorPlayer0Hand { get; init; }
+        public object? SpectatorPlayer1Hand { get; init; }
     }
 
     /// <summary>单视角构建，供重连和单个观战者加入时使用。</summary>
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
-        IReadOnlyList<EffectActivationEvent>? effectActivations = null, int spectatorPlayerIndex = 0)
+        IReadOnlyList<EffectActivationEvent>? effectActivations = null, int spectatorPlayerIndex = 0,
+        bool revealSpectatorMainHand = false)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         return BuildForViewer(
@@ -31,7 +35,8 @@ public static class StateSnapshotBuilder
             queuedLogEvents,
             requestId,
             effectActivations,
-            spectatorPlayerIndex);
+            spectatorPlayerIndex,
+            revealSpectatorMainHand: revealSpectatorMainHand);
     }
 
     /// <summary>
@@ -41,6 +46,7 @@ public static class StateSnapshotBuilder
     public static SnapshotSet BuildAll(GameState state, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
         IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false,
+        bool includePlayer0SpectatorHand = false, bool includePlayer1SpectatorHand = false,
         IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null)
     {
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
@@ -53,13 +59,20 @@ public static class StateSnapshotBuilder
             SpectatorPlayer1 = includePlayer1Spectator
                 ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, replayHandTimeline)
                 : null,
+            SpectatorPlayer0Hand = includePlayer0SpectatorHand
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline, true)
+                : null,
+            SpectatorPlayer1Hand = includePlayer1SpectatorHand
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, replayHandTimeline, true)
+                : null,
         };
     }
 
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
         PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
         string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex,
-        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null)
+        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null,
+        bool revealSpectatorMainHand = false)
     {
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
@@ -68,7 +81,7 @@ public static class StateSnapshotBuilder
             state,
             myIdx,
             asSelf: !isSpectator,
-            revealHand: state.IsGameOver,
+            revealHand: state.IsGameOver || (isSpectator && revealSpectatorMainHand),
             board: boards[myIdx]);
         var opponent = BuildPlayerSnapshot(
             state,
@@ -124,6 +137,7 @@ public static class StateSnapshotBuilder
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
             gameOverReason = state.GameOverReason,
             viewerKind = isSpectator ? "spectator" : "player",
+            spectatorHandVisible = isSpectator && (state.IsGameOver || revealSpectatorMainHand),
             requestId,
             lastAction = lastAction ?? "",
             actionPayload = payload.Json,
@@ -275,6 +289,9 @@ public static class StateSnapshotBuilder
             lifeFaceUp = board.LifeFaceUp,
             leaderId = board.LeaderId,
             leaderNumber = board.LeaderNumber,
+            championLeaderNumber = LeaderChampionStore.Default.IsChampion(p.AccountName, board.LeaderNumber)
+                ? board.LeaderNumber
+                : null,
             leaderTapped = board.LeaderTapped,
             leaderPower = board.LeaderPower,
             leaderAttachedDon = board.LeaderAttachedDon,

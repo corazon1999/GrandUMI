@@ -88,14 +88,20 @@ export default function GamePage() {
       {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
 
       {isObserver && (
-        <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
+        <div
+          className="absolute z-20 flex items-center gap-2"
+          style={{
+            left: "calc(1rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+            top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          }}
+        >
           <div className="rounded-full bg-purple-600/80 px-3 py-1 text-xs text-white">
             观战模式
           </div>
           {!isGameOver && (
             <button
               onClick={returnToHome}
-              className="rounded-lg border border-white/20 bg-gray-950/80 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-gray-800"
+              className="min-h-11 rounded-lg border border-white/20 bg-gray-950/80 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-gray-800"
             >
               退出观战
             </button>

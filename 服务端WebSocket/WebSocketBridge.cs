@@ -279,14 +279,19 @@ public static class WebSocketBridge
             case "MsgGameChat":    OnGameChat(session, msg);     break;
             case "MsgFriendChat":  OnFriendChat(session, msg);   break;
             case "MsgLeaveGameChat": OnLeaveGameChat(session);   break;
+            case "MsgGlobalAnnouncement": OnGlobalAnnouncement(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
             case "MsgUpdateSettings": OnUpdateSettings(session, msg); break;
+            case "MsgUpdateSpectateSettings": OnUpdateSpectateSettings(session, msg); break;
             case "MsgRequestState": OnRequestState(session);     break;
             case "MsgEndByDisconnect": OnEndByDisconnect(session); break;
             case "MsgSpectateRoom": OnSpectateRoom(session, msg); break;
             case "MsgLeaveSpectate": OnLeaveSpectate(session); break;
+            case "MsgRequestSpectatorHand": OnRequestSpectatorHand(session); break;
+            case "MsgRespondSpectatorHand": OnRespondSpectatorHand(session, msg); break;
+            case "MsgKickSpectator": OnKickSpectator(session, msg); break;
             case "MsgBugReport":   OnBugReport(session, msg);     break;
             default: LogWarn($"未知协议: {proto}"); break;
         }
@@ -813,7 +818,12 @@ public static class WebSocketBridge
                 p1SpriteMap: ResolveDeckSpriteMap(s.Account ?? "", deckName, deck),
                 vsBot: true,
                 matchKind: MatchKind.Bot,
-                broadcastInitialState: false);
+                broadcastInitialState: false,
+                p0DisplayName: s.PlayerName,
+                p0SpectateMode: s.SpectateMode,
+                p0SpectatorHandsPublic: s.SpectatorHandsPublic,
+                p0SpectateCode: s.SpectateCode,
+                p1SpectateMode: SpectatingRules.Closed);
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = true });
             Send(s.SessionId, new { proto = "MsgMatchFound", opponentName = botName });
             Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst });
@@ -859,7 +869,13 @@ public static class WebSocketBridge
                     matchKind: ranked ? MatchKind.Ranked : MatchKind.Casual,
                     broadcastInitialState: false,
                     p0DisplayName: p1.PlayerName,
-                    p1DisplayName: p2.PlayerName);
+                    p1DisplayName: p2.PlayerName,
+                    p0SpectateMode: p1.SpectateMode,
+                    p1SpectateMode: p2.SpectateMode,
+                    p0SpectatorHandsPublic: p1.SpectatorHandsPublic,
+                    p1SpectatorHandsPublic: p2.SpectatorHandsPublic,
+                    p0SpectateCode: p1.SpectateCode,
+                    p1SpectateCode: p2.SpectateCode);
 
                 GameOpponent[p1.SessionId] = p2.SessionId;
                 GameOpponent[p2.SessionId] = p1.SessionId;
@@ -1314,9 +1330,13 @@ public static class WebSocketBridge
                 {
                     account = x.Account,
                     name = x.PlayerName ?? x.Account,
+                    championLeaderNumbers = LeaderChampionStore.Default.GetChampionLeaderNumbers(x.Account),
                     status,
                     roomId = gameRoom?.RoomId,
                     seatIndex = seatIndex is >= 0 ? seatIndex : null,
+                    spectateMode = gameRoom is not null && seatIndex is >= 0
+                        ? gameRoom.SpectateModes[seatIndex ?? 0]
+                        : null,
                 };
             })
             .ToArray();
@@ -1373,6 +1393,7 @@ public static class WebSocketBridge
                         account = player.Account,
                         name = player.DisplayName,
                         avatar = player.Avatar,
+                        championLeaderNumbers = LeaderChampionStore.Default.GetChampionLeaderNumbers(player.Account),
                         relationship = player.Relationship,
                         online = presence.Online,
                         status = presence.Status,
@@ -1505,6 +1526,13 @@ public static class WebSocketBridge
         try
         {
             var snapshot = LeaderStatsStore.Default.GetLeaderboard(Str(msg, "period"));
+            var championsByLeader = snapshot.Items
+                .Select(item => LeaderChampionStore.Default.GetChampion(item.LeaderNumber))
+                .Where(champion => champion is not null)
+                .Cast<LeaderChampion>()
+                .ToDictionary(champion => champion.LeaderNumber, StringComparer.Ordinal);
+            var championNames = _playerDataStore.GetDisplayNamesByLeaderStatKeys(
+                championsByLeader.Values.Select(champion => champion.PlayerKey));
             Send(s.SessionId, new
             {
                 proto = "MsgLeaderLeaderboard",
@@ -1514,20 +1542,32 @@ public static class WebSocketBridge
                 sinceUtc = snapshot.SinceUtc,
                 totalMatches = snapshot.TotalMatches,
                 minimumGames = snapshot.MinimumGames,
-                items = snapshot.Items.Select(x => new
+                items = snapshot.Items.Select(x =>
                 {
-                    rank = x.Rank,
-                    leaderNumber = x.LeaderNumber,
-                    games = x.Games,
-                    wins = x.Wins,
-                    losses = x.Losses,
-                    winRate = x.WinRate,
-                    usageRate = x.UsageRate,
-                    firstGames = x.FirstGames,
-                    firstWinRate = x.FirstWinRate,
-                    secondGames = x.SecondGames,
-                    secondWinRate = x.SecondWinRate,
-                    insufficientSample = x.InsufficientSample,
+                    championsByLeader.TryGetValue(x.LeaderNumber, out var champion);
+                    championNames.TryGetValue(champion?.PlayerKey ?? "", out var championName);
+                    return new
+                    {
+                        rank = x.Rank,
+                        leaderNumber = x.LeaderNumber,
+                        games = x.Games,
+                        wins = x.Wins,
+                        losses = x.Losses,
+                        winRate = x.WinRate,
+                        usageRate = x.UsageRate,
+                        firstGames = x.FirstGames,
+                        firstWinRate = x.FirstWinRate,
+                        secondGames = x.SecondGames,
+                        secondWinRate = x.SecondWinRate,
+                        insufficientSample = x.InsufficientSample,
+                        champion = champion is null ? null : new
+                        {
+                            displayName = championName ?? "神秘玩家",
+                            games = champion.Games,
+                            wins = champion.Wins,
+                            winRate = champion.Wins / (double)champion.Games,
+                        },
+                    };
                 }),
             });
         }
@@ -1904,7 +1944,15 @@ public static class WebSocketBridge
                 p1SpriteMap: ResolveDeckSpriteMap(guest.Account ?? "", guestDeckName, guestDeck),
                 friendlyRoomId: friendlyRoomId,
                 matchKind: matchKind,
-                broadcastInitialState: false);
+                broadcastInitialState: false,
+                p0DisplayName: host.PlayerName,
+                p1DisplayName: guest.PlayerName,
+                p0SpectateMode: host.SpectateMode,
+                p1SpectateMode: guest.SpectateMode,
+                p0SpectatorHandsPublic: host.SpectatorHandsPublic,
+                p1SpectatorHandsPublic: guest.SpectatorHandsPublic,
+                p0SpectateCode: host.SpectateCode,
+                p1SpectateCode: guest.SpectateCode);
             GameOpponent[host.SessionId]  = guest.SessionId;
             GameOpponent[guest.SessionId] = host.SessionId;
             Send(host.SessionId,  new { proto = "MsgGameStart" });
@@ -2387,6 +2435,11 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "对战中的玩家无法观战" });
             return;
         }
+        if (!s.TryConsumeRateLimit("spectate-join", capacity: 5, refillPerSecond: 0.2))
+        {
+            Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "观战尝试过于频繁，请稍后再试" });
+            return;
+        }
 
         var roomId = Str(msg, "roomId") ?? "";
         var viewPlayerIndex = msg.TryGetValue("viewPlayerIndex", out var viewPlayerIndexValue)
@@ -2394,7 +2447,22 @@ public static class WebSocketBridge
             && parsedViewPlayerIndex == 1
                 ? 1
                 : 0;
-        GameRoomManager.AddSpectator(roomId, s.SessionId, viewPlayerIndex);
+        var room = GameRoomManager.GetRoom(roomId);
+        var targetAccount = room is null ? null : room.PlayerAccounts[viewPlayerIndex];
+        var isFriend = false;
+        if (s.Account is not null && targetAccount is not null)
+        {
+            try { isFriend = _playerDataStore.AreFriends(s.Account, targetAccount); }
+            catch { isFriend = false; }
+        }
+        GameRoomManager.AddSpectator(
+            roomId,
+            s.SessionId,
+            s.Account!,
+            s.PlayerName ?? s.Account!,
+            viewPlayerIndex,
+            Str(msg, "spectateCode"),
+            isFriend);
     }
 
     /// <summary>MsgLeaveSpectate — 主动退出观战</summary>
@@ -2407,18 +2475,45 @@ public static class WebSocketBridge
     /// <summary>向对战双方推送当前观战者名称列表。</summary>
     public static void BroadcastSpectatorList(GameRoomManager.RoomEntry room)
     {
-        var spectators = new List<string>();
-        foreach (var sid in room.Spectators.Keys)
+        var spectators = room.Spectators.Values
+            .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        for (var playerIndex = 0; playerIndex < 2; playerIndex++)
         {
-            if (!Sessions.TryGetValue(sid, out var session) || !session.IsLoggedIn) continue;
-            var name = session.PlayerName ?? session.Account;
-            if (!string.IsNullOrWhiteSpace(name)) spectators.Add(name);
+            var details = spectators.Select(item => new
+            {
+                account = item.Account,
+                name = item.DisplayName,
+                viewingYou = item.ViewPlayerIndex == playerIndex,
+                handVisible = item.HandVisible,
+            }).ToArray();
+            Send(room.PlayerSessionIds[playerIndex], new
+            {
+                proto = "MsgSpectatorList",
+                spectators = details.Select(item => item.name).ToArray(),
+                details,
+            });
         }
-        spectators.Sort(StringComparer.OrdinalIgnoreCase);
+    }
 
-        var packet = new { proto = "MsgSpectatorList", spectators = spectators.ToArray() };
-        Send(room.PlayerSessionIds[0], packet);
-        Send(room.PlayerSessionIds[1], packet);
+    private static void OnRequestSpectatorHand(WsSession s)
+    {
+        if (!s.IsLoggedIn || !s.TryConsumeRateLimit("spectator-hand-request", capacity: 2, refillPerSecond: 1d / 30d))
+        {
+            Send(s.SessionId, new { proto = "MsgSpectatorHandStatus", status = "denied", logStr = "申请过于频繁，请稍后再试", retryAfterMs = 30_000 });
+            return;
+        }
+        GameRoomManager.RequestSpectatorHand(s.SessionId);
+    }
+
+    private static void OnRespondSpectatorHand(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        GameRoomManager.RespondSpectatorHand(s.SessionId, Str(msg, "requestId") ?? "", Bool(msg, "accept"));
+    }
+
+    private static void OnKickSpectator(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        GameRoomManager.KickSpectator(s.SessionId, Str(msg, "spectatorAccount") ?? "");
     }
 
     /// <summary>MsgPromptResponse — 玩家响应服务端 prompt</summary>
@@ -2444,6 +2539,39 @@ public static class WebSocketBridge
         }
     }
 
+    private static void OnUpdateSpectateSettings(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn)
+        {
+            Send(s.SessionId, new { proto = "MsgUpdateSpectateSettings", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (s.IsMatching || GameRoomManager.GetRoomBySession(s.SessionId) is not null
+            || (s.Account is not null && FriendlyByAccount.ContainsKey(s.Account)))
+        {
+            Send(s.SessionId, new { proto = "MsgUpdateSpectateSettings", result = false, logStr = "匹配、房间或对局中不能修改观战设置" });
+            return;
+        }
+
+        var mode = SpectatingRules.NormalizeMode(Str(msg, "mode"));
+        var regenerate = Bool(msg, "regenerateCode");
+        if (mode == SpectatingRules.Password && (regenerate || string.IsNullOrWhiteSpace(s.SpectateCode)))
+            s.SpectateCode = SpectatingRules.GenerateCode();
+        if (mode != SpectatingRules.Password)
+            s.SpectateCode = null;
+
+        s.SpectateMode = mode;
+        s.SpectatorHandsPublic = Bool(msg, "handsPublic");
+        Send(s.SessionId, new
+        {
+            proto = "MsgUpdateSpectateSettings",
+            result = true,
+            mode = s.SpectateMode,
+            handsPublic = s.SpectatorHandsPublic,
+            spectateCode = s.SpectateCode,
+        });
+    }
+
     // ── 聊天 ────────────────────────────────────────────────────────────────
 
     private static void OnChatMsg(WsSession s, Dictionary<string, JsonElement> msg)
@@ -2463,6 +2591,41 @@ public static class WebSocketBridge
         var pkt  = new { proto = "MsgChatMsg", type, Name = name, Msg = text };
 
         BroadcastAll(pkt);
+    }
+
+    /// <summary>仅允许指定管理员向全部在线会话发送的瞬时滚动公告。</summary>
+    private static void OnGlobalAnnouncement(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "没有发送全服公告的权限" });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("global-announcement", capacity: 1, refillPerSecond: 0.2))
+        {
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "公告发送过于频繁，请稍后再试" });
+            return;
+        }
+
+        var content = GlobalAnnouncementPolicy.Normalize(Str(msg, "content"));
+        if (content is null)
+        {
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "公告内容不能为空" });
+            return;
+        }
+
+        BroadcastAll(new
+        {
+            proto = "MsgGlobalAnnouncement",
+            content,
+            issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+        Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = true, logStr = "全服公告已发送" });
     }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。
@@ -2639,11 +2802,15 @@ public static class WebSocketBridge
                 account = friend.Account,
                 name = friend.DisplayName,
                 avatar = friend.Avatar,
+                championLeaderNumbers = LeaderChampionStore.Default.GetChampionLeaderNumbers(friend.Account),
                 friendsSince = friend.FriendsSince,
                 online = presence.Online,
                 status = presence.Status,
                 roomId,
                 seatIndex,
+                spectateMode = roomId is not null && seatIndex is not null
+                    ? GameRoomManager.GetRoom(roomId)?.SpectateModes[seatIndex.Value]
+                    : null,
             };
         }).ToArray();
         var incomingRequests = snapshot.IncomingRequests.Select(request =>

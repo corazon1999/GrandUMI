@@ -1616,13 +1616,27 @@
         "text": "将手牌中最多1张力量不高于6000且拥有【触发】效果的角色登场"
       }
     ],
-    "counter": [
-      {
-        "op": "AddPowerThisBattle",
-        "target": "selfLeader",
-        "delta": 3000
-      }
-    ]
+    "counter": {
+      "if": {
+        "ownLifeCountLte": 2
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OpponentActiveCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "本回合中，对方最多1张活跃状态的角色无法攻击"
+        },
+        {
+          "op": "AddRestriction",
+          "target": "$tgt",
+          "kind": "CannotAttack",
+          "duration": "ThisTurn"
+        }
+      ]
+    }
   },
   "OP14-119": {
     "_name": "杰拉基尔·米霍克",

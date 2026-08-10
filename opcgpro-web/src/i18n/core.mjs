@@ -946,7 +946,7 @@ Object.assign(en, {
   "对方公开了": "Opponent revealed",
 
   "Leader 胜率榜": "Leader win-rate ranking",
-  "统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 支持排行榜与对阵一图流": "All human matches; matches ending by turn 7 are excluded · Ranking and matchup matrix available",
+  "统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流": "All human matches; matches ending by turn 7 or due to a disconnection are excluded · Ranking and matchup matrix available",
   "有效对局": "Valid matches",
   "排名门槛": "Ranking threshold",
   "更新于": "Updated",
@@ -1391,7 +1391,7 @@ Object.assign(ja, {
   "对方公开了": "相手が公開しました",
 
   "Leader 胜率榜": "リーダー勝率ランキング",
-  "统计全部真人对局；第 7 回合及以前结束的对局不计入数据 · 支持排行榜与对阵一图流": "全プレイヤー対戦を集計。7ターン目までに終了した対戦は除外 · ランキングと対戦表に対応",
+  "统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流": "全プレイヤー対戦を集計。7ターン目までに終了した対戦と切断による終了は除外 · ランキングと対戦表に対応",
   "有效对局": "有効な対戦",
   "排名门槛": "ランキング基準",
   "更新于": "更新",
