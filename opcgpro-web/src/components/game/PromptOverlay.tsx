@@ -185,7 +185,13 @@ export default function PromptOverlay() {
   // 「咚!!-N」放回：服务端用 extra.donChoices 携带费用区每张咚的状态与附着目标，
   // 这里独立渲染咚 token（咚牌无卡号、不在 fieldCards，走不了通用卡图反查）。
   const isReturnDon = prompt.kind === "ReturnOwnDon";
-  type DonChoice = { id: string; state: string; attachedToNumber?: string; attachedToName?: string };
+  type DonChoice = {
+    id: string;
+    state: string;
+    attachedToCardId?: string;
+    attachedToNumber?: string;
+    attachedToName?: string;
+  };
   const donChoices = (prompt.extra?.donChoices as DonChoice[] | undefined) ?? [];
   const canCancelReturnDon = prompt.extra?.canCancel === true;
   // 通用选择分支里，凡 id 命中 donChoices 的渲染成咚 token（混合"卡牌 + 咚"同列，如 OP16-033 休置成本）
@@ -488,16 +494,32 @@ export default function PromptOverlay() {
 
         {isReturnDon && (
           <>
-            <div className="flex flex-wrap gap-3 max-w-2xl justify-center">
+            <div className="flex max-w-3xl flex-wrap justify-center gap-3">
               {donChoices.map((d) => {
                 const isSel = selected.includes(d.id);
-                const attachedCard = d.attachedToNumber ? getGameCard(d.attachedToNumber, my?.spriteMap) ?? null : null;
+                const isLeaderTarget = !!my && d.attachedToCardId === my.leaderId;
+                const characterIndex = d.attachedToCardId
+                  ? (my?.fieldCards.findIndex((card) => card.id === d.attachedToCardId) ?? -1)
+                  : -1;
+                const targetNumber = isLeaderTarget
+                  ? my?.leaderNumber
+                  : characterIndex >= 0
+                    ? my?.fieldCards[characterIndex]?.number
+                    : d.attachedToNumber;
+                const attachedCard = targetNumber ? getGameCard(targetNumber, my?.spriteMap) ?? null : null;
+                const targetPosition = isLeaderTarget
+                  ? "领袖"
+                  : characterIndex >= 0
+                    ? `角色 ${characterIndex + 1}`
+                    : "角色";
+                const targetName = d.attachedToName ?? attachedCard?.name ?? "未知目标";
                 const stateLabel = d.state === "Active" ? "活跃" : d.state === "Rest" ? "休息" : "附着";
                 return (
                   <div
                     key={d.id}
                     onClick={() => toggle(d.id)}
-                    className={`relative flex w-20 cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-1.5 transition ${
+                    title={d.state === "Attached" ? `贴在 ${targetPosition} · ${targetName}` : stateLabel}
+                    className={`relative flex w-28 cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-2 transition ${
                       isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40 hover:border-white/50"
                     }`}
                   >
@@ -519,17 +541,23 @@ export default function PromptOverlay() {
                     >
                       {stateLabel}
                     </span>
-                    {attachedCard ? (
-                      <span
-                        className="max-w-full truncate text-[9px] text-amber-200"
-                        title={`贴在 ${d.attachedToName ?? attachedCard.name}`}
-                      >
-                        贴：{d.attachedToName ?? attachedCard.name}
-                      </span>
-                    ) : (
-                      d.state === "Attached" && (
-                        <span className="text-[9px] text-amber-200">附着中</span>
-                      )
+                    {d.state === "Attached" && (
+                      <div className="mt-1 flex w-full flex-col items-center gap-1 border-t border-amber-200/20 pt-2">
+                        {attachedCard && (
+                          <CardItem
+                            card={attachedCard}
+                            size="sm"
+                            hideCounter
+                            liftOnSelect={false}
+                          />
+                        )}
+                        <span className="rounded bg-amber-300 px-2 py-0.5 text-[10px] font-black text-black">
+                          {targetPosition}
+                        </span>
+                        <span className="w-full break-words text-center text-[10px] leading-tight text-amber-100">
+                          {targetName}
+                        </span>
+                      </div>
                     )}
                     {isSel && (
                       <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white ring-2 ring-white">

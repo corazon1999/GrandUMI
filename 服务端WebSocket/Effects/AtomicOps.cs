@@ -399,6 +399,32 @@ public static class AtomicOps
     public static Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
         => PromptReturnDonToDeck(ctx, ctx.OwnerIndex, n, optional);
 
+    /// <summary>构造咚选择项，并补充附着目标实例、卡号与卡名，供客户端明确区分领袖和同名角色。</summary>
+    private static List<object> BuildDonPromptChoices(PlayerState player, IEnumerable<DonCard> dons)
+    {
+        return dons.Select(don =>
+        {
+            string? attachedToCardId = null;
+            CardInstance? attachedTarget = null;
+            if (don.State == DonState.Attached && don.AttachedToCardId is { } targetId)
+            {
+                attachedToCardId = targetId.ToString();
+                attachedTarget = player.Leader.Id == targetId
+                    ? player.Leader
+                    : player.Characters.FirstOrDefault(card => card.Id == targetId);
+            }
+
+            return (object)new
+            {
+                id = don.Id.ToString(),
+                state = don.State.ToString(),
+                attachedToCardId,
+                attachedToNumber = attachedTarget?.Info.Number,
+                attachedToName = attachedTarget?.Info.Name,
+            };
+        }).ToList();
+    }
+
     /// <summary>“将 1 张或更多咚!!放回咚!!卡组”成本：玩家可选择费用区任意正数张咚，0 张视为放弃。</summary>
     public static async Task<bool> PromptReturnAtLeastOneDonToDeck(EffectContext ctx)
     {
@@ -412,12 +438,7 @@ public static class AtomicOps
             eligible.Select(don => don.Id.ToString()).ToList(), 0, eligible.Count,
             new Dictionary<string, object?>
             {
-                ["donChoices"] = eligible.Select(don => new
-                {
-                    id = don.Id.ToString(),
-                    state = don.State.ToString(),
-                    attachedToCardId = don.AttachedToCardId?.ToString(),
-                }).ToList(),
+                ["donChoices"] = BuildDonPromptChoices(player, eligible),
                 ["canCancel"] = true,
             });
         if (chosen.Count == 0) return false;
@@ -462,25 +483,7 @@ public static class AtomicOps
         }
         else
         {
-            // 反查附着目标卡号/名，供客户端标注"贴在 X"
-            var donChoices = eligible.Select(d =>
-            {
-                string? num = null, name = null;
-                if (d.State == DonState.Attached && d.AttachedToCardId is { } tid)
-                {
-                    CardInstance? t = player.Leader.Id == tid
-                        ? player.Leader
-                        : player.Characters.FirstOrDefault(c => c.Id == tid);
-                    if (t is not null) { num = t.Info.Number; name = t.Info.Name; }
-                }
-                return new
-                {
-                    id = d.Id.ToString(),
-                    state = d.State.ToString(),  // Active / Rest / Attached
-                    attachedToNumber = num,
-                    attachedToName = name,
-                };
-            }).ToList();
+            var donChoices = BuildDonPromptChoices(player, eligible);
 
             var ans = await ctx.Prompts.ChooseCards(playerIdx, "ReturnOwnDon",
                 optional

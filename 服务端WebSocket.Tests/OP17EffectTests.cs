@@ -708,10 +708,16 @@ public class OP17EffectTests
     [Fact]
     public async Task OP17_058_DonMinusPrompt_IncludesActiveRestAndAttachedDon()
     {
-        var state = TestScene.New("OP17-058").MyActiveDon(1).OppCharacter("OP17-011").Build();
+        var state = TestScene.New("OP17-058")
+            .MyActiveDon(1)
+            .MyCharacter("OP17-011")
+            .OppCharacter("OP17-011")
+            .Build();
         var me = state.Players[0];
+        var ownCharacter = Assert.Single(me.Characters);
         me.CostArea.Add(new DonCard { State = DonState.Rest });
         me.CostArea.Add(new DonCard { State = DonState.Attached, AttachedToCardId = me.Leader.Id });
+        me.CostArea.Add(new DonCard { State = DonState.Attached, AttachedToCardId = ownCharacter.Id });
         var expectedIds = me.CostArea.Select(d => d.Id.ToString()).ToHashSet();
         var prompts = new MockPromptService().QueueChooseEmpty();
 
@@ -721,7 +727,18 @@ public class OP17EffectTests
         var prompt = Assert.Single(prompts.ChooseHistory);
         Assert.Equal("ReturnOwnDon", prompt.kind);
         Assert.Equal(expectedIds, prompt.choices.ToHashSet());
-        Assert.Equal(3, me.CostArea.Count);
+        var donChoices = JsonSerializer.SerializeToElement(prompt.extra!["donChoices"])
+            .EnumerateArray()
+            .ToList();
+        var leaderDon = Assert.Single(donChoices.Where(choice =>
+            choice.GetProperty("attachedToCardId").GetString() == me.Leader.Id.ToString()));
+        Assert.Equal(me.Leader.Info.Number, leaderDon.GetProperty("attachedToNumber").GetString());
+        Assert.Equal(me.Leader.Info.Name, leaderDon.GetProperty("attachedToName").GetString());
+        var characterDon = Assert.Single(donChoices.Where(choice =>
+            choice.GetProperty("attachedToCardId").GetString() == ownCharacter.Id.ToString()));
+        Assert.Equal(ownCharacter.Info.Number, characterDon.GetProperty("attachedToNumber").GetString());
+        Assert.Equal(ownCharacter.Info.Name, characterDon.GetProperty("attachedToName").GetString());
+        Assert.Equal(4, me.CostArea.Count);
         Assert.Empty(me.DonDeck);
     }
 
