@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { listMeta, deleteMatch, clearAll, type MatchMeta } from "@/data/matchHistoryDB";
 import { getCard } from "@/data/CardLoader";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
-function fmtTime(ts: number): string {
+function fmtTime(ts: number, locale: string): string {
   try {
-    return new Date(ts).toLocaleString("zh-CN", {
+    return new Date(ts).toLocaleString(locale, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -25,6 +26,7 @@ function leaderLabel(num: string): string {
 }
 
 export default function HistoryPanel() {
+  const { locale, t } = useLanguage();
   const router = useRouter();
   const [list, setList] = useState<MatchMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ export default function HistoryPanel() {
   };
 
   const handleClear = async () => {
-    if (!confirm("确定清空全部对局记录？此操作不可恢复。")) return;
+    if (!confirm(t("确定清空全部对局记录？此操作不可恢复。"))) return;
     await clearAll().catch(() => {});
     refresh();
   };
@@ -109,7 +111,7 @@ export default function HistoryPanel() {
                       <span className="text-red-300">{leaderLabel(m.opponentLeader)}</span>
                     </p>
                     <p className="mt-0.5 truncate text-xs text-gray-500">
-                      对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt)}
+                      对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt, locale)}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm text-gray-600 transition-colors group-hover:text-orange-400">

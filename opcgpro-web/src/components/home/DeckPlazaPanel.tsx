@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { loadAllDecks, subscribeDecksUpdated } from "@/data/DeckMapper";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
@@ -17,8 +18,8 @@ type PublishDraft = {
   title: string;
 };
 
-function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(timestamp);
+function formatDate(timestamp: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" }).format(timestamp);
 }
 
 function countedCards(cards: string[]) {
@@ -54,6 +55,7 @@ function CostCurve({ item }: { item: DeckPlazaItem }) {
 }
 
 function DeckDetail({ item }: { item: DeckPlazaItem }) {
+  const { locale } = useLanguage();
   const entries = countedCards(item.cards);
   return (
     <div className="space-y-5">
@@ -68,7 +70,7 @@ function DeckDetail({ item }: { item: DeckPlazaItem }) {
         <div className="min-w-0">
           <h2 className="truncate text-xl font-black text-white">{item.title}</h2>
           <p className="mt-1 text-sm text-gray-400">{item.leaderName} · {item.leaderColor}</p>
-          <p className="mt-1 text-xs text-gray-600">作者：{item.authorName} · 更新于 {formatDate(item.updatedAt)}</p>
+          <p className="mt-1 text-xs text-gray-600">作者：{item.authorName} · 更新于 {formatDate(item.updatedAt, locale)}</p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-yellow-500/10 px-2 py-1 text-yellow-400">角色 {item.charCount}</span>
             <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-400">事件 {item.eventCount}</span>
@@ -113,6 +115,7 @@ export default function DeckPlazaPanel({
   onPublishOpened?: () => void;
   onGoMine: () => void;
 }) {
+  const { t } = useLanguage();
   const connState = useNetStore((state) => state.connState);
   const pageData = useNetStore((state) => state.deckPlazaPage);
   const revision = useNetStore((state) => state.deckPlazaRevision);
@@ -164,7 +167,7 @@ export default function DeckPlazaPanel({
   };
 
   const deletePublication = (item: DeckPlazaItem) => {
-    if (!window.confirm(`确定删除卡组投稿“${item.title}”吗？本地卡组不会被删除。`)) return;
+    if (!window.confirm(t(`确定删除卡组投稿“${item.title}”吗？本地卡组不会被删除。`))) return;
     HomeRequest.deleteDeckPlaza(item.id);
     if (detail?.id === item.id) setDetail(null);
   };

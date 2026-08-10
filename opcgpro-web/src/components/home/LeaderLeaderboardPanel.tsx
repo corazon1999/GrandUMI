@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
@@ -26,10 +27,10 @@ function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-function formatGeneratedAt(value?: string): string {
+function formatGeneratedAt(value: string | undefined, locale: string): string {
   if (!value) return "";
   try {
-    return new Date(value).toLocaleString("zh-CN", {
+    return new Date(value).toLocaleString(locale, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -108,6 +109,7 @@ function SortableHeader({
 }
 
 export default function LeaderLeaderboardPanel() {
+  const { locale } = useLanguage();
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
@@ -225,7 +227,7 @@ export default function LeaderLeaderboardPanel() {
           </span>
           {leaderboard?.generatedAtUtc && (
             <span className="hidden text-gray-600 @[640px]:inline">
-              更新于 {formatGeneratedAt(leaderboard.generatedAtUtc)}
+              更新于 {formatGeneratedAt(leaderboard.generatedAtUtc, locale)}
             </span>
           )}
         </div>

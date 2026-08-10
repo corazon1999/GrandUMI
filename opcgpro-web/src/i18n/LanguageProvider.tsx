@@ -30,7 +30,7 @@ interface RenderedValue {
 }
 
 const STORAGE_KEY = "grandumi_language";
-const TRANSLATED_ATTRIBUTES = ["aria-label", "placeholder", "title"] as const;
+const TRANSLATED_ATTRIBUTES = ["alt", "aria-label", "placeholder", "title"] as const;
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function useLanguage(): LanguageContextValue {

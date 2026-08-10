@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 
@@ -76,6 +77,7 @@ async function prepareCardBack(file: File): Promise<PreparedImage> {
 }
 
 export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: () => void }) {
+  const { t } = useLanguage();
   const gallery = useNetStore((state) => state.cardBackGallery);
   const currentCardBackId = useNetStore((state) => state.cardBackId);
   const connState = useNetStore((state) => state.connState);
@@ -129,7 +131,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   };
 
   const deleteCardBack = (cardBackId: string, cardBackName: string) => {
-    if (!window.confirm(`确定删除卡背“${cardBackName}”吗？删除后无法恢复。`)) return;
+    if (!window.confirm(t(`确定删除卡背“${cardBackName}”吗？删除后无法恢复。`))) return;
     setDeletingId(cardBackId);
     setError("");
     if (!HomeRequest.deleteCardBack(cardBackId)) {

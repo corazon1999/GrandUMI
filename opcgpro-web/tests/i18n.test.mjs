@@ -22,7 +22,7 @@ test("supports Simplified Chinese, Japanese, and English", () => {
 
 test("keeps the two translation catalogs in sync", () => {
   assert.deepEqual(Object.keys(MESSAGES.en).sort(), Object.keys(MESSAGES.ja).sort());
-  assert.ok(Object.keys(MESSAGES.en).length >= 200);
+  assert.ok(Object.keys(MESSAGES.en).length >= 700);
 });
 
 test("translates core lobby and match actions", () => {
@@ -43,4 +43,28 @@ test("preserves whitespace and translates dynamic labels", () => {
 test("leaves unknown content unchanged", () => {
   assert.equal(translateText("OP01-001", "en"), "OP01-001");
   assert.equal(translateText("玩家自定义内容", "ja"), "玩家自定义内容");
+});
+
+test("translates recently added account and community features", () => {
+  assert.equal(translateText("设置密码并登录", "en"), "Set password and sign in");
+  assert.equal(translateText("设置密码并登录", "ja"), "パスワードを設定してログイン");
+  assert.equal(translateText("卡组广场", "en"), "Deck plaza");
+  assert.equal(translateText("卡背广场", "ja"), "カード裏面ギャラリー");
+  assert.equal(translateText("▦ 导出一图流", "en"), "▦ Export deck image");
+  assert.equal(translateText("效果发动确认", "ja"), "効果発動の確認");
+  assert.equal(translateText("Leader 胜率榜", "en"), "Leader win-rate ranking");
+});
+
+test("translates new dynamic confirmations, counts, and notifications", () => {
+  assert.equal(
+    translateText("确定删除卡背“海浪”吗？删除后无法恢复。", "en"),
+    "Delete card back “海浪”? This cannot be undone.",
+  );
+  assert.equal(
+    translateText("确定删除卡组投稿“红路飞”吗？本地卡组不会被删除。", "ja"),
+    "デッキ投稿「红路飞」を削除しますか？ローカルデッキは削除されません。",
+  );
+  assert.equal(translateText("已压缩至 128KB", "en"), "Compressed to 128 KB");
+  assert.equal(translateText("好友 · 3 条新申请", "ja"), "フレンド · 新着申請3件");
+  assert.equal(translateText("· 5 条未读", "en"), "· 5 unread");
 });
