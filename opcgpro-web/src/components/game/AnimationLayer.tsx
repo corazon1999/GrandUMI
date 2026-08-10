@@ -35,16 +35,45 @@ type Banner = TurnBanner | ResultBanner;
 export default function AnimationLayer() {
   const anim = useGameAnimation();
   const mode = useGameStore((state) => state.mode);
+  const currentTurn = useGameStore((state) => state.currentTurn);
+  const turnCount = useGameStore((state) => state.turnCount);
 
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
   const [banner, setBanner] = useState<Banner | null>(null);
   const bannerIdRef = useRef(0);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastShownTurnRef = useRef(0);
 
   useEffect(() => () => {
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
   }, []);
+
+  // 回合归属以服务端权威快照为准。机器人或网络抖动可能让多个 lastAction 在 React
+  // 渲染前合并，但 turnCount 的最终变化不会丢失，因此每个可见回合至少提示一次。
+  useEffect(() => {
+    if (turnCount <= 0 || mode === "Observer") {
+      lastShownTurnRef.current = turnCount;
+      return;
+    }
+    if (lastShownTurnRef.current === turnCount) return;
+    lastShownTurnRef.current = turnCount;
+
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    bannerIdRef.current += 1;
+    const turnBanner: TurnBanner = {
+      id: bannerIdRef.current,
+      kind: "turn",
+      side: currentTurn ? "my" : "opponent",
+      text: currentTurn ? "我的回合！" : "对手回合",
+      turnCount,
+    };
+    setBanner(turnBanner);
+    bannerTimerRef.current = setTimeout(() => {
+      setBanner((current) => current?.id === turnBanner.id ? null : current);
+      bannerTimerRef.current = null;
+    }, 2200);
+  }, [currentTurn, mode, turnCount]);
 
   useEffect(() => {
     switch (anim.type) {
@@ -58,25 +87,6 @@ export default function AnimationLayer() {
       case "koUnit":
         setFlash(true);
         setTimeout(() => setFlash(false), 150);
-        break;
-
-      case "turnStart":
-        // 观战快照没有“我方”视角，避免把所有回合都误报成“对手回合”。
-        if (mode === "Observer") break;
-        if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-        bannerIdRef.current += 1;
-        const turnBanner: TurnBanner = {
-          id: bannerIdRef.current,
-          kind: "turn",
-          side: anim.side,
-          text: anim.side === "my" ? "我的回合！" : "对手回合",
-          turnCount: anim.turnCount,
-        };
-        setBanner(turnBanner);
-        bannerTimerRef.current = setTimeout(() => {
-          setBanner((current) => current?.id === turnBanner.id ? null : current);
-          bannerTimerRef.current = null;
-        }, 2200);
         break;
 
       case "gameOver":
@@ -95,7 +105,7 @@ export default function AnimationLayer() {
       default:
         break;
     }
-  }, [anim, mode]);
+  }, [anim]);
 
   return (
     <>

@@ -4,12 +4,19 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("首回合和后续回合切换都会产生玩家视角的动画事件", async () => {
-  const source = await readSource("../src/hooks/useGameAnimation.ts");
+test("回合提示直接监听服务端权威回合状态", async () => {
+  const [layer, animationHook] = await Promise.all([
+    readSource("../src/components/game/AnimationLayer.tsx"),
+    readSource("../src/hooks/useGameAnimation.ts"),
+  ]);
 
-  assert.match(source, /case "MulliganComplete":[\s\S]*?case "EndTurn":[\s\S]*?case "TurnStart":/);
-  assert.match(source, /side: currentTurn \? "my" : "opponent"/);
-  assert.match(source, /turnCount,/);
+  assert.match(layer, /const currentTurn = useGameStore/);
+  assert.match(layer, /const turnCount = useGameStore/);
+  assert.match(layer, /lastShownTurnRef/);
+  assert.match(layer, /lastShownTurnRef\.current === turnCount/);
+  assert.match(layer, /side: currentTurn \? "my" : "opponent"/);
+  assert.doesNotMatch(animationHook, /case "MulliganComplete"/);
+  assert.doesNotMatch(animationHook, /case "EndTurn"/);
 });
 
 test("回合提示位于中央、足够醒目且不会拦截操作", async () => {
