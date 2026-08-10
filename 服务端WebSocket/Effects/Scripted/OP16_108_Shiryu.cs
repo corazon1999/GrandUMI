@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 旧 DSL 占位错写成【触发】抽2，与原文不符，改脚本。可选成本（"可以…：…"），手牌为空则不可发动。
 ///   ConfirmOptional 确认后丢1手牌，再从废弃区选≤1张费用≤6《黑胡子海盗团》卡牌加入生命区最上方。
-///   （"卡牌"不限角色；生命卡入区即正面朝上，引擎生命不分正反故直接入顶。）
+///   （"卡牌"不限角色；移入生命区前设置 IsLifeFaceUp，确保以正面朝上状态公开。）
 /// </summary>
 public class OP16_108_Shiryu : IScriptedEffect
 {
@@ -52,6 +52,7 @@ public class OP16_108_Shiryu : IScriptedEffect
         {
             var picked = cands.First(c => c.Id.ToString() == tch[0]);
             me.Trash.Remove(picked);
+            picked.IsLifeFaceUp = true;
             me.LifeArea.Insert(0, picked); // 加入生命区最上方
         }
     }
