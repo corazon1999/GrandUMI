@@ -391,7 +391,7 @@ export default function DeckInfoPanel() {
       {/* 一图流预览弹窗 */}
       {imagePreview && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 sm:p-6"
+          className="fixed inset-0 z-[10010] flex items-center justify-center bg-black/85 p-3 sm:p-6"
           onClick={closeImagePreview}
           data-testid="deck-image-preview-backdrop"
         >
@@ -415,19 +415,21 @@ export default function DeckInfoPanel() {
               <button
                 onClick={closeImagePreview}
                 aria-label="关闭一图流预览"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gray-900 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                className="mr-12 grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gray-900 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white sm:mr-0"
               >
                 ✕
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto bg-black/40 p-3 sm:p-5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imagePreview.url}
-                alt={`${deckName.trim() || "未命名卡组"} 一图流预览`}
-                className="mx-auto block h-auto w-full max-w-[1440px] rounded-lg shadow-xl"
-              />
+            <div className="min-h-0 flex-1 overflow-hidden bg-black/40 p-3 sm:p-5">
+              <div className="relative h-full w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreview.url}
+                  alt={`${deckName.trim() || "未命名卡组"} 一图流预览`}
+                  className="absolute inset-0 m-auto block h-auto max-h-full w-auto max-w-full rounded-lg object-contain shadow-xl"
+                />
+              </div>
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-800 bg-gray-950 px-4 py-3">
@@ -435,13 +437,13 @@ export default function DeckInfoPanel() {
               <div className="ml-auto flex gap-2">
                 <button
                   onClick={closeImagePreview}
-                  className="rounded-lg bg-gray-800 px-4 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-700"
+                  className="min-h-11 rounded-lg bg-gray-800 px-4 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-700"
                 >
                   关闭
                 </button>
                 <button
                   onClick={handleImageDownload}
-                  className="rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-orange-400"
+                  className="min-h-11 rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-orange-400"
                   data-testid="deck-image-download"
                 >
                   下载 PNG
