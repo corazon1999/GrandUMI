@@ -10,6 +10,8 @@ interface Props {
   card: CardData | null;
   onClose: () => void;
   mobileSheet?: boolean;
+  /** 组牌页手机竖屏使用较小卡图，避免详情占满视口。 */
+  compactMobile?: boolean;
   initialArtwork?: "default" | "latest";
 }
 
@@ -24,6 +26,7 @@ export default function CardInfoPanel({
   card,
   onClose,
   mobileSheet = false,
+  compactMobile = false,
   initialArtwork = "default",
 }: Props) {
   return (
@@ -34,7 +37,13 @@ export default function CardInfoPanel({
       maxWidthClass="w-[calc(100vw-2rem)] max-w-4xl"
       mobileSheet={mobileSheet}
     >
-      {card && <CardInfoContent card={card} initialArtwork={initialArtwork} />}
+      {card && (
+        <CardInfoContent
+          card={card}
+          initialArtwork={initialArtwork}
+          compactMobile={compactMobile}
+        />
+      )}
     </Modal>
   );
 }
@@ -42,9 +51,11 @@ export default function CardInfoPanel({
 function CardInfoContent({
   card,
   initialArtwork,
+  compactMobile,
 }: {
   card: CardData;
   initialArtwork: NonNullable<Props["initialArtwork"]>;
+  compactMobile: boolean;
 }) {
   const displayColor = toDisplayColor(card.color);
   const primary      = primaryDisplayColor(card.color);
@@ -77,7 +88,14 @@ function CardInfoContent({
     <div className="max-h-[78vh] overflow-y-auto pr-1">
       <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start">
         {/* 卡图 */}
-        <div className="relative aspect-[0.717] w-full max-w-[22rem] shrink-0 overflow-hidden rounded-lg bg-gray-800">
+        <div
+          data-card-info-image
+          className={`relative aspect-[0.717] shrink-0 overflow-hidden rounded-lg bg-gray-800 ${
+            compactMobile
+              ? "w-[min(62vw,14rem)] sm:w-full sm:max-w-[22rem]"
+              : "w-full max-w-[22rem]"
+          }`}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageSrc}

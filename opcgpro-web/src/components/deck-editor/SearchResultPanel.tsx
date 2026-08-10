@@ -13,6 +13,9 @@ import { useVirtualList } from "@/hooks/useVirtualList";
 import { compareCatalogCards, filterAndSortCards } from "@/lib/cardSearch";
 
 const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪烁）
+const TOUCH_LONG_PRESS_DELAY = 500;
+const TOUCH_MOVE_TOLERANCE = 10;
+const TOUCH_CLICK_SUPPRESS_DURATION = 1000;
 const CARD_WIDTH    = 72;   // w-16(64px) + gap
 const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
@@ -159,6 +162,10 @@ export default function SearchResultPanel() {
                     isLeaderMode={isLeaderMode}
                     onClick={() => handleCardClick(card)}
                     onRightClick={(e) => { e.preventDefault(); setModal(card); }}
+                    onLongPress={() => {
+                      handleMouseLeave();
+                      setModal(card);
+                    }}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                     onSpriteChange={(sprite) => {
@@ -183,8 +190,8 @@ export default function SearchResultPanel() {
         {hover && <CardHoverPreview info={hover} />}
       </AnimatePresence>
 
-      {/* 右键弹窗 */}
-      <CardInfoPanel card={modal} onClose={() => setModal(null)} />
+      {/* 桌面右键或手机长按打开详情；手机竖屏使用更紧凑的卡图尺寸。 */}
+      <CardInfoPanel card={modal} onClose={() => setModal(null)} compactMobile />
     </div>
   );
 }
@@ -197,13 +204,14 @@ interface CardGridItemProps {
   isLeaderMode: boolean;
   onClick: () => void;
   onRightClick: (e: React.MouseEvent) => void;
+  onLongPress: () => void;
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
   onMouseLeave: () => void;
   onSpriteChange: (sprite: string) => void;
 }
 
 function CardGridItem({
-  card, deckCount, isLeaderMode, onClick, onRightClick, onMouseEnter, onMouseLeave, onSpriteChange,
+  card, deckCount, isLeaderMode, onClick, onRightClick, onLongPress, onMouseEnter, onMouseLeave, onSpriteChange,
 }: CardGridItemProps) {
   const isFull    = !isLeaderMode && deckCount >= 4 && !UNLIMITED_COPY_CARDS.has(card.number);
   const hasInDeck = deckCount > 0;
@@ -213,10 +221,23 @@ function CardGridItem({
   const [spriteIdx, setSpriteIdx] = useState(sprites.length - 1);
   const rawSrc = sprites[spriteIdx] ?? CARD_BACK_SRC;
   const [currentSrc, setCurrentSrc] = useState(thumbSrc(rawSrc));
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickUntil = useRef(0);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pressStart.current = null;
+  }, []);
 
   useEffect(() => {
     setCurrentSrc(thumbSrc(rawSrc));
   }, [rawSrc]);
+
+  useEffect(() => () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
 
   // 初始化时同步默认异画的 sprite 到 card 对象，确保添加卡牌时使用正确的异画
   useEffect(() => {
@@ -241,6 +262,53 @@ function CardGridItem({
     onSpriteChange(sprites[next]);
   };
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || !e.isPrimary) return;
+    if ((e.target as Element).closest("button")) return;
+
+    onMouseLeave();
+    clearLongPressTimer();
+    suppressClickUntil.current = 0;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      suppressClickUntil.current = Date.now() + TOUCH_CLICK_SUPPRESS_DURATION;
+      onLongPress();
+    }, TOUCH_LONG_PRESS_DELAY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || !pressStart.current) return;
+    const deltaX = e.clientX - pressStart.current.x;
+    const deltaY = e.clientY - pressStart.current.y;
+    if (Math.hypot(deltaX, deltaY) > TOUCH_MOVE_TOLERANCE) clearLongPressTimer();
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    clearLongPressTimer();
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    clearLongPressTimer();
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (Date.now() < suppressClickUntil.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onClick();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const pointerType = (e.nativeEvent as PointerEvent).pointerType;
+    if (!pointerType || pointerType === "mouse") onRightClick(e);
+  };
+
   return (
     <motion.div
       layout
@@ -249,8 +317,15 @@ function CardGridItem({
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.15 }}
       className="group flex flex-col items-center gap-1 transform-gpu backface-hidden"
-      onMouseEnter={(e) => onMouseEnter(card, e.currentTarget.getBoundingClientRect(), rawSrc)}
-      onMouseLeave={onMouseLeave}
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") {
+          onMouseEnter(card, e.currentTarget.getBoundingClientRect(), rawSrc);
+        }
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") onMouseLeave();
+        else clearLongPressTimer();
+      }}
     >
       <div
         className={`relative w-16 h-24 rounded-lg overflow-hidden select-none border-2 transition-all
@@ -262,8 +337,13 @@ function CardGridItem({
                 ? "border-orange-500 hover:scale-105 cursor-pointer"
                 : "border-gray-700 hover:border-gray-400 hover:scale-105 cursor-pointer"
           }`}
-        onClick={isFull ? undefined : onClick}
-        onContextMenu={onRightClick}
+        style={{ WebkitTouchCallout: "none" }}
+        onClick={isFull ? undefined : handleClick}
+        onContextMenu={handleContextMenu}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
         <NextImage
           src={currentSrc}
