@@ -92,9 +92,13 @@ export default function PromptOverlay() {
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const promptTogglePosition = spectatorNames.length > 0
-    ? "left-[6.75rem] max-md:left-[6.5rem]"
-    : "left-[3.75rem] max-md:left-[3.5rem]";
+  const promptToggleOffset = spectatorNames.length > 0 ? "6.75rem" : "3.75rem";
+  // 手机竖屏的对局画布会顺时针旋转 90°，这里必须使用布局层映射后的安全区变量，
+  // 不能只依赖固定 bottom/left，否则 iOS Safari 的刘海或浏览器边缘会裁掉按钮。
+  const promptToggleStyle = {
+    left: `calc(${promptToggleOffset} + var(--layout-safe-left, 0px))`,
+    bottom: "calc(0.75rem + var(--layout-safe-bottom, 0px))",
+  } as const;
 
   const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
     ? {
@@ -169,7 +173,8 @@ export default function PromptOverlay() {
           <button
             type="button"
             onClick={() => setIsMinimized(false)}
-            className={`pointer-events-auto fixed bottom-3 ${promptTogglePosition} flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700 max-md:bottom-2`}
+            style={promptToggleStyle}
+            className="pointer-events-auto fixed flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
             title="恢复选择面板"
             aria-label="恢复选择面板"
           >
@@ -438,7 +443,8 @@ export default function PromptOverlay() {
         <button
           type="button"
           onClick={() => setIsMinimized(true)}
-          className={`fixed bottom-3 ${promptTogglePosition} z-[60] flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700 max-md:bottom-2`}
+          style={promptToggleStyle}
+          className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
           title="隐藏选择面板"
           aria-label="隐藏选择面板"
         >

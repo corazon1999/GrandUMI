@@ -36,3 +36,16 @@ test("领袖目标在通用选择面板中显示明确标识", async () => {
   assert.match(source, /choiceZone === "leader"/);
   assert.match(source, /isLeaderChoice \? " · 领袖"/);
 });
+
+test("选择面板隐藏与恢复按钮适配手机竖屏安全区", async () => {
+  const source = await readSource("../src/components/game/PromptOverlay.tsx");
+
+  assert.match(source, /const promptToggleStyle =/);
+  assert.match(source, /var\(--layout-safe-left, 0px\)/);
+  assert.match(source, /var\(--layout-safe-bottom, 0px\)/);
+  assert.equal(source.match(/style=\{promptToggleStyle\}/g)?.length, 2);
+  assert.equal(
+    source.match(/flex h-12 w-12 items-center justify-center rounded-full bg-slate-800\/90/g)?.length,
+    2,
+  );
+});
