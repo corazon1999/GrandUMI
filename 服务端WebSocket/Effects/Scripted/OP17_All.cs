@@ -727,9 +727,9 @@ internal static class OP17Effects
             if (pick.Count > 0) AtomicOps.AddPowerThisBattle(pick[0], 4000);
             return;
         }
-        if (c.Trigger != EffectTrigger.EventMain || AtomicOps.RestableCount(Me(c)) < 6) return;
-        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方6张卡牌转为休息状态，结算事件主要效果？")) return;
-        if (!await AtomicOps.PromptRestOwnCards(c, 6, "选择我方6张卡牌转为休息状态", optional: true)) return;
+        if (c.Trigger != EffectTrigger.EventMain || Me(c).ActiveDonCount < 6) return;
+        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方6张活跃咚!!转为休息状态，结算事件主要效果？")) return;
+        if (!RestActiveDon(c, 6)) return;
         foreach (var card in await ChooseOppChars(c, x => !x.IsTapped, 1, "选择对方1张角色转为休息状态")) AtomicOps.RestCard(card);
         await KOByEffect(c, await ChooseOppChars(c, x => x.IsTapped && c.State.CurrentCostOf(x) <= 6, 2,
             "选择最多2张休息状态且费用≤6的角色KO"));

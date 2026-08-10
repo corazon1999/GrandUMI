@@ -14,6 +14,47 @@ public class OP17EffectTests
     private static CardInstance Card(string number, int turnPlayed = 0)
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
+    [Fact]
+    public async Task OP17_036_EventMain_CannotUseCharactersToCompleteDonCost()
+    {
+        var state = TestScene.New("OP17-001")
+            .MyActiveDon(5)
+            .MyCharacter("OP17-005")
+            .Build();
+        var character = Assert.Single(state.Players[0].Characters);
+        var prompts = new MockPromptService().QueueConfirm(true);
+
+        await EffectRuntime.Resolve(state, 0, Card("OP17-036"),
+            EffectTrigger.EventMain, prompts);
+
+        Assert.Equal(5, state.Players[0].ActiveDonCount);
+        Assert.False(character.IsTapped);
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
+    public async Task OP17_036_EventMain_RestsOnlySixActiveDon()
+    {
+        var state = TestScene.New("OP17-001")
+            .MyActiveDon(6)
+            .MyCharacter("OP17-005")
+            .Build();
+        var me = state.Players[0];
+        var character = Assert.Single(me.Characters);
+        var prompts = new MockPromptService().QueueConfirm(true);
+
+        await EffectRuntime.Resolve(state, 0, Card("OP17-036"),
+            EffectTrigger.EventMain, prompts);
+
+        Assert.Equal(0, me.ActiveDonCount);
+        Assert.All(me.CostArea, don => Assert.Equal(DonState.Rest, don.State));
+        Assert.False(me.Leader.IsTapped);
+        Assert.False(character.IsTapped);
+        Assert.Single(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
     [Theory]
     [InlineData("OP08-051", true)]
     [InlineData("OP07-049", false)]
