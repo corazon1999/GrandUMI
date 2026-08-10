@@ -12,8 +12,12 @@ import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMa
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { downloadGeneratedDeckImage, generateDeckImage } from "@/lib/deckImageExport";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
+import CardInfoPanel from "@/components/game/CardInfoPanel";
 
 const HOVER_DELAY = 180;
+const TOUCH_LONG_PRESS_DELAY = 500;
+const TOUCH_MOVE_TOLERANCE = 10;
+const TOUCH_CLICK_SUPPRESS_DURATION = 1000;
 
 type SaveState = "idle" | "saved" | "error";
 type ImageExportState = "idle" | "exporting" | "error";
@@ -49,6 +53,7 @@ export default function DeckInfoPanel() {
   const imagePreviewUrl             = useRef<string | null>(null);
   const noticeTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hover, setHover]           = useState<HoverInfo | null>(null);
+  const [modal, setModal]           = useState<CardData | null>(null);
   const hoverTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const total = totalCards();
 
@@ -596,6 +601,10 @@ export default function DeckInfoPanel() {
                 onAdd={addCard}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
+                onLongPress={(card) => {
+                  handleMouseLeave();
+                  setModal(card);
+                }}
               />
             ))
           )}
@@ -606,6 +615,8 @@ export default function DeckInfoPanel() {
       <AnimatePresence>
         {hover && <CardHoverPreview info={hover} />}
       </AnimatePresence>
+
+      <CardInfoPanel card={modal} onClose={() => setModal(null)} compactMobile />
 
       {/* 图片导出与保存 */}
       <div className="px-3 py-3 border-t border-gray-800 shrink-0 flex flex-col gap-2">
@@ -746,16 +757,60 @@ function DeckEntryRow({
   onAdd,
   onMouseEnter,
   onMouseLeave,
+  onLongPress,
 }: {
   entry: DeckEntry;
   onRemove: (number: string) => void;
   onAdd: (card: CardData) => void;
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
   onMouseLeave: () => void;
+  onLongPress: (card: CardData) => void;
 }) {
   const sprite      = entry.card.sprite ?? CARD_BACK_SRC;
   const primary     = primaryDisplayColor(entry.card.color);
   const colorStyle  = COLOR_STYLES[primary];
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickUntil = useRef(0);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pressStart.current = null;
+  }, []);
+
+  useEffect(() => () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || !e.isPrimary) return;
+
+    clearLongPressTimer();
+    suppressClickUntil.current = 0;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      suppressClickUntil.current = Date.now() + TOUCH_CLICK_SUPPRESS_DURATION;
+      onLongPress(entry.card);
+    }, TOUCH_LONG_PRESS_DELAY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || !pressStart.current) return;
+    const deltaX = e.clientX - pressStart.current.x;
+    const deltaY = e.clientY - pressStart.current.y;
+    if (Math.hypot(deltaX, deltaY) > TOUCH_MOVE_TOLERANCE) clearLongPressTimer();
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (Date.now() < suppressClickUntil.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onRemove(entry.card.number);
+  };
 
   return (
     <div
@@ -765,9 +820,20 @@ function DeckEntryRow({
         backgroundSize: "cover",
         backgroundPosition: "center 30%",
       }}
-      onClick={() => onRemove(entry.card.number)}
-      onMouseEnter={(e) => onMouseEnter(entry.card, e.currentTarget.getBoundingClientRect(), sprite)}
-      onMouseLeave={onMouseLeave}
+      onClick={handleClick}
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") {
+          onMouseEnter(entry.card, e.currentTarget.getBoundingClientRect(), sprite);
+        }
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") onMouseLeave();
+        else clearLongPressTimer();
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPressTimer}
+      onPointerCancel={clearLongPressTimer}
       title="点击减少一张"
     >
       {/* 半透明遮罩保证文字可读 */}

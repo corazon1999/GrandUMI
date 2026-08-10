@@ -33,7 +33,7 @@ function preloadSprite(src: string) {
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, getCount, notice, clearNotice } =
+  const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, setFilterType, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -87,8 +87,18 @@ export default function SearchResultPanel() {
     overscan: 2,
   });
 
-  const handleCardClick = (card: CardData) =>
-    isLeaderMode ? setLeader(card) : addCard(card);
+  const handleCardClick = (card: CardData) => {
+    if (!isLeaderMode) {
+      addCard(card);
+      return;
+    }
+
+    setLeader(card);
+    // 竖屏手机选定领航后直接回到普通牌池，免去手动切换的一步。
+    if (window.matchMedia("(max-width: 767px) and (orientation: portrait)").matches) {
+      setFilterType("");
+    }
+  };
 
   // 延迟显示预览，鼠标快速划过时不触发
   const handleMouseEnter = useCallback((card: CardData, rect: DOMRect, currentSprite: string) => {
