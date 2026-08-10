@@ -22,8 +22,8 @@ internal static class St13Brother
         if (!(top.Info.NameIs(targetName) && top.Info.Cost == 5 && top.Info.Kind == CardKind.Character)) return;
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, $"将生命区顶的「{top.Info.Name}」登场？")) return;
         await AtomicOps.PlayFromLifeFree(ctx.State, ctx.OwnerIndex, top);
-        // 登场成功 → 我方领袖+2000（近似“直到下个对方回合结束”，用持久修正，回合末清理）
-        AtomicOps.AddPowerPersistent(me.Leader, 2000);
+        // 登场成功 → 我方领袖+2000，持续到下个对方回合结束
+        AtomicOps.AddPowerUntilOppEnd(me.Leader, 2000, ctx.OwnerIndex);
     }
 }
 
