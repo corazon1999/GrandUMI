@@ -19,7 +19,7 @@ test("公开匹配明确保留排位与休闲两个入口", async () => {
   assert.match(types, /queueKind\?: "ranked" \| "casual"/);
 });
 
-test("排位前必须选择且永久锁定一个阵营", async () => {
+test("排位前必须选择阵营，更换阵营须确认并清空排位进度", async () => {
   const [lobby, protocol, types, rankedStore] = await Promise.all([
     readSource("../src/components/home/LobbyPanel.tsx"),
     readSource("../src/net/HomeProtocol.ts"),
@@ -28,12 +28,16 @@ test("排位前必须选择且永久锁定一个阵营", async () => {
   ]);
 
   assert.match(lobby, /选择你的排位阵营/);
-  assert.match(lobby, /HomeRequest\.selectRankFaction\(faction\.id\)/);
+  assert.match(lobby, /HomeRequest\.selectRankFaction\(pendingFaction, true\)/);
+  assert.match(lobby, /确认更换并清空/);
+  assert.match(lobby, /更换后将清空本赛季 RP、定级进度和战绩/);
   assert.match(lobby, /Boolean\(rankProfile\?\.faction\)/);
-  assert.match(protocol, /selectRankFaction\(faction: RankFaction\)/);
+  assert.match(protocol, /selectRankFaction\(faction: RankFaction, resetRankProgress = false\)/);
+  assert.match(protocol, /resetRankProgress/);
   assert.match(types, /type RankFaction = "pirate" \| "marine" \| "government"/);
   assert.match(rankedStore, /INSERT INTO rank_factions/);
-  assert.match(rankedStore, /阵营仅影响称号和阵营排行榜，不影响匹配或积分/);
+  assert.match(rankedStore, /更换阵营会重置当前赛季的排位进度/);
+  assert.match(rankedStore, /ResetRankProgress/);
 });
 
 test("三阵营称号和新世界榜首称号按约定映射", async () => {

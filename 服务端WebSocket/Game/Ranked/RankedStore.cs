@@ -237,8 +237,9 @@ public sealed class RankedStore
         }
     }
 
-    /// <summary>选择阵营后永久锁定；阵营仅影响称号和阵营排行榜，不影响匹配或积分。</summary>
-    public RankSnapshot? SelectFaction(string account, string? displayName, string faction, DateTime? nowUtc = null)
+    /// <summary>阵营仅影响称号和阵营排行榜；更换阵营会重置当前赛季的排位进度。</summary>
+    public RankSnapshot? SelectFaction(string account, string? displayName, string faction, DateTime? nowUtc = null,
+        bool resetRankProgress = false)
     {
         faction = NormalizeFaction(faction) ?? string.Empty;
         if (faction.Length == 0) return null;
@@ -260,6 +261,29 @@ public sealed class RankedStore
                 insert.Parameters.AddWithValue("$faction", faction);
                 insert.Parameters.AddWithValue("$selected", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
                 insert.ExecuteNonQuery();
+                selected = faction;
+            }
+            else if (!string.Equals(selected, faction, StringComparison.Ordinal))
+            {
+                // The caller must explicitly acknowledge the reset. Returning the existing snapshot keeps
+                // the request non-destructive when an old or malformed client omits that acknowledgement.
+                if (!resetRankProgress)
+                {
+                    var unchangedLeaderboard = ReadLeaderboard(connection, season);
+                    transaction.Commit();
+                    return new RankSnapshot(ToSnapshot(profile, season, selected,
+                        FactionRank(connection, season, profile, selected)), unchangedLeaderboard);
+                }
+
+                profile = ResetRankProgress(profile, nowUtc ?? DateTime.UtcNow);
+                Save(connection, transaction, profile);
+                using var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = "UPDATE rank_factions SET faction=$faction, selected_at_utc=$selected WHERE account_key=$key;";
+                update.Parameters.AddWithValue("$key", profile.AccountKey);
+                update.Parameters.AddWithValue("$faction", faction);
+                update.Parameters.AddWithValue("$selected", (nowUtc ?? DateTime.UtcNow).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+                update.ExecuteNonQuery();
                 selected = faction;
             }
             var leaderboard = ReadLeaderboard(connection, season);
@@ -366,6 +390,21 @@ public sealed class RankedStore
             UpdatedAtUtc = DateTime.UtcNow,
         };
     }
+
+    private static Profile ResetRankProgress(Profile profile, DateTime resetAtUtc)
+        => profile with
+        {
+            Rating = InitialRating,
+            RatingDeviation = InitialDeviation,
+            Volatility = InitialVolatility,
+            RankPoints = 0,
+            HighestRankPoints = 0,
+            PlacementGames = 0,
+            Games = 0,
+            Wins = 0,
+            Losses = 0,
+            UpdatedAtUtc = resetAtUtc.ToUniversalTime(),
+        };
 
     private static RatingUpdate UpdateRating(Profile self, Profile opponent, double score)
     {

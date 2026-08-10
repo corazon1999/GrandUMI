@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
+import Modal from "@/components/ui/Modal";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
@@ -52,6 +53,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [copied, setCopied] = useState(false);
   const [botGoFirst, setBotGoFirst] = useState(true);
   const [announcementInput, setAnnouncementInput] = useState("");
+  const [pendingFaction, setPendingFaction] = useState<RankFaction | null>(null);
 
   // 主卡组须恰好 50 张（后端 DeckValidator 强制，不满会被拒，bug #183）。
   // 这里前置拦截：未满 50 时置灰按钮并提示，避免「点了没反应」。
@@ -70,13 +72,27 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const handleMatch = () => {
     if (!selectedDeck) return;
     if (matchQueueKind === "ranked" && !rankProfile?.faction) {
-      showMessage("开始排位前请先选择阵营，阵营选定后不可更换", "error");
+      showMessage("开始排位前请先选择阵营", "error");
       return;
     }
     const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
     }
+  };
+
+  const requestFactionChange = (faction: RankFaction) => {
+    if (!rankProfile?.faction) {
+      HomeRequest.selectRankFaction(faction);
+      return;
+    }
+    if (rankProfile.faction !== faction) setPendingFaction(faction);
+  };
+
+  const confirmFactionChange = () => {
+    if (!pendingFaction) return;
+    HomeRequest.selectRankFaction(pendingFaction, true);
+    setPendingFaction(null);
   };
 
   const handleCancelMatch = () => {
@@ -258,13 +274,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                         {!rankProfile.faction ? (
                           <div>
                             <p className="text-sm font-black text-violet-200">选择你的排位阵营</p>
-                            <p className="mt-1 text-xs leading-5 text-gray-400">阵营只影响称号和阵营榜名次，不影响积分或匹配；选定后不能更换。</p>
+                            <p className="mt-1 text-xs leading-5 text-gray-400">阵营只影响称号和阵营榜名次，不影响积分或匹配；之后可更换，但会清空本赛季排位进度。</p>
                             <div className="mt-3 grid gap-2 @[640px]:grid-cols-3">
                               {RANK_FACTIONS.map((faction) => (
                                 <button
                                   key={faction.id}
                                   type="button"
-                                  onClick={() => HomeRequest.selectRankFaction(faction.id)}
+                                  onClick={() => requestFactionChange(faction.id)}
                                   className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors ${faction.className}`}
                                 >
                                   <span className="block text-sm font-black text-white">{faction.name}</span>
@@ -292,6 +308,24 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                               )}
                             </div>
                             <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
+                            <details className="mt-2 border-t border-violet-900/60 pt-2">
+                              <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">更换阵营</summary>
+                              <p className="mb-2 text-xs leading-5 text-gray-400">更换后将清空本赛季 RP、定级进度和战绩，并从头定级。</p>
+                              <div className="grid gap-2 @[640px]:grid-cols-3">
+                                {RANK_FACTIONS.map((faction) => (
+                                  <button
+                                    key={faction.id}
+                                    type="button"
+                                    disabled={faction.id === rankProfile.faction}
+                                    onClick={() => requestFactionChange(faction.id)}
+                                    className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${faction.className}`}
+                                  >
+                                    <span className="block text-sm font-black text-white">{faction.id === rankProfile.faction ? `${faction.name}（当前）` : faction.name}</span>
+                                    <span className="mt-1 block text-[11px] text-gray-300">{faction.description}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </details>
                             <details className="mt-2 border-t border-violet-900/60 pt-2">
                               <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-violet-300">查看排位榜</summary>
                               <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
@@ -467,6 +501,20 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
           </aside>
         </div>
       </div>
+
+      <Modal
+        open={Boolean(pendingFaction)}
+        onClose={() => setPendingFaction(null)}
+        title="确认更换排位阵营"
+        mobileSheet
+        maxWidthClass="max-w-md"
+      >
+        <p className="text-sm leading-6 text-gray-300">确认改为{pendingFaction ? RANK_FACTION_NAMES[pendingFaction] : "新阵营"}吗？此操作会清空本赛季的 RP、定级进度和战绩，且无法恢复。</p>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" onClick={() => setPendingFaction(null)} className="min-h-11 rounded-xl bg-gray-800 px-4 text-sm font-bold text-gray-200 hover:bg-gray-700">取消</button>
+          <button type="button" onClick={confirmFactionChange} className="min-h-11 rounded-xl bg-violet-600 px-4 text-sm font-black text-white hover:bg-violet-500">确认更换并清空</button>
+        </div>
+      </Modal>
 
       <div className="hidden w-72 shrink-0 border-l border-gray-800 @[1024px]:block">
         <ChatPanel />

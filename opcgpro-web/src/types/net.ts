@@ -287,6 +287,8 @@ export type RankFaction = "pirate" | "marine" | "government";
 export interface MsgSelectRankFaction extends MsgBase {
   proto: "MsgSelectRankFaction";
   faction: RankFaction;
+  /** 更换已选阵营时，明确确认清空本赛季排位进度。 */
+  resetRankProgress?: boolean;
   result?: boolean;
   logStr?: string;
   profile?: RankProfileSnapshot;

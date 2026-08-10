@@ -1051,7 +1051,8 @@ public static class WebSocketBridge
         var requested = Str(msg, "faction") ?? string.Empty;
         try
         {
-            var snapshot = RankedStore.Default.SelectFaction(session.Account, session.PlayerName, requested);
+            var snapshot = RankedStore.Default.SelectFaction(session.Account, session.PlayerName, requested,
+                resetRankProgress: Bool(msg, "resetRankProgress"));
             if (snapshot is null)
             {
                 Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "无效的阵营选择" });
@@ -1059,7 +1060,7 @@ public static class WebSocketBridge
             }
             if (!string.Equals(snapshot.Profile.Faction, requested, StringComparison.OrdinalIgnoreCase))
             {
-                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "阵营已经选定，不能更换" });
+                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "更换阵营会清空本赛季排位数据，请确认后重试" });
                 return;
             }
             Send(session.SessionId, new

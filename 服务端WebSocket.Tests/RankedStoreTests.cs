@@ -63,7 +63,7 @@ public class RankedStoreTests
     }
 
     [Fact]
-    public void 阵营选择_首次选择后永久锁定()
+    public void 阵营选择_确认更换后清空本赛季排位进度()
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
@@ -71,13 +71,32 @@ public class RankedStoreTests
             var store = new RankedStore(path);
             var now = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc);
 
-            var selected = store.SelectFaction("alice", "爱丽丝", RankedStore.MarineFaction, now);
-            var retry = store.SelectFaction("alice", "爱丽丝", RankedStore.GovernmentFaction, now.AddMinutes(1));
+            var selected = store.SelectFaction("alice", "爱丽丝", RankedStore.MarineFaction, now)!;
+            for (var i = 0; i < RankedStore.PlacementRequired; i++)
+            {
+                Assert.NotNull(store.RecordMatch($"ranked-reset-{i}", now.AddMinutes(i),
+                    "alice", "爱丽丝", $"bob-{i}", $"对手{i}", winnerIndex: 0));
+            }
 
-            Assert.NotNull(selected);
-            Assert.NotNull(retry);
-            Assert.Equal(RankedStore.MarineFaction, selected!.Profile.Faction);
-            Assert.Equal(RankedStore.MarineFaction, retry!.Profile.Faction);
+            var beforeReset = store.GetSnapshot("alice", "爱丽丝", now.AddMinutes(10));
+            var unconfirmed = store.SelectFaction("alice", "爱丽丝", RankedStore.GovernmentFaction, now.AddMinutes(11));
+            var changed = store.SelectFaction("alice", "爱丽丝", RankedStore.GovernmentFaction, now.AddMinutes(12),
+                resetRankProgress: true);
+
+            Assert.Equal(RankedStore.MarineFaction, selected.Profile.Faction);
+            Assert.Equal(RankedStore.PlacementRequired, beforeReset.Profile.Games);
+            Assert.NotNull(unconfirmed);
+            Assert.Equal(RankedStore.MarineFaction, unconfirmed!.Profile.Faction);
+            Assert.Equal(beforeReset.Profile.RankPoints, unconfirmed.Profile.RankPoints);
+            Assert.NotNull(changed);
+            Assert.Equal(RankedStore.GovernmentFaction, changed!.Profile.Faction);
+            Assert.Equal(0, changed.Profile.RankPoints);
+            Assert.Equal(0, changed.Profile.HighestRankPoints);
+            Assert.Equal(0, changed.Profile.PlacementGames);
+            Assert.Equal(0, changed.Profile.Games);
+            Assert.Equal(0, changed.Profile.Wins);
+            Assert.Equal(0, changed.Profile.Losses);
+            Assert.Equal(1500, store.GetMatchRating("alice", "爱丽丝", now.AddMinutes(13)));
         }
         finally
         {

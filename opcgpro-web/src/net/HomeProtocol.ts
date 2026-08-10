@@ -507,8 +507,11 @@ function handleSelectRankFaction(msg: MsgSelectRankFaction) {
     showMessage(msg.logStr ?? "阵营选择失败", "error");
     return;
   }
+  const previousFaction = useNetStore.getState().rankProfile?.faction;
   useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
-  showMessage("阵营已选定，之后不能更换", "info");
+  showMessage(previousFaction && previousFaction !== msg.profile.faction
+    ? "阵营已更换，排位进度已清空，请重新定级"
+    : "阵营已选定", "info");
 }
 
 /**
@@ -943,10 +946,11 @@ export const HomeRequest = {
     } as MsgCancelMatch);
   },
 
-  selectRankFaction(faction: RankFaction) {
+  selectRankFaction(faction: RankFaction, resetRankProgress = false) {
     return NetManager.send({
       proto: "MsgSelectRankFaction",
       faction,
+      resetRankProgress,
     } as MsgSelectRankFaction);
   },
 
