@@ -88,7 +88,9 @@ public static class EffectRuntime
         if (s is null) return;
         int owner = ReferenceEquals(s.Players[0], p) ? 0 : ReferenceEquals(s.Players[1], p) ? 1 : -1;
         if (owner < 0) return;
-        if (!PayingCost) p.HandDiscardedByEffectThisTurn = true;
+        // ST33-004 的“因效果而被丢弃”包含效果文本冒号前的发动成本；
+        // PayingCost 仍通过 watcher payload 下发，供其他监听按各自规则区分。
+        p.HandDiscardedByEffectThisTurn = true;
         s.EnqueueWatcher(EffectTrigger.OnHandDiscarded, new Dictionary<string, object?>
         {
             ["owner"] = owner,

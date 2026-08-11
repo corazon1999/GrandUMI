@@ -197,33 +197,42 @@ public class ST31To35EffectTests
     }
 
     [Fact]
-    public async Task ST33_004_DiscountTracksEffectDiscardButNotCostsAndClearsAtEndPhase()
+    public async Task ST33_004_DiscountTracksEffectCostDiscardAndClearsAtEndPhase()
     {
         var s = TestScene.New()
             .MyHandAdd("ST31-003")
             .Build();
-        var koby = new CardInstance { Info = CardDatabase.Get("ST33-001")! };
-        s.Players[0].Characters.Add(koby);
-        await EffectRuntime.Resolve(s, 0, koby, EffectTrigger.OnEnterField, new MockPromptService());
-        Assert.False(s.Players[0].HandDiscardedByEffectThisTurn);
-
-        s.Players[0].Hand.Add(new CardInstance { Info = CardDatabase.Get("ST31-003")! });
-        s.Players[0].Deck.Add(new CardInstance { Info = CardDatabase.Get("ST31-003")! });
-        s.Players[0].Deck.Add(new CardInstance { Info = CardDatabase.Get("ST31-003")! });
-        var don = new DonCard { State = DonState.Active };
-        s.Players[0].CostArea.Add(don);
-        var kinemon = new CardInstance { Info = CardDatabase.Get("ST32-001")! };
-        s.Players[0].Characters.Add(kinemon);
-
-        await EffectRuntime.Resolve(s, 0, kinemon, EffectTrigger.OnEnterField,
-            new MockPromptService().QueueChoose(don.Id.ToString()));
-        Assert.True(s.Players[0].HandDiscardedByEffectThisTurn);
-
+        var discarded = Assert.Single(s.Players[0].Hand);
         var borsalino = new CardInstance { Info = CardDatabase.Get("ST33-004")! };
         s.Players[0].Hand.Add(borsalino);
+        Assert.Equal(6, s.HandPlayCost(0, borsalino));
+
+        var koby = new CardInstance { Info = CardDatabase.Get("ST33-001")! };
+        s.Players[0].Characters.Add(koby);
+        await EffectRuntime.Resolve(s, 0, koby, EffectTrigger.OnEnterField,
+            new MockPromptService().QueueChoose(discarded.Id.ToString()));
+
+        Assert.Contains(discarded, s.Players[0].Trash);
+        Assert.True(s.Players[0].HandDiscardedByEffectThisTurn);
         Assert.Equal(3, s.HandPlayCost(0, borsalino));
 
         TurnEngine.EnterEndPhase(s);
+        Assert.False(s.Players[0].HandDiscardedByEffectThisTurn);
+        Assert.Equal(6, s.HandPlayCost(0, borsalino));
+    }
+
+    [Fact]
+    public void ST33_004_DiscountDoesNotTrackDiscardOutsideEffectResolution()
+    {
+        var s = TestScene.New()
+            .MyHandAdd("ST31-003")
+            .Build();
+        var discarded = Assert.Single(s.Players[0].Hand);
+        var borsalino = new CardInstance { Info = CardDatabase.Get("ST33-004")! };
+        s.Players[0].Hand.Add(borsalino);
+
+        AtomicOps.DiscardHand(s.Players[0], discarded);
+
         Assert.False(s.Players[0].HandDiscardedByEffectThisTurn);
         Assert.Equal(6, s.HandPlayCost(0, borsalino));
     }
