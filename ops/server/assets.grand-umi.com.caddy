@@ -17,9 +17,25 @@ assets.grand-umi.com {
 		file_server
 	}
 
+	@custom_card_backs {
+		method GET
+		path /card-back-images/*
+	}
+	handle @custom_card_backs {
+		header {
+			Access-Control-Allow-Origin "*"
+			Cache-Control "public, max-age=31536000, immutable"
+			Cross-Origin-Resource-Policy "cross-origin"
+			X-Content-Type-Options "nosniff"
+		}
+		reverse_proxy 127.0.0.1:8080 {
+			header_up Host localhost
+		}
+	}
+
 	@public_assets {
 		method GET HEAD
-		path /audio/* /cards/* /cards-thumb/* /cards-webp/* /data/* /sprites/* /sprites-thumb/* /status-icons/* /vfx/* /card-back-images/* /file.svg /globe.svg /next.svg /vercel.svg /window.svg
+		path /audio/* /cards/* /cards-thumb/* /cards-webp/* /data/* /sprites/* /sprites-thumb/* /status-icons/* /vfx/* /file.svg /globe.svg /next.svg /vercel.svg /window.svg
 	}
 	handle @public_assets {
 		root * /opt/grandumi/opcgpro-web/public

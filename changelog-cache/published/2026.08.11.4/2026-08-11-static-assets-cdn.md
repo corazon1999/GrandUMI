@@ -24,3 +24,4 @@
 - 三个 Shell 脚本均通过服务器端 `bash -n`，Caddy 配置通过服务器端 `caddy validate`。
 - 正式机实时核验：BBR、MTU 探测、fq 与 4 Mbps HTB 已启用，网络持久化服务为 enabled/active。
 - 网络整形脚本在已有 HTB 队列的情况下重复执行成功，systemd 服务可安全重启。
+- 自定义卡背路径由静态域名直接转发到后端图片接口，不再被磁盘文件规则误判为不存在。

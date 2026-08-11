@@ -26,8 +26,10 @@ test("asset host exposes only cacheable public resources with cross-origin acces
   assert.match(caddy, /root \* \/opt\/grandumi\/opcgpro-web\/public/);
   assert.match(caddy, /root \* \/opt\/grandumi\/opcgpro-web\/\.next\/static/);
   assert.match(caddy, /file_server/);
+  assert.match(caddy, /@custom_card_backs/);
+  assert.match(caddy, /reverse_proxy 127\.0\.0\.1:8080/);
   assert.match(caddy, /respond 404/);
-  assert.doesNotMatch(caddy, /reverse_proxy/);
+  assert.doesNotMatch(caddy, /reverse_proxy 127\.0\.0\.1:3000/);
   assert.doesNotMatch(caddy, /\/ws/);
 });
 
