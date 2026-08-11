@@ -38,9 +38,25 @@ public class ST17_003_Buggy : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var top = me.Deck.Take(3).ToList();
         if (top.Count == 0) return;
-        // 仅放回最上方（自选顺序简化为原相对顺序）
-        AtomicOps.ReorderTopK(me, top.Select(c => c.Id).ToList(), toBottom: false);
-        return;
+
+        var extra = new Dictionary<string, object?>
+        {
+            ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+        };
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ST17BuggyReorder",
+            $"确认卡组顶 {top.Count} 张，自选顺序排列后放回卡组最上方",
+            top.Select(c => c.Id.ToString()).ToList(), top.Count, top.Count, extra);
+
+        // 仅接受本次确认到的卡牌并去重；异常或不完整回传按原相对顺序补齐，避免丢牌。
+        var order = chosen
+            .Select(id => top.FirstOrDefault(c => c.Id.ToString() == id))
+            .Where(c => c is not null)
+            .Select(c => c!.Id)
+            .Distinct()
+            .ToList();
+        order.AddRange(top.Where(c => !order.Contains(c.Id)).Select(c => c.Id));
+
+        AtomicOps.ReorderTopK(me, order, toBottom: false);
     }
 }
 
