@@ -378,7 +378,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
         </div>
       )}
 
-      <div className="pointer-events-auto flex items-center gap-2">
+      <div className={`pointer-events-auto flex gap-2 ${rotateQuarterTurn ? "flex-col items-end" : "items-center"}`}>
         <button
           type="button"
           onClick={() => {
