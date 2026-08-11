@@ -188,7 +188,6 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
       showMessage("服务器未连接，请稍后再试", "error");
       return;
     }
-    setAnnouncementInput("");
   };
 
   const modeLocked = matchState !== "idle" || roomOperation !== "idle" || Boolean(roomCode);

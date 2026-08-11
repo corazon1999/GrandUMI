@@ -24,3 +24,13 @@ test("announcements use a dedicated protocol and render as a moving banner", () 
   assert.match(bridge, /GlobalAnnouncementPolicy\.IsAuthorized\(s\.Account\)/);
   assert.match(bridge, /BroadcastAll\(new[\s\S]*proto = "MsgGlobalAnnouncement"/);
 });
+
+test("管理员发送公告后保留输入内容", () => {
+  const sendHandler = lobby.match(
+    /const sendGlobalAnnouncement = \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0];
+
+  assert.ok(sendHandler, "应定义全服公告发送处理函数");
+  assert.match(sendHandler, /HomeRequest\.sendGlobalAnnouncement\(content\)/);
+  assert.doesNotMatch(sendHandler, /setAnnouncementInput\(\s*""\s*\)/);
+});
