@@ -89,12 +89,18 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                   key={p.account}
                   className="flex min-h-14 items-center gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">
-                      {p.name}
-                      {isMe && <span className="text-orange-400 text-[10px] ml-1">（我）</span>}
-                    </p>
-                    <LeaderChampionBadgeList leaderNumbers={p.championLeaderNumbers} className="mt-1" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-1">
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
+                        {p.name}
+                        {isMe && <span className="ml-1 text-[10px] text-orange-400">（我）</span>}
+                      </p>
+                      <LeaderChampionBadgeList
+                        leaderNumbers={p.championLeaderNumbers}
+                        maxVisible={1}
+                        className="max-w-[8.5rem] shrink-0"
+                      />
+                    </div>
                     <p className="truncate text-[10px] text-gray-500">@{p.account}</p>
                     <p className={`text-[10px] ${st.cls}`}>{st.text}</p>
                   </div>
