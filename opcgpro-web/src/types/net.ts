@@ -886,6 +886,7 @@ export interface PlayerSnapshot {
   leaderGainedKeywords: string[]; // 领袖动态获得的关键词（含持续效果）
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
   leaderCannotAttack: boolean; // 领袖是否存在明确的“无法攻击”状态
+  leaderEnterEffectNullified: boolean; // 【登场时】效果当前被无效
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
   stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   costActive: number;

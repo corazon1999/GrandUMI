@@ -126,6 +126,14 @@ export default function LeaderCard({ side }: Props) {
         }
         onClick={handleClick}
       />
+      {player.leaderEnterEffectNullified && (
+        <div
+          title="【登场时】效果无效"
+          className="pointer-events-none absolute -bottom-2 -right-2 z-40 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/90 text-rose-300 shadow-lg ring-2 ring-rose-400/70"
+        >
+          <span className="text-[13px] leading-none">🚫</span>
+        </div>
+      )}
       {isTargetable && (
         <div className="pointer-events-none absolute -right-2 -top-2 h-5 w-5 animate-pulse rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
       )}

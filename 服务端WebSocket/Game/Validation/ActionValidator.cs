@@ -128,6 +128,10 @@ public static class ActionValidator
 
     public static bool HasKeyword(GameState s, CardInstance c, string kw)
     {
+        // “效果无效”会移除该角色自身印刷的永续关键词（如【速攻】），
+        // 但不会抹掉由其他仍生效卡牌赋予它的关键词。
+        if (c.IsEffectsNullified)
+            return c.GainedKeywords.Any(k => k.Keyword == kw) || s.HasContinuousKeyword(c, kw);
         // 官网使用【速攻：角色】表示仅在登场回合可攻击角色；引擎内部沿用语义化名称。
         if (kw == "登场回合可攻击角色" && Array.IndexOf(c.Info.Abilities, "速攻：角色") >= 0) return true;
         if (Array.IndexOf(c.Info.Abilities, kw) >= 0) return true;

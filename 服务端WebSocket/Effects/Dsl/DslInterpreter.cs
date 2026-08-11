@@ -1766,12 +1766,12 @@ public static class DslInterpreter
             {
                 if (!c.Info.Property.Split('/').Contains(prop.GetString() ?? "")) return false;
             }
-            int filterCost = fieldUsesCurrentValues && state is not null ? CurrentCostOfCard(c, state) : c.Info.Cost;
-            int filterPower = fieldUsesCurrentValues && state is not null ? state.CurrentPowerOf(c) : c.Info.Power;
-            if (node.TryGetProperty("originalCostLte", out var oc) && filterCost > oc.GetInt32()) return false;
-            if (node.TryGetProperty("originalCostGte", out var oc2) && filterCost < oc2.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerLte", out var pp) && filterPower > pp.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerGte", out var pp2) && filterPower < pp2.GetInt32()) return false;
+            // 明确写了“原本”的过滤永远只看卡面值。fieldUsesCurrentValues 仅用于
+            // 未标明基准的场上筛选，不能让 originalCostLte/originalPowerLte 被费用、贴咚或光环污染。
+            if (node.TryGetProperty("originalCostLte", out var oc) && c.Info.Cost > oc.GetInt32()) return false;
+            if (node.TryGetProperty("originalCostGte", out var oc2) && c.Info.Cost < oc2.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerLte", out var pp) && c.Info.Power > pp.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerGte", out var pp2) && c.Info.Power < pp2.GetInt32()) return false;
             // currentPowerLte/Gte: 按"当前力量"判定（卡面「力量X以下」未写"原本的"时的默认口径）。
             // 场上卡走 CurrentPowerOf（含贴咚/回合加成/持续光环），非场上候选回退原本力量。
             if (node.TryGetProperty("currentPowerLte", out var cpl) && CurrentPowerOfCard(c) > cpl.GetInt32()) return false;

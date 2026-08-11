@@ -62,6 +62,9 @@ public static class LifeRevealManager
             p.LifeArea.RemoveAt(0);
             s.LifeLeftThisTurn.Add(targetPlayerIdx);
             dealt++;
+            // “生命变为 0 张”在生命牌离开的一刻成立；不能等该生命牌的【触发】
+            // 补回生命后才判断，否则 OP05-098 会漏掉与 OP06-115 等同时满足的时点。
+            bool lifeBecameZero = p.LifeArea.Count == 0;
 
             if (exile)
             {
@@ -114,7 +117,7 @@ public static class LifeRevealManager
 
             // 生命牌离场 → 派发 watcher（OP05-098 生命变0 / OP08-105 对方生命离场 / OP12-099 等）
             await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, engine.Prompts,
-                new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = p.LifeArea.Count == 0 });
+                new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = lifeBecameZero });
             if (s.IsGameOver) return;
         }
 

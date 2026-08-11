@@ -211,6 +211,7 @@ public class GameState
             // 先按维度短路再调谓词：零力量增量的效果对力量无贡献，求值它的谓词不仅浪费、
             // 还会引发递归（如 OP16-017 力量谓词内查费用，若此处不跳过则费用查询又回调它）。
             if (eff.PowerDelta == 0 && eff.PowerDeltaResolver is null) continue;
+            if (!IsContinuousEffectActive(eff)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             sum += eff.PowerDelta + (eff.PowerDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
@@ -224,6 +225,7 @@ public class GameState
         foreach (var eff in ContinuousEffects)
         {
             if (!eff.OriginalPowerOverride.HasValue) continue;
+            if (!IsContinuousEffectActive(eff)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             value = eff.OriginalPowerOverride.Value;
         }
@@ -267,6 +269,7 @@ public class GameState
             // 同时切断"力量谓词 → 查费用 → 又求值该力量谓词"的递归（OP16-017）。
             if (eff.CostDelta == 0 && eff.CostDeltaResolver is null) continue;
             if (excludedSourceCardId is not null && eff.SourceCardId == excludedSourceCardId) continue;
+            if (!IsContinuousEffectActive(eff)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             sum += eff.CostDelta + (eff.CostDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
@@ -301,7 +304,7 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.GrantKeyword == kw && eff.Predicate(this, side, card)) return true;
+            if (eff.GrantKeyword == kw && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -313,6 +316,7 @@ public class GameState
         foreach (var eff in ContinuousEffects)
         {
             if (eff.KoGuard is null) continue;
+            if (!IsContinuousEffectActive(eff)) continue;
             if (eff.KoGuard != "any" && eff.KoGuard != context) continue;
             if (eff.Predicate(this, side, card)) return true;
         }
@@ -327,6 +331,7 @@ public class GameState
         foreach (var eff in ContinuousEffects)
         {
             if (eff.LeaveGuard is null) continue;
+            if (!IsContinuousEffectActive(eff)) continue;
             if (eff.LeaveGuard != "any" && eff.LeaveGuard != context) continue;
             if (eff.Predicate(this, side, card)) return true;
         }
@@ -346,7 +351,7 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.NullifyEffect && eff.Predicate(this, side, card)) return true;
+            if (eff.NullifyEffect && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -356,7 +361,7 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.NullifyOnlyTrigger == trigger && eff.Predicate(this, side, card)) return true;
+            if (eff.NullifyOnlyTrigger == trigger && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -366,7 +371,7 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.PreventReset && eff.Predicate(this, side, card)) return true;
+            if (eff.PreventReset && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -376,8 +381,29 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.GrantRestriction == kind && eff.Predicate(this, side, card)) return true;
+            if (eff.GrantRestriction == kind && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
         return false;
+    }
+
+    /// <summary>
+    /// 持续效果仍由来源卡的效果产生。来源角色被“效果无效”后，它提供的费用、力量、关键词及限制必须一并停止。
+    /// 带后缀的来源标识（如“{card-id}-oppnullify”）也按前 36 位 Guid 定位原卡。
+    /// </summary>
+    private bool IsContinuousEffectActive(ContinuousEffect effect)
+    {
+        if (effect.SourceCardId.Length < 36 || !Guid.TryParse(effect.SourceCardId[..36], out var sourceId))
+            return true;
+
+        foreach (var player in Players)
+        {
+            var source = player.Leader.Id == sourceId
+                ? player.Leader
+                : player.StageCard?.Id == sourceId
+                    ? player.StageCard
+                    : player.Characters.FirstOrDefault(card => card.Id == sourceId);
+            if (source is not null) return !source.IsEffectsNullified;
+        }
+        return true;
     }
 
     /// <summary>统一计算某张卡当前费用：基础 + 一次性修正 + 永续修正 + 持续光环，最低 0</summary>

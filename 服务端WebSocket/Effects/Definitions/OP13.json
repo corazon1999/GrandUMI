@@ -366,10 +366,11 @@
       "then": [
         {
           "op": "Choose",
-          "prompt": "OpponentCharacterCostLe6",
+          "prompt": "OpponentCharacter",
           "max": 1,
           "min": 0,
-          "as": "$tgt"
+          "as": "$tgt",
+          "filter": { "originalCostLte": 6 }
         },
         {
           "op": "KO",
