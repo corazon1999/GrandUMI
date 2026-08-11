@@ -202,8 +202,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   return (
     <div className="flex h-full min-w-0">
-      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-5 @[640px]:px-6 @[1024px]:flex @[1024px]:flex-col @[1024px]:items-center @[1024px]:justify-center @[1024px]:px-8 @[1024px]:py-8">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-4 @[1024px]:gap-5">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 @[640px]:px-6 @[1024px]:flex @[1024px]:flex-col @[1024px]:items-center @[1024px]:px-8 @[1024px]:py-8">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-4 @[1024px]:my-auto @[1024px]:gap-5">
           <div>
             <h1 className="text-xl font-bold text-white @[1024px]:text-2xl">开始对战</h1>
             <p className="mt-1 text-sm text-gray-500">选择模式，准备好后即可进入牌桌。</p>
