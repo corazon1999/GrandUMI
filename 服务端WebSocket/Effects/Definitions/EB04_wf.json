@@ -694,7 +694,7 @@
       "then": [
         {
           "op": "Choose",
-          "prompt": "OwnCharacter",
+          "prompt": "OwnLeaderOrCharacter",
           "max": 1,
           "as": "$t",
           "filter": {

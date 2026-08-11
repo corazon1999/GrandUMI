@@ -942,7 +942,7 @@
         },
         "then": [
           {
-            "op": "ReturnDonToDeck",
+            "op": "OpponentReturnDonToDeck",
             "n": 1
           }
         ]
@@ -951,7 +951,7 @@
         "on": "OnKO",
         "then": [
           {
-            "op": "ReturnDonToDeck",
+            "op": "OpponentReturnDonToDeck",
             "n": 4
           }
         ]

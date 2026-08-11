@@ -189,7 +189,8 @@ public static class DeclaredOmissionEffects
                     SourceCardId = ctx.Source.Id.ToString(),
                     Scope = new ContinuousScope { Side = 1, IncludeLeader = false, IncludeCharacters = true },
                     PowerDelta = -1000,
-                    Predicate = (state, side, _) => side == 1 - ctx.OwnerIndex
+                    Predicate = (state, side, card) => side == 1 - ctx.OwnerIndex
+                        && state.Players[side].Characters.Contains(card)
                         && state.CurrentTurnPlayer != ctx.OwnerIndex
                         && state.Players[ctx.OwnerIndex].Leader.Info.HasKeyword("福克斯海盗团"),
                 });

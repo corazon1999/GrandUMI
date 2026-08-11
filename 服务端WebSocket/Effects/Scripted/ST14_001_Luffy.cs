@@ -25,6 +25,7 @@ public class ST14_001_Luffy : IScriptedEffect
             CostDelta = 1,
             Predicate = (s, sideIdx, card) =>
                 sideIdx == owner && card.Id != leaderId &&
+                s.Players[owner].Characters.Contains(card) &&
                 s.Players[owner].AttachedDonCount(leaderId) >= 1,
         });
         // 有费用≥8角色时此领袖力量+1000

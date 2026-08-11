@@ -365,6 +365,8 @@ public static class BattleEngine
         }
         p.Characters.Remove(card);
         p.Trash.Add(card);
+        // 实际 KO 后立即移除来源卡注册的持续效果，避免完整异步 KO 路径留下僵尸光环。
+        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == card.Id.ToString());
 
         // OnKO：卡已进入废弃区，但效果在"原场上位置"上发动
         await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
