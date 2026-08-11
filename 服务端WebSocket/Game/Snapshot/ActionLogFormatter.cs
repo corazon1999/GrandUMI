@@ -59,15 +59,21 @@ public static class ActionLogFormatter
                 var atk = FindCard(state, attackerId);
                 int attackerOwner = atk?.Owner ?? state.CurrentTurnPlayer;
                 string attackerName = atk?.Card.Info.Name ?? "角色";
-                string targetDesc;
-                if (targetIsLeader)
-                    targetDesc = $"{Side(1 - attackerOwner)}领袖";
-                else
-                {
-                    var tgt = FindCard(state, GetStr(payload, "targetId"));
-                    targetDesc = tgt?.Card.Info.Name ?? "角色";
-                }
-                return $"[攻击] {Side(attackerOwner)}用【{attackerName}】攻击【{targetDesc}】";
+                string attackerPower = atk is { } attackerRef
+                    ? state.CurrentPowerOf(attackerRef.Owner, attackerRef.Card).ToString()
+                    : "?";
+
+                int targetOwner = 1 - attackerOwner;
+                CardRef? target = targetIsLeader
+                    ? new CardRef(targetOwner, state.Players[targetOwner].Leader)
+                    : FindCard(state, GetStr(payload, "targetId"));
+                targetOwner = target?.Owner ?? targetOwner;
+                string targetName = target?.Card.Info.Name ?? (targetIsLeader ? "领袖" : "角色");
+                string targetPower = target is { } targetRef
+                    ? state.CurrentPowerOf(targetRef.Owner, targetRef.Card).ToString()
+                    : "?";
+
+                return $"[攻击] {Side(attackerOwner)}【{attackerName}】{attackerPower} vs {Side(targetOwner)}【{targetName}】{targetPower}";
             }
 
             case "DeclareBlocker":

@@ -20,6 +20,26 @@ public class ActionLogFormatterTests
     }
 
     [Fact]
+    public void 攻击日志_显示宣言时双方当前力量和卡名()
+    {
+        var state = TestScene.New(oppLeaderNumber: "ST01-001").MyCharacter("OP05-007").Build();
+        var attacker = state.Players[0].Characters.Single();
+        attacker.PowerModThisTurn = 1000 - attacker.Info.Power;
+        var payload = JsonSerializer.SerializeToElement(new
+        {
+            attacker = attacker.Id.ToString(),
+            targetIsLeader = true,
+            targetId = (string?)null,
+        });
+
+        var self = ActionLogFormatter.Format(state, 0, "Attack", payload);
+        var spectator = ActionLogFormatter.Format(state, -1, "Attack", payload);
+
+        Assert.Equal("[攻击] 我方【萨波】1000 vs 对手【蒙奇·D·路飞】5000", self);
+        Assert.Equal("[攻击] 玩家1【萨波】1000 vs 玩家2【蒙奇·D·路飞】5000", spectator);
+    }
+
+    [Fact]
     public void 效果选择日志_公开目标双方均可看到详情()
     {
         var state = TestScene.New().Build();
