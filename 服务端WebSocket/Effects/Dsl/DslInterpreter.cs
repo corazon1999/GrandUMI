@@ -1304,7 +1304,7 @@ public static class DslInterpreter
                 {
                     var target = ResolveTarget(op, "target", ctx);
                     if (target is null) break;
-                    AtomicOps.AddCostModifier(target, GetInt(op, "delta", 0), GetDuration(op));
+                    AtomicOps.AddCostModifier(target, GetInt(op, "delta", 0), GetDuration(op), ctx.OwnerIndex);
                     break;
                 }
             case "Nullify":

@@ -477,7 +477,7 @@
   },
   "OP15-074": {
     "_name": "放电",
-    "_matcher": "启动主要 咚-N 抽 1",
+    "_matcher": "主要:咚-1；领袖为艾尼路时抽1；之后我方最多1张角色费用+2直到下个对方结束阶段",
     "main": {
       "cost": {
         "donReturn": 1
@@ -485,7 +485,24 @@
       "then": [
         {
           "op": "Draw",
-          "n": 1
+          "n": 1,
+          "if": {
+            "leaderNameEquals": "艾尼路"
+          }
+        },
+        {
+          "op": "Choose",
+          "prompt": "OwnCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "选择我方最多1张角色，使其费用+2直到下个对方的结束阶段结束"
+        },
+        {
+          "op": "AddCostMod",
+          "target": "$tgt",
+          "delta": 2,
+          "duration": "UntilNextOpponentEndPhase"
         }
       ]
     },

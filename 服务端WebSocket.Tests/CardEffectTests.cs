@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -74,26 +75,67 @@ public class CardEffectTests
 
     /// <summary>
     /// OP15-074 放电（事件）
-    /// DSL main: cost{donReturn:1}, then [Draw 1]
+    /// 咚-1；领袖为艾尼路时抽1；之后我方最多1张角色费用+2直到下个对方结束阶段。
     /// </summary>
     [Fact]
-    public async Task OP15_074_FangDian_EventMain_PaysDonAndDraws1()
+    public async Task OP15_074_FangDian_EventMain_DrawsForEnelAndRaisesCharacterCostUntilOpponentEnd()
     {
-        var s = TestScene.New()
+        var s = TestScene.New(myLeaderNumber: "OP15-058")
             .MyActiveDon(2)
+            .MyCharacter("OP15-050")
             .MyDeckTop("OP15-050", "OP15-051")
             .Build();
 
+        var target = s.Players[0].Characters[0];
         int handBefore = s.Players[0].Hand.Count;
         int deckBefore = s.Players[0].Deck.Count;
         int activeDonBefore = s.Players[0].ActiveDonCount;
+        int costBefore = s.CurrentCostOf(0, target);
 
         var card = new CardInstance { Info = CardDatabase.Get("OP15-074")! };
-        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, new MockPromptService());
+        var prompts = new MockPromptService()
+            .QueueChoose(s.Players[0].CostArea[0].Id.ToString())
+            .QueueChoose(target.Id.ToString());
+        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, prompts);
 
         Assert.Equal(handBefore + 1, s.Players[0].Hand.Count);
         Assert.Equal(deckBefore - 1, s.Players[0].Deck.Count);
         Assert.Equal(activeDonBefore - 1, s.Players[0].ActiveDonCount);
+        Assert.Equal(costBefore + 2, s.CurrentCostOf(0, target));
+
+        s.CurrentTurnPlayer = 0;
+        TurnEngine.EnterEndPhase(s);
+        Assert.Equal(costBefore + 2, s.CurrentCostOf(0, target));
+
+        s.CurrentTurnPlayer = 1;
+        TurnEngine.EnterEndPhase(s);
+        Assert.Equal(costBefore, s.CurrentCostOf(0, target));
+    }
+
+    [Fact]
+    public async Task OP15_074_FangDian_EventMain_WithoutEnelSkipsDrawButStillRaisesCost()
+    {
+        var s = TestScene.New(myLeaderNumber: "OP15-001")
+            .MyActiveDon(1)
+            .MyCharacter("OP15-050")
+            .MyDeckTop("OP15-051")
+            .Build();
+
+        var target = s.Players[0].Characters[0];
+        int handBefore = s.Players[0].Hand.Count;
+        int deckBefore = s.Players[0].Deck.Count;
+        int costBefore = s.CurrentCostOf(0, target);
+        var card = new CardInstance { Info = CardDatabase.Get("OP15-074")! };
+        var prompts = new MockPromptService()
+            .QueueChoose(s.Players[0].CostArea[0].Id.ToString())
+            .QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(s, 0, card, EffectTrigger.EventMain, prompts);
+
+        Assert.Equal(handBefore, s.Players[0].Hand.Count);
+        Assert.Equal(deckBefore, s.Players[0].Deck.Count);
+        Assert.Equal(0, s.Players[0].ActiveDonCount);
+        Assert.Equal(costBefore + 2, s.CurrentCostOf(0, target));
     }
 
     /// <summary>

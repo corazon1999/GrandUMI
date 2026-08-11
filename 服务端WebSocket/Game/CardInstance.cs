@@ -50,6 +50,10 @@ public class CardInstance
     /// <summary>持续费用修正（直到效果失效）</summary>
     public int CostModPersistent { get; set; }
 
+    /// <summary>“直到下个对方结束阶段结束时为止”的费用修正。
+    /// 数值同时计入 CostModPersistent，此列表负责记录到期方与精确回收的增量。</summary>
+    public List<CardCostMod> CostModsUntilOppEnd { get; } = new();
+
     /// <summary>原本力量修正（"原本的力量变为 X"）</summary>
     public int? OriginalPowerOverride { get; set; }
 
@@ -113,6 +117,15 @@ public class CardPowerMod
 {
     public required int Delta { get; init; }
     /// <summary>施加此修正的控制者一方。-1 表示未指定，回退为"生存一个结束阶段"。</summary>
+    public int AppliedBySide { get; init; } = -1;
+    public int EndPhasesSeen { get; set; }
+}
+
+/// <summary>持续到施加方下个对方结束阶段的单次费用修正。</summary>
+public class CardCostMod
+{
+    public required int Delta { get; init; }
+    /// <summary>施加此修正的一方。-1 表示旧调用方未指定，回退为“生存一个结束阶段”。</summary>
     public int AppliedBySide { get; init; } = -1;
     public int EndPhasesSeen { get; set; }
 }

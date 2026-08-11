@@ -215,6 +215,26 @@ public static class TurnEngine
             if (m.EndPhasesSeen == 0) { m.EndPhasesSeen = 1; return false; }
             return true;
         });
+        c.CostModsUntilOppEnd.RemoveAll(m =>
+        {
+            bool expired;
+            if (m.AppliedBySide >= 0)
+            {
+                expired = currentTurnPlayer == 1 - m.AppliedBySide;
+            }
+            else if (m.EndPhasesSeen == 0)
+            {
+                m.EndPhasesSeen = 1;
+                expired = false;
+            }
+            else
+            {
+                expired = true;
+            }
+
+            if (expired) c.CostModPersistent -= m.Delta;
+            return expired;
+        });
     }
 
     private static bool IsSourceCardOnField(GameState s, string sourceId)

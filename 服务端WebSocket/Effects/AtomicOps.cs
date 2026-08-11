@@ -599,6 +599,9 @@ public static class AtomicOps
         card.PowerModThisBattle = 0;
         card.PowerModPersistent = 0;
         card.PowerModsUntilOppEnd.Clear();
+        card.CostModThisTurn = 0;
+        card.CostModPersistent = 0;
+        card.CostModsUntilOppEnd.Clear();
         card.GainedKeywords.Clear();
         p.Hand.Add(card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
@@ -861,6 +864,7 @@ public static class AtomicOps
         c.TurnPlayed = 0;
         c.CostModThisTurn = 0;
         c.CostModPersistent = 0;
+        c.CostModsUntilOppEnd.Clear();
         c.OriginalPowerOverride = null;
         c.IsEffectsNullified = false;
         c.Restrictions.Clear();
@@ -1036,11 +1040,18 @@ public static class AtomicOps
         return picked;
     }
 
-    /// <summary>给卡加费用修正</summary>
-    public static void AddCostModifier(CardInstance c, int delta, KeywordDuration duration)
+    /// <summary>给卡加费用修正；跨回合修正记录施加方，供 TurnEngine 在对应对方结束阶段精确清除。</summary>
+    public static void AddCostModifier(CardInstance c, int delta, KeywordDuration duration, int appliedBy = -1)
     {
-        if (duration == KeywordDuration.UntilNextOpponentEndPhase) c.CostModPersistent += delta;
-        else c.CostModThisTurn += delta;
+        if (duration == KeywordDuration.UntilNextOpponentEndPhase)
+        {
+            c.CostModPersistent += delta;
+            c.CostModsUntilOppEnd.Add(new CardCostMod { Delta = delta, AppliedBySide = appliedBy });
+        }
+        else
+        {
+            c.CostModThisTurn += delta;
+        }
     }
 
     /// <summary>无效化一张卡的所有效果</summary>
