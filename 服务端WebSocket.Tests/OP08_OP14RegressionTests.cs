@@ -124,6 +124,40 @@ public class OP08_OP14RegressionTests
         Assert.Equal(1, prompt.max);
     }
 
+    [Fact]
+    public async Task OP08_036_EventMain_DoesNotAffectCharacterRaisedAboveSevenCost()
+    {
+        var state = TestScene.New()
+            .OppCharacter("OP15-003")
+            .Build();
+        var source = new CardInstance { Info = CardDatabase.Get("OP08-036")! };
+        var target = Assert.Single(state.Players[1].Characters);
+        target.IsTapped = true;
+        target.CostModThisTurn = 12;
+        Assert.Equal(17, state.CurrentCostOf(1, target));
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.EventMain, new MockPromptService());
+
+        Assert.False(target.CannotActivateNextReset);
+    }
+
+    [Fact]
+    public async Task OP08_036_EventMain_AffectsCharacterReducedToSevenCost()
+    {
+        var state = TestScene.New()
+            .OppCharacter("OP15-008")
+            .Build();
+        var source = new CardInstance { Info = CardDatabase.Get("OP08-036")! };
+        var target = Assert.Single(state.Players[1].Characters);
+        target.IsTapped = true;
+        target.CostModThisTurn = -1;
+        Assert.Equal(7, state.CurrentCostOf(1, target));
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.EventMain, new MockPromptService());
+
+        Assert.True(target.CannotActivateNextReset);
+    }
+
     [Theory]
     [InlineData("OP14-110")]
     [InlineData("OP14-111")]

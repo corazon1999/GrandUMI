@@ -39,7 +39,10 @@ public class OP08_036_RaijinNyon : IScriptedEffect
             return;
         }
 
-        var targets = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 7).ToList();
+        var oppIdx = 1 - ctx.OwnerIndex;
+        var targets = opp.Characters
+            .Where(c => c.IsTapped && ctx.State.CurrentCostOf(oppIdx, c) <= 7)
+            .ToList();
         foreach (var c in targets)
             AtomicOps.PreventActivateNextReset(c);
     }
