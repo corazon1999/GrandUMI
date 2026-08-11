@@ -6,6 +6,7 @@ const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url),
 const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8");
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
+const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 
 test("production build routes hashed Next assets through the CDN origin", () => {
   assert.match(nextConfig, /assetPrefix: assetOrigin \|\| undefined/);
@@ -35,4 +36,10 @@ test("production promotion persists CDN and source-network protection", () => {
   assert.match(promote, /60-grandumi-network\.conf/);
   assert.match(promote, /grandumi-network-tuning\.service/);
   assert.match(promote, /systemctl (?:reload|start) caddy/);
+});
+
+test("network shaping can be applied repeatedly after boot or deployment", () => {
+  assert.match(networkTuning, /tc qdisc del dev "\$interface" root 2>\/dev\/null \|\| true/);
+  assert.match(networkTuning, /tc qdisc add dev "\$interface" root handle 1: htb/);
+  assert.match(networkTuning, /tc class add dev "\$interface" parent 1: classid 1:10/);
 });

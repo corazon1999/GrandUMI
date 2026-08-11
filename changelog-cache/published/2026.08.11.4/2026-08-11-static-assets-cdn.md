@@ -23,3 +23,4 @@
 - 正式环境 `npm run build`：构建成功，10 个页面生成完成。
 - 三个 Shell 脚本均通过服务器端 `bash -n`，Caddy 配置通过服务器端 `caddy validate`。
 - 正式机实时核验：BBR、MTU 探测、fq 与 4 Mbps HTB 已启用，网络持久化服务为 enabled/active。
+- 网络整形脚本在已有 HTB 队列的情况下重复执行成功，systemd 服务可安全重启。

@@ -14,9 +14,10 @@ modprobe sch_fq
 modprobe sch_htb
 
 # 阿里云公网出口出现拥塞时，先在本机平滑发送，避免运营商队列大量丢包后让 TCP 反复退避。
-tc qdisc replace dev "$interface" root handle 1: htb default 10
-tc class replace dev "$interface" parent 1: classid 1:10 \
+tc qdisc del dev "$interface" root 2>/dev/null || true
+tc qdisc add dev "$interface" root handle 1: htb default 10
+tc class add dev "$interface" parent 1: classid 1:10 \
   htb rate "$rate" ceil "$rate" burst 16k cburst 16k
-tc qdisc replace dev "$interface" parent 1:10 handle 10: fq
+tc qdisc add dev "$interface" parent 1:10 handle 10: fq
 
 echo "GrandUMI 出口整形已启用：网卡=$interface，速率=$rate"
