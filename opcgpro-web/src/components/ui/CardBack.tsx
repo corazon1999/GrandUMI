@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { cardBackImageSrc, cardBackName, normalizeCardBackId } from "@/lib/cardBacks";
-import { directAssetSrc } from "@/lib/sprite";
+import { assetSrc, directAssetSrc } from "@/lib/sprite";
 
 const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000;
 
@@ -52,7 +52,8 @@ export default function CardBack({
   decorative?: boolean;
 }) {
   const id = normalizeCardBackId(cardBackId);
-  const customImage = cardBackImageSrc(id);
+  const customImagePath = cardBackImageSrc(id);
+  const customImage = customImagePath ? assetSrc(customImagePath) : null;
   const [customImageSrc, setCustomImageSrc] = useState(customImage ?? "");
   const [customImageFailed, setCustomImageFailed] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);

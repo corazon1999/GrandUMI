@@ -1,0 +1,13 @@
+[Unit]
+Description=GrandUMI persistent network tuning
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=GRANDUMI_EGRESS_RATE=4mbit
+ExecStart=/usr/local/sbin/apply-grandumi-network
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -8,7 +8,8 @@ import { DATA_VERSION } from "@/data/dataVersion";
 
 export const CARD_BACK_SRC = "/sprites-thumb/CardBack.webp";
 const PRODUCTION_HOST = "grand-umi.com";
-const DIRECT_ASSET_ORIGIN = "https://direct.grand-umi.com";
+const PRODUCTION_DIRECT_ORIGIN = "https://grand-umi.com";
+const CONFIGURED_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
 
 const CARD_SOURCE_RE = /^\/cards\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 const SPRITE_SOURCE_RE = /^\/sprites\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
@@ -30,14 +31,20 @@ function mapLocalSource(
   return src;
 }
 
+/** 配置静态资源域名后，将本地 public 资源统一交给该域名。 */
+export function assetSrc(src: string): string {
+  if (!CONFIGURED_ASSET_ORIGIN || !src.startsWith("/") || src.startsWith("//")) return src;
+  return `${CONFIGURED_ASSET_ORIGIN}${src}`;
+}
+
 /** 小尺寸展示图：对战卡牌、网格、列表、领袖头像等。 */
 export function thumbSrc(src?: string | null): string {
-  return mapLocalSource(src || CARD_BACK_SRC, "cards-thumb");
+  return assetSrc(mapLocalSource(src || CARD_BACK_SRC, "cards-thumb"));
 }
 
 /** 大尺寸展示图：悬停预览、详情面板、Leader 开场和全屏大图。 */
 export function displaySrc(src?: string | null): string {
-  return mapLocalSource(src || CARD_BACK_SRC, "cards-webp");
+  return assetSrc(mapLocalSource(src || CARD_BACK_SRC, "cards-webp"));
 }
 
 /**
@@ -48,8 +55,11 @@ export function directAssetSrc(src: string): string | null {
   if (typeof window === "undefined" || window.location.hostname !== PRODUCTION_HOST) return null;
 
   const source = new URL(src, window.location.href);
-  if (source.origin !== window.location.origin) return null;
-  return new URL(`${source.pathname}${source.search}${source.hash}`, DIRECT_ASSET_ORIGIN).href;
+  const configuredOrigin = CONFIGURED_ASSET_ORIGIN
+    ? new URL(CONFIGURED_ASSET_ORIGIN).origin
+    : window.location.origin;
+  if (source.origin !== window.location.origin && source.origin !== configuredOrigin) return null;
+  return new URL(`${source.pathname}${source.search}${source.hash}`, PRODUCTION_DIRECT_ORIGIN).href;
 }
 
 function imageFallbackSources(candidates: Array<string | null | undefined>): string[] {

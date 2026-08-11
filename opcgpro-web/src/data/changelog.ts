@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-11-static-assets-cdn-release",
+    version: "2026.08.11.4",
+    date: "2026-08-11",
+    title: "卡图与网页加载链路优化",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "卡牌图鉴、卡背广场与网页脚本改用独立静态资源线路，避免大量卡图集中加载时拖慢或阻塞整个网页。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "已缓存的卡图和卡背会从就近节点读取，重复访问速度和稳定性得到提升。",
+          "源站网络保护会在服务器重启后自动恢复，降低跨境线路波动造成整站卡顿的概率。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-11-card-assets-network-resilience-release",
     version: "2026.08.11.3",
     date: "2026-08-11",

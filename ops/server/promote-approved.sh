@@ -67,6 +67,26 @@ changed="$(git -C "$repo" -c core.quotepath=false diff --name-only "$old" "$appr
 # 仅快进，不覆盖未知本地数据。
 git -C "$repo" merge --ff-only "$approved"
 
+# 正式服静态资源独立使用 Cloudflare，同时持久化源站出口保护，避免重启后配置丢失。
+install -m 0644 "$repo/ops/server/assets.grand-umi.com.caddy" \
+  /etc/caddy/conf.d/assets.grand-umi.com.caddy
+install -m 0644 "$repo/ops/server/60-grandumi-network.conf" \
+  /etc/sysctl.d/60-grandumi-network.conf
+install -m 0644 "$repo/ops/server/grandumi-network-modules.conf" \
+  /etc/modules-load.d/grandumi-network.conf
+install -m 0755 "$repo/ops/server/apply-grandumi-network.sh" \
+  /usr/local/sbin/apply-grandumi-network
+install -m 0644 "$repo/ops/server/grandumi-network-tuning.service" \
+  /etc/systemd/system/grandumi-network-tuning.service
+systemctl daemon-reload
+modprobe tcp_bbr
+modprobe sch_fq
+modprobe sch_htb
+sysctl --system >/dev/null
+systemctl enable grandumi-network-tuning.service
+systemctl restart grandumi-network-tuning.service
+caddy validate --config /etc/caddy/Caddyfile
+
 need_back=0
 need_front=0
 need_npm=0
@@ -97,7 +117,9 @@ if [[ "$need_front" == 1 ]]; then
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
-  if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' CARD_BACK_API_URL='http://127.0.0.1:8080' npm run build; then
+  if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' \
+      NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' \
+      CARD_BACK_API_URL='http://127.0.0.1:8080' npm run build; then
     rm -rf .next
     [[ -d .next.previous ]] && mv .next.previous .next
     die "正式服前端构建失败，旧服务保持运行。"
@@ -131,9 +153,20 @@ if [[ "$need_front" == 1 ]]; then
   rm -rf "$repo/opcgpro-web/.next.previous"
 fi
 
+systemctl start grandumi-backend.service
+systemctl start grandumi-frontend.service
+caddy validate --config /etc/caddy/Caddyfile
+if systemctl is-active --quiet caddy; then
+  systemctl reload caddy
+else
+  systemctl start caddy
+fi
+
 sleep 3
-[[ "$need_back" == 0 ]] || backend_ready
+backend_ready
 curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3000/
+curl -kfsS --retry 5 --retry-delay 1 --resolve assets.grand-umi.com:443:127.0.0.1 \
+  -o /dev/null https://assets.grand-umi.com/sprites-thumb/CardBack.webp
 echo "$approved" > "$deployed_file.next"
 mv "$deployed_file.next" "$deployed_file"
 rm -f "$approved_file"

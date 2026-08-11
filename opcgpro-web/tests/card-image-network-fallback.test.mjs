@@ -7,7 +7,10 @@ const catalog = await readFile(new URL("../src/components/home/CardCatalogPanel.
 const cardBack = await readFile(new URL("../src/components/ui/CardBack.tsx", import.meta.url), "utf8");
 
 test("正式主域图片可回退到 IPv4 直连入口", () => {
-  assert.match(sprite, /const DIRECT_ASSET_ORIGIN = "https:\/\/direct\.grand-umi\.com"/);
+  assert.match(sprite, /process\.env\.NEXT_PUBLIC_ASSET_ORIGIN/);
+  assert.match(sprite, /const PRODUCTION_DIRECT_ORIGIN = "https:\/\/grand-umi\.com"/);
+  assert.match(sprite, /export function assetSrc/);
+  assert.match(sprite, /return assetSrc\(mapLocalSource/);
   assert.match(sprite, /window\.location\.hostname !== PRODUCTION_HOST/);
   assert.match(sprite, /imageFallbackSources\(\[/);
 });
@@ -22,6 +25,7 @@ test("卡牌图鉴图片超时会推进到下一候选并最终显示占位", ()
 
 test("自定义卡背超时后仅重试直连入口并回退内置卡背", () => {
   assert.match(cardBack, /const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000/);
+  assert.match(cardBack, /assetSrc\(customImagePath\)/);
   assert.match(cardBack, /directAssetSrc\(customImage\)/);
   assert.match(cardBack, /setCustomImageFailed\(true\)/);
   assert.match(cardBack, /if \(customImage && !customImageFailed\)/);

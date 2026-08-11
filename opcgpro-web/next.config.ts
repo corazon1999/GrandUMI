@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
+const assetOrigin = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
+  // Next.js 只会处理自身的哈希 JS/CSS；public 下的卡图由 sprite.ts 路由到同一静态域名。
+  assetPrefix: assetOrigin || undefined,
   images: {
     // 卡牌是本地静态游戏图，无需优化；关闭优化避免 dev 的 /_next/image
     // 端点在大量卡图并发时拖垮服务器（反复出现整站 503 的根因）。
