@@ -257,8 +257,6 @@ export default function BattleRelationLayer() {
               <AttributeAttackEffect
                 attributes={attackTheme.attributes}
                 path={path}
-                source={points.source}
-                target={points.target}
                 reduceMotion={shouldReduceMotion}
               />
             </motion.g>

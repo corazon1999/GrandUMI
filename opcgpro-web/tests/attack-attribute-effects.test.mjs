@@ -59,28 +59,21 @@ test("未知属性使用青粉色差主题", () => {
   assert.equal(ATTACK_ATTRIBUTE_THEMES["?"].accent, "#f472b6");
 });
 
-test("程序化视觉层包含六类独立命中结构和分层动画", async () => {
+test("程序化视觉层只保留分层连线动画", async () => {
   const component = await readFile(
     new URL("../src/components/game/AttributeAttackEffect.tsx", import.meta.url),
     "utf8",
   );
 
-  for (const signature of [
-    "SlashImpact",
-    "StrikeImpact",
-    "ShotImpact",
-    "SpecialImpact",
-    "KnowledgeImpact",
-    "UnknownImpact",
-  ]) {
-    assert.match(component, new RegExp(`function ${signature}\\b`));
-  }
-
   assert.match(component, /data-attack-vfx="procedural"/);
   assert.match(component, /feGaussianBlur/);
   assert.match(component, /animateMotion/);
   assert.match(component, /AttributeTrail/);
-  assert.match(component, /PARTICLE_ANGLES/);
+  assert.match(component, /Traveler/);
+  assert.doesNotMatch(component, /(?:Slash|Strike|Shot|Special|Knowledge|Unknown)Impact/);
+  assert.doesNotMatch(component, /ImpactGlyph/);
+  assert.doesNotMatch(component, /key={`impact:/);
+  assert.doesNotMatch(component, /cx={source\.x}/);
   assert.doesNotMatch(component, /<image\b/);
   assert.doesNotMatch(component, /\/vfx\/attack-/);
 });
