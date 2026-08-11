@@ -102,9 +102,14 @@ public static class AtomicOps
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var cardCands = new List<CardInstance>();
-        if (!me.Leader.IsTapped) cardCands.Add(me.Leader);
-        cardCands.AddRange(me.Characters.Where(c => !c.IsTapped));
-        if (me.StageCard is not null && !me.StageCard.IsTapped) cardCands.Add(me.StageCard);
+        bool CanRest(CardInstance card) =>
+            !card.IsTapped &&
+            !card.HasRestriction(RestrictionKind.CannotBeRested) &&
+            !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested);
+
+        if (CanRest(me.Leader)) cardCands.Add(me.Leader);
+        cardCands.AddRange(me.Characters.Where(CanRest));
+        if (me.StageCard is not null && CanRest(me.StageCard)) cardCands.Add(me.StageCard);
         var activeDon = me.CostArea.Where(d => d.State == DonState.Active).ToList();
         if (cardCands.Count + activeDon.Count < n) return false;
 
