@@ -6,6 +6,7 @@ import { GameRequest } from "@/net/GameRequest";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 /** 对局聊天与好友实时私聊共用的左下角分页面板。 */
 
@@ -29,6 +30,7 @@ interface ChatToast {
 }
 
 export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: boolean; isObserver: boolean }) {
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const myAccount = useNetStore((s) => s.account);
   const friends = useNetStore((s) => s.friends);
   const friendChatMessages = useNetStore((s) => s.friendChatMessages);
@@ -249,7 +251,9 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
     <div
       className="pointer-events-none fixed z-50 flex flex-col items-start gap-2"
       style={{
-        left: "calc(0.75rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+        ...(rotateQuarterTurn
+          ? { right: "calc(0.75rem + var(--layout-safe-right, env(safe-area-inset-right)))" }
+          : { left: "calc(0.75rem + var(--layout-safe-left, env(safe-area-inset-left)))" }),
         bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
       }}
     >

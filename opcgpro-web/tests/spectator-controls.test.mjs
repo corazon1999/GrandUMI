@@ -48,6 +48,9 @@ test("局内新增固定控件使用安全区变量", async () => {
     read("src/app/game/page.tsx"),
   ]);
   assert.match(panel, /var\(--layout-safe-left, env\(safe-area-inset-left\)\)/);
+  assert.match(panel, /useLayoutQuarterTurn/);
+  assert.match(panel, /rotateQuarterTurn/);
+  assert.match(panel, /var\(--layout-safe-right, env\(safe-area-inset-right\)\)/);
   assert.match(panel, /var\(--layout-safe-bottom, env\(safe-area-inset-bottom\)\)/);
   assert.match(panel, /h-12 w-12/);
   assert.match(panel, /min-h-12 rounded-full/);
