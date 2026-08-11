@@ -108,7 +108,7 @@ public class ST12_007_Rika : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         if (opp.LifeCount < 3) return;
         if (me.ActiveDonCount < 2) return;
-        var cands = me.Characters.Where(c => c.Info.Cost <= 4 && c.Info.Property.Split('/').Contains("斩")).ToList();
+        var cands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4 && c.Info.Property.Split('/').Contains("斩")).ToList();
         if (cands.Count == 0) return;
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "将我方最多1张费用≤4属性(斩)角色转为活跃状态", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

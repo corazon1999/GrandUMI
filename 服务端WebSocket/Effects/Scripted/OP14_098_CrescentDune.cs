@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 多时机：EventMain / EventCounter，并兼容 OnLifeRevealTrigger(生命触发以反击收益结算)。
-///   - 【主要】场上条件按原本费用 Info.Cost 判定，"场上"含双方领袖与角色。
+///   - 【主要】场上条件按当前费用判定，"场上"含双方角色。
 ///     〈巴洛克工作室〉匹配用 HasKeyword(含"原巴洛克工作室"等子串特征)。
 ///   - 费用 +3 对我方每张符合角色逐张 AddCostModifier(UntilNextOpponentEndPhase)。
 /// </summary>
@@ -33,7 +33,7 @@ public class OP14_098_CrescentDune : IScriptedEffect
         {
             // 场上(双方领袖+角色)存在费用为 0 或费用≥8 的角色
             var allChars = me.Characters.Concat(opp.Characters).ToList();
-            bool cond = allChars.Any(c => c.Info.Cost == 0 || c.Info.Cost >= 8);
+            bool cond = allChars.Any(c => ctx.State.CurrentCostOf(c) == 0 || ctx.State.CurrentCostOf(c) >= 8);
             if (!cond) return Task.CompletedTask;
 
             foreach (var c in me.Characters.Where(c => c.Info.HasKeyword("巴洛克工作室")))

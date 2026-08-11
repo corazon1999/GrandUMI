@@ -38,7 +38,7 @@ public class OP13_108_JewelryBonney : IScriptedEffect
         {
             // 生命卡牌不多于 1 张：将对方最多 1 张费用 ≤7 的角色转休息
             if (me.LifeCount > 1) return;
-            var candidates = opp.Characters.Where(c => c.Info.Cost <= 7).ToList();
+            var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 7).ToList();
             if (candidates.Count == 0) return;
 
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

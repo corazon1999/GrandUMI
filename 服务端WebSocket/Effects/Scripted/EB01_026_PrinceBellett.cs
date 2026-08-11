@@ -32,8 +32,8 @@ public class EB01_026_PrinceBellett : IScriptedEffect
         if (me.Hand.Count > 1) return;
 
         // 候选：双方费用≤3 的角色
-        var mine = me.Characters.Where(c => c.Info.Cost <= 3).Select(c => (c, ctx.OwnerIndex)).ToList();
-        var theirs = opp.Characters.Where(c => c.Info.Cost <= 3).Select(c => (c, 1 - ctx.OwnerIndex)).ToList();
+        var mine = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).Select(c => (c, ctx.OwnerIndex)).ToList();
+        var theirs = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).Select(c => (c, 1 - ctx.OwnerIndex)).ToList();
         var cands = new List<(CardInstance card, int owner)>();
         cands.AddRange(mine);
         cands.AddRange(theirs);

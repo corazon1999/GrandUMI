@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 【主要】为可选效果：发动需先支付成本——将我方 1 张角色放回手牌（无我方角色则无法发动）。
 ///     成本支付后，再选「最多 1 张费用不高于 6 的角色」（敌我双方任一角色，min=0 可跳过）
-///     放回其持有者的手牌。费用取角色原本费用 c.Info.Cost。
+///     放回其持有者的手牌。费用取角色当前费用。
 ///   - 【触发】= 抽 1 张。
 /// </summary>
 public class OP13_059_ShiningBurst : IScriptedEffect
@@ -52,8 +52,8 @@ public class OP13_059_ShiningBurst : IScriptedEffect
 
         // 效果：将最多 1 张费用≤6 的角色（敌我任一）放回其持有者手牌
         var candidates = new List<(CardInstance card, int owner)>();
-        candidates.AddRange(me.Characters.Where(c => c.Info.Cost <= 6).Select(c => (c, ctx.OwnerIndex)));
-        candidates.AddRange(opp.Characters.Where(c => c.Info.Cost <= 6).Select(c => (c, 1 - ctx.OwnerIndex)));
+        candidates.AddRange(me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).Select(c => (c, ctx.OwnerIndex)));
+        candidates.AddRange(opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).Select(c => (c, 1 - ctx.OwnerIndex)));
         if (candidates.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "AnyCharacter",

@@ -32,7 +32,7 @@ public class OP05_026_Saatchis : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 成本候选：我方费用≥3 且当前为活跃状态的角色
-        var costCands = me.Characters.Where(c => c.Info.Cost >= 3 && !c.IsTapped).ToList();
+        var costCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) >= 3 && !c.IsTapped).ToList();
         if (costCands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

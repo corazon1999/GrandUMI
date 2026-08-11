@@ -23,7 +23,7 @@ public class EB01_021_Hannyabal : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         var cands = me.Characters.Where(c =>
-            c.Info.Cost >= 2 && c.Info.HasKeyword("因佩尔地狱")).ToList();
+            ctx.State.CurrentCostOf(c) >= 2 && c.Info.HasKeyword("因佩尔地狱")).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

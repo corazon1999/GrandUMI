@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 【咚!!×1】为发动条件：自身被赋予中的咚!! ≥1（即合计费用区附着到此卡的咚数 ≥1）。
 ///     用 me.AttachedDonCount(self.Id) ≥ 1 判定。
-///   - 用 AtomicOps.PreventActivateNextReset 标记最多 1 张对方休息状态且 Info.Cost ≤ 1 的角色。
+///   - 用 AtomicOps.PreventActivateNextReset 标记最多 1 张对方休息状态且当前费用 ≤ 1 的角色。
 /// </summary>
 public class OP08_026_Giovanni : IScriptedEffect
 {
@@ -28,7 +28,7 @@ public class OP08_026_Giovanni : IScriptedEffect
         // 【咚!!×1】：自身被赋予中的咚!! 至少 1 张
         if (me.AttachedDonCount(self.Id) < 1) return;
 
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

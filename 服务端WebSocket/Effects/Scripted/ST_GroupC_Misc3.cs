@@ -88,7 +88,7 @@ public class ST12_001_ZoroSanji : IScriptedEffect
         var key = "ST12-001-Activated" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
         // 成本：退回我方1张费用≥2角色（可选；不退则不发动）
-        var costCands = me.Characters.Where(c => c.Info.Cost >= 2).ToList();
+        var costCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) >= 2).ToList();
         if (costCands.Count == 0) return;
         var costCh = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "将我方1张费用≥2的角色放回手牌（成本，可放弃）", costCands.Select(c => c.Id.ToString()).ToList(), 0, 1);

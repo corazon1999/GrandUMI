@@ -69,7 +69,7 @@ public class OP02_118_YasakaniNoMagatama : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
             var stage = opp.StageCard;
-            if (stage is null || stage.Info.Cost > 3) return;
+            if (stage is null || ctx.State.CurrentCostOf(stage) > 3) return;
             bool ko = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "八尺琼勾玉【触发】：将对方费用≤3的舞台KO？");
             if (!ko) return;

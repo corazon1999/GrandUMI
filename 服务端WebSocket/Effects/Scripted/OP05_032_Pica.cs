@@ -39,7 +39,7 @@ public class OP05_032_Pica : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         var candidates = me.Characters
-            .Where(c => c.Id != self.Id && !c.Info.Name.Contains("匹卡") && c.Info.Cost >= 3)
+            .Where(c => c.Id != self.Id && !c.Info.Name.Contains("匹卡") && ctx.State.CurrentCostOf(c) >= 3)
             .ToList();
         if (candidates.Count == 0) return;
 

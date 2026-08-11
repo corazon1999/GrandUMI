@@ -42,7 +42,7 @@ public class OP16_030_Law : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnMyTurnEnd)
         {
             foreach (var c in me.Characters
-                         .Where(c => c.Info.Cost <= 5 && c.Info.ColorList.Contains("绿")).ToList())
+                         .Where(c => ctx.State.CurrentCostOf(c) <= 5 && c.Info.ColorList.Contains("绿")).ToList())
                 AtomicOps.ActivateCard(c);
         }
     }

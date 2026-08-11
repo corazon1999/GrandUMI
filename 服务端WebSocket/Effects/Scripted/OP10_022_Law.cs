@@ -37,7 +37,7 @@ public class OP10_022_Law : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 条件：我方角色费用合计 ≥ 5
-        int totalCost = me.Characters.Sum(c => c.CurrentCost());
+        int totalCost = me.Characters.Sum(c => ctx.State.CurrentCostOf(c));
         if (totalCost < 5) return;
 
         // 成本前置：需有可放回手牌的角色

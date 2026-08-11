@@ -33,7 +33,7 @@ public class OP10_114_XDrake : IScriptedEffect
         if (me.LifeCount > opp.LifeCount) return;
 
         // 收益候选：对方费用≤4 的活跃/任意角色
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

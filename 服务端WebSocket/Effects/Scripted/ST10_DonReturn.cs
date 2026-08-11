@@ -45,7 +45,7 @@ public class ST10_007_Killer : IScriptedEffect
         var key = $"ST10-007-donreturn:{ctx.Source.Id}";
         if (me.TurnOnceUsed.Contains(key)) return;
         int oppIdx = 1 - ctx.OwnerIndex;
-        var cands = ctx.State.Players[oppIdx].Characters.Where(c => c.IsTapped && c.Info.Cost <= 3).ToList();
+        var cands = ctx.State.Players[oppIdx].Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCharacter",
             "KO 对方最多1张休息且费用≤3 的角色", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

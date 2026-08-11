@@ -44,8 +44,8 @@ public class OP02_062_MonkeyDLuffy : IScriptedEffect
 
         // 收益：将最多 1 张费用≤4 的角色放回其持有者手牌（双方场上）
         var cands = new List<(CardInstance card, int ownerIdx)>();
-        foreach (var c in me.Characters.Where(c => c.Info.Cost <= 4)) cands.Add((c, ctx.OwnerIndex));
-        foreach (var c in opp.Characters.Where(c => c.Info.Cost <= 4)) cands.Add((c, 1 - ctx.OwnerIndex));
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4)) cands.Add((c, ctx.OwnerIndex));
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4)) cands.Add((c, 1 - ctx.OwnerIndex));
         if (cands.Count > 0)
         {
             var extra = new Dictionary<string, object?>

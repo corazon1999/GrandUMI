@@ -47,7 +47,7 @@ public class OP10_066_Giolla : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

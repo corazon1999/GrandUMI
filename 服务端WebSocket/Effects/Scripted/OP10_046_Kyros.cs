@@ -8,7 +8,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 【登场时】将最多 1 张费用不高于 5 的角色放回其持有者的手牌。
 ///
 /// 实现说明：
-/// - 目标含双方所有角色（不限于我方），费用以卡面原始费 c.Info.Cost 判定（≤5）。
+/// - 目标含双方所有角色（不限于我方），费用按当前费用判定（≤5）。
 /// - 在 C# 中可合并双方角色为候选并按所属方退回，逐一记录归属，BounceToHand 用目标所属方下标。
 /// </summary>
 public class OP10_046_Kyros : IScriptedEffect
@@ -24,9 +24,9 @@ public class OP10_046_Kyros : IScriptedEffect
 
         // 候选：双方所有费用 ≤5 的角色（记录所属方）
         var cands = new List<(CardInstance card, int ownerIdx)>();
-        foreach (var c in me.Characters.Where(c => c.Info.Cost <= 5))
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5))
             cands.Add((c, ctx.OwnerIndex));
-        foreach (var c in opp.Characters.Where(c => c.Info.Cost <= 5))
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5))
             cands.Add((c, 1 - ctx.OwnerIndex));
         if (cands.Count == 0) return;
 

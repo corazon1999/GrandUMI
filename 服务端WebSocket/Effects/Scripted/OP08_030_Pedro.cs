@@ -36,7 +36,7 @@ public class OP08_030_Pedro : IScriptedEffect
         }
         else
         {
-            var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 6).ToList();
+            var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 6).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "选择对方最多1张休息状态且费用≤6的角色KO",

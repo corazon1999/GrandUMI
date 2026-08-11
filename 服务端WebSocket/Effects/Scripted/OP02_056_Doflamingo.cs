@@ -59,7 +59,7 @@ public class OP02_056_Doflamingo : IScriptedEffect
         AtomicOps.DiscardHand(me, dcard);
 
         // 效果：将对方最多 1 张费用≤1 的角色放回其持有者的卡组最下方
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count == 0) return;
         var extra = new Dictionary<string, object?>
         {

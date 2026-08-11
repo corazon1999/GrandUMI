@@ -25,7 +25,7 @@ public class OP06_039_JustYou : IScriptedEffect
 
         if (opt == 0)
         {
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 6).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "选择最多 1 张费用≤6 的对方角色转为休息状态",
@@ -38,7 +38,7 @@ public class OP06_039_JustYou : IScriptedEffect
         }
         else
         {
-            var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 6).ToList();
+            var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 6).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "选择最多 1 张处于休息状态且费用≤6 的对方角色 KO",

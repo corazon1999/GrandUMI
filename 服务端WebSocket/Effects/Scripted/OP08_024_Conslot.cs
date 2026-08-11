@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   在下个对方的重置阶段中不会转为活跃状态。
 ///
 /// 实现说明 / 简化点：
-///   - 用 AtomicOps.PreventActivateNextReset 标记最多 1 张对方休息状态且 Info.Cost ≤ 4 的角色。
+///   - 用 AtomicOps.PreventActivateNextReset 标记最多 1 张对方休息状态且当前费用 ≤ 4 的角色。
 /// </summary>
 public class OP08_024_Conslot : IScriptedEffect
 {
@@ -21,7 +21,7 @@ public class OP08_024_Conslot : IScriptedEffect
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

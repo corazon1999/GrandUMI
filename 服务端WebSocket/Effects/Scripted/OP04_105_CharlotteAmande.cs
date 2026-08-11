@@ -49,7 +49,7 @@ public class OP04_105_CharlotteAmande : IScriptedEffect
         AtomicOps.DiscardHand(me, cost);
 
         // 收益：将对方最多 1 张费用≤2 的角色转为休息状态
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多 1 张费用≤2 的角色转为休息状态",

@@ -48,9 +48,8 @@ public class OP13_058_PineappleGravel : IScriptedEffect
         activeDon.State = DonState.Rest;
 
         // 候选：对方当前力量 ≤ 3000 的角色
-        bool oppTurn = s.CurrentTurnPlayer == (1 - ctx.OwnerIndex);
         var candidates = opp.Characters
-            .Where(c => c.CurrentPower(opp.AttachedDonCount(c.Id), oppTurn) <= 3000)
+            .Where(c => ctx.State.CurrentPowerOf(c) <= 3000)
             .ToList();
         if (candidates.Count == 0) return;
 

@@ -32,7 +32,7 @@ public class OP12_054_Teach : IScriptedEffect
         for (int i = 0; i < 2; i++)
         {
             foreach (var c in s.Players[i].Characters)
-                if (c.Info.Cost <= 1 && c.Id != ctx.Source.Id)
+                if (ctx.State.CurrentCostOf(c) <= 1 && c.Id != ctx.Source.Id)
                     candidates.Add((c, i));
         }
         if (candidates.Count == 0) return;

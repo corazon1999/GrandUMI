@@ -50,7 +50,7 @@ public class OP10_115_SeeYouInTheNewWorld : IScriptedEffect
         // ── 【触发】 ──
         // 候选：对方费用不高于对方生命卡牌张数的角色
         int threshold = opp.LifeCount;
-        var cands = opp.Characters.Where(c => c.Info.Cost <= threshold).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= threshold).ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

@@ -21,8 +21,8 @@ public class P_043_Luffy : IScriptedEffect
         var opp = ctx.State.Players[1 - owner];
 
         // 候选：双方场上费用≤3 的角色（含本卡自身亦可被退回，按文本"角色"不排除）
-        var mine = me.Characters.Where(c => c.Info.Cost <= 3).ToList();
-        var theirs = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var mine = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
+        var theirs = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         var all = new List<CardInstance>();
         all.AddRange(mine);
         all.AddRange(theirs);

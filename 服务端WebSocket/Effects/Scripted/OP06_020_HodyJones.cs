@@ -30,7 +30,7 @@ public class OP06_020_HodyJones : IScriptedEffect
         // 领袖须为活跃状态才能横置作为成本
         if (self.IsTapped) return;
 
-        var charCands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var charCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         bool hasActiveDon = opp.CostArea.Any(d => d.State == DonState.Active);
         if (charCands.Count == 0 && !hasActiveDon) return;
 

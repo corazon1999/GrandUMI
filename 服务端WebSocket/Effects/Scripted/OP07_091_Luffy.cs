@@ -28,7 +28,7 @@ public class OP07_091_Luffy : IScriptedEffect
         var self = ctx.Source;
 
         // ── 效果 1：KO 对方最多 1 张费用≤2 的角色 ──
-        var koCands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var koCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (koCands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

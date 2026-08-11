@@ -51,7 +51,7 @@ public class OP06_117_ArkMaxim : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 效果：将对方所有费用不高于 2 的角色 KO
-        var targets = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         foreach (var t in targets)
         {
             AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, t);

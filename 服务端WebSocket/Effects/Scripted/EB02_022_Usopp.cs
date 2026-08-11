@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   将我方手牌中最多1张力量不高于6000且原本没有效果的角色卡牌登场。
 ///
 /// 实现说明：
-///   - "力量为5000或更高的角色"取场上角色卡面原始力量 c.Info.Power >= 5000；
+///   - "力量为5000或更高的角色"取场上角色当前力量（含临时、持续修正与咚!!）；
 ///     "不多于2张"= 数量 <= 2（含本卡自身，登场时本卡已在场，符合官方裁定按当前场况判定）。
 ///   - "原本没有效果的角色"= 卡面没有任何效果标签/能力（EffectTags 与 Abilities 均为空）。
 ///   - 从手牌登场用 PlayFromHandFree。候选为非公开/需展示卡面 → 传 choiceCards。
@@ -25,7 +25,7 @@ public class EB02_022_Usopp : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 条件：我方力量≥5000的角色不多于2张
-        int big = me.Characters.Count(c => c.Info.Power >= 5000);
+        int big = me.Characters.Count(c => ctx.State.CurrentPowerOf(c) >= 5000);
         if (big > 2) return;
 
         var playable = me.Hand.Where(c =>

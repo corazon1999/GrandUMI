@@ -48,7 +48,7 @@ public class OP06_095_ShadowsGathering : IScriptedEffect
 
         // 可以将任意张数费用≤2 且《恐怖之船海盗团》的我方角色 KO，每 KO 1 张领袖再 +1000
         var cands = me.Characters
-            .Where(c => c.Info.Cost <= 2 && c.Info.HasKeyword("恐怖之船海盗团"))
+            .Where(c => ctx.State.CurrentCostOf(c) <= 2 && c.Info.HasKeyword("恐怖之船海盗团"))
             .ToList();
         if (cands.Count == 0) return;
 

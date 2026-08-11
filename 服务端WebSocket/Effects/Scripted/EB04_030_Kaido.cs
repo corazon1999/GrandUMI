@@ -56,7 +56,7 @@ public class EB04_030_Kaido : IScriptedEffect
             AtomicOps.GiveKeyword(ctx.Source, "速攻", KeywordDuration.ThisTurn);
 
             // 之后：对方最多 1 张费用≤7 的角色转为休息
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 7).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 7).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "将对方最多 1 张费用≤7 的角色转为休息状态",

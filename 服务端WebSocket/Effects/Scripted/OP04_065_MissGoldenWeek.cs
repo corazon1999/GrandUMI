@@ -26,7 +26,7 @@ public class OP04_065_MissGoldenWeek : IScriptedEffect
 
         if (!me.Leader.Info.HasKeyword("巴洛克工作室")) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

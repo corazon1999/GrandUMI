@@ -25,7 +25,7 @@ public class OP10_047_Koala : IScriptedEffect
 
         // 可作为成本退回的候选：我方费用≥3 且拥有《革命军》特征的角色
         var cands = me.Characters
-            .Where(c => c.Info.Cost >= 3 && c.Info.HasKeyword("革命军"))
+            .Where(c => ctx.State.CurrentCostOf(c) >= 3 && c.Info.HasKeyword("革命军"))
             .ToList();
         if (cands.Count == 0) return;
 

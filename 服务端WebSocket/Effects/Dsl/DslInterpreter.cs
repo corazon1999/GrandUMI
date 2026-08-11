@@ -697,7 +697,7 @@ public static class DslInterpreter
             {
                 case "leaderPowerNotMoreThan":
                     int threshold = p.Value.GetInt32();
-                    int curr = me.Leader.CurrentPower(me.AttachedDonCount(me.Leader.Id), s.CurrentTurnPlayer == ctx.OwnerIndex);
+                    int curr = s.CurrentPowerOf(ctx.OwnerIndex, me.Leader);
                     if (curr > threshold) return false;
                     break;
                 case "leaderHasKeyword":
@@ -787,13 +787,13 @@ public static class DslInterpreter
                     break;
                 case "selfPowerGte":
                 {
-                    int sp = ctx.Source.CurrentPower(me.AttachedDonCount(ctx.Source.Id), s.CurrentTurnPlayer == ctx.OwnerIndex);
+                    int sp = s.CurrentPowerOf(ctx.OwnerIndex, ctx.Source);
                     if (sp < p.Value.GetInt32()) return false;
                     break;
                 }
                 case "selfPowerLte":
                 {
-                    int sp = ctx.Source.CurrentPower(me.AttachedDonCount(ctx.Source.Id), s.CurrentTurnPlayer == ctx.OwnerIndex);
+                    int sp = s.CurrentPowerOf(ctx.OwnerIndex, ctx.Source);
                     if (sp > p.Value.GetInt32()) return false;
                     break;
                 }
@@ -802,7 +802,7 @@ public static class DslInterpreter
                     break;
                 case "leaderPowerGte":
                 {
-                    int lp = me.Leader.CurrentPower(me.AttachedDonCount(me.Leader.Id), s.CurrentTurnPlayer == ctx.OwnerIndex);
+                    int lp = s.CurrentPowerOf(ctx.OwnerIndex, me.Leader);
                     if (lp < p.Value.GetInt32()) return false;
                     break;
                 }
@@ -1078,11 +1078,19 @@ public static class DslInterpreter
                     string promptKind = op.GetProperty("prompt").GetString() ?? "OpponentCharacter";
                     int max = GetInt(op, "max", 1);
                     int min = GetInt(op, "min", 0);
-                    var candidates = BuildCandidates(promptKind, ctx);
+                    var text = op.TryGetProperty("text", out var tx) ? tx.GetString() ?? promptKind : promptKind;
+                    // 旧定义把未写“原本”的场上费用/力量也编码成 original*，并且部分旧 prompt
+                    // 自带卡面费用预筛。场上效果默认按当前值；明确标注 valueBasis=original（旧定义
+                    // 则兼容提示文本中的“原本”）时按卡面值。手牌/卡组/废弃区等非场上区域仍按卡面值。
+                    string? valueBasis = op.TryGetProperty("valueBasis", out var vb) ? vb.GetString() : null;
+                    bool explicitlyOriginal = string.Equals(valueBasis, "original", StringComparison.OrdinalIgnoreCase)
+                        || (valueBasis is null && text.Contains("原本"));
+                    bool fieldUsesCurrentValues = IsFieldCandidatePrompt(promptKind) && !explicitlyOriginal;
+                    var candidates = BuildCandidates(promptKind, ctx, legacyCostUsesOriginal: explicitlyOriginal);
                     // 可选 filter：在 prompt 基础候选上再套一层卡牌过滤（力量/费用/特征/名称等，复用 BuildCardFilter）
                     if (op.TryGetProperty("filter", out var chFilter) && chFilter.ValueKind == JsonValueKind.Object)
                     {
-                        var pred = BuildMatchPredicate(chFilter);
+                        var pred = BuildMatchPredicate(chFilter, s, fieldUsesCurrentValues);
                         candidates = candidates.Where(pred).ToList();
 
                         // 费用未写“原本的”时按当前费用判定。该判断需要对局与控制方上下文，
@@ -1105,7 +1113,6 @@ public static class DslInterpreter
                             candidates = candidates.Where(c => ActionValidator.HasKeyword(s, c, keyword)).ToList();
                         }
                     }
-                    var text = op.TryGetProperty("text", out var tx) ? tx.GetString() ?? promptKind : promptKind;
                     // 下发候选卡 {id,number}，让前端能解析"不在场上"区域（废弃区/卡组等）候选的卡图；
                     // 对场上候选也等价（前端 findCardById 优先用此映射），纯增益。
                     var chExtra = new Dictionary<string, object?>
@@ -1711,7 +1718,8 @@ public static class DslInterpreter
         => c.Info.ColorList.Contains(color);
 
     /// <summary>解析 DSL 中的 filter 节点，返回卡牌过滤谓词</summary>
-    static Func<CardInstance, bool> BuildCardFilter(JsonElement node)
+    static Func<CardInstance, bool> BuildCardFilter(
+        JsonElement node, GameState? state = null, bool fieldUsesCurrentValues = false)
     {
         if (node.ValueKind != JsonValueKind.Object) return _ => true;
         return c =>
@@ -1739,10 +1747,12 @@ public static class DslInterpreter
             {
                 if (!c.Info.Property.Split('/').Contains(prop.GetString() ?? "")) return false;
             }
-            if (node.TryGetProperty("originalCostLte", out var oc) && c.Info.Cost > oc.GetInt32()) return false;
-            if (node.TryGetProperty("originalCostGte", out var oc2) && c.Info.Cost < oc2.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerLte", out var pp) && c.Info.Power > pp.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerGte", out var pp2) && c.Info.Power < pp2.GetInt32()) return false;
+            int filterCost = fieldUsesCurrentValues && state is not null ? CurrentCostOfCard(c, state) : c.Info.Cost;
+            int filterPower = fieldUsesCurrentValues && state is not null ? state.CurrentPowerOf(c) : c.Info.Power;
+            if (node.TryGetProperty("originalCostLte", out var oc) && filterCost > oc.GetInt32()) return false;
+            if (node.TryGetProperty("originalCostGte", out var oc2) && filterCost < oc2.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerLte", out var pp) && filterPower > pp.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerGte", out var pp2) && filterPower < pp2.GetInt32()) return false;
             // currentPowerLte/Gte: 按"当前力量"判定（卡面「力量X以下」未写"原本的"时的默认口径）。
             // 场上卡走 CurrentPowerOf（含贴咚/回合加成/持续光环），非场上候选回退原本力量。
             if (node.TryGetProperty("currentPowerLte", out var cpl) && CurrentPowerOfCard(c) > cpl.GetInt32()) return false;
@@ -1791,18 +1801,20 @@ public static class DslInterpreter
     /// 解析"匹配规格"：支持 anyOf（任一子过滤命中即可，用于"X或Y"）+ excludeName（"某名字以外"）。
     /// 无 anyOf 时把节点本身当单个 filter。
     /// </summary>
-    static Func<CardInstance, bool> BuildMatchPredicate(JsonElement node)
+    static Func<CardInstance, bool> BuildMatchPredicate(
+        JsonElement node, GameState? state = null, bool fieldUsesCurrentValues = false)
     {
         if (node.ValueKind != JsonValueKind.Object) return _ => true;
         Func<CardInstance, bool> basePred;
         if (node.TryGetProperty("anyOf", out var anyOf) && anyOf.ValueKind == JsonValueKind.Array)
         {
-            var preds = anyOf.EnumerateArray().Select(BuildCardFilter).ToList();
+            var preds = anyOf.EnumerateArray()
+                .Select(item => BuildCardFilter(item, state, fieldUsesCurrentValues)).ToList();
             basePred = c => preds.Any(p => p(c));
         }
         else
         {
-            basePred = BuildCardFilter(node);
+            basePred = BuildCardFilter(node, state, fieldUsesCurrentValues);
         }
         if (node.TryGetProperty("excludeName", out var ex))
         {
@@ -1873,11 +1885,26 @@ public static class DslInterpreter
         return -1;
     }
 
-    static List<CardInstance> BuildCandidates(string promptKind, EffectContext ctx)
+    static bool IsFieldCandidatePrompt(string promptKind)
+        => promptKind is "OpponentCharacter" or "OpponentActiveCharacter" or "OpponentRestingCharacter"
+            or "OpponentCharacterWithDon" or "OpponentCharacterWithDonGe2"
+            or "OpponentLeaderOrCharacter" or "OwnCharacter" or "OwnLeaderOrCharacter"
+            or "AnyCharacter" or "OwnStage" or "OpponentStage" or "AnyStage"
+            || promptKind.StartsWith("OpponentCharacterCostLe", StringComparison.Ordinal)
+            || promptKind.StartsWith("OwnCharacterCostLe", StringComparison.Ordinal);
+
+    static List<CardInstance> BuildCandidates(
+        string promptKind, EffectContext ctx, bool legacyCostUsesOriginal = false)
     {
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
         var opp = s.Players[1 - ctx.OwnerIndex];
+        int OwnFieldCost(CardInstance card) => legacyCostUsesOriginal
+            ? card.Info.Cost
+            : s.CurrentCostOf(ctx.OwnerIndex, card);
+        int OpponentFieldCost(CardInstance card) => legacyCostUsesOriginal
+            ? card.Info.Cost
+            : s.CurrentCostOf(1 - ctx.OwnerIndex, card);
         return promptKind switch
         {
             "OpponentCharacter"           => opp.Characters.ToList(),
@@ -1899,25 +1926,25 @@ public static class DslInterpreter
             "OwnStage"                    => me.StageCard is { } sc ? new List<CardInstance> { sc } : new(),
             "OpponentStage"               => opp.StageCard is { } osc ? new List<CardInstance> { osc } : new(),
             "AnyStage"                    => new[] { me.StageCard, opp.StageCard }.Where(c => c is not null).Cast<CardInstance>().ToList(),
-            "OpponentCharacterCostLe5"    => opp.Characters.Where(c => c.Info.Cost <= 5).ToList(),
+            "OpponentCharacterCostLe5"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 5).ToList(),
             // C2 看对手私有区域：候选 ID 仍是卡 GUID，但仅向查看方暴露
             "OpponentHand"                => opp.Hand.ToList(),
             "OpponentLifeAll"             => opp.LifeArea.ToList(),
             // D 阶段新增：更丰富的候选范围
-            "OpponentCharacterCostLe0"    => opp.Characters.Where(c => s.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 0).ToList(),
-            "OpponentCharacterCostLe1"    => opp.Characters.Where(c => c.Info.Cost <= 1).ToList(),
-            "OpponentCharacterCostLe2"    => opp.Characters.Where(c => c.Info.Cost <= 2).ToList(),
-            "OpponentCharacterCostLe3"    => opp.Characters.Where(c => c.Info.Cost <= 3).ToList(),
-            "OpponentCharacterCostLe4"    => opp.Characters.Where(c => c.Info.Cost <= 4).ToList(),
-            "OpponentCharacterCostLe6"    => opp.Characters.Where(c => c.Info.Cost <= 6).ToList(),
-            "OpponentCharacterCostLe7"    => opp.Characters.Where(c => c.Info.Cost <= 7).ToList(),
-            "OpponentCharacterCostLe8"    => opp.Characters.Where(c => c.Info.Cost <= 8).ToList(),
-            "OpponentCharacterCostLe9"    => opp.Characters.Where(c => c.Info.Cost <= 9).ToList(),
-            "OwnCharacterCostLe2"         => me.Characters.Where(c => c.Info.Cost <= 2).ToList(),
-            "OwnCharacterCostLe3"         => me.Characters.Where(c => c.Info.Cost <= 3).ToList(),
-            "OwnCharacterCostLe4"         => me.Characters.Where(c => c.Info.Cost <= 4).ToList(),
-            "OwnCharacterCostLe5"         => me.Characters.Where(c => c.Info.Cost <= 5).ToList(),
-            "OwnCharacterCostLe6"         => me.Characters.Where(c => c.Info.Cost <= 6).ToList(),
+            "OpponentCharacterCostLe0"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 0).ToList(),
+            "OpponentCharacterCostLe1"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 1).ToList(),
+            "OpponentCharacterCostLe2"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 2).ToList(),
+            "OpponentCharacterCostLe3"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 3).ToList(),
+            "OpponentCharacterCostLe4"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 4).ToList(),
+            "OpponentCharacterCostLe6"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 6).ToList(),
+            "OpponentCharacterCostLe7"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 7).ToList(),
+            "OpponentCharacterCostLe8"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 8).ToList(),
+            "OpponentCharacterCostLe9"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 9).ToList(),
+            "OwnCharacterCostLe2"         => me.Characters.Where(c => OwnFieldCost(c) <= 2).ToList(),
+            "OwnCharacterCostLe3"         => me.Characters.Where(c => OwnFieldCost(c) <= 3).ToList(),
+            "OwnCharacterCostLe4"         => me.Characters.Where(c => OwnFieldCost(c) <= 4).ToList(),
+            "OwnCharacterCostLe5"         => me.Characters.Where(c => OwnFieldCost(c) <= 5).ToList(),
+            "OwnCharacterCostLe6"         => me.Characters.Where(c => OwnFieldCost(c) <= 6).ToList(),
             "OwnTrashCharacterCostLe1"    => me.Trash.Where(c => c.Info.Kind == CardKind.Character && c.Info.Cost <= 1).ToList(),
             "OwnTrashCharacterCostLe2"    => me.Trash.Where(c => c.Info.Kind == CardKind.Character && c.Info.Cost <= 2).ToList(),
             "OwnTrashCharacterCostLe3"    => me.Trash.Where(c => c.Info.Kind == CardKind.Character && c.Info.Cost <= 3).ToList(),

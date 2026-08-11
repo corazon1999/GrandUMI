@@ -30,8 +30,8 @@ public class EB04_045_Ginny : IScriptedEffect
 
         // 条件：场上存在 2 张或更多费用为 8 或更高的角色（双方）
         int bigCount =
-            me.Characters.Count(c => c.Info.Cost >= 8) +
-            opp.Characters.Count(c => c.Info.Cost >= 8);
+            me.Characters.Count(c => ctx.State.CurrentCostOf(c) >= 8) +
+            opp.Characters.Count(c => ctx.State.CurrentCostOf(c) >= 8);
         if (bigCount < 2) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

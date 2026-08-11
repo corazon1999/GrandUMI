@@ -36,7 +36,7 @@ public class P_075_Luffy : IScriptedEffect
         }
 
         // OnAttackDeclare：条件——我方场上存在费用≥8 的角色
-        bool hasBig = me.Characters.Any(c => c.Info.Cost >= 8);
+        bool hasBig = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 8);
         if (!hasBig) return;
 
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);

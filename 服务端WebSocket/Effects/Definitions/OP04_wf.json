@@ -66,6 +66,7 @@
             "max": 1,
             "min": 0,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 5000
             }

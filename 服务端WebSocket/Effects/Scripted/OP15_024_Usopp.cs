@@ -48,7 +48,7 @@ public class OP15_024_Usopp : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         var targets = new List<CardInstance> { opp.Leader };
-        targets.AddRange(opp.Characters.Where(c => c.Info.Cost <= 7));
+        targets.AddRange(opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 7));
         // 仅保留当前未休息的目标更友好，但保留全部也无害；此处给出全部可选
         targets = targets.Where(c => c is not null).ToList();
         if (targets.Count == 0) return;

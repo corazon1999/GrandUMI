@@ -201,6 +201,7 @@
             "max": 2,
             "min": 0,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 2000
             }

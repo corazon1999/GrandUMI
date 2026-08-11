@@ -23,7 +23,7 @@ public class EB01_053_Wapister : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

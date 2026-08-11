@@ -32,7 +32,7 @@ public class OP04_040_Queen : IScriptedEffect
         if (me.LifeArea.Count + me.Hand.Count > 4) return;
 
         // 若场上存在费用≥8 角色，可选择"将卡组顶 1 张加入生命区最上方"代替抽牌
-        bool hasBig = me.Characters.Any(c => c.CurrentCost() >= 8);
+        bool hasBig = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 8);
         if (hasBig && me.Deck.Count > 0)
         {
             int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,

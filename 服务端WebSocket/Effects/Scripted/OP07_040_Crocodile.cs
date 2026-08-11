@@ -28,8 +28,8 @@ public class OP07_040_Crocodile : IScriptedEffect
         if (activeDon is null) return;
 
         // 候选：双方费用≤2 的角色
-        var myCands = me.Characters.Where(c => c.Info.Cost <= 2).ToList();
-        var oppCands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var myCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
+        var oppCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (myCands.Count == 0 && oppCands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

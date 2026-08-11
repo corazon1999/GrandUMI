@@ -20,6 +20,7 @@
             "max": 1,
             "min": 0,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 3000
             }
@@ -70,6 +71,7 @@
           "prompt": "OpponentCharacter",
           "max": 1,
           "as": "$tgt",
+          "valueBasis": "original",
           "filter": {
             "originalPowerLte": 7000
           }

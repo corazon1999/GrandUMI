@@ -8,8 +8,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 此角色无法攻击。（由引擎依 Abilities 自动处理。）
 /// 我方领袖为"巴奇"的场合，所有费用为 3 和 4 的角色无法攻击。
 ///   —— 用 ContinuousEffect.GrantRestriction=CannotAttack 注册（OnEnterField）：谓词在领袖名为
-///      "巴奇"时，对原本费用为 3/4 的卡（双方"所有角色"）生效；HasContinuousRestriction 不校验
-///      Scope，故谓词内显式按 Info.Cost 判定。来源(本卡)离场时引擎自动清理。
+///      "巴奇"时，对当前费用为 3/4 的卡（双方"所有角色"）生效；HasContinuousRestriction 不校验
+///      Scope，故谓词内显式按当前费用判定。来源(本卡)离场时引擎自动清理。
 /// 【登场时】将我方手牌中最多 1 张费用不高于 6 且拥有《十字公会》特征的角色卡牌登场。
 /// </summary>
 public class P_084_Buggy : IScriptedEffect
@@ -24,7 +24,7 @@ public class P_084_Buggy : IScriptedEffect
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
 
-        // 持续：领袖为"巴奇"时，所有原本费用为 3/4 的角色无法攻击
+        // 持续：领袖为"巴奇"时，所有当前费用为 3/4 的角色无法攻击
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
@@ -33,7 +33,7 @@ public class P_084_Buggy : IScriptedEffect
             GrantRestriction = RestrictionKind.CannotAttack,
             Predicate = (s, sideIdx, card) =>
                 s.Players[owner].Leader.Info.NameContains("巴奇") &&
-                (card.Info.Cost == 3 || card.Info.Cost == 4),
+                (ctx.State.CurrentCostOf(card) == 3 || ctx.State.CurrentCostOf(card) == 4),
         });
 
         var playable = me.Hand.Where(c =>

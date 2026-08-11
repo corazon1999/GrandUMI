@@ -29,7 +29,7 @@ public class EB04_041_InvisibleBlack : IScriptedEffect
         if (me.TotalDonInCostArea < 4) return;
 
         bool MatchSanji(CardInstance c) =>
-            c.Info.Kind == CardKind.Character && c.Info.NameContains("山智") && c.Info.Power <= 6000;
+            c.Info.Kind == CardKind.Character && c.Info.NameContains("山智") && ctx.State.CurrentPowerOf(c) <= 6000;
 
         var handCands = me.Hand.Where(MatchSanji).ToList();
         var trashCands = me.Trash.Where(MatchSanji).ToList();

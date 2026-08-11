@@ -53,7 +53,7 @@ public class OP04_081_Cavendish : IScriptedEffect
 
         AtomicOps.RestCard(me.Leader);
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

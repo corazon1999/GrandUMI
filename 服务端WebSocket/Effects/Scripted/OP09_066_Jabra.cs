@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - "对方场上咚!!张数多于我方"用费用区咚!!总数比较：opp.TotalDonInCostArea &gt; me.TotalDonInCostArea。
 ///     （上一轮 DSL 判 complex 仅因 if 条件键只支持与固定阈值比较，C# 脚本可直接做双方相对比较。）
-///   - "费用不高于 3 的角色"取卡面原始费用 c.Info.Cost。
+///   - "费用不高于 3 的角色"取场上角色当前费用。
 /// </summary>
 public class OP09_066_Jabra : IScriptedEffect
 {
@@ -27,7 +27,7 @@ public class OP09_066_Jabra : IScriptedEffect
         // 条件：对方场上咚!!的张数多于我方
         if (opp.TotalDonInCostArea <= me.TotalDonInCostArea) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

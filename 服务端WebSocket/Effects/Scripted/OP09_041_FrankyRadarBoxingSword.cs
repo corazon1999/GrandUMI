@@ -66,7 +66,7 @@ public class OP09_041_FrankyRadarBoxingSword : IScriptedEffect
     private static async Task ResolveTrigger(EffectContext ctx)
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4 && !c.IsTapped).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4 && !c.IsTapped).ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多 1 张费用≤4 的角色转为休息状态",

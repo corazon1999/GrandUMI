@@ -27,7 +27,7 @@ public class ST08_005_Shanks : IScriptedEffect
         // 双方所有费用≤1角色KO（快照后逐一KO）
         for (int p = 0; p < 2; p++)
         {
-            foreach (var c in ctx.State.Players[p].Characters.Where(c => c.Info.Cost <= 1).ToList())
+            foreach (var c in ctx.State.Players[p].Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList())
                 AtomicOps.KO(ctx.State, p, c);
         }
     }
@@ -44,7 +44,7 @@ public class ST08_009_Makino : IScriptedEffect
 
     public Task Resolve(EffectContext ctx)
     {
-        bool boardHasCost0 = ctx.State.Players[0].Characters.Concat(ctx.State.Players[1].Characters).Any(c => c.Info.Cost == 0);
+        bool boardHasCost0 = ctx.State.Players[0].Characters.Concat(ctx.State.Players[1].Characters).Any(c => ctx.State.CurrentCostOf(c) == 0);
         if (boardHasCost0) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
         return Task.CompletedTask;
     }

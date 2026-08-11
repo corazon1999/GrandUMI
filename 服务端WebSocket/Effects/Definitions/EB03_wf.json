@@ -279,6 +279,7 @@
             "prompt": "OpponentCharacter",
             "max": 1,
             "as": "$p",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 4000
             }
@@ -293,6 +294,7 @@
             "prompt": "OpponentCharacter",
             "max": 1,
             "as": "$c",
+            "valueBasis": "original",
             "filter": {
               "originalCostLte": 3
             }
@@ -347,6 +349,7 @@
             "prompt": "OpponentCharacter",
             "max": 1,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 6000,
               "originalPowerGte": 6000
@@ -373,6 +376,7 @@
             "prompt": "OpponentLeaderOrCharacter",
             "max": 1,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "kind": "Character",
               "originalPowerLte": 7000,

@@ -32,7 +32,7 @@ public class OP06_111_Braham : IScriptedEffect
 
         // 成本候选：我方场上费用为 1 的舞台
         var stages = new List<CardInstance>();
-        if (me.StageCard != null && me.StageCard.Info.Cost == 1) stages.Add(me.StageCard);
+        if (me.StageCard != null && ctx.State.CurrentCostOf(me.StageCard) == 1) stages.Add(me.StageCard);
         if (stages.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -51,7 +51,7 @@ public class OP06_111_Braham : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 效果：将对方最多 1 张费用不高于 4 的角色转为休息状态
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

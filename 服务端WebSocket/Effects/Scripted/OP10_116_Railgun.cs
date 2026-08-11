@@ -59,7 +59,7 @@ public class OP10_116_Railgun : IScriptedEffect
         }
 
         // ── 第二段：KO 对方最多 1 张费用≤5 的角色 ──
-        var cands = opp.Characters.Where(c => c.CurrentCost() <= 5).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (cands.Count == 0) return;
 
         var extra2 = new Dictionary<string, object?>

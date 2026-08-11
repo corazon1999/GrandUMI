@@ -32,7 +32,7 @@ public class ST12_006_AttackDon : IScriptedEffect
 
         if (opt == 0)
         {
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
             if (cands.Count == 0) return;
             var extra = new Dictionary<string, object?>
             {
@@ -45,7 +45,7 @@ public class ST12_006_AttackDon : IScriptedEffect
         }
         else
         {
-            var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 2).ToList();
+            var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 2).ToList();
             if (cands.Count == 0) return;
             var extra = new Dictionary<string, object?>
             {

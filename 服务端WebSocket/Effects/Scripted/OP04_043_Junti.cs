@@ -29,8 +29,8 @@ public class OP04_043_Junti : IScriptedEffect
 
         // 双方费用≤2 角色（记录所属方）
         var cands = new List<(CardInstance card, int owner)>();
-        foreach (var c in me.Characters.Where(c => c.CurrentCost() <= 2)) cands.Add((c, ctx.OwnerIndex));
-        foreach (var c in opp.Characters.Where(c => c.CurrentCost() <= 2)) cands.Add((c, 1 - ctx.OwnerIndex));
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2)) cands.Add((c, ctx.OwnerIndex));
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2)) cands.Add((c, 1 - ctx.OwnerIndex));
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

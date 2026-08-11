@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 触发节带有"将咚!!转为休息状态"的可选成本。触发节无法表达可选成本（惯例：只实现收益），
 ///     故此处不真正横置费用区咚，仅实现"将对方角色转为休息状态"的收益部分；
 ///     用 ConfirmOptional 保留"可以"的可选语义。
-///   - "费用不高于6"按原本费用 Info.Cost 判定。
+///   - "费用不高于6"按当前费用判定。
 /// </summary>
 public class OP05_029_Doflamingo : IScriptedEffect
 {
@@ -30,7 +30,7 @@ public class OP05_029_Doflamingo : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 6).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();
         if (candidates.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

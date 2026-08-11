@@ -28,7 +28,7 @@ public class OP12_022_Inuarashi : IScriptedEffect
 
         // 候选：对方处于休息状态且原本费用 ≤5 的角色
         var candidates = opp.Characters
-            .Where(c => c.IsTapped && c.Info.Cost <= 5)
+            .Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 5)
             .ToList();
         if (candidates.Count == 0) return;
 

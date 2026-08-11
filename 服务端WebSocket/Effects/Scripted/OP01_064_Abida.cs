@@ -27,7 +27,7 @@ public class OP01_064_Abida : IScriptedEffect
         if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
 
         if (me.Hand.Count == 0) return;
-        var targets = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (targets.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

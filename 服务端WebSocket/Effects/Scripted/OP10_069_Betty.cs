@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【咚!!×1】为发动条件：自身需被赋予至少 1 张咚!!。
 ///   - 成本"咚!!-1"为强制成本（文本无"可以"），但触发节无法表达可选支付，此处按惯例：
 ///     条件满足且玩家有 KO 收益时直接支付（场上至少 1 张咚可放回），否则不发动。
-///   - "费用不高于 1"取卡面原始费用 c.Info.Cost。
+///   - "费用不高于 1"取场上角色当前费用。
 /// </summary>
 public class OP10_069_Betty : IScriptedEffect
 {
@@ -33,7 +33,7 @@ public class OP10_069_Betty : IScriptedEffect
         int returnable = me.CostArea.Count;
         if (returnable < 1) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

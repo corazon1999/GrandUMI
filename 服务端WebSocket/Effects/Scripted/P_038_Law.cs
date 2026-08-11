@@ -25,7 +25,7 @@ public class P_038_Law : IScriptedEffect
         // 领袖需为活跃状态才能横置作为成本
         if (me.Leader.IsTapped) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

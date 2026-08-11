@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "力量合计不高于 4000" 是跨多目标的合计上限约束，单次 ChooseCards 无法表达，
 ///     故拆为两次顺序选择：先选第 1 张（力量≤4000 的角色），再在剩余预算内选第 2 张
 ///     （力量 ≤ 4000 - 第1张力量 的角色）。逐张满足后 KO，等价于合计 ≤4000。
-///   - 力量用 Info.Power（卡面原始力量）评估，与文本"力量合计"一致。
+///   - 力量合计按各目标结算时的当前力量评估。
 ///   - 对方角色 KO 用 AtomicOps.KO(state, 1 - OwnerIndex, tgt)。
 /// </summary>
 public class OP05_007_Sabo : IScriptedEffect
@@ -30,7 +30,7 @@ public class OP05_007_Sabo : IScriptedEffect
 
         while (picked < 2)
         {
-            var cands = opp.Characters.Where(c => c.Info.Power <= budget).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentPowerOf(c) <= budget).ToList();
             if (cands.Count == 0) break;
 
             var extra = new Dictionary<string, object?>
@@ -43,7 +43,7 @@ public class OP05_007_Sabo : IScriptedEffect
             if (chosen.Count == 0) break;
 
             var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-            budget -= tgt.Info.Power;
+            budget -= ctx.State.CurrentPowerOf(tgt);
             AtomicOps.KO(ctx.State, oppIdx, tgt);
             picked++;
         }

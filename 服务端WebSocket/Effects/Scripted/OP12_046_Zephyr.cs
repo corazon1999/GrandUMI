@@ -65,7 +65,7 @@ public class OP12_046_Zephyr : IScriptedEffect
         for (int i = 0; i < 2; i++)
         {
             foreach (var c in s.Players[i].Characters)
-                if (c.Info.Cost <= 5) candidates.Add((c, i));
+                if (ctx.State.CurrentCostOf(c) <= 5) candidates.Add((c, i));
         }
         if (candidates.Count == 0) return;
 

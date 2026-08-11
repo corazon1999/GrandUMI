@@ -22,7 +22,7 @@ public class OP07_009_Dogura_Magura : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         var cands = me.Characters.Where(c =>
-            c.Info.Cost == 1 &&
+            ctx.State.CurrentCostOf(c) == 1 &&
             c.Info.ColorList.Contains("红")).ToList();
         if (cands.Count == 0) return;
 

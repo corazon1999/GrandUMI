@@ -35,7 +35,7 @@ public class OP13_061_Inuarashi : IScriptedEffect
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
 
         // 之后：将对方最多 1 张原本费用 ≤1 的角色 KO
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (candidates.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

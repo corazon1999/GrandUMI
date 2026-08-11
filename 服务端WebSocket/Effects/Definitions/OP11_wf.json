@@ -570,6 +570,7 @@
             "prompt": "OpponentCharacter",
             "max": 1,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalCostLte": 1,
               "originalCostGte": 1

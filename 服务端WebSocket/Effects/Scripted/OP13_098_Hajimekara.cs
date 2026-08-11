@@ -63,7 +63,7 @@ public class OP13_098_Hajimekara : IScriptedEffect
         if (!me.Leader.Info.NameIs("伊姆")) return;
 
         // 效果：将对方费用为 7 的舞台 KO（最多 1 张）
-        if (opp.StageCard is null || opp.StageCard.Info.Cost != 7) return;
+        if (opp.StageCard is null || ctx.State.CurrentCostOf(opp.StageCard) != 7) return;
 
         var stage = opp.StageCard;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentStage",

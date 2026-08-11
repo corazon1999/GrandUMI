@@ -32,7 +32,7 @@ public class OP10_002_Caesar : IScriptedEffect
 
         // 成本候选：我方费用≥2 且含《班克禁区》特征的角色
         var costCands = me.Characters
-            .Where(c => c.Info.Cost >= 2 && c.Info.HasKeyword("班克禁区"))
+            .Where(c => ctx.State.CurrentCostOf(c) >= 2 && c.Info.HasKeyword("班克禁区"))
             .ToList();
         if (costCands.Count == 0) return;
 

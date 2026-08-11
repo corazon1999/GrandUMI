@@ -25,7 +25,7 @@ public class P_085_JewelryBonney : IScriptedEffect
         if (!me.Leader.Info.HasKeyword("超新星")) return;
         if (me.LifeCount > opp.LifeCount) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

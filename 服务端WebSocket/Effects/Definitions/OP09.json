@@ -163,6 +163,7 @@
             "prompt": "OpponentCharacter",
             "max": 1,
             "as": "$tgt",
+            "valueBasis": "original",
             "filter": {
               "originalPowerLte": 6000
             }

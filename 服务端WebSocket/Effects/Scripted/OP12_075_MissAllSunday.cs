@@ -38,7 +38,7 @@ public class OP12_075_MissAllSunday : IScriptedEffect
         var opp = s.Players[oppIdx];
 
         // 1. 将对方最多 1 张费用不高于 3 的角色 KO（可选）
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (candidates.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

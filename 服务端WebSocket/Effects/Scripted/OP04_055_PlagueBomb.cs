@@ -32,8 +32,8 @@ public class OP04_055_PlagueBomb : IScriptedEffect
         if (iceHand.Count == 0) return;
 
         var costTargets = new List<(CardInstance card, int owner)>();
-        foreach (var c in me.Characters.Where(c => c.CurrentCost() <= 4)) costTargets.Add((c, ctx.OwnerIndex));
-        foreach (var c in opp.Characters.Where(c => c.CurrentCost() <= 4)) costTargets.Add((c, 1 - ctx.OwnerIndex));
+        foreach (var c in me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4)) costTargets.Add((c, ctx.OwnerIndex));
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4)) costTargets.Add((c, 1 - ctx.OwnerIndex));
         if (costTargets.Count == 0) return;
 
         var iceTrash = me.Trash.Where(c => c.MatchesName("冰鬼") && c.Info.Kind == CardKind.Character).ToList();

@@ -25,7 +25,7 @@ public class OP13_039_GomuSnakeGun : IScriptedEffect
         var opp = ctx.State.Players[oppIdx];
 
         // 候选：对方处于休息状态且原本费用 ≤4 的角色
-        var candidates = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 4).ToList();
+        var candidates = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (candidates.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCharacter",

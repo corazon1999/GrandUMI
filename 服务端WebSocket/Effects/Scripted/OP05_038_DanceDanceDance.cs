@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 反击：先选1张我方领袖或角色 +4000（本次战斗）；之后用 ConfirmOptional 询问是否丢1张手牌，
 ///     丢弃后将费用区最多3张休息状态的咚!!转为活跃状态（直接修改 DonCard.State）。
-///   - 触发节："费用不高于3"按原本费用 Info.Cost；将对方领袖或符合的角色转为休息状态。
+///   - 触发节："费用不高于3"按当前费用；将对方领袖或符合的角色转为休息状态。
 /// </summary>
 public class OP05_038_DanceDanceDance : IScriptedEffect
 {
@@ -30,7 +30,7 @@ public class OP05_038_DanceDanceDance : IScriptedEffect
         {
             // 【触发】将对方最多1张领袖或费用不高于3的角色转为休息状态
             var trigCands = new List<CardInstance> { opp.Leader };
-            trigCands.AddRange(opp.Characters.Where(c => c.Info.Cost <= 3));
+            trigCands.AddRange(opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3));
 
             var trigChosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentLeaderOrCharacter",
                 "将对方最多1张领袖或费用不高于3的角色转为休息状态",

@@ -44,7 +44,7 @@ public class OP03_066_Bari : IScriptedEffect
 
         // 效果 2：场上存在 8 张或更多咚!! 时，KO 对方最多 1 张费用≤4 的角色
         if (me.TotalDonInCostArea < 8) return;
-        var targets = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (targets.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多 1 张费用≤4 的角色 KO",

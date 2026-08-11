@@ -21,7 +21,7 @@ public class OP16_045_Crocodile : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        var costCands = me.Characters.Where(c => c.Info.Cost >= 2).ToList();
+        var costCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) >= 2).ToList();
         if (costCands.Count == 0) return; // 无费用≥2角色可回手 → 不可发动
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

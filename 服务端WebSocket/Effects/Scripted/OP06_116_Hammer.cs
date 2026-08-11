@@ -37,7 +37,7 @@ public class OP06_116_Hammer : IScriptedEffect
         if (pick == 0)
         {
             // KO 对方最多1张费用≤5的角色
-            var cands = opp.Characters.Where(c => c.CurrentCost() <= 5).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "将对方最多1张费用不高于5的角色KO",

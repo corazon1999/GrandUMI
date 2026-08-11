@@ -55,7 +55,7 @@ public class OP13_102_Edison : IScriptedEffect
 
     private static async Task RestOpponentCostLe3(EffectContext ctx, PlayerState opp)
     {
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (candidates.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe3",
             "将对方最多 1 张费用≤3 的角色转为休息状态",

@@ -26,7 +26,7 @@ public class OP04_068_Yokozuna : IScriptedEffect
 
         if (me.TotalDonInCostArea < 1) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

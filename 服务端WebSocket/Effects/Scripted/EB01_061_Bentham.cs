@@ -10,9 +10,8 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明：
 ///   - 【登场时】用 AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active) 追加 1 张活跃咚!!。
-///   - 【攻击时】"原本力量变为与被选中角色相同" → 取被选中角色的卡面原本力量 c.Info.Power，
-///     用 SetPowerThisTurn 把本卡本回合的力量绝对设为该值（不含咚加成，ownerTurn=我方回合）。
-///     这是规范第十五节"原本力量变为 N"的写法（用绝对值而非复制对方卡的完整效果）。
+///   - 【攻击时】"原本力量变为与被选中角色相同" → 复制被选中角色结算时的当前力量，
+///     并写入 OriginalPowerOverride；本卡自身的咚与其他力量修正仍会叠加在新的原本力量上。
 /// </summary>
 public class EB01_061_Bentham : IScriptedEffect
 {
@@ -45,8 +44,8 @@ public class EB01_061_Bentham : IScriptedEffect
             if (chosen.Count == 0) return;
 
             var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-            // 本回合此角色原本力量绝对设为被选角色的卡面原本力量
-            AtomicOps.SetPowerThisTurn(self, tgt.Info.Power, 0, true);
+            // 本回合此角色原本力量变为被选角色结算时的当前力量
+            self.OriginalPowerOverride = ctx.State.CurrentPowerOf(tgt);
             return;
         }
     }

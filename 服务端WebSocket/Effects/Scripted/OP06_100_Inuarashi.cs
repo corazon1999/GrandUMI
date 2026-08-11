@@ -33,7 +33,7 @@ public class OP06_100_Inuarashi : IScriptedEffect
 
         // 动态阈值：对方生命卡牌张数
         int threshold = opp.LifeCount;
-        var targets = opp.Characters.Where(c => c.Info.Cost <= threshold).ToList();
+        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= threshold).ToList();
         if (targets.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

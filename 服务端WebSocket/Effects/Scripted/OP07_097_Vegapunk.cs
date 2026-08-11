@@ -45,7 +45,7 @@ public class OP07_097_Vegapunk : IScriptedEffect
         if (activeDon.Count < 1) return;
 
         var candidates = me.Hand
-            .Where(c => c.CurrentCost() <= 5 && c.Info.HasKeyword("艾格赫德"))
+            .Where(c => ctx.State.CurrentCostOf(c) <= 5 && c.Info.HasKeyword("艾格赫德"))
             .ToList();
         if (candidates.Count == 0) return;
 

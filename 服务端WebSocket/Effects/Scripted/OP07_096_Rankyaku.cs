@@ -55,7 +55,7 @@ public class OP07_096_Rankyaku : IScriptedEffect
         var s = ctx.State;
         var opp = s.Players[1 - ctx.OwnerIndex];
 
-        var koCands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var koCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (koCands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

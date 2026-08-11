@@ -51,7 +51,7 @@ public class OP02_046_AkumaFuukyaku : IScriptedEffect
         }
 
         // 【主要】将对方最多 1 张休息状态、费用≤4 的角色 KO
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 4).ToList();
         if (cands.Count == 0) return;
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多 1 张休息状态、费用≤4 的角色 KO",

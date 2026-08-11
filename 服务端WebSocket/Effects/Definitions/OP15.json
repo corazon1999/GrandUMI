@@ -203,6 +203,7 @@
           "max": 1,
           "min": 0,
           "as": "$tgt",
+          "valueBasis": "original",
           "filter": {
             "originalCostLte": 8
           }

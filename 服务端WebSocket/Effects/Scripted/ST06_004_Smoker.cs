@@ -34,7 +34,7 @@ public class ST06_004_Smoker : IScriptedEffect
             Predicate = (s, sideIdx, card) =>
                 card.Id == selfId &&
                 s.Players[owner].AttachedDonCount(selfId) >= 1 &&
-                (s.Players[0].Characters.Concat(s.Players[1].Characters)).Any(c => c.Info.Cost == 0),
+                (s.Players[0].Characters.Concat(s.Players[1].Characters)).Any(c => ctx.State.CurrentCostOf(c) == 0),
         });
         return Task.CompletedTask;
     }

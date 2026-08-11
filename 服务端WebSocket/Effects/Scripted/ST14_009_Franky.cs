@@ -27,7 +27,7 @@ public class ST14_009_Franky : IScriptedEffect
                 card.Id == selfId &&
                 s.Players[owner].AttachedDonCount(selfId) >= 1 &&
                 s.CurrentTurnPlayer != owner &&
-                s.Players[owner].Characters.Any(c => c.Info.Cost >= 6),
+                s.Players[owner].Characters.Any(c => ctx.State.CurrentCostOf(c) >= 6),
         });
         return Task.CompletedTask;
     }

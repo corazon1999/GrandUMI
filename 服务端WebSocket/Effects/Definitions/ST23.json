@@ -24,7 +24,7 @@
         "if": { "leaderHasKeyword": "红发海盗团" },
         "cost": { "handDiscard": 1 },
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张原本力量≤4000 的角色" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "valueBasis": "original", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张原本力量≤4000 的角色" },
           { "op": "KO", "target": "$tgt" }
         ]
       }

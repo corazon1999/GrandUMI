@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 两个时机收益相同，统一处理：用 AtomicOps.PreventActivateNextReset 标记最多 1 张对方角色。
-///   - 目标为对方休息状态且 Info.Cost ≤ 7 的角色。
+///   - 目标为对方休息状态且当前费用 ≤ 7 的角色。
 /// </summary>
 public class OP08_023_Carrot : IScriptedEffect
 {
@@ -23,7 +23,7 @@ public class OP08_023_Carrot : IScriptedEffect
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 7).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 7).ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

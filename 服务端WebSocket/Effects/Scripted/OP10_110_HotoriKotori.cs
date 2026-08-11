@@ -23,7 +23,7 @@ public class OP10_110_HotoriKotori : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         int threshold = opp.LifeArea.Count;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= threshold).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= threshold).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

@@ -47,7 +47,7 @@ public class OP13_040_HonkiDayo : IScriptedEffect
 
         // 候选：对方处于休息状态且原本费用不高于 7 的角色
         var candidates = opp.Characters
-            .Where(c => c.IsTapped && c.Info.Cost <= 7)
+            .Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 7)
             .ToList();
         if (candidates.Count == 0) return;
 

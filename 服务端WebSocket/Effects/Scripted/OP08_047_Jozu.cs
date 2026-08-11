@@ -46,9 +46,9 @@ public class OP08_047_Jozu : IScriptedEffect
 
         // 收益：场上最多1张费用≤6角色(我方除自身/对方均可)放回其持有者手牌
         var targets = new List<(int owner, CardInstance card)>();
-        foreach (var c in me.Characters.Where(c => c.Id != self.Id && c.Info.Cost <= 6))
+        foreach (var c in me.Characters.Where(c => c.Id != self.Id && ctx.State.CurrentCostOf(c) <= 6))
             targets.Add((ctx.OwnerIndex, c));
-        foreach (var c in opp.Characters.Where(c => c.Info.Cost <= 6))
+        foreach (var c in opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6))
             targets.Add((1 - ctx.OwnerIndex, c));
         if (targets.Count == 0) return;
 

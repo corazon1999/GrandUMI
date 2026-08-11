@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   将我方最多 1 张处于休息状态、费用不高于 5 且拥有《时光旅诗》特征的角色转为活跃状态。
 ///
 /// 实现说明：
-///   - "费用不高于 5"取卡面原始费用 c.Info.Cost。
+///   - "费用不高于 5"取场上角色当前费用。
 ///   - "处于休息状态"= IsTapped。
 /// </summary>
 public class OP10_029_Mihawk : IScriptedEffect
@@ -29,7 +29,7 @@ public class OP10_029_Mihawk : IScriptedEffect
         // 候选：处于休息状态、费用≤5、拥有《时光旅诗》特征的角色
         var cands = me.Characters.Where(c =>
             c.IsTapped &&
-            c.Info.Cost <= 5 &&
+            ctx.State.CurrentCostOf(c) <= 5 &&
             c.Info.HasKeyword("时光旅诗")
         ).ToList();
         if (cands.Count == 0) return;

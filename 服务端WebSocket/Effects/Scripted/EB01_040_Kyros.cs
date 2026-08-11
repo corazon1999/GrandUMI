@@ -31,7 +31,7 @@ public class EB01_040_Kyros : IScriptedEffect
         // 成本：生命区需有牌可翻面（M2 已支持朝向，实际把顶张翻为正面朝上）
         if (me.LifeArea.Count == 0) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost == 0).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) == 0).ToList();
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "居鲁士【启动主要】：将生命区最上方 1 张翻至正面朝上，将对方最多 1 张费用为 0 的角色 KO？");

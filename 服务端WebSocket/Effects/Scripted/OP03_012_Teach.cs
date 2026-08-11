@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 攻击时（OnAttackDeclare），可选成本=废弃我方1张「原始力量≥4000的红色（炎）角色」。
 ///   - 支付后：抽1张，并本次战斗此角色+1000。
-///   - 红色判定用卡面 ColorList.Contains("红")；力量用卡面 Info.Power。
+///   - 红色判定用卡面 ColorList.Contains("红")；场上角色的力量按当前力量判定。
 /// </summary>
 public class OP03_012_Teach : IScriptedEffect
 {
@@ -25,7 +25,7 @@ public class OP03_012_Teach : IScriptedEffect
         var self = ctx.Source;
 
         var cands = me.Characters.Where(c =>
-            c.Info.Power >= 4000 && c.Info.ColorList.Contains("红")).ToList();
+            ctx.State.CurrentPowerOf(c) >= 4000 && c.Info.ColorList.Contains("红")).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

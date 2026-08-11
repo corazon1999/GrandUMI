@@ -28,7 +28,7 @@ public class OP04_033_Machvise : IScriptedEffect
         if (!me.Leader.Info.HasKeyword("堂吉诃德海盗团")) return;
 
         // 第一段：对方最多 1 张费用≤5 角色转为休息状态
-        var cands = opp.Characters.Where(c => c.CurrentCost() <= 5).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (cands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

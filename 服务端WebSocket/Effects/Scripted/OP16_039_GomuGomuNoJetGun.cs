@@ -50,7 +50,7 @@ public class OP16_039_GomuGomuNoJetGun : IScriptedEffect
         // ── 第二段：我方领袖具《因佩尔地狱》特征时，将对方最多 2 张费用≤3 的角色转为休息状态 ──
         if (!me.Leader.Info.HasKeyword("因佩尔地狱")) return;
 
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (candidates.Count == 0) return;
 
         var rested = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe3",

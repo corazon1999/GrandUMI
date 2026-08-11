@@ -30,7 +30,7 @@ public class EB01_001_KozukiOden : IScriptedEffect
         // 仅领袖攻击时本效果生效
         if (ctx.Source.Id != me.Leader.Id) return Task.CompletedTask;
 
-        bool cond = me.Characters.Any(c => c.Info.Cost >= 5 && c.Info.HasKeyword("和之国"));
+        bool cond = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 5 && c.Info.HasKeyword("和之国"));
         if (cond)
             AtomicOps.AddPowerThisTurn(me.Leader, 1000);
 

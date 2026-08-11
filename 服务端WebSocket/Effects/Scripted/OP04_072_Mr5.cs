@@ -32,7 +32,7 @@ public class OP04_072_Mr5 : IScriptedEffect
         if (me.TotalDonInCostArea < 2) return;
         if (self.IsTapped) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "Mr.5【对方攻击时】：咚!!-2 并将此角色转为休息状态，KO 对方最多 1 张费用≤4 的角色？");

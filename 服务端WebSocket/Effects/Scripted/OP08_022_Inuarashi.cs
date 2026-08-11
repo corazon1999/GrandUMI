@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - "不会转为活跃" 用 AtomicOps.PreventActivateNextReset 标记，引擎重置阶段对角色尊重该标记。
-///   - 条件：我方领袖含《纯毛族》特征；目标为对方休息状态且 Info.Cost ≤ 5 的角色，最多 2 张。
+///   - 条件：我方领袖含《纯毛族》特征；目标为对方休息状态且当前费用 ≤ 5 的角色，最多 2 张。
 /// </summary>
 public class OP08_022_Inuarashi : IScriptedEffect
 {
@@ -26,7 +26,7 @@ public class OP08_022_Inuarashi : IScriptedEffect
         // 条件：我方领袖拥有《纯毛族》特征
         if (!me.Leader.Info.HasKeyword("纯毛族")) return;
 
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 5).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (cands.Count == 0) return;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

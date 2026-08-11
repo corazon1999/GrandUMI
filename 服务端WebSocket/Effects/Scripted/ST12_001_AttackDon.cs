@@ -27,7 +27,7 @@ public class ST12_001_AttackDon : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 可选成本:将我方1张费用≥2角色放回手牌
-        var costCands = me.Characters.Where(c => c.Info.Cost >= 2).ToList();
+        var costCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) >= 2).ToList();
         if (costCands.Count == 0) return;
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "ST12-001【攻击时】:将我方1张费用≥2的角色放回手牌,使我方最多1张力量≤7000的角色转为活跃?");

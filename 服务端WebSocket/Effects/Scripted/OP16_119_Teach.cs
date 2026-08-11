@@ -75,7 +75,7 @@ public class OP16_119_Teach : IScriptedEffect
         }
 
         // ② 之后，将对方最多1张费用≤5的角色KO
-        var koCands = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var koCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (koCands.Count == 0) return;
         var koPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多1张费用不高于5的角色KO",

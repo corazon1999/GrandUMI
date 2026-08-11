@@ -28,8 +28,8 @@ public class OP01_089_CrescentDune : IScriptedEffect
 
         // 汇总双方费用≤5 的角色候选
         var cands = new List<CardInstance>();
-        cands.AddRange(me.Characters.Where(c => c.Info.Cost <= 5));
-        cands.AddRange(opp.Characters.Where(c => c.Info.Cost <= 5));
+        cands.AddRange(me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5));
+        cands.AddRange(opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5));
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

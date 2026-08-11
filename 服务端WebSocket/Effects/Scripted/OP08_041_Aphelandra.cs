@@ -35,7 +35,7 @@ public class OP08_041_Aphelandra : IScriptedEffect
         AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, self);
 
         // 收益：将对方最多1张费用≤1的角色放回卡组最下方
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 1).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多1张费用≤1的角色放回卡组最下方",

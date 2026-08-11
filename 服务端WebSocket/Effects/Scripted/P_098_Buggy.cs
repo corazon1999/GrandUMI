@@ -23,7 +23,7 @@ public class P_098_Buggy : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        int costGe5 = me.Characters.Count(c => c.Info.Cost >= 5);
+        int costGe5 = me.Characters.Count(c => ctx.State.CurrentCostOf(c) >= 5);
         if (costGe5 < 5)
         {
             AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, ctx.Source);

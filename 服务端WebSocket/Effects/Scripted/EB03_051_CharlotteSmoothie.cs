@@ -25,7 +25,7 @@ public class EB03_051_CharlotteSmoothie : IScriptedEffect
 
         if (!me.LifeArea.Any(c => c.IsLifeFaceUp)) return; // 无正面朝上生命牌 → 不发动
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe2",

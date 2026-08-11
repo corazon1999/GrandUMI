@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   将我方最多1张处于休息状态且费用为1的角色转为活跃状态。
 ///
 /// 实现说明：
-///   - "处于休息状态"用 CardInstance.IsTapped 判定；"费用为1"按原本费用 Info.Cost==1。
+///   - "处于休息状态"用 CardInstance.IsTapped 判定；"费用为1"按当前费用判定。
 /// </summary>
 public class OP05_031_Buffalo : IScriptedEffect
 {
@@ -31,7 +31,7 @@ public class OP05_031_Buffalo : IScriptedEffect
         if (restingCount < 2) return;
 
         // 候选：休息状态且费用为1的角色
-        var candidates = me.Characters.Where(c => c.IsTapped && c.Info.Cost == 1).ToList();
+        var candidates = me.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) == 1).ToList();
         if (candidates.Count == 0) return;
 
         me.TurnOnceUsed.Add(key);

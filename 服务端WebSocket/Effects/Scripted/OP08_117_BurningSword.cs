@@ -15,7 +15,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 成本为"将生命区最上方 1 张放置到废弃区"，整体为"可以"=可选，故先 ConfirmOptional。
 ///   - 无可 KO 目标（对方无费用≤7 角色）时仍允许玩家发动支付成本，但通常不会；
 ///     若选择不发动则直接返回，不支付成本。
-///   - "费用不高于 7"取卡面原始费用 c.Info.Cost。
+///   - "费用不高于 7"取场上角色当前费用。
 ///   - 【触发】先可选将剩余生命顶加入手牌，再从手牌中选择最多 1 张放回生命顶。
 /// </summary>
 public class OP08_117_BurningSword : IScriptedEffect
@@ -67,7 +67,7 @@ public class OP08_117_BurningSword : IScriptedEffect
         me.Trash.Add(lifeTop);
 
         // 收益：KO 对方最多 1 张费用≤7 的角色
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 7).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 7).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

@@ -41,7 +41,7 @@ public class OP13_066_Rayleigh : IScriptedEffect
             // 第一段：对方最多 1 张费用 ≤5 的角色转休息
             int oppIdx = 1 - ctx.OwnerIndex;
             var opp = ctx.State.Players[oppIdx];
-            var candidates = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+            var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
             if (candidates.Count > 0)
             {
                 var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe5",

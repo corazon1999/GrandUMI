@@ -22,10 +22,8 @@ public class OP13_013_Kuma : IScriptedEffect
         var s = ctx.State;
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = s.Players[oppIdx];
-        bool oppOwnerTurn = s.CurrentTurnPlayer == oppIdx;
-
         var candidates = opp.Characters
-            .Where(c => c.CurrentPower(opp.AttachedDonCount(c.Id), oppOwnerTurn) <= 0)
+            .Where(c => ctx.State.CurrentPowerOf(c) <= 0)
             .ToList();
         if (candidates.Count == 0) return;
 

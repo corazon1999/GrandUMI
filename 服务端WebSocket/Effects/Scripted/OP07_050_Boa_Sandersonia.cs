@@ -27,7 +27,7 @@ public class OP07_050_Boa_Sandersonia : IScriptedEffect
             c.Info.HasKeyword("亚马逊·百合") || c.Info.HasKeyword("九蛇海盗团"));
         if (featured < 2) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
 
         var extra = new Dictionary<string, object?>

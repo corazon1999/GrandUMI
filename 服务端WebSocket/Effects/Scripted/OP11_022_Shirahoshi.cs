@@ -37,7 +37,7 @@ public class OP11_022_Shirahoshi : IScriptedEffect
         int donCount = me.TotalDonInCostArea;
         var candidates = me.Hand.Where(c =>
             c.Info.Kind == CardKind.Character &&
-            c.CurrentCost() <= donCount &&
+            ctx.State.CurrentCostOf(c) <= donCount &&
             (c.Info.HasKeyword("海王类") || c.MatchesName("梅迦罗"))
         ).ToList();
         if (candidates.Count == 0) return;

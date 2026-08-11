@@ -7,7 +7,7 @@
         "on": "OnEnterField",
         "if": { "leaderHasKeyword": "和之国", "oppLifeCountGte": 3 },
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张原本费用≤5 的角色" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "valueBasis": "original", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张原本费用≤5 的角色" },
           { "op": "KO", "target": "$tgt" }
         ]
       }

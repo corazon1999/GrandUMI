@@ -30,7 +30,7 @@ public class OP13_038_GomuElephantGun : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         // 候选：对方原本费用 ≤5 的角色
-        var candidates = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (candidates.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe5",

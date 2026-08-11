@@ -29,7 +29,7 @@ public class OP14_028_Johnny : IScriptedEffect
         if (restedId != ctx.Source.Id.ToString()) return; // 仅本卡被横置
 
         var opp = ctx.State.Players[1 - owner];
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(owner, "OpponentCharacter",

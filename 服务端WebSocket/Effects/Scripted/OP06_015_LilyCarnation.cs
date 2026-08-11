@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   将我方废弃区中最多 1 张力量为 2000 到 5000 且拥有《FILM》特征的角色卡牌以休息状态登场。
 ///
 /// 实现说明：
-///   - 成本"将我方 1 张力量≥6000 的角色放置到废弃区"：以卡面原始力量 c.Info.Power 判定候选，
+///   - 成本"将我方 1 张力量≥6000 的角色放置到废弃区"：以场上当前力量判定候选，
 ///     玩家选 1 张移入废弃区。DSL 的 cost 节无"按力量条件废弃指定己方角色"键，故用脚本。
 ///   - 收益：从废弃区登场最多 1 张力量 2000~5000 且 FILM 的角色（休息状态）。
 ///   - 可选效果先 ConfirmOptional；每回合 1 次用 TurnOnceUsed。
@@ -28,8 +28,8 @@ public class OP06_015_LilyCarnation : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本候选：我方力量≥6000 的角色（卡面原始力量）
-        var costCands = me.Characters.Where(c => c.Info.Power >= 6000).ToList();
+        // 成本候选：我方当前力量≥6000 的角色
+        var costCands = me.Characters.Where(c => ctx.State.CurrentPowerOf(c) >= 6000).ToList();
         if (costCands.Count == 0) return;
 
         // 收益候选：废弃区中力量 2000~5000 且 FILM 的角色

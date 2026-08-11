@@ -266,7 +266,7 @@ public sealed class ST36_005_EustassKid : IScriptedEffect
         }
 
         var redirectTargets = me.Characters
-            .Where(card => card.Info.Power >= 5000 && card.MatchesName("尤斯塔斯·基德"))
+            .Where(card => ctx.State.CurrentPowerOf(card) >= 5000 && card.MatchesName("尤斯塔斯·基德"))
             .ToList();
         if (redirectTargets.Count == 0 || ctx.State.CurrentBattle is null) return;
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

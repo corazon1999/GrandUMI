@@ -34,7 +34,7 @@ public class OP08_033_Raizo : IScriptedEffect
         if (restedCards < 7) return;
 
         // 效果：将对方最多1张休息状态且费用≤2的角色KO
-        var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

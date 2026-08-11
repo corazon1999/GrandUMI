@@ -52,7 +52,7 @@ public class EB03_015_Kemy : IScriptedEffect
         }
 
         // 收益2：对方最多1张费用≤2的角色转为休息状态
-        var restCands = opp.Characters.Where(c => c.Info.Cost <= 2 && !c.IsTapped).ToList();
+        var restCands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2 && !c.IsTapped).ToList();
         if (restCands.Count > 0)
         {
             var ch2 = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

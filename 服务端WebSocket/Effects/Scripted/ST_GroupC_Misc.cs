@@ -22,7 +22,7 @@ public class ST11_003_Reverse : IScriptedEffect
             new List<string> { "将对方最多1张费用≤5角色转为休息状态", "KO对方最多1张休息且费用≤5的角色" });
         if (opt == 0)
         {
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
             if (cands.Count == 0) return;
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter", "转为休息状态",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
@@ -30,7 +30,7 @@ public class ST11_003_Reverse : IScriptedEffect
         }
         else if (opt == 1)
         {
-            var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 5).ToList();
+            var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 5).ToList();
             if (cands.Count == 0) return;
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCharacter", "KO",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
@@ -58,7 +58,7 @@ public class ST12_006_YosakuJohnny : IScriptedEffect
             new List<string> { "将对方最多1张费用≤2角色转为休息状态", "KO对方最多1张休息且费用≤2的角色" });
         if (opt == 0)
         {
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
             if (cands.Count == 0) return;
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter", "转为休息状态",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
@@ -66,7 +66,7 @@ public class ST12_006_YosakuJohnny : IScriptedEffect
         }
         else if (opt == 1)
         {
-            var cands = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 2).ToList();
+            var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 2).ToList();
             if (cands.Count == 0) return;
             var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCharacter", "KO",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
@@ -89,7 +89,7 @@ public class ST29_002_Usopp : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
         int threshold = opp.LifeCount;
-        var cands = opp.Characters.Where(c => c.Info.Cost <= threshold).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= threshold).ToList();
         if (cands.Count == 0) return;
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             $"将对方最多1张费用≤{threshold} 角色转为休息状态", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
@@ -111,7 +111,7 @@ public class ST29_013_RobLucci : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
         int threshold = ctx.State.Players[ctx.OwnerIndex].LifeCount + opp.LifeCount;
-        var cands = opp.Characters.Where(c => c.Info.Cost <= threshold).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= threshold).ToList();
         if (cands.Count == 0) return;
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             $"KO 对方最多1张费用≤{threshold} 的角色", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

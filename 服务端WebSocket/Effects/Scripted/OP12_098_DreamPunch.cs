@@ -44,7 +44,7 @@ public class OP12_098_DreamPunch : IScriptedEffect
         AtomicOps.AddPowerThisBattle(target, 2000);
 
         // 之后：我方场上存在费用≥8 且拥有《革命军》特征的角色 → 该卡牌再 +2000
-        bool hasRevolutionary8 = me.Characters.Any(c => c.Info.Cost >= 8 && c.Info.HasKeyword("革命军"));
+        bool hasRevolutionary8 = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 8 && c.Info.HasKeyword("革命军"));
         if (hasRevolutionary8)
             AtomicOps.AddPowerThisBattle(target, 2000);
     }

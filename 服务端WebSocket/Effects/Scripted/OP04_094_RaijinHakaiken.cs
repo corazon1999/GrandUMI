@@ -28,7 +28,7 @@ public class OP04_094_RaijinHakaiken : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.EventMain)
         {
             int cap = me.Trash.Count >= 15 ? 6 : 4;
-            var cands = opp.Characters.Where(c => c.Info.Cost <= cap).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= cap).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 $"将对方最多 1 张费用≤{cap} 的角色 KO",
@@ -49,7 +49,7 @@ public class OP04_094_RaijinHakaiken : IScriptedEffect
 
         AtomicOps.RestCard(me.Leader);
 
-        var t5 = opp.Characters.Where(c => c.Info.Cost <= 5).ToList();
+        var t5 = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (t5.Count == 0) return;
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多 1 张费用≤5 的角色 KO",

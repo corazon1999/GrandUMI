@@ -26,7 +26,7 @@ public class OP10_058_Rebecca : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         // 场上存在费用≥8 的角色 → 抽 1
-        bool has8 = me.Characters.Concat(opp.Characters).Any(c => c.Info.Cost >= 8);
+        bool has8 = me.Characters.Concat(opp.Characters).Any(c => ctx.State.CurrentCostOf(c) >= 8);
         if (has8)
             AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
 

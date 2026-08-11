@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 说明 / 简化点：
 ///   - 触发节无 cost 通道，故脚本实现"丢弃 2 张手牌"作为可选成本。
-///   - "力量为 0"取卡面原始力量 c.Info.Power == 0。
+///   - "力量为 0"取场上当前力量。
 ///   - 用 AtomicOps.MoveCharToLife(s, ownerIdx, card, toTop) 将角色置入生命区；
 ///     toTop 由玩家二选一（最上方 / 最下方）决定。
 /// </summary>
@@ -28,7 +28,7 @@ public class OP06_103_Kawamatsu : IScriptedEffect
         if (me.Hand.Count < 2) return;
 
         // 目标：我方力量为 0 的角色
-        var targets = me.Characters.Where(c => c.Info.Power == 0).ToList();
+        var targets = me.Characters.Where(c => ctx.State.CurrentPowerOf(c) == 0).ToList();
         if (targets.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

@@ -34,7 +34,7 @@ public class OP09_036_Luffy : IScriptedEffect
 
         if (choice == 0)
         {
-            var cands = opp.Characters.Where(c => c.Info.Cost <= 6 && !c.IsTapped).ToList();
+            var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6 && !c.IsTapped).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
                 "选择对方最多 1 张费用≤6 的角色转为休息",

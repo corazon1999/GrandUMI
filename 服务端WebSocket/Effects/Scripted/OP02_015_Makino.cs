@@ -8,7 +8,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 【启动主要】可以将此角色转为休息状态：本回合中，我方最多1张费用为1的红色（炎）角色力量+3000。
 ///
 /// 实现说明：成本=横置自身（ConfirmOptional 询问可选）。
-///   目标筛选「费用为1的红色角色」= c.Info.Cost == 1 && ColorList 含「炎」（领袖不计入）。
+///   目标筛选「费用为1的红色角色」按当前费用判定，且 ColorList 含「炎」（领袖不计入）。
 /// </summary>
 public class OP02_015_Makino : IScriptedEffect
 {
@@ -30,7 +30,7 @@ public class OP02_015_Makino : IScriptedEffect
         AtomicOps.RestCard(self);
 
         var cands = me.Characters.Where(c =>
-            c.Info.Cost == 1 && c.Info.ColorList.Contains("红")).ToList();
+            ctx.State.CurrentCostOf(c) == 1 && c.Info.ColorList.Contains("红")).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",

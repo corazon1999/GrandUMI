@@ -48,8 +48,8 @@ public class OP08_055_PhoenixSeal : IScriptedEffect
             revealed.Select(id => revealable.First(c => c.Id.ToString() == id).Info.Number).ToList());
 
         // 效果：将最多 1 张费用≤6 的角色（双方）放回其持有者卡组最下方
-        var myTargets = me.Characters.Where(c => c.Info.Cost <= 6).ToList();
-        var oppTargets = opp.Characters.Where(c => c.Info.Cost <= 6).ToList();
+        var myTargets = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();
+        var oppTargets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();
         var all = new List<CardInstance>();
         all.AddRange(myTargets);
         all.AddRange(oppTargets);

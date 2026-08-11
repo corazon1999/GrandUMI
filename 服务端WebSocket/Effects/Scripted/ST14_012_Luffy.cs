@@ -23,7 +23,7 @@ public class ST14_012_Luffy : IScriptedEffect
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
             GrantKeyword = "速攻",
             Predicate = (s, sideIdx, card) =>
-                card.Id == selfId && s.Players[owner].Characters.Any(c => c.Info.Cost >= 10),
+                card.Id == selfId && s.Players[owner].Characters.Any(c => ctx.State.CurrentCostOf(c) >= 10),
         });
         return Task.CompletedTask;
     }

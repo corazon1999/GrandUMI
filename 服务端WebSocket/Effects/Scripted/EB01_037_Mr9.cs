@@ -31,7 +31,7 @@ public class EB01_037_Mr9 : IScriptedEffect
         // 需费用区有可放回的咚!!
         if (me.TotalDonInCostArea < 1) return;
 
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

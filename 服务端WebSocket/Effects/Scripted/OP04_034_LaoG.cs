@@ -27,7 +27,7 @@ public class OP04_034_LaoG : IScriptedEffect
         if (me.ActiveDonCount < 3) return;
 
         // 对方休息状态且费用≤3 的角色
-        var cands = opp.Characters.Where(c => c.IsTapped && c.CurrentCost() <= 3).ToList();
+        var cands = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

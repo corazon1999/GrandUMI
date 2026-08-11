@@ -34,7 +34,7 @@ public class OP02_045_SantoryuKikyaku : IScriptedEffect
         {
             // 【触发】将对方最多 1 张领袖或费用≤5 角色转为休息状态
             var cands = new List<CardInstance> { opp.Leader };
-            cands.AddRange(opp.Characters.Where(c => c.Info.Cost <= 5));
+            cands.AddRange(opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5));
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentLeaderOrCharacter",
                 "将对方最多 1 张领袖或费用≤5 角色转为休息状态",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   之后，将对方最多 1 张处于休息状态且原本的费用不高于 1 的角色 KO。
 ///
 /// 说明：
-///   - 第一步候选 = 对方费用（原本费用）≤2 的角色，最多选 1 张转休息（可放弃）。
+///   - 第一步候选 = 对方当前费用 ≤2 的角色，最多选 1 张转休息（可放弃）。
 ///   - 第二步候选 = 对方处于休息状态且原本费用 ≤1 的角色（含本次刚被转休息者），
 ///     最多选 1 张 KO（可放弃）。
 /// 两步均为"最多 1 张"，故 min=0 可跳过。
@@ -25,7 +25,7 @@ public class OP12_029_Kozaburo : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         // 第一步：将对方最多 1 张费用 ≤2 的角色转为休息状态
-        var restTargets = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var restTargets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         if (restTargets.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

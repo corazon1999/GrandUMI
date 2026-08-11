@@ -40,7 +40,7 @@ public class OP16_040_GomuGomuNoHammerSpin : IScriptedEffect
         if (!hasLuffy || !hasMr3) return;
 
         // 候选：对方处于休息状态且费用≤6 的角色
-        var candidates = opp.Characters.Where(c => c.IsTapped && c.Info.Cost <= 6).ToList();
+        var candidates = opp.Characters.Where(c => c.IsTapped && ctx.State.CurrentCostOf(c) <= 6).ToList();
         if (candidates.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCharacterCostLe6",

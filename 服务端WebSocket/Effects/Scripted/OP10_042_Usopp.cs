@@ -13,7 +13,8 @@ namespace GrandUMI.Effects.Scripted;
 /// ContinuousEffect.CostDelta = +1，离场/换领袖由引擎按 SourceCardId 清理。
 ///
 /// 实现说明 / 简化点：
-///   - "费用为 2 或更高"按卡面原始费用 c.Info.Cost >= 2 判定（修正前），避免自我递归引用。
+///   - "费用为 2 或更高"按当前费用判定；求值时仅排除本效果自身的 +1，避免自我递归，
+///     其他临时与持续费用修正仍会参与门槛判断。
 ///   - 能力 2 未实现并判为反应式：引擎当前无"我方角色被KO时 / 因对方效果离场时"的事件 watcher
 ///     （规范 13.6 反应式事件钩子：当角色因效果离场时无派发通道），故此触发型抽牌无法表达。
 /// </summary>
@@ -38,7 +39,7 @@ public class OP10_042_Usopp : IScriptedEffect
                 Side = 0,
                 IncludeLeader = false,
                 IncludeCharacters = true,
-                Filter = c => c.Info.Cost >= 2 && c.Info.HasKeyword("德莱斯罗兹"),
+                Filter = c => c.Info.HasKeyword("德莱斯罗兹"),
             },
             CostDelta = 1,
             // Scope 仅供显示，作用对象必须写进 Predicate：仅我方场上、费用≥2 且《德莱斯罗兹》的角色，
@@ -46,7 +47,8 @@ public class OP10_042_Usopp : IScriptedEffect
             Predicate = (s, sideIdx, c) =>
                 sideIdx == owner &&
                 s.Players[owner].Characters.Contains(c) &&
-                c.Info.Cost >= 2 && c.Info.HasKeyword("德莱斯罗兹"),
+                s.CurrentCostOfExcludingSource(sideIdx, c, selfId.ToString()) >= 2
+                && c.Info.HasKeyword("德莱斯罗兹"),
         });
 
         return Task.CompletedTask;

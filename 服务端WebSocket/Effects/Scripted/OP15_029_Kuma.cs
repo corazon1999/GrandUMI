@@ -20,7 +20,7 @@ public class OP15_029_Kuma : IScriptedEffect
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var candidates = opp.Characters
-            .Where(c => c.Info.Cost <= 5)
+            .Where(c => ctx.State.CurrentCostOf(c) <= 5)
             .ToList();
         if (candidates.Count == 0) return;
 

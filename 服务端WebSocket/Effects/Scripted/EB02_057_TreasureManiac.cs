@@ -41,7 +41,7 @@ public class EB02_057_TreasureManiac : IScriptedEffect
         me.Hand.Add(lifeCard);
 
         // 收益：对方费用≤3 角色最多 1 张加入对方生命区
-        var cands = opp.Characters.Where(c => c.Info.Cost <= 3).ToList();
+        var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 3).ToList();
         if (cands.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "将对方最多 1 张费用≤3 的角色加入其生命区", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);

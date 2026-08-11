@@ -243,8 +243,19 @@ public class GameState
         return basePower + ContinuousPowerBonus(sideIdx, card);
     }
 
+    /// <summary>
+    /// 按卡自动定位其所属一方再计算当前力量（含咚!!、临时修正及持续光环）。
+    /// 卡须在场上；不在场上时回退为卡实例自身可计算的力量。
+    /// </summary>
+    public int CurrentPowerOf(CardInstance card)
+    {
+        int side = SideOf(card);
+        if (side >= 0) return CurrentPowerOf(side, card);
+        return card.CurrentPower(0, ownerTurn: false);
+    }
+
     /// <summary>评估指定卡当前从 ContinuousEffects 获得的总费用修正</summary>
-    public int ContinuousCostBonus(int sideIdx, CardInstance card)
+    public int ContinuousCostBonus(int sideIdx, CardInstance card, string? excludedSourceCardId = null)
     {
         int sum = 0;
         foreach (var eff in ContinuousEffects)
@@ -252,6 +263,7 @@ public class GameState
             // 先按维度短路再调谓词：零费用增量的效果对费用无贡献，跳过其谓词求值，
             // 同时切断"力量谓词 → 查费用 → 又求值该力量谓词"的递归（OP16-017）。
             if (eff.CostDelta == 0 && eff.CostDeltaResolver is null) continue;
+            if (excludedSourceCardId is not null && eff.SourceCardId == excludedSourceCardId) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             sum += eff.CostDelta + (eff.CostDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
@@ -370,6 +382,17 @@ public class GameState
     {
         int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
                   + ContinuousCostBonus(sideIdx, card);
+        return raw < 0 ? 0 : raw;
+    }
+
+    /// <summary>
+    /// 计算当前费用，但排除指定来源的持续费用修正。用于持续效果以当前费用筛选自身作用对象，
+    /// 防止该效果在判断条件时再次递归求值自身。
+    /// </summary>
+    public int CurrentCostOfExcludingSource(int sideIdx, CardInstance card, string sourceCardId)
+    {
+        int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
+                  + ContinuousCostBonus(sideIdx, card, sourceCardId);
         return raw < 0 ? 0 : raw;
     }
 

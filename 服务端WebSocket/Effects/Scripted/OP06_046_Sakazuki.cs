@@ -19,8 +19,8 @@ public class OP06_046_Sakazuki : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        var mine = me.Characters.Where(c => c.Info.Cost <= 2).ToList();
-        var theirs = opp.Characters.Where(c => c.Info.Cost <= 2).ToList();
+        var mine = me.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
+        var theirs = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
         var cands = new List<CardInstance>();
         cands.AddRange(mine);
         cands.AddRange(theirs);

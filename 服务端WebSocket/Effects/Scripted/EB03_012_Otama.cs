@@ -26,7 +26,7 @@ public class EB03_012_Otama : IScriptedEffect
         var self = ctx.Source;
 
         var charCands = opp.Characters.Where(c =>
-            c.Info.Cost <= 3 &&
+            ctx.State.CurrentCostOf(c) <= 3 &&
             (c.Info.HasKeyword("动物") || c.Info.HasKeyword("SMILE")) &&
             !c.IsTapped).ToList();
         var activeDons = opp.CostArea.Where(d => d.State == DonState.Active).ToList();

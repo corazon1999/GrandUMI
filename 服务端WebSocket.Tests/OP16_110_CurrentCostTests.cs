@@ -57,4 +57,29 @@ public class OP16_110_CurrentCostTests
         Assert.Contains(target.Id.ToString(), targetPrompt.choices);
         Assert.True(target.IsTapped);
     }
+
+    [Fact]
+    public async Task PrintedCostAboveSix_ReducedToSix_BecomesEligibleToBeRested()
+    {
+        var state = TestScene.New()
+            .OppCharacter("OP07-015")
+            .MyDeckTop("OP16-110")
+            .Build();
+        var target = state.Players[1].Characters.Single();
+        Assert.True(target.Info.Cost > 6);
+
+        target.CostModThisTurn = 6 - target.Info.Cost;
+        Assert.Equal(6, state.CurrentCostOf(1, target));
+
+        var source = new CardInstance { Info = CardDatabase.Get("OP16-110")! };
+        state.Players[0].Trash.Add(source);
+        var prompts = new MockPromptService().QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnKO, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(
+            history => history.kind == "OpponentCharacterCostLe6"));
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+        Assert.True(target.IsTapped);
+    }
 }
