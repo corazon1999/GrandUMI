@@ -16,7 +16,9 @@ public sealed record LeaderMatchResult(
     int? WinnerIndex,
     int FirstPlayerIndex,
     int TurnCount,
-    string FinishReason);
+    string FinishReason,
+    IReadOnlyList<string>? Player0StartingHand = null,
+    IReadOnlyList<string>? Player1StartingHand = null);
 
 public sealed record LeaderLeaderboardItem(
     int? Rank,
@@ -58,7 +60,14 @@ public sealed record LeaderMatchupSnapshot(
     DateTime GeneratedAtUtc,
     DateTime? SinceUtc,
     string LeaderNumber,
-    IReadOnlyList<LeaderMatchupItem> Items);
+    IReadOnlyList<LeaderMatchupItem> Items,
+    int StartingHandSampleGames,
+    IReadOnlyList<LeaderStartingHandItem> StartingHandItems);
+
+public sealed record LeaderStartingHandItem(
+    string CardNumber,
+    int Games,
+    double Percentage);
 
 public sealed record LeaderMatchupMatrixRow(
     string LeaderNumber,
@@ -115,7 +124,9 @@ public sealed class LeaderStatsStore
 {
     public const int MinimumRankedGames = 20;
     public const int MinimumCountedTurn = 8;
+    public const int MatchupLeaderboardLimit = 20;
     public const int MatchupMatrixLeaderLimit = 15;
+    public const int StartingHandCardLimit = 10;
     public const int StatsVersion = 1;
 
     private readonly object _lock = new();
@@ -196,6 +207,16 @@ public sealed class LeaderStatsStore
 
                 CREATE INDEX IF NOT EXISTS ix_match_results_counted_ended
                     ON match_results(counted, ended_at_utc);
+
+                CREATE TABLE IF NOT EXISTS match_starting_hand_cards (
+                    match_id            TEXT NOT NULL,
+                    player_index        INTEGER NOT NULL,
+                    card_number         TEXT NOT NULL,
+                    PRIMARY KEY (match_id, player_index, card_number)
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_match_starting_hand_cards_match
+                    ON match_starting_hand_cards(match_id, player_index);
                 """;
             command.ExecuteNonQuery();
             _initialized = true;
@@ -215,7 +236,9 @@ public sealed class LeaderStatsStore
             var (counted, excludeReason) = EvaluateEligibility(result);
 
             using var connection = OpenWriteConnection();
+            using var transaction = connection.BeginTransaction();
             using var command = connection.CreateCommand();
+            command.Transaction = transaction;
             command.CommandText = """
                 INSERT OR IGNORE INTO match_results (
                     match_id, ended_at_utc, match_kind,
@@ -244,6 +267,12 @@ public sealed class LeaderStatsStore
             command.Parameters.AddWithValue("$excludeReason", (object?)excludeReason ?? DBNull.Value);
             command.Parameters.AddWithValue("$statsVersion", StatsVersion);
             var inserted = command.ExecuteNonQuery() == 1;
+            if (inserted && counted)
+            {
+                RecordStartingHandCards(connection, transaction, result.MatchId, 0, result.Player0StartingHand);
+                RecordStartingHandCards(connection, transaction, result.MatchId, 1, result.Player1StartingHand);
+            }
+            transaction.Commit();
             if (inserted) _leaderboardCache.Clear();
             return inserted;
         }
@@ -314,7 +343,7 @@ public sealed class LeaderStatsStore
         }
     }
 
-    /// <summary>统计指定 Leader 对阵当前周期排行榜前十名的表现。</summary>
+    /// <summary>统计指定 Leader 对阵当前周期排行榜前二十名的表现，以及起手留牌使用率。</summary>
     public LeaderMatchupSnapshot GetMatchups(string leaderNumber, string? requestedPeriod, DateTime? nowUtc = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(leaderNumber);
@@ -322,7 +351,7 @@ public sealed class LeaderStatsStore
         var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);
         var topLeaders = leaderboard.Items
             .Where(x => x.Rank is not null)
-            .Take(10)
+            .Take(MatchupLeaderboardLimit)
             .ToArray();
 
         lock (_lock)
@@ -334,6 +363,7 @@ public sealed class LeaderStatsStore
             using var connection = OpenLeaderboardConnection();
             var rows = ReadMatchupRows(connection, normalizedLeader, leaderboard.SinceUtc);
             var mirror = ReadMirrorRow(connection, normalizedLeader, leaderboard.SinceUtc);
+            var startingHand = ReadStartingHandStats(connection, normalizedLeader, leaderboard.SinceUtc);
             var items = topLeaders.Select(opponent =>
             {
                 var rank = opponent.Rank!.Value;
@@ -375,7 +405,9 @@ public sealed class LeaderStatsStore
                 leaderboard.GeneratedAtUtc,
                 leaderboard.SinceUtc,
                 normalizedLeader,
-                items);
+                items,
+                startingHand.SampleGames,
+                startingHand.Items);
         }
     }
 
@@ -691,6 +723,110 @@ public sealed class LeaderStatsStore
         return rows;
     }
 
+    private static void RecordStartingHandCards(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string matchId,
+        int playerIndex,
+        IReadOnlyList<string>? cards)
+    {
+        if (cards is null) return;
+
+        var distinctCards = cards
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .Select(card => card.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (distinctCards.Length == 0) return;
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT OR IGNORE INTO match_starting_hand_cards (match_id, player_index, card_number)
+            VALUES ($matchId, $playerIndex, $cardNumber);
+            """;
+        command.Parameters.AddWithValue("$matchId", matchId);
+        command.Parameters.AddWithValue("$playerIndex", playerIndex);
+        var cardParameter = command.Parameters.Add("$cardNumber", SqliteType.Text);
+        foreach (var card in distinctCards)
+        {
+            cardParameter.Value = card;
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static StartingHandStats ReadStartingHandStats(
+        SqliteConnection connection,
+        string leaderNumber,
+        DateTime? sinceUtc)
+    {
+        // 允许测试服暂时读取尚未完成迁移的只读榜单库；此时起手分析显示为等待采样，其他统计照常可用。
+        using (var schemaCommand = connection.CreateCommand())
+        {
+            schemaCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'match_starting_hand_cards' LIMIT 1;";
+            if (schemaCommand.ExecuteScalar() is null)
+                return new StartingHandStats(0, Array.Empty<LeaderStartingHandItem>());
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH leader_matches AS (
+                SELECT match_id, 0 AS player_index
+                FROM match_results
+                WHERE counted = 1
+                  AND finish_reason NOT LIKE '%断线%'
+                  AND LOWER(finish_reason) NOT LIKE '%disconnect%'
+                  AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
+                  AND player0_leader = $leaderNumber
+                UNION ALL
+                SELECT match_id, 1 AS player_index
+                FROM match_results
+                WHERE counted = 1
+                  AND finish_reason NOT LIKE '%断线%'
+                  AND LOWER(finish_reason) NOT LIKE '%disconnect%'
+                  AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
+                  AND player1_leader = $leaderNumber
+            ), sampled_matches AS (
+                SELECT DISTINCT leader_matches.match_id, leader_matches.player_index
+                FROM leader_matches
+                INNER JOIN match_starting_hand_cards
+                    ON match_starting_hand_cards.match_id = leader_matches.match_id
+                   AND match_starting_hand_cards.player_index = leader_matches.player_index
+            ), card_counts AS (
+                SELECT match_starting_hand_cards.card_number, COUNT(*) AS games
+                FROM sampled_matches
+                INNER JOIN match_starting_hand_cards
+                    ON match_starting_hand_cards.match_id = sampled_matches.match_id
+                   AND match_starting_hand_cards.player_index = sampled_matches.player_index
+                GROUP BY match_starting_hand_cards.card_number
+            )
+            SELECT
+                (SELECT COUNT(*) FROM sampled_matches) AS sample_games,
+                card_number,
+                games
+            FROM card_counts
+            ORDER BY games DESC, card_number ASC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$leaderNumber", leaderNumber);
+        command.Parameters.AddWithValue("$sinceUtc", sinceUtc is null ? DBNull.Value : ToDatabaseUtc(sinceUtc.Value));
+        command.Parameters.AddWithValue("$limit", StartingHandCardLimit);
+
+        var items = new List<LeaderStartingHandItem>();
+        var sampleGames = 0;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            sampleGames = reader.GetInt32(0);
+            var games = reader.GetInt32(2);
+            items.Add(new LeaderStartingHandItem(
+                reader.GetString(1),
+                games,
+                sampleGames == 0 ? 0 : games / (double)sampleGames));
+        }
+        return new StartingHandStats(sampleGames, items);
+    }
+
     private static Dictionary<string, MatchupAggregateRow> ReadMatchupRows(
         SqliteConnection connection,
         string leaderNumber,
@@ -930,6 +1066,8 @@ public sealed class LeaderStatsStore
         int SecondWins);
 
     private sealed record MirrorAggregateRow(int Games, int FirstWins, int SecondWins);
+
+    private sealed record StartingHandStats(int SampleGames, IReadOnlyList<LeaderStartingHandItem> Items);
 
     private sealed record PlayerAppearanceRow(
         DateTime EndedAtUtc,

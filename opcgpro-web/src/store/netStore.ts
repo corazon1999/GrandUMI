@@ -87,7 +87,7 @@ interface NetStore {
   friendSearchResults: FriendSearchPlayer[];
   // 最近一次 Leader 排行榜回包
   leaderLeaderboard: MsgLeaderLeaderboard | null;
-  // 点击榜单项后按“周期:Leader”保存的对战前十统计
+  // 点击榜单项后按“周期:Leader”保存的对战前二十及起手留牌统计
   leaderMatchups: Record<string, MsgLeaderMatchups>;
   // 当前周期榜前十五的完整对阵矩阵
   leaderMatchupMatrix: MsgLeaderMatchupMatrix | null;

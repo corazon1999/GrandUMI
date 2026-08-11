@@ -675,7 +675,7 @@ function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
   if (msg.result === false && msg.error) showMessage(msg.error, "error");
 }
 
-/** MsgLeaderMatchups — 指定 Leader 对阵当前周期榜前十的统计。 */
+/** MsgLeaderMatchups — 指定 Leader 对阵当前周期榜前二十及起手留牌的统计。 */
 function handleLeaderMatchups(msg: MsgLeaderMatchups) {
   useNetStore.getState().setLeaderMatchups(msg);
 }

@@ -48,6 +48,56 @@ function matchupTier(item: LeaderMatchupItem): TierStyle {
   return { label: "劣", icon: "▼▼", className: "border-red-500/40 bg-red-500/10 text-red-300" };
 }
 
+function StartingHandAnalysis({ data }: { data: MsgLeaderMatchups }) {
+  const items = data.startingHandItems ?? [];
+  const sampleGames = data.startingHandSampleGames ?? 0;
+
+  return (
+    <section className="mt-4 rounded-xl border border-sky-500/20 bg-slate-950/70 p-3 @[640px]:p-4">
+      <header className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div>
+          <h4 className="text-sm font-bold text-white">起手留牌前 10</h4>
+          <p className="mt-0.5 text-[11px] text-gray-500">以双方完成换牌后的最终起手牌统计</p>
+        </div>
+        <p className="text-[11px] text-sky-200/70">已采样 {sampleGames} 场</p>
+      </header>
+
+      {items.length === 0 ? (
+        <div className="grid min-h-24 place-items-center rounded-lg border border-dashed border-gray-800 px-4 text-center text-xs leading-5 text-gray-600">
+          暂无起手留牌数据；完成的新对局会自动计入统计。
+        </div>
+      ) : (
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+          <ol className="flex min-w-max gap-2">
+            {items.map((item, index) => {
+              const card = getCard(item.cardNumber);
+              const sprite = latestLeaderSprite(card);
+              return (
+                <li key={item.cardNumber} className="w-[76px] shrink-0 rounded-lg border border-gray-800 bg-gray-900/80 p-1.5 text-center">
+                  <div className="relative mx-auto h-[86px] w-[60px] overflow-hidden rounded border border-gray-700 bg-gray-950">
+                    <Image
+                      src={thumbSrc(sprite)}
+                      alt={card?.name ?? item.cardNumber}
+                      fill
+                      sizes="60px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <p className="mt-1 truncate text-[10px] font-medium text-gray-300" title={card?.name ?? item.cardNumber}>
+                    {index + 1}. {card?.name ?? item.cardNumber}
+                  </p>
+                  <p className="mt-0.5 text-xs font-black tabular-nums text-sky-200">{percent(item.percentage)}</p>
+                  <p className="text-[9px] text-gray-600">{item.games} 场</p>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function LeaderMatchupBreakdown({ data, onRetry }: Props) {
   const loading = data == null || data.result == null;
 
@@ -55,7 +105,7 @@ export default function LeaderMatchupBreakdown({ data, onRetry }: Props) {
     <section className="rounded-xl border border-orange-500/20 bg-gray-950/90 p-3 @[640px]:p-4">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-bold text-white">对阵当前排行榜前 10</h3>
+          <h3 className="text-sm font-bold text-white">对阵当前排行榜前 20</h3>
           <p className="mt-0.5 text-[11px] text-gray-600">胜率按所选 Leader 的视角统计；少于 5 场会标记样本不足</p>
         </div>
         <p className="hidden text-[10px] text-gray-600 @[760px]:block">大优 ≥60% · 优 ≥55% · 平 45%–55% · 小劣 ≥40% · 劣 &lt;40%</p>
@@ -83,8 +133,9 @@ export default function LeaderMatchupBreakdown({ data, onRetry }: Props) {
           当前周期还没有满足排名门槛的 Leader
         </div>
       ) : (
-        <div className="grid gap-2 @[760px]:grid-cols-2 @[1280px]:grid-cols-5">
-          {data.items?.map((item) => {
+        <>
+          <div className="grid gap-2 @[760px]:grid-cols-2 @[1280px]:grid-cols-5">
+            {data.items?.map((item) => {
             const card = getCard(item.leaderNumber);
             const tier = matchupTier(item);
             const lowSample = item.games > 0 && item.games < 5;
@@ -139,8 +190,10 @@ export default function LeaderMatchupBreakdown({ data, onRetry }: Props) {
                 </div>
               </article>
             );
-          })}
-        </div>
+            })}
+          </div>
+          <StartingHandAnalysis data={data} />
+        </>
       )}
     </section>
   );

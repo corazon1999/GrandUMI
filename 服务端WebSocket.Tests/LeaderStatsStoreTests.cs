@@ -128,7 +128,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
         var store = CreateStore();
         const string target = "L-TARGET";
 
-        for (var opponentIndex = 1; opponentIndex <= 9; opponentIndex++)
+        for (var opponentIndex = 1; opponentIndex <= 19; opponentIndex++)
         {
             var opponent = $"L-{opponentIndex}";
             for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
@@ -161,14 +161,14 @@ public sealed class LeaderStatsStoreTests : IDisposable
         for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames - 1; gameIndex++)
         {
             store.RecordMatch(Match(
-                $"unranked-{gameIndex}", now, MatchKind.RoomCode, target, "L-10", 1, gameIndex % 2, 12));
+                $"unranked-{gameIndex}", now, MatchKind.RoomCode, target, "L-20", 1, gameIndex % 2, 12));
         }
 
         var result = store.GetMatchups(target, "all", now);
 
         Assert.Equal(target, result.LeaderNumber);
-        Assert.Equal(10, result.Items.Count);
-        Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "L-10");
+        Assert.Equal(LeaderStatsStore.MatchupLeaderboardLimit, result.Items.Count);
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "L-20");
 
         var opponentRow = Assert.Single(result.Items, x => x.LeaderNumber == "L-1");
         Assert.False(opponentRow.IsMirror);
@@ -189,6 +189,28 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Null(mirrorRow.Losses);
         Assert.Equal(0.6, mirrorRow.FirstWinRate!.Value, precision: 8);
         Assert.Equal(0.4, mirrorRow.SecondWinRate!.Value, precision: 8);
+    }
+
+    [Fact]
+    public void 起手留牌按换牌完成后的每局出现率统计并去重()
+    {
+        var now = new DateTime(2026, 8, 12, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+
+        store.RecordMatch(Match(
+            "hand-1", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8,
+            ["OP01-001", "OP01-001", "OP01-002"], ["OP01-003"]));
+        store.RecordMatch(Match(
+            "hand-2", now.AddMinutes(1), MatchKind.Matchmaking, "L-A", "L-C", 1, 1, 8,
+            ["OP01-001", "OP01-004"], ["OP01-005"]));
+
+        var result = store.GetMatchups("L-A", "all", now.AddMinutes(2));
+
+        Assert.Equal(2, result.StartingHandSampleGames);
+        var topCard = Assert.Single(result.StartingHandItems, item => item.CardNumber == "OP01-001");
+        Assert.Equal(2, topCard.Games);
+        Assert.Equal(1, topCard.Percentage, precision: 8);
+        Assert.Equal(1, Assert.Single(result.StartingHandItems, item => item.CardNumber == "OP01-002").Games);
     }
 
     [Fact]
@@ -382,7 +404,9 @@ public sealed class LeaderStatsStoreTests : IDisposable
         string leader1,
         int winner,
         int firstPlayer,
-        int turnCount)
+        int turnCount,
+        IReadOnlyList<string>? player0StartingHand = null,
+        IReadOnlyList<string>? player1StartingHand = null)
         => new(
             id,
             endedAtUtc,
@@ -394,7 +418,9 @@ public sealed class LeaderStatsStoreTests : IDisposable
             winner,
             firstPlayer,
             turnCount,
-            "测试结束");
+            "测试结束",
+            player0StartingHand,
+            player1StartingHand);
 
     private static string HashAccount(string account)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant()))).ToLowerInvariant();

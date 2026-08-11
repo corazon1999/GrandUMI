@@ -1294,6 +1294,7 @@ public class GameEngine
         if (State.MulliganBothDone)
         {
             State.MulliganDeadlineUtc = null;
+            CaptureStartingHands();
             TurnEngine.StartFirstTurn(State);
             // 注册双方领袖的永续被动（如 OP16-080【对方回合中】我方角色费用+1）。
             // 注册为纯状态写入（无 prompt），同步完成后再广播，使快照立即包含该效果。
@@ -1303,6 +1304,16 @@ public class GameEngine
         else
         {
             Broadcast("MulliganUpdate");
+        }
+    }
+
+    private void CaptureStartingHands()
+    {
+        for (var playerIndex = 0; playerIndex < State.Players.Length; playerIndex++)
+        {
+            var cards = State.StartingHandCardNumbers[playerIndex];
+            cards.Clear();
+            cards.AddRange(State.Players[playerIndex].Hand.Select(card => card.Info.Number));
         }
     }
 

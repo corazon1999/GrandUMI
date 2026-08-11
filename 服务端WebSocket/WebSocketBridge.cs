@@ -1621,6 +1621,13 @@ public static class WebSocketBridge
                 generatedAtUtc = snapshot.GeneratedAtUtc,
                 sinceUtc = snapshot.SinceUtc,
                 leaderNumber = snapshot.LeaderNumber,
+                startingHandSampleGames = snapshot.StartingHandSampleGames,
+                startingHandItems = snapshot.StartingHandItems.Select(x => new
+                {
+                    cardNumber = x.CardNumber,
+                    games = x.Games,
+                    percentage = x.Percentage,
+                }),
                 items = snapshot.Items.Select(x => new
                 {
                     rank = x.Rank,

@@ -1625,7 +1625,9 @@ public static class GameRoomManager
                 state.WinnerIndex,
                 state.FirstPlayer,
                 state.TurnCount,
-                state.GameOverReason ?? "");
+                state.GameOverReason ?? "",
+                state.StartingHandCardNumbers[0],
+                state.StartingHandCardNumbers[1]);
             LeaderStatsStore.Default.RecordMatch(result);
             LeaderChampionStore.Default.RecordMatch(result);
         }

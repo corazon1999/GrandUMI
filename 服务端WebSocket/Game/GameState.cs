@@ -62,6 +62,9 @@ public class GameState
     public string? GameOverReason { get; set; }
     public bool IsGameOver => WinnerIndex.HasValue;
 
+    /// <summary>双方完成换牌后最终保留的起手牌卡号，用于对局结束时写入公开 Leader 统计。</summary>
+    public List<string>[] StartingHandCardNumbers { get; } = [new(), new()];
+
     /// <summary>公开匹配的双方独立操作棋钟；选择先后手与调度手牌阶段不启用。</summary>
     public bool OperationClockEnabled { get; set; }
     public long[] OperationClockRemainingMs { get; } = [1_200_000, 1_200_000];

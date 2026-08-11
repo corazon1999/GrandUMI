@@ -666,7 +666,13 @@ export interface LeaderMatchupItem {
   isMirror: boolean;
 }
 
-/** 点击榜单项后，查询该 Leader 对阵当前周期榜前十的统计。 */
+export interface LeaderStartingHandItem {
+  cardNumber: string;
+  games: number;
+  percentage: number;
+}
+
+/** 点击榜单项后，查询该 Leader 对阵当前周期榜前二十的统计及起手留牌数据。 */
 export interface MsgLeaderMatchups extends MsgBase {
   proto: "MsgLeaderMatchups";
   period: LeaderboardPeriod;
@@ -676,6 +682,8 @@ export interface MsgLeaderMatchups extends MsgBase {
   generatedAtUtc?: string;
   sinceUtc?: string | null;
   items?: LeaderMatchupItem[];
+  startingHandSampleGames?: number;
+  startingHandItems?: LeaderStartingHandItem[];
 }
 
 export interface LeaderMatchupMatrixRow {
