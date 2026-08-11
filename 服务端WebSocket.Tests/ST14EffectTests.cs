@@ -7,6 +7,30 @@ namespace GrandUMI.Tests;
 
 public class ST14EffectTests
 {
+    [Fact]
+    public async Task ST14_017_SunnyGo_OnlyBoostsOwnMatchingCharactersOnField()
+    {
+        var state = TestScene.New(myLeaderNumber: "ST14-001")
+            .MyCharacter("ST14-007")
+            .MyHandAdd("ST14-007")
+            .OppCharacter("ST14-007")
+            .MyDeckTop("OP15-050")
+            .Build();
+
+        var ownFieldCharacter = state.Players[0].Characters[0];
+        var ownHandCharacter = state.Players[0].Hand[0];
+        var opponentFieldCharacter = state.Players[1].Characters[0];
+        var sunny = new CardInstance { Info = CardDatabase.Get("ST14-017")! };
+        state.Players[0].StageCard = sunny;
+
+        await EffectRuntime.Resolve(
+            state, 0, sunny, EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(ownFieldCharacter.Info.Cost + 1, state.CurrentCostOf(0, ownFieldCharacter));
+        Assert.Equal(ownHandCharacter.Info.Cost, state.HandPlayCost(0, ownHandCharacter));
+        Assert.Equal(opponentFieldCharacter.Info.Cost, state.CurrentCostOf(1, opponentFieldCharacter));
+    }
+
     [Theory]
     [InlineData(EffectTrigger.OnEnterField)]
     [InlineData(EffectTrigger.OnAttackDeclare)]

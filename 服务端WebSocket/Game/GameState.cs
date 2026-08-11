@@ -38,6 +38,9 @@ public class GameState
     /// <summary>最终骰点较大、拥有先后手选择权的玩家索引；非骰点开局为 -1。</summary>
     public int StartingPlayerChooser { get; set; } = -1;
 
+    /// <summary>骰点胜者选择先后手的服务端权威截止时间；null 表示已完成选择或无需骰点。</summary>
+    public DateTime? StartingPlayerChoiceDeadlineUtc { get; set; }
+
     /// <summary>是否已经确定第一回合的先攻方。</summary>
     public bool StartingPlayerChosen => FirstPlayer is 0 or 1;
 
@@ -430,9 +433,6 @@ public class EndTurnTask
 {
     public required string Kind { get; init; }      // 如 "TrashFilm"、"RefreshOwnDon"、"ReturnSelfToHand"
     public string? SourceCardId { get; init; }
-    /// <summary>骰点胜者选择先后手的服务端权威截止时间；null 表示已完成选择或无需骰点。</summary>
-    public DateTime? StartingPlayerChoiceDeadlineUtc { get; set; }
-
     public int Owner { get; init; }
 }
 

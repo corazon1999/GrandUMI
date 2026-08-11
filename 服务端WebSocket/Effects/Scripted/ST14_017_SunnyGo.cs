@@ -26,6 +26,7 @@ public class ST14_017_SunnyGo : IScriptedEffect
             CostDelta = 1,
             Predicate = (s, sideIdx, card) =>
                 sideIdx == owner &&
+                s.Players[owner].Characters.Any(character => character.Id == card.Id) &&
                 card.Id != s.Players[owner].Leader.Id &&
                 card.Info.HasKeyword("草帽一伙") &&
                 card.Info.ColorList.Contains("黑"),
