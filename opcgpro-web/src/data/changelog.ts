@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-11-card-assets-network-resilience-release",
+    version: "2026.08.11.3",
+    date: "2026-08-11",
+    title: "卡图与卡背加载稳定性优化",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "卡图或自定义卡背遇到线路无响应时会自动切换备用入口，不再无限空白等待；所有候选入口都失败时会显示明确占位。",
+          "卡背广场读取超过 8 秒会显示超时提示和重试按钮，玩家无需刷新整个网页。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "卡牌数据和图片启用长期边缘缓存，已缓存资源的加载延迟显著降低。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-11-gameplay-network-stability-release",
     version: "2026.08.11.2",
     date: "2026-08-11",
