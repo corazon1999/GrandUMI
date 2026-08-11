@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
 import { resolveGameLayout } from "@/lib/gameLayout";
+import MobileFullscreenButton from "@/components/game/MobileFullscreenButton";
 
 export default function LayoutPreviewRoute({ children }: { children: ReactNode }) {
   const { mode, setGameOverlayHost } = useLayoutSettings();
@@ -30,6 +31,7 @@ export default function LayoutPreviewRoute({ children }: { children: ReactNode }
     >
       <div className="layout-preview-route relative h-full w-full overflow-hidden">
         {children}
+        {isPhonePortrait && <MobileFullscreenButton />}
         <div
           ref={setGameOverlayHost}
           className="pointer-events-none absolute inset-0 z-[10000]"

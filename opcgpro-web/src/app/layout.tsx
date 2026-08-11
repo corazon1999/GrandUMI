@@ -8,6 +8,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "GrandUMI",
   description: "One Piece Card Game Online",
+  appleWebApp: {
+    capable: true,
+    title: "GrandUMI",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
