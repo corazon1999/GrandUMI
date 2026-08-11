@@ -23,6 +23,8 @@ if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringC
     var backfillStore = new LeaderStatsStore(args[2]);
     backfillStore.Initialize();
     var report = LeaderStatsBackfill.ImportDirectory(args[1], backfillStore);
+    var backfillChampionStore = new LeaderChampionStore(args[2]);
+    backfillChampionStore.Initialize();
     Console.WriteLine(
         $"[LeaderStats 回填] 扫描 {report.FilesScanned}，新增 {report.Imported}，已存在 {report.AlreadyRecorded}，" +
         $"未结束 {report.SkippedIncomplete}，无效 {report.SkippedInvalid}，错误 {report.Errors.Count}");
@@ -47,7 +49,8 @@ LeaderStatsStore.Default.Initialize();
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
 LeaderChampionStore.Default.Initialize();
-Console.WriteLine($"[LeaderChampion] SQLite: {LeaderChampionStore.Default.DatabasePath}");
+Console.WriteLine($"[LeaderChampion] 写入 SQLite: {LeaderChampionStore.Default.DatabasePath}");
+Console.WriteLine($"[LeaderChampion] 榜单 SQLite: {LeaderChampionStore.Default.LeaderboardDatabasePath}");
 RankedStore.Default.Initialize();
 Console.WriteLine($"[排位] SQLite: {RankedStore.Default.DatabasePath}");
 

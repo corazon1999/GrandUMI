@@ -57,6 +57,67 @@ public sealed class LeaderChampionStoreTests : IDisposable
         Assert.False(store.IsChampion("Alice", "OP16-001", now));
     }
 
+    [Fact]
+    public void 多个Leader会分别加载各自的最强使用者()
+    {
+        var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        for (var index = 0; index < LeaderChampionStore.MinimumChampionGames; index++)
+        {
+            store.RecordMatch(Match($"ace-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 0));
+            store.RecordMatch(Match($"kid-{index}", now, "Bob", "Opponent-B", "OP17-020", "OP02-001", 0));
+            store.RecordMatch(Match($"bonney-{index}", now, "Carol", "Opponent-C", "OP17-039", "OP03-001", 0));
+        }
+
+        Assert.Equal("OP16-001", store.GetChampion("OP16-001", now)?.LeaderNumber);
+        Assert.Equal("OP17-020", store.GetChampion("OP17-020", now)?.LeaderNumber);
+        Assert.Equal("OP17-039", store.GetChampion("OP17-039", now)?.LeaderNumber);
+        Assert.True(store.IsChampion("Alice", "OP16-001", now));
+        Assert.True(store.IsChampion("Bob", "OP17-020", now));
+        Assert.True(store.IsChampion("Carol", "OP17-039", now));
+    }
+
+    [Fact]
+    public void 测试服从独立排行榜数据库读取最强使用者()
+    {
+        var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
+        Directory.CreateDirectory(_tempDir);
+        var writePath = Path.Combine(_tempDir, "test-server.db");
+        var leaderboardPath = Path.Combine(_tempDir, "production-leaderboard.db");
+        var leaderboardStore = new LeaderChampionStore(leaderboardPath);
+        for (var index = 0; index < LeaderChampionStore.MinimumChampionGames; index++)
+        {
+            leaderboardStore.RecordMatch(Match(
+                $"production-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 0));
+        }
+
+        var testServerStore = new LeaderChampionStore(writePath, leaderboardPath);
+        testServerStore.Initialize();
+
+        Assert.Equal(Path.GetFullPath(writePath), testServerStore.DatabasePath);
+        Assert.Equal(Path.GetFullPath(leaderboardPath), testServerStore.LeaderboardDatabasePath);
+        Assert.True(testServerStore.IsChampion("Alice", "OP16-001", now));
+    }
+
+    [Fact]
+    public void 初始化时会从历史排行榜数据回填最强使用者()
+    {
+        var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
+        Directory.CreateDirectory(_tempDir);
+        var databasePath = Path.Combine(_tempDir, "leader-stats.db");
+        var statsStore = new LeaderStatsStore(databasePath);
+        for (var index = 0; index < LeaderChampionStore.MinimumChampionGames; index++)
+        {
+            Assert.True(statsStore.RecordMatch(Match(
+                $"history-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 0)));
+        }
+
+        var championStore = new LeaderChampionStore(databasePath);
+        championStore.Initialize();
+
+        Assert.True(championStore.IsChampion("Alice", "OP16-001", now));
+    }
+
     private LeaderChampionStore CreateStore()
     {
         Directory.CreateDirectory(_tempDir);

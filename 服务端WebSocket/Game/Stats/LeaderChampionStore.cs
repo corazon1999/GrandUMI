@@ -24,18 +24,23 @@ public sealed class LeaderChampionStore
 
     private readonly object _lock = new();
     private readonly string _databasePath;
-    private readonly string _connectionString;
+    private readonly string _leaderboardDatabasePath;
+    private readonly string _writeConnectionString;
+    private readonly string _leaderboardConnectionString;
     private DateTime _cacheCreatedAtUtc;
     private IReadOnlyDictionary<string, LeaderChampion>? _champions;
     private bool _initialized;
 
     // 与 Leader 战绩事实表共用数据库：首次启用时可直接从已记录的有效对局计算称号。
-    public static LeaderChampionStore Default { get; } = new(LeaderStatsStore.Default.DatabasePath);
+    public static LeaderChampionStore Default { get; } = new(
+        LeaderStatsStore.Default.DatabasePath,
+        LeaderStatsStore.Default.LeaderboardDatabasePath);
 
-    public LeaderChampionStore(string? databasePath = null)
+    public LeaderChampionStore(string? databasePath = null, string? leaderboardDatabasePath = null)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultDatabasePath());
-        _connectionString = new SqliteConnectionStringBuilder
+        _leaderboardDatabasePath = Path.GetFullPath(leaderboardDatabasePath ?? _databasePath);
+        _writeConnectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
@@ -43,9 +48,23 @@ public sealed class LeaderChampionStore
             Pooling = false,
             DefaultTimeout = 5,
         }.ToString();
+        _leaderboardConnectionString = string.Equals(
+            _databasePath,
+            _leaderboardDatabasePath,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+            ? _writeConnectionString
+            : new SqliteConnectionStringBuilder
+            {
+                DataSource = _leaderboardDatabasePath,
+                Mode = SqliteOpenMode.ReadOnly,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false,
+                DefaultTimeout = 5,
+            }.ToString();
     }
 
     public string DatabasePath => _databasePath;
+    public string LeaderboardDatabasePath => _leaderboardDatabasePath;
 
     public void Initialize()
     {
@@ -55,7 +74,7 @@ public sealed class LeaderChampionStore
             var parent = Path.GetDirectoryName(_databasePath);
             if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
 
-            using var connection = OpenConnection();
+            using var connection = OpenWriteConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 PRAGMA journal_mode = WAL;
@@ -88,7 +107,7 @@ public sealed class LeaderChampionStore
         lock (_lock)
         {
             Initialize();
-            using var connection = OpenConnection();
+            using var connection = OpenWriteConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT OR IGNORE INTO champion_match_results (
@@ -149,7 +168,10 @@ public sealed class LeaderChampionStore
             if (nowUtc is null && _champions is not null && generatedAtUtc - _cacheCreatedAtUtc < TimeSpan.FromSeconds(15))
                 return _champions;
 
-            using var connection = OpenConnection();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("最强使用者排行榜数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT player_key, leader_number, COUNT(*) AS games, SUM(won) AS wins
@@ -177,8 +199,8 @@ public sealed class LeaderChampionStore
                 var games = reader.GetInt32(2);
                 var wins = reader.GetInt32(3);
                 candidates.Add(new LeaderChampion(
-                    reader.GetString(0),
                     reader.GetString(1),
+                    reader.GetString(0),
                     games,
                     wins,
                     WilsonLowerBound(wins, games)));
@@ -225,9 +247,16 @@ public sealed class LeaderChampionStore
             / (1 + z2 / games);
     }
 
-    private SqliteConnection OpenConnection()
+    private SqliteConnection OpenWriteConnection()
     {
-        var connection = new SqliteConnection(_connectionString);
+        var connection = new SqliteConnection(_writeConnectionString);
+        connection.Open();
+        return connection;
+    }
+
+    private SqliteConnection OpenLeaderboardConnection()
+    {
+        var connection = new SqliteConnection(_leaderboardConnectionString);
         connection.Open();
         return connection;
     }
