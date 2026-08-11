@@ -9,6 +9,6 @@ test("结算时玩家和观战者都显示双方手牌", async () => {
 
   assert.match(source, /const isGameOver = useGameStore\(\(s\) => s\.isGameOver\)/);
   assert.match(source, /hidden=\{!isPlayback && !revealHands\}/);
-  assert.match(source, /hidden=\{isObserver && !revealHands\}/);
+  assert.match(source, /hidden=\{isObserver && !revealHands && !revealObserverHand\}/);
   assert.equal((source.match(/revealHands=\{isGameOver\}/g) ?? []).length, 2);
 });

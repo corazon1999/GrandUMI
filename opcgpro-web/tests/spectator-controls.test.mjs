@@ -34,6 +34,14 @@ test("手牌申请、审批、冷却与踢出都有局内交互", async () => {
   assert.match(protocol, /setNavigateTo\("\/home"\)/);
 });
 
+test("观战授权后仅公开主视角手牌", async () => {
+  const board = await read("src/components/game/GameBoard.tsx");
+  assert.match(board, /const spectatorHandVisible = useGameStore\(\(s\) => s\.spectatorHandVisible\)/);
+  assert.match(board, /side="opponent"[\s\S]{0,160}revealHands=\{isGameOver\}/);
+  assert.match(board, /side="my"[\s\S]{0,200}revealObserverHand=\{isObserver && spectatorHandVisible\}/);
+  assert.doesNotMatch(board, /side="opponent"[\s\S]{0,160}spectatorHandVisible/);
+});
+
 test("局内新增固定控件使用安全区变量", async () => {
   const [panel, page] = await Promise.all([
     read("src/components/game/GameChatPanel.tsx"),

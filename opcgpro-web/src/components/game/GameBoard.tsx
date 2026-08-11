@@ -33,11 +33,13 @@ function PlayerMat({
   isObserver,
   isPlayback,
   revealHands,
+  revealObserverHand = false,
 }: {
   side: "my" | "opponent";
   isObserver: boolean;
   isPlayback: boolean;
   revealHands: boolean;
+  revealObserverHand?: boolean;
 }) {
   const isOpponent = side === "opponent";
   const leaderStage = (
@@ -103,7 +105,7 @@ function PlayerMat({
           </div>
         ) : (
           <div className="relative -ml-[233px] min-h-0 min-w-0">
-            <HandArea side={side} hidden={isObserver && !revealHands} />
+            <HandArea side={side} hidden={isObserver && !revealHands && !revealObserverHand} />
           </div>
         )}
       </div>
@@ -287,6 +289,7 @@ export default function GameBoard({
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const spectatorHandVisible = useGameStore((s) => s.spectatorHandVisible);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
   const myChampionLeaderNumber = useGameStore((s) => s.my?.championLeaderNumber);
@@ -341,6 +344,7 @@ export default function GameBoard({
                   isObserver={isObserver}
                   isPlayback={isPlayback}
                   revealHands={isGameOver}
+                  revealObserverHand={isObserver && spectatorHandVisible}
                 />
               </main>
 
