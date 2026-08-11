@@ -6,6 +6,7 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
+import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 import type { MsgLogin } from "@/types/net";
 
 const STATE_LABEL: Record<string, string> = {
@@ -121,7 +122,7 @@ export default function LoginPanel() {
 
   const handleRetry = () => {
     useNetStore.getState().setError(null);
-    NetManager.connect(process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws");
+    NetManager.connect(getWebSocketEndpoints());
   };
 
   const startChangingAccount = () => {

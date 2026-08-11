@@ -1,0 +1,13 @@
+direct.grand-umi.com {
+	encode zstd gzip
+	@ws path /ws /ws/*
+	handle @ws {
+		rewrite /ws /ws/
+		reverse_proxy 127.0.0.1:8080 {
+			header_up Host localhost
+		}
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

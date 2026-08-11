@@ -7,8 +7,7 @@ import { registerGameProtocols } from "@/net/GameProtocol";
 import { eventBus } from "@/net/eventBus";
 import type { ConnectionState } from "@/net/eventBus";
 import { useNetStore } from "@/store/netStore";
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
+import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 
 let protocolsRegistered = false;
 
@@ -32,7 +31,7 @@ export function useNet() {
 
     eventBus.on("stateChange", onStateChange);
     eventBus.on("reconnectCountdown", onReconnectCountdown);
-    NetManager.connect(WS_URL);
+    NetManager.connect(getWebSocketEndpoints());
 
     return () => {
       eventBus.off("stateChange", onStateChange);
