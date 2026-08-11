@@ -28,19 +28,24 @@ public class OP09_117_EffectTests
             unselectedEligible,
         ]);
         var prompts = new MockPromptService()
-            .QueueChoose(firstEligible.Id.ToString(), secondEligible.Id.ToString());
+            .QueueChoose(firstEligible.Id.ToString(), secondEligible.Id.ToString())
+            .QueueChoose(unselectedEligible.Id.ToString(), noTrigger.Id.ToString(), sameName.Id.ToString());
 
         await EffectRuntime.Resolve(
             state, 0, Card("OP09-117"), EffectTrigger.EventMain, prompts);
 
-        var prompt = Assert.Single(prompts.ChooseHistory);
+        var prompt = prompts.ChooseHistory[0];
         Assert.Equal("LookTopReveal", prompt.kind);
         Assert.Equal(0, prompt.min);
         Assert.Equal(2, prompt.max);
         Assert.Equal(
             new[] { firstEligible.Id.ToString(), secondEligible.Id.ToString(), unselectedEligible.Id.ToString() },
             prompt.choices);
+        var reorder = prompts.ChooseHistory[1];
+        Assert.Equal("ReorderToDeckBottom", reorder.kind);
+        Assert.Equal(3, reorder.min);
+        Assert.Equal(3, reorder.max);
         Assert.Equal(new[] { firstEligible, secondEligible }, player.Hand);
-        Assert.Equal(new[] { sameName, noTrigger, unselectedEligible }, player.Deck);
+        Assert.Equal(new[] { unselectedEligible, noTrigger, sameName }, player.Deck);
     }
 }

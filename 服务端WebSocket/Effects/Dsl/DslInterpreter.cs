@@ -1707,11 +1707,30 @@ public static class DslInterpreter
             // 检索规范：公开加入手牌的牌，短暂向双方展示
             ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
         }
-        // 其余仍在顶部的牌按原相对顺序放回卡组最下方 / 废弃区
+        // 废弃区的处理不涉及排序。放回卡组底时，原文要求由玩家决定余卡顺序。
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();
         foreach (var c in rest) me.Deck.Remove(c);
         if (restTo == "trash") me.Trash.AddRange(rest);
-        else me.Deck.AddRange(rest);
+        else if (rest.Count <= 1) me.Deck.AddRange(rest);
+        else
+        {
+            var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderToDeckBottom",
+                "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+                rest.Select(c => c.Id.ToString()).ToList(), rest.Count, rest.Count,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                });
+            var ordered = orderedIds
+                .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))
+                .Where(c => c is not null)
+                .Cast<CardInstance>()
+                .Distinct()
+                .ToList();
+            // 网络异常或旧客户端提交不完整时，不丢失卡牌；未提交的余卡保持原顺序。
+            ordered.AddRange(rest.Where(c => !ordered.Contains(c)));
+            me.Deck.AddRange(ordered);
+        }
     }
 
     static bool ColorMatches(CardInstance c, string color)
