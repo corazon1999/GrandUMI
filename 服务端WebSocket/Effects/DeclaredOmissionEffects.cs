@@ -284,6 +284,15 @@ public static class DeclaredOmissionEffects
                 });
                 return false;
 
+            case ("OP15-067", EffectTrigger.OnEnterField):
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), GrantKeyword = "速攻",
+                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
+                        && state.Players[ctx.OwnerIndex].TotalDonInCostArea <= 6,
+                });
+                break;
+
             case ("OP15-095", EffectTrigger.EventCounter):
                 if (me.Trash.Count < 15) return false;
                 break;
