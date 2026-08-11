@@ -167,6 +167,9 @@ backend_ready
 curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3000/
 curl -kfsS --retry 5 --retry-delay 1 --resolve assets.grand-umi.com:443:127.0.0.1 \
   -o /dev/null https://assets.grand-umi.com/sprites-thumb/CardBack.webp
+if ! timeout 180 bash "$repo/ops/server/prewarm-assets.sh" release; then
+  log "警告：静态资源预热未完整完成，正式服务保持运行。"
+fi
 echo "$approved" > "$deployed_file.next"
 mv "$deployed_file.next" "$deployed_file"
 rm -f "$approved_file"

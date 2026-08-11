@@ -7,6 +7,7 @@ const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", imp
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
+const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", import.meta.url), "utf8");
 
 test("production build routes hashed Next assets through the CDN origin", () => {
   assert.match(nextConfig, /assetPrefix: assetOrigin \|\| undefined/);
@@ -44,4 +45,15 @@ test("network shaping can be applied repeatedly after boot or deployment", () =>
   assert.match(networkTuning, /tc qdisc del dev "\$interface" root 2>\/dev\/null \|\| true/);
   assert.match(networkTuning, /tc qdisc add dev "\$interface" root handle 1: htb/);
   assert.match(networkTuning, /tc class add dev "\$interface" parent 1: classid 1:10/);
+});
+
+test("release prewarms new chunks and catalog mode covers card thumbnails", () => {
+  assert.match(prewarm, /append_files "\$root\/\.next\/static" "\/_next\/static"/);
+  assert.match(prewarm, /append_files "\$root\/public\/cards-thumb" "\/cards-thumb"/);
+  assert.match(prewarm, /append_files "\$root\/public\/sprites-thumb" "\/sprites-thumb"/);
+  assert.match(prewarm, /\/card-back-images\/\$id/);
+  assert.match(prewarm, /GRANDUMI_PREWARM_CONCURRENCY:-1/);
+  assert.match(prewarm, /GRANDUMI_PREWARM_RATE:-128K/);
+  assert.match(prewarm, /--limit-rate "\$rate"/);
+  assert.match(promote, /prewarm-assets\.sh" release/);
 });
