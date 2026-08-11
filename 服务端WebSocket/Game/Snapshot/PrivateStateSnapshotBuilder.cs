@@ -14,6 +14,7 @@ public static class PrivateStateSnapshotBuilder
             firstPlayer = state.FirstPlayer,
             firstPlayerChosen = state.StartingPlayerChosen,
             startingPlayerChooser = state.StartingPlayerChooser,
+            startingPlayerChoiceDeadlineUtc = state.StartingPlayerChoiceDeadlineUtc,
             startingDiceRolls = state.StartingDiceRounds.Select(round => new
             {
                 player0 = round.Player0,

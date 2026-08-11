@@ -41,6 +41,14 @@ public static class GameRoomManager
     /// <summary>roomId → 断线计时器</summary>
     private static readonly ConcurrentDictionary<string, CancellationTokenSource> _grace = new();
 
+    /// <summary>roomId → 先后手选择超时任务；实际结算仍排入房间串行队列。</summary>
+    private static readonly ConcurrentDictionary<string, StartingPlayerChoiceTimeout> _startingPlayerChoiceTimeouts = new();
+    private sealed record StartingPlayerChoiceTimeout(
+        DateTime DeadlineUtc,
+        CancellationTokenSource Cancellation,
+        CancellationToken Token,
+        int RetryAttempt);
+
     /// <summary>roomId → 调度手牌超时任务；实际结算仍排入房间串行队列。</summary>
     private static readonly ConcurrentDictionary<string, MulliganTimeout> _mulliganTimeouts = new();
     private sealed record MulliganTimeout(
@@ -238,6 +246,7 @@ public static class GameRoomManager
         WebSocketBridge.BroadcastSpectatorList(entry);
         StartActionWorker(entry);
         EnsureMulliganTimeout(entry);
+        EnsureStartingPlayerChoiceTimeout(entry);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         if (broadcastInitialState)
@@ -336,6 +345,7 @@ public static class GameRoomManager
             }
             EnsureOperationClockRunning(room);
             EnsureMulliganTimeout(room);
+            EnsureStartingPlayerChoiceTimeout(room);
             if (room.Engine.State.IsGameOver)
                 CleanupRoom(room.RoomId);
         }, receivedAt));
@@ -484,6 +494,132 @@ public static class GameRoomManager
     }
 
     /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
+    /// <summary>根据服务端权威截止时间创建或清除先后手选择超时任务。</summary>
+    private static void EnsureStartingPlayerChoiceTimeout(RoomEntry room, int retryAttempt = 0)
+    {
+        var deadline = room.Engine.State.StartingPlayerChoiceDeadlineUtc;
+        if (deadline is null || room.Engine.State.StartingPlayerChosen)
+        {
+            CancelStartingPlayerChoiceTimeout(room.RoomId);
+            return;
+        }
+
+        if (_startingPlayerChoiceTimeouts.TryGetValue(room.RoomId, out var current)
+            && current.DeadlineUtc == deadline.Value)
+            return;
+
+        var cancellation = new CancellationTokenSource();
+        var next = new StartingPlayerChoiceTimeout(deadline.Value, cancellation, cancellation.Token, retryAttempt);
+        while (true)
+        {
+            if (_startingPlayerChoiceTimeouts.TryGetValue(room.RoomId, out current))
+            {
+                if (current.DeadlineUtc == deadline.Value)
+                {
+                    next.Cancellation.Dispose();
+                    return;
+                }
+                if (!_startingPlayerChoiceTimeouts.TryUpdate(room.RoomId, next, current)) continue;
+                current.Cancellation.Cancel();
+                current.Cancellation.Dispose();
+            }
+            else if (!_startingPlayerChoiceTimeouts.TryAdd(room.RoomId, next))
+            {
+                continue;
+            }
+
+            StartStartingPlayerChoiceTimeoutWait(room, next);
+            return;
+        }
+    }
+
+    private static void StartStartingPlayerChoiceTimeoutWait(RoomEntry room, StartingPlayerChoiceTimeout timer)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    var delay = timer.DeadlineUtc - DateTime.UtcNow;
+                    if (delay <= TimeSpan.Zero) break;
+                    await Task.Delay(delay, timer.Token);
+                }
+
+                if (timer.Token.IsCancellationRequested) return;
+                var active = GetRoom(room.RoomId);
+                if (active is null || !ReferenceEquals(active, room)) return;
+
+                await EnqueueCriticalWorkAsync(active, new RoomWork("StartingPlayerChoiceTimeout", LatencyDiagnostics.Start(), async () =>
+                {
+                    if (active.Engine.State.StartingPlayerChoiceDeadlineUtc == timer.DeadlineUtc)
+                        await ResolveExpiredStartingPlayerChoiceAsync(active, DateTime.UtcNow);
+                    EnsureStartingPlayerChoiceTimeout(active);
+                    EnsureMulliganTimeout(active);
+                }), timer.Token);
+            }
+            catch (OperationCanceledException) when (timer.Token.IsCancellationRequested)
+            {
+                // 玩家已完成选择、房间已结束或权威截止时间已经更换。
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[先后手超时] 房间 {room.RoomId} 第 {timer.RetryAttempt + 1} 次计时任务异常: {ex.Message}");
+                if (!TryRemoveStartingPlayerChoiceTimeout(room.RoomId, timer)) return;
+
+                timer.Cancellation.Dispose();
+                var active = GetRoom(room.RoomId);
+                if (active is null
+                    || !ReferenceEquals(active, room)
+                    || active.Engine.State.StartingPlayerChoiceDeadlineUtc != timer.DeadlineUtc
+                    || active.Engine.State.StartingPlayerChosen)
+                    return;
+
+                if (timer.RetryAttempt >= 2) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * (timer.RetryAttempt + 1)));
+                var retryRoom = GetRoom(room.RoomId);
+                if (retryRoom is not null
+                    && ReferenceEquals(retryRoom, room)
+                    && retryRoom.Engine.State.StartingPlayerChoiceDeadlineUtc == timer.DeadlineUtc
+                    && !retryRoom.Engine.State.StartingPlayerChosen)
+                    EnsureStartingPlayerChoiceTimeout(retryRoom, timer.RetryAttempt + 1);
+            }
+        });
+    }
+
+    private static bool TryRemoveStartingPlayerChoiceTimeout(string roomId, StartingPlayerChoiceTimeout expected)
+        => ((ICollection<KeyValuePair<string, StartingPlayerChoiceTimeout>>)_startingPlayerChoiceTimeouts)
+            .Remove(new KeyValuePair<string, StartingPlayerChoiceTimeout>(roomId, expected));
+
+    /// <summary>补做已过期的先后手选择：骰点胜者超时后默认选择自己先手。</summary>
+    private static async Task<bool> ResolveExpiredStartingPlayerChoiceAsync(RoomEntry room, DateTime utcNow)
+    {
+        var state = room.Engine.State;
+        if (state.StartingPlayerChoiceDeadlineUtc is not { } deadline
+            || utcNow < deadline
+            || state.StartingPlayerChosen
+            || state.StartingPlayerChooser is not (0 or 1))
+            return false;
+
+        var chooser = state.StartingPlayerChooser;
+        var data = JsonSerializer.SerializeToElement(new { goFirst = true });
+        room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { goFirst = true });
+        var accepted = room.Engine.HandleAction(chooser, "ChooseFirstPlayer", data);
+        if (!accepted) return false;
+
+        await room.Engine.WaitSettledAsync();
+        return true;
+    }
+
+    private static void CancelStartingPlayerChoiceTimeout(string roomId)
+    {
+        if (_startingPlayerChoiceTimeouts.TryRemove(roomId, out var timer))
+        {
+            timer.Cancellation.Cancel();
+            timer.Cancellation.Dispose();
+        }
+    }
+
     private static void EnsureMulliganTimeout(RoomEntry room, int retryAttempt = 0)
     {
         var deadline = room.Engine.State.MulliganDeadlineUtc;
@@ -687,6 +823,8 @@ public static class GameRoomManager
         EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
             await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
+            await ResolveExpiredStartingPlayerChoiceAsync(room, DateTime.UtcNow);
+            EnsureStartingPlayerChoiceTimeout(room);
             EnsureMulliganTimeout(room);
             if (idx < 0)
             {
@@ -852,6 +990,8 @@ public static class GameRoomManager
                     EnqueueRecoveryWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), async () =>
                     {
                         await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
+                        await ResolveExpiredStartingPlayerChoiceAsync(r, DateTime.UtcNow);
+                        EnsureStartingPlayerChoiceTimeout(r);
                         EnsureMulliganTimeout(r);
                         WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
                         r.Engine.Broadcast("PlayerReconnected", new { player = playerIndex });
@@ -1173,6 +1313,7 @@ public static class GameRoomManager
                 preservePostGameChat: r.Engine.State.IsGameOver);
             RoomDirectory.Unregister(roomId);
             CancelMulliganTimeout(roomId);
+            CancelStartingPlayerChoiceTimeout(roomId);
             foreach (var sid in r.PlayerSessionIds)
                 if (_grace.TryRemove(roomId + ":" + sid, out var grace)) { grace.Cancel(); grace.Dispose(); }
             r.ActionQueue.Writer.TryComplete();
@@ -1374,6 +1515,8 @@ public static class GameRoomManager
             p1AlwaysPrompt: p1Always,
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
+        if (!engine.State.StartingPlayerChosen)
+            engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
         engine.State.Players[0].CardBackId = p0CardBackId;
         engine.State.Players[1].CardBackId = p1CardBackId;
         CopySpriteMap(p0SpriteMap, engine.State.Players[0].SpriteMap);
@@ -1441,6 +1584,7 @@ public static class GameRoomManager
         StartActionWorker(entry);
         EnsureMulliganTimeout(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
+        EnsureStartingPlayerChoiceTimeout(entry);
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;
     }

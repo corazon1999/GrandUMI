@@ -15,6 +15,11 @@ public class StartingPlayerFlowTests
 
         Assert.False(engine.State.StartingPlayerChosen);
         Assert.Equal(-1, engine.State.FirstPlayer);
+        var deadline = Assert.IsType<DateTime>(engine.State.StartingPlayerChoiceDeadlineUtc);
+        Assert.InRange(
+            deadline,
+            DateTime.UtcNow.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds - 2),
+            DateTime.UtcNow.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds + 2));
         Assert.NotEmpty(engine.State.StartingDiceRounds);
         Assert.All(engine.State.StartingDiceRounds, round =>
         {
@@ -76,6 +81,7 @@ public class StartingPlayerFlowTests
 
         engine.HandleAction(chooser, "ChooseFirstPlayer", JsonSerializer.SerializeToElement(new { goFirst = false }));
         Assert.True(engine.State.StartingPlayerChosen);
+        Assert.Null(engine.State.StartingPlayerChoiceDeadlineUtc);
         Assert.Equal(loser, engine.State.FirstPlayer);
         Assert.Equal(loser, engine.State.CurrentTurnPlayer);
 
@@ -147,6 +153,9 @@ public class StartingPlayerFlowTests
         Assert.Equal(firstRound.Player1, p1Root.GetProperty("startingDiceRolls")[0].GetProperty("my").GetInt32());
         Assert.Equal(engine.State.StartingPlayerChooser == 0, p0Root.GetProperty("canChooseFirstPlayer").GetBoolean());
         Assert.Equal(engine.State.StartingPlayerChooser == 1, p1Root.GetProperty("canChooseFirstPlayer").GetBoolean());
+        Assert.Equal(
+            engine.State.StartingPlayerChoiceDeadlineUtc,
+            p0Root.GetProperty("startingPlayerChoiceDeadlineUtc").GetDateTime());
         Assert.False(spectator.RootElement.GetProperty("canChooseFirstPlayer").GetBoolean());
     }
 

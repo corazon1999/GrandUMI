@@ -430,6 +430,9 @@ public class EndTurnTask
 {
     public required string Kind { get; init; }      // 如 "TrashFilm"、"RefreshOwnDon"、"ReturnSelfToHand"
     public string? SourceCardId { get; init; }
+    /// <summary>骰点胜者选择先后手的服务端权威截止时间；null 表示已完成选择或无需骰点。</summary>
+    public DateTime? StartingPlayerChoiceDeadlineUtc { get; set; }
+
     public int Owner { get; init; }
 }
 

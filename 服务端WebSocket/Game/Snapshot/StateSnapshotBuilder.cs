@@ -116,6 +116,7 @@ public static class StateSnapshotBuilder
             isFirstPlayer = !isSpectator && state.StartingPlayerChosen && state.FirstPlayer == myIdx,
             canChooseFirstPlayer = !isSpectator && !state.StartingPlayerChosen && state.StartingPlayerChooser == myIdx,
             diceWinnerIsMe = !isSpectator && state.StartingPlayerChooser == myIdx,
+            startingPlayerChoiceDeadlineUtc = state.StartingPlayerChoiceDeadlineUtc,
             startingDiceRolls = state.StartingDiceRounds.Select(round => new
             {
                 my = myIdx == 0 ? round.Player0 : round.Player1,

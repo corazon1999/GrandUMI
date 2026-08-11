@@ -16,6 +16,7 @@ namespace GrandUMI.Game;
 /// </summary>
 public class GameEngine
 {
+    public const int StartingPlayerChoiceTimeoutSeconds = 60;
     public const int MulliganTimeoutSeconds = 60;
     public GameState State { get; }
     public PromptSystem Prompts { get; }
@@ -145,7 +146,10 @@ public class GameEngine
         State.Phase = Phase.Reset;
         State.TurnCount = 0; // 在双方完成 mulligan 后调用 TurnEngine.StartFirstTurn 才进入 turn 1
         if (firstPlayer < 0)
+        {
             RollStartingDice();
+            State.StartingPlayerChoiceDeadlineUtc = DateTime.UtcNow.AddSeconds(StartingPlayerChoiceTimeoutSeconds);
+        }
         Prompts = new PromptSystem(this);
         if (State.StartingPlayerChosen)
             BeginMulliganPhase();
@@ -275,6 +279,7 @@ public class GameEngine
         }
 
         var goFirst = goFirstElement.GetBoolean();
+        State.StartingPlayerChoiceDeadlineUtc = null;
         State.FirstPlayer = goFirst ? playerIndex : 1 - playerIndex;
         State.CurrentTurnPlayer = State.FirstPlayer;
         if (_deferOpeningSetupUntilFirstPlayerChosen)

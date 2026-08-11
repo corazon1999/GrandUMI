@@ -8,6 +8,8 @@ import { getGameCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const RECOVERY_RETRY_INTERVAL_MS = 2500;
+const MAX_RECOVERY_ATTEMPTS = 3;
 
 function Die({ value, rolling, label }: { value: number; rolling: boolean; label: string }) {
   return (
@@ -79,11 +81,50 @@ export default function FirstPlayerOverlay() {
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
   const canChooseFirstPlayer = useGameStore((s) => s.canChooseFirstPlayer);
   const diceWinnerIsMe = useGameStore((s) => s.diceWinnerIsMe);
+  const startingPlayerChoiceDeadlineUtc = useGameStore((s) => s.startingPlayerChoiceDeadlineUtc);
   const startingDiceRolls = useGameStore((s) => s.startingDiceRolls);
   const isPending = useGameStore((s) => s.isPending);
   const [roundIndex, setRoundIndex] = useState(0);
   const [settled, setSettled] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  const deadlineMs = startingPlayerChoiceDeadlineUtc
+    ? Date.parse(startingPlayerChoiceDeadlineUtc)
+    : Number.NaN;
+  const remainingSeconds = Number.isFinite(deadlineMs)
+    ? Math.max(0, Math.ceil((deadlineMs - now) / 1000))
+    : 60;
+  const isExpiring = remainingSeconds <= 10;
+  const timedOut = remainingSeconds === 0;
+
+  useEffect(() => {
+    if (!startingPlayerChoiceDeadlineUtc || firstPlayerChosen) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [firstPlayerChosen, startingPlayerChoiceDeadlineUtc]);
+
+  useEffect(() => {
+    if (!timedOut || firstPlayerChosen || !startingPlayerChoiceDeadlineUtc) return;
+
+    let attempts = 0;
+    const requestRecovery = () => {
+      attempts += 1;
+      GameRequest.requestState();
+    };
+
+    requestRecovery();
+    const timer = window.setInterval(() => {
+      if (attempts >= MAX_RECOVERY_ATTEMPTS) {
+        window.clearInterval(timer);
+        return;
+      }
+      requestRecovery();
+    }, RECOVERY_RETRY_INTERVAL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [firstPlayerChosen, startingPlayerChoiceDeadlineUtc, timedOut]);
 
   useEffect(() => {
     if (firstPlayerChosen || startingDiceRolls.length === 0) return;
@@ -131,6 +172,12 @@ export default function FirstPlayerOverlay() {
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-[clamp(12px,3vh,28px)] bg-slate-950/95 px-3 py-2 sm:px-4"
+        style={{
+          paddingTop: "calc(0.5rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          paddingRight: "calc(0.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+          paddingBottom: "calc(0.5rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
+          paddingLeft: "calc(0.75rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -174,13 +221,16 @@ export default function FirstPlayerOverlay() {
               <p className={`text-lg font-black ${diceWinnerIsMe ? "text-emerald-300" : "text-orange-300"}`}>
                 {diceWinnerIsMe ? "你的点数更大，请选择先后手" : "对手点数更大，获得先后手选择权"}
               </p>
-              {canChooseFirstPlayer ? (
+              <p className={`text-sm font-black tabular-nums ${isExpiring ? "text-rose-300" : "text-amber-200"}`}>
+                选择剩余 {remainingSeconds} 秒
+              </p>
+              {canChooseFirstPlayer && !timedOut ? (
                 <div className="flex gap-4">
                   <button
                     type="button"
                     disabled={isPending}
                     onClick={() => GameRequest.chooseFirstPlayer(true)}
-                    className="rounded-xl bg-orange-500 px-8 py-3 text-base font-black text-white transition-colors hover:bg-orange-400 disabled:cursor-wait disabled:opacity-50"
+                    className="min-h-11 rounded-xl bg-orange-500 px-8 py-3 text-base font-black text-white transition-colors hover:bg-orange-400 disabled:cursor-wait disabled:opacity-50"
                   >
                     选择先手
                   </button>
@@ -188,7 +238,7 @@ export default function FirstPlayerOverlay() {
                     type="button"
                     disabled={isPending}
                     onClick={() => GameRequest.chooseFirstPlayer(false)}
-                    className="rounded-xl bg-sky-600 px-8 py-3 text-base font-black text-white transition-colors hover:bg-sky-500 disabled:cursor-wait disabled:opacity-50"
+                    className="min-h-11 rounded-xl bg-sky-600 px-8 py-3 text-base font-black text-white transition-colors hover:bg-sky-500 disabled:cursor-wait disabled:opacity-50"
                   >
                     选择后手
                   </button>
@@ -196,9 +246,14 @@ export default function FirstPlayerOverlay() {
               ) : (
                 <div className="flex items-center gap-3 text-sm text-slate-300">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  等待对手选择先后手...
+                  {timedOut
+                    ? "时间到，正在同步自动选择结果..."
+                    : canChooseFirstPlayer
+                      ? "正在提交选择..."
+                      : "等待对手选择先后手..."}
                 </div>
               )}
+              <p className="text-xs text-slate-500">超时后将默认由骰点胜者先手</p>
             </>
           )}
         </div>

@@ -45,14 +45,26 @@ export default function OpponentDisconnectBanner() {
 
   if (timedOut) {
     return (
-      <div className="absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-lg bg-red-500/90 px-6 py-2 text-sm font-bold text-white shadow-lg">
+      <div
+        className="pointer-events-none absolute left-1/2 z-[70] -translate-x-1/2 rounded-lg bg-red-500/95 px-6 py-2 text-center text-sm font-bold text-white shadow-lg"
+        style={{
+          top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          maxWidth: "calc(100% - 2rem)",
+        }}
+      >
         对手重连宽限已结束，正在结算…
       </div>
     );
   }
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-yellow-500/90 text-black px-6 py-2 rounded-lg font-bold shadow-lg text-sm animate-pulse">
+    <div
+      className="pointer-events-none absolute left-1/2 z-[70] -translate-x-1/2 animate-pulse rounded-lg bg-yellow-500/95 px-6 py-2 text-center text-sm font-bold text-black shadow-lg"
+      style={{
+        top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+        maxWidth: "calc(100% - 2rem)",
+      }}
+    >
       对手已断线，等待重连 {countdown}s
     </div>
   );

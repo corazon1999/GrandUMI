@@ -128,6 +128,7 @@ interface GameStore {
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
+  startingPlayerChoiceDeadlineUtc: string | null;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc: string | null;
   operationClockEnabled: boolean;
@@ -230,6 +231,7 @@ export const useGameStore = create<GameStore>()(
     canChooseFirstPlayer: false,
     diceWinnerIsMe: false,
     startingDiceRolls: [],
+    startingPlayerChoiceDeadlineUtc: null,
     mulliganBothDone: false,
     mulliganDeadlineUtc: null,
     operationClockEnabled: false,
@@ -291,6 +293,7 @@ export const useGameStore = create<GameStore>()(
         s.canChooseFirstPlayer = msg.canChooseFirstPlayer ?? false;
         s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
         s.startingDiceRolls = msg.startingDiceRolls ?? [];
+        s.startingPlayerChoiceDeadlineUtc = msg.startingPlayerChoiceDeadlineUtc ?? null;
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
         s.mulliganDeadlineUtc = msg.mulliganDeadlineUtc ?? null;
         s.operationClockEnabled = msg.operationClockEnabled ?? false;
@@ -458,6 +461,7 @@ export const useGameStore = create<GameStore>()(
       s.canChooseFirstPlayer = false;
       s.diceWinnerIsMe = false;
       s.startingDiceRolls = [];
+      s.startingPlayerChoiceDeadlineUtc = null;
       s.mulliganBothDone = false;
       s.mulliganDeadlineUtc = null;
       s.operationClockEnabled = false;

@@ -949,6 +949,7 @@ export interface MsgGameState extends MsgBase {
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
   matchKind?: "Ranked" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
+  startingPlayerChoiceDeadlineUtc?: string | null;
   isGameOver: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;
