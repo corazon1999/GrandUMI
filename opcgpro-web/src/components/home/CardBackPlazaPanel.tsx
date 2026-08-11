@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { HomeRequest } from "@/net/HomeProtocol";
@@ -10,6 +10,7 @@ const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const TARGET_WIDTH = 420;
 const TARGET_HEIGHT = 588;
 const MAX_UPLOAD_BYTES = 235 * 1024;
+const GALLERY_TIMEOUT_MS = 8_000;
 
 type PreparedImage = {
   previewUrl: string;
@@ -87,12 +88,28 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [galleryView, setGalleryView] = useState<GalleryView>("popular");
+  const [galleryTimedOut, setGalleryTimedOut] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const requestGallery = useCallback(() => {
+    setGalleryTimedOut(false);
+    if (!HomeRequest.requestCardBackGallery()) setGalleryTimedOut(true);
+  }, []);
+
   useEffect(() => {
-    if (connState === "connected") HomeRequest.requestCardBackGallery();
-  }, [connState]);
+    if (connState === "connected") requestGallery();
+    else setGalleryTimedOut(false);
+  }, [connState, requestGallery]);
+  useEffect(() => {
+    if (gallery !== null) {
+      setGalleryTimedOut(false);
+      return;
+    }
+    if (connState !== "connected" || galleryTimedOut) return;
+    const timeout = window.setTimeout(() => setGalleryTimedOut(true), GALLERY_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [connState, gallery, galleryTimedOut]);
   useEffect(() => { setSubmitting(false); setDeletingId(null); }, [gallery]);
   useEffect(() => () => { if (prepared) URL.revokeObjectURL(prepared.previewUrl); }, [prepared]);
 
@@ -216,7 +233,19 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
         <span className="text-xs text-gray-600">{displayedCardBacks?.length ?? 0} 款</span>
       </div>
 
-      {gallery === null ? (
+      {gallery === null ? galleryTimedOut ? (
+        <div className="mt-4 rounded-2xl border border-amber-500/30 bg-gray-900 px-4 py-12 text-center">
+          <p className="text-sm text-amber-200">卡背广场响应超时，请检查当前线路后重试。</p>
+          <button
+            type="button"
+            onClick={requestGallery}
+            disabled={connState !== "connected"}
+            className="mt-4 min-h-11 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500"
+          >
+            重试
+          </button>
+        </div>
+      ) : (
         <div className="mt-4 rounded-2xl border border-gray-800 bg-gray-900 py-16 text-center text-sm text-gray-500">正在读取卡背广场…</div>
       ) : displayedCardBacks?.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-dashed border-gray-700 py-16 text-center text-sm text-gray-500">

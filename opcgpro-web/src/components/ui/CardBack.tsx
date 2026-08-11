@@ -1,5 +1,11 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { cardBackImageSrc, cardBackName, normalizeCardBackId } from "@/lib/cardBacks";
+import { directAssetSrc } from "@/lib/sprite";
+
+const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000;
 
 const themes = {
   classic: {
@@ -47,7 +53,40 @@ export default function CardBack({
 }) {
   const id = normalizeCardBackId(cardBackId);
   const customImage = cardBackImageSrc(id);
-  if (customImage) {
+  const [customImageSrc, setCustomImageSrc] = useState(customImage ?? "");
+  const [customImageFailed, setCustomImageFailed] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const loadTimeoutRef = useRef<number | null>(null);
+
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    clearLoadTimeout();
+    setCustomImageSrc(customImage ?? "");
+    setCustomImageFailed(false);
+  }, [clearLoadTimeout, customImage]);
+
+  const handleCustomImageFailure = useCallback(() => {
+    clearLoadTimeout();
+    const directSource = customImage ? directAssetSrc(customImage) : null;
+    if (directSource && customImageSrc !== directSource) {
+      setCustomImageSrc(directSource);
+      return;
+    }
+    setCustomImageFailed(true);
+  }, [clearLoadTimeout, customImage, customImageSrc]);
+
+  useEffect(() => {
+    clearLoadTimeout();
+    if (!customImage || customImageFailed || (imageRef.current?.complete && imageRef.current.naturalWidth > 0)) return;
+    loadTimeoutRef.current = window.setTimeout(handleCustomImageFailure, CUSTOM_CARD_BACK_TIMEOUT_MS);
+    return clearLoadTimeout;
+  }, [clearLoadTimeout, customImage, customImageFailed, customImageSrc, handleCustomImageFailure]);
+
+  if (customImage && !customImageFailed) {
     return (
       <div
         className={clsx("relative h-full w-full overflow-hidden rounded-[inherit] border-2 border-white/35 bg-gray-950 shadow-inner", className)}
@@ -55,7 +94,15 @@ export default function CardBack({
         aria-hidden={decorative || undefined}
         aria-label={decorative ? undefined : `${cardBackName(id)}卡背`}
       >
-        <img src={customImage} alt="" draggable={false} className="h-full w-full object-cover" />
+        <img
+          ref={imageRef}
+          src={customImageSrc}
+          alt=""
+          draggable={false}
+          onLoad={clearLoadTimeout}
+          onError={handleCustomImageFailure}
+          className="h-full w-full object-cover"
+        />
         <div className="pointer-events-none absolute inset-[4%] rounded-[8%] border border-white/20" />
       </div>
     );

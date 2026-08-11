@@ -7,6 +7,8 @@ import { DATA_VERSION } from "@/data/dataVersion";
 // 外部 URL、data URL 和已经是派生图的路径保持原样。
 
 export const CARD_BACK_SRC = "/sprites-thumb/CardBack.webp";
+const PRODUCTION_HOST = "grand-umi.com";
+const DIRECT_ASSET_ORIGIN = "https://direct.grand-umi.com";
 
 const CARD_SOURCE_RE = /^\/cards\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 const SPRITE_SOURCE_RE = /^\/sprites\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
@@ -38,6 +40,33 @@ export function displaySrc(src?: string | null): string {
   return mapLocalSource(src || CARD_BACK_SRC, "cards-webp");
 }
 
+/**
+ * Cloudflare 线路迟迟没有返回首字节时，允许图片切换到同一台源站的 IPv4 直连入口。
+ * 只在正式主域启用，避免本地和测试环境意外跨环境读取资源。
+ */
+export function directAssetSrc(src: string): string | null {
+  if (typeof window === "undefined" || window.location.hostname !== PRODUCTION_HOST) return null;
+
+  const source = new URL(src, window.location.href);
+  if (source.origin !== window.location.origin) return null;
+  return new URL(`${source.pathname}${source.search}${source.hash}`, DIRECT_ASSET_ORIGIN).href;
+}
+
+function imageFallbackSources(candidates: Array<string | null | undefined>): string[] {
+  const sources: string[] = [];
+  for (const source of candidates) {
+    if (!source || sources.includes(source)) continue;
+    sources.push(source);
+    const directSource = directAssetSrc(source);
+    if (directSource && !sources.includes(directSource)) sources.push(directSource);
+  }
+  return sources;
+}
+
+function absoluteImageSrc(src: string): string {
+  return typeof window === "undefined" ? src : new URL(src, window.location.href).href;
+}
+
 /** React 图片状态在加载失败时取得下一个候选，确保不会在原图和外部图之间循环。 */
 export function nextCardImageSrc(
   currentSrc: string,
@@ -46,9 +75,14 @@ export function nextCardImageSrc(
   variant: "thumb" | "display",
 ): string {
   const derivedSrc = variant === "thumb" ? thumbSrc(rawSrc) : displaySrc(rawSrc);
-  if (currentSrc === derivedSrc && derivedSrc !== rawSrc) return rawSrc;
-  if (externalSrc && currentSrc !== externalSrc) return externalSrc;
-  return CARD_BACK_SRC;
+  const sources = imageFallbackSources([
+    derivedSrc,
+    derivedSrc !== rawSrc ? rawSrc : null,
+    externalSrc,
+    CARD_BACK_SRC,
+  ]);
+  const currentIndex = sources.findIndex((source) => absoluteImageSrc(source) === absoluteImageSrc(currentSrc));
+  return currentIndex >= 0 ? (sources[currentIndex + 1] ?? currentSrc) : (sources[0] ?? currentSrc);
 }
 
 /** 判断路径是否为缩略图(用于加载失败时回退原图) */
@@ -69,7 +103,7 @@ export function advanceImageFallback(
   image: HTMLImageElement,
   candidates: Array<string | null | undefined>,
 ): void {
-  const sources = [...new Set([...candidates.filter((src): src is string => !!src), CARD_BACK_SRC])];
+  const sources = imageFallbackSources([...candidates, CARD_BACK_SRC]);
   const signature = sources.join("\n");
   if (image.dataset.fallbackSignature !== signature) {
     image.dataset.fallbackSignature = signature;

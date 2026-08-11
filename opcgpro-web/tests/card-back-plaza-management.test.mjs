@@ -20,3 +20,11 @@ test("删除入口只在我的投稿视图为本人投稿显示", () => {
   assert.match(source, /HomeRequest\.deleteCardBack\(cardBackId\)/);
   assert.doesNotMatch(source, /galleryView === "popular" && item\.owned && \(/);
 });
+
+test("卡背广场请求超时后停止无限加载并允许手动重试", () => {
+  assert.match(source, /const GALLERY_TIMEOUT_MS = 8_000/);
+  assert.match(source, /setGalleryTimedOut\(true\)/);
+  assert.match(source, /卡背广场响应超时，请检查当前线路后重试。/);
+  assert.match(source, /onClick=\{requestGallery\}/);
+  assert.match(source, />\s*重试\s*</);
+});
