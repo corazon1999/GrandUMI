@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
@@ -26,57 +26,6 @@ function PromptChevron({ expanded }: { expanded: boolean }) {
   );
 }
 
-function EffectDecisionButton({
-  tone,
-  label,
-  symbol,
-  onClick,
-  reduceMotion,
-}: {
-  tone: "confirm" | "cancel";
-  label: string;
-  symbol: string;
-  onClick: () => void;
-  reduceMotion: boolean;
-}) {
-  const isConfirm = tone === "confirm";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex min-w-24 flex-col items-center gap-2 text-xs font-black tracking-[0.2em] text-slate-100 focus-visible:outline-none"
-      aria-label={label}
-    >
-      <span
-        className={`relative flex h-16 w-16 items-center justify-center rounded-full border bg-slate-950/95 shadow-[0_0_24px_rgba(0,0,0,.75)] transition-transform duration-200 group-hover:scale-105 group-active:scale-95 ${
-          isConfirm
-            ? "border-cyan-300/70 text-cyan-100 group-hover:shadow-[0_0_28px_rgba(34,211,238,.55)]"
-            : "border-rose-300/70 text-rose-100 group-hover:shadow-[0_0_28px_rgba(251,113,133,.5)]"
-        }`}
-      >
-        <motion.span
-          className={`absolute inset-1 rounded-full border-2 border-dashed ${
-            isConfirm ? "border-cyan-300/75" : "border-rose-300/75"
-          }`}
-          animate={reduceMotion ? undefined : { rotate: isConfirm ? 360 : -360 }}
-          transition={{ duration: 5, ease: "linear", repeat: Infinity }}
-        />
-        <motion.span
-          className={`absolute inset-2 rounded-full border ${
-            isConfirm
-              ? "border-cyan-100/50 border-r-transparent"
-              : "border-rose-100/50 border-l-transparent"
-          }`}
-          animate={reduceMotion ? undefined : { rotate: isConfirm ? -360 : 360 }}
-          transition={{ duration: 3.5, ease: "linear", repeat: Infinity }}
-        />
-        <span className="relative text-3xl leading-none drop-shadow-[0_0_8px_currentColor]">{symbol}</span>
-      </span>
-      <span className={isConfirm ? "text-cyan-100" : "text-rose-100"}>{label}</span>
-    </button>
-  );
-}
-
 /**
  * 服务端 Prompt 弹窗：处理选择目标 / 选项 / 生命牌触发等交互
  */
@@ -88,7 +37,6 @@ export default function PromptOverlay() {
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
-  const reduceMotion = useReducedMotion() ?? false;
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -98,6 +46,20 @@ export default function PromptOverlay() {
   const promptToggleStyle = {
     left: `calc(${promptToggleOffset} + var(--layout-safe-left, 0px))`,
     bottom: "calc(0.75rem + var(--layout-safe-bottom, 0px))",
+  } as const;
+  // 竖屏设备中的对局实际运行在 844×390 的旋转容器内。效果确认框必须使用容器单位，
+  // 否则 100vw/max-sm 会继续按物理竖屏宽度计算，把横向内容误排成遮满牌桌的纵向弹窗。
+  const effectPromptStyle = {
+    bottom: "calc(clamp(0.75rem, 4cqh, 1.5rem) + var(--layout-safe-bottom, 0px))",
+    width:
+      "min(42rem, calc(100cqw - 2rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px)))",
+    maxHeight:
+      "calc(100cqh - 2rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px))",
+  } as const;
+  const minimizedEffectPromptStyle = {
+    bottom: "calc(0.75rem + var(--layout-safe-bottom, 0px))",
+    maxWidth:
+      "calc(100cqw - 2rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px))",
   } as const;
 
   const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
@@ -146,7 +108,8 @@ export default function PromptOverlay() {
             <motion.button
               type="button"
               onClick={() => setIsMinimized(false)}
-              className="pointer-events-auto fixed bottom-[clamp(1rem,5vh,3rem)] left-1/2 flex max-w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 border border-cyan-300/50 bg-slate-950/95 py-2 pl-4 pr-2 text-left text-xs font-bold text-slate-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-md"
+              className="pointer-events-auto fixed left-1/2 flex -translate-x-1/2 items-center gap-3 border border-cyan-300/50 bg-slate-950/95 py-2 pl-4 pr-2 text-left text-xs font-bold text-slate-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-md"
+              style={minimizedEffectPromptStyle}
               initial={{ y: 12, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               title="展开效果确认框"
@@ -371,7 +334,8 @@ export default function PromptOverlay() {
           data-effect-confirm-layer
         >
           <motion.section
-            className="pointer-events-auto fixed bottom-[clamp(1rem,7vh,4.5rem)] left-1/2 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden border border-cyan-200/55 bg-[linear-gradient(180deg,rgba(8,15,27,.97),rgba(2,6,12,.94))] text-white shadow-[0_18px_60px_rgba(0,0,0,.72),0_0_36px_rgba(14,165,233,.16)] backdrop-blur-md"
+            className="pointer-events-auto fixed left-1/2 -translate-x-1/2 overflow-hidden border border-cyan-200/55 bg-[linear-gradient(180deg,rgba(8,15,27,.97),rgba(2,6,12,.94))] text-white shadow-[0_18px_60px_rgba(0,0,0,.72),0_0_36px_rgba(14,165,233,.16)] backdrop-blur-md"
+            style={effectPromptStyle}
             initial={{ y: 36, opacity: 0, scale: 0.96 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 24, opacity: 0, scale: 0.98 }}
@@ -382,51 +346,56 @@ export default function PromptOverlay() {
             data-effect-confirm-dialog
           >
             <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(125,211,252,.08)_4px)]" />
-            <div className="relative flex min-h-12 items-center border-b border-cyan-200/20 bg-slate-950/70 px-5 pr-14">
-              <span className="mr-2 h-2 w-2 rotate-45 bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
-              <h2 id="effect-confirm-title" className="text-sm font-black tracking-[0.18em] text-cyan-50">
-                效果发动确认
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsMinimized(true)}
-                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center border border-cyan-200/30 bg-cyan-300/10 text-cyan-100 transition-colors hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
-                title="收起效果确认框"
-                aria-label="收起效果确认框"
-                aria-expanded="true"
-              >
-                <PromptChevron expanded />
-              </button>
-            </div>
-
-            <div className="relative grid max-h-[70vh] grid-cols-[1fr_auto] items-center gap-5 overflow-y-auto px-6 py-5 max-sm:grid-cols-1 max-sm:gap-3 max-sm:py-4">
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold tracking-[0.2em] text-cyan-300/80">是否发动以下效果？</p>
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-50 sm:text-base">{prompt.text}</p>
-              </div>
-              {sourceCard && (
-                <div className="flex shrink-0 flex-col items-center gap-1.5">
-                  <CardItem card={sourceCard} size="sm" />
-                  <span className="text-[10px] font-bold tracking-wider text-amber-200">效果源</span>
+            <div className="relative flex flex-col @[640px]:flex-row">
+              <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
+                <span className="h-2.5 w-2.5 shrink-0 rotate-45 bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 id="effect-confirm-title" className="shrink-0 text-xs font-black tracking-[0.14em] text-cyan-50">
+                      是否发动以下效果？
+                    </h2>
+                    {sourceCard && (
+                      <span className="truncate text-[10px] font-bold text-amber-200" title={`${sourceCard.number} ${sourceCard.name}`}>
+                        {sourceCard.number} · {sourceCard.name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 max-h-[3.75rem] overflow-y-auto pr-1 text-xs font-bold leading-5 text-slate-100">
+                    {prompt.text}
+                  </p>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="relative flex items-center justify-center gap-14 border-t border-white/10 bg-black/20 px-6 py-4 max-sm:gap-8">
-              <EffectDecisionButton
-                tone="cancel"
-                label="取消"
-                symbol="×"
-                onClick={() => submitServerPrompt(["1"])}
-                reduceMotion={reduceMotion}
-              />
-              <EffectDecisionButton
-                tone="confirm"
-                label="确认"
-                symbol="✓"
-                onClick={() => submitServerPrompt(["0"], true)}
-                reduceMotion={reduceMotion}
-              />
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 bg-black/20 px-3 py-2 @[640px]:border-l @[640px]:border-t-0">
+                <button
+                  type="button"
+                  onClick={() => submitServerPrompt(["1"])}
+                  className="flex h-11 min-w-20 items-center justify-center gap-1.5 border border-rose-300/55 bg-rose-400/10 px-3 text-xs font-black text-rose-100 transition-colors hover:bg-rose-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                  aria-label="取消"
+                >
+                  <span aria-hidden="true" className="text-lg leading-none">×</span>
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => submitServerPrompt(["0"], true)}
+                  className="flex h-11 min-w-20 items-center justify-center gap-1.5 border border-cyan-300/65 bg-cyan-400/15 px-3 text-xs font-black text-cyan-50 transition-colors hover:bg-cyan-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
+                  aria-label="确认"
+                >
+                  <span aria-hidden="true" className="text-base leading-none">✓</span>
+                  确认
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMinimized(true)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center border border-cyan-200/30 bg-cyan-300/10 text-cyan-100 transition-colors hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                  title="收起效果确认框"
+                  aria-label="收起效果确认框"
+                  aria-expanded="true"
+                >
+                  <PromptChevron expanded />
+                </button>
+              </div>
             </div>
           </motion.section>
         </motion.div>
