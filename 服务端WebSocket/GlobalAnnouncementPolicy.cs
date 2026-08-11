@@ -26,16 +26,30 @@ public static class GlobalAnnouncementPolicy
     {
         if (winStreak < RankedWinStreakAnnouncementThreshold) return null;
         var player = string.IsNullOrWhiteSpace(displayName) ? "玩家" : displayName.Trim();
-        var faction = defeatedFaction?.Trim().ToLowerInvariant() switch
-        {
-            "pirate" => "海贼阵营",
-            "marine" => "海军阵营",
-            "government" => "世界政府阵营",
-            _ => "未知阵营",
-        };
+        var faction = FormatFaction(defeatedFaction);
         var tier = string.IsNullOrWhiteSpace(defeatedTier) ? "未知段位" : defeatedTier.Trim();
         return Normalize($"{player} 打飞了“{faction}”的{tier}，完成了{FormatChineseNumber(winStreak)}连胜！");
     }
+
+    public static string? FormatRankedWinStreakEnded(
+        string? defeatedPlayerName,
+        int endedWinStreak,
+        string? winnerFaction,
+        string? winnerName)
+    {
+        if (endedWinStreak < RankedWinStreakAnnouncementThreshold) return null;
+        var defeatedPlayer = string.IsNullOrWhiteSpace(defeatedPlayerName) ? "玩家" : defeatedPlayerName.Trim();
+        var winner = string.IsNullOrWhiteSpace(winnerName) ? "玩家" : winnerName.Trim();
+        return Normalize($"{defeatedPlayer}的{FormatChineseNumber(endedWinStreak)}连胜 被 {FormatFaction(winnerFaction)} 的{winner} 终结了");
+    }
+
+    private static string FormatFaction(string? faction) => faction?.Trim().ToLowerInvariant() switch
+    {
+        "pirate" => "海贼阵营",
+        "marine" => "海军阵营",
+        "government" => "世界政府阵营",
+        _ => "未知阵营",
+    };
 
     private static string FormatChineseNumber(int value)
     {

@@ -1380,6 +1380,11 @@ public static class GameRoomManager
 
             var winnerIndex = room.Engine.State.WinnerIndex.Value;
             var loserIndex = 1 - winnerIndex;
+            WebSocketBridge.BroadcastRankedWinStreakEnded(
+                room.PlayerDisplayNames[loserIndex],
+                players[loserIndex].WinStreakBefore,
+                players[winnerIndex].Faction,
+                room.PlayerDisplayNames[winnerIndex]);
             WebSocketBridge.BroadcastRankedWinStreak(
                 room.PlayerDisplayNames[winnerIndex],
                 players[loserIndex].Faction,

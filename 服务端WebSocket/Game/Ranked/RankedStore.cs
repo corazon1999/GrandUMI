@@ -48,6 +48,7 @@ public sealed record RankPlayerSettlement(
     int PlacementGames,
     int PlacementRequired,
     bool PlacementCompleted,
+    int WinStreakBefore,
     int WinStreak);
 
 public sealed record RankedMatchSettlement(
@@ -343,6 +344,8 @@ public sealed class RankedStore
             var expected1 = 1d - expected0;
             var after0 = ApplyResult(before0, afterRating0, score0, expected0);
             var after1 = ApplyResult(before1, afterRating1, score1, expected1);
+            var winStreakBefore0 = CurrentWinStreak(connection, transaction, season.Id, before0.AccountKey);
+            var winStreakBefore1 = CurrentWinStreak(connection, transaction, season.Id, before1.AccountKey);
 
             Save(connection, transaction, after0);
             Save(connection, transaction, after1);
@@ -353,17 +356,13 @@ public sealed class RankedStore
             InsertEvent(connection, transaction, matchId, season.Id, before1, after1, endedAtUtc);
             var faction0 = ReadFaction(connection, transaction, after0.AccountKey);
             var faction1 = ReadFaction(connection, transaction, after1.AccountKey);
-            var winStreak0 = winnerIndex == 0
-                ? CurrentWinStreak(connection, transaction, season.Id, after0.AccountKey)
-                : 0;
-            var winStreak1 = winnerIndex == 1
-                ? CurrentWinStreak(connection, transaction, season.Id, after1.AccountKey)
-                : 0;
+            var winStreak0 = winnerIndex == 0 ? winStreakBefore0 + 1 : 0;
+            var winStreak1 = winnerIndex == 1 ? winStreakBefore1 + 1 : 0;
             transaction.Commit();
             return new RankedMatchSettlement(
                 matchId,
-                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0), winStreak0),
-                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1), winStreak1));
+                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0), winStreakBefore0, winStreak0),
+                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1), winStreakBefore1, winStreak1));
         }
     }
 
@@ -487,12 +486,14 @@ public sealed class RankedStore
         Profile after,
         string? faction,
         int? factionRank,
+        int winStreakBefore,
         int winStreak)
     {
         var (tier, division) = RankLabel(after.RankPoints, faction, factionRank);
         return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
             after.RankPoints - before.RankPoints, faction ?? string.Empty, tier, division, after.PlacementGames,
-            PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired, winStreak);
+            PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired,
+            winStreakBefore, winStreak);
     }
 
     private static RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank)

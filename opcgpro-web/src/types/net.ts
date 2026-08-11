@@ -453,6 +453,7 @@ export interface MsgChatMsg extends MsgBase {
 export interface MsgGlobalAnnouncement extends MsgBase {
   proto: "MsgGlobalAnnouncement";
   content?: string;
+  kind?: "rankedStreak";
   issuedAt?: number;
   result?: boolean;
   logStr?: string;

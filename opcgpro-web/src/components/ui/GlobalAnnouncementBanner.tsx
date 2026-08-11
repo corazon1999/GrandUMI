@@ -5,29 +5,33 @@ import { eventBus } from "@/net/eventBus";
 import type { MsgBase, MsgGlobalAnnouncement } from "@/types/net";
 
 interface Announcement {
-  id: number;
+  id: string;
   content: string;
+  kind?: "rankedStreak";
 }
 
 export default function GlobalAnnouncementBanner() {
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const announcement = announcements[0] ?? null;
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let sequence = 0;
     const handleMessage = (message: MsgBase) => {
       if (message.proto !== "MsgGlobalAnnouncement") return;
-      const { content, issuedAt } = message as MsgGlobalAnnouncement;
+      const { content, issuedAt, kind } = message as MsgGlobalAnnouncement;
       if (!content) return;
-      setAnnouncement({ id: issuedAt ?? Date.now(), content });
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setAnnouncement(null), 15_000);
+      const id = `${issuedAt ?? Date.now()}-${sequence++}`;
+      setAnnouncements((current) => [...current, { id, content, kind }]);
     };
     eventBus.on("message", handleMessage);
-    return () => {
-      eventBus.off("message", handleMessage);
-      if (timer) clearTimeout(timer);
-    };
+    return () => eventBus.off("message", handleMessage);
   }, []);
+
+  useEffect(() => {
+    if (!announcement) return;
+    const timer = setTimeout(() => setAnnouncements((current) => current.slice(1)), 15_000);
+    return () => clearTimeout(timer);
+  }, [announcement]);
 
   if (!announcement) return null;
 
@@ -39,7 +43,7 @@ export default function GlobalAnnouncementBanner() {
     >
       <div className="overflow-hidden border-y border-amber-400/60 bg-gray-950/95 py-2 text-sm font-bold text-amber-100 shadow-lg backdrop-blur">
         <span key={announcement.id} className="global-announcement-marquee">
-          📢 全服公告：{announcement.content}
+          📢 {announcement.kind === "rankedStreak" ? announcement.content : `全服公告：${announcement.content}`}
         </span>
       </div>
     </div>

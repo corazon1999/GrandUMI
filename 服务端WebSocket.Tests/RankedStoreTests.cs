@@ -120,6 +120,7 @@ public class RankedStoreTests
                 var result = store.RecordMatch($"streak-win-{i}", now.AddMinutes(i),
                     "alice", "爱丽丝", $"bob-{i}", $"对手{i}", winnerIndex: 0);
                 Assert.NotNull(result);
+                Assert.Equal(i - 1, result!.Player0.WinStreakBefore);
                 Assert.Equal(i, result!.Player0.WinStreak);
                 Assert.Equal(0, result.Player1.WinStreak);
             }
@@ -127,7 +128,9 @@ public class RankedStoreTests
             var loss = store.RecordMatch("streak-loss", now.AddMinutes(4),
                 "alice", "爱丽丝", "bob-loss", "对手", winnerIndex: 1);
             Assert.NotNull(loss);
+            Assert.Equal(3, loss!.Player0.WinStreakBefore);
             Assert.Equal(0, loss!.Player0.WinStreak);
+            Assert.Equal(0, loss.Player1.WinStreakBefore);
             Assert.Equal(1, loss.Player1.WinStreak);
 
             var winAfterLoss = store.RecordMatch("streak-restart", now.AddMinutes(5),

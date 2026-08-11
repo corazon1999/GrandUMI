@@ -37,4 +37,17 @@ public sealed class GlobalAnnouncementPolicyTests
             GlobalAnnouncementPolicy.FormatRankedWinStreak(
                 "爱丽丝", "government", "神之骑士团", 11));
     }
+
+    [Fact]
+    public void RankedWinStreakEndedAnnouncementStartsAtThreeWins()
+    {
+        Assert.Null(GlobalAnnouncementPolicy.FormatRankedWinStreakEnded(
+            "爱丽丝", 2, "marine", "卡普"));
+        Assert.Equal("爱丽丝的五连胜 被 海军阵营 的卡普 终结了",
+            GlobalAnnouncementPolicy.FormatRankedWinStreakEnded(
+                " 爱丽丝 ", 5, "marine", " 卡普 "));
+        Assert.Equal("玩家的十一连胜 被 世界政府阵营 的玩家 终结了",
+            GlobalAnnouncementPolicy.FormatRankedWinStreakEnded(
+                null, 11, "government", " "));
+    }
 }

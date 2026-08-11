@@ -25,6 +25,15 @@ test("announcements use a dedicated protocol and render as a moving banner", () 
   assert.match(bridge, /BroadcastAll\(new[\s\S]*proto = "MsgGlobalAnnouncement"/);
 });
 
+test("排位连胜播报不显示全服公告前缀且连续消息排队展示", () => {
+  assert.match(banner, /announcement\.kind === "rankedStreak"/);
+  assert.match(banner, /`全服公告：\$\{announcement\.content\}`/);
+  assert.match(banner, /setAnnouncements\(\(current\) => \[\.\.\.current,/);
+  assert.match(banner, /current\.slice\(1\)/);
+  assert.match(bridge, /kind = "rankedStreak"/);
+  assert.match(bridge, /BroadcastRankedWinStreakEnded/);
+});
+
 test("管理员发送公告后保留输入内容", () => {
   const sendHandler = lobby.match(
     /const sendGlobalAnnouncement = \(\) => \{[\s\S]*?\n  \};/,

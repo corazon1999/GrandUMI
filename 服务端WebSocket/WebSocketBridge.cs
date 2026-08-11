@@ -3036,6 +3036,29 @@ public static class WebSocketBridge
         {
             proto = "MsgGlobalAnnouncement",
             content,
+            kind = "rankedStreak",
+            issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+    }
+
+    /// <summary>排位玩家达到门槛的连胜被终结后，向所有在线会话发送滚动公告。</summary>
+    public static void BroadcastRankedWinStreakEnded(
+        string? defeatedPlayerName,
+        int endedWinStreak,
+        string? winnerFaction,
+        string? winnerName)
+    {
+        var content = GlobalAnnouncementPolicy.FormatRankedWinStreakEnded(
+            defeatedPlayerName,
+            endedWinStreak,
+            winnerFaction,
+            winnerName);
+        if (content is null) return;
+        BroadcastAll(new
+        {
+            proto = "MsgGlobalAnnouncement",
+            content,
+            kind = "rankedStreak",
             issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         });
     }
