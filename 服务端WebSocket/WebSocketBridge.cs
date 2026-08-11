@@ -3013,9 +3013,17 @@ public static class WebSocketBridge
     }
 
     /// <summary>排位连胜达到门槛后，向所有在线会话发送滚动公告。</summary>
-    public static void BroadcastRankedWinStreak(string? playerName, int winStreak)
+    public static void BroadcastRankedWinStreak(
+        string? playerName,
+        string? defeatedFaction,
+        string? defeatedTier,
+        int winStreak)
     {
-        var content = GlobalAnnouncementPolicy.FormatRankedWinStreak(playerName, winStreak);
+        var content = GlobalAnnouncementPolicy.FormatRankedWinStreak(
+            playerName,
+            defeatedFaction,
+            defeatedTier,
+            winStreak);
         if (content is null) return;
         BroadcastAll(new
         {
