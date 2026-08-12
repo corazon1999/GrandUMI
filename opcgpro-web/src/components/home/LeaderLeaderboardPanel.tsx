@@ -118,9 +118,6 @@ function ChampionOwner({
       <LeaderChampionBadge leaderNumber={item.leaderNumber} />
       <div className="min-w-0">
         <p className="truncate text-xs font-black text-amber-100">{item.champion.displayName}</p>
-        <p className="mt-0.5 whitespace-nowrap text-[10px] text-amber-200/65">
-          近 30 日 {item.champion.wins}/{item.champion.games} · {percent(item.champion.winRate)}
-        </p>
       </div>
     </div>
   );

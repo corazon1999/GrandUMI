@@ -626,9 +626,6 @@ export type LeaderboardPeriod = "7d" | "30d" | "all";
 
 export interface LeaderChampionInfo {
   displayName: string;
-  games: number;
-  wins: number;
-  winRate: number;
 }
 
 export interface LeaderLeaderboardItem {

@@ -1565,9 +1565,6 @@ public static class WebSocketBridge
                         champion = champion is null ? null : new
                         {
                             displayName = championName ?? "神秘玩家",
-                            games = champion.Games,
-                            wins = champion.Wins,
-                            winRate = champion.Wins / (double)champion.Games,
                         },
                     };
                 }),
