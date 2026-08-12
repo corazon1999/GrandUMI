@@ -5,10 +5,12 @@ namespace GrandUMI.Tests;
 public sealed class GlobalAnnouncementPolicyTests
 {
     [Fact]
-    public void OnlyTheConfiguredAccountCanSendAnnouncements()
+    public void OnlyConfiguredAccountsCanUseAdministratorFeatures()
     {
         Assert.True(GlobalAnnouncementPolicy.IsAuthorized("释迦"));
+        Assert.True(GlobalAnnouncementPolicy.IsAuthorized("栗子"));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized("释迦 "));
+        Assert.False(GlobalAnnouncementPolicy.IsAuthorized("栗子 "));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized("管理员"));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized(null));
     }

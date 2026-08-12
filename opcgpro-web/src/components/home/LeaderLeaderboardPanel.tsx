@@ -7,6 +7,7 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { formatRankBounty } from "@/lib/rankBounty";
 import { LeaderChampionBadge, LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import Modal from "@/components/ui/Modal";
 import {
@@ -56,8 +57,8 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
                 <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-lg font-black text-violet-200">{item.rankPoints}</p>
-                <p className="text-[11px] text-gray-600">PT</p>
+                <p className="max-w-28 text-sm font-black leading-5 text-violet-200">{formatRankBounty(item.rankPoints)}</p>
+                <p className="text-[11px] text-gray-600">悬赏金</p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center text-xs">
@@ -76,7 +77,7 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
             <th className="px-3 py-3">阵营</th>
             <th className="px-3 py-3">段位</th>
             <th className="px-3 py-3">最擅长 Leader</th>
-            <th className="px-3 py-3 text-right">PT</th>
+            <th className="px-3 py-3 text-right">悬赏金</th>
             <th className="px-3 py-3 text-right">场次</th>
             <th className="px-3 py-3 text-right">战绩</th>
             <th className="px-4 py-3 text-right">胜率</th>
@@ -95,7 +96,7 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
               <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
               <td className="px-3 py-3 text-sm text-gray-300">{rankTierLabel(item)}</td>
               <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
-              <td className="px-3 py-3 text-right text-sm font-black text-violet-200">{item.rankPoints}</td>
+              <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{formatRankBounty(item.rankPoints)}</td>
               <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
               <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
               <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{item.winRate.toFixed(1)}%</td>
@@ -333,7 +334,7 @@ export default function LeaderLeaderboardPanel() {
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
             {rankingTab === "leader"
               ? "统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流"
-              : "展示本赛季已完成定级的玩家排名，按 RP 与隐藏分排序。"}
+              : "展示本赛季已完成定级的玩家排名，按悬赏金与隐藏实力排序。"}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 @[640px]:w-auto @[640px]:items-end">

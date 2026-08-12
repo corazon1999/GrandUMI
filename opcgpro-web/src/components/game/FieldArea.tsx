@@ -13,6 +13,7 @@ interface Props {
 
 export default function FieldArea({ side }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
+  const my = useGameStore((s) => s.my);
   const isPending = useGameStore((s) => s.isPending);
   const selectedFieldId = useGameStore((s) => s.selectedFieldId);
   const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
@@ -24,17 +25,23 @@ export default function FieldArea({ side }: Props) {
   const turnCount = useGameStore((s) => s.turnCount);
 
   const isSelectingTarget = useBattleStore((s) => s.isSelectingTarget);
+  const attackerId = useBattleStore((s) => s.attackerId);
   const confirmAttackTarget = useBattleStore((s) => s.confirmAttackTarget);
   const { cardSize } = useResponsive();
 
   if (!player) return <div className="h-full min-h-0" />;
 
+  const attackerCanAttackActive = !!my && !!attackerId && (
+    (my.leaderId === attackerId && my.leaderGainedKeywords.includes("可攻击活跃"))
+    || (my.fieldCards.find((card) => card.id === attackerId)?.gainedKeywords.includes("可攻击活跃") ?? false)
+  );
+
   const handleCardClick = (cardId: string, isTapped: boolean) => {
     if (isPending) return;
 
     if (isSelectingTarget && side === "opponent") {
-      // 只有横置(休息)的角色才能被攻击；活跃角色不可成为目标
-      if (!isTapped) return;
+      // 通常只能攻击休息角色；获得“可攻击活跃”的攻击者也可点选活跃角色。
+      if (!isTapped && !attackerCanAttackActive) return;
       confirmAttackTarget({ isLeader: false, cardId });
       return;
     }
@@ -62,8 +69,10 @@ export default function FieldArea({ side }: Props) {
         const isBlocker = !!battle && fc.id === battle.blockerCardId;
         const isBattleTarget =
           isBlocker || (!!battle && !battle.blockerCardId && !battle.targetIsLeader && fc.id === battle.targetCardId);
-        // 选择攻击目标时：只有横置(休息)的对手角色可被选中
-        const isAttackTarget = isSelectingTarget && side === "opponent" && !isPending && fc.isTapped;
+        const isAttackTarget = isSelectingTarget
+          && side === "opponent"
+          && !isPending
+          && (fc.isTapped || attackerCanAttackActive);
         // 明确的禁攻状态对敌我双方、任意回合都可见；其他攻击状态仅在我方回合显示。
         // 新登场且未横置时显示召唤眩晕(sick)，横置等普通不可攻击条件不额外标记。
         const attackState: "can" | "sick" | "blocked" | "none" =
@@ -98,6 +107,14 @@ export default function FieldArea({ side }: Props) {
               {isBattleTarget && (
                 <span className={`pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded px-1.5 text-[10px] font-black text-black shadow ${isBlocker ? "bg-cyan-300" : "bg-amber-500"}`}>
                   {isBlocker ? "阻挡" : "目标"}
+                </span>
+              )}
+              {fc.effectsNullified && (
+                <span
+                  title="本回合角色效果无效"
+                  className="pointer-events-none absolute -left-2 -top-2 z-40 rounded-full bg-slate-950/95 px-2 py-1 text-[10px] font-black text-fuchsia-200 shadow-lg ring-2 ring-fuchsia-400/80"
+                >
+                  效果无效
                 </span>
               )}
               <CardItem

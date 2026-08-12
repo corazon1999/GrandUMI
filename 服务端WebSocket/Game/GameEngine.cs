@@ -55,6 +55,8 @@ public class GameEngine
     private readonly Func<Guid> _idFactory;
     /// <summary>骰点对局是否延迟到先后手确定后再洗牌、设置生命区并抽取起手牌。</summary>
     private readonly bool _deferOpeningSetupUntilFirstPlayerChosen;
+    /// <summary>双方领袖的 OnGameStart 是否已在准备起手牌前完成。</summary>
+    private bool _leaderStartEffectsResolved;
 
     /// <summary>最近一次动作触发的最外层 fire-and-forget 效果链；重放在喂下一个动作前等它进入稳定态。</summary>
     private Task _settle = Task.CompletedTask;
@@ -284,13 +286,34 @@ public class GameEngine
         State.CurrentTurnPlayer = State.FirstPlayer;
         if (_deferOpeningSetupUntilFirstPlayerChosen)
         {
-            InitLifeAndHand(State.Players[0], 0);
-            InitLifeAndHand(State.Players[1], 1);
+            _ = Track(CompleteDeferredOpeningSetupAsync(playerIndex, goFirst));
+            return;
         }
         BeginMulliganPhase();
         Broadcast("FirstPlayerChosen", new
         {
             player = playerIndex,
+            goFirst,
+            firstPlayer = State.FirstPlayer,
+        });
+    }
+
+    /// <summary>
+    /// 骰点对局的正式开局准备：先按“先后手选择者 → 另一方”的顺序处理双方 OnGameStart，
+    /// 再设置生命与起手牌并进入调度。OP13-079 因而会在任何卡牌进入起手或生命前检索舞台。
+    /// </summary>
+    private async Task CompleteDeferredOpeningSetupAsync(int chooserIndex, bool goFirst)
+    {
+        foreach (var owner in new[] { chooserIndex, 1 - chooserIndex })
+            await EffectRuntime.Resolve(State, owner, State.Players[owner].Leader, EffectTrigger.OnGameStart, Prompts);
+
+        _leaderStartEffectsResolved = true;
+        InitLifeAndHand(State.Players[0], 0);
+        InitLifeAndHand(State.Players[1], 1);
+        BeginMulliganPhase();
+        Broadcast("FirstPlayerChosen", new
+        {
+            player = chooserIndex,
             goFirst,
             firstPlayer = State.FirstPlayer,
         });
@@ -1323,6 +1346,8 @@ public class GameEngine
     /// </summary>
     private void RegisterLeaderPassives()
     {
+        if (_leaderStartEffectsResolved) return;
+        _leaderStartEffectsResolved = true;
         for (int i = 0; i < 2; i++)
             _ = Track(EffectRuntime.Resolve(State, i, State.Players[i].Leader, EffectTrigger.OnGameStart, Prompts));
     }

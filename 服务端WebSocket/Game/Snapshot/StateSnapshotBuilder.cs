@@ -216,6 +216,7 @@ public static class StateSnapshotBuilder
             cost = state.CurrentCostOf(idx, c),
             attachedDon = p.AttachedDonCount(c.Id),
             gainedKeywords = GrantedKeywords(state, c),
+            effectsNullified = c.IsEffectsNullified || state.IsContinuouslyNullified(c),
             cannotActivateNextReset = c.CannotActivateNextReset,
             cannotBeRested = c.HasRestriction(RestrictionKind.CannotBeRested)
                 || state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested),

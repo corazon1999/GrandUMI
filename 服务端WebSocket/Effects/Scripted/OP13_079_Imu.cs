@@ -5,11 +5,12 @@ namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
 /// OP13-079 伊姆（领航）
+/// 游戏开始时，将我方卡组中最多1张拥有《圣地玛丽乔尔》特征的舞台卡牌登场。
 /// 【启动主要】【每回合1次】可以将我方1张拥有《天龙人》特征的角色或我方1张手牌放置到废弃区：抽取1张卡牌。
 ///
-/// 实现说明 / 简化点：
-///   - 卡面另含两项无法表达的规则级机制（构筑上不能放2费以上事件、游戏开始时登场圣地玛丽乔尔舞台），
-///     这两项引擎无通道，本脚本仅实现可脚本化的【启动主要】抽牌效果。
+/// 实现说明：
+///   - OnGameStart 从当前卡组选择最多1张《圣地玛丽乔尔》舞台免费登场，随后洗牌。
+///   - 构筑上不能放2费以上事件仍由卡组校验层负责，不属于对局内效果。
 ///   - 成本为二选一：弃 1 张《天龙人》角色 或 弃 1 张手牌，支付成本后抽 1 张。
 ///   - "可以"=可选，先 ConfirmOptional。
 /// </summary>
@@ -17,11 +18,37 @@ public class OP13_079_Imu : IScriptedEffect
 {
     public string CardNumber => "OP13-079";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnGameStart || t == EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
+
+        if (ctx.Trigger == EffectTrigger.OnGameStart)
+        {
+            var stages = me.Deck
+                .Where(card => card.Info.Kind == CardKind.Stage && card.Info.HasKeyword("圣地玛丽乔尔"))
+                .ToList();
+            if (stages.Count == 0) return;
+
+            var extra = new Dictionary<string, object?>
+            {
+                ["choiceCards"] = stages.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+            };
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnDeck",
+                "伊姆：从卡组选择最多1张《圣地玛丽乔尔》舞台登场",
+                stages.Select(card => card.Id.ToString()).ToList(), 0, 1, extra);
+            if (chosen.Count == 0) return;
+
+            var stage = stages.First(card => card.Id.ToString() == chosen[0]);
+            await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, stage);
+            if (ctx.Engine is not null)
+                ctx.Engine.ShuffleDeck(me, ctx.OwnerIndex, "OP13-079_game_start");
+            else
+                AtomicOps.Shuffle(ctx.State, me.Deck);
+            return;
+        }
 
         // 每回合1次
         var key = ctx.Source.Info.Number + "-act" + ":" + ctx.Source.Id;

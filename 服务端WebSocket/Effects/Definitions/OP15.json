@@ -1045,8 +1045,15 @@
       },
       "then": [
         {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "min": 0,
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
           "op": "AddPowerThisBattle",
-          "target": "selfLeader",
+          "target": "$tgt",
           "delta": 3000
         }
       ]

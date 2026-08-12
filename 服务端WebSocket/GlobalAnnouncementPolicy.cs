@@ -2,12 +2,17 @@ namespace GrandUMI;
 
 public static class GlobalAnnouncementPolicy
 {
-    public const string AuthorizedAccount = "释迦";
+    private static readonly HashSet<string> AuthorizedAccounts = new(StringComparer.Ordinal)
+    {
+        "释迦",
+        "栗子",
+    };
+
     public const int MaximumContentLength = 200;
     public const int RankedWinStreakAnnouncementThreshold = 3;
 
     public static bool IsAuthorized(string? account)
-        => string.Equals(account, AuthorizedAccount, StringComparison.Ordinal);
+        => account is not null && AuthorizedAccounts.Contains(account);
 
     public static string? Normalize(string? content)
     {

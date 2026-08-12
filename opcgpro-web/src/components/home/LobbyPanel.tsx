@@ -8,6 +8,7 @@ import Modal from "@/components/ui/Modal";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { formatRankBounty } from "@/lib/rankBounty";
 import type { RankFaction } from "@/types/net";
 
 const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; titles: readonly string[]; className: string }> = [
@@ -22,10 +23,12 @@ const RANK_FACTION_NAMES: Record<RankFaction, string> = {
   government: "世界政府阵营",
 };
 
+const ADMIN_ACCOUNTS = new Set(["释迦", "栗子"]);
+
 function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | null }) {
   return (
     <div id="rank-faction-rules" className="mt-2 rounded-xl border border-violet-800/60 bg-black/20 p-3 text-xs leading-5 text-gray-300">
-      <p className="font-bold text-violet-200">阵营只改变排位称号，不影响匹配范围或 RP 结算。</p>
+      <p className="font-bold text-violet-200">阵营只改变排位称号，不影响匹配范围或悬赏金结算。</p>
       <div className="mt-3 grid gap-2 @[640px]:grid-cols-3">
         {RANK_FACTIONS.map((faction) => (
           <section
@@ -39,12 +42,13 @@ function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | n
       </div>
       <ul className="mt-3 list-disc space-y-1 pl-4 text-gray-400">
         <li>先完成 5 场定级赛；定级结果最高为各阵营第三阶 I。</li>
-        <li>每个称号分 III、II、I 三个小段；每 100 RP 变化一个小段，每 300 RP 进入下一称号。</li>
-        <li>定级后基础胜负分为 +20 / -20 RP；2 连胜或连败起每场增加 1 RP 奖励或保护，6 连胜、连败起封顶 5 RP。</li>
-        <li>低分方战胜高分方、或高分方负于低分方时，赛前每相差 100 RP 再获得 1 RP 奖励或保护，最多计算 500 RP。</li>
-        <li>第一阶不因失败扣除显示 RP，第二、三阶拥有大段保护；每局结算会逐项展示 RP 变化。</li>
-        <li>达到 1500 RP 后进入“新世界”，阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
-        <li>更换阵营会清空本赛季 RP、定级进度和战绩，并重新开始定级。</li>
+        <li>每个称号分 III、II、I 三个小段；悬赏金每增加 1000万贝里变化一个小段，每增加 3000万贝里进入下一称号。</li>
+        <li>定级后基础胜负会使悬赏金增加或减少 200万贝里；2 连胜或连败起每场增加 10万贝里奖励或保护，6 连胜、连败起封顶 50万贝里。</li>
+        <li>低悬赏方获胜时，赛前每低 1000万贝里额外增加 10万贝里；低悬赏方失败时，每低 1000万贝里少扣 10万贝里，两者最多修正 50万贝里。</li>
+        <li>高悬赏方获胜时，赛前每高 1000万贝里少加 10万贝里；高悬赏方失败时，每高 1000万贝里多扣 10万贝里，两者最多修正 30万贝里。</li>
+        <li>第一阶不因失败降低显示悬赏金，第二、三阶拥有大段保护；每局结算会逐项展示悬赏金变化。</li>
+        <li>悬赏金达到 1亿5000万贝里后进入“新世界”，阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
+        <li>更换阵营会清空本赛季悬赏金、定级进度和战绩，并重新开始定级。</li>
       </ul>
     </div>
   );
@@ -73,6 +77,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const roomCode      = useNetStore((s) => s.roomCode);
   const roomOperation = useNetStore((s) => s.roomOperation);
   const connState     = useNetStore((s) => s.connState);
+  const maintenance   = useNetStore((s) => s.maintenance);
 
   const [roomMode, setRoomMode] = useState<"none" | "create" | "join">("none");
   const [playMode, setPlayMode] = useState<"match" | "friend" | "bot">("match");
@@ -89,7 +94,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   // mainCount === 0 表示解析失败/未知，fail-open 不拦截，交由后端校验兜底。
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
-  const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle";
+  const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle" && !maintenance.enabled;
   const canQueue = canEnter && (matchQueueKind !== "ranked" || Boolean(rankProfile?.faction));
 
   useEffect(() => {
@@ -197,6 +202,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
     ? "请先选择一副卡组"
     : deckIncomplete
       ? `卡组需正好 50 张，当前 ${mainCount} 张`
+      : maintenance.enabled
+        ? "维护更新中，暂时无法开始新的对局"
       : connState !== "connected"
         ? "服务器连接恢复后即可开始"
         : "";
@@ -276,7 +283,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <>
                     <div>
                       <h2 className="font-bold text-white">公开匹配</h2>
-                      <p className="mt-1 text-sm leading-5 text-gray-500">排位计入段位积分，休闲不影响排名。</p>
+                      <p className="mt-1 text-sm leading-5 text-gray-500">排位会改变悬赏金，休闲不影响排名。</p>
                     </div>
                     <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
                       <button
@@ -302,7 +309,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                         {!rankProfile.faction ? (
                           <div>
                             <p className="text-sm font-black text-violet-200">选择你的排位阵营</p>
-                            <p className="mt-1 text-xs leading-5 text-gray-400">阵营只影响称号和阵营榜名次，不影响积分或匹配；之后可更换，但会清空本赛季排位进度。</p>
+                            <p className="mt-1 text-xs leading-5 text-gray-400">阵营只影响称号和阵营榜名次，不影响悬赏金结算或匹配；之后可更换，但会清空本赛季排位进度。</p>
                             <div className="mt-3 grid gap-2 @[640px]:grid-cols-3">
                               {RANK_FACTIONS.map((faction) => (
                                 <button
@@ -327,6 +334,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                                   ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
                                   : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
                               </p>
+                              <p className="mt-1 text-xs font-bold text-violet-300">悬赏金 {formatRankBounty(rankProfile.rankPoints)}</p>
                             </div>
                             <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>
                             <div className="mt-2 grid grid-cols-2 border-y border-violet-900/60" aria-label="排位阵营操作">
@@ -357,7 +365,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                             </div>
                             {factionEditorOpen && (
                               <div id="rank-faction-editor" className="mt-2">
-                                <p className="mb-2 text-xs leading-5 text-gray-400">更换后将清空本赛季 RP、定级进度和战绩，并从头定级。</p>
+                                <p className="mb-2 text-xs leading-5 text-gray-400">更换后将清空本赛季悬赏金、定级进度和战绩，并从头定级。</p>
                                 <div className="grid gap-2 @[640px]:grid-cols-3">
                                   {RANK_FACTIONS.map((faction) => (
                                     <button
@@ -498,7 +506,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             <p className="pb-2 text-center text-sm text-gray-500">{entryHint}</p>
           )}
 
-          {account === "释迦" && (
+          {ADMIN_ACCOUNTS.has(account) && (
             <section aria-label="全服公告" className="rounded-2xl border border-amber-700/70 bg-amber-950/25 p-3 @[640px]:p-4">
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <h2 className="text-sm font-black text-amber-200">全服滚动公告</h2>
@@ -542,7 +550,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
         mobileSheet
         maxWidthClass="max-w-md"
       >
-        <p className="text-sm leading-6 text-gray-300">确认改为{pendingFaction ? RANK_FACTION_NAMES[pendingFaction] : "新阵营"}吗？此操作会清空本赛季的 RP、定级进度和战绩，且无法恢复。</p>
+        <p className="text-sm leading-6 text-gray-300">确认改为{pendingFaction ? RANK_FACTION_NAMES[pendingFaction] : "新阵营"}吗？此操作会清空本赛季的悬赏金、定级进度和战绩，且无法恢复。</p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button type="button" onClick={() => setPendingFaction(null)} className="min-h-11 rounded-xl bg-gray-800 px-4 text-sm font-bold text-gray-200 hover:bg-gray-700">取消</button>
           <button type="button" onClick={confirmFactionChange} className="min-h-11 rounded-xl bg-violet-600 px-4 text-sm font-black text-white hover:bg-violet-500">确认更换并清空</button>

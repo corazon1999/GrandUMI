@@ -975,29 +975,34 @@
     "_name": "",
     "_matcher": "【反击】我方领袖或角色本次战斗+2000，之后横置对方1张角色；【触发】从咚卡组补1张活跃咚。",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "donReturn": 1
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 2000
-      },
-      {
-        "op": "Choose",
-        "prompt": "OpponentCharacter",
-        "max": 1,
-        "as": "$tgt"
-      },
-      {
-        "op": "Rest",
-        "target": "$tgt"
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 2000
+        },
+        {
+          "op": "Choose",
+          "prompt": "OpponentCharacter",
+          "max": 1,
+          "as": "$tgt"
+        },
+        {
+          "op": "Rest",
+          "target": "$tgt"
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "RefreshDon",

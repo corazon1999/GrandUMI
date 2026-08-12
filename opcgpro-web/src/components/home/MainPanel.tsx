@@ -26,6 +26,7 @@ import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
 import ProfilePanel from "./ProfilePanel";
 import CardBackPlazaPanel from "./CardBackPlazaPanel";
+import MaintenanceControlPanel from "./MaintenanceControlPanel";
 
 type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
@@ -411,6 +412,7 @@ export default function MainPanel() {
   const onlineCount = useNetStore((s) => s.onlineCount);
   const connState = useNetStore((s) => s.connState);
   const incomingFriendCount = useNetStore((s) => s.incomingFriendRequests.length);
+  const maintenance = useNetStore((s) => s.maintenance);
   const connectionLabel = connState === "connected"
     ? "服务器已连接"
     : connState === "connecting" || connState === "handshaking"
@@ -421,6 +423,10 @@ export default function MainPanel() {
     : connState === "connecting" || connState === "handshaking"
       ? "text-yellow-400"
       : "text-red-400";
+
+  useEffect(() => {
+    if (connState === "connected") HomeRequest.requestMaintenanceState();
+  }, [connState]);
 
   // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
   useEffect(() => {
@@ -542,22 +548,25 @@ export default function MainPanel() {
           </div>
         </nav>
 
-        <main className="relative min-w-0 flex-1 overflow-hidden">
-          {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
-          {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
-          {view === "catalog" && <CardCatalogPanel />}
-          {view === "leaderboard" && <LeaderLeaderboardPanel />}
-          {view === "cardBackPlaza" && <CardBackPlazaPanel onOpenProfile={() => setView("profile")} />}
-          {view === "history" && <HistoryPanel />}
-          {view === "profile" && (
-            <ProfilePanel
-              profileEditor={<PlayerAvatar variant="profile" />}
-              onOpenPlayers={() => setShowPlayerList(true)}
-              onOpenHistory={() => setView("history")}
-              onOpenChangelog={() => setShowChangelog(true)}
-              onOpenSettings={openSettings}
-            />
-          )}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {(maintenance.canManage || maintenance.enabled) && <MaintenanceControlPanel />}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
+            {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
+            {view === "catalog" && <CardCatalogPanel />}
+            {view === "leaderboard" && <LeaderLeaderboardPanel />}
+            {view === "cardBackPlaza" && <CardBackPlazaPanel onOpenProfile={() => setView("profile")} />}
+            {view === "history" && <HistoryPanel />}
+            {view === "profile" && (
+              <ProfilePanel
+                profileEditor={<PlayerAvatar variant="profile" />}
+                onOpenPlayers={() => setShowPlayerList(true)}
+                onOpenHistory={() => setView("history")}
+                onOpenChangelog={() => setShowChangelog(true)}
+                onOpenSettings={openSettings}
+              />
+            )}
+          </div>
         </main>
       </div>
 

@@ -1,6 +1,46 @@
 using GrandUMI.Cards;
+using System.Collections.ObjectModel;
 
 namespace GrandUMI.Game;
+
+/// <summary>
+/// 角色区集合。角色被移出角色区时统一执行离场清理，避免各效果路径遗漏附着咚的状态恢复。
+/// </summary>
+public sealed class CharacterZone : Collection<CardInstance>
+{
+    private readonly Action<CardInstance> _onRemoved;
+
+    internal CharacterZone(Action<CardInstance> onRemoved)
+    {
+        _onRemoved = onRemoved;
+    }
+
+    public void AddRange(IEnumerable<CardInstance> cards)
+    {
+        foreach (var card in cards) Add(card);
+    }
+
+    protected override void RemoveItem(int index)
+    {
+        var removed = this[index];
+        base.RemoveItem(index);
+        _onRemoved(removed);
+    }
+
+    protected override void SetItem(int index, CardInstance item)
+    {
+        var removed = this[index];
+        base.SetItem(index, item);
+        if (!ReferenceEquals(removed, item)) _onRemoved(removed);
+    }
+
+    protected override void ClearItems()
+    {
+        var removed = this.ToList();
+        base.ClearItems();
+        foreach (var card in removed) _onRemoved(card);
+    }
+}
 
 /// <summary>排位对局中公开展示的玩家阵营与开局段位。</summary>
 public sealed record PlayerRankIdentity(
@@ -15,6 +55,11 @@ public sealed record PlayerRankIdentity(
 /// </summary>
 public class PlayerState
 {
+    public PlayerState()
+    {
+        Characters = new CharacterZone(RestAttachedDonForDepartingCharacter);
+    }
+
     public required string SessionId   { get; set; }
     public required string AccountName { get; set; }
     /// <summary>仅排位对局缓存；创建或恢复房间时读取一次，避免每份快照查询数据库。</summary>
@@ -27,7 +72,7 @@ public class PlayerState
     public required CardInstance Leader  { get; init; }
     public List<CardInstance> Hand       { get; } = new();
     /// <summary>角色区（最多 5）</summary>
-    public List<CardInstance> Characters { get; } = new();
+    public CharacterZone Characters { get; }
     public CardInstance? StageCard       { get; set; }
     public List<CardInstance> Trash      { get; } = new();
     public List<CardInstance> Deck       { get; } = new();
@@ -61,4 +106,14 @@ public class PlayerState
     public int TotalDonInCostArea => CostArea.Count;
     public int DeckCount => Deck.Count;
     public int LifeCount => LifeArea.Count;
+
+    private void RestAttachedDonForDepartingCharacter(CardInstance character)
+    {
+        foreach (var don in CostArea)
+        {
+            if (don.State != DonState.Attached || don.AttachedToCardId != character.Id) continue;
+            don.State = DonState.Rest;
+            don.AttachedToCardId = null;
+        }
+    }
 }

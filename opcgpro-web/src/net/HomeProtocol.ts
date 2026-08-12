@@ -96,6 +96,21 @@ const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
 const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
 const AUTH_TOKEN_KEY = "grandumi_auth_token";
 
+interface MsgMaintenanceState extends MsgBase {
+  proto: "MsgMaintenanceState";
+  enabled: boolean;
+  activeRoomCount: number;
+  startedAt?: number | null;
+  canManage?: boolean;
+  result?: boolean;
+  logStr?: string;
+}
+
+interface MsgSetMaintenance extends MsgBase {
+  proto: "MsgSetMaintenance";
+  enabled: boolean;
+}
+
 function readAuthToken(account: string): string | undefined {
   if (typeof window === "undefined") return undefined;
   if (sessionStorage.getItem(AUTH_ACCOUNT_KEY)?.toLocaleLowerCase("zh-CN") !== account.toLocaleLowerCase("zh-CN")) {
@@ -202,6 +217,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgGlobalAnnouncement":
         handleGlobalAnnouncement(msg as MsgGlobalAnnouncement);
+        break;
+      case "MsgMaintenanceState":
+        handleMaintenanceState(msg as MsgMaintenanceState);
         break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
@@ -482,6 +500,7 @@ function handleUpdatePs(msg: MsgUpdatePs) {
  */
 function handleEnterMatch(msg: MsgEnterMatch) {
   if (msg.result === false) {
+    useNetStore.getState().setMatchState("idle");
     showMessage(msg.logStr ?? "加入匹配失败", "error");
     return;
   }
@@ -625,6 +644,18 @@ function handleChatMsg(msg: MsgChatMsg) {
 function handleGlobalAnnouncement(msg: MsgGlobalAnnouncement) {
   if (msg.result === undefined) return;
   showMessage(msg.logStr ?? (msg.result ? "全服公告已发送" : "全服公告发送失败"), msg.result ? "info" : "error");
+}
+
+function handleMaintenanceState(msg: MsgMaintenanceState) {
+  const store = useNetStore.getState();
+  store.setMaintenance({
+    enabled: msg.enabled === true,
+    activeRoomCount: Math.max(0, Number(msg.activeRoomCount) || 0),
+    startedAt: typeof msg.startedAt === "number" ? msg.startedAt : null,
+    canManage: msg.canManage === true,
+  });
+  if (msg.enabled && store.matchState === "matching") store.setMatchState("idle");
+  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
 }
 
 /**
@@ -1001,6 +1032,14 @@ export const HomeRequest = {
       proto: "MsgGlobalAnnouncement",
       content,
     } as MsgGlobalAnnouncement);
+  },
+
+  requestMaintenanceState() {
+    return NetManager.send({ proto: "MsgMaintenanceState" } as MsgMaintenanceState);
+  },
+
+  setMaintenance(enabled: boolean) {
+    return NetManager.send({ proto: "MsgSetMaintenance", enabled } as MsgSetMaintenance);
   },
 
   requestPlayerList(offset = 0, limit = 200) {

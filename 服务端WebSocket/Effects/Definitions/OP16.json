@@ -721,6 +721,10 @@
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "萨卡斯基【登场时】：咚!!-1，使对方最多1张角色力量-6000？",
         "then": [
           {
             "op": "Choose",

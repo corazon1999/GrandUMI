@@ -18,6 +18,7 @@ $ErrorActionPreference = "Stop"
 $SRV  = $Server
 $repo = $PSScriptRoot
 Set-Location $repo
+. (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
 
 function Die($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
 
@@ -81,7 +82,8 @@ if ($serverHead -ne $localHead) {
   }
 
   $shortHead = $localHead.Substring(0, 12)
-  $bundle = Join-Path ([IO.Path]::GetTempPath()) "grandumi-$shortHead.bundle"
+  $deployTempDirectory = Get-GrandUmiTempDirectory -Category "Deploy"
+  $bundle = Join-Path $deployTempDirectory "grandumi-$shortHead.bundle"
   $remoteBundle = "/tmp/grandumi-$shortHead.bundle"
   try {
     if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }

@@ -753,8 +753,7 @@
             "restTo": "bottom",
             "match": {
               "keyword": "大妈海盗团",
-              "originalCostGte": 2,
-              "excludeName": "夏洛特·布玲"
+              "originalCostGte": 2
             }
           }
         ]

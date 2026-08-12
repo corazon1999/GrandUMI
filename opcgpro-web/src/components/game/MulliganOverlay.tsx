@@ -19,6 +19,7 @@ export default function MulliganOverlay() {
   const mulliganBothDone = useGameStore((s) => s.mulliganBothDone);
   const mulliganDeadlineUtc = useGameStore((s) => s.mulliganDeadlineUtc);
   const isPending = useGameStore((s) => s.isPending);
+  const isGameOver = useGameStore((s) => s.isGameOver);
   const { cardSize } = useResponsive();
   const [now, setNow] = useState(() => Date.now());
   const [recoveryAttempts, setRecoveryAttempts] = useState(0);
@@ -62,8 +63,10 @@ export default function MulliganOverlay() {
     return () => window.clearInterval(timer);
   }, [timedOut, mulliganBothDone, mulliganDeadlineUtc]);
 
+  if (isGameOver) return null;
   if (!my) return null;
   if (!firstPlayerChosen) return null;
+  if (!mulliganDeadlineUtc) return null;
   if (mulliganBothDone) return null;
 
   const myDone = my.mulliganDone;

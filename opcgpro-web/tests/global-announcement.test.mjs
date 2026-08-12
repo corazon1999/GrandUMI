@@ -9,8 +9,9 @@ const [lobby, protocol, banner, bridge] = await Promise.all([
   readFile(new URL("../../服务端WebSocket/WebSocketBridge.cs", import.meta.url), "utf8"),
 ]);
 
-test("only the specified account sees the announcement composer", () => {
-  assert.match(lobby, /account === "释迦"/);
+test("only configured administrator accounts see the announcement composer", () => {
+  assert.match(lobby, /const ADMIN_ACCOUNTS = new Set\(\["释迦", "栗子"\]\)/);
+  assert.match(lobby, /ADMIN_ACCOUNTS\.has\(account\)/);
   assert.match(lobby, /aria-label="公告内容"/);
   assert.match(lobby, /maxLength=\{200\}/);
   assert.match(lobby, /min-h-11/);

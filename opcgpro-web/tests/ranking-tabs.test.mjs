@@ -20,7 +20,8 @@ test("排行榜页面在同一位置切换 Leader 榜和排位榜", async () => 
   assert.match(panel, /rankingTab === "ranked" \? <RankedLeaderboard items=\{rankLeaderboard\}/);
   assert.match(panel, /RANK_FACTION_NAMES/);
   assert.match(panel, /favoriteLeader/);
-  assert.match(panel, />PT</);
+  assert.match(panel, />悬赏金</);
+  assert.match(panel, /formatRankBounty\(item\.rankPoints\)/);
   assert.match(types, /favoriteLeader\?: string \| null/);
   assert.match(rankedStore, /GetFavoriteLeaders/);
   assert.match(sidebar, /SidebarButton label="排行榜" icon="leaderboard"/);

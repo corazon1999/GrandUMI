@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 Set-Location $repo
+. (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
 
 function Stop-WithError([string]$Message) {
   Write-Host $Message -ForegroundColor Red
@@ -46,7 +47,8 @@ if ($LASTEXITCODE -ne 0 -or $serverHead -notmatch '^[0-9a-f]{40}$') {
 }
 
 $short = $target.Substring(0, 12)
-$bundle = Join-Path ([IO.Path]::GetTempPath()) "grandumi-test-$short.bundle"
+$deployTempDirectory = Get-GrandUmiTempDirectory -Category "Deploy"
+$bundle = Join-Path $deployTempDirectory "grandumi-test-$short.bundle"
 $remoteBundle = "/tmp/grandumi-test-$short.bundle"
 try {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }

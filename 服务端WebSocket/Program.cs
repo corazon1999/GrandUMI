@@ -54,6 +54,9 @@ Console.WriteLine($"[LeaderChampion] 榜单 SQLite: {LeaderChampionStore.Default
 RankedStore.Default.Initialize();
 Console.WriteLine($"[排位] SQLite: {RankedStore.Default.DatabasePath}");
 
+GameRoomManager.InitializeMaintenance(Path.Combine(
+    Path.GetDirectoryName(playerDataStore.DatabasePath)!,
+    "maintenance-state.json"));
 await GameRoomManager.RestoreAll();
 WebSocketBridge.Initialize(playerDataStore, accountAuthenticationStore);
 

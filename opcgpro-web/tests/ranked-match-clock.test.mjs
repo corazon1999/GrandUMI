@@ -30,7 +30,7 @@ test("排位前必须选择阵营，更换阵营须确认并清空排位进度",
   assert.match(lobby, /选择你的排位阵营/);
   assert.match(lobby, /HomeRequest\.selectRankFaction\(pendingFaction, true\)/);
   assert.match(lobby, /确认更换并清空/);
-  assert.match(lobby, /更换后将清空本赛季 RP、定级进度和战绩/);
+  assert.match(lobby, /更换后将清空本赛季悬赏金、定级进度和战绩/);
   assert.match(lobby, /Boolean\(rankProfile\?\.faction\)/);
   assert.match(protocol, /selectRankFaction\(faction: RankFaction, resetRankProgress = false\)/);
   assert.match(protocol, /resetRankProgress/);
@@ -51,15 +51,15 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /aria-expanded=\{rankRulesOpen\}/);
   assert.match(lobby, />\s*阵营规则\s*</);
   assert.match(lobby, /先完成 5 场定级赛/);
-  assert.match(lobby, /每 100 RP 变化一个小段，每 300 RP 进入下一称号/);
-  assert.match(lobby, /基础胜负分为 \+20 \/ -20 RP/);
-  assert.match(lobby, /6 连胜、连败起封顶 5 RP/);
-  assert.match(lobby, /低分方获胜时/);
-  assert.match(lobby, /低分方失败时/);
-  assert.match(lobby, /最多修正 5 RP/);
-  assert.match(lobby, /高分方获胜时/);
-  assert.match(lobby, /高分方失败时/);
-  assert.match(lobby, /最多修正 3 RP/);
+  assert.match(lobby, /悬赏金每增加 1000万贝里变化一个小段，每增加 3000万贝里进入下一称号/);
+  assert.match(lobby, /基础胜负会使悬赏金增加或减少 200万贝里/);
+  assert.match(lobby, /6 连胜、连败起封顶 50万贝里/);
+  assert.match(lobby, /低悬赏方获胜时/);
+  assert.match(lobby, /低悬赏方失败时/);
+  assert.match(lobby, /最多修正 50万贝里/);
+  assert.match(lobby, /高悬赏方获胜时/);
+  assert.match(lobby, /高悬赏方失败时/);
+  assert.match(lobby, /最多修正 30万贝里/);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
@@ -74,10 +74,13 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /baseRankPointDelta/);
   assert.match(panel, /streakAdjustment/);
   assert.match(panel, /rankDifferenceAdjustment/);
-  assert.match(panel, /低分方获胜奖励/);
-  assert.match(panel, /低分方失败保护/);
-  assert.match(panel, /高分方获胜削减/);
-  assert.match(panel, /高分方失败追加扣分/);
+  assert.match(panel, /formatSignedRankBounty\(result\.rankPointDelta\)/);
+  assert.match(panel, /悬赏金\{formatSignedRankBounty\(result\.rankPointDelta\)\}/);
+  assert.doesNotMatch(panel, />.*RP| RP/);
+  assert.match(panel, /低悬赏方获胜奖励/);
+  assert.match(panel, /低悬赏方失败保护/);
+  assert.match(panel, /高悬赏方获胜削减/);
+  assert.match(panel, /高悬赏方失败追加扣除/);
   assert.match(panel, /rankProtectionAdjustment/);
   assert.match(panel, /最终变化/);
   assert.match(page, /min-h-11/);

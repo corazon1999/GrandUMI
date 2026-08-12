@@ -863,6 +863,7 @@ export interface FieldCardSnapshot {
   cost: number;              // 当前费用（含持续光环，如 OP16-080 对方回合 +1）
   attachedDon: number;
   gainedKeywords: string[];
+  effectsNullified: boolean; // 当前角色效果是否处于无效状态
   cannotActivateNextReset: boolean;
   cannotBeRested: boolean;   // 无法被效果转为休息状态
   activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
