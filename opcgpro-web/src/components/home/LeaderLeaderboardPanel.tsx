@@ -7,7 +7,7 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
-import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
+import { LeaderChampionBadge, LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import {
   nextLeaderLeaderboardSort,
   sortLeaderLeaderboardItems,
@@ -47,7 +47,10 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
             <div className="flex items-center gap-3">
               <span className={`w-7 shrink-0 text-center text-lg font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-400"}`}>#{item.rank}</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
+                  <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
+                </div>
                 <p className="mt-1 truncate text-xs text-gray-500">{RANK_FACTION_NAMES[item.faction]} · {rankTierLabel(item)}</p>
                 <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
               </div>
@@ -82,7 +85,12 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
           {items.map((item) => (
             <tr key={`${item.rank}-${item.displayName}`} className="transition-colors hover:bg-gray-900/80">
               <td className={`px-4 py-3 text-center font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</td>
-              <td className="px-3 py-3 text-sm font-bold text-white">{item.displayName}</td>
+              <td className="px-3 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-bold text-white">{item.displayName}</span>
+                  <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
+                </div>
+              </td>
               <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
               <td className="px-3 py-3 text-sm text-gray-300">{rankTierLabel(item)}</td>
               <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>

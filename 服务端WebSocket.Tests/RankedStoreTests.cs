@@ -1,4 +1,6 @@
 using GrandUMI.Game.Ranked;
+using GrandUMI.Game;
+using GrandUMI.Game.Stats;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -251,6 +253,42 @@ public class RankedStoreTests
             TryDelete(path);
             TryDelete(path + "-wal");
             TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位榜_返回玩家持有的最强称号且不包含称号胜率()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-champion-{Guid.NewGuid():N}");
+        var rankedPath = Path.Combine(tempDir, "ranked.db");
+        var championPath = Path.Combine(tempDir, "champions.db");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var now = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc);
+            var championStore = new LeaderChampionStore(championPath);
+            for (var i = 0; i < LeaderChampionStore.MinimumChampionGames; i++)
+            {
+                Assert.True(championStore.RecordMatch(new LeaderMatchResult(
+                    $"champion-{i}", now, MatchKind.Ranked,
+                    "alice", $"opponent-{i}", "OP16-001", "OP01-001", 0, 0, 8, "胜利")));
+            }
+
+            var rankedStore = new RankedStore(rankedPath, championStore);
+            Assert.NotNull(rankedStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            Assert.NotNull(rankedStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
+            CompletePlacements(rankedStore, now, "champion-rank");
+            var item = Assert.Single(rankedStore.GetSnapshot("alice", "爱丽丝", now.AddMinutes(20)).Leaderboard,
+                entry => entry.DisplayName == "爱丽丝");
+
+            Assert.Equal(new[] { "OP16-001" }, item.ChampionLeaderNumbers);
+            var wireJson = System.Text.Json.JsonSerializer.Serialize(RankWire.Leaderboard(new[] { item }));
+            Assert.Contains("\"championLeaderNumbers\":[\"OP16-001\"]", wireJson);
+            Assert.DoesNotContain("championWinRate", wireJson, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
     }
 

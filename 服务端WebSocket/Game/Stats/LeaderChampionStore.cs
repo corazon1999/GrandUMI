@@ -135,15 +135,42 @@ public sealed class LeaderChampionStore
     public IReadOnlyList<string> GetChampionLeaderNumbers(string? account, DateTime? nowUtc = null)
     {
         if (string.IsNullOrWhiteSpace(account)) return Array.Empty<string>();
-        var accountKey = HashAccount(account);
+        return GetChampionLeaderNumbersByPlayerKey(HashAccount(account), nowUtc);
+    }
+
+    /// <summary>供已持有匿名玩家键的服务端模块查询称号，避免重新暴露原始账号。</summary>
+    internal IReadOnlyList<string> GetChampionLeaderNumbersByPlayerKey(string? playerKey, DateTime? nowUtc = null)
+    {
+        if (string.IsNullOrWhiteSpace(playerKey)) return Array.Empty<string>();
+        return GetChampionLeaderNumbersByPlayerKeys(new[] { playerKey }, nowUtc)
+            .GetValueOrDefault(playerKey.Trim(), Array.Empty<string>());
+    }
+
+    /// <summary>一次读取多名匿名玩家持有的称号，供排行榜批量组装响应。</summary>
+    internal IReadOnlyDictionary<string, IReadOnlyList<string>> GetChampionLeaderNumbersByPlayerKeys(
+        IEnumerable<string> playerKeys,
+        DateTime? nowUtc = null)
+    {
+        var keys = playerKeys
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .ToHashSet(StringComparer.Ordinal);
+        if (keys.Count == 0)
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+
         return GetChampions(nowUtc)
             .Values
-            .Where(x => x.PlayerKey == accountKey)
-            .OrderByDescending(x => x.Score)
-            .ThenByDescending(x => x.Games)
-            .ThenBy(x => x.LeaderNumber, StringComparer.Ordinal)
-            .Select(x => x.LeaderNumber)
-            .ToArray();
+            .Where(x => keys.Contains(x.PlayerKey))
+            .GroupBy(x => x.PlayerKey, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group
+                    .OrderByDescending(x => x.Score)
+                    .ThenByDescending(x => x.Games)
+                    .ThenBy(x => x.LeaderNumber, StringComparer.Ordinal)
+                    .Select(x => x.LeaderNumber)
+                    .ToArray(),
+                StringComparer.Ordinal);
     }
 
     public bool IsChampion(string? account, string? leaderNumber, DateTime? nowUtc = null)

@@ -31,7 +31,8 @@ public sealed record RankLeaderboardItem(
     int Games,
     int Wins,
     double WinRate,
-    string? FavoriteLeader);
+    string? FavoriteLeader,
+    IReadOnlyList<string> ChampionLeaderNumbers);
 
 public sealed record RankSnapshot(
     RankProfileSnapshot Profile,
@@ -96,6 +97,7 @@ public static class RankWire
             wins = value.Wins,
             winRate = value.WinRate,
             favoriteLeader = value.FavoriteLeader,
+            championLeaderNumbers = value.ChampionLeaderNumbers,
         }).ToArray();
 
     public static object Settlement(RankPlayerSettlement value) => new
@@ -143,13 +145,15 @@ public sealed class RankedStore
     private readonly object _gate = new();
     private readonly string _databasePath;
     private readonly string _connectionString;
+    private readonly LeaderChampionStore _championStore;
     private bool _initialized;
 
     public static RankedStore Default { get; } = new();
 
-    public RankedStore(string? databasePath = null)
+    public RankedStore(string? databasePath = null, LeaderChampionStore? championStore = null)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
+        _championStore = championStore ?? LeaderChampionStore.Default;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -258,7 +262,7 @@ public sealed class RankedStore
                 Save(connection, transaction, profile);
             }
             var faction = ReadFaction(connection, transaction, profile.AccountKey);
-            var leaderboard = ReadLeaderboard(connection, season);
+            var leaderboard = ReadLeaderboard(connection, season, nowUtc);
             transaction.Commit();
             return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction)), leaderboard);
         }
@@ -296,7 +300,7 @@ public sealed class RankedStore
                 // the request non-destructive when an old or malformed client omits that acknowledgement.
                 if (!resetRankProgress)
                 {
-                    var unchangedLeaderboard = ReadLeaderboard(connection, season);
+                    var unchangedLeaderboard = ReadLeaderboard(connection, season, nowUtc);
                     transaction.Commit();
                     return new RankSnapshot(ToSnapshot(profile, season, selected,
                         FactionRank(connection, season, profile, selected)), unchangedLeaderboard);
@@ -313,7 +317,7 @@ public sealed class RankedStore
                 update.ExecuteNonQuery();
                 selected = faction;
             }
-            var leaderboard = ReadLeaderboard(connection, season);
+            var leaderboard = ReadLeaderboard(connection, season, nowUtc);
             transaction.Commit();
             return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected)), leaderboard);
         }
@@ -590,7 +594,7 @@ public sealed class RankedStore
         return new Season($"S{index}", start, start.Add(SeasonLength));
     }
 
-    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(SqliteConnection connection, Season season)
+    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(SqliteConnection connection, Season season, DateTime? nowUtc)
     {
         using var command = connection.CreateCommand();
         command.CommandText = """
@@ -630,14 +634,28 @@ public sealed class RankedStore
             favoriteLeaders = new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
         }
 
+        IReadOnlyDictionary<string, IReadOnlyList<string>> championLeaderNumbersByPlayer;
+        try
+        {
+            championLeaderNumbersByPlayer = _championStore.GetChampionLeaderNumbersByPlayerKeys(
+                entries.Select(entry => entry.AccountKey), nowUtc);
+        }
+        catch
+        {
+            // 称号数据源暂不可用时只隐藏称号，不影响排位榜主体加载。
+            championLeaderNumbersByPlayer = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        }
+
         var result = new List<RankLeaderboardItem>();
         foreach (var entry in entries)
         {
             var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
             favoriteLeaders.TryGetValue(entry.AccountKey, out var favoriteLeader);
+            championLeaderNumbersByPlayer.TryGetValue(entry.AccountKey, out var championLeaderNumbers);
             result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.DisplayName, entry.RankPoints, entry.Faction,
                 label.Tier, label.Division, entry.Games, entry.Wins,
-                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber));
+                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber,
+                championLeaderNumbers ?? Array.Empty<string>()));
         }
         return result;
     }

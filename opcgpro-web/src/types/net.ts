@@ -340,6 +340,7 @@ export interface RankLeaderboardItem {
   wins: number;
   winRate: number;
   favoriteLeader?: string | null;
+  championLeaderNumbers?: string[];
 }
 
 export interface RankPlayerSettlement {
