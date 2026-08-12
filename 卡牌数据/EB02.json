@@ -640,7 +640,9 @@
     "cost": "2",
     "keyWords": "阿拉巴斯坦王国/草帽一伙",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "EventCounter"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

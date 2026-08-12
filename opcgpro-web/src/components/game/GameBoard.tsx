@@ -23,6 +23,7 @@ import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
 import { PHASE_LABELS } from "@/game/battle/BattlePhase";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
+import type { PlayerRankIdentitySnapshot, RankFaction } from "@/types/net";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -176,9 +177,38 @@ function LeftRail() {
   );
 }
 
+const RANK_FACTION_NAMES: Record<RankFaction, string> = {
+  pirate: "海贼",
+  marine: "海军",
+  government: "世界政府",
+};
+
+function rankTierLabel(rank: PlayerRankIdentitySnapshot): string {
+  if (rank.placementGames < rank.placementRequired) {
+    return `定级 ${rank.placementGames}/${rank.placementRequired}`;
+  }
+  return `${rank.tier}${rank.division ? ` ${["", "I", "II", "III"][rank.division]}` : ""}`;
+}
+
+function PlayerRankIdentity({ rank }: { rank?: PlayerRankIdentitySnapshot | null }) {
+  if (!rank) return null;
+  const label = `${RANK_FACTION_NAMES[rank.faction]} · ${rankTierLabel(rank)}`;
+  return (
+    <p
+      className="mt-0.5 truncate text-[10px] font-bold leading-4 text-violet-200"
+      title={label}
+      aria-label={`排位身份：${label}`}
+    >
+      {label}
+    </p>
+  );
+}
+
 function RightRail({
   myName,
   opponentName,
+  myRankIdentity,
+  opponentRankIdentity,
   myChampionLeaderNumber,
   opponentChampionLeaderNumber,
   isObserver,
@@ -187,6 +217,8 @@ function RightRail({
 }: {
   myName: string;
   opponentName: string;
+  myRankIdentity?: PlayerRankIdentitySnapshot | null;
+  opponentRankIdentity?: PlayerRankIdentitySnapshot | null;
   myChampionLeaderNumber?: string | null;
   opponentChampionLeaderNumber?: string | null;
   isObserver: boolean;
@@ -198,11 +230,13 @@ function RightRail({
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+        <PlayerRankIdentity rank={opponentRankIdentity} />
         <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
         <OperationClock side="opponent" />
         <div className="my-3 h-px bg-white/10" />
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
+        <PlayerRankIdentity rank={myRankIdentity} />
         <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
         <OperationClock side="my" />
       </section>
@@ -292,6 +326,8 @@ export default function GameBoard({
   const spectatorHandVisible = useGameStore((s) => s.spectatorHandVisible);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
+  const myRankIdentity = useGameStore((s) => s.my?.rankIdentity);
+  const opponentRankIdentity = useGameStore((s) => s.opponent?.rankIdentity);
   const myChampionLeaderNumber = useGameStore((s) => s.my?.championLeaderNumber);
   const opponentChampionLeaderNumber = useGameStore((s) => s.opponent?.championLeaderNumber);
 
@@ -351,6 +387,8 @@ export default function GameBoard({
               <RightRail
                 myName={myName}
                 opponentName={opponentName}
+                myRankIdentity={myRankIdentity}
+                opponentRankIdentity={opponentRankIdentity}
                 myChampionLeaderNumber={myChampionLeaderNumber}
                 opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                 isObserver={isObserver}

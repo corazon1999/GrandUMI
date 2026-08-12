@@ -169,6 +169,7 @@ public static class GameRoomManager
             FriendlyRoomId = friendlyRoomId,
         };
         engine.State.MatchKind = matchKind;
+        AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
         engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking;
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
         engine.State.OperationClockRemainingMs[1] = OperationTimeLimitMs;
@@ -245,8 +246,8 @@ public static class GameRoomManager
         _sessionRoom[p1Sid] = roomId;
         WebSocketBridge.BroadcastSpectatorList(entry);
         StartActionWorker(entry);
-        EnsureMulliganTimeout(entry);
         EnsureStartingPlayerChoiceTimeout(entry);
+        EnsureMulliganTimeout(entry);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         if (broadcastInitialState)
@@ -344,8 +345,8 @@ public static class GameRoomManager
                 RoomJournal.AppendClock(room.RoomId, room.Engine.State.OperationClockRemainingMs);
             }
             EnsureOperationClockRunning(room);
-            EnsureMulliganTimeout(room);
             EnsureStartingPlayerChoiceTimeout(room);
+            EnsureMulliganTimeout(room);
             if (room.Engine.State.IsGameOver)
                 CleanupRoom(room.RoomId);
         }, receivedAt));
@@ -493,7 +494,6 @@ public static class GameRoomManager
         room.Engine.Broadcast("OperationTimeout", new { expiredPlayer });
     }
 
-    /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
     /// <summary>根据服务端权威截止时间创建或清除先后手选择超时任务。</summary>
     private static void EnsureStartingPlayerChoiceTimeout(RoomEntry room, int retryAttempt = 0)
     {
@@ -620,6 +620,7 @@ public static class GameRoomManager
         }
     }
 
+    /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
     private static void EnsureMulliganTimeout(RoomEntry room, int retryAttempt = 0)
     {
         var deadline = room.Engine.State.MulliganDeadlineUtc;
@@ -822,9 +823,9 @@ public static class GameRoomManager
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
-            await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
             await ResolveExpiredStartingPlayerChoiceAsync(room, DateTime.UtcNow);
             EnsureStartingPlayerChoiceTimeout(room);
+            await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
             EnsureMulliganTimeout(room);
             if (idx < 0)
             {
@@ -989,9 +990,9 @@ public static class GameRoomManager
                     var playerIndex = i;
                     EnqueueRecoveryWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), async () =>
                     {
-                        await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
                         await ResolveExpiredStartingPlayerChoiceAsync(r, DateTime.UtcNow);
                         EnsureStartingPlayerChoiceTimeout(r);
+                        await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
                         EnsureMulliganTimeout(r);
                         WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
                         r.Engine.Broadcast("PlayerReconnected", new { player = playerIndex });
@@ -1312,8 +1313,8 @@ public static class GameRoomManager
                 r.Spectators.Keys,
                 preservePostGameChat: r.Engine.State.IsGameOver);
             RoomDirectory.Unregister(roomId);
-            CancelMulliganTimeout(roomId);
             CancelStartingPlayerChoiceTimeout(roomId);
+            CancelMulliganTimeout(roomId);
             foreach (var sid in r.PlayerSessionIds)
                 if (_grace.TryRemove(roomId + ":" + sid, out var grace)) { grace.Cancel(); grace.Dispose(); }
             r.ActionQueue.Writer.TryComplete();
@@ -1519,9 +1520,9 @@ public static class GameRoomManager
             p0AlwaysPrompt: p0Always,
             p1AlwaysPrompt: p1Always,
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice);
-        engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         if (!engine.State.StartingPlayerChosen)
             engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
+        engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].CardBackId = p0CardBackId;
         engine.State.Players[1].CardBackId = p1CardBackId;
         CopySpriteMap(p0SpriteMap, engine.State.Players[0].SpriteMap);
@@ -1553,6 +1554,7 @@ public static class GameRoomManager
             MatchKind = matchKind,
         };
         engine.State.MatchKind = matchKind;
+        AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
         engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking;
         engine.State.OperationClockRemainingMs[0] = restoredClockMs[0];
         engine.State.OperationClockRemainingMs[1] = restoredClockMs[1];
@@ -1587,9 +1589,9 @@ public static class GameRoomManager
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
         StartActionWorker(entry);
+        EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
-        EnsureStartingPlayerChoiceTimeout(entry);
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;
     }
@@ -1605,6 +1607,35 @@ public static class GameRoomManager
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         return JsonSerializer.Deserialize<Dictionary<string, string>>(element.GetRawText())
                ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AttachRankIdentities(
+        GameState state,
+        MatchKind matchKind,
+        IReadOnlyList<string> playerAccounts,
+        IReadOnlyList<string> playerDisplayNames)
+    {
+        if (matchKind != MatchKind.Ranked) return;
+
+        for (var i = 0; i < state.Players.Length; i++)
+        {
+            try
+            {
+                var profile = RankedStore.Default.GetSnapshot(playerAccounts[i], playerDisplayNames[i]).Profile;
+                if (profile.Faction is null) continue;
+                state.Players[i].RankIdentity = new PlayerRankIdentity(
+                    profile.Faction,
+                    profile.Tier,
+                    profile.Division,
+                    profile.PlacementGames,
+                    profile.PlacementRequired);
+            }
+            catch (Exception ex)
+            {
+                // 排位身份展示失败不能阻止对局创建；保留日志供排查，客户端安全回退为只显示昵称。
+                Console.Error.WriteLine($"[排位] 玩家 {playerAccounts[i]} 的对局身份读取失败：{ex.Message}");
+            }
+        }
     }
 
     private static void TryRecordLeaderStats(

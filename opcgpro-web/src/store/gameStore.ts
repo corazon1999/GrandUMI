@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { EffectActivationSnapshot, MsgGameState, PlayerSnapshot, RevealSnapshot } from "@/types/net";
+import type { EffectActivationSnapshot, MsgGameState, PlayerRankIdentitySnapshot, PlayerSnapshot, RevealSnapshot } from "@/types/net";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -35,6 +35,7 @@ export interface FieldCardView {
 
 export interface PlayerView {
   name: string;
+  rankIdentity?: PlayerRankIdentitySnapshot | null;
   cardBackId?: string;         // 旧回放缺失时由卡背组件回退经典款
   spriteMap: Record<string, string>;
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
@@ -128,8 +129,8 @@ interface GameStore {
   isFirstPlayer: boolean;
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;
-  startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   startingPlayerChoiceDeadlineUtc: string | null;
+  startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc: string | null;
   operationClockEnabled: boolean;
@@ -231,8 +232,8 @@ export const useGameStore = create<GameStore>()(
     isFirstPlayer: false,
     canChooseFirstPlayer: false,
     diceWinnerIsMe: false,
-    startingDiceRolls: [],
     startingPlayerChoiceDeadlineUtc: null,
+    startingDiceRolls: [],
     mulliganBothDone: false,
     mulliganDeadlineUtc: null,
     operationClockEnabled: false,
@@ -293,8 +294,8 @@ export const useGameStore = create<GameStore>()(
         s.isFirstPlayer = msg.isFirstPlayer ?? false;
         s.canChooseFirstPlayer = msg.canChooseFirstPlayer ?? false;
         s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
-        s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.startingPlayerChoiceDeadlineUtc = msg.startingPlayerChoiceDeadlineUtc ?? null;
+        s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
         s.mulliganDeadlineUtc = msg.mulliganDeadlineUtc ?? null;
         s.operationClockEnabled = msg.operationClockEnabled ?? false;
@@ -461,8 +462,8 @@ export const useGameStore = create<GameStore>()(
       s.isFirstPlayer = false;
       s.canChooseFirstPlayer = false;
       s.diceWinnerIsMe = false;
-      s.startingDiceRolls = [];
       s.startingPlayerChoiceDeadlineUtc = null;
+      s.startingDiceRolls = [];
       s.mulliganBothDone = false;
       s.mulliganDeadlineUtc = null;
       s.operationClockEnabled = false;

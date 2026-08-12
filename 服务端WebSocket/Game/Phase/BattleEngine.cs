@@ -346,8 +346,59 @@ public static class BattleEngine
         string reason = s.KOReason == "effect" ? "effect" : "battle";
         if (s.IsKoGuarded(card, reason)) return true;
         if (reason == "effect" && s.IsLeaveGuarded(card, "effect")) return true;
+        if (await TryDiscardHandToPreventKOAsync(s, ownerIdx, card, prompts, reason)) return true;
 
         return false;
+    }
+
+    /// <summary>结算“可以丢弃我方 1 张手牌，使该角色不会被 KO”的限时置换效果。</summary>
+    private static async Task<bool> TryDiscardHandToPreventKOAsync(
+        GameState s, int ownerIdx, CardInstance card, IPromptService prompts, string reason)
+    {
+        int side = s.SideOf(card);
+        if (side < 0) return false;
+        var replacement = s.ContinuousEffects.FirstOrDefault(effect =>
+            effect.DiscardHandKoReplacement is not null &&
+            (effect.DiscardHandKoReplacement == "any" || effect.DiscardHandKoReplacement == reason) &&
+            effect.Predicate(s, side, card));
+        if (replacement is null) return false;
+
+        var owner = s.Players[ownerIdx];
+        if (owner.Hand.Count == 0) return false;
+
+        bool use = await prompts.ConfirmOptional(ownerIdx,
+            $"丢弃我方 1 张手牌，使「{card.Info.Name}」不会被 KO？");
+        if (!use) return false;
+
+        var candidates = owner.Hand.ToList();
+        var extra = new Dictionary<string, object?>
+        {
+            ["choiceCards"] = candidates
+                .Select(candidate => new { id = candidate.Id.ToString(), number = candidate.Info.Number })
+                .ToList(),
+        };
+        var chosen = await prompts.ChooseCards(ownerIdx, "OwnHand",
+            "选择丢弃 1 张手牌，使该角色不会被 KO",
+            candidates.Select(candidate => candidate.Id.ToString()).ToList(), 1, 1, extra);
+        if (chosen.Count == 0) return false;
+
+        var discard = candidates.FirstOrDefault(candidate => candidate.Id.ToString() == chosen[0]);
+        if (discard is null || !owner.Hand.Contains(discard)) return false;
+
+        // 此置换发生在战斗流程而非普通 EffectRuntime 上下文中，因此直接派发丢手牌监听，
+        // 保持“因效果丢弃手牌”（包括成本）类能力与普通卡牌脚本一致。
+        owner.Hand.Remove(discard);
+        owner.Trash.Add(discard);
+        owner.HandDiscardedByEffectThisTurn = true;
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnHandDiscarded, prompts,
+            new Dictionary<string, object?>
+            {
+                ["owner"] = ownerIdx,
+                ["sourceNumber"] = replacement.SourceCardNumber,
+                ["actingSide"] = ownerIdx,
+                ["isCost"] = true,
+            });
+        return true;
     }
 
     private static async Task CompleteKOAsync(

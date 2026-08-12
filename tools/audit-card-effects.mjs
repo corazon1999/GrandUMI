@@ -14,6 +14,7 @@ const VERBOSE = process.argv.includes('--verbose')
 const STRICT = process.argv.includes('--strict')
 
 const KNOWN_CLEAR_GAPS = new Set([
+  'EB02-030',
   'OP12-021', 'OP12-036', 'OP12-072', 'OP12-081',
   'ST36-001', 'ST36-002', 'ST36-004', 'ST36-005',
   'EB04-029', 'OP04-093', 'OP05-096',
@@ -65,6 +66,7 @@ const APPROXIMATE_EFFECTS = new Set([
 ])
 
 const REQUIRED_TAGS = new Map([
+  ['EB02-030', ['EventCounter']],
   ['EB04-029', ['EventCounter']],
   ['OP03-001', ['OnAttackDeclare', 'OnOppAttackDeclare']],
   ...['OP04-021', 'OP04-025', 'OP04-030', 'OP04-059', 'OP04-060', 'OP04-063', 'OP04-069', 'OP04-070', 'OP04-071', 'OP04-072']

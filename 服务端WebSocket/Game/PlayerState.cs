@@ -2,6 +2,14 @@ using GrandUMI.Cards;
 
 namespace GrandUMI.Game;
 
+/// <summary>排位对局中公开展示的玩家阵营与开局段位。</summary>
+public sealed record PlayerRankIdentity(
+    string Faction,
+    string Tier,
+    int? Division,
+    int PlacementGames,
+    int PlacementRequired);
+
 /// <summary>
 /// 单方玩家在对战中的完整状态
 /// </summary>
@@ -9,6 +17,8 @@ public class PlayerState
 {
     public required string SessionId   { get; set; }
     public required string AccountName { get; set; }
+    /// <summary>仅排位对局缓存；创建或恢复房间时读取一次，避免每份快照查询数据库。</summary>
+    public PlayerRankIdentity? RankIdentity { get; set; }
     /// <summary>公开外观信息：用于该玩家所有暗置主卡的卡背。</summary>
     public string CardBackId { get; set; } = "classic";
     /// <summary>该玩家卡组公开的异画选择（卡号 → 站内图片路径）。</summary>

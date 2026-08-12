@@ -866,8 +866,18 @@ export interface FieldCardSnapshot {
 }
 
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
+export interface PlayerRankIdentitySnapshot {
+  faction: RankFaction;
+  tier: string;
+  division: number | null;
+  placementGames: number;
+  placementRequired: number;
+}
+
 export interface PlayerSnapshot {
   name: string;
+  /** 仅排位对局携带；旧回放及其他对局类型缺失时不展示。 */
+  rankIdentity?: PlayerRankIdentitySnapshot | null;
   /** 旧回放没有该字段时回退经典卡背。 */
   cardBackId?: string;
   /** 该玩家卡组公开的卡面选择；旧回放缺失时使用正画。 */
@@ -949,6 +959,7 @@ export interface MsgGameState extends MsgBase {
   isFirstPlayer: boolean;
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;
+  startingPlayerChoiceDeadlineUtc?: string | null;
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc?: string | null;
@@ -959,7 +970,6 @@ export interface MsgGameState extends MsgBase {
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
   matchKind?: "Ranked" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
-  startingPlayerChoiceDeadlineUtc?: string | null;
   isGameOver: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;

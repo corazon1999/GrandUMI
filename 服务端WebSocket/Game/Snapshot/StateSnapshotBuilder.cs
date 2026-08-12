@@ -271,6 +271,16 @@ public static class StateSnapshotBuilder
         return new
         {
             name = board.Name,
+            rankIdentity = state.MatchKind == MatchKind.Ranked && p.RankIdentity is { } rank
+                ? new
+                {
+                    faction = rank.Faction,
+                    tier = rank.Tier,
+                    division = rank.Division,
+                    placementGames = rank.PlacementGames,
+                    placementRequired = rank.PlacementRequired,
+                }
+                : null,
             cardBackId = board.CardBackId,
             spriteMap = p.SpriteMap,
             handCardNumbers = asSelf || revealHand

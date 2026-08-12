@@ -76,6 +76,27 @@ test("对局界面展示双方独立的权威操作棋钟", async () => {
   assert.match(netTypes, /operationClockActive\?: "my" \| "opponent" \| null/);
 });
 
+test("排位对局右上角展示双方阵营和段位", async () => {
+  const [board, store, netTypes, manager, snapshotBuilder] = await Promise.all([
+    readSource("../src/components/game/GameBoard.tsx"),
+    readSource("../src/store/gameStore.ts"),
+    readSource("../src/types/net.ts"),
+    readSource("../../服务端WebSocket/Game/GameRoomManager.cs"),
+    readSource("../../服务端WebSocket/Game/Snapshot/StateSnapshotBuilder.cs"),
+  ]);
+
+  assert.match(board, /<PlayerRankIdentity rank=\{opponentRankIdentity\} \/>/);
+  assert.match(board, /<PlayerRankIdentity rank=\{myRankIdentity\} \/>/);
+  assert.match(board, /定级 \$\{rank\.placementGames\}\/\$\{rank\.placementRequired\}/);
+  assert.match(board, /海贼/);
+  assert.match(board, /海军/);
+  assert.match(board, /世界政府/);
+  assert.match(store, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
+  assert.match(netTypes, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
+  assert.match(manager, /AttachRankIdentities\(engine\.State, matchKind/);
+  assert.match(snapshotBuilder, /rankIdentity = state\.MatchKind == MatchKind\.Ranked/);
+});
+
 test("休闲公开匹配也使用双方各二十分钟的操作棋钟", async () => {
   const manager = await readSource("../../服务端WebSocket/Game/GameRoomManager.cs");
 

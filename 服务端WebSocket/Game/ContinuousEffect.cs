@@ -11,6 +11,7 @@ namespace GrandUMI.Game;
 public class ContinuousEffect
 {
     public required string SourceCardId { get; init; }    // 来源卡 GUID（来源 KO/离场后失效）
+    public string? SourceCardNumber { get; init; }        // 限时事件等来源已离场时，供后续反应式效果识别来源
     public required ContinuousScope Scope { get; init; }
     public int PowerDelta { get; init; }
 
@@ -33,6 +34,10 @@ public class ContinuousEffect
     /// <summary>持续"不会被KO"保护；非空时 Predicate 成立期间 scope 内卡牌不会被 KO。
     /// "battle"=仅战斗中, "effect"=仅因效果, "any"=任何 KO。</summary>
     public string? KoGuard { get; init; }
+
+    /// <summary>可选的弃手牌 KO 置换；非空时 Predicate 成立期间，可丢弃我方 1 张手牌防止对应来源的 KO。
+    /// "battle"=仅战斗中, "effect"=仅因效果, "any"=任何 KO。</summary>
+    public string? DiscardHandKoReplacement { get; init; }
 
     /// <summary>持续"不会离开场上"保护（含KO/退回手牌/放回卡组/置入生命等离场）；非空时 Predicate 成立期间
     /// scope 内卡牌不会因相应来源离场。"effect"=仅因效果离场, "any"=任何离场。比 KoGuard 范围更广。</summary>
