@@ -15,6 +15,7 @@ import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
 import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
 import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
+import RankResultPanel from "@/components/game/RankResultPanel";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -133,7 +134,7 @@ export default function GamePage() {
       <AnimatePresence>
         {isGameOver && (
           <motion.div
-            className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/70"
+            className="fixed inset-0 z-40 flex flex-col items-center overflow-y-auto bg-black/70 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -163,27 +164,17 @@ export default function GamePage() {
             )}
             {matchKind === "Ranked" && rankResult && (
               <motion.div
-                className="mt-4 min-w-64 rounded-xl border border-violet-400/40 bg-violet-950/70 px-5 py-3 text-center"
+                className="contents"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                <p className="text-xs font-bold text-violet-300">排位结算</p>
-                <p className="mt-1 text-lg font-black text-white">
-                  {rankResult.placementGames < rankResult.placementRequired
-                    ? `定级进度 ${rankResult.placementGames}/${rankResult.placementRequired}`
-                    : `${rankResult.tier}${rankResult.division ? ` ${["", "I", "II", "III"][rankResult.division]}` : ""}`}
-                </p>
-                {rankResult.placementGames >= rankResult.placementRequired && (
-                  <p className={`mt-1 text-2xl font-black ${rankResult.rankPointDelta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-                    {rankResult.rankPointDelta >= 0 ? "+" : ""}{rankResult.rankPointDelta} RP
-                  </p>
-                )}
+                <RankResultPanel result={rankResult} />
               </motion.div>
             )}
             <motion.button
               onClick={returnToHome}
-              className="mt-6 rounded-lg bg-orange-500 px-6 py-2 text-white transition-colors hover:bg-orange-400"
+              className="mt-4 min-h-11 rounded-lg bg-orange-500 px-6 py-2 text-white transition-colors hover:bg-orange-400"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}

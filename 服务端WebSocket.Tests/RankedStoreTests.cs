@@ -1,4 +1,5 @@
 using GrandUMI.Game.Ranked;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -147,7 +148,7 @@ public class RankedStoreTests
     }
 
     [Fact]
-    public void 排位结算_定级后胜负固定对称加减二十分()
+    public void 排位结算_二连胜败起逐分奖励保护且六连胜败封顶五分()
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
@@ -155,30 +156,123 @@ public class RankedStoreTests
             var store = new RankedStore(path);
             var now = new DateTime(2026, 8, 12, 12, 0, 0, DateTimeKind.Utc);
 
-            // 交替胜负完成双方定级，使双方都处在无段位保护影响的正常结算区间。
-            for (var i = 0; i < RankedStore.PlacementRequired; i++)
+            CompletePlacements(store, now, "streak");
+            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000));
+
+            for (var streak = 1; streak <= 7; streak++)
             {
-                Assert.NotNull(store.RecordMatch($"placement-{i}", now.AddMinutes(i),
-                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: i % 2));
+                var result = store.RecordMatch($"streak-{streak}", now.AddMinutes(10 + streak),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+                var adjustment = Math.Min(streak - 1, 5);
+
+                Assert.NotNull(result);
+                Assert.Equal(20 + adjustment, result!.Player0.RankPointDelta);
+                Assert.Equal(-20 + adjustment, result.Player1.RankPointDelta);
+                Assert.Equal(adjustment, result.Player0.StreakAdjustment);
+                Assert.Equal(adjustment, result.Player1.StreakAdjustment);
+                Assert.Equal(streak, result.Player0.ResultStreak);
+                Assert.Equal(streak, result.Player1.ResultStreak);
+                Assert.Equal(0, result.Player0.RankDifferenceAdjustment);
+                Assert.Equal(0, result.Player1.RankDifferenceAdjustment);
             }
-
-            var aliceWins = store.RecordMatch("fixed-rp-alice-win", now.AddMinutes(10),
-                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
-            Assert.NotNull(aliceWins);
-            Assert.Equal(20, aliceWins!.Player0.RankPointDelta);
-            Assert.Equal(-20, aliceWins.Player1.RankPointDelta);
-
-            var bobWins = store.RecordMatch("fixed-rp-bob-win", now.AddMinutes(11),
-                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
-            Assert.NotNull(bobWins);
-            Assert.Equal(-20, bobWins!.Player0.RankPointDelta);
-            Assert.Equal(20, bobWins.Player1.RankPointDelta);
         }
         finally
         {
             TryDelete(path);
             TryDelete(path + "-wal");
             TryDelete(path + "-shm");
+        }
+    }
+
+    [Theory]
+    [InlineData(99, 0)]
+    [InlineData(100, 1)]
+    [InlineData(499, 4)]
+    [InlineData(500, 5)]
+    [InlineData(900, 5)]
+    public void 排位结算_逆风结果每百分差加一且最多加五分(int rankDifference, int expectedAdjustment)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 13, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, $"gap-{rankDifference}");
+            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000 + rankDifference));
+
+            var result = store.RecordMatch($"gap-result-{rankDifference}", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(result);
+            Assert.Equal(-rankDifference, result!.Player0.RankDifference);
+            Assert.Equal(rankDifference, result.Player1.RankDifference);
+            Assert.Equal(expectedAdjustment, result.Player0.RankDifferenceAdjustment);
+            Assert.Equal(expectedAdjustment, result.Player1.RankDifferenceAdjustment);
+            Assert.Equal(20 + expectedAdjustment, result.Player0.RankPointDelta);
+            Assert.Equal(-20 + expectedAdjustment, result.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位结算_连续场次与五百分差修正可以叠加()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 14, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, "combined");
+            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000));
+
+            for (var i = 1; i <= 5; i++)
+                Assert.NotNull(store.RecordMatch($"combined-streak-{i}", now.AddMinutes(10 + i),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+
+            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1500));
+            var result = store.RecordMatch("combined-final", now.AddMinutes(20),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(result);
+            Assert.Equal(5, result!.Player0.StreakAdjustment);
+            Assert.Equal(5, result.Player0.RankDifferenceAdjustment);
+            Assert.Equal(30, result.Player0.RankPointDelta);
+            Assert.Equal(5, result.Player1.StreakAdjustment);
+            Assert.Equal(5, result.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-10, result.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    private static void CompletePlacements(RankedStore store, DateTime now, string prefix)
+    {
+        // 最后一场由鲍勃获胜，保证随后爱丽丝胜、鲍勃负时都从一连开始。
+        for (var i = 0; i < RankedStore.PlacementRequired; i++)
+            Assert.NotNull(store.RecordMatch($"{prefix}-placement-{i}", now.AddMinutes(i),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: (i + 1) % 2));
+    }
+
+    private static void SetRankPoints(string path, params (string DisplayName, int RankPoints)[] values)
+    {
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        foreach (var (displayName, rankPoints) in values)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE rank_profiles SET rank_points=$points, highest_rank_points=$points WHERE display_name=$name;";
+            command.Parameters.AddWithValue("$points", rankPoints);
+            command.Parameters.AddWithValue("$name", displayName);
+            Assert.Equal(1, command.ExecuteNonQuery());
         }
     }
 

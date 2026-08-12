@@ -347,6 +347,14 @@ export interface RankPlayerSettlement {
   rankPointsBefore: number;
   rankPointsAfter: number;
   rankPointDelta: number;
+  baseRankPointDelta: number;
+  streakAdjustment: number;
+  rankDifference: number;
+  rankDifferenceAdjustment: number;
+  rankProtectionAdjustment: number;
+  resultStreak: number;
+  won: boolean;
+  rankPointFormulaApplied: boolean;
   faction: RankFaction;
   tier: string;
   division: number | null;

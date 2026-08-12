@@ -40,7 +40,9 @@ function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | n
       <ul className="mt-3 list-disc space-y-1 pl-4 text-gray-400">
         <li>先完成 5 场定级赛；定级结果最高为各阵营第三阶 I。</li>
         <li>每个称号分 III、II、I 三个小段；每 100 RP 变化一个小段，每 300 RP 进入下一称号。</li>
-        <li>定级后胜局增加 12–30 RP，负局扣除 12–30 RP；第一阶不因失败扣除显示 RP，第二、三阶拥有大段保护。</li>
+        <li>定级后基础胜负分为 +20 / -20 RP；2 连胜或连败起每场增加 1 RP 奖励或保护，6 连胜、连败起封顶 5 RP。</li>
+        <li>低分方战胜高分方、或高分方负于低分方时，赛前每相差 100 RP 再获得 1 RP 奖励或保护，最多计算 500 RP。</li>
+        <li>第一阶不因失败扣除显示 RP，第二、三阶拥有大段保护；每局结算会逐项展示 RP 变化。</li>
         <li>达到 1500 RP 后进入“新世界”，阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
         <li>更换阵营会清空本赛季 RP、定级进度和战绩，并重新开始定级。</li>
       </ul>

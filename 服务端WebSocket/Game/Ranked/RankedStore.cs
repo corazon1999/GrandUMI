@@ -42,6 +42,14 @@ public sealed record RankPlayerSettlement(
     int RankPointsBefore,
     int RankPointsAfter,
     int RankPointDelta,
+    int BaseRankPointDelta,
+    int StreakAdjustment,
+    int RankDifference,
+    int RankDifferenceAdjustment,
+    int RankProtectionAdjustment,
+    int ResultStreak,
+    bool Won,
+    bool RankPointFormulaApplied,
     string Faction,
     string Tier,
     int? Division,
@@ -96,6 +104,14 @@ public static class RankWire
         rankPointsBefore = value.RankPointsBefore,
         rankPointsAfter = value.RankPointsAfter,
         rankPointDelta = value.RankPointDelta,
+        baseRankPointDelta = value.BaseRankPointDelta,
+        streakAdjustment = value.StreakAdjustment,
+        rankDifference = value.RankDifference,
+        rankDifferenceAdjustment = value.RankDifferenceAdjustment,
+        rankProtectionAdjustment = value.RankProtectionAdjustment,
+        resultStreak = value.ResultStreak,
+        won = value.Won,
+        rankPointFormulaApplied = value.RankPointFormulaApplied,
         faction = value.Faction,
         tier = value.Tier,
         division = value.Division,
@@ -341,10 +357,16 @@ public sealed class RankedStore
             var score1 = 1d - score0;
             var afterRating0 = UpdateRating(before0, before1, score0);
             var afterRating1 = UpdateRating(before1, before0, score1);
-            var after0 = ApplyResult(before0, afterRating0, score0);
-            var after1 = ApplyResult(before1, afterRating1, score1);
             var winStreakBefore0 = CurrentWinStreak(connection, transaction, season.Id, before0.AccountKey);
             var winStreakBefore1 = CurrentWinStreak(connection, transaction, season.Id, before1.AccountKey);
+            var lossStreakBefore0 = CurrentLossStreak(connection, transaction, season.Id, before0.AccountKey);
+            var lossStreakBefore1 = CurrentLossStreak(connection, transaction, season.Id, before1.AccountKey);
+            var resultStreak0 = (score0 > 0.5 ? winStreakBefore0 : lossStreakBefore0) + 1;
+            var resultStreak1 = (score1 > 0.5 ? winStreakBefore1 : lossStreakBefore1) + 1;
+            var calculation0 = CalculateRankPoints(before0, before1, score0 > 0.5, resultStreak0);
+            var calculation1 = CalculateRankPoints(before1, before0, score1 > 0.5, resultStreak1);
+            var after0 = ApplyResult(before0, afterRating0, score0, calculation0);
+            var after1 = ApplyResult(before1, afterRating1, score1, calculation1);
 
             Save(connection, transaction, after0);
             Save(connection, transaction, after1);
@@ -360,12 +382,30 @@ public sealed class RankedStore
             transaction.Commit();
             return new RankedMatchSettlement(
                 matchId,
-                ToSettlement(player0Account, before0, after0, faction0, FactionRank(connection, season, after0, faction0), winStreakBefore0, winStreak0),
-                ToSettlement(player1Account, before1, after1, faction1, FactionRank(connection, season, after1, faction1), winStreakBefore1, winStreak1));
+                ToSettlement(player0Account, before0, after0, calculation0, faction0, FactionRank(connection, season, after0, faction0), winStreakBefore0, winStreak0),
+                ToSettlement(player1Account, before1, after1, calculation1, faction1, FactionRank(connection, season, after1, faction1), winStreakBefore1, winStreak1));
         }
     }
 
-    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score)
+    private static RankPointCalculation CalculateRankPoints(Profile self, Profile opponent, bool won, int resultStreak)
+    {
+        if (self.PlacementGames < PlacementRequired)
+            return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
+
+        var baseDelta = won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch;
+        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, 5);
+        // 未完成定级的对手没有可比较的可见 RP，不参与分差修正。
+        var rankDifference = opponent.PlacementGames >= PlacementRequired
+            ? self.RankPoints - opponent.RankPoints
+            : 0;
+        var favorableDifference = won ? -rankDifference : rankDifference;
+        var rankDifferenceAdjustment = Math.Clamp(favorableDifference / 100, 0, 5);
+        return new RankPointCalculation(baseDelta, streakAdjustment, rankDifference,
+            rankDifferenceAdjustment, baseDelta + streakAdjustment + rankDifferenceAdjustment,
+            resultStreak, won, true);
+    }
+
+    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score, RankPointCalculation calculation)
     {
         var placementGames = Math.Min(PlacementRequired, before.PlacementGames + 1);
         var games = before.Games + 1;
@@ -380,9 +420,9 @@ public sealed class RankedStore
         }
         else if (before.PlacementGames >= PlacementRequired)
         {
-            // 可见 RP 使用对称胜负分，确保长期胜率超过 50% 时能够稳定净增长。
-            // Glicko 隐藏分仍独立更新并用于匹配，不让可见分奖惩受对手隐藏分差距影响。
-            var delta = score > 0.5 ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch;
+            // 可见 RP 以 ±20 为基础，再叠加连续胜负和赛前可见 RP 分差修正。
+            // Glicko 隐藏分仍独立更新且只用于匹配。
+            var delta = calculation.IntendedDelta;
             if (score < 0.5 && before.RankPoints < 300) delta = 0; // 青铜不扣可见分
             rankPoints = Math.Max(0, before.RankPoints + delta);
             // 白银、黄金为大段地板；白金起恢复完整升降。
@@ -481,14 +521,21 @@ public sealed class RankedStore
         string account,
         Profile before,
         Profile after,
+        RankPointCalculation calculation,
         string? faction,
         int? factionRank,
         int winStreakBefore,
         int winStreak)
     {
         var (tier, division) = RankLabel(after.RankPoints, faction, factionRank);
+        var actualDelta = after.RankPoints - before.RankPoints;
+        var rankProtectionAdjustment = calculation.FormulaApplied
+            ? actualDelta - calculation.IntendedDelta
+            : 0;
         return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
-            after.RankPoints - before.RankPoints, faction ?? string.Empty, tier, division, after.PlacementGames,
+            actualDelta, calculation.BaseDelta, calculation.StreakAdjustment, calculation.RankDifference,
+            calculation.RankDifferenceAdjustment, rankProtectionAdjustment, calculation.ResultStreak,
+            calculation.Won, calculation.FormulaApplied, faction ?? string.Empty, tier, division, after.PlacementGames,
             PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired,
             winStreakBefore, winStreak);
     }
@@ -703,6 +750,14 @@ public sealed class RankedStore
         SqliteTransaction transaction,
         string seasonId,
         string accountKey)
+        => CurrentResultStreak(connection, transaction, seasonId, accountKey, countWins: true);
+
+    private static int CurrentResultStreak(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string seasonId,
+        string accountKey,
+        bool countWins)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -722,11 +777,19 @@ public sealed class RankedStore
             var winnerIndex = reader.GetInt32(0);
             var won = (winnerIndex == 0 && string.Equals(reader.GetString(1), accountKey, StringComparison.Ordinal))
                 || (winnerIndex == 1 && string.Equals(reader.GetString(2), accountKey, StringComparison.Ordinal));
-            if (!won) break;
+            if (won != countWins) break;
             streak++;
         }
         return streak;
     }
+
+    /// <summary>读取本赛季从最新一局向前连续失败的场数；一场胜利即中断。</summary>
+    private static int CurrentLossStreak(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string seasonId,
+        string accountKey)
+        => CurrentResultStreak(connection, transaction, seasonId, accountKey, countWins: false);
 
     private static void InsertMatch(SqliteConnection connection, SqliteTransaction transaction, string matchId,
         string seasonId, DateTime endedAtUtc, string p0, string p1, int winner, int delta0, int delta1)
@@ -780,6 +843,15 @@ public sealed class RankedStore
 
     private sealed record Season(string Id, DateTime StartsAtUtc, DateTime EndsAtUtc);
     private sealed record RatingUpdate(double Rating, double Deviation, double Volatility);
+    private sealed record RankPointCalculation(
+        int BaseDelta,
+        int StreakAdjustment,
+        int RankDifference,
+        int RankDifferenceAdjustment,
+        int IntendedDelta,
+        int ResultStreak,
+        bool Won,
+        bool FormulaApplied);
     private sealed record Profile(
         string SeasonId, string AccountKey, string DisplayName,
         double Rating, double RatingDeviation, double Volatility,

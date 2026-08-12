@@ -52,6 +52,27 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, />\s*阵营规则\s*</);
   assert.match(lobby, /先完成 5 场定级赛/);
   assert.match(lobby, /每 100 RP 变化一个小段，每 300 RP 进入下一称号/);
+  assert.match(lobby, /基础胜负分为 \+20 \/ -20 RP/);
+  assert.match(lobby, /6 连胜、连败起封顶 5 RP/);
+  assert.match(lobby, /最多计算 500 RP/);
+});
+
+test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
+  const [page, panel, types] = await Promise.all([
+    readSource("../src/app/game/page.tsx"),
+    readSource("../src/components/game/RankResultPanel.tsx"),
+    readSource("../src/types/net.ts"),
+  ]);
+
+  assert.match(page, /<RankResultPanel result=\{rankResult\}/);
+  assert.match(panel, /data-testid="rank-rp-breakdown"/);
+  assert.match(panel, /baseRankPointDelta/);
+  assert.match(panel, /streakAdjustment/);
+  assert.match(panel, /rankDifferenceAdjustment/);
+  assert.match(panel, /rankProtectionAdjustment/);
+  assert.match(panel, /最终变化/);
+  assert.match(page, /min-h-11/);
+  assert.match(types, /rankPointFormulaApplied: boolean/);
 });
 
 test("三阵营称号和新世界榜首称号按约定映射", async () => {
