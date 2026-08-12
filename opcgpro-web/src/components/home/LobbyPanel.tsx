@@ -75,6 +75,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const roomCode      = useNetStore((s) => s.roomCode);
   const roomOperation = useNetStore((s) => s.roomOperation);
   const connState     = useNetStore((s) => s.connState);
+  const maintenance   = useNetStore((s) => s.maintenance);
 
   const [roomMode, setRoomMode] = useState<"none" | "create" | "join">("none");
   const [playMode, setPlayMode] = useState<"match" | "friend" | "bot">("match");
@@ -91,7 +92,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   // mainCount === 0 表示解析失败/未知，fail-open 不拦截，交由后端校验兜底。
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
-  const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle";
+  const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle" && !maintenance.enabled;
   const canQueue = canEnter && (matchQueueKind !== "ranked" || Boolean(rankProfile?.faction));
 
   useEffect(() => {
@@ -199,6 +200,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
     ? "请先选择一副卡组"
     : deckIncomplete
       ? `卡组需正好 50 张，当前 ${mainCount} 张`
+      : maintenance.enabled
+        ? "维护更新中，暂时无法开始新的对局"
       : connState !== "connected"
         ? "服务器连接恢复后即可开始"
         : "";

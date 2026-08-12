@@ -29,11 +29,20 @@ public static class GameRoomManager
 
     /// <summary>房间池</summary>
     private static readonly ConcurrentDictionary<string, RoomEntry> _rooms = new();
-    private static int _roomsBeingCreated;
+    private static GameMaintenanceState Maintenance = new();
 
     public static int RoomCount => _rooms.Count;
     public static int SpectatorCount => _rooms.Values.Sum(room => room.Spectators.Count);
     public static int TotalActionQueueDepth => _rooms.Values.Sum(room => Math.Max(0, Volatile.Read(ref room.ActionQueueDepth)));
+
+    public static MaintenanceSnapshot GetMaintenanceSnapshot()
+        => Maintenance.GetSnapshot(RoomCount);
+
+    public static MaintenanceSnapshot SetMaintenanceMode(bool enabled)
+        => Maintenance.SetEnabled(enabled, RoomCount);
+
+    public static void InitializeMaintenance(string persistencePath)
+        => Maintenance = new GameMaintenanceState(persistencePath);
 
     /// <summary>sessionId → roomId</summary>
     private static readonly ConcurrentDictionary<string, string> _sessionRoom = new();
@@ -266,10 +275,11 @@ public static class GameRoomManager
 
     private static IDisposable ReserveRoomCreation()
     {
-        var creating = Interlocked.Increment(ref _roomsBeingCreated);
-        if (RoomCount + creating <= ServerCapacity.MaxRooms) return new RoomAdmissionLease();
-        Interlocked.Decrement(ref _roomsBeingCreated);
-        throw new InvalidOperationException("服务器暂时无法创建新对局：room_limit");
+        if (Maintenance.TryReserveRoomCreation(RoomCount, ServerCapacity.MaxRooms, out var rejectionReason))
+            return new RoomAdmissionLease();
+        if (string.Equals(rejectionReason, GameMaintenanceState.PlayerMessage, StringComparison.Ordinal))
+            throw new GameMaintenanceException(GameMaintenanceState.PlayerMessage);
+        throw new InvalidOperationException(rejectionReason ?? "服务器暂时无法创建新对局");
     }
 
     private sealed class RoomAdmissionLease : IDisposable
@@ -279,7 +289,10 @@ public static class GameRoomManager
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _released, 1) == 0)
-                Interlocked.Decrement(ref _roomsBeingCreated);
+            {
+                var snapshot = Maintenance.CompleteRoomCreation(RoomCount);
+                if (snapshot.Enabled) WebSocketBridge.BroadcastMaintenanceState();
+            }
         }
     }
 
@@ -1349,6 +1362,9 @@ public static class GameRoomManager
                 string? winnerAccount = (wi is >= 0 and < 2) ? r.PlayerAccounts[wi.Value] : null;
                 WebSocketBridge.OnFriendlyGameEnd(r.FriendlyRoomId, winnerAccount);
             }
+
+            if (GetMaintenanceSnapshot().Enabled)
+                WebSocketBridge.BroadcastMaintenanceState();
         }
     }
 

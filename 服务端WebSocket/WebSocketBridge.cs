@@ -32,7 +32,7 @@ public static class WebSocketBridge
     private static readonly HashSet<string> CriticalOutboundProtocols = new(StringComparer.Ordinal)
     {
         "MsgLogin", "MsgSecret", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
-        "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected",
+        "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
@@ -280,6 +280,8 @@ public static class WebSocketBridge
             case "MsgFriendChat":  OnFriendChat(session, msg);   break;
             case "MsgLeaveGameChat": OnLeaveGameChat(session);   break;
             case "MsgGlobalAnnouncement": OnGlobalAnnouncement(session, msg); break;
+            case "MsgMaintenanceState": OnMaintenanceState(session); break;
+            case "MsgSetMaintenance": OnSetMaintenance(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -391,6 +393,7 @@ public static class WebSocketBridge
             });
             SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
             SendRankSnapshot(s);
+            SendMaintenanceState(s);
             Log($"登录 ✅ {playerData.Account}");
 
             // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
@@ -743,6 +746,7 @@ public static class WebSocketBridge
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "请先登录" }); return; }
+        if (RejectForMaintenance(s, "MsgEnterMatch")) return;
         if (!IsCurrentAccountSession(s))
         {
             s.IsMatching = false;
@@ -788,6 +792,7 @@ public static class WebSocketBridge
     private static void OnEnterBotMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "请先登录" }); return; }
+        if (RejectForMaintenance(s, "MsgEnterBotMatch")) return;
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
@@ -831,6 +836,10 @@ public static class WebSocketBridge
             room.Engine.BroadcastInitialState();
             Log($"单人测试开局 {s.Account} vs 机器人");
         }
+        catch (GameMaintenanceException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = ex.Message });
+        }
         catch (Exception ex)
         {
             LogErr($"单人测试建房失败: {ex.Message}");
@@ -850,6 +859,11 @@ public static class WebSocketBridge
 
     private static void TryMatch(string queueKind)
     {
+        if (GameRoomManager.GetMaintenanceSnapshot().Enabled)
+        {
+            CancelMatchingSessions();
+            return;
+        }
         var ranked = queueKind == "ranked";
         var queue = ranked ? RankedMatchQueue : MatchQueue;
         while (TryTakeMatchPairFromQueue(queue, ranked, out var p1, out var p2))
@@ -886,6 +900,11 @@ public static class WebSocketBridge
                 Send(p2.SessionId, new { proto = "MsgGameStart" });
                 room.Engine.BroadcastInitialState();
                 Log($"{(ranked ? "排位" : "休闲")}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
+            }
+            catch (GameMaintenanceException ex)
+            {
+                Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
+                Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
             }
             catch (Exception ex)
             {
@@ -1099,6 +1118,7 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = "请先登录" });
             return;
         }
+        if (RejectForMaintenance(s, "MsgCreateRoom")) return;
 
         var existingRoom = GetFriendlyRoomOf(s);
         if (existingRoom is not null && existingRoom.IsRoomCode && existingRoom.State == "lobby")
@@ -1157,6 +1177,7 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "请先登录" });
             return;
         }
+        if (RejectForMaintenance(s, "MsgJoinRoom")) return;
 
         var code = Str(msg, "roomCode")?.ToUpperInvariant() ?? "";
         var deck = Str(msg, "deck") ?? "";
@@ -1792,6 +1813,7 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "请先登录" });
             return;
         }
+        if (RejectForMaintenance(s, "MsgInvitePlayer")) return;
         var toAccount = Str(msg, "toAccount") ?? "";
 
         if (string.Equals(toAccount, s.Account, StringComparison.OrdinalIgnoreCase))
@@ -1849,6 +1871,12 @@ public static class WebSocketBridge
         {
             Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, byName = s.PlayerName ?? s.Account });
             Log($"邀请被拒 {s.Account} ✗ {from.Account}");
+            return;
+        }
+
+        if (RejectForMaintenance(s, "MsgInviteResult"))
+        {
+            Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = GameMaintenanceState.PlayerMessage });
             return;
         }
 
@@ -1965,6 +1993,12 @@ public static class WebSocketBridge
             Send(guest.SessionId, new { proto = "MsgGameStart" });
             room.Engine.BroadcastInitialState();
             return room.RoomId;
+        }
+        catch (GameMaintenanceException ex)
+        {
+            if (FriendlyRooms.TryGetValue(friendlyRoomId, out var lobby))
+                PushFriendlyRoom(lobby, ex.Message);
+            return null;
         }
         catch (Exception ex)
         {
@@ -2083,6 +2117,11 @@ public static class WebSocketBridge
     {
         var room = GetFriendlyRoomOf(s);
         if (room is null || s.Account is null) return;
+        if (GameRoomManager.GetMaintenanceSnapshot().Enabled)
+        {
+            PushFriendlyRoom(room, GameMaintenanceState.PlayerMessage);
+            return;
+        }
 
         bool ready = Bool(msg, "ready");
         lock (room.Gate)
@@ -2099,6 +2138,11 @@ public static class WebSocketBridge
 
     private static void TryStartFriendlyGame(DuelLobby room)
     {
+        if (GameRoomManager.GetMaintenanceSnapshot().Enabled)
+        {
+            PushFriendlyRoom(room, GameMaintenanceState.PlayerMessage);
+            return;
+        }
         if (!room.TryBeginStart(out var start) || start is null) return;
         if (!TryGetActiveSession(start.HostAccount, out var host) ||
             !TryGetActiveSession(start.GuestAccount, out var guest))
@@ -2114,6 +2158,11 @@ public static class WebSocketBridge
             guest, start.GuestDeck, start.GuestDeckName,
             room.RoomId, room.MatchKind);
         room.CompleteStart(gameRoomId is not null);
+        if (gameRoomId is null && GameRoomManager.GetMaintenanceSnapshot().Enabled)
+        {
+            DisbandFriendlyRoom(room, leaverAccount: null, otherMessage: GameMaintenanceState.PlayerMessage);
+            return;
+        }
         PushFriendlyRoom(room);
         if (gameRoomId is null)
         {
@@ -2140,6 +2189,11 @@ public static class WebSocketBridge
     public static void OnFriendlyGameEnd(string friendlyRoomId, string? winnerAccount)
     {
         if (!FriendlyRooms.TryGetValue(friendlyRoomId, out var room)) return;
+        if (GameRoomManager.GetMaintenanceSnapshot().Enabled)
+        {
+            DisbandFriendlyRoom(room, leaverAccount: null, otherMessage: "维护更新中，本场结束后房间已关闭");
+            return;
+        }
         lock (room.Gate)
         {
             if (winnerAccount is not null)
@@ -2632,6 +2686,106 @@ public static class WebSocketBridge
             issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         });
         Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = true, logStr = "全服公告已发送" });
+    }
+
+    private static void OnMaintenanceState(WsSession s)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s)) return;
+        SendMaintenanceState(s);
+    }
+
+    private static void OnSetMaintenance(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgMaintenanceState", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new { proto = "MsgMaintenanceState", result = false, logStr = "没有管理维护模式的权限" });
+            return;
+        }
+
+        var enabled = Bool(msg, "enabled");
+        try
+        {
+            GameRoomManager.SetMaintenanceMode(enabled);
+            if (enabled) CancelWaitingGameActivities();
+            BroadcastMaintenanceState();
+            SendMaintenanceState(s, result: true, logStr: enabled
+                ? "维护模式已开启，新的对局已停止"
+                : "维护模式已关闭，玩家可以开始新对局");
+            Log($"维护模式 {(enabled ? "开启" : "关闭")}：{s.Account}");
+        }
+        catch (Exception ex)
+        {
+            LogErr($"维护状态持久化失败: {ex.Message}");
+            SendMaintenanceState(s, result: false, logStr: "维护状态保存失败，未执行变更");
+        }
+    }
+
+    private static bool RejectForMaintenance(WsSession s, string proto)
+    {
+        if (!GameRoomManager.GetMaintenanceSnapshot().Enabled) return false;
+        Send(s.SessionId, new { proto, result = false, accepted = false, logStr = GameMaintenanceState.PlayerMessage });
+        return true;
+    }
+
+    private static void CancelWaitingGameActivities()
+    {
+        CancelMatchingSessions();
+
+        foreach (var item in PendingInvites.ToArray())
+        {
+            if (!PendingInvites.TryRemove(item.Key, out var invite)) continue;
+            Send(invite.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = GameMaintenanceState.PlayerMessage });
+            Send(invite.ToSid, new { proto = "MsgInviteResult", accepted = false, logStr = GameMaintenanceState.PlayerMessage });
+        }
+
+        foreach (var room in FriendlyRooms.Values.ToArray())
+        {
+            if (room.State == "lobby")
+                DisbandFriendlyRoom(room, leaverAccount: null, otherMessage: GameMaintenanceState.PlayerMessage);
+        }
+    }
+
+    private static void CancelMatchingSessions()
+    {
+        foreach (var session in Sessions.Values)
+        {
+            if (!session.IsMatching) continue;
+            session.IsMatching = false;
+            session.Deck = null;
+            session.DeckName = null;
+            Send(session.SessionId, new
+            {
+                proto = "MsgEnterMatch",
+                result = false,
+                logStr = GameMaintenanceState.PlayerMessage,
+            });
+        }
+    }
+
+    private static void SendMaintenanceState(WsSession session, bool? result = null, string? logStr = null)
+    {
+        var snapshot = GameRoomManager.GetMaintenanceSnapshot();
+        Send(session.SessionId, new
+        {
+            proto = "MsgMaintenanceState",
+            enabled = snapshot.Enabled,
+            activeRoomCount = snapshot.ActiveRoomCount,
+            startedAt = snapshot.StartedAt?.ToUnixTimeMilliseconds(),
+            canManage = GlobalAnnouncementPolicy.IsAuthorized(session.Account),
+            result,
+            logStr,
+        });
+    }
+
+    public static void BroadcastMaintenanceState()
+    {
+        foreach (var session in Sessions.Values)
+            if (session.IsLoggedIn) SendMaintenanceState(session);
     }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。

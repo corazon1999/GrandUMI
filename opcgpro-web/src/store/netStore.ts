@@ -34,6 +34,13 @@ export type FriendlyRoomState = {
 
 export type RoomOperation = "idle" | "creating" | "joining";
 
+export type MaintenanceState = {
+  enabled: boolean;
+  activeRoomCount: number;
+  startedAt: number | null;
+  canManage: boolean;
+};
+
 export interface ChatMessage {
   Name: string;
   Msg: string;
@@ -83,6 +90,7 @@ interface NetStore {
   roomOperation: RoomOperation;
   // 在线人数（服务器广播的已登录人数）
   onlineCount: number;
+  maintenance: MaintenanceState;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
   friends: FriendInfo[];
@@ -133,6 +141,7 @@ interface NetStore {
   setRoomCode: (code: string | null) => void;
   setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
+  setMaintenance: (maintenance: MaintenanceState) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
@@ -176,6 +185,7 @@ const initialState = {
   roomCode: null as string | null,
   roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
+  maintenance: { enabled: false, activeRoomCount: 0, startedAt: null, canManage: false },
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
   incomingFriendRequests: [] as FriendRequestInfo[],
@@ -239,6 +249,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setRoomOperation: (roomOperation) => set({ roomOperation }),
 
   setOnlineCount: (n) => set({ onlineCount: n }),
+  setMaintenance: (maintenance) => set({ maintenance }),
 
   setPlayerList: (list) => set({ playerList: list }),
 
