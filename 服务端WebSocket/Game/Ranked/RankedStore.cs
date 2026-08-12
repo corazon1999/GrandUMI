@@ -121,6 +121,7 @@ public sealed class RankedStore
     private const double InitialVolatility = 0.06;
     private const double GlickoScale = 173.7178;
     private const double Tau = 0.5;
+    private const int RankPointsPerCompletedMatch = 20;
     private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
     private readonly object _gate = new();
@@ -340,10 +341,8 @@ public sealed class RankedStore
             var score1 = 1d - score0;
             var afterRating0 = UpdateRating(before0, before1, score0);
             var afterRating1 = UpdateRating(before1, before0, score1);
-            var expected0 = Expected(before0.Rating, before1.Rating);
-            var expected1 = 1d - expected0;
-            var after0 = ApplyResult(before0, afterRating0, score0, expected0);
-            var after1 = ApplyResult(before1, afterRating1, score1, expected1);
+            var after0 = ApplyResult(before0, afterRating0, score0);
+            var after1 = ApplyResult(before1, afterRating1, score1);
             var winStreakBefore0 = CurrentWinStreak(connection, transaction, season.Id, before0.AccountKey);
             var winStreakBefore1 = CurrentWinStreak(connection, transaction, season.Id, before1.AccountKey);
 
@@ -366,7 +365,7 @@ public sealed class RankedStore
         }
     }
 
-    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score, double expected)
+    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score)
     {
         var placementGames = Math.Min(PlacementRequired, before.PlacementGames + 1);
         var games = before.Games + 1;
@@ -381,8 +380,9 @@ public sealed class RankedStore
         }
         else if (before.PlacementGames >= PlacementRequired)
         {
-            var raw = (int)Math.Round(40 * (score - expected));
-            var delta = score > 0.5 ? Math.Clamp(raw, 12, 30) : Math.Clamp(raw, -30, -12);
+            // 可见 RP 使用对称胜负分，确保长期胜率超过 50% 时能够稳定净增长。
+            // Glicko 隐藏分仍独立更新并用于匹配，不让可见分奖惩受对手隐藏分差距影响。
+            var delta = score > 0.5 ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch;
             if (score < 0.5 && before.RankPoints < 300) delta = 0; // 青铜不扣可见分
             rankPoints = Math.Max(0, before.RankPoints + delta);
             // 白银、黄金为大段地板；白金起恢复完整升降。
@@ -476,9 +476,6 @@ public sealed class RankedStore
         }
         return Math.Exp(A / 2);
     }
-
-    private static double Expected(double self, double opponent)
-        => 1 / (1 + Math.Pow(10, (opponent - self) / 400));
 
     private static RankPlayerSettlement ToSettlement(
         string account,

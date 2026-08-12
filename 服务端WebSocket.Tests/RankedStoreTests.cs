@@ -146,6 +146,42 @@ public class RankedStoreTests
         }
     }
 
+    [Fact]
+    public void 排位结算_定级后胜负固定对称加减二十分()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 12, 0, 0, DateTimeKind.Utc);
+
+            // 交替胜负完成双方定级，使双方都处在无段位保护影响的正常结算区间。
+            for (var i = 0; i < RankedStore.PlacementRequired; i++)
+            {
+                Assert.NotNull(store.RecordMatch($"placement-{i}", now.AddMinutes(i),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: i % 2));
+            }
+
+            var aliceWins = store.RecordMatch("fixed-rp-alice-win", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+            Assert.NotNull(aliceWins);
+            Assert.Equal(20, aliceWins!.Player0.RankPointDelta);
+            Assert.Equal(-20, aliceWins.Player1.RankPointDelta);
+
+            var bobWins = store.RecordMatch("fixed-rp-bob-win", now.AddMinutes(11),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
+            Assert.NotNull(bobWins);
+            Assert.Equal(-20, bobWins!.Player0.RankPointDelta);
+            Assert.Equal(20, bobWins.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
     private static void TryDelete(string path)
     {
         try { File.Delete(path); } catch { }
