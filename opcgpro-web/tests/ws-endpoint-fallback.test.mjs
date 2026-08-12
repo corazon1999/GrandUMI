@@ -5,7 +5,7 @@ import ts from "typescript";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("主域名优先 Cloudflare，备用域名优先直连", async () => {
+test("正式服主域名和备用域名均优先香港直连，Cloudflare 作为兜底", async () => {
   const source = await readSource("../src/net/wsEndpoint.ts");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -15,7 +15,7 @@ test("主域名优先 Cloudflare，备用域名优先直连", async () => {
 
   assert.deepEqual(
     buildWebSocketEndpoints("wss://grand-umi.com/ws", "grand-umi.com", "https:"),
-    ["wss://grand-umi.com/ws", "wss://direct.grand-umi.com/ws"],
+    ["wss://direct.grand-umi.com/ws", "wss://grand-umi.com/ws"],
   );
   assert.deepEqual(
     buildWebSocketEndpoints("wss://grand-umi.com/ws", "direct.grand-umi.com", "https:"),

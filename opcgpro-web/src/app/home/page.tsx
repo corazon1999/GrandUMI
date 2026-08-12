@@ -1,18 +1,8 @@
-"use client";
+import HomeClient from "./HomeClient";
 
-import { useNetStore } from "@/store/netStore";
-import LoginPanel from "@/components/home/LoginPanel";
-import MainPanel from "@/components/home/MainPanel";
-import FeedbackOverlay from "@/components/game/FeedbackOverlay";
+// 首页包含当前版本入口，必须逐次向源站校验，避免发布后仍引用旧前端脚本。
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  const loggedIn = useNetStore((s) => s.loggedIn);
-  return loggedIn ? (
-    <>
-      <MainPanel />
-      <FeedbackOverlay context="lobby" />
-    </>
-  ) : (
-    <LoginPanel />
-  );
+  return <HomeClient />;
 }

@@ -5,6 +5,7 @@ import test from "node:test";
 const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8");
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
+const deployHk = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", import.meta.url), "utf8");
@@ -12,6 +13,15 @@ const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", imp
 test("production build routes hashed Next assets through the CDN origin", () => {
   assert.match(nextConfig, /assetPrefix: assetOrigin \|\| undefined/);
   assert.match(promote, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
+  assert.match(deployHk, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
+});
+
+test("home response is dynamic so releases cannot reuse stale HTML", async () => {
+  const homePage = await readFile(new URL("../src/app/home/page.tsx", import.meta.url), "utf8");
+  const homeClient = await readFile(new URL("../src/app/home/HomeClient.tsx", import.meta.url), "utf8");
+  assert.match(homePage, /export const dynamic = "force-dynamic"/);
+  assert.doesNotMatch(homePage, /^"use client"/m);
+  assert.match(homeClient, /^"use client"/m);
 });
 
 test("test build keeps its assets on the test origin", () => {

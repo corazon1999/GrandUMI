@@ -20,6 +20,26 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-12-network-latency-release",
+    version: "2026.08.12.2",
+    date: "2026-08-12",
+    title: "正式服连接与发布链路修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复紧急发布后网页脚本未走独立静态资源线路的问题，并避免旧首页长期缓存导致版本和更新日志无法及时生效。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "正式服对局连接优先使用低延迟香港直连线路，Cloudflare 线路保留为故障兜底，降低登录等待和对局操作延迟。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-12-gameplay-ranking-maintenance-release",
     version: "2026.08.12.1",
     date: "2026-08-12",

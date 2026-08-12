@@ -11,9 +11,9 @@ export function buildWebSocketEndpoints(
 
   const socketProtocol = pageProtocol === "http:" ? "ws" : "wss";
   const directUrl = `${socketProtocol}://${DIRECT_HOST}/ws`;
-  const ordered = hostname === DIRECT_HOST
-    ? [directUrl, configuredUrl]
-    : [configuredUrl, directUrl];
+  // 正式服直连的稳态 RTT 显著低于 Cloudflare WebSocket；主域也优先直连，
+  // Cloudflare 继续作为源站直连不可用时的跨地域备用入口。
+  const ordered = [directUrl, configuredUrl];
 
   return [...new Set(ordered)];
 }
