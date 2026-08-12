@@ -12,7 +12,7 @@ namespace GrandUMI.Game;
 /// - 分胜负/房间结束时删除该文件（<see cref="Delete"/>），避免恢复已结束的局。
 /// - 仅持久化"被接受"的动作（拒绝的不写），重放时才不会引入分歧。
 /// - 每条 action 带 tsUtc 时间戳，供恢复时按"自最后一次操作起 30 分钟"做 TTL 判定。
-/// 写盘失败一律吞掉，绝不影响对局主流程（仿 ReplayRecorder / MatchLogRecorder）。
+/// 写盘失败一律吞掉，绝不影响对局主流程（仿 MatchLogRecorder）。
 /// </summary>
 public static class RoomJournal
 {

@@ -8,7 +8,7 @@ namespace GrandUMI.Game;
 /// 这是"服务器重启后恢复对局"的核心：重启时不去序列化无法序列化的内存状态（永续效果委托、
 /// 挂起的 async 续延），而是重新构造引擎并按序喂回当时记录的动作，让状态自然长回来。
 ///
-/// 重放期间引擎不挂任何回调（OnSendToPlayer/OnBroadcast/OnReplay/OnMatchLog 全为 null），
+/// 重放期间引擎不挂任何回调（OnSendToPlayer/OnBroadcast/OnMatchLog 全为 null），
 /// 故所有对外广播、日志、录像在重放期间天然为 no-op，不会污染线上或重复落盘。
 /// </summary>
 public static class MatchReplay

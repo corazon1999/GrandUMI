@@ -156,7 +156,6 @@ try
 finally
 {
     WebSocketBridge.Stop();
-    ReplayRecorder.Shutdown();
     MatchLogRecorder.Shutdown();
     RoomJournal.Shutdown();
     playerDataStore.Shutdown();

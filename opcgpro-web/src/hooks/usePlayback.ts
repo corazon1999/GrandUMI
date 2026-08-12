@@ -6,8 +6,8 @@ import type { PlaybackRecord, PlaybackState, PlaybackSpeed } from "@/types/playb
 /**
  * usePlayback — 回放控制器（M6 真正实现，目前为占位）
  *
- * 新架构下回放数据由服务端 ReplayRecorder 写盘，客户端读取 jsonl 后逐 tick 应用 MsgGameState 快照。
- * 当前 M1 阶段只保留接口形状，避免破坏 game/page.tsx。
+ * 当前玩家回放由浏览器 IndexedDB 保存对局快照流；服务端只保留统一 MatchLogs，
+ * 不再为同一局额外写一份 Replays 文件。此处仍只保留旧接口形状，避免破坏 game/page.tsx。
  */
 export function usePlayback(_record: PlaybackRecord | null) {
   const [state] = useState<PlaybackState>("idle");

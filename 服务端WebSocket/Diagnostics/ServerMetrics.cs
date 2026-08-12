@@ -30,8 +30,6 @@ public static class ServerMetrics
         Counter(output, "grandumi_websocket_dropped_messages_total", WebSocketBridge.DroppedOutboundCount);
         Gauge(output, "grandumi_room_journal_queue_depth", RoomJournal.QueueDepth);
         Counter(output, "grandumi_room_journal_dropped_total", RoomJournal.DroppedEntries);
-        Gauge(output, "grandumi_replay_queue_depth", ReplayRecorder.QueueDepth);
-        Counter(output, "grandumi_replay_dropped_total", ReplayRecorder.DroppedEntries);
         Gauge(output, "grandumi_matchlog_queue_depth", MatchLogRecorder.QueueDepth);
         Counter(output, "grandumi_matchlog_dropped_total", MatchLogRecorder.DroppedEntries);
         Gauge(output, "grandumi_pending_login_writes", playerDataStore.PendingLoginWrites);

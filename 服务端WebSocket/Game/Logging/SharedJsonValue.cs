@@ -5,7 +5,7 @@ namespace GrandUMI.Game.Logging;
 
 /// <summary>
 /// 多个日志出口共享的一份惰性 JSON 值。底层对象只物化一次，之后由各 JSONL 外层记录直接写入，
-/// 避免公开快照被回放日志和训练日志各自完整遍历、序列化一遍。
+/// 让公开快照写入对局日志时只物化一次，避免后台序列化重复遍历牌桌对象。
 /// </summary>
 [JsonConverter(typeof(SharedJsonValueConverter))]
 public sealed class SharedJsonValue

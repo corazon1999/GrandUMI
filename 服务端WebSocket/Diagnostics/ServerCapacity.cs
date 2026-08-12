@@ -40,7 +40,6 @@ public static class ServerCapacity
     private static bool CheckSharedResources(out string reason)
     {
         if (RoomJournal.QueueDepth >= 6_000
-            || ReplayRecorder.QueueDepth >= 12_000
             || MatchLogRecorder.QueueDepth >= 12_000)
         {
             reason = "persistence_backlog";

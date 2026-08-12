@@ -4,7 +4,7 @@
 
 ## 1. 背景与目标
 
-当前项目已经具备基础回放能力：服务端在对局中通过 `ReplayRecorder` 将观战视角的 `MsgGameState` 快照写入 `Replays/{date}/{roomId}.jsonl`，前端也有 `/replay/[id]` 页面读取 jsonl 并逐步同步到 `gameStore`。
+当前项目已经具备两条互补的数据链路：玩家端把自身收到的 `MsgGameState` 快照分块保存到浏览器 IndexedDB，供 `/replay/[id]` 本地回放；服务端则把公开快照、动作、随机事件和提示交互统一写入 `MatchLogs/{date}/{roomId}.jsonl`，供统计、审计、排障和后续训练导出使用。服务端不再重复生成 `Replays` 文件。
 
 这套能力适合做基础视觉回放，但还不足以支撑完整复盘、确定性重放、bug 复现和 AI 训练。主要原因是当前记录的是脱敏后的观战快照，缺少双方隐藏信息、玩家原始动作、prompt 选择结果、随机性来源、合法动作集合和可训练的决策样本。
 
@@ -19,11 +19,12 @@
 
 已有能力：
 
-- `服务端WebSocket/Game/ReplayRecorder.cs`：负责 jsonl 写盘。
-- `服务端WebSocket/Game/GameRoomManager.cs`：创建房间时打开 replay 写入器。
-- `服务端WebSocket/Game/GameEngine.cs`：每次 `Broadcast` 后写入一条 `kind = "state"` 记录。
+- `服务端WebSocket/Game/Logging/MatchLogRecorder.cs`：负责统一 jsonl 写盘。
+- `服务端WebSocket/Game/GameRoomManager.cs`：创建房间时打开 match log 写入器。
+- `服务端WebSocket/Game/GameEngine.cs`：每次 `Broadcast` 后写入一条 `kind = "public_snapshot"` 记录，并记录动作、随机事件和提示交互。
 - `服务端WebSocket/Game/Snapshot/StateSnapshotBuilder.cs`：生成发给玩家或观战者的脱敏 `MsgGameState`。
-- `opcgpro-web/src/app/replay/[id]/page.tsx`：已有回放页面框架。
+- `opcgpro-web/src/data/matchRecorder.ts`：把玩家视角快照分块保存到浏览器 IndexedDB。
+- `opcgpro-web/src/app/replay/[id]/page.tsx`：从浏览器 IndexedDB 读取本地回放。
 
 当前不足：
 
@@ -573,16 +574,12 @@ opcgpro-web/src/types/playback.ts
 - 训练样本如果包含 `hiddenState`，默认只用于本地或内部训练。
 - 未来如果上传、分享或公开回放，只使用 public replay。
 
-## 13. 与现有回放的兼容策略
+## 13. 回放与日志兼容策略
 
-短期内保留现有 `ReplayRecorder` 或让它成为 `MatchLogRecorder` 的兼容出口。
-
-迁移建议：
-
-1. 先新增 `MatchLogRecorder`，不删除 `ReplayRecorder`。
-2. 同一局同时写旧 replay 和新 matchlog，便于对比。
-3. 新 matchlog 稳定后，让 `/api/replay/{id}` 从 matchlog 导出 public replay。
-4. 最后再决定是否保留旧 `Replays` 目录。
+- 玩家当前设备上的回放继续使用浏览器 IndexedDB，不依赖服务器 `Replays` 目录。
+- 服务端只写一份 `MatchLogs`，其中 `public_snapshot` 已包含生成公开回放所需的牌桌快照。
+- 如果未来提供跨设备或分享回放，应从 `MatchLogs` 的 `public_snapshot` 导出脱敏 `PublicReplay`，不得重新引入整局双写。
+- 完整日志可能包含隐藏信息，不能直接暴露给普通玩家。
 
 ## 14. 协作约定
 

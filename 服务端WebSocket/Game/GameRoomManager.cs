@@ -82,7 +82,6 @@ public static class GameRoomManager
         internal object SpectatorGate { get; } = new();
         internal Dictionary<string, SpectatorHandRequest> PendingHandRequests { get; } = new(StringComparer.Ordinal);
         public DateTime CreatedAt { get; } = DateTime.UtcNow;
-        public string? ReplayPath { get; set; }
         public string? MatchLogPath { get; set; }
         /// <summary>是否为单人测试模式（P1 为机器人）</summary>
         public bool VsBot { get; init; }
@@ -205,9 +204,7 @@ public static class GameRoomManager
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex);
         engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
-        entry.ReplayPath = ReplayRecorder.Open(roomId);
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
-        engine.OnReplay = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
         engine.OnMatchLog = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
 
         engine.RecordMatchLog("match_start", -1, new
@@ -1346,7 +1343,6 @@ public static class GameRoomManager
             // 文件命令在各自单写 Channel 内仍然严格保序，但不让数百个房间清理线程
             // 同步占住线程池等待磁盘关闭。正常关服的 Shutdown 仍会排空全部队列。
             var persistenceCleanup = Task.WhenAll(
-                ReplayRecorder.CloseDeferred(roomId),
                 MatchLogRecorder.CloseDeferred(roomId),
                 RoomJournal.DeleteDeferred(roomId));
             _ = persistenceCleanup.ContinueWith(task =>
@@ -1578,7 +1574,7 @@ public static class GameRoomManager
         entry.DisconnectedPlayers[1] = true;
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
 
-        // 重新挂回回调（按当前 sid 发；日志/录像/动作日志均"续写"而非覆盖）
+        // 重新挂回回调（按当前 sid 发；日志/动作日志均"续写"而非覆盖）
         engine.OnSendToPlayer = (idx, payload) =>
             WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
         engine.OnSendToSpectators = (viewPlayerIndex, payload, handPayload) =>
@@ -1595,9 +1591,7 @@ public static class GameRoomManager
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex);
         engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
-        entry.ReplayPath   = ReplayRecorder.OpenAppend(roomId);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
-        engine.OnReplay        = (entryObj) => ReplayRecorder.Append(roomId, entryObj);
         engine.OnMatchLog      = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
         engine.OnPersistAction = (pi, act, data) => RoomJournal.Append(roomId, pi, act, data);
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）

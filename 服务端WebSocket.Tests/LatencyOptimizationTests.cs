@@ -79,44 +79,6 @@ public class LatencyOptimizationTests
     }
 
     [Fact]
-    public async Task 批量录像生命周期_打开与异步关闭保持有序且不占满调用线程()
-    {
-        var items = Enumerable.Range(0, 64)
-            .Select(index => new
-            {
-                RoomId = $"async-lifecycle-{Guid.NewGuid():N}",
-                Index = index,
-                Path = "",
-            })
-            .ToArray();
-
-        var opened = items.AsParallel().Select(item => new
-        {
-            item.RoomId,
-            item.Index,
-            Path = ReplayRecorder.Open(item.RoomId),
-        }).ToArray();
-
-        try
-        {
-            foreach (var item in opened)
-                ReplayRecorder.Append(item.RoomId, new { index = item.Index });
-
-            await Task.WhenAll(opened.Select(item => ReplayRecorder.CloseDeferred(item.RoomId)));
-
-            foreach (var item in opened)
-            {
-                var line = Assert.Single(File.ReadLines(item.Path));
-                Assert.Equal(item.Index, JsonDocument.Parse(line).RootElement.GetProperty("index").GetInt32());
-            }
-        }
-        finally
-        {
-            foreach (var item in opened) TryDelete(item.Path);
-        }
-    }
-
-    [Fact]
     public async Task WebSocket发送队列_只合并连续普通快照且保持控制消息顺序()
     {
         var received = new List<string>();
@@ -245,16 +207,51 @@ public class LatencyOptimizationTests
     }
 
     [Fact]
-    public void 公开快照_回放与训练日志共享一次JSON物化()
+    public void 公开快照_写入对局日志时只物化一次()
     {
         var shared = new SharedJsonValue(new { proto = "MsgGameState", tick = 9, values = Enumerable.Range(1, 20).ToArray() });
 
-        var replay = JsonSerializer.Serialize(new { kind = "state", snapshot = shared });
         var matchLog = JsonSerializer.Serialize(new { kind = "public_snapshot", payload = shared });
 
-        Assert.Contains("\"tick\":9", replay);
         Assert.Contains("\"tick\":9", matchLog);
         Assert.Equal(1, shared.MaterializationCount);
+    }
+
+    [Fact]
+    public async Task 房间生命周期_只写统一对局日志且不创建重复录像()
+    {
+        TestScene.New();
+        var deck = BuildLegalDeck("OP15-001");
+        var room = GameRoomManager.CreateRoom(
+            $"unified-log-s0-{Guid.NewGuid():N}", "unified-log-alice", deck,
+            $"unified-log-s1-{Guid.NewGuid():N}", "unified-log-bob", deck,
+            p0First: true);
+        var matchLogPath = Assert.IsType<string>(room.MatchLogPath);
+        var dateDirectory = Directory.GetParent(matchLogPath)!;
+        var matchLogRoot = Directory.GetParent(dateDirectory.FullName)!;
+        var dataRoot = Directory.GetParent(matchLogRoot.FullName)!;
+        var replayPath = Path.Combine(
+            dataRoot.FullName,
+            "Replays",
+            dateDirectory.Name,
+            $"{room.RoomId}.jsonl");
+
+        GameRoomManager.CleanupRoom(room.RoomId);
+        for (var i = 0; i < 200 && (!File.Exists(matchLogPath) || IsFileLocked(matchLogPath)); i++)
+            await Task.Delay(10);
+
+        try
+        {
+            Assert.True(File.Exists(matchLogPath));
+            Assert.Contains(
+                File.ReadLines(matchLogPath),
+                line => JsonDocument.Parse(line).RootElement.GetProperty("kind").GetString() == "public_snapshot");
+            Assert.False(File.Exists(replayPath));
+        }
+        finally
+        {
+            TryDelete(matchLogPath);
+        }
     }
 
     [Fact]
@@ -288,6 +285,7 @@ public class LatencyOptimizationTests
 
         try
         {
+            Assert.NotNull(room.MatchLogPath);
             var chooser = room.Engine.State.StartingPlayerChooser;
             var chooserSid = chooser == 0 ? "queue-s0" : "queue-s1";
             GameRoomManager.HandleAction(chooserSid, "ChooseFirstPlayer", JsonSerializer.SerializeToElement(new { goFirst = true }));
@@ -306,7 +304,6 @@ public class LatencyOptimizationTests
         finally
         {
             GameRoomManager.CleanupRoom(room.RoomId);
-            TryDelete(room.ReplayPath);
             TryDelete(room.MatchLogPath);
         }
     }
@@ -388,32 +385,7 @@ public class LatencyOptimizationTests
         finally
         {
             GameRoomManager.CleanupRoom(room.RoomId);
-            TryDelete(room.ReplayPath);
             TryDelete(room.MatchLogPath);
-        }
-    }
-
-    [Fact]
-    public void ReplayRecorder_Close会按顺序排空后台队列()
-    {
-        var roomId = $"async-log-test-{Guid.NewGuid():N}";
-        var path = ReplayRecorder.Open(roomId);
-
-        try
-        {
-            for (var i = 0; i < 50; i++)
-                ReplayRecorder.Append(roomId, new { index = i });
-
-            ReplayRecorder.Close(roomId);
-
-            var indexes = File.ReadLines(path)
-                .Select(line => JsonDocument.Parse(line).RootElement.GetProperty("index").GetInt32())
-                .ToArray();
-            Assert.Equal(Enumerable.Range(0, 50), indexes);
-        }
-        finally
-        {
-            try { File.Delete(path); } catch { }
         }
     }
 
@@ -465,5 +437,18 @@ public class LatencyOptimizationTests
     {
         if (path is null) return;
         try { File.Delete(path); } catch { }
+    }
+
+    private static bool IsFileLocked(string path)
+    {
+        try
+        {
+            using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
     }
 }

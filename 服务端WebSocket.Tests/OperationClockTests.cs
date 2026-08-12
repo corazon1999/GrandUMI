@@ -152,7 +152,6 @@ public class OperationClockTests
     private static void Cleanup(GameRoomManager.RoomEntry room)
     {
         GameRoomManager.CleanupRoom(room.RoomId);
-        TryDelete(room.ReplayPath);
         TryDelete(room.MatchLogPath);
     }
 

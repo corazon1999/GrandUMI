@@ -22,7 +22,6 @@ public class GameEngine
     public PromptSystem Prompts { get; }
     public Action<int, object>? OnSendToPlayer { get; set; }   // (playerIndex, payload)
     public Action<object>?      OnBroadcast    { get; set; }   // 双方都收到
-    public Action<object>?      OnReplay       { get; set; }   // 写入回放
     public Action<string, int?, object?>? OnMatchLog { get; set; }
     public Action<int, object, object?>? OnSendToSpectators { get; set; } // (主视角, 脱敏快照, 可选手牌快照)
     public Func<bool>? HasSpectators { get; set; }
@@ -1063,7 +1062,6 @@ public class GameEngine
                 OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1, snapshots.SpectatorPlayer1Hand);
         }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, snapshot = sharedPublicSnapshot });
         RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);
         if (EnablePrivateSnapshotLog)
             RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
@@ -1192,7 +1190,6 @@ public class GameEngine
                 OnSendToSpectators?.Invoke(1, snapshots.SpectatorPlayer1, snapshots.SpectatorPlayer1Hand);
         }
         var sharedPublicSnapshot = new SharedJsonValue(publicSnapshot);
-        OnReplay?.Invoke(new { kind = "state", tick = State.Tick, lastAction, payload, snapshot = sharedPublicSnapshot });
         RecordMatchLog("public_snapshot", -1, sharedPublicSnapshot);
         if (EnablePrivateSnapshotLog)
             RecordMatchLog("private_snapshot", -1, PrivateStateSnapshotBuilder.Build(State));
