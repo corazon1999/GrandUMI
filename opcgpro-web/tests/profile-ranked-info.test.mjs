@@ -14,10 +14,11 @@ test("个人详情展示当前赛季排位信息", () => {
   assert.match(rankedInfo, /id="profile-rank-heading"/);
   assert.match(rankedInfo, />排位信息</);
   assert.match(rankedInfo, />当前段位</);
+  assert.match(rankedInfo, /排位分 \{rankProfile\.rankPoints\} RP/);
   assert.match(rankedInfo, /RANK_FACTION_NAMES\[rankProfile\.faction\]/);
   assert.match(rankedInfo, /rankProfile\.wins.*胜 \/.*rankProfile\.losses.*负/s);
   assert.match(rankedInfo, /dateLabel\(rankProfile\.seasonEndsAtUtc\)/);
-  assert.doesNotMatch(rankedInfo, /排行榜|rankLeaderboard|RP/);
+  assert.doesNotMatch(rankedInfo, /排行榜|rankLeaderboard/);
 });
 
 test("个人详情排位信息兼容未选阵营和手机竖屏", () => {

@@ -253,7 +253,7 @@ export default function ProfilePanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="profile-rank-heading" className="text-lg font-bold text-white">排位信息</h2>
-            <p className="mt-1 text-xs text-gray-400">展示当前赛季的阵营、段位与排位战绩</p>
+            <p className="mt-1 text-xs text-gray-400">展示当前赛季的阵营、段位、排位分与排位战绩</p>
           </div>
           {rankProfile && (
             <span className="rounded-full border border-violet-700/70 bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">
@@ -278,6 +278,9 @@ export default function ProfilePanel({
                 <p className="text-xs font-bold text-violet-300">当前段位</p>
                 <p className="mt-2 text-xl font-black text-white">
                   {rankLabel(rankProfile.tier, rankProfile.division, rankProfile.placementGames, rankProfile.placementRequired)}
+                </p>
+                <p className="mt-1 text-xs font-bold text-violet-300">
+                  排位分 {rankProfile.rankPoints} RP
                 </p>
               </section>
               <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">
