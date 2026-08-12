@@ -6,6 +6,16 @@ interface RankResultPanelProps {
 
 const signedRp = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
 
+const rankDifferenceLabel = (result: RankPlayerSettlement) => {
+  if (result.rankDifference < 0) {
+    return `${result.won ? "低分方获胜奖励" : "低分方失败保护"}（低 ${Math.abs(result.rankDifference)} RP）`;
+  }
+  if (result.rankDifference > 0) {
+    return `${result.won ? "高分方获胜削减" : "高分方失败追加扣分"}（高 ${result.rankDifference} RP）`;
+  }
+  return "赛前与对手同分";
+};
+
 export default function RankResultPanel({ result }: RankResultPanelProps) {
   return (
     <div className="mt-4 w-full max-w-sm rounded-xl border border-violet-400/40 bg-violet-950/80 px-4 py-3 text-center sm:px-5">
@@ -31,12 +41,10 @@ export default function RankResultPanel({ result }: RankResultPanelProps) {
                 <dd className="font-bold text-emerald-300">{signedRp(result.streakAdjustment)} RP</dd>
               </div>
               <div className="flex items-center justify-between gap-4 text-left">
-                <dt>
-                  {result.rankDifferenceAdjustment > 0
-                    ? `${result.won ? "低分获胜奖励" : "高分落败保护"}（相差 ${Math.abs(result.rankDifference)} RP）`
-                    : `赛前与对手相差 ${Math.abs(result.rankDifference)} RP`}
-                </dt>
-                <dd className="shrink-0 font-bold text-emerald-300">{signedRp(result.rankDifferenceAdjustment)} RP</dd>
+                <dt>{rankDifferenceLabel(result)}</dt>
+                <dd className={`shrink-0 font-bold ${result.rankDifferenceAdjustment >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                  {signedRp(result.rankDifferenceAdjustment)} RP
+                </dd>
               </div>
               {result.rankProtectionAdjustment > 0 && (
                 <div className="flex items-center justify-between gap-4">

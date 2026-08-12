@@ -163,6 +163,8 @@ public class RankedStoreTests
 
             for (var streak = 1; streak <= 7; streak++)
             {
+                // 此用例只验证连续场次修正；每局前拉回同分，隔离分差修正。
+                SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000));
                 var result = store.RecordMatch($"streak-{streak}", now.AddMinutes(10 + streak),
                     "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
                 var adjustment = Math.Min(streak - 1, 5);
@@ -187,12 +189,17 @@ public class RankedStoreTests
     }
 
     [Theory]
-    [InlineData(99, 0)]
-    [InlineData(100, 1)]
-    [InlineData(499, 4)]
-    [InlineData(500, 5)]
-    [InlineData(900, 5)]
-    public void 排位结算_逆风结果每百分差加一且最多加五分(int rankDifference, int expectedAdjustment)
+    [InlineData(99, 0, 0)]
+    [InlineData(100, 1, -1)]
+    [InlineData(299, 2, -2)]
+    [InlineData(300, 3, -3)]
+    [InlineData(499, 4, -3)]
+    [InlineData(500, 5, -3)]
+    [InlineData(900, 5, -3)]
+    public void 排位结算_低分方每百分差加一封顶五且高分方每百分差减一封顶三(
+        int rankDifference,
+        int expectedLowAdjustment,
+        int expectedHighAdjustment)
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
@@ -202,16 +209,27 @@ public class RankedStoreTests
             CompletePlacements(store, now, $"gap-{rankDifference}");
             SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000 + rankDifference));
 
-            var result = store.RecordMatch($"gap-result-{rankDifference}", now.AddMinutes(10),
+            var lowWins = store.RecordMatch($"gap-low-win-{rankDifference}", now.AddMinutes(10),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
 
-            Assert.NotNull(result);
-            Assert.Equal(-rankDifference, result!.Player0.RankDifference);
-            Assert.Equal(rankDifference, result.Player1.RankDifference);
-            Assert.Equal(expectedAdjustment, result.Player0.RankDifferenceAdjustment);
-            Assert.Equal(expectedAdjustment, result.Player1.RankDifferenceAdjustment);
-            Assert.Equal(20 + expectedAdjustment, result.Player0.RankPointDelta);
-            Assert.Equal(-20 + expectedAdjustment, result.Player1.RankPointDelta);
+            Assert.NotNull(lowWins);
+            Assert.Equal(-rankDifference, lowWins!.Player0.RankDifference);
+            Assert.Equal(rankDifference, lowWins.Player1.RankDifference);
+            Assert.Equal(expectedLowAdjustment, lowWins.Player0.RankDifferenceAdjustment);
+            Assert.Equal(expectedHighAdjustment, lowWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(20 + expectedLowAdjustment, lowWins.Player0.RankPointDelta);
+            Assert.Equal(-20 + expectedHighAdjustment, lowWins.Player1.RankPointDelta);
+
+            // 重置 RP 并交换胜负，覆盖低分方失败与高分方获胜的另外两个象限。
+            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000 + rankDifference));
+            var highWins = store.RecordMatch($"gap-high-win-{rankDifference}", now.AddMinutes(11),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
+
+            Assert.NotNull(highWins);
+            Assert.Equal(expectedLowAdjustment, highWins!.Player0.RankDifferenceAdjustment);
+            Assert.Equal(expectedHighAdjustment, highWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-20 + expectedLowAdjustment, highWins.Player0.RankPointDelta);
+            Assert.Equal(20 + expectedHighAdjustment, highWins.Player1.RankPointDelta);
         }
         finally
         {
@@ -245,8 +263,8 @@ public class RankedStoreTests
             Assert.Equal(5, result.Player0.RankDifferenceAdjustment);
             Assert.Equal(30, result.Player0.RankPointDelta);
             Assert.Equal(5, result.Player1.StreakAdjustment);
-            Assert.Equal(5, result.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-10, result.Player1.RankPointDelta);
+            Assert.Equal(-3, result.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-18, result.Player1.RankPointDelta);
         }
         finally
         {

@@ -402,8 +402,12 @@ public sealed class RankedStore
         var rankDifference = opponent.PlacementGames >= PlacementRequired
             ? self.RankPoints - opponent.RankPoints
             : 0;
-        var favorableDifference = won ? -rankDifference : rankDifference;
-        var rankDifferenceAdjustment = Math.Clamp(favorableDifference / 100, 0, 5);
+        var rankDifferenceAdjustment = rankDifference switch
+        {
+            < 0 => Math.Clamp((-rankDifference) / 100, 0, 5),
+            > 0 => -Math.Clamp(rankDifference / 100, 0, 3),
+            _ => 0,
+        };
         return new RankPointCalculation(baseDelta, streakAdjustment, rankDifference,
             rankDifferenceAdjustment, baseDelta + streakAdjustment + rankDifferenceAdjustment,
             resultStreak, won, true);

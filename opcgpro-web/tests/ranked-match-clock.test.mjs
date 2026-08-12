@@ -54,7 +54,12 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /每 100 RP 变化一个小段，每 300 RP 进入下一称号/);
   assert.match(lobby, /基础胜负分为 \+20 \/ -20 RP/);
   assert.match(lobby, /6 连胜、连败起封顶 5 RP/);
-  assert.match(lobby, /最多计算 500 RP/);
+  assert.match(lobby, /低分方获胜时/);
+  assert.match(lobby, /低分方失败时/);
+  assert.match(lobby, /最多修正 5 RP/);
+  assert.match(lobby, /高分方获胜时/);
+  assert.match(lobby, /高分方失败时/);
+  assert.match(lobby, /最多修正 3 RP/);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
@@ -69,6 +74,10 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /baseRankPointDelta/);
   assert.match(panel, /streakAdjustment/);
   assert.match(panel, /rankDifferenceAdjustment/);
+  assert.match(panel, /低分方获胜奖励/);
+  assert.match(panel, /低分方失败保护/);
+  assert.match(panel, /高分方获胜削减/);
+  assert.match(panel, /高分方失败追加扣分/);
   assert.match(panel, /rankProtectionAdjustment/);
   assert.match(panel, /最终变化/);
   assert.match(page, /min-h-11/);
