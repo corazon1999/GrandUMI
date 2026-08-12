@@ -15,7 +15,7 @@ interface Props {
   onRetry: () => void;
 }
 
-const MATRIX_LEADER_LIMIT = 15;
+const MATRIX_LEADER_LIMIT = 20;
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;

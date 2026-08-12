@@ -125,7 +125,7 @@ public sealed class LeaderStatsStore
     public const int MinimumRankedGames = 20;
     public const int MinimumCountedTurn = 8;
     public const int MatchupLeaderboardLimit = 20;
-    public const int MatchupMatrixLeaderLimit = 15;
+    public const int MatchupMatrixLeaderLimit = 20;
     public const int StartingHandCardLimit = 10;
     public const int StatsVersion = 1;
 
@@ -411,7 +411,7 @@ public sealed class LeaderStatsStore
         }
     }
 
-    /// <summary>按综合胜率降序统计榜前十五 Leader 的完整对阵矩阵。</summary>
+    /// <summary>按综合胜率降序统计榜前二十 Leader 的完整对阵矩阵。</summary>
     public LeaderMatchupMatrixSnapshot GetMatchupMatrix(string? requestedPeriod, DateTime? nowUtc = null)
     {
         var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);

@@ -214,15 +214,16 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
-    public void 对阵矩阵取胜率榜前十五且双方胜率互补()
+    public void 对阵矩阵取胜率榜前二十且双方胜率互补()
     {
         var now = new DateTime(2026, 8, 9, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
 
-        for (var leaderIndex = 0; leaderIndex < 16; leaderIndex++)
+        const int candidateLeaderCount = LeaderStatsStore.MatchupMatrixLeaderLimit + 1;
+        for (var leaderIndex = 0; leaderIndex < candidateLeaderCount; leaderIndex++)
         {
             var leader = $"L-{leaderIndex:D2}";
-            var opponent = $"L-{(leaderIndex + 1) % 16:D2}";
+            var opponent = $"L-{(leaderIndex + 1) % candidateLeaderCount:D2}";
             for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
             {
                 store.RecordMatch(Match(
