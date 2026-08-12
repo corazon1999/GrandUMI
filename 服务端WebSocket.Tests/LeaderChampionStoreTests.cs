@@ -9,16 +9,21 @@ public sealed class LeaderChampionStoreTests : IDisposable
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "grandumi-leader-champion-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void 满足三十场后按保守胜率选出唯一最强使用者()
+    public void 满足二十场后按保守胜率选出唯一最强使用者()
     {
         var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
-        for (var index = 0; index < LeaderChampionStore.MinimumChampionGames; index++)
+        for (var index = 0; index < LeaderChampionStore.MinimumChampionGames - 1; index++)
         {
-            // Alice 24 胜 6 负，Bob 22 胜 8 负；二者都满足样本门槛。
-            store.RecordMatch(Match($"alice-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", index < 24 ? 0 : 1));
-            store.RecordMatch(Match($"bob-{index}", now, "Bob", "Opponent-B", "OP16-001", "OP01-001", index < 22 ? 0 : 1));
+            // 完成第 20 场后，Alice 为 16 胜 4 负，Bob 为 14 胜 6 负。
+            store.RecordMatch(Match($"alice-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", index < 16 ? 0 : 1));
+            store.RecordMatch(Match($"bob-{index}", now, "Bob", "Opponent-B", "OP16-001", "OP01-001", index < 14 ? 0 : 1));
         }
+
+        Assert.Null(store.GetChampion("OP16-001", now));
+        var lastIndex = LeaderChampionStore.MinimumChampionGames - 1;
+        store.RecordMatch(Match($"alice-{lastIndex}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 1));
+        store.RecordMatch(Match($"bob-{lastIndex}", now, "Bob", "Opponent-B", "OP16-001", "OP01-001", 1));
 
         Assert.True(store.IsChampion("alice", "OP16-001", now));
         Assert.False(store.IsChampion("Bob", "OP16-001", now));

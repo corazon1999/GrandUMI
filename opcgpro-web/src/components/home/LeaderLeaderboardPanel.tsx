@@ -9,6 +9,7 @@ import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { formatRankBounty } from "@/lib/rankBounty";
 import { LeaderChampionBadge, LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
+import Modal from "@/components/ui/Modal";
 import {
   nextLeaderLeaderboardSort,
   sortLeaderLeaderboardItems,
@@ -109,6 +110,40 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
+function ChampionRulesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} title="“最强”称号规则" mobileSheet maxWidthClass="max-w-lg">
+      <div className="max-h-[min(68dvh,34rem)] space-y-4 overflow-y-auto pr-1 text-sm leading-6 text-gray-300">
+        <p>
+          每个 Leader 都会单独评选一名全服最强使用者。评选固定采用<strong className="text-amber-200">近 30 日</strong>数据，
+          不会随榜单当前选择的“近 7 天 / 近 30 天 / 全部”切换。
+        </p>
+        <ol className="list-decimal space-y-3 pl-5 marker:font-bold marker:text-orange-400">
+          <li>
+            玩家使用该 Leader 完成至少 <strong className="text-white">20 场</strong>有效公开对局后，才会进入候选名单。
+          </li>
+          <li>
+            只统计排位、休闲匹配和普通公开匹配；好友房、房间码及机器人对局不计入。
+          </li>
+          <li>
+            少于 8 回合、掉线结束、没有明确胜负或同账号之间的对局不计入。
+          </li>
+          <li>
+            候选人按 <strong className="text-white">90% Wilson 胜率下限</strong>排名。它会同时考虑胜率和样本量，
+            避免少量对局的高胜率轻易超过长期稳定战绩。
+          </li>
+          <li>
+            得分相同时依次比较场次、胜场；仍相同时由服务器的稳定顺序选出唯一持有者。
+          </li>
+        </ol>
+        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-100/80">
+          称号会随最近 30 日战绩滚动更新，因此持有者可能发生变化。
+        </p>
+      </div>
+    </Modal>
+  );
 }
 
 function ChampionOwner({
@@ -227,6 +262,7 @@ export default function LeaderLeaderboardPanel() {
   const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("leader");
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
+  const [championRulesOpen, setChampionRulesOpen] = useState(false);
 
   const request = (nextPeriod: LeaderboardPeriod) => {
     setSelectedLeader(null);
@@ -355,6 +391,18 @@ export default function LeaderLeaderboardPanel() {
           </span>
           <span>
             排名门槛 <strong className="ml-1 text-white">{leaderboard?.minimumGames ?? 20} 场</strong>
+          </span>
+          <span className="flex items-center gap-1.5">
+            最强称号
+            <button
+              type="button"
+              onClick={() => setChampionRulesOpen(true)}
+              aria-label="查看最强称号规则"
+              title="查看最强称号规则"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-base transition-colors hover:border-amber-400 hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 @[640px]:h-11 @[640px]:w-11"
+            >
+              <span aria-hidden="true">❓️</span>
+            </button>
           </span>
           {leaderboard?.generatedAtUtc && (
             <span className="hidden text-gray-600 @[640px]:inline">
@@ -611,6 +659,7 @@ export default function LeaderLeaderboardPanel() {
           </>
         )}
       </div>
+      <ChampionRulesModal open={championRulesOpen} onClose={() => setChampionRulesOpen(false)} />
     </section>
   );
 }
