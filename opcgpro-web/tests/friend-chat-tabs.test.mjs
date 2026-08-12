@@ -15,8 +15,9 @@ test("在线玩家列表可直接申请或接受好友", async () => {
 });
 
 test("局内聊天面板提供局内与好友分页并保留各自消息流", async () => {
-  const [panel, request, protocol, store] = await Promise.all([
+  const [panel, picker, request, protocol, store] = await Promise.all([
     readSource("../src/components/game/GameChatPanel.tsx"),
+    readSource("../src/components/chat/FriendConversationPicker.tsx"),
     readSource("../src/net/GameRequest.ts"),
     readSource("../src/net/GameProtocol.ts"),
     readSource("../src/store/netStore.ts"),
@@ -26,6 +27,11 @@ test("局内聊天面板提供局内与好友分页并保留各自消息流", as
   assert.match(panel, /局内/);
   assert.match(panel, /好友/);
   assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
+  assert.match(panel, /friendChatUnreadByAccount/);
+  assert.match(panel, /markFriendChatRead\(selectedFriendAccount\)/);
+  assert.match(picker, /unreadByAccount\[accountKey\]/);
+  assert.match(picker, /min-h-11/);
+  assert.match(picker, /role="option"/);
   assert.match(request, /proto: "MsgFriendChat", toAccount, text/);
   assert.match(protocol, /case "MsgFriendChat"/);
   assert.match(store, /friendChatMessages/);
@@ -44,9 +50,19 @@ test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async
   assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
   assert.match(panel, /selectedFriendMessages/);
   assert.match(panel, /selectedFriend\?\.online/);
-  assert.match(panel, /条未读/);
+  assert.match(panel, /friendChatUnreadByAccount/);
+  assert.match(panel, /markFriendChatRead\(selectedFriendAccount\)/);
   assert.match(mainPanel, /title="聊天"/);
   assert.match(mainPanel, /aria-label="打开聊天"/);
+});
+
+test("好友聊天未读数由全局状态维护并可按好友清除", async () => {
+  const store = await readSource("../src/store/netStore.ts");
+
+  assert.match(store, /friendChatUnreadByAccount: Record<string, number>/);
+  assert.match(store, /\[senderKey\]: \(state\.friendChatUnreadByAccount\[senderKey\] \?\? 0\) \+ 1/);
+  assert.match(store, /markFriendChatRead: \(account\) => set/);
+  assert.match(store, /delete friendChatUnreadByAccount\[key\]/);
 });
 
 test("好友私聊由服务端验证好友关系且只回显给双方", async () => {

@@ -41,6 +41,10 @@ export interface ChatMessage {
   time: number;
 }
 
+export function friendAccountKey(account: string): string {
+  return account.toLocaleLowerCase("zh-CN");
+}
+
 export interface SelectedDeck {
   name: string;
   leader: string;
@@ -109,6 +113,7 @@ interface NetStore {
   // 聊天
   chatMessages: ChatMessage[];
   friendChatMessages: FriendChatMessage[];
+  friendChatUnreadByAccount: Record<string, number>;
   // 客户端路由导航（避免 window.location.href 导致整页刷新断开 WebSocket）
   navigateTo: string | null;
 
@@ -146,6 +151,7 @@ interface NetStore {
   setNavigateTo: (path: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addFriendChatMessage: (msg: FriendChatMessage) => void;
+  markFriendChatRead: (account: string) => void;
   clearChat: () => void;
   reset: () => void;
 }
@@ -191,6 +197,7 @@ const initialState = {
   spectateCode: null as string | null,
   chatMessages: [] as ChatMessage[],
   friendChatMessages: [] as FriendChatMessage[],
+  friendChatUnreadByAccount: {} as Record<string, number>,
   navigateTo: null as string | null,
 };
 
@@ -235,10 +242,17 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setPlayerList: (list) => set({ playerList: list }),
 
-  setFriendData: (friends, incomingFriendRequests, outgoingFriendRequests) => set({
-    friends,
-    incomingFriendRequests,
-    outgoingFriendRequests,
+  setFriendData: (friends, incomingFriendRequests, outgoingFriendRequests) => set((state) => {
+    const friendAccounts = new Set(friends.map((friend) => friendAccountKey(friend.account)));
+    const friendChatUnreadByAccount = Object.fromEntries(
+      Object.entries(state.friendChatUnreadByAccount).filter(([account]) => friendAccounts.has(account)),
+    );
+    return {
+      friends,
+      incomingFriendRequests,
+      outgoingFriendRequests,
+      friendChatUnreadByAccount,
+    };
   }),
 
   setFriendSearchResults: (friendSearchResults) => set({ friendSearchResults }),
@@ -280,10 +294,26 @@ export const useNetStore = create<NetStore>((set) => ({
       chatMessages: [...s.chatMessages.slice(-99), msg],
     })),
 
-  addFriendChatMessage: (msg) =>
-    set((s) => ({
-      friendChatMessages: [...s.friendChatMessages.slice(-199), msg],
-    })),
+  addFriendChatMessage: (msg) => set((state) => {
+    const friendChatMessages = [...state.friendChatMessages.slice(-199), msg];
+    const senderKey = friendAccountKey(msg.fromAccount);
+    if (senderKey === friendAccountKey(state.account)) return { friendChatMessages };
+    return {
+      friendChatMessages,
+      friendChatUnreadByAccount: {
+        ...state.friendChatUnreadByAccount,
+        [senderKey]: (state.friendChatUnreadByAccount[senderKey] ?? 0) + 1,
+      },
+    };
+  }),
+
+  markFriendChatRead: (account) => set((state) => {
+    const key = friendAccountKey(account);
+    if (!state.friendChatUnreadByAccount[key]) return state;
+    const friendChatUnreadByAccount = { ...state.friendChatUnreadByAccount };
+    delete friendChatUnreadByAccount[key];
+    return { friendChatUnreadByAccount };
+  }),
 
   clearChat: () => set({ chatMessages: [] }),
 

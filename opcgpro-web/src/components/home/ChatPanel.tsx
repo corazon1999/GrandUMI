@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import FriendConversationPicker from "@/components/chat/FriendConversationPicker";
 import { GameRequest } from "@/net/GameRequest";
 import { HomeRequest } from "@/net/HomeProtocol";
-import { useNetStore } from "@/store/netStore";
+import { friendAccountKey, useNetStore } from "@/store/netStore";
 
 type ChatTab = "lobby" | "friends";
 
 const FRIEND_CHAT_COOLDOWN_MS = 1300;
-
-function accountKey(account: string): string {
-  return account.toLocaleLowerCase("zh-CN");
-}
 
 export default function ChatPanel({ showHeader = true }: { showHeader?: boolean }) {
   const chatMessages = useNetStore((s) => s.chatMessages);
@@ -20,11 +17,12 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   const myAccount = useNetStore((s) => s.account);
   const playerName = useNetStore((s) => s.playerName);
   const connState = useNetStore((s) => s.connState);
+  const friendChatUnreadByAccount = useNetStore((s) => s.friendChatUnreadByAccount);
+  const markFriendChatRead = useNetStore((s) => s.markFriendChatRead);
   const [activeTab, setActiveTab] = useState<ChatTab>("lobby");
   const [lobbyInput, setLobbyInput] = useState("");
   const [friendInput, setFriendInput] = useState("");
   const [selectedFriendAccount, setSelectedFriendAccount] = useState("");
-  const [readFriendMessageIds, setReadFriendMessageIds] = useState<Set<string>>(() => new Set());
   const [friendChatCoolingDown, setFriendChatCoolingDown] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,29 +33,18 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   }), [friends]);
 
   const selectedFriend = useMemo(() => sortedFriends.find(
-    (friend) => accountKey(friend.account) === accountKey(selectedFriendAccount),
+    (friend) => friendAccountKey(friend.account) === friendAccountKey(selectedFriendAccount),
   ), [selectedFriendAccount, sortedFriends]);
 
   const selectedFriendMessages = useMemo(() => {
     if (!selectedFriendAccount) return [];
-    const selectedKey = accountKey(selectedFriendAccount);
+    const selectedKey = friendAccountKey(selectedFriendAccount);
     return friendChatMessages.filter((message) => (
-      accountKey(message.fromAccount) === selectedKey || accountKey(message.toAccount) === selectedKey
+      friendAccountKey(message.fromAccount) === selectedKey || friendAccountKey(message.toAccount) === selectedKey
     ));
   }, [friendChatMessages, selectedFriendAccount]);
 
-  const unreadByFriend = useMemo(() => {
-    const unread: Record<string, number> = {};
-    const myKey = accountKey(myAccount);
-    for (const message of friendChatMessages) {
-      if (accountKey(message.fromAccount) === myKey || readFriendMessageIds.has(message.id)) continue;
-      const fromKey = accountKey(message.fromAccount);
-      unread[fromKey] = (unread[fromKey] ?? 0) + 1;
-    }
-    return unread;
-  }, [friendChatMessages, myAccount, readFriendMessageIds]);
-
-  const totalFriendUnread = Object.values(unreadByFriend).reduce((total, count) => total + count, 0);
+  const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce((total, count) => total + count, 0);
 
   useEffect(() => {
     HomeRequest.requestFriendList();
@@ -77,18 +64,8 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
 
   useEffect(() => {
     if (activeTab !== "friends" || !selectedFriendAccount) return;
-    const selectedKey = accountKey(selectedFriendAccount);
-    const receivedIds = friendChatMessages
-      .filter((message) => accountKey(message.fromAccount) === selectedKey)
-      .map((message) => message.id);
-    if (receivedIds.length === 0) return;
-    setReadFriendMessageIds((previous) => {
-      if (receivedIds.every((id) => previous.has(id))) return previous;
-      const next = new Set(previous);
-      for (const id of receivedIds) next.add(id);
-      return next;
-    });
-  }, [activeTab, friendChatMessages, selectedFriendAccount]);
+    markFriendChatRead(selectedFriendAccount);
+  }, [activeTab, friendChatMessages, markFriendChatRead, selectedFriendAccount]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,6 +91,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   const selectFriend = (account: string) => {
     setSelectedFriendAccount(account);
     setFriendInput("");
+    markFriendChatRead(account);
   };
 
   return (
@@ -176,21 +154,12 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
       ) : sortedFriends.length > 0 ? (
         <>
           <div className="border-b border-gray-800 p-2">
-            <select
-              value={selectedFriendAccount}
-              onChange={(event) => selectFriend(event.target.value)}
-              aria-label="选择聊天好友"
-              className="h-10 w-full rounded-lg border border-gray-700 bg-gray-900 px-2 text-xs text-white outline-none focus:border-sky-500"
-            >
-              {sortedFriends.map((friend) => {
-                const unread = unreadByFriend[accountKey(friend.account)] ?? 0;
-                return (
-                  <option key={friend.account} value={friend.account}>
-                    {friend.online ? "●" : "○"} {friend.name} (@{friend.account}){unread ? ` · ${unread} 条未读` : ""}
-                  </option>
-                );
-              })}
-            </select>
+            <FriendConversationPicker
+              friends={sortedFriends}
+              selectedAccount={selectedFriendAccount}
+              unreadByAccount={friendChatUnreadByAccount}
+              onSelect={selectFriend}
+            />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3" aria-live="polite">
@@ -200,7 +169,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
               </p>
             )}
             {selectedFriendMessages.map((message) => {
-              const isSelf = accountKey(message.fromAccount) === accountKey(myAccount);
+              const isSelf = friendAccountKey(message.fromAccount) === friendAccountKey(myAccount);
               return (
                 <div key={message.id} className="mb-2 text-sm leading-5 @[1024px]:text-xs">
                   <span className={`font-bold ${isSelf ? "text-sky-300" : "text-emerald-300"}`}>

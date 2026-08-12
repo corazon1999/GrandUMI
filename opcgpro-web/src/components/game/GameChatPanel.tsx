@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import FriendConversationPicker from "@/components/chat/FriendConversationPicker";
 import { eventBus } from "@/net/eventBus";
 import { GameRequest } from "@/net/GameRequest";
 import { HomeRequest } from "@/net/HomeProtocol";
@@ -34,6 +35,8 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   const myAccount = useNetStore((s) => s.account);
   const friends = useNetStore((s) => s.friends);
   const friendChatMessages = useNetStore((s) => s.friendChatMessages);
+  const friendChatUnreadByAccount = useNetStore((s) => s.friendChatUnreadByAccount);
+  const markFriendChatRead = useNetStore((s) => s.markFriendChatRead);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const spectatorDetails = useGameStore((s) => s.spectatorDetails);
   const spectatorHandRequests = useGameStore((s) => s.spectatorHandRequests);
@@ -48,7 +51,6 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
   const [gameMessages, setGameMessages] = useState<GameChatItem[]>([]);
   const [coolingDown, setCoolingDown] = useState(false);
   const [gameUnread, setGameUnread] = useState(0);
-  const [friendUnread, setFriendUnread] = useState<Record<string, number>>({});
   const [selectedFriendAccount, setSelectedFriendAccount] = useState("");
   const [spectatorHovered, setSpectatorHovered] = useState(false);
   const [spectatorPinned, setSpectatorPinned] = useState(false);
@@ -81,7 +83,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
     });
   }, [friendChatMessages, selectedFriendAccount]);
 
-  const totalFriendUnread = Object.values(friendUnread).reduce((total, count) => total + count, 0);
+  const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce((total, count) => total + count, 0);
   const totalUnread = gameUnread + totalFriendUnread;
 
   useEffect(() => {
@@ -166,10 +168,6 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
         && activeTabRef.current === "friends"
         && selectedFriendRef.current.toLocaleLowerCase("zh-CN") === conversationAccount.toLocaleLowerCase("zh-CN");
       if (!isViewingConversation) {
-        setFriendUnread((previous) => ({
-          ...previous,
-          [conversationAccount]: (previous[conversationAccount] ?? 0) + 1,
-        }));
         showToast({ text: message.text, fromName: message.fromName, kind: "friends" });
       }
     }
@@ -179,6 +177,11 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
     if (!open || !listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [activeTab, friendChatMessages, gameMessages, open, selectedFriendAccount]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "friends" || !selectedFriendAccount) return;
+    markFriendChatRead(selectedFriendAccount);
+  }, [activeTab, friendChatMessages, markFriendChatRead, open, selectedFriendAccount]);
 
   if (isPlayback) return null;
 
@@ -195,13 +198,13 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
     setActiveTab(tab);
     if (tab === "game") setGameUnread(0);
     if (tab === "friends" && selectedFriendAccount) {
-      setFriendUnread((previous) => ({ ...previous, [selectedFriendAccount]: 0 }));
+      markFriendChatRead(selectedFriendAccount);
     }
   };
 
   const selectFriend = (account: string) => {
     setSelectedFriendAccount(account);
-    setFriendUnread((previous) => ({ ...previous, [account]: 0 }));
+    markFriendChatRead(account);
   };
 
   const sendPreset = (text: string) => {
@@ -333,18 +336,12 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
               {friends.length > 0 ? (
                 <>
                   <div className="border-b border-white/10 p-2">
-                    <select
-                      value={selectedFriendAccount}
-                      onChange={(event) => selectFriend(event.target.value)}
-                      aria-label="选择聊天好友"
-                      className="h-9 w-full rounded-md bg-slate-800 px-2 text-xs text-white outline-none ring-1 ring-white/10 focus:ring-sky-400"
-                    >
-                      {friends.map((friend) => (
-                        <option key={friend.account} value={friend.account}>
-                          {friend.online ? "●" : "○"} {friend.name} (@{friend.account}){friendUnread[friend.account] ? ` · ${friendUnread[friend.account]} 条未读` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <FriendConversationPicker
+                      friends={friends}
+                      selectedAccount={selectedFriendAccount}
+                      unreadByAccount={friendChatUnreadByAccount}
+                      onSelect={selectFriend}
+                    />
                   </div>
                   <div ref={listRef} className="h-48 overflow-y-auto px-3 py-2 text-xs">
                     {selectedFriendMessages.length === 0 && (
@@ -386,7 +383,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
             setOpen((value) => !value);
             if (!open && activeTab === "game") setGameUnread(0);
             if (!open && activeTab === "friends" && selectedFriendAccount) {
-              setFriendUnread((previous) => ({ ...previous, [selectedFriendAccount]: 0 }));
+              markFriendChatRead(selectedFriendAccount);
             }
           }}
           className="relative flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
