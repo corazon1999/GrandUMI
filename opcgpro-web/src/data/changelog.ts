@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-12-home-blank-screen-release",
+    version: "2026.08.12.3",
+    date: "2026-08-12",
+    title: "首页刷新稳定性修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复刷新页面后偶尔只剩背景和设置按钮、登录或大厅内容消失的问题。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-12-network-latency-release",
     version: "2026.08.12.2",
     date: "2026-08-12",

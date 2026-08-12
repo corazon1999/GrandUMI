@@ -10,8 +10,9 @@ const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.cadd
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", import.meta.url), "utf8");
 
-test("production build routes hashed Next assets through the CDN origin", () => {
-  assert.match(nextConfig, /assetPrefix: assetOrigin \|\| undefined/);
+test("production build keeps critical Next assets same-origin and routes card assets through the CDN", () => {
+  assert.doesNotMatch(nextConfig, /assetPrefix\s*:/);
+  assert.match(nextConfig, /Next\.js JS\/CSS 始终使用当前站点同源地址/);
   assert.match(promote, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
   assert.match(deployHk, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
 });
