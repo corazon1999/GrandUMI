@@ -18,7 +18,7 @@ public sealed record LeaderChampion(
 /// </summary>
 public sealed class LeaderChampionStore
 {
-    public const int MinimumChampionGames = 30;
+    public const int MinimumChampionGames = 20;
     public const int ChampionWindowDays = 30;
     private const double WilsonZ = 1.645; // 90% lower confidence bound
 
