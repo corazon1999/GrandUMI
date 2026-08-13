@@ -42,8 +42,21 @@ test("卡组条目手机轻点只减卡，长按才打开详情", async () => {
   const source = await readSource("../src/components/deck-editor/DeckInfoPanel.tsx");
 
   assert.match(source, /const TOUCH_LONG_PRESS_DELAY = 500/);
-  assert.match(source, /if \(e\.pointerType === "mouse"\) \{\s+onMouseEnter\(entry\.card/);
-  assert.match(source, /suppressClickUntil\.current = Date\.now\(\) \+ TOUCH_CLICK_SUPPRESS_DURATION;\s+onLongPress\(entry\.card\);/);
+  assert.match(source, /if \(e\.pointerType === "mouse"\) \{\s+onMouseEnter\(card/);
+  assert.match(source, /suppressClickUntil\.current = Date\.now\(\) \+ TOUCH_CLICK_SUPPRESS_DURATION;\s+onLongPress\(card\);/);
   assert.match(source, /onClick=\{handleClick\}/);
   assert.match(source, /<CardInfoPanel card=\{modal\} onClose=\{\(\) => setModal\(null\)\} compactMobile \/>/);
+});
+
+test("卡组列表使用领航在首位的五列卡面网格", async () => {
+  const source = await readSource("../src/components/deck-editor/DeckInfoPanel.tsx");
+
+  const grid = source.match(/className="([^"]+)" data-deck-card-grid/);
+  assert.ok(grid, "应标记卡组卡面网格");
+  assert.match(grid[1], /\bgrid\b/);
+  assert.match(grid[1], /\bgrid-cols-5\b/);
+  assert.match(source, /badge="领航"[\s\S]*?entries\.map\(\(entry\)/, "领航卡应排在主卡之前");
+  assert.match(source, /badge=\{`× \$\{entry\.count\}`\}/, "数量应覆盖显示在卡面底部");
+  assert.match(source, /data-deck-card-grid-item/);
+  assert.match(source, /aspect-\[5\/7\]/);
 });

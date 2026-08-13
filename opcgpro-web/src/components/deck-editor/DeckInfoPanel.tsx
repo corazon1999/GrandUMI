@@ -8,7 +8,6 @@ import { useNetStore } from "@/store/netStore";
 import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName, exportDeckString, importDeckString, getSelectedDeckName, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
 import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
-import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { downloadGeneratedDeckImage, generateDeckImage } from "@/lib/deckImageExport";
 import CardHoverPreview, { type HoverInfo } from "./CardHoverPreview";
@@ -520,40 +519,6 @@ export default function DeckInfoPanel() {
           />
         </div>
 
-        {/* 领航卡 */}
-        <div className="px-3 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-xs shrink-0">领航</span>
-            {leader ? (
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbSrc(leader.sprite ?? CARD_BACK_SRC)}
-                  alt={leader.name}
-                  className="w-10 h-14 object-cover rounded border border-gray-700"
-                  onError={(e) => advanceImageFallback(e.currentTarget, [leader.sprite, leader.image])}
-                />
-                <div className="min-w-0">
-                  <p className="text-white text-xs font-medium truncate">{leader.name}</p>
-                  <p className={`text-[10px] font-bold ${COLOR_STYLES[primaryDisplayColor(leader.color)]?.text ?? "text-gray-400"}`}>
-                    {toDisplayColor(leader.color)} · {leader.number}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setLeader(null)}
-                  className="text-gray-600 hover:text-red-400 text-xs shrink-0 ml-auto"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <div className="flex-1 h-14 rounded-lg border border-dashed border-gray-700 flex items-center justify-center">
-                <p className="text-gray-600 text-xs">← 切换领航卡模式选择</p>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* 自动移除提示 */}
         {notice?.type === "info" && (
           <div className="mx-3 mb-2 px-2 py-1.5 rounded-lg bg-blue-900/60 border border-blue-800">
@@ -586,19 +551,23 @@ export default function DeckInfoPanel() {
           )}
         </div>
 
-        {/* 卡牌列表 */}
-        <div className="px-3 pb-2 flex flex-col gap-0.5">
-          {entries.length === 0 ? (
-            <p className="text-gray-700 text-xs text-center py-6">
-              从搜索结果点击卡牌添加
-            </p>
-          ) : (
-            entries.map((e) => (
-              <DeckEntryRow
-                key={e.card.number}
-                entry={e}
-                onRemove={removeCard}
-                onAdd={addCard}
+        {/* 卡组卡面网格：领航固定在首位，主卡按参考图使用五列紧凑排列。 */}
+        <div className="px-3 pb-3" data-deck-card-list>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-gray-500">卡组构成</span>
+            <span className="text-[10px] text-gray-600">{entries.length} 种主卡</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5" data-deck-card-grid>
+            {leader ? (
+              <DeckCardGridItem
+                card={leader}
+                badge="领航"
+                badgeClassName="border-emerald-300/80 bg-emerald-950/90 text-emerald-50"
+                title="点击查看领航卡详情"
+                actionLabel="移除领航卡"
+                actionSymbol="✕"
+                onClick={() => setModal(leader)}
+                onAction={() => setLeader(null)}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
                 onLongPress={(card) => {
@@ -606,7 +575,37 @@ export default function DeckInfoPanel() {
                   setModal(card);
                 }}
               />
-            ))
+            ) : (
+              <div
+                className="flex aspect-[5/7] min-w-0 items-center justify-center rounded-lg border border-dashed border-gray-700 bg-gray-900/50 p-1 text-center"
+                data-deck-leader-placeholder
+              >
+                <span className="text-[9px] leading-tight text-gray-600">先从牌池选择领航</span>
+              </div>
+            )}
+
+            {entries.map((entry) => (
+              <DeckCardGridItem
+                key={entry.card.number}
+                card={entry.card}
+                badge={`× ${entry.count}`}
+                badgeClassName="border-sky-300/80 bg-sky-950/90 text-white"
+                title="点击减少一张，长按查看详情"
+                actionLabel={`增加一张 ${entry.card.name}`}
+                actionSymbol="+"
+                onClick={() => removeCard(entry.card.number)}
+                onAction={() => addCard(entry.card)}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                onLongPress={(card) => {
+                  handleMouseLeave();
+                  setModal(card);
+                }}
+              />
+            ))}
+          </div>
+          {entries.length === 0 && (
+            <p className="py-3 text-center text-xs text-gray-700">从搜索结果点击卡牌添加</p>
           )}
         </div>
       </div>
@@ -624,7 +623,7 @@ export default function DeckInfoPanel() {
           onClick={handleImageExport}
           disabled={!leader || entries.length === 0 || imageExportState === "exporting"}
           title="把当前异画、卡牌数量和卡号导出为一张 PNG 图片"
-          className={`w-full py-2 rounded-xl border text-xs font-bold transition-all ${
+          className={`min-h-11 w-full rounded-xl border px-3 py-2 text-xs font-bold transition-all ${
             leader && entries.length > 0 && imageExportState !== "exporting"
               ? imageExportState === "error"
                 ? "border-red-500/60 bg-red-500/10 text-red-300"
@@ -641,7 +640,7 @@ export default function DeckInfoPanel() {
         <button
           onClick={handleSave}
           disabled={!isValid()}
-          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
+          className={`min-h-11 w-full rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
             saveState === "saved"
               ? "bg-green-600 text-white"
               : saveState === "error"
@@ -749,26 +748,34 @@ function CostCurve({ entries }: { entries: DeckEntry[] }) {
   );
 }
 
-// ── 卡组条目行 ────────────────────────────────────────────────────────────
+// ── 卡组卡面网格项 ────────────────────────────────────────────────────────
 
-function DeckEntryRow({
-  entry,
-  onRemove,
-  onAdd,
+function DeckCardGridItem({
+  card,
+  badge,
+  badgeClassName,
+  title,
+  actionLabel,
+  actionSymbol,
+  onClick,
+  onAction,
   onMouseEnter,
   onMouseLeave,
   onLongPress,
 }: {
-  entry: DeckEntry;
-  onRemove: (number: string) => void;
-  onAdd: (card: CardData) => void;
+  card: CardData;
+  badge: string;
+  badgeClassName: string;
+  title: string;
+  actionLabel: string;
+  actionSymbol: "+" | "✕";
+  onClick: () => void;
+  onAction: () => void;
   onMouseEnter: (card: CardData, rect: DOMRect, currentSprite: string) => void;
   onMouseLeave: () => void;
   onLongPress: (card: CardData) => void;
 }) {
-  const sprite      = entry.card.sprite ?? CARD_BACK_SRC;
-  const primary     = primaryDisplayColor(entry.card.color);
-  const colorStyle  = COLOR_STYLES[primary];
+  const sprite = card.sprite ?? CARD_BACK_SRC;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClickUntil = useRef(0);
@@ -783,7 +790,7 @@ function DeckEntryRow({
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   }, []);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === "mouse" || !e.isPrimary) return;
 
     clearLongPressTimer();
@@ -792,72 +799,81 @@ function DeckEntryRow({
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
       suppressClickUntil.current = Date.now() + TOUCH_CLICK_SUPPRESS_DURATION;
-      onLongPress(entry.card);
+      onLongPress(card);
     }, TOUCH_LONG_PRESS_DELAY);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === "mouse" || !pressStart.current) return;
     const deltaX = e.clientX - pressStart.current.x;
     const deltaY = e.clientY - pressStart.current.y;
     if (Math.hypot(deltaX, deltaY) > TOUCH_MOVE_TOLERANCE) clearLongPressTimer();
   };
 
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (Date.now() < suppressClickUntil.current) {
       e.preventDefault();
       e.stopPropagation();
       return;
     }
-    onRemove(entry.card.number);
+    onClick();
   };
 
   return (
     <div
-      className="flex items-center gap-1.5 py-1.5 px-2 border-b border-gray-800/60 group relative rounded-md overflow-hidden cursor-pointer"
-      style={{
-        backgroundImage: `url(${thumbSrc(sprite)})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center 30%",
-      }}
-      onClick={handleClick}
+      className="group relative aspect-[5/7] min-w-0"
       onPointerEnter={(e) => {
         if (e.pointerType === "mouse") {
-          onMouseEnter(entry.card, e.currentTarget.getBoundingClientRect(), sprite);
+          onMouseEnter(card, e.currentTarget.getBoundingClientRect(), sprite);
         }
       }}
       onPointerLeave={(e) => {
         if (e.pointerType === "mouse") onMouseLeave();
         else clearLongPressTimer();
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={clearLongPressTimer}
-      onPointerCancel={clearLongPressTimer}
-      title="点击减少一张"
+      data-deck-card-grid-item
     >
-      {/* 半透明遮罩保证文字可读 */}
-      <div className="absolute inset-0 bg-gray-950/70 group-hover:bg-gray-950/55 transition-colors" />
-
-      {/* 费用圆形底图 */}
-      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 relative z-10 ${colorStyle?.bg ?? "bg-gray-600"}`}>
-        <span
-          className="text-white text-[9px] font-bold leading-none"
-          style={{ textShadow: "0 0 2px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,1)" }}
-        >
-          {entry.card.cost}
-        </span>
-      </div>
-      <span className="text-white text-[11px] truncate flex-1 min-w-0 relative z-10 font-medium drop-shadow-sm">
-        {entry.card.name}
-      </span>
-      <span className="text-gray-300 text-[10px] shrink-0 relative z-10">×{entry.count}</span>
       <button
-        onClick={(e) => { e.stopPropagation(); onAdd(entry.card); }}
-        className="text-gray-300 hover:text-green-400 text-sm opacity-0 group-hover:opacity-100 transition-all shrink-0 w-4 relative z-10 font-bold text-center leading-none"
-        title="点击增加一张"
+        type="button"
+        className="relative h-full w-full overflow-hidden rounded-lg border border-gray-700 bg-gray-900 shadow-sm outline-none transition duration-150 hover:-translate-y-0.5 hover:border-gray-400 hover:shadow-lg focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/70"
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={clearLongPressTimer}
+        onPointerCancel={clearLongPressTimer}
+        title={title}
+        aria-label={`${card.name}，${badge}。${title}`}
       >
-        +
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={thumbSrc(sprite)}
+          alt={card.name}
+          className="h-full w-full select-none object-cover"
+          draggable={false}
+          onError={(e) => advanceImageFallback(e.currentTarget, [card.sprite, card.image])}
+        />
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/75 to-transparent" />
+        <span
+          className={`pointer-events-none absolute bottom-1 left-1/2 max-w-[calc(100%-0.35rem)] -translate-x-1/2 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[clamp(0.65rem,3vw,0.85rem)] font-black leading-none shadow-[0_1px_3px_rgba(0,0,0,0.9)] ${badgeClassName}`}
+          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.95)" }}
+        >
+          {badge}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAction();
+        }}
+        className="pointer-events-none absolute right-0 top-0 z-10 grid h-11 w-11 place-items-center opacity-0 outline-none transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+        aria-label={actionLabel}
+        title={actionLabel}
+      >
+        <span className={`grid h-6 w-6 place-items-center rounded-full border border-white/70 bg-gray-950/90 text-sm font-black leading-none shadow-lg ${actionSymbol === "+" ? "text-emerald-300" : "text-red-300"}`}>
+          {actionSymbol}
+        </span>
       </button>
     </div>
   );

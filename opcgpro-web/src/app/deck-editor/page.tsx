@@ -159,7 +159,7 @@ export default function DeckEditorPage() {
       </main>
       <aside
         data-deck-editor-panel
-        className={`${mobilePanel === "deck" ? "block" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden border-gray-800 pb-[env(safe-area-inset-bottom)] md:block md:w-80 md:flex-none md:border-l`}
+        className={`${mobilePanel === "deck" ? "block" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden border-gray-800 pb-[env(safe-area-inset-bottom)] md:block md:w-96 md:flex-none md:border-l`}
       >
         <DeckInfoPanel />
       </aside>

@@ -42,5 +42,16 @@ test("桌面端仍保持筛选、牌池、卡组三栏布局", async () => {
   assert.ok(deckPanel);
   assert.match(searchPanel[1], /md:static md:flex md:w-48/);
   assert.match(cardPool[1], /md:block/);
-  assert.match(deckPanel[1], /md:block md:w-80/);
+  assert.match(deckPanel[1], /md:block md:w-96/);
+});
+
+test("手机端底部主要操作按钮满足最小触控尺寸", async () => {
+  const source = await readSource("../src/components/deck-editor/DeckInfoPanel.tsx");
+  const exportButton = source.match(/onClick=\{handleImageExport\}[\s\S]*?className=\{`([^`]+)`\}/);
+  const saveButton = source.match(/onClick=\{handleSave\}[\s\S]*?className=\{`([^`]+)`\}/);
+
+  assert.ok(exportButton, "应找到一图流导出按钮");
+  assert.ok(saveButton, "应找到保存卡组按钮");
+  assert.match(exportButton[1], /\bmin-h-11\b/);
+  assert.match(saveButton[1], /\bmin-h-11\b/);
 });
