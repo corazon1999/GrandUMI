@@ -29,6 +29,7 @@ export interface FieldCardView {
   cannotActivateNextReset: boolean;
   cannotBeRested: boolean;   // 无法被效果转为休息状态
   activatedUsedThisTurn: boolean;  // 本回合【启动主要】【每回合1次】是否已用（已用则隐藏启动按钮）
+  oncePerTurnEffectAvailable: boolean; // 至少一项【每回合1次】效果本回合仍可发动
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
   cannotAttack: boolean;     // 是否存在明确的“无法攻击”状态（不含横置、新登场等普通条件）
@@ -66,6 +67,8 @@ export interface PlayerView {
   leaderEnterEffectNullified: boolean; // 【登场时】效果当前被无效
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
   stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
+  leaderOncePerTurnEffectAvailable: boolean; // 领袖的【每回合1次】效果本回合仍可发动
+  stageOncePerTurnEffectAvailable: boolean;  // 舞台的【每回合1次】效果本回合仍可发动
   costActive: number;
   costRest: number;
   costAttached: number;
@@ -89,8 +92,11 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
       ...card,
       gainedKeywords: [...(card.gainedKeywords ?? [])],
       effectsNullified: card.effectsNullified ?? false,
+      oncePerTurnEffectAvailable: card.oncePerTurnEffectAvailable ?? false,
     })),
     leaderGainedKeywords: [...(player.leaderGainedKeywords ?? [])],
+    leaderOncePerTurnEffectAvailable: player.leaderOncePerTurnEffectAvailable ?? false,
+    stageOncePerTurnEffectAvailable: player.stageOncePerTurnEffectAvailable ?? false,
     trashNumbers: [...(player.trashNumbers ?? [])],
     lifeNumbers: [...(player.lifeNumbers ?? [])],
     lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),

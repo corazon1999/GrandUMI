@@ -130,6 +130,7 @@ export default function FieldArea({ side }: Props) {
                 showKeywordFx
                 gainedKeywords={fc.gainedKeywords}
                 attackState={attackState}
+                oncePerTurnEffectAvailable={fc.oncePerTurnEffectAvailable}
                 size={cardSize}
                 onClick={() => handleCardClick(fc.id, fc.isTapped)}
               />

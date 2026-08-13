@@ -103,6 +103,8 @@ public static class EffectRuntime
     /// <summary>对单个卡牌的指定触发时机解析效果</summary>
     public static async Task Resolve(GameState s, int ownerIdx, CardInstance source, EffectTrigger trigger, IPromptService prompts, Dictionary<string, object?>? payload = null)
     {
+        var owner = s.Players[ownerIdx];
+        int turnOnceCountBefore = owner.TurnOnceUsed.Count;
         // 许多旧脚本直接操作 LifeArea，容易漏派发“生命牌离场”监听。
         // 仅最外层效果记录前后生命区的卡实例，统一补齐实际离开的生命牌事件；
         // 嵌套效果共用这一轮快照，避免同一张生命牌被重复通知。
@@ -166,6 +168,7 @@ public static class EffectRuntime
             if (scripted is not null && scripted.HandlesTrigger(trigger))
             {
                 await scripted.Resolve(ctx);
+                MarkOncePerTurnCardUsedIfConsumed(owner, source, turnOnceCountBefore);
                 return;
             }
 
@@ -178,6 +181,7 @@ public static class EffectRuntime
 
             // 4. 后置补齐层：依赖 DSL 刚选中的同一目标，补结算条件加成、关键字或后续动作。
             await DeclaredOmissionEffects.AfterDsl(ctx);
+            MarkOncePerTurnCardUsedIfConsumed(owner, source, turnOnceCountBefore);
         }
         finally
         {
@@ -202,6 +206,12 @@ public static class EffectRuntime
                 && (s.PendingKOEffects.Count > 0 || s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))
                 await DrainPendingEnterFields(s, prompts);
         }
+    }
+
+    private static void MarkOncePerTurnCardUsedIfConsumed(PlayerState owner, CardInstance source, int turnOnceCountBefore)
+    {
+        if (owner.TurnOnceUsed.Count > turnOnceCountBefore && OncePerTurnEffectCatalog.Contains(source.Info.Number))
+            owner.OncePerTurnEffectUsedCardIds.Add(source.Id);
     }
 
     /// <summary>
@@ -392,6 +402,46 @@ public interface IScriptedEffect
     string CardNumber { get; }
     bool HandlesTrigger(EffectTrigger trigger);
     Task Resolve(EffectContext ctx);
+}
+
+/// <summary>卡牌是否包含至少一项【每回合1次】效果。</summary>
+public static class OncePerTurnEffectCatalog
+{
+    // 手写效果缺少统一元数据，集中登记卡号；实际已使用状态由 EffectRuntime 在
+    // TurnOnceUsed 成功增加后记录，取消发动或支付失败不会消耗界面标识。
+    private static readonly HashSet<string> ScriptedCards = new(StringComparer.Ordinal)
+    {
+        "EB01-002", "EB01-008", "EB01-037", "EB01-040", "EB01-047", "EB02-006", "EB02-010", "EB02-023",
+        "EB02-035", "EB02-061", "EB03-001", "EB03-008", "EB03-013", "EB03-026", "EB03-033", "EB03-061",
+        "EB04-007", "EB04-012", "EB04-031", "EB04-035", "EB04-043", "EB04-044", "OP01-002", "OP01-004",
+        "OP01-031", "OP01-051", "OP01-061", "OP01-062", "OP01-112", "OP02-025", "OP02-026", "OP02-071",
+        "OP02-093", "OP02-094", "OP03-005", "OP03-076", "OP04-024", "OP04-053", "OP04-058", "OP04-060",
+        "OP04-063", "OP04-070", "OP04-072", "OP04-090", "OP04-102", "OP04-105", "OP05-001", "OP05-002",
+        "OP05-026", "OP05-029", "OP05-031", "OP05-032", "OP05-041", "OP05-053", "OP05-060", "OP05-074",
+        "OP05-080", "OP05-098", "OP05-100", "OP05-107", "OP05-109", "OP05-119", "OP06-009", "OP06-011",
+        "OP06-015", "OP06-021", "OP06-042", "OP06-044", "OP06-062", "OP06-076", "OP06-102", "OP06-111",
+        "OP06-117", "OP06-118", "OP07-001", "OP07-010", "OP07-029", "OP07-031", "OP07-038", "OP07-042",
+        "OP07-048", "OP07-060", "OP07-097", "OP08-001", "OP08-002", "OP08-021", "OP08-046", "OP08-056",
+        "OP08-057", "OP08-067", "OP08-074", "OP08-079", "OP08-101", "OP08-105", "OP09-022", "OP09-023",
+        "OP09-032", "OP09-061", "OP09-074", "OP09-084", "OP09-093", "OP10-001", "OP10-022", "OP10-034",
+        "OP10-036", "OP10-037", "OP10-066", "OP10-071", "OP10-074", "OP10-086", "OP10-092", "OP10-102",
+        "OP10-118", "OP11-001", "OP11-012", "OP11-022", "OP11-031", "OP11-041", "OP11-043", "OP11-062",
+        "OP11-071", "OP11-072", "OP11-073", "OP11-074", "OP11-077", "OP11-088", "OP11-101", "OP11-102",
+        "OP11-107", "OP11-117", "OP12-001", "OP12-004", "OP12-008", "OP12-020", "OP12-041", "OP12-053",
+        "OP12-061", "OP12-069", "OP12-081", "OP12-091", "OP12-099", "OP13-002", "OP13-017", "OP13-026",
+        "OP13-046", "OP13-078", "OP13-079", "OP13-081", "OP13-100", "OP14-001", "OP14-009", "OP14-020",
+        "OP14-029", "OP14-041", "OP14-060", "OP14-068", "OP14-079", "OP14-080", "OP14-092", "OP14-105",
+        "OP15-001", "OP15-002", "OP15-003", "OP15-008", "OP15-010", "OP15-017", "OP15-022", "OP15-023",
+        "OP15-041", "OP15-058", "OP15-114", "OP16-001", "OP16-018", "OP16-022", "OP16-041", "OP16-080",
+        "P-011", "P-073", "P-076", "P-077", "P-086", "P-095", "P-096", "P-111", "P-122", "PRB01-001",
+        "PRB02-002", "ST02-010", "ST03-007", "ST04-001", "ST05-010", "ST09-010", "ST10-002", "ST10-006",
+        "ST10-007", "ST10-011", "ST10-014", "ST12-001", "ST12-010", "ST13-001", "ST13-002", "ST13-003",
+        "ST15-005", "ST19-003", "ST19-004", "ST19-005", "ST20-002", "ST22-001", "ST22-005", "ST25-003",
+        "ST31-001", "ST36-005",
+    };
+
+    public static bool Contains(string cardNumber)
+        => ScriptedCards.Contains(cardNumber) || Dsl.DslInterpreter.HasOncePerTurnEffect(cardNumber);
 }
 
 public static class ScriptedEffectRegistry

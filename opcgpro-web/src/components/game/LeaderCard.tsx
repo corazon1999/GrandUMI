@@ -124,6 +124,7 @@ export default function LeaderCard({ side }: Props) {
               ? "can"
               : "none"
         }
+        oncePerTurnEffectAvailable={player.leaderOncePerTurnEffectAvailable}
         onClick={handleClick}
       />
       {player.leaderEnterEffectNullified && (

@@ -27,6 +27,11 @@ public static class TurnEngine
         state.Phase = Phase.Reset;
         var p = state.Turn;
 
+        // 新的自己回合开始：仍在场的卡重新获得【每回合1次】可用标识。
+        // 对方回合内使用过的防御型效果也会在其控制者下次回合开始恢复。
+        p.TurnOnceUsed.Clear();
+        p.OncePerTurnEffectUsedCardIds.Clear();
+
         // 1. 赋予中的咚 → 休息状态放回费用区
         foreach (var d in p.CostArea)
         {
@@ -58,8 +63,6 @@ public static class TurnEngine
                 d.State = DonState.Active;
             }
 
-        // 清除本回合"每回合 1 次"使用记录（在 EnterResetPhase 阶段，回合玩家自己的清掉，
-        // 实际官方规则是在结束阶段清除，统一在 EnterEndPhase 做）
     }
 
     public static void EnterDrawPhase(GameState state)
@@ -104,7 +107,6 @@ public static class TurnEngine
             ClearUntilNextOpponentEndPhase(p.Leader, state.CurrentTurnPlayer);
             // 手牌卡的本回合费用修正（如 OP16-087 给"光月桃之助"+20）也需回合末清，否则会跨回合残留
             foreach (var c in p.Hand) c.CostModThisTurn = 0;
-            p.TurnOnceUsed.Clear();
             p.HandDiscardedByEffectThisTurn = false;
             p.HasActivatedBaseCost3PlusEventThisTurn = false;
         }

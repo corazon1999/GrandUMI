@@ -224,6 +224,7 @@ public static class StateSnapshotBuilder
             canAttack = Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
             cannotAttack = HasCannotAttackStatus(state, c),
             activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
+            oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(p, c),
         }).ToArray();
 
         return new PlayerBoardComputed(
@@ -235,6 +236,7 @@ public static class StateSnapshotBuilder
             p.StageCard?.Id.ToString(),
             p.StageCard?.IsTapped ?? false,
             p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
+            p.StageCard is not null && OncePerTurnEffectAvailable(p, p.StageCard),
             p.Trash.Select(c => c.Info.Number).ToArray(),
             p.DeckCount,
             p.LifeCount,
@@ -253,6 +255,7 @@ public static class StateSnapshotBuilder
             HasCannotAttackStatus(state, p.Leader),
             state.IsTriggerNullified(p.Leader, Effects.EffectTrigger.OnEnterField),
             ActivatedUsedThisTurn(p, p.Leader),
+            OncePerTurnEffectAvailable(p, p.Leader),
             p.ActiveDonCount,
             p.RestDonCount,
             p.CostArea.Count(d => d.State == DonState.Attached),
@@ -298,6 +301,7 @@ public static class StateSnapshotBuilder
             stageId = board.StageId,
             stageTapped = board.StageTapped,
             stageActivatedUsedThisTurn = board.StageActivatedUsedThisTurn,
+            stageOncePerTurnEffectAvailable = board.StageOncePerTurnEffectAvailable,
             trashNumbers = board.TrashNumbers,
             deckCount = board.DeckCount,
             lifeCount = board.LifeCount,
@@ -316,6 +320,7 @@ public static class StateSnapshotBuilder
             leaderCannotAttack = board.LeaderCannotAttack,
             leaderEnterEffectNullified = board.LeaderEnterEffectNullified,
             leaderActivatedUsedThisTurn = board.LeaderActivatedUsedThisTurn,
+            leaderOncePerTurnEffectAvailable = board.LeaderOncePerTurnEffectAvailable,
             costActive = board.CostActive,
             costRest = board.CostRest,
             costAttached = board.CostAttached,
@@ -334,6 +339,7 @@ public static class StateSnapshotBuilder
         string? StageId,
         bool StageTapped,
         bool StageActivatedUsedThisTurn,
+        bool StageOncePerTurnEffectAvailable,
         string[] TrashNumbers,
         int DeckCount,
         int LifeCount,
@@ -348,6 +354,7 @@ public static class StateSnapshotBuilder
         bool LeaderCannotAttack,
         bool LeaderEnterEffectNullified,
         bool LeaderActivatedUsedThisTurn,
+        bool LeaderOncePerTurnEffectAvailable,
         int CostActive,
         int CostRest,
         int CostAttached,
@@ -360,6 +367,10 @@ public static class StateSnapshotBuilder
     private static bool ActivatedUsedThisTurn(PlayerState p, CardInstance c)
         => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
            || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
+
+    private static bool OncePerTurnEffectAvailable(PlayerState p, CardInstance c)
+        => Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number)
+           && !p.OncePerTurnEffectUsedCardIds.Contains(c.Id);
 
     /// <summary>
     /// 是否存在明确的“无法攻击”状态。只统计卡牌限制、持续限制和卡牌自带禁攻，

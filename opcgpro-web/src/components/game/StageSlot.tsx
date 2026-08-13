@@ -46,6 +46,7 @@ export default function StageSlot({ side }: Props) {
           size={cardSize}
           isSelected={selectedFieldId === stageId}
           isTapped={stageTapped}
+          oncePerTurnEffectAvailable={player?.stageOncePerTurnEffectAvailable ?? false}
           onClick={clickable ? handleClick : undefined}
         />
       ) : (

@@ -92,6 +92,12 @@ public class PlayerState
     /// <summary>每回合 1 次效果的使用记录（key = "卡号-效果Id"）</summary>
     public HashSet<string> TurnOnceUsed { get; } = new();
 
+    /// <summary>
+    /// 本回合已成功发动过【每回合1次】效果的卡牌实例。
+    /// 与 TurnOnceUsed 的内部 key 分离，供快照和界面统一显示“次数仍可用”标识。
+    /// </summary>
+    public HashSet<Guid> OncePerTurnEffectUsedCardIds { get; } = new();
+
     /// <summary>本回合中该玩家是否曾因卡牌效果丢弃过手牌（不含发动成本）。</summary>
     public bool HandDiscardedByEffectThisTurn { get; set; }
 

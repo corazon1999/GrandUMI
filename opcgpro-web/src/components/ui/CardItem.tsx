@@ -14,7 +14,7 @@ import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
-interface Props {
+export interface CardItemProps {
   card: CardData | null;
   isSelected?: boolean;
   isTapped?: boolean;
@@ -45,6 +45,8 @@ interface Props {
   gainedKeywords?: string[];
   /** 攻击状态标识：can=可攻击 sick=本回合登场不可攻击 blocked=受到禁攻状态 none=不显示 */
   attackState?: "can" | "sick" | "blocked" | "none";
+  /** 卡牌至少一项【每回合1次】效果本回合仍可发动 */
+  oncePerTurnEffectAvailable?: boolean;
   /** 战斗中的身份高亮；选框挂在卡牌旋转节点上，可自动适配活跃/横置形状 */
   battleHighlight?: "attacker" | "target" | "blocker";
   onClick?: () => void;
@@ -76,10 +78,11 @@ export default function CardItem({
   showKeywordFx = false,
   gainedKeywords,
   attackState = "none",
+  oncePerTurnEffectAvailable = false,
   battleHighlight,
   onClick,
   size = "md",
-}: Props) {
+}: CardItemProps) {
   const showFaceDown = faceDown || !card;
   // 仅场上正面角色展示；同时识别卡面固有词条和服务端快照下发的动态词条。
   const visibleKeywords =
@@ -286,6 +289,21 @@ export default function CardItem({
           )}
 
           <CardKeywordEffects keywords={visibleKeywords} />
+
+          {oncePerTurnEffectAvailable && (
+            <span
+              data-once-per-turn-ready="true"
+              className="pointer-events-none absolute right-0 top-1/2 z-30 flex -translate-y-1/2 items-center gap-0.5 rounded-l bg-gradient-to-l from-cyan-400 to-blue-600 px-1 py-0.5 shadow-[0_0_7px_rgba(34,211,238,0.95)] ring-1 ring-cyan-100/80"
+              title="每回合1次效果可发动"
+              aria-label="每回合1次效果可发动"
+            >
+              <svg viewBox="0 0 24 24" className="h-3 w-3 text-white" fill="none" aria-hidden>
+                <path d="M19 7v5h-5M5 17v-5h5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18.2 11a7 7 0 0 0-12-3M5.8 13a7 7 0 0 0 12 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              <span className="text-[8px] font-black leading-none text-white">1</span>
+            </span>
+          )}
 
           {/* 攻击状态标识 → 左侧边中部（避开所有现有徽标），仅我方回合显示 */}
           {attackState === "can" && (

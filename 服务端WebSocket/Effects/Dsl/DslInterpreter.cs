@@ -29,6 +29,29 @@ public static class DslInterpreter
     private static bool _loaded;
     private static readonly object _loadLock = new();
 
+    /// <summary>该卡的有效 DSL 定义中是否包含【每回合1次】效果。</summary>
+    public static bool HasOncePerTurnEffect(string cardNumber)
+        => _defs.TryGetValue(cardNumber, out var def) && ContainsOncePerTurn(def);
+
+    private static bool ContainsOncePerTurn(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.NameEquals("oncePerTurn") && property.Value.ValueKind == JsonValueKind.True)
+                    return true;
+                if (ContainsOncePerTurn(property.Value)) return true;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                if (ContainsOncePerTurn(item)) return true;
+        }
+        return false;
+    }
+
     public static void Load(string path)
     {
         LoadFile(path);
