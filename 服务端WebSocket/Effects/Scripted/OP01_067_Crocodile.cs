@@ -33,7 +33,8 @@ public class OP01_067_Crocodile : IScriptedEffect
             {
                 Side = 0,
                 IncludeLeader = false,
-                IncludeCharacters = true,
+                IncludeCharacters = false,
+                IncludeHand = true,
                 Filter = c => c.Info.Kind == CardKind.Event && c.Info.ColorList.Contains("蓝"),
             },
             CostDelta = -1,

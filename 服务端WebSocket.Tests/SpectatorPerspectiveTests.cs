@@ -25,6 +25,8 @@ public class SpectatorPerspectiveTests
             snapshot.GetProperty("opponent").GetProperty("name").GetString());
         Assert.Empty(snapshot.GetProperty("my").GetProperty("handCardNumbers").EnumerateArray());
         Assert.Empty(snapshot.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+        Assert.Empty(snapshot.GetProperty("my").GetProperty("handCardIds").EnumerateArray());
+        Assert.Empty(snapshot.GetProperty("opponent").GetProperty("handCardIds").EnumerateArray());
     }
 
     [Fact]

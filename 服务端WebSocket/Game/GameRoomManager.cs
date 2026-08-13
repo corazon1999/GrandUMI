@@ -17,7 +17,7 @@ namespace GrandUMI.Game;
 public static class GameRoomManager
 {
     public static IRoomPlacementDirectory RoomDirectory { get; set; } = LocalRoomPlacementDirectory.Instance;
-    private const int GracePeriodSeconds = 120;
+    private const int GracePeriodSeconds = 90;
     private const long OperationTimeLimitMs = 20 * 60 * 1000;
     /// <summary>仅排障时开启；私有快照平均约 63 KB，不应作为正式服常态日志。</summary>
     private static readonly bool PrivateSnapshotLogEnabled =
@@ -857,7 +857,7 @@ public static class GameRoomManager
         }));
     }
 
-    /// <summary>玩家断线 → 暂停操作棋钟并启动每局累计 120s 宽限期。</summary>
+    /// <summary>玩家断线 → 暂停操作棋钟并启动每局累计 90s 宽限期。</summary>
     public static void OnPlayerDisconnect(string sessionId)
     {
         var room = GetRoomBySession(sessionId);
@@ -928,7 +928,7 @@ public static class GameRoomManager
     /// <summary>
     /// 在线方在对手断线宽限期内，主动请求即时结束对局（判对手负）。
     /// 仅当对手确实处于断线宽限期中（其计时器存在）时才生效，避免对手在线/已重连时被误判。
-    /// 与 120s 超时判负复用同一套结束流程；宽限尚未用完时拒绝提前判负。
+    /// 与 90s 超时判负复用同一套结束流程；宽限尚未用完时拒绝提前判负。
     /// </summary>
     public static void RequestEndByDisconnect(string sessionId)
     {
@@ -953,7 +953,7 @@ public static class GameRoomManager
                 : Stopwatch.GetElapsedTime(room.DisconnectStartedAt[oppIdx]).TotalMilliseconds;
             if (elapsed < room.DisconnectGraceRemainingMs[oppIdx])
             {
-                WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对手仍在 2 分钟断线宽限期内" });
+                WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对手仍在 90 秒断线宽限期内" });
                 return;
             }
         }

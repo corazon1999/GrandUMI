@@ -12,9 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 【我方的回合中】+1000：通过 ContinuousEffect 注册，Predicate 判定「我方回合 且 废弃区 ≥19」
 ///     时对我方领袖 +1000；来源舞台离场时由引擎按 SourceCardId 清理。
-///     注册时机：本卡无【登场时】文本，引擎不会在登场时调用本脚本，故在【启动主要】解析时
-///     （即玩家首次使用启动效果时）注册/刷新该持续效果。简化点：在玩家首次使用启动效果前，
-///     该 +1000 持续效果尚未生效。
+///     本卡进入舞台区时立即注册，启动主要时也会刷新，确保被动效果不依赖玩家先点一次启动。
 ///   - 【启动主要】成本 = 将此舞台转为休息 + 将我方 3 张活跃咚转为休息（活跃咚不足 3 张或舞台已休息则无法发动）。
 ///   - 效果候选 = 手牌中「拥有《五老星》特征、黑色（含元素色〈暗〉）、费用 ≤ 我方场上咚!!总张数」的角色卡。
 ///     “场上咚!!的张数”取费用区咚!!总数 TotalDonInCostArea（含活跃/休息/被赋予中）。
@@ -25,7 +23,8 @@ public class OP13_099_EmptyThrone : IScriptedEffect
 {
     public string CardNumber => "OP13-099";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+    public bool HandlesTrigger(EffectTrigger t)
+        => t == EffectTrigger.OnEnterField || t == EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
@@ -47,6 +46,8 @@ public class OP13_099_EmptyThrone : IScriptedEffect
                 st.Players[ownerIndex].Trash.Count >= 19,
         });
 
+        if (ctx.Trigger == EffectTrigger.OnEnterField) return;
+
         // ── 【启动主要】成本前置：此舞台须活跃 且 活跃咚 ≥3 ──
         if (ctx.Source.IsTapped) return;
         var activeDons = me.CostArea.Where(d => d.State == DonState.Active).ToList();
@@ -57,7 +58,7 @@ public class OP13_099_EmptyThrone : IScriptedEffect
         var candidates = me.Hand
             .Where(c => c.Info.Kind == CardKind.Character
                         && c.Info.HasKeyword("五老星")
-                        && c.Info.ColorList.Contains("紫")
+                        && c.Info.ColorList.Contains("黑")
                         && c.Info.Cost <= fieldDon)
             .ToList();
         if (candidates.Count == 0) return;

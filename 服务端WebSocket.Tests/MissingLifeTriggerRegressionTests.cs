@@ -56,10 +56,11 @@ public class MissingLifeTriggerRegressionTests
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
 
-        var prompt = Assert.Single(prompts.ChooseHistory);
+        var prompt = Assert.Single(prompts.ChooseHistory.Where(item => item.kind == "LilithReveal"));
         Assert.Equal("LilithReveal", prompt.kind);
         Assert.Equal([valid.Id.ToString()], prompt.choices);
         Assert.Contains(valid, me.Hand);
+        Assert.Contains(prompts.ChooseHistory, item => item.kind == "LilithReorderBottom");
     }
 
     [Theory]

@@ -15,7 +15,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 顶部 4 张全部经 extra.choiceCards 下发，客户端全部展示供玩家确认；
 ///     validChoices 仅含可公开的卡（“莉莉丝”以外且 Info.Trigger 非空）。
 ///   - "拥有【触发】效果"判定为 CardInfo.Trigger 字段非空。
-///   - "自选顺序放回卡组最下方"实现为保持原相对顺序放底（顺序对实战影响极小）。
+///   - 选中的卡牌通过 BroadcastReveal 向双方公开；剩余卡牌由玩家自选顺序放至卡组底。
 ///   - 生命牌【触发】发动【登场时】，由 HandlesTrigger 同时响应 OnLifeRevealTrigger。
 /// </summary>
 public class OP13_113_Lilith : IScriptedEffect
@@ -51,11 +51,30 @@ public class OP13_113_Lilith : IScriptedEffect
             var picked = revealable.First(c => c.Id.ToString() == chosen[0]);
             me.Deck.Remove(picked);
             me.Hand.Add(picked);
+            ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { picked.Info.Number });
         }
 
-        // 3. 其余仍在顶部的牌按原相对顺序放回卡组最下方
+        // 3. 其余仍在顶部的牌由玩家自选顺序放回卡组最下方
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();
         foreach (var c in rest) me.Deck.Remove(c);
-        me.Deck.AddRange(rest);
+        if (rest.Count <= 1)
+        {
+            me.Deck.AddRange(rest);
+            return;
+        }
+
+        var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LilithReorderBottom",
+            "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+            rest.Select(c => c.Id.ToString()).ToList(), 0, rest.Count,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                ["allowDefaultOrder"] = true,
+            });
+        var ordered = orderedIds
+            .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))
+            .Where(c => c is not null).Cast<CardInstance>().Distinct().ToList();
+        ordered.AddRange(rest.Where(c => !ordered.Contains(c)));
+        me.Deck.AddRange(ordered);
     }
 }

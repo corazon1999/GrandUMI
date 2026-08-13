@@ -90,7 +90,7 @@ public class OperationClockTests
     }
 
     [Fact]
-    public async Task 断线宽限为每局累计两分钟_重连不会重置额度()
+    public async Task 断线宽限为每局累计九十秒_重连不会重置额度()
     {
         TestScene.New();
         var room = CreateRankedRoom();
@@ -104,7 +104,7 @@ public class OperationClockTests
             Assert.True(GameRoomManager.TryReclaim(secondSession, account));
             var remainingAfterFirst = ReadDisconnectGrace(room, 0);
 
-            Assert.InRange(remainingAfterFirst, 118_000, 119_999);
+            Assert.InRange(remainingAfterFirst, 88_000, 89_999);
 
             GameRoomManager.OnPlayerDisconnect(secondSession);
             await Task.Delay(40);

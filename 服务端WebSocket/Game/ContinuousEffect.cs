@@ -70,5 +70,7 @@ public class ContinuousScope
     public int Side { get; init; }
     public bool IncludeLeader { get; init; } = true;
     public bool IncludeCharacters { get; init; } = true;
+    /// <summary>是否允许持续费用效果作用于手牌。默认关闭，避免场上角色光环泄漏到手牌。</summary>
+    public bool IncludeHand { get; init; }
     public Func<CardInstance, bool>? Filter { get; init; }
 }

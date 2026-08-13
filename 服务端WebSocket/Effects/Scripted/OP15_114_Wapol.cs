@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 两个时机：OnEnterField + ActivatedMain，按 ctx.Trigger 分支。
-///   - 【登场时】成本"将生命区最上方 1 张翻至正面朝上"：引擎未区分生命牌朝向，作为可选发动开关。
+///   - 【登场时】只在生命顶为背面时可发动，确认后先将生命顶翻为正面支付成本。
 ///   - 降力后用含持续光环的当前力量评估 ≤0 的对方角色并 KO(用快照避免遍历时修改集合)。
 ///   - 【启动主要】每回合 1 次：仅向含《空岛》特征的我方领袖/角色赋予 1 张休息咚。
 /// </summary>
@@ -29,11 +29,13 @@ public class OP15_114_Wapol : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            if (me.LifeArea.Count == 0) return; // 无法支付成本
+            if (me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return; // 无法支付成本
 
             bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "瓦帕【登场时】：将生命区最上方 1 张翻至正面朝上，本回合对方全角色-2000 并KO力量≤0者?");
             if (!use) return;
+
+            AtomicOps.FlipTopLifeFaceUp(me);
 
             // 收益 1：本回合对方所有角色力量-2000（不含领袖）
             AtomicOps.AddPowerToAllThisTurn(ctx.State, 1 - ctx.OwnerIndex, _ => true, -2000, includeLeader: false);

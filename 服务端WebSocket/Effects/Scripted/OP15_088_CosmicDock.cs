@@ -32,7 +32,7 @@ public class OP15_088_CosmicDock : IScriptedEffect
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope { Side = owner, IncludeLeader = false, IncludeCharacters = true },
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
             CostDelta = 6,
             Predicate = (s, sideIdx, c) => sideIdx == owner && c.Id == selfId,
         });

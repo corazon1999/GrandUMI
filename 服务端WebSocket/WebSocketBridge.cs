@@ -2212,7 +2212,7 @@ public static class WebSocketBridge
         PushFriendlyRoom(room);
     }
 
-    /// <summary>赛前房间断线保留 30 秒等待同账号重连；对战中由正式对局的 2 分钟宽限期处理。</summary>
+    /// <summary>赛前房间断线保留 30 秒等待同账号重连；对战中由正式对局的 90 秒宽限期处理。</summary>
     private static void HandleFriendlyDisconnect(string account)
     {
         if (!FriendlyByAccount.TryGetValue(account, out var roomId)) return;

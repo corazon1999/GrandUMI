@@ -284,6 +284,9 @@ public static class StateSnapshotBuilder
                 : null,
             cardBackId = board.CardBackId,
             spriteMap = p.SpriteMap,
+            handCardIds = asSelf || revealHand
+                ? p.Hand.Select(c => c.Id.ToString()).ToArray()
+                : Array.Empty<string>(),
             handCardNumbers = asSelf || revealHand
                 ? p.Hand.Select(c => c.Info.Number).ToArray()
                 : Array.Empty<string>(),

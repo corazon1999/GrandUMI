@@ -360,7 +360,7 @@ public static class BattleEngine
         var replacement = s.ContinuousEffects.FirstOrDefault(effect =>
             effect.DiscardHandKoReplacement is not null &&
             (effect.DiscardHandKoReplacement == "any" || effect.DiscardHandKoReplacement == reason) &&
-            effect.Predicate(s, side, card));
+            s.IsContinuousEffectApplicable(effect, side, card));
         if (replacement is null) return false;
 
         var owner = s.Players[ownerIdx];

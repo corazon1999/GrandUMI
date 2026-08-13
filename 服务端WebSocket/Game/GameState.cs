@@ -215,6 +215,7 @@ public class GameState
             // 还会引发递归（如 OP16-017 力量谓词内查费用，若此处不跳过则费用查询又回调它）。
             if (eff.PowerDelta == 0 && eff.PowerDeltaResolver is null) continue;
             if (!IsContinuousEffectActive(eff)) continue;
+            if (!MatchesContinuousScope(eff, sideIdx, card)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             sum += eff.PowerDelta + (eff.PowerDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
@@ -229,6 +230,7 @@ public class GameState
         {
             if (!eff.OriginalPowerOverride.HasValue) continue;
             if (!IsContinuousEffectActive(eff)) continue;
+            if (!MatchesContinuousScope(eff, sideIdx, card)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             value = eff.OriginalPowerOverride.Value;
         }
@@ -273,6 +275,7 @@ public class GameState
             if (eff.CostDelta == 0 && eff.CostDeltaResolver is null) continue;
             if (excludedSourceCardId is not null && eff.SourceCardId == excludedSourceCardId) continue;
             if (!IsContinuousEffectActive(eff)) continue;
+            if (!MatchesContinuousScope(eff, sideIdx, card)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
             sum += eff.CostDelta + (eff.CostDeltaResolver?.Invoke(this, sideIdx, card) ?? 0);
         }
@@ -307,7 +310,8 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.GrantKeyword == kw && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
+            if (eff.GrantKeyword == kw && IsContinuousEffectActive(eff)
+                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -321,6 +325,7 @@ public class GameState
             if (eff.KoGuard is null) continue;
             if (!IsContinuousEffectActive(eff)) continue;
             if (eff.KoGuard != "any" && eff.KoGuard != context) continue;
+            if (!MatchesContinuousScope(eff, side, card)) continue;
             if (eff.Predicate(this, side, card)) return true;
         }
         return false;
@@ -336,6 +341,7 @@ public class GameState
             if (eff.LeaveGuard is null) continue;
             if (!IsContinuousEffectActive(eff)) continue;
             if (eff.LeaveGuard != "any" && eff.LeaveGuard != context) continue;
+            if (!MatchesContinuousScope(eff, side, card)) continue;
             if (eff.Predicate(this, side, card)) return true;
         }
         return false;
@@ -354,7 +360,8 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.NullifyEffect && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
+            if (eff.NullifyEffect && IsContinuousEffectActive(eff)
+                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -364,7 +371,8 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.NullifyOnlyTrigger == trigger && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
+            if (eff.NullifyOnlyTrigger == trigger && IsContinuousEffectActive(eff)
+                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -374,7 +382,8 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.PreventReset && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
+            if (eff.PreventReset && IsContinuousEffectActive(eff)
+                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -384,8 +393,61 @@ public class GameState
         int side = SideOf(card);
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
-            if (eff.GrantRestriction == kind && IsContinuousEffectActive(eff) && eff.Predicate(this, side, card)) return true;
+            if (eff.GrantRestriction == kind && IsContinuousEffectActive(eff)
+                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
         return false;
+    }
+
+    /// <summary>
+    /// 统一执行持续效果的作用范围。此前 Scope 只被记录而没有参与结算，导致我方角色光环
+    /// 泄漏到对方场上与双方手牌。手牌效果必须显式声明 IncludeHand。
+    /// </summary>
+    private bool MatchesContinuousScope(ContinuousEffect effect, int targetSide, CardInstance card)
+    {
+        var scope = effect.Scope;
+        int sourceSide = ContinuousSourceSide(effect);
+        if (sourceSide >= 0 && scope.Side >= 0)
+        {
+            int expectedSide = scope.Side == 0 ? sourceSide : 1 - sourceSide;
+            if (targetSide != expectedSide) return false;
+        }
+
+        if (targetSide < 0 || targetSide >= Players.Length) return false;
+        var target = Players[targetSide];
+        if (ReferenceEquals(target.Leader, card))
+            return scope.IncludeLeader && (scope.Filter?.Invoke(card) ?? true);
+        if (target.Characters.Contains(card))
+            return scope.IncludeCharacters && (scope.Filter?.Invoke(card) ?? true);
+        if (target.Hand.Contains(card))
+            return scope.IncludeHand && (scope.Filter?.Invoke(card) ?? true);
+
+        // 持续效果目前不定义舞台、卡组、生命区或废弃区作用范围。
+        return false;
+    }
+
+    /// <summary>供战斗等独立流程统一判断持续效果是否可作用于目标。</summary>
+    public bool IsContinuousEffectApplicable(ContinuousEffect effect, int targetSide, CardInstance card)
+        => IsContinuousEffectActive(effect)
+           && MatchesContinuousScope(effect, targetSide, card)
+           && effect.Predicate(this, targetSide, card);
+
+    private int ContinuousSourceSide(ContinuousEffect effect)
+    {
+        if (effect.SourceCardId.Length < 36 || !Guid.TryParse(effect.SourceCardId[..36], out var sourceId))
+            return -1;
+
+        for (int side = 0; side < Players.Length; side++)
+        {
+            var player = Players[side];
+            if (player.Leader.Id == sourceId || player.StageCard?.Id == sourceId
+                || player.Characters.Any(card => card.Id == sourceId)
+                || player.Hand.Any(card => card.Id == sourceId)
+                || player.Deck.Any(card => card.Id == sourceId)
+                || player.LifeArea.Any(card => card.Id == sourceId)
+                || player.Trash.Any(card => card.Id == sourceId))
+                return side;
+        }
+        return -1;
     }
 
     /// <summary>

@@ -29,7 +29,13 @@ public class OP05_097_MaryGeoise : IScriptedEffect
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            Scope = new ContinuousScope
+            {
+                Side = 0,
+                IncludeLeader = false,
+                IncludeCharacters = false,
+                IncludeHand = true,
+            },
             CostDelta = -1,
             Predicate = (s, sideIdx, c) =>
                 sideIdx == owner                         // 我方打出
