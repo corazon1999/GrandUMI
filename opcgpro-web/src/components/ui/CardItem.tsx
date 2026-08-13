@@ -14,7 +14,7 @@ import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
-export interface CardItemProps {
+interface Props {
   card: CardData | null;
   isSelected?: boolean;
   isTapped?: boolean;
@@ -82,7 +82,7 @@ export default function CardItem({
   battleHighlight,
   onClick,
   size = "md",
-}: CardItemProps) {
+}: Props) {
   const showFaceDown = faceDown || !card;
   // 仅场上正面角色展示；同时识别卡面固有词条和服务端快照下发的动态词条。
   const visibleKeywords =

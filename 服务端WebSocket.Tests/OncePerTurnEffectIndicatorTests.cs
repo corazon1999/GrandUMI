@@ -39,10 +39,15 @@ public class OncePerTurnEffectIndicatorTests
 
         Assert.False(LeaderAvailable(state));
 
+        TurnEngine.EnterEndPhase(state);
+
+        // 规则次数已为新回合恢复，但显示标识保持到控制者自己的回合开始。
+        Assert.Empty(player.TurnOnceUsed);
+        Assert.False(LeaderAvailable(state));
+
         TurnEngine.EnterResetPhase(state);
 
         Assert.True(LeaderAvailable(state));
-        Assert.Empty(player.TurnOnceUsed);
         Assert.Empty(player.OncePerTurnEffectUsedCardIds);
     }
 

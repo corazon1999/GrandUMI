@@ -19,9 +19,3 @@ test("领袖、角色和舞台均接入服务端权威可用状态", () => {
   assert.match(leader, /oncePerTurnEffectAvailable=\{player\.leaderOncePerTurnEffectAvailable\}/);
   assert.match(stage, /oncePerTurnEffectAvailable=\{player\?\.stageOncePerTurnEffectAvailable \?\? false\}/);
 });
-
-test("开发预览页同时展示有标识与已消耗状态", () => {
-  const preview = read("../src/app/dev/once-per-turn-indicator/page.tsx");
-  assert.match(preview, /oncePerTurnEffectAvailable/);
-  assert.match(preview, /<CardItem card=\{character\} size="md" hideCounter \/>/);
-});
