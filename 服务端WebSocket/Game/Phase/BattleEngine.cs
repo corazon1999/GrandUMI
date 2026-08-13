@@ -199,14 +199,20 @@ public static class BattleEngine
     /// <summary>战斗结束：清临时修正 + 关键字 + 切回主要阶段</summary>
     public static void EndBattle(GameState s)
     {
-        // OP12-020：与对方角色战斗后，带此标记的攻击者转为活跃
+        // OP12-020：首次与对方角色战斗后转为活跃；“之后”才施加本回合不能攻击
+        // 对方原本费用≤7角色的限制。此延迟效果只结算一次，不能每次战斗都转活跃。
         var b = s.CurrentBattle;
         if (b is not null && !b.TargetIsLeader)
         {
             var atkP = s.Players[b.AttackerPlayerIndex];
             var atkCard = atkP.Leader.Id == b.AttackerCardId ? atkP.Leader
                 : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
-            if (atkCard is not null && atkCard.ReactivateAfterBattleThisTurn) atkCard.IsTapped = false;
+            if (atkCard is not null && atkCard.ReactivateAfterBattleThisTurn)
+            {
+                atkCard.IsTapped = false;
+                atkCard.ReactivateAfterBattleThisTurn = false;
+                atkCard.NoAttackCostLeThisTurn = 7;
+            }
         }
         foreach (var p in s.Players)
         {
