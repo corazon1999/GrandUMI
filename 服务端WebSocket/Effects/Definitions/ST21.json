@@ -17,7 +17,7 @@
       {
         "on": "OnEnterField",
         "then": [
-          { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙", "originalPowerGte": 6000 }, "text": "本回合该角色攻击时对方不能发动【阻挡者】" },
+          { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙", "currentPowerGte": 6000 }, "text": "本回合该角色攻击时对方不能发动【阻挡者】" },
           { "op": "GiveKeyword", "target": "$t", "keyword": "不可阻挡" }
         ]
       }

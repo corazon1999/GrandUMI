@@ -9,6 +9,34 @@ public class ST21EffectTests
 {
     static CardInstance Card(string number) => new() { Info = CardDatabase.Get(number)! };
 
+    [Fact]
+    public async Task ST21_003_OffersStrawHatCharacterWhoseCurrentPowerReaches6000()
+    {
+        var state = TestScene.New().Build();
+        var source = Card("ST21-003");
+        var target = Card("ST21-003");
+        state.Players[0].Characters.Add(target);
+        for (int i = 0; i < 3; i++)
+        {
+            state.Players[0].CostArea.Add(new DonCard
+            {
+                State = DonState.Attached,
+                AttachedToCardId = target.Id,
+            });
+        }
+        Assert.Equal(3000, target.Info.Power);
+        Assert.Equal(6000, state.CurrentPowerOf(0, target));
+        var prompts = new MockPromptService().QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnCharacter", targetPrompt.kind);
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+        Assert.Contains(target.GainedKeywords, keyword =>
+            keyword.Keyword == "不可阻挡" && keyword.Duration == KeywordDuration.ThisTurn);
+    }
+
     [Theory]
     [InlineData(EffectTrigger.EventMain)]
     [InlineData(EffectTrigger.OnLifeRevealTrigger)]
