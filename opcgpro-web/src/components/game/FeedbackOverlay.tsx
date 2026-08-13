@@ -56,6 +56,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
   const lastOpenRequestRef = useRef(openRequest);
   const description = drafts[category];
   const config = CATEGORY_CONFIG[category];
+  const title = context === "lobby" ? "问题反馈" : "游戏反馈（F）";
   const placeholder =
     category === "bug" && context === "lobby"
       ? "描述大厅中触发 Bug 的操作、实际现象和期望结果……提交时会自动附带当前页面信息。"
@@ -188,14 +189,17 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/50 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => setOpen(false)}
         >
           <motion.div
-            className={`w-full max-w-md rounded-lg border bg-slate-950/95 p-5 shadow-2xl shadow-black/60 ${
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            className={`max-h-full w-full max-w-md overflow-y-auto rounded-lg border bg-slate-950/95 p-4 shadow-2xl shadow-black/60 sm:p-5 ${
               category === "bug" ? "border-rose-400/40" : "border-sky-400/40"
             }`}
             initial={{ scale: 0.92, y: 16 }}
@@ -204,11 +208,12 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-black text-white">游戏反馈（F）</h2>
+              <h2 className="text-sm font-black text-white">{title}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded px-2 py-0.5 text-xs text-slate-400 transition-colors hover:text-white"
+                aria-label="关闭弹窗"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
               >
                 关闭
               </button>
@@ -225,7 +230,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
                     aria-selected={selected}
                     disabled={submit.kind === "sending"}
                     onClick={() => selectCategory(item)}
-                    className={`rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-wait ${
+                    className={`min-h-11 rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-wait ${
                       selected
                         ? item === "bug"
                           ? "bg-rose-500 text-white"
@@ -274,7 +279,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
                 type="button"
                 onClick={handleSubmit}
                 disabled={!description.trim() || submit.kind === "sending"}
-                className={`shrink-0 rounded px-4 py-1.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`min-h-11 shrink-0 rounded px-4 py-1.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   category === "bug"
                     ? "bg-rose-500 hover:bg-rose-400"
                     : "bg-sky-500 hover:bg-sky-400"

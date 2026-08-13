@@ -74,3 +74,34 @@ test("电脑与手机都显示全屏按钮且触控区不少于44像素", async 
   assert.match(fullscreen, /var\(--layout-safe-right/);
   assert.match(fullscreen, /h-12 w-12/);
 });
+
+test("主页我的页面提供手机可点击的反馈入口并复用大厅反馈窗口", async () => {
+  const [home, main, profile, feedback] = await Promise.all([
+    readSource("../src/app/home/HomeClient.tsx"),
+    readSource("../src/components/home/MainPanel.tsx"),
+    readSource("../src/components/home/ProfilePanel.tsx"),
+    readSource("../src/components/game/FeedbackOverlay.tsx"),
+  ]);
+
+  assert.match(home, /feedbackOpenRequest/);
+  assert.match(home, /<MainPanel onOpenFeedback=/);
+  assert.match(home, /<FeedbackOverlay context="lobby" openRequest=\{feedbackOpenRequest\}/);
+  assert.match(main, /onOpenFeedback=\{onOpenFeedback\}/);
+  assert.match(profile, /data-testid="profile-feedback-button"/);
+  assert.match(profile, /onClick=\{onOpenFeedback\}/);
+  assert.match(profile, /反馈 Bug 和建议/);
+  assert.match(profile, /min-h-20/);
+  assert.match(feedback, /context === "lobby" \? "问题反馈" : "游戏反馈（F）"/);
+});
+
+test("反馈窗口适配手机安全区且主要操作触控区不少于44像素", async () => {
+  const feedback = await readSource("../src/components/game/FeedbackOverlay.tsx");
+
+  for (const side of ["top", "right", "bottom", "left"]) {
+    assert.match(feedback, new RegExp(`var\\(--layout-safe-${side}`));
+  }
+  assert.match(feedback, /max-h-full/);
+  assert.match(feedback, /aria-modal="true"/);
+  assert.ok((feedback.match(/min-h-11/g) ?? []).length >= 3);
+  assert.match(feedback, /min-w-11/);
+});

@@ -100,12 +100,14 @@ export default function ProfilePanel({
   onOpenHistory,
   onOpenChangelog,
   onOpenSettings,
+  onOpenFeedback,
 }: {
   profileEditor: ReactNode;
   onOpenPlayers: () => void;
   onOpenHistory: () => void;
   onOpenChangelog: () => void;
   onOpenSettings: () => void;
+  onOpenFeedback: () => void;
 }) {
   const account = useNetStore((state) => state.account);
   const cloudCardBackId = useNetStore((state) => state.cardBackId);
@@ -245,6 +247,20 @@ export default function ProfilePanel({
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        data-testid="profile-feedback-button"
+        onClick={onOpenFeedback}
+        aria-label="打开 Bug 和建议反馈"
+        className="mt-3 flex min-h-20 w-full items-center justify-between rounded-2xl border border-rose-900/70 bg-rose-950/25 p-4 text-left transition-colors hover:border-rose-500 active:bg-rose-950/50 focus-visible:outline-2 focus-visible:outline-rose-400"
+      >
+        <span>
+          <strong className="block text-rose-300">反馈 Bug 和建议</strong>
+          <span className="mt-1 block text-xs text-gray-500">手机端可直接打开，无需键盘快捷键</span>
+        </span>
+        <span className="text-rose-500">›</span>
+      </button>
 
       <article
         data-testid="profile-ranked-info"

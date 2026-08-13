@@ -400,7 +400,7 @@ function changelogSeenKey(account: string): string {
   return `grandumi_changelog_seen_${encodeURIComponent(account)}`;
 }
 
-export default function MainPanel() {
+export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => void }) {
   const [view, setView] = useState<View>("lobby");
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
@@ -564,6 +564,7 @@ export default function MainPanel() {
                 onOpenHistory={() => setView("history")}
                 onOpenChangelog={() => setShowChangelog(true)}
                 onOpenSettings={openSettings}
+                onOpenFeedback={onOpenFeedback}
               />
             )}
           </div>
