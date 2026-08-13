@@ -69,8 +69,8 @@ public class CardInstance
     /// <summary>本回合无法攻击对方"原本费用 ≤ 此值"的角色（0=无限制，OP12-020）</summary>
     public int NoAttackCostLeThisTurn { get; set; }
 
-    /// <summary>本回合中此卡与对方角色战斗后转为活跃状态（OP12-020）</summary>
-    public bool ReactivateAfterBattleThisTurn { get; set; }
+    /// <summary>本回合中此卡是否已经与对方角色进行过战斗（OP12-020）</summary>
+    public bool BattledOpponentCharacterThisTurn { get; set; }
 
     /// <summary>卡名替身（"卡牌名也视为 X"），过滤 nameEquals 时同时匹配主名与别名</summary>
     public List<string> NameAliases { get; } = new();
