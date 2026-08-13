@@ -347,7 +347,7 @@ public class August2026PlayerBugRegressionTests
         Assert.Equal(me.Leader.Info.Power + 1000, state.CurrentPowerOf(0, me.Leader));
 
         var candidate = me.Hand.Single();
-        var prompts = new MockPromptService().QueueChoose(candidate.Id.ToString());
+        var prompts = new MockPromptService().QueueConfirm(true).QueueChoose(candidate.Id.ToString());
         await EffectRuntime.Resolve(state, 0, stage, EffectTrigger.ActivatedMain, prompts);
         Assert.Contains(candidate.Id.ToString(), prompts.ChooseHistory.Single().choices);
         Assert.Contains(candidate, me.Characters);

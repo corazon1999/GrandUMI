@@ -13,10 +13,11 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【我方的回合中】+1000：通过 ContinuousEffect 注册，Predicate 判定「我方回合 且 废弃区 ≥19」
 ///     时对我方领袖 +1000；来源舞台离场时由引擎按 SourceCardId 清理。
 ///     本卡进入舞台区时立即注册，启动主要时也会刷新，确保被动效果不依赖玩家先点一次启动。
-///   - 【启动主要】成本 = 将此舞台转为休息 + 将我方 3 张活跃咚转为休息（活跃咚不足 3 张或舞台已休息则无法发动）。
+///   - 【启动主要】先确认并支付成本：将此舞台转为休息 + 将我方 3 张活跃咚转为休息。
 ///   - 效果候选 = 手牌中「拥有《五老星》特征、黑色（含元素色〈暗〉）、费用 ≤ 我方场上咚!!总张数」的角色卡。
 ///     “场上咚!!的张数”取费用区咚!!总数 TotalDonInCostArea（含活跃/休息/被赋予中）。
-///     “最多 1 张”→ min=0、max=1；免费登场（PlayFromHandFree）。
+///     “最多 1 张”→ 支付成本后可选择 0～1 张；即使没有合法目标，也允许只支付成本。
+///     选择目标后免费登场（PlayFromHandFree）。
 ///     手牌身份对客户端默认不可见，故传 extra.choiceCards 显示卡面。
 /// </summary>
 public class OP13_099_EmptyThrone : IScriptedEffect
@@ -49,16 +50,32 @@ public class OP13_099_EmptyThrone : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnEnterField) return;
 
         // ── 【启动主要】成本前置：此舞台须活跃 且 活跃咚 ≥3 ──
-        if (ctx.Source.IsTapped) return;
+        if (ctx.Source.IsTapped)
+        {
+            ctx.Engine?.SendError(ctx.OwnerIndex, "空的王座已处于休息状态，无法发动启动主要效果");
+            return;
+        }
         var activeDons = me.CostArea.Where(d => d.State == DonState.Active).ToList();
-        if (activeDons.Count < 3) return;
+        if (activeDons.Count < 3)
+        {
+            ctx.Engine?.SendError(ctx.OwnerIndex, "需要 3 张活跃咚!!才能发动空的王座");
+            return;
+        }
+
+        bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+            "空的王座【启动主要】：将此舞台和 3 张咚!!转为休息状态？");
+        if (!use) return;
+
+        // 卡面冒号前为可选成本：确认发动后先支付，再结算冒号后的“最多1张”。
+        ctx.Source.IsTapped = true;
+        for (int i = 0; i < 3; i++) activeDons[i].State = DonState.Rest;
 
         // 效果候选：手牌中《五老星》黑色（含〈暗〉）角色，费用 ≤ 我方场上咚!!总张数
         int fieldDon = me.TotalDonInCostArea;
         var candidates = me.Hand
             .Where(c => c.Info.Kind == CardKind.Character
                         && c.Info.HasKeyword("五老星")
-                        && c.Info.ColorList.Contains("黑")
+                        && c.Info.ColorList.Any(color => color is "黑" or "暗")
                         && c.Info.Cost <= fieldDon)
             .ToList();
         if (candidates.Count == 0) return;
@@ -68,13 +85,9 @@ public class OP13_099_EmptyThrone : IScriptedEffect
             ["choiceCards"] = candidates.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
         };
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandCharacter",
-            $"将此舞台与 3 张咚!! 转为休息：将手牌中最多 1 张费用不高于 {fieldDon} 且拥有《五老星》特征的黑色角色登场",
+            $"将手牌中最多 1 张费用不高于 {fieldDon} 且拥有《五老星》特征的黑色角色登场",
             candidates.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (chosen.Count == 0) return;
-
-        // 支付成本：此舞台转休息 + 3 张活跃咚转休息
-        ctx.Source.IsTapped = true;
-        for (int i = 0; i < 3; i++) activeDons[i].State = DonState.Rest;
 
         var card = candidates.First(c => c.Id.ToString() == chosen[0]);
         await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, card);
