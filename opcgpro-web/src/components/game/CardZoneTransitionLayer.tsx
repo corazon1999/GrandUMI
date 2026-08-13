@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import CardItem from "@/components/ui/CardItem";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/cardZoneTransitions";
 import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type PlayerView } from "@/store/gameStore";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CARD_WIDTH = 72;
 const CARD_HEIGHT = 101;
@@ -145,10 +146,12 @@ function bendPoint(start: Flight["start"], end: Flight["end"], order: number) {
 function FlyingCard({
   flight,
   reducedMotion,
+  fast,
   onComplete,
 }: {
   flight: Flight;
   reducedMotion: boolean;
+  fast: boolean;
   onComplete: (id: string) => void;
 }) {
   const card = flight.cardNumber ? getGameCard(flight.cardNumber, flight.spriteMap) ?? null : null;
@@ -161,8 +164,8 @@ function FlyingCard({
   const endY = flight.end.y - CARD_HEIGHT / 2;
   const fromFlip = flight.fromFaceUp ? 0 : 180;
   const toFlip = flight.toFaceUp ? 0 : 180;
-  const duration = reducedMotion ? 0.2 : 0.56;
-  const delay = reducedMotion ? 0 : flight.order * 0.045;
+  const duration = reducedMotion ? 0.2 : fast ? 0.25 : 0.56;
+  const delay = reducedMotion ? 0 : flight.order * (fast ? 0.02 : 0.045);
 
   return (
     <motion.div
@@ -233,6 +236,11 @@ export default function CardZoneTransitionLayer() {
   const sequenceRef = useRef(0);
   const [flights, setFlights] = useState<Flight[]>([]);
   const reducedMotion = useReducedMotion() ?? false;
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+
+  useEffect(() => {
+    if (animationSpeed === "off") setFlights([]);
+  }, [animationSpeed]);
 
   const tick = useGameStore((state) => state.tick);
   const my = useGameStore((state) => state.my);
@@ -292,7 +300,7 @@ export default function CardZoneTransitionLayer() {
       return refreshBoundsAfterLayout();
     }
 
-    if (gameplayReady(previousFrame) && gameplayReady(currentFrame)) {
+    if (animationSpeed !== "off" && gameplayReady(previousFrame) && gameplayReady(currentFrame)) {
       const transitions = detectCardZoneTransitions(
         { my: previousFrame.my, opponent: previousFrame.opponent },
         { my, opponent },
@@ -327,6 +335,7 @@ export default function CardZoneTransitionLayer() {
     return refreshBoundsAfterLayout();
   }, [
     actionPayload,
+    animationSpeed,
     firstPlayerChosen,
     lastAction,
     mulliganBothDone,
@@ -349,6 +358,7 @@ export default function CardZoneTransitionLayer() {
             key={flight.id}
             flight={flight}
             reducedMotion={reducedMotion}
+            fast={animationSpeed === "fast"}
             onComplete={finishFlight}
           />
         ))}

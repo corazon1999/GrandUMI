@@ -14,13 +14,33 @@ public class OP15_001_Krieg : IScriptedEffect
 {
     public string CardNumber => "OP15-001";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+    public bool HandlesTrigger(EffectTrigger t) => t is EffectTrigger.OnGameStart or EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
         var opp = s.Players[1 - ctx.OwnerIndex];
+
+        if (ctx.Trigger == EffectTrigger.OnGameStart)
+        {
+            var leaderId = ctx.Source.Id;
+            int owner = ctx.OwnerIndex;
+            s.ContinuousEffects.RemoveAll(effect => effect.SourceCardId == leaderId.ToString());
+            s.ContinuousEffects.Add(new ContinuousEffect
+            {
+                SourceCardId = leaderId.ToString(),
+                Scope = new ContinuousScope { Side = 1, IncludeLeader = false, IncludeCharacters = true },
+                PowerDelta = -2000,
+                Predicate = (state, side, card) =>
+                    side == 1 - owner
+                    && state.Players[side].Characters.Any(character => character.Id == card.Id)
+                    && state.CurrentTurnPlayer == 1 - owner
+                    && me.AttachedDonCount(leaderId) >= 1
+                    && me.Characters.All(character => character.Info.HasKeyword("东海")),
+            });
+            return;
+        }
 
         // 每回合 1 次锁
         var key = "OP15-001-MainOncePerTurn" + ":" + ctx.Source.Id;

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export type CardSize = "sm" | "md" | "lg";
 
@@ -14,6 +15,7 @@ export const CardSizeOverride = createContext<CardSize | null>(null);
 
 export function useResponsive() {
   const override = useContext(CardSizeOverride);
+  const preferredSize = useSettingsStore((state) => state.cardSize);
   const [size, setSize] = useState<CardSize>("md");
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useResponsive() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const effective: CardSize = override ?? size;
+  const effective: CardSize = preferredSize === "auto" ? (override ?? size) : preferredSize;
 
   return {
     size: effective,

@@ -1035,6 +1035,7 @@ public class GameEngine
 
     private void CheckGameOver()
     {
+        State.EvaluateDeckOut();
         if (State.IsGameOver)
             Broadcast("DuelOver", new { winner = State.WinnerIndex, reason = State.GameOverReason });
     }
@@ -1443,6 +1444,7 @@ public class GameEngine
             if (!State.IsGameOver)
                 await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppTurnEnd, Prompts,
                     new Dictionary<string, object?> { ["owner"] = 1 - cur });
+            State.EvaluateDeckOut(endOfTurn: true);
             if (State.IsGameOver) { CheckGameOver(); return; }
 
             TurnEngine.AdvanceTurnToReset(State);

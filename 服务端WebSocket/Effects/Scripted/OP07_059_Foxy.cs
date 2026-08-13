@@ -28,10 +28,6 @@ public class OP07_059_Foxy : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        // 条件：我方场上 ≥3 张《福克斯海盗团》特征角色
-        int foxyCount = me.Characters.Count(c => c.Info.HasKeyword("福克斯海盗团"));
-        if (foxyCount < 3) return;
-
         // 可选成本：咚!!-3
         if (me.TotalDonInCostArea < 3) return;
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -39,14 +35,14 @@ public class OP07_059_Foxy : IScriptedEffect
         if (!use) return;
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 3)) return;
 
-        // 选择对方最多 1 张处于休息状态的领袖
+        // “存在3张”的条件属于冒号后的效果条件，不是成本发动条件；不满足时费用仍已支付。
+        int foxyCount = me.Characters.Count(c => c.Info.HasKeyword("福克斯海盗团"));
+        if (foxyCount < 3) return;
+
+        // 卡面写“选择对方的休息领袖和最多1张角色”：领袖满足状态时为强制选择。
         if (opp.Leader.IsTapped)
         {
-            var ldChosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentLeader",
-                "选择最多 1 张处于休息状态的对方领袖（下个对方重置阶段不转活跃）",
-                new List<string> { opp.Leader.Id.ToString() }, 0, 1);
-            if (ldChosen.Count > 0)
-                AtomicOps.PreventActivateNextReset(opp.Leader);
+            AtomicOps.PreventActivateNextReset(opp.Leader);
         }
 
         // 选择对方最多 1 张处于休息状态的角色

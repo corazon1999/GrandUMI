@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text;
 
 namespace GrandUMI.Cards;
 
@@ -105,8 +106,10 @@ public static class CardDatabase
     {
         if (string.IsNullOrEmpty(r.number) || string.IsNullOrEmpty(r.name)) return null;
 
-        int.TryParse(r.power,   out int power);
-        int.TryParse(r.cost,    out int cost);
+        // 历史卡表偶有全角数字（如 OP08-044 的“４”）；兼容性归一化后再解析，
+        // 避免合法费用被静默解析为 0。
+        int.TryParse(r.power?.Normalize(NormalizationForm.FormKC), out int power);
+        int.TryParse(r.cost?.Normalize(NormalizationForm.FormKC),  out int cost);
         // counter 字段可能是 "反击+1000" 这类带文字前缀的格式，需抽取数字（与客户端解析一致）
         int counter = ParseCounterValue(r.counter);
 

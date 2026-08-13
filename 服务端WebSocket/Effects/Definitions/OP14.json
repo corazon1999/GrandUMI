@@ -1363,10 +1363,13 @@
         "then": [
           {
             "op": "Choose",
-            "prompt": "OpponentCharacterCostLe7",
+            "prompt": "OpponentCharacter",
             "max": 1,
             "min": 0,
-            "as": "$tgt"
+            "as": "$tgt",
+            "valueBasis": "original",
+            "filter": { "originalPowerLte": 7000 },
+            "text": "将对方最多1张原本力量不高于7000的角色KO"
           },
           {
             "op": "KO",

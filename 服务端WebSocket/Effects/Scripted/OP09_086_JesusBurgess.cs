@@ -35,21 +35,16 @@ public class OP09_086_JesusBurgess : IScriptedEffect
             Predicate = (s, sideIdx, c) => c.Id == selfId,
         });
 
-        // 持续：领袖含《黑胡子海盗团》时，废弃区每4张 +1000（阶梯式，最多 12 阶）
-        for (int k = 1; k <= 12; k++)
+        // 持续：领袖含《黑胡子海盗团》时，废弃区每4张 +1000；按实时数量计算，不设人为上限。
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
-            int threshold = 4 * k;
-            ctx.State.ContinuousEffects.Add(new ContinuousEffect
-            {
-                SourceCardId = selfId.ToString(),
-                Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-                PowerDelta = 1000,
-                Predicate = (s, sideIdx, c) =>
-                    c.Id == selfId &&
-                    s.Players[owner].Leader.Info.HasKeyword("黑胡子海盗团") &&
-                    s.Players[owner].Trash.Count >= threshold,
-            });
-        }
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            PowerDeltaResolver = (s, _, _) => s.Players[owner].Trash.Count / 4 * 1000,
+            Predicate = (s, sideIdx, c) =>
+                sideIdx == owner && c.Id == selfId
+                && s.Players[owner].Leader.Info.HasKeyword("黑胡子海盗团"),
+        });
 
         return Task.CompletedTask;
     }

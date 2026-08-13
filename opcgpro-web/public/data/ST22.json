@@ -186,7 +186,9 @@
     "keyWords": "白胡子海盗团",
     "counter": "",
     "effectTags": [],
-    "abilities": [],
+    "abilities": [
+      "阻挡者"
+    ],
     "effectEvent": "",
     "rarity": "C",
     "subscript": 3,

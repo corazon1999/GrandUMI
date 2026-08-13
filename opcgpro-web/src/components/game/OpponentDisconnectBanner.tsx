@@ -8,7 +8,7 @@ import { eventBus } from "@/net/eventBus";
  *
  * 监听 eventBus 的 opponentDisconnected / opponentReconnected 事件，
  * 显示宽限期倒计时；对手重连后自动消失。
- * 断线期间双方操作棋钟暂停，服务端按每名玩家每局累计 120 秒宽限权威判负。
+ * 断线期间双方操作棋钟暂停，服务端按每名玩家每局累计 90 秒宽限权威判负。
  */
 export default function OpponentDisconnectBanner() {
   const [countdown, setCountdown] = useState<number | null>(null);

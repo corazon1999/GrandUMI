@@ -831,7 +831,7 @@
     "_src": "wf-dsl",
     "main": {
       "cost": {
-        "restCards": {
+        "restCharacters": {
           "n": 2,
           "optional": true
         }

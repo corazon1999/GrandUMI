@@ -889,6 +889,7 @@ export interface PlayerSnapshot {
   cardBackId?: string;
   /** 该玩家卡组公开的卡面选择；旧回放缺失时使用正画。 */
   spriteMap?: Record<string, string>;
+  handCardIds?: string[];     // 仅自己有内容；用于本地拖动排序时维持同名牌身份
   handCardNumbers: string[];  // 仅自己有内容
   handCardCosts: number[];    // 每张手牌的有效费用（含静态减费），仅自己有内容；对手为空
   handCardCounters: number[]; // 每张手牌的有效反击值（含静态光环），仅自己有内容；对手为空

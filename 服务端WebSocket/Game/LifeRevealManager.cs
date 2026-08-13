@@ -70,55 +70,59 @@ public static class LifeRevealManager
             {
                 // 【流放】：直接进废弃区，不触发触发效果，不弹窗
                 p.Trash.Add(top);
-                continue;
             }
-
-            bool hasTrigger = !string.IsNullOrEmpty(top.Info.Trigger);
-            bool forcePrompt = p.AlwaysPromptOnLifeReveal;
-
-            if (hasTrigger || forcePrompt)
+            else
             {
-                bool useTrigger = await engine.Prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
-                if (useTrigger && hasTrigger)
+                bool hasTrigger = !string.IsNullOrEmpty(top.Info.Trigger);
+                bool forcePrompt = p.AlwaysPromptOnLifeReveal;
+
+                if (hasTrigger || forcePrompt)
                 {
-                    // 发动触发：卡牌进废弃区。
-                    // “发动此卡牌的【主要】/【反击】/【登场时】/【KO时】效果”是元触发，
-                    // 直接复用对应时机，避免每张卡重复维护一份 trigger 定义。
-                    p.Trash.Add(top);
-                    var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
-                    await EffectRuntime.Resolve(s, targetPlayerIdx, top,
-                        revealTrigger, engine.Prompts);
-                    // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
-                    // 带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op 处理(那时卡已离开废弃区→不再命中此兜底)。
-                    if (!s.IsGameOver && top.Info.Kind == CardKind.Character
-                        && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
+                    bool useTrigger = await engine.Prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
+                    if (useTrigger && hasTrigger)
                     {
-                        await AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
-                        // 反馈#203：PlayFromTrashFree 只把【登场时】入 PendingEnterFields 延迟队列；
-                        // 这条"纯自登场"链路后续未必有 depth-0 的 Resolve 来排空该队列，
-                        // 会导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。此处显式排空一次。
+                        // 发动触发：卡牌进废弃区。
+                        // “发动此卡牌的【主要】/【反击】/【登场时】/【KO时】效果”是元触发，
+                        // 直接复用对应时机，避免每张卡重复维护一份 trigger 定义。
+                        p.Trash.Add(top);
+                        var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
+                        await EffectRuntime.Resolve(s, targetPlayerIdx, top,
+                            revealTrigger, engine.Prompts);
+                        // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
+                        // 带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op 处理(那时卡已离开废弃区→不再命中此兜底)。
+                        if (!s.IsGameOver && top.Info.Kind == CardKind.Character
+                            && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
+                        {
+                            await AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
+                            // 反馈#203：PlayFromTrashFree 只把【登场时】入 PendingEnterFields 延迟队列；
+                            // 这条"纯自登场"链路后续未必有 depth-0 的 Resolve 来排空该队列，
+                            // 会导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。此处显式排空一次。
+                            if (!s.IsGameOver)
+                                await EffectRuntime.DrainPendingEnterFields(s, engine.Prompts);
+                        }
+                        // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
                         if (!s.IsGameOver)
-                            await EffectRuntime.DrainPendingEnterFields(s, engine.Prompts);
+                            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, engine.Prompts,
+                                new Dictionary<string, object?> { ["owner"] = targetPlayerIdx });
                     }
-                    // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
-                    if (!s.IsGameOver)
-                        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, engine.Prompts,
-                            new Dictionary<string, object?> { ["owner"] = targetPlayerIdx });
+                    else
+                    {
+                        AddRevealedLifeToHandOrDeck(p, top);
+                    }
                 }
                 else
                 {
                     AddRevealedLifeToHandOrDeck(p, top);
                 }
             }
-            else
-            {
-                AddRevealedLifeToHandOrDeck(p, top);
-            }
 
             // 生命牌离场 → 派发 watcher（OP05-098 生命变0 / OP08-105 对方生命离场 / OP12-099 等）
             await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, engine.Prompts,
                 new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = lifeBecameZero });
             if (s.IsGameOver) return;
+            // 双重攻击在本次伤害中曾把生命降到 0 后，即使 OP05-098 等效果补回生命，
+            // 其余伤害也不会继续揭开刚补回的生命牌。
+            if (lifeBecameZero) break;
         }
 
         // 给对方生命区造成了伤害 → 派发 OnDamageToLeader（攻击者卡可据此发动，如 OP03-040/041/043）

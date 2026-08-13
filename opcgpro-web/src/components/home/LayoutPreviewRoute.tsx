@@ -31,7 +31,7 @@ export default function LayoutPreviewRoute({ children }: { children: ReactNode }
     >
       <div className="layout-preview-route relative h-full w-full overflow-hidden">
         {children}
-        {isPhonePortrait && <MobileFullscreenButton />}
+        <MobileFullscreenButton />
         <div
           ref={setGameOverlayHost}
           className="pointer-events-none absolute inset-0 z-[10000]"

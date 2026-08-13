@@ -175,6 +175,8 @@ export default function PromptOverlay() {
   // 观星 / 卡组重排等"自选顺序"提示：按点选先后决定相对顺序，
   // 给已选卡叠加"第N张"徽标，防止玩家忘记自己点选的顺序。
   const isOrdered = prompt.text?.includes("自选顺序") ?? false;
+  const allowDefaultOrder = prompt.kind === "ReorderToDeckBottom"
+    && prompt.extra?.allowDefaultOrder === true;
 
   // 服务端可在 extra.choiceCards 里携带候选卡的 {id, number}，
   // 用于显示卡组/手牌等"不下发身份"区域的候选（findCardById 默认只认场上卡）
@@ -660,15 +662,24 @@ export default function PromptOverlay() {
               )}
             </div>
 
-            <div className="flex gap-3">
-              {prompt.minChoose === 0 && (
+            <div className="flex flex-wrap justify-center gap-3">
+              {allowDefaultOrder && (
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="min-h-12 rounded-lg border border-sky-300/60 bg-sky-700 px-5 py-2 font-bold text-white hover:bg-sky-600"
+                >
+                  确定（按默认顺序放回）
+                </button>
+              )}
+              {prompt.minChoose === 0 && !allowDefaultOrder && (
                 <button onClick={handleSkip}
-                  className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg">
+                  className="min-h-12 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-500">
                   跳过
                 </button>
               )}
               <button onClick={handleConfirm} disabled={!canConfirm}
-                className="bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold">
+                className="min-h-12 rounded-lg bg-orange-500 px-6 py-2 font-bold text-white hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-700">
                 确认（已选 {selected.length} / {prompt.maxChoose}）
               </button>
             </div>

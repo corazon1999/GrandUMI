@@ -1,13 +1,14 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import CardItem from "@/components/ui/CardItem";
 import { getCard, getGameCard } from "@/data/CardLoader";
+import { animationDuration, useSettingsStore } from "@/store/settingsStore";
 
 interface Props {
   side: "my" | "opponent";
@@ -24,6 +25,33 @@ export default function HandArea({ side, hidden = false }: Props) {
   const setSelectedHand = useGameStore((s) => s.setSelectedHand);
   const { cardSize } = useResponsive();
   const isDefender = useIsDefender();
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const [localOrder, setLocalOrder] = useState<string[]>([]);
+  const draggedIdRef = useRef<string | null>(null);
+  const touchDragRef = useRef<{ id: string; startX: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const serverHandIds = player?.handCardIds ?? [];
+  const hasCompleteHandIds = !!player && serverHandIds.length === player.handCount;
+  const orderedHandIds = useMemo(() => {
+    if (!hasCompleteHandIds) return [];
+    const retained = localOrder.filter((id) => serverHandIds.includes(id));
+    return [...retained, ...serverHandIds.filter((id) => !retained.includes(id))];
+  }, [hasCompleteHandIds, localOrder, serverHandIds]);
+
+  useEffect(() => {
+    if (!hasCompleteHandIds) {
+      setLocalOrder((current) => current.length === 0 ? current : []);
+      return;
+    }
+    setLocalOrder((current) => {
+      const retained = current.filter((id) => serverHandIds.includes(id));
+      const next = [...retained, ...serverHandIds.filter((id) => !retained.includes(id))];
+      return current.length === next.length && current.every((id, index) => id === next[index])
+        ? current
+        : next;
+    });
+  }, [hasCompleteHandIds, serverHandIds]);
 
   // 测量手牌容器实际可用宽度（画布内为未缩放设计像素），用于动态计算重叠量
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -51,19 +79,25 @@ export default function HandArea({ side, hidden = false }: Props) {
   // 实时对局和观战按 handCount 生成卡背；回放合并终局时间线后，双方都会有完整牌号。
   // 旧回放缺少对手牌号时继续安全回退为卡背，不尝试推断隐藏信息。
   const hasCompleteHandIdentity = player.handCardNumbers.length === player.handCount;
-  const cards = !firstPlayerChosen
+  const serverCards = !firstPlayerChosen
     ? []
     : hidden
       ? Array.from({ length: player.handCount }, () => null)
       : hasCompleteHandIdentity
         ? player.handCardNumbers.map((n) => getGameCard(n, player.spriteMap) ?? null)
         : Array.from({ length: player.handCount }, () => null);
+  const displayIndices = hasCompleteHandIds && !hidden
+    ? orderedHandIds.map((id) => serverHandIds.indexOf(id)).filter((index) => index >= 0)
+    : serverCards.map((_, index) => index);
+  const cards = displayIndices.map((serverIndex) => serverCards[serverIndex]);
 
   // 稳定 key：按卡号 + 同名出现次序，不含数组下标。
   // 这样打出中间某张时，仅被移除那张的 key 消失，其余 key 不变 → 不会整手牌重排乱跳。
   const seen: Record<string, number> = {};
   const stableKeys = cards.map((card, i) => {
-    const base = hasCompleteHandIdentity ? player.handCardNumbers[i] ?? "null" : "back";
+    const serverIndex = displayIndices[i];
+    if (hasCompleteHandIds && serverHandIds[serverIndex]) return serverHandIds[serverIndex];
+    const base = hasCompleteHandIdentity ? player.handCardNumbers[serverIndex] ?? "null" : "back";
     const occ = (seen[base] = (seen[base] ?? 0) + 1);
     return `${base}#${occ}`;
   });
@@ -104,15 +138,32 @@ export default function HandArea({ side, hidden = false }: Props) {
   const xOf = (i: number) => startX + i * step;                       // 已是整数
 
   const handleClick = (i: number) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     if (hidden || isPending) return;
     if (isCounterStep) {
-      const c = cards[i];
+      const c = serverCards[i];
       if (c && effectiveCounter(c, i) > 0) GameRequest.playCounterFromHand(i);
       else if (isCounterEventPlayable(c, i)) GameRequest.playCounterEvent(i);
       return;
     }
     if (side !== "my" || !currentTurn) return;
     setSelectedHand(selectedHandIndex === i ? null : i);
+  };
+
+  const moveHandCard = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setLocalOrder((current) => {
+      const sourceIndex = current.indexOf(sourceId);
+      const targetIndex = current.indexOf(targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, sourceId);
+      return next;
+    });
   };
 
   return (
@@ -124,40 +175,86 @@ export default function HandArea({ side, hidden = false }: Props) {
     >
       <AnimatePresence>
         {cards.map((card, i) => {
+          const serverIndex = displayIndices[i];
+          const handId = hasCompleteHandIds ? serverHandIds[serverIndex] : null;
           const counterPlayable =
-            (isCounterStep && effectiveCounter(card, i) > 0) || isCounterEventPlayable(card, i);
+            (isCounterStep && effectiveCounter(card, serverIndex) > 0)
+              || isCounterEventPlayable(card, serverIndex);
           return (
             <motion.div
               key={stableKeys[i]}
               data-zone="hand"
               data-zone-side={side}
-              data-zone-index={i}
+              data-zone-index={serverIndex}
+              data-hand-order-id={handId ?? undefined}
+              draggable={side === "my" && !hidden && !!handId}
+              aria-grabbed={draggedIdRef.current === handId}
+              title={side === "my" && !hidden && handId ? "可左右拖动调整手牌显示顺序" : undefined}
+              onDragStartCapture={(event) => {
+                if (!handId) return;
+                draggedIdRef.current = handId;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", handId);
+              }}
+              onDragOverCapture={(event) => {
+                if (draggedIdRef.current && handId) event.preventDefault();
+              }}
+              onDragEnterCapture={() => {
+                if (draggedIdRef.current && handId) moveHandCard(draggedIdRef.current, handId);
+              }}
+              onDragEndCapture={() => { draggedIdRef.current = null; }}
+              onPointerDown={(event) => {
+                if (!handId || event.pointerType === "mouse") return;
+                touchDragRef.current = { id: handId, startX: event.clientX, moved: false };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const drag = touchDragRef.current;
+                if (!drag || event.pointerType === "mouse") return;
+                if (!drag.moved && Math.abs(event.clientX - drag.startX) < 8) return;
+                drag.moved = true;
+                suppressClickRef.current = true;
+                const target = document.elementsFromPoint(event.clientX, event.clientY)
+                  .map((element) => element.closest<HTMLElement>("[data-hand-order-id]"))
+                  .find((element) => element?.dataset.handOrderId);
+                if (target?.dataset.handOrderId) moveHandCard(drag.id, target.dataset.handOrderId);
+              }}
+              onPointerUp={(event) => {
+                if (touchDragRef.current?.moved) event.preventDefault();
+                touchDragRef.current = null;
+              }}
+              onPointerCancel={() => { touchDragRef.current = null; }}
               initial={{ x: xOf(i), y: side === "my" ? 36 : -24, opacity: 0 }}
               animate={{ x: xOf(i), y: 0, opacity: 1 }}
               exit={{ y: side === "my" ? -24 : 24, opacity: 0 }}
               transition={{
-                x: { type: "spring", stiffness: 350, damping: 30 },
-                y: { delay: i * 0.04, type: "spring", stiffness: 200 },
-                opacity: { delay: i * 0.04 },
+                x: animationSpeed === "off"
+                  ? { duration: 0 }
+                  : { type: "spring", stiffness: 350, damping: 30 },
+                y: animationSpeed === "off"
+                  ? { duration: 0 }
+                  : { delay: animationDuration(i * 40, animationSpeed) / 1000, type: "spring", stiffness: 200 },
+                opacity: { delay: animationDuration(i * 40, animationSpeed) / 1000 },
               }}
               style={{ position: "absolute", left: 0, bottom: 0 }}
               className={[
                 "hover:z-20", // 悬停提升层级，盖过邻牌，便于看清被压住的卡（低于右栏操作区 z-30，避免盖住出牌/结束回合按钮）
+                side === "my" && !hidden && handId ? "touch-none cursor-grab active:cursor-grabbing" : "",
                 counterPlayable ? "rounded-md ring-2 ring-amber-400 animate-pulse" : "",
               ].join(" ")}
             >
               <CardItem
                 card={card}
-                isSelected={!hidden && selectedHandIndex === i}
+                isSelected={!hidden && selectedHandIndex === serverIndex}
                 faceDown={hidden || card === null}
                 cardBackId={player.cardBackId}
                 hidePower
-                counterValue={effectiveCounter(card, i)}
-                onClick={() => handleClick(i)}
+                counterValue={effectiveCounter(card, serverIndex)}
+                onClick={() => handleClick(serverIndex)}
                 size={cardSize}
                 costBuff={
-                  side === "my" && card && player.handCardCosts?.[i] != null
-                    ? player.handCardCosts[i] - card.cost
+                  side === "my" && card && player.handCardCosts?.[serverIndex] != null
+                    ? player.handCardCosts[serverIndex] - card.cost
                     : 0
                 }
               />

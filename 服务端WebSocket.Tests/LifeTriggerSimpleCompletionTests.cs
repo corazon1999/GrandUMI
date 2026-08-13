@@ -53,6 +53,7 @@ public class LifeTriggerSimpleCompletionTests
     {
         _ = discardCount;
         var state = TestScene.New().Build();
+        DeckOutRules.Arm(state);
         var source = Card(sourceNumber);
 
         await EffectRuntime.Resolve(state, 0, source,

@@ -7,6 +7,7 @@ import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { RARITY_STYLES } from "@/components/deck-editor/CardHoverPreview";
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc } from "@/lib/sprite";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const TYPE_LABELS: Record<string, string> = {
   Leader: "领航", Character: "角色", Stage: "舞台", Event: "事件",
@@ -31,6 +32,7 @@ export default function CardZoomOverlay({
   const rawSprite = sprite ?? card.sprite ?? CARD_BACK_SRC;
   const displayCounter = counterValue ?? card.counter;
   const [imgSrc, setImgSrc] = useState(displaySrc(rawSprite));
+  const cardSize = useSettingsStore((state) => state.cardSize);
 
   useEffect(() => {
     setImgSrc(displaySrc(rawSprite));
@@ -60,7 +62,7 @@ export default function CardZoomOverlay({
       transition={{ duration: 0.15 }}
     >
       <motion.div
-        className="flex flex-col items-center gap-3"
+        className="flex max-h-[92vh] max-w-[94vw] flex-col items-center gap-3 overflow-y-auto p-2 md:flex-row md:items-start md:gap-5"
         // 内容区也响应点击关闭：右键看完即点任意处退出，无需精确点遮罩
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -70,7 +72,14 @@ export default function CardZoomOverlay({
         {/* 大卡图：高度跟随视口，宽按 0.717 卡牌比例；#162 同时按 88vw 约束高度，防竖屏窄屏派生宽度超屏横向溢出 */}
         <div
           className="relative overflow-hidden rounded-2xl border border-gray-600 shadow-2xl"
-          style={{ height: "min(78vh, 640px, calc(88vw / 0.717))", aspectRatio: "0.717" }}
+          style={{
+            height: cardSize === "sm"
+              ? "min(62vh, 520px, calc(88vw / 0.717))"
+              : cardSize === "lg"
+                ? "min(82vh, 700px, calc(88vw / 0.717))"
+                : "min(76vh, 640px, calc(88vw / 0.717))",
+            aspectRatio: "0.717",
+          }}
         >
           <NextImage
             src={imgSrc}
@@ -86,7 +95,7 @@ export default function CardZoomOverlay({
         </div>
 
         {/* 信息条 */}
-        <div className="max-w-[92vw] rounded-xl bg-gray-900/95 px-4 py-3 shadow-xl ring-1 ring-white/10">
+        <div className="w-full max-w-[92vw] rounded-xl bg-gray-900/95 px-4 py-3 shadow-xl ring-1 ring-white/10 md:mt-1 md:w-[22rem] md:max-w-[34vw]">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-bold text-base leading-tight">{card.name}</p>
             {colorStyle && (

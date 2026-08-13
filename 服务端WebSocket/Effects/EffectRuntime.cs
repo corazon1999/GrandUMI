@@ -195,6 +195,8 @@ public static class EffectRuntime
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
             _promptsAL.Value = prevPrompts;
+            if (isRootResolve)
+                s.EvaluateDeckOut();
             // 最外层效果结束后，排空期间积累的【KO时】、反应式 watcher 与被效果登场卡的【登场时】。
             if (_depth == 0 && !_draining
                 && (s.PendingKOEffects.Count > 0 || s.PendingWatchers.Count > 0 || s.PendingEnterFields.Count > 0))

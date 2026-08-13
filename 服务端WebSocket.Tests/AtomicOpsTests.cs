@@ -49,6 +49,7 @@ public class AtomicOpsTests
         Assert.Single(s.Players[0].Hand);
 
         // 卡组空抽 = 判负
+        DeckOutRules.Arm(s);
         AtomicOps.Draw(s, 0, 1);
         Assert.True(s.IsGameOver);
         Assert.Equal(1, s.WinnerIndex);

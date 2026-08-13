@@ -8,23 +8,44 @@ import { NetManager } from "@/net/NetManager";
  *   - alwaysPromptOnLifeReveal: 防触发信息泄露
  *     开启后每张生命牌加入手牌都弹"是否发动触发"窗口（即使没有触发），
  *     对手只能看到"对方正在选择"，无法通过弹窗时机推断生命牌内容
+ *   - cardSize: 卡牌显示大小
+ *   - animationSpeed: 对局动画速度
  */
 
 const KEY = "grandumi_settings";
 
+export type CardSizePreference = "auto" | "sm" | "md" | "lg";
+export type AnimationSpeed = "off" | "fast" | "standard";
+
 interface Settings {
   alwaysPromptOnLifeReveal: boolean;
+  cardSize: CardSizePreference;
+  animationSpeed: AnimationSpeed;
 }
 
 const defaults: Settings = {
   alwaysPromptOnLifeReveal: false,
+  cardSize: "auto",
+  animationSpeed: "standard",
 };
 
 function loadFromStorage(): Settings {
   if (typeof window === "undefined") return defaults;
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    return {
+      alwaysPromptOnLifeReveal: typeof parsed.alwaysPromptOnLifeReveal === "boolean"
+        ? parsed.alwaysPromptOnLifeReveal
+        : defaults.alwaysPromptOnLifeReveal,
+      cardSize: ["auto", "sm", "md", "lg"].includes(parsed.cardSize ?? "")
+        ? parsed.cardSize as CardSizePreference
+        : defaults.cardSize,
+      animationSpeed: ["off", "fast", "standard"].includes(parsed.animationSpeed ?? "")
+        ? parsed.animationSpeed as AnimationSpeed
+        : defaults.animationSpeed,
+    };
   } catch { return defaults; }
 }
 
@@ -36,6 +57,13 @@ function saveToStorage(s: Settings) {
 interface SettingsStore extends Settings {
   toggleAlwaysPromptOnLifeReveal: () => void;
   setAlwaysPromptOnLifeReveal: (v: boolean) => void;
+  setCardSize: (v: CardSizePreference) => void;
+  setAnimationSpeed: (v: AnimationSpeed) => void;
+}
+
+function persistCurrent() {
+  const { alwaysPromptOnLifeReveal, cardSize, animationSpeed } = useSettingsStore.getState();
+  saveToStorage({ alwaysPromptOnLifeReveal, cardSize, animationSpeed });
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -44,16 +72,31 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   toggleAlwaysPromptOnLifeReveal: () => {
     const next = !get().alwaysPromptOnLifeReveal;
     set({ alwaysPromptOnLifeReveal: next });
-    saveToStorage({ alwaysPromptOnLifeReveal: next });
+    persistCurrent();
     syncToServer();
   },
 
   setAlwaysPromptOnLifeReveal: (v) => {
     set({ alwaysPromptOnLifeReveal: v });
-    saveToStorage({ alwaysPromptOnLifeReveal: v });
+    persistCurrent();
     syncToServer();
   },
+
+  setCardSize: (v) => {
+    set({ cardSize: v });
+    persistCurrent();
+  },
+
+  setAnimationSpeed: (v) => {
+    set({ animationSpeed: v });
+    persistCurrent();
+  },
 }));
+
+export function animationDuration(standardMs: number, speed: AnimationSpeed) {
+  if (speed === "off") return 0;
+  return speed === "fast" ? Math.max(1, Math.round(standardMs * 0.45)) : standardMs;
+}
 
 /// 把当前设置上报给服务端，影响生命牌触发流程
 export function syncToServer() {

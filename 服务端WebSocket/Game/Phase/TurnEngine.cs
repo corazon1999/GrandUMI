@@ -12,6 +12,7 @@ public static class TurnEngine
     /// <summary>开局后双方都完成 Mulligan 时，进入第一回合的 Reset 阶段</summary>
     public static void StartFirstTurn(GameState state)
     {
+        DeckOutRules.Arm(state);
         state.TurnCount = 1;
         state.CurrentTurnPlayer = state.FirstPlayer;
         state.Phase = Phase.Reset;
@@ -75,11 +76,13 @@ public static class TurnEngine
         state.Phase = Phase.Don;
         bool firstTurnFirstPlayer = state.TurnCount == 1 && state.CurrentTurnPlayer == state.FirstPlayer;
         int add = firstTurnFirstPlayer ? 1 : 2;
-        AddDonFromDeck(state, state.CurrentTurnPlayer, add);
-
-        // OP13-003 高路·D·罗杰：我方场上存在咚时，将1张将要放置的咚改赋予我方领袖
         var tp = state.Players[state.CurrentTurnPlayer];
-        if (tp.Leader.Info.Number == "OP13-003")
+        int donBefore = tp.TotalDonInCostArea;
+        int added = AddDonFromDeck(state, state.CurrentTurnPlayer, add);
+
+        // OP13-003 高路·D·罗杰：进入咚阶段前场上已存在咚，且本次确实会放置咚时，
+        // 才把其中 1 张改为赋予领袖。0 咚的首回合与已经 10 咚时都不会发动。
+        if (tp.Leader.Info.Number == "OP13-003" && donBefore > 0 && donBefore < MaxDonInCostArea && added > 0)
         {
             var don = tp.CostArea.FirstOrDefault(d => d.State == DonState.Active);
             if (don is not null) { don.State = DonState.Attached; don.AttachedToCardId = tp.Leader.Id; }
@@ -287,21 +290,16 @@ public static class TurnEngine
         {
             if (p.Deck.Count == 0)
             {
-                // 卡组抽空 → 规则处理时点判负；OP03-040 奈美：登记了"卡组0张改判胜利"则反判此玩家胜利
-                if (!state.IsGameOver)
-                {
-                    bool deckOutWin = state.DeckOutVictoryPlayers.Contains(playerIdx);
-                    state.WinnerIndex = deckOutWin ? playerIdx : 1 - playerIdx;
-                    state.GameOverReason = deckOutWin
-                        ? $"{p.AccountName} 卡组耗尽（规则替换：胜利）"
-                        : $"{p.AccountName} 卡组耗尽";
-                }
+                state.EvaluateDeckOut();
                 break;
             }
             var top = p.Deck[0];
             p.Deck.RemoveAt(0);
             p.Hand.Add(top);
             actual++;
+            // 正式对局已启用规则时，抽走最后一张后立即判定；测试布场在未启用规则前不会被误判。
+            state.EvaluateDeckOut();
+            if (state.IsGameOver) break;
         }
         return actual;
     }

@@ -43,8 +43,9 @@ public class OP09_117_EffectTests
             prompt.choices);
         var reorder = prompts.ChooseHistory[1];
         Assert.Equal("ReorderToDeckBottom", reorder.kind);
-        Assert.Equal(3, reorder.min);
+        Assert.Equal(0, reorder.min);
         Assert.Equal(3, reorder.max);
+        Assert.True(Assert.IsType<bool>(reorder.extra!["allowDefaultOrder"]));
         Assert.Equal(new[] { firstEligible, secondEligible }, player.Hand);
         Assert.Equal(new[] { unselectedEligible, noTrigger, sameName }, player.Deck);
     }

@@ -3,6 +3,11 @@
 import Modal from "@/components/ui/Modal";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioStore } from "@/store/audioStore";
+import {
+  useSettingsStore,
+  type AnimationSpeed,
+  type CardSizePreference,
+} from "@/store/settingsStore";
 import { useLanguage, type Locale } from "@/i18n/LanguageProvider";
 import { LANGUAGE_OPTIONS } from "@/i18n/core.mjs";
 import {
@@ -55,6 +60,10 @@ export default function SettingsModal({
   const toggleMute = useAudioStore((state) => state.toggleMute);
   const setUnlocked = useAudioStore((state) => state.setUnlocked);
   const volumePercent = Math.round(sfxVolume * 100);
+  const cardSize = useSettingsStore((state) => state.cardSize);
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const setCardSize = useSettingsStore((state) => state.setCardSize);
+  const setAnimationSpeed = useSettingsStore((state) => state.setAnimationSpeed);
 
   const testSound = async () => {
     const unlocked = isUnlocked || (await unlock());
@@ -120,6 +129,59 @@ export default function SettingsModal({
         </div>
       </section>
 
+      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="card-display-settings-title">
+        <h3 id="card-display-settings-title" className="text-sm font-bold text-white">卡牌显示</h3>
+        <p className="mt-1 text-sm leading-5 text-gray-500">调整牌桌卡牌大小，设置会保存在当前浏览器。</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {([
+            ["auto", "自动"],
+            ["sm", "小"],
+            ["md", "中"],
+            ["lg", "大"],
+          ] as Array<[CardSizePreference, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={cardSize === value}
+              onClick={() => setCardSize(value)}
+              className={`min-h-11 rounded-xl border px-3 text-sm font-bold transition-colors ${
+                cardSize === value
+                  ? "border-orange-500 bg-orange-500/10 text-orange-200"
+                  : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="animation-settings-title">
+        <h3 id="animation-settings-title" className="text-sm font-bold text-white">对局动画</h3>
+        <p className="mt-1 text-sm leading-5 text-gray-500">关闭时会跳过纯视觉特效，必要的卡牌公开与对局结果仍会显示。</p>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {([
+            ["off", "关闭"],
+            ["fast", "快速"],
+            ["standard", "标准"],
+          ] as Array<[AnimationSpeed, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={animationSpeed === value}
+              onClick={() => setAnimationSpeed(value)}
+              className={`min-h-11 rounded-xl border px-3 text-sm font-bold transition-colors ${
+                animationSpeed === value
+                  ? "border-orange-500 bg-orange-500/10 text-orange-200"
+                  : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="audio-settings-title">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -131,7 +193,7 @@ export default function SettingsModal({
             aria-pressed={!isMuted}
             onClick={toggleMute}
             disabled={!isHydrated}
-            className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               isMuted
                 ? "border-gray-700 bg-gray-950 text-gray-400 hover:border-gray-500"
                 : "border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
@@ -166,7 +228,7 @@ export default function SettingsModal({
               type="button"
               onClick={() => void testSound()}
               disabled={!isHydrated || isMuted || volumePercent === 0}
-              className="min-h-9 shrink-0 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+              className="min-h-11 shrink-0 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
             >
               试听
             </button>

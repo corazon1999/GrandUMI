@@ -95,6 +95,31 @@ public static class AtomicOps
         return n;
     }
 
+    /// <summary>「将我方 N 张角色转为休息状态」专用支付；只允许选择自己的活跃角色。</summary>
+    public static async Task<bool> PromptRestOwnCharacters(EffectContext ctx, int n, string text, bool optional = false)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var candidates = me.Characters.Where(card =>
+            !card.IsTapped
+            && !card.HasRestriction(RestrictionKind.CannotBeRested)
+            && !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested)).ToList();
+        if (candidates.Count < n) return false;
+
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnActiveCharacter", text,
+            candidates.Select(card => card.Id.ToString()).ToList(), optional ? 0 : n, n,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = candidates.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+            });
+        if (chosen.Count < n) return false;
+        foreach (var id in chosen)
+        {
+            var card = candidates.FirstOrDefault(candidate => candidate.Id.ToString() == id);
+            if (card is not null) RestCard(card);
+        }
+        return true;
+    }
+
     /// <summary>「将我方N张卡牌转为休息状态」通用支付：弹窗让玩家从活跃的 领袖/角色/舞台/咚!! 中选 N 张休置，
     /// 四类同列展示（卡牌走卡图、咚走 donChoices token）。候选不足 N 或玩家未选满 → 返回 false（不支付）。
     /// 卡牌走 RestCard（含"无法休息"守护），咚直接置为休息状态。</summary>

@@ -7,6 +7,7 @@ import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
@@ -181,6 +182,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
   const turnCount = useGameStore((state) => state.turnCount);
   const reducedMotion = useReducedMotion() ?? false;
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const [phase, setPhase] = useState<IntroPhase>("waiting");
   const completedRef = useRef(false);
 
@@ -208,8 +210,8 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
       onComplete();
     };
 
-    // 已进入正式回合时说明这是恢复中的对局，不应重新遮挡玩家。
-    if (turnCount > 0) {
+    // 已进入正式回合或玩家关闭动画时，不应遮挡开局流程。
+    if (turnCount > 0 || animationSpeed === "off") {
       skipIntro();
       return;
     }
@@ -261,6 +263,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
     };
   }, [
     firstPlayerChosen,
+    animationSpeed,
     introKey,
     myLeaderNumber,
     mySprite,
@@ -274,9 +277,12 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
 
   useEffect(() => {
     if (phase !== "playing") return;
-    const timer = window.setTimeout(() => setPhase("exiting"), reducedMotion ? 2800 : 4800);
+    const timer = window.setTimeout(
+      () => setPhase("exiting"),
+      animationSpeed === "fast" || reducedMotion ? 2200 : 4800,
+    );
     return () => window.clearTimeout(timer);
-  }, [phase, reducedMotion]);
+  }, [animationSpeed, phase, reducedMotion]);
 
   useEffect(() => {
     if (phase !== "exiting") return;
@@ -290,9 +296,9 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
       }
       setPhase("done");
       onComplete();
-    }, reducedMotion ? 140 : 320);
+    }, animationSpeed === "fast" || reducedMotion ? 140 : 320);
     return () => window.clearTimeout(timer);
-  }, [introKey, onComplete, phase, reducedMotion]);
+  }, [animationSpeed, introKey, onComplete, phase, reducedMotion]);
 
   if (phase === "done") return null;
 

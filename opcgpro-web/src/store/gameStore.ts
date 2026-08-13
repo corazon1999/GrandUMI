@@ -39,6 +39,7 @@ export interface PlayerView {
   rankIdentity?: PlayerRankIdentitySnapshot | null;
   cardBackId?: string;         // 旧回放缺失时由卡背组件回退经典款
   spriteMap: Record<string, string>;
+  handCardIds: string[];       // 仅己方有内容；用于本地展示顺序，不改变服务端手牌顺序
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
@@ -80,6 +81,7 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
     spriteMap: { ...(player.spriteMap ?? {}) },
     // IndexedDB 中的旧回放可能缺少后来新增的手牌费用、反击值等字段。
     // 在同步入口统一补齐，避免旧快照中断回放或让手牌区域无法渲染。
+    handCardIds: [...(player.handCardIds ?? [])],
     handCardNumbers: [...(player.handCardNumbers ?? [])],
     handCardCosts: [...(player.handCardCosts ?? [])],
     handCardCounters: [...(player.handCardCounters ?? [])],
@@ -393,6 +395,7 @@ export const useGameStore = create<GameStore>()(
     optimisticPlayCard: (handIndex) => set((s) => {
       if (!s.my || handIndex < 0 || handIndex >= s.my.handCardNumbers.length) return;
       s.my.handCardNumbers.splice(handIndex, 1);
+      s.my.handCardIds.splice(handIndex, 1);
       s.my.handCardCosts.splice(handIndex, 1);
       s.my.handCardCounters.splice(handIndex, 1);
       s.my.handCount = Math.max(0, s.my.handCount - 1);

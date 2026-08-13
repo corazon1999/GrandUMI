@@ -8,6 +8,7 @@ import { getCard, getGameCard } from "@/data/CardLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type QueuedEffectActivation } from "@/store/gameStore";
+import { animationDuration, useSettingsStore } from "@/store/settingsStore";
 
 const EFFECT_DURATION_MS = 880;
 
@@ -213,6 +214,7 @@ export default function EffectActivationLayer() {
   const tick = useGameStore((state) => state.tick);
   const { play } = useAudio();
   const reduceMotion = useReducedMotion() ?? false;
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const [active, setActive] = useState<QueuedEffectActivation | null>(null);
   // undefined=尚未测量，null=已确认来源不在牌桌上。
   const [bounds, setBounds] = useState<CardBounds | null | undefined>(undefined);
@@ -220,16 +222,24 @@ export default function EffectActivationLayer() {
   useEffect(() => {
     if (active || !queued) return;
     shiftEffectActivation();
+    if (animationSpeed === "off") return;
     setBounds(undefined);
     setActive(queued);
-  }, [active, queued, shiftEffectActivation]);
+  }, [active, animationSpeed, queued, shiftEffectActivation]);
 
   useEffect(() => {
     if (!active) return;
     play("effect");
-    const timeout = window.setTimeout(() => setActive(null), EFFECT_DURATION_MS);
+    const timeout = window.setTimeout(
+      () => setActive(null),
+      animationDuration(EFFECT_DURATION_MS, animationSpeed),
+    );
     return () => window.clearTimeout(timeout);
-  }, [active, play]);
+  }, [active, animationSpeed, play]);
+
+  useEffect(() => {
+    if (animationSpeed === "off") setActive(null);
+  }, [animationSpeed]);
 
   useLayoutEffect(() => {
     const layer = layerRef.current;

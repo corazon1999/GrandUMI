@@ -34,6 +34,7 @@ public class EB03_041_Hancock : IScriptedEffect
             PowerDelta = 2000,
             Predicate = (s, sideIdx, card) =>
                 sideIdx == owner &&
+                me.Characters.Any(character => character.Id == card.Id) &&
                 s.CurrentTurnPlayer != owner &&
                 card.Info.HasKeyword("利刃") &&
                 s.CurrentCostOf(sideIdx, card) <= 6,

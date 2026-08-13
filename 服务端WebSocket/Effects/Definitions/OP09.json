@@ -566,7 +566,7 @@
           "max": 1,
           "as": "$tgt",
           "filter": {
-            "originalPowerLte": 6000
+            "currentPowerLte": 6000
           }
         },
         {

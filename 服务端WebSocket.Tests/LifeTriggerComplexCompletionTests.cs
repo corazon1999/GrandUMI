@@ -115,6 +115,7 @@ public class LifeTriggerComplexCompletionTests
     public async Task ST36_003_WithEmptyDeck_StopsBeforePowerChange()
     {
         var state = TestScene.New().Build();
+        DeckOutRules.Arm(state);
 
         await Resolve(state, "ST36-003");
 

@@ -34,7 +34,7 @@ export default function CardInfoPanel({
       open={!!card}
       onClose={onClose}
       title={card?.name}
-      maxWidthClass="w-[calc(100vw-2rem)] max-w-4xl"
+      maxWidthClass="w-[calc(100vw-2rem)] max-w-5xl"
       mobileSheet={mobileSheet}
     >
       {card && (
@@ -86,7 +86,7 @@ function CardInfoContent({
 
   return (
     <div className="max-h-[78vh] overflow-y-auto pr-1">
-      <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start">
+      <div className="flex flex-col items-center gap-5 md:flex-row md:items-start">
         {/* 卡图 */}
         <div
           data-card-info-image

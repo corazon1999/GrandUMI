@@ -334,6 +334,20 @@ public static class DslInterpreter
                 $"将我方 {n} 张卡牌转为休息状态（{(rcOpt ? "可放弃，" : "")}可选活跃 领袖/角色/舞台/咚!!）", rcOpt)) return false;
         }
 
+        // restCharacters：只可横置我方角色，不能把领袖、舞台或咚当作角色成本。
+        if (cost.TryGetProperty("restCharacters", out var rch))
+        {
+            int n = 0; bool optional = false;
+            if (rch.ValueKind == JsonValueKind.Number) n = rch.GetInt32();
+            else if (rch.ValueKind == JsonValueKind.Object)
+            {
+                n = GetInt(rch, "n", 1);
+                optional = rch.TryGetProperty("optional", out var opt) && opt.ValueKind == JsonValueKind.True;
+            }
+            if (n > 0 && !await AtomicOps.PromptRestOwnCharacters(ctx, n,
+                $"将我方 {n} 张角色转为休息状态（{(optional ? "可放弃" : "必须支付")}）", optional)) return false;
+        }
+
         // millTop: 从卡组顶废弃 N 张（用于某些特殊费用）
         if (cost.TryGetProperty("millTop", out var mt) && mt.ValueKind == JsonValueKind.Number)
         {
@@ -599,6 +613,21 @@ public static class DslInterpreter
 
         if (cost.TryGetProperty("restActiveDon", out var rad) && rad.ValueKind == JsonValueKind.Number)
             if (me.ActiveDonCount < rad.GetInt32()) return false;
+
+        if (cost.TryGetProperty("restCards", out var restCards))
+        {
+            int n = restCards.ValueKind == JsonValueKind.Number ? restCards.GetInt32() : GetInt(restCards, "n", 1);
+            if (AtomicOps.RestableCount(me) < n) return false;
+        }
+
+        if (cost.TryGetProperty("restCharacters", out var restCharacters))
+        {
+            int n = restCharacters.ValueKind == JsonValueKind.Number ? restCharacters.GetInt32() : GetInt(restCharacters, "n", 1);
+            int available = me.Characters.Count(card => !card.IsTapped
+                && !card.HasRestriction(RestrictionKind.CannotBeRested)
+                && !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested));
+            if (available < n) return false;
+        }
 
         if (cost.TryGetProperty("millTop", out var mt) && mt.ValueKind == JsonValueKind.Number)
             if (me.Deck.Count < mt.GetInt32()) return false;
@@ -1716,10 +1745,11 @@ public static class DslInterpreter
         {
             var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderToDeckBottom",
                 "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
-                rest.Select(c => c.Id.ToString()).ToList(), rest.Count, rest.Count,
+                rest.Select(c => c.Id.ToString()).ToList(), 0, rest.Count,
                 new Dictionary<string, object?>
                 {
                     ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    ["allowDefaultOrder"] = true,
                 });
             var ordered = orderedIds
                 .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))

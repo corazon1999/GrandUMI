@@ -6,12 +6,12 @@
       {
         "on": "OnEnterField",
         "if": { "leaderHasKeyword": "红发海盗团" },
-        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 2000 } ]
+        "then": [ { "op": "AddPowerUntilOppEnd", "target": "selfLeader", "delta": 2000 } ]
       },
       {
         "on": "OnEnterField",
         "if": { "leaderNameEquals": "乌塔" },
-        "then": [ { "op": "AddPowerPersistent", "target": "selfLeader", "delta": 2000 } ]
+        "then": [ { "op": "AddPowerUntilOppEnd", "target": "selfLeader", "delta": 2000 } ]
       }
     ]
   },

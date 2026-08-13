@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【登场时】领袖 +2000「直到下个对方结束阶段」跨回合，用 ContinuousEffect + TurnCount 时效
 ///     （baseTurn..+2，即我方回合与紧接的对方回合内有效）。Scope 限定我方领袖。
 ///   - 【启动主要】条件「对方存在当前力量≥8000角色」用 CurrentPowerOf 判定；满足则本回合赋予自身
-///     【速攻】（引擎仅识别"速攻"用于放行登场回合攻击；"速攻：角色"的只可打角色限制为简化省略）。
+///     【速攻：角色】，登场回合仅可攻击角色。
 ///   - 每回合1次用 TurnOnceUsed。
 /// </summary>
 public class EB04_007_Zoro : IScriptedEffect
@@ -65,7 +65,7 @@ public class EB04_007_Zoro : IScriptedEffect
             if (!hasBig) return Task.CompletedTask;
 
             me.TurnOnceUsed.Add(key);
-            AtomicOps.GiveKeyword(self, "速攻", KeywordDuration.ThisTurn);
+            AtomicOps.GiveKeyword(self, "登场回合可攻击角色", KeywordDuration.ThisTurn, ctx.OwnerIndex);
             return Task.CompletedTask;
         }
 

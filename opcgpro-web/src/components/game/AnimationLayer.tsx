@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameAnimation } from "@/hooks/useGameAnimation";
 import { useGameStore } from "@/store/gameStore";
+import { animationDuration, useSettingsStore } from "@/store/settingsStore";
 
 type TurnBanner = {
   id: number;
@@ -37,6 +38,7 @@ export default function AnimationLayer() {
   const mode = useGameStore((state) => state.mode);
   const currentTurn = useGameStore((state) => state.currentTurn);
   const turnCount = useGameStore((state) => state.turnCount);
+  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
 
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -52,8 +54,9 @@ export default function AnimationLayer() {
   // 回合归属以服务端权威快照为准。机器人或网络抖动可能让多个 lastAction 在 React
   // 渲染前合并，但 turnCount 的最终变化不会丢失，因此每个可见回合至少提示一次。
   useEffect(() => {
-    if (turnCount <= 0 || mode === "Observer") {
+    if (turnCount <= 0 || mode === "Observer" || animationSpeed === "off") {
       lastShownTurnRef.current = turnCount;
+      setBanner((current) => current?.kind === "turn" ? null : current);
       return;
     }
     if (lastShownTurnRef.current === turnCount) return;
@@ -72,21 +75,23 @@ export default function AnimationLayer() {
     bannerTimerRef.current = setTimeout(() => {
       setBanner((current) => current?.id === turnBanner.id ? null : current);
       bannerTimerRef.current = null;
-    }, 2200);
-  }, [currentTurn, mode, turnCount]);
+    }, animationDuration(2200, animationSpeed));
+  }, [animationSpeed, currentTurn, mode, turnCount]);
 
   useEffect(() => {
     switch (anim.type) {
       case "damage":
+        if (animationSpeed === "off") break;
         setFlash(true);
         setShake(true);
-        setTimeout(() => setFlash(false), 200);
-        setTimeout(() => setShake(false), 500);
+        setTimeout(() => setFlash(false), animationDuration(200, animationSpeed));
+        setTimeout(() => setShake(false), animationDuration(500, animationSpeed));
         break;
 
       case "koUnit":
+        if (animationSpeed === "off") break;
         setFlash(true);
-        setTimeout(() => setFlash(false), 150);
+        setTimeout(() => setFlash(false), animationDuration(150, animationSpeed));
         break;
 
       case "gameOver":
@@ -105,7 +110,7 @@ export default function AnimationLayer() {
       default:
         break;
     }
-  }, [anim]);
+  }, [anim, animationSpeed]);
 
   return (
     <>
@@ -113,7 +118,7 @@ export default function AnimationLayer() {
       <motion.div
         className="fixed inset-0 pointer-events-none z-20"
         animate={shake ? { x: [0, -6, 6, -4, 4, 0], y: [0, 3, -3, 2, -2, 0] } : {}}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: animationDuration(400, animationSpeed) / 1000 }}
       />
 
       {/* 红色闪光（伤害/KO） */}
@@ -124,7 +129,7 @@ export default function AnimationLayer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: animationDuration(150, animationSpeed) / 1000 }}
           />
         )}
       </AnimatePresence>
@@ -138,7 +143,7 @@ export default function AnimationLayer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: animationDuration(180, animationSpeed) / 1000 }}
             role="status"
             aria-live="assertive"
           >
