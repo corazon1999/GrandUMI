@@ -105,6 +105,9 @@ public class GameState
     public void MarkPreventEffectLeaveBatch(int ownerIdx, Guid currentVictimId,
         Func<CardInstance, bool> matches, bool isKoReplacement = false)
     {
+        // 除当前显式批次外，记录到本张卡牌效果的完整结算过程，兼容旧实现逐条处理多目标离场。
+        Effects.EffectRuntime.RegisterEffectLeaveReplacement(this, ownerIdx, matches);
+
         if (SimultaneousKOVictimIds is { } koVictims)
         {
             foreach (var card in Players[ownerIdx].Characters)

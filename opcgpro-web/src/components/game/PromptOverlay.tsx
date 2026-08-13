@@ -162,6 +162,7 @@ export default function PromptOverlay() {
   };
   const donChoices = (prompt.extra?.donChoices as DonChoice[] | undefined) ?? [];
   const canCancelReturnDon = prompt.extra?.canCancel === true;
+  const allowVariableReturnCount = prompt.extra?.allowVariableReturnCount === true;
   // 通用选择分支里，凡 id 命中 donChoices 的渲染成咚 token（混合"卡牌 + 咚"同列，如 OP16-033 休置成本）
   const donChoiceMap = new Map(donChoices.map((d) => [d.id, d]));
 
@@ -286,9 +287,12 @@ export default function PromptOverlay() {
     });
   };
 
-  // ReturnOwnDon 的 0 张仅表示“不发动”；点击“确认放回”仍必须选满指定数量。
+  // 固定“咚!!-N”必须选满 N 张；“1 张或更多”允许在 1..上限之间自行决定数量。
+  // 两者的 0 张都只通过独立的“不发动”按钮提交，避免误触确认。
   const canConfirm = isReturnDon
-    ? selected.length === prompt.maxChoose
+    ? allowVariableReturnCount
+      ? selected.length >= 1 && selected.length <= prompt.maxChoose
+      : selected.length === prompt.maxChoose
     : selected.length >= prompt.minChoose && selected.length <= prompt.maxChoose;
 
   const submitServerPrompt = (chosen: string[], showSuccess = false) => {
@@ -550,7 +554,7 @@ export default function PromptOverlay() {
               {canCancelReturnDon && (
                 <button
                   onClick={handleCancelReturnDon}
-                  className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
+                  className="min-h-12 bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
                 >
                   不发动
                 </button>
@@ -558,9 +562,11 @@ export default function PromptOverlay() {
               <button
                 onClick={handleConfirm}
                 disabled={!canConfirm}
-                className="bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold"
+                className="min-h-12 bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold"
               >
-                确认放回（{selected.length} / {prompt.maxChoose}）
+                {allowVariableReturnCount
+                  ? `确认放回（已选 ${selected.length} 张）`
+                  : `确认放回（${selected.length} / ${prompt.maxChoose}）`}
               </button>
             </div>
           </>

@@ -293,6 +293,9 @@ public static class BattleEngine
     private static async Task<bool> IsKOReplacedAsync(
         GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
+        if (s.KOReason == "effect" && EffectRuntime.IsEffectLeaveReplacementCovered(s, ownerIdx, card))
+            return true;
+
         // A replacement may already cover this card as part of the active simultaneous process.
         if (s.SimultaneousKOVictimIds?.Contains(card.Id) == true
             && (s.PreventKOCardIds.Remove(card.Id) || s.PreventLeaveCardIds.Remove(card.Id)))

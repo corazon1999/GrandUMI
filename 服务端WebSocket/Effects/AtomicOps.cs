@@ -322,6 +322,10 @@ public static class AtomicOps
         int acting = EffectRuntime.CurrentActingSide;
         if (acting < 0 || acting == victimOwner) return false; // 非"对方效果"(或无效果上下文)
 
+        // 同一张卡牌效果内已经支付过的离场置换，对之后才确定或逐条处理的匹配目标同样生效。
+        // 这既覆盖显式的“同时离场”批次，也兼容旧脚本把一个效果拆成多个离场步骤的情况。
+        if (EffectRuntime.IsEffectLeaveReplacementCovered(s, victimOwner, card)) return true;
+
         // A replacement that has already paid for the current simultaneous leave
         // process covers this victim without prompting or paying a second time.
         if (s.SimultaneousLeaveVictimIds?.Contains(card.Id) == true && s.PreventLeaveCardIds.Remove(card.Id))
@@ -526,6 +530,7 @@ public static class AtomicOps
             {
                 ["donChoices"] = BuildDonPromptChoices(player, eligible),
                 ["canCancel"] = true,
+                ["allowVariableReturnCount"] = true,
             });
         if (chosen.Count == 0) return false;
         int returned = 0;

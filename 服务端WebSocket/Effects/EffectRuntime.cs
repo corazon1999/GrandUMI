@@ -49,6 +49,7 @@ public static class EffectRuntime
     private static readonly AsyncLocal<CardInstance?> _currentSourceAL = new();
     private static readonly AsyncLocal<int?> _actingSideAL = new();
     private static readonly AsyncLocal<IPromptService?> _promptsAL = new();
+    private static readonly AsyncLocal<EffectLeaveReplacementProcess?> _leaveReplacementProcessAL = new();
     private static GameState? _ambient { get => _ambientAL.Value; set => _ambientAL.Value = value; }
     private static int _depth { get => _depthAL.Value; set => _depthAL.Value = value; }
     private static bool _draining { get => _drainingAL.Value; set => _drainingAL.Value = value; }
@@ -69,6 +70,33 @@ public static class EffectRuntime
     /// 供 AtomicOps 内需要临时交互的场景（如 PlayFromHandFree 满场自选弃谁）使用，
     /// 免去给 136 处同步调用点改签名。</summary>
     public static IPromptService? CurrentPrompts => _promptsAL.Value;
+
+    /// <summary>
+    /// 一张卡牌效果的一次完整结算中已经支付的离场置换。旧卡效可能把多目标离场拆成多个步骤，
+    /// 因此不能只依赖“同时离场”目标集合；置换触发自身会继承外层效果的处理过程。
+    /// </summary>
+    private sealed class EffectLeaveReplacementProcess(GameState state)
+    {
+        public GameState State { get; } = state;
+        public List<(int Owner, Func<CardInstance, bool> Matches)> Grants { get; } = new();
+    }
+
+    internal static void RegisterEffectLeaveReplacement(
+        GameState state, int owner, Func<CardInstance, bool> matches)
+    {
+        var process = _leaveReplacementProcessAL.Value;
+        if (process is null || !ReferenceEquals(process.State, state)) return;
+        process.Grants.Add((owner, matches));
+    }
+
+    internal static bool IsEffectLeaveReplacementCovered(
+        GameState state, int owner, CardInstance card)
+    {
+        var process = _leaveReplacementProcessAL.Value;
+        return process is not null
+            && ReferenceEquals(process.State, state)
+            && process.Grants.Any(grant => grant.Owner == owner && grant.Matches(card));
+    }
 
     /// <summary>由 AtomicOps 在状态变更时调用，把 watcher 事件入队到当前效果所属的 state（无效果上下文时忽略）</summary>
     public static void NotifyWatcher(EffectTrigger trigger, Dictionary<string, object?>? payload = null)
@@ -126,6 +154,14 @@ public static class EffectRuntime
         var prevSource = _currentSourceAL.Value;
         var prevActing = _actingSideAL.Value;
         var prevPrompts = _promptsAL.Value;
+        var prevLeaveReplacementProcess = _leaveReplacementProcessAL.Value;
+        bool inheritLeaveReplacementProcess = prevLeaveReplacementProcess is not null
+            && ReferenceEquals(prevLeaveReplacementProcess.State, s)
+            && trigger is EffectTrigger.PreKO
+                or EffectTrigger.OnAllyWillBeKOd
+                or EffectTrigger.OnAllyWillLeaveField;
+        if (!inheritLeaveReplacementProcess)
+            _leaveReplacementProcessAL.Value = new EffectLeaveReplacementProcess(s);
         _ambient = s;
         _currentSourceAL.Value = source;
         _actingSideAL.Value = ownerIdx;
@@ -199,6 +235,7 @@ public static class EffectRuntime
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
             _promptsAL.Value = prevPrompts;
+            _leaveReplacementProcessAL.Value = prevLeaveReplacementProcess;
             if (isRootResolve)
                 s.EvaluateDeckOut();
             // 最外层效果结束后，排空期间积累的【KO时】、反应式 watcher 与被效果登场卡的【登场时】。

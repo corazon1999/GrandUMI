@@ -678,25 +678,14 @@
         {
           "op": "Choose",
           "prompt": "OpponentCharacterCostLe6",
-          "max": 1,
+          "max": 2,
           "min": 0,
-          "as": "$t1"
+          "as": "$targets",
+          "text": "将对方最多2张费用不高于6的角色自选顺序放回卡组最下方"
         },
         {
           "op": "ReturnToDeckBottom",
-          "target": "$t1",
-          "from": "field"
-        },
-        {
-          "op": "Choose",
-          "prompt": "OpponentCharacterCostLe6",
-          "max": 1,
-          "min": 0,
-          "as": "$t2"
-        },
-        {
-          "op": "ReturnToDeckBottom",
-          "target": "$t2",
+          "target": "$targets",
           "from": "field"
         }
       ]

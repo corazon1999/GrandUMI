@@ -205,13 +205,26 @@
         "text": "将手牌中最多1张力量不高于2000的红色角色登场"
       }
     ],
-    "counter": [
-      {
-        "op": "AddPowerThisBattle",
-        "target": "selfLeader",
-        "delta": 4000
-      }
-    ]
+    "counter": {
+      "if": {
+        "boardHasCharPowerGte": 8000
+      },
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "min": 0,
+          "as": "$tgt",
+          "text": "本次战斗中，我方最多1张领袖或角色力量+4000"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$tgt",
+          "delta": 4000
+        }
+      ]
+    }
   },
   "OP14-019": {
     "trigger": [

@@ -29,6 +29,7 @@ public class OP13_017_MonkeyDDragon : IScriptedEffect
         if (!use) return;
         me.TurnOnceUsed.Add(key);
         AtomicOps.AddPowerThisTurn(victim, -2000);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Info.HasKeyword("革命军"));
     }
 }

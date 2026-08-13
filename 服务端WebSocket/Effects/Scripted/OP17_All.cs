@@ -819,7 +819,8 @@ internal static class OP17Effects
         var ordered = await Pick(c, 1 - c.OwnerIndex, "OrderOwnCharacters", "选择放回卡组底的顺序（先选者先放入）",
             targets, targets.Count, targets.Count);
         if (ordered.Count != targets.Count) ordered = targets;
-        foreach (var target in ordered) AtomicOps.ReturnFieldToDeckBottom(c.State, 1 - c.OwnerIndex, target);
+        await AtomicOps.ProcessEffectLeavesAsync(c.State, 1 - c.OwnerIndex, ordered, c.Prompts,
+            "deck-bottom", AtomicOps.ReturnFieldToDeckBottom);
     }
 
     private static async Task C042(EffectContext c)

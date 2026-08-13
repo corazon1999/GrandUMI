@@ -31,7 +31,8 @@ public class OP11_101_CaponeBege : IScriptedEffect
             $"卡彭·班吉：将「{victim.Info.Name}」正面朝下加入生命区顶以代替离场？");
         if (!use) return;
         me.TurnOnceUsed.Add(key);
-        ctx.State.MarkPreventLeave(victim.Id);
+        ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+            card => card.Id != self.Id && card.Info.HasKeyword("超新星"));
         // 置换：从场上移除，正面朝下置入生命区最上方
         foreach (var d in me.CostArea)
             if (d.State == DonState.Attached && d.AttachedToCardId == victim.Id)

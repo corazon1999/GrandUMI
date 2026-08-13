@@ -4,13 +4,14 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("手机竖屏对局显示安全区内的全屏按钮", async () => {
+test("电脑与手机对局均显示安全区内的全屏按钮", async () => {
   const [button, route] = await Promise.all([
     read("src/components/game/MobileFullscreenButton.tsx"),
     read("src/components/home/LayoutPreviewRoute.tsx"),
   ]);
 
-  assert.match(route, /isPhonePortrait && <MobileFullscreenButton \/>/);
+  assert.match(route, /<MobileFullscreenButton \/>/);
+  assert.doesNotMatch(route, /isPhonePortrait && <MobileFullscreenButton \/>/);
   assert.match(button, /h-12 w-12/);
   assert.match(button, /var\(--layout-safe-right, env\(safe-area-inset-right\)\)/);
   assert.match(button, /var\(--layout-safe-top, env\(safe-area-inset-top\)\)/);

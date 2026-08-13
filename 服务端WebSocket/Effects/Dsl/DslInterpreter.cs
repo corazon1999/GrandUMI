@@ -908,6 +908,16 @@ public static class DslInterpreter
                     // 对方场上存在当前力量 ≥ N 的角色
                     if (!opp.Characters.Any(c => s.CurrentPowerOf(1 - ctx.OwnerIndex, c) >= p.Value.GetInt32())) return false;
                     break;
+                case "boardHasCharPowerGte":
+                {
+                    // 双方场上存在当前力量 ≥ N 的角色；“场上存在”不限定控制方。
+                    int minimumPower = p.Value.GetInt32();
+                    bool found = s.Players.SelectMany((player, side) =>
+                            player.Characters.Select(card => (side, card)))
+                        .Any(item => s.CurrentPowerOf(item.side, item.card) >= minimumPower);
+                    if (!found) return false;
+                    break;
+                }
                 case "ownHasCharWithKeyword":
                     // 我方场上存在拥有指定特征的角色（如 OP16-076 反击段"存在《大将》角色"）
                     if (!me.Characters.Any(c => c.Info.HasKeyword(p.Value.GetString() ?? ""))) return false;
@@ -1236,18 +1246,43 @@ public static class DslInterpreter
                 }
             case "ReturnToDeckBottom":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is null) break;
+                    var targets = ResolveTargets(op, "target", ctx)
+                        .DistinctBy(card => card.Id)
+                        .ToList();
+                    if (targets.Count == 0) break;
                     var from = op.TryGetProperty("from", out var fr) ? fr.GetString() : "field";
-                    int owner = FindOwner(s, target);
-                    var ownerP = owner >= 0 ? s.Players[owner] : me;
                     switch (from)
                     {
-                        case "hand":  AtomicOps.ReturnHandToDeckBottom(ownerP, target); break;
-                        case "trash": AtomicOps.ReturnTrashToDeckBottom(ownerP, target); break;
+                        case "hand":
+                            foreach (var target in targets)
+                            {
+                                int owner = FindOwner(s, target);
+                                AtomicOps.ReturnHandToDeckBottom(owner >= 0 ? s.Players[owner] : me, target);
+                            }
+                            break;
+                        case "trash":
+                            foreach (var target in targets)
+                            {
+                                int owner = FindOwner(s, target);
+                                AtomicOps.ReturnTrashToDeckBottom(owner >= 0 ? s.Players[owner] : me, target);
+                            }
+                            break;
                         default:
-                            if (owner >= 0 && !await AtomicOps.TryEffectLeaveGuard(s, owner, target, ctx.Prompts, "deck"))
-                                AtomicOps.ReturnFieldToDeckBottom(s, owner, target);
+                            foreach (var ownerGroup in targets.GroupBy(target => FindOwner(s, target)))
+                            {
+                                int owner = ownerGroup.Key;
+                                if (owner < 0) continue;
+                                var cards = ownerGroup.ToList();
+                                var characters = cards.Where(card => s.Players[owner].Characters.Contains(card)).ToList();
+                                if (characters.Count > 0)
+                                    await AtomicOps.ProcessEffectLeavesAsync(s, owner, characters, ctx.Prompts,
+                                        "deck-bottom", AtomicOps.ReturnFieldToDeckBottom);
+                                foreach (var target in cards.Where(card => !characters.Contains(card)))
+                                {
+                                    if (!await AtomicOps.TryEffectLeaveGuard(s, owner, target, ctx.Prompts, "deck-bottom"))
+                                        AtomicOps.ReturnFieldToDeckBottom(s, owner, target);
+                                }
+                            }
                             break;
                     }
                     break;

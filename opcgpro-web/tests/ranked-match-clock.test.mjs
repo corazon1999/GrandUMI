@@ -139,16 +139,16 @@ test("休闲公开匹配也使用双方各二十分钟的操作棋钟", async ()
   assert.match(manager, /OperationClockRemainingMs\[1\] = OperationTimeLimitMs/);
 });
 
-test("断线提示只展示服务端两分钟宽限且不能提前判负", async () => {
+test("断线提示只展示服务端九十秒宽限且不能提前判负", async () => {
   const [banner, manager] = await Promise.all([
     readSource("../src/components/game/OpponentDisconnectBanner.tsx"),
     readSource("../../服务端WebSocket/Game/GameRoomManager.cs"),
   ]);
 
   assert.match(banner, /setCountdown\(payload\.gracePeriodSeconds\)/);
-  assert.match(banner, /每名玩家每局累计 120 秒宽限/);
+  assert.match(banner, /每名玩家每局累计 90 秒宽限/);
   assert.doesNotMatch(banner, /GameRequest/);
-  assert.match(manager, /private const int GracePeriodSeconds = 120/);
+  assert.match(manager, /private const int GracePeriodSeconds = 90/);
   assert.match(manager, /DisconnectGraceRemainingMs/);
-  assert.match(manager, /对手仍在 2 分钟断线宽限期内/);
+  assert.match(manager, /对手仍在 90 秒断线宽限期内/);
 });

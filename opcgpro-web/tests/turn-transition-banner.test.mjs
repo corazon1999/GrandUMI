@@ -25,7 +25,8 @@ test("回合提示位于中央、足够醒目且不会拦截操作", async () =>
   assert.match(source, /pointer-events-none fixed inset-0 z-30 flex items-center justify-center/);
   assert.match(source, /text-5xl font-black/);
   assert.match(source, /bg-black\/25/);
-  assert.match(source, /}, 2200\);/);
+  assert.match(source, /animationDuration\(2200, animationSpeed\)/);
+  assert.match(source, /animationSpeed === "off"/);
   assert.match(source, /mode === "Observer"/);
   assert.match(source, /current\?\.id === turnBanner\.id \? null : current/);
 });

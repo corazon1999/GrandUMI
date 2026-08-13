@@ -34,10 +34,8 @@ public class OP05_058_StopTramplingLife : IScriptedEffect
             var toBottom = ps.Characters
                 .Where(c => ctx.State.CurrentCostOf(side, c) <= costThreshold)
                 .ToList();
-            foreach (var c in toBottom)
-            {
-                AtomicOps.ReturnFieldToDeckBottom(ctx.State, side, c);
-            }
+            await AtomicOps.ProcessEffectLeavesAsync(ctx.State, side, toBottom, ctx.Prompts,
+                "deck-bottom", AtomicOps.ReturnFieldToDeckBottom);
         }
 
         // 触发节到此结束
