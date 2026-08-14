@@ -103,7 +103,7 @@ public class ST13_003_Luffy : IScriptedEffect
 /// <summary>
 /// ST26-005 蒙奇·D·路飞（角色）
 /// 【登场时】/【攻击时】咚!!-2：我方领袖为多种颜色且对方场上咚!!≥5张时，我方《草帽一伙》领袖原本力量变为7000。
-/// （原本力量覆写直到本回合结束清除，近似“直到下个对方回合结束”）
+/// （原本力量覆写持续到下个对方回合结束）
 /// </summary>
 public class ST26_005_Luffy : IScriptedEffect
 {
@@ -118,6 +118,6 @@ public class ST26_005_Luffy : IScriptedEffect
         if (!(multiColor && opp.TotalDonInCostArea >= 5 && me.Leader.Info.HasKeyword("草帽一伙"))) return;
         if (me.CostArea.Count < 2) return;
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
-        me.Leader.OriginalPowerOverride = 7000;
+        AtomicOps.SetOriginalPowerUntilOppEnd(me.Leader, 7000, ctx.OwnerIndex);
     }
 }

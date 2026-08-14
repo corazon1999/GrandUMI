@@ -142,6 +142,29 @@ public class August2026PlayerBugRegressionTests
     }
 
     [Fact]
+    public async Task ST26_005_LeaderPowerStaysSevenThousandDuringOpponentTurn()
+    {
+        var state = TestScene.New("OP01-003")
+            .MyActiveDon(2)
+            .OppActiveDon(5)
+            .Build();
+        var leader = state.Players[0].Leader;
+
+        await EffectRuntime.Resolve(
+            state, 0, Card("ST26-005"), EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(7000, state.CurrentPowerOf(0, leader));
+        state.CurrentTurnPlayer = 0;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(7000, state.CurrentPowerOf(0, leader));
+        state.CurrentTurnPlayer = 1;
+        TurnEngine.EnterResetPhase(state);
+        Assert.Equal(7000, state.CurrentPowerOf(0, leader));
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(leader.Info.Power, state.CurrentPowerOf(0, leader));
+    }
+
+    [Fact]
     public async Task OP07_059_CostCanBePaidBeforeThreeFoxyCharactersCondition()
     {
         var state = TestScene.New("OP07-059").MyActiveDon(3).Build();
