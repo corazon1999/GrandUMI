@@ -180,7 +180,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         )
         self.assertEqual("record", result["decision"])
         feedback = storage.get_feedback(result["feedback_id"])
-        self.assertEqual("queued", feedback["agent_state"])
+        self.assertEqual("none", feedback["agent_state"])
         self.assertIsNone(storage.get_chat_result_to_send())
 
     def test玩家回答追问后会合并原描述并重新检查(self):

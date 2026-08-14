@@ -344,9 +344,9 @@ def complete_bug_intake_job(
     decision: str,
     cleaned_description: str,
     reply: str,
-    agent_enabled: bool,
+    _agent_enabled: bool,
 ):
-    """完成 Bug 描述检查；合格时在同一事务内静默写入 feedback。"""
+    """完成 Bug 描述检查；合格时只静默记录，永不进入自动修复队列。"""
     if decision not in ("record", "clarify", "ignore"):
         raise ValueError("Bug 检查结论必须是 record、clarify 或 ignore")
     cleaned_description = str(cleaned_description or "").strip()
@@ -386,7 +386,7 @@ def complete_bug_intake_job(
                 (
                     str(row["qq"]), row["nickname"] or "",
                     str(row["group_id"]), cleaned_description, now_text,
-                    "queued" if agent_enabled else "none", now_text,
+                    "none", now_text,
                 ),
             )
             feedback_id = cur.lastrowid
