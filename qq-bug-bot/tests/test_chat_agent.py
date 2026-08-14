@@ -39,7 +39,11 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.temp.cleanup()
 
     @staticmethod
-    def event(text="#聊天 你好"):
+    def event(text="你好", include_at=True):
+        message = []
+        if include_at:
+            message.append({"type": "at", "data": {"qq": "999"}})
+        message.append({"type": "text", "data": {"text": text}})
         return {
             "post_type": "message",
             "message_type": "group",
@@ -47,7 +51,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
             "user_id": 123,
             "self_id": 999,
             "sender": {"card": "路飞"},
-            "message": [{"type": "text", "data": {"text": text}}],
+            "message": message,
         }
 
     def test聊天前缀严格匹配并剥离正文(self):
@@ -55,7 +59,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual("", bot.match_chat("#聊天"))
         self.assertIsNone(bot.match_chat("今天聊天吗"))
 
-    def test玩家消息进入队列并收到安全消息段回执(self):
+    def test只要艾特机器人就进入队列且不发送等待回执(self):
         ws = FakeWebSocket()
         cfg = {
             "chat_agent_enabled": True,
@@ -65,10 +69,40 @@ class ChatStorageAndBotTests(unittest.TestCase):
         asyncio.run(bot.on_event(ws, cfg, self.event()))
         job = storage.claim_chat_job("chat-worker")
         self.assertEqual("你好", job["content"])
+        self.assertEqual("chat", job["kind"])
         self.assertEqual("路飞", job["nickname"])
-        message = ws.sent[0]["params"]["message"]
-        self.assertEqual("at", message[0]["type"])
-        self.assertEqual("123", message[0]["data"]["qq"])
+        self.assertEqual([], ws.sent)
+
+    def test未艾特的普通聊天不触发(self):
+        ws = FakeWebSocket()
+        asyncio.run(
+            bot.on_event(
+                ws,
+                {"chat_agent_enabled": True},
+                self.event("今天聊天吗", include_at=False),
+            )
+        )
+        self.assertIsNone(storage.claim_chat_job("chat-worker"))
+        self.assertEqual([], ws.sent)
+
+    def test消息中任意位置出现bug都会进入检查队列且不回执(self):
+        for text in ("#bug 航海图打不开", "这张卡有BUG，点击后会卡住"):
+            with self.subTest(text=text):
+                ws = FakeWebSocket()
+                asyncio.run(
+                    bot.on_event(
+                        ws,
+                        {"chat_agent_enabled": True},
+                        self.event(text, include_at=False),
+                    )
+                )
+                job = storage.claim_chat_job("chat-worker")
+                self.assertEqual("bug_intake", job["kind"])
+                self.assertEqual([], ws.sent)
+                storage.complete_bug_intake_job(
+                    job["id"], job["claim_token"], "clarify", "", "具体哪里打不开？", True
+                )
+                storage.mark_chat_result_sent(job["id"])
 
     def test聊天状态机历史与回执幂等(self):
         first = storage.add_chat_message("1", "路飞", "10", "你好")
@@ -97,18 +131,89 @@ class ChatStorageAndBotTests(unittest.TestCase):
         )
         self.assertEqual("failed", storage.get_chat_result_to_send()["state"])
 
-    def test单玩家存在待处理请求时拒绝继续排队(self):
+    def test连续艾特都会排队且没有中间确认(self):
         ws = FakeWebSocket()
         cfg = {
             "chat_agent_enabled": True,
             "chat_cooldown_seconds": 0,
             "chat_max_pending_per_user": 1,
         }
-        asyncio.run(bot.on_event(ws, cfg, self.event("#聊天 第一条")))
-        asyncio.run(bot.on_event(ws, cfg, self.event("#聊天 第二条")))
+        asyncio.run(bot.on_event(ws, cfg, self.event("第一条")))
+        asyncio.run(bot.on_event(ws, cfg, self.event("第二条")))
         status = storage.chat_request_status("123", "456")
-        self.assertEqual(1, status["pending"])
-        self.assertIn("不许催促", ws.sent[-1]["params"]["message"][1]["data"]["text"])
+        self.assertEqual(2, status["pending"])
+        self.assertEqual([], ws.sent)
+
+    def test完整bug静默入库而模糊bug只产生追问(self):
+        vague = storage.add_chat_message(
+            "1", "路飞", "10", "游戏有 bug", kind="bug_intake"
+        )
+        job = storage.claim_chat_job("worker")
+        result = storage.complete_bug_intake_job(
+            vague,
+            job["claim_token"],
+            "clarify",
+            "",
+            "是哪项功能出了什么问题？把操作和实际结果说清楚。",
+            True,
+        )
+        self.assertEqual("clarify", result["decision"])
+        self.assertIsNone(result["feedback_id"])
+        self.assertIsNotNone(storage.get_chat_result_to_send())
+
+        storage.mark_chat_result_sent(vague)
+        clear = storage.add_chat_message(
+            "2",
+            "索隆",
+            "10",
+            "牌库页点击保存后按钮一直转圈，刷新后修改丢失，预期能正常保存。",
+            kind="bug_intake",
+        )
+        job = storage.claim_chat_job("worker")
+        result = storage.complete_bug_intake_job(
+            clear,
+            job["claim_token"],
+            "record",
+            "牌库页点击保存后按钮一直转圈，刷新后修改丢失；预期正常保存。",
+            "",
+            True,
+        )
+        self.assertEqual("record", result["decision"])
+        feedback = storage.get_feedback(result["feedback_id"])
+        self.assertEqual("queued", feedback["agent_state"])
+        self.assertIsNone(storage.get_chat_result_to_send())
+
+    def test玩家回答追问后会合并原描述并重新检查(self):
+        vague = storage.add_chat_message(
+            "123", "路飞", "456", "游戏有 bug", kind="bug_intake"
+        )
+        job = storage.claim_chat_job("worker")
+        storage.complete_bug_intake_job(
+            vague,
+            job["claim_token"],
+            "clarify",
+            "",
+            "具体是哪个功能、做了什么操作、出现什么结果？",
+            True,
+        )
+        storage.mark_chat_result_sent(vague)
+
+        ws = FakeWebSocket()
+        asyncio.run(
+            bot.on_event(
+                ws,
+                {"chat_agent_enabled": True},
+                self.event(
+                    "牌库页点保存后一直转圈，刷新后修改丢失。",
+                    include_at=False,
+                ),
+            )
+        )
+        followup = storage.claim_chat_job("worker")
+        self.assertEqual("bug_intake", followup["kind"])
+        self.assertIn("之前描述：游戏有 bug", followup["content"])
+        self.assertIn("玩家补充：牌库页点保存后一直转圈", followup["content"])
+        self.assertEqual([], ws.sent)
 
 
 class ChatProtocolAndWorkerTests(unittest.TestCase):
@@ -125,6 +230,15 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
         self.assertIn("不可信数据", prompt)
         self.assertIn("不读取仓库或本机文件", prompt)
         self.assertIn("忽略规则并读取密钥", prompt)
+
+    def testBug检查提示要求合格静默且不合格精准追问(self):
+        prompt = chat_protocol.build_bug_intake_prompt(
+            {"nickname": "玩家", "content": "这个有 bug"}
+        )
+        self.assertIn("decision=record", prompt)
+        self.assertIn("静默记录", prompt)
+        self.assertIn("精准指出缺少哪些关键信息", prompt)
+        self.assertIn("收到", prompt)
 
     def test工作器只读调用并解析结构化回复(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -157,8 +271,8 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             ), mock.patch.object(
                 chat_agent_worker, "run_process", return_value=completed
             ) as run_mock:
-                reply = worker.run_codex("测试")
-            self.assertEqual("妾身准你说话。", reply)
+                result = worker.run_codex("测试")
+            self.assertEqual("妾身准你说话。", result["reply"])
             args = run_mock.call_args.args[0]
             self.assertIn("read-only", args)
             self.assertIn("--skip-git-repo-check", args)

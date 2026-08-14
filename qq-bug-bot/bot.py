@@ -16,7 +16,6 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
 
 import websockets
 # 注意:websockets 16.0 的新版 asyncio 实现(默认的 websockets.connect)与 NapCat
@@ -25,7 +24,6 @@ import websockets
 from websockets.legacy.client import connect as ws_connect
 
 import storage
-import github_issue
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get(
@@ -70,27 +68,17 @@ def extract_plain_text(event: dict) -> str:
     return ""
 
 
-# 反馈触发:以 #bug 开头(忽略大小写)即视为反馈。
-_TRIGGER_RE = re.compile(r"^\s*#bug", re.IGNORECASE)
+# 反馈触发:群消息里只要出现 bug（忽略大小写）即进入描述检查。
+_BUG_RE = re.compile(r"bug", re.IGNORECASE)
+_LEADING_BUG_RE = re.compile(r"^\s*#bug(?:反馈)?[\s:：]*", re.IGNORECASE)
 _CHAT_TRIGGER_RE = re.compile(r"^\s*#聊天(?:\s+|[:：])?(.*)$", re.DOTALL)
 
 
 def match_feedback(text: str):
-    """识别以 #bug 开头的反馈消息。
-
-    命中后剥掉 #bug,以及其后可选的一个"反馈"词和分隔符(空格/中英文冒号),
-    返回剩下的正文;非反馈消息返回 None。
-    例:'#bug反馈：内容' / '#bug 内容' / '#bug内容' 均得到 '内容'。
-    """
-    if not text:
+    """识别任意含 bug 的群消息，开头为 #bug 时剥掉指令前缀。"""
+    if not text or not _BUG_RE.search(text):
         return None
-    m = _TRIGGER_RE.match(text)
-    if not m:
-        return None
-    rest = text[m.end():]
-    rest = re.sub(r"^反馈", "", rest)        # 紧跟的可选"反馈"一词
-    rest = re.sub(r"^[\s:：]+", "", rest)    # 再剥掉空格 / 中英文冒号
-    return rest.strip()
+    return _LEADING_BUG_RE.sub("", text, count=1).strip()
 
 
 def match_chat(text: str):
@@ -119,65 +107,20 @@ async def send_group_msg(ws, group_id, message) -> None:
 
 
 async def handle_feedback(ws, cfg, event, content) -> None:
-    """处理一条已确认为 bug 反馈的群消息(content 为已剥离触发词的正文)。"""
+    """把含 bug 的消息送入描述检查队列；此处不回确认话术。"""
     group_id = event.get("group_id")
     qq = str(event.get("user_id", ""))
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or ""
 
-    # 内容过短直接提示,不入库
-    if len(content) < int(cfg.get("min_content_length", 2)):
-        if cfg.get("reply_enabled", True):
-            await send_group_msg(
-                ws, group_id,
-                at_message(qq, "反馈内容太短啦，请在 #bug 后面描述具体问题~"),
-            )
-        return
-
-    # 1) 本地落库(一定成功)
-    agent_enabled = bool(cfg.get("agent_enabled", False))
-    fid = storage.add_feedback(
-        qq, nickname, group_id, content,
-        agent_state="queued" if agent_enabled else "none",
+    intake_id = storage.add_chat_message(
+        qq,
+        nickname,
+        str(group_id),
+        content or "（只提到了 bug，没有描述具体现象）",
+        kind="bug_intake",
     )
-    print(f"[反馈#{fid}] 群{group_id} {nickname}({qq}): {content}")
-
-    # 2) 尝试建 GitHub Issue
-    issue_line = ""
-    if cfg.get("create_issue", True):
-        title = content[:30] + ("…" if len(content) > 30 else "")
-        body = (
-            f"**来自 QQ 群反馈 #{fid}**\n\n"
-            f"- 上报人: {nickname} (QQ: {qq})\n"
-            f"- 来源群: {group_id}\n\n"
-            f"## 问题描述\n\n{content}\n"
-            f"\n<!-- grandumi-agent-job:v1 feedback_id={fid} -->\n"
-        )
-        # gh 是同步命令且最长可能等待 30 秒，放进线程避免阻塞 WebSocket 心跳与收消息。
-        res = await asyncio.to_thread(
-            github_issue.create_issue,
-            cfg["github_repo"],
-            f"[反馈] {title}",
-            body,
-        )
-        if res:
-            issue_no, url = res
-            storage.set_issue_no(fid, issue_no)
-            issue_line = f"\n已同步到 Issue #{issue_no}"
-            print(f"[反馈#{fid}] -> GitHub Issue #{issue_no} {url}")
-        else:
-            print(f"[反馈#{fid}] GitHub Issue 创建失败,仅保存在本地")
-
-    # 3) 群内回执
-    if cfg.get("reply_enabled", True):
-        queue_line = "\n已进入 Agent 自动分析队列" if agent_enabled else ""
-        await send_group_msg(
-            ws, group_id,
-            at_message(
-                qq,
-                f"✅ 已收到你的反馈 #{fid}，感谢！{issue_line}{queue_line}",
-            ),
-        )
+    print(f"[Bug检查#{intake_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
 async def handle_chat(ws, cfg, event, content: str) -> None:
@@ -192,11 +135,9 @@ async def handle_chat(ws, cfg, event, content: str) -> None:
             ws, group_id, at_message(qq, "妾身现在没空，稍后再来觐见吧。")
         )
         return
+    content = match_chat(content) if match_chat(content) is not None else content
     if not content:
-        await send_group_msg(
-            ws, group_id, at_message(qq, "想聊什么？请发送：#聊天 你的消息")
-        )
-        return
+        content = "（玩家只@了你，没有附加文字）"
     max_length = max(20, int(cfg.get("chat_max_content_length", 500)))
     if len(content) > max_length:
         await send_group_msg(
@@ -206,32 +147,19 @@ async def handle_chat(ws, cfg, event, content: str) -> None:
         )
         return
 
-    status = storage.chat_request_status(qq, str(group_id))
-    max_pending = max(1, int(cfg.get("chat_max_pending_per_user", 1)))
-    if status["pending"] >= max_pending:
-        await send_group_msg(
-            ws, group_id, at_message(qq, "上一句话妾身还没答完，不许催促。")
-        )
-        return
-    cooldown = max(0, int(cfg.get("chat_cooldown_seconds", 15)))
-    last_created = status.get("last_created_at")
-    if cooldown and last_created:
-        elapsed = (
-            datetime.now() - datetime.fromisoformat(last_created)
-        ).total_seconds()
-        if elapsed < cooldown:
-            wait_seconds = max(1, int(cooldown - elapsed + 0.999))
-            await send_group_msg(
-                ws,
-                group_id,
-                at_message(qq, f"慢一点，{wait_seconds} 秒后再来找我。"),
-            )
-            return
-
     chat_id = storage.add_chat_message(qq, nickname, str(group_id), content)
     print(f"[聊天#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
-    await send_group_msg(
-        ws, group_id, at_message(qq, "妾身听见了，准你稍候片刻。")
+
+
+def enqueue_bug_followup(event: dict, content: str):
+    """若玩家正在回答 Bug 追问，把这条消息作为补充说明重新检查。"""
+    sender = event.get("sender") or {}
+    nickname = sender.get("card") or sender.get("nickname") or "玩家"
+    return storage.add_bug_followup(
+        str(event.get("user_id", "")),
+        nickname,
+        str(event.get("group_id", "")),
+        content,
     )
 
 
@@ -381,21 +309,25 @@ async def on_event(ws, cfg, event) -> None:
     text = extract_plain_text(event)
     if await handle_owner_reply(ws, cfg, event):
         return
-    chat_content = match_chat(text)
-    if chat_content is not None:
-        try:
-            await handle_chat(ws, cfg, event, chat_content)
-        except Exception as e:
-            print(f"[错误] 处理聊天异常: {e}")
-        return
     content = match_feedback(text)
-    if content is None:
+    if content is not None:
+        try:
+            await handle_feedback(ws, cfg, event, content)
+        except Exception as e:
+            print(f"[错误] 处理反馈异常: {e}")
         return
-
-    try:
-        await handle_feedback(ws, cfg, event, content)
-    except Exception as e:  # 单条消息出错不应拖垮整个连接
-        print(f"[错误] 处理反馈异常: {e}")
+    followup_id = enqueue_bug_followup(event, text)
+    if followup_id:
+        print(
+            f"[Bug补充#{followup_id}] 群{event.get('group_id')} "
+            f"{event.get('user_id')}: {text}"
+        )
+        return
+    if is_at_self(event):
+        try:
+            await handle_chat(ws, cfg, event, text.strip())
+        except Exception as e:  # 单条消息出错不应拖垮整个连接
+            print(f"[错误] 处理聊天异常: {e}")
 
 
 async def run() -> None:

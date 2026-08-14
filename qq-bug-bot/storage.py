@@ -56,6 +56,7 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL DEFAULT 'chat',
                 qq TEXT NOT NULL,
                 nickname TEXT,
                 group_id TEXT NOT NULL,
@@ -69,7 +70,9 @@ def init_db() -> None:
                 attempts INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                reply_sent_at TEXT
+                reply_sent_at TEXT,
+                feedback_id INTEGER,
+                continued_at TEXT
             )
             """
         )
@@ -108,6 +111,18 @@ def init_db() -> None:
                 conn.execute(
                     f"ALTER TABLE feedback ADD COLUMN {name} {declaration}"
                 )
+        chat_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(chat_messages)")
+        }
+        if "kind" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'"
+            )
+        if "feedback_id" not in chat_cols:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN feedback_id INTEGER")
+        if "continued_at" not in chat_cols:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN continued_at TEXT")
         conn.commit()
 
 
@@ -116,18 +131,21 @@ def add_chat_message(
     nickname: str,
     group_id: str,
     content: str,
+    kind: str = "chat",
 ) -> int:
-    """新增一条群聊 Agent 请求并返回编号。"""
+    """新增一条聊天或 Bug 描述检查请求并返回编号。"""
+    if kind not in ("chat", "bug_intake"):
+        raise ValueError(f"不支持的消息类型: {kind}")
     now_text = datetime.now().isoformat(timespec="seconds")
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             """
             INSERT INTO chat_messages
-                (qq, nickname, group_id, content, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (kind, qq, nickname, group_id, content, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                str(qq), nickname or "", str(group_id), content,
+                kind, str(qq), nickname or "", str(group_id), content,
                 now_text, now_text,
             ),
         )
@@ -152,6 +170,68 @@ def chat_request_status(qq: str, group_id: str) -> dict:
             "pending": int(row[0] or 0),
             "last_created_at": row[1] if row else None,
         }
+
+
+def add_bug_followup(
+    qq: str,
+    nickname: str,
+    group_id: str,
+    content: str,
+    max_age_seconds: int = 1800,
+):
+    """把玩家对最近一次 Bug 追问的下一条消息合并后重新检查。"""
+    content = str(content or "").strip()
+    if not content:
+        return None
+    now = datetime.now()
+    now_text = now.isoformat(timespec="seconds")
+    since_text = (
+        now - timedelta(seconds=max(60, max_age_seconds))
+    ).isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute(
+            """
+            SELECT * FROM chat_messages
+             WHERE qq = ?
+               AND group_id = ?
+               AND kind = 'bug_intake'
+               AND state = 'completed'
+               AND feedback_id IS NULL
+               AND COALESCE(reply, '') <> ''
+               AND reply_sent_at IS NOT NULL
+               AND continued_at IS NULL
+               AND updated_at >= ?
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (str(qq), str(group_id), since_text),
+        ).fetchone()
+        if not previous:
+            conn.rollback()
+            return None
+        combined = (
+            f"之前描述：{previous['content']}\n"
+            f"玩家补充：{content}"
+        )
+        cur = conn.execute(
+            """
+            INSERT INTO chat_messages
+                (kind, qq, nickname, group_id, content, created_at, updated_at)
+            VALUES ('bug_intake', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(qq), nickname or "", str(group_id), combined,
+                now_text, now_text,
+            ),
+        )
+        conn.execute(
+            "UPDATE chat_messages SET continued_at = ? WHERE id = ?",
+            (now_text, previous["id"]),
+        )
+        conn.commit()
+        return cur.lastrowid
 
 
 def claim_chat_job(worker_id: str, lease_seconds: int = 600):
@@ -214,6 +294,7 @@ def claim_chat_job(worker_id: str, lease_seconds: int = 600):
             SELECT nickname, content, reply
               FROM chat_messages
              WHERE group_id = ?
+               AND kind = 'chat'
                AND state = 'completed'
                AND id < ?
              ORDER BY id DESC
@@ -247,6 +328,7 @@ def complete_chat_job(
                    updated_at = ?,
                    reply_sent_at = NULL
              WHERE id = ?
+               AND kind = 'chat'
                AND state = 'claimed'
                AND claim_token = ?
             """,
@@ -254,6 +336,92 @@ def complete_chat_job(
         )
         conn.commit()
         return cur.rowcount == 1
+
+
+def complete_bug_intake_job(
+    chat_id: int,
+    claim_token: str,
+    decision: str,
+    cleaned_description: str,
+    reply: str,
+    agent_enabled: bool,
+):
+    """完成 Bug 描述检查；合格时在同一事务内静默写入 feedback。"""
+    if decision not in ("record", "clarify"):
+        raise ValueError("Bug 检查结论必须是 record 或 clarify")
+    cleaned_description = str(cleaned_description or "").strip()
+    reply = str(reply or "").strip()
+    if decision == "record" and not cleaned_description:
+        raise ValueError("合格 Bug 缺少清理后的问题描述")
+    if decision == "clarify" and not reply:
+        raise ValueError("需补充的 Bug 缺少追问内容")
+
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM chat_messages
+             WHERE id = ?
+               AND kind = 'bug_intake'
+               AND state = 'claimed'
+               AND claim_token = ?
+            """,
+            (chat_id, claim_token),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+
+        feedback_id = None
+        if decision == "record":
+            cur = conn.execute(
+                """
+                INSERT INTO feedback
+                    (qq, nickname, group_id, content, created_at,
+                     agent_state, agent_updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(row["qq"]), row["nickname"] or "",
+                    str(row["group_id"]), cleaned_description, now_text,
+                    "queued" if agent_enabled else "none", now_text,
+                ),
+            )
+            feedback_id = cur.lastrowid
+
+        conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = 'completed',
+                   reply = ?,
+                   error = NULL,
+                   claim_token = NULL,
+                   worker_id = NULL,
+                   claimed_at = NULL,
+                   updated_at = ?,
+                   reply_sent_at = ?,
+                   feedback_id = ?
+             WHERE id = ?
+            """,
+            (
+                reply if decision == "clarify" else "",
+                now_text,
+                None if decision == "clarify" else now_text,
+                feedback_id,
+                chat_id,
+            ),
+        )
+        conn.commit()
+        return {
+            "decision": decision,
+            "feedback_id": feedback_id,
+            "content": cleaned_description,
+            "qq": str(row["qq"]),
+            "nickname": row["nickname"] or "",
+            "group_id": str(row["group_id"]),
+        }
 
 
 def release_chat_job(

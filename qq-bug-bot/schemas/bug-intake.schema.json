@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["record", "clarify"]
+    },
+    "cleaned_description": {
+      "type": "string",
+      "maxLength": 3000
+    },
+    "reply": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": ["decision", "cleaned_description", "reply"]
+}

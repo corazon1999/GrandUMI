@@ -21,6 +21,7 @@ CONFIG_PATH = os.environ.get(
 MAX_QUESTION_LENGTH = 3000
 MAX_SUMMARY_LENGTH = 2000
 MAX_CHAT_REPLY_LENGTH = 500
+MAX_BUG_DESCRIPTION_LENGTH = 3000
 
 
 def emit(payload: dict) -> None:
@@ -37,13 +38,19 @@ def read_payload() -> dict:
     return value
 
 
-def load_repo() -> str:
+def load_config() -> dict:
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as file:
-            cfg = json.load(file)
+            value = json.load(file)
     except (OSError, json.JSONDecodeError):
-        return "corazon1999/GrandUMI"
-    return str(cfg.get("github_repo") or "corazon1999/GrandUMI")
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def load_repo() -> str:
+    return str(
+        load_config().get("github_repo") or "corazon1999/GrandUMI"
+    )
 
 
 def require_text(payload: dict, key: str, limit: int) -> str:
@@ -73,6 +80,57 @@ def command_chat_complete() -> None:
     if not storage.complete_chat_job(chat_id, token, reply):
         raise ValueError("聊天任务租约已失效，未写入回复")
     emit({"ok": True, "chat_id": chat_id})
+
+
+def command_bug_intake_complete() -> None:
+    payload = read_payload()
+    chat_id = int(payload.get("chat_id"))
+    token = require_text(payload, "claim_token", 128)
+    decision = str(payload.get("decision") or "").strip()
+    description = str(payload.get("cleaned_description") or "").strip()
+    reply = str(payload.get("reply") or "").strip()
+    if len(description) > MAX_BUG_DESCRIPTION_LENGTH:
+        raise ValueError("cleaned_description 超过 3000 字")
+    if len(reply) > MAX_CHAT_REPLY_LENGTH:
+        raise ValueError("reply 超过 500 字")
+    cfg = load_config()
+    result = storage.complete_bug_intake_job(
+        chat_id,
+        token,
+        decision,
+        description,
+        reply,
+        bool(cfg.get("agent_enabled", False)),
+    )
+    if not result:
+        raise ValueError("Bug 描述检查任务租约已失效，未写入结果")
+
+    feedback_id = result.get("feedback_id")
+    if feedback_id and cfg.get("create_issue", True):
+        title = description[:30] + ("…" if len(description) > 30 else "")
+        body = (
+            f"**来自 QQ 群反馈 #{feedback_id}**\n\n"
+            f"- 上报人: {result['nickname']} (QQ: {result['qq']})\n"
+            f"- 来源群: {result['group_id']}\n\n"
+            f"## 问题描述\n\n{description}\n"
+            f"\n<!-- grandumi-agent-job:v1 feedback_id={feedback_id} -->\n"
+        )
+        issue = github_issue.create_issue(
+            str(cfg.get("github_repo") or "corazon1999/GrandUMI"),
+            f"[反馈] {title}",
+            body,
+        )
+        if issue:
+            issue_no, _ = issue
+            storage.set_issue_no(feedback_id, issue_no)
+    emit(
+        {
+            "ok": True,
+            "chat_id": chat_id,
+            "decision": decision,
+            "feedback_id": feedback_id,
+        }
+    )
 
 
 def command_chat_release() -> None:
@@ -170,6 +228,7 @@ def main() -> int:
     sub.add_parser("complete")
     sub.add_parser("release")
     sub.add_parser("chat-complete")
+    sub.add_parser("bug-intake-complete")
     sub.add_parser("chat-release")
     sub.add_parser("status")
     args = parser.parse_args()
@@ -181,6 +240,8 @@ def main() -> int:
             command_chat_claim(args)
         elif args.command == "chat-complete":
             command_chat_complete()
+        elif args.command == "bug-intake-complete":
+            command_bug_intake_complete()
         elif args.command == "chat-release":
             command_chat_release()
         elif args.command == "ask":

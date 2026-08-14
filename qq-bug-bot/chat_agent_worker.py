@@ -45,7 +45,10 @@ class ChatAgentWorker:
             file.write(line + "\n")
 
     def bridge(self, command: str, payload: dict | None = None) -> dict:
-        if command not in ("chat-claim", "chat-complete", "chat-release", "status"):
+        if command not in (
+            "chat-claim", "chat-complete", "bug-intake-complete",
+            "chat-release", "status",
+        ):
             raise WorkerError(f"非法聊天桥接命令: {command}")
         suffix = command
         if command == "chat-claim":
@@ -83,10 +86,10 @@ class ChatAgentWorker:
                 return data
         raise WorkerError("服务器聊天桥接未返回结构化结果")
 
-    def run_codex(self, prompt: str) -> str:
-        schema = self.repo / "qq-bug-bot" / "schemas" / "chat.schema.json"
+    def run_codex(self, prompt: str, schema_name: str = "chat.schema.json") -> dict:
+        schema = self.repo / "qq-bug-bot" / "schemas" / schema_name
         if not schema.is_file():
-            raise WorkerError(f"找不到聊天输出 Schema: {schema}")
+            raise WorkerError(f"找不到 Agent 输出 Schema: {schema}")
         args = [
             resolve_codex_command(str(self.cfg.get("codex_command") or "codex")),
             "--ask-for-approval", "never",
@@ -132,25 +135,59 @@ class ChatAgentWorker:
             value = json.loads(messages[-1])
         except json.JSONDecodeError as exc:
             raise WorkerError(f"聊天 Codex 最终消息不是 JSON: {exc}") from exc
-        reply = str(value.get("reply") or "").strip()
-        if not reply or len(reply) > 500:
-            raise WorkerError("聊天 Codex 返回的 reply 长度无效")
-        return reply
+        if not isinstance(value, dict):
+            raise WorkerError("聊天 Codex 最终消息必须是 JSON 对象")
+        return value
 
     def process_job(self, job: dict) -> None:
         chat_id = int(job["id"])
-        self.log(f"开始处理聊天 #{chat_id}")
+        kind = str(job.get("kind") or "chat")
+        self.log(f"开始处理{kind} #{chat_id}")
         try:
-            reply = self.run_codex(chat_protocol.build_chat_prompt(job))
-            self.bridge(
-                "chat-complete",
-                {
-                    "chat_id": chat_id,
-                    "claim_token": job["claim_token"],
-                    "reply": reply,
-                },
-            )
-            self.log(f"聊天 #{chat_id} 已完成")
+            if kind == "bug_intake":
+                result = self.run_codex(
+                    chat_protocol.build_bug_intake_prompt(job),
+                    "bug-intake.schema.json",
+                )
+                decision = str(result.get("decision") or "").strip()
+                description = str(
+                    result.get("cleaned_description") or ""
+                ).strip()
+                reply = str(result.get("reply") or "").strip()
+                if decision not in ("record", "clarify"):
+                    raise WorkerError("Bug 检查返回了无效 decision")
+                if decision == "record" and not description:
+                    raise WorkerError("Bug 检查未返回可记录的问题描述")
+                if decision == "clarify" and not reply:
+                    raise WorkerError("Bug 检查未返回具体追问")
+                completed = self.bridge(
+                    "bug-intake-complete",
+                    {
+                        "chat_id": chat_id,
+                        "claim_token": job["claim_token"],
+                        "decision": decision,
+                        "cleaned_description": description,
+                        "reply": reply,
+                    },
+                )
+                self.log(
+                    f"Bug检查 #{chat_id} 已完成：{decision} "
+                    f"feedback={completed.get('feedback_id')}"
+                )
+            else:
+                result = self.run_codex(chat_protocol.build_chat_prompt(job))
+                reply = str(result.get("reply") or "").strip()
+                if not reply or len(reply) > 500:
+                    raise WorkerError("聊天 Codex 返回的 reply 长度无效")
+                self.bridge(
+                    "chat-complete",
+                    {
+                        "chat_id": chat_id,
+                        "claim_token": job["claim_token"],
+                        "reply": reply,
+                    },
+                )
+                self.log(f"聊天 #{chat_id} 已完成")
         except Exception as exc:
             self.log(f"聊天 #{chat_id} 处理失败：{exc}")
             try:
@@ -174,9 +211,10 @@ class ChatAgentWorker:
                 raise WorkerError(f"未找到命令: {name}")
         resolve_codex_command(str(self.cfg.get("codex_command") or "codex"))
         self.bridge("status")
-        reply = self.run_codex(
+        result = self.run_codex(
             "不要运行命令或读取文件。仅按 Schema 输出 reply 字段，内容为‘聊天自检通过’。"
         )
+        reply = str(result.get("reply") or "")
         if "自检通过" not in reply:
             raise WorkerError("聊天 Codex 自检返回意外结果")
         self.log("自检通过")

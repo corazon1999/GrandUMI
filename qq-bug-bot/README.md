@@ -1,15 +1,17 @@
 # GrandUMI QQ 群 bug 反馈机器人
 
-监听 QQ 群里以 `#bug ` 开头的消息，把反馈**存到本地 SQLite**、**自动提交到 GitHub Issues**，并可调用所有者电脑上的 Codex Agent 自动分析和修复明确 Bug。
+监听 QQ 群里任何包含 `bug`（忽略大小写）的消息。机器人先检查描述能否定位问题：信息完整时**静默存到本地 SQLite**、**自动提交到 GitHub Issues**，信息不足时只追问具体缺失项；玩家下一条回复会自动与原描述合并后再次检查。
 
-玩家也可以发送 `#聊天 你好` 唤起独立的只读聊天 Agent。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
+玩家只需 @机器人即可唤起独立的只读聊天 Agent，不再要求 `#聊天` 前缀，也不发送“听见了、收到、稍等”等中间确认。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
 
 ```
-QQ群用户:  #bug OP16-080 的减费光环没生效
+QQ群用户:  这张卡有 bug
         ↓
-机器人:    @某某 ✅ 已收到你的反馈 #5,感谢!
-                  已同步到 Issue #23
-                  已进入 Agent 自动分析队列
+机器人:    @某某 是哪张卡？做了什么操作，实际结果和预期结果分别是什么？
+        ↓
+QQ群用户:  OP16-080 的减费光环在角色登场后没有生效，预期费用减 1
+        ↓
+机器人:    （静默记录，不发送确认话术）
 ```
 
 底层走 **OneBot 11** 协议,QQ 接入用 **NapCat**(正向 WebSocket)。
@@ -42,23 +44,18 @@ copy config.example.json config.json
 |------|------|
 | `ws_url` | NapCat 正向 WS 地址,默认 `ws://127.0.0.1:3001` |
 | `access_token` | 与 NapCat 一致;没设留空字符串 |
-| `command_prefix` | 触发前缀,默认 `#bug `(注意末尾空格) |
 | `allowed_groups` | 群号白名单数组,如 `[123456, 789012]`;**留空 `[]` 表示所有群** |
 | `create_issue` | 是否自动建 GitHub Issue |
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |
-| `reply_enabled` | 是否在群里回执 |
-| `min_content_length` | 反馈正文最少字数,过短不入库 |
 | `agent_enabled` | 是否把新反馈送入本机 Agent 队列 |
 | `agent_owner_qq` | 功能需求或不确定 Bug 需要确认时 @ 的管理员 QQ |
 | `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |
-| `chat_agent_enabled` | 是否接受玩家的 `#聊天` 请求 |
+| `chat_agent_enabled` | 是否接受玩家 @机器人后的聊天请求 |
 | `chat_max_content_length` | 单条聊天正文最大字数，默认 500 |
-| `chat_max_pending_per_user` | 同一玩家在同一群最多排队数，默认 1 |
-| `chat_cooldown_seconds` | 同一玩家两次请求的冷却秒数，默认 15 |
 
 ## 女帝汉库克人格聊天 Agent
 
-聊天使用独立的只读队列和常驻工作器。每次回复会参考同群最近 6 轮已完成聊天，但最多输出 500 字；玩家输入只作为不可信聊天数据，不会被当作工具指令。安装或更新本机工作器：
+聊天和 Bug 描述检查使用独立的只读队列和常驻工作器。聊天回复会参考同群最近 6 轮已完成聊天，但最多输出 500 字；玩家输入只作为不可信数据，不会被当作工具指令。安装或更新本机工作器：
 
 ```powershell
 cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
@@ -127,7 +124,7 @@ py -m pip install -r requirements.txt
 py bot.py
 ```
 
-看到「已连接 NapCat,等待群消息…」即成功。在群里发一条 `#bug 测试` 验证。
+看到「已连接 NapCat,等待群消息…」即成功。可以在测试群 @机器人验证聊天，或发送一条含 `bug` 的消息验证描述检查。
 
 > GitHub Issue 是通过本机 `gh issue create` 创建的,所以机器人必须跑在已 `gh auth login` 的这台机器上。
 
