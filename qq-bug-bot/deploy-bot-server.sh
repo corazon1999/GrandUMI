@@ -46,6 +46,10 @@ with open(path, "r", encoding="utf-8") as file:
 data["agent_enabled"] = enable_agent
 data["agent_owner_qq"] = 651846226
 data["agent_notification_interval_seconds"] = 3
+data["chat_agent_enabled"] = True
+data["chat_max_content_length"] = 500
+data["chat_max_pending_per_user"] = 1
+data["chat_cooldown_seconds"] = 15
 tmp = path + ".new"
 with open(tmp, "w", encoding="utf-8") as file:
     json.dump(data, file, ensure_ascii=False, indent=2)

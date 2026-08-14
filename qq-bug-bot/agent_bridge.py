@@ -20,6 +20,7 @@ CONFIG_PATH = os.environ.get(
 )
 MAX_QUESTION_LENGTH = 3000
 MAX_SUMMARY_LENGTH = 2000
+MAX_CHAT_REPLY_LENGTH = 500
 
 
 def emit(payload: dict) -> None:
@@ -57,6 +58,32 @@ def require_text(payload: dict, key: str, limit: int) -> str:
 def command_claim(args) -> None:
     job = storage.claim_agent_job(args.worker_id, args.lease_seconds)
     emit({"ok": True, "job": job})
+
+
+def command_chat_claim(args) -> None:
+    job = storage.claim_chat_job(args.worker_id, args.lease_seconds)
+    emit({"ok": True, "job": job})
+
+
+def command_chat_complete() -> None:
+    payload = read_payload()
+    chat_id = int(payload.get("chat_id"))
+    token = require_text(payload, "claim_token", 128)
+    reply = require_text(payload, "reply", MAX_CHAT_REPLY_LENGTH)
+    if not storage.complete_chat_job(chat_id, token, reply):
+        raise ValueError("聊天任务租约已失效，未写入回复")
+    emit({"ok": True, "chat_id": chat_id})
+
+
+def command_chat_release() -> None:
+    payload = read_payload()
+    chat_id = int(payload.get("chat_id"))
+    token = require_text(payload, "claim_token", 128)
+    error = str(payload.get("error") or "Agent 暂时不可用").strip()[:1000]
+    max_attempts = max(1, min(10, int(payload.get("max_attempts") or 3)))
+    if not storage.release_chat_job(chat_id, token, error, max_attempts):
+        raise ValueError("聊天任务租约已失效，未释放任务")
+    emit({"ok": True, "chat_id": chat_id})
 
 
 def command_ask() -> None:
@@ -136,15 +163,26 @@ def main() -> int:
     claim = sub.add_parser("claim")
     claim.add_argument("--worker-id", required=True)
     claim.add_argument("--lease-seconds", type=int, default=3600)
+    chat_claim = sub.add_parser("chat-claim")
+    chat_claim.add_argument("--worker-id", required=True)
+    chat_claim.add_argument("--lease-seconds", type=int, default=600)
     sub.add_parser("ask")
     sub.add_parser("complete")
     sub.add_parser("release")
+    sub.add_parser("chat-complete")
+    sub.add_parser("chat-release")
     sub.add_parser("status")
     args = parser.parse_args()
     storage.init_db()
     try:
         if args.command == "claim":
             command_claim(args)
+        elif args.command == "chat-claim":
+            command_chat_claim(args)
+        elif args.command == "chat-complete":
+            command_chat_complete()
+        elif args.command == "chat-release":
+            command_chat_release()
         elif args.command == "ask":
             command_ask()
         elif args.command == "complete":

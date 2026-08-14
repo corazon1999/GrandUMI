@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 
 import websockets
 # 注意:websockets 16.0 的新版 asyncio 实现(默认的 websockets.connect)与 NapCat
@@ -71,6 +72,7 @@ def extract_plain_text(event: dict) -> str:
 
 # 反馈触发:以 #bug 开头(忽略大小写)即视为反馈。
 _TRIGGER_RE = re.compile(r"^\s*#bug", re.IGNORECASE)
+_CHAT_TRIGGER_RE = re.compile(r"^\s*#聊天(?:\s+|[:：])?(.*)$", re.DOTALL)
 
 
 def match_feedback(text: str):
@@ -89,6 +91,14 @@ def match_feedback(text: str):
     rest = re.sub(r"^反馈", "", rest)        # 紧跟的可选"反馈"一词
     rest = re.sub(r"^[\s:：]+", "", rest)    # 再剥掉空格 / 中英文冒号
     return rest.strip()
+
+
+def match_chat(text: str):
+    """识别“#聊天 内容”，命中时返回剥离前缀后的正文。"""
+    if not text:
+        return None
+    match = _CHAT_TRIGGER_RE.match(text)
+    return match.group(1).strip() if match else None
 
 
 def at_message(qq: str, text: str) -> list[dict]:
@@ -168,6 +178,61 @@ async def handle_feedback(ws, cfg, event, content) -> None:
                 f"✅ 已收到你的反馈 #{fid}，感谢！{issue_line}{queue_line}",
             ),
         )
+
+
+async def handle_chat(ws, cfg, event, content: str) -> None:
+    """把群聊请求写入独立只读 Agent 队列。"""
+    group_id = event.get("group_id")
+    qq = str(event.get("user_id", ""))
+    sender = event.get("sender") or {}
+    nickname = sender.get("card") or sender.get("nickname") or "玩家"
+
+    if not cfg.get("chat_agent_enabled", False):
+        await send_group_msg(
+            ws, group_id, at_message(qq, "妾身现在没空，稍后再来觐见吧。")
+        )
+        return
+    if not content:
+        await send_group_msg(
+            ws, group_id, at_message(qq, "想聊什么？请发送：#聊天 你的消息")
+        )
+        return
+    max_length = max(20, int(cfg.get("chat_max_content_length", 500)))
+    if len(content) > max_length:
+        await send_group_msg(
+            ws,
+            group_id,
+            at_message(qq, f"一次最多聊 {max_length} 字，精简一下再告诉我。"),
+        )
+        return
+
+    status = storage.chat_request_status(qq, str(group_id))
+    max_pending = max(1, int(cfg.get("chat_max_pending_per_user", 1)))
+    if status["pending"] >= max_pending:
+        await send_group_msg(
+            ws, group_id, at_message(qq, "上一句话妾身还没答完，不许催促。")
+        )
+        return
+    cooldown = max(0, int(cfg.get("chat_cooldown_seconds", 15)))
+    last_created = status.get("last_created_at")
+    if cooldown and last_created:
+        elapsed = (
+            datetime.now() - datetime.fromisoformat(last_created)
+        ).total_seconds()
+        if elapsed < cooldown:
+            wait_seconds = max(1, int(cooldown - elapsed + 0.999))
+            await send_group_msg(
+                ws,
+                group_id,
+                at_message(qq, f"慢一点，{wait_seconds} 秒后再来找我。"),
+            )
+            return
+
+    chat_id = storage.add_chat_message(qq, nickname, str(group_id), content)
+    print(f"[聊天#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
+    await send_group_msg(
+        ws, group_id, at_message(qq, "妾身听见了，准你稍候片刻。")
+    )
 
 
 def is_at_self(event: dict) -> bool:
@@ -255,30 +320,48 @@ async def notification_loop(ws, cfg) -> None:
     owner_qq = str(cfg.get("agent_owner_qq", "651846226"))
     while True:
         try:
-            question = storage.get_owner_question_to_send()
-            if question:
-                content = str(question.get("content") or "")
-                if len(content) > 500:
-                    content = content[:500] + "…"
-                detail = str(question.get("agent_question") or "需要你的确认")
-                text = (
-                    f"反馈 #{question['id']} 需要确认\n"
-                    f"玩家反馈：{content}\n\n{detail}\n\n"
-                    "请发送：#回复 你的判断或补充说明（无需 @机器人）"
-                )
-                await send_group_msg(
-                    ws, question["group_id"], at_message(owner_qq, text)
-                )
-                storage.mark_owner_question_sent(question["id"])
+            if cfg.get("agent_enabled", False):
+                question = storage.get_owner_question_to_send()
+                if question:
+                    content = str(question.get("content") or "")
+                    if len(content) > 500:
+                        content = content[:500] + "…"
+                    detail = str(question.get("agent_question") or "需要你的确认")
+                    text = (
+                        f"反馈 #{question['id']} 需要确认\n"
+                        f"玩家反馈：{content}\n\n{detail}\n\n"
+                        "请发送：#回复 你的判断或补充说明（无需 @机器人）"
+                    )
+                    await send_group_msg(
+                        ws, question["group_id"], at_message(owner_qq, text)
+                    )
+                    storage.mark_owner_question_sent(question["id"])
 
-            result = storage.get_agent_result_to_send()
-            if result:
+                result = storage.get_agent_result_to_send()
+                if result:
+                    await send_group_msg(
+                        ws,
+                        result["group_id"],
+                        at_message(str(result["qq"]), result_text(result)),
+                    )
+                    storage.mark_agent_result_sent(result["id"])
+
+            chat = (
+                storage.get_chat_result_to_send()
+                if cfg.get("chat_agent_enabled", False)
+                else None
+            )
+            if chat:
+                if chat["state"] == "completed":
+                    text = str(chat.get("reply") or "嗯？妾身刚才没听清。")
+                else:
+                    text = "妾身现在暂时无法回答。过一会儿再来觐见吧。"
                 await send_group_msg(
                     ws,
-                    result["group_id"],
-                    at_message(str(result["qq"]), result_text(result)),
+                    chat["group_id"],
+                    at_message(str(chat["qq"]), text),
                 )
-                storage.mark_agent_result_sent(result["id"])
+                storage.mark_chat_result_sent(chat["id"])
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -297,6 +380,13 @@ async def on_event(ws, cfg, event) -> None:
 
     text = extract_plain_text(event)
     if await handle_owner_reply(ws, cfg, event):
+        return
+    chat_content = match_chat(text)
+    if chat_content is not None:
+        try:
+            await handle_chat(ws, cfg, event, chat_content)
+        except Exception as e:
+            print(f"[错误] 处理聊天异常: {e}")
         return
     content = match_feedback(text)
     if content is None:
@@ -320,7 +410,9 @@ async def run() -> None:
             async with ws_connect(url, max_size=None) as ws:
                 print("已连接 NapCat,等待群消息…")
                 notifier = None
-                if cfg.get("agent_enabled", False):
+                if cfg.get("agent_enabled", False) or cfg.get(
+                    "chat_agent_enabled", False
+                ):
                     notifier = asyncio.create_task(notification_loop(ws, cfg))
                 try:
                     async for raw in ws:

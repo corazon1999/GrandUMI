@@ -9,5 +9,9 @@
   "min_content_length": 2,
   "agent_enabled": true,
   "agent_owner_qq": 651846226,
-  "agent_notification_interval_seconds": 3
+  "agent_notification_interval_seconds": 3,
+  "chat_agent_enabled": true,
+  "chat_max_content_length": 500,
+  "chat_max_pending_per_user": 1,
+  "chat_cooldown_seconds": 15
 }

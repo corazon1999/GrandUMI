@@ -16,6 +16,8 @@ DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"
 
 AGENT_QUEUE_STATES = ("queued", "owner_answered")
 AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
+CHAT_QUEUE_STATES = ("queued", "claimed")
+CHAT_TERMINAL_STATES = ("completed", "failed")
 
 
 def init_db() -> None:
@@ -50,6 +52,33 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                qq TEXT NOT NULL,
+                nickname TEXT,
+                group_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                state TEXT NOT NULL DEFAULT 'queued',
+                reply TEXT,
+                error TEXT,
+                claim_token TEXT,
+                worker_id TEXT,
+                claimed_at TEXT,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                reply_sent_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_queue
+            ON chat_messages(state, created_at, id)
+            """
+        )
         # 幂等迁移:给老库补上新列(缺了才加)
         cols = {row[1] for row in conn.execute("PRAGMA table_info(feedback)")}
         if "status" not in cols:
@@ -80,6 +109,212 @@ def init_db() -> None:
                     f"ALTER TABLE feedback ADD COLUMN {name} {declaration}"
                 )
         conn.commit()
+
+
+def add_chat_message(
+    qq: str,
+    nickname: str,
+    group_id: str,
+    content: str,
+) -> int:
+    """新增一条群聊 Agent 请求并返回编号。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO chat_messages
+                (qq, nickname, group_id, content, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(qq), nickname or "", str(group_id), content,
+                now_text, now_text,
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def chat_request_status(qq: str, group_id: str) -> dict:
+    """返回用户在当前群的排队数和最近请求时间，用于限流。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                SUM(CASE WHEN state IN ('queued', 'claimed') THEN 1 ELSE 0 END),
+                MAX(created_at)
+              FROM chat_messages
+             WHERE qq = ? AND group_id = ?
+            """,
+            (str(qq), str(group_id)),
+        ).fetchone()
+        return {
+            "pending": int(row[0] or 0),
+            "last_created_at": row[1] if row else None,
+        }
+
+
+def claim_chat_job(worker_id: str, lease_seconds: int = 600):
+    """原子领取一条聊天请求，并回收超时租约。"""
+    now = datetime.now()
+    now_text = now.isoformat(timespec="seconds")
+    stale_text = (now - timedelta(seconds=max(60, lease_seconds))).isoformat(
+        timespec="seconds"
+    )
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = 'queued',
+                   claim_token = NULL,
+                   worker_id = NULL,
+                   claimed_at = NULL,
+                   updated_at = ?
+             WHERE state = 'claimed'
+               AND claimed_at IS NOT NULL
+               AND claimed_at < ?
+            """,
+            (now_text, stale_text),
+        )
+        row = conn.execute(
+            """
+            SELECT * FROM chat_messages
+             WHERE state = 'queued'
+             ORDER BY created_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        if not row:
+            conn.commit()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = 'claimed',
+                   claim_token = ?,
+                   worker_id = ?,
+                   claimed_at = ?,
+                   attempts = attempts + 1,
+                   updated_at = ?
+             WHERE id = ? AND state = 'queued'
+            """,
+            (token, worker_id, now_text, now_text, row["id"]),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        claimed = conn.execute(
+            "SELECT * FROM chat_messages WHERE id = ?", (row["id"],)
+        ).fetchone()
+        history = conn.execute(
+            """
+            SELECT nickname, content, reply
+              FROM chat_messages
+             WHERE group_id = ?
+               AND state = 'completed'
+               AND id < ?
+             ORDER BY id DESC
+             LIMIT 6
+            """,
+            (str(row["group_id"]), row["id"]),
+        ).fetchall()
+        conn.commit()
+        result = dict(claimed)
+        result["history"] = [dict(item) for item in reversed(history)]
+        return result
+
+
+def complete_chat_job(
+    chat_id: int,
+    claim_token: str,
+    reply: str,
+) -> bool:
+    """写入聊天回复；仅持有有效租约的工作器可完成。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = 'completed',
+                   reply = ?,
+                   error = NULL,
+                   claim_token = NULL,
+                   worker_id = NULL,
+                   claimed_at = NULL,
+                   updated_at = ?,
+                   reply_sent_at = NULL
+             WHERE id = ?
+               AND state = 'claimed'
+               AND claim_token = ?
+            """,
+            (reply, now_text, chat_id, claim_token),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def release_chat_job(
+    chat_id: int,
+    claim_token: str,
+    error: str,
+    max_attempts: int = 3,
+) -> bool:
+    """瞬时故障时重新排队；超过尝试次数后向群里返回失败。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = CASE WHEN attempts >= ? THEN 'failed' ELSE 'queued' END,
+                   error = ?,
+                   claim_token = NULL,
+                   worker_id = NULL,
+                   claimed_at = NULL,
+                   updated_at = ?,
+                   reply_sent_at = NULL
+             WHERE id = ?
+               AND state = 'claimed'
+               AND claim_token = ?
+            """,
+            (max(1, max_attempts), error, now_text, chat_id, claim_token),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def get_chat_result_to_send():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT * FROM chat_messages
+             WHERE state IN ('completed', 'failed')
+               AND reply_sent_at IS NULL
+             ORDER BY updated_at, id
+             LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def mark_chat_result_sent(chat_id: int) -> bool:
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE chat_messages
+               SET reply_sent_at = ?, updated_at = ?
+             WHERE id = ?
+               AND state IN ('completed', 'failed')
+               AND reply_sent_at IS NULL
+            """,
+            (now_text, now_text, chat_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
 
 
 def add_feedback(

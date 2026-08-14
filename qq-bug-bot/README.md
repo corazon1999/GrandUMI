@@ -2,6 +2,8 @@
 
 监听 QQ 群里以 `#bug ` 开头的消息，把反馈**存到本地 SQLite**、**自动提交到 GitHub Issues**，并可调用所有者电脑上的 Codex Agent 自动分析和修复明确 Bug。
 
+玩家也可以发送 `#聊天 你好` 唤起独立的只读聊天 Agent。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
+
 ```
 QQ群用户:  #bug OP16-080 的减费光环没生效
         ↓
@@ -49,6 +51,21 @@ copy config.example.json config.json
 | `agent_enabled` | 是否把新反馈送入本机 Agent 队列 |
 | `agent_owner_qq` | 功能需求或不确定 Bug 需要确认时 @ 的管理员 QQ |
 | `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |
+| `chat_agent_enabled` | 是否接受玩家的 `#聊天` 请求 |
+| `chat_max_content_length` | 单条聊天正文最大字数，默认 500 |
+| `chat_max_pending_per_user` | 同一玩家在同一群最多排队数，默认 1 |
+| `chat_cooldown_seconds` | 同一玩家两次请求的冷却秒数，默认 15 |
+
+## 女帝汉库克人格聊天 Agent
+
+聊天使用独立的只读队列和常驻工作器。每次回复会参考同群最近 6 轮已完成聊天，但最多输出 500 字；玩家输入只作为不可信聊天数据，不会被当作工具指令。安装或更新本机工作器：
+
+```powershell
+cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
+.\install-chat-agent-worker.ps1
+```
+
+安装器自检通过后会注册并立即启动 `GrandUMI-Chat-Agent` 登录任务。工作器使用隐藏的 `pythonw.exe` 常驻，异常退出后由任务计划程序自动重启；日志位于 `D:\Self\GrandUMI-agent-runtime\logs\chat-agent-worker.log`。
 
 ## Agent 自动分析与修复
 

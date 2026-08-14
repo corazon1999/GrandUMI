@@ -44,6 +44,15 @@ class DeployFileTests(unittest.TestCase):
         self.assertNotIn("-Execute $pythonw", installer)
         self.assertIn("Stop-ScheduledTask", installer)
 
+    def test_聊天工作器隐藏常驻并自动重启(self):
+        installer = (BOT_DIR / "install-chat-agent-worker.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        self.assertIn("pythonw.exe", installer)
+        self.assertIn("RestartCount 100", installer)
+        self.assertIn("Start-ScheduledTask", installer)
+        self.assertIn("女帝汉库克", installer)
+
 
 if __name__ == "__main__":
     unittest.main()
