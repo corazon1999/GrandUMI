@@ -259,6 +259,34 @@ async def download_media_refs(client, refs, cfg: dict):
 _BUG_RE = re.compile(r"bug", re.IGNORECASE)
 _LEADING_BUG_RE = re.compile(r"^\s*#bug(?:反馈)?[\s:：]*", re.IGNORECASE)
 _CHAT_TRIGGER_RE = re.compile(r"^\s*#聊天(?:\s+|[:：])?(.*)$", re.DOTALL)
+_PERSONALITY_SWITCH_RE = re.compile(
+    r"^\s*#切换\s*(娜美|罗宾|女帝)\s*$"
+)
+_PERSONALITY_KEYS = {
+    "娜美": "nami",
+    "罗宾": "robin",
+    "女帝": "hancock",
+}
+_PERSONALITY_SWITCH_REPLIES = {
+    "nami": "已经切换成娜美。接下来由我掌舵，可别给我添乱。",
+    "robin": "已经切换成罗宾。呵呵，接下来就让我安静地陪着各位吧。",
+    "hancock": "已经切换成女帝。能由妾身回应，是你们莫大的荣幸。",
+}
+_PERSONALITY_BUSY_REPLIES = {
+    "hancock": "妾身现在没空，稍后再来觐见吧。",
+    "nami": "我现在忙不过来，等会儿再问吧。",
+    "robin": "我现在暂时抽不开身，稍后再聊吧。",
+}
+_PERSONALITY_EMPTY_REPLIES = {
+    "hancock": "嗯？妾身刚才没听清。",
+    "nami": "嗯？刚才那句我没听清。",
+    "robin": "刚才那句话我没有听清，可以再说一次吗？",
+}
+_PERSONALITY_FAILED_REPLIES = {
+    "hancock": "妾身现在暂时无法回答。过一会儿再来觐见吧。",
+    "nami": "我现在暂时回答不了，过一会儿再来吧。",
+    "robin": "我现在暂时无法回答，稍后再聊吧。",
+}
 
 
 def match_feedback(text: str):
@@ -274,6 +302,13 @@ def match_chat(text: str):
         return None
     match = _CHAT_TRIGGER_RE.match(text)
     return match.group(1).strip() if match else None
+
+
+def match_personality_switch(text: str):
+    if not text:
+        return None
+    match = _PERSONALITY_SWITCH_RE.match(text)
+    return _PERSONALITY_KEYS.get(match.group(1)) if match else None
 
 
 def at_message(qq: str, text: str) -> list[dict]:
@@ -299,6 +334,7 @@ async def handle_feedback(ws, cfg, event, content, media=None) -> None:
     qq = str(event.get("user_id", ""))
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or ""
+    personality = storage.get_group_personality(str(group_id))
 
     intake_id = storage.add_chat_message(
         qq,
@@ -307,6 +343,7 @@ async def handle_feedback(ws, cfg, event, content, media=None) -> None:
         content or "（只提到了 bug，没有描述具体现象）",
         kind="bug_intake",
         media=media,
+        personality=personality,
     )
     print(f"[Bug检查#{intake_id}] 群{group_id} {nickname}({qq}): {content}")
 
@@ -319,13 +356,14 @@ async def handle_chat(
     qq = str(event.get("user_id", ""))
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or "玩家"
+    personality = storage.get_group_personality(str(group_id))
 
     enabled_key = (
         "admin_agent_enabled" if kind == "admin_agent" else "chat_agent_enabled"
     )
     if not cfg.get(enabled_key, False):
         await send_group_msg(
-            ws, group_id, at_message(qq, "妾身现在没空，稍后再来觐见吧。")
+            ws, group_id, at_message(qq, _PERSONALITY_BUSY_REPLIES[personality])
         )
         return
     content = match_chat(content) if match_chat(content) is not None else content
@@ -350,7 +388,13 @@ async def handle_chat(
         return
 
     chat_id = storage.add_chat_message(
-        qq, nickname, str(group_id), content, kind=kind, media=media
+        qq,
+        nickname,
+        str(group_id),
+        content,
+        kind=kind,
+        media=media,
+        personality=personality,
     )
     label = "管理员Agent" if kind == "admin_agent" else "聊天"
     print(f"[{label}#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
@@ -360,12 +404,14 @@ def enqueue_bug_followup(event: dict, content: str, media=None):
     """若玩家正在回答 Bug 追问，把这条消息作为补充说明重新检查。"""
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or "玩家"
+    group_id = str(event.get("group_id", ""))
     return storage.add_bug_followup(
         str(event.get("user_id", "")),
         nickname,
-        str(event.get("group_id", "")),
+        group_id,
         content,
         media=media,
+        personality=storage.get_group_personality(group_id),
     )
 
 
@@ -393,6 +439,30 @@ def is_admin_agent_request(event: dict, cfg: dict) -> bool:
         return False
     owner_qq = str(cfg.get("admin_agent_owner_qq", "651846226"))
     return str(event.get("user_id", "")) == owner_qq and is_at_self(event)
+
+
+async def handle_personality_switch(ws, cfg, event, personality: str) -> bool:
+    owner_qq = str(
+        cfg.get("admin_agent_owner_qq")
+        or cfg.get("agent_owner_qq")
+        or "651846226"
+    )
+    qq = str(event.get("user_id", ""))
+    group_id = str(event.get("group_id", ""))
+    if qq != owner_qq:
+        await send_group_msg(
+            ws,
+            group_id,
+            at_message(qq, "只有赛博释迦可以切换机器人的人格。"),
+        )
+        return True
+    selected = storage.set_group_personality(group_id, personality, qq)
+    await send_group_msg(
+        ws,
+        group_id,
+        at_message(qq, _PERSONALITY_SWITCH_REPLIES[selected]),
+    )
+    return True
 
 
 _OWNER_REPLY_RE = re.compile(r"^\s*#回复(?:\s+|[:：])?(.*)$", re.DOTALL)
@@ -503,9 +573,18 @@ async def notification_loop(ws, cfg) -> None:
             )
             if chat:
                 if chat["state"] == "completed":
-                    text = str(chat.get("reply") or "嗯？妾身刚才没听清。")
+                    personality = storage.normalize_personality(
+                        chat.get("personality")
+                    )
+                    text = str(
+                        chat.get("reply")
+                        or _PERSONALITY_EMPTY_REPLIES[personality]
+                    )
                 else:
-                    text = "妾身现在暂时无法回答。过一会儿再来觐见吧。"
+                    personality = storage.normalize_personality(
+                        chat.get("personality")
+                    )
+                    text = _PERSONALITY_FAILED_REPLIES[personality]
                 await send_group_msg(
                     ws,
                     chat["group_id"],
@@ -536,6 +615,10 @@ async def on_event(ws, cfg, event) -> None:
         print(f"[错误] 展开消息异常: {exc}")
         text = extract_plain_text(event)
         image_refs = []
+    personality = match_personality_switch(text)
+    if personality is not None:
+        await handle_personality_switch(ws, cfg, event, personality)
+        return
     if is_admin_agent_request(event, cfg):
         media = []
         try:

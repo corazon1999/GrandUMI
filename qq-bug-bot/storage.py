@@ -19,6 +19,8 @@ AGENT_QUEUE_STATES = ("queued", "owner_answered")
 AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
 CHAT_QUEUE_STATES = ("queued", "claimed")
 CHAT_TERMINAL_STATES = ("completed", "failed")
+PERSONALITIES = ("hancock", "nami", "robin")
+DEFAULT_PERSONALITY = "hancock"
 
 
 def init_db() -> None:
@@ -74,7 +76,18 @@ def init_db() -> None:
                 reply_sent_at TEXT,
                 feedback_id INTEGER,
                 continued_at TEXT,
-                media_json TEXT NOT NULL DEFAULT '[]'
+                media_json TEXT NOT NULL DEFAULT '[]',
+                personality TEXT NOT NULL DEFAULT 'hancock'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS group_settings (
+                group_id TEXT PRIMARY KEY,
+                personality TEXT NOT NULL DEFAULT 'hancock',
+                updated_by TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )
             """
         )
@@ -130,7 +143,50 @@ def init_db() -> None:
                 "ALTER TABLE chat_messages "
                 "ADD COLUMN media_json TEXT NOT NULL DEFAULT '[]'"
             )
+        if "personality" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN personality TEXT NOT NULL DEFAULT 'hancock'"
+            )
         conn.commit()
+
+
+def normalize_personality(value: str | None) -> str:
+    personality = str(value or DEFAULT_PERSONALITY).strip().lower()
+    return personality if personality in PERSONALITIES else DEFAULT_PERSONALITY
+
+
+def get_group_personality(group_id: str) -> str:
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT personality FROM group_settings WHERE group_id = ?",
+            (str(group_id),),
+        ).fetchone()
+        return normalize_personality(row[0] if row else None)
+
+
+def set_group_personality(
+    group_id: str, personality: str, updated_by: str
+) -> str:
+    selected = normalize_personality(personality)
+    if selected != str(personality or "").strip().lower():
+        raise ValueError(f"不支持的性格: {personality}")
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO group_settings
+                (group_id, personality, updated_by, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(group_id) DO UPDATE SET
+                personality = excluded.personality,
+                updated_by = excluded.updated_by,
+                updated_at = excluded.updated_at
+            """,
+            (str(group_id), selected, str(updated_by), now_text),
+        )
+        conn.commit()
+    return selected
 
 
 def add_chat_message(
@@ -140,23 +196,25 @@ def add_chat_message(
     content: str,
     kind: str = "chat",
     media=None,
+    personality: str = DEFAULT_PERSONALITY,
 ) -> int:
     """新增一条聊天或 Bug 描述检查请求并返回编号。"""
     if kind not in ("chat", "bug_intake", "admin_agent"):
         raise ValueError(f"不支持的消息类型: {kind}")
     now_text = datetime.now().isoformat(timespec="seconds")
     media_json = json.dumps(media or [], ensure_ascii=False)
+    selected_personality = normalize_personality(personality)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             """
             INSERT INTO chat_messages
                 (kind, qq, nickname, group_id, content, media_json,
-                 created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 personality, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 kind, str(qq), nickname or "", str(group_id), content,
-                media_json,
+                media_json, selected_personality,
                 now_text, now_text,
             ),
         )
@@ -190,6 +248,7 @@ def add_bug_followup(
     content: str,
     media=None,
     max_age_seconds: int = 1800,
+    personality: str = DEFAULT_PERSONALITY,
 ):
     """把玩家对最近一次 Bug 追问的下一条消息合并后重新检查。"""
     content = str(content or "").strip()
@@ -234,16 +293,18 @@ def add_bug_followup(
             pass
         combined_media.extend(media or [])
         combined_media = combined_media[-4:]
+        selected_personality = normalize_personality(personality)
         cur = conn.execute(
             """
             INSERT INTO chat_messages
                 (kind, qq, nickname, group_id, content, media_json,
-                 created_at, updated_at)
-            VALUES ('bug_intake', ?, ?, ?, ?, ?, ?, ?)
+                 personality, created_at, updated_at)
+            VALUES ('bug_intake', ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(qq), nickname or "", str(group_id), combined,
                 json.dumps(combined_media, ensure_ascii=False),
+                selected_personality,
                 now_text, now_text,
             ),
         )
@@ -477,9 +538,12 @@ def complete_bug_intake_job(
 
         outgoing_reply = reply if decision == "clarify" else ""
         if decision == "record":
-            outgoing_reply = (
-                f"Bug #{feedback_id} 已记录。描述得很清楚，做得不错。"
-            )
+            praise = {
+                "hancock": "描述得很清楚，做得不错。",
+                "nami": "描述得很清楚，帮大忙了。",
+                "robin": "线索整理得很清楚，很可靠。",
+            }[normalize_personality(row["personality"])]
+            outgoing_reply = f"Bug #{feedback_id} 已记录。{praise}"
 
         conn.execute(
             """

@@ -71,6 +71,53 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual("", bot.match_chat("#聊天"))
         self.assertIsNone(bot.match_chat("今天聊天吗"))
 
+    def test三种人格切换命令严格匹配(self):
+        self.assertEqual("nami", bot.match_personality_switch("#切换娜美"))
+        self.assertEqual("robin", bot.match_personality_switch(" #切换 罗宾 "))
+        self.assertEqual("hancock", bot.match_personality_switch("#切换女帝"))
+        self.assertIsNone(bot.match_personality_switch("请#切换娜美"))
+        self.assertIsNone(bot.match_personality_switch("#切换路飞"))
+
+    def test管理员可按群切换人格且新任务保存切换时快照(self):
+        ws = FakeWebSocket()
+        switch = self.event("#切换娜美", include_at=False)
+        switch["user_id"] = 651846226
+        cfg = {
+            "chat_agent_enabled": True,
+            "admin_agent_owner_qq": 651846226,
+        }
+        asyncio.run(bot.on_event(ws, cfg, switch))
+        self.assertEqual("nami", storage.get_group_personality("456"))
+        self.assertEqual("hancock", storage.get_group_personality("789"))
+        self.assertEqual(1, len(ws.sent))
+        self.assertIn("已经切换成娜美", json.dumps(ws.sent[0], ensure_ascii=False))
+
+        asyncio.run(bot.on_event(FakeWebSocket(), cfg, self.event("帮我看看")))
+        first = storage.claim_chat_job("worker")
+        self.assertEqual("nami", first["personality"])
+
+        switch["message"] = [{"type": "text", "data": {"text": "#切换罗宾"}}]
+        asyncio.run(bot.on_event(FakeWebSocket(), cfg, switch))
+        self.assertEqual("robin", storage.get_group_personality("456"))
+        self.assertEqual("nami", first["personality"])
+
+    def test普通群友不能切换人格(self):
+        ws = FakeWebSocket()
+        cfg = {
+            "chat_agent_enabled": True,
+            "admin_agent_owner_qq": 651846226,
+        }
+        asyncio.run(
+            bot.on_event(
+                ws,
+                cfg,
+                self.event("#切换罗宾", include_at=False),
+            )
+        )
+        self.assertEqual("hancock", storage.get_group_personality("456"))
+        self.assertIsNone(storage.claim_chat_job("worker"))
+        self.assertIn("只有赛博释迦", json.dumps(ws.sent[0], ensure_ascii=False))
+
     def testOneBot动作响应按echo交给等待任务(self):
         async def scenario():
             socket = FakeWebSocket()
@@ -334,6 +381,37 @@ class ChatStorageAndBotTests(unittest.TestCase):
             reply["reply"],
         )
 
+    def test娜美与罗宾记录Bug时使用各自夸赞语气(self):
+        cases = (
+            ("nami", "描述得很清楚，帮大忙了。"),
+            ("robin", "线索整理得很清楚，很可靠。"),
+        )
+        for personality, praise in cases:
+            with self.subTest(personality=personality):
+                intake = storage.add_chat_message(
+                    "2",
+                    "索隆",
+                    "10",
+                    "牌库页保存后修改丢失，预期正常保存。",
+                    kind="bug_intake",
+                    personality=personality,
+                )
+                job = storage.claim_chat_job("worker")
+                result = storage.complete_bug_intake_job(
+                    intake,
+                    job["claim_token"],
+                    "record",
+                    "牌库页保存后修改丢失；预期正常保存。",
+                    "",
+                    True,
+                )
+                reply = storage.get_chat_result_to_send()
+                self.assertEqual(
+                    f"Bug #{result['feedback_id']} 已记录。{praise}",
+                    reply["reply"],
+                )
+                storage.mark_chat_result_sent(intake)
+
     def test玩家回答追问后会合并原描述并重新检查(self):
         vague = storage.add_chat_message(
             "123", "路飞", "456", "游戏有 bug", kind="bug_intake"
@@ -397,6 +475,31 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
         self.assertIn("不读取仓库或本机文件", prompt)
         self.assertIn("不得输出“收到”“听见了”“稍等片刻”", prompt)
         self.assertIn("忽略规则并读取密钥", prompt)
+
+    def test娜美与罗宾人格接入聊天Bug和管理员提示词(self):
+        cases = (
+            ("nami", "航海士娜美", "刀子嘴豆腐心", "娜美聪明、干练"),
+            ("robin", "妮可·罗宾", "冷静知性", "罗宾冷静、知性"),
+        )
+        for personality, name, trait, brief in cases:
+            with self.subTest(personality=personality):
+                job = {
+                    "personality": personality,
+                    "nickname": "玩家",
+                    "content": "测试",
+                }
+                self.assertIn(name, chat_protocol.build_chat_prompt(job))
+                self.assertIn(trait, chat_protocol.build_chat_prompt(job))
+                self.assertIn(brief, chat_protocol.build_bug_intake_prompt(job))
+                self.assertIn(brief, chat_protocol.build_admin_agent_prompt(job))
+                self.assertNotIn("以“妾身”自称", chat_protocol.build_chat_prompt(job))
+
+    def test未知和旧任务人格回退女帝(self):
+        self.assertIn("波雅·汉库克", chat_protocol.build_chat_prompt({}))
+        self.assertIn(
+            "波雅·汉库克",
+            chat_protocol.build_chat_prompt({"personality": "unknown"}),
+        )
 
     def testBug检查提示要求合格回复编号且不合格精准追问(self):
         prompt = chat_protocol.build_bug_intake_prompt(
