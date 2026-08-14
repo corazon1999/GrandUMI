@@ -802,6 +802,9 @@ Object.assign(en, {
   "点击\"开始模拟\"洗牌抽手": "Select “Start simulation” to shuffle and draw a hand",
 
   "登录账号": "Signed-in account",
+  "非官方项目声明": "Unofficial project notice",
+  "非官方玩家项目": "Unofficial fan project",
+  "GrandUMI 未获得万代、集英社、东映动画或其他相关权利方的授权、认可或赞助，与上述权利方不存在隶属、合作或其他关联关系。相关名称、角色及卡牌素材的权利归各自权利方所有。": "GrandUMI is not authorized, endorsed, or sponsored by Bandai, Shueisha, Toei Animation, or any other relevant rights holder and is not affiliated with them. Rights to the relevant names, characters, and card materials belong to their respective owners.",
   "更换账号": "Switch account",
   "设置密码": "Set password",
   "密码": "Password",
@@ -1247,6 +1250,9 @@ Object.assign(ja, {
   "点击\"开始模拟\"洗牌抽手": "「シミュレーション開始」でシャッフルして手札を引きます",
 
   "登录账号": "ログイン中のアカウント",
+  "非官方项目声明": "非公式プロジェクトに関する声明",
+  "非官方玩家项目": "非公式ファンプロジェクト",
+  "GrandUMI 未获得万代、集英社、东映动画或其他相关权利方的授权、认可或赞助，与上述权利方不存在隶属、合作或其他关联关系。相关名称、角色及卡牌素材的权利归各自权利方所有。": "GrandUMIは、バンダイ、集英社、東映アニメーションその他の関連権利者から許諾、承認または協賛を受けておらず、これらの権利者とは関係ありません。関連する名称、キャラクターおよびカード素材の権利は各権利者に帰属します。",
   "更换账号": "アカウント切替",
   "设置密码": "パスワード設定",
   "密码": "パスワード",
