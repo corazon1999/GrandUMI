@@ -3,8 +3,8 @@
 
 工作流程:
   1. 主动连接 NapCat 的正向 WS 服务端(同一条连接收事件 + 发动作)。
-  2. 监听群消息,识别以 command_prefix(默认 "#bug ")开头的消息。
-  3. 写入本地 SQLite -> 尝试建 GitHub Issue -> 在群里 @ 上报人回执。
+  2. @机器人时展开文字、图片和合并转发，交给只读视觉聊天 Agent。
+  3. 含 bug 的消息先检查描述完整性，合格后只记录到 SQLite/Issue。
 
 运行: py bot.py
 依赖: websockets(见 requirements.txt);GitHub 走本机已登录的 gh CLI。
@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+from uuid import uuid4
 
 import websockets
 # 注意:websockets 16.0 的新版 asyncio 实现(默认的 websockets.connect)与 NapCat
@@ -24,6 +25,7 @@ import websockets
 from websockets.legacy.client import connect as ws_connect
 
 import storage
+import media_pipeline
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get(
@@ -51,6 +53,51 @@ def build_ws_url(cfg: dict) -> str:
     return url
 
 
+class OneBotClient:
+    """在同一条正向 WebSocket 上并发接收事件并等待 API 动作响应。"""
+
+    def __init__(self, ws):
+        self.ws = ws
+        self.pending = {}
+
+    async def send(self, payload) -> None:
+        await self.ws.send(payload)
+
+    async def call_action(
+        self, action: str, params: dict, timeout: float = 20
+    ) -> dict:
+        echo = f"grandumi:{uuid4().hex}"
+        future = asyncio.get_running_loop().create_future()
+        self.pending[echo] = future
+        try:
+            await self.send(
+                json.dumps(
+                    {"action": action, "params": params, "echo": echo},
+                    ensure_ascii=False,
+                )
+            )
+            response = await asyncio.wait_for(future, timeout=timeout)
+        finally:
+            self.pending.pop(echo, None)
+        if response.get("status") != "ok" or response.get("retcode", 0) != 0:
+            detail = response.get("message") or response.get("wording") or action
+            raise RuntimeError(f"NapCat 动作失败：{detail}")
+        return response
+
+    def resolve_response(self, response: dict) -> bool:
+        future = self.pending.get(str(response.get("echo") or ""))
+        if not future or future.done():
+            return False
+        future.set_result(response)
+        return True
+
+    def close(self) -> None:
+        for future in self.pending.values():
+            if not future.done():
+                future.cancel()
+        self.pending.clear()
+
+
 def extract_plain_text(event: dict) -> str:
     """从 OneBot 事件里取纯文本，并丢弃 @、图片等 CQ 片段。"""
     msg = event.get("message")
@@ -66,6 +113,146 @@ def extract_plain_text(event: dict) -> str:
     if isinstance(raw, str) and raw:
         return re.sub(r"\[CQ:[^\]]+\]", "", raw)
     return ""
+
+
+def _message_segments(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        for key in ("message", "content", "messages"):
+            if isinstance(value.get(key), list):
+                return value[key]
+    return []
+
+
+def _sender_label(value: dict) -> str:
+    sender = value.get("sender") or {}
+    data = value.get("data") or {}
+    return str(
+        sender.get("card")
+        or sender.get("nickname")
+        or data.get("name")
+        or data.get("nickname")
+        or value.get("nickname")
+        or sender.get("user_id")
+        or data.get("uin")
+        or "转发成员"
+    )[:80]
+
+
+async def _collect_segments(client, segments, state: dict, depth: int = 0) -> None:
+    if depth > state["max_depth"] or state["nodes"] >= state["max_nodes"]:
+        return
+    for segment in _message_segments(segments):
+        if state["nodes"] >= state["max_nodes"]:
+            break
+        if not isinstance(segment, dict):
+            continue
+        state["nodes"] += 1
+        kind = str(segment.get("type") or "")
+        data = segment.get("data") or {}
+        if kind == "text":
+            text = str(data.get("text") or "").strip()
+            if text:
+                state["text"].append(text)
+        elif kind == "image" and len(state["images"]) < state["max_images"]:
+            state["images"].append(
+                {
+                    "url": str(data.get("url") or "").strip(),
+                    "file": str(data.get("file") or "").strip(),
+                    "summary": str(data.get("summary") or "").strip()[:100],
+                    "source": "forward" if depth else "direct",
+                }
+            )
+        elif kind == "node":
+            content = data.get("content") or data.get("message") or []
+            label = _sender_label(segment)
+            before = len(state["text"])
+            await _collect_segments(client, content, state, depth + 1)
+            if len(state["text"]) > before:
+                joined = " ".join(state["text"][before:])
+                state["text"][before:] = [f"{label}：{joined}"]
+        elif kind == "forward":
+            content = data.get("content")
+            if not isinstance(content, list):
+                message_id = str(data.get("id") or "").strip()
+                if not message_id or not hasattr(client, "call_action"):
+                    continue
+                response = await client.call_action(
+                    "get_forward_msg", {"message_id": message_id}
+                )
+                payload = response.get("data") or {}
+                content = (
+                    payload.get("messages")
+                    or payload.get("message")
+                    or payload.get("content")
+                    or []
+                ) if isinstance(payload, dict) else payload
+            if isinstance(content, list):
+                state["text"].append("【合并转发】")
+                for node in content[: state["max_nodes"]]:
+                    node_segments = _message_segments(node)
+                    if not node_segments and isinstance(node, dict):
+                        node_segments = [node]
+                    label = _sender_label(node) if isinstance(node, dict) else "转发成员"
+                    before = len(state["text"])
+                    await _collect_segments(
+                        client, node_segments, state, depth + 1
+                    )
+                    if len(state["text"]) > before:
+                        joined = " ".join(state["text"][before:])
+                        state["text"][before:] = [f"{label}：{joined}"]
+
+
+async def expand_event_content(client, event: dict, cfg: dict):
+    """展开合并转发，返回带说话人上下文的文本和图片引用。"""
+    state = {
+        "text": [],
+        "images": [],
+        "nodes": 0,
+        "max_nodes": max(5, min(100, int(cfg.get("forward_max_nodes", 40)))),
+        "max_depth": max(1, min(5, int(cfg.get("forward_max_depth", 3)))),
+        "max_images": max(1, min(8, int(cfg.get("vision_max_images", 4)))),
+    }
+    await _collect_segments(client, event.get("message"), state)
+    text = "\n".join(state["text"]).strip()
+    return text, state["images"]
+
+
+async def download_media_refs(client, refs, cfg: dict):
+    """只在已命中聊天或 Bug 路由后下载图片。"""
+    if not refs or not cfg.get("vision_enabled", True):
+        return [], 0
+    maximum = max(64 * 1024, int(cfg.get("vision_max_image_bytes", 8 * 1024 * 1024)))
+    media = []
+    failures = 0
+    media_pipeline.cleanup_expired_media(
+        int(cfg.get("vision_media_ttl_seconds", 86400))
+    )
+    for reference in refs[: max(1, int(cfg.get("vision_max_images", 4)))]:
+        url = str(reference.get("url") or "").strip()
+        if not url and reference.get("file") and hasattr(client, "call_action"):
+            try:
+                response = await client.call_action(
+                    "get_image", {"file": reference["file"]}
+                )
+                data = response.get("data") or {}
+                url = str(data.get("url") or "").strip()
+            except RuntimeError as exc:
+                print(f"[识图] NapCat 获取图片失败：{exc}")
+        if not url:
+            failures += 1
+            continue
+        try:
+            item = await asyncio.to_thread(
+                media_pipeline.download_image, url, maximum
+            )
+            item["source"] = reference.get("source") or "direct"
+            media.append(item)
+        except (OSError, ValueError) as exc:
+            failures += 1
+            print(f"[识图] 图片读取失败：{exc}")
+    return media, failures
 
 
 # 反馈触发:群消息里只要出现 bug（忽略大小写）即进入描述检查。
@@ -106,7 +293,7 @@ async def send_group_msg(ws, group_id, message) -> None:
     await ws.send(json.dumps(payload, ensure_ascii=False))
 
 
-async def handle_feedback(ws, cfg, event, content) -> None:
+async def handle_feedback(ws, cfg, event, content, media=None) -> None:
     """把含 bug 的消息送入描述检查队列；此处不回确认话术。"""
     group_id = event.get("group_id")
     qq = str(event.get("user_id", ""))
@@ -119,11 +306,12 @@ async def handle_feedback(ws, cfg, event, content) -> None:
         str(group_id),
         content or "（只提到了 bug，没有描述具体现象）",
         kind="bug_intake",
+        media=media,
     )
     print(f"[Bug检查#{intake_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
-async def handle_chat(ws, cfg, event, content: str) -> None:
+async def handle_chat(ws, cfg, event, content: str, media=None) -> None:
     """把群聊请求写入独立只读 Agent 队列。"""
     group_id = event.get("group_id")
     qq = str(event.get("user_id", ""))
@@ -137,7 +325,10 @@ async def handle_chat(ws, cfg, event, content: str) -> None:
         return
     content = match_chat(content) if match_chat(content) is not None else content
     if not content:
-        content = "（玩家只@了你，没有附加文字）"
+        content = (
+            "（玩家附了一张或多张图片，请直接查看图片后回答）"
+            if media else "（玩家只@了你，没有附加文字）"
+        )
     max_length = max(20, int(cfg.get("chat_max_content_length", 500)))
     if len(content) > max_length:
         await send_group_msg(
@@ -147,11 +338,13 @@ async def handle_chat(ws, cfg, event, content: str) -> None:
         )
         return
 
-    chat_id = storage.add_chat_message(qq, nickname, str(group_id), content)
+    chat_id = storage.add_chat_message(
+        qq, nickname, str(group_id), content, media=media
+    )
     print(f"[聊天#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
-def enqueue_bug_followup(event: dict, content: str):
+def enqueue_bug_followup(event: dict, content: str, media=None):
     """若玩家正在回答 Bug 追问，把这条消息作为补充说明重新检查。"""
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or "玩家"
@@ -160,6 +353,7 @@ def enqueue_bug_followup(event: dict, content: str):
         nickname,
         str(event.get("group_id", "")),
         content,
+        media=media,
     )
 
 
@@ -246,8 +440,16 @@ async def notification_loop(ws, cfg) -> None:
     """串行发送管理员问题与玩家最终结果。"""
     interval = max(1, int(cfg.get("agent_notification_interval_seconds", 3)))
     owner_qq = str(cfg.get("agent_owner_qq", "651846226"))
+    next_media_cleanup = 0.0
     while True:
         try:
+            now = asyncio.get_running_loop().time()
+            if now >= next_media_cleanup:
+                await asyncio.to_thread(
+                    media_pipeline.cleanup_expired_media,
+                    int(cfg.get("vision_media_ttl_seconds", 86400)),
+                )
+                next_media_cleanup = now + 3600
             if cfg.get("agent_enabled", False):
                 question = storage.get_owner_question_to_send()
                 if question:
@@ -306,28 +508,74 @@ async def on_event(ws, cfg, event) -> None:
     if allowed and event.get("group_id") not in allowed:
         return  # 群白名单(为空表示全部群)
 
-    text = extract_plain_text(event)
     if await handle_owner_reply(ws, cfg, event):
         return
+    try:
+        text, image_refs = await expand_event_content(ws, event, cfg)
+    except Exception as exc:
+        print(f"[错误] 展开消息异常: {exc}")
+        text = extract_plain_text(event)
+        image_refs = []
     content = match_feedback(text)
     if content is not None:
+        media = []
         try:
-            await handle_feedback(ws, cfg, event, content)
+            media, failures = await download_media_refs(ws, image_refs, cfg)
+            if failures:
+                content += f"\n（有 {failures} 张图片读取失败）"
+            await handle_feedback(ws, cfg, event, content, media)
         except Exception as e:
+            media_pipeline.cleanup_media(media)
             print(f"[错误] 处理反馈异常: {e}")
         return
-    followup_id = enqueue_bug_followup(event, text)
-    if followup_id:
-        print(
-            f"[Bug补充#{followup_id}] 群{event.get('group_id')} "
-            f"{event.get('user_id')}: {text}"
-        )
-        return
-    if is_at_self(event):
+    if storage.has_pending_bug_followup(
+        str(event.get("user_id", "")), str(event.get("group_id", ""))
+    ):
+        media = []
         try:
-            await handle_chat(ws, cfg, event, text.strip())
+            media, failures = await download_media_refs(ws, image_refs, cfg)
+            followup_text = text
+            if failures:
+                followup_text += f"\n（有 {failures} 张图片读取失败）"
+            followup_id = enqueue_bug_followup(
+                event, followup_text.strip(), media
+            )
+            if followup_id:
+                print(
+                    f"[Bug补充#{followup_id}] 群{event.get('group_id')} "
+                    f"{event.get('user_id')}: {text}"
+                )
+                return
+            media_pipeline.cleanup_media(media)
+        except Exception as exc:
+            media_pipeline.cleanup_media(media)
+            print(f"[错误] 处理 Bug 补充异常: {exc}")
+    if is_at_self(event):
+        media = []
+        try:
+            media, failures = await download_media_refs(ws, image_refs, cfg)
+            chat_text = text.strip()
+            if failures:
+                chat_text += f"\n（有 {failures} 张图片读取失败）"
+            await handle_chat(ws, cfg, event, chat_text.strip(), media)
         except Exception as e:  # 单条消息出错不应拖垮整个连接
+            media_pipeline.cleanup_media(media)
             print(f"[错误] 处理聊天异常: {e}")
+
+
+async def _dispatch_event(lock, client, cfg, event) -> None:
+    """保持群消息到达顺序，同时让主接收循环继续分发 API 响应。"""
+    async with lock:
+        await on_event(client, cfg, event)
+
+
+def _finish_event_task(tasks: set, task) -> None:
+    tasks.discard(task)
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error:
+        print(f"[错误] 群消息任务异常: {error}")
 
 
 async def run() -> None:
@@ -341,22 +589,37 @@ async def run() -> None:
         try:
             async with ws_connect(url, max_size=None) as ws:
                 print("已连接 NapCat,等待群消息…")
+                client = OneBotClient(ws)
                 notifier = None
+                event_tasks = set()
+                event_lock = asyncio.Lock()
                 if cfg.get("agent_enabled", False) or cfg.get(
                     "chat_agent_enabled", False
                 ):
-                    notifier = asyncio.create_task(notification_loop(ws, cfg))
+                    notifier = asyncio.create_task(notification_loop(client, cfg))
                 try:
                     async for raw in ws:
                         try:
                             event = json.loads(raw)
                         except json.JSONDecodeError:
                             continue
-                        # 动作响应(带 echo / status)无 post_type,跳过
+                        # API 动作响应交给等待中的事件任务，不能阻塞主接收循环。
                         if "post_type" not in event:
+                            client.resolve_response(event)
                             continue
-                        await on_event(ws, cfg, event)
+                        task = asyncio.create_task(
+                            _dispatch_event(event_lock, client, cfg, event)
+                        )
+                        event_tasks.add(task)
+                        task.add_done_callback(
+                            lambda done: _finish_event_task(event_tasks, done)
+                        )
                 finally:
+                    client.close()
+                    for task in event_tasks:
+                        task.cancel()
+                    if event_tasks:
+                        await asyncio.gather(*event_tasks, return_exceptions=True)
                     if notifier:
                         notifier.cancel()
                         with contextlib.suppress(asyncio.CancelledError):

@@ -7,11 +7,17 @@
   "github_repo": "corazon1999/GrandUMI",
   "reply_enabled": true,
   "min_content_length": 2,
-  "agent_enabled": true,
+  "agent_enabled": false,
   "agent_owner_qq": 651846226,
   "agent_notification_interval_seconds": 3,
   "chat_agent_enabled": true,
   "chat_max_content_length": 500,
+  "vision_enabled": true,
+  "vision_max_images": 4,
+  "vision_max_image_bytes": 8388608,
+  "vision_media_ttl_seconds": 86400,
+  "forward_max_nodes": 40,
+  "forward_max_depth": 3,
   "chat_max_pending_per_user": 1,
   "chat_cooldown_seconds": 15
 }

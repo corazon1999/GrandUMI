@@ -4,6 +4,8 @@
 
 玩家只需 @机器人即可唤起独立的只读聊天 Agent，不再要求 `#聊天` 前缀，也不发送“听见了、收到、稍等”等中间确认。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
 
+@机器人时可以同时发送 PNG、JPEG、WebP 图片或合并转发消息。机器人会展开合并转发中的说话人、文字和图片，把最多 4 张受限下载的图片交给只读视觉模型识别；图片同样可用于补充 Bug 描述。
+
 ```
 QQ群用户:  这张卡有 bug
         ↓
@@ -52,10 +54,16 @@ copy config.example.json config.json
 | `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |
 | `chat_agent_enabled` | 是否接受玩家 @机器人后的聊天请求 |
 | `chat_max_content_length` | 单条聊天正文最大字数，默认 500 |
+| `vision_enabled` | 是否允许读取聊天和 Bug 反馈中的图片，默认开启 |
+| `vision_max_images` | 单条消息最多读取图片数，默认 4 |
+| `vision_max_image_bytes` | 单张图片最大字节数，默认 8 MiB |
+| `vision_media_ttl_seconds` | 未完成识别的服务器临时图片保留秒数，默认 86400 |
+| `forward_max_nodes` | 合并转发最多展开的消息段数，默认 40 |
+| `forward_max_depth` | 嵌套合并转发最大深度，默认 3 |
 
 ## 女帝汉库克人格聊天 Agent
 
-聊天和 Bug 描述检查使用独立的只读队列和常驻工作器。聊天回复会参考同群最近 6 轮已完成聊天，但最多输出 500 字；玩家输入只作为不可信数据，不会被当作工具指令。安装或更新本机工作器：
+聊天和 Bug 描述检查使用独立的只读队列和常驻工作器。聊天回复会参考同群最近 6 轮已完成聊天，但最多输出 500 字；玩家输入和图片只作为不可信数据，不会被当作工具指令。图片先在服务器校验协议、公网地址、体积和文件头，再通过 SSH 拉到 `E:\GrandUMI-Temp\QQBotMedia`，校验 SHA-256 后使用 Codex `--image` 只读识别，任务结束立即清理。安装或更新本机工作器：
 
 ```powershell
 cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot

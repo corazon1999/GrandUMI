@@ -5,6 +5,7 @@
 """
 
 import os
+import json
 import sqlite3
 from datetime import datetime
 from datetime import timedelta
@@ -72,7 +73,8 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL,
                 reply_sent_at TEXT,
                 feedback_id INTEGER,
-                continued_at TEXT
+                continued_at TEXT,
+                media_json TEXT NOT NULL DEFAULT '[]'
             )
             """
         )
@@ -123,6 +125,11 @@ def init_db() -> None:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN feedback_id INTEGER")
         if "continued_at" not in chat_cols:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN continued_at TEXT")
+        if "media_json" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN media_json TEXT NOT NULL DEFAULT '[]'"
+            )
         conn.commit()
 
 
@@ -132,20 +139,24 @@ def add_chat_message(
     group_id: str,
     content: str,
     kind: str = "chat",
+    media=None,
 ) -> int:
     """新增一条聊天或 Bug 描述检查请求并返回编号。"""
     if kind not in ("chat", "bug_intake"):
         raise ValueError(f"不支持的消息类型: {kind}")
     now_text = datetime.now().isoformat(timespec="seconds")
+    media_json = json.dumps(media or [], ensure_ascii=False)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             """
             INSERT INTO chat_messages
-                (kind, qq, nickname, group_id, content, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (kind, qq, nickname, group_id, content, media_json,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 kind, str(qq), nickname or "", str(group_id), content,
+                media_json,
                 now_text, now_text,
             ),
         )
@@ -177,11 +188,12 @@ def add_bug_followup(
     nickname: str,
     group_id: str,
     content: str,
+    media=None,
     max_age_seconds: int = 1800,
 ):
     """把玩家对最近一次 Bug 追问的下一条消息合并后重新检查。"""
     content = str(content or "").strip()
-    if not content:
+    if not content and not media:
         return None
     now = datetime.now()
     now_text = now.isoformat(timespec="seconds")
@@ -213,16 +225,25 @@ def add_bug_followup(
             return None
         combined = (
             f"之前描述：{previous['content']}\n"
-            f"玩家补充：{content}"
+            f"玩家补充：{content or '（附有图片，请结合图片内容判断）'}"
         )
+        combined_media = []
+        try:
+            combined_media.extend(json.loads(previous["media_json"] or "[]"))
+        except (json.JSONDecodeError, TypeError):
+            pass
+        combined_media.extend(media or [])
+        combined_media = combined_media[-4:]
         cur = conn.execute(
             """
             INSERT INTO chat_messages
-                (kind, qq, nickname, group_id, content, created_at, updated_at)
-            VALUES ('bug_intake', ?, ?, ?, ?, ?, ?)
+                (kind, qq, nickname, group_id, content, media_json,
+                 created_at, updated_at)
+            VALUES ('bug_intake', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(qq), nickname or "", str(group_id), combined,
+                json.dumps(combined_media, ensure_ascii=False),
                 now_text, now_text,
             ),
         )
@@ -232,6 +253,35 @@ def add_bug_followup(
         )
         conn.commit()
         return cur.lastrowid
+
+
+def has_pending_bug_followup(
+    qq: str,
+    group_id: str,
+    max_age_seconds: int = 1800,
+) -> bool:
+    """玩家是否正在等待补充最近一条 Bug 描述。"""
+    since_text = (
+        datetime.now() - timedelta(seconds=max(60, max_age_seconds))
+    ).isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT 1 FROM chat_messages
+             WHERE qq = ?
+               AND group_id = ?
+               AND kind = 'bug_intake'
+               AND state = 'completed'
+               AND feedback_id IS NULL
+               AND COALESCE(reply, '') <> ''
+               AND reply_sent_at IS NOT NULL
+               AND continued_at IS NULL
+               AND updated_at >= ?
+             LIMIT 1
+            """,
+            (str(qq), str(group_id), since_text),
+        ).fetchone()
+        return row is not None
 
 
 def claim_chat_job(worker_id: str, lease_seconds: int = 600):
@@ -304,7 +354,27 @@ def claim_chat_job(worker_id: str, lease_seconds: int = 600):
         ).fetchall()
         conn.commit()
         result = dict(claimed)
+        try:
+            result["media"] = json.loads(result.get("media_json") or "[]")
+        except (json.JSONDecodeError, TypeError):
+            result["media"] = []
         result["history"] = [dict(item) for item in reversed(history)]
+        return result
+
+
+def get_chat_message(chat_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM chat_messages WHERE id = ?", (chat_id,)
+        ).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        try:
+            result["media"] = json.loads(result.get("media_json") or "[]")
+        except (json.JSONDecodeError, TypeError):
+            result["media"] = []
         return result
 
 

@@ -16,6 +16,7 @@ sys.path.insert(0, str(BOT_DIR))
 import bot
 import chat_agent_worker
 import chat_protocol
+import media_pipeline
 import storage
 
 
@@ -25,6 +26,17 @@ class FakeWebSocket:
 
     async def send(self, payload):
         self.sent.append(json.loads(payload))
+
+
+class FakeOneBotClient(FakeWebSocket):
+    def __init__(self, forward_data=None):
+        super().__init__()
+        self.forward_data = forward_data or {}
+        self.actions = []
+
+    async def call_action(self, action, params, timeout=20):
+        self.actions.append((action, params))
+        return {"status": "ok", "retcode": 0, "data": self.forward_data}
 
 
 class ChatStorageAndBotTests(unittest.TestCase):
@@ -59,6 +71,25 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual("", bot.match_chat("#聊天"))
         self.assertIsNone(bot.match_chat("今天聊天吗"))
 
+    def testOneBot动作响应按echo交给等待任务(self):
+        async def scenario():
+            socket = FakeWebSocket()
+            client = bot.OneBotClient(socket)
+            pending = asyncio.create_task(
+                client.call_action("get_forward_msg", {"message_id": "123"})
+            )
+            await asyncio.sleep(0)
+            echo = socket.sent[0]["echo"]
+            self.assertTrue(
+                client.resolve_response(
+                    {"status": "ok", "retcode": 0, "data": {"messages": []}, "echo": echo}
+                )
+            )
+            return await pending
+
+        response = asyncio.run(scenario())
+        self.assertEqual([], response["data"]["messages"])
+
     def test只要艾特机器人就进入队列且不发送等待回执(self):
         ws = FakeWebSocket()
         cfg = {
@@ -72,6 +103,50 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual("chat", job["kind"])
         self.assertEqual("路飞", job["nickname"])
         self.assertEqual([], ws.sent)
+
+    def test艾特机器人时展开合并转发并把图片写入视觉队列(self):
+        ws = FakeOneBotClient(
+            {
+                "messages": [
+                    {
+                        "sender": {"nickname": "山治"},
+                        "message": [
+                            {"type": "text", "data": {"text": "这个界面怎么设置"}},
+                            {
+                                "type": "image",
+                                "data": {
+                                    "file": "qq-image.jpg",
+                                    "url": "https://multimedia.nt.qq.com.cn/example.jpg",
+                                },
+                            },
+                        ],
+                    }
+                ]
+            }
+        )
+        event = self.event("", include_at=True)
+        event["message"].append(
+            {"type": "forward", "data": {"id": "forward-123"}}
+        )
+        media = {
+            "name": "a" * 32 + ".jpg",
+            "size": 123,
+            "sha256": "b" * 64,
+            "mime": "image/jpeg",
+        }
+        with mock.patch.object(
+            bot,
+            "download_media_refs",
+            new=mock.AsyncMock(return_value=([media], 0)),
+        ):
+            asyncio.run(bot.on_event(ws, {"chat_agent_enabled": True}, event))
+        job = storage.claim_chat_job("chat-worker")
+        self.assertIn("山治：这个界面怎么设置", job["content"])
+        self.assertEqual([media], job["media"])
+        self.assertEqual(
+            ("get_forward_msg", {"message_id": "forward-123"}),
+            ws.actions[0],
+        )
 
     def test未艾特的普通聊天不触发(self):
         ws = FakeWebSocket()
@@ -288,11 +363,24 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             ), mock.patch.object(
                 chat_agent_worker, "run_process", return_value=completed
             ) as run_mock:
-                result = worker.run_codex("测试")
+                image_path = root / "test.png"
+                result = worker.run_codex("测试", image_paths=[image_path])
             self.assertEqual("妾身准你说话。", result["reply"])
             args = run_mock.call_args.args[0]
             self.assertIn("read-only", args)
             self.assertIn("--skip-git-repo-check", args)
+            self.assertEqual(str(image_path), args[args.index("--image") + 1])
+            self.assertLess(args.index("测试"), args.index("--image"))
+
+    def test图片安全校验拒绝内网地址和伪图片(self):
+        with self.assertRaises(ValueError):
+            media_pipeline.validate_image_url("http://127.0.0.1/private.png")
+        with self.assertRaises(ValueError):
+            media_pipeline.detect_image_format(b"not-an-image")
+        self.assertEqual(
+            ("png", "image/png"),
+            media_pipeline.detect_image_format(b"\x89PNG\r\n\x1a\nrest"),
+        )
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ import re
 import sys
 
 import github_issue
+import media_pipeline
 import storage
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -77,8 +78,10 @@ def command_chat_complete() -> None:
     chat_id = int(payload.get("chat_id"))
     token = require_text(payload, "claim_token", 128)
     reply = require_text(payload, "reply", MAX_CHAT_REPLY_LENGTH)
+    row = storage.get_chat_message(chat_id)
     if not storage.complete_chat_job(chat_id, token, reply):
         raise ValueError("聊天任务租约已失效，未写入回复")
+    media_pipeline.cleanup_media((row or {}).get("media"))
     emit({"ok": True, "chat_id": chat_id})
 
 
@@ -94,6 +97,7 @@ def command_bug_intake_complete() -> None:
     if len(reply) > MAX_CHAT_REPLY_LENGTH:
         raise ValueError("reply 超过 500 字")
     cfg = load_config()
+    row = storage.get_chat_message(chat_id)
     result = storage.complete_bug_intake_job(
         chat_id,
         token,
@@ -123,6 +127,8 @@ def command_bug_intake_complete() -> None:
         if issue:
             issue_no, _ = issue
             storage.set_issue_no(feedback_id, issue_no)
+    if decision != "clarify":
+        media_pipeline.cleanup_media((row or {}).get("media"))
     emit(
         {
             "ok": True,
@@ -141,6 +147,9 @@ def command_chat_release() -> None:
     max_attempts = max(1, min(10, int(payload.get("max_attempts") or 3)))
     if not storage.release_chat_job(chat_id, token, error, max_attempts):
         raise ValueError("聊天任务租约已失效，未释放任务")
+    row = storage.get_chat_message(chat_id)
+    if row and row.get("state") == "failed":
+        media_pipeline.cleanup_media(row.get("media"))
     emit({"ok": True, "chat_id": chat_id})
 
 

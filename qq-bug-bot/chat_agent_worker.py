@@ -2,6 +2,7 @@
 """GrandUMI QQ 群聊只读 Agent 常驻工作器。"""
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -12,6 +13,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from pathlib import PurePosixPath
 
 import chat_protocol
 from agent_worker import (
@@ -26,7 +28,7 @@ from agent_worker import (
 
 
 class ChatAgentWorker:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, media_root: Path | None = None):
         self.cfg = cfg
         self.repo = Path(cfg["repository_root"]).resolve()
         self.logs_root = Path(cfg["logs_root"]).resolve()
@@ -37,6 +39,12 @@ class ChatAgentWorker:
         raw_id = configured_id or f"{socket.gethostname()}-chat-{os.getpid()}"
         self.worker_id = re.sub(r"[^A-Za-z0-9._-]", "-", raw_id)[:80]
         self.log_file = self.logs_root / "chat-agent-worker.log"
+        configured_media = str(cfg.get("chat_media_root") or "").strip()
+        self.media_root = Path(
+            media_root or configured_media or os.environ.get(
+                "GRANDUMI_QQ_MEDIA_ROOT", "E:/GrandUMI-Temp/QQBotMedia"
+            )
+        ).resolve()
 
     def log(self, message: str) -> None:
         line = f"{datetime.now().isoformat(timespec='seconds')} {message}"
@@ -86,22 +94,32 @@ class ChatAgentWorker:
                 return data
         raise WorkerError("服务器聊天桥接未返回结构化结果")
 
-    def run_codex(self, prompt: str, schema_name: str = "chat.schema.json") -> dict:
+    def run_codex(
+        self,
+        prompt: str,
+        schema_name: str = "chat.schema.json",
+        image_paths=None,
+    ) -> dict:
         schema = self.repo / "qq-bug-bot" / "schemas" / schema_name
         if not schema.is_file():
             raise WorkerError(f"找不到 Agent 输出 Schema: {schema}")
         args = [
             resolve_codex_command(str(self.cfg.get("codex_command") or "codex")),
             "--ask-for-approval", "never",
-            "exec", "--ephemeral", "--json", "--skip-git-repo-check",
-            "--sandbox", "read-only",
-            "--output-schema", str(schema),
-            "-C", str(self.workdir),
-            prompt,
+            "exec",
         ]
         model = str(self.cfg.get("chat_model") or self.cfg.get("model") or "").strip()
         if model:
-            args[4:4] = ["--model", model]
+            args.extend(["--model", model])
+        args.extend([
+            "--ephemeral", "--json", "--skip-git-repo-check",
+            "--sandbox", "read-only",
+            "--output-schema", str(schema),
+            "-C", str(self.workdir),
+        ])
+        args.append(prompt)
+        for image_path in image_paths or []:
+            args.extend(["--image", str(image_path)])
         env_extra = {}
         codex_proxy = str(self.cfg.get("codex_proxy") or "").strip()
         if codex_proxy:
@@ -139,15 +157,94 @@ class ChatAgentWorker:
             raise WorkerError("聊天 Codex 最终消息必须是 JSON 对象")
         return value
 
+    @staticmethod
+    def _validate_media_item(item: dict) -> tuple[str, int, str]:
+        item = item or {}
+        name = str(item.get("name") or "")
+        stem, dot, extension = name.partition(".")
+        if (
+            len(stem) != 32
+            or any(ch not in "0123456789abcdef" for ch in stem)
+            or dot != "."
+            or extension not in ("png", "jpg", "webp")
+        ):
+            raise WorkerError("服务器返回了无效图片文件名")
+        size = int((item or {}).get("size") or 0)
+        maximum = max(
+            64 * 1024,
+            int(item.get("max_size") or 20 * 1024 * 1024),
+        )
+        if size <= 0 or size > maximum:
+            raise WorkerError("服务器返回了无效图片大小")
+        digest = str((item or {}).get("sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise WorkerError("服务器返回了无效图片摘要")
+        return name, size, digest
+
+    def prepare_images(self, job: dict):
+        media = list(job.get("media") or [])
+        if not media:
+            return None, []
+        if os.name == "nt" and self.media_root.drive.upper() != "E:":
+            raise WorkerError("QQ 识图临时目录必须位于 E 盘")
+        self.media_root.mkdir(parents=True, exist_ok=True)
+        token = str(job.get("claim_token") or "")[:12]
+        job_dir = (self.media_root / f"job-{int(job['id'])}-{token}").resolve()
+        if job_dir.parent != self.media_root:
+            raise WorkerError("QQ 识图临时目录越界")
+        if job_dir.exists():
+            shutil.rmtree(job_dir)
+        job_dir.mkdir(parents=True)
+        images = []
+        try:
+            for item in media[:8]:
+                name, expected_size, expected_digest = self._validate_media_item(item)
+                local_path = job_dir / name
+                remote_path = PurePosixPath(
+                    str(self.cfg["remote_bot_dir"]), "data", "media", name
+                )
+                result = run_process(
+                    [
+                        "scp", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                        f"{self.cfg['server']}:{remote_path}", str(local_path),
+                    ],
+                    timeout=90,
+                )
+                require_success(result, "下载 QQ 识图临时文件")
+                data = local_path.read_bytes()
+                if len(data) != expected_size:
+                    raise WorkerError("QQ 图片大小校验失败")
+                if hashlib.sha256(data).hexdigest() != expected_digest:
+                    raise WorkerError("QQ 图片摘要校验失败")
+                images.append(local_path)
+            return job_dir, images
+        except Exception:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise
+
+    def cleanup_local_media(self) -> None:
+        if os.name == "nt" and self.media_root.drive.upper() != "E:":
+            raise WorkerError("QQ 识图临时目录必须位于 E 盘")
+        if not self.media_root.is_dir():
+            return
+        for child in self.media_root.iterdir():
+            if child.is_dir() and re.fullmatch(
+                r"job-[0-9]+-[0-9a-f]{1,12}", child.name
+            ):
+                shutil.rmtree(child, ignore_errors=True)
+
     def process_job(self, job: dict) -> None:
         chat_id = int(job["id"])
         kind = str(job.get("kind") or "chat")
         self.log(f"开始处理{kind} #{chat_id}")
+        media_dir = None
         try:
+            media_dir, image_paths = self.prepare_images(job)
             if kind == "bug_intake":
                 result = self.run_codex(
                     chat_protocol.build_bug_intake_prompt(job),
                     "bug-intake.schema.json",
+                    image_paths,
                 )
                 decision = str(result.get("decision") or "").strip()
                 description = str(
@@ -175,7 +272,10 @@ class ChatAgentWorker:
                     f"feedback={completed.get('feedback_id')}"
                 )
             else:
-                result = self.run_codex(chat_protocol.build_chat_prompt(job))
+                result = self.run_codex(
+                    chat_protocol.build_chat_prompt(job),
+                    image_paths=image_paths,
+                )
                 reply = str(result.get("reply") or "").strip()
                 if not reply or len(reply) > 500:
                     raise WorkerError("聊天 Codex 返回的 reply 长度无效")
@@ -204,6 +304,9 @@ class ChatAgentWorker:
                 )
             except Exception as bridge_exc:
                 self.log(f"聊天 #{chat_id} 释放失败：{bridge_exc}")
+        finally:
+            if media_dir:
+                shutil.rmtree(media_dir, ignore_errors=True)
 
     def self_check(self) -> None:
         for name in ("ssh",):
@@ -229,6 +332,7 @@ class ChatAgentWorker:
 
     def run_forever(self) -> None:
         interval = max(2, int(self.cfg.get("chat_poll_seconds", 5)))
+        self.cleanup_local_media()
         self.log(f"聊天工作器启动：{self.worker_id}")
         while True:
             try:
@@ -244,9 +348,13 @@ def main() -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--self-check", action="store_true")
+    parser.add_argument("--media-root", type=Path)
     args = parser.parse_args()
     try:
-        worker = ChatAgentWorker(load_config(args.config.resolve()))
+        worker = ChatAgentWorker(
+            load_config(args.config.resolve()),
+            args.media_root.resolve() if args.media_root else None,
+        )
         if args.self_check:
             worker.self_check()
         elif args.once:

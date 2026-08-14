@@ -28,6 +28,7 @@ $files = @(
     "storage.py",
     "github_issue.py",
     "agent_bridge.py",
+    "media_pipeline.py",
     "export_by_date.py",
     "mark.py",
     "dedup.py",

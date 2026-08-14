@@ -52,6 +52,8 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("RestartCount 100", installer)
         self.assertIn("Start-ScheduledTask", installer)
         self.assertIn("女帝汉库克", installer)
+        self.assertIn("Get-GrandUmiTempDirectory", installer)
+        self.assertIn("--media-root", installer)
 
 
 if __name__ == "__main__":

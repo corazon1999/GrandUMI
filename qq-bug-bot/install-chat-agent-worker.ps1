@@ -11,6 +11,8 @@ $repo = [IO.Path]::GetFullPath($RepositoryRoot)
 $worker = Join-Path $repo "qq-bug-bot\chat_agent_worker.py"
 $config = Join-Path $runtime "agent-worker.json"
 $logs = Join-Path $runtime "logs"
+. (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
+$mediaRoot = Get-GrandUmiTempDirectory -Category "QQBotMedia"
 
 if (-not (Test-Path -LiteralPath $worker)) { throw "找不到聊天工作器：$worker" }
 if (-not (Test-Path -LiteralPath $config)) { throw "找不到 Agent 配置：$config" }
@@ -28,12 +30,12 @@ if (-not (Test-Path -LiteralPath $pythonw)) { $pythonw = $pythonPath }
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
 
 Write-Host "正在执行 QQ 聊天 Agent 自检……" -ForegroundColor Cyan
-& $pythonPath $worker --config $config --self-check
+& $pythonPath $worker --config $config --media-root $mediaRoot --self-check
 if ($LASTEXITCODE -ne 0) { throw "聊天工作器自检失败，未注册计划任务。" }
 
 $action = New-ScheduledTaskAction `
     -Execute $pythonw `
-    -Argument ('"' + $worker + '" --config "' + $config + '"') `
+    -Argument ('"' + $worker + '" --config "' + $config + '" --media-root "' + $mediaRoot + '"') `
     -WorkingDirectory (Split-Path -Parent $worker)
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet `
