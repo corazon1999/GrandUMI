@@ -416,7 +416,7 @@ def complete_bug_intake_job(
     reply: str,
     _agent_enabled: bool,
 ):
-    """完成 Bug 描述检查；合格时只静默记录，永不进入自动修复队列。"""
+    """完成 Bug 描述检查；合格时回复记录编号，但永不进入自动修复队列。"""
     if decision not in ("record", "clarify", "ignore"):
         raise ValueError("Bug 检查结论必须是 record、clarify 或 ignore")
     cleaned_description = str(cleaned_description or "").strip()
@@ -461,6 +461,12 @@ def complete_bug_intake_job(
             )
             feedback_id = cur.lastrowid
 
+        outgoing_reply = reply if decision == "clarify" else ""
+        if decision == "record":
+            outgoing_reply = (
+                f"Bug #{feedback_id} 已记录。描述得很清楚，做得不错。"
+            )
+
         conn.execute(
             """
             UPDATE chat_messages
@@ -476,9 +482,9 @@ def complete_bug_intake_job(
              WHERE id = ?
             """,
             (
-                reply if decision == "clarify" else "",
+                outgoing_reply,
                 now_text,
-                None if decision == "clarify" else now_text,
+                None if outgoing_reply else now_text,
                 feedback_id,
                 chat_id,
             ),
