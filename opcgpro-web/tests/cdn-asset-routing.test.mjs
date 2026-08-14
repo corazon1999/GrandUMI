@@ -8,6 +8,7 @@ const promote = await readFile(new URL("../../ops/server/promote-approved.sh", i
 const deployHk = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
+const networkService = await readFile(new URL("../../ops/server/grandumi-network-tuning.service", import.meta.url), "utf8");
 const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", import.meta.url), "utf8");
 
 test("production build keeps critical Next assets same-origin and routes card assets through the CDN", () => {
@@ -53,9 +54,12 @@ test("production promotion persists CDN and source-network protection", () => {
 });
 
 test("network shaping can be applied repeatedly after boot or deployment", () => {
+  assert.match(networkTuning, /GRANDUMI_EGRESS_RATE:-2mbit/);
   assert.match(networkTuning, /tc qdisc del dev "\$interface" root 2>\/dev\/null \|\| true/);
   assert.match(networkTuning, /tc qdisc add dev "\$interface" root handle 1: htb/);
   assert.match(networkTuning, /tc class add dev "\$interface" parent 1: classid 1:10/);
+  assert.match(networkTuning, /burst 32k cburst 32k/);
+  assert.match(networkService, /GRANDUMI_EGRESS_RATE=2mbit/);
 });
 
 test("release prewarms new chunks and catalog mode covers card thumbnails", () => {
