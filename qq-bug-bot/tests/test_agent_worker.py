@@ -74,6 +74,10 @@ class AgentWorkerGateTests(unittest.TestCase):
         ) as run_mock:
             agent_worker.run_process(["codex", "--version"])
         self.assertEqual(r"C:\tools\codex.CMD", run_mock.call_args.args[0][0])
+        self.assertEqual(
+            subprocess.CREATE_NO_WINDOW,
+            run_mock.call_args.kwargs["creationflags"],
+        )
 
     @unittest.skipUnless(os.name == "nt", "仅验证 Windows Codex 原生入口")
     def test_WindowsCodex绕过会截断多行提示词的cmd(self):

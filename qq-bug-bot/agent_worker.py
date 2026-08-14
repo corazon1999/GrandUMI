@@ -31,6 +31,9 @@ DEFAULT_CONFIG = Path(
 )
 BRIDGE_PREFIX = "AGENT_BRIDGE_JSON="
 WINDOWS_DLL_INIT_FAILED = 0xC0000142
+WINDOWS_NO_WINDOW = (
+    getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+)
 
 
 class WorkerError(RuntimeError):
@@ -129,6 +132,7 @@ def run_process(
         errors="replace",
         timeout=timeout,
         env=env,
+        creationflags=WINDOWS_NO_WINDOW,
     )
 
 
@@ -226,6 +230,7 @@ class AgentWorker:
                     stdout=output,
                     stderr=subprocess.PIPE,
                     timeout=120,
+                    creationflags=WINDOWS_NO_WINDOW,
                 )
             if proc.returncode != 0:
                 detail = proc.stderr.decode("utf-8", errors="replace")
