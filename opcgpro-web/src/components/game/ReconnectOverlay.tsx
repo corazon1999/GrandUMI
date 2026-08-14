@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNetStore } from "@/store/netStore";
+import { NetManager } from "@/net/NetManager";
+import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 
 /**
  * ReconnectOverlay — 断线重连全屏遮罩
@@ -47,6 +49,13 @@ export default function ReconnectOverlay() {
               <p className="text-gray-400 mt-2">
                 {remaining > 0 ? `${remaining} 秒后重试...` : "正在重连..."}
               </p>
+              <button
+                type="button"
+                onClick={() => NetManager.retryNow(getWebSocketEndpoints())}
+                className="mt-5 min-h-11 rounded-xl border border-orange-400/70 bg-orange-500/10 px-5 text-sm font-semibold text-orange-200 transition-colors hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-orange-400"
+              >
+                立即换线重试
+              </button>
             </>
           )}
 

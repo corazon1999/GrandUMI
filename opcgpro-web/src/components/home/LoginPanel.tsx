@@ -52,7 +52,7 @@ export default function LoginPanel() {
   const canLogin = connState === "connected";
   const accountReady = account.trim().length > 0;
   const isConnecting = ["connecting", "handshaking", "reconnecting", "recovering"].includes(connState);
-  const canRetry = connState === "failed" || connState === "disconnected";
+  const canRetry = connState === "failed" || connState === "disconnected" || connState === "reconnecting";
 
   useEffect(() => {
     const saved = localStorage.getItem("grandumi_account")?.trim() ?? "";
@@ -122,7 +122,8 @@ export default function LoginPanel() {
 
   const handleRetry = () => {
     useNetStore.getState().setError(null);
-    NetManager.connect(getWebSocketEndpoints());
+    if (connState === "reconnecting") NetManager.retryNow(getWebSocketEndpoints());
+    else NetManager.connect(getWebSocketEndpoints());
   };
 
   const startChangingAccount = () => {
@@ -316,7 +317,7 @@ export default function LoginPanel() {
               onClick={handleRetry}
               className="ml-1 min-h-11 rounded-lg px-3 text-sm font-medium text-orange-300 hover:bg-gray-800 hover:text-orange-200"
             >
-              重新连接
+              {connState === "reconnecting" ? "立即换线重试" : "重新连接"}
             </button>
           )}
         </div>

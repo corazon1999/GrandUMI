@@ -28,14 +28,19 @@ export function useNet() {
     const onReconnectCountdown = (seconds: number) => {
       useNetStore.getState().setReconnectCountdown(seconds);
     };
+    const onBrowserOnline = () => {
+      if (!NetManager.isConnected) NetManager.retryNow(getWebSocketEndpoints());
+    };
 
     eventBus.on("stateChange", onStateChange);
     eventBus.on("reconnectCountdown", onReconnectCountdown);
+    window.addEventListener("online", onBrowserOnline);
     NetManager.connect(getWebSocketEndpoints());
 
     return () => {
       eventBus.off("stateChange", onStateChange);
       eventBus.off("reconnectCountdown", onReconnectCountdown);
+      window.removeEventListener("online", onBrowserOnline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

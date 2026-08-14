@@ -27,14 +27,32 @@ test("正式服主域名和备用域名均优先香港直连，Cloudflare 作为
   );
 });
 
-test("连接层在五秒握手超时后关闭旧连接并轮换端点", async () => {
+test("连接层快速放弃异常首选线路，并为最后一条线路保留完整握手时间", async () => {
   const source = await readSource("../src/net/NetManager.ts");
 
   assert.match(source, /connect\(url: string \| readonly string\[\]/);
   assert.match(source, /CONNECTION_TIMEOUT_MS = 5_000/);
+  assert.match(source, /FALLBACK_SWITCH_TIMEOUT_MS = 1_500/);
+  assert.match(source, /hasUnusedFallback[\s\S]*FALLBACK_SWITCH_TIMEOUT_MS[\s\S]*CONNECTION_TIMEOUT_MS/);
   assert.match(source, /this\.ws = null;\s*this\.socketGeneration\+\+;/);
   assert.match(source, /socket\.close\(4001, "连接握手超时"\)/);
   assert.match(source, /this\.endpointIndex = \(this\.endpointIndex \+ 1\) % this\.endpoints\.length/);
+});
+
+test("重连等待可以由玩家或浏览器恢复联网事件立即打断", async () => {
+  const [manager, hook, login, overlay] = await Promise.all([
+    readSource("../src/net/NetManager.ts"),
+    readSource("../src/hooks/useNet.ts"),
+    readSource("../src/components/home/LoginPanel.tsx"),
+    readSource("../src/components/game/ReconnectOverlay.tsx"),
+  ]);
+
+  assert.match(manager, /retryNow\(url\?: string \| readonly string\[\]\)/);
+  assert.match(manager, /socket\?\.close\(4002, "立即切换线路重连"\)/);
+  assert.match(hook, /window\.addEventListener\("online", onBrowserOnline\)/);
+  assert.match(hook, /window\.removeEventListener\("online", onBrowserOnline\)/);
+  assert.match(login, /立即换线重试/);
+  assert.match(overlay, /立即换线重试/);
 });
 
 test("首次连接与登录重试共用端点选择逻辑", async () => {

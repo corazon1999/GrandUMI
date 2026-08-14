@@ -39,6 +39,9 @@ class NetManagerClass {
   private readonly RECONNECT_BASE_DELAY = 1500; // ms
   private readonly RECONNECT_MAX_DELAY = 5000; // 赛前房保留 30 秒，重试间隔不能膨胀到窗口之外
   private readonly CONNECTION_TIMEOUT_MS = 5_000;
+  // 正式服首选直连通常数百毫秒即可完成握手。它发生故障时应尽快切到备用线路，
+  // 不能让玩家每轮都先被坏线路完整阻塞五秒。
+  private readonly FALLBACK_SWITCH_TIMEOUT_MS = 1_500;
   /// 标记重连：握手完成后会自动触发 reconnected 事件，由 NetProvider 决定是否重新登录 + 请求状态
   private wasConnectedBefore = false;
   private manualClose = false;
@@ -106,6 +109,32 @@ class NetManagerClass {
     this.manualClose = false;
     this.reconnectAttempts = 0;
     this.clearTimers();
+    this.openSocket(this.url);
+  }
+
+  /**
+   * 跳过当前等待并立即换一条线路重试。
+   * 用于浏览器恢复联网以及玩家主动重试；旧连接通过 generation 失效，
+   * 它随后触发的 close/error 不会再启动第二套重连计时器。
+   */
+  retryNow(url?: string | readonly string[]) {
+    if (this._state === "connected" || this._state === "recovering") return;
+    if (url !== undefined) this.endpoints = normalizeEndpoints(url);
+
+    this.clearTimers();
+    const socket = this.ws;
+    this.ws = null;
+    this.socketGeneration++;
+    try {
+      socket?.close(4002, "立即切换线路重连");
+    } catch {
+      // 浏览器可能已经回收异常连接；继续建立新连接即可。
+    }
+
+    this.manualClose = false;
+    this.endpointFailuresInCycle = 0;
+    this.endpointIndex = (this.endpointIndex + 1) % this.endpoints.length;
+    this.url = this.endpoints[this.endpointIndex];
     this.openSocket(this.url);
   }
 
@@ -310,6 +339,10 @@ class NetManagerClass {
 
   private startConnectionTimeout(socket: WebSocket, generation: number) {
     this.clearConnectionTimeout();
+    const hasUnusedFallback = this.endpointFailuresInCycle < this.endpoints.length - 1;
+    const timeoutMs = hasUnusedFallback
+      ? this.FALLBACK_SWITCH_TIMEOUT_MS
+      : this.CONNECTION_TIMEOUT_MS;
     this.connectionTimeoutTimer = setTimeout(() => {
       if (!this.isCurrentSocket(socket, generation)) return;
       console.warn(`[NetManager] 连接握手超时，准备切换线路：${this.url}`);
@@ -321,7 +354,7 @@ class NetManagerClass {
       } finally {
         this.onConnectionFailed();
       }
-    }, this.CONNECTION_TIMEOUT_MS);
+    }, timeoutMs);
   }
 
   private scheduleReconnect() {
