@@ -142,7 +142,7 @@ def add_chat_message(
     media=None,
 ) -> int:
     """新增一条聊天或 Bug 描述检查请求并返回编号。"""
-    if kind not in ("chat", "bug_intake"):
+    if kind not in ("chat", "bug_intake", "admin_agent"):
         raise ValueError(f"不支持的消息类型: {kind}")
     now_text = datetime.now().isoformat(timespec="seconds")
     media_json = json.dumps(media or [], ensure_ascii=False)
@@ -284,7 +284,11 @@ def has_pending_bug_followup(
         return row is not None
 
 
-def claim_chat_job(worker_id: str, lease_seconds: int = 600):
+def claim_chat_job(
+    worker_id: str,
+    lease_seconds: int = 600,
+    kinds: tuple[str, ...] = ("chat", "bug_intake"),
+):
     """原子领取一条聊天请求，并回收超时租约。"""
     now = datetime.now()
     now_text = now.isoformat(timespec="seconds")
@@ -292,11 +296,18 @@ def claim_chat_job(worker_id: str, lease_seconds: int = 600):
         timespec="seconds"
     )
     token = uuid4().hex
+    allowed_kinds = tuple(
+        kind for kind in kinds
+        if kind in ("chat", "bug_intake", "admin_agent")
+    )
+    if not allowed_kinds:
+        raise ValueError("聊天任务类型过滤器为空")
+    placeholders = ",".join("?" for _ in allowed_kinds)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
         conn.execute(
-            """
+            f"""
             UPDATE chat_messages
                SET state = 'queued',
                    claim_token = NULL,
@@ -304,18 +315,21 @@ def claim_chat_job(worker_id: str, lease_seconds: int = 600):
                    claimed_at = NULL,
                    updated_at = ?
              WHERE state = 'claimed'
+               AND kind IN ({placeholders})
                AND claimed_at IS NOT NULL
                AND claimed_at < ?
             """,
-            (now_text, stale_text),
+            (now_text, *allowed_kinds, stale_text),
         )
         row = conn.execute(
-            """
+            f"""
             SELECT * FROM chat_messages
              WHERE state = 'queued'
+               AND kind IN ({placeholders})
              ORDER BY created_at, id
              LIMIT 1
-            """
+            """,
+            allowed_kinds,
         ).fetchone()
         if not row:
             conn.commit()
@@ -344,13 +358,13 @@ def claim_chat_job(worker_id: str, lease_seconds: int = 600):
             SELECT nickname, content, reply
               FROM chat_messages
              WHERE group_id = ?
-               AND kind = 'chat'
+               AND kind = ?
                AND state = 'completed'
                AND id < ?
              ORDER BY id DESC
              LIMIT 6
             """,
-            (str(row["group_id"]), row["id"]),
+            (str(row["group_id"]), str(row["kind"]), row["id"]),
         ).fetchall()
         conn.commit()
         result = dict(claimed)
@@ -398,7 +412,7 @@ def complete_chat_job(
                    updated_at = ?,
                    reply_sent_at = NULL
              WHERE id = ?
-               AND kind = 'chat'
+               AND kind IN ('chat', 'admin_agent')
                AND state = 'claimed'
                AND claim_token = ?
             """,

@@ -69,7 +69,20 @@ def command_claim(args) -> None:
 
 
 def command_chat_claim(args) -> None:
-    job = storage.claim_chat_job(args.worker_id, args.lease_seconds)
+    job = storage.claim_chat_job(
+        args.worker_id,
+        args.lease_seconds,
+        ("chat", "bug_intake"),
+    )
+    emit({"ok": True, "job": job})
+
+
+def command_admin_claim(args) -> None:
+    job = storage.claim_chat_job(
+        args.worker_id,
+        args.lease_seconds,
+        ("admin_agent",),
+    )
     emit({"ok": True, "job": job})
 
 
@@ -233,6 +246,9 @@ def main() -> int:
     chat_claim = sub.add_parser("chat-claim")
     chat_claim.add_argument("--worker-id", required=True)
     chat_claim.add_argument("--lease-seconds", type=int, default=600)
+    admin_claim = sub.add_parser("admin-claim")
+    admin_claim.add_argument("--worker-id", required=True)
+    admin_claim.add_argument("--lease-seconds", type=int, default=7200)
     sub.add_parser("ask")
     sub.add_parser("complete")
     sub.add_parser("release")
@@ -247,6 +263,8 @@ def main() -> int:
             command_claim(args)
         elif args.command == "chat-claim":
             command_chat_claim(args)
+        elif args.command == "admin-claim":
+            command_admin_claim(args)
         elif args.command == "chat-complete":
             command_chat_complete()
         elif args.command == "bug-intake-complete":

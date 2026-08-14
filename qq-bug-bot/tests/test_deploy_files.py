@@ -55,6 +55,17 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("Get-GrandUmiTempDirectory", installer)
         self.assertIn("--media-root", installer)
 
+    def test_管理员工作器独立隐藏常驻并绑定项目工作区(self):
+        installer = (BOT_DIR / "install-admin-agent-worker.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        self.assertIn("pythonw.exe", installer)
+        self.assertIn("GrandUMI-Admin-Agent", installer)
+        self.assertIn("--mode admin", installer)
+        self.assertIn("--admin-workspace", installer)
+        self.assertIn("D:\\Self\\GrandUMI", installer)
+        self.assertIn("RestartCount 100", installer)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GrandUMI QQ 群聊只读 Agent 常驻工作器。"""
+"""GrandUMI QQ 普通只读聊天与管理员全权限 Agent 常驻工作器。"""
 
 import argparse
 import hashlib
@@ -28,17 +28,48 @@ from agent_worker import (
 
 
 class ChatAgentWorker:
-    def __init__(self, cfg: dict, media_root: Path | None = None):
+    def __init__(
+        self,
+        cfg: dict,
+        media_root: Path | None = None,
+        mode: str = "chat",
+        admin_workspace: Path | None = None,
+    ):
         self.cfg = cfg
         self.repo = Path(cfg["repository_root"]).resolve()
+        if mode not in ("chat", "admin"):
+            raise WorkerError(f"不支持的聊天工作器模式: {mode}")
+        self.mode = mode
+        configured_admin_workspace = str(
+            cfg.get("admin_workspace_root") or ""
+        ).strip()
+        admin_root = admin_workspace or (
+            Path(configured_admin_workspace) if configured_admin_workspace else None
+        )
+        if self.mode == "admin" and admin_root is None:
+            raise WorkerError("管理员 Agent 缺少 admin_workspace_root")
+        self.admin_workspace = (
+            Path(admin_root).resolve() if admin_root else None
+        )
+        if self.admin_workspace and not self.admin_workspace.is_dir():
+            raise WorkerError(
+                f"管理员 Agent 工作区不存在: {self.admin_workspace}"
+            )
         self.logs_root = Path(cfg["logs_root"]).resolve()
         self.logs_root.mkdir(parents=True, exist_ok=True)
         self.workdir = self.logs_root / "chat-sandbox"
         self.workdir.mkdir(parents=True, exist_ok=True)
         configured_id = str(cfg.get("chat_worker_id") or "").strip()
-        raw_id = configured_id or f"{socket.gethostname()}-chat-{os.getpid()}"
+        raw_id = configured_id or (
+            f"{socket.gethostname()}-{self.mode}-{os.getpid()}"
+        )
         self.worker_id = re.sub(r"[^A-Za-z0-9._-]", "-", raw_id)[:80]
-        self.log_file = self.logs_root / "chat-agent-worker.log"
+        log_name = (
+            "admin-agent-worker.log"
+            if self.mode == "admin"
+            else "chat-agent-worker.log"
+        )
+        self.log_file = self.logs_root / log_name
         configured_media = str(cfg.get("chat_media_root") or "").strip()
         self.media_root = Path(
             media_root or configured_media or os.environ.get(
@@ -54,13 +85,19 @@ class ChatAgentWorker:
 
     def bridge(self, command: str, payload: dict | None = None) -> dict:
         if command not in (
-            "chat-claim", "chat-complete", "bug-intake-complete",
+            "chat-claim", "admin-claim", "chat-complete", "bug-intake-complete",
             "chat-release", "status",
         ):
             raise WorkerError(f"非法聊天桥接命令: {command}")
         suffix = command
-        if command == "chat-claim":
-            lease = max(120, int(self.cfg.get("chat_lease_seconds", 900)))
+        if command in ("chat-claim", "admin-claim"):
+            lease_key = (
+                "admin_agent_lease_seconds"
+                if command == "admin-claim"
+                else "chat_lease_seconds"
+            )
+            default_lease = 7200 if command == "admin-claim" else 900
+            lease = max(120, int(self.cfg.get(lease_key, default_lease)))
             suffix += f" --worker-id {self.worker_id} --lease-seconds {lease}"
         remote = (
             f"cd '{self.cfg['remote_bot_dir']}' && "
@@ -99,6 +136,7 @@ class ChatAgentWorker:
         prompt: str,
         schema_name: str = "chat.schema.json",
         image_paths=None,
+        admin_mode: bool = False,
     ) -> dict:
         schema = self.repo / "qq-bug-bot" / "schemas" / schema_name
         if not schema.is_file():
@@ -106,16 +144,25 @@ class ChatAgentWorker:
         args = [
             resolve_codex_command(str(self.cfg.get("codex_command") or "codex")),
             "--ask-for-approval", "never",
-            "exec",
         ]
+        if admin_mode:
+            args.extend([
+                "--search",
+                "exec",
+                "--dangerously-bypass-approvals-and-sandbox",
+            ])
+        else:
+            args.append("exec")
         model = str(self.cfg.get("chat_model") or self.cfg.get("model") or "").strip()
         if model:
             args.extend(["--model", model])
+        target_workdir = self.admin_workspace if admin_mode else self.workdir
+        args.extend(["--ephemeral", "--json", "--skip-git-repo-check"])
+        if not admin_mode:
+            args.extend(["--sandbox", "read-only"])
         args.extend([
-            "--ephemeral", "--json", "--skip-git-repo-check",
-            "--sandbox", "read-only",
             "--output-schema", str(schema),
-            "-C", str(self.workdir),
+            "-C", str(target_workdir),
         ])
         args.append(prompt)
         for image_path in image_paths or []:
@@ -127,8 +174,17 @@ class ChatAgentWorker:
             env_extra["HTTPS_PROXY"] = codex_proxy
         result = run_process(
             args,
-            cwd=self.workdir,
-            timeout=max(30, int(self.cfg.get("chat_timeout_seconds", 300))),
+            cwd=target_workdir,
+            timeout=max(
+                30,
+                int(
+                    self.cfg.get(
+                        "admin_agent_timeout_seconds"
+                        if admin_mode else "chat_timeout_seconds",
+                        7200 if admin_mode else 300,
+                    )
+                ),
+            ),
             env_extra=env_extra,
         )
         if result.returncode != 0:
@@ -240,7 +296,29 @@ class ChatAgentWorker:
         media_dir = None
         try:
             media_dir, image_paths = self.prepare_images(job)
-            if kind == "bug_intake":
+            if kind == "admin_agent":
+                if self.mode != "admin":
+                    raise WorkerError("普通聊天工作器拒绝管理员任务")
+                result = self.run_codex(
+                    chat_protocol.build_admin_agent_prompt(job),
+                    image_paths=image_paths,
+                    admin_mode=True,
+                )
+                reply = str(result.get("reply") or "").strip()
+                if not reply or len(reply) > 500:
+                    raise WorkerError("管理员 Codex 返回的 reply 长度无效")
+                self.bridge(
+                    "chat-complete",
+                    {
+                        "chat_id": chat_id,
+                        "claim_token": job["claim_token"],
+                        "reply": reply,
+                    },
+                )
+                self.log(f"管理员任务 #{chat_id} 已完成")
+            elif kind == "bug_intake":
+                if self.mode != "chat":
+                    raise WorkerError("管理员工作器拒绝 Bug 检查任务")
                 result = self.run_codex(
                     chat_protocol.build_bug_intake_prompt(job),
                     "bug-intake.schema.json",
@@ -272,6 +350,8 @@ class ChatAgentWorker:
                     f"feedback={completed.get('feedback_id')}"
                 )
             else:
+                if self.mode != "chat":
+                    raise WorkerError("管理员工作器拒绝普通聊天任务")
                 result = self.run_codex(
                     chat_protocol.build_chat_prompt(job),
                     image_paths=image_paths,
@@ -298,7 +378,15 @@ class ChatAgentWorker:
                         "claim_token": job["claim_token"],
                         "error": str(exc)[:1000],
                         "max_attempts": max(
-                            1, int(self.cfg.get("chat_max_attempts", 3))
+                            1,
+                            int(
+                                self.cfg.get(
+                                    "admin_agent_max_attempts"
+                                    if self.mode == "admin"
+                                    else "chat_max_attempts",
+                                    3,
+                                )
+                            ),
                         ),
                     },
                 )
@@ -314,8 +402,10 @@ class ChatAgentWorker:
                 raise WorkerError(f"未找到命令: {name}")
         resolve_codex_command(str(self.cfg.get("codex_command") or "codex"))
         self.bridge("status")
+        admin_mode = self.mode == "admin"
         result = self.run_codex(
-            "不要运行命令或读取文件。仅按 Schema 输出 reply 字段，内容为‘聊天自检通过’。"
+            "不要运行命令、读取或修改文件。仅按 Schema 输出 reply 字段，内容为‘聊天自检通过’。",
+            admin_mode=admin_mode,
         )
         reply = str(result.get("reply") or "")
         if "自检通过" not in reply:
@@ -323,7 +413,8 @@ class ChatAgentWorker:
         self.log("自检通过")
 
     def run_once(self) -> bool:
-        data = self.bridge("chat-claim")
+        command = "admin-claim" if self.mode == "admin" else "chat-claim"
+        data = self.bridge(command)
         job = data.get("job")
         if not job:
             return False
@@ -331,7 +422,12 @@ class ChatAgentWorker:
         return True
 
     def run_forever(self) -> None:
-        interval = max(2, int(self.cfg.get("chat_poll_seconds", 5)))
+        poll_key = (
+            "admin_agent_poll_seconds"
+            if self.mode == "admin"
+            else "chat_poll_seconds"
+        )
+        interval = max(2, int(self.cfg.get(poll_key, 5)))
         self.cleanup_local_media()
         self.log(f"聊天工作器启动：{self.worker_id}")
         while True:
@@ -349,11 +445,15 @@ def main() -> int:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--self-check", action="store_true")
     parser.add_argument("--media-root", type=Path)
+    parser.add_argument("--mode", choices=("chat", "admin"), default="chat")
+    parser.add_argument("--admin-workspace", type=Path)
     args = parser.parse_args()
     try:
         worker = ChatAgentWorker(
             load_config(args.config.resolve()),
             args.media_root.resolve() if args.media_root else None,
+            args.mode,
+            args.admin_workspace.resolve() if args.admin_workspace else None,
         )
         if args.self_check:
             worker.self_check()

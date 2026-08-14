@@ -311,14 +311,19 @@ async def handle_feedback(ws, cfg, event, content, media=None) -> None:
     print(f"[Bug检查#{intake_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
-async def handle_chat(ws, cfg, event, content: str, media=None) -> None:
+async def handle_chat(
+    ws, cfg, event, content: str, media=None, kind: str = "chat"
+) -> None:
     """把群聊请求写入独立只读 Agent 队列。"""
     group_id = event.get("group_id")
     qq = str(event.get("user_id", ""))
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or "玩家"
 
-    if not cfg.get("chat_agent_enabled", False):
+    enabled_key = (
+        "admin_agent_enabled" if kind == "admin_agent" else "chat_agent_enabled"
+    )
+    if not cfg.get(enabled_key, False):
         await send_group_msg(
             ws, group_id, at_message(qq, "妾身现在没空，稍后再来觐见吧。")
         )
@@ -329,7 +334,13 @@ async def handle_chat(ws, cfg, event, content: str, media=None) -> None:
             "（玩家附了一张或多张图片，请直接查看图片后回答）"
             if media else "（玩家只@了你，没有附加文字）"
         )
-    max_length = max(20, int(cfg.get("chat_max_content_length", 500)))
+    length_key = (
+        "admin_agent_max_content_length"
+        if kind == "admin_agent"
+        else "chat_max_content_length"
+    )
+    default_length = 3000 if kind == "admin_agent" else 500
+    max_length = max(20, int(cfg.get(length_key, default_length)))
     if len(content) > max_length:
         await send_group_msg(
             ws,
@@ -339,9 +350,10 @@ async def handle_chat(ws, cfg, event, content: str, media=None) -> None:
         return
 
     chat_id = storage.add_chat_message(
-        qq, nickname, str(group_id), content, media=media
+        qq, nickname, str(group_id), content, kind=kind, media=media
     )
-    print(f"[聊天#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
+    label = "管理员Agent" if kind == "admin_agent" else "聊天"
+    print(f"[{label}#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
 def enqueue_bug_followup(event: dict, content: str, media=None):
@@ -373,6 +385,14 @@ def is_at_self(event: dict) -> bool:
     return re.search(
         rf"\[CQ:at,qq={re.escape(self_id)}(?:,[^\]]*)?\]", raw
     ) is not None
+
+
+def is_admin_agent_request(event: dict, cfg: dict) -> bool:
+    """只信任 OneBot 事件中的真实发送者 QQ 与真实 @ 消息段。"""
+    if not cfg.get("admin_agent_enabled", False):
+        return False
+    owner_qq = str(cfg.get("admin_agent_owner_qq", "651846226"))
+    return str(event.get("user_id", "")) == owner_qq and is_at_self(event)
 
 
 _OWNER_REPLY_RE = re.compile(r"^\s*#回复(?:\s+|[:：])?(.*)$", re.DOTALL)
@@ -508,7 +528,7 @@ async def on_event(ws, cfg, event) -> None:
     if allowed and event.get("group_id") not in allowed:
         return  # 群白名单(为空表示全部群)
 
-    if await handle_owner_reply(ws, cfg, event):
+    if not is_at_self(event) and await handle_owner_reply(ws, cfg, event):
         return
     try:
         text, image_refs = await expand_event_content(ws, event, cfg)
@@ -516,6 +536,25 @@ async def on_event(ws, cfg, event) -> None:
         print(f"[错误] 展开消息异常: {exc}")
         text = extract_plain_text(event)
         image_refs = []
+    if is_admin_agent_request(event, cfg):
+        media = []
+        try:
+            media, failures = await download_media_refs(ws, image_refs, cfg)
+            admin_text = text.strip()
+            if failures:
+                admin_text += f"\n（有 {failures} 张图片读取失败）"
+            await handle_chat(
+                ws,
+                cfg,
+                event,
+                admin_text.strip(),
+                media,
+                kind="admin_agent",
+            )
+        except Exception as exc:
+            media_pipeline.cleanup_media(media)
+            print(f"[错误] 处理管理员 Agent 请求异常: {exc}")
+        return
     content = match_feedback(text)
     if content is not None:
         media = []

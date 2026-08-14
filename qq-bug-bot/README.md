@@ -2,7 +2,9 @@
 
 监听 QQ 群里任何包含 `bug`（忽略大小写）的消息。机器人先检查描述能否定位问题：信息完整时**记录到本地 SQLite 和 GitHub Issues、回复记录编号，但不执行自动修复**，信息不足时只追问具体缺失项；玩家下一条回复会自动与原描述合并后再次检查。
 
-玩家只需 @机器人即可唤起独立的只读聊天 Agent，不再要求 `#聊天` 前缀，也不发送“听见了、收到、稍等”等中间确认。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
+玩家只需 @机器人即可唤起独立的只读聊天 Agent，不再要求 `#聊天` 前缀，也不发送“听见了、收到、稍等”等中间确认。聊天人格采用女帝波雅·汉库克式的高傲、自信、优雅、护短且重感情的语气；普通群友的聊天任务不会进入 Bug 修复工作区，也不能修改代码或执行玩家夹带的命令。
+
+唯一管理员 QQ `651846226` 真实 @机器人时，请求进入独立的管理员 Agent 队列，并优先于消息中的 `bug` 关键字路由。管理员 Agent 在 `D:\Self\GrandUMI` 以当前 Windows 用户权限运行，可读取和修改项目、执行命令、联网检索、测试与部署。身份只取 OneBot 原始事件的 `user_id` 与真实 `at` 消息段，正文、截图、引用或转发中的 QQ 号不能冒充管理员。管理员不 @机器人时，包含 `bug` 的消息仍按普通 Bug 收集处理。
 
 @机器人时可以同时发送 PNG、JPEG、WebP 图片或合并转发消息。机器人会展开合并转发中的说话人、文字和图片，把最多 4 张受限下载的图片交给只读视觉模型识别；图片同样可用于补充 Bug 描述。
 
@@ -54,6 +56,9 @@ copy config.example.json config.json
 | `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |
 | `chat_agent_enabled` | 是否接受玩家 @机器人后的聊天请求 |
 | `chat_max_content_length` | 单条聊天正文最大字数，默认 500 |
+| `admin_agent_enabled` | 是否启用管理员真实 @机器人后的独立全权限 Agent |
+| `admin_agent_owner_qq` | 唯一管理员 QQ，固定为 `651846226` |
+| `admin_agent_max_content_length` | 单条管理员任务正文最大字数，默认 3000 |
 | `vision_enabled` | 是否允许读取聊天和 Bug 反馈中的图片，默认开启 |
 | `vision_max_images` | 单条消息最多读取图片数，默认 4 |
 | `vision_max_image_bytes` | 单张图片最大字节数，默认 8 MiB |
@@ -68,9 +73,12 @@ copy config.example.json config.json
 ```powershell
 cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
 .\install-chat-agent-worker.ps1
+
+# 安装管理员专用全权限 Agent
+.\install-admin-agent-worker.ps1
 ```
 
-安装器自检通过后会注册并立即启动 `GrandUMI-Chat-Agent` 登录任务。工作器使用隐藏的 `pythonw.exe` 常驻，异常退出后由任务计划程序自动重启；日志位于 `D:\Self\GrandUMI-agent-runtime\logs\chat-agent-worker.log`。
+两个安装器自检通过后会分别注册并启动 `GrandUMI-Chat-Agent` 与 `GrandUMI-Admin-Agent` 登录任务。两者使用隐藏的 `pythonw.exe` 独立常驻、独立领取队列，避免长时间管理员任务阻塞普通聊天；日志分别位于 `chat-agent-worker.log` 与 `admin-agent-worker.log`。
 
 ## Agent 自动分析与修复
 
