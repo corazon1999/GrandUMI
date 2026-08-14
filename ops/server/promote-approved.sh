@@ -78,6 +78,12 @@ install -m 0755 "$repo/ops/server/apply-grandumi-network.sh" \
   /usr/local/sbin/apply-grandumi-network
 install -m 0644 "$repo/ops/server/grandumi-network-tuning.service" \
   /etc/systemd/system/grandumi-network-tuning.service
+install -m 0755 "$repo/ops/server/grandumi-network-monitor.sh" \
+  /usr/local/sbin/grandumi-network-monitor
+install -m 0644 "$repo/ops/server/grandumi-network-monitor.service" \
+  /etc/systemd/system/grandumi-network-monitor.service
+install -m 0644 "$repo/ops/server/grandumi-network-monitor.timer" \
+  /etc/systemd/system/grandumi-network-monitor.timer
 systemctl daemon-reload
 modprobe tcp_bbr
 modprobe sch_fq
@@ -85,6 +91,7 @@ modprobe sch_htb
 sysctl --system >/dev/null
 systemctl enable grandumi-network-tuning.service
 systemctl restart grandumi-network-tuning.service
+systemctl enable --now grandumi-network-monitor.timer
 caddy validate --config /etc/caddy/Caddyfile
 
 need_back=0

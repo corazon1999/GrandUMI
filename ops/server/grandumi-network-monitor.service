@@ -1,0 +1,20 @@
+[Unit]
+Description=GrandUMI 分钟级网络状态采集
+After=network-online.target grandumi-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/grandumi-network-monitor
+Environment=GRANDUMI_METRICS_URL=http://127.0.0.1:8080/metrics
+StateDirectory=grandumi-network-monitor
+StateDirectoryMode=0750
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
