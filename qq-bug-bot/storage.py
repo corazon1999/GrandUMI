@@ -347,8 +347,8 @@ def complete_bug_intake_job(
     agent_enabled: bool,
 ):
     """完成 Bug 描述检查；合格时在同一事务内静默写入 feedback。"""
-    if decision not in ("record", "clarify"):
-        raise ValueError("Bug 检查结论必须是 record 或 clarify")
+    if decision not in ("record", "clarify", "ignore"):
+        raise ValueError("Bug 检查结论必须是 record、clarify 或 ignore")
     cleaned_description = str(cleaned_description or "").strip()
     reply = str(reply or "").strip()
     if decision == "record" and not cleaned_description:

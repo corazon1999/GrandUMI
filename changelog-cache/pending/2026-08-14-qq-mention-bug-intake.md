@@ -15,9 +15,10 @@
 - 调整 OneBot 群消息路由，Bug 触发优先于 @聊天，并移除聊天排队回执和单用户等待限制。
 - 扩展只读聊天队列支持 `bug_intake` 类型和结构化完整性判定；合格反馈在事务内写入反馈表并抑制确认消息，不合格反馈保留精准追问。
 - 增加 30 分钟内追问续答关联，自动合并原描述和玩家下一条补充后重新判定；聊天历史排除 Bug 检查记录。
+- 对“旧 Bug 不用回复”等仅讨论收集流程、并未上报产品异常的消息静默忽略，避免误建追问链干扰后续群聊。
 
 ## 验证结果
 
-- `py -m unittest discover -s qq-bug-bot\tests -q`：43 项测试全部通过。
+- `py -m unittest discover -s qq-bug-bot\tests -q`：44 项测试全部通过。
 - `py -m py_compile qq-bug-bot\bot.py qq-bug-bot\storage.py qq-bug-bot\agent_bridge.py qq-bug-bot\chat_agent_worker.py qq-bug-bot\chat_protocol.py`：通过。
 - 覆盖 @触发无中间回执、普通聊天不触发、任意位置大小写 Bug 触发、模糊描述追问、完整描述静默入库、追问续答合并及只读结构化输出。

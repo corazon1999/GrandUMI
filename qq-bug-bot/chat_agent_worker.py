@@ -154,7 +154,7 @@ class ChatAgentWorker:
                     result.get("cleaned_description") or ""
                 ).strip()
                 reply = str(result.get("reply") or "").strip()
-                if decision not in ("record", "clarify"):
+                if decision not in ("record", "clarify", "ignore"):
                     raise WorkerError("Bug 检查返回了无效 decision")
                 if decision == "record" and not description:
                     raise WorkerError("Bug 检查未返回可记录的问题描述")

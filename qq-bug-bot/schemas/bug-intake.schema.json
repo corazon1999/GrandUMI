@@ -5,7 +5,7 @@
   "properties": {
     "decision": {
       "type": "string",
-      "enum": ["record", "clarify"]
+      "enum": ["record", "clarify", "ignore"]
     },
     "cleaned_description": {
       "type": "string",

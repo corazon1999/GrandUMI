@@ -215,6 +215,21 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertIn("玩家补充：牌库页点保存后一直转圈", followup["content"])
         self.assertEqual([], ws.sent)
 
+    def test只讨论Bug收集流程时静默忽略且不建立追问链(self):
+        intake = storage.add_chat_message(
+            "123", "路飞", "456", "今天以前的 bug 都不用再回了", kind="bug_intake"
+        )
+        job = storage.claim_chat_job("worker")
+        result = storage.complete_bug_intake_job(
+            intake, job["claim_token"], "ignore", "", "", True
+        )
+        self.assertEqual("ignore", result["decision"])
+        self.assertIsNone(result["feedback_id"])
+        self.assertIsNone(storage.get_chat_result_to_send())
+        self.assertIsNone(
+            storage.add_bug_followup("123", "路飞", "456", "我又没问你")
+        )
+
 
 class ChatProtocolAndWorkerTests(unittest.TestCase):
     def test女帝人格与提示注入边界写入固定提示词(self):
@@ -237,6 +252,7 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             {"nickname": "玩家", "content": "这个有 bug"}
         )
         self.assertIn("decision=record", prompt)
+        self.assertIn("decision=ignore", prompt)
         self.assertIn("静默记录", prompt)
         self.assertIn("精准指出缺少哪些关键信息", prompt)
         self.assertIn("收到", prompt)
