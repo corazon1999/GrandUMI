@@ -134,6 +134,7 @@ public sealed class RankedStore
     public const string MarineFaction = "marine";
     public const string GovernmentFaction = "government";
     public const int PlacementRequired = 5;
+    public const int NewWorldRankPoints = 1500;
     private const double InitialRating = 1500;
     private const double InitialDeviation = 350;
     private const double InitialVolatility = 0.06;
@@ -396,16 +397,18 @@ public sealed class RankedStore
         if (self.PlacementGames < PlacementRequired)
             return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
 
-        var baseDelta = won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch;
-        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, won ? 10 : 5);
+        var settlementMultiplier = self.RankPoints >= NewWorldRankPoints ? 2 : 1;
+        var baseDelta = (won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch) * settlementMultiplier;
+        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, (won ? 10 : 5) * settlementMultiplier);
         // 未完成定级的对手没有可比较的可见 RP，不参与分差修正。
         var rankDifference = opponent.PlacementGames >= PlacementRequired
             ? self.RankPoints - opponent.RankPoints
             : 0;
+        var rankDifferenceAdjustmentCap = 5 * settlementMultiplier;
         var rankDifferenceAdjustment = rankDifference switch
         {
-            < 0 => Math.Clamp((-rankDifference) / 100, 0, 5),
-            > 0 => -Math.Clamp(rankDifference / 100, 0, 5),
+            < 0 => Math.Clamp((-rankDifference) / 100, 0, rankDifferenceAdjustmentCap),
+            > 0 => -Math.Clamp(rankDifference / 100, 0, rankDifferenceAdjustmentCap),
             _ => 0,
         };
         return new RankPointCalculation(baseDelta, streakAdjustment, rankDifference,
@@ -558,7 +561,7 @@ public sealed class RankedStore
 
     public static (string Tier, int? Division) RankLabel(int rankPoints, string? faction = null, int? factionRank = null)
     {
-        if (rankPoints >= 1500) return (NewWorldTitle(faction, factionRank), null);
+        if (rankPoints >= NewWorldRankPoints) return (NewWorldTitle(faction, factionRank), null);
         var tiers = faction switch
         {
             PirateFaction => new[] { "见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长" },

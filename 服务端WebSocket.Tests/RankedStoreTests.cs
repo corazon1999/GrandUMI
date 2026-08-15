@@ -199,7 +199,6 @@ public class RankedStoreTests
     [InlineData(300, 3, -3)]
     [InlineData(499, 4, -4)]
     [InlineData(500, 5, -5)]
-    [InlineData(900, 5, -5)]
     public void 排位结算_低分方与高分方每百分差修正一分且均封顶五分(
         int rankDifference,
         int expectedLowAdjustment,
@@ -211,7 +210,7 @@ public class RankedStoreTests
             var store = new RankedStore(path);
             var now = new DateTime(2026, 8, 12, 13, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, $"gap-{rankDifference}");
-            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000 + rankDifference));
+            SetRankPoints(path, ("爱丽丝", 900), ("鲍勃", 900 + rankDifference));
 
             var lowWins = store.RecordMatch($"gap-low-win-{rankDifference}", now.AddMinutes(10),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
@@ -225,7 +224,7 @@ public class RankedStoreTests
             Assert.Equal(-20 + expectedHighAdjustment, lowWins.Player1.RankPointDelta);
 
             // 重置 RP 并交换胜负，覆盖低分方失败与高分方获胜的另外两个象限。
-            SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000 + rankDifference));
+            SetRankPoints(path, ("爱丽丝", 900), ("鲍勃", 900 + rankDifference));
             var highWins = store.RecordMatch($"gap-high-win-{rankDifference}", now.AddMinutes(11),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
 
@@ -266,9 +265,84 @@ public class RankedStoreTests
             Assert.Equal(10, result!.Player0.StreakAdjustment);
             Assert.Equal(5, result.Player0.RankDifferenceAdjustment);
             Assert.Equal(35, result.Player0.RankPointDelta);
-            Assert.Equal(5, result.Player1.StreakAdjustment);
+            Assert.Equal(10, result.Player1.StreakAdjustment);
             Assert.Equal(-5, result.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-20, result.Player1.RankPointDelta);
+            Assert.Equal(-35, result.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位结算_新世界基础分与连续胜负上限全部翻倍()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 14, 30, 0, DateTimeKind.Utc);
+
+            CompletePlacements(store, now, "new-world-streak");
+            SetRankPoints(path, ("爱丽丝", RankedStore.NewWorldRankPoints), ("鲍勃", RankedStore.NewWorldRankPoints));
+
+            for (var streak = 1; streak <= 22; streak++)
+            {
+                SetRankPoints(path, ("爱丽丝", RankedStore.NewWorldRankPoints), ("鲍勃", RankedStore.NewWorldRankPoints));
+                var result = store.RecordMatch($"new-world-streak-{streak}", now.AddMinutes(10 + streak),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+                var winAdjustment = Math.Min(streak - 1, 20);
+                var lossAdjustment = Math.Min(streak - 1, 10);
+
+                Assert.NotNull(result);
+                Assert.Equal(40 + winAdjustment, result!.Player0.RankPointDelta);
+                Assert.Equal(-40 + lossAdjustment, result.Player1.RankPointDelta);
+                Assert.Equal(winAdjustment, result.Player0.StreakAdjustment);
+                Assert.Equal(lossAdjustment, result.Player1.StreakAdjustment);
+                Assert.Equal(0, result.Player0.RankDifferenceAdjustment);
+                Assert.Equal(0, result.Player1.RankDifferenceAdjustment);
+            }
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位结算_新世界高低分双方分差修正上限翻倍至十分()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, "new-world-gap");
+            SetRankPoints(path, ("爱丽丝", 1500), ("鲍勃", 2500));
+
+            var lowWins = store.RecordMatch("new-world-gap-low-win", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(lowWins);
+            Assert.Equal(10, lowWins!.Player0.RankDifferenceAdjustment);
+            Assert.Equal(-10, lowWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(50, lowWins.Player0.RankPointDelta);
+            Assert.Equal(-50, lowWins.Player1.RankPointDelta);
+
+            SetRankPoints(path, ("爱丽丝", 1500), ("鲍勃", 2500));
+            var highWins = store.RecordMatch("new-world-gap-high-win", now.AddMinutes(11),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
+
+            Assert.NotNull(highWins);
+            Assert.Equal(10, highWins!.Player0.RankDifferenceAdjustment);
+            Assert.Equal(-10, highWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-30, highWins.Player0.RankPointDelta);
+            Assert.Equal(30, highWins.Player1.RankPointDelta);
         }
         finally
         {
