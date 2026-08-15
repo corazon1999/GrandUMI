@@ -26,7 +26,9 @@ $bundle = Join-Path $tempDir "grandumi-production-$short.bundle"
 $remoteBundle = "/tmp/grandumi-production-$short.bundle"
 try {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
-  $serverHead = (& $ssh -o BatchMode=yes $Server 'git -C /opt/grandumi rev-parse refs/remotes/origin/main 2>/dev/null || true').Trim()
+  $serverHead = ""
+  $serverHeadOutput = & $ssh -o BatchMode=yes $Server 'git -C /opt/grandumi rev-parse refs/remotes/origin/main 2>/dev/null || true'
+  if ($null -ne $serverHeadOutput) { $serverHead = ([string]$serverHeadOutput).Trim() }
   if ($serverHead -eq $target) {
     Write-Host "新正式服代码已是目标提交，跳过代码包上传。" -ForegroundColor Yellow
   } elseif ($serverHead -match '^[0-9a-f]{40}$') {
