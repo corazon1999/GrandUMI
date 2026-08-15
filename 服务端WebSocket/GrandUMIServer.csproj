@@ -17,4 +17,18 @@
   <ItemGroup>
     <InternalsVisibleTo Include="GrandUMIServer.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Effects\Definitions\**\*.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="ValidatePublishedDslDefinitions" AfterTargets="Publish">
+    <ItemGroup>
+      <PublishedDslDefinitions Include="$(PublishDir)Effects\Definitions\*.json" />
+    </ItemGroup>
+    <Error Condition="'@(PublishedDslDefinitions)' == ''"
+           Text="发布产物缺少 Effects/Definitions DSL 卡效定义。" />
+  </Target>
 </Project>

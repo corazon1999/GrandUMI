@@ -72,19 +72,28 @@ public static class DslInterpreter
 
     private static void LoadDirectoryCore(string dir)
     {
-        if (!Directory.Exists(dir))
-        {
-            Console.Error.WriteLine($"[DSL] 未找到定义目录: {dir}");
-            return;
-        }
+        var files = GetDefinitionFiles(dir);
         int total = 0;
-        foreach (var file in Directory.GetFiles(dir, "*.json"))
+        foreach (var file in files)
         {
             int n = LoadFile(file);
             total += n;
         }
+        if (_defs.Count == 0)
+            throw new InvalidOperationException($"DSL 定义目录未加载到任何卡效: {dir}");
         Console.WriteLine($"[DSL] 累计加载 {total} 条卡效定义，{_defs.Count} 张唯一卡");
         _loaded = true;
+    }
+
+    internal static string[] GetDefinitionFiles(string dir)
+    {
+        if (!Directory.Exists(dir))
+            throw new DirectoryNotFoundException($"DSL 定义目录不存在: {dir}");
+
+        var files = Directory.GetFiles(dir, "*.json");
+        if (files.Length == 0)
+            throw new InvalidOperationException($"DSL 定义目录中没有 JSON 文件: {dir}");
+        return files;
     }
 
     private static int LoadFile(string path)
