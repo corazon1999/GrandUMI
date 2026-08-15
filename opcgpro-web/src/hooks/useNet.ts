@@ -7,7 +7,7 @@ import { registerGameProtocols } from "@/net/GameProtocol";
 import { eventBus } from "@/net/eventBus";
 import type { ConnectionState } from "@/net/eventBus";
 import { useNetStore } from "@/store/netStore";
-import { getWebSocketEndpoints } from "@/net/wsEndpoint";
+import { getWebSocketEndpoints, refreshWebSocketEndpoints } from "@/net/wsEndpoint";
 
 let protocolsRegistered = false;
 
@@ -31,16 +31,31 @@ export function useNet() {
     const onBrowserOnline = () => {
       if (!NetManager.isConnected) NetManager.retryNow(getWebSocketEndpoints());
     };
+    const onForegroundResume = () => {
+      if (document.visibilityState === "visible") {
+        NetManager.handleForegroundResume(getWebSocketEndpoints());
+      }
+    };
+    const onPageShow = () => NetManager.handleForegroundResume(getWebSocketEndpoints());
 
     eventBus.on("stateChange", onStateChange);
     eventBus.on("reconnectCountdown", onReconnectCountdown);
     window.addEventListener("online", onBrowserOnline);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onForegroundResume);
     NetManager.connect(getWebSocketEndpoints());
+    void refreshWebSocketEndpoints().then((endpoints) => {
+      if (["disconnected", "reconnecting", "failed"].includes(NetManager.state)) {
+        NetManager.retryNow(endpoints);
+      }
+    });
 
     return () => {
       eventBus.off("stateChange", onStateChange);
       eventBus.off("reconnectCountdown", onReconnectCountdown);
       window.removeEventListener("online", onBrowserOnline);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onForegroundResume);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

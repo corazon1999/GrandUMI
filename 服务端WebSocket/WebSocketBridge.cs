@@ -23,7 +23,7 @@ public static class WebSocketBridge
     private const int MaxInboundMessageBytes = 524_288;
     private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
     {
-        "GameStart", "Resync", "SpectateJoin", "FirstPlayerChosen",
+        "GameStart", "Resync", "DuplicateRequest", "SpectateJoin", "FirstPlayerChosen",
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
@@ -232,6 +232,7 @@ public static class WebSocketBridge
         {
             case "MsgSecret":      OnSecret(session, msg);      break;
             case "MsgPing":        OnPing(session, msg);         break;
+            case "MsgNetworkDiagnostics": OnNetworkDiagnostics(session, msg); break;
             case "MsgLogin":       OnLogin(session, msg);        break;
             case "MsgAddAccount":  OnAddAccount(session, msg);   break;
             case "MsgUpdatePs":    OnUpdatePs(session, msg);     break;
@@ -317,6 +318,36 @@ public static class WebSocketBridge
 
     private static void OnPing(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
         => Send(s.SessionId, new { proto = "MsgPing", id = Str(msg, "id") });
+
+    /// <summary>接收不含账号隐私的线路质量摘要，用于区分入口波动、握手慢和服务端排队。</summary>
+    private static void OnNetworkDiagnostics(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.TryConsumeRateLimit("network-diagnostics", capacity: 3, refillPerSecond: 1d / 60d)) return;
+
+        static double Number(IReadOnlyDictionary<string, JsonElement> values, string key)
+            => values.TryGetValue(key, out var value)
+               && value.ValueKind == JsonValueKind.Number
+               && value.TryGetDouble(out var parsed)
+                ? Math.Clamp(parsed, 0, 60_000)
+                : 0;
+
+        var endpointHost = (Str(msg, "endpointHost") ?? "unknown").Trim();
+        if (endpointHost.Length > 100) endpointHost = endpointHost[..100];
+        endpointHost = endpointHost.ToLowerInvariant() switch
+        {
+            "grand-umi.com" => "grand-umi.com",
+            "direct.grand-umi.com" => "direct.grand-umi.com",
+            "test.grand-umi.com" => "test.grand-umi.com",
+            "103.146.230.37" => "103.146.230.37",
+            "localhost:8080" => "localhost",
+            _ => "other",
+        };
+        LatencyDiagnostics.RecordMetric($"客户端握手:{endpointHost}", Number(msg, "handshakeMs"), "ms");
+        var rtt = Number(msg, "rttMs");
+        if (rtt > 0) LatencyDiagnostics.RecordMetric($"客户端RTT:{endpointHost}", rtt, "ms");
+        LatencyDiagnostics.RecordMetric($"客户端线路失败:{endpointHost}", Number(msg, "endpointFailureCount"), "次");
+        LatencyDiagnostics.RecordMetric("客户端重连累计", Number(msg, "reconnectCount"), "次");
+    }
 
     private static void OnLogin(WsSession s, Dictionary<string, JsonElement> msg)
     {

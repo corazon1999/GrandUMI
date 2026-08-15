@@ -1,0 +1,24 @@
+[Unit]
+Description=GrandUMI 新香港候选服前端
+After=network-online.target grandumi-candidate-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=grandumi
+Group=grandumi
+WorkingDirectory=/opt/grandumi-candidate/opcgpro-web
+ExecStart=/opt/node/bin/node /opt/grandumi-candidate/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=2
+Environment=NODE_ENV=production
+LimitNOFILE=65536
+CPUQuota=150%
+MemoryMax=1536M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/grandumi-candidate/opcgpro-web/.next
+
+[Install]
+WantedBy=multi-user.target

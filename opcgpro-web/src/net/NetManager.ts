@@ -8,6 +8,11 @@ export const CLIENT_VERSION = "0.999";
 const DEFAULT_WS_URL = "ws://localhost:8080/ws";
 
 export interface NetworkDiagnostics {
+  endpointHost: string;
+  handshakeMs: number | null;
+  reconnectCount: number;
+  endpointFailureCount: number;
+  lastDisconnectReason: string | null;
   rttMs: number | null;
   rttP95Ms: number | null;
   parseMaxMs: number;
@@ -18,6 +23,13 @@ export interface NetworkDiagnostics {
   stateDeltaEnabled: boolean;
   stateDeltaCount: number;
   fullStateCount: number;
+}
+
+interface EndpointHealth {
+  consecutiveFailures: number;
+  totalFailures: number;
+  circuitOpenUntil: number;
+  lastSuccessAt: number;
 }
 
 class NetManagerClass {
@@ -33,6 +45,12 @@ class NetManagerClass {
   private endpoints = [DEFAULT_WS_URL];
   private endpointIndex = 0;
   private endpointFailuresInCycle = 0;
+  private endpointHealth = new Map<string, EndpointHealth>();
+  private connectionStartedAt = 0;
+  private handshakeMs: number | null = null;
+  private reconnectCount = 0;
+  private lastDisconnectReason: string | null = null;
+  private rttReportedGeneration = 0;
 
   // 重连参数
   private reconnectAttempts = 0;
@@ -42,6 +60,8 @@ class NetManagerClass {
   // 正式服首选直连通常数百毫秒即可完成握手。它发生故障时应尽快切到备用线路，
   // 不能让玩家每轮都先被坏线路完整阻塞五秒。
   private readonly FALLBACK_SWITCH_TIMEOUT_MS = 1_500;
+  private readonly CIRCUIT_FAILURE_THRESHOLD = 2;
+  private readonly CIRCUIT_OPEN_MS = 45_000;
   /// 标记重连：握手完成后会自动触发 reconnected 事件，由 NetProvider 决定是否重新登录 + 请求状态
   private wasConnectedBefore = false;
   private manualClose = false;
@@ -74,7 +94,13 @@ class NetManagerClass {
   }
 
   getDiagnostics(): NetworkDiagnostics {
+    const health = this.getEndpointHealth(this.url);
     return {
+      endpointHost: endpointHost(this.url),
+      handshakeMs: this.handshakeMs,
+      reconnectCount: this.reconnectCount,
+      endpointFailureCount: health.totalFailures,
+      lastDisconnectReason: this.lastDisconnectReason,
       rttMs: this.rttSamples.at(-1) ?? null,
       rttP95Ms: percentile(this.rttSamples, 0.95),
       parseMaxMs: this.parseMaxMs,
@@ -102,7 +128,7 @@ class NetManagerClass {
     if (["connecting", "handshaking", "connected", "reconnecting", "recovering"].includes(this._state)) {
       return;
     }
-    this.endpoints = normalizeEndpoints(url);
+    this.endpoints = this.rankEndpoints(normalizeEndpoints(url));
     this.endpointIndex = 0;
     this.endpointFailuresInCycle = 0;
     this.url = this.endpoints[0];
@@ -119,7 +145,7 @@ class NetManagerClass {
    */
   retryNow(url?: string | readonly string[]) {
     if (this._state === "connected" || this._state === "recovering") return;
-    if (url !== undefined) this.endpoints = normalizeEndpoints(url);
+    if (url !== undefined) this.endpoints = this.rankEndpoints(normalizeEndpoints(url));
 
     this.clearTimers();
     const socket = this.ws;
@@ -143,6 +169,7 @@ class NetManagerClass {
     this.setState(isReconnectAttempt ? "reconnecting" : "connecting");
 
     const generation = ++this.socketGeneration;
+    this.connectionStartedAt = now();
     this.resetConnectionMeasurements();
     let socket: WebSocket;
 
@@ -167,13 +194,14 @@ class NetManagerClass {
       } as MsgBase);
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (!this.isCurrentSocket(socket, generation)) return;
       this.ws = null;
       this.clearConnectionTimeout();
       this.stopHeartbeat();
       this.stateBaseline = null;
       this.pendingPings.clear();
+      this.lastDisconnectReason = event.reason || `WebSocket ${event.code}`;
       if (this.manualClose) {
         this.setState("disconnected");
         return;
@@ -230,6 +258,10 @@ class NetManagerClass {
         if (startedAt !== undefined) {
           const rtt = now() - startedAt;
           pushBounded(this.rttSamples, rtt);
+          if (this.rttReportedGeneration !== this.socketGeneration) {
+            this.rttReportedGeneration = this.socketGeneration;
+            this.reportNetworkDiagnostics();
+          }
           if (rtt >= 80) console.info(`[延迟] WebSocket RTT ${rtt.toFixed(1)}ms`);
         }
       }
@@ -242,6 +274,9 @@ class NetManagerClass {
         this.clearConnectionTimeout();
         this.endpointFailuresInCycle = 0;
         const isReconnect = this.wasConnectedBefore;
+        this.handshakeMs = Math.max(0, now() - this.connectionStartedAt);
+        this.markEndpointSuccess(this.url);
+        if (isReconnect) this.reconnectCount++;
         this.reconnectAttempts = 0;
         this.wasConnectedBefore = true;
         this.lossNotified = false;
@@ -251,6 +286,7 @@ class NetManagerClass {
         this.setState(isReconnect ? "recovering" : "connected");
         eventBus.emit("connectSucc");
         if (isReconnect) eventBus.emit("reconnected");
+        this.reportNetworkDiagnostics();
       }
     }
 
@@ -305,6 +341,21 @@ class NetManagerClass {
     if (this._state === "recovering") this.setState("connected");
   }
 
+  /** 浏览器从后台或休眠恢复时立即验证当前连接，坏连接不再等待下一轮定时心跳。 */
+  handleForegroundResume(url?: string | readonly string[]) {
+    if (url !== undefined) this.endpoints = this.rankEndpoints(normalizeEndpoints(url));
+    const socket = this.ws;
+    if (socket?.readyState === WebSocket.OPEN && this.isConnected) {
+      if (Date.now() - this.lastPongAt > 20_000) {
+        socket.close(4003, "页面恢复时心跳已过期");
+      } else {
+        this.sendHeartbeat(socket);
+      }
+      return;
+    }
+    this.retryNow(this.endpoints);
+  }
+
   disconnect() {
     this.clearTimers();
     this.manualClose = true;
@@ -321,10 +372,11 @@ class NetManagerClass {
   }
 
   private onConnectionFailed() {
+    this.markEndpointFailure(this.url);
     eventBus.emit("connectFail");
     if (this.endpointFailuresInCycle < this.endpoints.length - 1) {
       this.endpointFailuresInCycle++;
-      this.endpointIndex = (this.endpointIndex + 1) % this.endpoints.length;
+      this.endpointIndex = this.findNextEndpointIndex();
       this.url = this.endpoints[this.endpointIndex];
       console.warn(`[NetManager] 当前线路不可用，切换备用线路：${this.url}`);
       this.openSocket(this.url);
@@ -332,7 +384,7 @@ class NetManagerClass {
     }
 
     this.endpointFailuresInCycle = 0;
-    this.endpointIndex = (this.endpointIndex + 1) % this.endpoints.length;
+    this.endpointIndex = this.findNextEndpointIndex();
     this.url = this.endpoints[this.endpointIndex];
     this.scheduleReconnect();
   }
@@ -360,10 +412,12 @@ class NetManagerClass {
   private scheduleReconnect() {
     this.clearReconnectTimers();
     // 持续重试并封顶间隔，避免网络在房间宽限期内恢复后，客户端却因长退避或停止重试而必须刷新。
-    const delay = Math.min(
+    const baseDelay = Math.min(
       this.RECONNECT_BASE_DELAY * Math.pow(2, Math.min(this.reconnectAttempts, 8)),
       this.RECONNECT_MAX_DELAY,
     );
+    // 加入抖动，避免入口短暂恢复时大量玩家在同一毫秒重连形成惊群。
+    const delay = Math.round(baseDelay * (0.75 + Math.random() * 0.5));
     this.reconnectAttempts++;
     console.log(`[NetManager] ${delay / 1000}s 后尝试第 ${this.reconnectAttempts} 次重连`);
     this.setState("reconnecting");
@@ -385,6 +439,7 @@ class NetManagerClass {
     this.stopHeartbeat();
     const socket = this.ws;
     if (!socket) return;
+    this.sendHeartbeat(socket);
     this.pingTimer = setInterval(() => {
       if (this.ws !== socket || socket.readyState !== WebSocket.OPEN) return;
       if (Date.now() - this.lastPongAt > 30_000) {
@@ -392,15 +447,88 @@ class NetManagerClass {
         socket.close(4000, "心跳超时");
         return;
       }
-      const id = `${this.socketGeneration}-${++this.pingSequence}`;
-      const sentAt = now();
-      if (this.sendOn(socket, { proto: "MsgPing", id } as MsgPing)) {
-        this.pendingPings.set(id, sentAt);
-        for (const [pendingId, pendingAt] of this.pendingPings) {
-          if (sentAt - pendingAt > 30_000) this.pendingPings.delete(pendingId);
-        }
-      }
+      this.sendHeartbeat(socket);
     }, 10_000);
+  }
+
+  private sendHeartbeat(socket: WebSocket) {
+    if (this.ws !== socket || socket.readyState !== WebSocket.OPEN) return;
+    const id = `${this.socketGeneration}-${++this.pingSequence}`;
+    const sentAt = now();
+    if (this.sendOn(socket, { proto: "MsgPing", id } as MsgPing)) {
+      this.pendingPings.set(id, sentAt);
+      for (const [pendingId, pendingAt] of this.pendingPings) {
+        if (sentAt - pendingAt > 30_000) this.pendingPings.delete(pendingId);
+      }
+    }
+  }
+
+  private getEndpointHealth(url: string): EndpointHealth {
+    let health = this.endpointHealth.get(url);
+    if (!health) {
+      health = { consecutiveFailures: 0, totalFailures: 0, circuitOpenUntil: 0, lastSuccessAt: 0 };
+      this.endpointHealth.set(url, health);
+    }
+    return health;
+  }
+
+  private markEndpointFailure(url: string) {
+    const health = this.getEndpointHealth(url);
+    health.consecutiveFailures++;
+    health.totalFailures++;
+    if (health.consecutiveFailures >= this.CIRCUIT_FAILURE_THRESHOLD) {
+      health.circuitOpenUntil = Date.now() + this.CIRCUIT_OPEN_MS;
+    }
+  }
+
+  private markEndpointSuccess(url: string) {
+    const health = this.getEndpointHealth(url);
+    health.consecutiveFailures = 0;
+    health.circuitOpenUntil = 0;
+    health.lastSuccessAt = Date.now();
+    try { localStorage.setItem("grandumi_last_good_ws", url); } catch { /* 隐私模式可禁用存储。 */ }
+  }
+
+  private rankEndpoints(endpoints: string[]): string[] {
+    let preferred = "";
+    try { preferred = localStorage.getItem("grandumi_last_good_ws") ?? ""; } catch { /* noop */ }
+    return [...endpoints].sort((a, b) => {
+      const aOpen = this.getEndpointHealth(a).circuitOpenUntil > Date.now() ? 1 : 0;
+      const bOpen = this.getEndpointHealth(b).circuitOpenUntil > Date.now() ? 1 : 0;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+      if (a === preferred) return -1;
+      if (b === preferred) return 1;
+      return this.getEndpointHealth(b).lastSuccessAt - this.getEndpointHealth(a).lastSuccessAt;
+    });
+  }
+
+  private findNextEndpointIndex(): number {
+    const nowMs = Date.now();
+    for (let offset = 1; offset <= this.endpoints.length; offset++) {
+      const candidate = (this.endpointIndex + offset) % this.endpoints.length;
+      if (this.getEndpointHealth(this.endpoints[candidate]).circuitOpenUntil <= nowMs) return candidate;
+    }
+    // 全部熔断时仍选择最早允许半开探测的一条，避免永久停止恢复。
+    let best = 0;
+    for (let index = 1; index < this.endpoints.length; index++) {
+      if (this.getEndpointHealth(this.endpoints[index]).circuitOpenUntil
+          < this.getEndpointHealth(this.endpoints[best]).circuitOpenUntil) best = index;
+    }
+    return best;
+  }
+
+  private reportNetworkDiagnostics() {
+    const diagnostics = this.getDiagnostics();
+    this.send({
+      proto: "MsgNetworkDiagnostics",
+      endpointHost: diagnostics.endpointHost,
+      handshakeMs: diagnostics.handshakeMs,
+      rttMs: diagnostics.rttMs,
+      rttP95Ms: diagnostics.rttP95Ms,
+      reconnectCount: diagnostics.reconnectCount,
+      endpointFailureCount: diagnostics.endpointFailureCount,
+      lastDisconnectReason: diagnostics.lastDisconnectReason?.slice(0, 120) ?? null,
+    } as MsgBase);
   }
 
   private stopHeartbeat() {
@@ -481,6 +609,10 @@ export const NetManager = new NetManagerClass();
 function normalizeEndpoints(url: string | readonly string[]): string[] {
   const endpoints = (typeof url === "string" ? [url] : url).filter(Boolean);
   return [...new Set(endpoints.length > 0 ? endpoints : [DEFAULT_WS_URL])];
+}
+
+function endpointHost(raw: string): string {
+  try { return new URL(raw).host; } catch { return "unknown"; }
 }
 
 function now(): number {
