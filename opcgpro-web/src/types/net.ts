@@ -355,6 +355,7 @@ export interface RankProfileSnapshot {
   wins: number;
   losses: number;
   highestRankPoints: number;
+  championLeaderNumbers?: string[];
 }
 
 export interface RankLeaderboardItem {

@@ -96,18 +96,18 @@ textarea {
 }
 
 .rank-tier-badge--pirate {
-  --rank-badge-rgb: 251 146 60;
-  --rank-badge-strong-rgb: 254 215 170;
+  --rank-badge-rgb: 244 63 94;
+  --rank-badge-strong-rgb: 254 205 211;
 }
 
 .rank-tier-badge--marine {
-  --rank-badge-rgb: 56 189 248;
+  --rank-badge-rgb: 14 165 233;
   --rank-badge-strong-rgb: 186 230 253;
 }
 
 .rank-tier-badge--government {
-  --rank-badge-rgb: 192 132 252;
-  --rank-badge-strong-rgb: 233 213 255;
+  --rank-badge-rgb: 245 158 11;
+  --rank-badge-strong-rgb: 253 230 138;
 }
 
 .rank-tier-badge__aura {

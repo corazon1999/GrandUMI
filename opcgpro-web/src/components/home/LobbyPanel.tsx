@@ -5,6 +5,8 @@ import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { showMessage } from "@/components/ui/MessageBox";
 import Modal from "@/components/ui/Modal";
+import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
+import RankTierBadge from "@/components/ui/RankTierBadge";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
@@ -330,11 +332,12 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                             <div>
                               <p className="text-xs font-bold text-violet-300">{RANK_FACTION_NAMES[rankProfile.faction]} · {rankProfile.seasonId}</p>
                               <p className="mt-1 text-[11px] font-bold text-gray-500">当前段位</p>
-                              <p className="mt-0.5 text-lg font-black text-white">
+                              <div className="mt-0.5 flex min-h-7 min-w-0 flex-wrap items-center gap-2">
                                 {rankProfile.placementGames < rankProfile.placementRequired
-                                  ? `定级中 ${rankProfile.placementGames}/${rankProfile.placementRequired}`
-                                  : `${rankProfile.tier}${rankProfile.division ? ` ${["", "I", "II", "III"][rankProfile.division]}` : ""}`}
-                              </p>
+                                  ? <span className="text-lg font-black text-white">定级中 {rankProfile.placementGames}/{rankProfile.placementRequired}</span>
+                                  : <RankTierBadge faction={rankProfile.faction} tier={rankProfile.tier} division={rankProfile.division} className="text-sm" />}
+                                <LeaderChampionBadgeList leaderNumbers={rankProfile.championLeaderNumbers} maxVisible={2} />
+                              </div>
                               <p className="mt-1 text-xs font-bold text-violet-300">悬赏金 {formatRankBounty(rankProfile.rankPoints)}</p>
                             </div>
                             <p className="mt-2 text-xs text-gray-500">战绩 {rankProfile.wins} 胜 / {rankProfile.losses} 负 · 赛季结束 {new Date(rankProfile.seasonEndsAtUtc).toLocaleDateString("zh-CN")}</p>

@@ -451,11 +451,15 @@ public class RankedStoreTests
             Assert.NotNull(rankedStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(rankedStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             CompletePlacements(rankedStore, now, "champion-rank");
-            var item = Assert.Single(rankedStore.GetSnapshot("alice", "爱丽丝", now.AddMinutes(20)).Leaderboard,
+            var snapshot = rankedStore.GetSnapshot("alice", "爱丽丝", now.AddMinutes(20));
+            var item = Assert.Single(snapshot.Leaderboard,
                 entry => entry.DisplayName == "爱丽丝");
 
+            Assert.Equal(new[] { "OP16-001" }, snapshot.Profile.ChampionLeaderNumbers);
             Assert.Equal(new[] { "OP16-001" }, item.ChampionLeaderNumbers);
+            var profileWireJson = System.Text.Json.JsonSerializer.Serialize(RankWire.Profile(snapshot.Profile));
             var wireJson = System.Text.Json.JsonSerializer.Serialize(RankWire.Leaderboard(new[] { item }));
+            Assert.Contains("\"championLeaderNumbers\":[\"OP16-001\"]", profileWireJson);
             Assert.Contains("\"championLeaderNumbers\":[\"OP16-001\"]", wireJson);
             Assert.DoesNotContain("championWinRate", wireJson, StringComparison.OrdinalIgnoreCase);
         }

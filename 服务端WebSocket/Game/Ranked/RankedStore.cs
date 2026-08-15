@@ -19,7 +19,8 @@ public sealed record RankProfileSnapshot(
     int Games,
     int Wins,
     int Losses,
-    int HighestRankPoints);
+    int HighestRankPoints,
+    IReadOnlyList<string> ChampionLeaderNumbers);
 
 public sealed record RankLeaderboardItem(
     int Rank,
@@ -82,6 +83,7 @@ public static class RankWire
         wins = value.Wins,
         losses = value.Losses,
         highestRankPoints = value.HighestRankPoints,
+        championLeaderNumbers = value.ChampionLeaderNumbers,
     };
 
     public static object[] Leaderboard(IReadOnlyList<RankLeaderboardItem> values)
@@ -266,7 +268,7 @@ public sealed class RankedStore
             var faction = ReadFaction(connection, transaction, profile.AccountKey);
             var leaderboard = ReadLeaderboard(connection, season, nowUtc);
             transaction.Commit();
-            return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction)), leaderboard);
+            return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction), account, nowUtc), leaderboard);
         }
     }
 
@@ -305,7 +307,7 @@ public sealed class RankedStore
                     var unchangedLeaderboard = ReadLeaderboard(connection, season, nowUtc);
                     transaction.Commit();
                     return new RankSnapshot(ToSnapshot(profile, season, selected,
-                        FactionRank(connection, season, profile, selected)), unchangedLeaderboard);
+                        FactionRank(connection, season, profile, selected), account, nowUtc), unchangedLeaderboard);
                 }
 
                 profile = ResetRankProgress(profile, nowUtc ?? DateTime.UtcNow);
@@ -321,7 +323,7 @@ public sealed class RankedStore
             }
             var leaderboard = ReadLeaderboard(connection, season, nowUtc);
             transaction.Commit();
-            return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected)), leaderboard);
+            return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected), account, nowUtc), leaderboard);
         }
     }
 
@@ -557,12 +559,23 @@ public sealed class RankedStore
             winStreakBefore, winStreak);
     }
 
-    private static RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank)
+    private RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank,
+        string account, DateTime? nowUtc)
     {
         var (tier, division) = RankLabel(profile.RankPoints, faction, factionRank);
+        IReadOnlyList<string> championLeaderNumbers;
+        try
+        {
+            championLeaderNumbers = _championStore.GetChampionLeaderNumbers(account, nowUtc);
+        }
+        catch
+        {
+            // 称号数据源暂不可用时只隐藏称号，不影响排位资料加载。
+            championLeaderNumbers = Array.Empty<string>();
+        }
         return new RankProfileSnapshot(season.Id, season.StartsAtUtc, season.EndsAtUtc,
             profile.PlacementGames, PlacementRequired, profile.RankPoints, faction, tier, division,
-            profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints);
+            profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints, championLeaderNumbers);
     }
 
     public static (string Tier, int? Division) RankLabel(int rankPoints, string? faction = null, int? factionRank = null)

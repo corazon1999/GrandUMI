@@ -41,12 +41,20 @@ test("排位前必须选择阵营，更换阵营须确认并清空排位进度",
 });
 
 test("排位卡片只显示当前段位并可展开阵营规则", async () => {
-  const lobby = await readSource("../src/components/home/LobbyPanel.tsx");
+  const [lobby, types, rankedStore] = await Promise.all([
+    readSource("../src/components/home/LobbyPanel.tsx"),
+    readSource("../src/types/net.ts"),
+    readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs"),
+  ]);
 
   assert.doesNotMatch(lobby, /查看排位榜/);
   assert.doesNotMatch(lobby, /rankLeaderboard/);
   assert.doesNotMatch(lobby, /见习海贼 → 船长/);
   assert.match(lobby, /当前段位/);
+  assert.match(lobby, /<RankTierBadge faction=\{rankProfile\.faction\}/);
+  assert.match(lobby, /<LeaderChampionBadgeList leaderNumbers=\{rankProfile\.championLeaderNumbers\}/);
+  assert.match(types, /interface RankProfileSnapshot[\s\S]+championLeaderNumbers\?: string\[\]/);
+  assert.match(rankedStore, /championLeaderNumbers = value\.ChampionLeaderNumbers/);
   assert.match(lobby, /aria-label="排位阵营操作"/);
   assert.match(lobby, /aria-expanded=\{rankRulesOpen\}/);
   assert.match(lobby, />\s*阵营规则\s*</);

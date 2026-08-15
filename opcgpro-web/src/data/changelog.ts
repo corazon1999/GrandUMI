@@ -20,6 +20,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-15-ranked-faction-badge-release",
+    version: "2026.08.15.4",
+    date: "2026-08-15",
+    title: "阵营称号与主页排位信息更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "主页排位卡会同步展示玩家已获得的“最强××”徽章，不再只能前往排行榜查看。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "海贼、海军、世界政府的特殊排位称号分别使用玫红、天蓝、琥珀三套动态样式，并在主页排位卡与排行榜保持一致。",
+          "手机竖屏空间不足时，特殊称号和最强徽章会自动换行，保持完整可读。",
+          "日常功能更新完成后直接进入测试服验证，不再经过候选环境，减少重复构建与等待时间。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-15-ranked-champion-visual-release",
     version: "2026.08.15.3",
     date: "2026-08-15",
