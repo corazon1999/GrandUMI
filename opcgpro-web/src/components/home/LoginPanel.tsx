@@ -160,16 +160,6 @@ export default function LoginPanel() {
           One Piece Card Game Online
         </p>
 
-        <aside
-          aria-label="非官方项目声明"
-          className="mb-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-3.5 py-3"
-        >
-          <p className="text-center text-sm font-black text-amber-200">非官方玩家项目</p>
-          <p className="mt-1.5 text-xs leading-5 text-gray-300">
-            GrandUMI 未获得万代、集英社、东映动画或其他相关权利方的授权、认可或赞助，与上述权利方不存在隶属、合作或其他关联关系。相关名称、角色及卡牌素材的权利归各自权利方所有。
-          </p>
-        </aside>
-
         {authStep === "account" && storedAccount && !editingAccount ? (
           <div className="mb-5 rounded-2xl border border-gray-800 bg-gray-950/70 px-4 py-4 text-center">
             <p className="text-sm text-gray-500">欢迎回来</p>
