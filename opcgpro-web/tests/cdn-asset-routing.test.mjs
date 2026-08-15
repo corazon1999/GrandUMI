@@ -10,6 +10,7 @@ const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.cadd
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const networkService = await readFile(new URL("../../ops/server/grandumi-network-tuning.service", import.meta.url), "utf8");
 const prewarm = await readFile(new URL("../../ops/server/prewarm-assets.sh", import.meta.url), "utf8");
+const sprite = await readFile(new URL("../src/lib/sprite.ts", import.meta.url), "utf8");
 
 test("production build keeps critical Next assets same-origin and routes card assets through the CDN", () => {
   assert.doesNotMatch(nextConfig, /assetPrefix\s*:/);
@@ -77,4 +78,9 @@ test("release prewarms new chunks and catalog mode covers card thumbnails", () =
   assert.match(prewarm, /GRANDUMI_PREWARM_RATE:-128K/);
   assert.match(prewarm, /--limit-rate "\$rate"/);
   assert.match(promote, /prewarm-assets\.sh" release/);
+});
+
+test("card image URLs carry a recovery revision to bypass stale 404 caches", () => {
+  assert.match(sprite, /CARD_ASSET_VERSION = `\$\{DATA_VERSION\}-r2`/);
+  assert.match(sprite, /`\?v=\$\{CARD_ASSET_VERSION\}`/);
 });

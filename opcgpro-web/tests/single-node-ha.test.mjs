@@ -82,6 +82,8 @@ test("发布构建进入低优先级资源组且产物按提交隔离", () => {
   assert.match(stageScript, /rsync -a --ignore-existing "\$previous_frontend\/\.next\/static\/"/);
   assert.match(stageScript, /node_modules\/ "\$frontend_next\/node_modules\/"/);
   assert.match(stageScript, /previous_frontend\/node_modules/);
+  assert.match(stageScript, /shared_asset_root=\/www/);
+  assert.match(stageScript, /ln -s "\$shared_asset_root\/\$asset_dir" "\$slot_asset_path"/);
   assert.match(stageScript, /releases\/\$target/);
   assert.match(productionSlice, /MemoryMax=6500M/);
   assert.match(buildSlice, /CPUQuota=200%/);

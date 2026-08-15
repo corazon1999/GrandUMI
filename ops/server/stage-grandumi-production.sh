@@ -5,12 +5,26 @@ repo=/opt/grandumi
 stage_script="$(readlink -f "${BASH_SOURCE[0]}")"
 target="${1:-}"
 production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
+shared_asset_root=/www
+production_asset_root="$repo/opcgpro-web/public"
+card_asset_dirs=(cards-thumb cards-webp)
 
 die() { echo "错误：$*" >&2; exit 1; }
 [[ "$production_ip" == "103.146.230.37" ]] || die "拒绝部署到未登记主机：$production_ip"
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位提交号"
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "新正式服仓库中不存在提交 $target"
 command -v rsync >/dev/null || die "缺少 rsync，无法创建节省磁盘的版本化静态资源"
+
+# 卡图不进入 Git，发布 worktree 中不会包含这些目录。先把正式服持久资源同步到
+# /www，再在每个 A/B 前端槽内创建符号链接，避免切槽后整批卡图返回 404。
+for asset_dir in "${card_asset_dirs[@]}"; do
+  source_dir="$production_asset_root/$asset_dir"
+  shared_dir="$shared_asset_root/$asset_dir"
+  [[ -d "$source_dir" ]] || die "正式服卡图资源目录不存在：$source_dir"
+  install -d -m 0755 "$shared_dir"
+  rsync -a "$source_dir/" "$shared_dir/"
+  [[ -n "$(find "$shared_dir" -type f -print -quit)" ]] || die "正式服共享卡图目录为空：$shared_dir"
+done
 
 # 构建任务自动进入低优先级 slice，避免 npm/dotnet 抢占在线对局 CPU、内存和磁盘。
 if [[ "${GRANDUMI_BUILD_SCOPED:-0}" != 1 ]]; then
@@ -73,6 +87,12 @@ if [[ -d "$previous_public" ]]; then
 else
   rsync -a --delete public/ "$frontend_next/public/"
 fi
+for asset_dir in "${card_asset_dirs[@]}"; do
+  slot_asset_path="$frontend_next/public/$asset_dir"
+  [[ ! -e "$slot_asset_path" && ! -L "$slot_asset_path" ]] \
+    || die "前端发布槽卡图路径已存在，拒绝覆盖：$slot_asset_path"
+  ln -s "$shared_asset_root/$asset_dir" "$slot_asset_path"
+done
 rm -rf "$release_dir/backend" "$release_dir/frontend"
 mv "$publish_next" "$release_dir/backend"
 mv "$frontend_next" "$release_dir/frontend"

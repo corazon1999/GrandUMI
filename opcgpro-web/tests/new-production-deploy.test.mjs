@@ -22,6 +22,14 @@ test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
   assert.match(stage, /尚未切换服务/);
 });
 
+test("正式服发布槽始终挂载不进入 Git 的共享卡图资源", () => {
+  assert.match(stage, /shared_asset_root=\/www/);
+  assert.match(stage, /card_asset_dirs=\(cards-thumb cards-webp\)/);
+  assert.match(stage, /rsync -a "\$source_dir\/" "\$shared_dir\/"/);
+  assert.match(stage, /ln -s "\$shared_asset_root\/\$asset_dir" "\$slot_asset_path"/);
+  assert.match(stage, /正式服共享卡图目录为空/);
+});
+
 test("正式入口只承载主域名，候选域名由隔离站点承载", () => {
   assert.match(nginx, /server_name grand-umi\.com;/);
   assert.match(nginx, /live\/grand-umi\.com\/fullchain\.pem/);
