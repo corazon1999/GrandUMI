@@ -15,9 +15,9 @@ test("正式主域图片可回退到 IPv4 直连入口", () => {
   assert.match(sprite, /imageFallbackSources\(\[/);
 });
 
-test("卡牌图鉴图片超时会推进到下一候选并最终显示占位", () => {
-  assert.match(catalog, /const CARD_IMAGE_TIMEOUT_MS = 5_000/);
-  assert.match(catalog, /const CARD_IMAGE_MAX_RETRIES = 1/);
+test("卡牌图鉴会依次尝试派生图、原图与外部图后再显示占位", () => {
+  assert.match(catalog, /const CARD_IMAGE_TIMEOUT_MS = 15_000/);
+  assert.match(catalog, /const CARD_IMAGE_MAX_RETRIES = 2/);
   assert.match(catalog, /retryCountRef\.current >= CARD_IMAGE_MAX_RETRIES/);
   assert.match(catalog, /window\.setTimeout\(handleImageFailure, CARD_IMAGE_TIMEOUT_MS\)/);
   assert.match(catalog, /图片暂不可用/);

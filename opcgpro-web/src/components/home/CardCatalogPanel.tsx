@@ -27,8 +27,8 @@ const COLOR_OPTIONS = ["红", "绿", "蓝", "紫", "黑", "黄"];
 const CARD_WIDTH = 118;
 const CARD_HEIGHT = 198;
 const CARD_GAP = 12;
-const CARD_IMAGE_TIMEOUT_MS = 5_000;
-const CARD_IMAGE_MAX_RETRIES = 1;
+const CARD_IMAGE_TIMEOUT_MS = 15_000;
+const CARD_IMAGE_MAX_RETRIES = 2;
 
 type LoadState = "loading" | "done" | "error";
 
