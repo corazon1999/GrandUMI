@@ -29,12 +29,21 @@ $bundle = Join-Path $tempDir "grandumi-candidate-$short.bundle"
 $remoteBundle = "/tmp/grandumi-candidate-$short.bundle"
 try {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
-  & $git bundle create $bundle main
+  $serverHead = (& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-candidate rev-parse refs/remotes/origin/main 2>/dev/null || true").Trim()
+  if ($serverHead -eq $target) {
+    Write-Host "候选服代码已是目标提交，跳过代码包上传。" -ForegroundColor Yellow
+  } elseif ($serverHead -match '^[0-9a-f]{40}$') {
+    & $git bundle create $bundle main "^$serverHead"
+  } else {
+    & $git bundle create $bundle main
+  }
   if ($LASTEXITCODE -ne 0) { Stop-WithError "创建候选服代码包失败。" }
-  & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
-  if ($LASTEXITCODE -ne 0) { Stop-WithError "上传候选服代码包失败。" }
-  & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-candidate fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle' && git -C /opt/grandumi-candidate checkout --detach '$target'"
-  if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服导入代码包失败。" }
+  if (Test-Path -LiteralPath $bundle) {
+    & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "上传候选服代码包失败。" }
+    & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-candidate fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle' && git -C /opt/grandumi-candidate checkout --detach '$target'"
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服导入代码包失败。" }
+  }
 } finally {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
 }
@@ -44,7 +53,7 @@ if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服基础环境初始化失败�
 & $ssh -o BatchMode=yes $Server "GRANDUMI_CANDIDATE_IP=103.146.230.37 bash /opt/grandumi-candidate/ops/server/deploy-grandumi-candidate.sh '$target'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服应用部署失败。" }
 
-$homeCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" "http://103.146.230.37/"
+$homeCode = & curl.exe -s -L --noproxy '*' -o NUL -w "%{http_code}" "http://103.146.230.37/"
 $readyCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" "http://103.146.230.37/backend/ready"
 if ($homeCode -ne "200" -or $readyCode -ne "200") { Stop-WithError "候选服外网验证失败：首页=$homeCode，就绪=$readyCode。" }
 Write-Host "新香港候选服部署成功：$target" -ForegroundColor Green

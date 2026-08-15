@@ -1,0 +1,10 @@
+[Unit]
+Description=GrandUMI 候选服每日备份计划
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

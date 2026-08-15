@@ -6,7 +6,7 @@ candidate_ip="${GRANDUMI_CANDIDATE_IP:-103.146.230.37}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git nginx rsync xz-utils iproute2 kmod
+apt-get install -y --no-install-recommends ca-certificates curl git nginx rsync xz-utils iproute2 kmod sqlite3 jq xfsprogs
 
 if [[ ! -x /opt/dotnet/dotnet ]]; then
   installer="$(mktemp)"
@@ -36,11 +36,27 @@ ln -sfn /opt/node/bin/npx /usr/local/bin/npx
 id grandumi >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin grandumi
 install -d -o grandumi -g grandumi -m 0750 /data/grandumi
 install -d -m 0755 /opt/grandumi-candidate
+if ! swapon --show=NAME --noheadings | grep -Fxq /data/grandumi.swap; then
+  if [[ ! -f /data/grandumi.swap ]]; then
+    fallocate -l 2G /data/grandumi.swap
+    chmod 0600 /data/grandumi.swap
+    mkswap /data/grandumi.swap >/dev/null
+  fi
+  swapon /data/grandumi.swap
+fi
+grep -Fq '/data/grandumi.swap none swap sw 0 0' /etc/fstab \
+  || printf '/data/grandumi.swap none swap sw 0 0\n' >> /etc/fstab
 
 install -m 0644 /opt/grandumi-candidate/ops/server/60-grandumi-network.conf /etc/sysctl.d/60-grandumi-network.conf
 install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-network-modules.conf /etc/modules-load.d/grandumi-network.conf
 install -m 0755 /opt/grandumi-candidate/ops/server/apply-grandumi-network.sh /usr/local/sbin/apply-grandumi-network
 install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-network-tuning.service /etc/systemd/system/grandumi-network-tuning.service
+install -m 0755 /opt/grandumi-candidate/ops/server/grandumi-network-monitor.sh /usr/local/sbin/grandumi-network-monitor
+install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-network-monitor.service /etc/systemd/system/grandumi-network-monitor.service
+install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-network-monitor.timer /etc/systemd/system/grandumi-network-monitor.timer
+install -m 0755 /opt/grandumi-candidate/ops/server/grandumi-candidate-backup.sh /usr/local/sbin/grandumi-candidate-backup
+install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate-backup.service /etc/systemd/system/grandumi-candidate-backup.service
+install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate-backup.timer /etc/systemd/system/grandumi-candidate-backup.timer
 mkdir -p /etc/systemd/system/grandumi-network-tuning.service.d
 printf '[Service]\nEnvironment=GRANDUMI_EGRESS_RATE=60mbit\n' > /etc/systemd/system/grandumi-network-tuning.service.d/candidate.conf
 sysctl --system >/dev/null
@@ -53,8 +69,9 @@ rm -f /etc/nginx/sites-enabled/default
 sed -ri 's/worker_connections\s+[0-9]+;/worker_connections 8192;/' /etc/nginx/nginx.conf
 nginx -t
 systemctl daemon-reload
-systemctl enable nginx grandumi-network-tuning.service grandumi-candidate-backend.service grandumi-candidate-frontend.service
+systemctl enable nginx grandumi-network-tuning.service grandumi-network-monitor.timer grandumi-candidate-backup.timer grandumi-candidate-backend.service grandumi-candidate-frontend.service
 systemctl restart grandumi-network-tuning.service
+systemctl restart grandumi-network-monitor.timer grandumi-candidate-backup.timer
 systemctl restart nginx
 
 echo "候选服基础环境初始化完成：IP=$candidate_ip，dotnet=$(dotnet --version)，node=$(node --version)"

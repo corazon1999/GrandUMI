@@ -1,0 +1,9 @@
+[Unit]
+Description=GrandUMI 候选服 SQLite 在线备份
+After=grandumi-candidate-backend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/grandumi-candidate-backup
+Nice=10
+IOSchedulingClass=idle
