@@ -16,9 +16,9 @@ die() { echo "错误：$*" >&2; exit 1; }
 # 已进入 A/B 模式后，发布只切换到空闲槽位；失败由切换脚本自动回滚。
 active_slot="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || true)"
 if [[ "$active_slot" =~ ^[ab]$ \
-      && -e "$repo/slots/$active_slot/backend/GrandUMIServer.dll" \
+      && -e "$repo/slots/$active_slot/backend/GrandUMIServer.dll" ]] \
       && systemctl is-active --quiet "grandumi-production-backend@$active_slot.service" \
-      && systemctl is-active --quiet "grandumi-production-frontend@$active_slot.service" ]]; then
+      && systemctl is-active --quiet "grandumi-production-frontend@$active_slot.service"; then
   /usr/local/sbin/grandumi-production-switch --release "$target"
   active="$(cat /var/lib/grandumi-ha/active-slot)"
   port=8080; [[ "$active" == b ]] && port=8082
