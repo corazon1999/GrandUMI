@@ -63,6 +63,8 @@ test("蓝绿切换先验证目标，失败自动恢复原槽", () => {
   assert.match(switchScript, /grandumi-active-assets\.conf\.next/);
   assert.match(activateScript, /systemctl disable grandumi-production-backend\.service/);
   assert.match(activateScript, /grandumi-production-switch --release/);
+  assert.match(activateScript, /systemctl is-active --quiet "grandumi-production-backend@\$active_slot\.service"/);
+  assert.match(activateScript, /systemctl is-active --quiet "grandumi-production-frontend@\$active_slot\.service"/);
   assert.match(activateScript, /data_source=existing/);
   assert.match(activateScript, /data_source=import/);
   assert.match(activateScript, /拒绝覆盖或激活/);
