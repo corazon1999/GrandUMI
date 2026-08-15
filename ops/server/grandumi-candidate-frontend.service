@@ -8,13 +8,13 @@ Type=simple
 User=grandumi
 Group=grandumi
 WorkingDirectory=/opt/grandumi-candidate/opcgpro-web
-ExecStart=/opt/node/bin/node /opt/grandumi-candidate/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+ExecStart=/opt/node/bin/node /opt/grandumi-candidate/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 13000
 Restart=always
 RestartSec=2
 Environment=NODE_ENV=production
 LimitNOFILE=65536
-CPUQuota=150%
-MemoryMax=1536M
+CPUQuota=100%
+MemoryMax=768M
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full

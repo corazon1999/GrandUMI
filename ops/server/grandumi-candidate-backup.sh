@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-data_dir=/data/grandumi
+data_dir=/data/grandumi-candidate
 backup_root="$data_dir/backups"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="$backup_root/$timestamp"
 
-[[ "$data_dir" == /data/grandumi ]] || { echo "备份数据目录安全检查失败" >&2; exit 1; }
+[[ "$data_dir" == /data/grandumi-candidate ]] || { echo "备份数据目录安全检查失败" >&2; exit 1; }
 install -d -o grandumi -g grandumi -m 0700 "$backup_root" "$target"
 
 count=0

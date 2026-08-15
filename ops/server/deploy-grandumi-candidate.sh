@@ -5,7 +5,7 @@ repo=/opt/grandumi-candidate
 target="${1:-}"
 candidate_ip="${GRANDUMI_CANDIDATE_IP:-103.146.230.37}"
 candidate_host="${GRANDUMI_CANDIDATE_HOST:-candidate.grand-umi.com}"
-candidate_asset_origin="${GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https://$candidate_host}"
+candidate_asset_origin="${GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https://grand-umi.com}"
 
 die() { echo "错误：$*" >&2; exit 1; }
 [[ "$candidate_ip" == "103.146.230.37" ]] || die "拒绝部署到未登记主机：$candidate_ip"
@@ -29,7 +29,7 @@ rm -rf .next.candidate-previous
 [[ -d .next ]] && mv .next .next.candidate-previous
 if ! NEXT_PUBLIC_WS_URL="wss://$candidate_host/ws" \
     NEXT_PUBLIC_ASSET_ORIGIN="$candidate_asset_origin" \
-    CARD_BACK_API_URL=http://127.0.0.1:8080 npm run build; then
+    CARD_BACK_API_URL=http://127.0.0.1:18080 npm run build; then
   rm -rf .next
   [[ -d .next.candidate-previous ]] && mv .next.candidate-previous .next
   die "前端构建失败"
@@ -41,7 +41,7 @@ JSON
 rm -rf "$backend_previous"
 [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$backend_previous"
 mv "$backend_next" "$repo/服务端WebSocket/publish"
-chown -R grandumi:grandumi /data/grandumi "$repo/服务端WebSocket/publish" "$repo/opcgpro-web/.next"
+chown -R grandumi:grandumi /data/grandumi-candidate "$repo/服务端WebSocket/publish" "$repo/opcgpro-web/.next"
 
 install -m 0644 "$repo/ops/server/grandumi-candidate-backend.service" /etc/systemd/system/grandumi-candidate-backend.service
 install -m 0644 "$repo/ops/server/grandumi-candidate-frontend.service" /etc/systemd/system/grandumi-candidate-frontend.service
@@ -52,10 +52,10 @@ fi
 systemctl daemon-reload
 nginx -t
 systemctl restart grandumi-candidate-backend.service
-curl -fsS --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:8080/ready >/dev/null
-curl -fsS http://127.0.0.1:8080/version | grep -Fq "$target" || die "后端版本与目标提交不一致"
+curl -fsS --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:18080/ready >/dev/null
+curl -fsS http://127.0.0.1:18080/version | grep -Fq "$target" || die "后端版本与目标提交不一致"
 systemctl restart grandumi-candidate-frontend.service nginx
-curl -fsS --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/ >/dev/null
+curl -fsS --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:13000/ >/dev/null
 rm -rf .next.candidate-previous "$backend_previous"
 
 echo "候选服部署成功：$target"

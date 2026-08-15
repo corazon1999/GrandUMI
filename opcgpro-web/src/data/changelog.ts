@@ -20,6 +20,21 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-15-high-bounty-release",
+    version: "2026.08.15.2",
+    date: "2026-08-15",
+    title: "高悬赏排位结算与发布稳定性更新",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "悬赏金达到 1 亿 5000 万贝里后，基础胜负变化、连胜奖励、连败保护和高低悬赏分差修正上限全部翻倍；达到 10 亿贝里后会再次翻倍。",
+          "测试与候选环境改为独立端口、独立数据和受控资源上限，后续版本验证不会再与正式对局争用服务入口或玩家数据。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-15-production-migration-release",
     version: "2026.08.15.1",
     date: "2026-08-15",

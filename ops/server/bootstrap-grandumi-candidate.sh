@@ -34,7 +34,7 @@ ln -sfn /opt/node/bin/npm /usr/local/bin/npm
 ln -sfn /opt/node/bin/npx /usr/local/bin/npx
 
 id grandumi >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin grandumi
-install -d -o grandumi -g grandumi -m 0750 /data/grandumi
+install -d -o grandumi -g grandumi -m 0750 /data/grandumi-candidate
 install -d -m 0755 /opt/grandumi-candidate
 if ! swapon --show=NAME --noheadings | grep -Fxq /data/grandumi.swap; then
   if [[ ! -f /data/grandumi.swap ]]; then

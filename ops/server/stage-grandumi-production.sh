@@ -31,7 +31,7 @@ if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' \
   die "新正式服前端构建失败"
 fi
 cat > public/network-endpoints.json <<'JSON'
-{"version":1,"hosts":["grand-umi.com","candidate.grand-umi.com"],"endpoints":[{"url":"wss://grand-umi.com/ws","enabled":true},{"url":"wss://candidate.grand-umi.com/ws","enabled":true}]}
+{"version":1,"hosts":["grand-umi.com"],"endpoints":[{"url":"wss://grand-umi.com/ws","enabled":true}]}
 JSON
 
 rm -rf "$repo/服务端WebSocket/publish"
