@@ -160,6 +160,8 @@ public static class GameRoomManager
             firstPlayer: firstPlayer,
             leaderKeywordWildcard: vsBot,
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice);
+        engine.State.Players[0].DisplayName = p0DisplayName ?? p0Account;
+        engine.State.Players[1].DisplayName = p1DisplayName ?? p1Account;
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
         engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
@@ -241,8 +243,8 @@ public static class GameRoomManager
                 seed = engine.State.RngSeed,
                 firstPlayer,
                 openingSetupAfterFirstPlayerChoice,
-                p0 = new { account = p0Account, deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
-                p1 = new { account = p1Account, deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
+                p0 = new { account = p0Account, displayName = entry.PlayerDisplayNames[0], deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
+                p1 = new { account = p1Account, displayName = entry.PlayerDisplayNames[1], deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
                 vsBot,
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
@@ -527,7 +529,7 @@ public static class GameRoomManager
             StopOperationClockLocked(room);
         }
         room.Engine.State.WinnerIndex = 1 - expiredPlayer;
-        room.Engine.State.GameOverReason = $"{room.PlayerAccounts[expiredPlayer]} 操作时间耗尽";
+        room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[expiredPlayer]} 操作时间耗尽";
         room.Engine.Broadcast("OperationTimeout", new { expiredPlayer });
     }
 
@@ -945,7 +947,7 @@ public static class GameRoomManager
                 if (!r.Engine.State.IsGameOver)
                 {
                     r.Engine.State.WinnerIndex = 1 - idx;
-                    r.Engine.State.GameOverReason = $"{r.PlayerAccounts[idx]} 断线超时";
+                    r.Engine.State.GameOverReason = $"{r.PlayerDisplayNames[idx]} 断线超时";
                     r.Engine.Broadcast("DisconnectTimeout", new { disconnected = idx });
                 }
                 CleanupRoom(room.RoomId);
@@ -995,7 +997,7 @@ public static class GameRoomManager
             if (!room.Engine.State.IsGameOver)
             {
                 room.Engine.State.WinnerIndex = idx;
-                room.Engine.State.GameOverReason = $"{room.PlayerAccounts[oppIdx]} 断线，对手确认结束对局";
+                room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[oppIdx]} 断线，对手确认结束对局";
                 room.Engine.Broadcast("DisconnectTimeout", new { disconnected = oppIdx });
             }
             CleanupRoom(room.RoomId);
@@ -1552,6 +1554,12 @@ public static class GameRoomManager
         var p1          = h.GetProperty("p1");
         var p0Account   = p0.GetProperty("account").GetString()!;
         var p1Account   = p1.GetProperty("account").GetString()!;
+        var p0DisplayName = p0.TryGetProperty("displayName", out var dn0)
+            ? dn0.GetString() ?? p0Account
+            : p0Account;
+        var p1DisplayName = p1.TryGetProperty("displayName", out var dn1)
+            ? dn1.GetString() ?? p1Account
+            : p1Account;
         var p0Deck      = p0.GetProperty("deckRaw").GetString()!;
         var p1Deck      = p1.GetProperty("deckRaw").GetString()!;
         var p0Always    = p0.TryGetProperty("alwaysPrompt", out var a0) && a0.GetBoolean();
@@ -1633,6 +1641,8 @@ public static class GameRoomManager
         if (!engine.State.StartingPlayerChosen)
             engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
+        engine.State.Players[0].DisplayName = p0DisplayName;
+        engine.State.Players[1].DisplayName = p1DisplayName;
         engine.State.Players[0].CardBackId = p0CardBackId;
         engine.State.Players[1].CardBackId = p1CardBackId;
         CopySpriteMap(p0SpriteMap, engine.State.Players[0].SpriteMap);
@@ -1656,7 +1666,7 @@ public static class GameRoomManager
             Engine = engine,
             PlayerSessionIds = new[] { "offline-0", "offline-1" },
             PlayerAccounts   = new[] { p0Account, p1Account },
-            PlayerDisplayNames = new[] { p0Account, p1Account },
+            PlayerDisplayNames = new[] { p0DisplayName, p1DisplayName },
             SpectateModes = [p0SpectateMode, p1SpectateMode],
             SpectatorHandsPublic = [p0SpectatorHandsPublic, p1SpectatorHandsPublic],
             SpectateCodes = [p0SpectateCode, p1SpectateCode],

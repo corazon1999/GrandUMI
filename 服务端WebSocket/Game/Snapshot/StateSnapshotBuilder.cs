@@ -228,7 +228,7 @@ public static class StateSnapshotBuilder
         }).ToArray();
 
         return new PlayerBoardComputed(
-            p.AccountName,
+            p.VisibleName,
             p.CardBackId,
             p.Hand.Count,
             fieldCards,

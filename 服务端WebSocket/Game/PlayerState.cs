@@ -62,6 +62,9 @@ public class PlayerState
 
     public required string SessionId   { get; set; }
     public required string AccountName { get; set; }
+    /// <summary>对局内公开展示名；登录账号只用于身份校验和内部关联。</summary>
+    public string DisplayName { get; set; } = "";
+    public string VisibleName => string.IsNullOrWhiteSpace(DisplayName) ? AccountName : DisplayName;
     /// <summary>仅排位对局缓存；创建或恢复房间时读取一次，避免每份快照查询数据库。</summary>
     public PlayerRankIdentity? RankIdentity { get; set; }
     /// <summary>公开外观信息：用于该玩家所有暗置主卡的卡背。</summary>

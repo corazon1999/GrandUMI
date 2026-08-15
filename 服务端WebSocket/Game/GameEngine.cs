@@ -1491,7 +1491,7 @@ public class GameEngine
     private void HandleSurrender(int playerIndex)
     {
         State.WinnerIndex = 1 - playerIndex;
-        State.GameOverReason = $"{State.Players[playerIndex].AccountName} 投降";
+        State.GameOverReason = $"{State.Players[playerIndex].VisibleName} 投降";
         Broadcast("Surrender", new { surrendered = playerIndex });
     }
 

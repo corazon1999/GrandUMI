@@ -34,7 +34,7 @@ public static class LifeRevealManager
             if (!s.IsGameOver)
             {
                 s.WinnerIndex = 1 - targetPlayerIdx;
-                s.GameOverReason = $"{p.AccountName} 生命耗尽";
+                s.GameOverReason = $"{p.VisibleName} 生命耗尽";
             }
             return;
         }
@@ -185,7 +185,7 @@ public static class LifeRevealManagerSync
             if (!s.IsGameOver)
             {
                 s.WinnerIndex = 1 - targetPlayerIdx;
-                s.GameOverReason = $"{p.AccountName} 生命耗尽";
+                s.GameOverReason = $"{p.VisibleName} 生命耗尽";
             }
             return;
         }

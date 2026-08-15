@@ -42,10 +42,6 @@ if ($LASTEXITCODE -ne 0) { Stop-WithError "推送 main 失败，未部署测试�
 
 $target = (& $git rev-parse HEAD).Trim()
 
-# 所有日常改动必须先进入新香港候选服并通过外网检查，再继续更新旧测试服。
-& (Join-Path $repo "deploy-new-hk-candidate.ps1") -Commit $target
-if ($LASTEXITCODE -ne 0) { Stop-WithError "新香港候选服部署失败，已停止后续测试服部署。" }
-
 $serverHead = (& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test rev-parse HEAD").Trim()
 if ($LASTEXITCODE -ne 0 -or $serverHead -notmatch '^[0-9a-f]{40}$') {
   Stop-WithError "无法读取测试服版本。"

@@ -33,14 +33,14 @@ public static class DeckOutRules
             if (state.DeckOutVictoryPlayers.Contains(playerIdx))
             {
                 state.WinnerIndex = playerIdx;
-                state.GameOverReason = $"{player.AccountName} 卡组耗尽（规则替换：胜利）";
+                state.GameOverReason = $"{player.VisibleName} 卡组耗尽（规则替换：胜利）";
                 return;
             }
 
             if (player.Leader.Info.Number == "OP15-022" && !endOfTurn) continue;
 
             state.WinnerIndex = 1 - playerIdx;
-            state.GameOverReason = $"{player.AccountName} 卡组耗尽";
+            state.GameOverReason = $"{player.VisibleName} 卡组耗尽";
             return;
         }
     }
