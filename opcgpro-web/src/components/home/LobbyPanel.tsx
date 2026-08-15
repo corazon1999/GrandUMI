@@ -14,7 +14,7 @@ import type { RankFaction } from "@/types/net";
 const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; titles: readonly string[]; className: string }> = [
   { id: "pirate", name: "海贼阵营", titles: ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长"], className: "border-rose-700/70 bg-rose-950/30 hover:border-rose-400" },
   { id: "marine", name: "海军阵营", titles: ["海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将"], className: "border-sky-700/70 bg-sky-950/30 hover:border-sky-400" },
-  { id: "government", name: "世界政府阵营", titles: ["政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团"], className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
+  { id: "government", name: "世界政府阵营", titles: ["政府线人", "初级特工", "CP9 特工", "CP0 特工", "浅海契约"], className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
 ];
 
 const RANK_FACTION_NAMES: Record<RankFaction, string> = {
@@ -47,7 +47,7 @@ function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | n
         <li>低悬赏方获胜时，赛前每低 1000万贝里额外增加 10万贝里；低悬赏方失败时，每低 1000万贝里少扣 10万贝里，两者最多修正 50万贝里。</li>
         <li>高悬赏方获胜时，赛前每高 1000万贝里少加 10万贝里；高悬赏方失败时，每高 1000万贝里多扣 10万贝里，两者最多修正 50万贝里。</li>
         <li>第一阶不因失败降低显示悬赏金，第二、三阶拥有大段保护；每局结算会逐项展示悬赏金变化。</li>
-        <li>悬赏金达到 1亿5000万贝里后进入“新世界”，阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
+        <li>悬赏金达到 1亿5000万贝里后，海贼、海军、世界政府普通玩家分别显示超新星、大将候补、深海契约；阵营前列玩家会获得海贼王、四皇、海军元帅、海军大将、世界之王或五老星称号。</li>
         <li>更换阵营会清空本赛季悬赏金、定级进度和战绩，并重新开始定级。</li>
       </ul>
     </div>

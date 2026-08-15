@@ -563,7 +563,7 @@ public sealed class RankedStore
         {
             PirateFaction => new[] { "见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长" },
             MarineFaction => new[] { "海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将" },
-            GovernmentFaction => new[] { "政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团" },
+            GovernmentFaction => new[] { "政府线人", "初级特工", "CP9 特工", "CP0 特工", "浅海契约" },
             _ => new[] { "未选择阵营", "未选择阵营", "未选择阵营", "未选择阵营", "未选择阵营" },
         };
         var tierIndex = Math.Clamp(rankPoints / 300, 0, tiers.Length - 1);
@@ -579,6 +579,9 @@ public sealed class RankedStore
         (MarineFaction, >= 2 and <= 4) => "海军大将",
         (GovernmentFaction, 1) => "世界之王",
         (GovernmentFaction, >= 2 and <= 6) => "五老星",
+        (PirateFaction, _) => "超新星",
+        (MarineFaction, _) => "大将候补",
+        (GovernmentFaction, _) => "深海契约",
         _ => "新世界",
     };
 

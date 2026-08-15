@@ -35,7 +35,7 @@ public class RankedPlayerIdentitySnapshotTests
     {
         var state = TestScene.MaxScenario();
         state.MatchKind = MatchKind.Casual;
-        state.Players[0].RankIdentity = new PlayerRankIdentity("government", "神之骑士团", 3, 5, 5);
+        state.Players[0].RankIdentity = new PlayerRankIdentity("government", "浅海契约", 3, 5, 5);
 
         var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, viewerIndex: 0));
 

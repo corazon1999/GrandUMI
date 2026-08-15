@@ -35,9 +35,9 @@ public sealed class GlobalAnnouncementPolicyTests
         Assert.Equal("爱丽丝 打飞了“海贼阵营”的船长，完成了八连胜！",
             GlobalAnnouncementPolicy.FormatRankedWinStreak(
                 "爱丽丝", "pirate", "船长", 8));
-        Assert.Equal("爱丽丝 打飞了“世界政府阵营”的神之骑士团，完成了十一连胜！",
+        Assert.Equal("爱丽丝 打飞了“世界政府阵营”的浅海契约，完成了十一连胜！",
             GlobalAnnouncementPolicy.FormatRankedWinStreak(
-                "爱丽丝", "government", "神之骑士团", 11));
+                "爱丽丝", "government", "浅海契约", 11));
     }
 
     [Fact]

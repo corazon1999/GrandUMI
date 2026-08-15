@@ -88,10 +88,10 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(types, /rankPointFormulaApplied: boolean/);
 });
 
-test("三阵营称号和新世界榜首称号按约定映射", async () => {
+test("三阵营称号和高悬赏称号按约定映射", async () => {
   const rankedStore = await readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs");
 
-  for (const label of ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长", "海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将", "政府线人", "初级特工", "CP9 特工", "CP0 特工", "神之骑士团", "新世界", "海贼王", "四皇", "海军元帅", "海军大将", "世界之王", "五老星"]) {
+  for (const label of ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长", "海军三等兵", "海军少尉", "海军少校", "海军少将", "海军中将", "政府线人", "初级特工", "CP9 特工", "CP0 特工", "浅海契约", "超新星", "大将候补", "深海契约", "海贼王", "四皇", "海军元帅", "海军大将", "世界之王", "五老星"]) {
     assert.match(rankedStore, new RegExp(label));
   }
 });
