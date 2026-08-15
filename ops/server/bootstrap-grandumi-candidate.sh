@@ -5,8 +5,8 @@ candidate_ip="${GRANDUMI_CANDIDATE_IP:-103.146.230.37}"
 [[ "$candidate_ip" == "103.146.230.37" ]] || { echo "拒绝在未登记主机上初始化：$candidate_ip" >&2; exit 1; }
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git nginx rsync xz-utils iproute2 kmod sqlite3 jq xfsprogs
+apt-get -o DPkg::Lock::Timeout=300 update
+apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends ca-certificates curl git nginx rsync xz-utils iproute2 kmod sqlite3 jq xfsprogs
 
 if [[ ! -x /opt/dotnet/dotnet ]]; then
   installer="$(mktemp)"
