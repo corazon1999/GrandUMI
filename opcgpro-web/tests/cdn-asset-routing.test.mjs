@@ -6,6 +6,7 @@ const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url),
 const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8");
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
 const deployHk = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
+const deployCandidate = await readFile(new URL("../../ops/server/deploy-grandumi-candidate.sh", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const networkService = await readFile(new URL("../../ops/server/grandumi-network-tuning.service", import.meta.url), "utf8");
@@ -28,6 +29,11 @@ test("home response is dynamic so releases cannot reuse stale HTML", async () =>
 
 test("test build keeps its assets on the test origin", () => {
   assert.match(deployTest, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/test\.grand-umi\.com'/);
+});
+
+test("candidate build uses the populated asset host until static assets are migrated", () => {
+  assert.match(deployCandidate, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/assets\.grand-umi\.com/);
+  assert.match(deployCandidate, /NEXT_PUBLIC_ASSET_ORIGIN="\$candidate_asset_origin"/);
 });
 
 test("asset host exposes only cacheable public resources with cross-origin access", () => {
@@ -54,12 +60,12 @@ test("production promotion persists CDN and source-network protection", () => {
 });
 
 test("network shaping can be applied repeatedly after boot or deployment", () => {
-  assert.match(networkTuning, /GRANDUMI_EGRESS_RATE:-2mbit/);
+  assert.match(networkTuning, /GRANDUMI_EGRESS_RATE:-60mbit/);
   assert.match(networkTuning, /tc qdisc del dev "\$interface" root 2>\/dev\/null \|\| true/);
   assert.match(networkTuning, /tc qdisc add dev "\$interface" root handle 1: htb/);
   assert.match(networkTuning, /tc class add dev "\$interface" parent 1: classid 1:10/);
   assert.match(networkTuning, /burst 32k cburst 32k/);
-  assert.match(networkService, /GRANDUMI_EGRESS_RATE=2mbit/);
+  assert.match(networkService, /GRANDUMI_EGRESS_RATE=60mbit/);
 });
 
 test("release prewarms new chunks and catalog mode covers card thumbnails", () => {
