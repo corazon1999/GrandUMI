@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-15-dsl-effect-publish-release",
+    version: "2026.08.15.7",
+    date: "2026-08-15",
+    title: "卡牌效果加载修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复服务器更新后大量卡牌效果无法正确发动的问题；后续版本若卡牌效果资源不完整，将在发布或启动阶段直接拦截。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-15-production-card-assets-release",
     version: "2026.08.15.6",
     date: "2026-08-15",
