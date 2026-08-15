@@ -262,6 +262,9 @@ export function registerHomeProtocols() {
       case "MsgCardBackGallery":
         handleCardBackGallery(msg as MsgCardBackGallery);
         break;
+      case "MsgLikeCardBack":
+        handleCardBackLike(msg as MsgLikeCardBack);
+        break;
       case "MsgCardBackReviewQueue":
         handleCardBackReviewQueue(msg as MsgCardBackReviewQueue);
         break;
@@ -729,13 +732,29 @@ function handlePlayerProfileStats(msg: MsgPlayerProfileStats) {
 
 function handleCardBackGallery(msg: MsgCardBackGallery) {
   if (msg.result === false) {
-    const current = useNetStore.getState().cardBackGallery;
-    useNetStore.getState().setCardBackGallery(current ? [...current] : []);
+    const store = useNetStore.getState();
+    if (store.cardBackGallery === null) store.setCardBackGallery([]);
+    store.setCardBackGalleryLoadingMore(false);
     showMessage(msg.logStr ?? "卡背广场操作失败", "error");
     return;
   }
-  useNetStore.getState().setCardBackGallery(Array.isArray(msg.items) ? msg.items : []);
+  useNetStore.getState().setCardBackGalleryPage({
+    items: Array.isArray(msg.items) ? msg.items : [],
+    ownedItems: Array.isArray(msg.ownedItems) ? msg.ownedItems : [],
+    total: Math.max(0, msg.total ?? 0),
+    nextCursor: msg.nextCursor ?? null,
+    hasMore: Boolean(msg.hasMore),
+    append: Boolean(msg.cursor),
+  });
   if (msg.logStr) showMessage(msg.logStr, "info");
+}
+
+function handleCardBackLike(msg: MsgLikeCardBack) {
+  if (msg.result === false || !msg.item) {
+    showMessage(msg.logStr ?? "更新红心失败", "error");
+    return;
+  }
+  useNetStore.getState().updateCardBackGalleryItem(msg.item);
 }
 
 function handleCardBackReviewQueue(msg: MsgCardBackReviewQueue) {
@@ -913,9 +932,17 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgUpdateCardBack", cardBackId } as MsgUpdateCardBack);
   },
 
-  requestCardBackGallery() {
-    useNetStore.getState().setCardBackGallery(null);
-    return NetManager.send({ proto: "MsgCardBackGallery" } as MsgCardBackGallery);
+  requestCardBackGallery(cursor?: string | null) {
+    const store = useNetStore.getState();
+    if (cursor) store.setCardBackGalleryLoadingMore(true);
+    else store.setCardBackGallery(null);
+    const sent = NetManager.send({
+      proto: "MsgCardBackGallery",
+      cursor: cursor ?? null,
+      pageSize: 40,
+    } as MsgCardBackGallery);
+    if (!sent && cursor) store.setCardBackGalleryLoadingMore(false);
+    return sent;
   },
 
   uploadCardBack(name: string, mimeType: MsgUploadCardBack["mimeType"], imageBase64: string) {

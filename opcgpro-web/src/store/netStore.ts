@@ -107,6 +107,11 @@ interface NetStore {
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
   cardBackGallery: CardBackGalleryItem[] | null;
+  cardBackGalleryOwned: CardBackGalleryItem[];
+  cardBackGalleryTotal: number;
+  cardBackGalleryNextCursor: string | null;
+  cardBackGalleryHasMore: boolean;
+  cardBackGalleryLoadingMore: boolean;
   cardBackReviewQueue: CardBackReviewItem[] | null;
   deckPlazaPage: { items: DeckPlazaItem[]; page: number; pageSize: number; total: number; hasMore: boolean } | null;
   deckPlazaRevision: number;
@@ -153,6 +158,16 @@ interface NetStore {
   setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
   setCardBackGallery: (items: CardBackGalleryItem[] | null) => void;
+  setCardBackGalleryPage: (page: {
+    items: CardBackGalleryItem[];
+    ownedItems: CardBackGalleryItem[];
+    total: number;
+    nextCursor: string | null;
+    hasMore: boolean;
+    append: boolean;
+  }) => void;
+  setCardBackGalleryLoadingMore: (loading: boolean) => void;
+  updateCardBackGalleryItem: (item: CardBackGalleryItem) => void;
   setCardBackReviewQueue: (items: CardBackReviewItem[] | null) => void;
   setDeckPlazaPage: (page: NetStore["deckPlazaPage"]) => void;
   refreshDeckPlaza: () => void;
@@ -199,6 +214,11 @@ const initialState = {
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
   cardBackGallery: null as CardBackGalleryItem[] | null,
+  cardBackGalleryOwned: [] as CardBackGalleryItem[],
+  cardBackGalleryTotal: 0,
+  cardBackGalleryNextCursor: null as string | null,
+  cardBackGalleryHasMore: false,
+  cardBackGalleryLoadingMore: false,
   cardBackReviewQueue: null as CardBackReviewItem[] | null,
   deckPlazaPage: null as NetStore["deckPlazaPage"],
   deckPlazaRevision: 0,
@@ -287,7 +307,37 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
 
-  setCardBackGallery: (cardBackGallery) => set({ cardBackGallery }),
+  setCardBackGallery: (cardBackGallery) => set({
+    cardBackGallery,
+    ...(cardBackGallery === null ? {
+      cardBackGalleryOwned: [],
+      cardBackGalleryTotal: 0,
+      cardBackGalleryNextCursor: null,
+      cardBackGalleryHasMore: false,
+      cardBackGalleryLoadingMore: false,
+    } : {}),
+  }),
+  setCardBackGalleryPage: ({ items, ownedItems, total, nextCursor, hasMore, append }) => set((state) => {
+    const merged = append && state.cardBackGallery ? [...state.cardBackGallery, ...items] : items;
+    const seen = new Set<string>();
+    return {
+      cardBackGallery: merged.filter((item) => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      }),
+      cardBackGalleryOwned: ownedItems,
+      cardBackGalleryTotal: total,
+      cardBackGalleryNextCursor: nextCursor,
+      cardBackGalleryHasMore: hasMore,
+      cardBackGalleryLoadingMore: false,
+    };
+  }),
+  setCardBackGalleryLoadingMore: (cardBackGalleryLoadingMore) => set({ cardBackGalleryLoadingMore }),
+  updateCardBackGalleryItem: (item) => set((state) => ({
+    cardBackGallery: state.cardBackGallery?.map((current) => current.id === item.id ? item : current) ?? null,
+    cardBackGalleryOwned: state.cardBackGalleryOwned.map((current) => current.id === item.id ? item : current),
+  })),
   setCardBackReviewQueue: (cardBackReviewQueue) => set({ cardBackReviewQueue }),
   setDeckPlazaPage: (deckPlazaPage) => set({ deckPlazaPage }),
   refreshDeckPlaza: () => set((state) => ({ deckPlazaRevision: state.deckPlazaRevision + 1 })),

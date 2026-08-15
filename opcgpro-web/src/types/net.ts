@@ -176,12 +176,18 @@ export interface CardBackGalleryItem {
   reviewReason: string;
 }
 
-/** 客户端空请求读取广场；服务端返回按红心数量排序后的投稿。 */
+/** 卡背广场游标分页请求与响应；本人投稿单独返回，不占热门分页名额。 */
 export interface MsgCardBackGallery extends MsgBase {
   proto: "MsgCardBackGallery";
   result?: boolean;
   logStr?: string;
+  cursor?: string | null;
+  pageSize?: number;
   items?: CardBackGalleryItem[];
+  ownedItems?: CardBackGalleryItem[];
+  total?: number;
+  hasMore?: boolean;
+  nextCursor?: string | null;
 }
 
 export interface MsgUploadCardBack extends MsgBase {
@@ -193,7 +199,10 @@ export interface MsgUploadCardBack extends MsgBase {
 
 export interface MsgLikeCardBack extends MsgBase {
   proto: "MsgLikeCardBack";
-  cardBackId: string;
+  cardBackId?: string;
+  result?: boolean;
+  logStr?: string;
+  item?: CardBackGalleryItem;
 }
 
 export interface MsgDeleteCardBack extends MsgBase {

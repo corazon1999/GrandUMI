@@ -60,6 +60,15 @@ public sealed record CardBackGalleryItem(
     string ReviewStatus,
     string ReviewReason);
 
+/// <summary>卡背广场游标分页；本人投稿单独返回，避免与热门列表分页互相干扰。</summary>
+public sealed record CardBackGalleryPage(
+    IReadOnlyList<CardBackGalleryItem> Items,
+    IReadOnlyList<CardBackGalleryItem> OwnedItems,
+    int PageSize,
+    int Total,
+    bool HasMore,
+    string? NextCursor);
+
 /// <summary>管理员卡背审核队列中的待处理投稿。</summary>
 public sealed record CardBackReviewItem(
     string Id,
@@ -72,7 +81,7 @@ public sealed record CardBackImage(string MimeType, byte[] Data);
 
 public sealed record CardBackSelectionResult(
     PlayerDataSnapshot Snapshot,
-    IReadOnlyList<CardBackGalleryItem> Gallery);
+    CardBackGalleryItem? GalleryItem);
 
 public sealed record CardBackDeletionResult(
     string DeletedCardBackId,

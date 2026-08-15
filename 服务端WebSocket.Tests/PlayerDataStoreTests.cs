@@ -171,11 +171,15 @@ public sealed class PlayerDataStoreTests : IDisposable
 
         var selected = store.UpdateCardBack("Alice", bobBack.Id);
         Assert.Equal(bobBack.Id, selected.Snapshot.CardBackId);
-        var selectedItem = Assert.Single(selected.Gallery, item => item.Id == bobBack.Id);
+        var selectedItem = Assert.IsType<CardBackGalleryItem>(selected.GalleryItem);
+        Assert.Equal(bobBack.Id, selectedItem.Id);
         Assert.True(selectedItem.Liked);
         Assert.Equal(1, selectedItem.Likes);
 
-        store.ToggleCardBackLike("Bob", bobBack.Id);
+        var likedByBob = store.ToggleCardBackLike("Bob", bobBack.Id);
+        Assert.Equal(bobBack.Id, likedByBob.Id);
+        Assert.True(likedByBob.Liked);
+        Assert.Equal(2, likedByBob.Likes);
         var ranked = store.GetCardBackGallery("Alice");
         Assert.Equal(bobBack.Id, ranked[0].Id);
         Assert.Equal(2, ranked[0].Likes);
@@ -273,7 +277,7 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
-    public void CardBackGallery_公开榜最多返回三百款并额外保留本人投稿()
+    public void CardBackGallery_游标分页可读取全部公开卡背并单独返回本人投稿()
     {
         var store = CreateStore();
         store.Login("Viewer");
@@ -295,11 +299,26 @@ public sealed class PlayerDataStoreTests : IDisposable
             }
         }
 
-        Assert.Equal(300, store.GetCardBackGallery("Viewer").Count);
-        var ownerView = store.GetCardBackGallery("Owner00");
-        Assert.Equal(300, ownerView.Count(item => item.PubliclyListed));
-        Assert.Equal(20, ownerView.Count(item => item.Owned));
-        Assert.Equal(300, PlayerDataStore.MaxCardBackGalleryItems);
+        var allItems = new List<CardBackGalleryItem>();
+        string? cursor = null;
+        do
+        {
+            var page = store.GetCardBackGalleryPage("Viewer", cursor, pageSize: 50);
+            Assert.Equal(320, page.Total);
+            Assert.InRange(page.Items.Count, 1, 50);
+            allItems.AddRange(page.Items);
+            cursor = page.NextCursor;
+            if (!page.HasMore) Assert.Null(cursor);
+        } while (cursor is not null);
+
+        Assert.Equal(320, allItems.Count);
+        Assert.Equal(320, allItems.Select(item => item.Id).Distinct().Count());
+        var ownerView = store.GetCardBackGalleryPage("Owner00");
+        Assert.Equal(PlayerDataStore.DefaultCardBackGalleryPageSize, ownerView.Items.Count);
+        Assert.Equal(20, ownerView.OwnedItems.Count);
+        Assert.All(ownerView.OwnedItems, item => Assert.True(item.Owned));
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.GetCardBackGalleryPage("Viewer", "不是有效游标"));
     }
 
     [Fact]

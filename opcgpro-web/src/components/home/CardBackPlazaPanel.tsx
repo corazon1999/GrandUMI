@@ -80,6 +80,11 @@ async function prepareCardBack(file: File): Promise<PreparedImage> {
 export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: () => void }) {
   const { t } = useLanguage();
   const gallery = useNetStore((state) => state.cardBackGallery);
+  const ownedCardBacks = useNetStore((state) => state.cardBackGalleryOwned);
+  const galleryTotal = useNetStore((state) => state.cardBackGalleryTotal);
+  const galleryNextCursor = useNetStore((state) => state.cardBackGalleryNextCursor);
+  const galleryHasMore = useNetStore((state) => state.cardBackGalleryHasMore);
+  const galleryLoadingMore = useNetStore((state) => state.cardBackGalleryLoadingMore);
   const currentCardBackId = useNetStore((state) => state.cardBackId);
   const connState = useNetStore((state) => state.connState);
   const canManage = useNetStore((state) => state.maintenance.canManage);
@@ -92,11 +97,18 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const [galleryTimedOut, setGalleryTimedOut] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
   const requestGallery = useCallback(() => {
     setGalleryTimedOut(false);
     if (!HomeRequest.requestCardBackGallery()) setGalleryTimedOut(true);
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (!galleryNextCursor || galleryLoadingMore) return;
+    HomeRequest.requestCardBackGallery(galleryNextCursor);
+  }, [galleryLoadingMore, galleryNextCursor]);
 
   useEffect(() => {
     if (connState === "connected") requestGallery();
@@ -113,6 +125,17 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   }, [connState, gallery, galleryTimedOut]);
   useEffect(() => { setSubmitting(false); setDeletingId(null); }, [gallery]);
   useEffect(() => () => { if (prepared) URL.revokeObjectURL(prepared.previewUrl); }, [prepared]);
+  useEffect(() => {
+    if (galleryView !== "popular" || !galleryHasMore || galleryLoadingMore) return;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((entry) => entry.isIntersecting)) loadMore(); },
+      { root: sectionRef.current, rootMargin: "600px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [galleryHasMore, galleryLoadingMore, galleryView, loadMore]);
 
   const chooseFile = async (file: File | undefined) => {
     if (!file) return;
@@ -162,11 +185,10 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   };
 
   const approvedCardBacks = gallery?.filter((item) => item.reviewStatus === "approved" && item.publiclyListed) ?? [];
-  const ownedCardBacks = gallery?.filter((item) => item.owned) ?? [];
   const displayedCardBacks = galleryView === "mine" ? ownedCardBacks : approvedCardBacks;
 
   return (
-    <section className="h-full overflow-y-auto px-4 py-5 @[720px]:px-6 @[720px]:py-6" data-testid="card-back-plaza">
+    <section ref={sectionRef} className="h-full overflow-y-auto px-4 py-5 @[720px]:px-6 @[720px]:py-6" data-testid="card-back-plaza">
       <header className="flex flex-col gap-3 @[640px]:flex-row @[640px]:items-end @[640px]:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-rose-400">Community Gallery</p>
@@ -216,7 +238,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
               role="tab"
               aria-selected={galleryView === "popular"}
               onClick={() => setGalleryView("popular")}
-              className={`min-h-10 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "popular" ? "bg-orange-500 text-white" : "text-gray-500 hover:text-white"}`}
+              className={`min-h-11 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "popular" ? "bg-orange-500 text-white" : "text-gray-500 hover:text-white"}`}
             >
               热门卡背
             </button>
@@ -225,17 +247,19 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
               role="tab"
               aria-selected={galleryView === "mine"}
               onClick={() => setGalleryView("mine")}
-              className={`min-h-10 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "mine" ? "bg-rose-500 text-white" : "text-gray-500 hover:text-white"}`}
+              className={`min-h-11 rounded-lg px-4 text-sm font-bold transition-colors ${galleryView === "mine" ? "bg-rose-500 text-white" : "text-gray-500 hover:text-white"}`}
             >
               我发布的卡背
               {ownedCardBacks.length > 0 && <span className="ml-1.5 text-xs opacity-75">{ownedCardBacks.length}</span>}
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-600">
-            {galleryView === "popular" ? "最多展示 300 款已通过审核的卡背；按红心数量排序，同票时新发布的在前。" : "在这里查看审核状态，并管理你提交的卡背。"}
+            {galleryView === "popular" ? "全部已通过审核的卡背均可浏览；按红心数量排序，滚动到底会自动继续加载。" : "在这里查看审核状态，并管理你提交的卡背。"}
           </p>
         </div>
-        <span className="text-xs text-gray-600">{displayedCardBacks?.length ?? 0} 款</span>
+        <span className="text-xs text-gray-600">
+          {galleryView === "popular" ? `已显示 ${approvedCardBacks.length} / 共 ${galleryTotal} 款` : `${ownedCardBacks.length} 款`}
+        </span>
       </div>
 
       {gallery === null ? galleryTimedOut ? (
@@ -266,7 +290,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
             return (
               <article key={item.id} className={`overflow-hidden rounded-2xl border bg-gray-900 p-3 ${active ? "border-orange-500 ring-1 ring-orange-500/30" : "border-gray-800"}`}>
                 <div className="relative mx-auto aspect-[5/7] w-full max-w-40 overflow-hidden rounded-xl bg-gray-950 shadow-xl">
-                  <CardBack cardBackId={item.id} decorative />
+                  <CardBack cardBackId={item.id} decorative lazy />
                   {galleryView === "popular" && <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">#{index + 1}</span>}
                   {active && <span className="absolute bottom-2 left-2 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-bold text-white">使用中</span>}
                   {galleryView === "mine" && !approved && (
@@ -309,6 +333,22 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
               </article>
             );
           })}
+        </div>
+      )}
+      {gallery !== null && galleryView === "popular" && approvedCardBacks.length > 0 && (
+        <div ref={loadMoreSentinelRef} className="flex min-h-24 items-center justify-center py-5" aria-live="polite">
+          {galleryHasMore ? (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={galleryLoadingMore}
+              className="min-h-11 rounded-xl border border-gray-700 px-5 text-sm font-bold text-gray-300 hover:border-orange-500 hover:text-white disabled:text-gray-600"
+            >
+              {galleryLoadingMore ? "正在加载更多…" : "加载更多卡背"}
+            </button>
+          ) : (
+            <span className="text-xs text-gray-600">已显示全部 {galleryTotal} 款卡背</span>
+          )}
         </div>
       )}
     </section>

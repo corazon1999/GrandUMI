@@ -11,12 +11,14 @@ const [store, models, bridge, protocol, panel, main] = await Promise.all([
   readFile(new URL("../src/components/home/MainPanel.tsx", import.meta.url), "utf8"),
 ]);
 
-test("新投稿默认待审核且公开广场只读取最多三百款已通过投稿", () => {
-  assert.match(store, /MaxCardBackGalleryItems = 300/);
+test("新投稿默认待审核且公开广场仅读取已通过投稿", () => {
+  assert.match(store, /DefaultCardBackGalleryPageSize = 40/);
+  assert.match(store, /MaxCardBackGalleryPageSize = 50/);
   assert.match(store, /CardBackReviewPending = "pending"/);
   assert.match(store, /VALUES\([\s\S]*\$status, '', NULL, NULL\)/);
   assert.match(store, /WHERE cb\.review_status=\$approved/);
-  assert.match(store, /SELECT id FROM card_backs WHERE owner_player_id=\$playerId/);
+  assert.match(store, /GetCardBackGalleryPage/);
+  assert.match(store, /LoadOwnedCardBacks/);
   assert.match(models, /bool PubliclyListed,[\s\S]*string ReviewStatus,[\s\S]*string ReviewReason/);
 });
 

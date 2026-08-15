@@ -13,6 +13,8 @@ namespace GrandUMI.Persistence;
 /// </summary>
 public sealed class PlayerDataStore
 {
+    private readonly record struct CardBackGalleryCursor(int Likes, long CreatedAt, long Id);
+
     public const int MaxDecksPerPlayer = 100;
     public const string DefaultCardBackId = "classic";
     private static readonly HashSet<string> ValidCardBackIds = new(StringComparer.Ordinal)
@@ -31,6 +33,8 @@ public sealed class PlayerDataStore
     public const int MaxCardBackImageBytes = 240 * 1024;
     public const int MaxCardBacksPerPlayer = 20;
     public const int MaxCardBackGalleryItems = 300;
+    public const int DefaultCardBackGalleryPageSize = 40;
+    public const int MaxCardBackGalleryPageSize = 50;
     public const int MaxCardBackReviewReasonLength = 300;
     public const int MaxPendingCardBackReviewItems = 300;
     public const string CardBackReviewPending = "pending";
@@ -918,11 +922,13 @@ public sealed class PlayerDataStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         var playerId = RequirePlayerId(connection, transaction, account);
+        long? selectedCustomId = null;
 
         if (TryParseCustomCardBackId(normalizedCardBackId, out var customId))
         {
             RequireApprovedCardBack(connection, transaction, customId);
             AddCardBackLike(connection, transaction, customId, playerId);
+            selectedCustomId = customId;
         }
 
         using var update = connection.CreateCommand();
@@ -934,9 +940,11 @@ public sealed class PlayerDataStore
         update.ExecuteNonQuery();
 
         var snapshot = LoadSnapshot(connection, transaction, playerId);
-        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
+        var galleryItem = selectedCustomId is long selectedId
+            ? LoadCardBackGalleryItem(connection, transaction, playerId, selectedId)
+            : null;
         transaction.Commit();
-        return new CardBackSelectionResult(snapshot, gallery);
+        return new CardBackSelectionResult(snapshot, galleryItem);
     }
 
     public static string NormalizeCardBackId(string? cardBackId)
@@ -955,6 +963,84 @@ public sealed class PlayerDataStore
         var gallery = LoadCardBackGallery(connection, transaction, playerId, Math.Clamp(limit, 1, MaxCardBackGalleryItems));
         transaction.Commit();
         return gallery;
+    }
+
+    /// <summary>按红心、发布时间和编号进行稳定的游标分页，允许玩家浏览全部已通过卡背。</summary>
+    public CardBackGalleryPage GetCardBackGalleryPage(
+        string account,
+        string? cursor = null,
+        int pageSize = DefaultCardBackGalleryPageSize)
+    {
+        var size = Math.Clamp(pageSize, 1, MaxCardBackGalleryPageSize);
+        var parsedCursor = ParseCardBackGalleryCursor(cursor);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        using var totalCommand = connection.CreateCommand();
+        totalCommand.Transaction = transaction;
+        totalCommand.CommandText = "SELECT COUNT(*) FROM card_backs WHERE review_status=$approved;";
+        totalCommand.Parameters.AddWithValue("$approved", CardBackReviewApproved);
+        var total = Convert.ToInt32(totalCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            WITH ranked AS (
+                SELECT cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id,
+                       COUNT(l.player_id) AS likes,
+                       MAX(CASE WHEN l.player_id=$playerId THEN 1 ELSE 0 END) AS liked
+                FROM card_backs cb
+                JOIN players p ON p.id=cb.owner_player_id
+                LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
+                WHERE cb.review_status=$approved
+                GROUP BY cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id
+            )
+            SELECT id, name, display_name, created_at, likes, liked,
+                   CASE WHEN owner_player_id=$playerId THEN 1 ELSE 0 END AS owned
+            FROM ranked
+            WHERE $hasCursor=0
+               OR likes < $cursorLikes
+               OR (likes=$cursorLikes AND created_at < $cursorCreatedAt)
+               OR (likes=$cursorLikes AND created_at=$cursorCreatedAt AND id < $cursorId)
+            ORDER BY likes DESC, created_at DESC, id DESC
+            LIMIT $fetchLimit;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$approved", CardBackReviewApproved);
+        command.Parameters.AddWithValue("$hasCursor", parsedCursor is null ? 0 : 1);
+        command.Parameters.AddWithValue("$cursorLikes", parsedCursor?.Likes ?? 0);
+        command.Parameters.AddWithValue("$cursorCreatedAt", parsedCursor?.CreatedAt ?? 0);
+        command.Parameters.AddWithValue("$cursorId", parsedCursor?.Id ?? 0);
+        command.Parameters.AddWithValue("$fetchLimit", size + 1);
+
+        var fetched = new List<CardBackGalleryItem>(size + 1);
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var id = reader.GetInt64(0);
+                fetched.Add(new CardBackGalleryItem(
+                    $"{CustomCardBackPrefix}{id}",
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    $"/card-back-images/{id}",
+                    reader.GetInt32(4),
+                    reader.GetInt32(5) != 0,
+                    reader.GetInt32(6) != 0,
+                    true,
+                    reader.GetInt64(3),
+                    CardBackReviewApproved,
+                    ""));
+            }
+        }
+
+        var hasMore = fetched.Count > size;
+        if (hasMore) fetched.RemoveAt(fetched.Count - 1);
+        var nextCursor = hasMore && fetched.Count > 0 ? EncodeCardBackGalleryCursor(fetched[^1]) : null;
+        var ownedItems = LoadOwnedCardBacks(connection, transaction, playerId);
+        transaction.Commit();
+        return new CardBackGalleryPage(fetched, ownedItems, size, total, hasMore, nextCursor);
     }
 
     public IReadOnlyList<CardBackGalleryItem> UploadCardBack(
@@ -1011,7 +1097,7 @@ public sealed class PlayerDataStore
         return gallery;
     }
 
-    public IReadOnlyList<CardBackGalleryItem> ToggleCardBackLike(string account, string cardBackId)
+    public CardBackGalleryItem ToggleCardBackLike(string account, string cardBackId)
     {
         var normalized = NormalizeCardBackReference(cardBackId);
         if (!TryParseCustomCardBackId(normalized, out var customId))
@@ -1029,9 +1115,10 @@ public sealed class PlayerDataStore
         remove.Parameters.AddWithValue("$playerId", playerId);
         if (remove.ExecuteNonQuery() == 0) AddCardBackLike(connection, transaction, customId, playerId);
 
-        var gallery = LoadCardBackGallery(connection, transaction, playerId, MaxCardBackGalleryItems);
+        var item = LoadCardBackGalleryItem(connection, transaction, playerId, customId)
+            ?? throw new PlayerDataValidationException("该卡背不存在或已下架。");
         transaction.Commit();
-        return gallery;
+        return item;
     }
 
     public CardBackDeletionResult DeleteCardBack(
@@ -1326,6 +1413,120 @@ public sealed class PlayerDataStore
                 reader.GetString(9)));
         }
         return items;
+    }
+
+    private static IReadOnlyList<CardBackGalleryItem> LoadOwnedCardBacks(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT cb.id, cb.name, p.display_name, cb.created_at,
+                   COUNT(l.player_id) AS likes,
+                   MAX(CASE WHEN l.player_id=$playerId THEN 1 ELSE 0 END) AS liked,
+                   cb.review_status,
+                   cb.review_reason
+            FROM card_backs cb
+            JOIN players p ON p.id=cb.owner_player_id
+            LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
+            WHERE cb.owner_player_id=$playerId
+            GROUP BY cb.id, cb.name, p.display_name, cb.created_at,
+                     cb.review_status, cb.review_reason
+            ORDER BY cb.created_at DESC, cb.id DESC;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        var items = new List<CardBackGalleryItem>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var id = reader.GetInt64(0);
+            var reviewStatus = reader.GetString(6);
+            items.Add(new CardBackGalleryItem(
+                $"{CustomCardBackPrefix}{id}",
+                reader.GetString(1),
+                reader.GetString(2),
+                $"/card-back-images/{id}",
+                reader.GetInt32(4),
+                reader.GetInt32(5) != 0,
+                true,
+                reviewStatus == CardBackReviewApproved,
+                reader.GetInt64(3),
+                reviewStatus,
+                reader.GetString(7)));
+        }
+        return items;
+    }
+
+    private static CardBackGalleryItem? LoadCardBackGalleryItem(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId,
+        long cardBackId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT cb.id, cb.name, p.display_name, cb.created_at,
+                   COUNT(l.player_id) AS likes,
+                   MAX(CASE WHEN l.player_id=$playerId THEN 1 ELSE 0 END) AS liked,
+                   CASE WHEN cb.owner_player_id=$playerId THEN 1 ELSE 0 END AS owned,
+                   cb.review_status,
+                   cb.review_reason
+            FROM card_backs cb
+            JOIN players p ON p.id=cb.owner_player_id
+            LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
+            WHERE cb.id=$cardBackId AND cb.review_status=$approved
+            GROUP BY cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id,
+                     cb.review_status, cb.review_reason;
+            """;
+        command.Parameters.AddWithValue("$playerId", playerId);
+        command.Parameters.AddWithValue("$cardBackId", cardBackId);
+        command.Parameters.AddWithValue("$approved", CardBackReviewApproved);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) return null;
+        var id = reader.GetInt64(0);
+        return new CardBackGalleryItem(
+            $"{CustomCardBackPrefix}{id}",
+            reader.GetString(1),
+            reader.GetString(2),
+            $"/card-back-images/{id}",
+            reader.GetInt32(4),
+            reader.GetInt32(5) != 0,
+            reader.GetInt32(6) != 0,
+            true,
+            reader.GetInt64(3),
+            reader.GetString(7),
+            reader.GetString(8));
+    }
+
+    private static string EncodeCardBackGalleryCursor(CardBackGalleryItem item)
+    {
+        var id = long.Parse(item.Id[CustomCardBackPrefix.Length..], CultureInfo.InvariantCulture);
+        var value = $"{item.Likes}:{item.CreatedAt}:{id}";
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
+    }
+
+    private static CardBackGalleryCursor? ParseCardBackGalleryCursor(string? cursor)
+    {
+        if (string.IsNullOrWhiteSpace(cursor)) return null;
+        try
+        {
+            var value = Encoding.UTF8.GetString(Convert.FromBase64String(cursor.Trim()));
+            var parts = value.Split(':');
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var likes)
+                || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var createdAt)
+                || !long.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var id)
+                || likes < 0 || createdAt <= 0 || id <= 0)
+                throw new FormatException();
+            return new CardBackGalleryCursor(likes, createdAt, id);
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        {
+            throw new PlayerDataValidationException("卡背广场分页游标无效。");
+        }
     }
 
     public int PendingLoginWrites => _pendingLoginTouches.Count;

@@ -46,16 +46,20 @@ export default function CardBack({
   cardBackId,
   className,
   decorative = false,
+  lazy = false,
 }: {
   cardBackId?: string | null;
   className?: string;
   decorative?: boolean;
+  lazy?: boolean;
 }) {
   const id = normalizeCardBackId(cardBackId);
   const customImagePath = cardBackImageSrc(id);
   const customImage = customImagePath ? assetSrc(customImagePath) : null;
   const [customImageSrc, setCustomImageSrc] = useState(customImage ?? "");
   const [customImageFailed, setCustomImageFailed] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(!lazy);
+  const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const loadTimeoutRef = useRef<number | null>(null);
 
@@ -70,6 +74,25 @@ export default function CardBack({
     setCustomImageFailed(false);
   }, [clearLoadTimeout, customImage]);
 
+  useEffect(() => {
+    if (!lazy) {
+      setIsNearViewport(true);
+      return;
+    }
+    const container = containerRef.current;
+    if (!container || isNearViewport) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setIsNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "500px 0px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isNearViewport, lazy]);
+
   const handleCustomImageFailure = useCallback(() => {
     clearLoadTimeout();
     const directSource = customImage ? directAssetSrc(customImage) : null;
@@ -82,28 +105,35 @@ export default function CardBack({
 
   useEffect(() => {
     clearLoadTimeout();
-    if (!customImage || customImageFailed || (imageRef.current?.complete && imageRef.current.naturalWidth > 0)) return;
+    if (!customImage || customImageFailed || !isNearViewport || (imageRef.current?.complete && imageRef.current.naturalWidth > 0)) return;
     loadTimeoutRef.current = window.setTimeout(handleCustomImageFailure, CUSTOM_CARD_BACK_TIMEOUT_MS);
     return clearLoadTimeout;
-  }, [clearLoadTimeout, customImage, customImageFailed, customImageSrc, handleCustomImageFailure]);
+  }, [clearLoadTimeout, customImage, customImageFailed, customImageSrc, handleCustomImageFailure, isNearViewport]);
 
   if (customImage && !customImageFailed) {
     return (
       <div
+        ref={containerRef}
         className={clsx("relative h-full w-full overflow-hidden rounded-[inherit] border-2 border-white/35 bg-gray-950 shadow-inner", className)}
         role={decorative ? undefined : "img"}
         aria-hidden={decorative || undefined}
         aria-label={decorative ? undefined : `${cardBackName(id)}卡背`}
       >
-        <img
-          ref={imageRef}
-          src={customImageSrc}
-          alt=""
-          draggable={false}
-          onLoad={clearLoadTimeout}
-          onError={handleCustomImageFailure}
-          className="h-full w-full object-cover"
-        />
+        {isNearViewport ? (
+          <img
+            ref={imageRef}
+            src={customImageSrc}
+            alt=""
+            draggable={false}
+            loading={lazy ? "lazy" : "eager"}
+            decoding="async"
+            onLoad={clearLoadTimeout}
+            onError={handleCustomImageFailure}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full animate-pulse bg-gradient-to-br from-gray-900 via-gray-800 to-gray-950" aria-hidden="true" />
+        )}
         <div className="pointer-events-none absolute inset-[4%] rounded-[8%] border border-white/20" />
       </div>
     );

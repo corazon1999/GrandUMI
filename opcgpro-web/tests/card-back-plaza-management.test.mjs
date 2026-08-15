@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const source = await readFile(
-  new URL("../src/components/home/CardBackPlazaPanel.tsx", import.meta.url),
-  "utf8",
-);
+const [source, cardBack, protocol, store] = await Promise.all([
+  readFile(new URL("../src/components/home/CardBackPlazaPanel.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/ui/CardBack.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/net/HomeProtocol.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/store/netStore.ts", import.meta.url), "utf8"),
+]);
 
 test("卡背广场提供热门与我的投稿两个管理视图", () => {
   assert.match(source, /type GalleryView = "popular" \| "mine"/);
@@ -14,7 +16,33 @@ test("卡背广场提供热门与我的投稿两个管理视图", () => {
   assert.match(source, /我发布的卡背/);
   assert.match(source, /galleryView === "mine" \? ownedCardBacks : approvedCardBacks/);
   assert.match(source, /item\.reviewStatus === "approved" && item\.publiclyListed/);
-  assert.match(source, /最多展示 300 款已通过审核的卡背/);
+  assert.match(source, /全部已通过审核的卡背均可浏览/);
+  assert.match(source, /已显示 \$\{approvedCardBacks\.length\} \/ 共 \$\{galleryTotal\} 款/);
+});
+
+test("热门卡背使用游标自动续页并保留手动加载入口", () => {
+  assert.match(source, /loadMoreSentinelRef/);
+  assert.match(source, /rootMargin: "600px 0px"/);
+  assert.match(source, /HomeRequest\.requestCardBackGallery\(galleryNextCursor\)/);
+  assert.match(source, /正在加载更多…/);
+  assert.match(protocol, /pageSize: 40/);
+  assert.match(protocol, /append: Boolean\(msg\.cursor\)/);
+  assert.match(store, /cardBackGalleryNextCursor/);
+  assert.match(store, /seen = new Set<string>/);
+});
+
+test("卡背图片只在接近可视区时加载", () => {
+  assert.match(source, /<CardBack cardBackId=\{item\.id\} decorative lazy \/>/);
+  assert.match(cardBack, /new IntersectionObserver/);
+  assert.match(cardBack, /rootMargin: "500px 0px"/);
+  assert.match(cardBack, /loading=\{lazy \? "lazy" : "eager"\}/);
+  assert.match(cardBack, /decoding="async"/);
+});
+
+test("点赞回包只更新对应卡背而不覆盖整个广场", () => {
+  assert.match(protocol, /case "MsgLikeCardBack"/);
+  assert.match(protocol, /updateCardBackGalleryItem\(msg\.item\)/);
+  assert.match(store, /current\.id === item\.id \? item : current/);
 });
 
 test("本人投稿展示待审核与未通过状态且只有已通过卡背可互动", () => {

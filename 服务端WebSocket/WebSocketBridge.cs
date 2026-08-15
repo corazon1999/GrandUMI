@@ -241,7 +241,7 @@ public static class WebSocketBridge
             case "MsgSelectDeck":  OnSelectDeck(session, msg);   break;
             case "MsgUpdateProfile": OnUpdateProfile(session, msg); break;
             case "MsgUpdateCardBack": OnUpdateCardBack(session, msg); break;
-            case "MsgCardBackGallery": OnCardBackGallery(session); break;
+            case "MsgCardBackGallery": OnCardBackGallery(session, msg); break;
             case "MsgUploadCardBack": OnUploadCardBack(session, msg); break;
             case "MsgLikeCardBack": OnLikeCardBack(session, msg); break;
             case "MsgDeleteCardBack": OnDeleteCardBack(session, msg); break;
@@ -584,15 +584,23 @@ public static class WebSocketBridge
             var result = _playerDataStore.UpdateCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
             s.CardBackId = result.Snapshot.CardBackId;
             SendPlayerData(s, result.Snapshot, "卡背已保存并点亮了红心");
-            SendCardBackGallery(s, result.Gallery);
+            if (result.GalleryItem is not null) SendCardBackLikeUpdate(s, result.GalleryItem);
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "保存卡背失败"); }
     }
 
-    private static void OnCardBackGallery(WsSession s)
+    private static void OnCardBackGallery(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequirePlayer(s)) return;
-        try { SendCardBackGallery(s, _playerDataStore.GetCardBackGallery(s.Account!)); }
+        try
+        {
+            var cursor = Str(msg, "cursor");
+            var page = _playerDataStore.GetCardBackGalleryPage(
+                s.Account!,
+                cursor,
+                Int(msg, "pageSize", PlayerDataStore.DefaultCardBackGalleryPageSize));
+            SendCardBackGalleryPage(s, page, cursor);
+        }
         catch (Exception ex) { SendCardBackGalleryError(s, ex, "读取卡背广场失败"); }
     }
 
@@ -601,12 +609,16 @@ public static class WebSocketBridge
         if (!TryRequirePlayer(s)) return;
         try
         {
-            var gallery = _playerDataStore.UploadCardBack(
+            _playerDataStore.UploadCardBack(
                 s.Account!,
                 Str(msg, "name") ?? "",
                 Str(msg, "mimeType") ?? "",
                 Str(msg, "imageBase64") ?? "");
-            SendCardBackGallery(s, gallery, "卡背已提交审核，通过后将在广场展示");
+            SendCardBackGalleryPage(
+                s,
+                _playerDataStore.GetCardBackGalleryPage(s.Account!),
+                requestCursor: null,
+                logStr: "卡背已提交审核，通过后将在广场展示");
         }
         catch (Exception ex) { SendCardBackGalleryError(s, ex, "上传卡背失败"); }
     }
@@ -616,10 +628,10 @@ public static class WebSocketBridge
         if (!TryRequirePlayer(s)) return;
         try
         {
-            var gallery = _playerDataStore.ToggleCardBackLike(s.Account!, Str(msg, "cardBackId") ?? "");
-            SendCardBackGallery(s, gallery);
+            var item = _playerDataStore.ToggleCardBackLike(s.Account!, Str(msg, "cardBackId") ?? "");
+            SendCardBackLikeUpdate(s, item);
         }
-        catch (Exception ex) { SendCardBackGalleryError(s, ex, "更新红心失败"); }
+        catch (Exception ex) { SendCardBackLikeError(s, ex); }
     }
 
     private static void OnDeleteCardBack(WsSession s, Dictionary<string, JsonElement> msg)
@@ -633,7 +645,7 @@ public static class WebSocketBridge
                 canManagePublishedCardBacks: AdministratorPolicy.IsAuthorized(s.Account));
             s.CardBackId = result.Snapshot.CardBackId;
             SendPlayerData(s, result.Snapshot, "卡背已删除并从广场下架");
-            SendCardBackGallery(s, result.Gallery);
+            SendCardBackGalleryPage(s, _playerDataStore.GetCardBackGalleryPage(s.Account!), requestCursor: null);
 
             foreach (var session in Sessions.Values.Where(IsCurrentAccountSession))
             {
@@ -646,7 +658,10 @@ public static class WebSocketBridge
                         session.CardBackId = snapshot.CardBackId;
                         SendPlayerData(session, snapshot, "正在使用的卡背已下架，已恢复为经典卡背");
                     }
-                    SendCardBackGallery(session, _playerDataStore.GetCardBackGallery(session.Account));
+                    SendCardBackGalleryPage(
+                        session,
+                        _playerDataStore.GetCardBackGalleryPage(session.Account),
+                        requestCursor: null);
                 }
                 catch (Exception ex) { LogErr($"同步卡背删除结果 {session.Account}: {ex.Message}"); }
             }
@@ -3133,32 +3148,58 @@ public static class WebSocketBridge
         Send(session.SessionId, new { proto, result = false, logStr = message });
     }
 
-    private static void SendCardBackGallery(
+    private static void SendCardBackGalleryPage(
         WsSession session,
-        IReadOnlyList<CardBackGalleryItem> items,
+        CardBackGalleryPage page,
+        string? requestCursor,
         string? logStr = null)
     {
-        var payloadItems = items.Select(item => new
-        {
-            id = item.Id,
-            name = item.Name,
-            authorName = item.AuthorName,
-            imageUrl = item.ImageUrl,
-            likes = item.Likes,
-            liked = item.Liked,
-            owned = item.Owned,
-            publiclyListed = item.PubliclyListed,
-            createdAt = item.CreatedAt,
-            reviewStatus = item.ReviewStatus,
-            reviewReason = item.ReviewReason,
-        }).ToArray();
         Send(session.SessionId, new
         {
             proto = "MsgCardBackGallery",
             result = true,
             logStr,
-            items = payloadItems,
+            cursor = requestCursor,
+            items = page.Items.Select(ToCardBackGalleryPayload).ToArray(),
+            ownedItems = page.OwnedItems.Select(ToCardBackGalleryPayload).ToArray(),
+            pageSize = page.PageSize,
+            total = page.Total,
+            hasMore = page.HasMore,
+            nextCursor = page.NextCursor,
         });
+    }
+
+    private static object ToCardBackGalleryPayload(CardBackGalleryItem item) => new
+    {
+        id = item.Id,
+        name = item.Name,
+        authorName = item.AuthorName,
+        imageUrl = item.ImageUrl,
+        likes = item.Likes,
+        liked = item.Liked,
+        owned = item.Owned,
+        publiclyListed = item.PubliclyListed,
+        createdAt = item.CreatedAt,
+        reviewStatus = item.ReviewStatus,
+        reviewReason = item.ReviewReason,
+    };
+
+    private static void SendCardBackLikeUpdate(WsSession session, CardBackGalleryItem item)
+    {
+        Send(session.SessionId, new
+        {
+            proto = "MsgLikeCardBack",
+            result = true,
+            item = ToCardBackGalleryPayload(item),
+        });
+    }
+
+    private static void SendCardBackLikeError(WsSession session, Exception exception)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : "更新红心失败";
+        if (exception is not PlayerDataValidationException)
+            LogErr($"更新红心失败 {session.Account}: {exception.Message}");
+        Send(session.SessionId, new { proto = "MsgLikeCardBack", result = false, logStr = message });
     }
 
     private static void SendCardBackGalleryError(WsSession session, Exception exception, string fallback)
