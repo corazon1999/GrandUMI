@@ -7,6 +7,13 @@ production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
 
 [[ "$production_ip" == "103.146.230.37" ]] || { echo "拒绝在未登记主机上初始化：$production_ip" >&2; exit 1; }
 [[ -f /etc/letsencrypt/live/grand-umi.com/fullchain.pem ]] || { echo "缺少 grand-umi.com 证书" >&2; exit 1; }
+[[ -f /etc/letsencrypt/live/direct.grand-umi.com/fullchain.pem ]] || {
+  echo "缺少 direct.grand-umi.com 证书；必须先迁移低延迟直连域名" >&2
+  exit 1
+}
+openssl x509 -in /etc/letsencrypt/live/direct.grand-umi.com/fullchain.pem \
+  -noout -checkhost direct.grand-umi.com >/dev/null \
+  || { echo "direct.grand-umi.com 证书主机名校验失败" >&2; exit 1; }
 
 id grandumi >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin grandumi
 install -d -o grandumi -g grandumi -m 0750 /data/grandumi
@@ -57,4 +64,6 @@ nginx -t
 systemctl reload nginx
 
 curl -kfsS --resolve grand-umi.com:443:127.0.0.1 https://grand-umi.com/backend/ready >/dev/null
-echo "新正式服主域名入口已预置：IP=$production_ip"
+curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
+  https://direct.grand-umi.com/backend/ready >/dev/null
+echo "新正式服主域名与低延迟直连入口已预置：IP=$production_ip"

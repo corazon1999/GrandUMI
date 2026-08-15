@@ -26,6 +26,8 @@ if [[ "$active_slot" =~ ^[ab]$ \
     || die "切换后版本与目标提交不一致"
   curl -kfsS --resolve grand-umi.com:443:127.0.0.1 \
     https://grand-umi.com/backend/ready >/dev/null
+  curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
+    https://direct.grand-umi.com/backend/ready >/dev/null
   echo "新正式服 A/B 发布成功：$target（活动槽位 $active）"
   exit 0
 fi
@@ -115,6 +117,8 @@ nginx -t
 systemctl reload nginx
 systemctl enable --now grandumi-production-health.timer
 curl -kfsS --resolve grand-umi.com:443:127.0.0.1 https://grand-umi.com/backend/ready >/dev/null
+curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
+  https://direct.grand-umi.com/backend/ready >/dev/null
 
 trap - ERR
 echo "新正式服服务已激活：$target；数据来源：$data_source；切换前归档：$archive_dir"

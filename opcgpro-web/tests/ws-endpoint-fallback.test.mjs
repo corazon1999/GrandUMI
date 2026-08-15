@@ -61,7 +61,9 @@ test("首次连接与登录重试共用端点选择逻辑", async () => {
     readSource("../src/components/home/LoginPanel.tsx"),
   ]);
 
-  assert.match(hook, /NetManager\.connect\(getWebSocketEndpoints\(\)\)/);
+  assert.match(hook, /refreshWebSocketEndpoints\(\)\.then\(\(endpoints\)/);
+  assert.match(hook, /NetManager\.connect\(endpoints\)/);
+  assert.doesNotMatch(hook, /NetManager\.connect\(getWebSocketEndpoints\(\)\)/);
   assert.match(login, /NetManager\.connect\(getWebSocketEndpoints\(\)\)/);
 });
 

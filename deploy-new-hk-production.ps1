@@ -11,6 +11,15 @@ function Stop-WithError([string]$Message) { Write-Host $Message -ForegroundColor
 if ($Server -ne "root@103.146.230.37") { Stop-WithError "安全检查失败：新正式服部署只允许 root@103.146.230.37。" }
 if ((git branch --show-current).Trim() -ne "main") { Stop-WithError "新正式服部署必须从 main 分支执行。" }
 if (git status --porcelain) { Stop-WithError "工作区存在未提交改动，已停止新正式服部署。" }
+$directAddresses = @(Resolve-DnsName -Type A direct.grand-umi.com -ErrorAction Stop |
+  Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
+if ($directAddresses.Count -ne 1 -or $directAddresses[0] -ne "103.146.230.37") {
+  Stop-WithError "低延迟直连 DNS 未独占指向新正式服：direct.grand-umi.com -> $($directAddresses -join ', ')"
+}
+$directCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://direct.grand-umi.com/backend/ready"
+if ($LASTEXITCODE -ne 0 -or $directCode -ne "200") {
+  Stop-WithError "低延迟直连 TLS/健康检查失败，HTTP $directCode。"
+}
 $target = if ($Commit) { (git rev-parse $Commit).Trim() } else { (git rev-parse HEAD).Trim() }
 if ($target -notmatch '^[0-9a-f]{40}$') { Stop-WithError "无法解析部署提交。" }
 

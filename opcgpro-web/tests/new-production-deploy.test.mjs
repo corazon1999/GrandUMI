@@ -13,11 +13,13 @@ const candidateBackup = await readFile(new URL("../../ops/server/grandumi-candid
 const candidateDeploy = await readFile(new URL("../../ops/server/deploy-grandumi-candidate.sh", import.meta.url), "utf8");
 const productionBootstrap = await readFile(new URL("../../ops/server/bootstrap-grandumi-production.sh", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../../deploy-new-hk-production.ps1", import.meta.url), "utf8");
+const directTls = await readFile(new URL("../../ops/server/enable-grandumi-production-direct-tls.sh", import.meta.url), "utf8");
 
 test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
   assert.match(stage, /NEXT_PUBLIC_WS_URL='wss:\/\/grand-umi\.com\/ws'/);
   assert.match(stage, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/grand-umi\.com'/);
-  assert.match(stage, /"hosts":\["grand-umi\.com"\]/);
+  assert.match(stage, /"hosts":\["grand-umi\.com","direct\.grand-umi\.com"\]/);
+  assert.match(stage, /wss:\/\/direct\.grand-umi\.com\/ws/);
   assert.doesNotMatch(stage, /wss:\/\/candidate\.grand-umi\.com\/ws/);
   assert.match(stage, /尚未切换服务/);
 });
@@ -30,14 +32,27 @@ test("正式服发布槽始终挂载不进入 Git 的共享卡图资源", () => 
   assert.match(stage, /正式服共享卡图目录为空/);
 });
 
-test("正式入口只承载主域名，候选域名由隔离站点承载", () => {
+test("正式入口同时承载主域名和独立证书的低延迟直连域名", () => {
   assert.match(nginx, /server_name grand-umi\.com;/);
   assert.match(nginx, /live\/grand-umi\.com\/fullchain\.pem/);
+  assert.match(nginx, /server_name direct\.grand-umi\.com;/);
+  assert.match(nginx, /live\/direct\.grand-umi\.com\/fullchain\.pem/);
   assert.doesNotMatch(nginx, /server_name candidate\.grand-umi\.com/);
-  assert.equal((nginx.match(/grandumi-production-proxy\.conf/g) ?? []).length, 1);
+  assert.equal((nginx.match(/grandumi-production-proxy\.conf/g) ?? []).length, 2);
   assert.match(candidateNginx, /server_name candidate\.grand-umi\.com;/);
   assert.match(candidateNginx, /live\/candidate\.grand-umi\.com\/fullchain\.pem/);
   assert.doesNotMatch(candidateNginx, /default_server/);
+});
+
+test("直连启用前必须完成 DNS 独占、证书主机名和活动槽运行时配置校验", () => {
+  assert.match(directTls, /direct\.grand-umi\.com/);
+  assert.match(directTls, /resolved_ipv4/);
+  assert.match(directTls, /103\.146\.230\.37/);
+  assert.match(directTls, /openssl x509[\s\S]*-checkhost/);
+  assert.match(directTls, /network-endpoints\.json/);
+  assert.match(directTls, /wss:\/\/direct\.grand-umi\.com\/ws/);
+  assert.match(directTls, /backend\/ready/);
+  assert.match(productionBootstrap, /缺少 direct\.grand-umi\.com 证书/);
 });
 
 test("候选服使用独立端口、独立数据目录和较低资源上限", () => {
@@ -78,4 +93,6 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /worktree add --detach/);
   assert.doesNotMatch(deploy, /checkout --detach/);
   assert.match(deploy, /尚未切流/);
+  assert.match(deploy, /Resolve-DnsName -Type A direct\.grand-umi\.com/);
+  assert.match(deploy, /低延迟直连 TLS\/健康检查失败/);
 });
