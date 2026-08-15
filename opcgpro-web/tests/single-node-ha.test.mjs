@@ -79,6 +79,7 @@ test("发布构建进入低优先级资源组且产物按提交隔离", () => {
   assert.doesNotMatch(stageScript, /checkout --detach/);
   assert.doesNotMatch(stageScript, /\.next\.production-previous/);
   assert.match(stageScript, /rsync -a --delete --link-dest/);
+  assert.match(stageScript, /rsync -a --ignore-existing "\$previous_frontend\/\.next\/static\/"/);
   assert.match(stageScript, /node_modules\/ "\$frontend_next\/node_modules\/"/);
   assert.match(stageScript, /previous_frontend\/node_modules/);
   assert.match(stageScript, /releases\/\$target/);

@@ -55,6 +55,11 @@ mkdir -p "$frontend_next"
 cp -a .next package.json package-lock.json "$frontend_next/"
 active_slot="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || echo a)"
 previous_frontend="$repo/slots/$active_slot/frontend"
+# Cloudflare 可能在短时间内继续返回上一版本 HTML；保留旧哈希分块，避免缓存入口
+# 在新版本切换后引用已删除文件而导致白屏。只补缺文件，绝不覆盖本次构建产物。
+if [[ -d "$previous_frontend/.next/static" ]]; then
+  rsync -a --ignore-existing "$previous_frontend/.next/static/" "$frontend_next/.next/static/"
+fi
 if [[ -d "$previous_frontend/node_modules" ]]; then
   rsync -a --delete --link-dest="$previous_frontend/node_modules" node_modules/ "$frontend_next/node_modules/"
 else
