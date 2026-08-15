@@ -86,7 +86,7 @@ export default function SettingsModal({
                 lang={option.value}
                 aria-pressed={active}
                 onClick={() => setLocale(option.value as Locale)}
-                className={`min-h-11 rounded-xl border px-2 text-sm font-bold transition-colors ${
+                className={`min-h-12 rounded-xl border px-2 text-sm font-bold transition-colors ${
                   active
                     ? "border-orange-500 bg-orange-500/10 text-orange-200"
                     : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
@@ -144,7 +144,7 @@ export default function SettingsModal({
               type="button"
               aria-pressed={cardSize === value}
               onClick={() => setCardSize(value)}
-              className={`min-h-11 rounded-xl border px-3 text-sm font-bold transition-colors ${
+              className={`min-h-12 rounded-xl border px-3 text-sm font-bold transition-colors ${
                 cardSize === value
                   ? "border-orange-500 bg-orange-500/10 text-orange-200"
                   : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
@@ -170,7 +170,7 @@ export default function SettingsModal({
               type="button"
               aria-pressed={animationSpeed === value}
               onClick={() => setAnimationSpeed(value)}
-              className={`min-h-11 rounded-xl border px-3 text-sm font-bold transition-colors ${
+              className={`min-h-12 rounded-xl border px-3 text-sm font-bold transition-colors ${
                 animationSpeed === value
                   ? "border-orange-500 bg-orange-500/10 text-orange-200"
                   : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"
@@ -193,7 +193,7 @@ export default function SettingsModal({
             aria-pressed={!isMuted}
             onClick={toggleMute}
             disabled={!isHydrated}
-            className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`min-h-12 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               isMuted
                 ? "border-gray-700 bg-gray-950 text-gray-400 hover:border-gray-500"
                 : "border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
@@ -228,7 +228,7 @@ export default function SettingsModal({
               type="button"
               onClick={() => void testSound()}
               disabled={!isHydrated || isMuted || volumePercent === 0}
-              className="min-h-11 shrink-0 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+              className="min-h-12 shrink-0 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
             >
               试听
             </button>

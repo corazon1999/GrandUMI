@@ -58,7 +58,7 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
             right: "calc(0.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",
             top: "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",
           }}
-          className="pointer-events-auto fixed z-[10000] flex h-11 w-11 items-center justify-center rounded-xl border border-gray-700/80 bg-gray-900/90 text-gray-300 shadow-lg backdrop-blur-md transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white active:bg-gray-700 focus-visible:outline-2 focus-visible:outline-orange-400"
+          className="pointer-events-auto fixed z-[10000] flex h-12 w-12 items-center justify-center rounded-xl border border-gray-700/80 bg-gray-900/90 text-gray-300 shadow-lg backdrop-blur-md transition-colors hover:border-orange-500 hover:bg-gray-800 hover:text-white active:bg-gray-700 focus-visible:outline-2 focus-visible:outline-orange-400"
         >
           <svg
             viewBox="0 0 24 24"

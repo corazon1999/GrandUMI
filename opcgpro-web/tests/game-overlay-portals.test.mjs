@@ -34,3 +34,38 @@ test("旋转宿主中的交互浮层显式接收指针事件", async () => {
     assert.match(source, /pointer-events-auto fixed/);
   }
 });
+
+test("共享弹窗在旋转对局画布中使用容器尺寸并保留可滚动内容区", async () => {
+  const modal = await readSource("../src/components/ui/Modal.tsx");
+
+  assert.match(modal, /const useMobileSheet = mobileSheet && !rotateQuarterTurn/);
+  assert.match(modal, /w-\[calc\(100cqw-2rem\)\]/);
+  assert.match(modal, /max-h-\[calc\(100cqh-2rem/);
+  assert.match(modal, /data-modal-scroll-region/);
+  assert.match(modal, /overflow-y-auto overscroll-contain/);
+  assert.match(modal, /h-12 w-12/);
+  assert.match(modal, /var\(--layout-safe-left/);
+  assert.match(modal, /var\(--layout-safe-right/);
+});
+
+test("对局设置的同类浮层不再使用未旋转的视口宽高", async () => {
+  const [zoom, cardInfo, life, trash, menu] = await Promise.all([
+    readSource("../src/components/ui/CardZoomOverlay.tsx"),
+    readSource("../src/components/game/CardInfoPanel.tsx"),
+    readSource("../src/components/game/LifeArea.tsx"),
+    readSource("../src/components/game/TrashPile.tsx"),
+    readSource("../src/components/game/GameMenu.tsx"),
+  ]);
+
+  assert.match(zoom, /100cqh/);
+  assert.match(zoom, /100cqw/);
+  assert.match(zoom, /@\[640px\]:flex-row/);
+  assert.match(cardInfo, /78cqh/);
+  assert.match(cardInfo, /62cqw/);
+  assert.match(life, /75cqh/);
+  assert.match(trash, /75cqh/);
+  assert.match(menu, /maxWidthClass="max-w-sm"/);
+  assert.match(menu, /var\(--layout-safe-right/);
+  assert.equal(menu.match(/min-h-12/g)?.length, 2);
+  assert.match(menu, /h-12 w-12/);
+});

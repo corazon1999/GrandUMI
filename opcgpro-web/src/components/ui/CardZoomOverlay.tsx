@@ -53,7 +53,7 @@ export default function CardZoomOverlay({
 
   return (
     <motion.div
-      className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))] backdrop-blur-sm"
       onClick={onClose}
       onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       initial={{ opacity: 0 }}
@@ -62,7 +62,7 @@ export default function CardZoomOverlay({
       transition={{ duration: 0.15 }}
     >
       <motion.div
-        className="flex max-h-[92vh] max-w-[94vw] flex-col items-center gap-3 overflow-y-auto p-2 md:flex-row md:items-start md:gap-5"
+        className="flex max-h-[calc(100cqh-2rem)] max-w-[calc(100cqw-2rem)] flex-col items-center gap-3 overflow-y-auto p-2 @[640px]:flex-row @[640px]:items-start @[640px]:gap-5"
         // 内容区也响应点击关闭：右键看完即点任意处退出，无需精确点遮罩
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -74,10 +74,10 @@ export default function CardZoomOverlay({
           className="relative overflow-hidden rounded-2xl border border-gray-600 shadow-2xl"
           style={{
             height: cardSize === "sm"
-              ? "min(62vh, 520px, calc(88vw / 0.717))"
+              ? "min(62cqh, 520px, calc(88cqw / 0.717))"
               : cardSize === "lg"
-                ? "min(82vh, 700px, calc(88vw / 0.717))"
-                : "min(76vh, 640px, calc(88vw / 0.717))",
+                ? "min(82cqh, 700px, calc(88cqw / 0.717))"
+                : "min(76cqh, 640px, calc(88cqw / 0.717))",
             aspectRatio: "0.717",
           }}
         >
@@ -95,7 +95,7 @@ export default function CardZoomOverlay({
         </div>
 
         {/* 信息条 */}
-        <div className="w-full max-w-[92vw] rounded-xl bg-gray-900/95 px-4 py-3 shadow-xl ring-1 ring-white/10 md:mt-1 md:w-[22rem] md:max-w-[34vw]">
+        <div className="w-full max-w-[92cqw] rounded-xl bg-gray-900/95 px-4 py-3 shadow-xl ring-1 ring-white/10 @[640px]:mt-1 @[640px]:w-[22rem] @[640px]:max-w-[34cqw]">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-bold text-base leading-tight">{card.name}</p>
             {colorStyle && (

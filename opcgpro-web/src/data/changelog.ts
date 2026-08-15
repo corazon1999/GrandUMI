@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-15-ranked-champion-visual-release",
+    version: "2026.08.15.3",
+    date: "2026-08-15",
+    title: "排位榜冠军称号视觉更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "排位榜为海贼王、海军元帅、世界之王等阵营巅峰称号，以及四皇、海军大将、神之骑士团等次级称号增加专属徽章与动效。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "排行榜默认打开排位榜并将其放在首个页签；世界政府新世界普通称号调整为“神之骑士团”。",
+          "手机竖屏自动旋转对局画布时，卡牌详情、卡牌放大、生命区、废弃区和游戏菜单会按旋转后的安全区域正确显示并支持滚动。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-15-high-bounty-release",
     version: "2026.08.15.2",
     date: "2026-08-15",

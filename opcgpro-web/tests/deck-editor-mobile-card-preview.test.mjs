@@ -28,7 +28,7 @@ test("组牌页手机详情使用紧凑卡图且保留桌面尺寸", async () =>
   ]);
 
   assert.match(searchResult, /<CardInfoPanel[\s\S]*?compactMobile\s*\/>/);
-  assert.match(cardInfo, /w-\[min\(62vw,14rem\)\] sm:w-full sm:max-w-\[22rem\]/);
+  assert.match(cardInfo, /w-\[min\(62cqw,14rem\)\] @\[640px\]:w-full @\[640px\]:max-w-\[22rem\]/);
   assert.match(cardInfo, /: "w-full max-w-\[22rem\]"/);
 });
 

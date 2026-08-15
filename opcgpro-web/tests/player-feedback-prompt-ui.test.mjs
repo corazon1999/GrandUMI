@@ -46,6 +46,7 @@ test("个人设置可调整卡牌大小与动画速度并持久化", async () =>
   assert.match(store, /localStorage\.setItem\(KEY/);
   assert.match(settings, /卡牌显示/);
   assert.match(settings, /对局动画/);
+  assert.ok((settings.match(/min-h-12/g) ?? []).length >= 5);
   assert.match(responsive, /preferredSize === "auto"/);
 });
 

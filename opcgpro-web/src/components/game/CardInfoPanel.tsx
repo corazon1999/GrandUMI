@@ -34,7 +34,7 @@ export default function CardInfoPanel({
       open={!!card}
       onClose={onClose}
       title={card?.name}
-      maxWidthClass="w-[calc(100vw-2rem)] max-w-5xl"
+      maxWidthClass="max-w-5xl"
       mobileSheet={mobileSheet}
     >
       {card && (
@@ -85,14 +85,14 @@ function CardInfoContent({
   };
 
   return (
-    <div className="max-h-[78vh] overflow-y-auto pr-1">
-      <div className="flex flex-col items-center gap-5 md:flex-row md:items-start">
+    <div className="max-h-[78cqh] overflow-y-auto pr-1">
+      <div className="flex flex-col items-center gap-5 @[720px]:flex-row @[720px]:items-start">
         {/* 卡图 */}
         <div
           data-card-info-image
           className={`relative aspect-[0.717] shrink-0 overflow-hidden rounded-lg bg-gray-800 ${
             compactMobile
-              ? "w-[min(62vw,14rem)] sm:w-full sm:max-w-[22rem]"
+              ? "w-[min(62cqw,14rem)] @[640px]:w-full @[640px]:max-w-[22rem]"
               : "w-full max-w-[22rem]"
           }`}
         >
@@ -119,7 +119,7 @@ function CardInfoContent({
                 type="button"
                 onClick={() => moveSprite(-1)}
                 aria-label="上一张异画"
-                className="absolute bottom-1/2 left-2 flex h-9 w-9 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
+                className="absolute bottom-1/2 left-2 flex h-12 w-12 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
               >
                 ‹
               </button>
@@ -127,7 +127,7 @@ function CardInfoContent({
                 type="button"
                 onClick={() => moveSprite(1)}
                 aria-label="下一张异画"
-                className="absolute bottom-1/2 right-2 flex h-9 w-9 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
+                className="absolute bottom-1/2 right-2 flex h-12 w-12 translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-xl text-white transition-colors hover:bg-black/90"
               >
                 ›
               </button>
