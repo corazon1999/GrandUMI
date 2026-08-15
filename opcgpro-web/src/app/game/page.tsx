@@ -91,7 +91,7 @@ export default function GamePage() {
 
       {isObserver && (
         <div
-          className="absolute z-20 flex items-center gap-2"
+          className="absolute z-[90] flex items-center gap-2"
           style={{
             left: "calc(1rem + var(--layout-safe-left, env(safe-area-inset-left)))",
             top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",

@@ -57,10 +57,20 @@ public static class BugReportStore
                 if (Directory.Exists(Path.Combine(dir.FullName, "卡牌数据"))) { projectRoot = dir.FullName; break; }
                 dir = dir.Parent;
             }
-            _root = Path.Combine(projectRoot ?? AppContext.BaseDirectory, "BugReports");
+            _root = ResolveRoot(
+                Environment.GetEnvironmentVariable("GRANDUMI_BUG_REPORT_DIR"),
+                Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR"),
+                projectRoot ?? AppContext.BaseDirectory);
             Directory.CreateDirectory(_root);
             return _root;
         }
+    }
+
+    internal static string ResolveRoot(string? explicitRoot, string? dataRoot, string fallbackRoot)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitRoot)) return Path.GetFullPath(explicitRoot);
+        if (!string.IsNullOrWhiteSpace(dataRoot)) return Path.Combine(Path.GetFullPath(dataRoot), "BugReports");
+        return Path.Combine(Path.GetFullPath(fallbackRoot), "BugReports");
     }
 
     private static string Sanitize(string s)

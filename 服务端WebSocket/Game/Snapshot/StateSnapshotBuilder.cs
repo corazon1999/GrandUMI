@@ -226,7 +226,7 @@ public static class StateSnapshotBuilder
             cannotBeRested = c.HasRestriction(RestrictionKind.CannotBeRested)
                 || state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested),
             turnPlayed = c.TurnPlayed,
-            canAttack = Validation.ActionValidator.CanAttack(state, idx, c.Id, true, null).Ok,
+            canAttack = CanInitiateAttack(state, idx, c.Id),
             cannotAttack = HasCannotAttackStatus(state, c),
             activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
             oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(p, c),
@@ -256,7 +256,7 @@ public static class StateSnapshotBuilder
             state.CurrentPowerOf(idx, p.Leader),
             p.AttachedDonCount(p.Leader.Id),
             GrantedKeywords(state, p.Leader),
-            Validation.ActionValidator.CanAttack(state, idx, p.Leader.Id, true, null).Ok,
+            CanInitiateAttack(state, idx, p.Leader.Id),
             HasCannotAttackStatus(state, p.Leader),
             state.IsTriggerNullified(p.Leader, Effects.EffectTrigger.OnEnterField),
             ActivatedUsedThisTurn(p, p.Leader),
@@ -376,6 +376,20 @@ public static class StateSnapshotBuilder
     private static bool OncePerTurnEffectAvailable(PlayerState p, CardInstance c)
         => Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number)
            && !p.OncePerTurnEffectUsedCardIds.Contains(c.Id);
+
+    /// <summary>
+    /// 客户端的攻击按钮表示“至少存在一个合法攻击对象”，不能只用对方领袖做探测。
+    /// 例如【速攻：角色】在登场回合只能攻击角色，OP17-044 也可能暂时把目标限制为约翰。
+    /// </summary>
+    private static bool CanInitiateAttack(GameState state, int attackerIndex, Guid attackerId)
+    {
+        if (Validation.ActionValidator.CanAttack(state, attackerIndex, attackerId, true, null).Ok)
+            return true;
+
+        int defenderIndex = 1 - attackerIndex;
+        return state.Players[defenderIndex].Characters.Any(target =>
+            Validation.ActionValidator.CanAttack(state, attackerIndex, attackerId, false, target.Id).Ok);
+    }
 
     /// <summary>
     /// 是否存在明确的“无法攻击”状态。只统计卡牌限制、持续限制和卡牌自带禁攻，

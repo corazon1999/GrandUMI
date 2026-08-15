@@ -176,7 +176,8 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     }
 
     private static int AssignedDon(PlayerState player) => player.CostArea.Count(d => d.State == DonState.Attached);
-    private static bool SlashLeader(PlayerState player) => player.Leader.Info.Property == "斩";
+    private static bool SlashLeader(PlayerState player)
+        => player.Leader.Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains("斩");
 
     private static async Task ST31_001(EffectContext ctx)
     {
@@ -300,7 +301,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         }
         if (!SlashLeader(me)) return;
         await PlayFromHand(ctx, c => c.Info.Kind == CardKind.Character && c.Info.Cost <= 5 &&
-            (c.Info.NameContains("佩罗娜") || c.Info.Property == "斩"),
+            (c.Info.NameContains("佩罗娜") || c.Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains("斩")),
             "将最多1张费用不高于5的佩罗娜或斩属性角色登场");
     }
 

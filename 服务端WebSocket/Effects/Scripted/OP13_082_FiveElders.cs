@@ -47,16 +47,18 @@ public class OP13_082_FiveElders : IScriptedEffect
         var handPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
             "丢弃 1 张手牌",
             me.Hand.Select(c => c.Id.ToString()).ToList(), 1, 1, handExtra);
-        if (handPick.Count > 0)
+        if (handPick.Count == 0)
         {
-            var hc = me.Hand.First(c => c.Id.ToString() == handPick[0]);
-            AtomicOps.DiscardHand(me, hc);
+            activeDon.State = DonState.Active;
+            return;
         }
+        var hc = me.Hand.First(c => c.Id.ToString() == handPick[0]);
+        AtomicOps.DiscardHand(me, hc);
 
         // 效果1：将我方所有角色放置到废弃区
         foreach (var ch in me.Characters.ToList())
         {
-            AtomicOps.KO(ctx.State, ctx.OwnerIndex, ch);
+            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, ch);
         }
 
         // 效果2：从废弃区登场最多 5 张力量5000且名称不同的《五老星》角色
