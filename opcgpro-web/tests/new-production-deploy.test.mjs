@@ -29,6 +29,7 @@ test("正式入口只承载主域名，候选域名由隔离站点承载", () =>
   assert.equal((nginx.match(/grandumi-production-proxy\.conf/g) ?? []).length, 1);
   assert.match(candidateNginx, /server_name candidate\.grand-umi\.com;/);
   assert.match(candidateNginx, /live\/candidate\.grand-umi\.com\/fullchain\.pem/);
+  assert.doesNotMatch(candidateNginx, /default_server/);
 });
 
 test("候选服使用独立端口、独立数据目录和较低资源上限", () => {

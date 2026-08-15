@@ -1,6 +1,6 @@
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen 80;
+    listen [::]:80;
     server_name candidate.grand-umi.com;
 
     location ^~ /.well-known/acme-challenge/ {
@@ -14,8 +14,8 @@ server {
 }
 
 server {
-    listen 443 ssl http2 default_server;
-    listen [::]:443 ssl http2 default_server;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name candidate.grand-umi.com;
     client_max_body_size 1m;
 
