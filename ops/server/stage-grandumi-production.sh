@@ -52,10 +52,16 @@ fi
 
 frontend_next="$release_dir/frontend.next"
 mkdir -p "$frontend_next"
-cp -a .next package.json "$frontend_next/"
-mkdir -p "$frontend_next/public"
+cp -a .next package.json package-lock.json "$frontend_next/"
 active_slot="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || echo a)"
-previous_public="$repo/slots/$active_slot/frontend/public"
+previous_frontend="$repo/slots/$active_slot/frontend"
+if [[ -d "$previous_frontend/node_modules" ]]; then
+  rsync -a --delete --link-dest="$previous_frontend/node_modules" node_modules/ "$frontend_next/node_modules/"
+else
+  rsync -a --delete node_modules/ "$frontend_next/node_modules/"
+fi
+mkdir -p "$frontend_next/public"
+previous_public="$previous_frontend/public"
 if [[ -d "$previous_public" ]]; then
   # 约 2 GB 卡图绝大多数版本不变；未变化文件与活动版本硬链接，回滚仍保留独立目录。
   rsync -a --delete --link-dest="$previous_public" public/ "$frontend_next/public/"
