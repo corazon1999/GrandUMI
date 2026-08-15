@@ -34,10 +34,12 @@ export default function GameMenu() {
   const drawRequestPendingFromOpponent = useGameStore((state) => state.drawRequestPendingFromOpponent);
   const drawRequestRejectionCount = useGameStore((state) => state.drawRequestRejectionCount);
   const drawRequestRejectionLimit = useGameStore((state) => state.drawRequestRejectionLimit);
+  const lastAction = useGameStore((state) => state.lastAction);
   const previousRejectionCount = useRef(drawRequestRejectionCount);
 
   useEffect(() => {
-    if (drawRequestRejectionCount > previousRejectionCount.current) {
+    if (lastAction === "DrawRequestRejected"
+      && drawRequestRejectionCount > previousRejectionCount.current) {
       const reachedLimit = drawRequestRejectionCount >= drawRequestRejectionLimit;
       showMessage(
         reachedLimit
@@ -47,7 +49,7 @@ export default function GameMenu() {
       );
     }
     previousRejectionCount.current = drawRequestRejectionCount;
-  }, [drawRequestRejectionCount, drawRequestRejectionLimit]);
+  }, [drawRequestRejectionCount, drawRequestRejectionLimit, lastAction]);
 
   const handleSurrender = () => {
     setOpen(false);
@@ -118,13 +120,13 @@ export default function GameMenu() {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => handleRespondDraw(false)}
-              className="min-h-12 rounded-lg bg-gray-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-600"
+              className="min-h-[52px] rounded-lg bg-gray-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-600"
             >
               不同意
             </button>
             <button
               onClick={() => handleRespondDraw(true)}
-              className="min-h-12 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-500"
+              className="min-h-[52px] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-500"
             >
               同意平局
             </button>

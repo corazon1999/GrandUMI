@@ -19,6 +19,8 @@ test("游戏菜单展示平局申请次数并提供同意与拒绝操作", () =>
   assert.match(source, />\s*同意平局\s*</);
   assert.match(source, /平局不会改变双方赏金，也不会影响连胜或连败/);
   assert.match(source, /min-h-12/);
+  assert.equal(source.match(/min-h-\[52px\]/g)?.length, 2);
+  assert.match(source, /lastAction === "DrawRequestRejected"/);
 });
 
 test("平局终局不会渲染胜负或排位分数变化", () => {
