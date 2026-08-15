@@ -1,0 +1,10 @@
+[Unit]
+Description=GrandUMI 正式服主动健康检查
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/grandumi-production-health-check
+Nice=10
+IOSchedulingClass=idle

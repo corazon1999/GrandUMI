@@ -1,0 +1,9 @@
+[Unit]
+Description=GrandUMI 低优先级构建资源组
+
+[Slice]
+CPUQuota=200%
+CPUWeight=10
+MemoryHigh=2G
+MemoryMax=3G
+IOWeight=10

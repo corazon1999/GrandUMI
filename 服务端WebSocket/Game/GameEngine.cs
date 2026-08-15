@@ -27,7 +27,7 @@ public class GameEngine
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Func<int, bool>? HasSpectatorsWithHandForPerspective { get; set; }
-    public Action<int, string, JsonElement>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
+    public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
     /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
     public Action? BeforeSnapshot { get; set; }
     /// <summary>
@@ -222,7 +222,7 @@ public class GameEngine
         if (accepted)
         {
             RecordMatchLog("player_action_accepted", playerIndex, new { action });
-            OnPersistAction?.Invoke(playerIndex, action, data); // 仅持久化被接受的动作
+            OnPersistAction?.Invoke(playerIndex, action, data, requestId); // 仅持久化被接受的动作
         }
 
         _activeAction = null;

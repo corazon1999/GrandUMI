@@ -37,7 +37,13 @@ try { Console.Title = "GrandUMI WebSocket 服务器"; } catch { }
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 var port = args.Length > 0 && int.TryParse(args[0], out var parsedPort) ? parsedPort : 8080;
-var playerDataStore = new PlayerDataStore(PlayerDataStore.ResolveDefaultPath(), deferLoginWrites: true);
+var playerDatabasePath = PlayerDataStore.ResolveDefaultPath();
+using var writerLease = SingleWriterLease.IsRequired
+    ? SingleWriterLease.Acquire(Path.GetDirectoryName(playerDatabasePath)!, BuildInfo.NodeId)
+    : null;
+if (writerLease is not null)
+    Console.WriteLine($"[单写者] 已锁定正式数据目录：{writerLease.LeasePath}");
+var playerDataStore = new PlayerDataStore(playerDatabasePath, deferLoginWrites: true);
 playerDataStore.Initialize();
 var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore);
 accountAuthenticationStore.Initialize();
@@ -155,9 +161,12 @@ try
 }
 finally
 {
+    GameRoomManager.CaptureAllRecoverySnapshots();
+    await RoomRecoverySnapshotStore.FlushAsync();
     WebSocketBridge.Stop();
     MatchLogRecorder.Shutdown();
     RoomJournal.Shutdown();
+    RoomRecoverySnapshotStore.Shutdown();
     playerDataStore.Shutdown();
     Console.WriteLine("[服务器] 已停止");
 }

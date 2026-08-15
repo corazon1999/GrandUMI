@@ -32,15 +32,15 @@ try {
   if ($LASTEXITCODE -ne 0) { Stop-WithError "创建新正式服代码包失败。" }
   & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
   if ($LASTEXITCODE -ne 0) { Stop-WithError "上传新正式服代码包失败。" }
-  & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle' && git -C /opt/grandumi checkout --detach '$target'"
+  & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle'"
   if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服导入代码包失败。" }
 } finally {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
 }
 
-& $ssh -o BatchMode=yes $Server "GRANDUMI_PRODUCTION_IP=103.146.230.37 bash /opt/grandumi/ops/server/bootstrap-grandumi-production.sh"
-if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服双域名入口初始化失败。" }
-& $ssh -o BatchMode=yes $Server "GRANDUMI_PRODUCTION_IP=103.146.230.37 bash /opt/grandumi/ops/server/stage-grandumi-production.sh '$target'"
+$remoteStageRoot = "/opt/grandumi-stage-" + $target.Substring(0, 12)
+$remoteStageCommand = "set -Eeuo pipefail; trap 'git -C /opt/grandumi worktree remove --force $remoteStageRoot >/dev/null 2>&1 || true' EXIT; git -C /opt/grandumi worktree add --detach $remoteStageRoot '$target' >/dev/null; GRANDUMI_PRODUCTION_IP=103.146.230.37 bash $remoteStageRoot/ops/server/bootstrap-grandumi-production.sh; GRANDUMI_PRODUCTION_IP=103.146.230.37 bash $remoteStageRoot/ops/server/stage-grandumi-production.sh '$target'"
+& $ssh -o BatchMode=yes $Server $remoteStageCommand
 if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服预构建失败。" }
 
 & $ssh -o BatchMode=yes $Server "grep -Fxq '$target' /var/lib/grandumi-production-staged"

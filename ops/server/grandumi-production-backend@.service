@@ -1,5 +1,5 @@
 [Unit]
-Description=GrandUMI 新正式服后端
+Description=GrandUMI 正式服后端槽位 %i
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=60
@@ -9,8 +9,9 @@ StartLimitBurst=8
 Type=simple
 User=grandumi
 Group=grandumi
-WorkingDirectory=/opt/grandumi/服务端WebSocket/publish
-ExecStart=/opt/dotnet/dotnet /opt/grandumi/服务端WebSocket/publish/GrandUMIServer.dll 8080
+EnvironmentFile=/etc/grandumi/backend-%i.env
+WorkingDirectory=/opt/grandumi/slots/%i/backend
+ExecStart=/opt/dotnet/dotnet /opt/grandumi/slots/%i/backend/GrandUMIServer.dll ${GRANDUMI_BACKEND_PORT}
 Restart=always
 RestartSec=2
 TimeoutStartSec=45
@@ -19,7 +20,7 @@ KillSignal=SIGINT
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 Environment=GRANDUMI_DATA_DIR=/data/grandumi
 Environment=GRANDUMI_REQUIRE_SINGLE_WRITER=1
-Environment=GRANDUMI_NODE_ID=hk-production-01
+Environment=GRANDUMI_NODE_ID=hk-production-%i
 Environment=GRANDUMI_MAX_CONNECTIONS=3000
 Environment=GRANDUMI_MAX_ROOMS=600
 Environment=GRANDUMI_PRIVATE_SNAPSHOT_LOG=0
@@ -33,7 +34,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/data/grandumi /opt/grandumi/服务端WebSocket/publish
+ReadWritePaths=/data/grandumi
 
 [Install]
 WantedBy=multi-user.target

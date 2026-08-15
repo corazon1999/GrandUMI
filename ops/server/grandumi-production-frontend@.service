@@ -1,6 +1,6 @@
 [Unit]
-Description=GrandUMI 新正式服前端
-After=network-online.target grandumi-production-backend.service
+Description=GrandUMI 正式服前端槽位 %i
+After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=60
 StartLimitBurst=8
@@ -9,8 +9,9 @@ StartLimitBurst=8
 Type=simple
 User=grandumi
 Group=grandumi
-WorkingDirectory=/opt/grandumi/opcgpro-web
-ExecStart=/opt/node/bin/node /opt/grandumi/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+EnvironmentFile=/etc/grandumi/frontend-%i.env
+WorkingDirectory=/opt/grandumi/slots/%i/frontend
+ExecStart=/opt/node/bin/node /opt/grandumi/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${GRANDUMI_FRONTEND_PORT}
 Restart=always
 RestartSec=2
 TimeoutStartSec=45
@@ -23,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/grandumi/opcgpro-web/.next
+ReadWritePaths=/opt/grandumi/slots/%i/frontend/.next
 
 [Install]
 WantedBy=multi-user.target

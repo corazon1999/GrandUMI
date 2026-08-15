@@ -1,0 +1,11 @@
+[Unit]
+Description=每 5 秒检查 GrandUMI 正式服，连续三次失败后自愈
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5s
+AccuracySec=1s
+Unit=grandumi-production-health.service
+
+[Install]
+WantedBy=timers.target

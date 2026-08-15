@@ -109,6 +109,10 @@ public static class GameRoomManager
         internal int ActionQueueDepth;
         /// <summary>同一玩家的 requestId 只执行一次；房间销毁时随 RoomEntry 一并释放。</summary>
         internal RequestDedupeWindow ProcessedPlayerRequests { get; } = new(512, TimeSpan.FromMinutes(10));
+        /// <summary>服务端为已接受动作分配的持久化序号。</summary>
+        internal long JournalSequence;
+        internal long[] LastOperationSequences { get; } = [-1, -1];
+        internal int AcceptedActionsSinceSnapshot;
     }
 
     internal sealed record RoomWork(string Name, long EnqueuedAt, Func<Task> Execute, long ReceivedAt = 0);
@@ -243,11 +247,13 @@ public static class GameRoomManager
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
             });
-            engine.OnPersistAction = (pi, act, data) => RoomJournal.Append(roomId, pi, act, data);
+            engine.OnPersistAction = (pi, act, data, requestId) =>
+                PersistAcceptedAction(entry, pi, act, data, requestId);
         }
 
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
+        CaptureRecoverySnapshot(entry);
         WebSocketBridge.OnGameChatParticipantJoined(p0Sid);
         WebSocketBridge.OnGameChatParticipantJoined(p1Sid);
         _sessionRoom[p0Sid] = roomId;
@@ -373,6 +379,7 @@ public static class GameRoomManager
             {
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
                 RoomJournal.AppendClock(room.RoomId, room.Engine.State.OperationClockRemainingMs);
+                MaybeCaptureRecoverySnapshot(room);
             }
             EnsureOperationClockRunning(room);
             EnsureStartingPlayerChoiceTimeout(room);
@@ -761,7 +768,7 @@ public static class GameRoomManager
         {
             var data = JsonSerializer.SerializeToElement(new { redraw = false });
             room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { redraw = false });
-            room.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data);
+            room.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data, null);
         }
         await room.Engine.WaitSettledAsync();
         return autoKept;
@@ -1364,7 +1371,8 @@ public static class GameRoomManager
             // 同步占住线程池等待磁盘关闭。正常关服的 Shutdown 仍会排空全部队列。
             var persistenceCleanup = Task.WhenAll(
                 MatchLogRecorder.CloseDeferred(roomId),
-                RoomJournal.DeleteDeferred(roomId));
+                RoomJournal.DeleteDeferred(roomId),
+                RoomRecoverySnapshotStore.DeleteDeferred(roomId));
             _ = persistenceCleanup.ContinueWith(task =>
             {
                 if (task.Exception is not null)
@@ -1434,6 +1442,56 @@ public static class GameRoomManager
 
     // ── 重启恢复 ──────────────────────────────────────────────────────────
 
+    private static void PersistAcceptedAction(
+        RoomEntry room,
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string? requestId)
+    {
+        var journalSequence = Interlocked.Increment(ref room.JournalSequence);
+        Volatile.Write(ref room.LastOperationSequences[playerIndex], journalSequence);
+        Interlocked.Increment(ref room.AcceptedActionsSinceSnapshot);
+        RoomJournal.Append(room.RoomId, journalSequence, playerIndex, action, data, requestId, journalSequence);
+    }
+
+    private static void MaybeCaptureRecoverySnapshot(RoomEntry room)
+    {
+        if (Volatile.Read(ref room.AcceptedActionsSinceSnapshot)
+            < RoomRecoverySnapshotStore.CaptureEveryAcceptedActions)
+            return;
+        CaptureRecoverySnapshot(room);
+    }
+
+    private static void CaptureRecoverySnapshot(RoomEntry room)
+    {
+        if (room.VsBot) return;
+        Interlocked.Exchange(ref room.AcceptedActionsSinceSnapshot, 0);
+        var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
+        RoomRecoverySnapshotStore.Capture(new RoomRecoverySnapshot(
+            RoomRecoverySnapshotStore.SchemaVersion,
+            room.RoomId,
+            Volatile.Read(ref room.JournalSequence),
+            DateTime.UtcNow,
+            room.LastOperationSequences.ToArray(),
+            room.Engine.State.OperationClockRemainingMs.ToArray(),
+            room.ProcessedPlayerRequests.Snapshot().ToArray(),
+            RoomRecoverySnapshotStore.ComputeStateSha256(privateState),
+            privateState));
+    }
+
+    public static void CaptureAllRecoverySnapshots()
+    {
+        foreach (var room in _rooms.Values)
+        {
+            try { CaptureRecoverySnapshot(room); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[恢复快照] 捕获 {room.RoomId} 失败：{ex.Message}");
+            }
+        }
+    }
+
     /// <summary>
     /// 服务器启动时调用：扫描 Persist/*.jsonl，把 TTL 内未结束的 PvP 对局重放重建回 _rooms。
     /// 必须在 WebSocketBridge.Start 之前、CardDatabase/Dsl 加载之后调用。
@@ -1457,7 +1515,7 @@ public static class GameRoomManager
             {
                 skipped++;
                 Console.WriteLine($"[Restore] 跳过 {Path.GetFileName(file)}（重建失败）：{ex.Message}");
-                try { File.Delete(file); } catch { }
+                Quarantine(file, ex.Message);
             }
         }
         if (files.Length > 0)
@@ -1468,12 +1526,16 @@ public static class GameRoomManager
     private static async Task<bool> RestoreOne(string file)
     {
         var lines = await File.ReadAllLinesAsync(file);
-        if (lines.Length == 0) { TryDelete(file); return false; }
+        if (lines.Length == 0) { Quarantine(file, "日志为空"); return false; }
 
         // 首行 header
         using var headerDoc = JsonDocument.Parse(lines[0]);
         var h = headerDoc.RootElement;
-        if (h.GetProperty("kind").GetString() != "create") { TryDelete(file); return false; }
+        if (h.GetProperty("kind").GetString() != "create")
+        {
+            Quarantine(file, "首行不是建房记录");
+            return false;
+        }
 
         var roomId      = h.GetProperty("roomId").GetString()!;
         var seed        = h.GetProperty("seed").GetInt32();
@@ -1511,6 +1573,9 @@ public static class GameRoomManager
 
         // 解析动作磁带 + 记录"最后一次操作时间"
         var actions = new List<MatchReplay.ActionEntry>();
+        var processedRequests = new List<RequestDedupeEntry>();
+        var lastOperationSequences = new long[] { -1, -1 };
+        long journalSequence = 0;
         var restoredClockMs = new long[] { OperationTimeLimitMs, OperationTimeLimitMs };
         DateTime lastActivity = h.TryGetProperty("createdAtUtc", out var ca)
             ? ca.GetDateTime() : DateTime.UtcNow;
@@ -1532,7 +1597,18 @@ public static class GameRoomManager
             var act  = e.GetProperty("action").GetString()!;
             var data = e.GetProperty("data").Clone();
             actions.Add(new MatchReplay.ActionEntry(pi, act, data));
+            journalSequence = e.TryGetProperty("journalSequence", out var sequenceElement)
+                ? Math.Max(journalSequence, sequenceElement.GetInt64())
+                : journalSequence + 1;
+            lastOperationSequences[pi] = e.TryGetProperty("operationSequence", out var operationElement)
+                && operationElement.ValueKind == JsonValueKind.Number
+                    ? Math.Max(lastOperationSequences[pi], operationElement.GetInt64())
+                    : journalSequence;
             if (e.TryGetProperty("tsUtc", out var ts)) lastActivity = ts.GetDateTime();
+            if (e.TryGetProperty("requestId", out var requestElement)
+                && requestElement.ValueKind == JsonValueKind.String
+                && requestElement.GetString() is { Length: > 0 } restoredRequestId)
+                processedRequests.Add(new RequestDedupeEntry(pi, restoredRequestId, lastActivity));
         }
 
         // TTL：自最后一次操作起超过 30 分钟 → 弃局
@@ -1585,6 +1661,10 @@ public static class GameRoomManager
             VsBot = false,
             MatchKind = matchKind,
         };
+        entry.JournalSequence = journalSequence;
+        entry.LastOperationSequences[0] = lastOperationSequences[0];
+        entry.LastOperationSequences[1] = lastOperationSequences[1];
+        entry.ProcessedPlayerRequests.Restore(processedRequests);
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
         engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking;
@@ -1613,7 +1693,8 @@ public static class GameRoomManager
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
         engine.OnMatchLog      = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
-        engine.OnPersistAction = (pi, act, data) => RoomJournal.Append(roomId, pi, act, data);
+        engine.OnPersistAction = (pi, act, data, requestId) =>
+            PersistAcceptedAction(entry, pi, act, data, requestId);
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）
 
         _rooms[roomId] = entry;
@@ -1621,6 +1702,7 @@ public static class GameRoomManager
         StartActionWorker(entry);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
+        ValidateAndRefreshRecoverySnapshot(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;
@@ -1629,6 +1711,52 @@ public static class GameRoomManager
     private static void TryDelete(string file)
     {
         try { File.Delete(file); } catch { }
+        _ = RoomRecoverySnapshotStore.DeleteDeferred(Path.GetFileNameWithoutExtension(file));
+    }
+
+    private static void ValidateAndRefreshRecoverySnapshot(RoomEntry room)
+    {
+        var snapshot = RoomRecoverySnapshotStore.TryRead(room.RoomId);
+        if (snapshot is not null)
+        {
+            room.ProcessedPlayerRequests.Restore(snapshot.ProcessedRequests);
+            if (snapshot.JournalSequence == room.JournalSequence)
+            {
+                var current = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
+                var currentHash = RoomRecoverySnapshotStore.ComputeStateSha256(current);
+                if (!string.Equals(currentHash, snapshot.StateSha256, StringComparison.Ordinal))
+                    Console.Error.WriteLine($"[恢复快照] {room.RoomId} 重放校验不一致，已以动作日志重建结果为准。");
+            }
+        }
+        CaptureRecoverySnapshot(room);
+    }
+
+    private static void Quarantine(string file, string reason)
+    {
+        try
+        {
+            var quarantineDirectory = Path.Combine(Path.GetDirectoryName(file)!, "quarantine");
+            Directory.CreateDirectory(quarantineDirectory);
+            var target = Path.Combine(
+                quarantineDirectory,
+                $"{Path.GetFileNameWithoutExtension(file)}-{DateTime.UtcNow:yyyyMMddHHmmss}.jsonl");
+            File.Move(file, target, overwrite: true);
+            var snapshot = Path.Combine(
+                Path.GetDirectoryName(file)!,
+                $"{Path.GetFileNameWithoutExtension(file)}.snapshot.json");
+            if (File.Exists(snapshot))
+            {
+                var snapshotTarget = Path.Combine(
+                    quarantineDirectory,
+                    $"{Path.GetFileNameWithoutExtension(file)}-{DateTime.UtcNow:yyyyMMddHHmmss}.snapshot.json");
+                File.Move(snapshot, snapshotTarget, overwrite: true);
+            }
+            Console.Error.WriteLine($"[Restore] 已隔离损坏日志 {target}：{reason}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Restore] 隔离日志失败 {file}：{ex.Message}");
+        }
     }
 
     private static IReadOnlyDictionary<string, string> ReadSpriteMap(JsonElement player)

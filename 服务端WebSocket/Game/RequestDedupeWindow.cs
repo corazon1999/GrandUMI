@@ -25,6 +25,31 @@ internal sealed class RequestDedupeWindow(int capacity, TimeSpan ttl)
         if (IsTrackable(requestId)) _requests.TryRemove(Key(playerIndex, requestId!), out _);
     }
 
+    internal IReadOnlyList<RequestDedupeEntry> Snapshot(DateTime? utcNow = null)
+    {
+        var now = utcNow ?? DateTime.UtcNow;
+        Prune(now);
+        return _requests
+            .Select(item => Parse(item.Key, item.Value))
+            .Where(item => item is not null)
+            .Select(item => item!)
+            .OrderBy(item => item.AcceptedAtUtc)
+            .ToArray();
+    }
+
+    internal void Restore(IEnumerable<RequestDedupeEntry> entries, DateTime? utcNow = null)
+    {
+        var now = utcNow ?? DateTime.UtcNow;
+        var cutoff = now - ttl;
+        foreach (var entry in entries)
+        {
+            if (entry.PlayerIndex is < 0 or > 1 || !IsTrackable(entry.RequestId) || entry.AcceptedAtUtc < cutoff)
+                continue;
+            _requests.TryAdd(Key(entry.PlayerIndex, entry.RequestId), entry.AcceptedAtUtc);
+        }
+        Prune(now);
+    }
+
     private void Prune(DateTime utcNow)
     {
         if (_requests.Count < capacity) return;
@@ -40,4 +65,14 @@ internal sealed class RequestDedupeWindow(int capacity, TimeSpan ttl)
 
     private static string Key(int playerIndex, string requestId)
         => $"{playerIndex}:{requestId.Trim()}";
+
+    private static RequestDedupeEntry? Parse(string key, DateTime acceptedAtUtc)
+    {
+        var separator = key.IndexOf(':');
+        return separator > 0 && int.TryParse(key[..separator], out var playerIndex)
+            ? new RequestDedupeEntry(playerIndex, key[(separator + 1)..], acceptedAtUtc)
+            : null;
+    }
 }
+
+internal sealed record RequestDedupeEntry(int PlayerIndex, string RequestId, DateTime AcceptedAtUtc);

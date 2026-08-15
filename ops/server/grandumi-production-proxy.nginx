@@ -1,15 +1,17 @@
 location = /backend/ready {
-    proxy_pass http://127.0.0.1:8080/ready;
+    rewrite ^ /ready break;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
     proxy_set_header Host localhost;
 }
 
 location = /backend/version {
-    proxy_pass http://127.0.0.1:8080/version;
+    rewrite ^ /version break;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
     proxy_set_header Host localhost;
 }
 
 location /ws {
-    proxy_pass http://127.0.0.1:8080/ws;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -22,7 +24,7 @@ location /ws {
 }
 
 location ~ ^/(audio|cards|cards-thumb|cards-webp|data|sprites|sprites-thumb|status-icons|vfx)/ {
-    root /opt/grandumi/opcgpro-web/public;
+    include /etc/nginx/snippets/grandumi-active-assets.conf;
     try_files $uri =404;
     add_header Access-Control-Allow-Origin "*" always;
     add_header Cache-Control "public, max-age=31536000, immutable" always;
@@ -31,7 +33,7 @@ location ~ ^/(audio|cards|cards-thumb|cards-webp|data|sprites|sprites-thumb|stat
 }
 
 location / {
-    proxy_pass http://127.0.0.1:3000;
+    include /etc/nginx/snippets/grandumi-active-frontend.conf;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;

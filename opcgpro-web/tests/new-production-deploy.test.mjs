@@ -67,5 +67,7 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /root@103\.146\.230\.37/);
   assert.doesNotMatch(deploy, /8\.210\.155\.25/);
   assert.match(deploy, /stage-grandumi-production\.sh/);
+  assert.match(deploy, /worktree add --detach/);
+  assert.doesNotMatch(deploy, /checkout --detach/);
   assert.match(deploy, /尚未切流/);
 });

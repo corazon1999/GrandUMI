@@ -58,16 +58,26 @@ public static class RoomJournal
     }
 
     /// <summary>追加一个被接受的动作（{kind:"action", playerIndex, action, data, tsUtc}）。</summary>
-    public static void Append(string roomId, int playerIndex, string action, JsonElement data)
+    public static void Append(
+        string roomId,
+        long journalSequence,
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string? requestId = null,
+        long? operationSequence = null)
     {
         try
         {
             Writer.Append(roomId, new
             {
                 kind = "action",
+                journalSequence,
                 playerIndex,
                 action,
                 data,
+                requestId,
+                operationSequence,
                 tsUtc = DateTime.UtcNow,
             });
         }

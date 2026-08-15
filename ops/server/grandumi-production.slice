@@ -1,0 +1,8 @@
+[Unit]
+Description=GrandUMI 正式服运行时资源组
+
+[Slice]
+CPUWeight=900
+MemoryHigh=6G
+MemoryMax=6500M
+IOWeight=900

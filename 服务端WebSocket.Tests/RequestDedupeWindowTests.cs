@@ -37,4 +37,18 @@ public sealed class RequestDedupeWindowTests
 
         Assert.True(window.TryRegister(0, "retryable"));
     }
+
+    [Fact]
+    public void 重启快照会恢复未过期请求并继续去重()
+    {
+        var now = new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc);
+        var beforeRestart = new RequestDedupeWindow(8, TimeSpan.FromMinutes(10));
+        Assert.True(beforeRestart.TryRegister(0, "persisted", now));
+
+        var afterRestart = new RequestDedupeWindow(8, TimeSpan.FromMinutes(10));
+        afterRestart.Restore(beforeRestart.Snapshot(now), now.AddMinutes(1));
+
+        Assert.False(afterRestart.TryRegister(0, "persisted", now.AddMinutes(1)));
+        Assert.True(afterRestart.TryRegister(1, "persisted", now.AddMinutes(1)));
+    }
 }
