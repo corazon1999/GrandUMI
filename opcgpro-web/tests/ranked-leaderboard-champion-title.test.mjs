@@ -22,3 +22,22 @@ test("排位榜昵称旁显示最强称号且不展示称号胜率", async () =>
   assert.doesNotMatch(rankedLeaderboard, /championWinRate|champion\.winRate/);
   assert.doesNotMatch(rankItem, /championWinRate/);
 });
+
+test("排位榜为阵营巅峰与次级称号显示两档专属特效", async () => {
+  const [panel, styles] = await Promise.all([
+    readSource("../src/components/home/LeaderLeaderboardPanel.tsx"),
+    readSource("../src/app/globals.css"),
+  ]);
+
+  for (const title of ["海贼王", "海军元帅", "世界之王"]) {
+    assert.match(panel, new RegExp(`SUPREME_RANK_TITLES[^;]+${title}`));
+  }
+  for (const title of ["四皇", "海军大将", "神之骑士团"]) {
+    assert.match(panel, new RegExp(`ELITE_RANK_TITLES[^;]+${title}`));
+  }
+  assert.match(panel, /rank-tier-badge--\$\{effect\}/);
+  assert.match(panel, /rank-tier-badge--\$\{item\.faction\}/);
+  assert.match(styles, /\.rank-tier-badge--supreme/);
+  assert.match(styles, /\.rank-tier-badge--elite/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]+\.rank-tier-badge--supreme/);
+});

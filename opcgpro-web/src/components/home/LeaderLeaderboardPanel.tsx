@@ -36,6 +36,31 @@ function rankTierLabel(item: RankLeaderboardItem): string {
   return `${item.tier}${item.division ? ` ${["", "I", "II", "III"][item.division]}` : ""}`;
 }
 
+const SUPREME_RANK_TITLES = new Set(["海贼王", "海军元帅", "世界之王"]);
+const ELITE_RANK_TITLES = new Set(["四皇", "海军大将", "神之骑士团"]);
+
+function RankTierBadge({ item }: { item: RankLeaderboardItem }) {
+  const label = rankTierLabel(item);
+  const effect = SUPREME_RANK_TITLES.has(item.tier)
+    ? "supreme"
+    : ELITE_RANK_TITLES.has(item.tier)
+      ? "elite"
+      : null;
+
+  if (!effect) return <span>{label}</span>;
+
+  return (
+    <span
+      className={`rank-tier-badge rank-tier-badge--${effect} rank-tier-badge--${item.faction}`}
+      data-rank-effect={effect}
+    >
+      <span className="rank-tier-badge__aura" aria-hidden="true" />
+      <span className="rank-tier-badge__emblem" aria-hidden="true">{effect === "supreme" ? "♛" : "✦"}</span>
+      <span className="rank-tier-badge__label">{label}</span>
+    </span>
+  );
+}
+
 function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
   if (items.length === 0) {
     return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有完成定级的玩家。</p>;
@@ -53,7 +78,11 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
                   <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
                   <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
                 </div>
-                <p className="mt-1 truncate text-xs text-gray-500">{RANK_FACTION_NAMES[item.faction]} · {rankTierLabel(item)}</p>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
+                  <span>{RANK_FACTION_NAMES[item.faction]}</span>
+                  <span aria-hidden="true">·</span>
+                  <RankTierBadge item={item} />
+                </div>
                 <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
               </div>
               <div className="shrink-0 text-right">
@@ -94,7 +123,7 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
                 </div>
               </td>
               <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
-              <td className="px-3 py-3 text-sm text-gray-300">{rankTierLabel(item)}</td>
+              <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge item={item} /></td>
               <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
               <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{formatRankBounty(item.rankPoints)}</td>
               <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
@@ -259,7 +288,7 @@ export default function LeaderLeaderboardPanel() {
   const [search, setSearch] = useState("");
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
-  const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("leader");
+  const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("ranked");
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
   const [championRulesOpen, setChampionRulesOpen] = useState(false);
@@ -341,19 +370,19 @@ export default function LeaderLeaderboardPanel() {
           <div className="grid w-full grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:w-auto">
             <button
               type="button"
-              onClick={() => setRankingTab("leader")}
-              aria-pressed={rankingTab === "leader"}
-              className={`min-h-11 rounded-md px-3 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankingTab === "leader" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
-            >
-              Leader榜
-            </button>
-            <button
-              type="button"
               onClick={() => setRankingTab("ranked")}
               aria-pressed={rankingTab === "ranked"}
               className={`min-h-11 rounded-md px-3 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankingTab === "ranked" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
             >
               排位榜
+            </button>
+            <button
+              type="button"
+              onClick={() => setRankingTab("leader")}
+              aria-pressed={rankingTab === "leader"}
+              className={`min-h-11 rounded-md px-3 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankingTab === "leader" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+            >
+              Leader榜
             </button>
           </div>
           {rankingTab === "leader" && <div className="grid grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex">

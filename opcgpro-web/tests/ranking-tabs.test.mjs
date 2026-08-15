@@ -15,6 +15,8 @@ test("排行榜页面在同一位置切换 Leader 榜和排位榜", async () => 
   assert.match(panel, /<h2[^>]*>排行榜<\/h2>/);
   assert.match(panel, /setRankingTab\("leader"\)/);
   assert.match(panel, /setRankingTab\("ranked"\)/);
+  assert.match(panel, /useState<"leader" \| "ranked">\("ranked"\)/);
+  assert.ok(panel.indexOf(">\n              排位榜\n") < panel.indexOf(">\n              Leader榜\n"), "排位榜页签应位于 Leader 榜左侧");
   assert.match(panel, />\s*Leader榜\s*</);
   assert.match(panel, />\s*排位榜\s*</);
   assert.match(panel, /rankingTab === "ranked" \? <RankedLeaderboard items=\{rankLeaderboard\}/);

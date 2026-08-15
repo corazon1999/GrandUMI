@@ -590,7 +590,7 @@ public sealed class RankedStore
         (GovernmentFaction, >= 2 and <= 6) => "五老星",
         (PirateFaction, _) => "超新星",
         (MarineFaction, _) => "大将候补",
-        (GovernmentFaction, _) => "深海契约",
+        (GovernmentFaction, _) => "神之骑士团",
         _ => "新世界",
     };
 

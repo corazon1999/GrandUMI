@@ -56,7 +56,7 @@ public class RankedStoreTests
     [InlineData(1499, RankedStore.GovernmentFaction, "浅海契约", 1, null)]
     [InlineData(1500, RankedStore.PirateFaction, "超新星", null, 6)]
     [InlineData(1500, RankedStore.MarineFaction, "大将候补", null, 5)]
-    [InlineData(1500, RankedStore.GovernmentFaction, "深海契约", null, 7)]
+    [InlineData(1500, RankedStore.GovernmentFaction, "神之骑士团", null, 7)]
     [InlineData(1500, RankedStore.PirateFaction, "海贼王", null, 1)]
     [InlineData(1500, RankedStore.PirateFaction, "四皇", null, 5)]
     [InlineData(1500, RankedStore.MarineFaction, "海军大将", null, 4)]
