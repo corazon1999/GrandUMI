@@ -25,7 +25,7 @@ const RANK_FACTION_NAMES: Record<RankFaction, string> = {
   government: "世界政府阵营",
 };
 
-const ADMIN_ACCOUNTS = new Set(["释迦", "栗子"]);
+const ADMIN_ACCOUNTS = new Set(["释迦", "释迦2号", "栗子"]);
 
 function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | null }) {
   return (

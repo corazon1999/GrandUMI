@@ -5,6 +5,7 @@ public static class AdministratorPolicy
     private static readonly HashSet<string> AuthorizedAccounts = new(StringComparer.Ordinal)
     {
         "释迦",
+        "释迦2号",
         "栗子",
     };
 

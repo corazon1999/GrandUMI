@@ -8,8 +8,10 @@ public sealed class GlobalAnnouncementPolicyTests
     public void OnlyConfiguredAccountsCanUseAdministratorFeatures()
     {
         Assert.True(GlobalAnnouncementPolicy.IsAuthorized("释迦"));
+        Assert.True(GlobalAnnouncementPolicy.IsAuthorized("释迦2号"));
         Assert.True(GlobalAnnouncementPolicy.IsAuthorized("栗子"));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized("释迦 "));
+        Assert.False(GlobalAnnouncementPolicy.IsAuthorized("释迦2号 "));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized("栗子 "));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized("管理员"));
         Assert.False(GlobalAnnouncementPolicy.IsAuthorized(null));

@@ -11,7 +11,7 @@ const [lobby, protocol, banner, bridge, gamePage] = await Promise.all([
 ]);
 
 test("only configured administrator accounts see the announcement composer", () => {
-  assert.match(lobby, /const ADMIN_ACCOUNTS = new Set\(\["释迦", "栗子"\]\)/);
+  assert.match(lobby, /const ADMIN_ACCOUNTS = new Set\(\["释迦", "释迦2号", "栗子"\]\)/);
   assert.match(lobby, /ADMIN_ACCOUNTS\.has\(account\)/);
   assert.match(lobby, /aria-label="公告内容"/);
   assert.match(lobby, /maxLength=\{200\}/);
