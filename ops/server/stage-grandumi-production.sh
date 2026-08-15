@@ -19,7 +19,7 @@ if [[ "${GRANDUMI_BUILD_SCOPED:-0}" != 1 ]]; then
     --slice=grandumi-build.slice \
     --setenv=GRANDUMI_BUILD_SCOPED=1 \
     --setenv=GRANDUMI_PRODUCTION_IP="$production_ip" \
-    "$stage_script" "$target"
+    /usr/bin/bash "$stage_script" "$target"
 fi
 
 release_dir="$repo/releases/$target"

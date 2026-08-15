@@ -70,6 +70,7 @@ test("蓝绿切换先验证目标，失败自动恢复原槽", () => {
 
 test("发布构建进入低优先级资源组且产物按提交隔离", () => {
   assert.match(stageScript, /--slice=grandumi-build\.slice/);
+  assert.match(stageScript, /\/usr\/bin\/bash "\$stage_script" "\$target"/);
   assert.match(stageScript, /worktree add --detach/);
   assert.doesNotMatch(stageScript, /checkout --detach/);
   assert.doesNotMatch(stageScript, /\.next\.production-previous/);
