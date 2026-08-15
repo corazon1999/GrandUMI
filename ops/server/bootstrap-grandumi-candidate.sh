@@ -63,7 +63,11 @@ sysctl --system >/dev/null
 
 install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate-backend.service /etc/systemd/system/grandumi-candidate-backend.service
 install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate-frontend.service /etc/systemd/system/grandumi-candidate-frontend.service
-install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate.nginx /etc/nginx/sites-available/grandumi-candidate
+if [[ -f /etc/letsencrypt/live/candidate.grand-umi.com/fullchain.pem ]]; then
+  install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate-tls.nginx /etc/nginx/sites-available/grandumi-candidate
+else
+  install -m 0644 /opt/grandumi-candidate/ops/server/grandumi-candidate.nginx /etc/nginx/sites-available/grandumi-candidate
+fi
 ln -sfn /etc/nginx/sites-available/grandumi-candidate /etc/nginx/sites-enabled/grandumi-candidate
 rm -f /etc/nginx/sites-enabled/default
 sed -ri 's/worker_connections\s+[0-9]+;/worker_connections 8192;/' /etc/nginx/nginx.conf

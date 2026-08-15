@@ -4,6 +4,7 @@ set -Eeuo pipefail
 repo=/opt/grandumi-candidate
 target="${1:-}"
 candidate_ip="${GRANDUMI_CANDIDATE_IP:-103.146.230.37}"
+candidate_host="${GRANDUMI_CANDIDATE_HOST:-candidate.grand-umi.com}"
 
 die() { echo "错误：$*" >&2; exit 1; }
 [[ "$candidate_ip" == "103.146.230.37" ]] || die "拒绝部署到未登记主机：$candidate_ip"
@@ -24,15 +25,15 @@ cd "$repo/opcgpro-web"
 npm ci --no-audit --no-fund
 rm -rf .next.candidate-previous
 [[ -d .next ]] && mv .next .next.candidate-previous
-if ! NEXT_PUBLIC_WS_URL="ws://$candidate_ip/ws" \
-    NEXT_PUBLIC_ASSET_ORIGIN="http://$candidate_ip" \
+if ! NEXT_PUBLIC_WS_URL="wss://$candidate_host/ws" \
+    NEXT_PUBLIC_ASSET_ORIGIN="https://$candidate_host" \
     CARD_BACK_API_URL=http://127.0.0.1:8080 npm run build; then
   rm -rf .next
   [[ -d .next.candidate-previous ]] && mv .next.candidate-previous .next
   die "前端构建失败"
 fi
 cat > public/network-endpoints.json <<JSON
-{"version":1,"hosts":["$candidate_ip"],"endpoints":[{"url":"ws://$candidate_ip/ws","enabled":true}]}
+{"version":1,"hosts":["$candidate_host"],"endpoints":[{"url":"wss://$candidate_host/ws","enabled":true}]}
 JSON
 
 rm -rf "$backend_previous"
@@ -43,6 +44,9 @@ chown -R grandumi:grandumi /data/grandumi "$repo/服务端WebSocket/publish" "$r
 install -m 0644 "$repo/ops/server/grandumi-candidate-backend.service" /etc/systemd/system/grandumi-candidate-backend.service
 install -m 0644 "$repo/ops/server/grandumi-candidate-frontend.service" /etc/systemd/system/grandumi-candidate-frontend.service
 install -m 0644 "$repo/ops/server/grandumi-candidate.nginx" /etc/nginx/sites-available/grandumi-candidate
+if [[ -f "/etc/letsencrypt/live/$candidate_host/fullchain.pem" ]]; then
+  install -m 0644 "$repo/ops/server/grandumi-candidate-tls.nginx" /etc/nginx/sites-available/grandumi-candidate
+fi
 systemctl daemon-reload
 nginx -t
 systemctl restart grandumi-candidate-backend.service

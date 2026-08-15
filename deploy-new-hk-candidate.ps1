@@ -52,8 +52,10 @@ try {
 if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服基础环境初始化失败。" }
 & $ssh -o BatchMode=yes $Server "GRANDUMI_CANDIDATE_IP=103.146.230.37 bash /opt/grandumi-candidate/ops/server/deploy-grandumi-candidate.sh '$target'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "候选服应用部署失败。" }
+& $ssh -o BatchMode=yes $Server "bash /opt/grandumi-candidate/ops/server/enable-grandumi-candidate-tls.sh"
+if ($LASTEXITCODE -ne 0) { Stop-WithError "候选域名 HTTPS/WSS 配置失败。" }
 
-$homeCode = & curl.exe -s -L --noproxy '*' -o NUL -w "%{http_code}" "http://103.146.230.37/"
-$readyCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" "http://103.146.230.37/backend/ready"
+$homeCode = & curl.exe -s -L --noproxy '*' -o NUL -w "%{http_code}" "https://candidate.grand-umi.com/"
+$readyCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" "https://candidate.grand-umi.com/backend/ready"
 if ($homeCode -ne "200" -or $readyCode -ne "200") { Stop-WithError "候选服外网验证失败：首页=$homeCode，就绪=$readyCode。" }
 Write-Host "新香港候选服部署成功：$target" -ForegroundColor Green
