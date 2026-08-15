@@ -6,7 +6,6 @@ param(
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 Set-Location $repo
-. (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
 
 function Stop-WithError([string]$Message) { Write-Host $Message -ForegroundColor Red; exit 1 }
 if ($Server -ne "root@103.146.230.37") { Stop-WithError "安全检查失败：新正式服部署只允许 root@103.146.230.37。" }
@@ -20,7 +19,10 @@ $scp = (Get-Command scp.exe -ErrorAction Stop).Source
 & $ssh -o BatchMode=yes $Server "mkdir -p /opt/grandumi && if [ ! -d /opt/grandumi/.git ]; then git init -b main /opt/grandumi; fi"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "无法初始化新正式服仓库。" }
 
-$tempDir = Get-GrandUmiTempDirectory -Category "Deploy"
+$tempDir = & {
+  . (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
+  Get-GrandUmiTempDirectory -Category "Deploy"
+}
 $short = $target.Substring(0, 12)
 $bundle = Join-Path $tempDir "grandumi-production-$short.bundle"
 $remoteBundle = "/tmp/grandumi-production-$short.bundle"
