@@ -14,6 +14,8 @@ const candidateDeploy = await readFile(new URL("../../ops/server/deploy-grandumi
 const productionBootstrap = await readFile(new URL("../../ops/server/bootstrap-grandumi-production.sh", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../../deploy-new-hk-production.ps1", import.meta.url), "utf8");
 const directTls = await readFile(new URL("../../ops/server/enable-grandumi-production-direct-tls.sh", import.meta.url), "utf8");
+const emergencyDirectRelay = await readFile(new URL("../../ops/server/grandumi-emergency-direct-relay.caddy", import.meta.url), "utf8");
+const enableEmergencyDirectRelay = await readFile(new URL("../../ops/server/enable-grandumi-emergency-direct-relay.sh", import.meta.url), "utf8");
 
 test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
   assert.match(stage, /NEXT_PUBLIC_WS_URL='wss:\/\/grand-umi\.com\/ws'/);
@@ -95,4 +97,15 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /尚未切流/);
   assert.match(deploy, /Resolve-DnsName -Type A direct\.grand-umi\.com/);
   assert.match(deploy, /低延迟直连 TLS\/健康检查失败/);
+});
+
+test("应急直连中转固定进入新正式服并保留自动回滚", () => {
+  assert.match(emergencyDirectRelay, /direct\.grand-umi\.com/);
+  assert.match(emergencyDirectRelay, /reverse_proxy https:\/\/103\.146\.230\.37/);
+  assert.match(emergencyDirectRelay, /header_up Host grand-umi\.com/);
+  assert.match(emergencyDirectRelay, /tls_server_name grand-umi\.com/);
+  assert.match(enableEmergencyDirectRelay, /direct\.grand-umi\.com\.caddy\.pre-relay-/);
+  assert.match(enableEmergencyDirectRelay, /rollback\(\)/);
+  assert.match(enableEmergencyDirectRelay, /caddy validate/);
+  assert.match(enableEmergencyDirectRelay, /systemctl reload caddy/);
 });
