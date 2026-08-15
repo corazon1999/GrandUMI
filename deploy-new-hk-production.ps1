@@ -26,24 +26,14 @@ $tempDir = & {
 $short = $target.Substring(0, 12)
 $bundle = Join-Path $tempDir "grandumi-production-$short.bundle"
 $remoteBundle = "/tmp/grandumi-production-$short.bundle"
-$serverHead = "none"
 try {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
-  $serverHead = ([string](& $ssh -o BatchMode=yes $Server 'git -C /opt/grandumi rev-parse --verify refs/remotes/origin/main 2>/dev/null || printf "none\n"')).Trim()
-  if ($serverHead -eq $target) {
-    Write-Host "新正式服代码已是目标提交，跳过代码包上传。" -ForegroundColor Yellow
-  } elseif ($serverHead -match '^[0-9a-f]{40}$') {
-    git bundle create $bundle main "^$serverHead"
-  } else {
-    git bundle create $bundle main
-  }
+  git bundle create $bundle main
   if ($LASTEXITCODE -ne 0) { Stop-WithError "创建新正式服代码包失败。" }
-  if (Test-Path -LiteralPath $bundle) {
-    & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
-    if ($LASTEXITCODE -ne 0) { Stop-WithError "上传新正式服代码包失败。" }
-    & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle' && git -C /opt/grandumi checkout --detach '$target'"
-    if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服导入代码包失败。" }
-  }
+  & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
+  if ($LASTEXITCODE -ne 0) { Stop-WithError "上传新正式服代码包失败。" }
+  & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi fetch '$remoteBundle' 'refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle' && git -C /opt/grandumi checkout --detach '$target'"
+  if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服导入代码包失败。" }
 } finally {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
 }
