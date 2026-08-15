@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$Server = "root@103.146.230.37",
   [string]$Commit = ""
 )
