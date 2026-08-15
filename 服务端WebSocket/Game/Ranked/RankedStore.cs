@@ -397,7 +397,7 @@ public sealed class RankedStore
             return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
 
         var baseDelta = won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch;
-        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, 5);
+        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, won ? 10 : 5);
         // 未完成定级的对手没有可比较的可见 RP，不参与分差修正。
         var rankDifference = opponent.PlacementGames >= PlacementRequired
             ? self.RankPoints - opponent.RankPoints
@@ -405,7 +405,7 @@ public sealed class RankedStore
         var rankDifferenceAdjustment = rankDifference switch
         {
             < 0 => Math.Clamp((-rankDifference) / 100, 0, 5),
-            > 0 => -Math.Clamp(rankDifference / 100, 0, 3),
+            > 0 => -Math.Clamp(rankDifference / 100, 0, 5),
             _ => 0,
         };
         return new RankPointCalculation(baseDelta, streakAdjustment, rankDifference,

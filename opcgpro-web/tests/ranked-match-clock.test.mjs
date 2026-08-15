@@ -53,13 +53,14 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /先完成 5 场定级赛/);
   assert.match(lobby, /悬赏金每增加 1000万贝里变化一个小段，每增加 3000万贝里进入下一称号/);
   assert.match(lobby, /基础胜负会使悬赏金增加或减少 200万贝里/);
-  assert.match(lobby, /6 连胜、连败起封顶 50万贝里/);
+  assert.match(lobby, /11 连胜起奖励封顶 100万贝里/);
+  assert.match(lobby, /6 连败起保护封顶 50万贝里/);
   assert.match(lobby, /低悬赏方获胜时/);
   assert.match(lobby, /低悬赏方失败时/);
   assert.match(lobby, /最多修正 50万贝里/);
   assert.match(lobby, /高悬赏方获胜时/);
   assert.match(lobby, /高悬赏方失败时/);
-  assert.match(lobby, /最多修正 30万贝里/);
+  assert.equal(lobby.match(/最多修正 50万贝里/g)?.length, 2);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
