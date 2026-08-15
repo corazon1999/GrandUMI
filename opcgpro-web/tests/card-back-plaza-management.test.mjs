@@ -12,7 +12,16 @@ test("卡背广场提供热门与我的投稿两个管理视图", () => {
   assert.match(source, /role="tablist" aria-label="卡背广场分类"/);
   assert.match(source, />\s*热门卡背\s*</);
   assert.match(source, /我发布的卡背/);
-  assert.match(source, /galleryView === "mine" \? ownedCardBacks : gallery/);
+  assert.match(source, /galleryView === "mine" \? ownedCardBacks : approvedCardBacks/);
+  assert.match(source, /item\.reviewStatus === "approved" && item\.publiclyListed/);
+  assert.match(source, /最多展示 300 款已通过审核的卡背/);
+});
+
+test("本人投稿展示待审核与未通过状态且只有已通过卡背可互动", () => {
+  assert.match(source, /item\.reviewStatus === "pending" \? "待审核" : "未通过"/);
+  assert.match(source, /item\.reviewStatus === "rejected" && item\.reviewReason/);
+  assert.match(source, /disabled=\{active \|\| !approved\}/);
+  assert.match(source, /disabled=\{!approved\}/);
 });
 
 test("删除入口只在我的投稿视图为本人投稿显示", () => {

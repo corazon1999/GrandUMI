@@ -55,6 +55,17 @@ public sealed record CardBackGalleryItem(
     int Likes,
     bool Liked,
     bool Owned,
+    bool PubliclyListed,
+    long CreatedAt,
+    string ReviewStatus,
+    string ReviewReason);
+
+/// <summary>管理员卡背审核队列中的待处理投稿。</summary>
+public sealed record CardBackReviewItem(
+    string Id,
+    string Name,
+    string AuthorName,
+    string ImageUrl,
     long CreatedAt);
 
 public sealed record CardBackImage(string MimeType, byte[] Data);

@@ -157,8 +157,9 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
     }
   };
 
+  const approvedCardBacks = gallery?.filter((item) => item.reviewStatus === "approved" && item.publiclyListed) ?? [];
   const ownedCardBacks = gallery?.filter((item) => item.owned) ?? [];
-  const displayedCardBacks = galleryView === "mine" ? ownedCardBacks : gallery;
+  const displayedCardBacks = galleryView === "mine" ? ownedCardBacks : approvedCardBacks;
 
   return (
     <section className="h-full overflow-y-auto px-4 py-5 @[720px]:px-6 @[720px]:py-6" data-testid="card-back-plaza">
@@ -166,7 +167,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-rose-400">Community Gallery</p>
           <h1 className="mt-1 text-2xl font-black text-white">卡背广场</h1>
-          <p className="mt-1 text-sm text-gray-500">分享你的卡背设计，红心越多排名越靠前。</p>
+          <p className="mt-1 text-sm text-gray-500">分享你的卡背设计，审核通过后进入广场，红心越多排名越靠前。</p>
         </div>
         <button type="button" onClick={onOpenProfile} className="min-h-11 rounded-xl border border-gray-700 px-4 text-sm font-bold text-gray-300 hover:border-orange-500 hover:text-white">
           查看我的卡背设置
@@ -183,7 +184,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
         </button>
         <div className="min-w-0">
           <h2 className="font-bold text-white">发布新卡背</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-500">上传后公开展示。图片会居中裁切为 5:7，并压缩到适合对局加载的大小。</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">上传后将由管理员审核，通过后公开展示。图片会居中裁切为 5:7，并压缩到适合对局加载的大小。</p>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => void chooseFile(event.target.files?.[0])} />
           <label className="mt-4 block text-xs font-bold text-gray-400" htmlFor="card-back-name">卡背名字</label>
           <input
@@ -227,7 +228,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-600">
-            {galleryView === "popular" ? "按红心数量排序，同票时新发布的在前。" : "在这里查看和删除你发布到广场的卡背。"}
+            {galleryView === "popular" ? "最多展示 300 款已通过审核的卡背；按红心数量排序，同票时新发布的在前。" : "在这里查看审核状态，并管理你提交的卡背。"}
           </p>
         </div>
         <span className="text-xs text-gray-600">{displayedCardBacks?.length ?? 0} 款</span>
@@ -255,27 +256,37 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
         <div className="mt-4 grid grid-cols-2 gap-3 @[560px]:grid-cols-3 @[820px]:grid-cols-4 @[1120px]:grid-cols-5">
           {displayedCardBacks?.map((item, index) => {
             const active = currentCardBackId === item.id;
+            const approved = item.reviewStatus === "approved";
             return (
               <article key={item.id} className={`overflow-hidden rounded-2xl border bg-gray-900 p-3 ${active ? "border-orange-500 ring-1 ring-orange-500/30" : "border-gray-800"}`}>
                 <div className="relative mx-auto aspect-[5/7] w-full max-w-40 overflow-hidden rounded-xl bg-gray-950 shadow-xl">
                   <CardBack cardBackId={item.id} decorative />
                   {galleryView === "popular" && <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">#{index + 1}</span>}
                   {active && <span className="absolute bottom-2 left-2 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-bold text-white">使用中</span>}
+                  {galleryView === "mine" && !approved && (
+                    <span className={`absolute bottom-2 left-2 rounded-full px-2 py-1 text-[10px] font-bold text-white ${item.reviewStatus === "pending" ? "bg-amber-500" : "bg-red-600"}`}>
+                      {item.reviewStatus === "pending" ? "待审核" : "未通过"}
+                    </span>
+                  )}
                 </div>
                 <h3 className="mt-3 truncate text-sm font-bold text-white" title={item.name}>{item.name}</h3>
                 <p className="mt-1 truncate text-[11px] text-gray-600">by {item.authorName}{item.owned ? " · 我的投稿" : ""}</p>
+                {galleryView === "mine" && item.reviewStatus === "rejected" && item.reviewReason && (
+                  <p className="mt-2 rounded-lg border border-red-900/70 bg-red-950/20 px-2 py-2 text-[11px] leading-5 text-red-300">未通过理由：{item.reviewReason}</p>
+                )}
                 <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
                   <button
                     type="button"
+                    disabled={!approved}
                     aria-label={`${item.liked ? "取消" : "添加"}红心，当前 ${item.likes} 个`}
                     aria-pressed={item.liked}
                     onClick={() => HomeRequest.toggleCardBackLike(item.id)}
-                    className={`min-h-11 rounded-xl border px-3 text-sm font-bold ${item.liked ? "border-rose-500/60 bg-rose-500/15 text-rose-300" : "border-gray-700 text-gray-400 hover:border-rose-500 hover:text-rose-300"}`}
+                    className={`min-h-11 rounded-xl border px-3 text-sm font-bold disabled:border-gray-800 disabled:text-gray-600 ${item.liked ? "border-rose-500/60 bg-rose-500/15 text-rose-300" : "border-gray-700 text-gray-400 hover:border-rose-500 hover:text-rose-300"}`}
                   >
                     {item.liked ? "♥" : "♡"} {item.likes}
                   </button>
-                  <button type="button" disabled={active} onClick={() => HomeRequest.updateCardBack(item.id)} className="min-h-11 rounded-xl bg-orange-500 px-2 text-xs font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500">
-                    {active ? "已选用" : "选用并点♥"}
+                  <button type="button" disabled={active || !approved} onClick={() => HomeRequest.updateCardBack(item.id)} className="min-h-11 rounded-xl bg-orange-500 px-2 text-xs font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500">
+                    {active ? "已选用" : approved ? "选用并点♥" : "审核后可选"}
                   </button>
                   {galleryView === "mine" && item.owned && (
                     <button

@@ -25,6 +25,8 @@ import type {
   MsgUploadCardBack,
   MsgLikeCardBack,
   MsgDeleteCardBack,
+  MsgCardBackReviewQueue,
+  MsgReviewCardBack,
   MsgImportDecks,
   MsgDeckPlazaList,
   MsgPublishDeckPlaza,
@@ -259,6 +261,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgCardBackGallery":
         handleCardBackGallery(msg as MsgCardBackGallery);
+        break;
+      case "MsgCardBackReviewQueue":
+        handleCardBackReviewQueue(msg as MsgCardBackReviewQueue);
         break;
       case "MsgDeckPlazaList":
         handleDeckPlazaList(msg as MsgDeckPlazaList);
@@ -733,6 +738,17 @@ function handleCardBackGallery(msg: MsgCardBackGallery) {
   if (msg.logStr) showMessage(msg.logStr, "info");
 }
 
+function handleCardBackReviewQueue(msg: MsgCardBackReviewQueue) {
+  if (msg.result === false) {
+    const current = useNetStore.getState().cardBackReviewQueue;
+    useNetStore.getState().setCardBackReviewQueue(current ? [...current] : []);
+    showMessage(msg.logStr ?? "卡背审核操作失败", "error");
+    return;
+  }
+  useNetStore.getState().setCardBackReviewQueue(Array.isArray(msg.items) ? msg.items : []);
+  if (msg.logStr) showMessage(msg.logStr, "info");
+}
+
 function handleDeckPlazaList(msg: MsgDeckPlazaList) {
   if (msg.result === false) {
     showMessage(msg.logStr ?? "读取卡组广场失败", "error");
@@ -912,6 +928,15 @@ export const HomeRequest = {
 
   deleteCardBack(cardBackId: string) {
     return NetManager.send({ proto: "MsgDeleteCardBack", cardBackId } as MsgDeleteCardBack);
+  },
+
+  requestCardBackReviewQueue() {
+    useNetStore.getState().setCardBackReviewQueue(null);
+    return NetManager.send({ proto: "MsgCardBackReviewQueue" } as MsgCardBackReviewQueue);
+  },
+
+  reviewCardBack(cardBackId: string, approved: boolean, reason?: string) {
+    return NetManager.send({ proto: "MsgReviewCardBack", cardBackId, approved, reason } as MsgReviewCardBack);
   },
 
   importDecks(decks: SavedDeck[]) {

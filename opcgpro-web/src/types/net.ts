@@ -59,6 +59,8 @@ export enum ProtocolEnum {
   MsgLikeDeckPlaza = 54,
   MsgCopyDeckPlaza = 55,
   MsgDeleteDeckPlaza = 56,
+  MsgCardBackReviewQueue = 57,
+  MsgReviewCardBack = 58,
 }
 
 // WebSocket JSON 消息基类
@@ -168,7 +170,10 @@ export interface CardBackGalleryItem {
   likes: number;
   liked: boolean;
   owned: boolean;
+  publiclyListed: boolean;
   createdAt: number;
+  reviewStatus: "pending" | "approved" | "rejected";
+  reviewReason: string;
 }
 
 /** 客户端空请求读取广场；服务端返回按红心数量排序后的投稿。 */
@@ -194,6 +199,29 @@ export interface MsgLikeCardBack extends MsgBase {
 export interface MsgDeleteCardBack extends MsgBase {
   proto: "MsgDeleteCardBack";
   cardBackId: string;
+}
+
+export interface CardBackReviewItem {
+  id: string;
+  name: string;
+  authorName: string;
+  imageUrl: string;
+  createdAt: number;
+}
+
+export interface MsgCardBackReviewQueue extends MsgBase {
+  proto: "MsgCardBackReviewQueue";
+  result?: boolean;
+  canReview?: boolean;
+  logStr?: string;
+  items?: CardBackReviewItem[];
+}
+
+export interface MsgReviewCardBack extends MsgBase {
+  proto: "MsgReviewCardBack";
+  cardBackId: string;
+  approved: boolean;
+  reason?: string;
 }
 
 export interface MsgImportDecks extends MsgBase {
@@ -1178,6 +1206,8 @@ export type AnyMsg =
   | MsgUploadCardBack
   | MsgLikeCardBack
   | MsgDeleteCardBack
+  | MsgCardBackReviewQueue
+  | MsgReviewCardBack
   | MsgDeckPlazaList
   | MsgPublishDeckPlaza
   | MsgLikeDeckPlaza

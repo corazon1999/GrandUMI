@@ -30,7 +30,14 @@ public sealed class PlayerDataStore
     public const int MaxCardBackNameLength = 30;
     public const int MaxCardBackImageBytes = 240 * 1024;
     public const int MaxCardBacksPerPlayer = 20;
-    public const int MaxCardBackGalleryItems = 100;
+    public const int MaxCardBackGalleryItems = 300;
+    public const int MaxCardBackReviewReasonLength = 300;
+    public const int MaxPendingCardBackReviewItems = 300;
+    public const string CardBackReviewPending = "pending";
+    public const string CardBackReviewApproved = "approved";
+    public const string CardBackReviewRejected = "rejected";
+    public const string DefaultCardBackRejectionReason =
+        "投稿未通过：禁止使用真人人像、个人照片、违法违规、色情暴力、仇恨歧视、侵权盗用或其他不适合公开展示的内容。请调整后重新投稿。";
     public const int MaxDeckPublicationsPerPlayer = 10;
     public const int MaxDeckPlazaTitleLength = 50;
     public const int MaxDeckPlazaPageSize = 30;
@@ -217,6 +224,18 @@ public sealed class PlayerDataStore
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
         EnsureColumn(connection, "players", "display_name_change_used", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "card_backs", "review_status", "TEXT NOT NULL DEFAULT 'approved'");
+        EnsureColumn(connection, "card_backs", "review_reason", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "card_backs", "reviewed_by_account", "TEXT NULL");
+        EnsureColumn(connection, "card_backs", "reviewed_at", "INTEGER NULL");
+
+        using var moderationIndex = connection.CreateCommand();
+        moderationIndex.CommandText = """
+            CREATE INDEX IF NOT EXISTS ix_card_backs_review_status_created
+                ON card_backs(review_status, created_at DESC, id DESC);
+            PRAGMA user_version=6;
+            """;
+        moderationIndex.ExecuteNonQuery();
     }
 
     public PlayerDataSnapshot Login(string account)
@@ -902,7 +921,7 @@ public sealed class PlayerDataStore
 
         if (TryParseCustomCardBackId(normalizedCardBackId, out var customId))
         {
-            RequireCardBack(connection, transaction, customId);
+            RequireApprovedCardBack(connection, transaction, customId);
             AddCardBackLike(connection, transaction, customId, playerId);
         }
 
@@ -969,14 +988,17 @@ public sealed class PlayerDataStore
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
             insert.CommandText = """
-                INSERT INTO card_backs(owner_player_id, name, image_mime, image_data, created_at)
-                VALUES($playerId, $name, $mime, $data, $now);
-                """;
+            INSERT INTO card_backs(
+                owner_player_id, name, image_mime, image_data, created_at,
+                review_status, review_reason, reviewed_by_account, reviewed_at)
+            VALUES($playerId, $name, $mime, $data, $now, $status, '', NULL, NULL);
+            """;
             insert.Parameters.AddWithValue("$playerId", playerId);
             insert.Parameters.AddWithValue("$name", normalizedName);
             insert.Parameters.AddWithValue("$mime", normalizedMime);
             insert.Parameters.Add("$data", SqliteType.Blob).Value = imageData;
             insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            insert.Parameters.AddWithValue("$status", CardBackReviewPending);
             insert.ExecuteNonQuery();
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
@@ -998,7 +1020,7 @@ public sealed class PlayerDataStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         var playerId = RequirePlayerId(connection, transaction, account);
-        RequireCardBack(connection, transaction, customId);
+        RequireApprovedCardBack(connection, transaction, customId);
 
         using var remove = connection.CreateCommand();
         remove.Transaction = transaction;
@@ -1057,6 +1079,72 @@ public sealed class PlayerDataStore
         return new CardBackDeletionResult(normalized, snapshot, gallery);
     }
 
+    public IReadOnlyList<CardBackReviewItem> GetPendingCardBackReviews(
+        int limit = MaxPendingCardBackReviewItems)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT cb.id, cb.name, p.display_name, cb.created_at
+            FROM card_backs cb
+            JOIN players p ON p.id=cb.owner_player_id
+            WHERE cb.review_status=$status
+            ORDER BY cb.created_at ASC, cb.id ASC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$status", CardBackReviewPending);
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, MaxPendingCardBackReviewItems));
+
+        var items = new List<CardBackReviewItem>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var id = reader.GetInt64(0);
+            items.Add(new CardBackReviewItem(
+                $"{CustomCardBackPrefix}{id}",
+                reader.GetString(1),
+                reader.GetString(2),
+                $"/card-back-images/{id}",
+                reader.GetInt64(3)));
+        }
+        return items;
+    }
+
+    public void ReviewCardBack(
+        string reviewerAccount,
+        string cardBackId,
+        bool approved,
+        string? rejectionReason)
+    {
+        var normalized = NormalizeCardBackReference(cardBackId);
+        if (!TryParseCustomCardBackId(normalized, out var customId))
+            throw new PlayerDataValidationException("只能审核玩家投稿的卡背。");
+
+        var reviewer = ValidateAccount(reviewerAccount);
+        var reason = approved ? "" : NormalizeCardBackReviewReason(rejectionReason);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE card_backs
+            SET review_status=$status,
+                review_reason=$reason,
+                reviewed_by_account=$reviewer,
+                reviewed_at=$reviewedAt
+            WHERE id=$id AND review_status=$pending;
+            """;
+        command.Parameters.AddWithValue("$status", approved ? CardBackReviewApproved : CardBackReviewRejected);
+        command.Parameters.AddWithValue("$reason", reason);
+        command.Parameters.AddWithValue("$reviewer", reviewer);
+        command.Parameters.AddWithValue("$reviewedAt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        command.Parameters.AddWithValue("$id", customId);
+        command.Parameters.AddWithValue("$pending", CardBackReviewPending);
+        if (command.ExecuteNonQuery() == 0)
+            throw new PlayerDataValidationException("该卡背已被审核、删除或不存在。");
+        transaction.Commit();
+    }
+
     public PlayerDataSnapshot GetPlayerData(string account)
     {
         using var connection = OpenConnection();
@@ -1110,6 +1198,18 @@ public sealed class PlayerDataStore
         _ => throw new PlayerDataValidationException("卡背图片仅支持 PNG、JPEG 或 WebP。"),
     };
 
+    private static string NormalizeCardBackReviewReason(string? reason)
+    {
+        var normalized = string.IsNullOrWhiteSpace(reason)
+            ? DefaultCardBackRejectionReason
+            : reason.Trim().Normalize(NormalizationForm.FormKC);
+        if (normalized.Length > MaxCardBackReviewReasonLength)
+            throw new PlayerDataValidationException($"未通过理由不能超过 {MaxCardBackReviewReasonLength} 个字符。");
+        if (normalized.Any(char.IsControl))
+            throw new PlayerDataValidationException("未通过理由不能包含控制字符。");
+        return normalized;
+    }
+
     private static void ValidateCardBackImage(string mimeType, byte[] data)
     {
         if (data.Length is < 16 or > MaxCardBackImageBytes)
@@ -1132,6 +1232,17 @@ public sealed class PlayerDataStore
         command.CommandText = "SELECT 1 FROM card_backs WHERE id=$id;";
         command.Parameters.AddWithValue("$id", cardBackId);
         if (command.ExecuteScalar() is null) throw new PlayerDataValidationException("该卡背不存在或已下架。");
+    }
+
+    private static void RequireApprovedCardBack(SqliteConnection connection, SqliteTransaction transaction, long cardBackId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT 1 FROM card_backs WHERE id=$id AND review_status=$status;";
+        command.Parameters.AddWithValue("$id", cardBackId);
+        command.Parameters.AddWithValue("$status", CardBackReviewApproved);
+        if (command.ExecuteScalar() is null)
+            throw new PlayerDataValidationException("该卡背尚未通过审核或已下架。");
     }
 
     private static void AddCardBackLike(SqliteConnection connection, SqliteTransaction transaction, long cardBackId, long playerId)
@@ -1157,19 +1268,39 @@ public sealed class PlayerDataStore
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
+            WITH public_card_backs AS (
+                SELECT cb.id
+                FROM card_backs cb
+                LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
+                WHERE cb.review_status=$approved
+                GROUP BY cb.id, cb.created_at
+                ORDER BY COUNT(l.player_id) DESC, cb.created_at DESC, cb.id DESC
+                LIMIT $limit
+            ), visible_card_backs AS (
+                SELECT id FROM public_card_backs
+                UNION
+                SELECT id FROM card_backs WHERE owner_player_id=$playerId
+            )
             SELECT cb.id, cb.name, p.display_name, cb.created_at,
                    COUNT(l.player_id) AS likes,
                    MAX(CASE WHEN l.player_id=$playerId THEN 1 ELSE 0 END) AS liked,
-                   CASE WHEN cb.owner_player_id=$playerId THEN 1 ELSE 0 END AS owned
+                   CASE WHEN cb.owner_player_id=$playerId THEN 1 ELSE 0 END AS owned,
+                   CASE WHEN public.id IS NOT NULL THEN 1 ELSE 0 END AS publicly_listed,
+                   cb.review_status,
+                   cb.review_reason
             FROM card_backs cb
+            JOIN visible_card_backs visible ON visible.id=cb.id
+            LEFT JOIN public_card_backs public ON public.id=cb.id
             JOIN players p ON p.id=cb.owner_player_id
             LEFT JOIN card_back_likes l ON l.card_back_id=cb.id
-            GROUP BY cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id
-            ORDER BY likes DESC, cb.created_at DESC, cb.id DESC
-            LIMIT $limit;
+            GROUP BY cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id,
+                     public.id, cb.review_status, cb.review_reason
+            ORDER BY CASE WHEN cb.review_status=$approved THEN 0 ELSE 1 END,
+                     likes DESC, cb.created_at DESC, cb.id DESC;
             """;
         command.Parameters.AddWithValue("$playerId", playerId);
         command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$approved", CardBackReviewApproved);
         var items = new List<CardBackGalleryItem>();
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -1183,7 +1314,10 @@ public sealed class PlayerDataStore
                 reader.GetInt32(4),
                 reader.GetInt32(5) != 0,
                 reader.GetInt32(6) != 0,
-                reader.GetInt64(3)));
+                reader.GetInt32(7) != 0,
+                reader.GetInt64(3),
+                reader.GetString(8),
+                reader.GetString(9)));
         }
         return items;
     }

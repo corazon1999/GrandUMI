@@ -245,6 +245,8 @@ public static class WebSocketBridge
             case "MsgUploadCardBack": OnUploadCardBack(session, msg); break;
             case "MsgLikeCardBack": OnLikeCardBack(session, msg); break;
             case "MsgDeleteCardBack": OnDeleteCardBack(session, msg); break;
+            case "MsgCardBackReviewQueue": OnCardBackReviewQueue(session); break;
+            case "MsgReviewCardBack": OnReviewCardBack(session, msg); break;
             case "MsgImportDecks": OnImportDecks(session, msg);  break;
             case "MsgDeckPlazaList": OnDeckPlazaList(session, msg); break;
             case "MsgPublishDeckPlaza": OnPublishDeckPlaza(session, msg); break;
@@ -604,7 +606,7 @@ public static class WebSocketBridge
                 Str(msg, "name") ?? "",
                 Str(msg, "mimeType") ?? "",
                 Str(msg, "imageBase64") ?? "");
-            SendCardBackGallery(s, gallery, "卡背已发布到广场");
+            SendCardBackGallery(s, gallery, "卡背已提交审核，通过后将在广场展示");
         }
         catch (Exception ex) { SendCardBackGalleryError(s, ex, "上传卡背失败"); }
     }
@@ -647,6 +649,56 @@ public static class WebSocketBridge
             }
         }
         catch (Exception ex) { SendCardBackGalleryError(s, ex, "删除卡背失败"); }
+    }
+
+    private static void OnCardBackReviewQueue(WsSession s)
+    {
+        if (!TryRequirePlayer(s)) return;
+        if (!AdministratorPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgCardBackReviewQueue",
+                result = false,
+                canReview = false,
+                logStr = "没有审核卡背的权限",
+            });
+            return;
+        }
+
+        try { SendCardBackReviewQueue(s, _playerDataStore.GetPendingCardBackReviews()); }
+        catch (Exception ex) { SendCardBackReviewError(s, ex, "读取卡背审核队列失败"); }
+    }
+
+    private static void OnReviewCardBack(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        if (!AdministratorPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgCardBackReviewQueue",
+                result = false,
+                canReview = false,
+                logStr = "没有审核卡背的权限",
+            });
+            return;
+        }
+
+        try
+        {
+            var approved = Bool(msg, "approved");
+            _playerDataStore.ReviewCardBack(
+                s.Account!,
+                Str(msg, "cardBackId") ?? "",
+                approved,
+                Str(msg, "reason"));
+            SendCardBackReviewQueue(
+                s,
+                _playerDataStore.GetPendingCardBackReviews(),
+                approved ? "卡背已审核通过" : "卡背已标记为未通过");
+        }
+        catch (Exception ex) { SendCardBackReviewError(s, ex, "审核卡背失败"); }
     }
 
     private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)
@@ -3092,7 +3144,10 @@ public static class WebSocketBridge
             likes = item.Likes,
             liked = item.Liked,
             owned = item.Owned,
+            publiclyListed = item.PubliclyListed,
             createdAt = item.CreatedAt,
+            reviewStatus = item.ReviewStatus,
+            reviewReason = item.ReviewReason,
         }).ToArray();
         Send(session.SessionId, new
         {
@@ -3109,6 +3164,42 @@ public static class WebSocketBridge
         if (exception is not PlayerDataValidationException)
             LogErr($"{fallback} {session.Account}: {exception.Message}");
         Send(session.SessionId, new { proto = "MsgCardBackGallery", result = false, logStr = message });
+    }
+
+    private static void SendCardBackReviewQueue(
+        WsSession session,
+        IReadOnlyList<CardBackReviewItem> items,
+        string? logStr = null)
+    {
+        Send(session.SessionId, new
+        {
+            proto = "MsgCardBackReviewQueue",
+            result = true,
+            canReview = true,
+            logStr,
+            items = items.Select(item => new
+            {
+                id = item.Id,
+                name = item.Name,
+                authorName = item.AuthorName,
+                imageUrl = item.ImageUrl,
+                createdAt = item.CreatedAt,
+            }).ToArray(),
+        });
+    }
+
+    private static void SendCardBackReviewError(WsSession session, Exception exception, string fallback)
+    {
+        var message = exception is PlayerDataValidationException ? exception.Message : fallback;
+        if (exception is not PlayerDataValidationException)
+            LogErr($"{fallback} {session.Account}: {exception.Message}");
+        Send(session.SessionId, new
+        {
+            proto = "MsgCardBackReviewQueue",
+            result = false,
+            canReview = true,
+            logStr = message,
+        });
     }
 
     private static void SendDeckPlazaPage(WsSession session, DeckPlazaPage page)

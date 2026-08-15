@@ -26,9 +26,10 @@ import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
 import ProfilePanel from "./ProfilePanel";
 import CardBackPlazaPanel from "./CardBackPlazaPanel";
+import CardBackReviewPanel from "./CardBackReviewPanel";
 import MaintenanceControlPanel from "./MaintenanceControlPanel";
 
-type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "history" | "profile";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "cardBackReview" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
@@ -311,6 +312,9 @@ function NavIcon({ name }: { name: NavIconName }) {
   if (name === "cardBackPlaza") {
     return <><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 16h6" /><path d="M12 10.5c-1.7-2-4.5.6 0 4 4.5-3.4 1.7-6 0-4Z" /></>;
   }
+  if (name === "cardBackReview") {
+    return <><path d="M12 3 5 6v5c0 4.6 2.7 8 7 10 4.3-2 7-5.4 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-5" /></>;
+  }
   if (name === "profile") {
     return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
   }
@@ -413,6 +417,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
   const connState = useNetStore((s) => s.connState);
   const incomingFriendCount = useNetStore((s) => s.incomingFriendRequests.length);
   const maintenance = useNetStore((s) => s.maintenance);
+  const pendingCardBackReviews = useNetStore((s) => s.cardBackReviewQueue)?.length ?? 0;
   const connectionLabel = connState === "connected"
     ? "服务器已连接"
     : connState === "connecting" || connState === "handshaking"
@@ -427,6 +432,10 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
   useEffect(() => {
     if (connState === "connected") HomeRequest.requestMaintenanceState();
   }, [connState]);
+
+  useEffect(() => {
+    if (connState === "connected" && maintenance.canManage) HomeRequest.requestCardBackReviewQueue();
+  }, [connState, maintenance.canManage]);
 
   // 每个账号在当前浏览器首次进入新版本时自动展示更新日志。
   useEffect(() => {
@@ -473,6 +482,9 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
     { view: "cardBackPlaza", label: "卡背" },
     { view: "profile", label: "我的" },
   ];
+  if (maintenance.canManage) {
+    mobileNavItems.splice(5, 0, { view: "cardBackReview", label: "审核" });
+  }
 
   return (
     <LayoutPreviewFrame mode={layoutMode}>
@@ -537,6 +549,9 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
             <SidebarButton label="卡牌图鉴" icon="catalog" active={view === "catalog"} onClick={() => setView("catalog")} />
             <SidebarButton label="排行榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
             <SidebarButton label="卡背广场" icon="cardBackPlaza" active={view === "cardBackPlaza"} onClick={() => setView("cardBackPlaza")} />
+            {maintenance.canManage && (
+              <SidebarButton label="卡背审核" icon="cardBackReview" badge={pendingCardBackReviews} active={view === "cardBackReview"} onClick={() => setView("cardBackReview")} />
+            )}
             <SidebarButton label="我的" icon="profile" active={view === "profile"} onClick={() => setView("profile")} />
             <SidebarButton label="对局记录" icon="history" active={view === "history"} onClick={() => setView("history")} />
           </div>
@@ -556,6 +571,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
             {view === "catalog" && <CardCatalogPanel />}
             {view === "leaderboard" && <LeaderLeaderboardPanel />}
             {view === "cardBackPlaza" && <CardBackPlazaPanel onOpenProfile={() => setView("profile")} />}
+            {view === "cardBackReview" && <CardBackReviewPanel />}
             {view === "history" && <HistoryPanel />}
             {view === "profile" && (
               <ProfilePanel
@@ -573,7 +589,8 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
 
       <nav
         aria-label="主要导航"
-        className="grid h-16 shrink-0 grid-cols-6 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
+        className="grid h-16 shrink-0 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
+        style={{ gridTemplateColumns: `repeat(${mobileNavItems.length}, minmax(44px, 1fr))` }}
       >
         {mobileNavItems.map((item) => {
           const active = activeMobileView === item.view;

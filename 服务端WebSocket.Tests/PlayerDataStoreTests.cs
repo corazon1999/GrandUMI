@@ -155,8 +155,14 @@ public sealed class PlayerDataStoreTests : IDisposable
         store.Login("Alice");
         store.Login("Bob");
 
-        store.UploadCardBack("Alice", "海上日出", "image/png", TinyPngBase64());
-        store.UploadCardBack("Bob", "月下航路", "image/png", TinyPngBase64());
+        var alicePending = Assert.Single(store.UploadCardBack("Alice", "海上日出", "image/png", TinyPngBase64()));
+        var bobPending = Assert.Single(store.UploadCardBack("Bob", "月下航路", "image/png", TinyPngBase64()));
+        Assert.Equal(PlayerDataStore.CardBackReviewPending, alicePending.ReviewStatus);
+        var bobBeforeReview = store.GetCardBackGallery("Bob");
+        Assert.DoesNotContain(bobBeforeReview, item => item.ReviewStatus == PlayerDataStore.CardBackReviewApproved);
+        Assert.Single(bobBeforeReview, item => item.Id == bobPending.Id && item.Owned);
+        store.ReviewCardBack("释迦", alicePending.Id, approved: true, rejectionReason: null);
+        store.ReviewCardBack("释迦", bobPending.Id, approved: true, rejectionReason: null);
         var before = store.GetCardBackGallery("Alice");
         var aliceBack = Assert.Single(before, item => item.Name == "海上日出");
         var bobBack = Assert.Single(before, item => item.Name == "月下航路");
@@ -202,7 +208,8 @@ public sealed class PlayerDataStoreTests : IDisposable
         var store = CreateStore();
         store.Login("Alice");
         store.Login("Bob");
-        store.UploadCardBack("Alice", "待删除卡背", "image/png", TinyPngBase64());
+        var pending = Assert.Single(store.UploadCardBack("Alice", "待删除卡背", "image/png", TinyPngBase64()));
+        store.ReviewCardBack("释迦", pending.Id, approved: true, rejectionReason: null);
         var cardBack = Assert.Single(store.GetCardBackGallery("Alice"));
         store.UpdateCardBack("Alice", cardBack.Id);
         store.UpdateCardBack("Bob", cardBack.Id);
@@ -216,6 +223,61 @@ public sealed class PlayerDataStoreTests : IDisposable
         Assert.Equal(PlayerDataStore.DefaultCardBackId, store.GetPlayerData("Bob").CardBackId);
         Assert.Null(store.GetCardBackImage(long.Parse(cardBack.Id["custom-".Length..])));
         Assert.Throws<PlayerDataValidationException>(() => store.DeleteCardBack("Alice", cardBack.Id));
+    }
+
+    [Fact]
+    public void CardBackReview_待审核不可公开选用且未通过理由仅向投稿者展示()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+
+        var pending = Assert.Single(store.UploadCardBack("Alice", "人物照片", "image/png", TinyPngBase64()));
+        Assert.Equal(PlayerDataStore.CardBackReviewPending, pending.ReviewStatus);
+        Assert.Empty(store.GetCardBackGallery("Bob"));
+        Assert.Single(store.GetPendingCardBackReviews());
+        Assert.Throws<PlayerDataValidationException>(() => store.UpdateCardBack("Alice", pending.Id));
+        Assert.Throws<PlayerDataValidationException>(() => store.ToggleCardBackLike("Bob", pending.Id));
+
+        store.ReviewCardBack("栗子", pending.Id, approved: false, rejectionReason: null);
+
+        Assert.Empty(store.GetPendingCardBackReviews());
+        Assert.Empty(store.GetCardBackGallery("Bob"));
+        var rejected = Assert.Single(store.GetCardBackGallery("Alice"));
+        Assert.Equal(PlayerDataStore.CardBackReviewRejected, rejected.ReviewStatus);
+        Assert.Equal(PlayerDataStore.DefaultCardBackRejectionReason, rejected.ReviewReason);
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.ReviewCardBack("释迦", pending.Id, approved: true, rejectionReason: null));
+    }
+
+    [Fact]
+    public void CardBackGallery_公开榜最多返回三百款并额外保留本人投稿()
+    {
+        var store = CreateStore();
+        store.Login("Viewer");
+        for (var ownerIndex = 0; ownerIndex < 16; ownerIndex++)
+        {
+            var account = $"Owner{ownerIndex:D2}";
+            store.Login(account);
+            for (var itemIndex = 0; itemIndex < 20; itemIndex++)
+            {
+                var name = $"Card{itemIndex:D2}";
+                var uploaded = store.UploadCardBack(
+                    account,
+                    name,
+                    "image/png",
+                    TinyPngBase64());
+                var pending = Assert.Single(uploaded, item =>
+                    item.Owned && item.Name == name && item.ReviewStatus == PlayerDataStore.CardBackReviewPending);
+                store.ReviewCardBack("释迦", pending.Id, approved: true, rejectionReason: null);
+            }
+        }
+
+        Assert.Equal(300, store.GetCardBackGallery("Viewer").Count);
+        var ownerView = store.GetCardBackGallery("Owner00");
+        Assert.Equal(300, ownerView.Count(item => item.PubliclyListed));
+        Assert.Equal(20, ownerView.Count(item => item.Owned));
+        Assert.Equal(300, PlayerDataStore.MaxCardBackGalleryItems);
     }
 
     [Fact]

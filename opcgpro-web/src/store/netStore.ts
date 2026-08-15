@@ -10,6 +10,7 @@ import type {
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   CardBackGalleryItem,
+  CardBackReviewItem,
   DeckPlazaItem,
   FriendChatMessage,
   RankProfileSnapshot,
@@ -106,6 +107,7 @@ interface NetStore {
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
   cardBackGallery: CardBackGalleryItem[] | null;
+  cardBackReviewQueue: CardBackReviewItem[] | null;
   deckPlazaPage: { items: DeckPlazaItem[]; page: number; pageSize: number; total: number; hasMore: boolean } | null;
   deckPlazaRevision: number;
   // 收到的对战邀请（被邀请方弹窗用）
@@ -151,6 +153,7 @@ interface NetStore {
   setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
   setCardBackGallery: (items: CardBackGalleryItem[] | null) => void;
+  setCardBackReviewQueue: (items: CardBackReviewItem[] | null) => void;
   setDeckPlazaPage: (page: NetStore["deckPlazaPage"]) => void;
   refreshDeckPlaza: () => void;
   setIncomingInvite: (inv: IncomingInvite | null) => void;
@@ -196,6 +199,7 @@ const initialState = {
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
   cardBackGallery: null as CardBackGalleryItem[] | null,
+  cardBackReviewQueue: null as CardBackReviewItem[] | null,
   deckPlazaPage: null as NetStore["deckPlazaPage"],
   deckPlazaRevision: 0,
   incomingInvite: null as IncomingInvite | null,
@@ -284,6 +288,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
 
   setCardBackGallery: (cardBackGallery) => set({ cardBackGallery }),
+  setCardBackReviewQueue: (cardBackReviewQueue) => set({ cardBackReviewQueue }),
   setDeckPlazaPage: (deckPlazaPage) => set({ deckPlazaPage }),
   refreshDeckPlaza: () => set((state) => ({ deckPlazaRevision: state.deckPlazaRevision + 1 })),
 
