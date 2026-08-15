@@ -18,6 +18,6 @@
 ## 验证结果
 
 - `node --test opcgpro-web/tests/new-production-deploy.test.mjs`：4 项通过。
-- PowerShell 部署入口脚本解析通过。
+- Windows PowerShell 5 部署入口脚本解析通过。
 - 三个服务器端 Bash 脚本已在新正式服执行 `bash -n`，语法检查通过。
 - `git diff --check` 通过。
