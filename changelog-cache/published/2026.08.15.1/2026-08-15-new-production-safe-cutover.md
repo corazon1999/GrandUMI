@@ -14,10 +14,11 @@
 - 新增仅允许登记新正式服 IP 的预构建入口，固定使用 `grand-umi.com` 的 HTTPS/WSS 地址。
 - 新增双域名 Nginx 入口、正式服务单元、最终数据库完整性门禁和激活失败时的候选服回退流程。
 - 预构建与正式激活分离；缺少最终数据就绪标记、数据库完整性检查失败或版本不一致时均拒绝切流。
+- 正式激活会在切换数据前清理候选部署可能重建的重复 Nginx 站点，并在服务停机前完成配置验证。
 
 ## 验证结果
 
-- `node --test opcgpro-web/tests/new-production-deploy.test.mjs`：4 项通过。
+- `node --test opcgpro-web/tests/new-production-deploy.test.mjs`：5 项通过。
 - Windows PowerShell 5 部署入口脚本解析通过。
 - 三个服务器端 Bash 脚本已在新正式服执行 `bash -n`，语法检查通过。
 - `git diff --check` 通过。

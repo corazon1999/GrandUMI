@@ -32,6 +32,15 @@ test("正式数据未就绪时拒绝激活，失败时恢复候选服务", () =>
   assert.match(backendService, /GRANDUMI_NODE_ID=hk-production-01/);
 });
 
+test("正式激活会在数据切换前清理候选服重复站点", () => {
+  const removeCandidateSite = activate.indexOf("rm -f /etc/nginx/sites-enabled/grandumi-candidate");
+  const stopCandidateService = activate.indexOf("systemctl stop grandumi-candidate-frontend.service");
+  assert.ok(removeCandidateSite >= 0);
+  assert.ok(stopCandidateService > removeCandidateSite);
+  assert.match(activate, /systemctl daemon-reload/);
+  assert.match(activate, /nginx -t/);
+});
+
 test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /root@103\.146\.230\.37/);
   assert.doesNotMatch(deploy, /8\.210\.155\.25/);

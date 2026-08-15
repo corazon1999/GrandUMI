@@ -16,6 +16,14 @@ for name in players.db ranked.db leader-stats.db; do
   [[ "$(sqlite3 "$import_dir/$name" 'PRAGMA integrity_check;')" == ok ]] || die "最终正式数据完整性失败：$name"
 done
 
+# 候选服自动部署可能在预构建后重新创建旧站点；正式双域名站点已经同时
+# 服务 grand-umi.com 与 candidate.grand-umi.com，激活前必须清理重复监听。
+systemctl daemon-reload
+ln -sfn /etc/nginx/sites-available/grandumi-production /etc/nginx/sites-enabled/grandumi-production
+rm -f /etc/nginx/sites-enabled/grandumi-candidate
+nginx -t
+systemctl reload nginx
+
 rollback() {
   status=$?
   if [[ "$switched" == 1 ]]; then
