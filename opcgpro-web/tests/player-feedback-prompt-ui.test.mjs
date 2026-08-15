@@ -124,3 +124,40 @@ test("反馈窗口适配手机安全区且主要操作触控区不少于44像素
   assert.ok((feedback.match(/min-h-11/g) ?? []).length >= 3);
   assert.match(feedback, /min-w-11/);
 });
+
+test("对局反馈在桌面侧栏与手机旋转画布均有入口且弹窗高于公告", async () => {
+  const [page, board, feedback] = await Promise.all([
+    readSource("../src/app/game/page.tsx"),
+    readSource("../src/components/game/GameBoard.tsx"),
+    readSource("../src/components/game/FeedbackOverlay.tsx"),
+  ]);
+
+  assert.match(page, /feedbackOpenRequest/);
+  assert.match(page, /<FeedbackOverlay context="game" openRequest=\{feedbackOpenRequest\}/);
+  assert.match(page, /onOpenFeedback=/);
+  assert.match(board, /F · 反馈 Bug 和建议/);
+  assert.match(board, /hidden min-h-11[\s\S]*md:block/);
+  assert.match(feedback, /createPortal\(/);
+  assert.match(feedback, /createPortal\(\s*<AnimatePresence>[\s\S]*document\.body/);
+  assert.match(feedback, /left: "calc\(4\.25rem/);
+  assert.match(feedback, /md:hidden/);
+  assert.match(feedback, /min-h-11 min-w-11/);
+  assert.match(feedback, /z-\[100\]/);
+});
+
+test("公开牌浮层不会因普通快照或卡图映射变化反复重置计时器", async () => {
+  const reveal = await readSource("../src/components/game/RevealOverlay.tsx");
+
+  assert.match(reveal, /useGameStore\.getState\(\)/);
+  assert.match(reveal, /\[animationSpeed, reveal\?\.nonce, clearReveal\]/);
+  assert.doesNotMatch(reveal, /\breveal, clearReveal/);
+  assert.doesNotMatch(reveal, /mySpriteMap, opponentSpriteMap/);
+});
+
+test("同赛季更旧的排位快照不会覆盖刚完成的结算", async () => {
+  const store = await readSource("../src/store/netStore.ts");
+
+  assert.match(store, /state\.rankProfile\?\.seasonId === rankProfile\.seasonId/);
+  assert.match(store, /rankProfile\.games < state\.rankProfile\.games/);
+  assert.match(store, /return \{\};/);
+});

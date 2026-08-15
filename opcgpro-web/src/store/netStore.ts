@@ -265,7 +265,14 @@ export const useNetStore = create<NetStore>((set) => ({
   setSelectedDeck: (deck) => set({ selectedDeck: deck }),
 
   setOpponentName: (name) => set({ opponentName: name }),
-  setRankSnapshot: (rankProfile, rankLeaderboard) => set({ rankProfile, rankLeaderboard }),
+  setRankSnapshot: (rankProfile, rankLeaderboard) => set((state) => {
+    // 排位结算与大厅快照可能由不同异步请求返回。拒绝同赛季局数更旧的快照，
+    // 避免胜利结算刚更新后又被在途旧响应短暂覆盖，随后再“自行恢复”。
+    if (state.rankProfile?.seasonId === rankProfile.seasonId
+        && rankProfile.games < state.rankProfile.games)
+      return {};
+    return { rankProfile, rankLeaderboard };
+  }),
   setLastRankResult: (lastRankResult) => set({ lastRankResult }),
 
   setRoomCode: (code) => set({ roomCode: code }),

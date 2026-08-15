@@ -159,7 +159,8 @@ public static class GameRoomManager
             (p1Sid, p1Account, p1Deck),
             firstPlayer: firstPlayer,
             leaderKeywordWildcard: vsBot,
-            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice);
+            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
+            deferInitialSetupUntilStart: true);
         engine.State.Players[0].DisplayName = p0DisplayName ?? p0Account;
         engine.State.Players[1].DisplayName = p1DisplayName ?? p1Account;
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
@@ -190,6 +191,11 @@ public static class GameRoomManager
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
         engine.State.OperationClockRemainingMs[1] = OperationTimeLimitMs;
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
+        engine.OnOpeningSequenceReady = () =>
+        {
+            EnsureStartingPlayerChoiceTimeout(entry);
+            EnsureMulliganTimeout(entry);
+        };
 
         // 配置回调：人类走 WS 下发；单人模式下 P1(机器人) 的消息驱动 BotDriver 思考
         engine.OnSendToPlayer = (idx, payload) =>

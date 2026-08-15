@@ -251,7 +251,7 @@ function RightRail({
           <button
             type="button"
             onClick={onOpenFeedback}
-            className="rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20"
+            className="hidden min-h-11 rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20 md:block"
             aria-label="打开 Bug 和建议反馈（快捷键 F）"
           >
             F · 反馈 Bug 和建议

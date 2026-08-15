@@ -25,8 +25,8 @@ import { GameRequest } from "@/net/GameRequest";
 
 export default function GamePage() {
   const router = useRouter();
-  const [feedbackOpenRequest, setFeedbackOpenRequest] = useState(0);
   const [leaderClashComplete, setLeaderClashComplete] = useState(false);
+  const [feedbackOpenRequest, setFeedbackOpenRequest] = useState(0);
   // 只订阅页面壳实际使用的字段，避免每份完整牌桌快照都让整个页面树重新渲染。
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
@@ -191,7 +191,11 @@ export default function GamePage() {
       <GameBoard
         isObserver={isObserver}
         isPlayback={isPlayback}
-        onOpenFeedback={isPlayback ? undefined : () => setFeedbackOpenRequest((value) => value + 1)}
+        onOpenFeedback={
+          !isObserver && !isPlayback
+            ? () => setFeedbackOpenRequest((request) => request + 1)
+            : undefined
+        }
       />
     </div>
   );

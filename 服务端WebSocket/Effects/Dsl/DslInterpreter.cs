@@ -803,6 +803,14 @@ public static class DslInterpreter
                 case "ownLifeCountLte":
                     if (me.LifeCount > p.Value.GetInt32()) return false;
                     break;
+                case "blockerIsSelf":
+                    {
+                        bool expected = p.Value.ValueKind == JsonValueKind.True;
+                        bool isSelf = ctx.Vars.TryGetValue("blockerCardId", out var blockerId)
+                            && string.Equals(blockerId?.ToString(), ctx.Source.Id.ToString(), StringComparison.Ordinal);
+                        if (isSelf != expected) return false;
+                        break;
+                    }
                 case "oppLifeCountLte":
                     if (opp.LifeCount > p.Value.GetInt32()) return false;
                     break;

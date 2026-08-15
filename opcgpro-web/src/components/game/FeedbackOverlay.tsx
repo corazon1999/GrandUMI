@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { createPortal } from "react-dom";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { useGameStore } from "@/store/gameStore";
@@ -186,16 +187,33 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/50 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setOpen(false)}
+    <>
+      {context === "game" && !open && typeof document !== "undefined" && createPortal(
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed z-[90] flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-amber-300/50 bg-slate-950/95 px-3 text-xs font-black text-amber-100 shadow-xl shadow-black/50 md:hidden"
+          style={{
+            left: "calc(4.25rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+            bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
+          }}
+          aria-label="打开 Bug 和建议反馈（快捷键 F）"
         >
-          <motion.div
+          F · 反馈
+        </button>,
+        document.body,
+      )}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            >
+              <motion.div
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -288,9 +306,12 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
                 发送
               </button>
             </div>
-          </motion.div>
-        </motion.div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
-    </AnimatePresence>
+    </>
   );
 }

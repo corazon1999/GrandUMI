@@ -23,26 +23,11 @@ public class P_107_Roger : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
-        var self = ctx.Source;
-        var selfId = self.Id;
-        int owner = ctx.OwnerIndex;
-
         bool tenDon = me.CostArea.Count >= 10 || opp.CostArea.Count >= 10;
         if (!tenDon) return Task.CompletedTask;
 
-        int baseTurn = ctx.State.TurnCount;
-
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
-        {
-            SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = false },
-            PowerDelta = 2000,
-            // 我方领袖；有效期至下个对方回合结束（baseTurn 我方回合 → baseTurn+1 对方回合）
-            Predicate = (s, sideIdx, card) =>
-                sideIdx == owner && card.Id == s.Players[owner].Leader.Id &&
-                s.TurnCount <= baseTurn + 1,
-        });
+        // 限时加成已施加到领袖本身，不应在 P-107 离场时随光环清理。
+        AtomicOps.AddPowerUntilOppEnd(me.Leader, 2000, ctx.OwnerIndex);
 
         return Task.CompletedTask;
     }

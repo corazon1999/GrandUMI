@@ -717,13 +717,18 @@
         }
       ]
     },
-    "counter": [
-      {
-        "op": "AddPowerThisBattle",
-        "target": "selfLeader",
-        "delta": 4000
-      }
-    ]
+    "counter": {
+      "cost": {
+        "donReturn": 1
+      },
+      "then": [
+        {
+          "op": "AddPowerThisBattle",
+          "target": "selfLeader",
+          "delta": 4000
+        }
+      ]
+    }
   },
   "EB04-042": {
     "_name": "阿尔法",
@@ -851,7 +856,8 @@
       {
         "on": "OnBlockDeclare",
         "if": {
-          "ownLifeCountLte": 2
+          "ownLifeCountLte": 2,
+          "blockerIsSelf": true
         },
         "then": [
           {

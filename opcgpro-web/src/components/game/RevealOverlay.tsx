@@ -24,29 +24,29 @@ type Shown = { cards: CardData[]; label: string };
 export default function RevealOverlay() {
   const reveal = useGameStore((s) => s.reveal);
   const clearReveal = useGameStore((s) => s.clearReveal);
-  const mySpriteMap = useGameStore((s) => s.my?.spriteMap);
-  const opponentSpriteMap = useGameStore((s) => s.opponent?.spriteMap);
   const [shown, setShown] = useState<Shown | null>(null);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
 
   useEffect(() => {
-    if (!reveal) return;
-    const spriteMap = reveal.side === "my" ? mySpriteMap : opponentSpriteMap;
-    const cards = reveal.cardNumbers
+    const current = useGameStore.getState();
+    const currentReveal = current.reveal;
+    if (!currentReveal) return;
+    const spriteMap = currentReveal.side === "my" ? current.my?.spriteMap : current.opponent?.spriteMap;
+    const cards = currentReveal.cardNumbers
       .map((n) => getGameCard(n, spriteMap))
       .filter((c): c is CardData => !!c);
     if (cards.length === 0) {
       clearReveal();
       return;
     }
-    setShown({ cards, label: reveal.side === "my" ? "你公开了" : "对方公开了" });
+    setShown({ cards, label: currentReveal.side === "my" ? "你公开了" : "对方公开了" });
     const t = setTimeout(() => {
       setShown(null);
       clearReveal();
     }, animationSpeed === "off" ? 1000 : animationDuration(REVEAL_DURATION, animationSpeed));
     return () => clearTimeout(t);
     // nonce 变化即重新触发一次展示
-  }, [animationSpeed, reveal?.nonce, reveal, clearReveal, mySpriteMap, opponentSpriteMap]);
+  }, [animationSpeed, reveal?.nonce, clearReveal]);
 
   return (
     <AnimatePresence>

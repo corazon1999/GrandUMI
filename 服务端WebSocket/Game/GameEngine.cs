@@ -28,6 +28,7 @@ public class GameEngine
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Func<int, bool>? HasSpectatorsWithHandForPerspective { get; set; }
     public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
+    public Action? OnOpeningSequenceReady { get; set; }
     /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
     public Action? BeforeSnapshot { get; set; }
     /// <summary>
@@ -54,6 +55,8 @@ public class GameEngine
     private readonly Func<Guid> _idFactory;
     /// <summary>骰点对局是否延迟到先后手确定后再洗牌、设置生命区并抽取起手牌。</summary>
     private readonly bool _deferOpeningSetupUntilFirstPlayerChosen;
+    private readonly bool _deferInitialSetupUntilStart;
+    private bool _openingSequenceStarted;
     /// <summary>双方领袖的 OnGameStart 是否已在准备起手牌前完成。</summary>
     private bool _leaderStartEffectsResolved;
 
@@ -104,13 +107,15 @@ public class GameEngine
                                        int firstPlayer,
                                        int? rngSeed = null,
                                        bool leaderKeywordWildcard = false,
-                                       bool deferOpeningSetupUntilFirstPlayerChosen = false)
+                                       bool deferOpeningSetupUntilFirstPlayerChosen = false,
+                                       bool deferInitialSetupUntilStart = false)
     {
         var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
         // 必须在创建任何卡实例（ParseDeck/InitDonDeck/InitLifeAndHand）之前装好确定性 ID 工厂，
         // 否则建出的牌走随机 GUID，重放将无法对齐。
         _idFactory = DeterministicId.SeededFactory(seed);
         _deferOpeningSetupUntilFirstPlayerChosen = deferOpeningSetupUntilFirstPlayerChosen;
+        _deferInitialSetupUntilStart = deferInitialSetupUntilStart;
         DeterministicId.Current = _idFactory;
         State = new GameState { RoomId = roomId, FirstPlayer = firstPlayer, RngSeed = seed };
 
@@ -139,7 +144,8 @@ public class GameEngine
         State.Players[1] = player1;
         // 预设先后手（如单人测试）以及旧日志恢复沿用构造时发牌；
         // 新骰点对局必须等胜者选定先后手后才生成生命区和起手牌。
-        if (!_deferOpeningSetupUntilFirstPlayerChosen || firstPlayer >= 0)
+        if (!_deferInitialSetupUntilStart
+            && (!_deferOpeningSetupUntilFirstPlayerChosen || firstPlayer >= 0))
         {
             InitLifeAndHand(player0, 0);
             InitLifeAndHand(player1, 1);
@@ -147,15 +153,48 @@ public class GameEngine
         State.CurrentTurnPlayer = firstPlayer;
         State.Phase = Phase.Reset;
         State.TurnCount = 0; // 在双方完成 mulligan 后调用 TurnEngine.StartFirstTurn 才进入 turn 1
-        if (firstPlayer < 0)
+        if (!_deferInitialSetupUntilStart && firstPlayer < 0)
         {
             RollStartingDice();
             State.StartingPlayerChoiceDeadlineUtc = DateTime.UtcNow.AddSeconds(StartingPlayerChoiceTimeoutSeconds);
         }
         Prompts = new PromptSystem(this);
-        if (State.StartingPlayerChosen)
+        if (!_deferInitialSetupUntilStart && State.StartingPlayerChosen)
             BeginMulliganPhase();
         CaptureReplayHands();
+    }
+
+    /// <summary>
+    /// 线上新对局在首份快照前启动的开局序列。先处理可交互的 OnGameStart，
+    /// 再进行骰点或预设先后手的生命/起手牌初始化，避免 OP13-079 被延迟到骰点或调度之后。
+    /// </summary>
+    public void BeginOpeningSequence()
+    {
+        if (!_deferInitialSetupUntilStart || _openingSequenceStarted) return;
+        _openingSequenceStarted = true;
+        _ = Track(CompleteInitialOpeningSequenceAsync());
+    }
+
+    private async Task CompleteInitialOpeningSequenceAsync()
+    {
+        for (int owner = 0; owner < State.Players.Length; owner++)
+            await EffectRuntime.Resolve(State, owner, State.Players[owner].Leader, EffectTrigger.OnGameStart, Prompts);
+
+        _leaderStartEffectsResolved = true;
+        if (State.StartingPlayerChosen)
+        {
+            InitLifeAndHand(State.Players[0], 0);
+            InitLifeAndHand(State.Players[1], 1);
+            BeginMulliganPhase();
+        }
+        else
+        {
+            RollStartingDice();
+            State.StartingPlayerChoiceDeadlineUtc = DateTime.UtcNow.AddSeconds(StartingPlayerChoiceTimeoutSeconds);
+        }
+
+        OnOpeningSequenceReady?.Invoke();
+        Broadcast("OpeningEffectsComplete");
     }
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
@@ -192,7 +231,8 @@ public class GameEngine
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
         else if (!State.StartingPlayerChosen
-            && action is not "ChooseFirstPlayer" and not "Surrender" and not "RequestDraw" and not "RespondDraw")
+            && action is not "ChooseFirstPlayer" and not "PromptResponse"
+                and not "Surrender" and not "RequestDraw" and not "RespondDraw")
         {
             SendError(playerIndex, "请先完成先后手选择");
         }
@@ -312,10 +352,12 @@ public class GameEngine
     /// </summary>
     private async Task CompleteDeferredOpeningSetupAsync(int chooserIndex, bool goFirst)
     {
-        foreach (var owner in new[] { chooserIndex, 1 - chooserIndex })
-            await EffectRuntime.Resolve(State, owner, State.Players[owner].Leader, EffectTrigger.OnGameStart, Prompts);
-
-        _leaderStartEffectsResolved = true;
+        if (!_leaderStartEffectsResolved)
+        {
+            foreach (var owner in new[] { chooserIndex, 1 - chooserIndex })
+                await EffectRuntime.Resolve(State, owner, State.Players[owner].Leader, EffectTrigger.OnGameStart, Prompts);
+            _leaderStartEffectsResolved = true;
+        }
         InitLifeAndHand(State.Players[0], 0);
         InitLifeAndHand(State.Players[1], 1);
         BeginMulliganPhase();
@@ -983,6 +1025,9 @@ public class GameEngine
             var result = CardPlayer.Play(State, playerIndex, handIndex);   // 复用：按 HandPlayCost 扣活跃咚→休息，事件入废弃区
             Broadcast("PlayCard", new { player = playerIndex, cardNumber, kind = result.Kind.ToString(), cardId = result.Card.Id.ToString() });
             await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventCounter, Prompts);
+            if (!State.IsGameOver)
+                await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppEventPlayed, Prompts,
+                    new Dictionary<string, object?> { ["owner"] = playerIndex });
             Broadcast("EffectResolved", new { cardNumber });
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
             if (!BattleEngine.AreBattleParticipantsOnField(State))
@@ -1052,6 +1097,7 @@ public class GameEngine
 
     public void BroadcastInitialState()
     {
+        BeginOpeningSequence();
         var startedAt = LatencyDiagnostics.Start();
         BeforeSnapshot?.Invoke();
         State.Tick++;

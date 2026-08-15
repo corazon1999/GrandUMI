@@ -106,10 +106,12 @@
   },
   "ST29-015": {
     "_name": "温度 半熟爆裂踢",
-    "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“生命≤1则对方-2000”因反击数组无条件分支已略去）；【触发】抽1张。",
+    "_note": "【反击】我方最多1张领袖或角色+2000；我方生命≤1时，对方最多1张领袖或角色-2000。【触发】抽1张。",
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色+2000" },
-      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
+      { "op": "Choose", "prompt": "OpponentLeaderOrCharacter", "max": 1, "min": 0, "as": "$opp", "text": "本次战斗对方最多1张领袖或角色-2000", "if": { "ownLifeCountLte": 1 } },
+      { "op": "AddPowerThisBattle", "target": "$opp", "delta": -2000, "if": { "ownLifeCountLte": 1 } }
     ],
     "trigger": [
       { "op": "Draw", "n": 1 }

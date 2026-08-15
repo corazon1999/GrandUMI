@@ -115,7 +115,7 @@ internal static class OP17Effects
 
     private static async Task SearchTop(
         EffectContext c, int count, Func<CardInstance, bool> filter, string text,
-        bool trashRemainder = false, bool requireOne = false)
+        bool trashRemainder = false, bool requireOne = false, bool reorderRemainder = false)
     {
         var me = Me(c);
         var top = me.Deck.Take(count).ToList();
@@ -142,7 +142,23 @@ internal static class OP17Effects
             top.Remove(picked[0]);
         }
         if (trashRemainder) me.Trash.AddRange(top);
-        else me.Deck.AddRange(top);
+        else if (!reorderRemainder || top.Count <= 1) me.Deck.AddRange(top);
+        else
+        {
+            var orderedIds = await c.Prompts.ChooseCards(c.OwnerIndex, "ReorderToDeckBottom",
+                "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+                top.Select(card => card.Id.ToString()).ToList(), 0, top.Count,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = top.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                    ["allowDefaultOrder"] = true,
+                });
+            var ordered = orderedIds
+                .Select(id => top.FirstOrDefault(card => card.Id.ToString() == id))
+                .Where(card => card is not null).Cast<CardInstance>().Distinct().ToList();
+            ordered.AddRange(top.Where(card => !ordered.Contains(card)));
+            me.Deck.AddRange(ordered);
+        }
         if (picked.Count > 0)
             c.Engine?.BroadcastReveal(c.OwnerIndex, new[] { picked[0].Info.Number });
     }
@@ -1092,7 +1108,7 @@ internal static class OP17Effects
 
     private static async Task C063(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.TurnPlayed != c.State.TurnCount) return;
+        if (c.Trigger != EffectTrigger.ActivatedMain) return;
         string key = $"OP17-063-act:{c.Source.Id}";
         if (Me(c).TurnOnceUsed.Contains(key) || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
         var pick = await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 6, 1, "选择费用≤6的角色，使其效果无效并KO");
@@ -1458,15 +1474,20 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnAttackDeclare || Me(c).Hand.Count == 0) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃1张手牌，让对方选择效果？")
             || !await DiscardOwn(c, 1, "选择丢弃1张手牌")) return;
-        var options = new List<string>();
-        if (Me(c).Hand.Count > 0) options.Add("效果控制者丢弃1张手牌，并将卡组顶1张加入生命");
-        if (Opp(c).Hand.Count > 0) options.Add("随机丢弃你的1张手牌");
-        if (options.Count == 0) return;
-        int pick = options.Count == 1 ? 0 : await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的攻击时效果", options);
-        if (options[pick].StartsWith("效果控制者"))
+        var options = new List<string>
         {
-            await DiscardOwn(c, 1, "选择丢弃1张手牌");
-            AtomicOps.AddLifeFromDeckTop(Me(c), 1);
+            "效果控制者可以丢弃1张手牌，并将卡组顶最多1张加入生命",
+            "随机丢弃你的1张手牌",
+        };
+        int pick = await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的攻击时效果", options);
+        if (pick == 0)
+        {
+            if (Me(c).Hand.Count > 0
+                && await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃我方1张手牌？"))
+                await DiscardOwn(c, 1, "选择丢弃1张手牌");
+            if (Me(c).Deck.Count > 0
+                && await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方卡组最上方最多1张卡牌加入生命区最上方？"))
+                AtomicOps.AddLifeFromDeckTop(Me(c), 1);
         }
         else
         {
@@ -1622,7 +1643,8 @@ internal static class OP17Effects
     private static async Task C113(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
-            await SearchTop(c, 3, x => x.Info.HasKeyword("大妈海盗团"), "公开最多1张《大妈海盗团》卡牌加入手牌");
+            await SearchTop(c, 3, x => x.Info.HasKeyword("大妈海盗团"), "公开最多1张《大妈海盗团》卡牌加入手牌",
+                reorderRemainder: true);
     }
 
     private static async Task C114(EffectContext c)

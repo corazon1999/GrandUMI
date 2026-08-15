@@ -117,7 +117,12 @@ public static class BattleEngine
                 new Dictionary<string, object?> { ["restedCardId"] = bid.ToString(), ["reason"] = "block" });
             if (s.IsGameOver) return;
         }
-        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnBlockDeclare, prompts);
+        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnBlockDeclare, prompts,
+            new Dictionary<string, object?>
+            {
+                ["blockerCardId"] = s.CurrentBattle?.ReplacedByBlockerCardId?.ToString(),
+                ["owner"] = s.CurrentBattle?.DefenderPlayerIndex,
+            });
     }
 
     public static void PassBlock(GameState s)
