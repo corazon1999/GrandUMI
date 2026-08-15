@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "hosts": ["grand-umi.com", "direct.grand-umi.com"],
+  "endpoints": [
+    { "url": "wss://direct.grand-umi.com/ws", "enabled": true },
+    { "url": "wss://grand-umi.com/ws", "enabled": true }
+  ]
+}

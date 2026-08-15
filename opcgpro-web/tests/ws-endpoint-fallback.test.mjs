@@ -64,3 +64,28 @@ test("首次连接与登录重试共用端点选择逻辑", async () => {
   assert.match(hook, /NetManager\.connect\(getWebSocketEndpoints\(\)\)/);
   assert.match(login, /NetManager\.connect\(getWebSocketEndpoints\(\)\)/);
 });
+
+test("线路清单支持运行时刷新且失败时回退缓存", async () => {
+  const source = await readSource("../src/net/wsEndpoint.ts");
+
+  assert.match(source, /fetch\(`\$\{RUNTIME_CONFIG_PATH\}\?t=\$\{Date\.now\(\)\}`/);
+  assert.match(source, /cache: "no-store"/);
+  assert.match(source, /RUNTIME_CACHE_TTL_MS = 10 \* 60 \* 1000/);
+  assert.match(source, /window\.location\.protocol !== "https:" \|\| url\.protocol === "wss:"/);
+});
+
+test("连接恢复包含抖动、线路熔断、成功线路记忆和前台唤醒探测", async () => {
+  const [manager, hook] = await Promise.all([
+    readSource("../src/net/NetManager.ts"),
+    readSource("../src/hooks/useNet.ts"),
+  ]);
+
+  assert.match(manager, /CIRCUIT_FAILURE_THRESHOLD = 2/);
+  assert.match(manager, /CIRCUIT_OPEN_MS = 45_000/);
+  assert.match(manager, /0\.75 \+ Math\.random\(\) \* 0\.5/);
+  assert.match(manager, /grandumi_last_good_ws/);
+  assert.match(manager, /handleForegroundResume/);
+  assert.match(hook, /visibilitychange/);
+  assert.match(hook, /pageshow/);
+  assert.match(hook, /refreshWebSocketEndpoints/);
+});

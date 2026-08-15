@@ -107,6 +107,8 @@ public static class GameRoomManager
         });
         internal Task ActionWorker { get; set; } = Task.CompletedTask;
         internal int ActionQueueDepth;
+        /// <summary>同一玩家的 requestId 只执行一次；房间销毁时随 RoomEntry 一并释放。</summary>
+        internal RequestDedupeWindow ProcessedPlayerRequests { get; } = new(512, TimeSpan.FromMinutes(10));
     }
 
     internal sealed record RoomWork(string Name, long EnqueuedAt, Func<Task> Execute, long ReceivedAt = 0);
@@ -320,9 +322,27 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "观战者不能操作", requestId });
             return;
         }
+        var tracksRequest = room.ProcessedPlayerRequests.IsTrackable(requestId);
+        if (tracksRequest && !room.ProcessedPlayerRequests.TryRegister(idx, requestId))
+        {
+            // 重复包可能是客户端没有收到第一次回包后的补发。按房间队列顺序回一份带原 requestId
+            // 的权威快照，让客户端安全结束 pending，绝不再次执行动作。
+            EnqueueRecoveryWork(room, new RoomWork("DuplicateRequest", LatencyDiagnostics.Start(), () =>
+            {
+                WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
+                    room.Engine.State, idx, "DuplicateRequest", requestId: requestId));
+                return Task.CompletedTask;
+            }));
+            LatencyDiagnostics.RecordMetric("对局动作去重", 1, "次");
+            return;
+        }
         if (!EnqueuePlayerAction(room, idx, action, data.Clone(), requestId, receivedAt))
+        {
+            if (tracksRequest) room.ProcessedPlayerRequests.Remove(idx, requestId);
             WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对局正在结束，操作未执行", requestId });
+        }
     }
+
 
     internal static void EnqueueBotAction(RoomEntry room, int playerIndex, string action, JsonElement data)
         => EnqueuePlayerAction(room, playerIndex, action, data.Clone());

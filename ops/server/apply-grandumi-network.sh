@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 interface="${GRANDUMI_NETWORK_INTERFACE:-$(ip -4 route show default | awk 'NR == 1 { print $5 }')}"
-rate="${GRANDUMI_EGRESS_RATE:-2mbit}"
+rate="${GRANDUMI_EGRESS_RATE:-60mbit}"
 
 [[ -n "$interface" ]] || {
   echo "错误：无法识别默认公网网卡。" >&2
