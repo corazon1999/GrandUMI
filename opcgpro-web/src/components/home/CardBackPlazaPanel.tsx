@@ -82,6 +82,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const gallery = useNetStore((state) => state.cardBackGallery);
   const currentCardBackId = useNetStore((state) => state.cardBackId);
   const connState = useNetStore((state) => state.connState);
+  const canManage = useNetStore((state) => state.maintenance.canManage);
   const [name, setName] = useState("");
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
   const [preparing, setPreparing] = useState(false);
@@ -147,8 +148,11 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const deleteCardBack = (cardBackId: string, cardBackName: string) => {
-    if (!window.confirm(t(`确定删除卡背“${cardBackName}”吗？删除后无法恢复。`))) return;
+  const deleteCardBack = (cardBackId: string, cardBackName: string, authorName?: string) => {
+    const confirmation = authorName
+      ? `确定以管理员身份删除已发布卡背“${cardBackName}”（作者：${authorName}）吗？删除后无法恢复。`
+      : `确定删除卡背“${cardBackName}”吗？删除后无法恢复。`;
+    if (!window.confirm(t(confirmation))) return;
     setDeletingId(cardBackId);
     setError("");
     if (!HomeRequest.deleteCardBack(cardBackId)) {
@@ -257,6 +261,8 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
           {displayedCardBacks?.map((item, index) => {
             const active = currentCardBackId === item.id;
             const approved = item.reviewStatus === "approved";
+            const canDeleteOwned = galleryView === "mine" && item.owned;
+            const canAdminDelete = galleryView === "popular" && canManage && approved && item.publiclyListed;
             return (
               <article key={item.id} className={`overflow-hidden rounded-2xl border bg-gray-900 p-3 ${active ? "border-orange-500 ring-1 ring-orange-500/30" : "border-gray-800"}`}>
                 <div className="relative mx-auto aspect-[5/7] w-full max-w-40 overflow-hidden rounded-xl bg-gray-950 shadow-xl">
@@ -288,14 +294,15 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
                   <button type="button" disabled={active || !approved} onClick={() => HomeRequest.updateCardBack(item.id)} className="min-h-11 rounded-xl bg-orange-500 px-2 text-xs font-bold text-white hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-500">
                     {active ? "已选用" : approved ? "选用并点♥" : "审核后可选"}
                   </button>
-                  {galleryView === "mine" && item.owned && (
+                  {(canDeleteOwned || canAdminDelete) && (
                     <button
                       type="button"
                       disabled={deletingId === item.id}
-                      onClick={() => deleteCardBack(item.id, item.name)}
+                      onClick={() => deleteCardBack(item.id, item.name, canAdminDelete ? item.authorName : undefined)}
+                      aria-label={canAdminDelete ? `以管理员身份删除卡背 ${item.name}` : `删除卡背投稿 ${item.name}`}
                       className="col-span-2 min-h-11 rounded-xl border border-red-500/50 px-3 text-xs font-bold text-red-300 hover:border-red-400 hover:bg-red-500/10 disabled:border-gray-700 disabled:text-gray-600"
                     >
-                      {deletingId === item.id ? "删除中…" : "删除投稿"}
+                      {deletingId === item.id ? "删除中…" : canAdminDelete ? "管理员删除" : "删除投稿"}
                     </button>
                   )}
                 </div>

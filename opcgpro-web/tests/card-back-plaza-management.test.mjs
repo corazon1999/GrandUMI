@@ -24,10 +24,19 @@ test("本人投稿展示待审核与未通过状态且只有已通过卡背可�
   assert.match(source, /disabled=\{!approved\}/);
 });
 
-test("删除入口只在我的投稿视图为本人投稿显示", () => {
-  assert.match(source, /galleryView === "mine" && item\.owned && \(/);
+test("普通用户只能管理自己的投稿，管理员可在热门视图删除已发布卡背", () => {
+  assert.match(source, /const canManage = useNetStore\(\(state\) => state\.maintenance\.canManage\)/);
+  assert.match(source, /const canDeleteOwned = galleryView === "mine" && item\.owned/);
+  assert.match(source, /const canAdminDelete = galleryView === "popular" && canManage && approved && item\.publiclyListed/);
+  assert.match(source, /\{\(canDeleteOwned \|\| canAdminDelete\) && \(/);
+  assert.match(source, /管理员删除/);
   assert.match(source, /HomeRequest\.deleteCardBack\(cardBackId\)/);
-  assert.doesNotMatch(source, /galleryView === "popular" && item\.owned && \(/);
+});
+
+test("删除按钮需要不可恢复的二次确认", () => {
+  assert.match(source, /window\.confirm\(t\(confirmation\)\)/);
+  assert.match(source, /确定以管理员身份删除已发布卡背/);
+  assert.match(source, /删除后无法恢复/);
 });
 
 test("卡背广场请求超时后停止无限加载并允许手动重试", () => {

@@ -627,9 +627,12 @@ public static class WebSocketBridge
         if (!TryRequirePlayer(s)) return;
         try
         {
-            var result = _playerDataStore.DeleteCardBack(s.Account!, Str(msg, "cardBackId") ?? "");
+            var result = _playerDataStore.DeleteCardBack(
+                s.Account!,
+                Str(msg, "cardBackId") ?? "",
+                canManagePublishedCardBacks: AdministratorPolicy.IsAuthorized(s.Account));
             s.CardBackId = result.Snapshot.CardBackId;
-            SendPlayerData(s, result.Snapshot, "卡背投稿已删除");
+            SendPlayerData(s, result.Snapshot, "卡背已删除并从广场下架");
             SendCardBackGallery(s, result.Gallery);
 
             foreach (var session in Sessions.Values.Where(IsCurrentAccountSession))
@@ -641,7 +644,7 @@ public static class WebSocketBridge
                     {
                         var snapshot = _playerDataStore.GetPlayerData(session.Account);
                         session.CardBackId = snapshot.CardBackId;
-                        SendPlayerData(session, snapshot, "正在使用的卡背已由发布者删除，已恢复为经典卡背");
+                        SendPlayerData(session, snapshot, "正在使用的卡背已下架，已恢复为经典卡背");
                     }
                     SendCardBackGallery(session, _playerDataStore.GetCardBackGallery(session.Account));
                 }

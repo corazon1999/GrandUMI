@@ -226,6 +226,28 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void CardBackGallery_管理员可删除他人已发布卡背但不可删除未发布投稿()
+    {
+        var store = CreateStore();
+        store.Login("释迦");
+        store.Login("Alice");
+        store.Login("Bob");
+        var pendingItems = store.UploadCardBack("Alice", "待审核卡背", "image/png", TinyPngBase64());
+        var pending = Assert.Single(pendingItems);
+
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.DeleteCardBack("释迦", pending.Id, canManagePublishedCardBacks: true));
+
+        store.ReviewCardBack("释迦", pending.Id, approved: true, rejectionReason: null);
+        store.UpdateCardBack("Bob", pending.Id);
+        var deleted = store.DeleteCardBack("释迦", pending.Id, canManagePublishedCardBacks: true);
+
+        Assert.Equal(pending.Id, deleted.DeletedCardBackId);
+        Assert.Empty(store.GetCardBackGallery("Alice"));
+        Assert.Equal(PlayerDataStore.DefaultCardBackId, store.GetPlayerData("Bob").CardBackId);
+    }
+
+    [Fact]
     public void CardBackReview_待审核不可公开选用且未通过理由仅向投稿者展示()
     {
         var store = CreateStore();

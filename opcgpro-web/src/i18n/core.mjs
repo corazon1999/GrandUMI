@@ -1714,6 +1714,7 @@ export const MESSAGES = { en, ja };
 const templateRules = {
   en: [
     [/^确定删除卡背“(.+)”吗？删除后无法恢复。$/, "Delete card back “$1”? This cannot be undone."],
+    [/^确定以管理员身份删除已发布卡背“(.+)”（作者：(.+)）吗？删除后无法恢复。$/, "Delete published card back “$1” by $2 as an administrator? This cannot be undone."],
     [/^确定删除卡组投稿“(.+)”吗？本地卡组不会被删除。$/, "Delete deck upload “$1”? Your local deck will not be deleted."],
     [/^已压缩至\s*(\d+)KB$/, "Compressed to $1 KB"],
     [/^添加红心，当前\s*(\d+)\s*个$/, "Add heart, currently $1"],
@@ -1739,6 +1740,7 @@ const templateRules = {
   ],
   ja: [
     [/^确定删除卡背“(.+)”吗？删除后无法恢复。$/, "カード裏面「$1」を削除しますか？元に戻せません。"],
+    [/^确定以管理员身份删除已发布卡背“(.+)”（作者：(.+)）吗？删除后无法恢复。$/, "管理者として公開済みのカード裏面「$1」（作者：$2）を削除しますか？元に戻せません。"],
     [/^确定删除卡组投稿“(.+)”吗？本地卡组不会被删除。$/, "デッキ投稿「$1」を削除しますか？ローカルデッキは削除されません。"],
     [/^已压缩至\s*(\d+)KB$/, "$1KBに圧縮済み"],
     [/^添加红心，当前\s*(\d+)\s*个$/, "ハートを追加、現在$1"],

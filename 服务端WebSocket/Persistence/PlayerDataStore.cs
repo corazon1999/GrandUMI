@@ -1034,7 +1034,10 @@ public sealed class PlayerDataStore
         return gallery;
     }
 
-    public CardBackDeletionResult DeleteCardBack(string account, string cardBackId)
+    public CardBackDeletionResult DeleteCardBack(
+        string account,
+        string cardBackId,
+        bool canManagePublishedCardBacks = false)
     {
         var normalized = NormalizeCardBackReference(cardBackId);
         if (!TryParseCustomCardBackId(normalized, out var customId))
@@ -1047,12 +1050,15 @@ public sealed class PlayerDataStore
         using (var ownership = connection.CreateCommand())
         {
             ownership.Transaction = transaction;
-            ownership.CommandText = "SELECT owner_player_id FROM card_backs WHERE id=$id;";
+            ownership.CommandText = "SELECT owner_player_id, review_status FROM card_backs WHERE id=$id;";
             ownership.Parameters.AddWithValue("$id", customId);
-            var owner = ownership.ExecuteScalar();
-            if (owner is null) throw new PlayerDataValidationException("该卡背不存在或已下架。");
-            if (Convert.ToInt64(owner, CultureInfo.InvariantCulture) != playerId)
-                throw new PlayerDataValidationException("只能删除自己发布的卡背。");
+            using var reader = ownership.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("该卡背不存在或已下架。");
+
+            var owned = reader.GetInt64(0) == playerId;
+            var published = reader.GetString(1) == CardBackReviewApproved;
+            if (!owned && !(canManagePublishedCardBacks && published))
+                throw new PlayerDataValidationException("只能删除自己发布的卡背；管理员可删除已发布卡背。");
         }
 
         using (var resetSelections = connection.CreateCommand())

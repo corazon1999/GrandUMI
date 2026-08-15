@@ -61,6 +61,10 @@ test("translates new dynamic confirmations, counts, and notifications", () => {
     "Delete card back “海浪”? This cannot be undone.",
   );
   assert.equal(
+    translateText("确定以管理员身份删除已发布卡背“海浪”（作者：路飞）吗？删除后无法恢复。", "en"),
+    "Delete published card back “海浪” by 路飞 as an administrator? This cannot be undone.",
+  );
+  assert.equal(
     translateText("确定删除卡组投稿“红路飞”吗？本地卡组不会被删除。", "ja"),
     "デッキ投稿「红路飞」を削除しますか？ローカルデッキは削除されません。",
   );
