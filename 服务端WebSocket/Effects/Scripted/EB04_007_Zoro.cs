@@ -28,30 +28,11 @@ public class EB04_007_Zoro : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
-        var selfId = self.Id;
         int owner = ctx.OwnerIndex;
 
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            var leaderId = me.Leader.Id;
-            int baseTurn = ctx.State.TurnCount;
-            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-            ctx.State.ContinuousEffects.Add(new ContinuousEffect
-            {
-                SourceCardId = selfId.ToString(),
-                Scope = new ContinuousScope
-                {
-                    Side = 0,
-                    IncludeLeader = true,
-                    IncludeCharacters = false,
-                    Filter = c => c.Id == leaderId,
-                },
-                PowerDelta = 2000,
-                // 只加领袖：必须在 Predicate 里限定 card.Id==leaderId（引擎不消费 Scope.Filter，
-                // 否则会变成全场+2000）
-                Predicate = (s, sideIdx, card) =>
-                    sideIdx == owner && card.Id == leaderId && s.TurnCount <= baseTurn + 1,
-            });
+            AtomicOps.AddPowerUntilOppEnd(me.Leader, 2000, owner);
             return Task.CompletedTask;
         }
 

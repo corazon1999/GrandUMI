@@ -2612,6 +2612,9 @@
   {
     "number": "OP01-121",
     "name": "大和",
+    "alsoNames": [
+      "光月御殿"
+    ],
     "color": "绿",
     "type": "角色",
     "property": "打",

@@ -69,4 +69,28 @@ public class DeckValidatorTests
         var v = DeckValidator.Validate(string.Join('\n', lines));
         Assert.False(v.Ok);
     }
+
+    [Fact]
+    public void P117_RejectsCardsWithoutEastBlueTrait()
+    {
+        var lines = new List<string> { "P-117" };
+        var eastBlueCards = new[]
+        {
+            "EB01-029", "EB01-030", "EB02-022", "EB02-029", "EB03-023",
+            "EB03-028", "OP03-041", "OP03-042", "OP03-043", "OP03-044",
+            "OP03-045", "OP03-046", "OP03-047",
+        };
+        foreach (var number in eastBlueCards)
+        {
+            while (lines.Count < 50 && lines.Count(card => card == number) < 4)
+                lines.Add(number);
+        }
+        lines.Add("OP01-073");
+
+        var result = DeckValidator.Validate(string.Join('\n', lines));
+
+        Assert.False(result.Ok);
+        Assert.Contains("东海", result.Reason ?? "");
+        Assert.Contains("OP01-073", result.Reason ?? "");
+    }
 }

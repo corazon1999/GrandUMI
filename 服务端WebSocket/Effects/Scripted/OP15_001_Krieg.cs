@@ -46,9 +46,6 @@ public class OP15_001_Krieg : IScriptedEffect
         var key = "OP15-001-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 赋予条件：自身被赋予 >= 1 张咚
-        if (me.AttachedDonCount(me.Leader.Id) < 1) return;
-
         // 候选目标：对方被赋予 >= 2 张咚的角色
         var candidates = opp.Characters
             .Where(c => opp.AttachedDonCount(c.Id) >= 2)

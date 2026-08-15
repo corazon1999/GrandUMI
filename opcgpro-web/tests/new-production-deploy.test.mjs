@@ -41,7 +41,7 @@ test("候选服使用独立端口、独立数据目录和较低资源上限", ()
   assert.match(candidateNginx, /127\.0\.0\.1:13000/);
   assert.match(candidateBackup, /data_dir=\/data\/grandumi-candidate/);
   assert.doesNotMatch(candidateBackup, /data_dir=\/data\/grandumi\n/);
-  assert.match(candidateDeploy, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/grand-umi\.com/);
+  assert.match(candidateDeploy, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/\$candidate_host/);
   assert.doesNotMatch(productionBootstrap, /rm -f \/etc\/nginx\/sites-enabled\/grandumi-candidate/);
 });
 

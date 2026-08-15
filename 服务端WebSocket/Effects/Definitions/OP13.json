@@ -156,7 +156,7 @@
             "count": 5,
             "max": 1,
             "match": {
-              "keyword": "罗杰海盗团",
+              "keywordContains": "罗杰海盗团",
               "excludeName": "杰克斯"
             }
           }

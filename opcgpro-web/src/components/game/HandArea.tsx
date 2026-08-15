@@ -21,6 +21,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
   const phase = useGameStore((s) => s.phase);
   const isPending = useGameStore((s) => s.isPending);
+  const pendingPrompt = useGameStore((s) => s.pendingPrompt);
   const selectedHandIndex = useGameStore((s) => s.selectedHandIndex);
   const setSelectedHand = useGameStore((s) => s.setSelectedHand);
   const { cardSize } = useResponsive();
@@ -105,7 +106,10 @@ export default function HandArea({ side, hidden = false }: Props) {
   // 反击步骤：防守方可点击带反击值的手牌丢弃加反击；
   // 或点击「反击事件」（带 EventCounter 标签且费用可付）从手牌打出。
   // 防守方判断用 isDefender（攻击者属于对手），兼容 GM「对手领袖攻击」在我方回合制造的战斗。
-  const isCounterStep = !hidden && side === "my" && phase === "Counter" && isDefender;
+  // 反击流程中的卡牌效果可能先打开另一个服务器选牌提示。
+  // 该提示未处理完时，底层手牌只用于查看，不能把一次点击误发成反击弃牌请求。
+  const isCounterStep =
+    !hidden && side === "my" && phase === "Counter" && isDefender && pendingPrompt === null;
   const myActiveDon = side === "my" && player ? player.costActive : 0;
   const effectiveCounter = (c: ReturnType<typeof getCard> | null, i: number) =>
     (side === "my" ? player.handCardCounters?.[i] : undefined) ?? c?.counter ?? 0;

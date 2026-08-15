@@ -36,6 +36,7 @@ public static class CardPlayer
                     p.Trash.Add(sacrifice);
                 }
                 card.TurnPlayed = s.TurnCount;
+                card.IsTapped = s.ShouldCharacterEnterRested(playerIdx, card);
                 p.Characters.Add(card);
                 return new PlayResult(PlayKind.Character, card);
 

@@ -40,9 +40,11 @@ test("共享弹窗在旋转对局画布中使用容器尺寸并保留可滚动�
 
   assert.match(modal, /const useMobileSheet = mobileSheet && !rotateQuarterTurn/);
   assert.match(modal, /w-\[calc\(100cqw-2rem\)\]/);
-  assert.match(modal, /max-h-\[calc\(100cqh-2rem/);
+  assert.match(modal, /calc\(100cqh - 2rem - var\(--layout-safe-top/);
+  assert.match(modal, /style=\{\{ maxHeight: dialogMaxHeight \}\}/);
   assert.match(modal, /data-modal-scroll-region/);
-  assert.match(modal, /overflow-y-auto overscroll-contain/);
+  assert.match(modal, /touch-pan-y overflow-y-auto overscroll-contain/);
+  assert.match(modal, /tabIndex=\{0\}/);
   assert.match(modal, /h-12 w-12/);
   assert.match(modal, /var\(--layout-safe-left/);
   assert.match(modal, /var\(--layout-safe-right/);

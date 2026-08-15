@@ -37,9 +37,11 @@ export default function Modal({
     : "lg:w-[calc(100vw-2rem)] lg:rounded-xl lg:border-b lg:p-6";
   const mediumDialogPadding = containerResponsive ? "@[640px]:p-6" : "sm:p-6";
   const dialogWidthClass = containerResponsive ? "w-[calc(100cqw-2rem)]" : "w-[calc(100vw-2rem)]";
-  const maxHeightClass = containerResponsive
-    ? "max-h-[calc(100cqh-2rem-var(--layout-safe-top,0px)-var(--layout-safe-bottom,0px))]"
-    : "max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]";
+  // calc() 的加减号两侧必须保留空格。把高度写入 style，避免 Tailwind 任意值
+  // 在压缩下丢失空格后整条 max-height 被浏览器判为无效，导致长设置弹窗无法滚动。
+  const dialogMaxHeight = containerResponsive
+    ? "calc(100cqh - 2rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px))"
+    : "calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))";
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -117,7 +119,8 @@ export default function Modal({
             aria-labelledby={title ? titleId : undefined}
             data-modal-dialog
             tabIndex={-1}
-            className={`relative z-10 flex ${maxHeightClass} flex-col overflow-hidden border border-gray-700 bg-gray-900 shadow-2xl outline-none ${
+            style={{ maxHeight: dialogMaxHeight }}
+            className={`relative z-10 flex flex-col overflow-hidden border border-gray-700 bg-gray-900 shadow-2xl outline-none ${
               useMobileSheet
                 ? `w-full rounded-t-2xl border-b-0 p-4 pb-[calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] ${largeDialogClasses}`
                 : `${dialogWidthClass} rounded-xl p-4 ${mediumDialogPadding}`
@@ -141,7 +144,11 @@ export default function Modal({
                 ×
               </button>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" data-modal-scroll-region>
+            <div
+              className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]"
+              data-modal-scroll-region
+              tabIndex={0}
+            >
               {children}
             </div>
           </motion.div>

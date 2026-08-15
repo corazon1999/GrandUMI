@@ -643,8 +643,7 @@
             "max": 1,
             "restTo": "bottom",
             "match": {
-              "keyword": "福克斯海盗团",
-              "excludeName": "波尔茜"
+              "keyword": "福克斯海盗团"
             }
           }
         ]

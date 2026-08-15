@@ -767,25 +767,11 @@ public static class DeclaredOmissionEffects
                 "虏之矢：将我方 1 张费用不低于 2 的角色放回手牌，使我方卡牌本次战斗+4000？")) return;
         var cost = await ChooseUpToOne(ctx, "OwnCharacter", "选择放回手牌的角色", costs);
         if (cost is null) return;
-        ReturnOwnCharacterToHand(me, cost);
+        AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, cost);
         var targets = new List<CardInstance> { me.Leader };
         targets.AddRange(me.Characters);
         var target = await ChooseUpToOne(ctx, "OwnLeaderOrCharacter", "选择我方最多 1 张领袖或角色+4000", targets);
         if (target is not null) AtomicOps.AddPowerThisBattle(target, 4000);
-    }
-
-    private static void ReturnOwnCharacterToHand(PlayerState owner, CardInstance card)
-    {
-        foreach (var don in owner.CostArea.Where(don => don.State == DonState.Attached && don.AttachedToCardId == card.Id))
-        {
-            don.State = DonState.Rest;
-            don.AttachedToCardId = null;
-        }
-        if (owner.Characters.Remove(card))
-        {
-            card.IsTapped = false;
-            owner.Hand.Add(card);
-        }
     }
 
     private static async Task ResolveOP07_075(EffectContext ctx)

@@ -123,19 +123,24 @@
         }
       ]
     },
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "lifeToHand": true
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 3000
-      }
-    ]
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisTurn",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    }
   },
   "OP06-019": {
     "_name": "",

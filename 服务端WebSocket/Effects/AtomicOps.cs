@@ -192,6 +192,16 @@ public static class AtomicOps
 
     public static void KO(GameState s, int ownerIdx, CardInstance card)
     {
+        // 旧脚本仍大量调用同步入口；在效果结算上下文中统一转入完整异步 KO 流程，
+        // 使 PreKO、他卡守护、离场置换和【KO时】不会被绕过。
+        var prompts = EffectRuntime.CurrentPrompts;
+        if (prompts is not null && ReferenceEquals(EffectRuntime.CurrentState, s))
+        {
+            KOByEffectAsync(s, ownerIdx, card, prompts, EffectRuntime.CurrentActingSide)
+                .GetAwaiter().GetResult();
+            return;
+        }
+
         // 持续"因效果不会被KO"保护（自送废弃/满员牺牲走 KOCard，不经此入口，不受保护）
         if (s.IsKoGuarded(card, "effect")) return;
         if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
@@ -706,6 +716,7 @@ public static class AtomicOps
             if (p.Characters.Count >= 5)
                 await SqueezeCharacterSlot(s, playerIdx);
             card.TurnPlayed = s.TurnCount;
+            card.IsTapped = s.ShouldCharacterEnterRested(playerIdx, card);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
         }
@@ -816,7 +827,7 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState;
+            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "trash"); // 触发被登场角色的【登场时】
         }
@@ -988,7 +999,7 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState;
+            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "deck"); // 触发被登场角色的【登场时】
         }
@@ -1012,7 +1023,7 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState;
+            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "life"); // 触发被登场角色的【登场时】
         }

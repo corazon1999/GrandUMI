@@ -627,8 +627,9 @@
       "then": [
         {
           "op": "Choose",
-          "prompt": "OpponentCharacterCostLe4",
+          "prompt": "OpponentCharacter",
           "max": 1,
+          "filter": { "originalCostLte": 4 },
           "as": "$tgt"
         },
         {
@@ -641,8 +642,9 @@
     "trigger": [
       {
         "op": "Choose",
-        "prompt": "OpponentCharacterCostLe1",
+        "prompt": "OpponentCharacter",
         "max": 1,
+        "filter": { "originalCostLte": 1 },
         "as": "$tgt"
       },
       {

@@ -1583,6 +1583,8 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
         if (c.Trigger != EffectTrigger.OnEnterField) return;
+        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex,
+            "是否公开手牌中2张拥有【触发】的卡牌，并KO对方最多2张费用≤1的角色？")) return;
         if (!await DiscardOwnFiltered(c, x => !string.IsNullOrEmpty(x.Info.Trigger), 2,
             "公开手牌中2张拥有【触发】的卡牌", revealOnly: true)) return;
         await KOByEffect(c, await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 1, 2, "选择最多2张费用≤1的角色KO"));
@@ -1688,8 +1690,9 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         AtomicOps.Draw(c.State, c.OwnerIndex, 1);
         var selected = await ChooseByTotalCost(c,
-            Me(c).Hand.Where(x => x.Info.Kind == CardKind.Character && x.Info.HasKeyword("洛克斯海盗团")),
-            9, 2, "选择不同名称的《洛克斯海盗团》角色登场", distinctNames: true);
+            Me(c).Hand.Where(x => x.Info.HasKeyword("洛克斯海盗团") &&
+                                  x.Info.Kind is CardKind.Character or CardKind.Stage),
+            9, 2, "选择不同名称的《洛克斯海盗团》角色或舞台登场", distinctNames: true);
         foreach (var card in selected) await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, card);
     }
 

@@ -28,7 +28,7 @@ public class OP03_030_Nami : IScriptedEffect
         var top = me.Deck.Take(k).ToList();
 
         var cand = top.Where(c =>
-            c.Info.ColorList.Contains("草") &&
+            c.Info.ColorList.Contains("绿") &&
             c.Info.HasKeyword("东海") &&
             !c.MatchesName("奈美")).ToList();
 

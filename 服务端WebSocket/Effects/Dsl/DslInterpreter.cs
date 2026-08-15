@@ -866,9 +866,12 @@ public static class DslInterpreter
                     break;
                 case "donAttachedGteOwn":
                 {
-                    // 己方任意角色被赋予咚数 ≥ N
+                    // “我方场上存在被赋予咚的牌”同时包含领袖和角色；
+                    // OP13-063/072 在咚赋予领袖时也必须满足条件。
                     int nDon = p.Value.GetInt32();
-                    if (!me.Characters.Any(c => me.AttachedDonCount(c.Id) >= nDon)) return false;
+                    if (me.AttachedDonCount(me.Leader.Id) < nDon
+                        && !me.Characters.Any(c => me.AttachedDonCount(c.Id) >= nDon))
+                        return false;
                     break;
                 }
                 case "donAttachedLteOwn":

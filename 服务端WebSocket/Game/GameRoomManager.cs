@@ -933,7 +933,9 @@ public static class GameRoomManager
             // 超时 → 判负
             var r = GetRoom(room.RoomId);
             if (r is null) return;
-            EnqueueWork(r, new RoomWork("DisconnectTimeout", LatencyDiagnostics.Start(), () =>
+            // 终局任务不能像普通玩家操作一样在队列满时静默丢弃；否则房间最终会被清理，
+            // 在线一方却收不到权威终局快照，只会一直停留在“正在结算”。
+            EnqueueRecoveryWork(r, new RoomWork("DisconnectTimeout", LatencyDiagnostics.Start(), () =>
             {
                 lock (r.ClockGate)
                 {
@@ -987,7 +989,8 @@ public static class GameRoomManager
         _grace.TryRemove(room.RoomId + ":" + oppSid, out _);
         cts.Cancel(); // 取消对手宽限计时器，避免随后超时逻辑重复判负
 
-        if (!EnqueueWork(room, new RoomWork("EndByDisconnect", LatencyDiagnostics.Start(), () =>
+        // 与自动断线判负共用保证入队语义，避免压力下“结束对局”请求被丢弃。
+        EnqueueRecoveryWork(room, new RoomWork("EndByDisconnect", LatencyDiagnostics.Start(), () =>
         {
             if (!room.Engine.State.IsGameOver)
             {
@@ -997,8 +1000,7 @@ public static class GameRoomManager
             }
             CleanupRoom(room.RoomId);
             return Task.CompletedTask;
-        })))
-            WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "对局正在结束，请稍候" });
+        }));
     }
 
     /// <summary>断线玩家在宽限期内重新连接（同账号新 sessionId）</summary>

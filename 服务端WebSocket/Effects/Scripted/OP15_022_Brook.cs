@@ -11,13 +11,22 @@ public class OP15_022_Brook : IScriptedEffect
 {
     public string CardNumber => "OP15-022";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var key = "OP15-022-MainOncePerTurn" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
         AtomicOps.MillTop(me, 4);
         me.TurnOnceUsed.Add(key);
-        return Task.CompletedTask;
+        if (me.Deck.Count != 0 || me.Characters.Count == 0) return;
+
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
+            "卡组为0张，将我方最多1张角色转为活跃状态",
+            me.Characters.Select(card => card.Id.ToString()).ToList(), 0, 1);
+        if (chosen.Count > 0)
+        {
+            var target = me.Characters.FirstOrDefault(card => card.Id.ToString() == chosen[0]);
+            if (target is not null) AtomicOps.ActivateCard(target);
+        }
     }
 }

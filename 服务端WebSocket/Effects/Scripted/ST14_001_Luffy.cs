@@ -35,7 +35,9 @@ public class ST14_001_Luffy : IScriptedEffect
             Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = false },
             PowerDelta = 1000,
             Predicate = (s, sideIdx, card) =>
-                card.Id == leaderId && s.Players[owner].Characters.Any(c => s.CurrentCostOf(owner, c) >= 8),
+                card.Id == leaderId &&
+                s.Players[owner].AttachedDonCount(leaderId) >= 1 &&
+                s.Players[owner].Characters.Any(c => s.CurrentCostOf(owner, c) >= 8),
         });
         return Task.CompletedTask;
     }

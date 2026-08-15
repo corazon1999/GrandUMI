@@ -37,6 +37,7 @@ public class OP12_063_Reiju : IScriptedEffect
         {
             SourceCardId = selfId.ToString(),
             PowerDelta = 2000,
+            CostDelta = 5,
             Scope = new ContinuousScope
             {
                 Side = 0,                 // 仅我方

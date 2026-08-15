@@ -53,7 +53,7 @@
         "on": "OnAttackDeclare",
         "if": { "donAttachedGte": 2 },
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
           { "op": "KO", "target": "$tgt" }
         ]
       }

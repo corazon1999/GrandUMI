@@ -53,12 +53,20 @@ public class OP14_105_GorgonSisters : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
 
-        // 赋予所有领袖与角色各最多 1 张「休息状态」的咚!!（DonState.Rest；只取费用区休息咚，
-        // 无休息咚则不赋予，不回退活跃咚，见 AttachDonFromCost 与 ST17-004 修复记录）
-        AtomicOps.AttachDonFromCost(me, me.Leader.Id, 1, DonState.Rest);
-        foreach (var ch in me.Characters.ToList())
+        // 每个目标都是「最多 1 张」：让玩家选择本次要赋予的领袖/角色，而不是强制按场上顺序贴满。
+        var targets = new List<CardInstance> { me.Leader };
+        targets.AddRange(me.Characters);
+        int maxTargets = Math.Min(targets.Count, me.CostArea.Count(d => d.State == DonState.Rest));
+        if (maxTargets <= 0) return;
+
+        var chosenTargets = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
+            $"选择最多 {maxTargets} 张我方领袖或角色，各赋予 1 张休息状态的咚!!",
+            targets.Select(card => card.Id.ToString()).ToList(), 0, maxTargets);
+        foreach (var id in chosenTargets.Distinct())
         {
-            AtomicOps.AttachDonFromCost(me, ch.Id, 1, DonState.Rest);
+            var target = targets.FirstOrDefault(card => card.Id.ToString() == id);
+            if (target is not null)
+                AtomicOps.AttachDonFromCost(me, target.Id, 1, DonState.Rest);
         }
     }
 }

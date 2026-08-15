@@ -9,6 +9,30 @@ namespace GrandUMI.Tests;
 public class OperationClockTests
 {
     [Fact]
+    public void 断线超时终局在效果批次挂起时也会立即下发快照()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            var sentPlayers = new List<int>();
+            room.Engine.OnSendToPlayer = (playerIndex, _) => sentPlayers.Add(playerIndex);
+            typeof(GameEngine).GetField("_snapshotBatchActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(room.Engine, true);
+
+            room.Engine.State.WinnerIndex = 1;
+            room.Engine.State.GameOverReason = "玩家断线超时";
+            room.Engine.Broadcast("DisconnectTimeout", new { disconnected = 0 });
+
+            Assert.Equal([0, 1], sentPlayers);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public async Task 选先后与调度不计时_进入第一回合后才启动棋钟()
     {
         TestScene.New();

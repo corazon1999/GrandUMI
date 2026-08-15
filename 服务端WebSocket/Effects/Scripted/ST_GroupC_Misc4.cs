@@ -27,12 +27,14 @@ public class ST13_001_Sabo : IScriptedEffect
         if (mch.Count == 0) return;
         var moved = moveCands.First(c => c.Id.ToString() == mch[0]);
         AtomicOps.MoveCharToLife(ctx.State, ctx.OwnerIndex, moved, toTop: true);
+        moved.IsLifeFaceUp = true;
         me.TurnOnceUsed.Add(key);
         var buffCands = me.Characters.ToList();
         if (buffCands.Count == 0) return;
         var bch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "我方最多1张角色力量+2000（直到下个我方回合开始）", buffCands.Select(c => c.Id.ToString()).ToList(), 0, 1);
-        if (bch.Count > 0) AtomicOps.AddPowerPersistent(buffCands.First(c => c.Id.ToString() == bch[0]), 2000);
+        if (bch.Count > 0)
+            AtomicOps.AddPowerUntilOppEnd(buffCands.First(c => c.Id.ToString() == bch[0]), 2000, ctx.OwnerIndex);
     }
 }
 

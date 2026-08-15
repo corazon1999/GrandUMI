@@ -5,14 +5,13 @@ namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
 /// EB01-001 光月御殿（领航 / 炎·风 / 和之国·光月家）
-/// 规则上，我方所有拥有《和之国》特征且没有反击的角色卡牌变为拥有反击+1000。 ← 反击赋予引擎无持续通道，未实现该段。
+/// 规则上，我方所有拥有《和之国》特征且没有反击的角色卡牌变为拥有反击+1000。
 /// 【咚!!×1】【攻击时】我方场上存在费用为5或更高且拥有《和之国》特征的角色的场合，
 ///   直到下个我方的回合开始时为止，此领袖的力量+1000。
 ///
 /// 实现说明 / 简化点：
-///   - 仅实现可表达的【攻击时】力量段：条件满足时给领袖 +1000。
-///   - "直到下个我方回合开始时"用本回合力量加成近似（AddPowerThisTurn），与多数实现一致。
-///   - "规则上赋予反击+1000"为持续的反击数值赋予，引擎无对应持续通道，未实现该部分。
+///   - 手牌中的持续反击值由 HandStaticCounter 实时计算。
+///   - "直到下个我方回合开始时"等价为跨越当前回合并在紧随的对方结束阶段清除。
 /// </summary>
 public class EB01_001_KozukiOden : IScriptedEffect
 {
@@ -32,7 +31,7 @@ public class EB01_001_KozukiOden : IScriptedEffect
 
         bool cond = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 5 && c.Info.HasKeyword("和之国"));
         if (cond)
-            AtomicOps.AddPowerThisTurn(me.Leader, 1000);
+            AtomicOps.AddPowerUntilOppEnd(me.Leader, 1000, ctx.OwnerIndex);
 
         return Task.CompletedTask;
     }

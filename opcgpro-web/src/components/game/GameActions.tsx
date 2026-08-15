@@ -30,16 +30,15 @@ export default function GameActions() {
   const cancelAttack = useBattleStore((s) => s.cancelAttack);
   const isSelectingTarget = useBattleStore((s) => s.isSelectingTarget);
 
-  // 选中的攻击者（领袖或己方角色）的横置状态；非攻击者返回 null
-  const attackerTapped =
+  // 攻击机会以后端权威字段为准，避免仅凭“活跃状态”展示实际不可发动的攻击按钮。
+  const selectedAttackerCanAttack =
     my && selectedFieldId !== null
       ? my.leaderId === selectedFieldId
-        ? my.leaderTapped
-        : (my.fieldCards.find((c) => c.id === selectedFieldId)?.isTapped ?? null)
-      : null;
-  // 攻击者未横置才可宣言攻击
+        ? my.leaderCanAttack
+        : (my.fieldCards.find((c) => c.id === selectedFieldId)?.canAttack ?? false)
+      : false;
   const canAttack =
-    currentTurn && turnCount > 1 && !battle && !isSelectingTarget && attackerTapped === false;
+    currentTurn && turnCount > 1 && !battle && !isSelectingTarget && selectedAttackerCanAttack;
   const canPlay = currentTurn && selectedHandIndex !== null;
   const canPassCounter = isDefender && phase === "Counter";
 

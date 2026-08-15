@@ -83,7 +83,8 @@ public class OP13_079_Imu : IScriptedEffect
                 tenryubito.Select(c => c.Id.ToString()).ToList(), 1, 1);
             if (chosen.Count == 0) return;
             var tgt = tenryubito.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.KO(ctx.State, ctx.OwnerIndex, tgt);
+            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, tgt);
+            if (me.Characters.Contains(tgt)) return;
         }
         else
         {

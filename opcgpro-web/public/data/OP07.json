@@ -2130,7 +2130,7 @@
     "type": "领航",
     "property": "知",
     "power": "5000",
-    "cost": "-",
+    "cost": "2",
     "keyWords": "科学家/艾格赫德",
     "counter": "",
     "effectTags": [

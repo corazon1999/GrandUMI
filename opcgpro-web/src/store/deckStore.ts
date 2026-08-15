@@ -51,6 +51,19 @@ function setCodeOf(card: CardData): string {
   return card.number.split("-")[0];
 }
 
+export function isCardAllowedByLeaderRule(
+  leader: CardData,
+  card: CardData,
+): { ok: boolean; reason?: string } {
+  if (leader.number === "P-117" && !card.keyWords.includes("东海")) {
+    return {
+      ok: false,
+      reason: `无法加入卡组：P-117 奈美只能使用拥有《东海》特征的卡牌（${card.number}）`,
+    };
+  }
+  return { ok: true };
+}
+
 // 不受「同名卡 ≤ 4」限制的卡（卡面注明"规则上，可以将任意张数的此卡牌放入卡组"）。
 // 与服务端 DeckValidator.UnlimitedCopyCards 保持一致；新增同类卡时两处同步登记。
 export const UNLIMITED_COPY_CARDS = new Set<string>([
@@ -208,11 +221,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       return;
     }
     set((s) => {
+      const compatible = (entry: DeckEntry) =>
+        colorMatch(card.color, entry.card.color) && isCardAllowedByLeaderRule(card, entry.card).ok;
       const removed = s.entries.reduce(
-        (sum, e) => (!colorMatch(card.color, e.card.color) ? sum + e.count : sum),
-        0
+        (sum, entry) => (!compatible(entry) ? sum + entry.count : sum),
+        0,
       );
-      const entries = s.entries.filter((e) => colorMatch(card.color, e.card.color));
+      const entries = s.entries.filter(compatible);
       // 颜色筛选自动收缩为领航颜色：单色直接选中该色，双色置「全部」（两色都显示，可再按需多选）
       const leaderColors = card.color.split("/");
       const filterColors = leaderColors.length === 1 ? leaderColors : [];
@@ -240,6 +255,10 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       }
       if (s.leader && !colorMatch(s.leader.color, card.color)) {
         return { notice: { message: "无法加入卡组：颜色与领航卡不符", type: "error" as const } };
+      }
+      const leaderRule = isCardAllowedByLeaderRule(s.leader, card);
+      if (!leaderRule.ok) {
+        return { notice: { message: leaderRule.reason!, type: "error" as const } };
       }
       const existing = s.entries.find((e) => e.card.number === card.number);
       if (existing) {
@@ -314,6 +333,8 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       if (!colorMatch(s.leader.color, e.card.color)) {
         return { ok: false, reason: `卡牌 ${e.card.number} 颜色与领航不符` };
       }
+      const leaderRule = isCardAllowedByLeaderRule(s.leader, e.card);
+      if (!leaderRule.ok) return leaderRule;
     }
     return { ok: true };
   },

@@ -29,18 +29,20 @@ public class OP06_117_ArkMaxim : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本前提：此舞台需为活跃，且存在 1 张活跃的"艾尼路"角色
+        // 成本前提：此舞台需为活跃，且存在 1 张活跃的"艾尼路"领袖或角色
         if (self.IsTapped) return;
-        var enels = me.Characters.Where(c => !c.IsTapped && c.MatchesName("艾尼路")).ToList();
+        var enels = new[] { me.Leader }.Concat(me.Characters)
+            .Where(c => !c.IsTapped && c.MatchesName("艾尼路"))
+            .ToList();
         if (enels.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "方舟箴言【启动主要】：将此舞台和我方 1 张活跃的“艾尼路”转为休息，KO 对方所有费用≤2 的角色？");
+            "方舟箴言【启动主要】：将此舞台和我方 1 张活跃的“艾尼路”领袖或角色转为休息，KO 对方所有费用≤2 的角色？");
         if (!use) return;
 
         // 成本：选择 1 张活跃"艾尼路"横置
         var enelPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnEnel",
-            "选择 1 张活跃的“艾尼路”转为休息状态（成本）",
+            "选择 1 张活跃的“艾尼路”领袖或角色转为休息状态（成本）",
             enels.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (enelPick.Count < 1) return; // 未支付成本
 

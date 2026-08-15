@@ -64,6 +64,24 @@ test("手牌拖动只改变本地显示顺序并保留服务端下标", async ()
   assert.match(hand, /onClick=\{\(\) => handleClick\(serverIndex\)\}/);
 });
 
+test("反击阶段存在服务器选牌提示时不会误把查看手牌当成反击", async () => {
+  const hand = await readSource("../src/components/game/HandArea.tsx");
+
+  assert.match(hand, /const pendingPrompt = useGameStore\(\(s\) => s\.pendingPrompt\)/);
+  assert.match(
+    hand,
+    /phase === "Counter" && isDefender && pendingPrompt === null/,
+  );
+});
+
+test("P-117 奈美组卡器只允许加入东海特征卡牌", async () => {
+  const store = await readSource("../src/store/deckStore.ts");
+
+  assert.match(store, /leader\.number === "P-117"/);
+  assert.match(store, /card\.keyWords\.includes\("东海"\)/);
+  assert.match(store, /const leaderRule = isCardAllowedByLeaderRule\(s\.leader, card\)/);
+});
+
 test("电脑与手机都显示全屏按钮且触控区不少于44像素", async () => {
   const [route, fullscreen] = await Promise.all([
     readSource("../src/components/home/LayoutPreviewRoute.tsx"),

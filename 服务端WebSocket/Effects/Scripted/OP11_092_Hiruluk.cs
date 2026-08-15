@@ -64,7 +64,15 @@ public class OP11_092_Hiruluk : IScriptedEffect
         {
             var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
             if (picked is not null)
+            {
                 await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, picked);
+                ctx.State.EndOfTurnTasks.Add(new EndTurnTask
+                {
+                    Kind = "ReturnCharacterToDeckBottom",
+                    Owner = ctx.OwnerIndex,
+                    SourceCardId = picked.Id.ToString(),
+                });
+            }
         }
     }
 }

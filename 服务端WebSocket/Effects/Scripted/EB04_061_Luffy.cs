@@ -44,9 +44,9 @@ public class EB04_061_Luffy : IScriptedEffect
         AtomicOps.DiscardHand(me, discard);
 
         // 效果 1：我方领袖力量 +2000（近似：本回合内有效，见类注释）
-        AtomicOps.AddPowerThisTurn(me.Leader, 2000);
+        AtomicOps.AddPowerUntilOppEnd(me.Leader, 2000, ctx.OwnerIndex);
 
         // 效果 2：此角色获得【阻挡者】，直到下个对方的结束阶段结束时为止
-        AtomicOps.GiveKeyword(self, "阻挡者", KeywordDuration.UntilNextOpponentEndPhase);
+        AtomicOps.GiveKeyword(self, "阻挡者", KeywordDuration.UntilNextOpponentEndPhase, ctx.OwnerIndex);
     }
 }

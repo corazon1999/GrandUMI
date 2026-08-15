@@ -1,3 +1,5 @@
+using GrandUMI.Effects;
+
 namespace GrandUMI.Game.PhaseFlow;
 
 /// <summary>
@@ -42,7 +44,10 @@ public static class TurnEngine
         }
 
         // 2. 领袖/角色/舞台/费用区中的休息卡牌 → 活跃
-        if (p.Leader.IsTapped) p.Leader.IsTapped = false;
+        if (p.Leader.CannotActivateNextReset)
+            p.Leader.CannotActivateNextReset = false;
+        else if (!state.IsResetPrevented(p.Leader) && p.Leader.IsTapped)
+            p.Leader.IsTapped = false;
         foreach (var c in p.Characters)
         {
             if (c.CannotActivateNextReset)
@@ -54,7 +59,11 @@ public static class TurnEngine
             if (c.IsTapped) c.IsTapped = false;
         }
         // 舞台卡通常不会休息，但留个处理点
-        if (p.StageCard is { IsTapped: true } && !state.IsResetPrevented(p.StageCard)) p.StageCard.IsTapped = false;
+        if (p.StageCard is { } stage)
+        {
+            if (stage.CannotActivateNextReset) stage.CannotActivateNextReset = false;
+            else if (stage.IsTapped && !state.IsResetPrevented(stage)) stage.IsTapped = false;
+        }
         foreach (var d in p.CostArea)
             if (d.State == DonState.Rest)
             {
@@ -149,6 +158,13 @@ public static class TurnEngine
                 // P-058：本回合结束时，将我方所有《FILM》角色转为活跃状态。
                 foreach (var card in state.Players[task.Owner].Characters.Where(c => c.Info.HasKeyword("FILM")))
                     card.IsTapped = false;
+            }
+            else if (task.Kind == "ReturnCharacterToDeckBottom")
+            {
+                var owner = state.Players[task.Owner];
+                var card = owner.Characters.FirstOrDefault(c => c.Id.ToString() == task.SourceCardId);
+                if (card is not null)
+                    AtomicOps.ReturnFieldToDeckBottom(state, task.Owner, card);
             }
         }
         state.EndOfTurnTasks.Clear();

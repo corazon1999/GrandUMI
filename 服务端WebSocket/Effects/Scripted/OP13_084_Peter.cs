@@ -21,12 +21,38 @@ public class OP13_084_Peter : IScriptedEffect
 {
     public string CardNumber => "OP13-084";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.PreKO;
+    public bool HandlesTrigger(EffectTrigger t) =>
+        t == EffectTrigger.OnEnterField || t == EffectTrigger.PreKO;
 
     public Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
+
+        if (ctx.Trigger == EffectTrigger.OnEnterField)
+        {
+            int owner = ctx.OwnerIndex;
+            ctx.State.ContinuousEffects.RemoveAll(e =>
+                e.SourceCardId == self.Id.ToString() && e.OriginalPowerOverride.HasValue);
+            ctx.State.ContinuousEffects.Add(new ContinuousEffect
+            {
+                SourceCardId = self.Id.ToString(),
+                Scope = new ContinuousScope
+                {
+                    Side = 0,
+                    IncludeLeader = false,
+                    IncludeCharacters = true,
+                    Filter = card => card.Info.HasKeyword("五老星"),
+                },
+                OriginalPowerOverride = 7000,
+                Predicate = (state, sideIdx, card) =>
+                    sideIdx == owner &&
+                    state.CurrentTurnPlayer == owner &&
+                    state.Players[owner].Trash.Count >= 10 &&
+                    card.Info.HasKeyword("五老星"),
+            });
+            return Task.CompletedTask;
+        }
 
         // 仅"因对方的效果"近似：非战斗结算中
         if (ctx.State.CurrentBattle is not null) return Task.CompletedTask;

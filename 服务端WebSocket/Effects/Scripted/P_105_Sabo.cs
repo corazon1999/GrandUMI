@@ -60,7 +60,7 @@ public class P_105_Sabo : IScriptedEffect
         me.Hand.Add(lifeCard);
 
         // 赋予我方 1 张领袖或角色最多 1 张休息状态的咚!!
-        if (me.CostArea.Any(d => d.State == DonState.Active))
+        if (me.CostArea.Any(d => d.State == DonState.Rest))
         {
             var targets = new List<CardInstance> { me.Leader };
             targets.AddRange(me.Characters);

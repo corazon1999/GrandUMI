@@ -87,7 +87,7 @@ public class GameEngine
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
-        "DuelOver", "Surrender", "OperationTimeout", "PlayerDisconnected", "PlayerReconnected",
+        "DuelOver", "Surrender", "OperationTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
 
@@ -450,6 +450,7 @@ public class GameEngine
                     p.Trash.Add(sacrifice);
                 }
                 card.TurnPlayed = State.TurnCount; // 沿用登场回合规则（当回合默认不能攻击）
+                card.IsTapped = State.ShouldCharacterEnterRested(targetIndex, card);
                 p.Characters.Add(card);
                 break;
 

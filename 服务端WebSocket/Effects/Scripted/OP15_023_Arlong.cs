@@ -32,17 +32,28 @@ public class OP15_023_Arlong : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.OnKO)
         {
-            // 对方最多2张休息状态的角色，下个对方重置阶段不转活跃
-            var rested = opp.Characters.Where(c => c.IsTapped).ToList();
-            if (rested.Count == 0) return;
+            // 对方最多2张休息状态的卡牌：领袖、角色、舞台或咚!!
+            var restedCards = new List<CardInstance>();
+            if (opp.Leader.IsTapped) restedCards.Add(opp.Leader);
+            restedCards.AddRange(opp.Characters.Where(c => c.IsTapped));
+            if (opp.StageCard is { IsTapped: true } stage) restedCards.Add(stage);
+            var restedDons = opp.CostArea.Where(don => don.State == DonState.Rest).ToList();
+            if (restedCards.Count + restedDons.Count == 0) return;
 
-            var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                "选择对方最多2张休息状态的角色，使其在下个对方重置阶段不转为活跃",
-                rested.Select(c => c.Id.ToString()).ToList(), 0, 2);
+            var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentRestingCardOrDon",
+                "选择对方最多2张休息状态的卡牌，使其在下个对方重置阶段不转为活跃",
+                restedCards.Select(c => c.Id.ToString()).Concat(restedDons.Select(d => d.Id.ToString())).ToList(), 0, 2,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = restedCards.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    ["donChoices"] = restedDons.Select(d => new { id = d.Id.ToString(), state = d.State.ToString() }).ToList(),
+                });
             foreach (var id in pick)
             {
-                var c = rested.First(x => x.Id.ToString() == id);
-                AtomicOps.PreventActivateNextReset(c);
+                var card = restedCards.FirstOrDefault(c => c.Id.ToString() == id);
+                if (card is not null) AtomicOps.PreventActivateNextReset(card);
+                var don = restedDons.FirstOrDefault(d => d.Id.ToString() == id);
+                if (don is not null) don.CannotActivateNextReset = true;
             }
             return;
         }

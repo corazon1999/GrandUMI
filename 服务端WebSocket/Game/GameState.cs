@@ -208,6 +208,19 @@ public class GameState
             EffectSourceNumber = Effects.EffectRuntime.CurrentSource?.Info.Number,
         });
 
+    /// <summary>
+    /// OP09-022 静态规则：该领袖效果生效时，我方角色均以休息状态登场。
+    /// 所有正常登场与效果登场入口都通过本方法统一判定。
+    /// </summary>
+    public bool ShouldCharacterEnterRested(int playerIdx, CardInstance card)
+    {
+        if (card.Info.Kind != Cards.CardKind.Character) return false;
+        var leader = Players[playerIdx].Leader;
+        return leader.Info.Number == "OP09-022"
+            && !leader.IsEffectsNullified
+            && !IsContinuouslyNullified(leader);
+    }
+
     /// <summary>评估指定卡当前从 ContinuousEffects 获得的总力量加成</summary>
     public int ContinuousPowerBonus(int sideIdx, CardInstance card)
     {
@@ -458,6 +471,9 @@ public class GameState
     /// 带后缀的来源标识（如“{card-id}-oppnullify”）也按前 36 位 Guid 定位原卡。
     /// </summary>
     private bool IsContinuousEffectActive(ContinuousEffect effect)
+        => IsContinuousEffectActive(effect, new HashSet<Guid>());
+
+    private bool IsContinuousEffectActive(ContinuousEffect effect, HashSet<Guid> evaluatingSources)
     {
         if (effect.SourceCardId.Length < 36 || !Guid.TryParse(effect.SourceCardId[..36], out var sourceId))
             return true;
@@ -469,7 +485,28 @@ public class GameState
                 : player.StageCard?.Id == sourceId
                     ? player.StageCard
                     : player.Characters.FirstOrDefault(card => card.Id == sourceId);
-            if (source is not null) return !source.IsEffectsNullified;
+            if (source is null) continue;
+            if (source.IsEffectsNullified) return false;
+
+            // 持续无效也必须停用该卡已注册的力量、费用、关键词等光环。
+            // 评估无效光环自身时可能形成循环引用，用来源卡集合截断递归。
+            if (!evaluatingSources.Add(sourceId)) return true;
+            try
+            {
+                int sourceSide = SideOf(source);
+                foreach (var nullifier in ContinuousEffects)
+                {
+                    if (!nullifier.NullifyEffect || ReferenceEquals(nullifier, effect)) continue;
+                    if (!IsContinuousEffectActive(nullifier, evaluatingSources)) continue;
+                    if (!MatchesContinuousScope(nullifier, sourceSide, source)) continue;
+                    if (nullifier.Predicate(this, sourceSide, source)) return false;
+                }
+            }
+            finally
+            {
+                evaluatingSources.Remove(sourceId);
+            }
+            return true;
         }
         return true;
     }
