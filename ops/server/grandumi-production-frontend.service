@@ -1,0 +1,24 @@
+[Unit]
+Description=GrandUMI 新正式服前端
+After=network-online.target grandumi-production-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=grandumi
+Group=grandumi
+WorkingDirectory=/opt/grandumi/opcgpro-web
+ExecStart=/opt/node/bin/node /opt/grandumi/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=2
+Environment=NODE_ENV=production
+LimitNOFILE=65536
+CPUQuota=150%
+MemoryMax=1536M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/grandumi/opcgpro-web/.next
+
+[Install]
+WantedBy=multi-user.target

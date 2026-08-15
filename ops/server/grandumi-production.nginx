@@ -1,0 +1,52 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name grand-umi.com candidate.grand-umi.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 308 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    server_name grand-umi.com;
+    client_max_body_size 1m;
+
+    ssl_certificate /etc/letsencrypt/live/grand-umi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/grand-umi.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:GrandUmiTls:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    include /etc/nginx/snippets/grandumi-production-proxy.conf;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name candidate.grand-umi.com;
+    client_max_body_size 1m;
+
+    ssl_certificate /etc/letsencrypt/live/candidate.grand-umi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/candidate.grand-umi.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:GrandUmiTls:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    include /etc/nginx/snippets/grandumi-production-proxy.conf;
+}
