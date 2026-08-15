@@ -353,6 +353,83 @@ public class RankedStoreTests
     }
 
     [Fact]
+    public void 排位结算_十亿悬赏后基础分与连续胜负上限再次翻倍()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 15, 30, 0, DateTimeKind.Utc);
+
+            CompletePlacements(store, now, "ten-billion-streak");
+            SetRankPoints(path, ("爱丽丝", RankedStore.TenBillionBountyRankPoints),
+                ("鲍勃", RankedStore.TenBillionBountyRankPoints));
+
+            for (var streak = 1; streak <= 42; streak++)
+            {
+                SetRankPoints(path, ("爱丽丝", RankedStore.TenBillionBountyRankPoints),
+                    ("鲍勃", RankedStore.TenBillionBountyRankPoints));
+                var result = store.RecordMatch($"ten-billion-streak-{streak}", now.AddMinutes(10 + streak),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+                var winAdjustment = Math.Min(streak - 1, 40);
+                var lossAdjustment = Math.Min(streak - 1, 20);
+
+                Assert.NotNull(result);
+                Assert.Equal(80 + winAdjustment, result!.Player0.RankPointDelta);
+                Assert.Equal(-80 + lossAdjustment, result.Player1.RankPointDelta);
+                Assert.Equal(winAdjustment, result.Player0.StreakAdjustment);
+                Assert.Equal(lossAdjustment, result.Player1.StreakAdjustment);
+                Assert.Equal(0, result.Player0.RankDifferenceAdjustment);
+                Assert.Equal(0, result.Player1.RankDifferenceAdjustment);
+            }
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位结算_十亿悬赏后高低分双方分差修正上限再次翻倍至二十分()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 12, 16, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, "ten-billion-gap");
+            SetRankPoints(path, ("爱丽丝", 10000), ("鲍勃", 12000));
+
+            var lowWins = store.RecordMatch("ten-billion-gap-low-win", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(lowWins);
+            Assert.Equal(20, lowWins!.Player0.RankDifferenceAdjustment);
+            Assert.Equal(-20, lowWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(100, lowWins.Player0.RankPointDelta);
+            Assert.Equal(-100, lowWins.Player1.RankPointDelta);
+
+            SetRankPoints(path, ("爱丽丝", 10000), ("鲍勃", 12000));
+            var highWins = store.RecordMatch("ten-billion-gap-high-win", now.AddMinutes(11),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1);
+
+            Assert.NotNull(highWins);
+            Assert.Equal(20, highWins!.Player0.RankDifferenceAdjustment);
+            Assert.Equal(-20, highWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-60, highWins.Player0.RankPointDelta);
+            Assert.Equal(60, highWins.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
     public void 排位榜_返回玩家持有的最强称号且不包含称号胜率()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-champion-{Guid.NewGuid():N}");

@@ -135,6 +135,7 @@ public sealed class RankedStore
     public const string GovernmentFaction = "government";
     public const int PlacementRequired = 5;
     public const int NewWorldRankPoints = 1500;
+    public const int TenBillionBountyRankPoints = 10000;
     private const double InitialRating = 1500;
     private const double InitialDeviation = 350;
     private const double InitialVolatility = 0.06;
@@ -397,7 +398,12 @@ public sealed class RankedStore
         if (self.PlacementGames < PlacementRequired)
             return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
 
-        var settlementMultiplier = self.RankPoints >= NewWorldRankPoints ? 2 : 1;
+        var settlementMultiplier = self.RankPoints switch
+        {
+            >= TenBillionBountyRankPoints => 4,
+            >= NewWorldRankPoints => 2,
+            _ => 1,
+        };
         var baseDelta = (won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch) * settlementMultiplier;
         var streakAdjustment = Math.Clamp(resultStreak - 1, 0, (won ? 10 : 5) * settlementMultiplier);
         // 未完成定级的对手没有可比较的可见 RP，不参与分差修正。
