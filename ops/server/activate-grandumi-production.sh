@@ -27,12 +27,31 @@ if [[ -s /var/lib/grandumi-ha/active-slot \
   exit 0
 fi
 
-# 以下仅用于从候选/旧单槽服务首次迁入 A/B 架构。
-[[ -f "$import_dir/.ready" ]] || die "首次激活所需最终正式数据尚未标记就绪"
-for name in players.db ranked.db leader-stats.db; do
-  [[ -s "$import_dir/$name" ]] || die "缺少最终正式数据：$name"
-  [[ "$(sqlite3 "$import_dir/$name" 'PRAGMA integrity_check;')" == ok ]] || die "最终正式数据完整性失败：$name"
+# 以下仅用于从候选/旧单槽服务首次迁入 A/B 架构。已经运行中的正式数据
+# 永远优先原地接管，不能被历史导入目录覆盖。
+database_names=(players.db ranked.db leader-stats.db)
+existing_count=0
+for name in "${database_names[@]}"; do
+  [[ -s "/data/grandumi/$name" ]] && existing_count=$((existing_count + 1))
 done
+
+if [[ "$existing_count" == "${#database_names[@]}" ]]; then
+  data_source=existing
+  for name in "${database_names[@]}"; do
+    [[ "$(sqlite3 "/data/grandumi/$name" 'PRAGMA integrity_check;')" == ok ]] \
+      || die "现有正式数据完整性失败：$name"
+  done
+elif [[ "$existing_count" == 0 ]]; then
+  data_source=import
+  [[ -f "$import_dir/.ready" ]] || die "空白服务器首次激活所需数据尚未标记就绪"
+  for name in "${database_names[@]}"; do
+    [[ -s "$import_dir/$name" ]] || die "缺少首次导入数据：$name"
+    [[ "$(sqlite3 "$import_dir/$name" 'PRAGMA integrity_check;')" == ok ]] \
+      || die "首次导入数据完整性失败：$name"
+  done
+else
+  die "正式数据目录只存在 $existing_count/${#database_names[@]} 个数据库，拒绝覆盖或激活"
+fi
 
 # 候选服自动部署可能在预构建后重新创建旧站点；正式双域名站点已经同时
 # 服务 grand-umi.com 与 candidate.grand-umi.com，激活前必须清理重复监听。
@@ -46,10 +65,16 @@ rollback() {
   status=$?
   if [[ "$switched" == 1 ]]; then
     systemctl stop grandumi-production-frontend@a.service grandumi-production-backend@a.service || true
-    for name in players.db ranked.db leader-stats.db; do
-      [[ -f "$archive_dir/$name" ]] && install -o grandumi -g grandumi -m 0640 "$archive_dir/$name" "/data/grandumi/$name"
-    done
-    systemctl start grandumi-candidate-backend.service grandumi-candidate-frontend.service || true
+    if [[ "$data_source" == existing ]]; then
+      systemctl enable grandumi-production-backend.service grandumi-production-frontend.service || true
+      systemctl start grandumi-production-backend.service grandumi-production-frontend.service || true
+    else
+      for name in "${database_names[@]}"; do
+        [[ -f "$archive_dir/$name" ]] && install -o grandumi -g grandumi -m 0640 "$archive_dir/$name" "/data/grandumi/$name"
+      done
+      systemctl enable grandumi-candidate-backend.service grandumi-candidate-frontend.service || true
+      systemctl start grandumi-candidate-backend.service grandumi-candidate-frontend.service || true
+    fi
   fi
   exit "$status"
 }
@@ -59,9 +84,11 @@ install -d -m 0750 "$archive_dir"
 systemctl stop grandumi-candidate-frontend.service grandumi-candidate-backend.service \
   grandumi-production-frontend.service grandumi-production-backend.service || true
 switched=1
-for name in players.db ranked.db leader-stats.db; do
+for name in "${database_names[@]}"; do
   [[ -f "/data/grandumi/$name" ]] && cp -a "/data/grandumi/$name" "$archive_dir/$name"
-  install -o grandumi -g grandumi -m 0640 "$import_dir/$name" "/data/grandumi/$name"
+  if [[ "$data_source" == import ]]; then
+    install -o grandumi -g grandumi -m 0640 "$import_dir/$name" "/data/grandumi/$name"
+  fi
 done
 
 ln -sfn "$repo/releases/$target/backend" "$repo/slots/a/backend"
@@ -87,4 +114,4 @@ systemctl enable --now grandumi-production-health.timer
 curl -kfsS --resolve grand-umi.com:443:127.0.0.1 https://grand-umi.com/backend/ready >/dev/null
 
 trap - ERR
-echo "新正式服服务已激活：$target；测试数据归档：$archive_dir"
+echo "新正式服服务已激活：$target；数据来源：$data_source；切换前归档：$archive_dir"
