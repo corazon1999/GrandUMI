@@ -31,8 +31,8 @@ test("test build keeps its assets on the test origin", () => {
   assert.match(deployTest, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/test\.grand-umi\.com'/);
 });
 
-test("candidate build uses the populated asset host until static assets are migrated", () => {
-  assert.match(deployCandidate, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/assets\.grand-umi\.com/);
+test("candidate build avoids depending on the old server asset host", () => {
+  assert.match(deployCandidate, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/\$candidate_host/);
   assert.match(deployCandidate, /NEXT_PUBLIC_ASSET_ORIGIN="\$candidate_asset_origin"/);
 });
 

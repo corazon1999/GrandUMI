@@ -5,7 +5,7 @@ repo=/opt/grandumi-candidate
 target="${1:-}"
 candidate_ip="${GRANDUMI_CANDIDATE_IP:-103.146.230.37}"
 candidate_host="${GRANDUMI_CANDIDATE_HOST:-candidate.grand-umi.com}"
-candidate_asset_origin="${GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https://assets.grand-umi.com}"
+candidate_asset_origin="${GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https://$candidate_host}"
 
 die() { echo "错误：$*" >&2; exit 1; }
 [[ "$candidate_ip" == "103.146.230.37" ]] || die "拒绝部署到未登记主机：$candidate_ip"
