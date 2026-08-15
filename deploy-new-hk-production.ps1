@@ -24,11 +24,10 @@ $tempDir = Get-GrandUmiTempDirectory -Category "Deploy"
 $short = $target.Substring(0, 12)
 $bundle = Join-Path $tempDir "grandumi-production-$short.bundle"
 $remoteBundle = "/tmp/grandumi-production-$short.bundle"
+$serverHead = "none"
 try {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
-  $serverHead = ""
-  $serverHeadOutput = & $ssh -o BatchMode=yes $Server 'git -C /opt/grandumi rev-parse refs/remotes/origin/main 2>/dev/null || true'
-  if ($null -ne $serverHeadOutput) { $serverHead = ([string]$serverHeadOutput).Trim() }
+  $serverHead = ([string](& $ssh -o BatchMode=yes $Server 'git -C /opt/grandumi rev-parse --verify refs/remotes/origin/main 2>/dev/null || printf "none\n"')).Trim()
   if ($serverHead -eq $target) {
     Write-Host "新正式服代码已是目标提交，跳过代码包上传。" -ForegroundColor Yellow
   } elseif ($serverHead -match '^[0-9a-f]{40}$') {
