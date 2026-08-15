@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-15-production-card-assets-release",
+    version: "2026.08.15.6",
+    date: "2026-08-15",
+    title: "正式服卡图加载恢复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复正式服发布后卡图大面积无法显示的问题；刷新页面后，卡牌图鉴、卡组编辑器与对局中的缩略图和大图会重新正常加载。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-15-card-rules-ranked-ha-release",
     version: "2026.08.15.5",
     date: "2026-08-15",
