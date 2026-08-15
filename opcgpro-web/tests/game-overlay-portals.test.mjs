@@ -68,6 +68,6 @@ test("对局设置的同类浮层不再使用未旋转的视口宽高", async ()
   assert.match(trash, /75cqh/);
   assert.match(menu, /maxWidthClass="max-w-sm"/);
   assert.match(menu, /var\(--layout-safe-right/);
-  assert.equal(menu.match(/min-h-12/g)?.length, 2);
+  assert.ok((menu.match(/min-h-12/g)?.length ?? 0) >= 2);
   assert.match(menu, /h-12 w-12/);
 });

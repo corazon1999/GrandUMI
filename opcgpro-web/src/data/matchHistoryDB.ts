@@ -31,6 +31,7 @@ export interface MatchMeta {
   myLeader: string;         // 我方领航卡号
   opponentLeader: string;   // 对手领航卡号
   winnerIsMe: boolean;
+  isDraw?: boolean;
   gameOverReason: string;
   turnCount: number;
   snapshotCount: number;

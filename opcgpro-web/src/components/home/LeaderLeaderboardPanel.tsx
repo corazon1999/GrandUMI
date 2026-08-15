@@ -33,79 +33,106 @@ const RANK_FACTION_NAMES: Record<RankFaction, string> = {
   government: "世界政府",
 };
 
+function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; pinned?: boolean }) {
+  return (
+    <li className={`p-3 ${pinned ? "bg-violet-500/[0.12] ring-1 ring-inset ring-violet-400/40" : ""}`}>
+      {pinned && <p className="mb-2 text-[11px] font-black tracking-[0.18em] text-violet-300">我的排名</p>}
+      <div className="flex items-center gap-3">
+        <span className={`w-9 shrink-0 text-center text-lg font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
+            <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
+          </div>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
+            <span>{RANK_FACTION_NAMES[item.faction]}</span>
+            <span aria-hidden="true">·</span>
+            <RankTierBadge faction={item.faction} tier={item.tier} division={item.division} />
+          </div>
+          <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="max-w-28 text-sm font-black leading-5 text-violet-200">{formatRankBounty(item.rankPoints)}</p>
+          <p className="text-[11px] text-gray-600">悬赏金</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900/90 px-3 py-2.5 text-center text-xs">
+        <div><p className="font-bold text-gray-200">{item.games}</p><p className="mt-1 text-gray-600">场次</p></div>
+        <div><p><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></p><p className="mt-1 text-gray-600">战绩</p></div>
+        <div><p className="font-bold text-violet-200">{item.winRate.toFixed(1)}%</p><p className="mt-1 text-gray-600">胜率</p></div>
+      </div>
+    </li>
+  );
+}
+
+function RankedDesktopRow({ item, pinned = false }: { item: RankLeaderboardItem; pinned?: boolean }) {
+  return (
+    <tr className={`transition-colors ${pinned ? "bg-violet-500/[0.12] ring-1 ring-inset ring-violet-400/40" : "hover:bg-gray-900/80"}`}>
+      <td className={`w-20 px-4 py-3 text-center font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</td>
+      <td className="px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-bold text-white">{item.displayName}</span>
+          {pinned && <span className="shrink-0 rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-black text-violet-200">我</span>}
+          <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
+        </div>
+      </td>
+      <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
+      <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge faction={item.faction} tier={item.tier} division={item.division} /></td>
+      <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{formatRankBounty(item.rankPoints)}</td>
+      <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
+      <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
+      <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{item.winRate.toFixed(1)}%</td>
+    </tr>
+  );
+}
+
+function RankedTable({ items, pinned = false }: { items: RankLeaderboardItem[]; pinned?: boolean }) {
+  return (
+    <table className="hidden w-full min-w-[720px] table-fixed border-collapse text-left @[1024px]:table">
+      {!pinned && <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
+        <tr>
+          <th className="w-20 px-4 py-3 text-center">排名</th>
+          <th className="w-[22%] px-3 py-3">昵称</th>
+          <th className="w-[10%] px-3 py-3">阵营</th>
+          <th className="w-[13%] px-3 py-3">段位</th>
+          <th className="w-[18%] px-3 py-3">最擅长 Leader</th>
+          <th className="w-[14%] px-3 py-3 text-right">悬赏金</th>
+          <th className="w-[7%] px-3 py-3 text-right">场次</th>
+          <th className="w-[9%] px-3 py-3 text-right">战绩</th>
+          <th className="w-[8%] px-4 py-3 text-right">胜率</th>
+        </tr>
+      </thead>}
+      <tbody className="divide-y divide-gray-800/80">
+        {items.map((item) => <RankedDesktopRow key={`${item.rank}-${item.displayName}-${pinned ? "mine" : "rank"}`} item={item} pinned={pinned} />)}
+      </tbody>
+    </table>
+  );
+}
+
 function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
-  if (items.length === 0) {
+  const topItems = items.filter((item) => item.rank <= 100);
+  const currentPlayer = items.find((item) => item.isCurrentPlayer);
+
+  if (topItems.length === 0 && !currentPlayer) {
     return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有完成定级的玩家。</p>;
   }
 
   return (
-    <>
-      <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
-        {items.map((item) => (
-          <li key={`${item.rank}-${item.displayName}`} className="p-3">
-            <div className="flex items-center gap-3">
-              <span className={`w-7 shrink-0 text-center text-lg font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-400"}`}>#{item.rank}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
-                  <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
-                </div>
-                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
-                  <span>{RANK_FACTION_NAMES[item.faction]}</span>
-                  <span aria-hidden="true">·</span>
-                  <RankTierBadge faction={item.faction} tier={item.tier} division={item.division} />
-                </div>
-                <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="max-w-28 text-sm font-black leading-5 text-violet-200">{formatRankBounty(item.rankPoints)}</p>
-                <p className="text-[11px] text-gray-600">悬赏金</p>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-center text-xs">
-              <div><p className="font-bold text-gray-200">{item.games}</p><p className="mt-1 text-gray-600">场次</p></div>
-              <div><p><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></p><p className="mt-1 text-gray-600">战绩</p></div>
-              <div><p className="font-bold text-violet-200">{item.winRate.toFixed(1)}%</p><p className="mt-1 text-gray-600">胜率</p></div>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <table className="hidden w-full min-w-[720px] border-collapse text-left @[1024px]:table">
-        <thead className="sticky top-0 z-10 bg-gray-900 text-[11px] uppercase tracking-wide text-gray-500">
-          <tr>
-            <th className="w-20 px-4 py-3 text-center">排名</th>
-            <th className="px-3 py-3">昵称</th>
-            <th className="px-3 py-3">阵营</th>
-            <th className="px-3 py-3">段位</th>
-            <th className="px-3 py-3">最擅长 Leader</th>
-            <th className="px-3 py-3 text-right">悬赏金</th>
-            <th className="px-3 py-3 text-right">场次</th>
-            <th className="px-3 py-3 text-right">战绩</th>
-            <th className="px-4 py-3 text-right">胜率</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-800/80">
-          {items.map((item) => (
-            <tr key={`${item.rank}-${item.displayName}`} className="transition-colors hover:bg-gray-900/80">
-              <td className={`px-4 py-3 text-center font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</td>
-              <td className="px-3 py-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm font-bold text-white">{item.displayName}</span>
-                  <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
-                </div>
-              </td>
-              <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
-              <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge faction={item.faction} tier={item.tier} division={item.division} /></td>
-              <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
-              <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{formatRankBounty(item.rankPoints)}</td>
-              <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
-              <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
-              <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{item.winRate.toFixed(1)}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
+          {topItems.map((item) => <RankedMobileRow key={`${item.rank}-${item.displayName}`} item={item} />)}
+        </ul>
+        <RankedTable items={topItems} />
+      </div>
+      {currentPlayer && (
+        <div className="shrink-0 border-t-2 border-violet-400/50 bg-gray-950 shadow-[0_-12px_28px_rgba(0,0,0,0.45)]">
+          <ul className="@[1024px]:hidden"><RankedMobileRow item={currentPlayer} pinned /></ul>
+          <RankedTable items={[currentPlayer]} pinned />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -447,7 +474,7 @@ export default function LeaderLeaderboardPanel() {
         </div>}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-gray-800 bg-gray-950/60">
+      <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-hidden" : "overflow-auto"}`}>
         {rankingTab === "ranked" ? <RankedLeaderboard items={rankLeaderboard} /> : loading ? (
           <p className="py-16 text-center text-sm text-gray-600">正在加载排行榜…</p>
         ) : failed ? (

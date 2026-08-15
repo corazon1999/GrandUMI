@@ -322,17 +322,29 @@ public class ReportedCardRegressionTests
     }
 
     [Fact]
-    public async Task EB04_007_ResolvedLeaderBuffSurvivesSourceLeavingField()
+    public async Task EB04_007_ResolvedLeaderBuffSurvivesOpponentEffectKoUntilOpponentEnd()
     {
         var state = TestScene.New().MyCharacter("EB04-007").Build();
         var me = state.Players[0];
         var zoro = me.Characters.Single();
 
         await EffectRuntime.Resolve(state, 0, zoro, EffectTrigger.OnEnterField, new MockPromptService());
-        me.Characters.Remove(zoro);
-        me.Trash.Add(zoro);
-
         Assert.Equal(me.Leader.Info.Power + 2000, state.CurrentPowerOf(0, me.Leader));
+
+        bool koSucceeded = await AtomicOps.KOByEffectAsync(
+            state, 0, zoro, new MockPromptService(), actingSide: 1);
+
+        Assert.True(koSucceeded);
+        Assert.Contains(zoro, me.Trash);
+        Assert.Equal(me.Leader.Info.Power + 2000, state.CurrentPowerOf(0, me.Leader));
+
+        state.CurrentTurnPlayer = 0;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(me.Leader.Info.Power + 2000, state.CurrentPowerOf(0, me.Leader));
+
+        state.CurrentTurnPlayer = 1;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(me.Leader.Info.Power, state.CurrentPowerOf(0, me.Leader));
     }
 
     [Fact]

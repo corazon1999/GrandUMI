@@ -6,7 +6,6 @@ const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url),
 const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8");
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
 const deployHk = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
-const deployCandidate = await readFile(new URL("../../ops/server/deploy-grandumi-candidate.sh", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const networkService = await readFile(new URL("../../ops/server/grandumi-network-tuning.service", import.meta.url), "utf8");
@@ -31,9 +30,10 @@ test("test build keeps its assets on the test origin", () => {
   assert.match(deployTest, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/test\.grand-umi\.com'/);
 });
 
-test("candidate build avoids depending on the old server asset host", () => {
-  assert.match(deployCandidate, /GRANDUMI_CANDIDATE_ASSET_ORIGIN:-https:\/\/\$candidate_host/);
-  assert.match(deployCandidate, /NEXT_PUBLIC_ASSET_ORIGIN="\$candidate_asset_origin"/);
+test("active deployment entry no longer depends on a candidate environment", async () => {
+  const deployEntry = await readFile(new URL("../../deploy-test.ps1", import.meta.url), "utf8");
+  assert.doesNotMatch(deployEntry, /deploy-new-hk-candidate|candidate\.grand-umi\.com/);
+  assert.match(deployEntry, /bash \/opt\/grandumi-test\/deploy\.sh/);
 });
 
 test("asset host exposes only cacheable public resources with cross-origin access", () => {

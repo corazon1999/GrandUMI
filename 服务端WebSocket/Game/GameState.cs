@@ -57,10 +57,18 @@ public class GameState
     /// <summary>当前正在进行的战斗（仅 BattleAttack/Block/Counter/Damage 阶段非 null）</summary>
     public BattleContext? CurrentBattle { get; set; }
 
-    /// <summary>胜负已分时为非空，且 IsGameOver = true</summary>
+    /// <summary>胜负已分时为非空；协商平局时保持为空。</summary>
     public int? WinnerIndex { get; set; }
+    /// <summary>双方同意因 Bug 结束本局时为 true；平局没有胜者。</summary>
+    public bool IsDraw { get; set; }
     public string? GameOverReason { get; set; }
-    public bool IsGameOver => WinnerIndex.HasValue;
+    public bool IsGameOver => WinnerIndex.HasValue || IsDraw;
+
+    public const int DrawRequestRejectionLimit = 3;
+    /// <summary>当前等待回应的平局申请发起者；没有申请时为 null。</summary>
+    public int? PendingDrawRequester { get; set; }
+    /// <summary>双方各自在本局发起平局申请后被拒绝的次数。</summary>
+    public int[] DrawRequestRejectionCounts { get; } = [0, 0];
 
     /// <summary>双方完成换牌后最终保留的起手牌卡号，用于对局结束时写入公开 Leader 统计。</summary>
     public List<string>[] StartingHandCardNumbers { get; } = [new(), new()];

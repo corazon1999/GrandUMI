@@ -97,12 +97,14 @@ export default function HistoryPanel() {
                 >
                   <span
                     className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${
-                      m.winnerIsMe
+                      m.isDraw
+                        ? "bg-sky-500/20 text-sky-300"
+                        : m.winnerIsMe
                         ? "bg-yellow-500/20 text-yellow-400"
                         : "bg-gray-700/60 text-gray-400"
                     }`}
                   >
-                    {m.winnerIsMe ? "胜" : "负"}
+                    {m.isDraw ? "平" : m.winnerIsMe ? "胜" : "负"}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-white">

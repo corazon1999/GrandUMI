@@ -25,8 +25,11 @@ public static class PrivateStateSnapshotBuilder
             mulliganBothDone = state.MulliganBothDone,
             mulliganDeadlineUtc = state.MulliganDeadlineUtc,
             isGameOver = state.IsGameOver,
+            isDraw = state.IsDraw,
             winnerIndex = state.WinnerIndex,
             gameOverReason = state.GameOverReason,
+            pendingDrawRequester = state.PendingDrawRequester,
+            drawRequestRejectionCounts = state.DrawRequestRejectionCounts,
             players = state.Players.Select((p, idx) => SnapshotPlayer(state, p, idx)).ToArray(),
             pendingPrompt = state.PendingPrompt is { } prompt
                 ? new

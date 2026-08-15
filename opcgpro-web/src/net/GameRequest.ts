@@ -119,6 +119,8 @@ export const GameRequest = {
   endTurn:       () => send("EndTurn"),
   confirmDamage: () => send("ConfirmDamage"),
   surrender:     () => send("Surrender"),
+  requestDraw:   () => send("RequestDraw"),
+  respondDraw:   (accept: boolean) => send("RespondDraw", { accept }),
 
   /** GM 调试：按编号加一张牌到自己手牌 */
   debugAddCard: (cardNumber: string) => send("DebugAddCard", { cardNumber }),

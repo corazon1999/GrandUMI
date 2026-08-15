@@ -31,6 +31,7 @@ export default function GamePage() {
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const isDraw = useGameStore((s) => s.isDraw);
   const winnerIsMe = useGameStore((s) => s.winnerIsMe);
   const gameOverReason = useGameStore((s) => s.gameOverReason);
   const matchKind = useGameStore((s) => s.matchKind);
@@ -142,6 +143,8 @@ export default function GamePage() {
               className={
                 isObserver
                   ? "text-5xl font-black text-purple-300 drop-shadow-[0_0_12px_rgba(216,180,254,0.5)]"
+                  : isDraw
+                  ? "text-5xl font-black text-sky-300 drop-shadow-[0_0_12px_rgba(125,211,252,0.5)]"
                   : winnerIsMe
                   ? "text-5xl font-black text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)]"
                   : "text-5xl font-black text-gray-400 drop-shadow-[0_0_12px_rgba(156,163,175,0.5)]"
@@ -150,7 +153,7 @@ export default function GamePage() {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              {isObserver ? "对局结束" : winnerIsMe ? "你胜利了！" : "你战败了"}
+              {isObserver ? "对局结束" : isDraw ? "本局平局" : winnerIsMe ? "你胜利了！" : "你战败了"}
             </motion.h1>
             {gameOverReason && (
               <motion.p
@@ -162,7 +165,7 @@ export default function GamePage() {
                 结束原因：{gameOverReason}
               </motion.p>
             )}
-            {matchKind === "Ranked" && rankResult && (
+            {!isDraw && matchKind === "Ranked" && rankResult && (
               <motion.div
                 className="contents"
                 initial={{ opacity: 0, y: 8 }}

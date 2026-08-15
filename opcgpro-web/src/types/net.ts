@@ -379,6 +379,7 @@ export interface RankLeaderboardItem {
   winRate: number;
   favoriteLeader?: string | null;
   championLeaderNumbers?: string[];
+  isCurrentPlayer?: boolean;
 }
 
 export interface RankPlayerSettlement {
@@ -881,6 +882,8 @@ export type GameActionType =
   | "UseEffect"         // { sourceId, effectKey, ... }
   | "EndTurn"           // {}
   | "ConfirmDamage"     // {}
+  | "RequestDraw"       // {}
+  | "RespondDraw"       // { accept: boolean }
   | "DebugAddCard"      // { cardNumber: string }  ← GM 调试：加牌到手牌
   | "DebugAddLife"      // { cardNumber: string; target: "self" | "opponent" } ← GM 调试：置于生命区顶端
   | "DebugAddDon"       // { count: number }       ← GM 调试：加咚
@@ -1020,8 +1023,13 @@ export interface MsgGameState extends MsgBase {
   operationClockPaused?: boolean;
   matchKind?: "Ranked" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
   isGameOver: boolean;
+  isDraw?: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;
+  drawRequestPendingFromMe?: boolean;
+  drawRequestPendingFromOpponent?: boolean;
+  drawRequestRejectionCount?: number;
+  drawRequestRejectionLimit?: number;
   viewerKind: "player" | "spectator";
   spectatorHandVisible?: boolean;
   /** 对应触发本次状态变化的客户端请求；无客户端请求时为空。 */

@@ -139,6 +139,15 @@ public static class ActionLogFormatter
             case "Surrender":
                 return $"[结束] {Side(GetInt(payload, "surrendered"))}投降";
 
+            case "DrawRequested":
+                return $"[平局申请] {Side(GetInt(payload, "requester"))}请求因 Bug 平局";
+
+            case "DrawRequestRejected":
+                return $"[平局申请] {Side(GetInt(payload, "responder"))}拒绝平局申请（第 {GetInt(payload, "rejectionCount")} 次）";
+
+            case "DrawAgreed":
+                return "[结束] 双方同意因 Bug 平局";
+
             // ── GM 调试动作 ──
             case "DebugAddCard":
                 return $"[GM] {Side(GetInt(payload, "player"))}将【{Card(GetStr(payload, "cardNumber"))}】加入手牌";

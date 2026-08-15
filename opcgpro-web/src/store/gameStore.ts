@@ -190,8 +190,13 @@ interface GameStore {
   // UI 暂态
   isPending: boolean;
   isGameOver: boolean;
+  isDraw: boolean;
   winnerIsMe: boolean;
   gameOverReason: string;
+  drawRequestPendingFromMe: boolean;
+  drawRequestPendingFromOpponent: boolean;
+  drawRequestRejectionCount: number;
+  drawRequestRejectionLimit: number;
 
   // 选中（纯本地）
   selectedHandIndex: number | null;
@@ -275,8 +280,13 @@ export const useGameStore = create<GameStore>()(
     promptFlash: 0,
     isPending: false,
     isGameOver: false,
+    isDraw: false,
     winnerIsMe: false,
     gameOverReason: "",
+    drawRequestPendingFromMe: false,
+    drawRequestPendingFromOpponent: false,
+    drawRequestRejectionCount: 0,
+    drawRequestRejectionLimit: 3,
     selectedHandIndex: null,
     selectedFieldId: null,
     selectedDonIndex: null,
@@ -316,8 +326,13 @@ export const useGameStore = create<GameStore>()(
         s.operationClockPaused = msg.operationClockPaused ?? false;
         s.matchKind = msg.matchKind ?? "UnknownHuman";
         s.isGameOver = msg.isGameOver ?? false;
+        s.isDraw = msg.isDraw ?? false;
         s.winnerIsMe = msg.winnerIsMe ?? false;
         s.gameOverReason = msg.gameOverReason ?? "";
+        s.drawRequestPendingFromMe = msg.drawRequestPendingFromMe ?? false;
+        s.drawRequestPendingFromOpponent = msg.drawRequestPendingFromOpponent ?? false;
+        s.drawRequestRejectionCount = msg.drawRequestRejectionCount ?? 0;
+        s.drawRequestRejectionLimit = msg.drawRequestRejectionLimit ?? 3;
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
         s.spectatorHandVisible = msg.spectatorHandVisible ?? false;
         if (s.spectatorHandVisible) {
@@ -501,8 +516,13 @@ export const useGameStore = create<GameStore>()(
       s.reveal = null;
       s.isPending = false;
       s.isGameOver = false;
+      s.isDraw = false;
       s.winnerIsMe = false;
       s.gameOverReason = "";
+      s.drawRequestPendingFromMe = false;
+      s.drawRequestPendingFromOpponent = false;
+      s.drawRequestRejectionCount = 0;
+      s.drawRequestRejectionLimit = 3;
       s.selectedHandIndex = null;
       s.selectedFieldId = null;
       s.selectedDonIndex = null;

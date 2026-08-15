@@ -10,7 +10,7 @@ test("排位榜昵称旁显示最强称号且不展示称号胜率", async () =>
     readSource("../src/types/net.ts"),
     readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs"),
   ]);
-  const rankedLeaderboard = panel.match(/function RankedLeaderboard\([\s\S]*?\n}\n\nfunction percent/)?.[0];
+  const rankedLeaderboard = panel.match(/function RankedMobileRow\([\s\S]*?\n}\n\nfunction percent/)?.[0];
   const rankItem = types.match(/export interface RankLeaderboardItem \{[\s\S]*?\n}/)?.[0];
 
   assert.ok(rankedLeaderboard, "应能找到排位榜展示组件");

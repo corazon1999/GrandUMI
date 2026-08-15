@@ -469,6 +469,56 @@ public class RankedStoreTests
         }
     }
 
+    [Fact]
+    public void 排位榜_返回前一百并额外包含当前玩家的真实名次()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-top100-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 15, 12, 0, 0, DateTimeKind.Utc);
+            for (var index = 1; index <= 101; index++)
+                Assert.NotNull(store.SelectFaction($"player-{index}", $"玩家{index:D3}", RankedStore.PirateFaction, now));
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                for (var index = 1; index <= 101; index++)
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = """
+                        UPDATE rank_profiles
+                        SET placement_games=$placements, games=10, wins=5,
+                            rank_points=$points, highest_rank_points=$points
+                        WHERE display_name=$name;
+                        """;
+                    command.Parameters.AddWithValue("$placements", RankedStore.PlacementRequired);
+                    command.Parameters.AddWithValue("$points", 10_000 - index);
+                    command.Parameters.AddWithValue("$name", $"玩家{index:D3}");
+                    Assert.Equal(1, command.ExecuteNonQuery());
+                }
+            }
+
+            var snapshot = store.GetSnapshot("player-101", "玩家101", now.AddMinutes(1));
+
+            Assert.Equal(101, snapshot.Leaderboard.Count);
+            Assert.Equal(100, snapshot.Leaderboard.Count(item => item.Rank <= 100));
+            var current = Assert.Single(snapshot.Leaderboard, item => item.IsCurrentPlayer);
+            Assert.Equal(101, current.Rank);
+            Assert.Equal("玩家101", current.DisplayName);
+            Assert.False(snapshot.Leaderboard.Single(item => item.Rank == 1).IsCurrentPlayer);
+
+            var wireJson = System.Text.Json.JsonSerializer.Serialize(RankWire.Leaderboard(snapshot.Leaderboard));
+            Assert.Contains("\"isCurrentPlayer\":true", wireJson);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
     private static void CompletePlacements(RankedStore store, DateTime now, string prefix)
     {
         // 最后一场由鲍勃获胜，保证随后爱丽丝胜、鲍勃负时都从一连开始。

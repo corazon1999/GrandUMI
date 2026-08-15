@@ -406,8 +406,9 @@ public static class GameRoomManager
             if (activePlayer is 0 or 1 && room.Engine.State.OperationClockRemainingMs[activePlayer] <= 0)
                 return activePlayer;
 
-            // 非当前决策者发来的非法动作不能暂停对手棋钟；投降是唯一例外。
-            if (action != "Surrender" && activePlayer != playerIndex) return null;
+            // 非当前决策者发来的非法动作不能暂停对手棋钟；投降和平局协商是例外。
+            if (action is not "Surrender" and not "RequestDraw" and not "RespondDraw"
+                && activePlayer != playerIndex) return null;
             StopOperationClockLocked(room);
             return null;
         }
@@ -439,6 +440,7 @@ public static class GameRoomManager
         var state = room.Engine.State;
         if (!state.OperationClockEnabled || state.IsGameOver || !state.MulliganBothDone) return -1;
         if (room.DisconnectedPlayers[0] || room.DisconnectedPlayers[1]) return -1;
+        if (state.PendingDrawRequester is not null) return -1;
         if (state.PendingPrompt is { } prompt) return prompt.PlayerIndex;
         if (state.Phase is Phase.BattleBlock or Phase.BattleCounter)
             return state.CurrentBattle?.DefenderPlayerIndex ?? -1;

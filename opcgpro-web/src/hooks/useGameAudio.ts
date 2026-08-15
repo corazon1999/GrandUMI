@@ -41,6 +41,7 @@ export function useGameAudio(): void {
   const opponent = useGameStore((state) => state.opponent);
   const pendingPrompt = useGameStore((state) => state.pendingPrompt);
   const isGameOver = useGameStore((state) => state.isGameOver);
+  const isDraw = useGameStore((state) => state.isDraw);
   const winnerIsMe = useGameStore((state) => state.winnerIsMe);
   const connectionState = useNetStore((state) => state.connState);
   const previousRef = useRef<AudioSnapshot | null>(null);
@@ -122,13 +123,14 @@ export function useGameAudio(): void {
 
     if (current.isGameOver && !previous.isGameOver) {
       stopAll();
-      play(winnerIsMe ? "win" : "lose");
+      if (!isDraw) play(winnerIsMe ? "win" : "lose");
     }
   }, [
     actionPayload,
     connectionState,
     currentTurn,
     isGameOver,
+    isDraw,
     lastAction,
     mode,
     my,

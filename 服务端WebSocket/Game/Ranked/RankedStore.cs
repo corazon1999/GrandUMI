@@ -33,7 +33,8 @@ public sealed record RankLeaderboardItem(
     int Wins,
     double WinRate,
     string? FavoriteLeader,
-    IReadOnlyList<string> ChampionLeaderNumbers);
+    IReadOnlyList<string> ChampionLeaderNumbers,
+    bool IsCurrentPlayer);
 
 public sealed record RankSnapshot(
     RankProfileSnapshot Profile,
@@ -100,6 +101,7 @@ public static class RankWire
             winRate = value.WinRate,
             favoriteLeader = value.FavoriteLeader,
             championLeaderNumbers = value.ChampionLeaderNumbers,
+            isCurrentPlayer = value.IsCurrentPlayer,
         }).ToArray();
 
     public static object Settlement(RankPlayerSettlement value) => new
@@ -266,7 +268,7 @@ public sealed class RankedStore
                 Save(connection, transaction, profile);
             }
             var faction = ReadFaction(connection, transaction, profile.AccountKey);
-            var leaderboard = ReadLeaderboard(connection, season, nowUtc);
+            var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
             transaction.Commit();
             return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction), account, nowUtc), leaderboard);
         }
@@ -304,7 +306,7 @@ public sealed class RankedStore
                 // the request non-destructive when an old or malformed client omits that acknowledgement.
                 if (!resetRankProgress)
                 {
-                    var unchangedLeaderboard = ReadLeaderboard(connection, season, nowUtc);
+                    var unchangedLeaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
                     transaction.Commit();
                     return new RankSnapshot(ToSnapshot(profile, season, selected,
                         FactionRank(connection, season, profile, selected), account, nowUtc), unchangedLeaderboard);
@@ -321,7 +323,7 @@ public sealed class RankedStore
                 update.ExecuteNonQuery();
                 selected = faction;
             }
-            var leaderboard = ReadLeaderboard(connection, season, nowUtc);
+            var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
             transaction.Commit();
             return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected), account, nowUtc), leaderboard);
         }
@@ -623,7 +625,11 @@ public sealed class RankedStore
         return new Season($"S{index}", start, start.Add(SeasonLength));
     }
 
-    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(SqliteConnection connection, Season season, DateTime? nowUtc)
+    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(
+        SqliteConnection connection,
+        Season season,
+        string currentAccountKey,
+        DateTime? nowUtc)
     {
         using var command = connection.CreateCommand();
         command.CommandText = """
@@ -641,11 +647,12 @@ public sealed class RankedStore
             )
             SELECT account_key, display_name, rank_points, games, wins, faction, global_rank, faction_rank
             FROM ranked
-            WHERE global_rank <= 50 OR faction_rank <= 6
+            WHERE global_rank <= 100 OR account_key = $currentAccountKey
             ORDER BY global_rank ASC;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
         command.Parameters.AddWithValue("$placements", PlacementRequired);
+        command.Parameters.AddWithValue("$currentAccountKey", currentAccountKey);
         using var reader = command.ExecuteReader();
         var entries = new List<(string AccountKey, string DisplayName, int RankPoints, int Games, int Wins, string Faction, int GlobalRank, int FactionRank)>();
         while (reader.Read())
@@ -684,7 +691,8 @@ public sealed class RankedStore
             result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.DisplayName, entry.RankPoints, entry.Faction,
                 label.Tier, label.Division, entry.Games, entry.Wins,
                 entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber,
-                championLeaderNumbers ?? Array.Empty<string>()));
+                championLeaderNumbers ?? Array.Empty<string>(),
+                string.Equals(entry.AccountKey, currentAccountKey, StringComparison.Ordinal)));
         }
         return result;
     }

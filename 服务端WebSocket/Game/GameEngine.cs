@@ -87,7 +87,8 @@ public class GameEngine
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
-        "DuelOver", "Surrender", "OperationTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
+        "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
+        "OperationTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
 
@@ -177,15 +178,21 @@ public class GameEngine
         _activeActor = playerIndex;
         _activeActionRejected = false;
 
+        // 平局申请期间冻结牌局，只允许对方回应或任一方直接投降。
+        if (State.PendingDrawRequester is not null
+            && action is not "RespondDraw" and not "Surrender")
+        {
+            SendError(playerIndex, "请先等待或处理当前平局申请");
+        }
         // 卡牌效果等待玩家选择时，必须先完成当前效果链，不能让任何一方抢先推进牌局。
-        // 投降不受限制；PromptResponse 是解除等待状态的唯一常规入口。
-        if (State.PendingPrompt is not null
-            && action is not "PromptResponse" and not "Surrender")
+        // 投降、平局申请与回应不受卡牌 Prompt 限制。
+        else if (State.PendingPrompt is not null
+            && action is not "PromptResponse" and not "Surrender" and not "RequestDraw" and not "RespondDraw")
         {
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
         else if (!State.StartingPlayerChosen
-            && action is not "ChooseFirstPlayer" and not "Surrender")
+            && action is not "ChooseFirstPlayer" and not "Surrender" and not "RequestDraw" and not "RespondDraw")
         {
             SendError(playerIndex, "请先完成先后手选择");
         }
@@ -202,6 +209,8 @@ public class GameEngine
             case "PassCounter":    HandlePassCounter(playerIndex); break;
             case "EndTurn":        HandleEndTurn(playerIndex); break;
             case "Surrender":      HandleSurrender(playerIndex); break;
+            case "RequestDraw":    HandleRequestDraw(playerIndex); break;
+            case "RespondDraw":    HandleRespondDraw(playerIndex, data); break;
             case "PromptResponse": HandlePromptResponse(playerIndex, data); break;
             case "UseEffect":      HandleUseEffect(playerIndex, data); break;
             case "DebugAddCard":   HandleDebugAddCard(playerIndex, data); break;
@@ -1490,9 +1499,75 @@ public class GameEngine
 
     private void HandleSurrender(int playerIndex)
     {
+        State.PendingDrawRequester = null;
         State.WinnerIndex = 1 - playerIndex;
         State.GameOverReason = $"{State.Players[playerIndex].VisibleName} 投降";
         Broadcast("Surrender", new { surrendered = playerIndex });
+    }
+
+    // ── 协商平局 ────────────────────────────────────────────────────────
+
+    private void HandleRequestDraw(int playerIndex)
+    {
+        if (State.MatchKind == MatchKind.Bot)
+        {
+            SendError(playerIndex, "机器人对局无法请求平局");
+            return;
+        }
+        if (State.PendingDrawRequester is not null)
+        {
+            SendError(playerIndex, "当前已有平局申请等待回应");
+            return;
+        }
+        if (State.DrawRequestRejectionCounts[playerIndex] >= GameState.DrawRequestRejectionLimit)
+        {
+            SendError(playerIndex, "本局平局申请已连续被拒绝 3 次，无法再次申请");
+            return;
+        }
+
+        State.PendingDrawRequester = playerIndex;
+        Broadcast("DrawRequested", new { requester = playerIndex });
+    }
+
+    private void HandleRespondDraw(int playerIndex, JsonElement data)
+    {
+        if (State.PendingDrawRequester is not int requester)
+        {
+            SendError(playerIndex, "当前没有等待回应的平局申请");
+            return;
+        }
+        if (requester == playerIndex)
+        {
+            SendError(playerIndex, "发起者不能回应自己的平局申请");
+            return;
+        }
+        if (data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("accept", out var acceptElement)
+            || acceptElement.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+        {
+            SendError(playerIndex, "缺少有效的平局回应");
+            return;
+        }
+
+        State.PendingDrawRequester = null;
+        if (!acceptElement.GetBoolean())
+        {
+            State.DrawRequestRejectionCounts[requester] = Math.Min(
+                GameState.DrawRequestRejectionLimit,
+                State.DrawRequestRejectionCounts[requester] + 1);
+            Broadcast("DrawRequestRejected", new
+            {
+                requester,
+                responder = playerIndex,
+                rejectionCount = State.DrawRequestRejectionCounts[requester],
+            });
+            return;
+        }
+
+        State.WinnerIndex = null;
+        State.IsDraw = true;
+        State.GameOverReason = "双方同意因 Bug 平局";
+        Broadcast("DrawAgreed", new { requester, responder = playerIndex });
     }
 
     // ── 初始化辅助 ────────────────────────────────────────────────────────

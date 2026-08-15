@@ -59,6 +59,7 @@ function finalize(s: Session, last: MsgGameState): void {
     myLeader: last.my?.leaderNumber ?? "",
     opponentLeader: last.opponent?.leaderNumber ?? "",
     winnerIsMe: last.winnerIsMe ?? false,
+    isDraw: last.isDraw ?? false,
     gameOverReason: last.gameOverReason ?? "",
     turnCount: last.turnCount ?? 0,
     snapshotCount: s.snapshotCount,
