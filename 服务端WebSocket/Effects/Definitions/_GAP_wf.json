@@ -133,7 +133,7 @@
   },
   "P-019": {
     "_name": "贝宝",
-    "_matcher": "【咚!!×1】=被贴咚≥1(donAttachedGte:1)，【攻击时】KO对方最多1张原本力量≤3000角色。",
+    "_matcher": "【咚!!×1】=被贴咚≥1(donAttachedGte:1)，【攻击时】KO对方最多1张当前力量≤3000角色。",
     "_src": "wf-gap",
     "triggers": [
       {
@@ -148,9 +148,8 @@
             "max": 1,
             "min": 0,
             "as": "$tgt",
-            "valueBasis": "original",
             "filter": {
-              "originalPowerLte": 3000
+              "currentPowerLte": 3000
             }
           },
           {

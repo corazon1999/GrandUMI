@@ -123,7 +123,7 @@ public class CardValueBasisRegressionTests
     }
 
     [Fact]
-    public async Task P019_ExplicitOriginalPowerIgnoresCurrentPowerIncrease()
+    public async Task P019_CurrentPowerExcludesCharacterRaisedAbove3000()
     {
         var state = TestScene.New()
             .OppCharacter("OP13-013")
@@ -144,9 +144,9 @@ public class CardValueBasisRegressionTests
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnAttackDeclare, prompts);
 
         var targetPrompt = Assert.Single(prompts.ChooseHistory);
-        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
-        Assert.DoesNotContain(target, state.Players[1].Characters);
-        Assert.Contains(target, state.Players[1].Trash);
+        Assert.DoesNotContain(target.Id.ToString(), targetPrompt.choices);
+        Assert.Contains(target, state.Players[1].Characters);
+        Assert.DoesNotContain(target, state.Players[1].Trash);
     }
 
     [Fact]

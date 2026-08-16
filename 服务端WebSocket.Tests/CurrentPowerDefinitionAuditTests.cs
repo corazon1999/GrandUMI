@@ -1,4 +1,7 @@
 using System.Text.Json;
+using GrandUMI.Cards;
+using GrandUMI.Effects;
+using GrandUMI.Game;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -20,6 +23,7 @@ public class CurrentPowerDefinitionAuditTests
         "OP10-019", "OP10-020",
         "OP11-020",
         "OP16-006", "OP16-008",
+        "P-019",
         "ST01-015",
         "ST10-001", "ST10-015", "ST10-016",
         "ST21-016",
@@ -31,7 +35,7 @@ public class CurrentPowerDefinitionAuditTests
     {
         var definitions = LoadDefinitions();
 
-        Assert.Equal(32, CurrentPowerCards.Length);
+        Assert.Equal(33, CurrentPowerCards.Length);
         Assert.Equal(CurrentPowerCards.Length, CurrentPowerCards.Distinct().Count());
 
         foreach (var number in CurrentPowerCards)
@@ -52,6 +56,9 @@ public class CurrentPowerDefinitionAuditTests
                     $"{number} 的场上目标仍未使用 currentPowerLte");
                 Assert.False(filter.TryGetProperty("originalPowerLte", out _),
                     $"{number} 的场上目标仍残留 originalPowerLte");
+                Assert.False(choice.TryGetProperty("valueBasis", out var valueBasis) &&
+                             valueBasis.GetString() == "original",
+                    $"{number} 的场上目标仍残留原本力量口径标记");
             });
         }
     }
@@ -77,6 +84,34 @@ public class CurrentPowerDefinitionAuditTests
             Assert.False(filter.TryGetProperty("currentPowerLte", out _),
                 $"{number} 不应改为 currentPowerLte");
         });
+    }
+
+    [Fact]
+    public async Task P019CanKOCharacterReducedTo3000Power()
+    {
+        var state = TestScene.New()
+            .OppCharacter("OP13-010")
+            .Build();
+        var source = new CardInstance { Info = CardDatabase.Get("P-019")! };
+        state.Players[0].Characters.Add(source);
+        state.Players[0].CostArea.Add(new DonCard
+        {
+            State = DonState.Attached,
+            AttachedToCardId = source.Id,
+        });
+
+        var target = state.Players[1].Characters[0];
+        target.PowerModThisTurn = -5000;
+        Assert.Equal(3000, state.CurrentPowerOf(1, target));
+        var prompts = new MockPromptService().QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnAttackDeclare, prompts);
+
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(
+            history => history.kind == "OpponentCharacter"));
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+        Assert.DoesNotContain(target, state.Players[1].Characters);
+        Assert.Contains(target, state.Players[1].Trash);
     }
 
     private static Dictionary<string, JsonElement> LoadDefinitions()
