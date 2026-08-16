@@ -9,6 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  ContainerResponsiveProvider,
+  LayoutQuarterTurnProvider,
+} from "@/components/ui/ResponsiveScope";
 import SettingsModal from "./SettingsModal";
 import {
   useLayoutPreviewMode,
@@ -20,7 +24,7 @@ interface LayoutSettingsContextValue {
   setMode: (mode: SelectableLayoutPreviewMode) => void;
   openSettings: () => void;
   gameOverlayHost: HTMLDivElement | null;
-  setGameOverlayHost: (host: HTMLDivElement | null) => void;
+  setGameOverlayHost: (host: HTMLDivElement | null, rotateQuarterTurn?: boolean) => void;
 }
 
 const LayoutSettingsContext = createContext<LayoutSettingsContextValue | null>(null);
@@ -37,9 +41,14 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
   const [mode, setMode] = useLayoutPreviewMode();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameOverlayHost, setGameOverlayHostState] = useState<HTMLDivElement | null>(null);
+  const [gameOverlayQuarterTurn, setGameOverlayQuarterTurn] = useState(false);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
-  const setGameOverlayHost = useCallback((host: HTMLDivElement | null) => {
+  const setGameOverlayHost = useCallback((
+    host: HTMLDivElement | null,
+    rotateQuarterTurn = false,
+  ) => {
     setGameOverlayHostState(host);
+    setGameOverlayQuarterTurn(host ? rotateQuarterTurn : false);
   }, []);
   const contextValue = useMemo(
     () => ({ mode, setMode, openSettings, gameOverlayHost, setGameOverlayHost }),
@@ -89,7 +98,14 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
   return (
     <LayoutSettingsContext.Provider value={contextValue}>
       {children}
-      {gameOverlayHost ? createPortal(settingsUi, gameOverlayHost) : settingsUi}
+      {gameOverlayHost
+        ? createPortal(
+            <LayoutQuarterTurnProvider rotateQuarterTurn={gameOverlayQuarterTurn}>
+              <ContainerResponsiveProvider>{settingsUi}</ContainerResponsiveProvider>
+            </LayoutQuarterTurnProvider>,
+            gameOverlayHost,
+          )
+        : settingsUi}
     </LayoutSettingsContext.Provider>
   );
 }

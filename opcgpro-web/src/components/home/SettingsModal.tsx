@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/ui/Modal";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioStore } from "@/store/audioStore";
 import {
@@ -64,6 +65,13 @@ export default function SettingsModal({
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const setCardSize = useSettingsStore((state) => state.setCardSize);
   const setAnimationSpeed = useSettingsStore((state) => state.setAnimationSpeed);
+  const compactLandscape = useLayoutQuarterTurn();
+  const compactSectionClass = compactLandscape
+    ? "rounded-xl border border-gray-800 bg-gray-950/40 p-3"
+    : "";
+  const dividedSectionClass = compactLandscape
+    ? compactSectionClass
+    : "mt-6 border-t border-gray-800 pt-5";
 
   const testSound = async () => {
     const unlocked = isUnlocked || (await unlock());
@@ -72,8 +80,21 @@ export default function SettingsModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="设置" mobileSheet maxWidthClass="max-w-lg">
-      <section aria-labelledby="language-settings-title">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="设置"
+      mobileSheet
+      maxWidthClass={compactLandscape ? "max-w-[52rem]" : "max-w-lg"}
+    >
+      <div
+        data-settings-layout={compactLandscape ? "landscape-compact" : "stacked"}
+        className={compactLandscape ? "grid grid-cols-2 items-start gap-3" : ""}
+      >
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-3` : compactSectionClass}
+        aria-labelledby="language-settings-title"
+      >
         <h3 id="language-settings-title" className="text-sm font-bold text-white">界面语言</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">切换后立即应用，并保存在当前浏览器。</p>
         <div className="mt-4 grid grid-cols-3 gap-2" data-no-i18n>
@@ -99,7 +120,10 @@ export default function SettingsModal({
         </div>
       </section>
 
-      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="layout-preview-title">
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-3` : dividedSectionClass}
+        aria-labelledby="layout-preview-title"
+      >
         <h3 id="layout-preview-title" className="text-sm font-bold text-white">界面布局</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">手机竖屏模式下大厅保持竖屏，对局与回放会自动旋转为横屏，无需切换系统方向。</p>
 
@@ -129,10 +153,13 @@ export default function SettingsModal({
         </div>
       </section>
 
-      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="card-display-settings-title">
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-1` : dividedSectionClass}
+        aria-labelledby="card-display-settings-title"
+      >
         <h3 id="card-display-settings-title" className="text-sm font-bold text-white">卡牌显示</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">调整牌桌卡牌大小，设置会保存在当前浏览器。</p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 @[640px]:grid-cols-4">
           {([
             ["auto", "自动"],
             ["sm", "小"],
@@ -156,7 +183,10 @@ export default function SettingsModal({
         </div>
       </section>
 
-      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="animation-settings-title">
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-1` : dividedSectionClass}
+        aria-labelledby="animation-settings-title"
+      >
         <h3 id="animation-settings-title" className="text-sm font-bold text-white">对局动画</h3>
         <p className="mt-1 text-sm leading-5 text-gray-500">关闭时会跳过纯视觉特效，必要的卡牌公开与对局结果仍会显示。</p>
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -182,7 +212,11 @@ export default function SettingsModal({
         </div>
       </section>
 
-      <section className="mt-6 border-t border-gray-800 pt-5" aria-labelledby="audio-settings-title">
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-2 col-span-2` : dividedSectionClass}
+        aria-labelledby="audio-settings-title"
+      >
+        <div className={compactLandscape ? "grid grid-cols-2 items-start gap-3" : ""}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 id="audio-settings-title" className="text-sm font-bold text-white">游戏音效</h3>
@@ -203,7 +237,7 @@ export default function SettingsModal({
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
+        <div className={`${compactLandscape ? "" : "mt-5"} rounded-xl border border-gray-800 bg-gray-950/60 p-4`}>
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="sfx-volume" className="text-sm font-bold text-gray-200">音效音量</label>
             <span className="font-mono text-sm tabular-nums text-orange-300">{volumePercent}%</span>
@@ -234,7 +268,9 @@ export default function SettingsModal({
             </button>
           </div>
         </div>
+        </div>
       </section>
+      </div>
     </Modal>
   );
 }

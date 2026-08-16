@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
 import { useLayoutSettings } from "./LayoutSettingsProvider";
 import { resolveGameLayout } from "@/lib/gameLayout";
@@ -22,6 +22,12 @@ export default function LayoutPreviewRoute({ children }: { children: ReactNode }
   }, []);
 
   const layout = resolveGameLayout(mode, isPhonePortrait);
+  const setOverlayHost = useCallback(
+    (host: HTMLDivElement | null) => {
+      setGameOverlayHost(host, layout.rotateQuarterTurn);
+    },
+    [layout.rotateQuarterTurn, setGameOverlayHost],
+  );
 
   return (
     <LayoutPreviewFrame
@@ -33,7 +39,7 @@ export default function LayoutPreviewRoute({ children }: { children: ReactNode }
         {children}
         <MobileFullscreenButton />
         <div
-          ref={setGameOverlayHost}
+          ref={setOverlayHost}
           className="pointer-events-none absolute inset-0 z-[10000]"
         />
       </div>

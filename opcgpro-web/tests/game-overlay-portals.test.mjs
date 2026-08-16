@@ -50,6 +50,29 @@ test("共享弹窗在旋转对局画布中使用容器尺寸并保留可滚动�
   assert.match(modal, /var\(--layout-safe-right/);
 });
 
+test("旋转对局中的设置弹窗使用横屏紧凑双栏布局", async () => {
+  const [settings, provider, previewRoute] = await Promise.all([
+    readSource("../src/components/home/SettingsModal.tsx"),
+    readSource("../src/components/home/LayoutSettingsProvider.tsx"),
+    readSource("../src/components/home/LayoutPreviewRoute.tsx"),
+  ]);
+
+  assert.match(settings, /useLayoutQuarterTurn/);
+  assert.match(settings, /max-w-\[52rem\]/);
+  assert.match(settings, /data-settings-layout=/);
+  assert.match(settings, /landscape-compact/);
+  assert.match(settings, /grid grid-cols-2 items-start gap-3/);
+  assert.match(settings, /col-span-2/);
+  assert.match(settings, /order-1/);
+  assert.match(settings, /order-2/);
+  assert.match(settings, /order-3/);
+  assert.match(settings, /@\[640px\]:grid-cols-4/);
+  assert.doesNotMatch(settings, /sm:grid-cols-4/);
+  assert.match(provider, /LayoutQuarterTurnProvider rotateQuarterTurn=\{gameOverlayQuarterTurn\}/);
+  assert.match(provider, /<ContainerResponsiveProvider>\{settingsUi\}<\/ContainerResponsiveProvider>/);
+  assert.match(previewRoute, /setGameOverlayHost\(host, layout\.rotateQuarterTurn\)/);
+});
+
 test("对局设置的同类浮层不再使用未旋转的视口宽高", async () => {
   const [zoom, cardInfo, life, trash, menu] = await Promise.all([
     readSource("../src/components/ui/CardZoomOverlay.tsx"),
