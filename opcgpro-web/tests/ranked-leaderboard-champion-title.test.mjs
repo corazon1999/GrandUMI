@@ -33,9 +33,10 @@ test("排位榜为阵营巅峰与次级称号显示两档专属特效", async ()
   for (const title of ["海贼王", "海军元帅", "世界之王"]) {
     assert.match(badge, new RegExp(`SUPREME_RANK_TITLES[^;]+${title}`));
   }
-  for (const title of ["四皇", "海军大将", "神之骑士团"]) {
+  for (const title of ["四皇", "海军大将", "五老星"]) {
     assert.match(badge, new RegExp(`ELITE_RANK_TITLES[^;]+${title}`));
   }
+  assert.doesNotMatch(badge, /ELITE_RANK_TITLES[^;]+神之骑士团/);
   assert.match(panel, /<RankTierBadge faction=\{item\.faction\}/);
   assert.match(badge, /rank-tier-badge--\$\{effect\}/);
   assert.match(badge, /rank-tier-badge--\$\{faction\}/);

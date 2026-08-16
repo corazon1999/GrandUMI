@@ -1,7 +1,7 @@
 import type { RankFaction } from "@/types/net";
 
 const SUPREME_RANK_TITLES = new Set(["海贼王", "海军元帅", "世界之王"]);
-const ELITE_RANK_TITLES = new Set(["四皇", "海军大将", "神之骑士团"]);
+const ELITE_RANK_TITLES = new Set(["四皇", "海军大将", "五老星"]);
 
 export function rankTierLabel(tier: string, division?: number | null): string {
   return `${tier}${division ? ` ${["", "I", "II", "III"][division]}` : ""}`;
