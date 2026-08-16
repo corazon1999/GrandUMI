@@ -15,7 +15,7 @@ import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
 import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
 import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
-import RankResultPanel from "@/components/game/RankResultPanel";
+import GameOverOverlay from "@/components/game/GameOverOverlay";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -31,11 +31,6 @@ export default function GamePage() {
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
-  const isDraw = useGameStore((s) => s.isDraw);
-  const winnerIsMe = useGameStore((s) => s.winnerIsMe);
-  const gameOverReason = useGameStore((s) => s.gameOverReason);
-  const matchKind = useGameStore((s) => s.matchKind);
-  const rankResult = useNetStore((s) => s.lastRankResult);
 
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
@@ -132,61 +127,7 @@ export default function GamePage() {
         </AnimatePresence>
       )}
 
-      <AnimatePresence>
-        {isGameOver && (
-          <motion.div
-            className="fixed inset-0 z-40 flex flex-col items-center overflow-y-auto bg-black/70 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.h1
-              className={
-                isObserver
-                  ? "text-5xl font-black text-purple-300 drop-shadow-[0_0_12px_rgba(216,180,254,0.5)]"
-                  : isDraw
-                  ? "text-5xl font-black text-sky-300 drop-shadow-[0_0_12px_rgba(125,211,252,0.5)]"
-                  : winnerIsMe
-                  ? "text-5xl font-black text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)]"
-                  : "text-5xl font-black text-gray-400 drop-shadow-[0_0_12px_rgba(156,163,175,0.5)]"
-              }
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            >
-              {isObserver ? "对局结束" : isDraw ? "本局平局" : winnerIsMe ? "你胜利了！" : "你战败了"}
-            </motion.h1>
-            {gameOverReason && (
-              <motion.p
-                className="mt-3 text-lg text-white/70"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                结束原因：{gameOverReason}
-              </motion.p>
-            )}
-            {!isDraw && matchKind === "Ranked" && rankResult && (
-              <motion.div
-                className="contents"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <RankResultPanel result={rankResult} />
-              </motion.div>
-            )}
-            <motion.button
-              onClick={returnToHome}
-              className="mt-4 min-h-11 rounded-lg bg-orange-500 px-6 py-2 text-white transition-colors hover:bg-orange-400"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-            >
-              返回大厅
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <GameOverOverlay isObserver={isObserver} onReturnToHome={returnToHome} />
 
       <GameBoard
         isObserver={isObserver}
