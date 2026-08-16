@@ -84,6 +84,23 @@ test("好友聊天未读数由全局状态维护并可按好友清除", async ()
   assert.match(store, /delete friendChatUnreadByAccount\[key\]/);
 });
 
+test("好友中心默认就是微信式会话列表并可直接发送好友消息", async () => {
+  const [panel, friendChatView] = await Promise.all([
+    readSource("../src/components/home/FriendsPanel.tsx"),
+    readSource("../src/components/chat/FriendChatView.tsx"),
+  ]);
+
+  assert.match(panel, /type Tab = "chat" \| "requests" \| "search"/);
+  assert.match(panel, /useState<Tab>\("chat"\)/);
+  assert.match(panel, /<FriendChatView/);
+  assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
+  assert.match(panel, /markFriendChatRead\(selectedFriendAccount\)/);
+  assert.match(panel, /headerActions=\{chatHeaderActions\}/);
+  assert.match(panel, /邀请 \$\{selectedFriend\.name\} 对战/);
+  assert.match(panel, /删除好友 \$\{selectedFriend\.name\}/);
+  assert.match(friendChatView, /headerActions &&/);
+});
+
 test("好友私聊由服务端验证好友关系且只回显给双方", async () => {
   const bridge = await readSource("../../服务端WebSocket/WebSocketBridge.cs");
 

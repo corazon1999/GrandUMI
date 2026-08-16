@@ -23,8 +23,8 @@ test("好友面板可从正在进行的好友对局直接进入观战", async ()
     readSource("../src/components/home/SpectateJoinButton.tsx"),
   ]);
 
-  assert.match(panel, /friend\.status === "playing" && friend\.roomId/);
-  assert.match(panel, /<SpectateJoinButton[\s\S]*roomId=\{friend\.roomId\}[\s\S]*seatIndex=\{friend\.seatIndex \?\? 0\}/);
+  assert.match(panel, /selectedFriend\.status === "playing" && selectedFriend\.roomId/);
+  assert.match(panel, /<SpectateJoinButton[\s\S]*roomId=\{selectedFriend\.roomId\}[\s\S]*seatIndex=\{selectedFriend\.seatIndex \?\? 0\}/);
   assert.match(joinButton, /HomeRequest\.spectateRoom\(roomId, seatIndex, spectateCode\)/);
   assert.match(joinButton, /spectateState === "joining" && spectateRoomId === roomId/);
   assert.match(joinButton, /normalizedMode === "password"/);
@@ -33,9 +33,10 @@ test("好友面板可从正在进行的好友对局直接进入观战", async ()
 test("移动端好友列表在受限高度内支持纵向触摸滚动", async () => {
   const panel = await readSource("../src/components/home/FriendsPanel.tsx");
 
-  assert.match(panel, /h-\[min\(70cqh,36rem\)\]/);
+  assert.match(panel, /h-\[min\(76cqh,40rem\)\]/);
   assert.match(panel, /max-h-\[calc\(100cqh-7rem\)\]/);
   assert.match(panel, /min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain/);
   assert.match(panel, /\[-webkit-overflow-scrolling:touch\]/);
+  assert.match(panel, /conversationOpen=\{friendConversationOpen\}/);
   assert.doesNotMatch(panel, /min-h-\[28rem\]/);
 });

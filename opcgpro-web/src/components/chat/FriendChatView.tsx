@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { friendAccountKey } from "@/store/netStore";
 import type { FriendChatMessage, FriendInfo } from "@/types/net";
 
@@ -19,6 +19,7 @@ interface Props {
   onSend: () => void;
   conversationOpen: boolean;
   bottomRef?: React.RefObject<HTMLDivElement | null>;
+  headerActions?: ReactNode;
 }
 
 function formatConversationTime(timestamp?: number) {
@@ -79,6 +80,7 @@ export default function FriendChatView({
   onSend,
   conversationOpen,
   bottomRef,
+  headerActions,
 }: Props) {
   const [search, setSearch] = useState("");
   const myKey = friendAccountKey(myAccount);
@@ -205,6 +207,7 @@ export default function FriendChatView({
                 <h3 className="truncate text-sm font-bold text-gray-100">{selectedFriend.name}</h3>
                 <p className={`text-[11px] ${selectedFriend.online ? "text-emerald-400" : "text-gray-500"}`}>{selectedFriend.online ? "在线" : "离线，暂时无法发送消息"}</p>
               </div>
+              {headerActions && <div className="flex shrink-0 items-center gap-1">{headerActions}</div>}
             </header>
 
             <div className="friend-chat-wallpaper flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 py-4 @[560px]:px-5" aria-live="polite">
