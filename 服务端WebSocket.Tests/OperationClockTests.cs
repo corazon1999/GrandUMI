@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Reflection;
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.Snapshot;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -138,6 +139,86 @@ public class OperationClockTests
 
             Assert.True(remainingAfterSecond < remainingAfterFirst,
                 $"第二次断线后剩余额度应继续减少：首次={remainingAfterFirst}，再次={remainingAfterSecond}");
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 对局中断线重连后_操作棋钟立即继续运行()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            Assert.Equal(room.Engine.State.CurrentTurnPlayer, room.Engine.State.OperationClockActivePlayer);
+
+            var oldSession = room.PlayerSessionIds[0];
+            GameRoomManager.OnPlayerDisconnect(oldSession);
+            Assert.True(room.Engine.State.OperationClockPaused);
+            Assert.Equal(-1, room.Engine.State.OperationClockActivePlayer);
+
+            var newSession = $"clock-resume-{Guid.NewGuid():N}";
+            Assert.True(GameRoomManager.TryReclaim(newSession, room.PlayerAccounts[0]));
+            await WaitUntilAsync(() => room.Engine.State.OperationClockActivePlayer >= 0);
+
+            Assert.False(room.Engine.State.OperationClockPaused);
+            Assert.Equal(room.Engine.State.CurrentTurnPlayer, room.Engine.State.OperationClockActivePlayer);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 在线账号被新会话接管_不会重复广播玩家重连()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            var tickBefore = room.Engine.State.Tick;
+            var newSession = $"clock-takeover-{Guid.NewGuid():N}";
+
+            Assert.True(GameRoomManager.TryReclaim(newSession, room.PlayerAccounts[0]));
+            await Task.Delay(80);
+
+            Assert.Equal(tickBefore, room.Engine.State.Tick);
+            Assert.Same(room, GameRoomManager.GetRoomBySession(newSession));
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public void 私有诊断快照包含对局类型与完整棋钟状态()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+
+            using var snapshot = JsonDocument.Parse(JsonSerializer.Serialize(
+                PrivateStateSnapshotBuilder.Build(room.Engine.State)));
+            var root = snapshot.RootElement;
+
+            Assert.True(root.GetProperty("operationClockEnabled").GetBoolean());
+            Assert.Equal(2, root.GetProperty("operationClockRemainingMs").GetArrayLength());
+            Assert.Equal(room.Engine.State.CurrentTurnPlayer,
+                root.GetProperty("operationClockActivePlayer").GetInt32());
+            Assert.False(root.GetProperty("operationClockPaused").GetBoolean());
+            Assert.Equal("Ranked", root.GetProperty("matchKind").GetString());
         }
         finally
         {

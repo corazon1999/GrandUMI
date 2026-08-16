@@ -108,6 +108,25 @@ public class StartingPlayerFlowTests
     }
 
     [Fact]
+    public void 双方确认起手牌后_保留与重抽玩家都维持五张手牌()
+    {
+        var engine = CreateEngine(firstPlayer: 0, seed: 20260817);
+
+        Assert.All(engine.State.Players, player => Assert.Equal(5, player.Hand.Count));
+        engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = true }));
+        engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+
+        Assert.True(engine.State.MulliganBothDone);
+        Assert.All(engine.State.Players, player => Assert.Equal(5, player.Hand.Count));
+        Assert.All(engine.State.StartingHandCardNumbers, cards => Assert.Equal(5, cards.Count));
+
+        using var player0 = JsonDocument.Parse(JsonSerializer.Serialize(
+            StateSnapshotBuilder.Build(engine.State, 0, "MulliganComplete")));
+        Assert.Equal(5, player0.RootElement.GetProperty("my").GetProperty("handCount").GetInt32());
+        Assert.Equal(5, player0.RootElement.GetProperty("my").GetProperty("handCardIds").GetArrayLength());
+    }
+
+    [Fact]
     public void 调度超时_未决定双方自动保留并进入第一回合()
     {
         var engine = CreateEngine(firstPlayer: 0, seed: 20260807);

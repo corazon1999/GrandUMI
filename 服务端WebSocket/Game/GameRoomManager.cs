@@ -887,8 +887,9 @@ public static class GameRoomManager
                     revealSpectatorMainHand: spectator?.HandVisible == true));
                 return;
             }
-            CompleteDisconnectGrace(room, idx, sessionId);
-            WebSocketBridge.Send(room.PlayerSessionIds[1 - idx], new { proto = "MsgPlayerReconnected" });
+            var wasDisconnected = CompleteDisconnectGrace(room, idx, sessionId);
+            if (wasDisconnected)
+                WebSocketBridge.Send(room.PlayerSessionIds[1 - idx], new { proto = "MsgPlayerReconnected" });
             WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, idx, "Resync"));
             WebSocketBridge.BroadcastSpectatorList(room);
         }));
@@ -934,6 +935,15 @@ public static class GameRoomManager
             return Task.CompletedTask;
         }));
 
+        StartDisconnectGraceTimer(room, idx, sessionId, graceRemaining);
+    }
+
+    private static void StartDisconnectGraceTimer(
+        RoomEntry room,
+        int playerIndex,
+        string sessionId,
+        long graceRemaining)
+    {
         var cts = new CancellationTokenSource();
         _grace[room.RoomId + ":" + sessionId] = cts;
         _ = Task.Run(async () =>
@@ -949,14 +959,14 @@ public static class GameRoomManager
             {
                 lock (r.ClockGate)
                 {
-                    r.DisconnectGraceRemainingMs[idx] = 0;
-                    r.DisconnectStartedAt[idx] = 0;
+                    r.DisconnectGraceRemainingMs[playerIndex] = 0;
+                    r.DisconnectStartedAt[playerIndex] = 0;
                 }
                 if (!r.Engine.State.IsGameOver)
                 {
-                    r.Engine.State.WinnerIndex = 1 - idx;
-                    r.Engine.State.GameOverReason = $"{r.PlayerDisplayNames[idx]} 断线超时";
-                    r.Engine.Broadcast("DisconnectTimeout", new { disconnected = idx });
+                    r.Engine.State.WinnerIndex = 1 - playerIndex;
+                    r.Engine.State.GameOverReason = $"{r.PlayerDisplayNames[playerIndex]} 断线超时";
+                    r.Engine.Broadcast("DisconnectTimeout", new { disconnected = playerIndex });
                 }
                 CleanupRoom(room.RoomId);
                 return Task.CompletedTask;
@@ -1026,7 +1036,7 @@ public static class GameRoomManager
                 {
                     var oldSid = r.PlayerSessionIds[i];
                     if (oldSid == newSessionId) return false; // 同 sid 不算重连
-                    CompleteDisconnectGrace(r, i, oldSid);
+                    var wasDisconnected = CompleteDisconnectGrace(r, i, oldSid);
                     // 替换 session
                     _sessionRoom.TryRemove(oldSid, out _);
                     r.PlayerSessionIds[i] = newSessionId;
@@ -1043,9 +1053,13 @@ public static class GameRoomManager
                         EnsureStartingPlayerChoiceTimeout(r);
                         await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
                         EnsureMulliganTimeout(r);
-                        WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
-                        r.Engine.Broadcast("PlayerReconnected", new { player = playerIndex });
+                        if (wasDisconnected)
+                        {
+                            WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
+                            r.Engine.Broadcast("PlayerReconnected", new { player = playerIndex });
+                        }
                         WebSocketBridge.Send(newSessionId, StateSnapshotBuilder.Build(r.Engine.State, playerIndex, "Resync"));
+                        SendCurrentOpponentDisconnectState(r, playerIndex, newSessionId);
                         WebSocketBridge.BroadcastSpectatorList(r);
                     }));
                     return true;
@@ -1055,7 +1069,7 @@ public static class GameRoomManager
         return false;
     }
 
-    private static void CompleteDisconnectGrace(RoomEntry room, int playerIndex, string sessionId)
+    private static bool CompleteDisconnectGrace(RoomEntry room, int playerIndex, string sessionId)
     {
         if (_grace.TryRemove(room.RoomId + ":" + sessionId, out var cts))
         {
@@ -1064,7 +1078,8 @@ public static class GameRoomManager
         }
         lock (room.ClockGate)
         {
-            if (room.DisconnectedPlayers[playerIndex] && room.DisconnectStartedAt[playerIndex] > 0)
+            var wasDisconnected = room.DisconnectedPlayers[playerIndex];
+            if (wasDisconnected && room.DisconnectStartedAt[playerIndex] > 0)
             {
                 var elapsed = Stopwatch.GetElapsedTime(room.DisconnectStartedAt[playerIndex]).TotalMilliseconds;
                 room.DisconnectGraceRemainingMs[playerIndex] = Math.Max(0,
@@ -1073,7 +1088,30 @@ public static class GameRoomManager
             room.DisconnectedPlayers[playerIndex] = false;
             room.DisconnectStartedAt[playerIndex] = 0;
             room.Engine.State.OperationClockPaused = room.DisconnectedPlayers[0] || room.DisconnectedPlayers[1];
+            if (wasDisconnected && !room.Engine.State.OperationClockPaused)
+                StartOperationClockLocked(room, DetermineOperationClockPlayer(room));
+            return wasDisconnected;
         }
+    }
+
+    private static void SendCurrentOpponentDisconnectState(RoomEntry room, int playerIndex, string sessionId)
+    {
+        var opponentIndex = 1 - playerIndex;
+        long graceRemaining;
+        lock (room.ClockGate)
+        {
+            if (!room.DisconnectedPlayers[opponentIndex]) return;
+            var elapsed = room.DisconnectStartedAt[opponentIndex] <= 0
+                ? 0
+                : Stopwatch.GetElapsedTime(room.DisconnectStartedAt[opponentIndex]).TotalMilliseconds;
+            graceRemaining = Math.Max(0,
+                room.DisconnectGraceRemainingMs[opponentIndex] - (long)Math.Ceiling(elapsed));
+        }
+        WebSocketBridge.Send(sessionId, new
+        {
+            proto = "MsgPlayerDisconnected",
+            gracePeriodSeconds = Math.Max(0, (int)Math.Ceiling(graceRemaining / 1000d)),
+        });
     }
 
     public static void AddSpectator(
@@ -1692,6 +1730,10 @@ public static class GameRoomManager
         engine.State.OperationClockRemainingMs[1] = restoredClockMs[1];
         entry.DisconnectedPlayers[0] = true;
         entry.DisconnectedPlayers[1] = true;
+        var restoredDisconnectStartedAt = Stopwatch.GetTimestamp();
+        entry.DisconnectStartedAt[0] = restoredDisconnectStartedAt;
+        entry.DisconnectStartedAt[1] = restoredDisconnectStartedAt;
+        engine.State.OperationClockPaused = engine.State.OperationClockEnabled;
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
 
         // 重新挂回回调（按当前 sid 发；日志/动作日志均"续写"而非覆盖）
@@ -1720,6 +1762,8 @@ public static class GameRoomManager
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
         StartActionWorker(entry);
+        StartDisconnectGraceTimer(entry, 0, entry.PlayerSessionIds[0], entry.DisconnectGraceRemainingMs[0]);
+        StartDisconnectGraceTimer(entry, 1, entry.PlayerSessionIds[1], entry.DisconnectGraceRemainingMs[1]);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
         ValidateAndRefreshRecoverySnapshot(entry);
