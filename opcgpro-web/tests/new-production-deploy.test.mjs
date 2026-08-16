@@ -14,6 +14,8 @@ const candidateDeploy = await readFile(new URL("../../ops/server/deploy-grandumi
 const productionBootstrap = await readFile(new URL("../../ops/server/bootstrap-grandumi-production.sh", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../../deploy-new-hk-production.ps1", import.meta.url), "utf8");
 const directTls = await readFile(new URL("../../ops/server/enable-grandumi-production-direct-tls.sh", import.meta.url), "utf8");
+const directTlsRenewHook = await readFile(new URL("../../ops/server/renew-grandumi-direct-certificate.sh", import.meta.url), "utf8");
+const directTlsCompatChain = await readFile(new URL("../../ops/server/isrg-root-x2-cross-signed.pem", import.meta.url), "utf8");
 const emergencyDirectRelay = await readFile(new URL("../../ops/server/grandumi-emergency-direct-relay.caddy", import.meta.url), "utf8");
 const enableEmergencyDirectRelay = await readFile(new URL("../../ops/server/enable-grandumi-emergency-direct-relay.sh", import.meta.url), "utf8");
 
@@ -54,6 +56,13 @@ test("直连启用前必须完成 DNS 独占、证书主机名和活动槽运行
   assert.match(directTls, /network-endpoints\.json/);
   assert.match(directTls, /wss:\/\/direct\.grand-umi\.com\/ws/);
   assert.match(directTls, /backend\/ready/);
+  assert.match(directTls, /--key-type rsa --rsa-key-size 2048/);
+  assert.match(directTls, /grandumi-direct-certificate/);
+  assert.match(directTlsRenewHook, /isrg-root-x2-cross-signed\.pem/);
+  assert.match(directTlsRenewHook, /tail -c "\$compat_bytes"/);
+  assert.match(directTlsRenewHook, /openssl x509[\s\S]*-checkhost/);
+  assert.match(directTlsCompatChain, /BEGIN CERTIFICATE/);
+  assert.match(directTlsCompatChain, /END CERTIFICATE/);
   assert.match(productionBootstrap, /缺少 direct\.grand-umi\.com 证书/);
 });
 
