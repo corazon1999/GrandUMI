@@ -99,7 +99,8 @@ if [[ "$need_front" == 1 ]]; then
     target_dir="$test_assets/$asset_dir"
     [[ -d "$source_dir" ]] || die "正式服卡图资源目录不存在：$source_dir"
     mkdir -p "$target_dir"
-    rsync -a "$source_dir/" "$target_dir/"
+    # 测试服可能先行验证本机补齐的资源；保留目标端时间更新的修正版，正式资源更新后仍可继续增量同步。
+    rsync -au "$source_dir/" "$target_dir/"
   done
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
   node scripts/check-latest-card-art.mjs

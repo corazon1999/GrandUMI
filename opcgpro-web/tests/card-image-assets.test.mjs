@@ -41,6 +41,12 @@ test("测试服部署会校验全部卡图而不只校验最新异画", async ()
     path.join(repoRoot, "ops", "server", "deploy-test.sh"),
     "utf8",
   );
+  const deployEntry = await readFile(path.join(repoRoot, "deploy-test.ps1"), "utf8");
   assert.match(deployScript, /node scripts\/check-latest-card-art\.mjs/);
   assert.match(deployScript, /node scripts\/check-card-image-assets\.mjs/);
+  assert.match(deployScript, /rsync -au "\$source_dir\/" "\$target_dir\/"/);
+  assert.match(
+    deployEntry,
+    /bash \/opt\/grandumi-test\/ops\/server\/deploy-test\.sh/,
+  );
 });

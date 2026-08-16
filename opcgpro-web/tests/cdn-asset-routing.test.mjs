@@ -34,7 +34,7 @@ test("test build keeps its assets on the test origin", () => {
 test("active deployment entry no longer depends on a candidate environment", async () => {
   const deployEntry = await readFile(new URL("../../deploy-test.ps1", import.meta.url), "utf8");
   assert.doesNotMatch(deployEntry, /deploy-new-hk-candidate|candidate\.grand-umi\.com/);
-  assert.match(deployEntry, /bash \/opt\/grandumi-test\/deploy\.sh/);
+  assert.match(deployEntry, /bash \/opt\/grandumi-test\/ops\/server\/deploy-test\.sh/);
 });
 
 test("asset host exposes only cacheable public resources with cross-origin access", () => {
@@ -81,6 +81,6 @@ test("release prewarms new chunks and catalog mode covers card thumbnails", () =
 });
 
 test("card image URLs carry a recovery revision to bypass stale 404 caches", () => {
-  assert.match(sprite, /CARD_ASSET_VERSION = `\$\{DATA_VERSION\}-r3`/);
+  assert.match(sprite, /CARD_ASSET_VERSION = `\$\{DATA_VERSION\}-r4`/);
   assert.match(sprite, /`\?v=\$\{CARD_ASSET_VERSION\}`/);
 });

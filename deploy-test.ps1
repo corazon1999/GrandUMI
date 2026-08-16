@@ -68,7 +68,7 @@ try {
 }
 
 $forceArg = if ($All) { "all" } else { "" }
-& $ssh -o BatchMode=yes $Server "bash /opt/grandumi-test/deploy.sh '$target' '$forceArg'"
+& $ssh -o BatchMode=yes $Server "bash /opt/grandumi-test/ops/server/deploy-test.sh '$target' '$forceArg'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服部署失败，请检查服务器日志。" }
 
 $code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://test.grand-umi.com/"
