@@ -52,6 +52,8 @@ export default function Modal({
 
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
+    const previousModalCount = Number(document.body.dataset.modalOpenCount ?? "0");
+    document.body.dataset.modalOpenCount = String(previousModalCount + 1);
     document.body.style.overflow = "hidden";
 
     const dialog = dialogRef.current;
@@ -91,6 +93,9 @@ export default function Modal({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      const nextModalCount = Math.max(0, Number(document.body.dataset.modalOpenCount ?? "1") - 1);
+      if (nextModalCount === 0) delete document.body.dataset.modalOpenCount;
+      else document.body.dataset.modalOpenCount = String(nextModalCount);
       previousFocus?.focus();
     };
   }, [open]);

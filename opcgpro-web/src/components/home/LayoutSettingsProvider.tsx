@@ -63,6 +63,7 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
           onClick={openSettings}
           aria-label="打开设置"
           title="设置"
+          data-layout-settings-trigger
           style={{
             right: "calc(0.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",
             top: "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",

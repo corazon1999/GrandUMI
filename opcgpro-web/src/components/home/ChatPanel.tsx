@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import FriendConversationPicker from "@/components/chat/FriendConversationPicker";
+import FriendChatView from "@/components/chat/FriendChatView";
 import { GameRequest } from "@/net/GameRequest";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { friendAccountKey, useNetStore } from "@/store/netStore";
@@ -23,26 +23,14 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   const [lobbyInput, setLobbyInput] = useState("");
   const [friendInput, setFriendInput] = useState("");
   const [selectedFriendAccount, setSelectedFriendAccount] = useState("");
+  const [friendConversationOpen, setFriendConversationOpen] = useState(false);
   const [friendChatCoolingDown, setFriendChatCoolingDown] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sortedFriends = useMemo(() => [...friends].sort((a, b) => {
-    const onlineOrder = Number(b.online) - Number(a.online);
-    return onlineOrder || a.name.localeCompare(b.name, "zh-CN");
-  }), [friends]);
-
-  const selectedFriend = useMemo(() => sortedFriends.find(
+  const selectedFriend = useMemo(() => friends.find(
     (friend) => friendAccountKey(friend.account) === friendAccountKey(selectedFriendAccount),
-  ), [selectedFriendAccount, sortedFriends]);
-
-  const selectedFriendMessages = useMemo(() => {
-    if (!selectedFriendAccount) return [];
-    const selectedKey = friendAccountKey(selectedFriendAccount);
-    return friendChatMessages.filter((message) => (
-      friendAccountKey(message.fromAccount) === selectedKey || friendAccountKey(message.toAccount) === selectedKey
-    ));
-  }, [friendChatMessages, selectedFriendAccount]);
+  ), [friends, selectedFriendAccount]);
 
   const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce((total, count) => total + count, 0);
 
@@ -54,22 +42,25 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   }, []);
 
   useEffect(() => {
-    if (sortedFriends.length === 0) {
+    if (friends.length === 0) {
       setSelectedFriendAccount("");
+      setFriendConversationOpen(false);
       return;
     }
-    if (selectedFriend) return;
-    setSelectedFriendAccount((sortedFriends.find((friend) => friend.online) ?? sortedFriends[0]).account);
-  }, [selectedFriend, sortedFriends]);
+    if (selectedFriendAccount && !selectedFriend) {
+      setSelectedFriendAccount("");
+      setFriendConversationOpen(false);
+    }
+  }, [friends.length, selectedFriend, selectedFriendAccount]);
 
   useEffect(() => {
-    if (activeTab !== "friends" || !selectedFriendAccount) return;
+    if (activeTab !== "friends" || !friendConversationOpen || !selectedFriendAccount) return;
     markFriendChatRead(selectedFriendAccount);
-  }, [activeTab, friendChatMessages, markFriendChatRead, selectedFriendAccount]);
+  }, [activeTab, friendChatMessages, friendConversationOpen, markFriendChatRead, selectedFriendAccount]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeTab, chatMessages, selectedFriendAccount, selectedFriendMessages]);
+  }, [activeTab, chatMessages, friendChatMessages, selectedFriendAccount]);
 
   const sendLobbyMessage = () => {
     const text = lobbyInput.trim();
@@ -91,6 +82,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
   const selectFriend = (account: string) => {
     setSelectedFriendAccount(account);
     setFriendInput("");
+    setFriendConversationOpen(true);
     markFriendChatRead(account);
   };
 
@@ -151,48 +143,24 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
             placeholder={connState === "connected" ? "输入大厅消息" : "等待服务器连接"}
           />
         </>
-      ) : sortedFriends.length > 0 ? (
-        <>
-          <div className="border-b border-gray-800 p-2">
-            <FriendConversationPicker
-              friends={sortedFriends}
-              selectedAccount={selectedFriendAccount}
-              unreadByAccount={friendChatUnreadByAccount}
-              onSelect={selectFriend}
-            />
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3" aria-live="polite">
-            {selectedFriendMessages.length === 0 && (
-              <p className="my-auto text-center text-sm leading-6 text-gray-600">
-                {selectedFriend?.online ? "还没有消息，向好友打个招呼吧" : "好友当前离线，上线后即可聊天"}
-              </p>
-            )}
-            {selectedFriendMessages.map((message) => {
-              const isSelf = friendAccountKey(message.fromAccount) === friendAccountKey(myAccount);
-              return (
-                <div key={message.id} className="mb-2 text-sm leading-5 @[1024px]:text-xs">
-                  <span className={`font-bold ${isSelf ? "text-sky-300" : "text-emerald-300"}`}>
-                    {isSelf ? "你" : message.fromName}：
-                  </span>
-                  <span className="break-words text-gray-200">{message.text}</span>
-                </div>
-              );
-            })}
-            <div ref={bottomRef} />
-          </div>
-
-          <ChatInput
-            value={friendInput}
-            onChange={setFriendInput}
-            onSend={sendFriendMessage}
+      ) : (
+        <div className="min-h-0 flex-1">
+          <FriendChatView
+            friends={friends}
+            messages={friendChatMessages}
+            myAccount={myAccount}
+            selectedAccount={selectedFriendAccount}
+            unreadByAccount={friendChatUnreadByAccount}
+            input={friendInput}
             disabled={!selectedFriend?.online || friendChatCoolingDown || connState !== "connected"}
             placeholder={connState !== "connected" ? "等待服务器连接" : selectedFriend?.online ? `发给 ${selectedFriend.name}` : "好友当前离线"}
+            onInputChange={setFriendInput}
+            onSelect={selectFriend}
+            onBack={() => setFriendConversationOpen(false)}
+            onSend={sendFriendMessage}
+            conversationOpen={friendConversationOpen}
+            bottomRef={bottomRef}
           />
-        </>
-      ) : (
-        <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm leading-6 text-gray-600">
-          暂无好友。可以先在好友中心或在线玩家列表添加好友。
         </div>
       )}
     </div>

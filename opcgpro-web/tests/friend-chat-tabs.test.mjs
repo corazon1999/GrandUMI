@@ -38,9 +38,13 @@ test("局内聊天面板提供局内与好友分页并保留各自消息流", as
 });
 
 test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async () => {
-  const [panel, mainPanel] = await Promise.all([
+  const [panel, mainPanel, friendChatView, layoutSettings, modal, globals] = await Promise.all([
     readSource("../src/components/home/ChatPanel.tsx"),
     readSource("../src/components/home/MainPanel.tsx"),
+    readSource("../src/components/chat/FriendChatView.tsx"),
+    readSource("../src/components/home/LayoutSettingsProvider.tsx"),
+    readSource("../src/components/ui/Modal.tsx"),
+    readSource("../src/app/globals.css"),
   ]);
 
   assert.match(panel, /type ChatTab = "lobby" \| "friends"/);
@@ -48,12 +52,27 @@ test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async
   assert.match(panel, /好友/);
   assert.match(panel, /HomeRequest\.requestFriendList\(\)/);
   assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
-  assert.match(panel, /selectedFriendMessages/);
+  assert.match(panel, /messages={friendChatMessages}/);
   assert.match(panel, /selectedFriend\?\.online/);
   assert.match(panel, /friendChatUnreadByAccount/);
   assert.match(panel, /markFriendChatRead\(selectedFriendAccount\)/);
+  assert.match(panel, /friendConversationOpen/);
+  assert.match(panel, /<FriendChatView/);
   assert.match(mainPanel, /title="聊天"/);
   assert.match(mainPanel, /aria-label="打开聊天"/);
+  assert.match(mainPanel, /max-w-3xl/);
+  assert.match(friendChatView, /aria-label="好友会话列表"/);
+  assert.match(friendChatView, /placeholder="搜索好友"/);
+  assert.match(friendChatView, /role="listbox"/);
+  assert.match(friendChatView, /lastMessageByAccount/);
+  assert.match(friendChatView, /rounded-br-sm bg-\[#005c4b\]/);
+  assert.match(friendChatView, /返回好友会话列表/);
+  assert.match(friendChatView, /@\[560px\]:flex/);
+  assert.match(friendChatView, /min-h-11/);
+  assert.match(friendChatView, /Shift \+ Enter 换行/);
+  assert.match(layoutSettings, /data-layout-settings-trigger/);
+  assert.match(modal, /document\.body\.dataset\.modalOpenCount/);
+  assert.match(globals, /body\[data-modal-open-count\] \[data-layout-settings-trigger\]/);
 });
 
 test("好友聊天未读数由全局状态维护并可按好友清除", async () => {

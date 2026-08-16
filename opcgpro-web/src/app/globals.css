@@ -37,6 +37,19 @@ textarea {
   touch-action: manipulation;
 }
 
+.friend-chat-wallpaper {
+  background-color: #0b141a;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgb(255 255 255 / 0.022) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 65%, rgb(16 185 129 / 0.025) 0 1px, transparent 1.5px);
+  background-size: 28px 28px, 36px 36px;
+}
+
+/* 弹窗打开时收起全局设置入口，避免遮挡聊天标题、返回按钮等关键操作。 */
+body[data-modal-open-count] [data-layout-settings-trigger] {
+  display: none;
+}
+
 @keyframes global-announcement-scroll {
   from { transform: translateX(100vw); }
   to { transform: translateX(-100%); }

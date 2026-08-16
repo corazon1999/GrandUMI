@@ -615,8 +615,8 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
 
       <PlayerListPanel open={showPlayerList} onClose={() => setShowPlayerList(false)} />
       <FriendsPanel open={showFriends} onClose={() => setShowFriends(false)} />
-      <Modal open={showChat} onClose={() => setShowChat(false)} title="聊天" mobileSheet maxWidthClass="max-w-lg">
-        <div className="h-[min(70cqh,36rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+      <Modal open={showChat} onClose={() => setShowChat(false)} title="聊天" mobileSheet maxWidthClass="max-w-3xl">
+        <div className="h-[min(76cqh,40rem)] min-h-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
           <ChatPanel showHeader={false} />
         </div>
       </Modal>
