@@ -654,9 +654,15 @@ public static class AtomicOps
     }
 
     /// <summary>把场上一张角色/舞台放置到废弃区（非 KO，不触发【KO时】）。</summary>
-    public static void TrashFieldCard(GameState s, int ownerIdx, CardInstance card)
+    public static void TrashFieldCard(
+        GameState s,
+        int ownerIdx,
+        CardInstance card,
+        bool ignoreEffectLeaveGuard = false)
     {
-        if (s.IsLeaveGuarded(card, "effect")) return;
+        // “不会因对方的效果离场”不能阻止玩家把自己的角色作为成本放入废弃区。
+        // 默认仍尊重效果离场保护；只有明确的成本调用方可以选择绕过。
+        if (!ignoreEffectLeaveGuard && s.IsLeaveGuarded(card, "effect")) return;
         var p = s.Players[ownerIdx];
         bool removed = p.Characters.Remove(card);
         if (ReferenceEquals(p.StageCard, card))

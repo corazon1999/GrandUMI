@@ -83,7 +83,8 @@ public class OP13_079_Imu : IScriptedEffect
                 tenryubito.Select(c => c.Id.ToString()).ToList(), 1, 1);
             if (chosen.Count == 0) return;
             var tgt = tenryubito.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, tgt);
+            // 这是伊姆效果冒号前的己方成本，不属于“因对方的效果离场”。
+            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, tgt, ignoreEffectLeaveGuard: true);
             if (me.Characters.Contains(tgt)) return;
         }
         else
