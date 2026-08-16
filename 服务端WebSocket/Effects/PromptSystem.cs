@@ -1,4 +1,8 @@
 using GrandUMI.Game;
+using GrandUMI.Game.Snapshot;
+using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GrandUMI.Effects;
 
@@ -8,8 +12,10 @@ namespace GrandUMI.Effects;
 /// </summary>
 public class PromptSystem : IPromptService
 {
+    private const string ReturnToEffectConfirmPrefix = "__return_to_effect_confirm__";
     private readonly GameEngine _engine;
     private readonly Dictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
+    private readonly ConcurrentDictionary<int, OptionalConfirmation> _optionalConfirmations = new();
 
     /// <summary>本局 prompt 单调序号。promptId 必须确定性（按执行序生成），否则重放重建时
     /// 重新生成的 prompt 与录下的 PromptResponse.promptId 对不上，恢复会发散。</summary>
@@ -22,12 +28,17 @@ public class PromptSystem : IPromptService
         _engine = engine;
     }
 
+    internal void ClearOptionalConfirmation(int playerIdx, Guid sourceId)
+    {
+        if (_optionalConfirmations.TryGetValue(playerIdx, out var optional)
+            && optional.SourceId == sourceId.ToString())
+            _optionalConfirmations.TryRemove(playerIdx, out _);
+    }
+
     public async Task<List<string>> ChooseCards(int playerIdx, string kind, string text,
         IReadOnlyList<string> validChoices, int min, int max,
         Dictionary<string, object?>? extra = null)
     {
-        var promptId = $"p{++_promptSeq}";
-
         // 自动注入"效果源"：让客户端在选择提示里展示正在结算哪张卡的效果。
         // CurrentSource 随 AsyncLocal 传播，覆盖 DSL / 脚本 / AtomicOps 等所有调用点；
         // 无效果上下文（如战斗流程）时为 null，自然不注入，老行为不变。
@@ -74,50 +85,196 @@ public class PromptSystem : IPromptService
             }
         }
 
-        _engine.State.PendingPrompt = new PendingPrompt
+        // “是否发动”确认后的第一个、尚未支付任何状态成本的选择步骤，可返回上一级重新决定。
+        // 返回动作使用独立的内部合法选项，继续接受 GameEngine 对数量、重复项和伪造 ID 的统一校验。
+        // 多选成本会生成 min 个不同的返回选项，确保返回动作同样满足 minChoose，且不会放宽必选规则。
+        OptionalConfirmation? returnContext = null;
+        var returnChoiceIds = new List<string>();
+        OptionalConfirmation? optional = null;
+        var hasOptional = kind != "Option" && _optionalConfirmations.TryGetValue(playerIdx, out optional);
+        if (hasOptional
+            && optional!.SourceId == EffectRuntime.CurrentSource?.Id.ToString()
+            && optional.StateFingerprint == BuildOptionalStateFingerprint(_engine.State)
+            && min > 0
+            && max >= min
+            && LooksLikeCostSelection(kind, text, optional.Text, extra))
         {
-            PromptId = promptId,
-            PlayerIndex = playerIdx,
-            Kind = kind,
-            ValidChoices = validChoices.ToList(),
-            MinChoose = min,
-            MaxChoose = max,
-            PromptText = text,
-            Extra = extra ?? new(),
-        };
-        _engine.RecordMatchLog("prompt_created", playerIdx, new
-        {
-            promptId,
-            playerIndex = playerIdx,
-            kind,
-            text,
-            validChoices,
-            minChoose = min,
-            maxChoose = max,
-            extra = extra ?? new(),
-        });
-        // 先登记再广播，避免极低延迟客户端在 _pending 写入前回包。
-        // PromptResponse 在房间锁内调用 Resolve；若让 await 续程在当前线程内联执行，
-        // 续程再次发起满场挤位选择时会持锁同步等待下一次响应，造成 30 秒超时。
-        // 强制异步调度续程，让 Resolve 先退出并释放房间锁。
-        var tcs = new TaskCompletionSource<PromptAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pending[promptId] = tcs;
-        _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
-        try
-        {
-            // 对局中的选择均等待玩家明确响应；PendingPrompt 会随权威快照保留，
-            // 玩家重连后仍可继续完成当前选择，不再因固定时限跳过效果。
-            var ans = await tcs.Task;
-            _engine.State.PendingPrompt = null;
-            QueueResolvedLog(playerIdx, kind, text, ans.Chosen, extra, sourceNumber);
-            // 普通日志快照请求：若后续还有公开、出牌或下一次 Prompt，会自然合并进对应快照；
-            // 若效果在此结束，则在当前批次结束时至少下发这一条选择日志。
-            _engine.Broadcast("EffectChoice");
-            return ans.Chosen;
+            returnContext = optional;
+            _optionalConfirmations.TryRemove(playerIdx, out _);
+            returnChoiceIds.AddRange(Enumerable.Range(0, min)
+                .Select(i => $"{ReturnToEffectConfirmPrefix}:{i}"));
+            extra ??= new();
+            extra["canReturnToEffectConfirm"] = true;
+            extra["returnChoiceIds"] = returnChoiceIds.ToArray();
         }
-        finally
+
+        while (true)
         {
-            _pending.Remove(promptId);
+            var promptId = $"p{++_promptSeq}";
+            var serverChoices = validChoices.Concat(returnChoiceIds).ToList();
+            _engine.State.PendingPrompt = new PendingPrompt
+            {
+                PromptId = promptId,
+                PlayerIndex = playerIdx,
+                Kind = kind,
+                ValidChoices = serverChoices,
+                MinChoose = min,
+                MaxChoose = max,
+                PromptText = text,
+                Extra = extra ?? new(),
+            };
+            _engine.RecordMatchLog("prompt_created", playerIdx, new
+            {
+                promptId,
+                playerIndex = playerIdx,
+                kind,
+                text,
+                validChoices = serverChoices,
+                minChoose = min,
+                maxChoose = max,
+                extra = extra ?? new(),
+            });
+            // 先登记再广播，避免极低延迟客户端在 _pending 写入前回包。
+            // PromptResponse 在房间锁内调用 Resolve；若让 await 续程在当前线程内联执行，
+            // 续程再次发起满场挤位选择时会持锁同步等待下一次响应，造成 30 秒超时。
+            // 强制异步调度续程，让 Resolve 先退出并释放房间锁。
+            var tcs = new TaskCompletionSource<PromptAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pending[promptId] = tcs;
+            _engine.Broadcast("Prompt", new { kind, promptId, playerIdx });
+            try
+            {
+                // 对局中的选择均等待玩家明确响应；PendingPrompt 会随权威快照保留，
+                // 玩家重连后仍可继续完成当前选择，不再因固定时限跳过效果。
+                var ans = await tcs.Task;
+                _engine.State.PendingPrompt = null;
+                var isReturning = returnChoiceIds.Count > 0
+                    && ans.Chosen.SequenceEqual(returnChoiceIds, StringComparer.Ordinal);
+                if (isReturning && returnContext is not null)
+                {
+                    _engine.Broadcast("EffectChoice");
+                    var resume = await ChooseOption(playerIdx, returnContext.Text, new[] { "是", "否" });
+                    if (resume == 0) continue;
+
+                    RestoreUsageMarkers(returnContext.UsageMarkers);
+                    throw new OptionalEffectDeclinedException();
+                }
+
+                QueueResolvedLog(playerIdx, kind, text, ans.Chosen, extra, sourceNumber);
+                // 普通日志快照请求：若后续还有公开、出牌或下一次 Prompt，会自然合并进对应快照；
+                // 若效果在此结束，则在当前批次结束时至少下发这一条选择日志。
+                _engine.Broadcast("EffectChoice");
+                return ans.Chosen;
+            }
+            finally
+            {
+                _pending.Remove(promptId);
+            }
+        }
+    }
+
+    private static bool LooksLikeCostSelection(string kind, string promptText, string confirmText,
+        Dictionary<string, object?>? extra)
+    {
+        if (EffectRuntime.PayingCost) return true;
+        if (extra?.TryGetValue("isCost", out var explicitCost) == true && explicitCost is true) return true;
+
+        bool BothContain(params string[] cues)
+            => cues.Any(cue => promptText.Contains(cue, StringComparison.Ordinal)
+                               && confirmText.Contains(cue, StringComparison.Ordinal));
+
+        if (promptText.Contains("成本", StringComparison.Ordinal)
+            || promptText.Contains("支付", StringComparison.Ordinal)
+            || promptText.Contains("代价", StringComparison.Ordinal)) return true;
+        if (BothContain("丢弃", "废弃", "弃置")) return true;
+        if (BothContain("放回手牌", "返回手牌", "退回手牌")) return true;
+        if (BothContain("放回卡组", "返回卡组", "卡组最下方", "卡组底")) return true;
+        if (BothContain("休息", "横置")) return true;
+        if (BothContain("公开")) return true;
+        if (kind.Contains("Discard", StringComparison.OrdinalIgnoreCase)
+            && (confirmText.Contains("丢弃", StringComparison.Ordinal)
+                || confirmText.Contains("废弃", StringComparison.Ordinal))) return true;
+        if (kind == "ReturnOwnDon"
+            && (confirmText.Contains("咚!!-", StringComparison.Ordinal)
+                || confirmText.Contains("咚-", StringComparison.Ordinal)
+                || confirmText.Contains("放回", StringComparison.Ordinal))) return true;
+        return promptText.Contains("生命", StringComparison.Ordinal)
+               && confirmText.Contains("生命", StringComparison.Ordinal)
+               && (promptText.Contains("翻", StringComparison.Ordinal)
+                   || promptText.Contains("置入", StringComparison.Ordinal)
+                   || promptText.Contains("加入手牌", StringComparison.Ordinal));
+    }
+
+    private static string BuildOptionalStateFingerprint(GameState state)
+    {
+        var snapshot = JsonSerializer.SerializeToNode(PrivateStateSnapshotBuilder.Build(state))!.AsObject();
+        // 玩家响应 Prompt 时，房间层会同步推进 tick、棋钟、阶段/战斗流程等外围状态；
+        // 这些变化不是成本支付，不能因此误判为“已经付过成本”。这里只比较真正可能
+        // 被成本改变的玩家卡牌/区域/DON 状态及持续效果。
+        var node = new JsonObject
+        {
+            ["players"] = snapshot["players"]?.DeepClone(),
+            ["continuousEffects"] = snapshot["continuousEffects"]?.DeepClone(),
+        };
+        RemoveVolatileOrUsageProperties(node);
+        return node.ToJsonString();
+    }
+
+    private static void RemoveVolatileOrUsageProperties(JsonNode? node)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var property in new[]
+                     {
+                         "tick", "pendingPrompt", "operationClockRemainingMs", "operationClockSyncUtc",
+                         "operationClockActivePlayer", "operationClockPaused", "turnOnceUsed", "oncePerTurnUsedKeys",
+                     })
+                obj.Remove(property);
+            foreach (var child in obj.Select(pair => pair.Value).ToArray())
+                RemoveVolatileOrUsageProperties(child);
+        }
+        else if (node is JsonArray array)
+        {
+            foreach (var child in array) RemoveVolatileOrUsageProperties(child);
+        }
+    }
+
+    private UsageMarkerSnapshot CaptureUsageMarkers()
+    {
+        var playerKeys = _engine.State.Players
+            .Select(player => player.TurnOnceUsed.ToHashSet(StringComparer.Ordinal))
+            .ToArray();
+        var cardKeys = AllCards(_engine.State)
+            .ToDictionary(card => card.Id, card => card.OncePerTurnUsedKeys.ToHashSet(StringComparer.Ordinal));
+        return new UsageMarkerSnapshot(playerKeys, cardKeys);
+    }
+
+    private void RestoreUsageMarkers(UsageMarkerSnapshot snapshot)
+    {
+        for (var i = 0; i < _engine.State.Players.Length && i < snapshot.PlayerKeys.Length; i++)
+        {
+            _engine.State.Players[i].TurnOnceUsed.Clear();
+            _engine.State.Players[i].TurnOnceUsed.UnionWith(snapshot.PlayerKeys[i]);
+        }
+
+        foreach (var card in AllCards(_engine.State))
+        {
+            if (!snapshot.CardKeys.TryGetValue(card.Id, out var keys)) continue;
+            card.OncePerTurnUsedKeys.Clear();
+            card.OncePerTurnUsedKeys.UnionWith(keys);
+        }
+    }
+
+    private static IEnumerable<CardInstance> AllCards(GameState state)
+    {
+        foreach (var player in state.Players)
+        {
+            yield return player.Leader;
+            if (player.StageCard is not null) yield return player.StageCard;
+            foreach (var card in player.Characters) yield return card;
+            foreach (var card in player.Hand) yield return card;
+            foreach (var card in player.Deck) yield return card;
+            foreach (var card in player.Trash) yield return card;
+            foreach (var card in player.LifeArea) yield return card;
         }
     }
 
@@ -200,8 +357,19 @@ public class PromptSystem : IPromptService
 
     public async Task<bool> ConfirmOptional(int playerIdx, string text)
     {
+        // 在等待玩家回答前就保留上下文，确保网络线程响应后恢复的异步续程尚未执行时，
+        // 下一步成本 Prompt 也能稳定找到返回目标。
+        _optionalConfirmations[playerIdx] = new OptionalConfirmation(
+            text,
+            EffectRuntime.CurrentSource?.Id.ToString(),
+            BuildOptionalStateFingerprint(_engine.State),
+            CaptureUsageMarkers());
+
         var r = await ChooseOption(playerIdx, text, new[] { "是", "否" });
-        return r == 0;
+        if (r == 0) return true;
+
+        _optionalConfirmations.TryRemove(playerIdx, out _);
+        return false;
     }
 
     public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
@@ -248,4 +416,19 @@ public class PromptSystem : IPromptService
     }
 
     public record PromptAnswer(List<string> Chosen);
+
+    private sealed record OptionalConfirmation(
+        string Text,
+        string? SourceId,
+        string StateFingerprint,
+        UsageMarkerSnapshot UsageMarkers);
+
+    private sealed record UsageMarkerSnapshot(
+        HashSet<string>[] PlayerKeys,
+        Dictionary<Guid, HashSet<string>> CardKeys);
+}
+
+/// <summary>玩家从成本选择返回确认框后改为不发动；由效果运行时当作正常取消结束。</summary>
+public sealed class OptionalEffectDeclinedException : Exception
+{
 }

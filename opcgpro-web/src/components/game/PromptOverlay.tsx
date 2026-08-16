@@ -193,11 +193,16 @@ export default function PromptOverlay() {
   // 检索/确认类效果约定：choiceCards = "确认到的全部牌"（让玩家看全），
   // validChoices = "可公开/可选的子集"。展示全部 choiceCards（叠加不在其中的 validChoices），
   // 仅 validChoices 中的卡可点选，其余置灰仅供确认。
-  const validChoiceSet = new Set(prompt.validChoices);
+  const returnChoiceIds = (prompt.extra?.returnChoiceIds as string[] | undefined) ?? [];
+  const canReturnToEffectConfirm =
+    prompt.extra?.canReturnToEffectConfirm === true && returnChoiceIds.length > 0;
+  const returnChoiceSet = new Set(returnChoiceIds);
+  const selectableChoiceIds = prompt.validChoices.filter((id) => !returnChoiceSet.has(id));
+  const validChoiceSet = new Set(selectableChoiceIds);
   const displayChoiceIds =
     choiceCards.length > 0
-      ? [...choiceCards.map((c) => c.id), ...prompt.validChoices.filter((id) => !choiceMap.has(id))]
-      : prompt.validChoices;
+      ? [...choiceCards.map((c) => c.id), ...selectableChoiceIds.filter((id) => !choiceMap.has(id))]
+      : selectableChoiceIds;
 
   // 把 cardId 反查成显示用 CardData（优先 extra.choiceCards，再领袖，最后退回自己/对手场上）
   const findCardById = (id: string) => {
@@ -328,6 +333,9 @@ export default function PromptOverlay() {
   const handleCancelReturnDon = () => {
     submitServerPrompt([]);
   };
+  const handleReturnToEffectConfirm = () => {
+    submitServerPrompt(returnChoiceIds);
+  };
 
   if (isEffectConfirm) {
     return (
@@ -426,7 +434,7 @@ export default function PromptOverlay() {
           隐藏
         </button>
         {/* 内容包一层：内容少时居中；横屏等矮视口下内容超高时可纵向滚动、不裁切底部「加入手牌/确认」按钮 */}
-        <div className="flex min-h-full flex-col items-center justify-center gap-6 p-4 max-md:justify-start max-md:gap-4">
+        <div className="flex min-h-full flex-col items-center justify-center gap-6 px-[calc(1rem+var(--layout-safe-left,0px))] py-[calc(2rem+var(--layout-safe-top,0px))] [padding-bottom:calc(2rem+var(--layout-safe-bottom,0px))] [padding-right:calc(1rem+var(--layout-safe-right,0px))] max-md:justify-start max-md:gap-4">
         {sourceCard && (
           <div className="flex flex-col items-center gap-1">
             <span className="text-amber-300 text-xs font-bold tracking-wide">效果源</span>
@@ -475,7 +483,7 @@ export default function PromptOverlay() {
 
         {isReturnDon && (
           <>
-            <div className="flex max-w-3xl flex-wrap justify-center gap-3">
+            <div className="flex max-w-3xl flex-wrap justify-center gap-3 max-md:mb-12">
               {donChoices.map((d) => {
                 const isSel = selected.includes(d.id);
                 const isLeaderTarget = !!my && d.attachedToCardId === my.leaderId;
@@ -550,7 +558,17 @@ export default function PromptOverlay() {
               })}
               {donChoices.length === 0 && <span className="text-gray-400 text-sm">无可放回的咚</span>}
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap justify-center gap-3 max-md:sticky max-md:bottom-[calc(0.75rem+var(--layout-safe-bottom,0px))] max-md:z-20 max-md:rounded-xl max-md:bg-black/70 max-md:p-2">
+              {canReturnToEffectConfirm && (
+                <button
+                  type="button"
+                  onClick={handleReturnToEffectConfirm}
+                  className="min-h-12 rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600"
+                  aria-label="取消支付并返回是否发动"
+                >
+                  取消支付并返回
+                </button>
+              )}
               {canCancelReturnDon && (
                 <button
                   onClick={handleCancelReturnDon}
@@ -574,7 +592,7 @@ export default function PromptOverlay() {
 
         {!isLifeTrigger && !isOption && !isReturnDon && (
           <>
-            <div className="flex flex-wrap gap-2 max-w-2xl justify-center">
+            <div className="flex max-w-2xl flex-wrap justify-center gap-2 max-md:mb-12">
               {displayChoiceIds.map((id) => {
                 const selectable = validChoiceSet.has(id);
                 // 咚候选：渲染成咚 token，与卡牌同列混选（如 OP16-033「将我方卡牌转为休息」可选活跃咚）
@@ -668,7 +686,17 @@ export default function PromptOverlay() {
               )}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-3 max-md:sticky max-md:bottom-[calc(0.75rem+var(--layout-safe-bottom,0px))] max-md:z-20 max-md:rounded-xl max-md:bg-black/70 max-md:p-2">
+              {canReturnToEffectConfirm && (
+                <button
+                  type="button"
+                  onClick={handleReturnToEffectConfirm}
+                  className="min-h-12 rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600"
+                  aria-label="取消支付并返回是否发动"
+                >
+                  取消支付并返回
+                </button>
+              )}
               {allowDefaultOrder && (
                 <button
                   type="button"

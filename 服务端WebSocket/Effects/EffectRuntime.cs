@@ -219,8 +219,14 @@ public static class EffectRuntime
             await DeclaredOmissionEffects.AfterDsl(ctx);
             MarkOncePerTurnCardUsedIfConsumed(owner, source, turnOnceCountBefore);
         }
+        catch (OptionalEffectDeclinedException)
+        {
+            // 玩家在尚未支付成本时返回上一级并改选“不发动”，属于正常交互，不应记为效果异常。
+            return;
+        }
         finally
         {
+            (prompts as PromptSystem)?.ClearOptionalConfirmation(ownerIdx, source.Id);
             if (donBefore is not null)
             {
                 foreach (var don in s.Players[ownerIdx].CostArea)

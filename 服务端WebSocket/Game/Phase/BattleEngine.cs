@@ -387,9 +387,18 @@ public static class BattleEngine
                 .Select(candidate => new { id = candidate.Id.ToString(), number = candidate.Info.Number })
                 .ToList(),
         };
-        var chosen = await prompts.ChooseCards(ownerIdx, "OwnHand",
-            "选择丢弃 1 张手牌，使该角色不会被 KO",
-            candidates.Select(candidate => candidate.Id.ToString()).ToList(), 1, 1, extra);
+        List<string> chosen;
+        try
+        {
+            chosen = await prompts.ChooseCards(ownerIdx, "OwnHand",
+                "选择丢弃 1 张手牌，使该角色不会被 KO",
+                candidates.Select(candidate => candidate.Id.ToString()).ToList(), 1, 1, extra);
+        }
+        catch (OptionalEffectDeclinedException)
+        {
+            // 这条置换效果不经过 EffectRuntime；玩家返回确认并改选“不发动”时在此正常退出。
+            return false;
+        }
         if (chosen.Count == 0) return false;
 
         var discard = candidates.FirstOrDefault(candidate => candidate.Id.ToString() == chosen[0]);
