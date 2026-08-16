@@ -139,13 +139,14 @@ public sealed class RankedStore
     public const string GovernmentFaction = "government";
     public const int PlacementRequired = 5;
     public const int NewWorldRankPoints = 1500;
+    public const int ThreeHundredMillionBountyRankPoints = 3000;
+    public const int SixHundredMillionBountyRankPoints = 6000;
     public const int TenBillionBountyRankPoints = 10000;
     private const double InitialRating = 1500;
     private const double InitialDeviation = 350;
     private const double InitialVolatility = 0.06;
     private const double GlickoScale = 173.7178;
     private const double Tau = 0.5;
-    private const int RankPointsPerCompletedMatch = 20;
     private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
     private readonly object _gate = new();
@@ -402,19 +403,22 @@ public sealed class RankedStore
         if (self.PlacementGames < PlacementRequired)
             return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
 
-        var settlementMultiplier = self.RankPoints switch
+        var settlementRules = self.RankPoints switch
         {
-            >= TenBillionBountyRankPoints => 4,
-            >= NewWorldRankPoints => 2,
-            _ => 1,
+            >= TenBillionBountyRankPoints => new SettlementRules(250, 125, 63, 63),
+            >= SixHundredMillionBountyRankPoints => new SettlementRules(150, 75, 38, 38),
+            >= ThreeHundredMillionBountyRankPoints => new SettlementRules(80, 40, 20, 20),
+            >= NewWorldRankPoints => new SettlementRules(40, 20, 10, 10),
+            _ => new SettlementRules(20, 10, 5, 5),
         };
-        var baseDelta = (won ? RankPointsPerCompletedMatch : -RankPointsPerCompletedMatch) * settlementMultiplier;
-        var streakAdjustment = Math.Clamp(resultStreak - 1, 0, (won ? 10 : 5) * settlementMultiplier);
+        var baseDelta = won ? settlementRules.BaseDelta : -settlementRules.BaseDelta;
+        var streakAdjustment = Math.Clamp(resultStreak - 1, 0,
+            won ? settlementRules.WinStreakCap : settlementRules.LossStreakCap);
         // 未完成定级的对手没有可比较的可见 RP，不参与分差修正。
         var rankDifference = opponent.PlacementGames >= PlacementRequired
             ? self.RankPoints - opponent.RankPoints
             : 0;
-        var rankDifferenceAdjustmentCap = 5 * settlementMultiplier;
+        var rankDifferenceAdjustmentCap = settlementRules.RankDifferenceCap;
         var rankDifferenceAdjustment = rankDifference switch
         {
             < 0 => Math.Clamp((-rankDifference) / 100, 0, rankDifferenceAdjustmentCap),
@@ -898,6 +902,11 @@ public sealed class RankedStore
 
     private sealed record Season(string Id, DateTime StartsAtUtc, DateTime EndsAtUtc);
     private sealed record RatingUpdate(double Rating, double Deviation, double Volatility);
+    private sealed record SettlementRules(
+        int BaseDelta,
+        int WinStreakCap,
+        int LossStreakCap,
+        int RankDifferenceCap);
     private sealed record RankPointCalculation(
         int BaseDelta,
         int StreakAdjustment,

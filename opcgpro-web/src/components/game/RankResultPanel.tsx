@@ -16,6 +16,11 @@ const rankDifferenceLabel = (result: RankPlayerSettlement) => {
 };
 
 export default function RankResultPanel({ result }: RankResultPanelProps) {
+  const streakCap = result.won
+    ? Math.abs(result.baseRankPointDelta) / 2
+    : Math.ceil(Math.abs(result.baseRankPointDelta) / 4);
+  const streakCapped = result.streakAdjustment >= streakCap;
+
   return (
     <div className="mt-4 w-full max-w-sm rounded-xl border border-violet-400/40 bg-violet-950/80 px-4 py-3 text-center sm:px-5">
       <p className="text-xs font-bold text-violet-300">排位结算</p>
@@ -36,7 +41,7 @@ export default function RankResultPanel({ result }: RankResultPanelProps) {
                 <dd className="font-bold">{formatSignedRankBounty(result.baseRankPointDelta)}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt>{result.resultStreak}连{result.won ? "胜奖励" : "败保护"}{result.resultStreak >= 6 ? "（已封顶）" : ""}</dt>
+                <dt>{result.resultStreak}连{result.won ? "胜奖励" : "败保护"}{streakCapped ? "（已封顶）" : ""}</dt>
                 <dd className="font-bold text-emerald-300">{formatSignedRankBounty(result.streakAdjustment)}</dd>
               </div>
               <div className="flex items-center justify-between gap-4 text-left">

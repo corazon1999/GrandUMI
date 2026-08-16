@@ -65,13 +65,18 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /6 连败起保护封顶 50万贝里/);
   assert.match(lobby, /低悬赏方每低 1000万贝里多加或少扣 10万贝里/);
   assert.match(lobby, /高悬赏方每高 1000万贝里少加或多扣 10万贝里/);
-  assert.match(lobby, /达到 1亿5000万但未达到 10亿贝里时/);
-  assert.match(lobby, /基础胜负变为增加或减少 400万贝里/);
-  assert.match(lobby, /连胜奖励、连败保护和分差修正上限全部翻倍/);
+  assert.match(lobby, /达到 1亿5000万但未达到 3亿贝里时/);
+  assert.match(lobby, /基础胜负增加或减少 400万贝里/);
   assert.match(lobby, /分别最高为 200万、100万和 100万贝里/);
-  assert.match(lobby, /达到 10亿贝里后再次翻倍/);
+  assert.match(lobby, /达到 3亿但未达到 6亿贝里时/);
   assert.match(lobby, /基础胜负增加或减少 800万贝里/);
   assert.match(lobby, /分别最高为 400万、200万和 200万贝里/);
+  assert.match(lobby, /达到 6亿但未达到 10亿贝里时/);
+  assert.match(lobby, /基础胜负增加或减少 1500万贝里/);
+  assert.match(lobby, /连胜奖励最高 750万贝里，连败保护和分差修正上限均为 380万贝里/);
+  assert.match(lobby, /达到 10亿贝里后/);
+  assert.match(lobby, /基础胜负增加或减少 2500万贝里/);
+  assert.match(lobby, /连胜奖励最高 1250万贝里，连败保护和分差修正上限均为 630万贝里/);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
@@ -85,6 +90,9 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /data-testid="rank-rp-breakdown"/);
   assert.match(panel, /baseRankPointDelta/);
   assert.match(panel, /streakAdjustment/);
+  assert.match(panel, /Math\.ceil\(Math\.abs\(result\.baseRankPointDelta\) \/ 4\)/);
+  assert.match(panel, /streakAdjustment >= streakCap/);
+  assert.doesNotMatch(panel, /result\.resultStreak >= 6/);
   assert.match(panel, /rankDifferenceAdjustment/);
   assert.match(panel, /formatSignedRankBounty\(result\.rankPointDelta\)/);
   assert.match(panel, /悬赏金\{formatSignedRankBounty\(result\.rankPointDelta\)\}/);
