@@ -353,7 +353,7 @@
             "max": 1,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 1000
+              "currentPowerLte": 1000
             }
           },
           {

@@ -222,7 +222,7 @@
         "max": 1,
         "as": "$k",
         "filter": {
-          "originalPowerLte": 4000
+          "currentPowerLte": 4000
         }
       },
       {

@@ -6,7 +6,7 @@
       "oncePerTurn": true,
       "cost": { "donReturn": 3 },
       "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 3000 }, "text": "将对方最多1张力量≤3000 角色放回卡组最下方" },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 3000 }, "text": "将对方最多1张力量≤3000 角色放回卡组最下方" },
         { "op": "ReturnToDeckBottom", "target": "$tgt", "from": "field" },
         { "op": "PlayCharFromHand", "filter": { "originalCostLte": 4 }, "text": "手牌中最多1张费用≤4 角色登场" }
       ]
@@ -117,7 +117,7 @@
     "trigger": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
-      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 2000 }, "text": "KO 对方最多1张力量≤2000 的角色" },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 2000 }, "text": "KO 对方最多1张力量≤2000 的角色" },
       { "op": "KO", "target": "$tgt" }
     ]
   },
@@ -126,7 +126,7 @@
     "_note": "【主要】KO 对方最多1张力量≤7000 角色。",
     "main": {
       "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 7000 }, "text": "KO 对方最多1张力量≤7000 的角色" },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 7000 }, "text": "KO 对方最多1张力量≤7000 的角色" },
         { "op": "KO", "target": "$tgt" }
       ]
     }

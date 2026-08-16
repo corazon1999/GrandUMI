@@ -135,7 +135,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 2000
+              "currentPowerLte": 2000
             }
           },
           {

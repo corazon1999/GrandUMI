@@ -136,7 +136,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 1000
+              "currentPowerLte": 1000
             }
           },
           {
@@ -162,7 +162,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 2000
+              "currentPowerLte": 2000
             }
           },
           {
@@ -198,7 +198,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 2000
+              "currentPowerLte": 2000
             }
           },
           {
@@ -306,7 +306,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 3000
+              "currentPowerLte": 3000
             }
           },
           {
@@ -465,7 +465,7 @@
           "min": 0,
           "as": "$tgt",
           "filter": {
-            "originalPowerLte": 2000
+            "currentPowerLte": 2000
           }
         },
         {
@@ -1067,7 +1067,7 @@
             "as": "$tgt",
             "filter": {
               "keyword": "草帽一伙",
-              "originalPowerLte": 6000,
+              "currentPowerLte": 6000,
               "color": "紫"
             }
           },

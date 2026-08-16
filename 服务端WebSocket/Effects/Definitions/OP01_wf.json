@@ -77,7 +77,7 @@
             "max": 1,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 4000
+              "currentPowerLte": 4000
             },
             "text": "选择对方最多1张力量≤4000的角色"
           },
@@ -209,7 +209,7 @@
             "max": 1,
             "as": "$tgt",
             "filter": {
-              "originalPowerLte": 3000
+              "currentPowerLte": 3000
             }
           },
           {
@@ -322,7 +322,7 @@
         "min": 0,
         "as": "$ko",
         "filter": {
-          "originalPowerLte": 4000
+          "currentPowerLte": 4000
         }
       },
       {

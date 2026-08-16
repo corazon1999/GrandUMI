@@ -110,7 +110,7 @@
             "min": 0,
             "as": "$b",
             "filter": {
-              "originalPowerLte": 0
+              "currentPowerLte": 0
             }
           },
           {

@@ -104,12 +104,12 @@
       "then": [
         { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色+1000" },
         { "op": "AddPowerThisTurn", "target": "$t", "delta": 1000 },
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "本回合对方最多1张力量≤4000 角色无法发动【阻挡者】" },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 4000 }, "text": "本回合对方最多1张力量≤4000 角色无法发动【阻挡者】" },
         { "op": "AddRestriction", "target": "$tgt", "kind": "CannotBeBlocker" }
       ]
     },
     "trigger": [
-      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 4000 }, "text": "KO 对方最多1张力量≤4000 的角色" },
       { "op": "KO", "target": "$tgt" }
     ]
   },

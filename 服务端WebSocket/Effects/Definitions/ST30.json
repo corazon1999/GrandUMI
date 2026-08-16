@@ -140,7 +140,7 @@
       ]
     },
     "trigger": [
-      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalPowerLte": 6000 }, "text": "KO 对方最多1张力量≤6000 的角色" },
+      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 6000 }, "text": "KO 对方最多1张力量≤6000 的角色" },
       { "op": "KO", "target": "$tgt" }
     ]
   },
