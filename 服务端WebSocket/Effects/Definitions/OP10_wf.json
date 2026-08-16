@@ -851,7 +851,7 @@
   },
   "OP10-060": {
     "_name": "护罩护罩 手枪",
-    "_matcher": "事件【主要】将对方最多1张力量≤6000角色放回卡组底;【触发】发动同效果",
+    "_matcher": "事件【主要】将对方最多1张当前力量≤6000角色放回卡组底;【触发】发动同效果",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -862,7 +862,7 @@
           "min": 0,
           "as": "$tgt",
           "filter": {
-            "originalPowerLte": 6000
+            "currentPowerLte": 6000
           }
         },
         {
@@ -880,7 +880,7 @@
         "min": 0,
         "as": "$tgt",
         "filter": {
-          "originalPowerLte": 6000
+          "currentPowerLte": 6000
         }
       },
       {
