@@ -6,6 +6,7 @@ import { useBattleStore } from "@/store/battleStore";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import { getCard } from "@/data/CardLoader";
+import { canPayActivatedMainCost } from "@/lib/activatedMainCost";
 
 /**
  * 上下文操作按钮区：根据当前阶段/选中状态展示可用动作。
@@ -41,15 +42,19 @@ export default function GameActions() {
     currentTurn && turnCount > 1 && !battle && !isSelectingTarget && selectedAttackerCanAttack;
   const canPlay = currentTurn && selectedHandIndex !== null;
   const canPassCounter = isDefender && phase === "Counter";
+  const selectedFieldCard =
+    my && selectedFieldId !== null
+      ? my.fieldCards.find((card) => card.id === selectedFieldId)
+      : undefined;
 
   // 选中场上卡（领袖/领航、角色或舞台）含【启动主要】时，主要阶段可发动启动效果
   const selectedNumber =
     my && selectedFieldId !== null
       ? selectedFieldId === my.leaderId
-        ? my.leaderNumber
-        : selectedFieldId === my.stageId
-          ? my.stageNumber
-          : (my.fieldCards.find((c) => c.id === selectedFieldId)?.number ?? null)
+          ? my.leaderNumber
+          : selectedFieldId === my.stageId
+            ? my.stageNumber
+          : (selectedFieldCard?.number ?? null)
       : null;
   const selectedHasActivated = selectedNumber
     ? (getCard(selectedNumber)?.effectTags?.includes("ActivatedMain") ?? false)
@@ -61,7 +66,7 @@ export default function GameActions() {
         ? my.leaderActivatedUsedThisTurn
         : selectedFieldId === my.stageId
           ? my.stageActivatedUsedThisTurn
-          : (my.fieldCards.find((c) => c.id === selectedFieldId)?.activatedUsedThisTurn ?? false)
+          : (selectedFieldCard?.activatedUsedThisTurn ?? false)
       : false;
   const canActivate =
     currentTurn &&
@@ -70,7 +75,12 @@ export default function GameActions() {
     !isSelectingTarget &&
     selectedFieldId !== null &&
     selectedHasActivated &&
-    !selectedActivatedUsed;
+    !selectedActivatedUsed &&
+    canPayActivatedMainCost(
+      selectedNumber,
+      selectedFieldCard?.isTapped ?? false,
+      selectedFieldCard?.cannotBeRested ?? false,
+    );
 
   // 贴咚采用“目标优先”操作：先选中领袖/角色，再直接选择要赋予的张数。
   // 领袖在协议中使用固定标识 "leader"；角色沿用场上实例 ID，舞台不可贴咚。

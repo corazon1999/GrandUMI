@@ -389,6 +389,60 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task OP17_044_CannotPayRestCostWhileCannotBeRested()
+    {
+        var state = TestScene.New("OP17-039")
+            .MyDeckTop("OP17-040")
+            .Build();
+        state.CurrentTurnPlayer = 0;
+        state.Phase = Phase.Main;
+        var john = Card("OP17-044");
+        john.Restrictions.Add(new CardRestriction
+        {
+            Kind = RestrictionKind.CannotBeRested,
+            Duration = KeywordDuration.UntilNextOpponentEndPhase,
+            AppliedBySide = 1,
+        });
+        state.Players[0].Characters.Add(john);
+        var prompts = new MockPromptService().QueueConfirm(true);
+
+        var validation = ActionValidator.CanUseEffect(state, 0, john.Id);
+        await EffectRuntime.Resolve(state, 0, john, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.False(validation.Ok);
+        Assert.Contains("无法转为休息状态", validation.Reason);
+        Assert.False(john.IsTapped);
+        Assert.Empty(state.Players[0].Hand);
+        Assert.Single(state.Players[0].Deck);
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
+    public async Task OP17_044_CanStillPayRestCostWithoutRestriction()
+    {
+        var state = TestScene.New("OP17-039")
+            .MyDeckTop("OP17-040")
+            .Build();
+        state.CurrentTurnPlayer = 0;
+        state.Phase = Phase.Main;
+        var john = Card("OP17-044");
+        state.Players[0].Characters.Add(john);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose();
+
+        var validation = ActionValidator.CanUseEffect(state, 0, john.Id);
+        await EffectRuntime.Resolve(state, 0, john, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.True(validation.Ok);
+        Assert.True(john.IsTapped);
+        Assert.Single(state.Players[0].Hand);
+        Assert.Empty(state.Players[0].Deck);
+        Assert.Single(prompts.ConfirmHistory);
+    }
+
+    [Fact]
     public async Task OP17_079_GrantsBlockerToCharactersWhoseCurrentCostIsAtLeast12()
     {
         var state = TestScene.New("OP17-079").Build();

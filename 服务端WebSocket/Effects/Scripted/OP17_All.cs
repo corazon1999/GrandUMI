@@ -873,7 +873,10 @@ internal static class OP17Effects
 
     private static async Task C044(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.IsTapped) return;
+        if (c.Trigger != EffectTrigger.ActivatedMain
+            || c.Source.IsTapped
+            || c.Source.HasRestriction(RestrictionKind.CannotBeRested)
+            || c.State.HasContinuousRestriction(c.Source, RestrictionKind.CannotBeRested)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将约翰船长转为休息状态，抽1张并丢弃1张手牌？")) return;
         AtomicOps.RestCard(c.Source);
         AtomicOps.Draw(c.State, c.OwnerIndex, 1);

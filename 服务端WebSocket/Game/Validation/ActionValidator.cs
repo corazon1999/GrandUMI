@@ -145,10 +145,17 @@ public static class ActionValidator
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段使用启动效果");
         if (s.CurrentBattle is not null)      return Fail("战斗中不能使用启动效果");
         var me = s.Players[playerIdx];
-        bool found = me.Leader.Id == sourceId
-                  || me.Characters.Any(c => c.Id == sourceId)
-                  || me.StageCard?.Id == sourceId;
-        if (!found) return Fail("效果来源不在你场上");
+        var source = me.Leader.Id == sourceId ? me.Leader
+            : me.Characters.FirstOrDefault(c => c.Id == sourceId)
+              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
+        if (source is null) return Fail("效果来源不在你场上");
+
+        // OP17-044 的「将此角色转为休息状态」是发动成本；无法完成该状态变更时不能发动。
+        if (source.Info.Number == "OP17-044"
+            && (source.IsTapped
+                || source.HasRestriction(RestrictionKind.CannotBeRested)
+                || s.HasContinuousRestriction(source, RestrictionKind.CannotBeRested)))
+            return Fail("约翰船长当前无法转为休息状态，不能支付发动成本");
         return OkResult;
     }
 
