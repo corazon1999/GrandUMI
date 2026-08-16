@@ -990,11 +990,14 @@ export interface BattleSnapshot {
   defenderBonus: number;
 }
 
-/** 对局结束后附带的回放手牌变化帧；实时对局与观战不会收到内容。 */
+/** 对局结束后附带的回放隐藏区变化帧；实时对局与观战不会收到内容。 */
 export interface ReplayHandFrameSnapshot {
   tick: number;
   myCardNumbers: string[];
   opponentCardNumbers: string[];
+  /** 旧回放帧不含生命区字段，客户端保持卡背显示。 */
+  myLifeCardNumbers?: string[];
+  opponentLifeCardNumbers?: string[];
 }
 
 /** 服务器 → 双方：权威游戏状态快照 */
@@ -1042,7 +1045,7 @@ export interface MsgGameState extends MsgBase {
   logLines?: string[];
   /** 自上一份快照以来进入解析的卡牌效果；按实际结算顺序排列。 */
   effectActivations?: EffectActivationSnapshot[];
-  /** 仅终局玩家快照携带，用于回放时明示双方手牌。 */
+  /** 仅终局玩家快照携带，用于回放时明示双方手牌与生命区。 */
   replayHands?: ReplayHandFrameSnapshot[] | null;
   pendingPrompt: PromptSnapshot | null;
   battle: BattleSnapshot | null;

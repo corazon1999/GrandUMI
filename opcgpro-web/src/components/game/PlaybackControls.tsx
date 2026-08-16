@@ -40,16 +40,20 @@ export default function PlaybackControls({
 
   return (
     <motion.div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
+      className="fixed left-1/2 z-50 -translate-x-1/2"
+      style={{ bottom: "calc(1rem + var(--layout-safe-bottom, 0px))" }}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
     >
       {/* 折叠/展开切换 */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 bg-gray-800 rounded-t-md flex items-center justify-center"
+        className="absolute -top-12 left-1/2 flex h-12 w-12 -translate-x-1/2 items-end justify-center rounded-t-md bg-transparent pb-1"
+        aria-label={collapsed ? "展开回放控件" : "收起回放控件"}
       >
-        <span className="text-gray-500 text-[8px]">{collapsed ? "▲" : "▼"}</span>
+        <span className="flex h-3 w-6 items-center justify-center rounded-t-md bg-gray-800 text-[8px] text-gray-500">
+          {collapsed ? "▲" : "▼"}
+        </span>
       </button>
 
       <AnimatePresence>
@@ -90,7 +94,7 @@ export default function PlaybackControls({
               <button
                 onClick={onStepBackward}
                 disabled={currentStep <= 0}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+                className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
                 title="上一步"
               >
                 ⏮
@@ -100,7 +104,7 @@ export default function PlaybackControls({
               {isEnded ? (
                 <button
                   onClick={onPlay}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-500 text-white transition-colors"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-green-600 text-white transition-colors hover:bg-green-500"
                   title="重新播放"
                 >
                   ↺
@@ -108,7 +112,7 @@ export default function PlaybackControls({
               ) : isPlaying ? (
                 <button
                   onClick={onPause}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-yellow-600 hover:bg-yellow-500 text-white transition-colors"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-600 text-white transition-colors hover:bg-yellow-500"
                   title="暂停"
                 >
                   ⏸
@@ -116,7 +120,7 @@ export default function PlaybackControls({
               ) : (
                 <button
                   onClick={onPlay}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-500 text-white transition-colors"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-green-600 text-white transition-colors hover:bg-green-500"
                   title="播放"
                 >
                   ▶
@@ -127,7 +131,7 @@ export default function PlaybackControls({
               <button
                 onClick={onStepForward}
                 disabled={isEnded}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+                className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
                 title="下一步"
               >
                 ⏭
@@ -140,7 +144,7 @@ export default function PlaybackControls({
                 <button
                   key={s}
                   onClick={() => onSpeedChange(s)}
-                  className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                  className={`flex h-12 min-w-12 items-center justify-center rounded px-2 text-xs font-medium transition-colors ${
                     speed === s
                       ? "bg-green-600 text-white"
                       : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white"

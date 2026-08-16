@@ -9,8 +9,8 @@ function findReplayHandTimeline(snapshots: readonly MsgGameState[]): ReplayHandF
 }
 
 /**
- * 将终局快照携带的压缩手牌时间线合并回每一帧。
- * 旧回放没有时间线时保持原样，由手牌组件继续显示对手卡背。
+ * 将终局快照携带的压缩隐藏区时间线合并回每一帧。
+ * 旧回放没有生命区时间线时保持原样，继续显示生命卡背。
  */
 export function revealReplayHands(snapshots: readonly MsgGameState[]): MsgGameState[] {
   const timeline = findReplayHandTimeline(snapshots);
@@ -27,17 +27,33 @@ export function revealReplayHands(snapshots: readonly MsgGameState[]): MsgGameSt
 
     if (timelineIndex < 0) return snapshot;
     const frame = timeline[timelineIndex];
+    const myLife = frame.myLifeCardNumbers;
+    const opponentLife = frame.opponentLifeCardNumbers;
     return {
       ...snapshot,
       my: {
         ...snapshot.my,
         handCardNumbers: [...frame.myCardNumbers],
         handCount: frame.myCardNumbers.length,
+        ...(myLife
+          ? {
+              lifeNumbers: [...myLife],
+              lifeCount: myLife.length,
+              lifeFaceUp: myLife.map((number) => ({ faceUp: true, number })),
+            }
+          : {}),
       },
       opponent: {
         ...snapshot.opponent,
         handCardNumbers: [...frame.opponentCardNumbers],
         handCount: frame.opponentCardNumbers.length,
+        ...(opponentLife
+          ? {
+              lifeNumbers: [...opponentLife],
+              lifeCount: opponentLife.length,
+              lifeFaceUp: opponentLife.map((number) => ({ faceUp: true, number })),
+            }
+          : {}),
       },
     };
   });

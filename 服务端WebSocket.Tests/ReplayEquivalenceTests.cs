@@ -168,7 +168,7 @@ public class ReplayEquivalenceTests
     }
 
     [Fact]
-    public void 回放手牌时间线_终局向参战玩家提供且终局快照向所有视角公开双方手牌()
+    public void 回放隐藏区时间线_终局仅向参战玩家提供()
     {
         EnsureLoaded();
         var engine = new GameEngine("replay-hands",
@@ -189,18 +189,25 @@ public class ReplayEquivalenceTests
         engine.BroadcastInitialState();
         Assert.Equal(JsonValueKind.Null, player0Snapshot!.Value.GetProperty("replayHands").ValueKind);
         Assert.Empty(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers").EnumerateArray());
+        Assert.Empty(player0Snapshot.Value.GetProperty("my").GetProperty("lifeNumbers").EnumerateArray());
+        Assert.Empty(player0Snapshot.Value.GetProperty("opponent").GetProperty("lifeNumbers").EnumerateArray());
 
         // 普通状态广播以及手牌变化都不得在对局进行中泄露时间线。
         engine.Broadcast("NoHandChange");
         var removed = engine.State.Players[0].Hand[0];
         engine.State.Players[0].Hand.RemoveAt(0);
         engine.State.Players[0].Trash.Add(removed);
+        var removedLife = engine.State.Players[0].LifeArea[0];
+        engine.State.Players[0].LifeArea.RemoveAt(0);
+        engine.State.Players[0].Trash.Add(removedLife);
         engine.Broadcast("HandChanged");
         var handChangedTick = engine.State.Tick;
         Assert.Equal(JsonValueKind.Null, player0Snapshot!.Value.GetProperty("replayHands").ValueKind);
 
         var expectedPlayer0 = engine.State.Players[0].Hand.Select(card => card.Info.Number).ToArray();
         var expectedPlayer1 = engine.State.Players[1].Hand.Select(card => card.Info.Number).ToArray();
+        var expectedPlayer0Life = engine.State.Players[0].LifeArea.Select(card => card.Info.Number).ToArray();
+        var expectedPlayer1Life = engine.State.Players[1].LifeArea.Select(card => card.Info.Number).ToArray();
         engine.State.WinnerIndex = 0;
         engine.State.GameOverReason = "测试终局";
         engine.Broadcast("DuelOver");
@@ -217,11 +224,17 @@ public class ReplayEquivalenceTests
         Assert.Equal(expectedPlayer1, ReadStrings(player0Last.GetProperty("opponentCardNumbers")));
         Assert.Equal(expectedPlayer1, ReadStrings(player1Last.GetProperty("myCardNumbers")));
         Assert.Equal(expectedPlayer0, ReadStrings(player1Last.GetProperty("opponentCardNumbers")));
+        Assert.Equal(expectedPlayer0Life, ReadStrings(player0Last.GetProperty("myLifeCardNumbers")));
+        Assert.Equal(expectedPlayer1Life, ReadStrings(player0Last.GetProperty("opponentLifeCardNumbers")));
+        Assert.Equal(expectedPlayer1Life, ReadStrings(player1Last.GetProperty("myLifeCardNumbers")));
+        Assert.Equal(expectedPlayer0Life, ReadStrings(player1Last.GetProperty("opponentLifeCardNumbers")));
 
         // 回放时间线仍只下发给参战玩家；终局当前手牌则向参战玩家和观战者共同公开。
         Assert.Equal(expectedPlayer1,
             ReadStrings(player0Snapshot.Value.GetProperty("opponent").GetProperty("handCardNumbers")));
         Assert.Equal(JsonValueKind.Null, spectatorSnapshot!.Value.GetProperty("replayHands").ValueKind);
+        Assert.Empty(spectatorSnapshot.Value.GetProperty("my").GetProperty("lifeNumbers").EnumerateArray());
+        Assert.Empty(spectatorSnapshot.Value.GetProperty("opponent").GetProperty("lifeNumbers").EnumerateArray());
         Assert.Equal(expectedPlayer0,
             ReadStrings(spectatorSnapshot.Value.GetProperty("my").GetProperty("handCardNumbers")));
         Assert.Equal(expectedPlayer1,

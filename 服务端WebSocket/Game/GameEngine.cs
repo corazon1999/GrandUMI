@@ -1256,20 +1256,25 @@ public class GameEngine
     }
 
     /// <summary>
-    /// 记录当前双方手牌；仅在牌号或顺序变化时追加，避免终局回放数据随普通状态快照膨胀。
+    /// 记录当前双方手牌与生命区；仅在牌号或顺序变化时追加，避免终局回放数据随普通状态快照膨胀。
     /// 重启恢复重放同样会经过广播路径，因此能自然重建完整时间线。
     /// </summary>
     private void CaptureReplayHands()
     {
         var player0 = State.Players[0].Hand.Select(card => card.Info.Number).ToArray();
         var player1 = State.Players[1].Hand.Select(card => card.Info.Number).ToArray();
+        var player0Life = State.Players[0].LifeArea.Select(card => card.Info.Number).ToArray();
+        var player1Life = State.Players[1].LifeArea.Select(card => card.Info.Number).ToArray();
         var previous = _replayHandTimeline.LastOrDefault();
         if (previous is not null
             && previous.Player0CardNumbers.SequenceEqual(player0)
-            && previous.Player1CardNumbers.SequenceEqual(player1))
+            && previous.Player1CardNumbers.SequenceEqual(player1)
+            && previous.Player0LifeCardNumbers.SequenceEqual(player0Life)
+            && previous.Player1LifeCardNumbers.SequenceEqual(player1Life))
             return;
 
-        _replayHandTimeline.Add(new StateSnapshotBuilder.ReplayHandFrame(State.Tick, player0, player1));
+        _replayHandTimeline.Add(new StateSnapshotBuilder.ReplayHandFrame(
+            State.Tick, player0, player1, player0Life, player1Life));
     }
 
     /// <summary>短暂向双方公开 ownerIndex 检索到的牌（搭一次广播即清空），客户端弹出展示浮层</summary>

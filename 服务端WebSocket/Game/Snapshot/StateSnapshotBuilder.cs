@@ -7,10 +7,15 @@ namespace GrandUMI.Game.Snapshot;
 public static class StateSnapshotBuilder
 {
     /// <summary>
-    /// 回放专用的双方手牌变化帧。只保存牌号与发生变化的 Tick，
+    /// 回放专用的双方手牌与生命区变化帧。只保存牌号与发生变化的 Tick，
     /// 对局结束前不得下发给客户端。
     /// </summary>
-    public sealed record ReplayHandFrame(int Tick, string[] Player0CardNumbers, string[] Player1CardNumbers);
+    public sealed record ReplayHandFrame(
+        int Tick,
+        string[] Player0CardNumbers,
+        string[] Player1CardNumbers,
+        string[] Player0LifeCardNumbers,
+        string[] Player1LifeCardNumbers);
 
     public sealed record SnapshotSet(object Player0, object Player1, object Spectator)
     {
@@ -163,6 +168,8 @@ public static class StateSnapshotBuilder
                     tick = frame.Tick,
                     myCardNumbers = myIdx == 0 ? frame.Player0CardNumbers : frame.Player1CardNumbers,
                     opponentCardNumbers = myIdx == 0 ? frame.Player1CardNumbers : frame.Player0CardNumbers,
+                    myLifeCardNumbers = myIdx == 0 ? frame.Player0LifeCardNumbers : frame.Player1LifeCardNumbers,
+                    opponentLifeCardNumbers = myIdx == 0 ? frame.Player1LifeCardNumbers : frame.Player0LifeCardNumbers,
                 }).ToArray()
                 : null,
             my,
