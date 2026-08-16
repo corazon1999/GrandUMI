@@ -425,6 +425,7 @@ public static class WebSocketBridge
                 logStr = authentication.Message,
             });
             SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
+            PushQueuedFriendMessages(s);
             SendRankSnapshot(s);
             SendMaintenanceState(s);
             Log($"登录 ✅ {playerData.Account}");
@@ -2954,31 +2955,27 @@ public static class WebSocketBridge
 
         try
         {
-            if (!_playerDataStore.AreFriends(s.Account!, toAccount))
-            {
-                Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "只能给好友发送消息" });
-                return;
-            }
-            if (!TryGetActiveSession(toAccount, out var target))
-            {
-                Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "好友当前不在线" });
-                return;
-            }
-
+            var queued = _playerDataStore.QueueFriendMessage(
+                s.Account!,
+                toAccount,
+                Guid.NewGuid().ToString("N"),
+                text,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var packet = new
             {
                 proto = "MsgFriendChat",
                 result = true,
-                id = Guid.NewGuid().ToString("N"),
-                text,
-                fromAccount = s.Account,
-                fromName = s.PlayerName ?? s.Account ?? "玩家",
-                toAccount = target.Account,
-                toName = target.PlayerName ?? target.Account ?? "好友",
-                sentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                id = queued.Id,
+                text = queued.Text,
+                fromAccount = queued.FromAccount,
+                fromName = queued.FromName,
+                toAccount = queued.ToAccount,
+                toName = queued.ToName,
+                sentAt = queued.SentAt,
             };
             Send(s.SessionId, packet);
-            Send(target.SessionId, packet);
+            if (TryGetActiveSession(queued.ToAccount, out var target))
+                PushQueuedFriendMessages(target);
         }
         catch (Exception ex)
         {
@@ -3137,6 +3134,33 @@ public static class WebSocketBridge
         catch (Exception ex)
         {
             LogErr($"更新好友在线状态失败 {account}: {ex.Message}");
+        }
+    }
+
+    private static void PushQueuedFriendMessages(WsSession session)
+    {
+        if (!session.IsLoggedIn || session.Account is null) return;
+        try
+        {
+            foreach (var message in _playerDataStore.TakeQueuedFriendMessages(session.Account))
+            {
+                Send(session.SessionId, new
+                {
+                    proto = "MsgFriendChat",
+                    result = true,
+                    id = message.Id,
+                    text = message.Text,
+                    fromAccount = message.FromAccount,
+                    fromName = message.FromName,
+                    toAccount = message.ToAccount,
+                    toName = message.ToName,
+                    sentAt = message.SentAt,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            LogErr($"补发好友离线消息失败 {session.Account}: {ex.Message}");
         }
     }
 

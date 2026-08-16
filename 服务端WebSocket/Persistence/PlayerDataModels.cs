@@ -155,4 +155,14 @@ public sealed record FriendMutationResult(
     string OtherAccount,
     bool AutoAccepted = false);
 
+/// <summary>等待投递或刚刚投递的好友消息。</summary>
+public sealed record QueuedFriendMessage(
+    string Id,
+    string Text,
+    string FromAccount,
+    string FromName,
+    string ToAccount,
+    string ToName,
+    long SentAt);
+
 public sealed class PlayerDataValidationException(string message) : Exception(message);

@@ -106,7 +106,7 @@ export default function FriendChatView({
       .sort((a, b) => {
         const aLast = lastMessageByAccount.get(friendAccountKey(a.account))?.sentAt ?? 0;
         const bLast = lastMessageByAccount.get(friendAccountKey(b.account))?.sentAt ?? 0;
-        return bLast - aLast || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name, "zh-CN");
+        return Number(b.online) - Number(a.online) || bLast - aLast || a.name.localeCompare(b.name, "zh-CN");
       });
   }, [friends, lastMessageByAccount, search]);
 
@@ -128,7 +128,6 @@ export default function FriendChatView({
             <h3 className="text-base font-bold text-gray-100">好友消息</h3>
             <p className="text-[11px] text-gray-500">{friends.length} 位好友</p>
           </div>
-          <span className="rounded-full bg-[#202c33] px-2 py-1 text-[10px] text-gray-400">仅聊天</span>
         </div>
 
         <label className="mx-3 mb-2 flex min-h-11 items-center gap-2 rounded-lg bg-[#202c33] px-3 text-gray-400 focus-within:ring-1 focus-within:ring-emerald-500">
@@ -175,7 +174,7 @@ export default function FriendChatView({
                   </span>
                   <span className="mt-1 flex items-center gap-2">
                     <span className={`min-w-0 flex-1 truncate text-xs ${unread ? "text-gray-300" : "text-gray-500"}`}>
-                      {lastMessage ? `${sentByMe ? "你：" : ""}${lastMessage.text}` : friend.online ? "在线，可以开始聊天" : "离线"}
+                      {lastMessage ? `${sentByMe ? "你：" : ""}${lastMessage.text}` : friend.online ? "在线，可以开始聊天" : "离线 · 可留言"}
                     </span>
                     {unread > 0 && (
                       <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black text-[#062e24]">
@@ -205,7 +204,7 @@ export default function FriendChatView({
               <FriendAvatar friend={selectedFriend} size="small" />
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-bold text-gray-100">{selectedFriend.name}</h3>
-                <p className={`text-[11px] ${selectedFriend.online ? "text-emerald-400" : "text-gray-500"}`}>{selectedFriend.online ? "在线" : "离线，暂时无法发送消息"}</p>
+                <p className={`text-[11px] ${selectedFriend.online ? "text-emerald-400" : "text-gray-500"}`}>{selectedFriend.online ? "在线" : "离线 · 可留言"}</p>
               </div>
               {headerActions && <div className="flex shrink-0 items-center gap-1">{headerActions}</div>}
             </header>
@@ -216,7 +215,7 @@ export default function FriendChatView({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#202c33] text-gray-500">
                     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M5 18.5 3.8 21l3.8-1.3c1.3.6 2.8.9 4.4.9 5 0 9-3.5 9-8s-4-8-9-8-9 3.5-9 8c0 2.3 1 4.4 2 6Z" /></svg>
                   </div>
-                  <p className="mt-3 text-sm text-gray-500">{selectedFriend.online ? "还没有消息，发个招呼吧" : "好友当前离线，上线后即可聊天"}</p>
+                  <p className="mt-3 text-sm text-gray-500">{selectedFriend.online ? "还没有消息，发个招呼吧" : "还没有消息，给好友留句话吧"}</p>
                 </div>
               )}
               {selectedMessages.map((message) => {

@@ -482,6 +482,64 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void FriendMessageQueue_离线消息持久化并按发送顺序一次性取出()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        store.UpdateProfile("Alice", "艾丽丝", "");
+        store.UpdateProfile("Bob", "鲍勃", "");
+        store.SendFriendRequest("Alice", "Bob");
+        store.SendFriendRequest("Bob", "Alice");
+
+        store.QueueFriendMessage("Alice", "bob", "message-2", "第二条", 2_000);
+        store.QueueFriendMessage("Alice", "BOB", "message-1", "第一条", 1_000);
+
+        var afterRestart = CreateStore();
+        var messages = afterRestart.TakeQueuedFriendMessages("Bob");
+        Assert.Collection(
+            messages,
+            first =>
+            {
+                Assert.Equal("message-1", first.Id);
+                Assert.Equal("第一条", first.Text);
+                Assert.Equal("Alice", first.FromAccount);
+                Assert.Equal("艾丽丝", first.FromName);
+                Assert.Equal("Bob", first.ToAccount);
+                Assert.Equal("鲍勃", first.ToName);
+            },
+            second => Assert.Equal("message-2", second.Id));
+        Assert.Empty(afterRestart.TakeQueuedFriendMessages("Bob"));
+    }
+
+    [Fact]
+    public void FriendMessageQueue_拒绝非好友并限制每位收件人的待收数量()
+    {
+        var store = CreateStore();
+        store.Login("Alice");
+        store.Login("Bob");
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.QueueFriendMessage("Alice", "Bob", "not-friend", "你好", 1));
+
+        store.SendFriendRequest("Alice", "Bob");
+        store.SendFriendRequest("Bob", "Alice");
+        for (var index = 0; index <= PlayerDataStore.MaxQueuedFriendMessagesPerPlayer; index++)
+        {
+            store.QueueFriendMessage(
+                "Alice",
+                "Bob",
+                $"message-{index}",
+                $"消息 {index}",
+                index + 1);
+        }
+
+        var messages = store.TakeQueuedFriendMessages("Bob");
+        Assert.Equal(PlayerDataStore.MaxQueuedFriendMessagesPerPlayer, messages.Count);
+        Assert.Equal("message-1", messages[0].Id);
+        Assert.Equal($"message-{PlayerDataStore.MaxQueuedFriendMessagesPerPlayer}", messages[^1].Id);
+    }
+
+    [Fact]
     public void SearchPlayers_返回账号昵称匹配及当前好友关系()
     {
         var store = CreateStore();

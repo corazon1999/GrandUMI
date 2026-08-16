@@ -53,7 +53,7 @@ test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async
   assert.match(panel, /HomeRequest\.requestFriendList\(\)/);
   assert.match(panel, /GameRequest\.sendFriendChat\(selectedFriend\.account, text\)/);
   assert.match(panel, /messages={friendChatMessages}/);
-  assert.match(panel, /selectedFriend\?\.online/);
+  assert.doesNotMatch(panel, /!selectedFriend\?\.online/);
   assert.match(panel, /friendChatUnreadByAccount/);
   assert.match(panel, /markFriendChatRead\(selectedFriendAccount\)/);
   assert.match(panel, /friendConversationOpen/);
@@ -65,6 +65,9 @@ test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async
   assert.match(friendChatView, /placeholder="搜索好友"/);
   assert.match(friendChatView, /role="listbox"/);
   assert.match(friendChatView, /lastMessageByAccount/);
+  assert.match(friendChatView, /Number\(b\.online\) - Number\(a\.online\) \|\| bLast - aLast/);
+  assert.doesNotMatch(friendChatView, /仅聊天/);
+  assert.match(friendChatView, /离线 · 可留言/);
   assert.match(friendChatView, /rounded-br-sm bg-\[#005c4b\]/);
   assert.match(friendChatView, /返回好友会话列表/);
   assert.match(friendChatView, /@\[560px\]:flex/);
@@ -101,11 +104,32 @@ test("好友中心默认就是微信式会话列表并可直接发送好友消�
   assert.match(friendChatView, /headerActions &&/);
 });
 
-test("好友私聊由服务端验证好友关系且只回显给双方", async () => {
-  const bridge = await readSource("../../服务端WebSocket/WebSocketBridge.cs");
+test("好友私聊先持久化，在线时立即投递，离线时登录补发", async () => {
+  const [bridge, dataStore] = await Promise.all([
+    readSource("../../服务端WebSocket/WebSocketBridge.cs"),
+    readSource("../../服务端WebSocket/Persistence/PlayerDataStore.cs"),
+  ]);
 
-  assert.match(bridge, /_playerDataStore\.AreFriends\(s\.Account!, toAccount\)/);
-  assert.match(bridge, /只能给好友发送消息/);
-  assert.match(bridge, /好友当前不在线/);
-  assert.match(bridge, /Send\(s\.SessionId, packet\);\s*Send\(target\.SessionId, packet\);/);
+  assert.match(bridge, /_playerDataStore\.QueueFriendMessage\(/);
+  assert.match(bridge, /PushQueuedFriendMessages\(s\)/);
+  assert.match(bridge, /TryGetActiveSession\(queued\.ToAccount, out var target\)/);
+  assert.doesNotMatch(bridge, /好友当前不在线/);
+  assert.match(dataStore, /CREATE TABLE IF NOT EXISTS friend_message_queue/);
+  assert.match(dataStore, /MaxQueuedFriendMessagesPerPlayer = 500/);
+  assert.match(dataStore, /只能给好友发送消息/);
+  assert.match(dataStore, /TakeQueuedFriendMessages/);
+});
+
+test("大厅、好友中心和局内聊天均允许给离线好友留言", async () => {
+  const [homeChat, friendsPanel, gameChat] = await Promise.all([
+    readSource("../src/components/home/ChatPanel.tsx"),
+    readSource("../src/components/home/FriendsPanel.tsx"),
+    readSource("../src/components/game/GameChatPanel.tsx"),
+  ]);
+
+  for (const panel of [homeChat, friendsPanel, gameChat]) {
+    assert.doesNotMatch(panel, /!selectedFriend\?\.online/);
+    assert.doesNotMatch(panel, /好友当前离线/);
+    assert.match(panel, /留言/);
+  }
 });

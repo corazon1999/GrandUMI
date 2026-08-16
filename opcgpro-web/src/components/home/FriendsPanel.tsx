@@ -151,7 +151,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
 
   const sendFriendMessage = () => {
     const text = friendInput.trim();
-    if (!text || !selectedFriend?.online || friendChatCoolingDown || connState !== "connected") return;
+    if (!text || !selectedFriend || friendChatCoolingDown || connState !== "connected") return;
     GameRequest.sendFriendChat(selectedFriend.account, text);
     setFriendInput("");
     setFriendChatCoolingDown(true);
@@ -225,8 +225,8 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
               selectedAccount={selectedFriendAccount}
               unreadByAccount={friendChatUnreadByAccount}
               input={friendInput}
-              disabled={!selectedFriend?.online || friendChatCoolingDown || connState !== "connected"}
-              placeholder={connState !== "connected" ? "等待服务器连接" : selectedFriend?.online ? `发给 ${selectedFriend.name}` : "好友当前离线"}
+              disabled={!selectedFriend || friendChatCoolingDown || connState !== "connected"}
+              placeholder={connState !== "connected" ? "等待服务器连接" : selectedFriend?.online ? `发给 ${selectedFriend.name}` : `给 ${selectedFriend?.name ?? "好友"} 留言`}
               onInputChange={setFriendInput}
               onSelect={selectFriend}
               onBack={() => { setFriendConversationOpen(false); setRemoveConfirm(null); }}

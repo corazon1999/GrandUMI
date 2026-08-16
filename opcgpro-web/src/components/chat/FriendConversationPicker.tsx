@@ -24,7 +24,7 @@ export default function FriendConversationPicker({
       role="listbox"
       aria-label="选择聊天好友"
     >
-      {friends.map((friend) => {
+      {[...friends].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name, "zh-CN")).map((friend) => {
         const accountKey = friendAccountKey(friend.account);
         const unread = unreadByAccount[accountKey] ?? 0;
         const selected = accountKey === selectedKey;

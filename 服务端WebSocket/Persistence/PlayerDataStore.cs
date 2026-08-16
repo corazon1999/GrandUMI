@@ -45,6 +45,7 @@ public sealed class PlayerDataStore
     public const int MaxDeckPublicationsPerPlayer = 10;
     public const int MaxDeckPlazaTitleLength = 50;
     public const int MaxDeckPlazaPageSize = 30;
+    public const int MaxQueuedFriendMessagesPerPlayer = 500;
     private const string CustomCardBackPrefix = "custom-";
     private const string DeckPublicationPrefix = "deck-";
 
@@ -168,6 +169,19 @@ public sealed class PlayerDataStore
                 ON friend_requests(receiver_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS ix_friend_requests_sender
                 ON friend_requests(sender_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS friend_message_queue (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id  TEXT NOT NULL UNIQUE,
+                sender_id   INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                receiver_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                text        TEXT NOT NULL,
+                sent_at     INTEGER NOT NULL,
+                CHECK(sender_id <> receiver_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_friend_message_queue_receiver
+                ON friend_message_queue(receiver_id, sent_at, id);
 
             CREATE TABLE IF NOT EXISTS card_backs (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -312,6 +326,151 @@ public sealed class PlayerDataStore
         var areFriends = FriendshipExists(connection, transaction, low, high);
         transaction.Commit();
         return areFriends;
+    }
+
+    /// <summary>将好友消息写入待投递队列；在线好友也先入队，再由网关立即取走。</summary>
+    public QueuedFriendMessage QueueFriendMessage(
+        string fromAccount,
+        string toAccount,
+        string messageId,
+        string text,
+        long sentAt)
+    {
+        var normalizedMessageId = (messageId ?? "").Trim();
+        var normalizedText = (text ?? "").Trim();
+        if (normalizedMessageId.Length is < 1 or > 64)
+            throw new PlayerDataValidationException("好友消息编号无效。");
+        if (normalizedText.Length is < 1 or > 100)
+            throw new PlayerDataValidationException("好友消息长度需为 1–100 个字符。");
+        if (sentAt <= 0)
+            throw new PlayerDataValidationException("好友消息时间无效。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var senderId = RequirePlayerId(connection, transaction, fromAccount);
+        var receiverId = FindPlayerId(connection, transaction, NormalizeAccountKey(toAccount));
+        if (receiverId is null || receiverId.Value == senderId)
+            throw new PlayerDataValidationException("只能给好友发送消息。");
+
+        var (low, high) = OrderedPair(senderId, receiverId.Value);
+        if (!FriendshipExists(connection, transaction, low, high))
+            throw new PlayerDataValidationException("只能给好友发送消息。");
+
+        string senderAccount;
+        string senderName;
+        string receiverAccount;
+        string receiverName;
+        using (var profiles = connection.CreateCommand())
+        {
+            profiles.Transaction = transaction;
+            profiles.CommandText = """
+                SELECT sender.account, sender.display_name, receiver.account, receiver.display_name
+                FROM players sender, players receiver
+                WHERE sender.id=$senderId AND receiver.id=$receiverId;
+                """;
+            profiles.Parameters.AddWithValue("$senderId", senderId);
+            profiles.Parameters.AddWithValue("$receiverId", receiverId.Value);
+            using var reader = profiles.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("好友账号不存在。");
+            senderAccount = reader.GetString(0);
+            senderName = reader.GetString(1);
+            receiverAccount = reader.GetString(2);
+            receiverName = reader.GetString(3);
+        }
+
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO friend_message_queue(message_id, sender_id, receiver_id, text, sent_at)
+                VALUES($messageId, $senderId, $receiverId, $text, $sentAt);
+                """;
+            insert.Parameters.AddWithValue("$messageId", normalizedMessageId);
+            insert.Parameters.AddWithValue("$senderId", senderId);
+            insert.Parameters.AddWithValue("$receiverId", receiverId.Value);
+            insert.Parameters.AddWithValue("$text", normalizedText);
+            insert.Parameters.AddWithValue("$sentAt", sentAt);
+            insert.ExecuteNonQuery();
+        }
+
+        using (var trim = connection.CreateCommand())
+        {
+            trim.Transaction = transaction;
+            trim.CommandText = """
+                DELETE FROM friend_message_queue
+                WHERE receiver_id=$receiverId
+                  AND id NOT IN (
+                      SELECT id
+                      FROM friend_message_queue
+                      WHERE receiver_id=$receiverId
+                      ORDER BY sent_at DESC, id DESC
+                      LIMIT $limit
+                  );
+                """;
+            trim.Parameters.AddWithValue("$receiverId", receiverId.Value);
+            trim.Parameters.AddWithValue("$limit", MaxQueuedFriendMessagesPerPlayer);
+            trim.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return new QueuedFriendMessage(
+            normalizedMessageId,
+            normalizedText,
+            senderAccount,
+            senderName,
+            receiverAccount,
+            receiverName,
+            sentAt);
+    }
+
+    /// <summary>原子取出并删除玩家的全部待收好友消息，避免重复投递。</summary>
+    public IReadOnlyList<QueuedFriendMessage> TakeQueuedFriendMessages(string account)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var receiverId = RequirePlayerId(connection, transaction, account);
+        var messages = new List<QueuedFriendMessage>();
+
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT queue.message_id, queue.text,
+                       sender.account, sender.display_name,
+                       receiver.account, receiver.display_name,
+                       queue.sent_at
+                FROM friend_message_queue queue
+                JOIN players sender ON sender.id=queue.sender_id
+                JOIN players receiver ON receiver.id=queue.receiver_id
+                WHERE queue.receiver_id=$receiverId
+                ORDER BY queue.sent_at, queue.id;
+                """;
+            select.Parameters.AddWithValue("$receiverId", receiverId);
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+            {
+                messages.Add(new QueuedFriendMessage(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetString(4),
+                    reader.GetString(5),
+                    reader.GetInt64(6)));
+            }
+        }
+
+        if (messages.Count > 0)
+        {
+            using var delete = connection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM friend_message_queue WHERE receiver_id=$receiverId;";
+            delete.Parameters.AddWithValue("$receiverId", receiverId);
+            delete.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return messages;
     }
 
     public IReadOnlyList<FriendSearchPlayer> SearchPlayers(string account, string query, int limit = 20)

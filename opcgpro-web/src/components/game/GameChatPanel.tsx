@@ -223,7 +223,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
 
   const sendFriendMessage = () => {
     const text = friendInput.trim();
-    if (!text || !selectedFriend?.online || coolingDown) return;
+    if (!text || !selectedFriend || coolingDown) return;
     GameRequest.sendFriendChat(selectedFriend.account, text);
     setFriendInput("");
     fireCooldown();
@@ -345,7 +345,7 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                   </div>
                   <div ref={listRef} className="h-48 overflow-y-auto px-3 py-2 text-xs">
                     {selectedFriendMessages.length === 0 && (
-                      <div className="text-slate-500">还没有消息。{selectedFriend?.online ? "打个招呼吧～" : "好友上线后就可以聊天。"}</div>
+                      <div className="text-slate-500">还没有消息。{selectedFriend?.online ? "打个招呼吧～" : "可以先给好友留言。"}</div>
                     )}
                     {selectedFriendMessages.map((message) => {
                       const isSelf = message.fromAccount.toLocaleLowerCase("zh-CN") === myAccount.toLocaleLowerCase("zh-CN");
@@ -361,8 +361,8 @@ export default function GameChatPanel({ isPlayback, isObserver }: { isPlayback: 
                     value={friendInput}
                     onChange={setFriendInput}
                     onSend={sendFriendMessage}
-                    disabled={coolingDown || !selectedFriend?.online}
-                    placeholder={selectedFriend?.online ? `发给 ${selectedFriend.name}…` : "好友当前离线"}
+                    disabled={coolingDown || !selectedFriend}
+                    placeholder={selectedFriend?.online ? `发给 ${selectedFriend.name}…` : `给 ${selectedFriend?.name ?? "好友"} 留言…`}
                   />
                 </>
               ) : (
