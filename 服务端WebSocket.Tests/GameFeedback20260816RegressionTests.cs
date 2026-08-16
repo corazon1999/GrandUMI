@@ -43,4 +43,77 @@ public class GameFeedback20260816RegressionTests
         Assert.Contains(target, me.Trash);
         Assert.Contains(drawCard, me.Hand);
     }
+
+    [Theory]
+    [InlineData("OP13-080")]
+    [InlineData("OP13-083")]
+    [InlineData("OP13-084")]
+    [InlineData("OP13-089")]
+    [InlineData("OP13-091")]
+    public async Task FiveElders_WithSevenCardsInTrash_CannotLeaveByOpponentEffect(
+        string targetNumber)
+    {
+        var state = TestScene.New("OP13-079").Build();
+        var me = state.Players[0];
+        for (int i = 0; i < 7; i++) me.Trash.Add(Card("OP15-003"));
+
+        var target = Card(targetNumber);
+        me.Characters.Add(target);
+        await EffectRuntime.Resolve(state, 0, target, EffectTrigger.OnEnterField, new MockPromptService());
+
+        bool wasKOd = await AtomicOps.KOByEffectAsync(
+            state, 0, target, new MockPromptService(), actingSide: 1);
+
+        Assert.True(state.IsLeaveGuarded(target, "effect"));
+        Assert.False(wasKOd);
+        Assert.Contains(target, me.Characters);
+        Assert.DoesNotContain(target, me.Trash);
+    }
+
+    [Theory]
+    [InlineData("OP13-080")]
+    [InlineData("OP13-083")]
+    [InlineData("OP13-084")]
+    [InlineData("OP13-089")]
+    [InlineData("OP13-091")]
+    public async Task FiveElders_BelowSevenCardsInTrash_CanLeaveByOpponentEffect(
+        string targetNumber)
+    {
+        var state = TestScene.New("OP13-079").Build();
+        var me = state.Players[0];
+        for (int i = 0; i < 6; i++) me.Trash.Add(Card("OP15-003"));
+
+        var target = Card(targetNumber);
+        me.Characters.Add(target);
+        await EffectRuntime.Resolve(state, 0, target, EffectTrigger.OnEnterField, new MockPromptService());
+
+        bool wasKOd = await AtomicOps.KOByEffectAsync(
+            state, 0, target, new MockPromptService(), actingSide: 1);
+
+        Assert.False(state.IsLeaveGuarded(target, "effect"));
+        Assert.True(wasKOd);
+        Assert.DoesNotContain(target, me.Characters);
+        Assert.Contains(target, me.Trash);
+    }
+
+    [Fact]
+    public async Task OP17_119_CannotKO_OP13_083_WhenImuTrashHasAtLeastSevenCards()
+    {
+        var state = TestScene.New("OP13-079").Build();
+        var imu = state.Players[0];
+        for (int i = 0; i < 10; i++) imu.Trash.Add(Card("OP15-003"));
+
+        var saturn = Card("OP13-083");
+        imu.Characters.Add(saturn);
+        await EffectRuntime.Resolve(state, 0, saturn, EffectTrigger.OnEnterField, new MockPromptService());
+
+        var killer = Card("OP17-119");
+        state.Players[1].Characters.Add(killer);
+        var prompts = new MockPromptService().QueueChoose(saturn.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 1, killer, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Contains(saturn, imu.Characters);
+        Assert.DoesNotContain(saturn, imu.Trash);
+    }
 }

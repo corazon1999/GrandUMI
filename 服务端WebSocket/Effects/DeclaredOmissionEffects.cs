@@ -239,6 +239,15 @@ public static class DeclaredOmissionEffects
                 });
                 return false;
 
+            case ("OP13-083", EffectTrigger.OnEnterField):
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), LeaveGuard = "effect",
+                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
+                        && state.Players[ctx.OwnerIndex].Trash.Count >= 7,
+                });
+                break;
+
             case ("OP13-109", EffectTrigger.OnAllyWillLeaveField):
                 await ResolveOP13_109(ctx);
                 return false;
