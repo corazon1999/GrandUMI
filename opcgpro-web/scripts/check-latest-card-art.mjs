@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { derivedRelativePath } from "./check-card-image-assets.mjs";
 
 const DERIVED_ASSET_DIRS = ["cards-thumb", "cards-webp"];
 
@@ -13,9 +14,7 @@ export function expectedLatestArtworkFiles(manifest, publicDir) {
     const latestSprite = sprites.at(-1);
     if (typeof latestSprite !== "string" || !latestSprite.startsWith("/cards/")) continue;
 
-    const relativeWebpPath = latestSprite
-      .slice("/cards/".length)
-      .replace(/\.(png|jpe?g)$/i, ".webp");
+    const relativeWebpPath = derivedRelativePath(latestSprite.slice("/cards/".length));
 
     for (const assetDir of DERIVED_ASSET_DIRS) {
       expected.push({

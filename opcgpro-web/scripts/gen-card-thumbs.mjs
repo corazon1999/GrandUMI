@@ -13,6 +13,7 @@ import sharp from "sharp";
 import { readdir, mkdir, stat } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { auditCardImageAssets } from "./check-card-image-assets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(__dirname, "..", "public", "cards");
@@ -107,6 +108,20 @@ async function main() {
   console.log(
     `完成: 小图新生成=${thumbOk} 展示图新生成=${displayOk} 全部跳过=${skip} 失败=${fail}`,
   );
+  if (fail > 0) process.exitCode = 1;
+
+  const audit = await auditCardImageAssets(path.join(__dirname, "..", "public"));
+  if (audit.duplicateOutputs.length > 0 || audit.failures.length > 0) {
+    console.error(
+      `生成后校验失败：同名输出=${audit.duplicateOutputs.length}，缺失/过期/损坏=${audit.failures.length}`,
+    );
+    for (const item of audit.failures.slice(0, 20)) {
+      console.error(`- [${item.variant}] ${item.relativePath}（${item.reason}）`);
+    }
+    process.exitCode = 1;
+  } else {
+    console.log(`生成后校验通过：${audit.sourceCount} 张原图的两档 WebP 均完整可用。`);
+  }
 }
 
 main();

@@ -11,7 +11,7 @@ const PRODUCTION_HOST = "grand-umi.com";
 const PRODUCTION_DIRECT_ORIGIN = "https://grand-umi.com";
 const CONFIGURED_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
 // 正式服迁移期间源站曾短暂返回整批 404；追加修订号绕过 CDN 和浏览器中的负缓存。
-const CARD_ASSET_VERSION = `${DATA_VERSION}-r2`;
+const CARD_ASSET_VERSION = `${DATA_VERSION}-r3`;
 
 const CARD_SOURCE_RE = /^\/cards\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 const SPRITE_SOURCE_RE = /^\/sprites\/(.+?)\.(png|jpe?g)([?#].*)?$/i;

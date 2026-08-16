@@ -18,6 +18,7 @@
     "test:deck-plaza": "node --test tests/deck-plaza.test.mjs",
     "test:deck-image-export": "node --test tests/deck-image-export.test.mjs",
     "gen:card-thumbs": "node scripts/gen-card-thumbs.mjs",
+    "check:card-images": "node scripts/check-card-image-assets.mjs",
     "start": "next start"
   },
   "dependencies": {

@@ -101,9 +101,9 @@ if [[ "$need_front" == 1 ]]; then
     mkdir -p "$target_dir"
     rsync -a "$source_dir/" "$target_dir/"
   done
-  node scripts/check-latest-card-art.mjs
-
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
+  node scripts/check-latest-card-art.mjs
+  node scripts/check-card-image-assets.mjs
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
   if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' \

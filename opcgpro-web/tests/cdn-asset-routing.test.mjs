@@ -81,6 +81,6 @@ test("release prewarms new chunks and catalog mode covers card thumbnails", () =
 });
 
 test("card image URLs carry a recovery revision to bypass stale 404 caches", () => {
-  assert.match(sprite, /CARD_ASSET_VERSION = `\$\{DATA_VERSION\}-r2`/);
+  assert.match(sprite, /CARD_ASSET_VERSION = `\$\{DATA_VERSION\}-r3`/);
   assert.match(sprite, /`\?v=\$\{CARD_ASSET_VERSION\}`/);
 });
