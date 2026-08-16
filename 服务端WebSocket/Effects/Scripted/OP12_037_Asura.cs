@@ -26,9 +26,8 @@ public class OP12_037_Asura : IScriptedEffect
     {
         if (ctx.Trigger == EffectTrigger.EventCounter)
         {
-            // 【反击】本次战斗中，我方领袖力量 +3000。
-            var me0 = ctx.State.Players[ctx.OwnerIndex];
-            AtomicOps.AddPowerThisBattle(me0.Leader, 3000);
+            // 【反击】只增加我方领袖力量；即使当前被攻击的是角色，也不能把 +3000 转给角色。
+            AtomicOps.AddLeaderPowerThisBattle(ctx.State, ctx.OwnerIndex, 3000);
             return;
         }
 

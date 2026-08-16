@@ -48,6 +48,10 @@ public static class AtomicOps
     public static void AddPowerThisBattle(CardInstance c, int delta)
         => c.PowerModThisBattle += delta;
 
+    /// <summary>仅给指定玩家的领袖增加本次战斗力量，不随当前战斗目标切换到角色。</summary>
+    public static void AddLeaderPowerThisBattle(GameState s, int playerIdx, int delta)
+        => AddPowerThisBattle(s.Players[playerIdx].Leader, delta);
+
     public static void AddPowerPersistent(CardInstance c, int delta)
         => c.PowerModPersistent += delta;
 
