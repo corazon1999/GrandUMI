@@ -1650,12 +1650,13 @@ internal static class OP17Effects
     private static async Task C114(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.OnLifeRevealTrigger) { await PlaySelfFromTrash(c); return; }
-        if (c.Trigger != EffectTrigger.OnEnterField || c.State.CurrentTurnPlayer != c.OwnerIndex || Me(c).ActiveDonCount < 2) return;
-        if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，抽1张并将卡组顶1张加入生命？")) return;
-        RestActiveDon(c, 2);
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
-        AtomicOps.AddLifeFromDeckTop(Me(c), 1);
-        foreach (var target in await ChooseOppChars(c, _ => true, 2, "选择最多2张角色，本回合力量-3000"))
+        if (c.Trigger != EffectTrigger.OnEnterField
+            || c.State.CurrentTurnPlayer != c.OwnerIndex
+            || !LeaderHas(c, "大妈海盗团")) return;
+        if (Me(c).Deck.Count > 0
+            && await c.Prompts.ConfirmOptional(c.OwnerIndex, "将卡组最上方最多1张卡牌加入生命区最上方？"))
+            AtomicOps.AddLifeFromDeckTop(Me(c), 1);
+        foreach (var target in await ChooseOppChars(c, _ => true, 1, "选择最多1张角色，本回合力量-3000"))
             AtomicOps.AddPowerThisTurn(target, -3000);
     }
 

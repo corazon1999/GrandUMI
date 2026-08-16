@@ -15,6 +15,60 @@ public class OP17EffectTests
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
     [Fact]
+    public async Task OP17_114_OnPlay_AffectsOnlyOneOpponentCharacterWithoutDonCostOrDraw()
+    {
+        var state = TestScene.New("OP17-099")
+            .MyDeckTop("OP17-100")
+            .OppCharacter("OP17-089")
+            .OppCharacter("OP17-093")
+            .Build();
+        var me = state.Players[0];
+        var firstTarget = state.Players[1].Characters[0];
+        var secondTarget = state.Players[1].Characters[1];
+        var lifeCard = Assert.Single(me.Deck);
+        var source = Card("OP17-114");
+        me.Characters.Add(source);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(firstTarget.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Empty(me.CostArea);
+        Assert.Empty(me.Hand);
+        Assert.Empty(me.Deck);
+        Assert.Same(lifeCard, Assert.Single(me.LifeArea));
+        Assert.Equal(-3000, firstTarget.PowerModThisTurn);
+        Assert.Equal(0, secondTarget.PowerModThisTurn);
+        var targetPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OpponentCharacter", targetPrompt.kind);
+        Assert.Equal(1, targetPrompt.max);
+        Assert.Contains("最多1张角色", targetPrompt.text);
+    }
+
+    [Fact]
+    public async Task OP17_114_OnPlay_RequiresBigMomPiratesLeader()
+    {
+        var state = TestScene.New("OP13-004")
+            .MyDeckTop("OP17-100")
+            .OppCharacter("OP17-093")
+            .Build();
+        var me = state.Players[0];
+        var target = Assert.Single(state.Players[1].Characters);
+        var source = Card("OP17-114");
+        me.Characters.Add(source);
+        var prompts = new MockPromptService();
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Single(me.Deck);
+        Assert.Empty(me.LifeArea);
+        Assert.Equal(0, target.PowerModThisTurn);
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+    }
+
+    [Fact]
     public async Task OP17_095_ReturnsThreeTrashOnceToProtectAllSimultaneousEffectKOs()
     {
         var state = TestScene.New().Build();
