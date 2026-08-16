@@ -18,6 +18,7 @@ import {
   saveMatchMeta,
   type MatchMeta,
 } from "./matchHistoryDB";
+import { shouldHideDisconnectLoss } from "./matchHistoryPolicy";
 
 const SNAPSHOT_CHUNK_SIZE = 16;
 
@@ -50,7 +51,6 @@ function startSession(gs: MsgGameState): Session {
 function finalize(s: Session, last: MsgGameState): void {
   if (s.saved) return;
   s.saved = true;
-  flushChunk(s);
   const meta: MatchMeta = {
     id: s.id,
     startedAt: s.startedAt,
@@ -64,6 +64,15 @@ function finalize(s: Session, last: MsgGameState): void {
     turnCount: last.turnCount ?? 0,
     snapshotCount: s.snapshotCount,
   };
+
+  if (shouldHideDisconnectLoss(meta)) {
+    // 已异步写入的分块也要删除；同一 writeChain 可保证删除发生在旧写入完成之后。
+    s.pendingSnapshots = [];
+    enqueueWrite(s, () => deleteMatch(s.id));
+    return;
+  }
+
+  flushChunk(s);
   enqueueWrite(s, () => saveMatchMeta(meta));
 }
 

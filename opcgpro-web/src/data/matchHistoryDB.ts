@@ -11,6 +11,7 @@
  */
 
 import type { MsgGameState } from "@/types/net";
+import { shouldHideDisconnectLoss } from "./matchHistoryPolicy";
 
 const DB_NAME = "grandumi-history";
 const DB_VERSION = 2;
@@ -124,7 +125,14 @@ export async function listMeta(): Promise<MatchMeta[]> {
   const db = await openDB();
   const tx = db.transaction(STORE_META, "readonly");
   const all = await reqToPromise(tx.objectStore(STORE_META).getAll() as IDBRequest<MatchMeta[]>);
-  return all.sort((a, b) => b.startedAt - a.startedAt);
+  const hidden = all.filter(shouldHideDisconnectLoss);
+  if (hidden.length > 0) {
+    // 旧版本已经落盘的断线败局也一并清除，包括回放快照占用的空间。
+    await Promise.all(hidden.map((match) => deleteMatch(match.id)));
+  }
+  return all
+    .filter((match) => !shouldHideDisconnectLoss(match))
+    .sort((a, b) => b.startedAt - a.startedAt);
 }
 
 /** 取某局完整快照流。 */
