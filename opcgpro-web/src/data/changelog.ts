@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-16-admin-subscript-direct-tls-release",
+    version: "2026.08.16.2",
+    date: "2026-08-16",
+    title: "管理员权限、角标筛选与直连兼容更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "账号“释迦2号”现在可以使用管理员全服公告、维护控制及卡背审核与管理功能。",
+        ],
+      },
+      {
+        category: "修复",
+        items: [
+          "已确认继续适用于当前标准环境的20张角标1卡现在会默认显示；其他角标1卡仍保持默认隐藏，并可通过筛选按钮主动显示。",
+          "修复部分 Windows、Node.js 和浏览器无法建立低延迟直连的问题，并让后续证书自动续期继续保留兼容证书链。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-16-qq-feedback-game-stability-release",
     version: "2026.08.16.1",
     date: "2026-08-16",
