@@ -20,6 +20,7 @@ const PRESETS = [
   "认输吧",
   "GG",
   "网络卡了，稍等",
+  "老板来了，等我一会",
 ];
 const COOLDOWN_MS = 1300;
 
@@ -341,7 +342,7 @@ export default function GameChatPanel({
                   type="button"
                   onClick={() => sendPreset(preset)}
                   disabled={coolingDown}
-                  className="rounded-full bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+                  className="min-h-12 min-w-12 rounded-full bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 disabled:opacity-40"
                 >
                   {preset}
                 </button>

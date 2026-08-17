@@ -30,6 +30,14 @@ test("translates core lobby and match actions", () => {
   assert.equal(translateText("设置", "ja"), "設定");
   assert.equal(translateText("结束回合", "en"), "End turn");
   assert.equal(translateText("结束回合", "ja"), "ターン終了");
+  assert.equal(
+    translateText("老板来了，等我一会", "en"),
+    "My boss is here. Give me a moment.",
+  );
+  assert.equal(
+    translateText("老板来了，等我一会", "ja"),
+    "上司が来たので、少し待ってください。",
+  );
   assert.equal(translateText("设置", "zh-CN"), "设置");
 });
 

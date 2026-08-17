@@ -54,6 +54,8 @@ test("局内聊天气泡只保留局内消息并通过独立按钮打开完整�
   assert.match(panel, /friendChatUnreadByAccount/);
   assert.match(panel, /incomingFriendRequests\.length/);
   assert.match(panel, /GameRequest\.sendGameChat\(text\)/);
+  assert.match(panel, /"老板来了，等我一会"/);
+  assert.match(panel, /min-h-12 min-w-12 rounded-full/);
   assert.doesNotMatch(panel, /type ChatTab/);
   assert.doesNotMatch(panel, /FriendConversationPicker/);
   assert.doesNotMatch(panel, /GameRequest\.sendFriendChat/);

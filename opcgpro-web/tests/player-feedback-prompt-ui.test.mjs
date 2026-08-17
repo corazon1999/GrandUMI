@@ -139,7 +139,7 @@ test("对局反馈在桌面侧栏与手机旋转画布均有入口且弹窗高�
   assert.match(board, /hidden min-h-11[\s\S]*md:block/);
   assert.match(feedback, /createPortal\(/);
   assert.match(feedback, /createPortal\(\s*<AnimatePresence>[\s\S]*document\.body/);
-  assert.match(feedback, /left: "calc\(4\.25rem/);
+  assert.match(feedback, /left: "calc\(7\.75rem/);
   assert.match(feedback, /md:hidden/);
   assert.match(feedback, /min-h-11 min-w-11/);
   assert.match(feedback, /z-\[100\]/);
