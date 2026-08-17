@@ -39,16 +39,20 @@ public class OP12_041_Sanji : IScriptedEffect
         var key = "OP12-041-Activated" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
+        // 成本：咚!!-1（需至少 1 张可放回的咚）
+        if (me.CostArea.Count < 1) return;
+        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
+
+        // 支付成本后才选择是否发动事件；纯【反击】事件不具备可发动的【主要】效果。
+        me.TurnOnceUsed.Add(key);
         // 候选：手牌中原本费用 ≤3 且拥有《草帽一伙》特征的事件
         var candidates = me.Hand
             .Where(c => c.Info.Kind == CardKind.Event
                         && c.Info.Cost <= 3
-                        && c.Info.HasKeyword("草帽一伙"))
+                        && c.Info.HasKeyword("草帽一伙")
+                        && EffectRuntime.HasEffectForTrigger(c, EffectTrigger.EventMain))
             .ToList();
         if (candidates.Count == 0) return;
-
-        // 成本：咚!!-1（需至少 1 张可放回的咚）
-        if (me.CostArea.Count < 1) return;
 
         var extra = new Dictionary<string, object?>
         {
@@ -64,10 +68,6 @@ public class OP12_041_Sanji : IScriptedEffect
         var card = candidates.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
         if (card is null) return;
 
-        // 支付咚!!-1
-        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-
-        me.TurnOnceUsed.Add(key);
         AtomicOps.PlayEventFromHandFree(ctx.State, ctx.OwnerIndex, card, ctx.Prompts);
     }
 

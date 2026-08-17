@@ -366,7 +366,8 @@
           "prompt": "OpponentRestingCharacter",
           "max": 1,
           "min": 0,
-          "as": "$tgt"
+          "as": "$tgt",
+          "filter": { "originalPowerLte": 7000 }
         },
         {
           "op": "KO",
