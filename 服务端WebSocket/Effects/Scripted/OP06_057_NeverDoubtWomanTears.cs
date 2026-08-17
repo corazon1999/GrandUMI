@@ -39,6 +39,7 @@ public class OP06_057_NeverDoubtWomanTears : IScriptedEffect
         // 之后：公开卡组最上方 1 张
         if (me.Deck.Count == 0) return;
         var topCard = me.Deck[0];
+        ctx.BroadcastReveal(topCard);
 
         var extra = new Dictionary<string, object?>
         {

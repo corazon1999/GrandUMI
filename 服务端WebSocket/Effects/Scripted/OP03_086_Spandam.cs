@@ -49,6 +49,7 @@ public class OP03_086_Spandam : IScriptedEffect
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
+                ctx.BroadcastReveal(picked);
             }
         }
 

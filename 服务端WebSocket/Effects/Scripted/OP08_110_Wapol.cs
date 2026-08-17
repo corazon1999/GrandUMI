@@ -47,6 +47,7 @@ public class OP08_110_Wapol : IScriptedEffect
                     var picked = islands.First(c => c.Id.ToString() == chosen[0]);
                     me.Deck.Remove(picked);
                     me.Hand.Add(picked);
+                    ctx.BroadcastReveal(picked);
                 }
             }
 

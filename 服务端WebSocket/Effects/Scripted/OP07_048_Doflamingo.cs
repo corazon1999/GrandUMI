@@ -43,6 +43,7 @@ public class OP07_048_Doflamingo : IScriptedEffect
 
         if (me.Deck.Count == 0) return;
         var top = me.Deck[0];
+        ctx.BroadcastReveal(top);
 
         bool eligible = top.Info.Kind == CardKind.Character
             && top.Info.Cost <= 4

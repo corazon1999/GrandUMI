@@ -67,6 +67,7 @@ public class OP12_047_Sengoku : IScriptedEffect
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "SengokuReveal",
                 "公开最多 2 张\"战国\"以外的《海军》卡加入手牌",
                 navy.Select(c => c.Id.ToString()).ToList(), 0, 2, extra);
+            var revealedCards = new List<CardInstance>();
             foreach (var cid in chosen)
             {
                 var picked = navy.FirstOrDefault(c => c.Id.ToString() == cid);
@@ -74,8 +75,10 @@ public class OP12_047_Sengoku : IScriptedEffect
                 {
                     me.Deck.Remove(picked);
                     me.Hand.Add(picked);
+                    revealedCards.Add(picked);
                 }
             }
+            ctx.BroadcastReveal(revealedCards);
         }
 
         // 其余仍在顶部的牌按原相对顺序放回卡组最下方

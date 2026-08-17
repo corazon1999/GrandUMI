@@ -39,6 +39,7 @@ public class OP08_054_DontCatchTheKing : IScriptedEffect
         // 公开卡组最上方 1 张
         if (me.Deck.Count == 0) return;
         var top = me.Deck[0];
+        ctx.BroadcastReveal(top);
 
         var revealExtra = new Dictionary<string, object?>
         {

@@ -26,6 +26,7 @@ public class OP08_049_SpeedJiru : IScriptedEffect
 
         if (me.Deck.Count == 0) return;
         var topCard = me.Deck[0];
+        ctx.BroadcastReveal(topCard);
 
         // 公开卡组顶 1 张，并选择放回最上方或最下方
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,

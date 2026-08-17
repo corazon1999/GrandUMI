@@ -39,6 +39,7 @@ public class OP10_119_Law : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = cands.First(c => c.Id.ToString() == chosen[0]);
+                ctx.BroadcastReveal(picked);
                 me.Hand.Remove(picked);
                 me.LifeArea.Insert(0, picked);
             }

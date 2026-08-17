@@ -46,6 +46,7 @@ public class OP16_067_Otsuru : IScriptedEffect
             var picked = navy.First(c => c.Id.ToString() == chosen[0]);
             me.Deck.Remove(picked);
             me.Hand.Add(picked);
+            ctx.BroadcastReveal(picked);
         }
 
         // 3. 其余仍在顶部的牌按原相对顺序放回卡组最下方

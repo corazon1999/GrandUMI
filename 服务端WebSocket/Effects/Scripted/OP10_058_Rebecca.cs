@@ -49,6 +49,7 @@ public class OP10_058_Rebecca : IScriptedEffect
         if (revealed.Count == 0) return;
 
         var revealedCards = pool.Where(c => revealed.Contains(c.Id.ToString())).ToList();
+        ctx.BroadcastReveal(revealedCards);
 
         // 将公开卡牌中的 1 张登场
         var playExtra = new Dictionary<string, object?>

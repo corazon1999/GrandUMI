@@ -17,6 +17,17 @@ public class EffectContext
 
     /// <summary>引擎引用，DSL 中某些 op（如 OpponentDiscard）需要发起对手 Prompt</summary>
     public GameEngine? Engine { get; init; }
+
+    /// <summary>按卡面“公开”语义，向双方短暂展示指定卡牌。</summary>
+    public void BroadcastReveal(CardInstance card)
+        => Engine?.BroadcastReveal(OwnerIndex, new[] { card.Info.Number });
+
+    /// <summary>按卡面“公开”语义，向双方短暂展示指定卡牌。</summary>
+    public void BroadcastReveal(IEnumerable<CardInstance> cards)
+    {
+        var numbers = cards.Select(card => card.Info.Number).ToList();
+        if (numbers.Count > 0) Engine?.BroadcastReveal(OwnerIndex, numbers);
+    }
 }
 
 public class GameEvent

@@ -64,6 +64,7 @@ public class OP03_020_Striker : IScriptedEffect
                 var p = events.First(c => c.Id.ToString() == ch[0]);
                 me.Deck.Remove(p);
                 me.Hand.Add(p);
+                ctx.BroadcastReveal(p);
             }
         }
 

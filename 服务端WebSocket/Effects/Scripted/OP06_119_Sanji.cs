@@ -26,6 +26,7 @@ public class OP06_119_Sanji : IScriptedEffect
 
         if (me.Deck.Count == 0) return;
         var topCard = me.Deck[0];
+        ctx.BroadcastReveal(topCard);
 
         // 公开顶 1 张
         var reveal = new List<CardInstance> { topCard };

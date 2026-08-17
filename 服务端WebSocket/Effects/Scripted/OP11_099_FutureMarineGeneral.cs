@@ -46,6 +46,7 @@ public class OP11_099_FutureMarineGeneral : IScriptedEffect
                 var picked = cands.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
+                ctx.BroadcastReveal(picked);
             }
         }
 

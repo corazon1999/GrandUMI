@@ -62,6 +62,7 @@ public class OP10_022_Law : IScriptedEffect
         // 效果：公开生命区最上方 1 张
         if (me.LifeArea.Count == 0) return;
         var lifeTop = me.LifeArea[0];
+        ctx.BroadcastReveal(lifeTop);
 
         bool isPlayable =
             lifeTop.Info.Kind == CardKind.Character &&

@@ -46,6 +46,7 @@ public class OP03_030_Nami : IScriptedEffect
                 var p = cand.First(c => c.Id.ToString() == ch[0]);
                 me.Deck.Remove(p);
                 me.Hand.Add(p);
+                ctx.BroadcastReveal(p);
             }
         }
 

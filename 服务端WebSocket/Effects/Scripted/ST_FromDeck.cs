@@ -109,3 +109,32 @@ public class ST12_013_Zoff : IScriptedEffect
         await ST12_010_Ivankov.RevealTopPlayCost2(ctx, me, rest: true);
     }
 }
+
+/// <summary>
+/// ST12-017 整形暴踹（事件）
+/// 【反击】本次战斗中，我方最多1张领袖或角色力量+2000。之后，公开卡组顶1张，
+/// 将最多1张费用为2的角色登场；未登场时将公开牌放回卡组最上方或最下方。
+/// </summary>
+public class ST12_017_Concasser : IScriptedEffect
+{
+    public string CardNumber => "ST12-017";
+    public bool HandlesTrigger(EffectTrigger trigger) => trigger == EffectTrigger.EventCounter;
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var targets = new List<CardInstance> { me.Leader };
+        targets.AddRange(me.Characters);
+
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
+            "本次战斗中，选择我方最多1张领袖或角色力量+2000",
+            targets.Select(card => card.Id.ToString()).ToList(), 0, 1);
+        if (chosen.Count > 0)
+        {
+            var target = targets.First(card => card.Id.ToString() == chosen[0]);
+            AtomicOps.AddPowerThisBattle(target, 2000);
+        }
+
+        await ST12_010_Ivankov.RevealTopPlayCost2(ctx, me, rest: false);
+    }
+}

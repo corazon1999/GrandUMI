@@ -52,6 +52,7 @@ public class EB02_036_NicoRobin : IScriptedEffect
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
+                ctx.BroadcastReveal(picked);
             }
         }
 

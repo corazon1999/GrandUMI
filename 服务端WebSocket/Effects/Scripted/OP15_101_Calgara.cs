@@ -54,11 +54,18 @@ public class OP15_101_Calgara : IScriptedEffect
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
                 "公开最多 2 张「蒙布朗·诺兰度」或《山迪亚战士》并加入手牌",
                 candidates.Select(c => c.Id.ToString()).ToList(), 0, 2, extra);
+            var revealedCards = new List<CardInstance>();
             foreach (var cid in chosen)
             {
                 var picked = candidates.FirstOrDefault(c => c.Id.ToString() == cid);
-                if (picked is not null) { me.Deck.Remove(picked); me.Hand.Add(picked); }
+                if (picked is not null)
+                {
+                    me.Deck.Remove(picked);
+                    me.Hand.Add(picked);
+                    revealedCards.Add(picked);
+                }
             }
+            ctx.BroadcastReveal(revealedCards);
         }
 
         // 剩余仍在顶部的卡按原相对顺序放回卡组最下方

@@ -62,7 +62,7 @@
   },
   "ST12-017": {
     "_name": "整形暴踹",
-    "_note": "【反击】我方最多1张领袖或角色+2000（原文后半“公开卡组顶并登场费用2角色”无卡组登场 op，已略去）。",
+    "_note": "完整【反击】效果由 ST12_017_Concasser 脚本实现；此处仅保留旧 DSL 兼容定义。",
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }

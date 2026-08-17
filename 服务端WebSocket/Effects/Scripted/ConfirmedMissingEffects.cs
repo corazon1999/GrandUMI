@@ -482,6 +482,7 @@ public sealed class OP15_037_ResultsSpeak : IScriptedEffect
         {
             me.Deck.Remove(picked);
             me.Hand.Add(picked);
+            ctx.BroadcastReveal(picked);
         }
         var rest = top.Where(me.Deck.Contains).ToList();
         if (rest.Count > 1)

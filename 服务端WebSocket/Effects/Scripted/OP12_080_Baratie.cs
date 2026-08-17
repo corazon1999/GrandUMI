@@ -60,6 +60,7 @@ public class OP12_080_Baratie : IScriptedEffect
                 var picked = events.First(c => c.Id.ToString() == chosen[0]);
                 me.Deck.Remove(picked);
                 me.Hand.Add(picked);
+                ctx.BroadcastReveal(picked);
             }
         }
 

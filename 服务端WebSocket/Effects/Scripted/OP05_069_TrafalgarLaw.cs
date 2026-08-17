@@ -45,6 +45,7 @@ public class OP05_069_TrafalgarLaw : IScriptedEffect
                 var p = cand.First(c => c.Id.ToString() == ch[0]);
                 me.Deck.Remove(p);
                 me.Hand.Add(p);
+                ctx.BroadcastReveal(p);
             }
         }
 

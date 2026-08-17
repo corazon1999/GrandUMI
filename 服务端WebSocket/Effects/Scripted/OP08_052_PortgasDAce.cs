@@ -25,6 +25,7 @@ public class OP08_052_PortgasDAce : IScriptedEffect
 
         if (me.Deck.Count == 0) return;
         var top = me.Deck[0];
+        ctx.BroadcastReveal(top);
 
         var revealExtra = new Dictionary<string, object?>
         {

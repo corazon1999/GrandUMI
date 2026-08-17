@@ -59,11 +59,11 @@
   },
   "ST22-011": {
     "_name": "霍怀迪贝",
-    "_note": "【我方的回合中】【登场时】公开手牌中含〈白胡子海盗团〉的牌（原文公开2张，以 revealHand 公开1张近似）：本回合我方领袖+2000。",
+    "_note": "【我方的回合中】【登场时】公开手牌中2张含〈白胡子海盗团〉的牌：本回合我方领袖+2000。",
     "triggers": [
       {
         "on": "OnEnterField",
-        "cost": { "revealHand": { "keywordContains": "白胡子海盗团" } },
+        "cost": { "revealHand": { "n": 2, "keywordContains": "白胡子海盗团" } },
         "then": [
           { "op": "AddPowerThisTurn", "target": "selfLeader", "delta": 2000 }
         ]
@@ -107,9 +107,9 @@
   },
   "ST22-017": {
     "_name": "火拳",
-    "_note": "【主要】公开手牌中含〈白胡子海盗团〉的牌（原文2张，近似1张）：抽1并将最多1张费用≤5 角色放回卡组底；【触发】将最多1张费用≤3 角色放回手牌。",
+    "_note": "【主要】公开手牌中2张含〈白胡子海盗团〉的牌：抽1并将最多1张费用≤5 角色放回卡组底；【触发】将最多1张费用≤3 角色放回手牌。",
     "main": {
-      "cost": { "revealHand": { "keywordContains": "白胡子海盗团" } },
+      "cost": { "revealHand": { "n": 2, "keywordContains": "白胡子海盗团" } },
       "then": [
         { "op": "Draw", "n": 1 },
         { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将最多1张费用≤5 角色放回卡组最下方" },
