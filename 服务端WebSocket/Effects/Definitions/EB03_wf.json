@@ -792,7 +792,7 @@
   },
   "EB03-057": {
     "_name": "大和",
-    "_matcher": "登场时:领袖含和之国时赋予领袖3张休息咚;KO时可将对方生命顶1张放置到废弃区",
+    "_matcher": "登场时:领袖含和之国时从费用区赋予领袖最多3张休息咚;KO时可将对方生命顶1张放置到废弃区",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -802,9 +802,10 @@
         },
         "then": [
           {
-            "op": "RefreshDon",
+            "op": "AttachDon",
+            "target": "selfLeader",
             "n": 3,
-            "state": "rest"
+            "from": "rest"
           }
         ]
       },
