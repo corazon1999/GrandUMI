@@ -60,16 +60,16 @@ public class OP09_081_Teach : IScriptedEffect
         AtomicOps.DiscardHand(me, discard);
 
         // 注册对方限时无效化（仅【登场时】）。有效期至下个对方回合结束。
-        int baseTurn = ctx.State.TurnCount;
         var srcId = ctx.Source.Id.ToString() + "-oppnullify";
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == srcId);
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = srcId,
+            ExpiresAtEndOfTurnForSide = 1 - owner,
             Scope = new ContinuousScope { Side = 1, IncludeLeader = true, IncludeCharacters = true },
             NullifyOnlyTrigger = EffectTrigger.OnEnterField,
-            // 作用于对方一侧；有效期覆盖到下个对方回合结束（近似为 +2 回合内）
-            Predicate = (s, sideIdx, c) => sideIdx == (1 - owner) && s.TurnCount <= baseTurn + 2,
+            // 作用于对方一侧；由回合引擎在对方的下一个结束阶段精确移除。
+            Predicate = (s, sideIdx, c) => sideIdx == (1 - owner),
         });
     }
 }

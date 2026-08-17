@@ -176,8 +176,10 @@ public static class TurnEngine
         state.OneShotPlayDiscounts.Clear();   // OP02-025：一次性减费仅"本回合下次"
         state.AttackTaxDiscard[state.CurrentTurnPlayer] = 0; // 本回合方被课的攻击税到期
 
-        // 清除来源已不在场上的 ContinuousEffect（防止僵尸效果）
-        state.ContinuousEffects.RemoveAll(eff => !IsSourceCardOnField(state, eff.SourceCardId));
+        // 清除到期或来源已不在场上的 ContinuousEffect（防止僵尸效果）。
+        state.ContinuousEffects.RemoveAll(eff =>
+            eff.ExpiresAtEndOfTurnForSide == state.CurrentTurnPlayer
+            || !IsSourceCardOnField(state, eff.SourceCardId));
     }
 
     private static void ClearTurnScopedState(CardInstance c)
@@ -261,7 +263,8 @@ public static class TurnEngine
 
     private static bool IsSourceCardOnField(GameState s, string sourceId)
     {
-        if (!Guid.TryParse(sourceId, out var gid)) return false;
+        // 限时效果可在来源 GUID 后附加用途后缀，仍应按前 36 位定位来源卡。
+        if (sourceId.Length < 36 || !Guid.TryParse(sourceId[..36], out var gid)) return false;
         foreach (var p in s.Players)
         {
             if (p.Leader.Id == gid) return true;

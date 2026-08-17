@@ -12,6 +12,8 @@ public class ContinuousEffect
 {
     public required string SourceCardId { get; init; }    // 来源卡 GUID（来源 KO/离场后失效）
     public string? SourceCardNumber { get; init; }        // 限时事件等来源已离场时，供后续反应式效果识别来源
+    /// <summary>指定后，在该玩家的下一个结束阶段结束时移除此限时持续效果。</summary>
+    public int? ExpiresAtEndOfTurnForSide { get; init; }
     public required ContinuousScope Scope { get; init; }
     public int PowerDelta { get; init; }
 

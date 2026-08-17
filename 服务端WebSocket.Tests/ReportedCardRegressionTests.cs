@@ -39,6 +39,14 @@ public class ReportedCardRegressionTests
         await EffectRuntime.Resolve(state, 0, state.Players[0].Leader, EffectTrigger.ActivatedMain, prompts);
 
         Assert.True(state.IsTriggerNullified(target, EffectTrigger.OnEnterField));
+
+        TurnEngine.AdvanceTurn(state);
+        Assert.Equal(1, state.CurrentTurnPlayer);
+        Assert.True(state.IsTriggerNullified(target, EffectTrigger.OnEnterField));
+
+        TurnEngine.AdvanceTurn(state);
+        Assert.Equal(0, state.CurrentTurnPlayer);
+        Assert.False(state.IsTriggerNullified(target, EffectTrigger.OnEnterField));
     }
 
     [Fact]
