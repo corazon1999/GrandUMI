@@ -7,6 +7,9 @@ import { useResponsive } from "@/hooks/useResponsive";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import CardItem from "@/components/ui/CardItem";
+import CounterEventConfirmModal, {
+  type PendingCounterEvent,
+} from "@/components/game/CounterEventConfirmModal";
 import { getCard, getGameCard } from "@/data/CardLoader";
 import { animationDuration, useSettingsStore } from "@/store/settingsStore";
 
@@ -28,6 +31,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   const isDefender = useIsDefender();
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const [localOrder, setLocalOrder] = useState<string[]>([]);
+  const [pendingCounterEvent, setPendingCounterEvent] = useState<PendingCounterEvent | null>(null);
   const draggedIdRef = useRef<string | null>(null);
   const touchDragRef = useRef<{ id: string; startX: number; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
@@ -150,7 +154,14 @@ export default function HandArea({ side, hidden = false }: Props) {
     if (isCounterStep) {
       const c = serverCards[i];
       if (c && effectiveCounter(c, i) > 0) GameRequest.playCounterFromHand(i);
-      else if (isCounterEventPlayable(c, i)) GameRequest.playCounterEvent(i);
+      else if (isCounterEventPlayable(c, i) && c) {
+        setPendingCounterEvent({
+          handIndex: i,
+          cardNumber: c.number,
+          cardName: c.name,
+          cost: player.handCardCosts?.[i] ?? c.cost,
+        });
+      }
       return;
     }
     if (side !== "my" || !currentTurn) return;
@@ -171,7 +182,8 @@ export default function HandArea({ side, hidden = false }: Props) {
   };
 
   return (
-    <div
+    <>
+      <div
       ref={wrapRef}
       className="relative z-30 h-full w-full min-w-0 overflow-visible"
       data-zone="hand"
@@ -283,6 +295,19 @@ export default function HandArea({ side, hidden = false }: Props) {
       >
         {cards.length}
       </span>
-    </div>
+      </div>
+
+      <CounterEventConfirmModal
+        pending={pendingCounterEvent}
+        onCancel={() => setPendingCounterEvent(null)}
+        onConfirm={() => {
+          const pending = pendingCounterEvent;
+          setPendingCounterEvent(null);
+          if (!pending || !isCounterStep || isPending) return;
+          if (serverCards[pending.handIndex]?.number !== pending.cardNumber) return;
+          GameRequest.playCounterEvent(pending.handIndex);
+        }}
+      />
+    </>
   );
 }
