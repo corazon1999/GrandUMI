@@ -124,17 +124,30 @@ export default function BattleDefenseOverlay() {
           <div className="flex flex-col items-center gap-2">
             {blockers.length > 0 ? (
               <div className="flex flex-wrap justify-center gap-2">
-                {blockers.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => GameRequest.declareBlocker(b.id)}
-                    className="rounded-md ring-2 ring-transparent transition hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <CardItem card={getGameCard(b.number, my.spriteMap) ?? null} size="sm" isTapped={b.isTapped} />
-                  </button>
-                ))}
+                {blockers.map((b) => {
+                  const card = getGameCard(b.number, my.spriteMap) ?? null;
+                  const basePower = card?.power ?? 0;
+                  const powerBuff = b.powerCurrent - basePower - b.attachedDon * 1000;
+
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => GameRequest.declareBlocker(b.id)}
+                      className="rounded-md ring-2 ring-transparent transition hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CardItem
+                        card={card}
+                        size="sm"
+                        isTapped={b.isTapped}
+                        attachedDonCount={b.attachedDon}
+                        powerBuff={powerBuff}
+                        hideCounter
+                      />
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <span className="text-xs text-slate-400">没有可用的【阻挡者】</span>
