@@ -1453,7 +1453,7 @@ public static class GameRoomManager
 
     private static void TrySettleRankedMatch(RoomEntry room)
     {
-        if (room.MatchKind != MatchKind.Ranked || room.Engine.State.WinnerIndex is not (0 or 1)) return;
+        if (!IsRankedSettlementEligible(room.MatchKind, room.Engine.State)) return;
         try
         {
             var settlement = RankedStore.Default.RecordMatch(
@@ -1463,7 +1463,7 @@ public static class GameRoomManager
                 room.PlayerDisplayNames[0],
                 room.PlayerAccounts[1],
                 room.PlayerDisplayNames[1],
-                room.Engine.State.WinnerIndex.Value);
+                room.Engine.State.WinnerIndex.GetValueOrDefault());
             if (settlement is null) return;
             var players = new[] { settlement.Player0, settlement.Player1 };
             for (var i = 0; i < 2; i++)
@@ -1478,7 +1478,7 @@ public static class GameRoomManager
                 });
             }
 
-            var winnerIndex = room.Engine.State.WinnerIndex.Value;
+            var winnerIndex = room.Engine.State.WinnerIndex.GetValueOrDefault();
             var loserIndex = 1 - winnerIndex;
             WebSocketBridge.BroadcastRankedWinStreakEnded(
                 room.PlayerDisplayNames[loserIndex],
@@ -1498,6 +1498,11 @@ public static class GameRoomManager
                 WebSocketBridge.Send(sessionId, new { proto = "MsgRankResult", error = "排位结算暂时失败，服务端将保留对局记录" });
         }
     }
+
+    internal static bool IsRankedSettlementEligible(MatchKind matchKind, GameState state)
+        => matchKind == MatchKind.Ranked
+           && state.WinnerIndex is 0 or 1
+           && state.MulliganBothDone;
 
     private static void NotifyRulesetUpdateAfterMatch(RoomEntry room)
     {
@@ -1730,9 +1735,9 @@ public static class GameRoomManager
         {
             // 服务进程可能在胜负已产生、正常 CleanupRoom 尚未落盘时退出；恢复时补做幂等结算。
             TryRecordLeaderStats(roomId, matchKind, new[] { p0Account, p1Account }, engine.State, lastActivity);
-            if (matchKind == MatchKind.Ranked && engine.State.WinnerIndex is 0 or 1)
+            if (IsRankedSettlementEligible(matchKind, engine.State))
                 RankedStore.Default.RecordMatch(roomId, lastActivity, p0Account, p0Account,
-                    p1Account, p1Account, engine.State.WinnerIndex.Value);
+                    p1Account, p1Account, engine.State.WinnerIndex.GetValueOrDefault());
             TryDelete(file);
             return false;
         }
