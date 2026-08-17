@@ -142,6 +142,13 @@ public sealed class RankedStore
     public const int ThreeHundredMillionBountyRankPoints = 3000;
     public const int SixHundredMillionBountyRankPoints = 6000;
     public const int TenBillionBountyRankPoints = 10000;
+    private static readonly int[] PermanentBountyProtectionFloors =
+    [
+        TenBillionBountyRankPoints,
+        SixHundredMillionBountyRankPoints,
+        ThreeHundredMillionBountyRankPoints,
+        NewWorldRankPoints,
+    ];
     private const double InitialRating = 1500;
     private const double InitialDeviation = 350;
     private const double InitialVolatility = 0.06;
@@ -445,14 +452,12 @@ public sealed class RankedStore
         }
         else if (before.PlacementGames >= PlacementRequired)
         {
-            // 可见 RP 以 ±20 为基础，再叠加连续胜负和赛前可见 RP 分差修正。
+            // 可见 RP 按赛前悬赏档位取基础分，再叠加连续胜负和赛前可见 RP 分差修正。
             // Glicko 隐藏分仍独立更新且只用于匹配。
             var delta = calculation.IntendedDelta;
             if (score < 0.5 && before.RankPoints < 300) delta = 0; // 青铜不扣可见分
             rankPoints = Math.Max(0, before.RankPoints + delta);
-            // 白银、黄金为大段地板；白金起恢复完整升降。
-            if (before.HighestRankPoints >= 600 && before.HighestRankPoints < 900) rankPoints = Math.Max(600, rankPoints);
-            else if (before.HighestRankPoints >= 300 && before.HighestRankPoints < 600) rankPoints = Math.Max(300, rankPoints);
+            rankPoints = Math.Max(RankProtectionFloor(before.HighestRankPoints), rankPoints);
         }
 
         return before with
@@ -468,6 +473,18 @@ public sealed class RankedStore
             Losses = losses,
             UpdatedAtUtc = DateTime.UtcNow,
         };
+    }
+
+    private static int RankProtectionFloor(int highestRankPoints)
+    {
+        // 每个基础结算分变化的悬赏档位都是永久地板；达到后不再掉回上一档。
+        foreach (var floor in PermanentBountyProtectionFloors)
+            if (highestRankPoints >= floor) return floor;
+
+        // 保留原有白银、黄金大段保护；白金至新世界前仍按既有规则完整升降。
+        if (highestRankPoints >= 600 && highestRankPoints < 900) return 600;
+        if (highestRankPoints >= 300 && highestRankPoints < 600) return 300;
+        return 0;
     }
 
     private static Profile ResetRankProgress(Profile profile, DateTime resetAtUtc)

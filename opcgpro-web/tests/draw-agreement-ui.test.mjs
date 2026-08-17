@@ -24,12 +24,12 @@ test("游戏菜单展示平局申请次数并提供同意与拒绝操作", () =>
 });
 
 test("平局终局不会渲染胜负或排位分数变化", () => {
-  const page = read("src/app/game/page.tsx");
+  const overlay = read("src/components/game/GameOverOverlay.tsx");
   const audio = read("src/hooks/useGameAudio.ts");
   const history = read("src/components/home/HistoryPanel.tsx");
 
-  assert.match(page, /isDraw \? "本局平局"/);
-  assert.match(page, /!isDraw && matchKind === "Ranked" && rankResult/);
+  assert.match(overlay, /isDraw \? "本局平局"/);
+  assert.match(overlay, /!isDraw && matchKind === "Ranked" && rankResult/);
   assert.match(audio, /if \(!isDraw\) play\(winnerIsMe \? "win" : "lose"\)/);
   assert.match(history, /m\.isDraw \? "平"/);
 });

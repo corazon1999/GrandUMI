@@ -77,16 +77,17 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /达到 10亿贝里后/);
   assert.match(lobby, /基础胜负增加或减少 2500万贝里/);
   assert.match(lobby, /连胜奖励最高 1250万贝里，连败保护和分差修正上限均为 630万贝里/);
+  assert.match(lobby, /达到 1亿5000万、3亿、6亿或 10亿贝里后，对应档位会成为永久保底线/);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
-  const [page, panel, types] = await Promise.all([
-    readSource("../src/app/game/page.tsx"),
+  const [overlay, panel, types] = await Promise.all([
+    readSource("../src/components/game/GameOverOverlay.tsx"),
     readSource("../src/components/game/RankResultPanel.tsx"),
     readSource("../src/types/net.ts"),
   ]);
 
-  assert.match(page, /<RankResultPanel result=\{rankResult\}/);
+  assert.match(overlay, /<RankResultPanel result=\{rankResult\}/);
   assert.match(panel, /data-testid="rank-rp-breakdown"/);
   assert.match(panel, /baseRankPointDelta/);
   assert.match(panel, /streakAdjustment/);
@@ -103,7 +104,7 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /高悬赏方失败追加扣除/);
   assert.match(panel, /rankProtectionAdjustment/);
   assert.match(panel, /最终变化/);
-  assert.match(page, /min-h-11/);
+  assert.match(overlay, /h-12 min-w-28/);
   assert.match(types, /rankPointFormulaApplied: boolean/);
 });
 

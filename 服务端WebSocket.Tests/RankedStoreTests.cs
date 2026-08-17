@@ -267,7 +267,8 @@ public class RankedStoreTests
             Assert.Equal(35, result.Player0.RankPointDelta);
             Assert.Equal(10, result.Player1.StreakAdjustment);
             Assert.Equal(-5, result.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-35, result.Player1.RankPointDelta);
+            Assert.Equal(-35,
+                result.Player1.RankPointDelta - result.Player1.RankProtectionAdjustment);
         }
         finally
         {
@@ -311,7 +312,8 @@ public class RankedStoreTests
 
                 Assert.NotNull(result);
                 Assert.Equal(baseDelta + winAdjustment, result!.Player0.RankPointDelta);
-                Assert.Equal(-baseDelta + lossAdjustment, result.Player1.RankPointDelta);
+                Assert.Equal(-baseDelta + lossAdjustment,
+                    result.Player1.RankPointDelta - result.Player1.RankProtectionAdjustment);
                 Assert.Equal(winAdjustment, result.Player0.StreakAdjustment);
                 Assert.Equal(lossAdjustment, result.Player1.StreakAdjustment);
                 Assert.Equal(0, result.Player0.RankDifferenceAdjustment);
@@ -362,8 +364,44 @@ public class RankedStoreTests
             Assert.NotNull(highWins);
             Assert.Equal(differenceCap, highWins!.Player0.RankDifferenceAdjustment);
             Assert.Equal(-differenceCap, highWins.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-baseDelta + differenceCap, highWins.Player0.RankPointDelta);
+            Assert.Equal(-baseDelta + differenceCap,
+                highWins.Player0.RankPointDelta - highWins.Player0.RankProtectionAdjustment);
             Assert.Equal(baseDelta - differenceCap, highWins.Player1.RankPointDelta);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Theory]
+    [InlineData(RankedStore.NewWorldRankPoints, 40)]
+    [InlineData(RankedStore.ThreeHundredMillionBountyRankPoints, 80)]
+    [InlineData(RankedStore.SixHundredMillionBountyRankPoints, 150)]
+    [InlineData(RankedStore.TenBillionBountyRankPoints, 250)]
+    public void 排位结算_达到基础分变化档位后永久保底(int protectionFloor, int baseDelta)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-floor-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 17, 12, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, $"bounty-floor-{protectionFloor}");
+            SetRankPoints(path,
+                ("爱丽丝", protectionFloor + 1),
+                ("鲍勃", protectionFloor + 1));
+
+            var result = store.RecordMatch($"bounty-floor-loss-{protectionFloor}", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(result);
+            Assert.Equal(-baseDelta, result!.Player1.BaseRankPointDelta);
+            Assert.Equal(protectionFloor + 1, result.Player1.RankPointsBefore);
+            Assert.Equal(protectionFloor, result.Player1.RankPointsAfter);
+            Assert.Equal(-1, result.Player1.RankPointDelta);
+            Assert.Equal(baseDelta - 1, result.Player1.RankProtectionAdjustment);
         }
         finally
         {

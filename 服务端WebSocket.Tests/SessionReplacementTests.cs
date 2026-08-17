@@ -8,11 +8,11 @@ public sealed class SessionReplacementTests
     [Fact]
     public async Task 终止通知发出后_发送循环停止且拒绝后续消息()
     {
-        var sent = new List<string>();
+        var sent = new List<object>();
         var session = new WsSession();
         session.StartSender(message =>
         {
-            sent.Add(JsonSerializer.Serialize(message.Data));
+            sent.Add(message.Data);
             return Task.CompletedTask;
         });
 
@@ -25,8 +25,9 @@ public sealed class SessionReplacementTests
 
         Assert.True(delivered);
         Assert.False(session.Enqueue(new { proto = "MsgOnlineCount" }, isStateSnapshot: false));
-        var payload = Assert.Single(sent);
-        Assert.Contains("MsgSessionReplaced", payload);
-        Assert.Contains("账号已在其他地方登录", payload);
+        var payload = JsonSerializer.SerializeToElement(Assert.Single(sent));
+        Assert.Equal("MsgSessionReplaced", payload.GetProperty("proto").GetString());
+        Assert.Contains("账号已在其他地方登录",
+            payload.GetProperty("reason").GetString());
     }
 }

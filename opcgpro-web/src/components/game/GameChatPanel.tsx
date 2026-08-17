@@ -236,7 +236,9 @@ export default function GameChatPanel({
   return (
     <>
       <div
-        className="pointer-events-none fixed z-50 flex flex-col items-start gap-2"
+        data-game-chat-root
+        data-layout-rotated={rotateQuarterTurn ? "true" : "false"}
+        className="pointer-events-none fixed z-50"
         style={{
           ...(rotateQuarterTurn
             ? {
@@ -250,11 +252,19 @@ export default function GameChatPanel({
             "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
         }}
       >
+        <div
+          data-game-chat-popovers
+          className={`absolute flex flex-col gap-2 ${
+            rotateQuarterTurn
+              ? "bottom-0 right-[calc(100%+0.5rem)] items-end"
+              : "bottom-[calc(100%+0.5rem)] left-0 items-start"
+          }`}
+        >
         {!isObserver &&
           spectatorHandRequests.map((request) => (
             <div
               key={request.requestId}
-              className="pointer-events-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-purple-400/30 bg-slate-900/95 p-3 text-xs text-white shadow-2xl"
+              className="pointer-events-auto w-72 max-w-[calc(100cqw-1.5rem-var(--layout-safe-left,0px)-var(--layout-safe-right,0px))] rounded-xl border border-purple-400/30 bg-slate-900/95 p-3 text-xs text-white shadow-2xl"
             >
               <p className="font-bold text-purple-200">
                 {request.spectatorName} 申请查看你的手牌
@@ -288,14 +298,29 @@ export default function GameChatPanel({
         )}
 
         {open && (
-          <div className="pointer-events-auto flex w-80 flex-col overflow-hidden rounded-xl bg-slate-900/95 shadow-2xl ring-1 ring-white/15 max-md:w-64">
+          <div
+            data-game-chat-dialog
+            className={`pointer-events-auto flex flex-col overflow-hidden rounded-xl bg-slate-900/95 shadow-2xl ring-1 ring-white/15 ${
+              rotateQuarterTurn ? "" : "w-80 max-md:w-64"
+            }`}
+            style={
+              rotateQuarterTurn
+                ? {
+                    width:
+                      "min(20rem, calc(100cqw - 5.25rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px)))",
+                    height:
+                      "min(22rem, calc(100cqh - 1.5rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px)))",
+                  }
+                : undefined
+            }
+          >
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
               <span className="text-xs font-bold text-slate-200">局内聊天</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setMuted((value) => !value)}
-                  className={`min-h-11 px-1 text-xs ${muted ? "text-rose-400" : "text-slate-400 hover:text-slate-200"}`}
+                  className={`min-h-12 px-1 text-xs ${muted ? "text-rose-400" : "text-slate-400 hover:text-slate-200"}`}
                   title={
                     muted
                       ? "已静音局内其他玩家（点击取消）"
@@ -308,7 +333,7 @@ export default function GameChatPanel({
                   type="button"
                   onClick={() => setOpen(false)}
                   aria-label="收起局内聊天"
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white"
+                  className="flex h-12 w-12 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white"
                   title="收起"
                 >
                   ✕
@@ -318,7 +343,8 @@ export default function GameChatPanel({
 
             <div
               ref={listRef}
-              className="h-40 overflow-y-auto px-3 py-2 text-xs"
+              data-game-chat-message-list
+              className={`${rotateQuarterTurn ? "min-h-0 flex-1" : "h-40"} overflow-y-auto overscroll-contain px-3 py-2 text-xs`}
             >
               {gameMessages.length === 0 && (
                 <div className="text-slate-500">还没有消息。发个招呼吧～</div>
@@ -335,14 +361,21 @@ export default function GameChatPanel({
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-1 border-t border-white/10 px-2 py-1.5">
+            <div
+              data-game-chat-presets
+              className={`gap-1 border-t border-white/10 px-2 py-1.5 ${
+                rotateQuarterTurn
+                  ? "flex shrink-0 touch-pan-x overflow-x-auto overscroll-x-contain"
+                  : "flex flex-wrap"
+              }`}
+            >
               {PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => sendPreset(preset)}
                   disabled={coolingDown}
-                  className="min-h-12 min-w-12 rounded-full bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+                  className="min-h-12 min-w-12 rounded-full shrink-0 bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 disabled:opacity-40"
                 >
                   {preset}
                 </button>
@@ -357,6 +390,7 @@ export default function GameChatPanel({
             />
           </div>
         )}
+        </div>
 
         <div
           className={`pointer-events-auto flex gap-2 ${rotateQuarterTurn ? "flex-col items-end" : "items-center"}`}
@@ -571,13 +605,13 @@ function ChatInput({
         disabled={disabled}
         maxLength={100}
         placeholder={placeholder}
-        className="min-h-11 min-w-0 flex-1 rounded-md bg-slate-800 px-2 py-1.5 text-xs text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-12 min-w-0 flex-1 rounded-md bg-slate-800 px-2 py-1.5 text-xs text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
       />
       <button
         type="button"
         onClick={onSend}
         disabled={disabled || !value.trim()}
-        className="min-h-11 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500 disabled:bg-slate-700 disabled:opacity-50"
+        className="min-h-12 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500 disabled:bg-slate-700 disabled:opacity-50"
       >
         发送
       </button>
