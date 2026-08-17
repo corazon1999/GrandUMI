@@ -16,6 +16,7 @@ type Events = {
   connectFail: void;
   close: void;
   reconnected: void;        // 二次以后的握手完成（重连成功）
+  sessionReplaced: { reason: string }; // 同账号在其他设备登录，本会话必须停止自动恢复
   stateChange: ConnectionState;
   reconnectCountdown: number;
 

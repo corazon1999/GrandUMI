@@ -8,6 +8,10 @@ import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 import type { MsgLogin } from "@/types/net";
+import {
+  clearSessionReplacedNotice,
+  getSessionReplacedNotice,
+} from "@/net/sessionReplacement";
 
 const STATE_LABEL: Record<string, string> = {
   disconnected: "未连接",
@@ -59,6 +63,8 @@ export default function LoginPanel() {
     setAccount(saved);
     setStoredAccount(saved);
     setEditingAccount(!saved);
+    const sessionReplacedNotice = getSessionReplacedNotice();
+    if (sessionReplacedNotice) useNetStore.getState().setError(sessionReplacedNotice);
   }, []);
 
   useEffect(() => {
@@ -94,6 +100,7 @@ export default function LoginPanel() {
   const handleLogin = () => {
     if (!canLogin || pending || !account.trim()) return;
     const store = useNetStore.getState();
+    clearSessionReplacedNotice();
     store.setError(null);
 
     if (authStep !== "account" && !password) {
@@ -127,6 +134,7 @@ export default function LoginPanel() {
   };
 
   const startChangingAccount = () => {
+    clearSessionReplacedNotice();
     setEditingAccount(true);
     setAuthStep("account");
     setPassword("");

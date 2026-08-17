@@ -7,6 +7,7 @@ import { useNetStore } from "@/store/netStore";
 import LoginPanel from "@/components/home/LoginPanel";
 import GlobalAnnouncementBanner from "@/components/ui/GlobalAnnouncementBanner";
 import MessageBox from "@/components/ui/MessageBox";
+import { getSessionReplacedNotice } from "@/net/sessionReplacement";
 
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
 
@@ -24,7 +25,11 @@ export default function NetProvider({ children }: { children: ReactNode }) {
     if (!loggedIn && requiresLogin) {
       if (pathname === "/game") {
         const savedAccount = localStorage.getItem("grandumi_account")?.trim();
-        if (savedAccount) sessionStorage.setItem(GAME_REFRESH_RESUME_KEY, "1");
+        if (savedAccount && !getSessionReplacedNotice()) {
+          sessionStorage.setItem(GAME_REFRESH_RESUME_KEY, "1");
+        } else {
+          sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+        }
       }
       router.replace("/home");
     }

@@ -94,6 +94,8 @@ export interface MsgLogin extends MsgBase {
   account: string;
   password?: string;
   authToken?: string;
+  clientInstanceId?: string;
+  resume?: boolean;
   needsPassword?: boolean;
   needsPasswordSetup?: boolean;
   authChallenge?: boolean;

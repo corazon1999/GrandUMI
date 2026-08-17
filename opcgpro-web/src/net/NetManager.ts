@@ -1,5 +1,9 @@
 import { eventBus, type ConnectionState } from "./eventBus";
 import type { MsgBase, MsgGameState, MsgGameStateDelta, MsgPing, MsgRequestState } from "@/types/net";
+import {
+  DEFAULT_SESSION_REPLACED_NOTICE,
+  SESSION_REPLACED_CLOSE_CODE,
+} from "./sessionReplacement";
 
 // 客户端版本号，与服务器 MsgSecret 握手时校验
 export const CLIENT_VERSION = "0.999";
@@ -202,6 +206,10 @@ class NetManagerClass {
       this.stateBaseline = null;
       this.pendingPings.clear();
       this.lastDisconnectReason = event.reason || `WebSocket ${event.code}`;
+      if (event.code === SESSION_REPLACED_CLOSE_CODE) {
+        this.stopForSessionReplacement(event.reason);
+        return;
+      }
       if (this.manualClose) {
         this.setState("disconnected");
         return;
@@ -248,6 +256,14 @@ class NetManagerClass {
   }
 
   private onMessage(msg: MsgBase) {
+    if (msg.proto === "MsgSessionReplaced") {
+      this.stopForSessionReplacement(
+        (msg as { reason?: string; logStr?: string }).reason
+          ?? (msg as { logStr?: string }).logStr,
+      );
+      return;
+    }
+
     // 心跳回包：直接处理，不入队
     if (msg.proto === "MsgPing") {
       this.lastPongAt = Date.now();
@@ -369,6 +385,23 @@ class NetManagerClass {
     this.pendingPings.clear();
     socket?.close(1000, "主动断开");
     this.setState("disconnected");
+  }
+
+  private stopForSessionReplacement(reason?: string | null) {
+    const notice = reason?.trim() || DEFAULT_SESSION_REPLACED_NOTICE;
+    this.clearTimers();
+    this.manualClose = true;
+    this.reconnectAttempts = 0;
+    this.endpointFailuresInCycle = 0;
+    this.wasConnectedBefore = false;
+    const socket = this.ws;
+    this.ws = null;
+    this.socketGeneration++;
+    this.stateBaseline = null;
+    this.pendingPings.clear();
+    try { socket?.close(1000, "会话已被新登录替代"); } catch { /* 关闭帧可能已经由服务端发出。 */ }
+    this.setState("disconnected");
+    eventBus.emit("sessionReplaced", { reason: notice });
   }
 
   private onConnectionFailed() {

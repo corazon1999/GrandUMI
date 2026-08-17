@@ -21,6 +21,8 @@ namespace GrandUMI;
 public static class WebSocketBridge
 {
     private const int MaxInboundMessageBytes = 524_288;
+    private const int SessionReplacedCloseCode = 4009;
+    private const string SessionReplacedMessage = "账号已在其他地方登录，请重新登录。";
     private static readonly HashSet<string> NonReplaceableStateActions = new(StringComparer.Ordinal)
     {
         "GameStart", "Resync", "DuplicateRequest", "SpectateJoin", "FirstPlayerChosen",
@@ -31,7 +33,7 @@ public static class WebSocketBridge
     };
     private static readonly HashSet<string> CriticalOutboundProtocols = new(StringComparer.Ordinal)
     {
-        "MsgLogin", "MsgSecret", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
+        "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
@@ -41,6 +43,7 @@ public static class WebSocketBridge
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DateTime>  SupersededClientInstances = new(StringComparer.Ordinal);
     private static readonly object                                  AccountIndexGate = new();
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
@@ -55,6 +58,7 @@ public static class WebSocketBridge
     private static readonly PostGameChatRegistry PostGameChats = new(TimeSpan.FromMinutes(30));
     private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
+    private static readonly TimeSpan SupersededClientLifetime = TimeSpan.FromDays(30);
     private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
@@ -149,7 +153,8 @@ public static class WebSocketBridge
                     result = await ws.ReceiveAsync(buffer, ct);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                        if (ws.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
                         return;
                     }
                     buffer.AsSpan(0, result.Count).CopyTo(payload.GetSpan(result.Count));
@@ -354,6 +359,8 @@ public static class WebSocketBridge
     private static void OnLogin(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var requestedAccount = Str(msg, "account") ?? "";
+        var clientInstanceId = Str(msg, "clientInstanceId")?.Trim();
+        var isResume = Bool(msg, "resume");
         if (!s.TryConsumeRateLimit("account-login", capacity: 6, refillPerSecond: 0.1))
         {
             Send(s.SessionId, new
@@ -389,6 +396,14 @@ public static class WebSocketBridge
                 return;
             }
 
+            if (isResume && IsSupersededClientInstance(clientInstanceId))
+            {
+                SupersedeSession(s);
+                return;
+            }
+            if (!isResume && !string.IsNullOrEmpty(clientInstanceId))
+                SupersededClientInstances.TryRemove(clientInstanceId, out _);
+
             var playerData = _playerDataStore.Login(authentication.Account);
 
             string? supersededSessionId = null;
@@ -405,6 +420,7 @@ public static class WebSocketBridge
                     supersededSessionId = previousForAccount;
 
                 s.Account = playerData.Account;
+                s.ClientInstanceId = clientInstanceId;
                 s.PlayerName = playerData.DisplayName;
                 s.CardBackId = playerData.CardBackId;
                 AccountIndex[playerData.Account] = s.SessionId;
@@ -433,7 +449,9 @@ public static class WebSocketBridge
             // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
             if (supersededSessionId is not null && Sessions.TryGetValue(supersededSessionId, out var superseded))
             {
-                try { superseded.Socket.Abort(); } catch { }
+                if (!string.Equals(superseded.ClientInstanceId, clientInstanceId, StringComparison.Ordinal))
+                    MarkClientInstanceSuperseded(superseded.ClientInstanceId);
+                SupersedeSession(superseded);
             }
 
             // 两个登录请求并发时，只有当前账号索引指向的最新连接有权恢复房间。
@@ -462,6 +480,54 @@ public static class WebSocketBridge
         {
             Send(s.SessionId, new { proto = "MsgLogin", account = requestedAccount, name = "", result = false, logStr = "玩家数据库暂时不可用" });
             LogErr($"登录数据库异常 {requestedAccount}: {ex.Message}");
+        }
+    }
+
+    private static void SupersedeSession(WsSession session)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await session.EnqueueTerminalAsync(new
+                {
+                    proto = "MsgSessionReplaced",
+                    reason = SessionReplacedMessage,
+                    logStr = SessionReplacedMessage,
+                });
+                if (session.Socket.State == WebSocketState.Open)
+                {
+                    await session.Socket.CloseOutputAsync(
+                        (WebSocketCloseStatus)SessionReplacedCloseCode,
+                        SessionReplacedMessage,
+                        CancellationToken.None);
+                }
+            }
+            catch
+            {
+                try { session.Socket.Abort(); } catch { }
+            }
+        });
+    }
+
+    private static bool IsSupersededClientInstance(string? clientInstanceId)
+    {
+        if (string.IsNullOrEmpty(clientInstanceId)) return false;
+        if (!SupersededClientInstances.TryGetValue(clientInstanceId, out var expiresAt)) return false;
+        if (expiresAt > DateTime.UtcNow) return true;
+        SupersededClientInstances.TryRemove(clientInstanceId, out _);
+        return false;
+    }
+
+    private static void MarkClientInstanceSuperseded(string? clientInstanceId)
+    {
+        if (string.IsNullOrEmpty(clientInstanceId)) return;
+        SupersededClientInstances[clientInstanceId] = DateTime.UtcNow + SupersededClientLifetime;
+        if (SupersededClientInstances.Count <= 10_000) return;
+        var now = DateTime.UtcNow;
+        foreach (var entry in SupersededClientInstances)
+        {
+            if (entry.Value <= now) SupersededClientInstances.TryRemove(entry.Key, out _);
         }
     }
 

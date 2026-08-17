@@ -21,6 +21,7 @@ public class WsSession
     public WebSocket Socket     { get; init; } = null!;
 
     public string?   Account    { get; set; }
+    public string?   ClientInstanceId { get; set; }
     public string?   PlayerName { get; set; }
     public string    CardBackId { get; set; } = Persistence.PlayerDataStore.DefaultCardBackId;
 
@@ -81,7 +82,9 @@ public class WsSession
         int QueueDepth,
         bool IsStateSnapshot,
         string? CoalesceKey = null,
-        OutboundPriority Priority = OutboundPriority.Normal);
+        OutboundPriority Priority = OutboundPriority.Normal,
+        TaskCompletionSource<bool>? Completion = null,
+        bool StopsSender = false);
 
     /// <summary>每个连接只启动一个发送循环，从根源上保证 WebSocket SendAsync 不并发且顺序稳定。</summary>
     public void StartSender(Func<OutboundMessage, Task> sender)
@@ -144,14 +147,42 @@ public class WsSession
 
     public async Task StopSenderAsync()
     {
+        Task senderLoop;
         lock (_outboundGate)
         {
-            if (_senderStopping) return;
+            if (!_senderStopping)
+            {
+                _senderStopping = true;
+                _coalesced.Clear();
+                _outboundSignal.Release();
+            }
+            senderLoop = _senderLoop;
+        }
+        await senderLoop;
+    }
+
+    /// <summary>清空待发数据，只发送最后一条终止通知，并在通知写出后停止发送循环。</summary>
+    public Task<bool> EnqueueTerminalAsync(object data)
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_outboundGate)
+        {
+            if (_senderStopping || _sender is null) return Task.FromResult(false);
             _senderStopping = true;
+            _outbound.Clear();
             _coalesced.Clear();
+            var enqueuedAt = LatencyDiagnostics.Start();
+            _outbound.AddLast(new OutboundMessage(
+                data,
+                enqueuedAt,
+                1,
+                IsStateSnapshot: false,
+                Priority: OutboundPriority.Critical,
+                Completion: completion,
+                StopsSender: true));
             _outboundSignal.Release();
         }
-        await _senderLoop;
+        return completion.Task;
     }
 
     private async Task SenderLoopAsync()
@@ -179,6 +210,7 @@ public class WsSession
             }
 
             if (message is null) continue;
+            var sent = true;
             try
             {
                 LatencyDiagnostics.Observe("WebSocket 发送队列", message.EnqueuedAt,
@@ -188,8 +220,14 @@ public class WsSession
             }
             catch (Exception ex)
             {
+                sent = false;
                 Console.Error.WriteLine($"[WebSocket] 会话 {SessionId[..8]} 发送循环异常: {ex.Message}");
             }
+            finally
+            {
+                message.Completion?.TrySetResult(sent);
+            }
+            if (message.StopsSender) return;
         }
     }
 

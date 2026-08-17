@@ -11,6 +11,12 @@
 
 import { NetManager } from "./NetManager";
 import { eventBus } from "./eventBus";
+import {
+  clearSessionReplacedNotice,
+  getClientInstanceId,
+  getSessionReplacedNotice,
+  rememberSessionReplacedNotice,
+} from "./sessionReplacement";
 import type {
   MsgBase,
   MsgSecret,
@@ -310,15 +316,33 @@ export function registerHomeProtocols() {
     if (typeof window === "undefined") return;
     if (sessionStorage.getItem(GAME_REFRESH_RESUME_KEY) !== "1") return;
     const savedAccount = localStorage.getItem("grandumi_account")?.trim();
-    if (savedAccount) HomeRequest.login(savedAccount);
+    if (savedAccount) HomeRequest.login(savedAccount, undefined, true);
     else sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
   });
 
   // 已登录会话发生普通网络断线时继续沿用当前账号自动恢复。
   eventBus.on("reconnected", () => {
     const { loggedIn, account } = useNetStore.getState();
-    if (loggedIn && account) HomeRequest.login(account);
+    if (loggedIn && account) HomeRequest.login(account, undefined, true);
     else NetManager.finishRecovery();
+  });
+
+  eventBus.on("sessionReplaced", ({ reason }) => {
+    const notice = rememberSessionReplacedNotice(reason);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+    }
+    clearRoomRequestTimer();
+    clearSpectateRequestTimer();
+    pendingLegacyImport = null;
+    useGameStore.getState().resetGame();
+    const store = useNetStore.getState();
+    store.reset();
+    store.setError(notice);
+    if (typeof window !== "undefined" && window.location.pathname !== "/home") {
+      store.setNavigateTo("/home");
+    }
+    showMessage(notice, "error");
   });
 
   eventBus.on("close", () => {
@@ -358,7 +382,7 @@ function handleSecret(msg: MsgSecret) {
     return;
   }
   // 版本匹配，握手成功，UI 可以展示登录界面
-  useNetStore.getState().setError(null);
+  if (!getSessionReplacedNotice()) useNetStore.getState().setError(null);
 }
 
 /**
@@ -388,6 +412,7 @@ function handleLogin(msg: MsgLogin) {
     );
     store.setLoggedIn(true, displayName, account);
     store.setError(null);
+    clearSessionReplacedNotice();
     NetManager.finishRecovery();
     // 持久化账号用于登录页预填，以及对局页刷新时的一次性自动恢复。
     if (typeof window !== "undefined" && account) {
@@ -885,10 +910,12 @@ function handleUpdateSpectateSettings(msg: MsgUpdateSpectateSettings) {
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
 export const HomeRequest = {
-  login(account: string, password?: string) {
+  login(account: string, password?: string, resume = false) {
     return NetManager.send({
       proto: "MsgLogin",
       account,
+      clientInstanceId: getClientInstanceId(),
+      resume,
       ...(password === undefined
         ? { authToken: readAuthToken(account) }
         : { password }),
