@@ -325,7 +325,9 @@
     "cost": "1",
     "keyWords": "草帽一伙",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "EventCounter"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

@@ -339,6 +339,20 @@ public static class AtomicOps
     /// </summary>
     public static async Task<bool> TryEffectLeaveGuard(GameState s, int victimOwner, CardInstance card, IPromptService prompts, string kind)
     {
+        // “此角色将要离开场上”类自身置换不区分效果来源；先于只响应“对方效果”的守护者派发。
+        if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.OnSelfWillLeaveField))
+        {
+            s.PreventLeaveCardIds.Remove(card.Id);
+            await EffectRuntime.Resolve(s, victimOwner, card, EffectTrigger.OnSelfWillLeaveField, prompts,
+                new Dictionary<string, object?>
+                {
+                    ["victimId"] = card.Id.ToString(),
+                    ["victimOwner"] = victimOwner,
+                    ["kind"] = kind,
+                });
+            if (s.PreventLeaveCardIds.Remove(card.Id)) return true;
+        }
+
         int acting = EffectRuntime.CurrentActingSide;
         if (acting < 0 || acting == victimOwner) return false; // 非"对方效果"(或无效果上下文)
 

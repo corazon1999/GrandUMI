@@ -113,8 +113,8 @@
   },
   "ST10-015": {
     "_name": "橡皮橡皮巨人推掌",
-    "_note": "【触发（生命）】我方最多1张领袖或角色+2000，并 KO 对方最多1张力量≤2000 角色。",
-    "trigger": [
+    "_note": "【反击】我方最多1张领袖或角色+2000，并 KO 对方最多1张力量≤2000 角色。",
+    "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
       { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentPowerLte": 2000 }, "text": "KO 对方最多1张力量≤2000 的角色" },

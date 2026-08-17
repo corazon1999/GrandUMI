@@ -1518,6 +1518,7 @@ public class GameEngine
             State.EvaluateDeckOut(endOfTurn: true);
             if (State.IsGameOver) { CheckGameOver(); return; }
 
+            await TurnEngine.ResolvePromptedEndPhaseTasksAsync(State, Prompts);
             TurnEngine.AdvanceTurnToReset(State);
             // 【我方的回合开始时】(OP11-040 路飞等)：在准备阶段(Reset)之后、抽牌/加咚之前派发。
             // 此刻费用区咚数 = 进入本回合的咚总数（本回合 Don 尚未加咚），符合官方「回合开始时」判定时点。

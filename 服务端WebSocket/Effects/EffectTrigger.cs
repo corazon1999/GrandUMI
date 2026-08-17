@@ -31,6 +31,7 @@ public enum EffectTrigger
     OnOppBlocker,           // 当对方发动【阻挡者】时（payload: blockerOwner）
     OnAllyWillBeKOd,        // 守护者：他卡将要被KO时（payload: victimId, victimOwner）让"代替被KO"置换效果有机会发动
     OnAllyWillLeaveField,   // 守护者：我方角色因对方效果"将要离开场上"时（KO/退手牌/回卡组/置入生命，payload: victimId, victimOwner, kind）让"代替离场"置换效果有机会发动
+    OnSelfWillLeaveField,   // 自身因任意效果将要非KO离场时（退手牌/回卡组/置入生命，payload 同上），用于不区分效果来源的自身离场置换
     OnAnyCharKOd,           // 当(任意一方)角色被KO时（payload: cardId, owner, reason="battle"|"effect"）场上他卡可据此反应
     OnBattleEnd,            // 战斗结束时（在 EndBattle 清场前派发；CurrentBattle 仍可读，payload: attackerId/defenderPlayerIdx/targetCardId/targetIsLeader）
     OnLeaderBattle,         // 任一领袖攻击或成为攻击对象时（场上旁观卡使用，payload: attackerId/targetLeaderOwner）

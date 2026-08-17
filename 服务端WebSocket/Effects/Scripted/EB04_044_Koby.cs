@@ -10,24 +10,33 @@ namespace GrandUMI.Effects.Scripted;
 /// 【我方的回合中】【每回合1次】当对方的角色被KO时，抽取 1 张卡牌。
 ///
 /// 实现说明（M6）：
-///   - 自身防离场置换走 PreKO（受害者自身钩子）：覆盖战斗KO与DSL效果KO；
-///     退回手牌/放回卡组等非KO离场不经 PreKO，本卡此情形未覆盖（已文档化）。
+///   - 自身防离场置换：KO 走 PreKO；退回手牌、放回卡组等非KO离场走 OnSelfWillLeaveField。
+///     后者不区分效果来源，可覆盖我方回合结束延迟效果将自身放回卡组的场景。
 ///   - 第二段走 OnAnyCharKOd（战斗/效果KO均派发）：我方回合中、被KO者属对方、每回合1次 → 抽1。
-///   - 两段各自独立的【每回合1次】计数。effectTags 已设为 ["PreKO","OnAnyCharKOd"]。
+///   - 两段各自独立的【每回合1次】计数。
 /// </summary>
 public class EB04_044_Koby : IScriptedEffect
 {
     public string CardNumber => "EB04-044";
 
     public bool HandlesTrigger(EffectTrigger t) =>
-        t == EffectTrigger.PreKO || t == EffectTrigger.OnAnyCharKOd;
+        t is EffectTrigger.PreKO or EffectTrigger.OnSelfWillLeaveField or EffectTrigger.OnAnyCharKOd;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        if (ctx.Trigger == EffectTrigger.PreKO)
+        if (ctx.Trigger is EffectTrigger.PreKO or EffectTrigger.OnSelfWillLeaveField)
         {
+            if (ctx.Trigger == EffectTrigger.OnSelfWillLeaveField)
+            {
+                var victimId = ctx.Vars.TryGetValue("victimId", out var v) ? v as string : null;
+                var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int leaveOwner
+                    ? leaveOwner
+                    : -1;
+                if (victimOwner != ctx.OwnerIndex || victimId != ctx.Source.Id.ToString()) return;
+            }
+
             var key = ctx.Source.Info.Number + "-guard" + ":" + ctx.Source.Id;
             if (me.TurnOnceUsed.Contains(key)) return;
             if (!me.Leader.Info.HasKeyword("海军")) return;
@@ -43,7 +52,8 @@ public class EB04_044_Koby : IScriptedEffect
             var disc = me.Hand.First(c => c.Id.ToString() == pick[0]);
             AtomicOps.DiscardHand(me, disc);
 
-            ctx.State.MarkPreventKO(ctx.Source.Id);
+            if (ctx.Trigger == EffectTrigger.PreKO) ctx.State.MarkPreventKO(ctx.Source.Id);
+            else ctx.State.MarkPreventLeave(ctx.Source.Id);
             me.TurnOnceUsed.Add(key);
             return;
         }

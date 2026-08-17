@@ -94,6 +94,32 @@ public class EB_M6_Tests
         Assert.Empty(me.Hand);                         // 弃1张
     }
 
+    [Fact]
+    public async Task EB04_044_SelfGuard_PreventsOwnEffectReturningItToDeck()
+    {
+        var s = TestScene.New("OP02-002").MyCharacter("EB04-044").Build();
+        var me = s.Players[0];
+        var koby = me.Characters[0];
+        me.Hand.Add(Filler());
+
+        var p = new MockPromptService().QueueConfirm(true);
+        p.QueueChoose(me.Hand[0].Id.ToString());
+
+        s.EndOfTurnTasks.Add(new EndTurnTask
+        {
+            Kind = "ReturnCharacterToDeckBottom",
+            Owner = 0,
+            SourceCardId = koby.Id.ToString(),
+        });
+        await TurnEngine.ResolvePromptedEndPhaseTasksAsync(s, p);
+        TurnEngine.EnterEndPhase(s);
+
+        Assert.Contains(koby, me.Characters);
+        Assert.DoesNotContain(koby, me.Deck);
+        Assert.Empty(me.Hand);
+        Assert.Single(p.ConfirmHistory);
+    }
+
     // ── EB04-057 贝加班克：生命≤2时我方科学家黄色角色不会因效果离场 ──
     [Fact]
     public async Task EB04_057_LeaveGuard_BlocksEffectKO_WhenLifeLow()

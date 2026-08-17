@@ -98,4 +98,26 @@ public class OP07_077_GoingToFindTheGreatTreasureTests
             .Count(document => document.RootElement.GetProperty("lastAction").GetString() == "RevealCards");
         Assert.Equal(0, revealCount);
     }
+
+    [Fact]
+    public async Task EventMain_WhenNoCandidate_StillShowsTopCardsAndLetsPlayerReorderThem()
+    {
+        var state = TestScene.New("OP17-058").Build();
+        var player = state.Players[0];
+        player.Deck.Clear();
+        var first = Card("OP01-001");
+        var second = Card("OP01-002");
+        player.Deck.AddRange([first, second]);
+        var prompts = new MockPromptService()
+            .QueueChoose()
+            .QueueChoose(second.Id.ToString(), first.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, Card("OP07-077"), EffectTrigger.EventMain, prompts);
+
+        var revealPrompt = Assert.Single(prompts.ChooseHistory.Where(item => item.kind == "LookTopReveal"));
+        Assert.Empty(revealPrompt.choices);
+        Assert.Equal(new[] { second, first }, player.Deck);
+        Assert.Contains(prompts.ChooseHistory, item => item.kind == "ReorderToDeckBottom");
+    }
 }

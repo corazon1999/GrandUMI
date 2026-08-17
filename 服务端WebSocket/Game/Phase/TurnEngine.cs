@@ -185,6 +185,31 @@ public static class TurnEngine
             || !IsSourceCardOnField(state, eff.SourceCardId));
     }
 
+    /// <summary>
+    /// 在同步结束阶段清理前，先处理需要玩家确认的延迟离场任务。
+    /// 这类任务不能直接调用同步移动方法，否则“将要离场时”的置换效果没有机会弹出并支付成本。
+    /// </summary>
+    public static async Task ResolvePromptedEndPhaseTasksAsync(GameState state, IPromptService prompts)
+    {
+        var tasks = state.EndOfTurnTasks
+            .Where(task => task.Kind == "ReturnCharacterToDeckBottom")
+            .ToList();
+        foreach (var task in tasks)
+        {
+            state.EndOfTurnTasks.Remove(task);
+            var owner = state.Players[task.Owner];
+            var card = owner.Characters.FirstOrDefault(c => c.Id.ToString() == task.SourceCardId);
+            if (card is null) continue;
+            await AtomicOps.ProcessEffectLeavesAsync(
+                state,
+                task.Owner,
+                new[] { card },
+                prompts,
+                "deckBottom",
+                AtomicOps.ReturnFieldToDeckBottom);
+        }
+    }
+
     private static void ClearTurnScopedState(CardInstance c)
     {
         c.PowerModThisTurn = 0;

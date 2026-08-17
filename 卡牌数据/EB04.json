@@ -993,6 +993,7 @@
     "counter": "1000",
     "effectTags": [
       "PreKO",
+      "OnSelfWillLeaveField",
       "OnAnyCharKOd"
     ],
     "abilities": [],
