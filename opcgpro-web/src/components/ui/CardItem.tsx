@@ -183,6 +183,7 @@ export default function CardItem({
         scale: isSelected ? (liftOnSelect ? 1.05 : 1.03) : 1,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      data-game-board-interactive={onClick ? "true" : undefined}
       onClick={onClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}

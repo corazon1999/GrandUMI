@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import HandArea from "@/components/game/HandArea";
 import FieldArea from "@/components/game/FieldArea";
 import LeaderCard from "@/components/game/LeaderCard";
@@ -330,10 +330,24 @@ export default function GameBoard({
   const opponentRankIdentity = useGameStore((s) => s.opponent?.rankIdentity);
   const myChampionLeaderNumber = useGameStore((s) => s.my?.championLeaderNumber);
   const opponentChampionLeaderNumber = useGameStore((s) => s.opponent?.championLeaderNumber);
+  const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
+  const setSelectedDon = useGameStore((s) => s.setSelectedDon);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageScale = useStageScale(STAGE_W, STAGE_H, viewportRef);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  const handleBoardBlankClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (selectedDonIndex === null || !(event.target instanceof Element)) return;
+
+    // 卡牌、按钮等真实操作目标继续处理自身点击；只有牌桌空白区域取消待依附的咚。
+    const interactiveTarget = event.target.closest(
+      "button, a, input, textarea, select, [role='button'], [data-game-board-interactive='true']",
+    );
+    if (interactiveTarget) return;
+
+    setSelectedDon(null);
+  };
 
   return (
     <>
@@ -344,7 +358,11 @@ export default function GameBoard({
       <RevealOverlay />
 
       {/* 固定设计画布 + 整体等比缩放居中（scale-to-fit），保证任何宽高比下比例恒定、不裁切 */}
-      <div ref={viewportRef} className="absolute inset-0 z-10 flex items-center justify-center">
+      <div
+        ref={viewportRef}
+        className="absolute inset-0 z-10 flex items-center justify-center"
+        onClick={handleBoardBlankClick}
+      >
         <CardSizeOverride.Provider value="sm">
           <div
             ref={stageRef}
