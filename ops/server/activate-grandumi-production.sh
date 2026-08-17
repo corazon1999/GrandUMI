@@ -105,6 +105,7 @@ printf 'b\n' > /var/lib/grandumi-ha/standby-slot
 printf 'proxy_pass http://127.0.0.1:8080;\n' > /etc/nginx/snippets/grandumi-active-backend.conf
 printf 'proxy_pass http://127.0.0.1:3000;\n' > /etc/nginx/snippets/grandumi-active-frontend.conf
 printf 'root /opt/grandumi/slots/a/frontend/public;\n' > /etc/nginx/snippets/grandumi-active-assets.conf
+printf 'root /opt/grandumi/slots/a/frontend;\n' > /etc/nginx/snippets/grandumi-active-frontend-files.conf
 systemctl enable grandumi-production-backend@a.service grandumi-production-frontend@a.service
 systemctl disable grandumi-production-backend.service grandumi-production-frontend.service || true
 systemctl disable grandumi-candidate-backend.service grandumi-candidate-frontend.service || true

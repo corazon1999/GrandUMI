@@ -43,11 +43,19 @@ install -m 0644 "$source_root/ops/server/grandumi-production-frontend@.service" 
 install -m 0755 "$source_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
 install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$source_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
+install -m 0755 "$source_root/ops/server/enable-grandumi-assets.sh" /usr/local/sbin/enable-grandumi-assets
 install -m 0644 "$source_root/ops/server/grandumi-production-health.service" /etc/systemd/system/grandumi-production-health.service
 install -m 0644 "$source_root/ops/server/grandumi-production-health.timer" /etc/systemd/system/grandumi-production-health.timer
 install -m 0644 "$source_root/ops/server/grandumi-production-proxy.nginx" /etc/nginx/snippets/grandumi-production-proxy.conf
 install -m 0644 "$source_root/ops/server/grandumi-production.nginx" /etc/nginx/sites-available/grandumi-production
+install -m 0644 "$source_root/ops/server/grandumi-assets-acme.nginx" /etc/nginx/sites-available/grandumi-assets-acme
+install -m 0644 "$source_root/ops/server/grandumi-assets.nginx" /etc/nginx/sites-available/grandumi-assets
 ln -sfn /etc/nginx/sites-available/grandumi-production /etc/nginx/sites-enabled/grandumi-production
+if [[ -f /etc/letsencrypt/live/assets.grand-umi.com/fullchain.pem ]] \
+    && openssl x509 -in /etc/letsencrypt/live/assets.grand-umi.com/fullchain.pem \
+      -noout -checkhost assets.grand-umi.com >/dev/null 2>&1; then
+  ln -sfn /etc/nginx/sites-available/grandumi-assets /etc/nginx/sites-enabled/grandumi-assets
+fi
 rm -f /etc/nginx/sites-enabled/default
 
 [[ -f /etc/nginx/snippets/grandumi-active-backend.conf ]] || \
@@ -56,6 +64,8 @@ rm -f /etc/nginx/sites-enabled/default
   printf 'proxy_pass http://127.0.0.1:3000;\n' > /etc/nginx/snippets/grandumi-active-frontend.conf
 [[ -f /etc/nginx/snippets/grandumi-active-assets.conf ]] || \
   printf 'root /opt/grandumi/opcgpro-web/public;\n' > /etc/nginx/snippets/grandumi-active-assets.conf
+[[ -f /etc/nginx/snippets/grandumi-active-frontend-files.conf ]] || \
+  printf 'root /opt/grandumi/slots/a/frontend;\n' > /etc/nginx/snippets/grandumi-active-frontend-files.conf
 [[ -s /var/lib/grandumi-ha/active-slot ]] || printf 'a\n' > /var/lib/grandumi-ha/active-slot
 
 systemctl daemon-reload

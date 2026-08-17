@@ -18,14 +18,33 @@ const directTlsRenewHook = await readFile(new URL("../../ops/server/renew-grandu
 const directTlsCompatChain = await readFile(new URL("../../ops/server/isrg-root-x2-cross-signed.pem", import.meta.url), "utf8");
 const emergencyDirectRelay = await readFile(new URL("../../ops/server/grandumi-emergency-direct-relay.caddy", import.meta.url), "utf8");
 const enableEmergencyDirectRelay = await readFile(new URL("../../ops/server/enable-grandumi-emergency-direct-relay.sh", import.meta.url), "utf8");
+const assetsNginx = await readFile(new URL("../../ops/server/grandumi-assets.nginx", import.meta.url), "utf8");
+const enableAssets = await readFile(new URL("../../ops/server/enable-grandumi-assets.sh", import.meta.url), "utf8");
+const productionSwitch = await readFile(new URL("../../ops/server/grandumi-production-switch.sh", import.meta.url), "utf8");
 
 test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
   assert.match(stage, /NEXT_PUBLIC_WS_URL='wss:\/\/grand-umi\.com\/ws'/);
-  assert.match(stage, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/grand-umi\.com'/);
+  assert.match(stage, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
   assert.match(stage, /"hosts":\["grand-umi\.com","direct\.grand-umi\.com"\]/);
   assert.match(stage, /wss:\/\/direct\.grand-umi\.com\/ws/);
   assert.doesNotMatch(stage, /wss:\/\/candidate\.grand-umi\.com\/ws/);
   assert.match(stage, /尚未切换服务/);
+});
+
+test("新正式服独立承载静态资源域名并跟随活动槽切换", () => {
+  assert.match(assetsNginx, /server_name assets\.grand-umi\.com;/);
+  assert.match(assetsNginx, /live\/assets\.grand-umi\.com\/fullchain\.pem/);
+  assert.match(assetsNginx, /grandumi-active-frontend-files\.conf/);
+  assert.match(assetsNginx, /grandumi-active-assets\.conf/);
+  assert.match(assetsNginx, /grandumi-active-backend\.conf/);
+  assert.match(assetsNginx, /\/card-back-images\//);
+  assert.match(assetsNginx, /respond 404|return 404/);
+  assert.match(productionSwitch, /grandumi-active-frontend-files\.conf/);
+  assert.match(productionBootstrap, /enable-grandumi-assets/);
+  assert.match(productionBootstrap, /checkhost assets\.grand-umi\.com/);
+  assert.match(enableAssets, /certbot certonly --webroot/);
+  assert.match(enableAssets, /--deploy-hook "systemctl reload nginx"/);
+  assert.match(enableAssets, /sprites-thumb\/CardBack\.webp/);
 });
 
 test("正式服发布槽始终挂载不进入 Git 的共享卡图资源", () => {

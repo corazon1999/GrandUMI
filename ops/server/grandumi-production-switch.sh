@@ -54,12 +54,16 @@ write_proxy() {
     > /etc/nginx/snippets/grandumi-active-frontend.conf.next
   printf 'root /opt/grandumi/slots/%s/frontend/public;\n' "$slot" \
     > /etc/nginx/snippets/grandumi-active-assets.conf.next
+  printf 'root /opt/grandumi/slots/%s/frontend;\n' "$slot" \
+    > /etc/nginx/snippets/grandumi-active-frontend-files.conf.next
   mv /etc/nginx/snippets/grandumi-active-backend.conf.next \
     /etc/nginx/snippets/grandumi-active-backend.conf
   mv /etc/nginx/snippets/grandumi-active-frontend.conf.next \
     /etc/nginx/snippets/grandumi-active-frontend.conf
   mv /etc/nginx/snippets/grandumi-active-assets.conf.next \
     /etc/nginx/snippets/grandumi-active-assets.conf
+  mv /etc/nginx/snippets/grandumi-active-frontend-files.conf.next \
+    /etc/nginx/snippets/grandumi-active-frontend-files.conf
   nginx -t
   systemctl reload nginx
 }

@@ -1,0 +1,75 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name assets.grand-umi.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 308 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name assets.grand-umi.com;
+    client_max_body_size 1m;
+
+    ssl_certificate /etc/letsencrypt/live/assets.grand-umi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/assets.grand-umi.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:GrandUmiAssetsTls:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    location ^~ /_next/static/ {
+        limit_except GET { deny all; }
+        include /etc/nginx/snippets/grandumi-active-frontend-files.conf;
+        try_files $uri =404;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cross-Origin-Resource-Policy "cross-origin" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location ~ ^/(audio|cards|cards-thumb|cards-webp|data|sprites|sprites-thumb|status-icons|vfx)/ {
+        limit_except GET { deny all; }
+        include /etc/nginx/snippets/grandumi-active-assets.conf;
+        try_files $uri =404;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cross-Origin-Resource-Policy "cross-origin" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location ~ ^/(file|globe|next|vercel|window)\.svg$ {
+        limit_except GET { deny all; }
+        include /etc/nginx/snippets/grandumi-active-assets.conf;
+        try_files $uri =404;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cross-Origin-Resource-Policy "cross-origin" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location ~ ^/card-back-images/[0-9]+$ {
+        limit_except GET { deny all; }
+        include /etc/nginx/snippets/grandumi-active-backend.conf;
+        proxy_set_header Host localhost;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 15s;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cross-Origin-Resource-Policy "cross-origin" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location / {
+        return 404;
+    }
+}
