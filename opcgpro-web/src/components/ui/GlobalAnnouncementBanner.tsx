@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { eventBus } from "@/net/eventBus";
 import type { MsgBase, MsgGlobalAnnouncement } from "@/types/net";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 interface Announcement {
   id: string;
@@ -11,6 +12,7 @@ interface Announcement {
 }
 
 export default function GlobalAnnouncementBanner() {
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const announcement = announcements[0] ?? null;
   const bannerRef = useRef<HTMLDivElement>(null);
@@ -52,18 +54,33 @@ export default function GlobalAnnouncementBanner() {
 
   if (!announcement) return null;
 
+  const dismissAnnouncements = () => setAnnouncements([]);
+
   return (
     <div
       ref={bannerRef}
       data-global-announcement-banner
       aria-live="polite"
       role="status"
-      className="pointer-events-none fixed inset-x-0 top-0 z-[80] pt-[var(--layout-safe-top,env(safe-area-inset-top))]"
+      className={`pointer-events-none fixed inset-x-0 top-0 z-[80] ${
+        rotateQuarterTurn
+          ? "pt-[calc(0.5rem+var(--layout-safe-top,env(safe-area-inset-top)))]"
+          : "pt-[var(--layout-safe-top,env(safe-area-inset-top))]"
+      }`}
     >
-      <div className="overflow-hidden border-y border-amber-400/60 bg-gray-950/95 py-2 text-sm font-bold text-amber-100 shadow-lg backdrop-blur">
+      <div className="relative overflow-hidden border-y border-amber-400/60 bg-gray-950/95 py-2 pr-[calc(4rem+var(--layout-safe-right,env(safe-area-inset-right)))] text-sm font-bold text-amber-100 shadow-lg backdrop-blur">
         <span key={announcement.id} className="global-announcement-marquee">
           📢 {announcement.kind === "rankedStreak" ? announcement.content : `全服公告：${announcement.content}`}
         </span>
+        <button
+          type="button"
+          onClick={dismissAnnouncements}
+          aria-label="关闭广播横幅"
+          title="关闭广播横幅"
+          className="pointer-events-auto absolute right-[max(0.5rem,var(--layout-safe-right,env(safe-area-inset-right)))] top-1/2 flex min-h-12 min-w-12 -translate-y-1/2 items-center justify-center rounded-md border border-amber-200/35 bg-gray-900/95 text-lg font-black leading-none text-amber-50 shadow hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+        >
+          ×
+        </button>
       </div>
     </div>
   );

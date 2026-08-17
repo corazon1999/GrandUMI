@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "此领袖无法进行攻击" 为持续被动；引擎的攻击限制（Restriction）按回合时长生效、无持续通道，
 ///     该被动暂不在脚本中强制实现（不影响本启动效果）。
 ///   - 成本"将 1 张咚!! 转为休息状态"：将费用区中 1 张活跃咚置为 Rest。
-///   - 成本"将生命区最上方 1 张翻至正面朝上"：引擎生命牌无正/反面状态字段，无法表达，按惯例省略该成本，仅实现收益。
+///   - 成本“将生命区最上方 1 张翻至正面朝上”：要求生命顶为背面，支付后保持正面朝上。
 ///   - 收益：登场手牌中费用 ≤ 我方场上咚!! 总张数（CostArea 全部咚）且《海王类》特征或名为"梅迦罗"的角色，最多 1 张。
 ///   - 每回合 1 次用 TurnOnceUsed 标记。
 /// </summary>
@@ -30,8 +30,8 @@ public class OP11_022_Shirahoshi : IScriptedEffect
         var key = ctx.Source.Info.Number + "-act" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本前置：至少要有 1 张活跃咚可转休息
-        if (me.ActiveDonCount < 1) return;
+        // 成本前置：至少要有 1 张活跃咚，且生命顶须能翻至正面。
+        if (me.ActiveDonCount < 1 || me.LifeArea.Count == 0 || me.LifeArea[0].IsLifeFaceUp) return;
 
         // 候选收益：手牌中费用 ≤ 场上咚!! 总张数、且《海王类》或名为"梅迦罗"的角色
         int donCount = me.TotalDonInCostArea;
@@ -40,18 +40,20 @@ public class OP11_022_Shirahoshi : IScriptedEffect
             ctx.State.CurrentCostOf(c) <= donCount &&
             (c.Info.HasKeyword("海王类") || c.MatchesName("梅迦罗"))
         ).ToList();
-        if (candidates.Count == 0) return;
-
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "白星【启动主要】：将 1 张咚!! 转为休息状态，登场 1 张费用≤场上咚数的《海王类》角色或\"梅迦罗\"？");
+            "白星【启动主要】：将 1 张咚!! 转为休息状态并将生命顶翻至正面，之后可登场最多 1 张符合条件的角色？");
         if (!use) return;
 
         // 支付成本：将 1 张活跃咚转为休息
         var don = me.CostArea.FirstOrDefault(d => d.State == DonState.Active);
         if (don is null) return;
         don.State = DonState.Rest;
+        AtomicOps.FlipTopLifeFaceUp(me);
 
         me.TurnOnceUsed.Add(key);
+
+        // “最多1张”允许手牌中没有符合条件的角色时仍只支付成本发动。
+        if (candidates.Count == 0) return;
 
         // 收益：登场最多 1 张候选角色
         var extra = new Dictionary<string, object?>

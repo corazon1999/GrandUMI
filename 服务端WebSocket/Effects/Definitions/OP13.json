@@ -390,6 +390,10 @@
           {
             "op": "ActiveOwnDon",
             "n": 4
+          },
+          {
+            "op": "NoPlayCharacterOriginalCostGte",
+            "n": 5
           }
         ]
       }

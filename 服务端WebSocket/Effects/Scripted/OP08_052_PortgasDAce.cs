@@ -34,7 +34,7 @@ public class OP08_052_PortgasDAce : IScriptedEffect
 
         bool eligible = top.Info.Kind == CardKind.Character
             && top.Info.Cost <= 4
-            && top.Info.HasKeyword("白胡子海盗团");
+            && top.Info.HasKeywordContaining("白胡子海盗团");
 
         if (eligible)
         {

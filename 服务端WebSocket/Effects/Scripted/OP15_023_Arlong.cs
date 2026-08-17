@@ -93,6 +93,6 @@ public class OP15_023_Arlong : IScriptedEffect
 
         bool ownedByMe = me.Leader.Id == target.Id || me.Characters.Any(c => c.Id == target.Id);
         var holder = ownedByMe ? me : opp;
-        AtomicOps.AttachDonFromCost(holder, target.Id, 1, DonState.Active);
+        AtomicOps.AttachDonFromCost(holder, target.Id, 1, DonState.Rest);
     }
 }

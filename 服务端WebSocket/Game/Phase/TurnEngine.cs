@@ -172,6 +172,7 @@ public static class TurnEngine
         state.EndOfTurnTasks.Clear();
         // 清除回合级玩家状态
         state.NoPlayCharacterThisTurn.Clear();
+        state.NoPlayCharacterOriginalCostGteThisTurn.Clear();
         state.NoEffectLifeToHandThisTurn.Clear();
         state.NoActivateDonByCharacterEffectThisTurn.Clear();
         state.LifeLeftThisTurn.Clear();

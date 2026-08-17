@@ -724,6 +724,7 @@ public static class AtomicOps
     public static async Task PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
     {
         var p = s.Players[playerIdx];
+        if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
         // OP12-036：该能力只限制“手牌中的此卡牌”被效果登场，正常支付费用登场不受影响。
         if (card.Info.Abilities.Contains("无法通过效果登场")) return;
         if (!p.Hand.Remove(card)) return;
@@ -836,6 +837,7 @@ public static class AtomicOps
     public static async Task PlayFromTrashFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
+        if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
         if (!p.Trash.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
@@ -1008,6 +1010,7 @@ public static class AtomicOps
     public static async Task PlayFromDeckFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
+        if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
         if (!p.Deck.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
@@ -1032,6 +1035,7 @@ public static class AtomicOps
     public static async Task PlayFromLifeFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
     {
         var p = s.Players[playerIdx];
+        if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
         if (!p.LifeArea.Remove(card)) return;
         if (card.Info.Kind == CardKind.Character)
         {
@@ -1049,6 +1053,12 @@ public static class AtomicOps
             p.LifeArea.Add(card);
         }
     }
+
+    private static bool IsCharacterPlayRestricted(GameState s, int playerIdx, CardInstance card)
+        => card.Info.Kind == CardKind.Character
+           && (s.NoPlayCharacterThisTurn.Contains(playerIdx)
+               || (s.NoPlayCharacterOriginalCostGteThisTurn.TryGetValue(playerIdx, out int blockedCost)
+                   && card.Info.Cost >= blockedCost));
 
     /// <summary>把手牌中的一张卡置入生命区（toTop=true 顶部，faceUp 指定正反朝向）。</summary>
     public static void HandToLife(PlayerState p, CardInstance card, bool toTop = true, bool faceUp = false)

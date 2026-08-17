@@ -7,12 +7,50 @@
  * 新条目在底部，自动滚动到底。
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useGameStore } from "@/store/gameStore";
+import { getCard } from "@/data/CardLoader";
+import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
+import { CARD_BACK_SRC } from "@/lib/sprite";
+
+const CARD_NUMBER_PATTERN = /(?:OP|ST|EB|PRB|P)\d{0,2}-\d{3}/gi;
+
+function renderLogContent(content: string, onOpenCard: (number: string) => void): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of content.matchAll(CARD_NUMBER_PATTERN)) {
+    const index = match.index ?? 0;
+    if (index > cursor) nodes.push(content.slice(cursor, index));
+    const rawNumber = match[0];
+    const number = rawNumber.toUpperCase();
+    if (getCard(number)) {
+      nodes.push(
+        <button
+          key={`${index}-${number}`}
+          type="button"
+          onClick={() => onOpenCard(number)}
+          className="rounded px-0.5 font-black text-sky-300 underline decoration-sky-400/45 underline-offset-2 hover:bg-sky-400/15 hover:text-sky-100 focus-visible:outline-2 focus-visible:outline-sky-300"
+          aria-label={`查看卡牌 ${number} 大图`}
+          title={`查看 ${number} 大图`}
+        >
+          {rawNumber}
+        </button>,
+      );
+    } else {
+      nodes.push(rawNumber);
+    }
+    cursor = index + rawNumber.length;
+  }
+  if (cursor < content.length) nodes.push(content.slice(cursor));
+  return nodes;
+}
 
 export default function GameLog() {
   const logLines = useGameStore((s) => s.logLines);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [zoomCardNumber, setZoomCardNumber] = useState<string | null>(null);
+  const zoomCard = zoomCardNumber ? getCard(zoomCardNumber) : undefined;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -23,7 +61,8 @@ export default function GameLog() {
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-1">
+    <>
+      <div className="mt-2 flex flex-col gap-1">
       {logLines.map((l) => {
         const isTurnMark = l.text.startsWith("——");
         const categoryMatch = l.text.match(/^\[([^\]]+)]\s*/);
@@ -48,14 +87,26 @@ export default function GameLog() {
                     {category}
                   </span>
                 )}
-                <span className="min-w-0 break-words">{content}</span>
+                <span className="min-w-0 break-words">
+                  {renderLogContent(content, setZoomCardNumber)}
+                </span>
               </>
             )}
           </div>
         );
       })}
       <div ref={bottomRef} />
-    </div>
+      </div>
+      {zoomCard && (
+        <GameOverlayPortal>
+          <CardZoomOverlay
+            card={zoomCard}
+            sprite={zoomCard.sprite ?? CARD_BACK_SRC}
+            onClose={() => setZoomCardNumber(null)}
+          />
+        </GameOverlayPortal>
+      )}
+    </>
   );
 }
 

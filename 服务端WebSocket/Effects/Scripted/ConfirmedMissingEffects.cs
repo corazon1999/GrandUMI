@@ -155,6 +155,9 @@ public sealed class OP12_081_Koala : IScriptedEffect
             || !Guid.TryParse(idValue?.ToString(), out var enteredId)) return;
         var entered = ctx.State.Players[enteredOwner].Characters.FirstOrDefault(card => card.Id == enteredId);
         if (entered is null) return;
+        // 从生命触发登场不是“将角色登场”或“通过角色效果登场”，不能触发克尔拉。
+        if (ctx.Vars.TryGetValue("from", out var from)
+            && string.Equals(from?.ToString(), "life", StringComparison.OrdinalIgnoreCase)) return;
         bool highCost = entered.Info.Cost >= 8;
         bool throughCharacterEffect = ctx.Vars.TryGetValue("effectSourceKind", out var kind)
             && string.Equals(kind?.ToString(), CardKind.Character.ToString(), StringComparison.Ordinal);

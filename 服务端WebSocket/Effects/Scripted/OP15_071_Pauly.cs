@@ -11,9 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 两条均为持续/静态效果，登场时注册 ContinuousEffect，离场时引擎自动清理。
 ///   - 【双重攻击】用 ContinuousEffect.GrantKeyword（Wave1 13.1），谓词选中自身或"欧姆"。
-///   - "原本力量变为 6000"：ContinuousEffect 仅支持固定的 int PowerDelta，无 per-card 力量函数，
-///     无法把基础力量各异的多张"欧姆"统一设为 6000；此处对自身（保利原力量 4000）按
-///     PowerDelta = +2000 在对方回合中近似实现"变为 6000"，多张"欧姆"的精确换算无通道。
+///   - “原本力量变为 6000”使用 OriginalPowerOverride，实时作用于自身及所有“欧姆”。
 /// </summary>
 public class OP15_071_Pauly : IScriptedEffect
 {
@@ -43,13 +41,13 @@ public class OP15_071_Pauly : IScriptedEffect
             Predicate = (s, sideIdx, c) => IsTarget(sideIdx, c),
         });
 
-        // 持续②：【对方的回合中】自身原本力量变为 6000（保利基础 4000，近似为 +2000）
+        // 持续②：【对方的回合中】自身及所有“欧姆”的原本力量变为 6000
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = selfId.ToString(),
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-            PowerDelta = 6000 - self.Info.Power,
-            Predicate = (s, sideIdx, c) => c.Id == selfId && s.CurrentTurnPlayer != owner,
+            OriginalPowerOverride = 6000,
+            Predicate = (s, sideIdx, c) => IsTarget(sideIdx, c) && s.CurrentTurnPlayer != owner,
         });
 
         return Task.CompletedTask;

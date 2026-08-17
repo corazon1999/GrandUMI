@@ -780,6 +780,9 @@ public static class DslInterpreter
                 case "leaderHasKeyword":
                     if (!me.Leader.Info.HasKeyword(p.Value.GetString() ?? "")) return false;
                     break;
+                case "leaderKeywordContains":
+                    if (!me.Leader.Info.HasKeywordContaining(p.Value.GetString() ?? "")) return false;
+                    break;
                 case "leaderNameEquals":
                     if (!me.Leader.Info.NameIs(p.Value.GetString() ?? "")) return false;
                     break;
@@ -1623,6 +1626,10 @@ public static class DslInterpreter
                 // 本回合中我方无法登场角色卡牌（回合结束自动清除）
                 ctx.State.NoPlayCharacterThisTurn.Add(ctx.OwnerIndex);
                 break;
+            case "NoPlayCharacterOriginalCostGte":
+                // 本回合中我方无法登场原本费用不低于 N 的角色卡牌（回合结束自动清除）
+                ctx.State.NoPlayCharacterOriginalCostGteThisTurn[ctx.OwnerIndex] = GetInt(op, "n", 0);
+                break;
             case "SelfToTrash":
                 {
                     // 把自身放置到废弃区（不触发 KO 事件），常用于成本
@@ -1702,6 +1709,10 @@ public static class DslInterpreter
                 {
                     var pred = BuildMatchPredicate(op.TryGetProperty("filter", out var f) ? f : default);
                     var cands = me.Trash.Where(c => c.Info.Kind == CardKind.Character).Where(pred).ToList();
+                    // 发动生命触发的卡在结算前已暂置废弃区，不能被自己的“从废弃区登场”效果选中。
+                    // 真正的自登场由专用 PlaySelf 处理。
+                    if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
+                        cands = cands.Where(c => c.Id != ctx.Source.Id).ToList();
                     if (cands.Count == 0) break;
                     bool rest = op.TryGetProperty("rest", out var rv) && rv.ValueKind == JsonValueKind.True;
                     var text = op.TryGetProperty("text", out var tx) ? tx.GetString() ?? "从废弃区登场最多1张角色" : "从废弃区登场最多1张角色";
@@ -1890,12 +1901,12 @@ public static class DslInterpreter
             {
                 if (!c.Info.Property.Split('/').Contains(prop.GetString() ?? "")) return false;
             }
-            // 明确写了“原本”的过滤永远只看卡面值。fieldUsesCurrentValues 仅用于
-            // 未标明基准的场上筛选，不能让 originalCostLte/originalPowerLte 被费用、贴咚或光环污染。
+            // 明确写了“原本”的费用过滤看卡面值；原本力量还须应用“原本力量变为X”的持续覆盖。
+            // fieldUsesCurrentValues 仅用于未标明基准的场上筛选，不能把贴咚或普通力量修正混入原本力量。
             if (node.TryGetProperty("originalCostLte", out var oc) && c.Info.Cost > oc.GetInt32()) return false;
             if (node.TryGetProperty("originalCostGte", out var oc2) && c.Info.Cost < oc2.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerLte", out var pp) && c.Info.Power > pp.GetInt32()) return false;
-            if (node.TryGetProperty("originalPowerGte", out var pp2) && c.Info.Power < pp2.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerLte", out var pp) && OriginalPowerOfCard(c) > pp.GetInt32()) return false;
+            if (node.TryGetProperty("originalPowerGte", out var pp2) && OriginalPowerOfCard(c) < pp2.GetInt32()) return false;
             // currentPowerLte/Gte: 按"当前力量"判定（卡面「力量X以下」未写"原本的"时的默认口径）。
             // 场上卡走 CurrentPowerOf（含贴咚/回合加成/持续光环），非场上候选回退原本力量。
             if (node.TryGetProperty("currentPowerLte", out var cpl) && CurrentPowerOfCard(c) > cpl.GetInt32()) return false;
@@ -1931,6 +1942,15 @@ public static class DslInterpreter
         if (st is null) return c.Info.Power;
         int side = st.SideOf(c);
         return side >= 0 ? st.CurrentPowerOf(side, c) : c.Info.Power;
+    }
+
+    /// <summary>场上卡按规则计算“原本力量”（含变为X的覆盖）；非场上候选回退卡面值。</summary>
+    static int OriginalPowerOfCard(CardInstance c)
+    {
+        var st = EffectRuntime.CurrentState;
+        if (st is null) return c.Info.Power;
+        int side = st.SideOf(c);
+        return side >= 0 ? st.OriginalPowerOf(side, c) : c.Info.Power;
     }
 
     /// <summary>场上卡按当前费用判定；非场上候选回退卡面原本费用。</summary>

@@ -459,12 +459,12 @@
         "cost": {
           "revealHand": {
             "n": 2,
-            "keyword": "白胡子海盗团"
+            "keywordContains": "白胡子海盗团"
           }
         },
         "costPrompt": "公开2张拥有《白胡子海盗团》特征的手牌：发动此效果？",
         "if": {
-          "leaderHasKeyword": "白胡子海盗团"
+          "leaderKeywordContains": "白胡子海盗团"
         },
         "then": [
           {

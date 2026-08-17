@@ -7,6 +7,7 @@ import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import { getCard } from "@/data/CardLoader";
 import { canPayActivatedMainCost } from "@/lib/activatedMainCost";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 /**
  * 上下文操作按钮区：根据当前阶段/选中状态展示可用动作。
@@ -14,6 +15,8 @@ import { canPayActivatedMainCost } from "@/lib/activatedMainCost";
  */
 export default function GameActions() {
   const [isEndTurnConfirming, setIsEndTurnConfirming] = useState(false);
+  const [pendingAttachDonCount, setPendingAttachDonCount] = useState<number | null>(null);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const currentTurn = useGameStore((s) => s.currentTurn);
   const phase = useGameStore((s) => s.phase);
   const isPending = useGameStore((s) => s.isPending);
@@ -108,10 +111,11 @@ export default function GameActions() {
 
   useEffect(() => {
     setIsEndTurnConfirming(false);
+    setPendingAttachDonCount(null);
   }, [currentTurn, phase, turnCount, selectedHandIndex, selectedFieldId, isSelectingTarget]);
 
   const btn =
-    "w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
+    "min-h-12 w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
 
   const hasAny =
     canAttack || isSelectingTarget || canPlay || canActivate || canPassCounter || currentTurn;
@@ -135,7 +139,16 @@ export default function GameActions() {
   const attachDon = (count: number) => {
     if (!attachTargetId) return;
     GameRequest.attachDon(attachTargetId, count);
+    setPendingAttachDonCount(null);
     setSelectedField(null);
+  };
+
+  const requestAttachDon = (count: number) => {
+    if (rotateQuarterTurn) {
+      setPendingAttachDonCount(count);
+      return;
+    }
+    attachDon(count);
   };
 
   const requestEndTurn = () => {
@@ -195,29 +208,56 @@ export default function GameActions() {
             <span className="text-amber-100">贴咚</span>
             <span className="text-amber-300/80">可用 {my?.costActive ?? 0}</span>
           </div>
-          <div className="grid grid-cols-5 gap-1">
-            {attachDonCounts.map((count) => (
-              <button
-                key={count}
-                type="button"
-                onClick={() => attachDon(count)}
-                disabled={isPending}
-                title={`赋予 ${count} 张咚!!`}
-                className="rounded bg-amber-500/85 py-1 text-xs font-black text-black shadow transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300"
-              >
-                {count}
-              </button>
-            ))}
-          </div>
-          {attachDonCounts.length > 1 && (
-            <button
-              type="button"
-              onClick={() => attachDon(attachDonCounts.length)}
-              disabled={isPending}
-              className="mt-1.5 w-full rounded bg-amber-700/80 py-1 text-[11px] font-black text-amber-50 shadow transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-600"
-            >
-              全部（{attachDonCounts.length}）
-            </button>
+          {pendingAttachDonCount !== null ? (
+            <div className="rounded border border-amber-300/35 bg-black/25 p-1.5" role="group" aria-label="确认赋予咚">
+              <p className="mb-1.5 text-center text-xs font-bold text-amber-50">
+                确认赋予 {pendingAttachDonCount} 张咚!!？
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingAttachDonCount(null)}
+                  className="min-h-12 rounded bg-slate-700 px-2 text-xs font-bold text-white hover:bg-slate-600"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => attachDon(pendingAttachDonCount)}
+                  disabled={isPending}
+                  className="min-h-12 rounded bg-amber-400 px-2 text-xs font-black text-black hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-gray-600"
+                >
+                  确认贴咚
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-5 gap-1">
+                {attachDonCounts.map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => requestAttachDon(count)}
+                    disabled={isPending}
+                    title={`赋予 ${count} 张咚!!`}
+                    className={`rounded bg-amber-500/85 text-xs font-black text-black shadow transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300 ${rotateQuarterTurn ? "min-h-12" : "py-1"}`}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+              {attachDonCounts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => requestAttachDon(attachDonCounts.length)}
+                  disabled={isPending}
+                  className={`mt-1.5 w-full rounded bg-amber-700/80 text-[11px] font-black text-amber-50 shadow transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-600 ${rotateQuarterTurn ? "min-h-12" : "py-1"}`}
+                >
+                  全部（{attachDonCounts.length}）
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -251,7 +291,7 @@ export default function GameActions() {
                   type="button"
                   onClick={() => setIsEndTurnConfirming(false)}
                   disabled={isPending}
-                  className="rounded-md bg-slate-700 px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-gray-600"
+                  className="min-h-12 rounded-md bg-slate-700 px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-gray-600"
                 >
                   取消
                 </button>
@@ -259,7 +299,7 @@ export default function GameActions() {
                   type="button"
                   onClick={confirmEndTurn}
                   disabled={isPending}
-                  className="rounded-md bg-rose-600 px-2 py-2 text-xs font-bold text-white shadow transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+                  className="min-h-12 rounded-md bg-rose-600 px-2 py-2 text-xs font-bold text-white shadow transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-gray-600"
                 >
                   确认结束
                 </button>

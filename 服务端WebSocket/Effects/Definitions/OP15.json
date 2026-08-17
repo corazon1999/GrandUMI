@@ -45,10 +45,17 @@
             "op": "Choose",
             "prompt": "OwnHandCharacter",
             "max": 1,
+            "min": 0,
+            "filter": {
+              "originalCostLte": 5
+            },
             "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
           }
-        ],
-        "_doc": "需 PlayFromHand 原子（filter cost ≤5）"
+        ]
       }
     ]
   },

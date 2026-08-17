@@ -166,6 +166,9 @@ public class GameState
     /// <summary>本回合无法登场角色卡牌的玩家集合（OP14-020）</summary>
     public HashSet<int> NoPlayCharacterThisTurn { get; } = new();
 
+    /// <summary>本回合禁止登场“原本费用不低于阈值”的角色；键为玩家索引（OP13-118）。</summary>
+    public Dictionary<int, int> NoPlayCharacterOriginalCostGteThisTurn { get; } = new();
+
     /// <summary>本回合无法通过"我方的效果"将生命卡牌加入手牌的玩家集合（ST15-001）</summary>
     public HashSet<int> NoEffectLifeToHandThisTurn { get; } = new();
 
@@ -269,6 +272,13 @@ public class GameState
         return value;
     }
 
+    /// <summary>统一计算规则意义上的“原本力量”，包含卡实例及持续效果的“变为X”覆盖。</summary>
+    public int OriginalPowerOf(int sideIdx, CardInstance card)
+        => ContinuousOriginalPowerOverride(sideIdx, card)
+           ?? card.OriginalPowerOverride
+           ?? card.OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
+           ?? card.Info.Power;
+
     /// <summary>统一计算某张卡当前力量：基础 + 咚 + 临时修正 + 永续修正</summary>
     public int CurrentPowerOf(int sideIdx, CardInstance card)
     {
@@ -276,12 +286,10 @@ public class GameState
         int donCount = p.AttachedDonCount(card.Id);
         bool ownerTurn = CurrentTurnPlayer == sideIdx;
         int basePower = card.CurrentPower(donCount, ownerTurn);
-        int currentOriginalPower = card.OriginalPowerOverride
+        int instanceOriginalPower = card.OriginalPowerOverride
             ?? card.OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
             ?? card.Info.Power;
-        int? continuousOriginalPower = ContinuousOriginalPowerOverride(sideIdx, card);
-        if (continuousOriginalPower.HasValue)
-            basePower += continuousOriginalPower.Value - currentOriginalPower;
+        basePower += OriginalPowerOf(sideIdx, card) - instanceOriginalPower;
         return basePower + ContinuousPowerBonus(sideIdx, card);
     }
 

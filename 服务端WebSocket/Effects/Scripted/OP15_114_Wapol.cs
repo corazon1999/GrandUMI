@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -44,8 +45,20 @@ public class OP15_114_Wapol : IScriptedEffect
             var toKO = opp.Characters
                 .Where(c => ctx.State.CurrentPowerOf(1 - ctx.OwnerIndex, c) <= 0)
                 .ToList();
-            foreach (var c in toKO)
-                AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, c);
+            var oldReason = ctx.State.KOReason;
+            int oldActingSide = ctx.State.KOActingSide;
+            ctx.State.KOReason = "effect";
+            ctx.State.KOActingSide = ctx.OwnerIndex;
+            try
+            {
+                await BattleEngine.KOCardsSimultaneouslyAsync(
+                    ctx.State, 1 - ctx.OwnerIndex, toKO, ctx.Prompts);
+            }
+            finally
+            {
+                ctx.State.KOReason = oldReason;
+                ctx.State.KOActingSide = oldActingSide;
+            }
             return;
         }
 

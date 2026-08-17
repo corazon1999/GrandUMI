@@ -147,7 +147,7 @@
   },
   "EB03-014": {
     "_name": "古伊娜",
-    "_matcher": "横置自身为成本，领袖含属性(斩)时为领袖补2张休息状态咚，用 RefreshDon rest 表达。",
+    "_matcher": "横置自身为成本，领袖含属性(斩)时为领袖赋予最多2张休息状态咚。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
@@ -158,9 +158,10 @@
       },
       "then": [
         {
-          "op": "RefreshDon",
+          "op": "AttachDon",
+          "target": "selfLeader",
           "n": 2,
-          "state": "rest"
+          "from": "rest"
         }
       ]
     }

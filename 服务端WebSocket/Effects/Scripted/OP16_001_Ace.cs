@@ -24,7 +24,7 @@ public class OP16_001_Ace : IScriptedEffect
         // 否则伊佐(基础7000)贴1咚后实际8000会被 7000<8000 误过滤（反馈#191）。
         var candidates = pool.Where(c =>
             ctx.State.CurrentPowerOf(ctx.OwnerIndex, c) >= 8000 &&
-            (c.MatchesName("蒙奇·D·路飞") || c.Info.HasKeyword("白胡子海盗团"))
+            (c.MatchesName("蒙奇·D·路飞") || c.Info.HasKeywordContaining("白胡子海盗团"))
         ).ToList();
         if (candidates.Count == 0) return;
 

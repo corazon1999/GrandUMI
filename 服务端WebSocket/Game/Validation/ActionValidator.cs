@@ -31,6 +31,10 @@ public static class ActionValidator
         if (card.Kind == CardKind.Leader)     return Fail("领航不能从手牌出");
         if (card.Kind == CardKind.Character && s.NoPlayCharacterThisTurn.Contains(playerIdx))
             return Fail("本回合无法登场角色卡牌");
+        if (card.Kind == CardKind.Character
+            && s.NoPlayCharacterOriginalCostGteThisTurn.TryGetValue(playerIdx, out int blockedCost)
+            && card.Cost >= blockedCost)
+            return Fail($"本回合无法登场原本费用不低于{blockedCost}的角色卡牌");
         int effCost = s.HandPlayCost(playerIdx, p.Hand[handIndex]);
         if (p.ActiveDonCount < effCost)       return Fail($"费用不足，需要 {effCost}");
         // 角色区满员（≥5）不再拒绝：登场时由玩家选择 1 张己方角色废弃后再登场
