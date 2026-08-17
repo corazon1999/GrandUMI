@@ -422,7 +422,7 @@
     "number": "EB01-020",
     "name": "混乱空间",
     "color": "绿",
-    "type": "角色",
+    "type": "事件",
     "property": "-",
     "power": "-",
     "cost": "1",
