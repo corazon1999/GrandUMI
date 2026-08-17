@@ -1007,6 +1007,8 @@ export interface ReplayHandFrameSnapshot {
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
+  /** 本局锁定的卡牌效果规则版本；断线恢复和回放期间保持不变。 */
+  rulesetId?: string;
   tick: number;
   my: PlayerSnapshot;
   opponent: PlayerSnapshot;
@@ -1214,6 +1216,39 @@ export interface MsgPlayerReconnected extends MsgBase {
   proto: "MsgPlayerReconnected";
 }
 
+/** 旧规则对局结束后通知玩家：后续对局已切换至新版卡效。 */
+export interface MsgRulesetUpdated extends MsgBase {
+  proto: "MsgRulesetUpdated";
+  previousRulesetId: string;
+  currentRulesetId: string;
+  description?: string;
+  changedCards?: string[];
+  logStr?: string;
+}
+
+export interface CardRulesetSummary {
+  id: string;
+  baseRulesetId?: string | null;
+  description?: string;
+  changedCards: string[];
+  active: boolean;
+}
+
+/** 管理员查询/激活卡效规则后的状态。 */
+export interface MsgRulesetState extends MsgBase {
+  proto: "MsgRulesetState";
+  activeRulesetId?: string;
+  availableRulesets?: CardRulesetSummary[];
+  activeRoomCounts?: Record<string, number>;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface MsgActivateRuleset extends MsgBase {
+  proto: "MsgActivateRuleset";
+  rulesetId: string;
+}
+
 // ── 联合类型（用于分发时的类型收窄）──────────────────────────────────────
 export type AnyMsg =
   | MsgSecret
@@ -1271,6 +1306,8 @@ export type AnyMsg =
   | MsgRequestState
   | MsgPlayerDisconnected
   | MsgPlayerReconnected
+  | MsgRulesetUpdated
+  | MsgRulesetState
   | MsgBugReport
   | MsgChatMsg
   | MsgGlobalAnnouncement

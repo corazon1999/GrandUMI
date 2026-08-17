@@ -113,6 +113,7 @@ public static class StateSnapshotBuilder
         {
             proto = "MsgGameState",
             tick = state.Tick,
+            rulesetId = state.RulesetId,
             phase = PhaseLabels.Of(state.Phase),
             currentTurn = !isSpectator && state.CurrentTurnPlayer == myIdx,
             turnCount = state.TurnCount,
@@ -236,7 +237,7 @@ public static class StateSnapshotBuilder
             canAttack = CanInitiateAttack(state, idx, c.Id),
             cannotAttack = HasCannotAttackStatus(state, c),
             activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
-            oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(p, c),
+            oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(state, p, c),
         }).ToArray();
 
         return new PlayerBoardComputed(
@@ -248,7 +249,7 @@ public static class StateSnapshotBuilder
             p.StageCard?.Id.ToString(),
             p.StageCard?.IsTapped ?? false,
             p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
-            p.StageCard is not null && OncePerTurnEffectAvailable(p, p.StageCard),
+            p.StageCard is not null && OncePerTurnEffectAvailable(state, p, p.StageCard),
             p.Trash.Select(c => c.Info.Number).ToArray(),
             p.DeckCount,
             p.LifeCount,
@@ -267,7 +268,7 @@ public static class StateSnapshotBuilder
             HasCannotAttackStatus(state, p.Leader),
             state.IsTriggerNullified(p.Leader, Effects.EffectTrigger.OnEnterField),
             ActivatedUsedThisTurn(p, p.Leader),
-            OncePerTurnEffectAvailable(p, p.Leader),
+            OncePerTurnEffectAvailable(state, p, p.Leader),
             p.ActiveDonCount,
             p.RestDonCount,
             p.CostArea.Count(d => d.State == DonState.Attached),
@@ -380,8 +381,8 @@ public static class StateSnapshotBuilder
         => p.TurnOnceUsed.Contains($"{c.Id}-Activated")
            || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
 
-    private static bool OncePerTurnEffectAvailable(PlayerState p, CardInstance c)
-        => Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number)
+    private static bool OncePerTurnEffectAvailable(GameState state, PlayerState p, CardInstance c)
+        => Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number, state)
            && !p.OncePerTurnEffectUsedCardIds.Contains(c.Id);
 
     /// <summary>

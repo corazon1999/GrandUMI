@@ -1,4 +1,6 @@
+using System.Reflection;
 using GrandUMI.Cards;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Effects.Scripted;
 using GrandUMI.Game;
 
@@ -215,11 +217,11 @@ public static class EffectRuntime
                 ctx.Engine?.QueueEffectActivation(ownerIdx, source, trigger);
 
             // 1. 优先用手写脚本
-            var scripted = ScriptedEffectRegistry.TryGet(source.Info.Number);
+            var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(source.Info.Number);
             if (scripted is not null && scripted.HandlesTrigger(trigger))
             {
                 await scripted.Resolve(ctx);
-                MarkOncePerTurnCardUsedIfConsumed(owner, source, turnOnceCountBefore);
+                MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
                 return;
             }
 
@@ -232,7 +234,7 @@ public static class EffectRuntime
 
             // 4. 后置补齐层：依赖 DSL 刚选中的同一目标，补结算条件加成、关键字或后续动作。
             await DeclaredOmissionEffects.AfterDsl(ctx);
-            MarkOncePerTurnCardUsedIfConsumed(owner, source, turnOnceCountBefore);
+            MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
         }
         catch (OptionalEffectDeclinedException)
         {
@@ -266,9 +268,9 @@ public static class EffectRuntime
         }
     }
 
-    private static void MarkOncePerTurnCardUsedIfConsumed(PlayerState owner, CardInstance source, int turnOnceCountBefore)
+    private static void MarkOncePerTurnCardUsedIfConsumed(GameState s, PlayerState owner, CardInstance source, int turnOnceCountBefore)
     {
-        if (owner.TurnOnceUsed.Count > turnOnceCountBefore && OncePerTurnEffectCatalog.Contains(source.Info.Number))
+        if (owner.TurnOnceUsed.Count > turnOnceCountBefore && OncePerTurnEffectCatalog.Contains(source.Info.Number, s))
             owner.OncePerTurnEffectUsedCardIds.Add(source.Id);
     }
 
@@ -498,46 +500,56 @@ public static class OncePerTurnEffectCatalog
         "ST31-001", "ST36-005",
     };
 
-    public static bool Contains(string cardNumber)
-        => ScriptedCards.Contains(cardNumber) || Dsl.DslInterpreter.HasOncePerTurnEffect(cardNumber);
+    public static bool Contains(string cardNumber, GameState? state = null)
+        => ScriptedCards.Contains(cardNumber)
+           || (state is null
+               ? Dsl.DslInterpreter.HasOncePerTurnEffect(cardNumber)
+               : CardRulesetManager.For(state).HasOncePerTurnEffect(cardNumber));
 }
 
 public static class ScriptedEffectRegistry
 {
-    private static readonly Dictionary<string, IScriptedEffect> _byNumber = new();
-    private static readonly object _scanLock = new();
-    private static volatile bool _scanned;
+    private static readonly Dictionary<string, IScriptedEffect> LegacyOverrides = new(StringComparer.OrdinalIgnoreCase);
 
     public static IScriptedEffect? TryGet(string number)
-    {
-        if (!_scanned) ScanAll();
-        return _byNumber.TryGetValue(number, out var e) ? e : null;
-    }
+        => LegacyOverrides.TryGetValue(number, out var legacy)
+            ? legacy
+            : CardRulesetManager.Current.TryGetScriptedEffect(number);
 
-    public static void Register(IScriptedEffect effect) => _byNumber[effect.CardNumber] = effect;
+    /// <summary>仅保留给旧测试/调试代码；线上规则热更新必须通过不可变规则包激活。</summary>
+    public static void Register(IScriptedEffect effect) => LegacyOverrides[effect.CardNumber] = effect;
 
-    private static void ScanAll()
+    internal static IReadOnlyDictionary<string, IScriptedEffect> ScanAssembly(
+        Assembly assembly,
+        bool rejectDuplicates = false)
     {
-        // 必须加锁且 _scanned 置位放在填充之后：否则并发下另一线程见 _scanned==true 即跳过扫描，
-        // 但此时 _byNumber 尚未填充完，TryGet 返回 null → 脚本卡效果被漏判（如领袖永续被动不注册）。
-        lock (_scanLock)
+        var effects = new Dictionary<string, IScriptedEffect>(StringComparer.OrdinalIgnoreCase);
+        Type[] types;
+        try
         {
-            if (_scanned) return;
-            // 反射扫描当前程序集中所有 IScriptedEffect 实现
-            var asm = typeof(ScriptedEffectRegistry).Assembly;
-            foreach (var t in asm.GetTypes())
-            {
-                if (t.IsAbstract || t.IsInterface) continue;
-                if (!typeof(IScriptedEffect).IsAssignableFrom(t)) continue;
-                try
-                {
-                    var inst = (IScriptedEffect)Activator.CreateInstance(t)!;
-                    _byNumber[inst.CardNumber] = inst;
-                }
-                catch { /* 跳过构造失败的 */ }
-            }
-            Console.WriteLine($"[Effects] 已注册 {_byNumber.Count} 张手写卡效果");
-            _scanned = true;
+            types = assembly.GetTypes();
         }
+        catch (ReflectionTypeLoadException ex)
+        {
+            types = ex.Types.Where(type => type is not null).Cast<Type>().ToArray();
+        }
+
+        foreach (var type in types)
+        {
+            if (type.IsAbstract || type.IsInterface || !typeof(IScriptedEffect).IsAssignableFrom(type)) continue;
+            try
+            {
+                var instance = (IScriptedEffect)Activator.CreateInstance(type)!;
+                if (rejectDuplicates && effects.ContainsKey(instance.CardNumber))
+                    throw new InvalidOperationException($"程序集 {assembly.GetName().Name} 重复注册卡效 {instance.CardNumber}");
+                // 内置程序集沿用旧注册器的兼容行为：同一卡号后扫描到的实现覆盖前者。
+                effects[instance.CardNumber] = instance;
+            }
+            catch (MissingMethodException)
+            {
+                // 没有无参构造函数的类型不是可加载的卡效插件。
+            }
+        }
+        return effects;
     }
 }

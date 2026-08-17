@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using GrandUMI.Cluster;
 using GrandUMI.Diagnostics;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Stats;
@@ -34,6 +35,10 @@ public static class GameRoomManager
     public static int RoomCount => _rooms.Count;
     public static int SpectatorCount => _rooms.Values.Sum(room => room.Spectators.Count);
     public static int TotalActionQueueDepth => _rooms.Values.Sum(room => Math.Max(0, Volatile.Read(ref room.ActionQueueDepth)));
+    public static IReadOnlyDictionary<string, int> RoomCountsByRuleset
+        => _rooms.Values
+            .GroupBy(room => room.Engine.State.RulesetId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
 
     public static MaintenanceSnapshot GetMaintenanceSnapshot()
         => Maintenance.GetSnapshot(RoomCount);
@@ -234,7 +239,7 @@ public static class GameRoomManager
             rngSeed = engine.State.RngSeed,
             openingSetupAfterFirstPlayerChoice,
             matchKind = matchKind.ToString(),
-            rulesVersion = "opcg-grandumi-v1",
+            rulesVersion = engine.State.RulesetId,
             cardDbVersion = "local-card-json",
         });
         engine.FlushPendingMatchLogs();
@@ -248,6 +253,7 @@ public static class GameRoomManager
                 roomId,
                 seed = engine.State.RngSeed,
                 firstPlayer,
+                rulesetId = engine.State.RulesetId,
                 openingSetupAfterFirstPlayerChoice,
                 p0 = new { account = p0Account, displayName = entry.PlayerDisplayNames[0], deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
                 p1 = new { account = p1Account, displayName = entry.PlayerDisplayNames[1], deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
@@ -1414,7 +1420,10 @@ public static class GameRoomManager
                 turnCount = r.Engine.State.TurnCount,
                 finalTick = r.Engine.State.Tick,
                 matchKind = r.MatchKind.ToString(),
+                rulesetId = r.Engine.State.RulesetId,
             });
+
+            NotifyRulesetUpdateAfterMatch(r);
 
             TryRecordLeaderStats(r.RoomId, r.MatchKind, r.PlayerAccounts, r.Engine.State);
             // 文件命令在各自单写 Channel 内仍然严格保序，但不让数百个房间清理线程
@@ -1487,6 +1496,24 @@ public static class GameRoomManager
             Console.Error.WriteLine($"[排位] 对局 {room.RoomId} 结算失败：{ex.Message}");
             foreach (var sessionId in room.PlayerSessionIds)
                 WebSocketBridge.Send(sessionId, new { proto = "MsgRankResult", error = "排位结算暂时失败，服务端将保留对局记录" });
+        }
+    }
+
+    private static void NotifyRulesetUpdateAfterMatch(RoomEntry room)
+    {
+        var notice = CardRulesetManager.BuildUpdateNotice(room.Engine.State.RulesetId);
+        if (notice is null) return;
+        foreach (var sessionId in room.PlayerSessionIds)
+        {
+            WebSocketBridge.Send(sessionId, new
+            {
+                proto = "MsgRulesetUpdated",
+                previousRulesetId = notice.PreviousRulesetId,
+                currentRulesetId = notice.CurrentRulesetId,
+                description = notice.Description,
+                changedCards = notice.ChangedCards,
+                logStr = "卡牌效果已更新，将从下一局开始生效",
+            });
         }
     }
 
@@ -1590,6 +1617,10 @@ public static class GameRoomManager
         var roomId      = h.GetProperty("roomId").GetString()!;
         var seed        = h.GetProperty("seed").GetInt32();
         var firstPlayer = h.GetProperty("firstPlayer").GetInt32();
+        var rulesetId = h.TryGetProperty("rulesetId", out var storedRulesetId)
+            ? storedRulesetId.GetString() ?? CardRulesetManager.BuiltIn.Id
+            : CardRulesetManager.BuiltIn.Id;
+        var ruleset = CardRulesetManager.GetRequired(rulesetId);
         var vsBot       = h.TryGetProperty("vsBot", out var vb) && vb.GetBoolean();
         var matchKind = MatchKind.UnknownHuman;
         if (h.TryGetProperty("matchKind", out var mk)
@@ -1683,7 +1714,8 @@ public static class GameRoomManager
             leaderKeywordWildcard: false,
             p0AlwaysPrompt: p0Always,
             p1AlwaysPrompt: p1Always,
-            openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice);
+            openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
+            ruleset: ruleset);
         if (!engine.State.StartingPlayerChosen)
             engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;

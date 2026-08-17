@@ -1,3 +1,5 @@
+using GrandUMI.Effects.Rules;
+
 namespace GrandUMI.Game;
 
 /// <summary>开局决定先后手时的一轮双方六面骰结果。</summary>
@@ -9,6 +11,12 @@ public sealed record StartingDiceRound(int Player0, int Player1);
 public class GameState
 {
     public required string RoomId { get; init; }
+
+    /// <summary>本局创建时锁定的卡效规则版本；整局以及重启重放期间都不得改变。</summary>
+    public string RulesetId { get; internal set; } = "unassigned";
+
+    /// <summary>规则集运行时句柄不进入状态序列化，恢复时按 RulesetId 重新绑定。</summary>
+    internal CardRuleset? Ruleset { get; set; }
 
     /// <summary>Per-match RNG seed used for deterministic replay.</summary>
     public required int RngSeed { get; init; }

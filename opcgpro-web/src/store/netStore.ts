@@ -17,6 +17,7 @@ import type {
   RankLeaderboardItem,
   RankPlayerSettlement,
   SpectateMode,
+  CardRulesetSummary,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -40,6 +41,12 @@ export type MaintenanceState = {
   activeRoomCount: number;
   startedAt: number | null;
   canManage: boolean;
+};
+
+export type RulesetAdminState = {
+  activeRulesetId: string;
+  availableRulesets: CardRulesetSummary[];
+  activeRoomCounts: Record<string, number>;
 };
 
 export interface ChatMessage {
@@ -92,6 +99,7 @@ interface NetStore {
   // 在线人数（服务器广播的已登录人数）
   onlineCount: number;
   maintenance: MaintenanceState;
+  rulesets: RulesetAdminState;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
   friends: FriendInfo[];
@@ -149,6 +157,7 @@ interface NetStore {
   setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
   setMaintenance: (maintenance: MaintenanceState) => void;
+  setRulesets: (rulesets: RulesetAdminState) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
@@ -204,6 +213,7 @@ const initialState = {
   roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
   maintenance: { enabled: false, activeRoomCount: 0, startedAt: null, canManage: false },
+  rulesets: { activeRulesetId: "", availableRulesets: [], activeRoomCounts: {} } as RulesetAdminState,
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
   incomingFriendRequests: [] as FriendRequestInfo[],
@@ -281,6 +291,7 @@ export const useNetStore = create<NetStore>((set) => ({
 
   setOnlineCount: (n) => set({ onlineCount: n }),
   setMaintenance: (maintenance) => set({ maintenance }),
+  setRulesets: (rulesets) => set({ rulesets }),
 
   setPlayerList: (list) => set({ playerList: list }),
 

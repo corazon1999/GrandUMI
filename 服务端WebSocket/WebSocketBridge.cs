@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Game;
 using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
@@ -35,6 +36,7 @@ public static class WebSocketBridge
     {
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
+        "MsgRulesetState", "MsgRulesetUpdated",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
@@ -290,6 +292,8 @@ public static class WebSocketBridge
             case "MsgGlobalAnnouncement": OnGlobalAnnouncement(session, msg); break;
             case "MsgMaintenanceState": OnMaintenanceState(session); break;
             case "MsgSetMaintenance": OnSetMaintenance(session, msg); break;
+            case "MsgRulesetState": OnRulesetState(session); break;
+            case "MsgActivateRuleset": OnActivateRuleset(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -2964,6 +2968,99 @@ public static class WebSocketBridge
     {
         foreach (var session in Sessions.Values)
             if (session.IsLoggedIn) SendMaintenanceState(session);
+    }
+
+    private static void OnRulesetState(WsSession s)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "没有管理卡效规则的权限" });
+            return;
+        }
+
+        try
+        {
+            CardRulesetManager.RefreshPackages();
+            SendRulesetState(s);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"刷新卡效规则包失败: {ex.Message}");
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = $"刷新规则包失败：{ex.Message}" });
+        }
+    }
+
+    private static void OnActivateRuleset(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(s.Account))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "没有管理卡效规则的权限" });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("ruleset-activation", capacity: 2, refillPerSecond: 0.1))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "规则切换过于频繁，请稍后再试" });
+            return;
+        }
+
+        var rulesetId = Str(msg, "rulesetId")?.Trim();
+        if (string.IsNullOrWhiteSpace(rulesetId))
+        {
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = "缺少规则版本 ID" });
+            return;
+        }
+
+        try
+        {
+            CardRulesetManager.RefreshPackages();
+            var activated = CardRulesetManager.Activate(rulesetId);
+            var oldRoomCount = GameRoomManager.RoomCountsByRuleset.TryGetValue(activated.PreviousRulesetId, out var count)
+                ? count
+                : 0;
+            SendRulesetState(
+                s,
+                result: true,
+                logStr: $"已激活 {activated.CurrentRulesetId}；{oldRoomCount} 场进行中的旧版对局不受影响，新对局立即使用新版");
+            BroadcastRulesetStateExcept(s.SessionId);
+            Log($"规则集 {activated.PreviousRulesetId} -> {activated.CurrentRulesetId}：{s.Account}");
+        }
+        catch (Exception ex)
+        {
+            LogErr($"激活卡效规则失败: {ex.Message}");
+            Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = $"激活规则失败：{ex.Message}" });
+        }
+    }
+
+    private static void SendRulesetState(WsSession session, bool? result = null, string? logStr = null)
+    {
+        Send(session.SessionId, new
+        {
+            proto = "MsgRulesetState",
+            activeRulesetId = CardRulesetManager.Current.Id,
+            availableRulesets = CardRulesetManager.Snapshot(),
+            activeRoomCounts = GameRoomManager.RoomCountsByRuleset,
+            result,
+            logStr,
+        });
+    }
+
+    private static void BroadcastRulesetStateExcept(string excludedSessionId)
+    {
+        foreach (var session in Sessions.Values)
+            if (session.SessionId != excludedSessionId
+                && session.IsLoggedIn
+                && GlobalAnnouncementPolicy.IsAuthorized(session.Account))
+                SendRulesetState(session);
     }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。

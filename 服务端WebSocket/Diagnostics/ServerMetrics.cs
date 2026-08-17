@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using GrandUMI.Game;
 using GrandUMI.Game.Logging;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Persistence;
 
 namespace GrandUMI.Diagnostics;
@@ -37,6 +38,17 @@ public static class ServerMetrics
         Gauge(output, "grandumi_capacity_max_rooms", ServerCapacity.MaxRooms);
         Gauge(output, "grandumi_ready", WebSocketBridge.IsReady ? 1 : 0);
         Gauge(output, "grandumi_overloaded", ServerCapacity.IsOverloaded(out _) ? 1 : 0);
+        output.AppendLine("# TYPE grandumi_ruleset_info gauge")
+            .Append("grandumi_ruleset_info{ruleset=\"")
+            .Append(EscapeLabel(CardRulesetManager.Current.Id))
+            .AppendLine("\"} 1");
+        output.AppendLine("# TYPE grandumi_ruleset_rooms gauge");
+        foreach (var pair in GameRoomManager.RoomCountsByRuleset.OrderBy(item => item.Key, StringComparer.Ordinal))
+            output.Append("grandumi_ruleset_rooms{ruleset=\"")
+                .Append(EscapeLabel(pair.Key))
+                .Append("\"} ")
+                .Append(pair.Value.ToString(CultureInfo.InvariantCulture))
+                .AppendLine();
         return output.ToString();
     }
 
@@ -47,4 +59,9 @@ public static class ServerMetrics
     private static void Counter(StringBuilder output, string name, double value)
         => output.Append("# TYPE ").Append(name).AppendLine(" counter")
             .Append(name).Append(' ').Append(value.ToString("G17", CultureInfo.InvariantCulture)).AppendLine();
+
+    private static string EscapeLabel(string value)
+        => value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
 }

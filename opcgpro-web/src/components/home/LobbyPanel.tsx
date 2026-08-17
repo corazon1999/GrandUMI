@@ -9,6 +9,7 @@ import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import RankTierBadge from "@/components/ui/RankTierBadge";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
+import RulesetControlPanel from "./RulesetControlPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { formatRankBounty } from "@/lib/rankBounty";
 import type { RankFaction } from "@/types/net";
@@ -539,6 +540,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
               </div>
             </section>
           )}
+
+          {maintenance.canManage && <RulesetControlPanel />}
 
           <aside
             aria-label="平台声明"

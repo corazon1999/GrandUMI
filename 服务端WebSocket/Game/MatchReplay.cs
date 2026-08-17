@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GrandUMI.Effects.Rules;
 
 namespace GrandUMI.Game;
 
@@ -40,7 +41,8 @@ public static class MatchReplay
         bool leaderKeywordWildcard = false,
         bool p0AlwaysPrompt = false,
         bool p1AlwaysPrompt = false,
-        bool openingSetupAfterFirstPlayerChoice = false)
+        bool openingSetupAfterFirstPlayerChoice = false,
+        CardRuleset? ruleset = null)
     {
         var engine = new GameEngine(
             roomId,
@@ -49,7 +51,8 @@ public static class MatchReplay
             firstPlayer: firstPlayer,
             rngSeed: seed,
             leaderKeywordWildcard: leaderKeywordWildcard,
-            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice);
+            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
+            ruleset: ruleset);
 
         // 必须在喂入动作之前恢复"防触发信息泄露"开关：它决定生命揭示是否暂停发 prompt，
         // 进而决定动作磁带里有没有对应的 PromptResponse —— 不还原会导致重放分歧。

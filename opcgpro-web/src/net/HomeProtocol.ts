@@ -81,6 +81,8 @@ import type {
   MsgLeaveSpectate,
   MsgUpdateSpectateSettings,
   SpectateMode,
+  MsgRulesetState,
+  MsgActivateRuleset,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
 import { useNetStore } from "@/store/netStore";
@@ -228,6 +230,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgMaintenanceState":
         handleMaintenanceState(msg as MsgMaintenanceState);
+        break;
+      case "MsgRulesetState":
+        handleRulesetState(msg as MsgRulesetState);
         break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
@@ -691,6 +696,18 @@ function handleMaintenanceState(msg: MsgMaintenanceState) {
   if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
 }
 
+function handleRulesetState(msg: MsgRulesetState) {
+  const store = useNetStore.getState();
+  if (msg.activeRulesetId && Array.isArray(msg.availableRulesets)) {
+    store.setRulesets({
+      activeRulesetId: msg.activeRulesetId,
+      availableRulesets: msg.availableRulesets,
+      activeRoomCounts: msg.activeRoomCounts ?? {},
+    });
+  }
+  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
+}
+
 /**
  * MsgOnlineCount — 在线人数广播
  * 服务器在有人登录/断开时推送，更新角落徽标
@@ -1119,6 +1136,14 @@ export const HomeRequest = {
 
   setMaintenance(enabled: boolean) {
     return NetManager.send({ proto: "MsgSetMaintenance", enabled } as MsgSetMaintenance);
+  },
+
+  requestRulesetState() {
+    return NetManager.send({ proto: "MsgRulesetState" } as MsgRulesetState);
+  },
+
+  activateRuleset(rulesetId: string) {
+    return NetManager.send({ proto: "MsgActivateRuleset", rulesetId } as MsgActivateRuleset);
   },
 
   requestPlayerList(offset = 0, limit = 200) {

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrandUMI.Cards;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Validation;
@@ -25,15 +26,14 @@ namespace GrandUMI.Effects.Dsl;
 /// </summary>
 public static class DslInterpreter
 {
-    private static Dictionary<string, JsonElement> _defs = new();
-    private static bool _loaded;
-    private static readonly object _loadLock = new();
+    private static readonly object BuiltInLoadGate = new();
+    private static bool _builtInLoaded;
 
     /// <summary>该卡的有效 DSL 定义中是否包含【每回合1次】效果。</summary>
     public static bool HasOncePerTurnEffect(string cardNumber)
-        => _defs.TryGetValue(cardNumber, out var def) && ContainsOncePerTurn(def);
+        => CardRulesetManager.Current.HasOncePerTurnEffect(cardNumber);
 
-    private static bool ContainsOncePerTurn(JsonElement element)
+    internal static bool ContainsOncePerTurnDefinition(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -41,48 +41,57 @@ public static class DslInterpreter
             {
                 if (property.NameEquals("oncePerTurn") && property.Value.ValueKind == JsonValueKind.True)
                     return true;
-                if (ContainsOncePerTurn(property.Value)) return true;
+                if (ContainsOncePerTurnDefinition(property.Value)) return true;
             }
         }
         else if (element.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in element.EnumerateArray())
-                if (ContainsOncePerTurn(item)) return true;
+                if (ContainsOncePerTurnDefinition(item)) return true;
         }
         return false;
     }
 
-    public static void Load(string path)
+    public static void Load(string path, string rulesetId = "builtin-test")
     {
-        LoadFile(path);
-        _loaded = true;
-    }
-
-    /// <summary>批量加载某个目录下所有 *.json。幂等且线程安全：首次加载后重复调用直接返回。</summary>
-    public static void LoadDirectory(string dir)
-    {
-        if (_loaded) return;
-        lock (_loadLock)
+        lock (BuiltInLoadGate)
         {
-            if (_loaded) return;
-            LoadDirectoryCore(dir);
-            _loaded = true;
+            if (_builtInLoaded) return;
+            var definitions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            LoadFile(path, definitions);
+            if (definitions.Count == 0)
+                throw new InvalidOperationException($"DSL 定义文件未加载到任何卡效：{path}");
+            CardRulesetManager.InitializeBuiltIn(definitions, rulesetId);
+            _builtInLoaded = true;
         }
     }
 
-    private static void LoadDirectoryCore(string dir)
+    /// <summary>批量加载某个目录下所有 *.json，注册为当前发布产物的内置规则。</summary>
+    public static void LoadDirectory(string dir, string rulesetId = "builtin-test")
+    {
+        lock (BuiltInLoadGate)
+        {
+            if (_builtInLoaded) return;
+            var definitions = ReadDefinitionsDirectory(dir);
+            CardRulesetManager.InitializeBuiltIn(definitions, rulesetId);
+            _builtInLoaded = true;
+        }
+    }
+
+    internal static IReadOnlyDictionary<string, JsonElement> ReadDefinitionsDirectory(string dir, bool strict = false)
     {
         var files = GetDefinitionFiles(dir);
+        var definitions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         int total = 0;
         foreach (var file in files)
         {
-            int n = LoadFile(file);
+            int n = LoadFile(file, definitions, strict);
             total += n;
         }
-        if (_defs.Count == 0)
+        if (definitions.Count == 0)
             throw new InvalidOperationException($"DSL 定义目录未加载到任何卡效: {dir}");
-        Console.WriteLine($"[DSL] 累计加载 {total} 条卡效定义，{_defs.Count} 张唯一卡");
-        _loaded = true;
+        Console.WriteLine($"[DSL] 累计加载 {total} 条卡效定义，{definitions.Count} 张唯一卡");
+        return definitions;
     }
 
     internal static string[] GetDefinitionFiles(string dir)
@@ -96,7 +105,10 @@ public static class DslInterpreter
         return files;
     }
 
-    private static int LoadFile(string path)
+    private static int LoadFile(
+        string path,
+        IDictionary<string, JsonElement> definitions,
+        bool strict = false)
     {
         if (!File.Exists(path)) return 0;
         try
@@ -110,8 +122,10 @@ public static class DslInterpreter
                 // 占位条目（仅 complex/noEffect 标记、无真实效果键）不得覆盖已加载的真实定义。
                 // 定义目录按 Directory.GetFiles 枚举顺序加载，该顺序在 Linux 生产机不保证字母序，
                 // 占位文件(如 *_gap.json)可能后加载冲掉真实定义(如 *_wf.json)，导致线上卡效失效。
-                if (_defs.ContainsKey(k) && IsPlaceholderDef(v)) continue;
-                _defs[k] = v;
+                if (definitions.ContainsKey(k) && IsPlaceholderDef(v)) continue;
+                if (strict && definitions.ContainsKey(k))
+                    throw new InvalidOperationException($"规则包内重复定义卡牌 {k}");
+                definitions[k] = v.Clone();
                 n++;
             }
             Console.WriteLine($"[DSL] {Path.GetFileName(path)} 加载 {n} 条");
@@ -119,6 +133,8 @@ public static class DslInterpreter
         }
         catch (Exception ex)
         {
+            if (strict)
+                throw new InvalidOperationException($"DSL 加载失败：{path}：{ex.Message}", ex);
             Console.Error.WriteLine($"[DSL] 加载 {path} 失败: {ex.Message}");
             return 0;
         }
@@ -139,8 +155,8 @@ public static class DslInterpreter
 
     public static async Task<bool> TryResolve(EffectContext ctx)
     {
-        if (!_loaded) return false;
-        if (!_defs.TryGetValue(ctx.Source.Info.Number, out var def)) return false;
+        var ruleset = CardRulesetManager.For(ctx.State);
+        if (!ruleset.TryGetDslDefinition(ctx.Source.Info.Number, out var def)) return false;
 
         var triggerName = ctx.Trigger.ToString();
         // 1. triggers: 数组里找 on == 当前触发的项

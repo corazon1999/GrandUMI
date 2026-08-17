@@ -5,6 +5,7 @@ using GrandUMI.Game;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -50,7 +51,12 @@ accountAuthenticationStore.Initialize();
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
 
 CardDatabase.LoadFrom(ResolveCardDataPath());
-GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(ResolveDslDir());
+GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
+    ResolveDslDir(),
+    $"builtin-{BuildInfo.Commit}");
+CardRulesetManager.InitializePackages(Path.Combine(
+    Path.GetDirectoryName(playerDataStore.DatabasePath)!,
+    "Rulesets"));
 LeaderStatsStore.Default.Initialize();
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
@@ -103,6 +109,8 @@ app.MapGet("/ready", () =>
         reason = ready ? null : reason,
         connections = WebSocketBridge.ConnectionCount,
         rooms = GameRoomManager.RoomCount,
+        activeRuleset = CardRulesetManager.Current.Id,
+        rulesetRooms = GameRoomManager.RoomCountsByRuleset,
     }, statusCode: ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);
 });
 
@@ -112,6 +120,7 @@ app.MapGet("/version", () => Results.Json(new
     commit = BuildInfo.Commit,
     buildTimeUtc = BuildInfo.BuildTimeUtc,
     nodeId = BuildInfo.NodeId,
+    activeRuleset = CardRulesetManager.Current.Id,
 }));
 
 app.MapGet("/metrics", () => Results.Text(

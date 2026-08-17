@@ -21,6 +21,7 @@ import type {
   MsgSpectatorHandResponse,
   MsgKickSpectator,
   MsgSpectatorKicked,
+  MsgRulesetUpdated,
 } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
@@ -73,6 +74,18 @@ export function registerGameProtocols() {
       case "MsgPlayerReconnected":
         eventBus.emit("opponentReconnected");
         break;
+
+      case "MsgRulesetUpdated": {
+        const update = msg as MsgRulesetUpdated;
+        const changedCards = update.changedCards?.length
+          ? `（涉及 ${update.changedCards.join("、")}）`
+          : "";
+        showMessage(
+          `${update.logStr ?? "卡牌效果已更新，将从下一局开始生效"}${changedCards}`,
+          "info",
+        );
+        break;
+      }
 
       case "MsgDuelOver":
         useGameStore.getState().setPending(false);

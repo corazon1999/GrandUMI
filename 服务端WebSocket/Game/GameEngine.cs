@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Game.Debug;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.PhaseFlow;
@@ -108,16 +109,25 @@ public class GameEngine
                                        int? rngSeed = null,
                                        bool leaderKeywordWildcard = false,
                                        bool deferOpeningSetupUntilFirstPlayerChosen = false,
-                                       bool deferInitialSetupUntilStart = false)
+                                       bool deferInitialSetupUntilStart = false,
+                                       CardRuleset? ruleset = null)
     {
         var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
+        var pinnedRuleset = ruleset ?? CardRulesetManager.Current;
         // 必须在创建任何卡实例（ParseDeck/InitDonDeck/InitLifeAndHand）之前装好确定性 ID 工厂，
         // 否则建出的牌走随机 GUID，重放将无法对齐。
         _idFactory = DeterministicId.SeededFactory(seed);
         _deferOpeningSetupUntilFirstPlayerChosen = deferOpeningSetupUntilFirstPlayerChosen;
         _deferInitialSetupUntilStart = deferInitialSetupUntilStart;
         DeterministicId.Current = _idFactory;
-        State = new GameState { RoomId = roomId, FirstPlayer = firstPlayer, RngSeed = seed };
+        State = new GameState
+        {
+            RoomId = roomId,
+            FirstPlayer = firstPlayer,
+            RngSeed = seed,
+            RulesetId = pinnedRuleset.Id,
+            Ruleset = pinnedRuleset,
+        };
 
         var p0Cards = ParseDeck(p0.deckRaw, out var p0Leader);
         var p1Cards = ParseDeck(p1.deckRaw, out var p1Leader);

@@ -7,6 +7,7 @@ public static class PrivateStateSnapshotBuilder
         return new
         {
             roomId = state.RoomId,
+            rulesetId = state.RulesetId,
             tick = state.Tick,
             phase = PhaseLabels.Of(state.Phase),
             currentTurnPlayer = state.CurrentTurnPlayer,
