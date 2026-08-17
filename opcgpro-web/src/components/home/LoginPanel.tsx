@@ -153,7 +153,7 @@ export default function LoginPanel() {
       }}
     >
       <motion.div
-        className="my-auto w-full max-w-sm rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-2xl sm:p-8"
+        className="mt-auto w-full max-w-sm rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-2xl sm:p-8"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -164,8 +164,8 @@ export default function LoginPanel() {
         <h1 className="mb-1 text-center text-2xl font-bold text-white">
           GrandUMI
         </h1>
-        <p className="mb-4 text-center text-sm text-gray-500">
-          One Piece Card Game Online
+        <p className="mb-4 text-center text-sm leading-5 text-gray-500">
+          TCG Intelligence Project｜集换式卡牌博弈智能ai研究项目。
         </p>
 
         {authStep === "account" && storedAccount && !editingAccount ? (
@@ -330,6 +330,15 @@ export default function LoginPanel() {
           )}
         </div>
       </motion.div>
+
+      <aside
+        aria-label="项目免责声明"
+        className="mb-auto mt-5 w-full max-w-5xl rounded-2xl border border-gray-800/80 bg-gray-900/60 px-5 py-4 text-center shadow-lg shadow-black/20 sm:mt-6 sm:px-8"
+      >
+        <p className="text-xs leading-5 text-gray-500 sm:text-sm sm:leading-6">
+          本项目为独立学术研究项目，与任何卡牌游戏的发行商、版权方或商标权利人均无隶属、授权或合作关系。相关商标、卡牌名称及美术素材归各自权利人所有。本平台不提供付费服务。
+        </p>
+      </aside>
     </main>
   );
 }
