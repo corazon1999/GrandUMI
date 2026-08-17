@@ -25,8 +25,11 @@ public static class GameRoomManager
         string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "1", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "true", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>对局存活上限：自最后一次操作起超过此时长即弃局（重启不恢复）。</summary>
-    private static readonly TimeSpan RestoreTtl = TimeSpan.FromMinutes(30);
+    /// <summary>对局无有效操作的存活上限；启动恢复与运行期清理使用同一口径。</summary>
+    internal static readonly TimeSpan RoomInactivityTimeout = TimeSpan.FromMinutes(30);
+
+    /// <summary>运行期死房间扫描间隔。</summary>
+    internal static readonly TimeSpan RoomExpirationSweepInterval = TimeSpan.FromMinutes(1);
 
     /// <summary>房间池</summary>
     private static readonly ConcurrentDictionary<string, RoomEntry> _rooms = new();
@@ -86,7 +89,16 @@ public static class GameRoomManager
         public ConcurrentDictionary<string, byte> KickedSpectatorAccounts { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal object SpectatorGate { get; } = new();
         internal Dictionary<string, SpectatorHandRequest> PendingHandRequests { get; } = new(StringComparer.Ordinal);
-        public DateTime CreatedAt { get; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+        private long _lastActivityUtcTicks = DateTime.UtcNow.Ticks;
+        public DateTime LastActivityUtc
+            => new(Interlocked.Read(ref _lastActivityUtcTicks), DateTimeKind.Utc);
+
+        internal void MarkActivity(DateTime? activityUtc = null)
+        {
+            var normalized = activityUtc?.ToUniversalTime() ?? DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastActivityUtcTicks, normalized.Ticks);
+        }
         public string? MatchLogPath { get; set; }
         /// <summary>是否为单人测试模式（P1 为机器人）</summary>
         public bool VsBot { get; init; }
@@ -391,6 +403,7 @@ public static class GameRoomManager
             // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
             if (accepted)
             {
+                room.MarkActivity();
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
                 RoomJournal.AppendClock(room.RoomId, room.Engine.State.OperationClockRemainingMs);
                 MaybeCaptureRecoverySnapshot(room);
@@ -1043,6 +1056,7 @@ public static class GameRoomManager
                     var oldSid = r.PlayerSessionIds[i];
                     if (oldSid == newSessionId) return false; // 同 sid 不算重连
                     var wasDisconnected = CompleteDisconnectGrace(r, i, oldSid);
+                    r.MarkActivity();
                     // 替换 session
                     _sessionRoom.TryRemove(oldSid, out _);
                     r.PlayerSessionIds[i] = newSessionId;
@@ -1396,6 +1410,9 @@ public static class GameRoomManager
     }
 
     public static void CleanupRoom(string roomId)
+        => TryCleanupRoom(roomId);
+
+    private static bool TryCleanupRoom(string roomId)
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
@@ -1448,6 +1465,61 @@ public static class GameRoomManager
 
             if (GetMaintenanceSnapshot().Enabled)
                 WebSocketBridge.BroadcastMaintenanceState();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 周期扫描运行中的房间，兜底回收已经终局但未完成清理，或连续 30 分钟没有有效操作的死房间。
+    /// 返回本轮实际清理数量，便于测试和运维日志观察。
+    /// </summary>
+    public static int SweepExpiredRooms(DateTime utcNow)
+    {
+        var normalizedNow = utcNow.ToUniversalTime();
+        var cleaned = 0;
+        foreach (var room in _rooms.Values)
+        {
+            if (TryCleanupExpiredRoom(room.RoomId, normalizedNow)) cleaned++;
+        }
+        return cleaned;
+    }
+
+    internal static bool TryCleanupExpiredRoom(string roomId, DateTime utcNow)
+    {
+        if (!_rooms.TryGetValue(roomId, out var room)) return false;
+
+        var terminalRoom = room.Engine.State.IsGameOver;
+        var inactiveFor = utcNow.ToUniversalTime() - room.LastActivityUtc;
+        if (!terminalRoom && inactiveFor <= RoomInactivityTimeout) return false;
+
+        if (!terminalRoom)
+        {
+            const string description = "对局长时间无操作，房间已自动关闭";
+            foreach (var sessionId in room.PlayerSessionIds.Concat(room.Spectators.Keys))
+                WebSocketBridge.Send(sessionId, new { proto = "MsgDuelOver", IsWin = false, Description = description });
+        }
+
+        if (!TryCleanupRoom(roomId)) return false;
+
+        var reason = terminalRoom
+            ? "终局后残留"
+            : $"连续无操作 {Math.Max(0, (int)inactiveFor.TotalMinutes)} 分钟";
+        Console.WriteLine($"[房间超时清理] 已回收 {roomId}（{reason}）。");
+        return true;
+    }
+
+    public static async Task RunExpirationMonitorAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RoomExpirationSweepInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+                SweepExpiredRooms(DateTime.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // 正常关服：由调用方取消周期扫描。
         }
     }
 
@@ -1704,7 +1776,7 @@ public static class GameRoomManager
         }
 
         // TTL：自最后一次操作起超过 30 分钟 → 弃局
-        if (DateTime.UtcNow - lastActivity > RestoreTtl)
+        if (DateTime.UtcNow - lastActivity > RoomInactivityTimeout)
         {
             Console.WriteLine($"[Restore] 弃局 {roomId}（超 TTL，最后操作 {lastActivity:u}）。");
             TryDelete(file);
@@ -1755,7 +1827,11 @@ public static class GameRoomManager
             SpectateCodes = [p0SpectateCode, p1SpectateCode],
             VsBot = false,
             MatchKind = matchKind,
+            CreatedAt = h.TryGetProperty("createdAtUtc", out var createdAt)
+                ? createdAt.GetDateTime().ToUniversalTime()
+                : lastActivity,
         };
+        entry.MarkActivity(lastActivity > DateTime.UtcNow ? DateTime.UtcNow : lastActivity);
         entry.JournalSequence = journalSequence;
         entry.LastOperationSequences[0] = lastOperationSequences[0];
         entry.LastOperationSequences[1] = lastOperationSequences[1];

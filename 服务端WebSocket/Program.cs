@@ -161,6 +161,9 @@ app.Map("/ws", async context =>
 });
 
 app.Lifetime.ApplicationStopping.Register(WebSocketBridge.Stop);
+using var roomExpirationCancellation = new CancellationTokenSource();
+var roomExpirationTask = GameRoomManager.RunExpirationMonitorAsync(roomExpirationCancellation.Token);
+app.Lifetime.ApplicationStopping.Register(roomExpirationCancellation.Cancel);
 Console.WriteLine($"[网络] Kestrel 监听 http://127.0.0.1:{port}，WebSocket 路径 /ws");
 Console.WriteLine($"[构建] version={BuildInfo.Version}, commit={BuildInfo.Commit}, node={BuildInfo.NodeId}");
 
@@ -170,6 +173,8 @@ try
 }
 finally
 {
+    roomExpirationCancellation.Cancel();
+    await roomExpirationTask;
     GameRoomManager.CaptureAllRecoverySnapshots();
     await RoomRecoverySnapshotStore.FlushAsync();
     WebSocketBridge.Stop();
