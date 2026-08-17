@@ -59,7 +59,7 @@
       {
         "on": "OnEnterField",
         "then": [
-          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+          { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波", "originalCostLte": 5 }, { "nameEquals": "波特夹斯·D·艾斯", "originalCostLte": 5 }, { "nameEquals": "蒙奇·D·路飞", "originalCostLte": 5 } ] } }
         ]
       }
     ]
@@ -109,11 +109,11 @@
     "_note": "【主要】确认卡组顶5张，公开≤1张费用≤5的“萨波/波特夹斯·D·艾斯/蒙奇·D·路飞”入手，余放回底；【触发】同。",
     "main": {
       "then": [
-        { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+        { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波", "originalCostLte": 5 }, { "nameEquals": "波特夹斯·D·艾斯", "originalCostLte": 5 }, { "nameEquals": "蒙奇·D·路飞", "originalCostLte": 5 } ] } }
       ]
     },
     "trigger": [
-      { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波" }, { "nameEquals": "波特夹斯·D·艾斯" }, { "nameEquals": "蒙奇·D·路飞" } ], "originalCostLte": 5 } }
+      { "op": "LookTopReveal", "count": 5, "max": 1, "restTo": "bottom", "match": { "anyOf": [ { "nameEquals": "萨波", "originalCostLte": 5 }, { "nameEquals": "波特夹斯·D·艾斯", "originalCostLte": 5 }, { "nameEquals": "蒙奇·D·路飞", "originalCostLte": 5 } ] } }
     ]
   }
 }

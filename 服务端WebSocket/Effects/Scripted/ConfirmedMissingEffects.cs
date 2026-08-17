@@ -268,12 +268,14 @@ public sealed class ST36_005_EustassKid : IScriptedEffect
         var redirectTargets = me.Characters
             .Where(card => card.Info.Power >= 5000 && card.MatchesName("尤斯塔斯·基德"))
             .ToList();
+        if (me.Leader.Info.Power >= 5000 && me.Leader.MatchesName("尤斯塔斯·基德"))
+            redirectTargets.Insert(0, me.Leader);
         if (redirectTargets.Count == 0 || ctx.State.CurrentBattle is null) return;
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "尤斯塔斯·基德【对方的攻击时】：将生命顶或底翻至背面并变更攻击对象？")) return;
         var paidLife = await ChooseLifeEdge(ctx, edgeCards, "选择翻至背面朝下的生命牌");
         if (paidLife is null) return;
-        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
             "选择新的攻击对象“尤斯塔斯·基德”",
             redirectTargets.Select(card => card.Id.ToString()).ToList(), 1, 1,
             new Dictionary<string, object?>
@@ -286,8 +288,9 @@ public sealed class ST36_005_EustassKid : IScriptedEffect
         if (target is null) return;
         paidLife.IsLifeFaceUp = false;
         me.TurnOnceUsed.Add(key);
-        ctx.State.CurrentBattle.TargetIsLeader = false;
-        ctx.State.CurrentBattle.TargetCardId = target.Id;
+        bool targetsLeader = target.Id == me.Leader.Id;
+        ctx.State.CurrentBattle.TargetIsLeader = targetsLeader;
+        ctx.State.CurrentBattle.TargetCardId = targetsLeader ? null : target.Id;
         ctx.State.CurrentBattle.ReplacedByBlockerCardId = null;
         ctx.State.CurrentBattle.BlockerDeclared = false;
     }

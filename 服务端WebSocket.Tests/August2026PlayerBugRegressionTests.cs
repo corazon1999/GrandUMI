@@ -40,6 +40,37 @@ public class August2026PlayerBugRegressionTests
     }
 
     [Fact]
+    public async Task ST36_005_OpponentAttack_CanRedirectToEustassKidLeader()
+    {
+        var state = TestScene.New("ST02-001").Build();
+        var source = Card("ST36-005");
+        state.Players[0].Characters.Add(source);
+        state.Players[0].LifeArea.Add(Card("OP15-003"));
+        state.Players[0].LifeArea[0].IsLifeFaceUp = true;
+        state.CurrentTurnPlayer = 1;
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 1,
+            DefenderPlayerIndex = 0,
+            AttackerCardId = state.Players[1].Leader.Id,
+            TargetIsLeader = false,
+            TargetCardId = source.Id,
+        };
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(state.Players[0].Leader.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnOppAttackDeclare, prompts);
+
+        Assert.True(state.CurrentBattle.TargetIsLeader);
+        Assert.Null(state.CurrentBattle.TargetCardId);
+        Assert.False(state.Players[0].LifeArea[0].IsLifeFaceUp);
+        var redirectPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OwnLeaderOrCharacter", redirectPrompt.kind);
+        Assert.Contains(state.Players[0].Leader.Id.ToString(), redirectPrompt.choices);
+    }
+
+    [Fact]
     public async Task OP01_055_RestCost_OnlyOffersOwnActiveCharacters()
     {
         var state = TestScene.New().MyCharacter("OP15-003").MyCharacter("OP15-004")
