@@ -28,7 +28,7 @@ public class ST22_001_Ace_Newgate : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         // 候选：手牌中含〈白胡子海盗团〉特征的卡
-        var cands = me.Hand.Where(c => c.Info.HasKeyword("白胡子海盗团")).ToList();
+        var cands = me.Hand.Where(c => c.Info.HasKeywordContaining("白胡子海盗团")).ToList();
         if (cands.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

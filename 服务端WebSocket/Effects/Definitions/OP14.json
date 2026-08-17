@@ -510,13 +510,15 @@
         "on": "OnEnterField",
         "then": [
           {
-            "op": "LookTopReveal",
+            "op": "RevealTopThen",
             "count": 1,
-            "max": 1,
-            "restTo": "bottom",
             "match": {
-              "keyword": "白胡子海盗团"
-            }
+              "keywordContains": "白胡子海盗团"
+            },
+            "then": [
+              { "op": "Draw", "n": 2 },
+              { "op": "DiscardOwnChosen", "n": 1 }
+            ]
           }
         ]
       }

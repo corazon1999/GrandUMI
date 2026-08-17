@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   2. 【KO时】可以将我方废弃区中的 3 张卡牌自选顺序放回卡组最下方：从废弃区中登场此角色卡牌。
 ///
 /// 实现说明 / 简化点：
-/// - 持续 +7000：仅作用于自身（card.Id == selfId）；条件为我方场上存在当前力量≥10000 的“月光·莫利亚”，
+/// - 持续 +7000：仅作用于自身（card.Id == selfId）；条件为我方领航或角色中存在当前力量≥10000 的“月光·莫利亚”，
 ///   且我方场上不存在除自身外的其他“奥兹”。用 ContinuousEffect.Predicate 实时评估。
 /// - 【KO时】此卡已位于我方废弃区。可选成本=由玩家选择废弃区 3 张放回卡组最下方（自选顺序，
 ///   实现为按所选顺序放底）。成本支付完成后，从废弃区登场自身（PlayFromTrashFree）。
@@ -46,8 +46,11 @@ public class OP15_080_Oars : IScriptedEffect
                 {
                     if (card.Id != selfId) return false;
                     var p = st.Players[owner];
-                    bool hasBigMoria = p.Characters.Any(c =>
-                        c.MatchesName("月光·莫利亚") && st.CurrentPowerOf(owner, c) >= 10000);
+                    bool hasBigMoria =
+                        (p.Leader.MatchesName("月光·莫利亚")
+                         && st.CurrentPowerOf(owner, p.Leader) >= 10000)
+                        || p.Characters.Any(c =>
+                            c.MatchesName("月光·莫利亚") && st.CurrentPowerOf(owner, c) >= 10000);
                     bool noOtherOars = !p.Characters.Any(c =>
                         c.Id != selfId && c.MatchesName("奥兹"));
                     return hasBigMoria && noOtherOars;

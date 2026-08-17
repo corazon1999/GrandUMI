@@ -15,8 +15,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "效果无效"持续状态用规范十三新增的 ContinuousEffect.NullifyEffect 通道实现。该通道仅看
 ///     Predicate（不读 Scope.Filter），故所有目标判定写入 Predicate。来源卡离场时引擎自动清理。
 ///   - "直到下个对方的结束阶段结束时为止"的力量修正用 ContinuousEffect.PowerDelta + Predicate
-///     的有效期限制实现：注册前记下当前 TurnCount，Predicate 在 s.TurnCount <= 基准+2 时生效
-///     （覆盖本回合 + 下个对方回合，近似"直到下个对方结束阶段结束"）。
+///     的有效期限制实现：注册前记下当前 TurnCount，Predicate 在 s.TurnCount <= 基准+1 时生效
+///     （覆盖本回合 + 下个对方回合，下个我方回合开始后失效）。
 ///   - 咚!!-3 为发动成本：若活跃咚不足 3 则无法支付，不发动【登场时】收益（持续无效化第 1 条
 ///     已在 OnEnterField 注册，与登场时收益相互独立）。
 /// </summary>
@@ -64,7 +64,7 @@ public class OP13_064_GolDRoger : IScriptedEffect
             Predicate = (s, sideIdx, card) =>
                 sideIdx == owner &&
                 card.Id == s.Players[owner].Leader.Id &&
-                s.TurnCount <= baseTurn + 2,
+                s.TurnCount <= baseTurn + 1,
         });
 
         // 持续 3：对方所有角色力量 -2000（限期）
@@ -76,7 +76,7 @@ public class OP13_064_GolDRoger : IScriptedEffect
             Predicate = (s, sideIdx, card) =>
                 sideIdx == (1 - owner) &&
                 card.Info.Kind == CardKind.Character &&
-                s.TurnCount <= baseTurn + 2,
+                s.TurnCount <= baseTurn + 1,
         });
     }
 }

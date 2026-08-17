@@ -1485,9 +1485,10 @@ internal static class OP17Effects
         int pick = await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的攻击时效果", options);
         if (pick == 0)
         {
-            if (Me(c).Hand.Count > 0
-                && await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃我方1张手牌？"))
-                await DiscardOwn(c, 1, "选择丢弃1张手牌");
+            if (Me(c).Hand.Count == 0
+                || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃我方1张手牌？")
+                || !await DiscardOwn(c, 1, "选择丢弃1张手牌"))
+                return;
             if (Me(c).Deck.Count > 0
                 && await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方卡组最上方最多1张卡牌加入生命区最上方？"))
                 AtomicOps.AddLifeFromDeckTop(Me(c), 1);

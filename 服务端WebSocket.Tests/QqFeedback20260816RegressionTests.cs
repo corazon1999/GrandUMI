@@ -101,7 +101,7 @@ public class QqFeedback20260816RegressionTests
     }
 
     [Fact]
-    public async Task OP17_099_FirstOptionMayKeepSecondHandCardAndStillAddLife()
+    public async Task OP17_099_FirstOptionRequiresSecondDiscardBeforeAddingLife()
     {
         var state = TestScene.New("OP17-099").MyDeckTop("OP17-100").Build();
         var activationDiscard = Card("OP17-101");
@@ -120,7 +120,8 @@ public class QqFeedback20260816RegressionTests
 
         Assert.Contains(kept, state.Players[0].Hand);
         Assert.Contains(activationDiscard, state.Players[0].Trash);
-        Assert.Contains(lifeCard, state.Players[0].LifeArea);
+        Assert.DoesNotContain(lifeCard, state.Players[0].LifeArea);
+        Assert.Contains(lifeCard, state.Players[0].Deck);
     }
 
     [Fact]
