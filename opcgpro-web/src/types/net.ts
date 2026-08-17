@@ -635,6 +635,8 @@ export interface MsgFriendSearch extends MsgBase {
 export interface MsgFriendRequest extends MsgBase {
   proto: "MsgFriendRequest";
   toAccount?: string;
+  /** 对局内快捷申请：由服务端按当前会话解析交战对手，不向客户端公开账号。 */
+  currentOpponent?: boolean;
   result?: boolean;
   autoAccepted?: boolean;
   logStr?: string;

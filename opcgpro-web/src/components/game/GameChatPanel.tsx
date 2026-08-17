@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import FriendsPanel from "@/components/home/FriendsPanel";
 import { eventBus } from "@/net/eventBus";
 import { GameRequest } from "@/net/GameRequest";
+import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
@@ -50,6 +51,7 @@ export default function GameChatPanel({
   const incomingFriendCount = useNetStore(
     (s) => s.incomingFriendRequests.length,
   );
+  const matchKind = useGameStore((s) => s.matchKind);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const spectatorDetails = useGameStore((s) => s.spectatorDetails);
   const spectatorHandRequests = useGameStore((s) => s.spectatorHandRequests);
@@ -72,6 +74,8 @@ export default function GameChatPanel({
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [kickConfirm, setKickConfirm] = useState("");
+  const [opponentFriendRequestSent, setOpponentFriendRequestSent] =
+    useState(false);
 
   const idRef = useRef(0);
   const mutedRef = useRef(muted);
@@ -80,6 +84,8 @@ export default function GameChatPanel({
   const listRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const opponentFriendRequestTimer =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce(
     (total, count) => total + count,
@@ -153,6 +159,8 @@ export default function GameChatPanel({
       eventBus.off("gameChat", handler);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
+      if (opponentFriendRequestTimer.current)
+        clearTimeout(opponentFriendRequestTimer.current);
     };
   }, []);
 
@@ -209,6 +217,19 @@ export default function GameChatPanel({
     }
     GameRequest.kickSpectator(account);
     setKickConfirm("");
+  };
+
+  const handleOpponentFriendAction = () => {
+    if (opponentFriendRequestSent) return;
+    if (HomeRequest.sendOpponentFriendRequest()) {
+      setOpponentFriendRequestSent(true);
+      if (opponentFriendRequestTimer.current)
+        clearTimeout(opponentFriendRequestTimer.current);
+      opponentFriendRequestTimer.current = setTimeout(
+        () => setOpponentFriendRequestSent(false),
+        2500,
+      );
+    }
   };
 
   return (
@@ -358,6 +379,45 @@ export default function GameChatPanel({
               </span>
             )}
           </button>
+
+          {!isObserver && matchKind !== "Bot" && (
+            <button
+              type="button"
+              onClick={handleOpponentFriendAction}
+              disabled={opponentFriendRequestSent}
+              data-opponent-friend-action
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-800/95 text-sky-50 shadow-lg ring-1 ring-sky-300/30 transition-colors hover:bg-sky-700 disabled:cursor-wait disabled:bg-emerald-900/90 disabled:text-emerald-200"
+              title={
+                opponentFriendRequestSent
+                  ? "好友申请已发送"
+                  : "添加交战对手为好友"
+              }
+              aria-label={
+                opponentFriendRequestSent
+                  ? "好友申请已发送"
+                  : "添加交战对手为好友"
+              }
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="8.5" cy="8" r="3" />
+                <path d="M3.5 19c.6-3.5 2.3-5 5-5 1.7 0 3 .5 3.9 1.5" />
+                {opponentFriendRequestSent ? (
+                  <path d="m14.5 17 2 2 4-5" />
+                ) : (
+                  <path d="M17.5 14v6M14.5 17h6" />
+                )}
+              </svg>
+            </button>
+          )}
 
           <button
             type="button"

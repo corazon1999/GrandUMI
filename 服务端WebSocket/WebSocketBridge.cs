@@ -1614,7 +1614,17 @@ public static class WebSocketBridge
 
         try
         {
-            var result = _playerDataStore.SendFriendRequest(s.Account, Str(msg, "toAccount") ?? "");
+            var targetAccount = Str(msg, "toAccount") ?? "";
+            if (Bool(msg, "currentOpponent"))
+            {
+                if (!GameOpponent.TryGetValue(s.SessionId, out var opponentSessionId) ||
+                    !Sessions.TryGetValue(opponentSessionId, out var opponent) ||
+                    !opponent.IsLoggedIn || string.IsNullOrWhiteSpace(opponent.Account))
+                    throw new PlayerDataValidationException("当前没有可添加的交战对手");
+                targetAccount = opponent.Account;
+            }
+
+            var result = _playerDataStore.SendFriendRequest(s.Account, targetAccount);
             var text = result.AutoAccepted ? "对方也申请了你，已自动成为好友" : "好友申请已发送";
             Send(s.SessionId, new { proto = "MsgFriendRequest", result = true, autoAccepted = result.AutoAccepted, logStr = text });
             SendFriendData(s, result.Snapshot);

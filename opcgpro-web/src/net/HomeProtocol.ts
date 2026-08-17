@@ -1138,6 +1138,10 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgFriendRequest", toAccount } as MsgFriendRequest);
   },
 
+  sendOpponentFriendRequest() {
+    return NetManager.send({ proto: "MsgFriendRequest", currentOpponent: true } as MsgFriendRequest);
+  },
+
   respondFriendRequest(requestId: number, accept: boolean) {
     return NetManager.send({ proto: "MsgFriendRespond", requestId, accept } as MsgFriendRespond);
   },

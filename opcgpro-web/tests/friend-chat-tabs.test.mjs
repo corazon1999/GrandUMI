@@ -19,6 +19,25 @@ test("在线玩家列表可直接申请或接受好友", async () => {
   assert.match(playerList, /<svg[\s\S]*?m14\.5 17 2 2 4-5/);
 });
 
+test("对局内通过服务端安全解析交战对手并直接发送好友申请", async () => {
+  const [panel, request, bridge, displayNameTests] = await Promise.all([
+    readSource("../src/components/game/GameChatPanel.tsx"),
+    readSource("../src/net/HomeProtocol.ts"),
+    readSource("../../服务端WebSocket/WebSocketBridge.cs"),
+    readSource("../../服务端WebSocket.Tests/GameDisplayNameTests.cs"),
+  ]);
+
+  assert.match(panel, /data-opponent-friend-action/);
+  assert.match(panel, /HomeRequest\.sendOpponentFriendRequest\(\)/);
+  assert.match(panel, /matchKind !== "Bot"/);
+  assert.match(panel, /h-12 w-12/);
+  assert.match(request, /currentOpponent: true/);
+  assert.match(bridge, /Bool\(msg, "currentOpponent"\)/);
+  assert.match(bridge, /GameOpponent\.TryGetValue\(s\.SessionId/);
+  assert.match(bridge, /targetAccount = opponent\.Account/);
+  assert.match(displayNameTests, /Assert\.DoesNotContain\(account0, json/);
+});
+
 test("局内聊天气泡只保留局内消息并通过独立按钮打开完整好友中心", async () => {
   const [panel, friendsPanel, request, protocol, store] = await Promise.all([
     readSource("../src/components/game/GameChatPanel.tsx"),
