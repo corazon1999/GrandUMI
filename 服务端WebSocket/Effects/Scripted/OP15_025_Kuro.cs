@@ -11,8 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   在下个对方的重置阶段中不会转为活跃状态。
 ///
 /// 实现说明 / 简化点：
-///   - "赋予对方 1 张角色最多 2 张对方费用区中的咚" = 从对方费用区取最多 2 张活跃咚附到对方所选角色。
-///     用 AtomicOps.AttachDonFromCost(opp, target.Id, n, DonState.Active)。
+///   - 按官方卡表与 Q&amp;A，只能赋予对方费用区中的休息咚，不能改取活跃咚。
 ///   - 第二段"当本回合结束时…不会转为活跃状态"原文为延迟到回合结束触发；本引擎在【登场时】
 ///     时机内一并结算（PreventActivateNextReset 标记会保留到对方下个重置阶段，效果等价）。
 ///     选择对象时即时判定"被赋予 3 张或更多咚且休息状态"，故先附咚再判定。
@@ -42,7 +41,7 @@ public class OP15_025_Kuro : IScriptedEffect
             if (pick.Count > 0)
             {
                 var tgt = targets.First(c => c.Id.ToString() == pick[0]);
-                AtomicOps.AttachDonFromCost(opp, tgt.Id, 2, DonState.Active);
+                AtomicOps.AttachDonFromCost(opp, tgt.Id, 2, DonState.Rest);
             }
         }
 

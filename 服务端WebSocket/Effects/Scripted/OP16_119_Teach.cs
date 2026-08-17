@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   之后，将剩余的卡牌自选顺序放回卡组最下方。
 /// 【触发】本回合中，对方最多1张角色的效果无效。之后，将对方最多1张费用不高于5的角色KO。
 ///
-/// 实现：登场=探顶3张（choiceCards 给全3张让玩家看全），选≤1张加入生命区最上方，余按原序放回卡组底。
+/// 实现：登场=探顶3张（choiceCards 给全3张让玩家看全），选≤1张加入生命区最上方，余卡由玩家自选顺序放回卡组底。
 ///   触发(生命翻牌)=选对方≤1张角色本回合效果无效，再选对方≤1张费用≤5角色KO。
 ///   原 DSL 占位 AddLifeFromDeck 是"无脑顶1张入生命"、缺玩家从3张里选，故改脚本。
 /// </summary>
@@ -48,10 +48,31 @@ public class OP16_119_Teach : IScriptedEffect
             me.LifeArea.Insert(0, picked); // 加入生命区最上方
         }
 
-        // 剩余仍在顶部的卡按原相对顺序放回卡组最下方
+        // 剩余仍在顶部的卡由玩家自选顺序放回卡组最下方
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();
         foreach (var c in rest) me.Deck.Remove(c);
-        me.Deck.AddRange(rest);
+        if (rest.Count <= 1)
+        {
+            me.Deck.AddRange(rest);
+            return;
+        }
+
+        var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderToDeckBottom",
+            "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+            rest.Select(c => c.Id.ToString()).ToList(), 0, rest.Count,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                ["allowDefaultOrder"] = true,
+            });
+        var ordered = orderedIds
+            .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))
+            .Where(c => c is not null)
+            .Cast<CardInstance>()
+            .DistinctBy(c => c.Id)
+            .ToList();
+        ordered.AddRange(rest.Where(c => ordered.All(item => item.Id != c.Id)));
+        me.Deck.AddRange(ordered);
     }
 
     /// <summary>【触发】本回合中对方最多1张角色效果无效；之后KO对方最多1张费用≤5角色。</summary>

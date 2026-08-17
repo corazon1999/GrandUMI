@@ -54,7 +54,8 @@
     "keyWords": "堂吉诃德海盗团",
     "counter": "",
     "effectTags": [
-      "OnMyTurnEnd"
+      "OnMyTurnEnd",
+      "OnOppEventPlayed"
     ],
     "abilities": [],
     "effectEvent": "",

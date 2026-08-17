@@ -1890,9 +1890,7 @@
     "cost": "4",
     "keyWords": "黑胡子海盗团",
     "counter": "1000",
-    "effectTags": [
-      "OnEnterField"
-    ],
+    "effectTags": [],
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",

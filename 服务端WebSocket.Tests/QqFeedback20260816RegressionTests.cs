@@ -80,7 +80,7 @@ public class QqFeedback20260816RegressionTests
     }
 
     [Fact]
-    public async Task OP17_063_CanActivateOnLaterTurnAfterEnteringField()
+    public async Task OP17_063_CannotActivateAfterItsEntryTurn()
     {
         var state = TestScene.New("OP17-039").MyActiveDon(1).OppCharacter("OP17-011").Build();
         state.TurnCount = 4;
@@ -95,9 +95,10 @@ public class QqFeedback20260816RegressionTests
 
         await EffectRuntime.Resolve(state, 0, ged, EffectTrigger.ActivatedMain, prompts);
 
-        Assert.True(victim.IsEffectsNullified);
-        Assert.Contains(victim, state.Players[1].Trash);
-        Assert.Empty(state.Players[0].CostArea);
+        Assert.False(victim.IsEffectsNullified);
+        Assert.Contains(victim, state.Players[1].Characters);
+        Assert.Contains(don, state.Players[0].CostArea);
+        Assert.Empty(prompts.ChooseHistory);
     }
 
     [Fact]

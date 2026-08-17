@@ -133,10 +133,12 @@ public static class TurnEngine
             }
             else if (task.Kind == "RefreshOwnDon")
             {
-                // EB02-015：回合结束时将我方最多 1 张休息咚转为活跃状态
+                // 回合结束时将指定数量的我方休息咚转为活跃状态（默认1张；OP14-031为5张）
                 var owner = state.Players[task.Owner];
-                var don = owner.CostArea.FirstOrDefault(d => d.State == DonState.Rest && d.AttachedToCardId is null);
-                if (don is not null) don.State = DonState.Active;
+                foreach (var don in owner.CostArea
+                             .Where(d => d.State == DonState.Rest && d.AttachedToCardId is null)
+                             .Take(task.Count))
+                    don.State = DonState.Active;
             }
             else if (task.Kind == "ReturnSelfToHand")
             {

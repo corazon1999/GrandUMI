@@ -581,6 +581,7 @@ public class EndTurnTask
     public required string Kind { get; init; }      // 如 "TrashFilm"、"RefreshOwnDon"、"ReturnSelfToHand"
     public string? SourceCardId { get; init; }
     public int Owner { get; init; }
+    public int Count { get; init; } = 1;
 }
 
 /// <summary>延迟到"下个对方主要阶段开始时"执行的任务（PRB02-005 路飞）</summary>

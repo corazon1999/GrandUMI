@@ -9,8 +9,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 我方领袖拥有《黑胡子海盗团》特征的场合，我方废弃区中每有4张卡牌，此角色的力量+1000。
 /// 实现说明：
 ///   - "不会因对方效果被KO"→ ContinuousEffect.KoGuard="effect"（引擎无法区分是否"对方的"效果，近似为任意效果KO均免）。
-///   - "废弃区每4张+1000"为动态阶梯加成；ContinuousEffect.PowerDelta 为定值，故注册若干阶梯，
-///     第 k 阶为 +1000 且仅当废弃区张数 ≥ 4*k 时生效（覆盖至 +12000，实战足够）。
+///   - 这两项均为静态能力，并非【登场时】效果；卡牌数据不再伪造 OnEnterField 标签，
+///     因此 OP09-081 只会无效真正的【登场时】，不会阻止本卡初始化持续能力。
 /// </summary>
 public class OP09_086_JesusBurgess : IScriptedEffect
 {

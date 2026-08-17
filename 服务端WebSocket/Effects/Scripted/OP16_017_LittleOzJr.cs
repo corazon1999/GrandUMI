@@ -12,8 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 登场时注册一条 ContinuousEffect，PowerDelta = -4000，仅作用于自身（Predicate 限定 c.Id == selfId）。
 ///   - Predicate 为动态实时判断：场上满足条件的角色登场/离场时，减力会自动失效/重新生效
 ///     （战斗 BattleEngine 与快照 StateSnapshotBuilder 均走 GameState.CurrentPowerOf → ContinuousPowerBonus）。
-///   - 费用判定走 GameState.CurrentCostOf（兼容持续费用光环），特征用精确匹配的 HasKeyword
-///     （故自身的「白胡子海盗团旗下」不会被误判为「白胡子海盗团」）。
+///   - 费用判定走 GameState.CurrentCostOf（兼容持续费用光环）；卡面写的是“特征中包含”，
+///     因此《白胡子海盗团旗下》等复合特征同样视为命中。
 ///   - 来源卡离场时由 TurnEngine 按 SourceCardId 自动清理。
 /// </summary>
 public class OP16_017_LittleOzJr : IScriptedEffect
@@ -36,7 +36,7 @@ public class OP16_017_LittleOzJr : IScriptedEffect
             if (sideIdx != owner || c.Id != selfId) return false;   // 仅作用于自身
             var me = s.Players[owner];
             bool hasBigWhitebeard = me.Characters.Any(ch =>
-                s.CurrentCostOf(owner, ch) >= 8 && ch.Info.HasKeyword("白胡子海盗团"));
+                s.CurrentCostOf(owner, ch) >= 8 && ch.Info.HasKeywordContaining("白胡子海盗团"));
             return !hasBigWhitebeard;                               // 不存在 → 减力 -4000
         }
 

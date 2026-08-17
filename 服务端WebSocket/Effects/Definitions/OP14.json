@@ -386,7 +386,7 @@
   "OP14-038": {
     "main": {
       "cost": {
-        "restActiveDon": 2
+        "restCards": 2
       },
       "then": [
         {

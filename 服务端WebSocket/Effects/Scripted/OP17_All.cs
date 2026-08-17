@@ -570,7 +570,7 @@ internal static class OP17Effects
     private static async Task C019(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.EventMain)
-            await SearchTop(c, 5, x => x.Info.HasKeyword("白胡子海盗团"), "公开1张《白胡子海盗团》卡牌加入手牌", requireOne: true);
+            await SearchTop(c, 5, x => x.Info.HasKeywordContaining("白胡子海盗团"), "公开1张特征中包含《白胡子海盗团》的卡牌加入手牌", requireOne: true);
         else if (c.Trigger == EffectTrigger.OnLifeRevealTrigger)
             AtomicOps.AddPowerThisTurn(Me(c).Leader, 1000);
     }
@@ -1111,7 +1111,7 @@ internal static class OP17Effects
 
     private static async Task C063(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.ActivatedMain) return;
+        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.TurnPlayed != c.State.TurnCount) return;
         string key = $"OP17-063-act:{c.Source.Id}";
         if (Me(c).TurnOnceUsed.Contains(key) || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
         var pick = await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 6, 1, "选择费用≤6的角色，使其效果无效并KO");
@@ -1353,10 +1353,15 @@ internal static class OP17Effects
         if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -3000);
     }
 
+    internal static Task RegisterC089Static(EffectContext c)
+    {
+        RegisterContinuous(c, SelfCost(c, 12, _ => true));
+        return Task.CompletedTask;
+    }
+
     private static async Task C089(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfCost(c, 12, _ => true));
         await SearchTop(c, 3, x => x.Info.HasKeyword("埃鲁巴夫"), "公开最多1张《埃鲁巴夫》卡牌加入手牌", trashRemainder: true);
     }
 
@@ -1587,7 +1592,8 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            await SearchTop(c, 5, x => x.Info.HasKeyword("大妈海盗团"), "公开最多1张《大妈海盗团》卡牌加入手牌");
+            await SearchTop(c, 5, x => x.Info.HasKeyword("大妈海盗团"), "公开最多1张《大妈海盗团》卡牌加入手牌",
+                reorderRemainder: true);
             return;
         }
         if (c.Trigger != EffectTrigger.OnEnterField) return;
@@ -1830,7 +1836,11 @@ public sealed class OP17_084_Effect : OP17CardEffect { protected override string
 public sealed class OP17_085_Effect : OP17CardEffect { protected override string Number => "OP17-085"; }
 public sealed class OP17_086_Effect : OP17CardEffect { protected override string Number => "OP17-086"; }
 public sealed class OP17_087_Effect : OP17CardEffect { protected override string Number => "OP17-087"; }
-public sealed class OP17_089_Effect : OP17CardEffect { protected override string Number => "OP17-089"; }
+public sealed class OP17_089_Effect : OP17CardEffect, IFieldStaticEffect
+{
+    protected override string Number => "OP17-089";
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC089Static(ctx);
+}
 public sealed class OP17_090_Effect : OP17CardEffect { protected override string Number => "OP17-090"; }
 public sealed class OP17_091_Effect : OP17CardEffect { protected override string Number => "OP17-091"; }
 public sealed class OP17_092_Effect : OP17CardEffect { protected override string Number => "OP17-092"; }

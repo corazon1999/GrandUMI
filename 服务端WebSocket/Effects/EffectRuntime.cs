@@ -198,6 +198,12 @@ public static class EffectRuntime
             if (payload is not null)
                 foreach (var (k, v) in payload) ctx.Vars[k] = v;
 
+            // 静态场上效果并不属于【登场时】效果。即使 OP09-081 等效果令【登场时】无效，
+            // 角色自身的持续费用、力量与守护能力仍须完成注册，待整卡无效结束后也能自动恢复。
+            var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(source.Info.Number);
+            if (trigger == EffectTrigger.OnEnterField && scripted is IFieldStaticEffect fieldStatic)
+                await fieldStatic.RegisterFieldStatic(ctx);
+
             // “发动过事件”是发动历史，而不是事件效果是否成功解决。
             // 统一在效果运行时记录，确保从手牌直接发动、反击发动和被其它效果免费发动都能被统计。
             if (source.Info.Kind == CardKind.Event
@@ -207,8 +213,10 @@ public static class EffectRuntime
                 s.Players[ownerIdx].HasActivatedBaseCost3PlusEventThisTurn = true;
             }
 
-            // 持续"效果无效"：被持续无效化的卡（整卡或该类触发），其效果不发动
-            if (source.IsEffectsNullified || s.IsContinuouslyNullified(source) || s.IsTriggerNullified(source, trigger)) return;
+            // 持续"效果无效"：被持续无效化的卡（整卡或该类已印刷触发），其效果不发动。
+            // 内部借 OnEnterField 初始化静态能力、但卡面并无【登场时】的卡不能被选择性无效化拦截。
+            if (source.IsEffectsNullified || s.IsContinuouslyNullified(source)
+                || (HasEffectForTrigger(source, trigger) && s.IsTriggerNullified(source, trigger))) return;
 
             // 出牌流程会统一调用 OnEnterField，即使卡牌没有该时点效果；只为确实声明了
             // 当前触发时机的卡记录表现，避免无效果卡登场时误播“效果发动”。
@@ -217,7 +225,6 @@ public static class EffectRuntime
                 ctx.Engine?.QueueEffectActivation(ownerIdx, source, trigger);
 
             // 1. 优先用手写脚本
-            var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(source.Info.Number);
             if (scripted is not null && scripted.HandlesTrigger(trigger))
             {
                 await scripted.Resolve(ctx);
@@ -462,6 +469,15 @@ public interface IScriptedEffect
     string CardNumber { get; }
     bool HandlesTrigger(EffectTrigger trigger);
     Task Resolve(EffectContext ctx);
+}
+
+/// <summary>
+/// 角色进入场上时需要注册、但规则上不属于【登场时】的静态效果。
+/// 该注册发生在选择性触发无效判定之前，注册后的持续效果仍会随整卡无效而停用。
+/// </summary>
+public interface IFieldStaticEffect
+{
+    Task RegisterFieldStatic(EffectContext ctx);
 }
 
 /// <summary>卡牌是否包含至少一项【每回合1次】效果。</summary>
