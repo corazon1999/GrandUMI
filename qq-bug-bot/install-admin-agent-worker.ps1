@@ -55,12 +55,21 @@ $action = New-ScheduledTaskAction `
     -Execute $pythonw `
     -Argument $arguments `
     -WorkingDirectory (Split-Path -Parent $worker)
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$triggers = @(
+    New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+    New-ScheduledTaskTrigger `
+        -Once `
+        -At (Get-Date).AddMinutes(5) `
+        -RepetitionInterval (New-TimeSpan -Minutes 5) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+)
 $settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew `
     -RestartCount 100 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit (New-TimeSpan -Days 3650) `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
     -StartWhenAvailable
 $principal = New-ScheduledTaskPrincipal `
     -UserId $env:USERNAME `
@@ -82,7 +91,7 @@ Register-ScheduledTask `
     -TaskName $TaskName `
     -Description "GrandUMI QQ 管理员专用全权限 Agent" `
     -Action $action `
-    -Trigger $trigger `
+    -Trigger $triggers `
     -Settings $settings `
     -Principal $principal | Out-Null
 

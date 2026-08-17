@@ -54,6 +54,9 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("女帝汉库克", installer)
         self.assertIn("Get-GrandUmiTempDirectory", installer)
         self.assertIn("--media-root", installer)
+        self.assertIn("RepetitionInterval (New-TimeSpan -Minutes 5)", installer)
+        self.assertIn("AllowStartIfOnBatteries", installer)
+        self.assertIn("DontStopIfGoingOnBatteries", installer)
 
     def test_管理员工作器独立隐藏常驻并绑定项目工作区(self):
         installer = (BOT_DIR / "install-admin-agent-worker.ps1").read_text(
@@ -65,6 +68,9 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("--admin-workspace", installer)
         self.assertIn("D:\\Self\\GrandUMI", installer)
         self.assertIn("RestartCount 100", installer)
+        self.assertIn("RepetitionInterval (New-TimeSpan -Minutes 5)", installer)
+        self.assertIn("AllowStartIfOnBatteries", installer)
+        self.assertIn("DontStopIfGoingOnBatteries", installer)
 
 
 if __name__ == "__main__":
