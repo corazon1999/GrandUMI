@@ -15,41 +15,45 @@ public class OP17EffectTests
         => new() { Info = CardDatabase.Get(number)!, TurnPlayed = turnPlayed };
 
     [Fact]
-    public async Task OP17_114_OnPlay_AffectsOnlyOneOpponentCharacterWithoutDonCostOrDraw()
+    public async Task OP17_114_OnPlay_RestsTwoDonDrawsAddsLifeAndAffectsUpToTwoCharacters()
     {
-        var state = TestScene.New("OP17-099")
-            .MyDeckTop("OP17-100")
+        var state = TestScene.New("OP13-004")
+            .MyActiveDon(2)
+            .MyDeckTop("OP17-100", "OP17-101")
             .OppCharacter("OP17-089")
             .OppCharacter("OP17-093")
             .Build();
         var me = state.Players[0];
         var firstTarget = state.Players[1].Characters[0];
         var secondTarget = state.Players[1].Characters[1];
-        var lifeCard = Assert.Single(me.Deck);
+        var drawCard = me.Deck[0];
+        var lifeCard = me.Deck[1];
         var source = Card("OP17-114");
         me.Characters.Add(source);
         var prompts = new MockPromptService()
             .QueueConfirm(true)
-            .QueueChoose(firstTarget.Id.ToString());
+            .QueueConfirm(true)
+            .QueueChoose(firstTarget.Id.ToString(), secondTarget.Id.ToString());
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
 
-        Assert.Empty(me.CostArea);
-        Assert.Empty(me.Hand);
+        Assert.Equal(2, me.CostArea.Count(don => don.State == DonState.Rest));
+        Assert.Contains(drawCard, me.Hand);
         Assert.Empty(me.Deck);
         Assert.Same(lifeCard, Assert.Single(me.LifeArea));
         Assert.Equal(-3000, firstTarget.PowerModThisTurn);
-        Assert.Equal(0, secondTarget.PowerModThisTurn);
+        Assert.Equal(-3000, secondTarget.PowerModThisTurn);
         var targetPrompt = Assert.Single(prompts.ChooseHistory);
         Assert.Equal("OpponentCharacter", targetPrompt.kind);
-        Assert.Equal(1, targetPrompt.max);
-        Assert.Contains("最多1张角色", targetPrompt.text);
+        Assert.Equal(2, targetPrompt.max);
+        Assert.Contains("最多2张角色", targetPrompt.text);
     }
 
     [Fact]
-    public async Task OP17_114_OnPlay_RequiresBigMomPiratesLeader()
+    public async Task OP17_114_OnPlay_CanBeCancelledBeforePayingDonCost()
     {
         var state = TestScene.New("OP13-004")
+            .MyActiveDon(2)
             .MyDeckTop("OP17-100")
             .OppCharacter("OP17-093")
             .Build();
@@ -57,14 +61,16 @@ public class OP17EffectTests
         var target = Assert.Single(state.Players[1].Characters);
         var source = Card("OP17-114");
         me.Characters.Add(source);
-        var prompts = new MockPromptService();
+        var prompts = new MockPromptService().QueueConfirm(false);
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
 
         Assert.Single(me.Deck);
+        Assert.Empty(me.Hand);
         Assert.Empty(me.LifeArea);
+        Assert.Equal(2, me.ActiveDonCount);
         Assert.Equal(0, target.PowerModThisTurn);
-        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Single(prompts.ConfirmHistory);
         Assert.Empty(prompts.ChooseHistory);
     }
 
