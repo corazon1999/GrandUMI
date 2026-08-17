@@ -43,8 +43,7 @@ public class OP08_052_PortgasDAce : IScriptedEffect
                 new List<string> { top.Id.ToString() }, 0, 1, revealExtra);
             if (pick.Count > 0)
             {
-                me.Deck.Remove(top);
-                await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, top);
+                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, top);
                 return; // 已登场，无剩余牌
             }
         }

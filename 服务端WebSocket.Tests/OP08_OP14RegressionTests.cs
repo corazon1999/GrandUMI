@@ -58,6 +58,29 @@ public class OP08_OP14RegressionTests
     }
 
     [Fact]
+    public async Task OP08_052_OnEnter_PlaysEligibleTopCharacterDirectlyFromDeck()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP03-012", "OP15-050")
+            .Build();
+        var me = state.Players[0];
+        var source = new CardInstance { Info = CardDatabase.Get("OP08-052")! };
+        var eligibleTop = me.Deck[0];
+        me.Characters.Add(source);
+        var prompts = new MockPromptService().QueueChoose(eligibleTop.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("LookTopReveal", prompt.kind);
+        Assert.Contains(eligibleTop.Id.ToString(), prompt.choices);
+        Assert.DoesNotContain(eligibleTop, me.Deck);
+        Assert.DoesNotContain(eligibleTop, me.Hand);
+        Assert.Contains(eligibleTop, me.Characters);
+        Assert.Equal("OP15-050", Assert.Single(me.Deck).Info.Number);
+    }
+
+    [Fact]
     public async Task OP14_031_OnEnter_RestsBothSelectedCharacters()
     {
         var state = TestScene.New()
