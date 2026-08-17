@@ -22,13 +22,20 @@
     <None Update="Effects\Definitions\**\*.json"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\卡牌数据\**\*.json"
+          Link="卡牌数据\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="ValidatePublishedDslDefinitions" AfterTargets="Publish">
     <ItemGroup>
       <PublishedDslDefinitions Include="$(PublishDir)Effects\Definitions\*.json" />
+      <PublishedCardData Include="$(PublishDir)卡牌数据\*.json" />
     </ItemGroup>
     <Error Condition="'@(PublishedDslDefinitions)' == ''"
            Text="发布产物缺少 Effects/Definitions DSL 卡效定义。" />
+    <Error Condition="'@(PublishedCardData)' == ''"
+           Text="发布产物缺少与当前提交一致的卡牌数据。" />
   </Target>
 </Project>

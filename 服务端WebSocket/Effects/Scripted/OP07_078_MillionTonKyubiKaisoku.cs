@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 条件"我方咚数 ≤ 对方咚数"用费用区咚!!总数动态比较：me.TotalDonInCostArea &lt;= opp.TotalDonInCostArea。
-///   - "福克斯"用 MatchesName("福克斯") 匹配；仅休息状态的角色才有"转为活跃"的意义，故候选取已横置者。
+///   - "福克斯"用 MatchesName("福克斯") 匹配，候选同时包含领航区和角色区的已横置卡牌。
 ///   - "最多 1 张"由玩家选择 0~1 张目标。
 ///   - 卡面【触发】(从咚!!卡组追加最多 1 张活跃咚!!)由触发节单独处理，不在本脚本内。
 /// </summary>
@@ -27,11 +27,13 @@ public class OP07_078_MillionTonKyubiKaisoku : IScriptedEffect
         // 条件：我方场上咚数 ≤ 对方场上咚数
         if (me.TotalDonInCostArea > opp.TotalDonInCostArea) return;
 
-        // 将我方最多 1 张"福克斯"（休息状态）转为活跃
-        var cands = me.Characters.Where(c => c.IsTapped && c.MatchesName("福克斯")).ToList();
+        // 将我方最多 1 张"福克斯"（领航或角色，休息状态）转为活跃
+        var cands = new List<CardInstance>();
+        if (me.Leader.IsTapped && me.Leader.MatchesName("福克斯")) cands.Add(me.Leader);
+        cands.AddRange(me.Characters.Where(c => c.IsTapped && c.MatchesName("福克斯")));
         if (cands.Count == 0) return;
 
-        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrCharacter",
             "选择最多 1 张\"福克斯\"转为活跃状态",
             cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
         if (chosen.Count > 0)

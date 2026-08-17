@@ -48,8 +48,11 @@ test("选择面板隐藏与恢复按钮适配手机竖屏安全区", async () =>
   const source = await readSource("../src/components/game/PromptOverlay.tsx");
 
   assert.match(source, /const promptToggleStyle =/);
+  assert.match(source, /left: "calc\(0\.75rem \+ var\(--layout-safe-left, 0px\)\)"/);
+  assert.match(source, /bottom: "calc\(4\.5rem \+ var\(--layout-safe-bottom, 0px\)\)"/);
   assert.match(source, /var\(--layout-safe-left, 0px\)/);
   assert.match(source, /var\(--layout-safe-bottom, 0px\)/);
+  assert.doesNotMatch(source, /promptToggleOffset/);
   assert.equal(source.match(/style=\{promptToggleStyle\}/g)?.length, 2);
   assert.equal(
     source.match(/flex h-12 w-12 items-center justify-center rounded-full bg-slate-800\/90/g)?.length,

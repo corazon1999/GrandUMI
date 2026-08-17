@@ -34,18 +34,16 @@ export default function PromptOverlay() {
   const localOverflowHandIndex = useGameStore((s) => s.localOverflowHandIndex);
   const my = useGameStore((s) => s.my);
   const opp = useGameStore((s) => s.opponent);
-  const spectatorNames = useGameStore((s) => s.spectatorNames);
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
   const [selected, setSelected] = useState<string[]>([]);
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const promptToggleOffset = spectatorNames.length > 0 ? "6.75rem" : "3.75rem";
   // 手机竖屏的对局画布会顺时针旋转 90°，这里必须使用布局层映射后的安全区变量，
-  // 不能只依赖固定 bottom/left，否则 iOS Safari 的刘海或浏览器边缘会裁掉按钮。
+  // 选择面板开关固定在聊天入口上方，避开聊天、添加对手与好友中心三个常驻按钮。
   const promptToggleStyle = {
-    left: `calc(${promptToggleOffset} + var(--layout-safe-left, 0px))`,
-    bottom: "calc(0.75rem + var(--layout-safe-bottom, 0px))",
+    left: "calc(0.75rem + var(--layout-safe-left, 0px))",
+    bottom: "calc(4.5rem + var(--layout-safe-bottom, 0px))",
   } as const;
   // 竖屏设备中的对局实际运行在 844×390 的旋转容器内。效果确认框必须使用容器单位，
   // 否则 100vw/max-sm 会继续按物理竖屏宽度计算，把横向内容误排成遮满牌桌的纵向弹窗。
