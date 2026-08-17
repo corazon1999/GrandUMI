@@ -29,6 +29,7 @@ server {
     location ^~ /_next/static/ {
         limit_except GET { deny all; }
         include /etc/nginx/snippets/grandumi-active-frontend-files.conf;
+        rewrite ^/_next/static/(.*)$ /.next/static/$1 break;
         try_files $uri =404;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Cache-Control "public, max-age=31536000, immutable" always;

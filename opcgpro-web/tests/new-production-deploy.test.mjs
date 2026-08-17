@@ -35,6 +35,7 @@ test("新正式服独立承载静态资源域名并跟随活动槽切换", () =>
   assert.match(assetsNginx, /server_name assets\.grand-umi\.com;/);
   assert.match(assetsNginx, /live\/assets\.grand-umi\.com\/fullchain\.pem/);
   assert.match(assetsNginx, /grandumi-active-frontend-files\.conf/);
+  assert.match(assetsNginx, /rewrite \^\/_next\/static\/\(\.\*\)\$ \/\.next\/static\/\$1 break/);
   assert.match(assetsNginx, /grandumi-active-assets\.conf/);
   assert.match(assetsNginx, /grandumi-active-backend\.conf/);
   assert.match(assetsNginx, /\/card-back-images\//);
