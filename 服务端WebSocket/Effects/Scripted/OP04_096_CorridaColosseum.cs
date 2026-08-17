@@ -7,7 +7,7 @@ namespace GrandUMI.Effects.Scripted;
 /// OP04-096 斗牛竞技场（舞台 / 地）
 /// 我方领袖拥有《德莱斯罗兹》特征的场合，我方拥有《德莱斯罗兹》特征的角色在登场的回合中可以攻击角色。
 ///
-/// 实现：OnEnterField（舞台登场）注册持续 GrantKeyword="登场回合可攻击角色"，谓词限定我方、领袖含
+/// 实现：OnEnterField（舞台登场）持续赋予正式关键词【速攻：角色】，谓词限定我方、领袖含
 /// 《德莱斯罗兹》、且该角色含《德莱斯罗兹》。ActionValidator 据此放行其登场回合攻击对方角色（不含领袖）。
 /// </summary>
 public class OP04_096_CorridaColosseum : IScriptedEffect
@@ -26,7 +26,7 @@ public class OP04_096_CorridaColosseum : IScriptedEffect
         {
             SourceCardId = sid,
             Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-            GrantKeyword = "登场回合可攻击角色",
+            GrantKeyword = "速攻：角色",
             Predicate = (s, sideIdx, c) => sideIdx == owner
                 && s.Players[owner].Leader.Info.HasKeyword("德莱斯罗兹")
                 && c.Info.HasKeyword("德莱斯罗兹"),

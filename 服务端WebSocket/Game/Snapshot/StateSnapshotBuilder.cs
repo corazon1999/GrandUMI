@@ -409,13 +409,19 @@ public static class StateSnapshotBuilder
                    || Array.IndexOf(card.Info.Abilities, "此角色无法攻击") >= 0));
 
     private static readonly string[] GrantableKeywords =
-        { "阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };
+        { "阻挡者", "速攻", "速攻：角色", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };
 
     private static IEnumerable<string> ContinuousGrantedKeywords(GameState state, CardInstance c)
-        => GrantableKeywords.Where(kw => state.HasContinuousKeyword(c, kw));
+    {
+        foreach (var keyword in GrantableKeywords)
+            if (state.HasContinuousKeyword(c, keyword)) yield return keyword;
+
+        // 旧脚本仍使用语义化内部名，向客户端统一输出正式词条。
+        if (state.HasContinuousKeyword(c, "登场回合可攻击角色")) yield return "速攻：角色";
+    }
 
     private static string[] GrantedKeywords(GameState state, CardInstance c)
-        => c.GainedKeywords.Select(k => k.Keyword)
+        => c.GainedKeywords.Select(k => k.Keyword == "登场回合可攻击角色" ? "速攻：角色" : k.Keyword)
             .Concat(ContinuousGrantedKeywords(state, c))
             .Distinct()
             .ToArray();

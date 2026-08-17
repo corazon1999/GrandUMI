@@ -213,7 +213,10 @@ public static class AtomicOps
         if (!owner.Characters.Contains(card) && !ReferenceEquals(owner.StageCard, card)) return;
         BattleEngine.KOCard(s, ownerIdx, card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
-            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+            new Dictionary<string, object?>
+            {
+                ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["isKo"] = true,
+            });
         // 任意角色被KO（效果）：场上他卡可据此反应（如 EB01-047 拉布）
         EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
             new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
@@ -284,7 +287,10 @@ public static class AtomicOps
             // 实际 KO（复用同步移除逻辑）
             BattleEngine.KOCard(s, ownerIdx, card);
             EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
-                new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
+                new Dictionary<string, object?>
+                {
+                    ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["isKo"] = true,
+                });
             EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
                 new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
             // 受害者 OnKO：卡已进入废弃区，但效果在"原场上位置"发动（如 EB01-057 白星因对方效果被KO）。

@@ -98,9 +98,24 @@ public static class EffectRuntime
             && process.Grants.Any(grant => grant.Owner == owner && grant.Matches(card));
     }
 
-    /// <summary>由 AtomicOps 在状态变更时调用，把 watcher 事件入队到当前效果所属的 state（无效果上下文时忽略）</summary>
+    /// <summary>由 AtomicOps 在状态变更时调用，把 watcher 事件入队到当前效果所属的 state（无效果上下文时忽略）。
+    /// 角色因效果离场时附带效果控制方，供“因对方的效果离场”类监听准确判定。</summary>
     public static void NotifyWatcher(EffectTrigger trigger, Dictionary<string, object?>? payload = null)
-        => _ambient?.EnqueueWatcher(trigger, payload);
+    {
+        var state = _ambient;
+        if (state is null) return;
+
+        if (trigger == EffectTrigger.OnCharLeaveField)
+        {
+            payload = payload is null
+                ? new Dictionary<string, object?>()
+                : new Dictionary<string, object?>(payload);
+            payload.TryAdd("actingSide", CurrentActingSide);
+            payload.TryAdd("sourceNumber", CurrentSource?.Info.Number);
+        }
+
+        state.EnqueueWatcher(trigger, payload);
+    }
 
     /// <summary>是否正在支付效果成本（DSL PayActivationCost 内为 true）。
     /// 供 OnHandDiscarded 消费端按各自规则区分成本与收益阶段；OP12-040 两者均会触发。</summary>
@@ -467,7 +482,7 @@ public static class OncePerTurnEffectCatalog
         "OP07-048", "OP07-060", "OP07-097", "OP08-001", "OP08-002", "OP08-021", "OP08-046", "OP08-056",
         "OP08-057", "OP08-067", "OP08-074", "OP08-079", "OP08-101", "OP08-105", "OP09-022", "OP09-023",
         "OP09-032", "OP09-061", "OP09-074", "OP09-084", "OP09-093", "OP10-001", "OP10-022", "OP10-034",
-        "OP10-036", "OP10-037", "OP10-066", "OP10-071", "OP10-074", "OP10-086", "OP10-092", "OP10-102",
+        "OP10-036", "OP10-037", "OP10-042", "OP10-066", "OP10-071", "OP10-074", "OP10-086", "OP10-092", "OP10-102",
         "OP10-118", "OP11-001", "OP11-012", "OP11-022", "OP11-031", "OP11-041", "OP11-043", "OP11-062",
         "OP11-071", "OP11-072", "OP11-073", "OP11-074", "OP11-077", "OP11-088", "OP11-101", "OP11-102",
         "OP11-107", "OP11-117", "OP12-001", "OP12-004", "OP12-008", "OP12-020", "OP12-041", "OP12-053",

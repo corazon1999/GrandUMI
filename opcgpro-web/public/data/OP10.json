@@ -916,7 +916,8 @@
     "keyWords": "德莱斯罗兹/草帽一伙",
     "counter": "",
     "effectTags": [
-      "OnCharLeaveField"
+      "OnCharLeaveField",
+      "OnAnyCharKOd"
     ],
     "abilities": [],
     "effectEvent": "",
