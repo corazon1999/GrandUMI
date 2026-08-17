@@ -314,7 +314,7 @@ export interface MsgEnterMatch extends MsgBase {
   proto: "MsgEnterMatch";
   deck: string;
   deckName?: string;
-  queueKind?: "ranked" | "casual";
+  queueKind?: MatchQueueKind;
   result?: boolean;
   logStr?: string;
 }
@@ -324,16 +324,20 @@ export interface MsgCancelMatch extends MsgBase {
 }
 
 export type RankFaction = "pirate" | "marine" | "government";
+export type RankedMode = "standard" | "wild";
+export type MatchQueueKind = "ranked" | "rankedWild" | "casual";
 
 export interface MsgSelectRankFaction extends MsgBase {
   proto: "MsgSelectRankFaction";
   faction: RankFaction;
   /** 更换已选阵营时，明确确认清空本赛季排位进度。 */
   resetRankProgress?: boolean;
+  mode?: RankedMode;
   result?: boolean;
   logStr?: string;
   profile?: RankProfileSnapshot;
   leaderboard?: RankLeaderboardItem[];
+  factionStandings?: FactionStanding[];
 }
 
 // 单人测试模式：与机器人对战
@@ -349,7 +353,7 @@ export interface MsgEnterBotMatch extends MsgBase {
 export interface MsgMatchFound extends MsgBase {
   proto: "MsgMatchFound";
   opponentName: string;
-  queueKind?: "ranked" | "casual";
+  queueKind?: MatchQueueKind;
 }
 
 export interface RankProfileSnapshot {
@@ -371,6 +375,7 @@ export interface RankProfileSnapshot {
 
 export interface RankLeaderboardItem {
   rank: number;
+  factionRank: number;
   displayName: string;
   rankPoints: number;
   faction: RankFaction;
@@ -382,6 +387,15 @@ export interface RankLeaderboardItem {
   favoriteLeader?: string | null;
   championLeaderNumbers?: string[];
   isCurrentPlayer?: boolean;
+}
+
+export interface FactionStanding {
+  rank: number;
+  faction: RankFaction;
+  totalRankPoints: number;
+  playerCount: number;
+  games: number;
+  wins: number;
 }
 
 export interface RankPlayerSettlement {
@@ -408,15 +422,19 @@ export interface RankPlayerSettlement {
 
 export interface MsgRankSnapshot extends MsgBase {
   proto: "MsgRankSnapshot";
-  profile: RankProfileSnapshot;
-  leaderboard: RankLeaderboardItem[];
+  mode?: RankedMode;
+  profile?: RankProfileSnapshot;
+  leaderboard?: RankLeaderboardItem[];
+  factionStandings?: FactionStanding[];
 }
 
 export interface MsgRankResult extends MsgBase {
   proto: "MsgRankResult";
+  mode?: RankedMode;
   result?: RankPlayerSettlement;
   profile?: RankProfileSnapshot;
   leaderboard?: RankLeaderboardItem[];
+  factionStandings?: FactionStanding[];
   error?: string;
 }
 
@@ -661,6 +679,26 @@ export interface MsgFriendRemove extends MsgBase {
 export interface MsgFriendCancel extends MsgBase {
   proto: "MsgFriendCancel";
   requestId?: number;
+  result?: boolean;
+  logStr?: string;
+}
+
+export interface BlockedPlayerInfo {
+  account: string;
+  name: string;
+  createdAt: number;
+}
+
+export type PlayerReportCategory = "harassment" | "stalling" | "cheating" | "spam" | "other";
+
+export interface MsgPlayerSafety extends MsgBase {
+  proto: "MsgPlayerSafety";
+  action?: "list" | "block" | "unblock" | "report";
+  targetAccount?: string;
+  currentOpponent?: boolean;
+  category?: PlayerReportCategory;
+  description?: string;
+  blockedPlayers?: BlockedPlayerInfo[];
   result?: boolean;
   logStr?: string;
 }
@@ -1007,6 +1045,8 @@ export interface ReplayHandFrameSnapshot {
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
+  /** 生成该快照时的服务端 UTC 时间，供客户端校准权威倒计时。 */
+  serverNowUtc?: string;
   /** 本局锁定的卡牌效果规则版本；断线恢复和回放期间保持不变。 */
   rulesetId?: string;
   tick: number;
@@ -1027,10 +1067,12 @@ export interface MsgGameState extends MsgBase {
   operationClockEnabled?: boolean;
   myOperationTimeMs?: number;
   opponentOperationTimeMs?: number;
+  myTurnOperationTimeMs?: number;
+  opponentTurnOperationTimeMs?: number;
   operationClockActive?: "my" | "opponent" | null;
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
-  matchKind?: "Ranked" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
+  matchKind?: "Ranked" | "RankedWild" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
   isGameOver: boolean;
   isDraw?: boolean;
   winnerIsMe: boolean;
@@ -1326,6 +1368,7 @@ export type AnyMsg =
   | MsgFriendRespond
   | MsgFriendRemove
   | MsgFriendCancel
+  | MsgPlayerSafety
   | MsgInvitePlayer
   | MsgInviteNotify
   | MsgInviteResponse

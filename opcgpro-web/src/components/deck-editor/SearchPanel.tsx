@@ -23,10 +23,10 @@ export default function SearchPanel({ onClose }: { onClose?: () => void }) {
   const {
     leader,
     searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost,
-    filterSets, filterShowSub1,
+    filterSets, filterShowSub1, filterHasTrigger,
     gridColumns,
     setSearchQuery, toggleFilterColor, clearFilterColors, setFilterType, setFilterProperty, setFilterRarity, setFilterCost,
-    toggleFilterSet, clearFilterSets, setFilterShowSub1,
+    toggleFilterSet, clearFilterSets, setFilterShowSub1, setFilterHasTrigger,
     setGridColumns,
   } = useDeckStore();
 
@@ -34,7 +34,7 @@ export default function SearchPanel({ onClose }: { onClose?: () => void }) {
   const [setGroupExpanded, setSetGroupExpanded] = useState<number | null>(null);
 
   const isLeaderMode        = filterType === "Leader";
-  const hasFilter           = !!(searchQuery || filterColors.length > 0 || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1);
+  const hasFilter           = !!(searchQuery || filterColors.length > 0 || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1 || filterHasTrigger);
 
   // 已选领航且非领航模式时，颜色筛选收缩为领航拥有的颜色（双色剩 2、单色剩 1）；否则显示全部 6 色
   const leaderDataColors    = leader && !isLeaderMode ? leader.color.split("/") : null;
@@ -242,6 +242,20 @@ export default function SearchPanel({ onClose }: { onClose?: () => void }) {
             </div>
           </div>
 
+          {/* 仅显示拥有【触发】效果的卡牌 */}
+          <button
+            type="button"
+            onClick={() => setFilterHasTrigger(!filterHasTrigger)}
+            aria-pressed={filterHasTrigger}
+            className={`min-h-11 w-full rounded-lg border py-1.5 text-[10px] font-bold transition-colors ${
+              filterHasTrigger
+                ? "border-amber-500 bg-amber-500/25 text-amber-100"
+                : "border-gray-700 bg-gray-800 text-gray-500 hover:text-white"
+            }`}
+          >
+            {filterHasTrigger ? "✓ 仅显示拥有【触发】的卡" : "筛选拥有【触发】的卡"}
+          </button>
+
           {/* 角标=1 切换（默认隐藏，按下显示） */}
           <button
             onClick={() => setFilterShowSub1(!filterShowSub1)}
@@ -260,7 +274,7 @@ export default function SearchPanel({ onClose }: { onClose?: () => void }) {
             <button
               onClick={() => {
                 setSearchQuery(""); clearFilterColors(); setFilterType(""); setFilterProperty(""); setFilterRarity(""); setFilterCost(null);
-                clearFilterSets(); setFilterShowSub1(false);
+                clearFilterSets(); setFilterShowSub1(false); setFilterHasTrigger(false);
               }}
               className="text-gray-600 hover:text-white text-[10px] transition-colors text-center"
             >

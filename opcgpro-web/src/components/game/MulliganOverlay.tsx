@@ -8,6 +8,7 @@ import { getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 import { useResponsive } from "@/hooks/useResponsive";
 import { showMessage } from "@/components/ui/MessageBox";
+import { useServerCountdown } from "@/hooks/useServerCountdown";
 
 const RECOVERY_RETRY_INTERVAL_MS = 2500;
 const MAX_RECOVERY_ATTEMPTS = 3;
@@ -19,27 +20,21 @@ export default function MulliganOverlay() {
   const isFirst = useGameStore((s) => s.isFirstPlayer);
   const mulliganBothDone = useGameStore((s) => s.mulliganBothDone);
   const mulliganDeadlineUtc = useGameStore((s) => s.mulliganDeadlineUtc);
+  const serverNowUtc = useGameStore((s) => s.serverNowUtc);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
   const { cardSize } = useResponsive();
-  const [now, setNow] = useState(() => Date.now());
   const [recoveryAttempts, setRecoveryAttempts] = useState(0);
   const opponentRedrawNotified = useRef(false);
   const opponentRedrew = opp?.mulliganDone === true && opp.hasReDraw === false;
 
-  const deadlineMs = mulliganDeadlineUtc ? Date.parse(mulliganDeadlineUtc) : Number.NaN;
-  const remainingSeconds = Number.isFinite(deadlineMs)
-    ? Math.max(0, Math.ceil((deadlineMs - now) / 1000))
-    : 60;
+  const remainingSeconds = useServerCountdown(
+    mulliganDeadlineUtc,
+    serverNowUtc,
+    Boolean(mulliganDeadlineUtc && !mulliganBothDone),
+  );
   const isExpiring = remainingSeconds <= 10;
   const timedOut = remainingSeconds === 0;
-
-  useEffect(() => {
-    if (!mulliganDeadlineUtc || mulliganBothDone) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [mulliganDeadlineUtc, mulliganBothDone]);
 
   useEffect(() => {
     if (!timedOut || mulliganBothDone || !mulliganDeadlineUtc) {
@@ -87,7 +82,7 @@ export default function MulliganOverlay() {
   const choosing = !myDone;
 
   const submitMulligan = (redraw: boolean) => {
-    if (timedOut || useGameStore.getState().isPending) return;
+    if (useGameStore.getState().isPending) return;
     GameRequest.mulligan(redraw);
   };
 
@@ -106,7 +101,7 @@ export default function MulliganOverlay() {
           </p>
           <p className="text-gray-400 text-sm">
             {timedOut && choosing
-              ? "时间到，正在同步自动保留结果…"
+              ? "时间到，服务器正在自动保留；完成前仍可提交选择"
               : timedOut
                 ? "对手选择已超时，正在恢复对局状态…"
               : choosing ? "是否要更换起始手牌？" : oppDone ? "进入对局..." : "等待对手选择..."}
@@ -140,11 +135,11 @@ export default function MulliganOverlay() {
         {choosing && (
           <motion.div className="flex flex-wrap justify-center gap-4"
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}>
-            <button onClick={() => submitMulligan(true)} disabled={timedOut || isPending}
+            <button onClick={() => submitMulligan(true)} disabled={isPending}
               className="min-h-12 min-w-28 rounded-lg bg-blue-600 px-8 py-3 text-base font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-wait disabled:opacity-50">
               更换
             </button>
-            <button onClick={() => submitMulligan(false)} disabled={timedOut || isPending}
+            <button onClick={() => submitMulligan(false)} disabled={isPending}
               className="min-h-12 min-w-28 rounded-lg bg-orange-500 px-8 py-3 text-base font-bold text-white transition-colors hover:bg-orange-400 disabled:cursor-wait disabled:opacity-50">
               保留
             </button>

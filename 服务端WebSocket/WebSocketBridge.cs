@@ -49,6 +49,7 @@ public static class WebSocketBridge
     private static readonly object                                  AccountIndexGate = new();
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
+    private static readonly ConcurrentQueue<WsSession>              WildRankedMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
     private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
@@ -57,13 +58,30 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string> FriendlyByAccount = new(StringComparer.OrdinalIgnoreCase); // account → roomId
     private static readonly ConcurrentDictionary<string, CancellationTokenSource> FriendlyDisconnectGrace = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> GameChatAt = new(); // sessionId → 上次局内聊天时间(限频防刷屏)
+    private static readonly ConcurrentDictionary<string, ConcurrentQueue<GameChatEvidence>> GameChatEvidenceByRoom = new(StringComparer.Ordinal);
     private static readonly PostGameChatRegistry PostGameChats = new(TimeSpan.FromMinutes(30));
+    private static readonly ConcurrentDictionary<string, RecentOpponentContext> RecentOpponentContexts = new(StringComparer.Ordinal);
     private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
     private static readonly TimeSpan SupersededClientLifetime = TimeSpan.FromDays(30);
     private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
+    private sealed record GameChatEvidence(
+        DateTime SentAtUtc,
+        string? FromAccount,
+        string FromName,
+        string FromRole,
+        string Text,
+        string? Code);
+    private sealed record RecentOpponentContext(
+        string OpponentAccount,
+        string RoomId,
+        string MatchKind,
+        int TurnCount,
+        string? GameOverReason,
+        GameChatEvidence[] RecentGameChat,
+        DateTime ExpiresAtUtc);
 
     private static CancellationTokenSource _cts = new();
     private static PlayerDataStore _playerDataStore = null!;
@@ -196,6 +214,7 @@ public static class WebSocketBridge
         if (session.IsMatching) RebuildMatchQueue(session);
         // 对局中的玩家断开 → 进入 90s 宽限期（M1）
         GameOpponent.TryRemove(session.SessionId, out _);
+        RecentOpponentContexts.TryRemove(session.SessionId, out _);
         GameChatAt.TryRemove(session.SessionId, out _);
         PostGameChats.Leave(session.SessionId);
         CleanupInvites(session.SessionId);
@@ -261,6 +280,7 @@ public static class WebSocketBridge
             case "MsgCopyDeckPlaza": OnCopyDeckPlaza(session, msg); break;
             case "MsgDeleteDeckPlaza": OnDeleteDeckPlaza(session, msg); break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
+            case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode"))); break;
             case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -274,6 +294,7 @@ public static class WebSocketBridge
             case "MsgFriendRespond": OnFriendRespond(session, msg); break;
             case "MsgFriendCancel": OnFriendCancel(session, msg); break;
             case "MsgFriendRemove": OnFriendRemove(session, msg); break;
+            case "MsgPlayerSafety": OnPlayerSafety(session, msg); break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
             case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
             case "MsgLeaderMatchupMatrix": OnLeaderMatchupMatrix(session, msg); break;
@@ -927,8 +948,16 @@ public static class WebSocketBridge
         }
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在房间、观战或对局中" }); return; }
 
+        var queueKind = Str(msg, "queueKind") switch
+        {
+            var value when string.Equals(value, "rankedWild", StringComparison.OrdinalIgnoreCase) => "rankedWild",
+            var value when string.Equals(value, "ranked", StringComparison.OrdinalIgnoreCase) => "ranked",
+            _ => "casual",
+        };
+        var ranked = IsRankedQueue(queueKind);
+        var rankedMode = RankedModeForQueue(queueKind);
         var deck = Str(msg, "deck") ?? "";
-        var v    = DeckValidator.Validate(deck);
+        var v = DeckValidator.Validate(deck, queueKind == "ranked" ? DeckValidator.FormatStandard : DeckValidator.FormatUnrestricted);
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = $"卡组不合法: {v.Reason}" });
@@ -936,10 +965,7 @@ public static class WebSocketBridge
             return;
         }
 
-        var queueKind = string.Equals(Str(msg, "queueKind"), "ranked", StringComparison.OrdinalIgnoreCase)
-            ? "ranked"
-            : "casual";
-        if (queueKind == "ranked" && RankedStore.Default.GetSnapshot(s.Account!, s.PlayerName).Profile.Faction is null)
+        if (ranked && RankedStore.ForMode(rankedMode).GetSnapshot(s.Account!, s.PlayerName).Profile.Faction is null)
         {
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择阵营，阵营选定后不可更改" });
             return;
@@ -948,16 +974,16 @@ public static class WebSocketBridge
         s.DeckName = Str(msg, "deckName");
         s.MatchQueueKind = queueKind;
         s.MatchEnqueuedAtUtc = DateTime.UtcNow;
-        s.MatchRating = queueKind == "ranked"
-            ? RankedStore.Default.GetMatchRating(s.Account!, s.PlayerName)
+        s.MatchRating = ranked
+            ? RankedStore.ForMode(rankedMode).GetMatchRating(s.Account!, s.PlayerName)
             : 1500;
         s.IsMatching = true;
-        var queue = queueKind == "ranked" ? RankedMatchQueue : MatchQueue;
+        var queue = QueueFor(queueKind);
         queue.Enqueue(s);
         Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind });
-        Log($"{(queueKind == "ranked" ? "排位" : "休闲")}匹配加入 {s.Account}");
+        Log($"{QueueLabel(queueKind)}匹配加入 {s.Account}");
         TryMatch(queueKind);
-        if (queueKind == "ranked") _ = RetryRankedMatchAsync(s);
+        if (ranked) _ = RetryRankedMatchAsync(s, queueKind);
     }
 
     /// <summary>单人测试模式：人类(P0,先手) vs 机器人(P1,同卡组)，立即建房</summary>
@@ -1036,8 +1062,8 @@ public static class WebSocketBridge
             CancelMatchingSessions();
             return;
         }
-        var ranked = queueKind == "ranked";
-        var queue = ranked ? RankedMatchQueue : MatchQueue;
+        var ranked = IsRankedQueue(queueKind);
+        var queue = QueueFor(queueKind);
         while (TryTakeMatchPairFromQueue(queue, ranked, out var p1, out var p2))
         {
             var deck1 = p1.Deck ?? "";
@@ -1053,7 +1079,7 @@ public static class WebSocketBridge
                     p1CardBackId: p2.CardBackId,
                     p0SpriteMap: ResolveDeckSpriteMap(p1.Account ?? "", p1.DeckName, deck1),
                     p1SpriteMap: ResolveDeckSpriteMap(p2.Account ?? "", p2.DeckName, deck2),
-                    matchKind: ranked ? MatchKind.Ranked : MatchKind.Casual,
+                    matchKind: MatchKindForQueue(queueKind),
                     broadcastInitialState: false,
                     p0DisplayName: p1.PlayerName,
                     p1DisplayName: p2.PlayerName,
@@ -1071,7 +1097,7 @@ public static class WebSocketBridge
                 Send(p1.SessionId, new { proto = "MsgGameStart" });
                 Send(p2.SessionId, new { proto = "MsgGameStart" });
                 room.Engine.BroadcastInitialState();
-                Log($"{(ranked ? "排位" : "休闲")}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
+                Log($"{QueueLabel(queueKind)}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
             }
             catch (GameMaintenanceException ex)
             {
@@ -1087,16 +1113,43 @@ public static class WebSocketBridge
         }
     }
 
-    private static async Task RetryRankedMatchAsync(WsSession session)
+    private static async Task RetryRankedMatchAsync(WsSession session, string queueKind)
     {
         foreach (var delay in new[] { 15, 15, 30, 30 })
         {
             try { await Task.Delay(TimeSpan.FromSeconds(delay), _cts.Token); }
             catch (OperationCanceledException) { return; }
-            if (!session.IsMatching || session.MatchQueueKind != "ranked") return;
-            TryMatch("ranked");
+            if (!session.IsMatching || session.MatchQueueKind != queueKind) return;
+            TryMatch(queueKind);
         }
     }
+
+    private static bool IsRankedQueue(string queueKind)
+        => queueKind is "ranked" or "rankedWild";
+
+    private static RankedMode RankedModeForQueue(string queueKind)
+        => queueKind == "rankedWild" ? RankedMode.Wild : RankedMode.Standard;
+
+    private static ConcurrentQueue<WsSession> QueueFor(string queueKind) => queueKind switch
+    {
+        "ranked" => RankedMatchQueue,
+        "rankedWild" => WildRankedMatchQueue,
+        _ => MatchQueue,
+    };
+
+    private static MatchKind MatchKindForQueue(string queueKind) => queueKind switch
+    {
+        "ranked" => MatchKind.Ranked,
+        "rankedWild" => MatchKind.RankedWild,
+        _ => MatchKind.Casual,
+    };
+
+    private static string QueueLabel(string queueKind) => queueKind switch
+    {
+        "ranked" => "标准排位",
+        "rankedWild" => "狂野排位",
+        _ => "休闲",
+    };
 
     /// <summary>
     /// 在同一临界区内取出并占用一对不同玩家，避免并发 TryMatch 或重复队列项让同一会话进入两个座位。
@@ -1208,17 +1261,19 @@ public static class WebSocketBridge
         exclude.IsMatching = false;
     }
 
-    private static void SendRankSnapshot(WsSession session)
+    private static void SendRankSnapshot(WsSession session, RankedMode mode = RankedMode.Standard)
     {
         if (session.Account is null) return;
         try
         {
-            var snapshot = RankedStore.Default.GetSnapshot(session.Account, session.PlayerName);
+            var snapshot = RankedStore.ForMode(mode).GetSnapshot(session.Account, session.PlayerName);
             Send(session.SessionId, new
             {
                 proto = "MsgRankSnapshot",
+                mode = RankedModeWire.Value(mode),
                 profile = RankWire.Profile(snapshot.Profile),
                 leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+                factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
             });
         }
         catch (Exception ex)
@@ -1241,9 +1296,10 @@ public static class WebSocketBridge
         }
 
         var requested = Str(msg, "faction") ?? string.Empty;
+        var mode = RankedModeWire.Parse(Str(msg, "mode"));
         try
         {
-            var snapshot = RankedStore.Default.SelectFaction(session.Account, session.PlayerName, requested,
+            var snapshot = RankedStore.ForMode(mode).SelectFaction(session.Account, session.PlayerName, requested,
                 resetRankProgress: Bool(msg, "resetRankProgress"));
             if (snapshot is null)
             {
@@ -1259,8 +1315,10 @@ public static class WebSocketBridge
             {
                 proto = "MsgSelectRankFaction",
                 result = true,
+                mode = RankedModeWire.Value(mode),
                 profile = RankWire.Profile(snapshot.Profile),
                 leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+                factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
             });
         }
         catch (Exception ex)
@@ -1503,8 +1561,12 @@ public static class WebSocketBridge
         var limit = msg.TryGetValue("limit", out var limitValue) && limitValue.TryGetInt32(out var parsedLimit)
             ? Math.Clamp(parsedLimit, 1, 200)
             : 100;
+        var blockedAccounts = s.Account is null
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : _playerDataStore.GetBlockedRelatedAccountKeys(s.Account);
         var loggedIn = Sessions.Values
             .Where(x => x.IsLoggedIn)
+            .Where(x => x.Account is null || !blockedAccounts.Contains(x.Account))
             .OrderBy(x => x.Account, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var players = loggedIn
@@ -1562,6 +1624,178 @@ public static class WebSocketBridge
         {
             SendFriendError(s, "MsgFriendList", ex, "好友列表暂时不可用");
         }
+    }
+
+    private static void OnPlayerSafety(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!s.IsLoggedIn || s.Account is null || !IsCurrentAccountSession(s))
+        {
+            Send(s.SessionId, new { proto = "MsgPlayerSafety", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!s.TryConsumeRateLimit("player-safety", capacity: 6, refillPerSecond: 0.5))
+        {
+            Send(s.SessionId, new { proto = "MsgPlayerSafety", result = false, logStr = "操作过于频繁，请稍后再试" });
+            return;
+        }
+
+        try
+        {
+            var action = (Str(msg, "action") ?? "list").Trim().ToLowerInvariant();
+            var targetAccount = ResolvePlayerSafetyTarget(s, msg);
+            string? logStr = null;
+            switch (action)
+            {
+                case "list":
+                    break;
+                case "block":
+                    _playerDataStore.BlockPlayer(s.Account, targetAccount);
+                    logStr = "已屏蔽该玩家，并清除双方好友与待处理消息";
+                    PushFriendDataToAccount(s.Account);
+                    PushFriendDataToAccount(targetAccount);
+                    break;
+                case "unblock":
+                    _playerDataStore.UnblockPlayer(s.Account, targetAccount);
+                    logStr = "已解除屏蔽";
+                    break;
+                case "report":
+                    if (!s.TryConsumeRateLimit("player-report", capacity: 3, refillPerSecond: 1.0 / 120))
+                        throw new PlayerDataValidationException("举报提交过于频繁，请稍后再试。");
+                    var description = Str(msg, "description") ?? "";
+                    var context = BuildPlayerReportContext(s, targetAccount);
+                    _playerDataStore.CreatePlayerReport(
+                        s.Account,
+                        targetAccount,
+                        Str(msg, "category") ?? "harassment",
+                        description,
+                        context);
+                    logStr = "举报已提交，感谢你协助维护社区环境";
+                    break;
+                default:
+                    throw new PlayerDataValidationException("不支持的安全操作。");
+            }
+
+            SendPlayerSafetyState(s, logStr);
+        }
+        catch (Exception ex)
+        {
+            SendFriendError(s, "MsgPlayerSafety", ex, "安全操作暂时不可用");
+        }
+    }
+
+    private static string ResolvePlayerSafetyTarget(
+        WsSession session,
+        IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        var targetAccount = (Str(msg, "targetAccount") ?? "").Trim();
+        if (!Bool(msg, "currentOpponent")) return targetAccount;
+        var room = GameRoomManager.GetRoomBySession(session.SessionId);
+        if (room is not null)
+        {
+            var reporterSeat = Array.IndexOf(room.PlayerSessionIds, session.SessionId);
+            if (reporterSeat is 0 or 1 && !string.IsNullOrWhiteSpace(room.PlayerAccounts[1 - reporterSeat]))
+                return room.PlayerAccounts[1 - reporterSeat];
+        }
+        if (GameOpponent.TryGetValue(session.SessionId, out var opponentSessionId)
+            && Sessions.TryGetValue(opponentSessionId, out var opponent)
+            && opponent.IsLoggedIn
+            && !string.IsNullOrWhiteSpace(opponent.Account))
+            return opponent.Account;
+
+        if (TryGetRecentOpponentContext(session.SessionId, out var recent))
+            return recent.OpponentAccount;
+
+        throw new PlayerDataValidationException("当前没有可操作的交战对手。");
+    }
+
+    private static string BuildPlayerReportContext(WsSession session, string targetAccount)
+    {
+        var reportedAtUtc = DateTime.UtcNow;
+        var room = GameRoomManager.GetRoomBySession(session.SessionId);
+        if (room is not null)
+        {
+            var state = room.Engine.State;
+            var reporterSeat = Array.IndexOf(room.PlayerSessionIds, session.SessionId);
+            var reportedSeat = Array.FindIndex(
+                room.PlayerAccounts,
+                account => string.Equals(account, targetAccount, StringComparison.OrdinalIgnoreCase));
+            return JsonSerializer.Serialize(new
+            {
+                evidenceVersion = 1,
+                source = "active_match",
+                roomId = room.RoomId,
+                matchKind = room.MatchKind.ToString(),
+                roomCreatedAtUtc = room.CreatedAt,
+                reportedAtUtc,
+                reporterSeat,
+                reportedSeat,
+                turnCount = state.TurnCount,
+                phase = state.Phase.ToString(),
+                currentTurnPlayer = state.CurrentTurnPlayer,
+                gameOverReason = state.GameOverReason,
+                operationClockEnabled = state.OperationClockEnabled,
+                operationClockRemainingMs = state.OperationClockRemainingMs.ToArray(),
+                operationTurnClockRemainingMs = state.OperationTurnClockRemainingMs.ToArray(),
+                operationClockActivePlayer = state.OperationClockActivePlayer,
+                operationClockPaused = state.OperationClockPaused,
+                recentGameChat = SnapshotGameChatEvidence(room.RoomId),
+            });
+        }
+
+        if (TryGetRecentOpponentContext(session.SessionId, out var recent)
+            && string.Equals(recent.OpponentAccount, targetAccount, StringComparison.OrdinalIgnoreCase))
+            return JsonSerializer.Serialize(new
+            {
+                evidenceVersion = 1,
+                source = "recent_match",
+                roomId = recent.RoomId,
+                matchKind = recent.MatchKind,
+                reportedAtUtc,
+                turnCount = recent.TurnCount,
+                gameOverReason = recent.GameOverReason,
+                recentGameChat = recent.RecentGameChat,
+            });
+
+        return JsonSerializer.Serialize(new
+        {
+            evidenceVersion = 1,
+            source = "player_directory",
+            reportedAtUtc,
+        });
+    }
+
+    private static bool TryGetRecentOpponentContext(string sessionId, out RecentOpponentContext context)
+    {
+        if (RecentOpponentContexts.TryGetValue(sessionId, out context!)
+            && context.ExpiresAtUtc > DateTime.UtcNow)
+            return true;
+        RecentOpponentContexts.TryRemove(sessionId, out _);
+        context = null!;
+        return false;
+    }
+
+    private static GameChatEvidence[] SnapshotGameChatEvidence(string roomId)
+        => GameChatEvidenceByRoom.TryGetValue(roomId, out var queue)
+            ? queue.ToArray()
+            : [];
+
+    private static void SendPlayerSafetyState(WsSession session, string? logStr = null)
+    {
+        var blockedPlayers = _playerDataStore.GetBlockedPlayers(session.Account!)
+            .Select(player => new
+            {
+                account = player.Account,
+                name = player.DisplayName,
+                createdAt = player.BlockedAt,
+            })
+            .ToArray();
+        Send(session.SessionId, new
+        {
+            proto = "MsgPlayerSafety",
+            result = true,
+            logStr,
+            blockedPlayers,
+        });
     }
 
     private static void OnFriendSearch(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
@@ -2008,6 +2242,11 @@ public static class WebSocketBridge
             !Sessions.TryGetValue(toSid, out var target) || !target.IsLoggedIn)
         {
             Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "对方不在线" });
+            return;
+        }
+        if (_playerDataStore.GetBlockedRelatedAccountKeys(s.Account!).Contains(toAccount))
+        {
+            Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "你与该玩家之间已启用屏蔽" });
             return;
         }
 
@@ -2830,9 +3069,12 @@ public static class WebSocketBridge
         var text = (Str(msg, "Msg") ?? "").Trim();
         if (text.Length == 0) return;
         if (text.Length > 200) text = text[..200];
-        var pkt  = new { proto = "MsgChatMsg", type, Name = name, Msg = text };
-
-        BroadcastAll(pkt);
+        var pkt  = new { proto = "MsgChatMsg", type, Name = name, account = s.Account, Msg = text };
+        var blockedAccounts = _playerDataStore.GetBlockedRelatedAccountKeys(s.Account!);
+        foreach (var recipient in Sessions.Values)
+            if (recipient.IsLoggedIn
+                && (recipient.Account is null || !blockedAccounts.Contains(recipient.Account)))
+                Send(recipient.SessionId, pkt);
     }
 
     /// <summary>仅允许指定管理员向全部在线会话发送的瞬时滚动公告。</summary>
@@ -3094,6 +3336,18 @@ public static class WebSocketBridge
         GameChatAt[s.SessionId] = now;
 
         int seat = Array.IndexOf(playerSessionIds, s.SessionId); // 0/1=玩家, -1=观战
+        if (room is not null && seat >= 0)
+        {
+            var evidence = GameChatEvidenceByRoom.GetOrAdd(room.RoomId, _ => new ConcurrentQueue<GameChatEvidence>());
+            evidence.Enqueue(new GameChatEvidence(
+                now,
+                s.Account,
+                s.PlayerName ?? s.Account ?? "玩家",
+                "player",
+                text,
+                code));
+            while (evidence.Count > 24) evidence.TryDequeue(out _);
+        }
         var pkt = new
         {
             proto = "MsgGameChat",
@@ -3104,7 +3358,16 @@ public static class WebSocketBridge
             fromName = s.PlayerName ?? s.Account ?? "玩家",
             fromRole = seat >= 0 ? "player" : "spectator",
         };
-        foreach (var recipient in recipients) Send(recipient, pkt);
+        var blockedAccounts = string.IsNullOrWhiteSpace(s.Account)
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : _playerDataStore.GetBlockedRelatedAccountKeys(s.Account);
+        foreach (var recipient in recipients)
+        {
+            if (!Sessions.TryGetValue(recipient, out var recipientSession)
+                || recipientSession.Account is null
+                || !blockedAccounts.Contains(recipientSession.Account))
+                Send(recipient, pkt);
+        }
     }
 
     /// <summary>好友实时私聊：仅允许已建立好友关系的双方互发，消息不会广播给对局或大厅。</summary>
@@ -3160,6 +3423,7 @@ public static class WebSocketBridge
     private static void OnLeaveGameChat(WsSession s)
     {
         PostGameChats.Leave(s.SessionId);
+        RecentOpponentContexts.TryRemove(s.SessionId, out _);
     }
 
     // ── 对手查找 ──────────────────────────────────────────────────────────
@@ -3510,17 +3774,36 @@ public static class WebSocketBridge
     public static void OnGameChatParticipantJoined(string sessionId)
     {
         PostGameChats.Leave(sessionId);
+        RecentOpponentContexts.TryRemove(sessionId, out _);
     }
 
     /// <summary>权威对局清理时保留轻量赛后聊天组，并清除会话级对手索引。</summary>
     public static void OnGameRoomClosed(
+        string roomId,
         IEnumerable<string> playerSessionIds,
+        IEnumerable<string> playerAccounts,
         IEnumerable<string> spectatorSessionIds,
-        bool preservePostGameChat)
+        bool preservePostGameChat,
+        MatchKind matchKind,
+        int turnCount,
+        string? gameOverReason)
     {
         var players = playerSessionIds.ToArray();
+        var accounts = playerAccounts.ToArray();
         if (preservePostGameChat)
+        {
             PostGameChats.Register(players, spectatorSessionIds);
+            if (players.Length >= 2 && accounts.Length >= 2)
+            {
+                var expiresAtUtc = DateTime.UtcNow.AddMinutes(30);
+                var recentGameChat = SnapshotGameChatEvidence(roomId);
+                RecentOpponentContexts[players[0]] = new RecentOpponentContext(
+                    accounts[1], roomId, matchKind.ToString(), turnCount, gameOverReason, recentGameChat, expiresAtUtc);
+                RecentOpponentContexts[players[1]] = new RecentOpponentContext(
+                    accounts[0], roomId, matchKind.ToString(), turnCount, gameOverReason, recentGameChat, expiresAtUtc);
+            }
+        }
+        GameChatEvidenceByRoom.TryRemove(roomId, out _);
         foreach (var sessionId in players)
             GameOpponent.TryRemove(sessionId, out _);
     }

@@ -62,7 +62,7 @@ export default function GameOverOverlay({ isObserver, onReturnToHome }: Props) {
                 结束原因：{gameOverReason}
               </motion.p>
             )}
-            {!isDraw && matchKind === "Ranked" && rankResult && (
+            {!isDraw && (matchKind === "Ranked" || matchKind === "RankedWild") && rankResult && (
               <motion.div
                 className="contents"
                 initial={{ opacity: 0, y: 8 }}

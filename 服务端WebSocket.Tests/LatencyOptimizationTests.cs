@@ -153,10 +153,11 @@ public class LatencyOptimizationTests
         };
         var payload = new { value = 7 };
 
-        var all = StateSnapshotBuilder.BuildAll(state, "Prompt", payload);
-        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, 0, "Prompt", payload)), JsonSerializer.Serialize(all.Player0));
-        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, 1, "Prompt", payload)), JsonSerializer.Serialize(all.Player1));
-        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, -1, "Prompt", payload)), JsonSerializer.Serialize(all.Spectator));
+        var serverNowUtc = DateTime.UtcNow;
+        var all = StateSnapshotBuilder.BuildAll(state, "Prompt", payload, serverNowUtc: serverNowUtc);
+        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, 0, "Prompt", payload, serverNowUtc: serverNowUtc)), JsonSerializer.Serialize(all.Player0));
+        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, 1, "Prompt", payload, serverNowUtc: serverNowUtc)), JsonSerializer.Serialize(all.Player1));
+        Assert.Equal(JsonSerializer.Serialize(StateSnapshotBuilder.Build(state, -1, "Prompt", payload, serverNowUtc: serverNowUtc)), JsonSerializer.Serialize(all.Spectator));
 
         using var spectator = JsonDocument.Parse(JsonSerializer.Serialize(all.Spectator));
         Assert.Equal(JsonValueKind.Null, spectator.RootElement.GetProperty("pendingPrompt").ValueKind);

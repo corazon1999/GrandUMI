@@ -30,7 +30,12 @@ test("投骰界面显示权威倒计时并在超时后请求恢复", async () =>
   ]);
 
   assert.match(netTypes, /startingPlayerChoiceDeadlineUtc\?: string \| null/);
+  assert.match(netTypes, /serverNowUtc\?: string/);
   assert.match(store, /s\.startingPlayerChoiceDeadlineUtc = msg\.startingPlayerChoiceDeadlineUtc \?\? null/);
+  assert.match(store, /s\.serverNowUtc = msg\.serverNowUtc \?\? null/);
+  assert.match(overlay, /useServerCountdown/);
+  assert.match(overlay, /\{canChooseFirstPlayer \? \(/);
+  assert.doesNotMatch(overlay, /canChooseFirstPlayer && !timedOut/);
   assert.match(overlay, /选择剩余 \{remainingSeconds\} 秒/);
   assert.match(overlay, /超时后将默认由骰点胜者先手/);
   assert.match(overlay, /GameRequest\.requestState\(\)/);

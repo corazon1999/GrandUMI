@@ -65,6 +65,8 @@ export interface CardSearchFilters {
   filterCost: number | null;
   filterSets: string[];
   filterShowSub1: boolean;
+  /** 仅显示拥有生命【触发】效果的卡牌。 */
+  filterHasTrigger?: boolean;
 }
 
 interface CardSearchOptions {
@@ -188,6 +190,7 @@ export function filterAndSortCards(
     filterCost,
     filterSets,
     filterShowSub1,
+    filterHasTrigger = false,
   } = filters;
   const isLeaderMode = filterType === "Leader";
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
@@ -199,6 +202,7 @@ export function filterAndSortCards(
       if (options.allowedSets && !options.allowedSets.includes(setCode)) return false;
       if (filterSets.length > 0 && !filterSets.includes(setCode)) return false;
       if (!filterShowSub1 && isSubscriptOneHiddenByDefault(card)) return false;
+      if (filterHasTrigger && !card.trigger.trim()) return false;
 
       if (isLeaderMode && card.type !== "Leader") return false;
       if (!isLeaderMode && !options.includeLeadersWhenAllTypes && card.type === "Leader") {

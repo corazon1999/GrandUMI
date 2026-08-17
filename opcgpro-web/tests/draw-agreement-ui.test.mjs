@@ -29,7 +29,7 @@ test("平局终局不会渲染胜负或排位分数变化", () => {
   const history = read("src/components/home/HistoryPanel.tsx");
 
   assert.match(overlay, /isDraw \? "本局平局"/);
-  assert.match(overlay, /!isDraw && matchKind === "Ranked" && rankResult/);
+  assert.match(overlay, /!isDraw && \(matchKind === "Ranked" \|\| matchKind === "RankedWild"\) && rankResult/);
   assert.match(audio, /if \(!isDraw\) play\(winnerIsMe \? "win" : "lose"\)/);
   assert.match(history, /m\.isDraw \? "平"/);
 });

@@ -12,6 +12,7 @@ import TrashPile from "@/components/game/TrashPile";
 import StageSlot from "@/components/game/StageSlot";
 import GameLog from "@/components/game/GameLog";
 import GameActions from "@/components/game/GameActions";
+import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import BattleRelationLayer from "@/components/game/BattleRelationLayer";
 import EffectActivationLayer from "@/components/game/EffectActivationLayer";
@@ -230,6 +231,11 @@ function RightRail({
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+        {!isObserver && !isPlayback && (
+          <div className="mt-1">
+            <PlayerSafetyActions targetName={opponentName || "对手"} currentOpponent compact />
+          </div>
+        )}
         <PlayerRankIdentity rank={opponentRankIdentity} />
         <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
         <OperationClock side="opponent" />
@@ -272,7 +278,8 @@ function formatOperationTime(milliseconds: number): string {
 
 function OperationClock({ side }: { side: "my" | "opponent" }) {
   const enabled = useGameStore((s) => s.operationClockEnabled);
-  const base = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
+  const totalBase = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
+  const turnBase = useGameStore((s) => side === "my" ? s.myTurnOperationTimeMs : s.opponentTurnOperationTimeMs);
   const active = useGameStore((s) => s.operationClockActive);
   const syncUtc = useGameStore((s) => s.operationClockSyncUtc);
   const paused = useGameStore((s) => s.operationClockPaused);
@@ -282,24 +289,30 @@ function OperationClock({ side }: { side: "my" | "opponent" }) {
   useEffect(() => {
     if (!enabled || active !== side || paused) return;
     setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), base < 12_000 ? 100 : 500);
+    const timer = window.setInterval(() => setNow(Date.now()), Math.min(totalBase, turnBase) < 12_000 ? 100 : 500);
     return () => window.clearInterval(timer);
-  }, [active, base, enabled, paused, side, syncUtc]);
+  }, [active, enabled, paused, side, syncUtc, totalBase, turnBase]);
 
   if (!enabled) return null;
   const elapsed = active === side && !paused && syncUtc
     ? Math.max(0, now - Date.parse(syncUtc))
     : 0;
-  const remaining = Math.max(0, base - elapsed);
-  const urgent = remaining <= 60_000;
+  const totalRemaining = Math.max(0, totalBase - elapsed);
+  const turnRemaining = Math.min(totalRemaining, Math.max(0, turnBase - elapsed));
+  const urgent = Math.min(totalRemaining, turnRemaining) <= 60_000;
   return (
-    <div className={`mt-1.5 flex items-center justify-between rounded border px-2 py-1 font-mono text-sm font-black tabular-nums ${
+    <div className={`mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-2 rounded border px-2 py-1 font-mono font-black tabular-nums ${
       active === side && !paused
         ? urgent ? "border-red-400/70 bg-red-500/20 text-red-200" : "border-sky-400/60 bg-sky-500/15 text-sky-100"
         : "border-white/10 bg-black/20 text-slate-400"
     }`}>
-      <span className="text-[9px] font-bold tracking-wide">{matchKind === "Ranked" ? "排位" : "休闲"}</span>
-      <span>{formatOperationTime(remaining)}</span>
+      <span className="text-[9px] font-bold tracking-wide">{matchKind === "RankedWild" ? "狂野排位" : matchKind === "Ranked" ? "标准排位" : "休闲"}</span>
+      <span className="justify-self-end text-sm" aria-label={`本回合剩余 ${formatOperationTime(turnRemaining)}`}>
+        回合 {formatOperationTime(turnRemaining)}
+      </span>
+      <span className="col-span-2 justify-self-end text-[9px] font-bold opacity-75" aria-label={`总操作剩余 ${formatOperationTime(totalRemaining)}`}>
+        总计 {formatOperationTime(totalRemaining)}
+      </span>
     </div>
   );
 }

@@ -65,6 +65,10 @@ Console.WriteLine($"[LeaderChampion] 写入 SQLite: {LeaderChampionStore.Default
 Console.WriteLine($"[LeaderChampion] 榜单 SQLite: {LeaderChampionStore.Default.LeaderboardDatabasePath}");
 RankedStore.Default.Initialize();
 Console.WriteLine($"[排位] SQLite: {RankedStore.Default.DatabasePath}");
+if (string.Equals(RankedStore.Default.DatabasePath, RankedStore.Wild.DatabasePath, StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("标准排位与狂野排位数据库不能使用同一路径");
+RankedStore.Wild.Initialize();
+Console.WriteLine($"[狂野排位] SQLite: {RankedStore.Wild.DatabasePath}");
 
 GameRoomManager.InitializeMaintenance(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,

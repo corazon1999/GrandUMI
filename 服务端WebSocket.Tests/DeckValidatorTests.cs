@@ -93,4 +93,42 @@ public class DeckValidatorTests
         Assert.Contains("东海", result.Reason ?? "");
         Assert.Contains("OP01-073", result.Reason ?? "");
     }
+
+    [Fact]
+    public void 标准排位拒绝角标一卡_狂野排位允许同一卡组()
+    {
+        var leader = CardDatabase.Get("OP01-001")!;
+        Assert.Equal(1, leader.Subscript);
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP01"));
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standard.Ok);
+        Assert.Contains("标准排位不能使用禁限领航卡", standard.Reason ?? "");
+        Assert.True(wild.Ok, wild.Reason);
+    }
+
+    [Fact]
+    public void 标准排位允许当前环境卡组()
+    {
+        var leader = CardDatabase.Get("OP15-001")!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+
+        Assert.True(standard.Ok, standard.Reason);
+    }
+
+    private static List<string> BuildValidDeck(CardInfo leader, IReadOnlyList<CardInfo> pool)
+    {
+        var lines = new List<string> { leader.Number };
+        foreach (var card in pool.Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leader)))
+        {
+            for (var copy = 0; copy < 4 && lines.Count < 51; copy++) lines.Add(card.Number);
+            if (lines.Count == 51) break;
+        }
+        Assert.Equal(51, lines.Count);
+        return lines;
+    }
 }

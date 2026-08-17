@@ -17,7 +17,7 @@ import {
   type LeaderLeaderboardSortKey,
   type LeaderLeaderboardSortState,
 } from "@/lib/leaderLeaderboardSort";
-import type { LeaderboardPeriod, LeaderLeaderboardItem, RankFaction, RankLeaderboardItem } from "@/types/net";
+import type { FactionStanding, LeaderboardPeriod, LeaderLeaderboardItem, RankFaction, RankedMode, RankLeaderboardItem } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
 
@@ -110,9 +110,19 @@ function RankedTable({ items, pinned = false }: { items: RankLeaderboardItem[]; 
   );
 }
 
-function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
-  const topItems = items.filter((item) => item.rank <= 100);
-  const currentPlayer = items.find((item) => item.isCurrentPlayer);
+function RankedLeaderboard({ items, standings }: { items: RankLeaderboardItem[]; standings: FactionStanding[] }) {
+  const [selectedFaction, setSelectedFaction] = useState<RankFaction | null>(null);
+  const topItems = selectedFaction
+    ? items
+        .filter((item) => item.faction === selectedFaction && item.factionRank <= 100)
+        .sort((a, b) => a.factionRank - b.factionRank)
+        .map((item) => ({ ...item, rank: item.factionRank }))
+    : items.filter((item) => item.rank <= 100);
+  const currentPlayerSource = items.find((item) => item.isCurrentPlayer);
+  const currentPlayer = currentPlayerSource
+    && (!selectedFaction || currentPlayerSource.faction === selectedFaction)
+    ? { ...currentPlayerSource, rank: selectedFaction ? currentPlayerSource.factionRank : currentPlayerSource.rank }
+    : undefined;
 
   if (topItems.length === 0 && !currentPlayer) {
     return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有完成定级的玩家。</p>;
@@ -120,6 +130,30 @@ function RankedLeaderboard({ items }: { items: RankLeaderboardItem[] }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-gray-800 bg-gray-950/90 p-2.5">
+        <div className="grid grid-cols-2 gap-2 @[720px]:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => setSelectedFaction(null)}
+            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === null ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
+          >
+            <strong className="block">全服个人榜</strong>
+            <span className="mt-1 block text-[10px] text-gray-500">按全服排名查看</span>
+          </button>
+          {standings.map((standing) => (
+            <button
+              key={standing.faction}
+              type="button"
+              onClick={() => setSelectedFaction(standing.faction)}
+              className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === standing.faction ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
+            >
+              <span className="flex items-center justify-between gap-2"><strong>{RANK_FACTION_NAMES[standing.faction]}</strong><b className="text-amber-300">#{standing.rank}</b></span>
+              <span className="mt-1 block text-[10px]">总分 {standing.totalRankPoints.toLocaleString()} · {standing.playerCount} 人</span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] text-gray-600">阵营总分为本赛季已完成定级成员悬赏金之和；点击阵营可查看内部排行榜。</p>
+      </div>
       <div className="min-h-0 flex-1 overflow-auto">
         <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
           {topItems.map((item) => <RankedMobileRow key={`${item.rank}-${item.displayName}`} item={item} />)}
@@ -279,8 +313,9 @@ function SortableHeader({
 export default function LeaderLeaderboardPanel() {
   const { locale } = useLanguage();
   const leaderboard = useNetStore((s) => s.leaderLeaderboard);
-  const rankProfile = useNetStore((s) => s.rankProfile);
-  const rankLeaderboard = useNetStore((s) => s.rankLeaderboard);
+  const rankProfiles = useNetStore((s) => s.rankProfiles);
+  const rankLeaderboards = useNetStore((s) => s.rankLeaderboards);
+  const factionStandingsByMode = useNetStore((s) => s.factionStandingsByMode);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
@@ -288,9 +323,13 @@ export default function LeaderLeaderboardPanel() {
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
   const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("ranked");
+  const [rankedMode, setRankedMode] = useState<RankedMode>("standard");
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
   const [championRulesOpen, setChampionRulesOpen] = useState(false);
+  const rankProfile = rankProfiles[rankedMode];
+  const rankLeaderboard = rankLeaderboards[rankedMode];
+  const factionStandings = factionStandingsByMode[rankedMode];
 
   const request = (nextPeriod: LeaderboardPeriod) => {
     setSelectedLeader(null);
@@ -325,6 +364,10 @@ export default function LeaderLeaderboardPanel() {
     setSelectedLeader(null);
     HomeRequest.requestLeaderLeaderboard(period);
   }, [period, rankingTab]);
+
+  useEffect(() => {
+    if (rankingTab === "ranked" && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
+  }, [rankProfile, rankedMode, rankingTab]);
 
   useEffect(() => {
     if (
@@ -384,6 +427,26 @@ export default function LeaderLeaderboardPanel() {
               Leader榜
             </button>
           </div>
+          {rankingTab === "ranked" && (
+            <div className="grid w-full grid-cols-2 rounded-lg border border-violet-900/70 bg-gray-950 p-1 @[640px]:w-auto" aria-label="排位榜模式">
+              <button
+                type="button"
+                onClick={() => setRankedMode("standard")}
+                aria-pressed={rankedMode === "standard"}
+                className={`min-h-11 rounded-md px-4 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankedMode === "standard" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+              >
+                标准
+              </button>
+              <button
+                type="button"
+                onClick={() => setRankedMode("wild")}
+                aria-pressed={rankedMode === "wild"}
+                className={`min-h-11 rounded-md px-4 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:py-1.5 ${rankedMode === "wild" ? "bg-fuchsia-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+              >
+                狂野
+              </button>
+            </div>
+          )}
           {rankingTab === "leader" && <div className="grid grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex">
           <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
             {PERIODS.map((option) => (
@@ -440,7 +503,7 @@ export default function LeaderLeaderboardPanel() {
         </div> : <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
           <span>赛季 <strong className="ml-1 text-white">{rankProfile?.seasonId ?? "加载中"}</strong></span>
           <span>已上榜 <strong className="ml-1 text-white">{rankLeaderboard.length}</strong> 名玩家</span>
-          <span className="text-gray-600">完成定级后进入排行榜</span>
+          <span className="text-gray-600">{rankedMode === "standard" ? "标准排位" : "狂野排位"}完成定级后进入排行榜</span>
         </div>}
         {rankingTab === "leader" && <div className="flex w-full flex-wrap items-center gap-2 @[640px]:w-auto">
           <div className="grid flex-1 grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:flex-none">
@@ -475,7 +538,9 @@ export default function LeaderLeaderboardPanel() {
       </div>
 
       <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-hidden" : "overflow-auto"}`}>
-        {rankingTab === "ranked" ? <RankedLeaderboard items={rankLeaderboard} /> : loading ? (
+        {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : (
+          <p className="py-16 text-center text-sm text-gray-600">正在加载{rankedMode === "standard" ? "标准" : "狂野"}排位榜…</p>
+        ) : loading ? (
           <p className="py-16 text-center text-sm text-gray-600">正在加载排行榜…</p>
         ) : failed ? (
           <div className="py-16 text-center">

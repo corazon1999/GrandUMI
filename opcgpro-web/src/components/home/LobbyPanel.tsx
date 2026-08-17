@@ -12,7 +12,7 @@ import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import RulesetControlPanel from "./RulesetControlPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { formatRankBounty } from "@/lib/rankBounty";
-import type { RankFaction } from "@/types/net";
+import type { RankFaction, RankedMode } from "@/types/net";
 
 const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; titles: readonly string[]; className: string }> = [
   { id: "pirate", name: "海贼阵营", titles: ["见习海贼", "海贼战斗员", "海贼干部", "副船长", "船长"], className: "border-rose-700/70 bg-rose-950/30 hover:border-rose-400" },
@@ -78,7 +78,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const selectedDeck  = useNetStore((s) => s.selectedDeck);
   const opponentName  = useNetStore((s) => s.opponentName);
   const matchQueueKind = useNetStore((s) => s.matchQueueKind);
-  const rankProfile = useNetStore((s) => s.rankProfile);
+  const rankedMode: RankedMode = matchQueueKind === "rankedWild" ? "wild" : "standard";
+  const rankProfile = useNetStore((s) => s.rankProfiles[rankedMode]);
   const account       = useNetStore((s) => s.account);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
@@ -102,7 +103,12 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
   const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle" && !maintenance.enabled;
-  const canQueue = canEnter && (matchQueueKind !== "ranked" || Boolean(rankProfile?.faction));
+  const isRanked = matchQueueKind !== "casual";
+  const canQueue = canEnter && (!isRanked || Boolean(rankProfile?.faction));
+
+  useEffect(() => {
+    if (isRanked && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
+  }, [isRanked, rankProfile, rankedMode]);
 
   useEffect(() => {
     if (roomMode === "create" && roomOperation === "idle" && !roomCode) {
@@ -112,7 +118,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const handleMatch = () => {
     if (!selectedDeck) return;
-    if (matchQueueKind === "ranked" && !rankProfile?.faction) {
+    if (isRanked && !rankProfile?.faction) {
       showMessage("开始排位前请先选择阵营", "error");
       return;
     }
@@ -124,7 +130,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const requestFactionChange = (faction: RankFaction) => {
     if (!rankProfile?.faction) {
-      HomeRequest.selectRankFaction(faction);
+      HomeRequest.selectRankFaction(faction, false, rankedMode);
       return;
     }
     if (rankProfile.faction !== faction) setPendingFaction(faction);
@@ -132,7 +138,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const confirmFactionChange = () => {
     if (!pendingFaction) return;
-    HomeRequest.selectRankFaction(pendingFaction, true);
+    HomeRequest.selectRankFaction(pendingFaction, true, rankedMode);
     setPendingFaction(null);
   };
 
@@ -217,17 +223,17 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   return (
     <div className="flex h-full min-w-0">
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 @[640px]:px-6 @[1024px]:flex @[1024px]:flex-col @[1024px]:items-center @[1024px]:px-8 @[1024px]:py-8">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-4 @[1024px]:my-auto @[1024px]:gap-5">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-3 @[640px]:px-6 @[640px]:py-5 @[1024px]:flex @[1024px]:flex-col @[1024px]:items-center @[1024px]:px-8 @[1024px]:py-8">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-3 @[640px]:gap-4 @[1024px]:my-auto @[1024px]:gap-5">
           <div>
             <h1 className="text-xl font-bold text-white @[1024px]:text-2xl">开始对战</h1>
-            <p className="mt-1 text-sm text-gray-500">选择模式，准备好后即可进入牌桌。</p>
+            <p className="mt-1 text-sm text-gray-500 [@media(max-height:800px)]:hidden">选择模式，准备好后即可进入牌桌。</p>
           </div>
 
           <button
             type="button"
             onClick={onGoToDeck}
-            className="w-full rounded-2xl border border-gray-800 bg-gray-900 p-4 text-left transition-colors hover:border-orange-700 active:bg-gray-800"
+            className="w-full rounded-2xl border border-gray-800 bg-gray-900 p-3 text-left transition-colors hover:border-orange-700 active:bg-gray-800 @[640px]:p-4"
           >
             {selectedDeck ? (
               <div className="flex items-center gap-3">
@@ -283,7 +289,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             ))}
           </div>
 
-          <section className="rounded-2xl border border-gray-800 bg-gray-900 p-4 @[640px]:p-5">
+          <section className="rounded-2xl border border-gray-800 bg-gray-900 p-3 @[640px]:p-5">
             {playMode === "match" && (
               <div className="flex flex-col gap-3">
                 {matchState === "idle" && (
@@ -296,8 +302,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       <button
                         type="button"
                         onClick={() => useNetStore.getState().setMatchQueueKind("ranked")}
-                        aria-pressed={matchQueueKind === "ranked"}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${matchQueueKind === "ranked" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        aria-pressed={isRanked}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${isRanked ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                       >
                         排位匹配
                       </button>
@@ -311,7 +317,33 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       </button>
                     </div>
 
-                    {matchQueueKind === "ranked" && rankProfile && (
+                    {isRanked && (
+                      <div className="grid grid-cols-2 rounded-xl border border-violet-900/70 bg-gray-950 p-1" aria-label="排位模式">
+                        <button
+                          type="button"
+                          onClick={() => useNetStore.getState().setMatchQueueKind("ranked")}
+                          aria-pressed={rankedMode === "standard"}
+                          className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${rankedMode === "standard" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        >
+                          标准
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => useNetStore.getState().setMatchQueueKind("rankedWild")}
+                          aria-pressed={rankedMode === "wild"}
+                          className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${rankedMode === "wild" ? "bg-fuchsia-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        >
+                          狂野
+                        </button>
+                      </div>
+                    )}
+                    {isRanked && (
+                      <p className="text-xs leading-5 text-gray-500">
+                        {rankedMode === "standard" ? "标准排位遵循当前环境禁限卡表。" : "狂野排位可使用角标 1 等标准禁限卡，积分与榜单独立。"}
+                      </p>
+                    )}
+
+                    {isRanked && rankProfile && (
                       <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
                         {!rankProfile.faction ? (
                           <div>
@@ -399,16 +431,16 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       type="button"
                       onClick={handleMatch}
                       disabled={!canQueue}
-                      className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${matchQueueKind === "ranked" ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
+                      className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${isRanked ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
                     >
-                      开始{matchQueueKind === "ranked" ? "排位" : "休闲"}匹配
+                      开始{matchQueueKind === "rankedWild" ? "狂野排位" : matchQueueKind === "ranked" ? "标准排位" : "休闲"}匹配
                     </button>
                   </>
                 )}
                 {matchState === "matching" && (
                   <div className="flex flex-col items-center gap-3 py-2" role="status">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                    <p className="font-bold text-orange-300">正在寻找{matchQueueKind === "ranked" ? "排位" : "休闲"}对手…</p>
+                    <p className="font-bold text-orange-300">正在寻找{matchQueueKind === "rankedWild" ? "狂野排位" : matchQueueKind === "ranked" ? "标准排位" : "休闲"}对手…</p>
                     <button type="button" onClick={handleCancelMatch} className="min-h-11 rounded-lg px-4 text-sm text-gray-400 hover:bg-gray-800 hover:text-white">
                       取消匹配
                     </button>

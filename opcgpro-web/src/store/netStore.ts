@@ -4,6 +4,7 @@ import type {
   FriendInfo,
   FriendRequestInfo,
   FriendSearchPlayer,
+  BlockedPlayerInfo,
   FriendlyPlayer,
   MsgLeaderLeaderboard,
   MsgLeaderMatchupMatrix,
@@ -15,7 +16,10 @@ import type {
   FriendChatMessage,
   RankProfileSnapshot,
   RankLeaderboardItem,
+  FactionStanding,
   RankPlayerSettlement,
+  RankedMode,
+  MatchQueueKind,
   SpectateMode,
   CardRulesetSummary,
 } from "@/types/net";
@@ -87,11 +91,14 @@ interface NetStore {
   error: string | null;
   // 匹配
   matchState: MatchState;
-  matchQueueKind: "ranked" | "casual";
+  matchQueueKind: MatchQueueKind;
   selectedDeck: SelectedDeck | null;
   opponentName: string;
   rankProfile: RankProfileSnapshot | null;
   rankLeaderboard: RankLeaderboardItem[];
+  rankProfiles: Record<RankedMode, RankProfileSnapshot | null>;
+  rankLeaderboards: Record<RankedMode, RankLeaderboardItem[]>;
+  factionStandingsByMode: Record<RankedMode, FactionStanding[]>;
   lastRankResult: RankPlayerSettlement | null;
   // 房间码
   roomCode: string | null;
@@ -106,6 +113,7 @@ interface NetStore {
   incomingFriendRequests: FriendRequestInfo[];
   outgoingFriendRequests: FriendRequestInfo[];
   friendSearchResults: FriendSearchPlayer[];
+  blockedPlayers: BlockedPlayerInfo[];
   // 最近一次 Leader 排行榜回包
   leaderLeaderboard: MsgLeaderLeaderboard | null;
   // 点击榜单项后按“周期:Leader”保存的对战前二十及起手留牌统计
@@ -148,10 +156,10 @@ interface NetStore {
   setProfile: (name: string, avatar: string, cardBackId?: string, canChangeDisplayName?: boolean) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
-  setMatchQueueKind: (kind: "ranked" | "casual") => void;
+  setMatchQueueKind: (kind: MatchQueueKind) => void;
   setSelectedDeck: (deck: SelectedDeck | null) => void;
   setOpponentName: (name: string) => void;
-  setRankSnapshot: (profile: RankProfileSnapshot, leaderboard: RankLeaderboardItem[]) => void;
+  setRankSnapshot: (mode: RankedMode, profile: RankProfileSnapshot, leaderboard: RankLeaderboardItem[], factionStandings?: FactionStanding[]) => void;
   setLastRankResult: (result: RankPlayerSettlement | null) => void;
   setRoomCode: (code: string | null) => void;
   setRoomOperation: (operation: RoomOperation) => void;
@@ -161,6 +169,7 @@ interface NetStore {
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
+  setBlockedPlayers: (players: BlockedPlayerInfo[]) => void;
   setLeaderLeaderboard: (data: MsgLeaderLeaderboard | null) => void;
   setLeaderMatchups: (data: MsgLeaderMatchups) => void;
   clearLeaderMatchups: () => void;
@@ -208,6 +217,9 @@ const initialState = {
   opponentName: "",
   rankProfile: null as RankProfileSnapshot | null,
   rankLeaderboard: [] as RankLeaderboardItem[],
+  rankProfiles: { standard: null, wild: null } as Record<RankedMode, RankProfileSnapshot | null>,
+  rankLeaderboards: { standard: [], wild: [] } as Record<RankedMode, RankLeaderboardItem[]>,
+  factionStandingsByMode: { standard: [], wild: [] } as Record<RankedMode, FactionStanding[]>,
   lastRankResult: null as RankPlayerSettlement | null,
   roomCode: null as string | null,
   roomOperation: "idle" as RoomOperation,
@@ -219,6 +231,7 @@ const initialState = {
   incomingFriendRequests: [] as FriendRequestInfo[],
   outgoingFriendRequests: [] as FriendRequestInfo[],
   friendSearchResults: [] as FriendSearchPlayer[],
+  blockedPlayers: [] as BlockedPlayerInfo[],
   leaderLeaderboard: null as MsgLeaderLeaderboard | null,
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
@@ -275,13 +288,22 @@ export const useNetStore = create<NetStore>((set) => ({
   setSelectedDeck: (deck) => set({ selectedDeck: deck }),
 
   setOpponentName: (name) => set({ opponentName: name }),
-  setRankSnapshot: (rankProfile, rankLeaderboard) => set((state) => {
+  setRankSnapshot: (mode, rankProfile, rankLeaderboard, factionStandings = []) => set((state) => {
     // 排位结算与大厅快照可能由不同异步请求返回。拒绝同赛季局数更旧的快照，
     // 避免胜利结算刚更新后又被在途旧响应短暂覆盖，随后再“自行恢复”。
-    if (state.rankProfile?.seasonId === rankProfile.seasonId
-        && rankProfile.games < state.rankProfile.games)
+    const current = state.rankProfiles[mode];
+    if (current?.seasonId === rankProfile.seasonId
+        && rankProfile.games < current.games)
       return {};
-    return { rankProfile, rankLeaderboard };
+    const rankProfiles = { ...state.rankProfiles, [mode]: rankProfile };
+    const rankLeaderboards = { ...state.rankLeaderboards, [mode]: rankLeaderboard };
+    const factionStandingsByMode = { ...state.factionStandingsByMode, [mode]: factionStandings };
+    return {
+      rankProfiles,
+      rankLeaderboards,
+      factionStandingsByMode,
+      ...(mode === "standard" ? { rankProfile, rankLeaderboard } : {}),
+    };
   }),
   setLastRankResult: (lastRankResult) => set({ lastRankResult }),
 
@@ -309,6 +331,7 @@ export const useNetStore = create<NetStore>((set) => ({
   }),
 
   setFriendSearchResults: (friendSearchResults) => set({ friendSearchResults }),
+  setBlockedPlayers: (blockedPlayers) => set({ blockedPlayers }),
 
   setLeaderLeaderboard: (leaderLeaderboard) => set({ leaderLeaderboard }),
 

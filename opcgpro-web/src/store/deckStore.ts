@@ -110,6 +110,7 @@ interface DeckStore {
   filterCost: number | null;   // 费用筛选，null = 全部
   filterSets: string[];        // 弹数（卡集）筛选，空数组 = 显示全部
   filterShowSub1: boolean;     // 是否显示角标=1 的卡（默认 false 隐藏）
+  filterHasTrigger: boolean;   // 是否只显示拥有【触发】效果的卡
   gridColumns: number;
 
   setFormat: (f: DeckFormat) => void;
@@ -127,6 +128,7 @@ interface DeckStore {
   toggleFilterSet: (set: string) => void;
   clearFilterSets: () => void;
   setFilterShowSub1: (v: boolean) => void;
+  setFilterHasTrigger: (v: boolean) => void;
   setGridColumns: (n: number) => void;
   clearDeck: () => void;
 
@@ -160,6 +162,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   filterCost: null,
   filterSets: [],
   filterShowSub1: false,
+  filterHasTrigger: false,
   gridColumns: 8,
 
   setFormat: (f) => {
@@ -307,6 +310,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     })),
   clearFilterSets: () => set({ filterSets: [] }),
   setFilterShowSub1: (v) => set({ filterShowSub1: v }),
+  setFilterHasTrigger: (v) => set({ filterHasTrigger: v }),
   setGridColumns: (n) => {
     const clamped = Math.min(MAX_COLS, Math.max(MIN_COLS, n));
     if (typeof window !== "undefined")

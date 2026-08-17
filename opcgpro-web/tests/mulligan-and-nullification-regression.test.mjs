@@ -13,6 +13,9 @@ test("对局结束后调度遮罩立即卸载", async () => {
 
   assert.match(source, /const isGameOver = useGameStore\(\(s\) => s\.isGameOver\)/);
   assert.match(source, /if \(isGameOver\) return null;/);
+  assert.match(source, /useServerCountdown/);
+  assert.doesNotMatch(source, /disabled=\{timedOut \|\| isPending\}/);
+  assert.doesNotMatch(source, /if \(timedOut \|\| useGameStore\.getState\(\)\.isPending\) return/);
 });
 
 test("角色效果无效状态会显示在牌桌上", async () => {

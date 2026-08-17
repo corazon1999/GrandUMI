@@ -84,6 +84,10 @@ public class GameState
     /// <summary>公开匹配的双方独立操作棋钟；选择先后手与调度手牌阶段不启用。</summary>
     public bool OperationClockEnabled { get; set; }
     public long[] OperationClockRemainingMs { get; } = [1_200_000, 1_200_000];
+    /// <summary>当前游戏回合内双方各自剩余的操作时间；新回合重置为 8 分钟或总剩余时间中的较小值。</summary>
+    public long[] OperationTurnClockRemainingMs { get; } = [480_000, 480_000];
+    /// <summary>回合操作时钟最近一次重置时对应的 TurnCount。</summary>
+    public int OperationTurnClockTurnCount { get; set; }
     public int OperationClockActivePlayer { get; set; } = -1;
     public DateTime? OperationClockSyncUtc { get; set; }
     public bool OperationClockPaused { get; set; }

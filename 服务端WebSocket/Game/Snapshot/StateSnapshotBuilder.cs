@@ -28,8 +28,9 @@ public static class StateSnapshotBuilder
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
         IReadOnlyList<EffectActivationEvent>? effectActivations = null, int spectatorPlayerIndex = 0,
-        bool revealSpectatorMainHand = false)
+        bool revealSpectatorMainHand = false, DateTime? serverNowUtc = null)
     {
+        var snapshotServerNowUtc = serverNowUtc ?? DateTime.UtcNow;
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         return BuildForViewer(
             state,
@@ -41,6 +42,7 @@ public static class StateSnapshotBuilder
             requestId,
             effectActivations,
             spectatorPlayerIndex,
+            snapshotServerNowUtc,
             revealSpectatorMainHand: revealSpectatorMainHand);
     }
 
@@ -52,23 +54,24 @@ public static class StateSnapshotBuilder
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
         IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false,
         bool includePlayer0SpectatorHand = false, bool includePlayer1SpectatorHand = false,
-        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null)
+        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null, DateTime? serverNowUtc = null)
     {
+        var snapshotServerNowUtc = serverNowUtc ?? DateTime.UtcNow;
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline))
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline))
         {
             SpectatorPlayer1 = includePlayer1Spectator
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, replayHandTimeline)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline)
                 : null,
             SpectatorPlayer0Hand = includePlayer0SpectatorHand
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, replayHandTimeline, true)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, true)
                 : null,
             SpectatorPlayer1Hand = includePlayer1SpectatorHand
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, replayHandTimeline, true)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline, true)
                 : null,
         };
     }
@@ -76,6 +79,7 @@ public static class StateSnapshotBuilder
     private static object BuildForViewer(GameState state, int viewerIndex, string? lastAction,
         PayloadComputed payload, PlayerBoardComputed[] boards, IReadOnlyList<ActionLogEvent>? queuedLogEvents,
         string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex,
+        DateTime serverNowUtc,
         IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null,
         bool revealSpectatorMainHand = false)
     {
@@ -113,6 +117,7 @@ public static class StateSnapshotBuilder
         {
             proto = "MsgGameState",
             tick = state.Tick,
+            serverNowUtc,
             rulesetId = state.RulesetId,
             phase = PhaseLabels.Of(state.Phase),
             currentTurn = !isSpectator && state.CurrentTurnPlayer == myIdx,
@@ -134,6 +139,8 @@ public static class StateSnapshotBuilder
             operationClockEnabled = state.OperationClockEnabled,
             myOperationTimeMs = state.OperationClockRemainingMs[myIdx],
             opponentOperationTimeMs = state.OperationClockRemainingMs[oppIdx],
+            myTurnOperationTimeMs = state.OperationTurnClockRemainingMs[myIdx],
+            opponentTurnOperationTimeMs = state.OperationTurnClockRemainingMs[oppIdx],
             operationClockActive = state.OperationClockActivePlayer < 0
                 ? null
                 : state.OperationClockActivePlayer == myIdx ? "my" : "opponent",
@@ -288,7 +295,7 @@ public static class StateSnapshotBuilder
         return new
         {
             name = board.Name,
-            rankIdentity = state.MatchKind == MatchKind.Ranked && p.RankIdentity is { } rank
+            rankIdentity = state.MatchKind is (MatchKind.Ranked or MatchKind.RankedWild) && p.RankIdentity is { } rank
                 ? new
                 {
                     faction = rank.Faction,

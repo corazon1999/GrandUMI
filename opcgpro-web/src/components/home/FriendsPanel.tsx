@@ -10,8 +10,9 @@ import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import { friendAccountKey, useNetStore } from "@/store/netStore";
 import type { FriendInfo, FriendPresenceStatus, FriendRequestInfo, FriendSearchPlayer } from "@/types/net";
 import SpectateJoinButton from "./SpectateJoinButton";
+import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 
-type Tab = "chat" | "requests" | "search";
+type Tab = "chat" | "requests" | "search" | "blocked";
 
 const FRIEND_CHAT_COOLDOWN_MS = 1300;
 
@@ -74,6 +75,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
   const incoming = useNetStore((state) => state.incomingFriendRequests);
   const outgoing = useNetStore((state) => state.outgoingFriendRequests);
   const searchResults = useNetStore((state) => state.friendSearchResults);
+  const blockedPlayers = useNetStore((state) => state.blockedPlayers);
   const [tab, setTab] = useState<Tab>("chat");
   const [query, setQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
@@ -88,6 +90,7 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
   useEffect(() => {
     if (!open) return;
     HomeRequest.requestFriendList();
+    HomeRequest.requestPlayerSafety();
   }, [open]);
 
   useEffect(() => () => {
@@ -196,23 +199,27 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5M14 11v5" /></svg>
         )}
       </button>
+      <PlayerSafetyActions targetAccount={selectedFriend.account} targetName={selectedFriend.name} compact />
     </>
   ) : null;
 
   return (
     <Modal open={open} onClose={onClose} title="好友中心" mobileSheet maxWidthClass="max-w-4xl">
       <div className="flex h-[min(76cqh,40rem)] min-h-0 max-h-[calc(100cqh-7rem)] flex-col" data-testid="friends-panel">
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-gray-950 p-1">
-          <button type="button" onClick={() => switchTab("chat")} className={`relative min-h-11 rounded-lg text-sm font-bold transition-colors ${tab === "chat" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
+        <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-950 p-1">
+          <button type="button" onClick={() => switchTab("chat")} className={`relative min-h-12 rounded-lg text-sm font-bold transition-colors ${tab === "chat" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
             聊天 {friends.length > 0 ? `(${friends.length})` : ""}
             {totalFriendUnread > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{totalFriendUnread > 99 ? "99+" : totalFriendUnread}</span>}
           </button>
-          <button type="button" onClick={() => switchTab("requests")} className={`relative min-h-11 rounded-lg text-sm font-bold transition-colors ${tab === "requests" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
+          <button type="button" onClick={() => switchTab("requests")} className={`relative min-h-12 rounded-lg text-sm font-bold transition-colors ${tab === "requests" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
             申请
             {incoming.length > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{incoming.length}</span>}
           </button>
-          <button type="button" onClick={() => switchTab("search")} className={`min-h-11 rounded-lg text-sm font-bold transition-colors ${tab === "search" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
+          <button type="button" onClick={() => switchTab("search")} className={`min-h-12 rounded-lg text-sm font-bold transition-colors ${tab === "search" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
             添加好友
+          </button>
+          <button type="button" onClick={() => switchTab("blocked")} className={`min-h-12 rounded-lg text-sm font-bold transition-colors ${tab === "blocked" ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}>
+            屏蔽
           </button>
         </div>
 
@@ -308,6 +315,22 @@ export default function FriendsPanel({ open, onClose }: { open: boolean; onClose
                 })}
                 {hasSearched && searchResults.length === 0 && <EmptyState>没有找到匹配的玩家</EmptyState>}
               </div>
+            </div>
+          )}
+          {tab === "blocked" && (
+            <div className="space-y-2">
+              {blockedPlayers.length === 0 ? <EmptyState>当前没有已屏蔽的玩家</EmptyState> : blockedPlayers.map((player) => (
+                <div key={player.account} className="flex min-h-16 items-center gap-3 rounded-xl border border-gray-800 bg-gray-900/70 p-3">
+                  <PlayerIdentity name={player.name} account={player.account} online={false} />
+                  <button
+                    type="button"
+                    onClick={() => HomeRequest.unblockPlayer(player.account)}
+                    className="min-h-12 rounded-lg border border-gray-600 px-3 text-xs font-bold text-gray-300 transition-colors hover:border-emerald-600 hover:text-emerald-300"
+                  >
+                    解除屏蔽
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           </div>

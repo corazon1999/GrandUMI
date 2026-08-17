@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import type { PlayerInfo } from "@/types/net";
 import SpectateJoinButton from "./SpectateJoinButton";
+import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 
 const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> = {
   idle:     { text: "空闲",   cls: "text-green-400" },
@@ -168,6 +169,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                           邀请对战
                         </button>
                       )}
+                      <PlayerSafetyActions targetAccount={p.account} targetName={p.name} compact />
                     </div>
                   )}
                 </div>

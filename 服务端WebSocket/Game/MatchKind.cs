@@ -9,6 +9,7 @@ public enum MatchKind
     Matchmaking,
     Casual,
     Ranked,
+    RankedWild,
     RoomCode,
     Friendly,
     Bot,

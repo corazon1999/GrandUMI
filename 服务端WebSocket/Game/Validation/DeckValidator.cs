@@ -13,6 +13,7 @@ namespace GrandUMI.Game.Validation;
 public static class DeckValidator
 {
     public const string FormatUnrestricted = "Unrestricted";
+    public const string FormatStandard = "Standard";
     public const string FormatOp15Only = "OP15-Only";
     public const string FormatOp16Only = "OP16-Only";
     public const string FormatOp15Op16 = "OP15-OP16";
@@ -31,9 +32,23 @@ public static class DeckValidator
         "OP16-042", // 因佩尔地狱的囚犯
     };
 
+    /// <summary>
+    /// 官方确认仍可在当前标准环境使用的角标 1 卡。
+    /// 与前端 cardSearch.STANDARD_LEGAL_SUBSCRIPT_ONE_CARDS 保持一致。
+    /// </summary>
+    private static readonly HashSet<string> StandardLegalSubscriptOneCards = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "OP01-016", "OP01-039", "OP01-055", "OP01-120",
+        "OP02-005", "OP02-013", "OP02-068",
+        "OP03-008", "OP03-025", "OP03-044", "OP03-048", "OP03-072", "OP03-097",
+        "OP04-016", "OP04-077", "OP04-083", "OP04-096",
+        "ST01-011", "ST02-007", "ST06-008",
+    };
+
     private static readonly Dictionary<string, FormatRule> Rules = new()
     {
         [FormatUnrestricted] = new(FormatUnrestricted, null,             50, 4),
+        [FormatStandard] = new(FormatStandard, null,                     50, 4),
         [FormatOp15Only] = new(FormatOp15Only, new[] { "OP15" },         50, 4),
         [FormatOp16Only] = new(FormatOp16Only, new[] { "OP16" },         50, 4),
         [FormatOp15Op16] = new(FormatOp15Op16, new[] { "OP15", "OP16" }, 50, 4),
@@ -72,10 +87,10 @@ public static class DeckValidator
             return new(false, $"指定的领航卡 {leaderNum} 不是领航类型", null);
 
         var mainCards = lines.Skip(1).ToArray();
-        return ValidateAgainstRule(leader, mainCards, rule);
+        return ValidateAgainstRule(leader, mainCards, rule, format == FormatStandard);
     }
 
-    private static Result ValidateAgainstRule(CardInfo leader, string[] mainCards, FormatRule rule)
+    private static Result ValidateAgainstRule(CardInfo leader, string[] mainCards, FormatRule rule, bool enforceStandardLegality)
     {
         var allowed = rule.AllowedSets;
         var setList = allowed is null ? "" : string.Join("/", allowed);
@@ -83,6 +98,8 @@ public static class DeckValidator
         // 1. 领航必须来自白名单卡集（allowed=null 表示不限卡集，跳过此检查）
         if (allowed is not null && !allowed.Contains(leader.SetCode))
             return new(false, $"{rule.Name} 格式：领航必须来自 {setList}（当前 {leader.SetCode}）", leader.Number);
+        if (enforceStandardLegality && IsStandardRestricted(leader))
+            return new(false, $"标准排位不能使用禁限领航卡：{leader.Number}；可改用狂野排位", leader.Number);
 
         // 2. 主卡组张数
         if (mainCards.Length != rule.MainSize)
@@ -104,6 +121,8 @@ public static class DeckValidator
                 return new(false, $"卡牌不存在：{num}", leader.Number);
             if (card.Kind == CardKind.Leader)
                 return new(false, $"主卡组不能包含领航卡：{num}", leader.Number);
+            if (enforceStandardLegality && IsStandardRestricted(card))
+                return new(false, $"标准排位不能使用禁限卡：{num}；可改用狂野排位", leader.Number);
             if (allowed is not null && !allowed.Contains(card.SetCode))
                 return new(false, $"{rule.Name} 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
             if (leader.Number == "P-117" && !card.HasKeyword("东海"))
@@ -114,4 +133,7 @@ public static class DeckValidator
 
         return new(true, null, leader.Number);
     }
+
+    private static bool IsStandardRestricted(CardInfo card)
+        => card.Subscript == 1 && !StandardLegalSubscriptOneCards.Contains(card.Number);
 }

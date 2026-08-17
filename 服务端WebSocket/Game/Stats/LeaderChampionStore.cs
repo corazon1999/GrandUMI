@@ -255,7 +255,7 @@ public sealed class LeaderChampionStore
     }
 
     private static bool IsEligible(LeaderMatchResult result)
-        => result.MatchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking
+        => result.MatchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking
            && result.WinnerIndex is 0 or 1
            && result.TurnCount >= LeaderStatsStore.MinimumCountedTurn
            && !IsDisconnectFinish(result.FinishReason)

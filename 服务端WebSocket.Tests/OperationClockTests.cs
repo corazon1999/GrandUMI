@@ -43,6 +43,7 @@ public class OperationClockTests
             Assert.True(room.Engine.State.OperationClockEnabled);
             Assert.Equal(-1, room.Engine.State.OperationClockActivePlayer);
             Assert.All(room.Engine.State.OperationClockRemainingMs, value => Assert.Equal(1_200_000, value));
+            Assert.All(room.Engine.State.OperationTurnClockRemainingMs, value => Assert.Equal(480_000, value));
 
             room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
             await Task.Delay(40);
@@ -91,6 +92,62 @@ public class OperationClockTests
     }
 
     [Fact]
+    public async Task 单方本回合八分钟操作时间耗尽_直接判负()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            var active = room.Engine.State.CurrentTurnPlayer;
+            room.Engine.State.OperationTurnClockRemainingMs[active] = 30;
+            room.Engine.Broadcast("TurnClockTest");
+
+            Assert.Equal(active, room.Engine.State.OperationClockActivePlayer);
+            Assert.InRange(room.Engine.State.OperationTurnClockRemainingMs[active], 1, 30);
+
+            await WaitUntilAsync(() => room.Engine.State.IsGameOver);
+
+            Assert.Equal(1 - active, room.Engine.State.WinnerIndex);
+            Assert.Equal(0, room.Engine.State.OperationTurnClockRemainingMs[active]);
+            Assert.True(room.Engine.State.OperationClockRemainingMs[active] > 0);
+            Assert.Contains("本回合操作时间耗尽", room.Engine.State.GameOverReason);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public void 新回合操作时间重置为八分钟与总剩余时间的较小值()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            var active = room.Engine.State.CurrentTurnPlayer;
+            var next = 1 - active;
+            room.Engine.State.OperationClockRemainingMs[next] = 300_000;
+            room.Engine.State.OperationTurnClockRemainingMs[next] = 1_000;
+
+            room.Engine.HandleAction(active, "EndTurn", JsonSerializer.SerializeToElement(new { }));
+            room.Engine.Broadcast("NextTurnClockTest");
+
+            Assert.Equal(next, room.Engine.State.CurrentTurnPlayer);
+            Assert.InRange(room.Engine.State.OperationTurnClockRemainingMs[next], 299_000, 300_000);
+            Assert.Equal(room.Engine.State.TurnCount, room.Engine.State.OperationTurnClockTurnCount);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public async Task 休闲对局同样启用双方二十分钟操作棋钟()
     {
         TestScene.New();
@@ -107,6 +164,22 @@ public class OperationClockTests
             Assert.Equal(room.Engine.State.CurrentTurnPlayer, room.Engine.State.OperationClockActivePlayer);
             Assert.InRange(room.Engine.State.OperationClockRemainingMs[0], 1_199_000, 1_200_000);
             Assert.Equal(1_200_000, room.Engine.State.OperationClockRemainingMs[1]);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public void 狂野排位同样启用双方二十分钟操作棋钟()
+    {
+        TestScene.New();
+        var room = CreateTimedRoom(MatchKind.RankedWild);
+        try
+        {
+            Assert.True(room.Engine.State.OperationClockEnabled);
+            Assert.All(room.Engine.State.OperationClockRemainingMs, value => Assert.Equal(1_200_000, value));
         }
         finally
         {
@@ -215,6 +288,9 @@ public class OperationClockTests
 
             Assert.True(root.GetProperty("operationClockEnabled").GetBoolean());
             Assert.Equal(2, root.GetProperty("operationClockRemainingMs").GetArrayLength());
+            Assert.Equal(2, root.GetProperty("operationTurnClockRemainingMs").GetArrayLength());
+            Assert.Equal(room.Engine.State.TurnCount,
+                root.GetProperty("operationTurnClockTurnCount").GetInt32());
             Assert.Equal(room.Engine.State.CurrentTurnPlayer,
                 root.GetProperty("operationClockActivePlayer").GetInt32());
             Assert.False(root.GetProperty("operationClockPaused").GetBoolean());
@@ -242,8 +318,8 @@ public class OperationClockTests
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
-        for (var i = 0; i < 200 && !condition(); i++)
-            await Task.Delay(5);
+        for (var i = 0; i < 500 && !condition(); i++)
+            await Task.Delay(10);
         Assert.True(condition(), "棋钟未在预期时间内完成超时结算");
     }
 

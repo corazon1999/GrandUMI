@@ -9,6 +9,17 @@ namespace GrandUMI.Tests;
 public class RankedStoreTests
 {
     [Fact]
+    public void 标准与狂野排位使用不同数据库且协议默认标准()
+    {
+        Assert.NotEqual(
+            Path.GetFullPath(RankedStore.ResolveDefaultPath()),
+            Path.GetFullPath(RankedStore.ResolveWildDefaultPath()));
+        Assert.Equal(RankedMode.Standard, RankedModeWire.Parse(null));
+        Assert.Equal(RankedMode.Standard, RankedModeWire.Parse("standard"));
+        Assert.Equal(RankedMode.Wild, RankedModeWire.Parse("wild"));
+    }
+
+    [Fact]
     public void 排位结算_五局完成定级且同一对局只结算一次()
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");

@@ -132,6 +132,7 @@ interface GameStore {
   mode: GameMode;
   isStart: boolean;
   tick: number;
+  serverNowUtc: string | null;
   currentTurn: boolean;
   turnCount: number;
   firstPlayer: number;
@@ -146,6 +147,8 @@ interface GameStore {
   operationClockEnabled: boolean;
   myOperationTimeMs: number;
   opponentOperationTimeMs: number;
+  myTurnOperationTimeMs: number;
+  opponentTurnOperationTimeMs: number;
   operationClockActive: "my" | "opponent" | null;
   operationClockSyncUtc: string | null;
   operationClockPaused: boolean;
@@ -240,6 +243,7 @@ export const useGameStore = create<GameStore>()(
     mode: "Player",
     isStart: false,
     tick: 0,
+    serverNowUtc: null,
     currentTurn: false,
     turnCount: 0,
     firstPlayer: -1,
@@ -254,6 +258,8 @@ export const useGameStore = create<GameStore>()(
     operationClockEnabled: false,
     myOperationTimeMs: 1_200_000,
     opponentOperationTimeMs: 1_200_000,
+    myTurnOperationTimeMs: 480_000,
+    opponentTurnOperationTimeMs: 480_000,
     operationClockActive: null,
     operationClockSyncUtc: null,
     operationClockPaused: false,
@@ -304,6 +310,7 @@ export const useGameStore = create<GameStore>()(
         const my = clonePlayerView(msg.my ?? null);
         const opponent = clonePlayerView(msg.opponent ?? null);
         s.tick = incomingTick;
+        s.serverNowUtc = msg.serverNowUtc ?? null;
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
         s.turnCount = msg.turnCount;
@@ -321,6 +328,8 @@ export const useGameStore = create<GameStore>()(
         s.operationClockEnabled = msg.operationClockEnabled ?? false;
         s.myOperationTimeMs = msg.myOperationTimeMs ?? 1_200_000;
         s.opponentOperationTimeMs = msg.opponentOperationTimeMs ?? 1_200_000;
+        s.myTurnOperationTimeMs = msg.myTurnOperationTimeMs ?? Math.min(480_000, s.myOperationTimeMs);
+        s.opponentTurnOperationTimeMs = msg.opponentTurnOperationTimeMs ?? Math.min(480_000, s.opponentOperationTimeMs);
         s.operationClockActive = msg.operationClockActive ?? null;
         s.operationClockSyncUtc = msg.operationClockSyncUtc ?? null;
         s.operationClockPaused = msg.operationClockPaused ?? false;
@@ -481,6 +490,7 @@ export const useGameStore = create<GameStore>()(
     resetGame: () => set((s) => {
       s.isStart = false;
       s.tick = 0;
+      s.serverNowUtc = null;
       s.currentTurn = false;
       s.turnCount = 0;
       s.firstPlayer = -1;
@@ -495,6 +505,8 @@ export const useGameStore = create<GameStore>()(
       s.operationClockEnabled = false;
       s.myOperationTimeMs = 1_200_000;
       s.opponentOperationTimeMs = 1_200_000;
+      s.myTurnOperationTimeMs = 480_000;
+      s.opponentTurnOperationTimeMs = 480_000;
       s.operationClockActive = null;
       s.operationClockSyncUtc = null;
       s.operationClockPaused = false;

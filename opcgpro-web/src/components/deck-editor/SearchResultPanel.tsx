@@ -33,7 +33,7 @@ function preloadSprite(src: string) {
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 export default function SearchResultPanel() {
-  const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, gridColumns, addCard, setLeader, setFilterType, getCount, notice, clearNotice } =
+  const { format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, filterHasTrigger, gridColumns, addCard, setLeader, setFilterType, getCount, notice, clearNotice } =
     useDeckStore();
   const [modal, setModal]     = useState<CardData | null>(null);   // 右键弹窗
   const [hover, setHover]     = useState<HoverInfo | null>(null);  // 悬停预览
@@ -64,6 +64,7 @@ export default function SearchResultPanel() {
         filterCost,
         filterSets,
         filterShowSub1,
+        filterHasTrigger,
       },
       {
         allowedSets: whitelist,
@@ -71,7 +72,7 @@ export default function SearchResultPanel() {
         sortComparator: filterSets.length === 1 ? compareCatalogCards : undefined,
       },
     );
-  }, [format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, isLeaderMode]);
+  }, [format, leader, searchQuery, filterColors, filterType, filterProperty, filterRarity, filterCost, filterSets, filterShowSub1, filterHasTrigger, isLeaderMode]);
 
   // 虚拟网格列表
   const {

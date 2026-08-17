@@ -99,6 +99,7 @@ public static class CardDatabase
         public string[]? abilities { get; set; }
         public string? trigger     { get; set; }
         public string? rarity      { get; set; }
+        public JsonElement subscript { get; set; }
         public string[]? alsoNames { get; set; }
     }
 
@@ -141,6 +142,7 @@ public static class CardDatabase
             Abilities  = r.abilities ?? Array.Empty<string>(),
             Trigger    = r.trigger ?? "",
             Rarity     = r.rarity ?? "",
+            Subscript  = ParseSubscript(r.subscript),
             AlsoNames  = r.alsoNames ?? Array.Empty<string>(),
         };
     }
@@ -151,5 +153,12 @@ public static class CardDatabase
         if (string.IsNullOrEmpty(raw)) return 0;
         var m = System.Text.RegularExpressions.Regex.Match(raw, @"\d+");
         return m.Success ? int.Parse(m.Value) : 0;
+    }
+
+    private static int ParseSubscript(JsonElement raw)
+    {
+        if (raw.ValueKind == JsonValueKind.Number && raw.TryGetInt32(out var number)) return number;
+        if (raw.ValueKind == JsonValueKind.String && int.TryParse(raw.GetString(), out number)) return number;
+        return 0;
     }
 }

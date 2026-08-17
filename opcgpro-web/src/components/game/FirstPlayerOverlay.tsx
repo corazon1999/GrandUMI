@@ -6,6 +6,7 @@ import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
 import { getGameCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { useServerCountdown } from "@/hooks/useServerCountdown";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const RECOVERY_RETRY_INTERVAL_MS = 2500;
@@ -82,28 +83,19 @@ export default function FirstPlayerOverlay() {
   const canChooseFirstPlayer = useGameStore((s) => s.canChooseFirstPlayer);
   const diceWinnerIsMe = useGameStore((s) => s.diceWinnerIsMe);
   const startingPlayerChoiceDeadlineUtc = useGameStore((s) => s.startingPlayerChoiceDeadlineUtc);
+  const serverNowUtc = useGameStore((s) => s.serverNowUtc);
   const startingDiceRolls = useGameStore((s) => s.startingDiceRolls);
   const isPending = useGameStore((s) => s.isPending);
   const [roundIndex, setRoundIndex] = useState(0);
   const [settled, setSettled] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-
-  const deadlineMs = startingPlayerChoiceDeadlineUtc
-    ? Date.parse(startingPlayerChoiceDeadlineUtc)
-    : Number.NaN;
-  const remainingSeconds = Number.isFinite(deadlineMs)
-    ? Math.max(0, Math.ceil((deadlineMs - now) / 1000))
-    : 60;
+  const remainingSeconds = useServerCountdown(
+    startingPlayerChoiceDeadlineUtc,
+    serverNowUtc,
+    Boolean(startingPlayerChoiceDeadlineUtc && !firstPlayerChosen),
+  );
   const isExpiring = remainingSeconds <= 10;
   const timedOut = remainingSeconds === 0;
-
-  useEffect(() => {
-    if (!startingPlayerChoiceDeadlineUtc || firstPlayerChosen) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [firstPlayerChosen, startingPlayerChoiceDeadlineUtc]);
 
   useEffect(() => {
     if (!timedOut || firstPlayerChosen || !startingPlayerChoiceDeadlineUtc) return;
@@ -224,7 +216,7 @@ export default function FirstPlayerOverlay() {
               <p className={`text-sm font-black tabular-nums ${isExpiring ? "text-rose-300" : "text-amber-200"}`}>
                 选择剩余 {remainingSeconds} 秒
               </p>
-              {canChooseFirstPlayer && !timedOut ? (
+              {canChooseFirstPlayer ? (
                 <div className="flex gap-4">
                   <button
                     type="button"
@@ -253,7 +245,9 @@ export default function FirstPlayerOverlay() {
                       : "等待对手选择先后手..."}
                 </div>
               )}
-              <p className="text-xs text-slate-500">超时后将默认由骰点胜者先手</p>
+              <p className="text-xs text-slate-500">
+                {timedOut ? "服务器正在确认超时结果，完成前仍可选择" : "超时后将默认由骰点胜者先手"}
+              </p>
             </>
           )}
         </div>

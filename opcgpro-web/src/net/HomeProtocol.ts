@@ -46,6 +46,8 @@ import type {
   MsgCancelMatch,
   MsgSelectRankFaction,
   RankFaction,
+  RankedMode,
+  MatchQueueKind,
   MsgMatchFound,
   MsgRankSnapshot,
   MsgRankResult,
@@ -63,6 +65,7 @@ import type {
   MsgFriendRespond,
   MsgFriendRemove,
   MsgFriendCancel,
+  MsgPlayerSafety,
   MsgLeaderLeaderboard,
   MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
@@ -257,6 +260,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgFriendCancel":
         handleFriendMutation(msg as MsgFriendCancel);
+        break;
+      case "MsgPlayerSafety":
+        handlePlayerSafety(msg as MsgPlayerSafety);
         break;
       case "MsgLeaderLeaderboard":
         handleLeaderLeaderboard(msg as MsgLeaderLeaderboard);
@@ -567,8 +573,9 @@ function handleSelectRankFaction(msg: MsgSelectRankFaction) {
     showMessage(msg.logStr ?? "阵营选择失败", "error");
     return;
   }
-  const previousFaction = useNetStore.getState().rankProfile?.faction;
-  useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+  const mode = msg.mode ?? "standard";
+  const previousFaction = useNetStore.getState().rankProfiles[mode]?.faction;
+  useNetStore.getState().setRankSnapshot(mode, msg.profile, msg.leaderboard ?? [], msg.factionStandings);
   showMessage(previousFaction && previousFaction !== msg.profile.faction
     ? "阵营已更换，排位进度已清空，请重新定级"
     : "阵营已选定", "info");
@@ -588,7 +595,8 @@ function handleMatchFound(msg: MsgMatchFound) {
 }
 
 function handleRankSnapshot(msg: MsgRankSnapshot) {
-  useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+  if (!msg.profile) return;
+  useNetStore.getState().setRankSnapshot(msg.mode ?? "standard", msg.profile, msg.leaderboard ?? [], msg.factionStandings);
 }
 
 function handleRankResult(msg: MsgRankResult) {
@@ -596,7 +604,7 @@ function handleRankResult(msg: MsgRankResult) {
     showMessage(msg.error, "error");
     return;
   }
-  if (msg.profile) useNetStore.getState().setRankSnapshot(msg.profile, msg.leaderboard ?? []);
+  if (msg.profile) useNetStore.getState().setRankSnapshot(msg.mode ?? "standard", msg.profile, msg.leaderboard ?? [], msg.factionStandings);
   if (msg.result) useNetStore.getState().setLastRankResult(msg.result);
 }
 
@@ -748,6 +756,27 @@ function handleFriendMutation(msg: MsgFriendRequest | MsgFriendRespond | MsgFrie
     msg.logStr ?? (msg.result === false ? "好友操作失败" : "好友状态已更新"),
     msg.result === false ? "error" : "info",
   );
+}
+
+function handlePlayerSafety(msg: MsgPlayerSafety) {
+  if (msg.result !== false) {
+    const store = useNetStore.getState();
+    const blockedPlayers = msg.blockedPlayers ?? [];
+    const blockedKeys = new Set(blockedPlayers.map((player) => player.account.toLocaleLowerCase("zh-CN")));
+    store.setBlockedPlayers(blockedPlayers);
+    store.setPlayerList(store.playerList.filter(
+      (player) => !blockedKeys.has(player.account.toLocaleLowerCase("zh-CN")),
+    ));
+    store.setFriendSearchResults(store.friendSearchResults.filter(
+      (player) => !blockedKeys.has(player.account.toLocaleLowerCase("zh-CN")),
+    ));
+  }
+  if (msg.result === false || msg.logStr) {
+    showMessage(
+      msg.logStr ?? "安全操作失败",
+      msg.result === false ? "error" : "info",
+    );
+  }
 }
 
 /** MsgLeaderLeaderboard — 服务端 Leader 聚合榜单。 */
@@ -1047,7 +1076,7 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgDeleteDeckPlaza", publicationId } as MsgDeleteDeckPlaza);
   },
 
-  enterMatch(deck: string, deckName?: string, queueKind: "ranked" | "casual" = "casual") {
+  enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casual") {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     useNetStore.getState().setMatchQueueKind(queueKind);
     useNetStore.getState().setLastRankResult(null);
@@ -1076,11 +1105,16 @@ export const HomeRequest = {
     } as MsgCancelMatch);
   },
 
-  selectRankFaction(faction: RankFaction, resetRankProgress = false) {
+  requestRankSnapshot(mode: RankedMode = "standard") {
+    return NetManager.send({ proto: "MsgRankSnapshot", mode } as MsgRankSnapshot);
+  },
+
+  selectRankFaction(faction: RankFaction, resetRankProgress = false, mode: RankedMode = "standard") {
     return NetManager.send({
       proto: "MsgSelectRankFaction",
       faction,
       resetRankProgress,
+      mode,
     } as MsgSelectRankFaction);
   },
 
@@ -1177,6 +1211,43 @@ export const HomeRequest = {
 
   removeFriend(account: string) {
     return NetManager.send({ proto: "MsgFriendRemove", account } as MsgFriendRemove);
+  },
+
+  requestPlayerSafety() {
+    return NetManager.send({ proto: "MsgPlayerSafety", action: "list" } as MsgPlayerSafety);
+  },
+
+  blockPlayer(targetAccount?: string, currentOpponent = false) {
+    return NetManager.send({
+      proto: "MsgPlayerSafety",
+      action: "block",
+      targetAccount,
+      currentOpponent,
+    } as MsgPlayerSafety);
+  },
+
+  unblockPlayer(targetAccount: string) {
+    return NetManager.send({
+      proto: "MsgPlayerSafety",
+      action: "unblock",
+      targetAccount,
+    } as MsgPlayerSafety);
+  },
+
+  reportPlayer(
+    description: string,
+    category: MsgPlayerSafety["category"] = "harassment",
+    targetAccount?: string,
+    currentOpponent = false,
+  ) {
+    return NetManager.send({
+      proto: "MsgPlayerSafety",
+      action: "report",
+      targetAccount,
+      currentOpponent,
+      category,
+      description,
+    } as MsgPlayerSafety);
   },
 
   requestLeaderLeaderboard(period: LeaderboardPeriod) {

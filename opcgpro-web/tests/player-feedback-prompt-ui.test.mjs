@@ -139,7 +139,7 @@ test("对局反馈在桌面侧栏与手机旋转画布均有入口且弹窗高�
   assert.match(board, /hidden min-h-11[\s\S]*md:block/);
   assert.match(feedback, /createPortal\(/);
   assert.match(feedback, /createPortal\(\s*<AnimatePresence>[\s\S]*document\.body/);
-  assert.match(feedback, /left: "calc\(7\.75rem/);
+  assert.match(feedback, /right: "calc\(0\.75rem \+ var\(--layout-safe-right/);
   assert.match(feedback, /md:hidden/);
   assert.match(feedback, /min-h-11 min-w-11/);
   assert.match(feedback, /z-\[100\]/);
@@ -157,7 +157,8 @@ test("公开牌浮层不会因普通快照或卡图映射变化反复重置计�
 test("同赛季更旧的排位快照不会覆盖刚完成的结算", async () => {
   const store = await readSource("../src/store/netStore.ts");
 
-  assert.match(store, /state\.rankProfile\?\.seasonId === rankProfile\.seasonId/);
-  assert.match(store, /rankProfile\.games < state\.rankProfile\.games/);
+  assert.match(store, /const current = state\.rankProfiles\[mode\]/);
+  assert.match(store, /current\?\.seasonId === rankProfile\.seasonId/);
+  assert.match(store, /rankProfile\.games < current\.games/);
   assert.match(store, /return \{\};/);
 });

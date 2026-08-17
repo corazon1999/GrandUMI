@@ -95,6 +95,7 @@ export default function CardItem({
   const displayCounter = counterValue ?? card?.counter ?? 0;
   const rawSprite = card?.sprite ?? CARD_BACK_SRC;
   const [imgSrc, setImgSrc] = useState(thumbSrc(rawSprite));
+  const [imageFailed, setImageFailed] = useState(false);
   const leaderBreathingEffect =
     !showFaceDown && card?.type === "Leader"
       ? getLeaderBreathingEffect(card.number, rawSprite)
@@ -120,6 +121,7 @@ export default function CardItem({
   // 卡背后、即使图恢复也一直卡在卡背的问题）
   useEffect(() => {
     setImgSrc(thumbSrc(rawSprite));
+    setImageFailed(false);
   }, [card?.sprite]);
 
   // 悬停详情预览（仅正面且有卡牌数据时显示，避免泄露对手暗置手牌）
@@ -194,20 +196,35 @@ export default function CardItem({
         <CardBack cardBackId={cardBackId} />
       ) : (
         <>
-          <NextImage
-            src={imgSrc}
-            alt={card!.name}
-            fill
-            sizes="180px"
-            className={clsx(
-              "object-cover transition-[filter] duration-300",
+          {!imageFailed ? (
+            <NextImage
+              src={imgSrc}
+              alt={card!.name}
+              fill
+              sizes="180px"
+              className={clsx(
+                "object-cover transition-[filter] duration-300",
+                isTapped && "grayscale brightness-[0.6]",
+              )}
+              draggable={false}
+              onError={() => setImgSrc((cur) => {
+                const next = nextCardImageSrc(cur, rawSprite, card?.image, "thumb");
+                if (next === cur || next.includes(CARD_BACK_SRC)) setImageFailed(true);
+                return next;
+              })}
+            />
+          ) : (
+            <div className={clsx(
+              "absolute inset-0 flex flex-col bg-gradient-to-b from-slate-800 to-slate-950 p-1 text-slate-100",
               isTapped && "grayscale brightness-[0.6]",
-            )}
-            draggable={false}
-            onError={() =>
-              setImgSrc((cur) => nextCardImageSrc(cur, rawSprite, card?.image, "thumb"))
-            }
-          />
+            )}>
+              <p className="line-clamp-2 text-[9px] font-black leading-tight">{card!.name}</p>
+              <p className="mt-0.5 text-[7px] text-slate-400">{card!.number}</p>
+              <p className="mt-1 line-clamp-6 overflow-hidden whitespace-pre-wrap text-[7px] leading-tight text-slate-200">
+                {card!.effectEvent || card!.trigger || card!.abilities.join(" / ") || "卡图暂不可用"}
+              </p>
+            </div>
+          )}
           {leaderBreathingEffect && (
             <div
               className={clsx("leader-breath-fx", isTapped && "leader-breath-fx--tapped")}

@@ -20,6 +20,7 @@ public static class GameRoomManager
     public static IRoomPlacementDirectory RoomDirectory { get; set; } = LocalRoomPlacementDirectory.Instance;
     private const int GracePeriodSeconds = 90;
     private const long OperationTimeLimitMs = 20 * 60 * 1000;
+    private const long OperationTurnTimeLimitMs = 8 * 60 * 1000;
     /// <summary>仅排障时开启；私有快照平均约 63 KB，不应作为正式服常态日志。</summary>
     private static readonly bool PrivateSnapshotLogEnabled =
         string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "1", StringComparison.OrdinalIgnoreCase)
@@ -204,9 +205,10 @@ public static class GameRoomManager
         };
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
-        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking;
+        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking;
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
         engine.State.OperationClockRemainingMs[1] = OperationTimeLimitMs;
+        ResetOperationTurnClock(engine.State);
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
         engine.OnOpeningSequenceReady = () =>
         {
@@ -405,7 +407,11 @@ public static class GameRoomManager
             {
                 room.MarkActivity();
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
-                RoomJournal.AppendClock(room.RoomId, room.Engine.State.OperationClockRemainingMs);
+                RoomJournal.AppendClock(
+                    room.RoomId,
+                    room.Engine.State.OperationClockRemainingMs,
+                    room.Engine.State.OperationTurnClockRemainingMs,
+                    room.Engine.State.OperationTurnClockTurnCount);
                 MaybeCaptureRecoverySnapshot(room);
             }
             EnsureOperationClockRunning(room);
@@ -428,7 +434,7 @@ public static class GameRoomManager
             var cutoff = receivedAt > 0 ? receivedAt : Stopwatch.GetTimestamp();
             var activePlayer = room.Engine.State.OperationClockActivePlayer;
             ChargeOperationClockLocked(room, cutoff);
-            if (activePlayer is 0 or 1 && room.Engine.State.OperationClockRemainingMs[activePlayer] <= 0)
+            if (activePlayer is 0 or 1 && IsOperationClockExpired(room.Engine.State, activePlayer))
                 return activePlayer;
 
             // 非当前决策者发来的非法动作不能暂停对手棋钟；投降和平局协商是例外。
@@ -480,8 +486,16 @@ public static class GameRoomManager
         if (cutoff < room.OperationClockActiveSince) cutoff = Stopwatch.GetTimestamp();
         var elapsed = Stopwatch.GetElapsedTime(room.OperationClockActiveSince, cutoff).TotalMilliseconds;
         if (elapsed > 0)
+        {
+            var elapsedMs = (long)Math.Ceiling(elapsed);
             state.OperationClockRemainingMs[active] = Math.Max(0,
-                state.OperationClockRemainingMs[active] - (long)Math.Ceiling(elapsed));
+                state.OperationClockRemainingMs[active] - elapsedMs);
+            state.OperationTurnClockRemainingMs[active] = Math.Max(0,
+                state.OperationTurnClockRemainingMs[active] - elapsedMs);
+            state.OperationTurnClockRemainingMs[active] = Math.Min(
+                state.OperationTurnClockRemainingMs[active],
+                state.OperationClockRemainingMs[active]);
+        }
         room.OperationClockActiveSince = cutoff;
         state.OperationClockSyncUtc = DateTime.UtcNow;
     }
@@ -489,6 +503,8 @@ public static class GameRoomManager
     private static void StartOperationClockLocked(RoomEntry room, int playerIndex)
     {
         var state = room.Engine.State;
+        if (state.OperationTurnClockTurnCount != state.TurnCount)
+            ResetOperationTurnClock(state);
         CancelOperationClockTimerLocked(room);
         state.OperationClockActivePlayer = playerIndex;
         state.OperationClockPaused = state.MulliganBothDone
@@ -497,7 +513,9 @@ public static class GameRoomManager
         room.OperationClockActiveSince = playerIndex is 0 or 1 ? Stopwatch.GetTimestamp() : 0;
         if (playerIndex is not (0 or 1)) return;
 
-        var remaining = state.OperationClockRemainingMs[playerIndex];
+        var remaining = Math.Min(
+            state.OperationClockRemainingMs[playerIndex],
+            state.OperationTurnClockRemainingMs[playerIndex]);
         var version = ++room.OperationClockTimerVersion;
         var cancellation = new CancellationTokenSource();
         room.OperationClockTimer = cancellation;
@@ -516,7 +534,7 @@ public static class GameRoomManager
                         if (version != activeRoom.OperationClockTimerVersion) return Task.CompletedTask;
                         var current = activeRoom.Engine.State.OperationClockActivePlayer;
                         ChargeOperationClockLocked(activeRoom, Stopwatch.GetTimestamp());
-                        if (current is 0 or 1 && activeRoom.Engine.State.OperationClockRemainingMs[current] <= 0)
+                        if (current is 0 or 1 && IsOperationClockExpired(activeRoom.Engine.State, current))
                             expired = current;
                     }
                     if (expired is 0 or 1)
@@ -552,12 +570,30 @@ public static class GameRoomManager
         if (room.Engine.State.IsGameOver) return;
         lock (room.ClockGate)
         {
-            room.Engine.State.OperationClockRemainingMs[expiredPlayer] = 0;
+            var turnExpired = room.Engine.State.OperationTurnClockRemainingMs[expiredPlayer] <= 0;
+            if (!turnExpired) room.Engine.State.OperationClockRemainingMs[expiredPlayer] = 0;
+            room.Engine.State.OperationTurnClockRemainingMs[expiredPlayer] = 0;
             StopOperationClockLocked(room);
         }
         room.Engine.State.WinnerIndex = 1 - expiredPlayer;
-        room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[expiredPlayer]} 操作时间耗尽";
-        room.Engine.Broadcast("OperationTimeout", new { expiredPlayer });
+        var reason = room.Engine.State.OperationClockRemainingMs[expiredPlayer] <= 0
+            ? "总操作时间耗尽"
+            : "本回合操作时间耗尽";
+        room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[expiredPlayer]} {reason}";
+        room.Engine.Broadcast("OperationTimeout", new { expiredPlayer, reason });
+    }
+
+    private static bool IsOperationClockExpired(GameState state, int playerIndex)
+        => state.OperationClockRemainingMs[playerIndex] <= 0
+           || state.OperationTurnClockRemainingMs[playerIndex] <= 0;
+
+    private static void ResetOperationTurnClock(GameState state)
+    {
+        state.OperationTurnClockTurnCount = state.TurnCount;
+        for (var player = 0; player < 2; player++)
+            state.OperationTurnClockRemainingMs[player] = Math.Min(
+                OperationTurnTimeLimitMs,
+                state.OperationClockRemainingMs[player]);
     }
 
     /// <summary>根据服务端权威截止时间创建或清除先后手选择超时任务。</summary>
@@ -1419,9 +1455,14 @@ public static class GameRoomManager
             lock (r.ClockGate) CancelOperationClockTimerLocked(r);
             TrySettleRankedMatch(r);
             WebSocketBridge.OnGameRoomClosed(
+                r.RoomId,
                 r.PlayerSessionIds,
+                r.PlayerAccounts,
                 r.Spectators.Keys,
-                preservePostGameChat: r.Engine.State.IsGameOver);
+                preservePostGameChat: r.Engine.State.IsGameOver,
+                matchKind: r.MatchKind,
+                turnCount: r.Engine.State.TurnCount,
+                gameOverReason: r.Engine.State.GameOverReason);
             RoomDirectory.Unregister(roomId);
             CancelStartingPlayerChoiceTimeout(roomId);
             CancelMulliganTimeout(roomId);
@@ -1528,7 +1569,9 @@ public static class GameRoomManager
         if (!IsRankedSettlementEligible(room.MatchKind, room.Engine.State)) return;
         try
         {
-            var settlement = RankedStore.Default.RecordMatch(
+            var mode = RankedModeForMatch(room.MatchKind);
+            var store = RankedStore.ForMode(mode);
+            var settlement = store.RecordMatch(
                 room.RoomId,
                 DateTime.UtcNow,
                 room.PlayerAccounts[0],
@@ -1540,13 +1583,15 @@ public static class GameRoomManager
             var players = new[] { settlement.Player0, settlement.Player1 };
             for (var i = 0; i < 2; i++)
             {
-                var snapshot = RankedStore.Default.GetSnapshot(room.PlayerAccounts[i], room.PlayerDisplayNames[i]);
+                var snapshot = store.GetSnapshot(room.PlayerAccounts[i], room.PlayerDisplayNames[i]);
                 WebSocketBridge.Send(room.PlayerSessionIds[i], new
                 {
                     proto = "MsgRankResult",
+                    mode = RankedModeWire.Value(mode),
                     result = RankWire.Settlement(players[i]),
                     profile = RankWire.Profile(snapshot.Profile),
                     leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+                    factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
                 });
             }
 
@@ -1572,7 +1617,7 @@ public static class GameRoomManager
     }
 
     internal static bool IsRankedSettlementEligible(MatchKind matchKind, GameState state)
-        => matchKind == MatchKind.Ranked
+        => matchKind is MatchKind.Ranked or MatchKind.RankedWild
            && state.WinnerIndex is 0 or 1
            && state.MulliganBothDone;
 
@@ -1741,6 +1786,8 @@ public static class GameRoomManager
         var lastOperationSequences = new long[] { -1, -1 };
         long journalSequence = 0;
         var restoredClockMs = new long[] { OperationTimeLimitMs, OperationTimeLimitMs };
+        var restoredTurnClockMs = new long[] { OperationTurnTimeLimitMs, OperationTurnTimeLimitMs };
+        var restoredTurnClockTurnCount = 0;
         DateTime lastActivity = h.TryGetProperty("createdAtUtc", out var ca)
             ? ca.GetDateTime() : DateTime.UtcNow;
         for (int i = 1; i < lines.Length; i++)
@@ -1753,6 +1800,9 @@ public static class GameRoomManager
             {
                 if (e.TryGetProperty("player0RemainingMs", out var c0)) restoredClockMs[0] = Math.Max(0, c0.GetInt64());
                 if (e.TryGetProperty("player1RemainingMs", out var c1)) restoredClockMs[1] = Math.Max(0, c1.GetInt64());
+                if (e.TryGetProperty("player0TurnRemainingMs", out var tc0)) restoredTurnClockMs[0] = Math.Max(0, tc0.GetInt64());
+                if (e.TryGetProperty("player1TurnRemainingMs", out var tc1)) restoredTurnClockMs[1] = Math.Max(0, tc1.GetInt64());
+                if (e.TryGetProperty("turnCount", out var turnCount)) restoredTurnClockTurnCount = Math.Max(0, turnCount.GetInt32());
                 if (e.TryGetProperty("tsUtc", out var clockTs)) lastActivity = clockTs.GetDateTime();
                 continue;
             }
@@ -1808,7 +1858,7 @@ public static class GameRoomManager
             // 服务进程可能在胜负已产生、正常 CleanupRoom 尚未落盘时退出；恢复时补做幂等结算。
             TryRecordLeaderStats(roomId, matchKind, new[] { p0Account, p1Account }, engine.State, lastActivity);
             if (IsRankedSettlementEligible(matchKind, engine.State))
-                RankedStore.Default.RecordMatch(roomId, lastActivity, p0Account, p0Account,
+                RankedStore.ForMode(RankedModeForMatch(matchKind)).RecordMatch(roomId, lastActivity, p0Account, p0Account,
                     p1Account, p1Account, engine.State.WinnerIndex.GetValueOrDefault());
             TryDelete(file);
             return false;
@@ -1838,9 +1888,12 @@ public static class GameRoomManager
         entry.ProcessedPlayerRequests.Restore(processedRequests);
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
-        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.Casual or MatchKind.Matchmaking;
+        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking;
         engine.State.OperationClockRemainingMs[0] = restoredClockMs[0];
         engine.State.OperationClockRemainingMs[1] = restoredClockMs[1];
+        engine.State.OperationTurnClockRemainingMs[0] = Math.Min(restoredTurnClockMs[0], restoredClockMs[0]);
+        engine.State.OperationTurnClockRemainingMs[1] = Math.Min(restoredTurnClockMs[1], restoredClockMs[1]);
+        engine.State.OperationTurnClockTurnCount = restoredTurnClockTurnCount;
         entry.DisconnectedPlayers[0] = true;
         entry.DisconnectedPlayers[1] = true;
         var restoredDisconnectStartedAt = Stopwatch.GetTimestamp();
@@ -1950,13 +2003,15 @@ public static class GameRoomManager
         IReadOnlyList<string> playerAccounts,
         IReadOnlyList<string> playerDisplayNames)
     {
-        if (matchKind != MatchKind.Ranked) return;
+        if (matchKind is not (MatchKind.Ranked or MatchKind.RankedWild)) return;
+
+        var store = RankedStore.ForMode(RankedModeForMatch(matchKind));
 
         for (var i = 0; i < state.Players.Length; i++)
         {
             try
             {
-                var profile = RankedStore.Default.GetSnapshot(playerAccounts[i], playerDisplayNames[i]).Profile;
+                var profile = store.GetSnapshot(playerAccounts[i], playerDisplayNames[i]).Profile;
                 if (profile.Faction is null) continue;
                 state.Players[i].RankIdentity = new PlayerRankIdentity(
                     profile.Faction,
@@ -1972,6 +2027,9 @@ public static class GameRoomManager
             }
         }
     }
+
+    private static RankedMode RankedModeForMatch(MatchKind matchKind)
+        => matchKind == MatchKind.RankedWild ? RankedMode.Wild : RankedMode.Standard;
 
     private static void TryRecordLeaderStats(
         string roomId,

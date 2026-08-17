@@ -39,6 +39,7 @@ public class PromptSystem : IPromptService
         IReadOnlyList<string> validChoices, int min, int max,
         Dictionary<string, object?>? extra = null)
     {
+        (min, max) = NormalizeChooseRange(kind, text, min, max, extra);
         // 自动注入"效果源"：让客户端在选择提示里展示正在结算哪张卡的效果。
         // CurrentSource 随 AsyncLocal 传播，覆盖 DSL / 脚本 / AtomicOps 等所有调用点；
         // 无效果上下文（如战斗流程）时为 null，自然不注入，老行为不变。
@@ -170,6 +171,27 @@ public class PromptSystem : IPromptService
                 _pending.Remove(promptId);
             }
         }
+    }
+
+    /// <summary>
+    /// 卡面写明“最多 N 张”时，数量范围必须是 0..N。调用脚本若误把最小值也写成 N，
+    /// 在统一提示入口纠正，确保玩家可以少选或不选；成本、排序和明确必选流程不受影响。
+    /// </summary>
+    internal static (int Min, int Max) NormalizeChooseRange(
+        string kind,
+        string text,
+        int min,
+        int max,
+        Dictionary<string, object?>? extra = null)
+    {
+        if (min <= 0 || max <= 0 || !text.Contains("最多", StringComparison.Ordinal))
+            return (min, max);
+        if (EffectRuntime.PayingCost
+            || extra?.TryGetValue("isCost", out var isCost) == true && isCost is true
+            || kind.Contains("Order", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("Reorder", StringComparison.OrdinalIgnoreCase))
+            return (min, max);
+        return (0, max);
     }
 
     private static bool LooksLikeCostSelection(string kind, string promptText, string confirmText,

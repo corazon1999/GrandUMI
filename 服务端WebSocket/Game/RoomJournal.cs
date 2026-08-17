@@ -85,9 +85,13 @@ public static class RoomJournal
     }
 
     /// <summary>保存最近一次正式操作后的双方剩余棋钟；服务重启期间不继续扣时。</summary>
-    public static void AppendClock(string roomId, IReadOnlyList<long> remainingMs)
+    public static void AppendClock(
+        string roomId,
+        IReadOnlyList<long> remainingMs,
+        IReadOnlyList<long> turnRemainingMs,
+        int turnCount)
     {
-        if (remainingMs.Count < 2) return;
+        if (remainingMs.Count < 2 || turnRemainingMs.Count < 2) return;
         try
         {
             Writer.Append(roomId, new
@@ -95,6 +99,9 @@ public static class RoomJournal
                 kind = "clock",
                 player0RemainingMs = remainingMs[0],
                 player1RemainingMs = remainingMs[1],
+                player0TurnRemainingMs = turnRemainingMs[0],
+                player1TurnRemainingMs = turnRemainingMs[1],
+                turnCount,
                 tsUtc = DateTime.UtcNow,
             });
         }

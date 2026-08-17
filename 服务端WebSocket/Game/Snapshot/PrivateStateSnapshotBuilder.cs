@@ -27,6 +27,8 @@ public static class PrivateStateSnapshotBuilder
             mulliganDeadlineUtc = state.MulliganDeadlineUtc,
             operationClockEnabled = state.OperationClockEnabled,
             operationClockRemainingMs = state.OperationClockRemainingMs.ToArray(),
+            operationTurnClockRemainingMs = state.OperationTurnClockRemainingMs.ToArray(),
+            operationTurnClockTurnCount = state.OperationTurnClockTurnCount,
             operationClockActivePlayer = state.OperationClockActivePlayer,
             operationClockSyncUtc = state.OperationClockSyncUtc,
             operationClockPaused = state.OperationClockPaused,

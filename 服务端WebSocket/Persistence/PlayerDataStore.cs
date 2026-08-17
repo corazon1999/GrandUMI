@@ -46,6 +46,17 @@ public sealed class PlayerDataStore
     public const int MaxDeckPlazaTitleLength = 50;
     public const int MaxDeckPlazaPageSize = 30;
     public const int MaxQueuedFriendMessagesPerPlayer = 500;
+    public const int MinPlayerReportDescriptionLength = 2;
+    public const int MaxPlayerReportDescriptionLength = 1000;
+    private static readonly HashSet<string> ValidPlayerReportCategories = new(StringComparer.Ordinal)
+    {
+        "harassment",
+        "stalling",
+        "cheating",
+        "spam",
+        "other",
+    };
+    private static readonly TimeSpan DuplicatePlayerReportWindow = TimeSpan.FromMinutes(2);
     private const string CustomCardBackPrefix = "custom-";
     private const string DeckPublicationPrefix = "deck-";
 
@@ -182,6 +193,31 @@ public sealed class PlayerDataStore
 
             CREATE INDEX IF NOT EXISTS ix_friend_message_queue_receiver
                 ON friend_message_queue(receiver_id, sent_at, id);
+
+            CREATE TABLE IF NOT EXISTS player_blocks (
+                blocker_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                blocked_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY(blocker_id, blocked_id),
+                CHECK(blocker_id <> blocked_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_player_blocks_blocked
+                ON player_blocks(blocked_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS player_reports (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                reporter_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                reported_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                category    TEXT NOT NULL,
+                description TEXT NOT NULL,
+                context_json TEXT NOT NULL DEFAULT '{}',
+                created_at  INTEGER NOT NULL,
+                CHECK(reporter_id <> reported_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_player_reports_reported_created
+                ON player_reports(reported_id, created_at DESC);
 
             CREATE TABLE IF NOT EXISTS card_backs (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,6 +387,8 @@ public sealed class PlayerDataStore
         var receiverId = FindPlayerId(connection, transaction, NormalizeAccountKey(toAccount));
         if (receiverId is null || receiverId.Value == senderId)
             throw new PlayerDataValidationException("只能给好友发送消息。");
+        if (BlockRelationshipExists(connection, transaction, senderId, receiverId.Value))
+            throw new PlayerDataValidationException("你与该玩家之间已启用屏蔽，无法发送消息。");
 
         var (low, high) = OrderedPair(senderId, receiverId.Value);
         if (!FriendshipExists(connection, transaction, low, high))
@@ -493,6 +531,11 @@ public sealed class PlayerDataStore
             SELECT account, display_name, avatar
             FROM players
             WHERE id<>$playerId
+              AND NOT EXISTS (
+                  SELECT 1 FROM player_blocks block
+                  WHERE (block.blocker_id=$playerId AND block.blocked_id=players.id)
+                     OR (block.blocker_id=players.id AND block.blocked_id=$playerId)
+              )
               AND (account_key LIKE $pattern ESCAPE '\' COLLATE NOCASE
                    OR display_name LIKE $pattern ESCAPE '\' COLLATE NOCASE)
             ORDER BY CASE WHEN account_key=$exact COLLATE NOCASE THEN 0 ELSE 1 END,
@@ -554,6 +597,8 @@ public sealed class PlayerDataStore
         var targetId = FindPlayerId(connection, transaction, NormalizeAccountKey(toAccount));
         if (targetId is null) throw new PlayerDataValidationException("未找到该玩家。");
         if (playerId == targetId.Value) throw new PlayerDataValidationException("不能添加自己为好友。");
+        if (BlockRelationshipExists(connection, transaction, playerId, targetId.Value))
+            throw new PlayerDataValidationException("你与该玩家之间已启用屏蔽，无法添加好友。");
 
         var (low, high) = OrderedPair(playerId, targetId.Value);
         if (FriendshipExists(connection, transaction, low, high))
@@ -689,6 +734,156 @@ public sealed class PlayerDataStore
         var normalizedOtherAccount = GetAccount(connection, transaction, otherId.Value);
         transaction.Commit();
         return new FriendMutationResult(snapshot, normalizedOtherAccount);
+    }
+
+    public IReadOnlyList<BlockedPlayerSnapshot> GetBlockedPlayers(string account)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var blockerId = RequirePlayerId(connection, transaction, account);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT p.account, p.display_name, b.created_at
+            FROM player_blocks b
+            JOIN players p ON p.id=b.blocked_id
+            WHERE b.blocker_id=$blocker
+            ORDER BY b.created_at DESC;
+            """;
+        command.Parameters.AddWithValue("$blocker", blockerId);
+        using var reader = command.ExecuteReader();
+        var result = new List<BlockedPlayerSnapshot>();
+        while (reader.Read())
+            result.Add(new BlockedPlayerSnapshot(reader.GetString(0), reader.GetString(1), reader.GetInt64(2)));
+        transaction.Commit();
+        return result;
+    }
+
+    public void BlockPlayer(string account, string targetAccount)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var blockerId = RequirePlayerId(connection, transaction, account);
+        var blockedId = RequirePlayerId(connection, transaction, targetAccount);
+        if (blockerId == blockedId) throw new PlayerDataValidationException("不能拉黑自己。");
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT OR IGNORE INTO player_blocks(blocker_id,blocked_id,created_at) VALUES($blocker,$blocked,$now);";
+            insert.Parameters.AddWithValue("$blocker", blockerId);
+            insert.Parameters.AddWithValue("$blocked", blockedId);
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            insert.ExecuteNonQuery();
+        }
+        var (low, high) = OrderedPair(blockerId, blockedId);
+        using (var cleanup = connection.CreateCommand())
+        {
+            cleanup.Transaction = transaction;
+            cleanup.CommandText = """
+                DELETE FROM friendships WHERE player_low_id=$low AND player_high_id=$high;
+                DELETE FROM friend_requests WHERE player_low_id=$low AND player_high_id=$high;
+                DELETE FROM friend_message_queue
+                WHERE (sender_id=$blocker AND receiver_id=$blocked)
+                   OR (sender_id=$blocked AND receiver_id=$blocker);
+                """;
+            cleanup.Parameters.AddWithValue("$low", low);
+            cleanup.Parameters.AddWithValue("$high", high);
+            cleanup.Parameters.AddWithValue("$blocker", blockerId);
+            cleanup.Parameters.AddWithValue("$blocked", blockedId);
+            cleanup.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    public void UnblockPlayer(string account, string targetAccount)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var blockerId = RequirePlayerId(connection, transaction, account);
+        var blockedId = RequirePlayerId(connection, transaction, targetAccount);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM player_blocks WHERE blocker_id=$blocker AND blocked_id=$blocked;";
+        command.Parameters.AddWithValue("$blocker", blockerId);
+        command.Parameters.AddWithValue("$blocked", blockedId);
+        command.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    public IReadOnlySet<string> GetBlockedRelatedAccountKeys(string account)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var playerId = RequirePlayerId(connection, transaction, account);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT p.account_key
+            FROM player_blocks b
+            JOIN players p ON p.id = CASE WHEN b.blocker_id=$id THEN b.blocked_id ELSE b.blocker_id END
+            WHERE b.blocker_id=$id OR b.blocked_id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", playerId);
+        using var reader = command.ExecuteReader();
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read()) result.Add(reader.GetString(0));
+        transaction.Commit();
+        return result;
+    }
+
+    public void CreatePlayerReport(
+        string account,
+        string targetAccount,
+        string category,
+        string description,
+        string contextJson)
+    {
+        category = (category ?? "harassment").Trim();
+        description = (description ?? "").Trim();
+        if (!ValidPlayerReportCategories.Contains(category))
+            throw new PlayerDataValidationException("举报类型无效，请重新选择。");
+        if (description.Length is < MinPlayerReportDescriptionLength or > MaxPlayerReportDescriptionLength)
+            throw new PlayerDataValidationException($"举报说明需为 {MinPlayerReportDescriptionLength}–{MaxPlayerReportDescriptionLength} 个字符。");
+        if (contextJson.Length > 8000) contextJson = contextJson[..8000];
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var reporterId = RequirePlayerId(connection, transaction, account);
+        var reportedId = RequirePlayerId(connection, transaction, targetAccount);
+        if (reporterId == reportedId) throw new PlayerDataValidationException("不能举报自己。");
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        using (var duplicate = connection.CreateCommand())
+        {
+            duplicate.Transaction = transaction;
+            duplicate.CommandText = """
+                SELECT 1 FROM player_reports
+                WHERE reporter_id=$reporter
+                  AND reported_id=$reported
+                  AND category=$category
+                  AND created_at >= $cutoff
+                LIMIT 1;
+                """;
+            duplicate.Parameters.AddWithValue("$reporter", reporterId);
+            duplicate.Parameters.AddWithValue("$reported", reportedId);
+            duplicate.Parameters.AddWithValue("$category", category);
+            duplicate.Parameters.AddWithValue("$cutoff", now - (long)DuplicatePlayerReportWindow.TotalMilliseconds);
+            if (duplicate.ExecuteScalar() is not null)
+                throw new PlayerDataValidationException("相同类型的举报已提交，请勿重复提交。");
+        }
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO player_reports(reporter_id,reported_id,category,description,context_json,created_at)
+            VALUES($reporter,$reported,$category,$description,$context,$now);
+            """;
+        command.Parameters.AddWithValue("$reporter", reporterId);
+        command.Parameters.AddWithValue("$reported", reportedId);
+        command.Parameters.AddWithValue("$category", category);
+        command.Parameters.AddWithValue("$description", description);
+        command.Parameters.AddWithValue("$context", contextJson);
+        command.Parameters.AddWithValue("$now", now);
+        command.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     public PlayerDataSnapshot SaveDeck(string account, StoredDeck deck)
@@ -1859,6 +2054,25 @@ public sealed class PlayerDataStore
         command.CommandText = "SELECT 1 FROM friendships WHERE player_low_id=$low AND player_high_id=$high LIMIT 1;";
         command.Parameters.AddWithValue("$low", low);
         command.Parameters.AddWithValue("$high", high);
+        return command.ExecuteScalar() is not null;
+    }
+
+    private static bool BlockRelationshipExists(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long first,
+        long second)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT 1 FROM player_blocks
+            WHERE (blocker_id=$first AND blocked_id=$second)
+               OR (blocker_id=$second AND blocked_id=$first)
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$first", first);
+        command.Parameters.AddWithValue("$second", second);
         return command.ExecuteScalar() is not null;
     }
 

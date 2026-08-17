@@ -6,6 +6,23 @@ using GrandUMI.Game.Stats;
 
 namespace GrandUMI.Game.Ranked;
 
+public enum RankedMode
+{
+    Standard,
+    Wild,
+}
+
+public static class RankedModeWire
+{
+    public const string Standard = "standard";
+    public const string Wild = "wild";
+
+    public static RankedMode Parse(string? value)
+        => string.Equals(value, Wild, StringComparison.OrdinalIgnoreCase) ? RankedMode.Wild : RankedMode.Standard;
+
+    public static string Value(RankedMode mode) => mode == RankedMode.Wild ? Wild : Standard;
+}
+
 public sealed record RankProfileSnapshot(
     string SeasonId,
     DateTime SeasonStartsAtUtc,
@@ -24,6 +41,7 @@ public sealed record RankProfileSnapshot(
 
 public sealed record RankLeaderboardItem(
     int Rank,
+    int FactionRank,
     string DisplayName,
     int RankPoints,
     string Faction,
@@ -36,9 +54,18 @@ public sealed record RankLeaderboardItem(
     IReadOnlyList<string> ChampionLeaderNumbers,
     bool IsCurrentPlayer);
 
+public sealed record FactionStanding(
+    int Rank,
+    string Faction,
+    long TotalRankPoints,
+    int PlayerCount,
+    int Games,
+    int Wins);
+
 public sealed record RankSnapshot(
     RankProfileSnapshot Profile,
-    IReadOnlyList<RankLeaderboardItem> Leaderboard);
+    IReadOnlyList<RankLeaderboardItem> Leaderboard,
+    IReadOnlyList<FactionStanding> FactionStandings);
 
 public sealed record RankPlayerSettlement(
     string Account,
@@ -91,6 +118,7 @@ public static class RankWire
         => values.Select(value => (object)new
         {
             rank = value.Rank,
+            factionRank = value.FactionRank,
             displayName = value.DisplayName,
             rankPoints = value.RankPoints,
             faction = value.Faction,
@@ -102,6 +130,17 @@ public static class RankWire
             favoriteLeader = value.FavoriteLeader,
             championLeaderNumbers = value.ChampionLeaderNumbers,
             isCurrentPlayer = value.IsCurrentPlayer,
+        }).ToArray();
+
+    public static object[] FactionStandings(IReadOnlyList<FactionStanding> values)
+        => values.Select(value => (object)new
+        {
+            rank = value.Rank,
+            faction = value.Faction,
+            totalRankPoints = value.TotalRankPoints,
+            playerCount = value.PlayerCount,
+            games = value.Games,
+            wins = value.Wins,
         }).ToArray();
 
     public static object Settlement(RankPlayerSettlement value) => new
@@ -163,6 +202,9 @@ public sealed class RankedStore
     private bool _initialized;
 
     public static RankedStore Default { get; } = new();
+    public static RankedStore Wild { get; } = new(ResolveWildDefaultPath());
+
+    public static RankedStore ForMode(RankedMode mode) => mode == RankedMode.Wild ? Wild : Default;
 
     public RankedStore(string? databasePath = null, LeaderChampionStore? championStore = null)
     {
@@ -187,6 +229,15 @@ public sealed class RankedStore
         var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
         if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "ranked.db"));
         return Path.Combine(Path.GetDirectoryName(Persistence.PlayerDataStore.ResolveDefaultPath())!, "ranked.db");
+    }
+
+    public static string ResolveWildDefaultPath()
+    {
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_RANKED_WILD_DB");
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var dataDir = Environment.GetEnvironmentVariable("GRANDUMI_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(dataDir)) return Path.GetFullPath(Path.Combine(dataDir, "ranked-wild.db"));
+        return Path.Combine(Path.GetDirectoryName(Persistence.PlayerDataStore.ResolveDefaultPath())!, "ranked-wild.db");
     }
 
     public void Initialize()
@@ -278,7 +329,10 @@ public sealed class RankedStore
             var faction = ReadFaction(connection, transaction, profile.AccountKey);
             var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
             transaction.Commit();
-            return new RankSnapshot(ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction), account, nowUtc), leaderboard);
+            return new RankSnapshot(
+                ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction), account, nowUtc),
+                leaderboard,
+                ReadFactionStandings(connection, season));
         }
     }
 
@@ -317,7 +371,8 @@ public sealed class RankedStore
                     var unchangedLeaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
                     transaction.Commit();
                     return new RankSnapshot(ToSnapshot(profile, season, selected,
-                        FactionRank(connection, season, profile, selected), account, nowUtc), unchangedLeaderboard);
+                        FactionRank(connection, season, profile, selected), account, nowUtc), unchangedLeaderboard,
+                        ReadFactionStandings(connection, season));
                 }
 
                 profile = ResetRankProgress(profile, nowUtc ?? DateTime.UtcNow);
@@ -333,7 +388,10 @@ public sealed class RankedStore
             }
             var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
             transaction.Commit();
-            return new RankSnapshot(ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected), account, nowUtc), leaderboard);
+            return new RankSnapshot(
+                ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected), account, nowUtc),
+                leaderboard,
+                ReadFactionStandings(connection, season));
         }
     }
 
@@ -668,7 +726,7 @@ public sealed class RankedStore
             )
             SELECT account_key, display_name, rank_points, games, wins, faction, global_rank, faction_rank
             FROM ranked
-            WHERE global_rank <= 100 OR account_key = $currentAccountKey
+            WHERE global_rank <= 100 OR faction_rank <= 100 OR account_key = $currentAccountKey
             ORDER BY global_rank ASC;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
@@ -709,11 +767,46 @@ public sealed class RankedStore
             var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
             favoriteLeaders.TryGetValue(entry.AccountKey, out var favoriteLeader);
             championLeaderNumbersByPlayer.TryGetValue(entry.AccountKey, out var championLeaderNumbers);
-            result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.DisplayName, entry.RankPoints, entry.Faction,
+            result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.FactionRank, entry.DisplayName, entry.RankPoints, entry.Faction,
                 label.Tier, label.Division, entry.Games, entry.Wins,
                 entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber,
                 championLeaderNumbers ?? Array.Empty<string>(),
                 string.Equals(entry.AccountKey, currentAccountKey, StringComparison.Ordinal)));
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<FactionStanding> ReadFactionStandings(
+        SqliteConnection connection,
+        Season season)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH totals AS (
+                SELECT f.faction,
+                       SUM(p.rank_points) AS total_points,
+                       COUNT(*) AS player_count,
+                       SUM(p.games) AS games,
+                       SUM(p.wins) AS wins
+                FROM rank_profiles p
+                JOIN rank_factions f ON f.account_key=p.account_key
+                WHERE p.season_id=$season AND p.placement_games >= $placements
+                GROUP BY f.faction
+            )
+            SELECT faction, total_points, player_count, games, wins,
+                   ROW_NUMBER() OVER (ORDER BY total_points DESC, wins DESC, faction ASC) AS faction_rank
+            FROM totals
+            ORDER BY faction_rank;
+            """;
+        command.Parameters.AddWithValue("$season", season.Id);
+        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        using var reader = command.ExecuteReader();
+        var result = new List<FactionStanding>();
+        while (reader.Read())
+        {
+            result.Add(new FactionStanding(
+                reader.GetInt32(5), reader.GetString(0), reader.GetInt64(1),
+                reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4)));
         }
         return result;
     }

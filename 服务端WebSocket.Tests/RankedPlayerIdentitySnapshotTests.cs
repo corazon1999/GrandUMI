@@ -7,11 +7,13 @@ namespace GrandUMI.Tests;
 
 public class RankedPlayerIdentitySnapshotTests
 {
-    [Fact]
-    public void 排位快照_按观看视角下发双方阵营和段位()
+    [Theory]
+    [InlineData(MatchKind.Ranked)]
+    [InlineData(MatchKind.RankedWild)]
+    public void 排位快照_按观看视角下发双方阵营和段位(MatchKind matchKind)
     {
         var state = TestScene.MaxScenario();
-        state.MatchKind = MatchKind.Ranked;
+        state.MatchKind = matchKind;
         state.Players[0].RankIdentity = new PlayerRankIdentity("pirate", "船长", 2, 5, 5);
         state.Players[1].RankIdentity = new PlayerRankIdentity("marine", "海军少将", 1, 3, 5);
 

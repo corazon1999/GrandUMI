@@ -165,4 +165,9 @@ public sealed record QueuedFriendMessage(
     string ToName,
     long SentAt);
 
+public sealed record BlockedPlayerSnapshot(
+    string Account,
+    string DisplayName,
+    long BlockedAt);
+
 public sealed class PlayerDataValidationException(string message) : Exception(message);

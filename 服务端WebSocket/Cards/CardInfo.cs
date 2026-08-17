@@ -21,6 +21,8 @@ public class CardInfo
     public string[] Abilities        { get; init; } = Array.Empty<string>();
     public string Trigger            { get; init; } = "";
     public string Rarity             { get; init; } = "";
+    /// <summary>官方环境角标；1 表示该印次通常不在当前标准环境，白名单重印卡除外。</summary>
+    public int Subscript             { get; init; }
 
     /// <summary>规则上"卡牌名称也视为"的其它名称（如 EB04-038 也视为"特拉法尔加·罗"/"堂吉诃德·罗西南德"）。
     /// 静态恒成立(手牌/卡组/场上全区)，故卡名匹配(NameContains/NameIs)同时匹配主名与这些别名。</summary>
@@ -87,7 +89,7 @@ public class CardInfo
     {
         Number = Number, Name = Name, Color = Color, Kind = Kind, Property = Property,
         Power = Power, Cost = Cost, Keywords = Keywords, Counter = Counter,
-        EffectTags = EffectTags, Abilities = Abilities, Trigger = Trigger, Rarity = Rarity,
+        EffectTags = EffectTags, Abilities = Abilities, Trigger = Trigger, Rarity = Rarity, Subscript = Subscript,
         AlsoNames = AlsoNames,
         AllKeywordsWildcard = true,
         NameWildcard = true,

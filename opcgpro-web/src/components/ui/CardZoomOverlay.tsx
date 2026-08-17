@@ -32,10 +32,12 @@ export default function CardZoomOverlay({
   const rawSprite = sprite ?? card.sprite ?? CARD_BACK_SRC;
   const displayCounter = counterValue ?? card.counter;
   const [imgSrc, setImgSrc] = useState(displaySrc(rawSprite));
+  const [imageFailed, setImageFailed] = useState(false);
   const cardSize = useSettingsStore((state) => state.cardSize);
 
   useEffect(() => {
     setImgSrc(displaySrc(rawSprite));
+    setImageFailed(false);
   }, [rawSprite]);
 
   // Esc 关闭
@@ -61,6 +63,15 @@ export default function CardZoomOverlay({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
+      <button
+        type="button"
+        onClick={(event) => { event.stopPropagation(); onClose(); }}
+        className="absolute right-[calc(0.75rem+var(--layout-safe-right,env(safe-area-inset-right)))] top-[calc(0.75rem+var(--layout-safe-top,env(safe-area-inset-top)))] z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/30 bg-slate-950/95 text-xl font-black text-white shadow-xl hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-white"
+        aria-label="关闭卡牌详情"
+        title="关闭卡牌详情"
+      >
+        ×
+      </button>
       <motion.div
         className="flex max-h-[calc(100cqh-2rem)] max-w-[calc(100cqw-2rem)] flex-col items-center gap-3 overflow-y-auto p-2 @[640px]:flex-row @[640px]:items-start @[640px]:gap-5"
         // 内容区也响应点击关闭：右键看完即点任意处退出，无需精确点遮罩
@@ -81,17 +92,29 @@ export default function CardZoomOverlay({
             aspectRatio: "0.717",
           }}
         >
-          <NextImage
-            src={imgSrc}
-            alt={card.name}
-            fill
-            sizes="480px"
-            className="object-cover"
-            priority
-            onError={() =>
-              setImgSrc((prev) => nextCardImageSrc(prev, rawSprite, card.image, "display"))
-            }
-          />
+          {!imageFailed ? (
+            <NextImage
+              src={imgSrc}
+              alt={card.name}
+              fill
+              sizes="480px"
+              className="object-cover"
+              priority
+              onError={() => setImgSrc((prev) => {
+                const next = nextCardImageSrc(prev, rawSprite, card.image, "display");
+                if (next === prev || next.includes(CARD_BACK_SRC)) setImageFailed(true);
+                return next;
+              })}
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col bg-gradient-to-b from-slate-800 to-slate-950 p-5 text-slate-100">
+              <p className="text-lg font-black">{card.name}</p>
+              <p className="mt-1 text-xs text-slate-400">{card.number} · 卡图暂不可用</p>
+              <p className="mt-5 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-200">
+                {card.effectEvent || card.trigger || card.abilities.join(" / ") || "此卡暂无效果文字。"}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* 信息条 */}
@@ -155,6 +178,11 @@ export default function CardZoomOverlay({
             // #179 触发文本字号响应式：手机端从 12px 提升到 sm/base
             <p className="mt-2 text-sm sm:text-base leading-snug text-amber-200">
               <span className="font-bold">触发</span> {card.trigger}
+            </p>
+          )}
+          {card.effectEvent && (
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200 sm:text-base">
+              {card.effectEvent}
             </p>
           )}
         </div>

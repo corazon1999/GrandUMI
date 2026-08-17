@@ -175,6 +175,10 @@ public class StartingPlayerFlowTests
         Assert.Equal(
             engine.State.StartingPlayerChoiceDeadlineUtc,
             p0Root.GetProperty("startingPlayerChoiceDeadlineUtc").GetDateTime());
+        Assert.InRange(
+            p0Root.GetProperty("serverNowUtc").GetDateTime(),
+            DateTime.UtcNow.AddSeconds(-2),
+            DateTime.UtcNow.AddSeconds(2));
         Assert.False(spectator.RootElement.GetProperty("canChooseFirstPlayer").GetBoolean());
     }
 

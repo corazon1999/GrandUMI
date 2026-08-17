@@ -19,7 +19,9 @@ test("排行榜页面在同一位置切换 Leader 榜和排位榜", async () => 
   assert.ok(panel.indexOf(">\n              排位榜\n") < panel.indexOf(">\n              Leader榜\n"), "排位榜页签应位于 Leader 榜左侧");
   assert.match(panel, />\s*Leader榜\s*</);
   assert.match(panel, />\s*排位榜\s*</);
-  assert.match(panel, /rankingTab === "ranked" \? <RankedLeaderboard items=\{rankLeaderboard\}/);
+  assert.match(panel, /rankingTab === "ranked" \? rankProfile \? <RankedLeaderboard items=\{rankLeaderboard\} standings=\{factionStandings\}/);
+  assert.match(panel, /useState<RankedMode>\("standard"\)/);
+  assert.match(panel, /aria-label="排位榜模式"/);
   assert.match(panel, /RANK_FACTION_NAMES/);
   assert.match(panel, /favoriteLeader/);
   assert.match(panel, />悬赏金</);

@@ -15,6 +15,7 @@ import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
 import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
 import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
+import AttachDonUndoToast from "@/components/game/AttachDonUndoToast";
 import GameOverOverlay from "@/components/game/GameOverOverlay";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
@@ -56,6 +57,10 @@ export default function GamePage() {
     }
   }, [isPlayback, playback]);
 
+  useEffect(() => () => {
+    GameRequest.cancelPendingAttachDon();
+  }, []);
+
   const returnToHome = () => {
     GameRequest.leaveGameChat();
     if (isObserver) HomeRequest.leaveSpectate();
@@ -83,6 +88,7 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <GameMenu />}
       {!isObserver && !isPlayback && <GMPanel />}
       {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
+      {!isObserver && !isPlayback && <AttachDonUndoToast />}
 
       {isObserver && (
         <div
