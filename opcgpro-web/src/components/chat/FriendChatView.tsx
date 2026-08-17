@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { friendAccountKey } from "@/store/netStore";
-import type { FriendChatMessage, FriendInfo } from "@/types/net";
+import type { FriendChatMessage, FriendInfo, FriendPresenceStatus } from "@/types/net";
 
 interface Props {
   friends: FriendInfo[];
@@ -20,6 +20,18 @@ interface Props {
   conversationOpen: boolean;
   bottomRef?: React.RefObject<HTMLDivElement | null>;
   headerActions?: ReactNode;
+}
+
+const FRIEND_STATUS_VIEW: Record<FriendPresenceStatus, { text: string; cls: string }> = {
+  offline: { text: "离线", cls: "text-gray-500" },
+  idle: { text: "在线", cls: "text-emerald-400" },
+  matching: { text: "匹配中", cls: "text-amber-400" },
+  playing: { text: "对战中", cls: "text-red-400" },
+  spectating: { text: "观战中", cls: "text-purple-400" },
+};
+
+function friendStatusView(friend: FriendInfo) {
+  return FRIEND_STATUS_VIEW[friend.online ? friend.status : "offline"];
 }
 
 function formatConversationTime(timestamp?: number) {
@@ -154,13 +166,14 @@ export default function FriendChatView({
             const unread = unreadByAccount[accountKey] ?? 0;
             const selected = accountKey === selectedKey;
             const sentByMe = lastMessage && friendAccountKey(lastMessage.fromAccount) === myKey;
+            const statusView = friendStatusView(friend);
             return (
               <button
                 key={friend.account}
                 type="button"
                 role="option"
                 aria-selected={selected}
-                aria-label={`${friend.name}，${friend.online ? "在线" : "离线"}${unread ? `，${unread} 条未读消息` : ""}`}
+                aria-label={`${friend.name}，${statusView.text}${unread ? `，${unread} 条未读消息` : ""}`}
                 onClick={() => onSelect(friend.account)}
                 className={`flex min-h-[4.5rem] w-full items-center gap-3 px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-400 ${
                   selected ? "bg-[#2a3942]" : "hover:bg-[#202c33] active:bg-[#2a3942]"
@@ -173,8 +186,15 @@ export default function FriendChatView({
                     <span className={`shrink-0 text-[10px] ${unread ? "text-emerald-400" : "text-gray-500"}`}>{formatConversationTime(lastMessage?.sentAt)}</span>
                   </span>
                   <span className="mt-1 flex items-center gap-2">
+                    <span
+                      data-friend-presence={friend.online ? friend.status : "offline"}
+                      className={`shrink-0 text-[11px] font-medium ${statusView.cls}`}
+                    >
+                      {statusView.text}
+                    </span>
+                    <span aria-hidden="true" className="shrink-0 text-[10px] text-gray-700">·</span>
                     <span className={`min-w-0 flex-1 truncate text-xs ${unread ? "text-gray-300" : "text-gray-500"}`}>
-                      {lastMessage ? `${sentByMe ? "你：" : ""}${lastMessage.text}` : friend.online ? "在线，可以开始聊天" : "离线 · 可留言"}
+                      {lastMessage ? `${sentByMe ? "你：" : ""}${lastMessage.text}` : friend.online ? "可以开始聊天" : "可留言"}
                     </span>
                     {unread > 0 && (
                       <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black text-[#062e24]">

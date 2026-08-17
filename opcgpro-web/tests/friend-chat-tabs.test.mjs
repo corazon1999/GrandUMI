@@ -101,6 +101,12 @@ test("大厅聊天面板提供大厅与好友分页并支持实时私聊", async
   assert.match(friendChatView, /placeholder="搜索好友"/);
   assert.match(friendChatView, /role="listbox"/);
   assert.match(friendChatView, /lastMessageByAccount/);
+  assert.match(friendChatView, /data-friend-presence=/);
+  assert.match(friendChatView, /FRIEND_STATUS_VIEW/);
+  for (const statusText of ["在线", "匹配中", "对战中", "观战中", "离线"]) {
+    assert.match(friendChatView, new RegExp(`text: "${statusText}"`));
+  }
+  assert.match(friendChatView, /friend\.online \? friend\.status : "offline"/);
   assert.match(
     friendChatView,
     /Number\(b\.online\) - Number\(a\.online\) \|\| bLast - aLast/,
