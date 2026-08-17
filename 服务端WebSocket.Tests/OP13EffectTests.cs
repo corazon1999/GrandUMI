@@ -1,3 +1,4 @@
+using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
@@ -7,6 +8,57 @@ namespace GrandUMI.Tests;
 
 public class OP13EffectTests
 {
+    [Fact]
+    public async Task OP13_004_Plays_OP13_016_StillShowsTopFourWhenNoCardIsEligible()
+    {
+        TestScene.New(); // 确保测试卡库已加载
+        var deck = BuildLegalDeck("OP13-004");
+        var engine = new GameEngine(
+            "op13-016-no-eligible-test",
+            ("s0", "alice", deck),
+            ("s1", "bob", deck),
+            firstPlayer: 0,
+            rngSeed: 20260817);
+        var state = engine.State;
+        var me = state.Players[0];
+
+        state.CurrentTurnPlayer = 0;
+        state.TurnCount = 3;
+        state.Phase = Phase.Main;
+        me.Hand.Clear();
+        me.Hand.Add(new CardInstance { Info = CardDatabase.Get("OP13-016")! });
+        me.Characters.Clear();
+        me.CostArea.Clear();
+        me.CostArea.Add(new DonCard { State = DonState.Active });
+        me.Deck.Clear();
+        for (var index = 0; index < 4; index++)
+            me.Deck.Add(new CardInstance { Info = CardDatabase.Get("OP13-016")! });
+        me.Deck.Add(new CardInstance { Info = CardDatabase.Get("OP13-017")! });
+        var originalTopFour = me.Deck.Take(4).ToList();
+        var originalTail = me.Deck[4];
+
+        engine.HandleAction(0, "PlayCard", JsonSerializer.SerializeToElement(new { handIndex = 0 }));
+        await engine.WaitSettledAsync();
+
+        var prompt = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+        Assert.Equal("LookTopReveal", prompt.Kind);
+        Assert.Empty(prompt.ValidChoices);
+        var choiceCards = Assert.IsAssignableFrom<IEnumerable<object>>(prompt.Extra["choiceCards"]);
+        Assert.Equal(4, choiceCards.Count());
+
+        engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        }));
+        await engine.WaitSettledAsync(resolvingPromptId: prompt.PromptId);
+
+        Assert.Null(state.PendingPrompt);
+        Assert.Contains(me.Characters, card => card.Info.Number == "OP13-016");
+        Assert.Equal(originalTail.Id, me.Deck[0].Id);
+        Assert.Equal(originalTopFour.Select(card => card.Id), me.Deck.Skip(1).Select(card => card.Id));
+    }
+
     [Fact]
     public async Task OP13_113_CanSearchBurningSwordWithPrintedLifeTrigger()
     {
@@ -91,5 +143,25 @@ public class OP13EffectTests
         character.CostModThisTurn = 0;
         Assert.Equal(7, state.CurrentCostOf(0, character));
         Assert.Equal(0, state.ContinuousPowerBonus(0, me.Leader));
+    }
+
+    private static string BuildLegalDeck(string leaderNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var pool = CardDatabase.GetBySet("OP13")
+            .Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leader))
+            .ToList();
+        var lines = new List<string> { leaderNumber };
+        var counts = new Dictionary<string, int>();
+        var index = 0;
+        while (lines.Count < 51)
+        {
+            var card = pool[index++ % pool.Count];
+            var count = counts.GetValueOrDefault(card.Number);
+            if (count >= 4) continue;
+            lines.Add(card.Number);
+            counts[card.Number] = count + 1;
+        }
+        return string.Join('\n', lines);
     }
 }
