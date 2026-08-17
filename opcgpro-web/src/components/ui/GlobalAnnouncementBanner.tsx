@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { eventBus } from "@/net/eventBus";
 import type { MsgBase, MsgGlobalAnnouncement } from "@/types/net";
 
@@ -13,6 +13,7 @@ interface Announcement {
 export default function GlobalAnnouncementBanner() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const announcement = announcements[0] ?? null;
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let sequence = 0;
@@ -33,10 +34,28 @@ export default function GlobalAnnouncementBanner() {
     return () => clearTimeout(timer);
   }, [announcement]);
 
+  useEffect(() => {
+    if (!announcement || !bannerRef.current) return;
+    const banner = bannerRef.current;
+    const root = document.documentElement;
+    const updateOffset = () => {
+      root.style.setProperty("--global-announcement-height", `${Math.ceil(banner.getBoundingClientRect().height)}px`);
+    };
+    updateOffset();
+    const observer = new ResizeObserver(updateOffset);
+    observer.observe(banner);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--global-announcement-height");
+    };
+  }, [announcement]);
+
   if (!announcement) return null;
 
   return (
     <div
+      ref={bannerRef}
+      data-global-announcement-banner
       aria-live="polite"
       role="status"
       className="pointer-events-none fixed inset-x-0 top-0 z-[80] pt-[var(--layout-safe-top,env(safe-area-inset-top))]"

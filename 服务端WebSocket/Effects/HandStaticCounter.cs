@@ -13,13 +13,12 @@ public static class HandStaticCounter
 
         var me = state.Players[playerIdx];
 
-        // EB01-001 光月御殿：规则上，我方手牌中没有反击值的《和之国》角色卡获得反击+1000。
-        if (value == 0
+        // EB01-001 光月御殿：这是“规则上”的卡牌规则，不属于可被效果无效化的领袖效果。
+        // 我方所有原本没有反击值的《和之国》角色卡牌均变为拥有反击+1000。
+        if (card.Info.Counter == 0
             && card.Info.HasKeyword("和之国")
-            && me.Leader.Info.Number == "EB01-001"
-            && !me.Leader.IsEffectsNullified
-            && !state.IsContinuouslyNullified(me.Leader))
-            value = 1000;
+            && me.Leader.Info.Number == "EB01-001")
+            value = Math.Max(value, 1000);
 
         // OP17-063 盖德：我方没有反击值的角色手牌获得反击+1000；同名光环不叠加。
         if (value == 0 && me.Characters.Any(c =>

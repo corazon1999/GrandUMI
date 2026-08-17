@@ -23,6 +23,9 @@ test("announcements use a dedicated protocol and render as a moving banner", () 
   assert.match(protocol, /proto: "MsgGlobalAnnouncement"/);
   assert.match(banner, /global-announcement-marquee/);
   assert.match(banner, /z-\[80\]/);
+  assert.match(banner, /data-global-announcement-banner/);
+  assert.match(banner, /--global-announcement-height/);
+  assert.match(banner, /new ResizeObserver\(updateOffset\)/);
   assert.match(gamePage, /isObserver[\s\S]*z-\[90\][\s\S]*退出观战/, "观战退出控件应显示在公告之上");
   assert.match(bridge, /case "MsgGlobalAnnouncement": OnGlobalAnnouncement/);
   assert.match(bridge, /GlobalAnnouncementPolicy\.IsAuthorized\(s\.Account\)/);

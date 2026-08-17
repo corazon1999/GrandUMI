@@ -13,6 +13,19 @@ test("卡组编辑器工具栏为全局设置按钮预留右侧空间", async ()
   assert.ok(actions, "应标记卡组工具栏操作区");
   assert.match(heading[1], /\bpr-16\b/);
   assert.match(actions[1], /\bpr-16\b/);
+  assert.match(heading[1], /\bmin-h-11\b/);
+  assert.match(source, /min-h-11 min-w-11/);
+});
+
+test("系统广播出现时卡组编辑器为公告和手机安全区预留顶部空间", async () => {
+  const page = await readSource("../src/app/deck-editor/page.tsx");
+
+  assert.match(page, /data-deck-editor-page/);
+  assert.match(page, /box-border/);
+  assert.match(page, /--layout-safe-top/);
+  assert.match(page, /--global-announcement-height/);
+  assert.match(page, /paddingTop: "max\(/);
+  assert.match(page, /height: "100dvh"/);
 });
 
 test("卡组操作按钮使用独立五列布局", async () => {

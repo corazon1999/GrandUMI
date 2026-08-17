@@ -219,7 +219,7 @@ public class ReportedCardRegressionTests
         Assert.Equal(1000, HandStaticCounter.Value(state, 0, card));
 
         AtomicOps.NullifyEffects(state.Players[0].Leader, KeywordDuration.ThisTurn);
-        Assert.Equal(0, HandStaticCounter.Value(state, 0, card));
+        Assert.Equal(1000, HandStaticCounter.Value(state, 0, card));
     }
 
     [Fact]

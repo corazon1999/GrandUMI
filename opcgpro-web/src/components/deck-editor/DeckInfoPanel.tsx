@@ -240,12 +240,12 @@ export default function DeckInfoPanel() {
       <div className="border-b border-gray-800 shrink-0">
         <div
           data-deck-toolbar-heading
-          className="flex items-center px-3 pt-2 pr-16"
+          className="flex min-h-11 items-center px-3 pr-16"
         >
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push("/home")}
-              className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
               title="返回大厅"
             >
               ← 返回

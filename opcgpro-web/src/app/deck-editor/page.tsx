@@ -100,8 +100,12 @@ export default function DeckEditorPage() {
 
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden bg-gray-950 md:flex-row"
-      style={{ height: "100dvh" }}
+      data-deck-editor-page
+      className="relative box-border flex h-screen flex-col overflow-hidden bg-gray-950 transition-[padding] duration-200 md:flex-row"
+      style={{
+        height: "100dvh",
+        paddingTop: "max(var(--layout-safe-top, env(safe-area-inset-top)), var(--global-announcement-height, 0px))",
+      }}
     >
       {/* 手机竖屏主导航：牌池与卡组各自占满可用宽度，避免三栏互相挤压。 */}
       <nav

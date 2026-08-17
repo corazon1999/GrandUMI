@@ -6,7 +6,7 @@ const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("卡组编辑器使用动态视口高度", async () => {
   const source = await readSource("../src/app/deck-editor/page.tsx");
-  const dynamicViewportContainers = source.match(/style=\{\{ height: "100dvh" \}\}/g) ?? [];
+  const dynamicViewportContainers = source.match(/height: "100dvh"/g) ?? [];
 
   assert.equal(dynamicViewportContainers.length, 3, "加载、错误和编辑状态均应以内联动态视口高度覆盖 h-screen 回退");
   assert.doesNotMatch(source, /h-screen h-\[100dvh\]/, "不得依赖 Tailwind 工具类生成顺序覆盖静态视口高度");
