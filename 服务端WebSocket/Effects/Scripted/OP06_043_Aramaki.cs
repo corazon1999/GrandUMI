@@ -23,6 +23,21 @@ public sealed class OP06_043_Aramaki : IScriptedEffect
             .ToList();
         if (candidates.Count == 0) return;
 
+        var discardExtra = new Dictionary<string, object?>
+        {
+            ["choiceCards"] = me.Hand.Select(card => new
+            {
+                id = card.Id.ToString(),
+                number = card.Info.Number,
+            }).ToList(),
+        };
+        var selectedDiscard = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "DiscardOwnChosen",
+            "丢弃1张手牌作为发动成本",
+            me.Hand.Select(card => card.Id.ToString()).ToList(), 1, 1, discardExtra);
+        if (selectedDiscard.Count != 1) return;
+        var discard = me.Hand.First(card => card.Id.ToString() == selectedDiscard[0]);
+        AtomicOps.DiscardHand(me, discard);
+
         var targetExtra = new Dictionary<string, object?>
         {
             ["choiceCards"] = candidates.Select(item => new
@@ -36,22 +51,7 @@ public sealed class OP06_043_Aramaki : IScriptedEffect
             candidates.Select(item => item.card.Id.ToString()).ToList(), 1, 1, targetExtra);
         if (selectedTarget.Count != 1) return;
 
-        var discardExtra = new Dictionary<string, object?>
-        {
-            ["choiceCards"] = me.Hand.Select(card => new
-            {
-                id = card.Id.ToString(),
-                number = card.Info.Number,
-            }).ToList(),
-        };
-        var selectedDiscard = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "DiscardOwnChosen",
-            "丢弃1张手牌作为发动成本",
-            me.Hand.Select(card => card.Id.ToString()).ToList(), 1, 1, discardExtra);
-        if (selectedDiscard.Count != 1) return;
-
         var target = candidates.First(item => item.card.Id.ToString() == selectedTarget[0]);
-        var discard = me.Hand.First(card => card.Id.ToString() == selectedDiscard[0]);
-        AtomicOps.DiscardHand(me, discard);
 
         if (await AtomicOps.TryEffectLeaveGuard(state, target.side, target.card, ctx.Prompts, "deck-bottom"))
             return;

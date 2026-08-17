@@ -63,8 +63,8 @@ public class QqFeedback20260817BatchCRegressionTests
         var discard = Assert.Single(state.Players[0].Hand);
         var target = Assert.Single(state.Players[1].Characters);
         var prompts = new MockPromptService()
-            .QueueChoose(target.Id.ToString())
-            .QueueChoose(discard.Id.ToString());
+            .QueueChoose(discard.Id.ToString())
+            .QueueChoose(target.Id.ToString());
 
         await EffectRuntime.Resolve(state, 0, aramaki, EffectTrigger.ActivatedMain, prompts);
 

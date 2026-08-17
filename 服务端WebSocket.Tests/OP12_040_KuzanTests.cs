@@ -12,13 +12,15 @@ public class OP12_040_KuzanTests
             .MyCharacter("OP06-043")
             .MyHandAdd("OP15-003")
             .MyDeckTop("OP15-004")
+            .OppCharacter("OP06-052")
             .Build();
         var aramaki = state.Players[0].Characters[0];
         var discarded = state.Players[0].Hand[0];
         var drawn = state.Players[0].Deck[0];
+        var target = state.Players[1].Characters[0];
         var prompts = new MockPromptService()
             .QueueChoose(discarded.Id.ToString())
-            .QueueChooseEmpty();
+            .QueueChoose(target.Id.ToString());
 
         await EffectRuntime.Resolve(
             state, 0, aramaki, EffectTrigger.ActivatedMain, prompts);
@@ -26,6 +28,8 @@ public class OP12_040_KuzanTests
         Assert.Contains(discarded, state.Players[0].Trash);
         Assert.Contains(drawn, state.Players[0].Hand);
         Assert.Empty(state.Players[0].Deck);
+        Assert.DoesNotContain(target, state.Players[1].Characters);
+        Assert.Equal(target, state.Players[1].Deck[^1]);
     }
 
     [Fact]
