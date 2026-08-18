@@ -4,15 +4,22 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("手机竖屏旋转布局中的贴咚操作需要二次确认", async () => {
-  const actions = await readSource("../src/components/game/GameActions.tsx");
+test("桌面与手机竖屏旋转布局中的贴咚操作均需要二次确认", async () => {
+  const [actions, request, dialog, page] = await Promise.all([
+    readSource("../src/components/game/GameActions.tsx"),
+    readSource("../src/net/GameRequest.ts"),
+    readSource("../src/components/game/AttachDonConfirmDialog.tsx"),
+    readSource("../src/app/game/page.tsx"),
+  ]);
 
-  assert.match(actions, /useLayoutQuarterTurn/);
-  assert.match(actions, /pendingAttachDonCount/);
-  assert.match(actions, /if \(rotateQuarterTurn\)/);
-  assert.match(actions, /确认赋予 \{pendingAttachDonCount\} 张咚/);
-  assert.match(actions, /确认贴咚/);
-  assert.ok((actions.match(/min-h-12/g)?.length ?? 0) >= 6);
+  assert.match(actions, /GameRequest\.attachDon\(attachTargetId, count\)/);
+  assert.match(request, /requestAttachDonConfirmation/);
+  assert.match(dialog, /确认贴\{pending\.count\}咚？/);
+  assert.match(dialog, />\s*取消\s*</);
+  assert.match(dialog, />\s*确认\s*</);
+  assert.match(dialog, /--layout-safe-bottom/);
+  assert.ok((dialog.match(/min-h-12/g)?.length ?? 0) >= 2);
+  assert.match(page, /<AttachDonConfirmDialog \/>/);
 });
 
 test("全服广播横幅可关闭并为安全区预留空间", async () => {

@@ -46,6 +46,8 @@ test("preserves whitespace and translates dynamic labels", () => {
   assert.equal(translateText("第 2 次投掷", "ja"), "2回目");
   assert.equal(translateText("共 50 张", "en"), "50 cards");
   assert.equal(translateText("以 Luffy 继续", "en"), "Continue as Luffy");
+  assert.equal(translateText("确认贴3咚？", "en"), "Attach 3 DON!!?");
+  assert.equal(translateText("确认贴3咚？", "ja"), "ドン!!を3枚付与しますか？");
 });
 
 test("leaves unknown content unchanged", () => {

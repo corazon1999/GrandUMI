@@ -13,25 +13,23 @@ type PendingLatency = { requestId: string; action: string; startedAt: number };
 const pendingLatencies = new Map<string, PendingLatency>();
 let requestSequence = 0;
 
-export type PendingAttachDonUndo = {
+export type PendingAttachDonConfirmation = {
   targetId: string | "leader";
   count: number;
-  expiresAt: number;
 };
 
-type PendingAttachDonInternal = PendingAttachDonUndo & { timer: ReturnType<typeof setTimeout> };
-let pendingAttachDon: PendingAttachDonInternal | null = null;
+let pendingAttachDon: PendingAttachDonConfirmation | null = null;
 const pendingAttachDonListeners = new Set<() => void>();
 
 function notifyPendingAttachDon() {
   pendingAttachDonListeners.forEach((listener) => listener());
 }
 
-export function getPendingAttachDonUndo(): PendingAttachDonUndo | null {
+export function getPendingAttachDonConfirmation(): PendingAttachDonConfirmation | null {
   return pendingAttachDon;
 }
 
-export function subscribePendingAttachDonUndo(listener: () => void) {
+export function subscribePendingAttachDonConfirmation(listener: () => void) {
   pendingAttachDonListeners.add(listener);
   return () => pendingAttachDonListeners.delete(listener);
 }
@@ -79,7 +77,6 @@ function send(
   data: Record<string, unknown> = {},
   optimistic?: () => void,
 ) {
-  if (action !== "AttachDon" && pendingAttachDon) commitPendingAttachDon();
   const store = useGameStore.getState();
   store.setPending(true);
   optimistic?.();
@@ -99,39 +96,31 @@ function send(
   return sent;
 }
 
-function queueAttachDon(targetId: string | "leader", count: number) {
-  if (pendingAttachDon) commitPendingAttachDon();
+function requestAttachDonConfirmation(targetId: string | "leader", count: number) {
   const safeCount = Math.max(1, Math.floor(count));
-  const store = useGameStore.getState();
-  store.setPending(true);
-  store.optimisticAttachDon(targetId, safeCount);
-  const expiresAt = Date.now() + 4_000;
   pendingAttachDon = {
     targetId,
     count: safeCount,
-    expiresAt,
-    timer: setTimeout(() => commitPendingAttachDon(), 4_000),
   };
   notifyPendingAttachDon();
   return true;
 }
 
-export function commitPendingAttachDon() {
+export function confirmPendingAttachDon() {
   const pending = pendingAttachDon;
   if (!pending) return false;
-  clearTimeout(pending.timer);
   pendingAttachDon = null;
   notifyPendingAttachDon();
-  return send("AttachDon", { targetId: pending.targetId, count: pending.count });
+  return send(
+    "AttachDon",
+    { targetId: pending.targetId, count: pending.count },
+    () => useGameStore.getState().optimisticAttachDon(pending.targetId, pending.count),
+  );
 }
 
-export function cancelPendingAttachDon() {
-  const pending = pendingAttachDon;
-  if (!pending) return false;
-  clearTimeout(pending.timer);
+export function cancelPendingAttachDonConfirmation() {
+  if (!pendingAttachDon) return false;
   pendingAttachDon = null;
-  useGameStore.getState().rollbackOptimistic();
-  useGameStore.getState().setPending(false);
   notifyPendingAttachDon();
   return true;
 }
@@ -150,12 +139,12 @@ export const GameRequest = {
       ...(overflowTrashCardId ? { overflowTrashCardId } : {}),
     }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
-  /** 赋予咚：将一张活跃咚附给领袖或场上角色 */
+  /** 请求赋予咚；玩家确认后立即将活跃咚附给领袖或场上角色。 */
   attachDon: (targetId: string | "leader", count = 1) =>
-    queueAttachDon(targetId, count),
+    requestAttachDonConfirmation(targetId, count),
 
-  /** 在短暂待提交窗口内撤回刚才的赋予咚操作。 */
-  cancelPendingAttachDon,
+  /** 关闭尚未确认的贴咚弹窗。 */
+  cancelPendingAttachDon: cancelPendingAttachDonConfirmation,
 
   /** 攻击宣言 */
   attack: (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>

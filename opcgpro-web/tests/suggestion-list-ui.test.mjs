@@ -44,15 +44,16 @@ test("对局同时显示八分钟回合时钟与总操作时钟", async () => {
   assert.match(types, /opponentTurnOperationTimeMs\?: number/);
 });
 
-test("贴咚在服务端提交前提供四秒撤回窗口", async () => {
-  const [request, toast] = await Promise.all([
+test("贴咚确认后立即提交，不再等待四秒撤回窗口", async () => {
+  const [request, dialog] = await Promise.all([
     readSource("../src/net/GameRequest.ts"),
-    readSource("../src/components/game/AttachDonUndoToast.tsx"),
+    readSource("../src/components/game/AttachDonConfirmDialog.tsx"),
   ]);
-  assert.match(request, /expiresAt = Date\.now\(\) \+ 4_000/);
-  assert.match(request, /cancelPendingAttachDon/);
-  assert.match(toast, />\s*撤回\s*</);
-  assert.match(toast, /min-h-11 min-w-11/);
+  assert.doesNotMatch(request, /setTimeout\(\(\) => commitPendingAttachDon\(\), 4_000\)/);
+  assert.match(request, /return send\(\s*"AttachDon"/);
+  assert.match(request, /optimisticAttachDon\(pending\.targetId, pending\.count\)/);
+  assert.match(dialog, /confirmPendingAttachDon/);
+  assert.doesNotMatch(dialog, /撤回/);
 });
 
 test("在线玩家、好友与局内对手均提供屏蔽和举报入口", async () => {
