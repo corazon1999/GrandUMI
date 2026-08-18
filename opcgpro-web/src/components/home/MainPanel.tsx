@@ -500,7 +500,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-4 pr-16 @[1024px]:hidden">
         <div>
           <p className="text-base font-black tracking-tight text-white">GrandUMI</p>
-          <p className="text-xs text-gray-500">海贼王卡牌对战</p>
+          <p className="text-xs text-gray-500">TCG博弈智能AI研究项目</p>
         </div>
         <div className="flex items-center gap-1">
           <button
