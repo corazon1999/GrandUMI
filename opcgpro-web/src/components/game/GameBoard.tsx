@@ -12,7 +12,6 @@ import TrashPile from "@/components/game/TrashPile";
 import StageSlot from "@/components/game/StageSlot";
 import GameLog from "@/components/game/GameLog";
 import GameActions from "@/components/game/GameActions";
-import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 import AnimationLayer from "@/components/game/AnimationLayer";
 import BattleRelationLayer from "@/components/game/BattleRelationLayer";
 import EffectActivationLayer from "@/components/game/EffectActivationLayer";
@@ -231,11 +230,6 @@ function RightRail({
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
-        {!isObserver && !isPlayback && (
-          <div className="mt-1">
-            <PlayerSafetyActions targetName={opponentName || "对手"} currentOpponent compact />
-          </div>
-        )}
         <PlayerRankIdentity rank={opponentRankIdentity} />
         <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
         <OperationClock side="opponent" />

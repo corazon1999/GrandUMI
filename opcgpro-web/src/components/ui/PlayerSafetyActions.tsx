@@ -38,16 +38,39 @@ const REPORT_CATEGORIES: ReadonlyArray<{
   },
 ];
 
+function BlockPlayerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19c.6-3.2 2.5-5 5.5-5 1.1 0 2 .2 2.8.7" strokeLinecap="round" />
+      <circle cx="17" cy="16" r="4" />
+      <path d="m14.2 18.8 5.6-5.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReportPlayerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M12 3 2.8 20h18.4L12 3Z" strokeLinejoin="round" />
+      <path d="M12 9v5" strokeLinecap="round" />
+      <path d="M12 17.5h.01" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function PlayerSafetyActions({
   targetAccount,
   targetName,
   currentOpponent = false,
   compact = false,
+  toolbar = false,
 }: {
   targetAccount?: string;
   targetName: string;
   currentOpponent?: boolean;
   compact?: boolean;
+  toolbar?: boolean;
 }) {
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -85,14 +108,29 @@ export default function PlayerSafetyActions({
 
   return (
     <>
-      <div className="flex flex-wrap justify-end gap-1" aria-label={`${targetName} 的安全操作`}>
+      <div
+        className={toolbar
+          ? "pointer-events-auto fixed z-[70] flex gap-2"
+          : "flex flex-wrap justify-end gap-1"}
+        style={toolbar
+          ? {
+              right: "calc(7.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+              top: "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+            }
+          : undefined}
+        aria-label={`${targetName} 的安全操作`}
+      >
         <button
           type="button"
           onClick={block}
           onBlur={() => setConfirmBlock(false)}
-          className={`min-h-12 min-w-12 rounded-lg border px-2 text-xs font-bold transition-colors ${confirmBlock ? "border-red-400 bg-red-950 text-red-200" : "border-gray-700 text-gray-400 hover:border-red-700 hover:text-red-300"}`}
+          aria-label={confirmBlock ? `确认屏蔽玩家 ${targetName}` : `屏蔽玩家 ${targetName}`}
+          title={confirmBlock ? "再次点击确认屏蔽" : "屏蔽玩家"}
+          className={`min-h-12 min-w-12 rounded-lg border text-xs font-bold transition-colors ${
+            toolbar ? "flex h-12 w-12 items-center justify-center p-0 shadow-lg backdrop-blur-md" : "px-2"
+          } ${confirmBlock ? "border-red-400 bg-red-950 text-red-200" : "border-gray-700 bg-slate-900/90 text-gray-400 hover:border-red-700 hover:text-red-300"}`}
         >
-          {confirmBlock ? "确认屏蔽" : compact ? "屏蔽" : "屏蔽玩家"}
+          {toolbar ? <BlockPlayerIcon /> : confirmBlock ? "确认屏蔽" : compact ? "屏蔽" : "屏蔽玩家"}
         </button>
         <button
           type="button"
@@ -100,10 +138,13 @@ export default function PlayerSafetyActions({
             setSubmitError("");
             setReportOpen(true);
           }}
-          className="min-h-12 min-w-12 rounded-lg border border-amber-800/80 px-2 text-xs font-bold text-amber-300 transition-colors hover:bg-amber-950"
+          className={`min-h-12 min-w-12 rounded-lg border border-amber-800/80 bg-slate-900/90 text-xs font-bold text-amber-300 transition-colors hover:bg-amber-950 ${
+            toolbar ? "flex h-12 w-12 items-center justify-center p-0 shadow-lg backdrop-blur-md" : "px-2"
+          }`}
           aria-label={`举报玩家 ${targetName}`}
+          title="举报玩家"
         >
-          举报
+          {toolbar ? <ReportPlayerIcon /> : "举报"}
         </button>
       </div>
 

@@ -8,6 +8,7 @@
 import { NetManager } from "./NetManager";
 import type { MsgBase, MsgFriendChat, MsgGameAction, MsgLeaveGameChat, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type PendingLatency = { requestId: string; action: string; startedAt: number };
 const pendingLatencies = new Map<string, PendingLatency>();
@@ -106,16 +107,20 @@ function requestAttachDonConfirmation(targetId: string | "leader", count: number
   return true;
 }
 
+function sendAttachDon(targetId: string | "leader", count: number) {
+  return send(
+    "AttachDon",
+    { targetId, count },
+    () => useGameStore.getState().optimisticAttachDon(targetId, count),
+  );
+}
+
 export function confirmPendingAttachDon() {
   const pending = pendingAttachDon;
   if (!pending) return false;
   pendingAttachDon = null;
   notifyPendingAttachDon();
-  return send(
-    "AttachDon",
-    { targetId: pending.targetId, count: pending.count },
-    () => useGameStore.getState().optimisticAttachDon(pending.targetId, pending.count),
-  );
+  return sendAttachDon(pending.targetId, pending.count);
 }
 
 export function cancelPendingAttachDonConfirmation() {
@@ -140,8 +145,12 @@ export const GameRequest = {
     }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
   /** 请求赋予咚；玩家确认后立即将活跃咚附给领袖或场上角色。 */
-  attachDon: (targetId: string | "leader", count = 1) =>
-    requestAttachDonConfirmation(targetId, count),
+  attachDon: (targetId: string | "leader", count = 1) => {
+    const safeCount = Math.max(1, Math.floor(count));
+    return useSettingsStore.getState().confirmAttachDon
+      ? requestAttachDonConfirmation(targetId, safeCount)
+      : sendAttachDon(targetId, safeCount);
+  },
 
   /** 关闭尚未确认的贴咚弹窗。 */
   cancelPendingAttachDon: cancelPendingAttachDonConfirmation,

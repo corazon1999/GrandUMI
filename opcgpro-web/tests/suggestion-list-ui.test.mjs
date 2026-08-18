@@ -51,21 +51,21 @@ test("贴咚确认后立即提交，不再等待四秒撤回窗口", async () =>
   ]);
   assert.doesNotMatch(request, /setTimeout\(\(\) => commitPendingAttachDon\(\), 4_000\)/);
   assert.match(request, /return send\(\s*"AttachDon"/);
-  assert.match(request, /optimisticAttachDon\(pending\.targetId, pending\.count\)/);
+  assert.match(request, /optimisticAttachDon\(targetId, count\)/);
   assert.match(dialog, /confirmPendingAttachDon/);
   assert.doesNotMatch(dialog, /撤回/);
 });
 
 test("在线玩家、好友与局内对手均提供屏蔽和举报入口", async () => {
-  const [actions, players, friends, board] = await Promise.all([
+  const [actions, players, friends, gamePage] = await Promise.all([
     readSource("../src/components/ui/PlayerSafetyActions.tsx"),
     readSource("../src/components/home/PlayerListPanel.tsx"),
     readSource("../src/components/home/FriendsPanel.tsx"),
-    readSource("../src/components/game/GameBoard.tsx"),
+    readSource("../src/app/game/page.tsx"),
   ]);
   assert.match(actions, /确认屏蔽/);
   assert.match(actions, /提交举报/);
   assert.match(players, /<PlayerSafetyActions/);
   assert.match(friends, /解除屏蔽/);
-  assert.match(board, /currentOpponent compact/);
+  assert.match(gamePage, /currentOpponent compact toolbar/);
 });

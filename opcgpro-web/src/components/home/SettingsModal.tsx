@@ -63,8 +63,10 @@ export default function SettingsModal({
   const volumePercent = Math.round(sfxVolume * 100);
   const cardSize = useSettingsStore((state) => state.cardSize);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const confirmAttachDon = useSettingsStore((state) => state.confirmAttachDon);
   const setCardSize = useSettingsStore((state) => state.setCardSize);
   const setAnimationSpeed = useSettingsStore((state) => state.setAnimationSpeed);
+  const setConfirmAttachDon = useSettingsStore((state) => state.setConfirmAttachDon);
   const compactLandscape = useLayoutQuarterTurn();
   const compactSectionClass = compactLandscape
     ? "rounded-xl border border-gray-800 bg-gray-950/40 p-3"
@@ -92,7 +94,7 @@ export default function SettingsModal({
         className={compactLandscape ? "grid grid-cols-2 items-start gap-3" : ""}
       >
       <section
-        className={compactLandscape ? `${compactSectionClass} order-3` : compactSectionClass}
+        className={compactLandscape ? `${compactSectionClass} order-4` : compactSectionClass}
         aria-labelledby="language-settings-title"
       >
         <h3 id="language-settings-title" className="text-sm font-bold text-white">界面语言</h3>
@@ -121,7 +123,7 @@ export default function SettingsModal({
       </section>
 
       <section
-        className={compactLandscape ? `${compactSectionClass} order-3` : dividedSectionClass}
+        className={compactLandscape ? `${compactSectionClass} order-4` : dividedSectionClass}
         aria-labelledby="layout-preview-title"
       >
         <h3 id="layout-preview-title" className="text-sm font-bold text-white">界面布局</h3>
@@ -214,6 +216,41 @@ export default function SettingsModal({
 
       <section
         className={compactLandscape ? `${compactSectionClass} order-2 col-span-2` : dividedSectionClass}
+        aria-labelledby="attach-don-settings-title"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 id="attach-don-settings-title" className="text-sm font-bold text-white">贴咚操作</h3>
+            <p className="mt-1 text-sm leading-5 text-gray-500">
+              开启后每次贴咚会先询问确认；关闭后点击目标或数量便会直接贴咚。
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={confirmAttachDon}
+            onClick={() => setConfirmAttachDon(!confirmAttachDon)}
+            className={`flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-bold transition-colors ${
+              confirmAttachDon
+                ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                : "border-gray-700 bg-gray-950 text-gray-400 hover:border-gray-500"
+            }`}
+          >
+            <span>{confirmAttachDon ? "确认开启" : "确认关闭"}</span>
+            <span
+              aria-hidden="true"
+              className={`relative h-6 w-11 rounded-full transition-colors ${confirmAttachDon ? "bg-emerald-500" : "bg-gray-700"}`}
+            >
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${confirmAttachDon ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section
+        className={compactLandscape ? `${compactSectionClass} order-3 col-span-2` : dividedSectionClass}
         aria-labelledby="audio-settings-title"
       >
         <div className={compactLandscape ? "grid grid-cols-2 items-start gap-3" : ""}>

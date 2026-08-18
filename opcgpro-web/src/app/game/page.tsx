@@ -17,6 +17,7 @@ import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
 import AttachDonConfirmDialog from "@/components/game/AttachDonConfirmDialog";
 import GameOverOverlay from "@/components/game/GameOverOverlay";
+import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -32,6 +33,7 @@ export default function GamePage() {
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const opponentName = useGameStore((s) => s.opponentName);
 
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
@@ -86,6 +88,9 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
       {!isObserver && !isPlayback && <GameMenu />}
+      {!isObserver && !isPlayback && (
+        <PlayerSafetyActions targetName={opponentName || "对手"} currentOpponent compact toolbar />
+      )}
       {!isObserver && !isPlayback && <GMPanel />}
       {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
       {!isObserver && !isPlayback && <AttachDonConfirmDialog />}

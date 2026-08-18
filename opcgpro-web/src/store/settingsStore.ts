@@ -10,6 +10,7 @@ import { NetManager } from "@/net/NetManager";
  *     对手只能看到"对方正在选择"，无法通过弹窗时机推断生命牌内容
  *   - cardSize: 卡牌显示大小
  *   - animationSpeed: 对局动画速度
+ *   - confirmAttachDon: 贴咚前是否需要二次确认
  */
 
 const KEY = "grandumi_settings";
@@ -21,12 +22,14 @@ interface Settings {
   alwaysPromptOnLifeReveal: boolean;
   cardSize: CardSizePreference;
   animationSpeed: AnimationSpeed;
+  confirmAttachDon: boolean;
 }
 
 const defaults: Settings = {
   alwaysPromptOnLifeReveal: false,
   cardSize: "auto",
   animationSpeed: "standard",
+  confirmAttachDon: true,
 };
 
 function loadFromStorage(): Settings {
@@ -45,6 +48,9 @@ function loadFromStorage(): Settings {
       animationSpeed: ["off", "fast", "standard"].includes(parsed.animationSpeed ?? "")
         ? parsed.animationSpeed as AnimationSpeed
         : defaults.animationSpeed,
+      confirmAttachDon: typeof parsed.confirmAttachDon === "boolean"
+        ? parsed.confirmAttachDon
+        : defaults.confirmAttachDon,
     };
   } catch { return defaults; }
 }
@@ -59,11 +65,12 @@ interface SettingsStore extends Settings {
   setAlwaysPromptOnLifeReveal: (v: boolean) => void;
   setCardSize: (v: CardSizePreference) => void;
   setAnimationSpeed: (v: AnimationSpeed) => void;
+  setConfirmAttachDon: (v: boolean) => void;
 }
 
 function persistCurrent() {
-  const { alwaysPromptOnLifeReveal, cardSize, animationSpeed } = useSettingsStore.getState();
-  saveToStorage({ alwaysPromptOnLifeReveal, cardSize, animationSpeed });
+  const { alwaysPromptOnLifeReveal, cardSize, animationSpeed, confirmAttachDon } = useSettingsStore.getState();
+  saveToStorage({ alwaysPromptOnLifeReveal, cardSize, animationSpeed, confirmAttachDon });
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -89,6 +96,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setAnimationSpeed: (v) => {
     set({ animationSpeed: v });
+    persistCurrent();
+  },
+
+  setConfirmAttachDon: (v) => {
+    set({ confirmAttachDon: v });
     persistCurrent();
   },
 }));

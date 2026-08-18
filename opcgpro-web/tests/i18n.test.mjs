@@ -48,6 +48,8 @@ test("preserves whitespace and translates dynamic labels", () => {
   assert.equal(translateText("以 Luffy 继续", "en"), "Continue as Luffy");
   assert.equal(translateText("确认贴3咚？", "en"), "Attach 3 DON!!?");
   assert.equal(translateText("确认贴3咚？", "ja"), "ドン!!を3枚付与しますか？");
+  assert.equal(translateText("确认关闭", "en"), "Confirmation off");
+  assert.equal(translateText("屏蔽玩家 Luffy", "ja"), "Luffy をブロック");
 });
 
 test("leaves unknown content unchanged", () => {

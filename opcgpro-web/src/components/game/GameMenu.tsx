@@ -74,10 +74,10 @@ export default function GameMenu() {
       <button
         onClick={() => setOpen(true)}
         style={{
-          right: "calc(4rem + var(--layout-safe-right, env(safe-area-inset-right)))",
-          top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          right: "calc(4.125rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+          top: "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",
         }}
-        className="fixed z-[70] flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-white transition-colors hover:bg-slate-700"
+        className="fixed z-[70] flex h-12 w-12 items-center justify-center rounded-lg border border-gray-700/80 bg-slate-800/95 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-slate-700"
         aria-label="打开投降菜单"
         title="投降"
       >

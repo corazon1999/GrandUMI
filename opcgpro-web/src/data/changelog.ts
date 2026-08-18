@@ -20,6 +20,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-18-attach-don-controls-release",
+    version: "2026.08.18.3",
+    date: "2026-08-18",
+    title: "贴咚操作与对局界面优化",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "贴咚取消 4 秒等待：选择目标或数量后先显示确认弹窗，确认后立即执行，取消则不改变牌桌状态。",
+          "个人设置新增贴咚确认开关；默认开启，关闭后选择目标或数量便会直接贴咚。",
+          "对局中的屏蔽和举报改为右上角紧凑图标，与投降、设置水平排列，不再占用对手信息区域。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-18-mobile-leaderboard-scroll-release",
     version: "2026.08.18.2",
     date: "2026-08-18",
