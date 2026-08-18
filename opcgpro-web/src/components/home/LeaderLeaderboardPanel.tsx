@@ -130,35 +130,40 @@ function RankedLeaderboard({ items, standings }: { items: RankLeaderboardItem[];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-gray-800 bg-gray-950/90 p-2.5">
-        <div className="grid grid-cols-2 gap-2 @[720px]:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setSelectedFaction(null)}
-            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === null ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
-          >
-            <strong className="block">全服个人榜</strong>
-            <span className="mt-1 block text-[10px] text-gray-500">按全服排名查看</span>
-          </button>
-          {standings.map((standing) => (
+      <div
+        data-testid="ranked-leaderboard-scroll"
+        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+      >
+        <div className="border-b border-gray-800 bg-gray-950/90 p-2.5">
+          <div className="grid grid-cols-2 gap-2 @[720px]:grid-cols-4">
             <button
-              key={standing.faction}
               type="button"
-              onClick={() => setSelectedFaction(standing.faction)}
-              className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === standing.faction ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
+              onClick={() => setSelectedFaction(null)}
+              className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === null ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
             >
-              <span className="flex items-center justify-between gap-2"><strong>{RANK_FACTION_NAMES[standing.faction]}</strong><b className="text-amber-300">#{standing.rank}</b></span>
-              <span className="mt-1 block text-[10px]">总分 {standing.totalRankPoints.toLocaleString()} · {standing.playerCount} 人</span>
+              <strong className="block">全服个人榜</strong>
+              <span className="mt-1 block text-[10px] text-gray-500">按全服排名查看</span>
             </button>
-          ))}
+            {standings.map((standing) => (
+              <button
+                key={standing.faction}
+                type="button"
+                onClick={() => setSelectedFaction(standing.faction)}
+                className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === standing.faction ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
+              >
+                <span className="flex items-center justify-between gap-2"><strong>{RANK_FACTION_NAMES[standing.faction]}</strong><b className="text-amber-300">#{standing.rank}</b></span>
+                <span className="mt-1 block text-[10px]">总分 {standing.totalRankPoints.toLocaleString()} · {standing.playerCount} 人</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-gray-600">阵营总分为本赛季已完成定级成员悬赏金之和；点击阵营可查看内部排行榜。</p>
         </div>
-        <p className="mt-2 text-[10px] text-gray-600">阵营总分为本赛季已完成定级成员悬赏金之和；点击阵营可查看内部排行榜。</p>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
-          {topItems.map((item) => <RankedMobileRow key={`${item.rank}-${item.displayName}`} item={item} />)}
-        </ul>
-        <RankedTable items={topItems} />
+        <div>
+          <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
+            {topItems.map((item) => <RankedMobileRow key={`${item.rank}-${item.displayName}`} item={item} />)}
+          </ul>
+          <RankedTable items={topItems} />
+        </div>
       </div>
       {currentPlayer && (
         <div className="shrink-0 border-t-2 border-violet-400/50 bg-gray-950 shadow-[0_-12px_28px_rgba(0,0,0,0.45)]">
@@ -537,7 +542,7 @@ export default function LeaderLeaderboardPanel() {
         </div>}
       </div>
 
-      <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-hidden" : "overflow-auto"}`}>
+      <div className={`min-h-0 flex-1 touch-pan-y overscroll-contain rounded-xl border border-gray-800 bg-gray-950/60 [-webkit-overflow-scrolling:touch] ${rankingTab === "ranked" ? "overflow-hidden" : "overflow-auto"}`}>
         {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : (
           <p className="py-16 text-center text-sm text-gray-600">正在加载{rankedMode === "standard" ? "标准" : "狂野"}排位榜…</p>
         ) : loading ? (
