@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-18-mobile-leaderboard-scroll-release",
+    version: "2026.08.18.2",
+    date: "2026-08-18",
+    title: "手机排行榜体验修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "手机竖屏下可以正常上下滑动排位榜和 Leader 榜，排位榜的阵营筛选区不再把玩家列表挤出可滑动范围。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-18-wild-ranked-safety-card-effects-release",
     version: "2026.08.18.1",
     date: "2026-08-18",
