@@ -42,10 +42,13 @@ install -m 0644 "$source_root/ops/server/grandumi-production-backend@.service" /
 install -m 0644 "$source_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
 install -m 0755 "$source_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
 install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
+install -m 0755 "$source_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$source_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
 install -m 0755 "$source_root/ops/server/enable-grandumi-assets.sh" /usr/local/sbin/enable-grandumi-assets
 install -m 0644 "$source_root/ops/server/grandumi-production-health.service" /etc/systemd/system/grandumi-production-health.service
 install -m 0644 "$source_root/ops/server/grandumi-production-health.timer" /etc/systemd/system/grandumi-production-health.timer
+install -m 0644 "$source_root/ops/server/grandumi-matchlog-maintenance.service" /etc/systemd/system/grandumi-matchlog-maintenance.service
+install -m 0644 "$source_root/ops/server/grandumi-matchlog-maintenance.timer" /etc/systemd/system/grandumi-matchlog-maintenance.timer
 install -m 0644 "$source_root/ops/server/grandumi-production-proxy.nginx" /etc/nginx/snippets/grandumi-production-proxy.conf
 install -m 0644 "$source_root/ops/server/grandumi-production.nginx" /etc/nginx/sites-available/grandumi-production
 install -m 0644 "$source_root/ops/server/grandumi-assets-acme.nginx" /etc/nginx/sites-available/grandumi-assets-acme
@@ -69,7 +72,7 @@ rm -f /etc/nginx/sites-enabled/default
 [[ -s /var/lib/grandumi-ha/active-slot ]] || printf 'a\n' > /var/lib/grandumi-ha/active-slot
 
 systemctl daemon-reload
-systemctl enable --now grandumi-production-health.timer
+systemctl enable --now grandumi-production-health.timer grandumi-matchlog-maintenance.timer
 nginx -t
 systemctl reload nginx
 

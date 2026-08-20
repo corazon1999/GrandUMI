@@ -106,11 +106,18 @@ app.MapGet("/ready", () =>
 {
     var overloaded = ServerCapacity.IsOverloaded(out var reason);
     var ready = WebSocketBridge.IsReady && !overloaded;
+    var storage = StorageHealth.GetCurrent();
     return Results.Json(new
     {
         status = ready ? "ready" : "not_ready",
         overloaded,
-        reason = ready ? null : reason,
+        reason = ready ? null : WebSocketBridge.IsReady ? reason : "initializing",
+        storage = new
+        {
+            healthy = storage.Healthy,
+            totalBytes = storage.TotalBytes,
+            availableBytes = storage.AvailableBytes,
+        },
         connections = WebSocketBridge.ConnectionCount,
         rooms = GameRoomManager.RoomCount,
         activeRuleset = CardRulesetManager.Current.Id,

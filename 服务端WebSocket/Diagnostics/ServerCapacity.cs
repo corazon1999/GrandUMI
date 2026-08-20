@@ -39,6 +39,13 @@ public static class ServerCapacity
 
     private static bool CheckSharedResources(out string reason)
     {
+        var storage = StorageHealth.GetCurrent();
+        if (!storage.Healthy)
+        {
+            reason = storage.Reason;
+            return false;
+        }
+
         if (RoomJournal.QueueDepth >= 6_000
             || MatchLogRecorder.QueueDepth >= 12_000)
         {

@@ -1,0 +1,10 @@
+[Unit]
+Description=GrandUMI 正式服每日对局日志维护计划
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 UTC
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

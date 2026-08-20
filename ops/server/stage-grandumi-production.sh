@@ -106,10 +106,14 @@ install -m 0644 "$build_root/ops/server/grandumi-production-backend@.service" /e
 install -m 0644 "$build_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
 install -m 0755 "$build_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
 install -m 0755 "$build_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
+install -m 0755 "$build_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$build_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
 install -m 0644 "$build_root/ops/server/grandumi-production-health.service" /etc/systemd/system/grandumi-production-health.service
 install -m 0644 "$build_root/ops/server/grandumi-production-health.timer" /etc/systemd/system/grandumi-production-health.timer
+install -m 0644 "$build_root/ops/server/grandumi-matchlog-maintenance.service" /etc/systemd/system/grandumi-matchlog-maintenance.service
+install -m 0644 "$build_root/ops/server/grandumi-matchlog-maintenance.timer" /etc/systemd/system/grandumi-matchlog-maintenance.timer
 systemctl daemon-reload
+systemctl enable --now grandumi-matchlog-maintenance.timer
 
 printf '%s\n' "$target" > /var/lib/grandumi-production-staged
 echo "新正式服 A/B 发布包已在受限资源组内预构建，尚未切换服务：$target"

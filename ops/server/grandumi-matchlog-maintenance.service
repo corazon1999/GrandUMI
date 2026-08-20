@@ -1,0 +1,16 @@
+[Unit]
+Description=GrandUMI 正式服对局日志压缩与保留期清理
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=grandumi
+Group=grandumi
+ExecStart=/usr/local/sbin/grandumi-matchlog-maintenance
+Nice=15
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/data/grandumi

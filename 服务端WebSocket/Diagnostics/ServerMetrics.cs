@@ -33,11 +33,16 @@ public static class ServerMetrics
         Counter(output, "grandumi_room_journal_dropped_total", RoomJournal.DroppedEntries);
         Gauge(output, "grandumi_matchlog_queue_depth", MatchLogRecorder.QueueDepth);
         Counter(output, "grandumi_matchlog_dropped_total", MatchLogRecorder.DroppedEntries);
+        var storage = StorageHealth.GetCurrent();
+        Gauge(output, "grandumi_storage_healthy", storage.Healthy ? 1 : 0);
+        Gauge(output, "grandumi_storage_total_bytes", storage.TotalBytes);
+        Gauge(output, "grandumi_storage_available_bytes", storage.AvailableBytes);
         Gauge(output, "grandumi_pending_login_writes", playerDataStore.PendingLoginWrites);
         Gauge(output, "grandumi_capacity_max_connections", ServerCapacity.MaxConnections);
         Gauge(output, "grandumi_capacity_max_rooms", ServerCapacity.MaxRooms);
-        Gauge(output, "grandumi_ready", WebSocketBridge.IsReady ? 1 : 0);
-        Gauge(output, "grandumi_overloaded", ServerCapacity.IsOverloaded(out _) ? 1 : 0);
+        var overloaded = ServerCapacity.IsOverloaded(out _);
+        Gauge(output, "grandumi_ready", WebSocketBridge.IsReady && !overloaded ? 1 : 0);
+        Gauge(output, "grandumi_overloaded", overloaded ? 1 : 0);
         output.AppendLine("# TYPE grandumi_ruleset_info gauge")
             .Append("grandumi_ruleset_info{ruleset=\"")
             .Append(EscapeLabel(CardRulesetManager.Current.Id))
