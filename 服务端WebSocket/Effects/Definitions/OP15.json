@@ -144,6 +144,9 @@
     ],
     "activated": {
       "oncePerTurn": true,
+      "cost": {
+        "selfToTrash": true
+      },
       "then": [
         {
           "op": "Choose",
