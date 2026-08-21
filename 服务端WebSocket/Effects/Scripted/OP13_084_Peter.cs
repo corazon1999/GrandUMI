@@ -52,6 +52,7 @@ public class OP13_084_Peter : IScriptedEffect
                 OriginalPowerOverride = 7000,
                 Predicate = (state, sideIdx, card) =>
                     sideIdx == owner &&
+                    state.Players[owner].Characters.Any(source => source.Id == self.Id) &&
                     state.CurrentTurnPlayer == owner &&
                     state.Players[owner].Trash.Count >= 10 &&
                     card.Info.HasKeyword("五老星"),

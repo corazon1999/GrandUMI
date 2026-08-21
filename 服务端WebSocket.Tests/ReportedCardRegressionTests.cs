@@ -371,6 +371,27 @@ public class ReportedCardRegressionTests
     }
 
     [Fact]
+    public async Task OP13_084_StopsChangingFiveElderPowerAfterLeavingField()
+    {
+        var state = TestScene.New()
+            .MyCharacter("OP13-084")
+            .MyCharacter("OP13-083")
+            .Build();
+        var me = state.Players[0];
+        var peter = me.Characters.Single(card => card.Info.Number == "OP13-084");
+        var otherFiveElder = me.Characters.Single(card => card.Info.Number == "OP13-083");
+        for (int i = 0; i < 10; i++) me.Trash.Add(Card("OP15-003"));
+
+        await EffectRuntime.Resolve(state, 0, peter, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(7000, state.CurrentPowerOf(0, otherFiveElder));
+
+        me.Characters.Remove(peter);
+        me.Trash.Add(peter);
+
+        Assert.Equal(otherFiveElder.Info.Power, state.CurrentPowerOf(0, otherFiveElder));
+    }
+
+    [Fact]
     public async Task OP15_022_ActivatesCharacterWhenDeckReachesZero()
     {
         var state = TestScene.New("OP15-022").MyCharacter("OP15-003")
