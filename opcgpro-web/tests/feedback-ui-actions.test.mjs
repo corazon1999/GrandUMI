@@ -30,7 +30,8 @@ test("桌面与手机竖屏旋转布局中的贴咚确认及撤回可由个人�
   assert.match(settings, /role="switch"/);
   assert.match(settings, /aria-checked=\{confirmAttachDon\}/);
   assert.match(settings, /setConfirmAttachDon\(!confirmAttachDon\)/);
-  assert.match(store, /confirmAttachDon: true/);
+  assert.match(settings, /此设置默认关闭/);
+  assert.match(store, /confirmAttachDon: false/);
   assert.match(store, /localStorage\.setItem\(KEY/);
 });
 

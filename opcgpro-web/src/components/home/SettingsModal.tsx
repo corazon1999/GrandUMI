@@ -222,7 +222,7 @@ export default function SettingsModal({
           <div>
             <h3 id="attach-don-settings-title" className="text-sm font-bold text-white">贴咚操作</h3>
             <p className="mt-1 text-sm leading-5 text-gray-500">
-              开启后每次贴咚会先询问确认；关闭后点击目标或数量便会直接贴咚。
+              此设置默认关闭；开启后每次贴咚会先询问确认，关闭时将直接贴咚。
             </p>
           </div>
           <button

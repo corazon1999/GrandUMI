@@ -29,7 +29,7 @@ const defaults: Settings = {
   alwaysPromptOnLifeReveal: false,
   cardSize: "auto",
   animationSpeed: "standard",
-  confirmAttachDon: true,
+  confirmAttachDon: false,
 };
 
 function loadFromStorage(): Settings {
