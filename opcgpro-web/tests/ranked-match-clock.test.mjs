@@ -77,6 +77,8 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /达到 10亿贝里后/);
   assert.match(lobby, /基础胜负增加或减少 2500万贝里/);
   assert.match(lobby, /连胜奖励最高 1250万贝里，连败保护和分差修正上限均为 630万贝里/);
+  assert.match(lobby, /终结至少 3 连胜的玩家时/);
+  assert.match(lobby, /1亿5000万、3亿、6亿和10亿档分别为 200万、400万、750万和1250万贝里/);
   assert.match(lobby, /达到 1亿5000万、3亿、6亿或 10亿贝里后，对应档位会成为永久保底线/);
 });
 
@@ -94,6 +96,9 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /Math\.ceil\(Math\.abs\(result\.baseRankPointDelta\) \/ 4\)/);
   assert.match(panel, /streakAdjustment >= streakCap/);
   assert.doesNotMatch(panel, /result\.resultStreak >= 6/);
+  assert.match(panel, /result\.winStreakEndedBounty > 0/);
+  assert.match(panel, /终结\{result\.endedWinStreak\}连胜赏金/);
+  assert.match(panel, /formatSignedRankBounty\(result\.winStreakEndedBounty\)/);
   assert.match(panel, /rankDifferenceAdjustment/);
   assert.match(panel, /formatSignedRankBounty\(result\.rankPointDelta\)/);
   assert.match(panel, /悬赏金\{formatSignedRankBounty\(result\.rankPointDelta\)\}/);
@@ -106,6 +111,8 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /最终变化/);
   assert.match(overlay, /h-12 min-w-28/);
   assert.match(types, /rankPointFormulaApplied: boolean/);
+  assert.match(types, /winStreakEndedBounty: number/);
+  assert.match(types, /endedWinStreak: number/);
 });
 
 test("三阵营称号和高悬赏称号按约定映射", async () => {

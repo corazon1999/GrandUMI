@@ -44,6 +44,12 @@ export default function RankResultPanel({ result }: RankResultPanelProps) {
                 <dt>{result.resultStreak}连{result.won ? "胜奖励" : "败保护"}{streakCapped ? "（已封顶）" : ""}</dt>
                 <dd className="font-bold text-emerald-300">{formatSignedRankBounty(result.streakAdjustment)}</dd>
               </div>
+              {result.winStreakEndedBounty > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <dt>终结{result.endedWinStreak}连胜赏金</dt>
+                  <dd className="font-bold text-amber-300">{formatSignedRankBounty(result.winStreakEndedBounty)}</dd>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-4 text-left">
                 <dt>{rankDifferenceLabel(result)}</dt>
                 <dd className={`shrink-0 font-bold ${result.rankDifferenceAdjustment >= 0 ? "text-emerald-300" : "text-red-300"}`}>

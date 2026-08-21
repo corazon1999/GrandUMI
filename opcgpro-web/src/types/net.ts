@@ -405,6 +405,8 @@ export interface RankPlayerSettlement {
   rankPointDelta: number;
   baseRankPointDelta: number;
   streakAdjustment: number;
+  winStreakEndedBounty: number;
+  endedWinStreak: number;
   rankDifference: number;
   rankDifferenceAdjustment: number;
   rankProtectionAdjustment: number;

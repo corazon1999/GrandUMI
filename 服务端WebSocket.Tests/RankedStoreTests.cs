@@ -163,6 +163,91 @@ public class RankedStoreTests
         }
     }
 
+    [Theory]
+    [InlineData(1499, 0)]
+    [InlineData(1500, 20)]
+    [InlineData(2999, 20)]
+    [InlineData(3000, 40)]
+    [InlineData(5999, 40)]
+    [InlineData(6000, 75)]
+    [InlineData(9999, 75)]
+    [InlineData(10000, 125)]
+    public void 排位结算_终结三连胜时按败方赛前悬赏档位发放一次赏金(
+        int defeatedRankPoints,
+        int expectedBounty)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-streak-bounty-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 22, 12, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, $"streak-bounty-{defeatedRankPoints}");
+
+            // 先由爱丽丝获胜清空鲍勃在定级赛末尾形成的连胜，再让鲍勃取得三连胜。
+            Assert.NotNull(store.RecordMatch($"streak-bounty-reset-{defeatedRankPoints}", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            for (var streak = 1; streak <= 3; streak++)
+                Assert.NotNull(store.RecordMatch($"streak-bounty-build-{defeatedRankPoints}-{streak}", now.AddMinutes(10 + streak),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1));
+
+            SetRankPoints(path, ("爱丽丝", defeatedRankPoints), ("鲍勃", defeatedRankPoints));
+            var result = store.RecordMatch($"streak-bounty-ended-{defeatedRankPoints}", now.AddMinutes(20),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(result);
+            Assert.Equal(expectedBounty, result!.Player0.WinStreakEndedBounty);
+            Assert.Equal(expectedBounty > 0 ? 3 : 0, result.Player0.EndedWinStreak);
+            Assert.Equal(0, result.Player1.WinStreakEndedBounty);
+            Assert.Equal(0, result.Player1.EndedWinStreak);
+            Assert.Equal(result.Player0.BaseRankPointDelta
+                + result.Player0.StreakAdjustment
+                + result.Player0.RankDifferenceAdjustment
+                + expectedBounty,
+                result.Player0.RankPointDelta);
+
+            var wireJson = System.Text.Json.JsonSerializer.Serialize(RankWire.Settlement(result.Player0));
+            Assert.Contains($"\"winStreakEndedBounty\":{expectedBounty}", wireJson);
+            Assert.Contains($"\"endedWinStreak\":{(expectedBounty > 0 ? 3 : 0)}", wireJson);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
+    public void 排位结算_不足三连胜时不发放终结赏金()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-streak-bounty-threshold-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 22, 13, 0, 0, DateTimeKind.Utc);
+            CompletePlacements(store, now, "streak-bounty-threshold");
+            Assert.NotNull(store.RecordMatch("streak-bounty-threshold-reset", now.AddMinutes(10),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            for (var streak = 1; streak <= 2; streak++)
+                Assert.NotNull(store.RecordMatch($"streak-bounty-threshold-build-{streak}", now.AddMinutes(10 + streak),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1));
+
+            SetRankPoints(path, ("爱丽丝", 6000), ("鲍勃", 6000));
+            var result = store.RecordMatch("streak-bounty-threshold-ended", now.AddMinutes(20),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+
+            Assert.NotNull(result);
+            Assert.Equal(0, result!.Player0.WinStreakEndedBounty);
+            Assert.Equal(0, result.Player0.EndedWinStreak);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
     [Fact]
     public void 排位结算_连胜奖励十一连胜封顶十分且连败保护六连败封顶五分()
     {

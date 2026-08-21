@@ -74,6 +74,8 @@ public sealed record RankPlayerSettlement(
     int RankPointDelta,
     int BaseRankPointDelta,
     int StreakAdjustment,
+    int WinStreakEndedBounty,
+    int EndedWinStreak,
     int RankDifference,
     int RankDifferenceAdjustment,
     int RankProtectionAdjustment,
@@ -151,6 +153,8 @@ public static class RankWire
         rankPointDelta = value.RankPointDelta,
         baseRankPointDelta = value.BaseRankPointDelta,
         streakAdjustment = value.StreakAdjustment,
+        winStreakEndedBounty = value.WinStreakEndedBounty,
+        endedWinStreak = value.EndedWinStreak,
         rankDifference = value.RankDifference,
         rankDifferenceAdjustment = value.RankDifferenceAdjustment,
         rankProtectionAdjustment = value.RankProtectionAdjustment,
@@ -439,8 +443,14 @@ public sealed class RankedStore
             var lossStreakBefore1 = CurrentLossStreak(connection, transaction, season.Id, before1.AccountKey);
             var resultStreak0 = (score0 > 0.5 ? winStreakBefore0 : lossStreakBefore0) + 1;
             var resultStreak1 = (score1 > 0.5 ? winStreakBefore1 : lossStreakBefore1) + 1;
-            var calculation0 = CalculateRankPoints(before0, before1, score0 > 0.5, resultStreak0);
-            var calculation1 = CalculateRankPoints(before1, before0, score1 > 0.5, resultStreak1);
+            var winStreakEndedBounty0 = winnerIndex == 0
+                ? CalculateWinStreakEndedBounty(before1.RankPoints, winStreakBefore1)
+                : 0;
+            var winStreakEndedBounty1 = winnerIndex == 1
+                ? CalculateWinStreakEndedBounty(before0.RankPoints, winStreakBefore0)
+                : 0;
+            var calculation0 = CalculateRankPoints(before0, before1, score0 > 0.5, resultStreak0, winStreakEndedBounty0);
+            var calculation1 = CalculateRankPoints(before1, before0, score1 > 0.5, resultStreak1, winStreakEndedBounty1);
             var after0 = ApplyResult(before0, afterRating0, score0, calculation0);
             var after1 = ApplyResult(before1, afterRating1, score1, calculation1);
 
@@ -458,17 +468,21 @@ public sealed class RankedStore
             transaction.Commit();
             return new RankedMatchSettlement(
                 matchId,
-                ToSettlement(player0Account, before0, after0, calculation0, faction0, FactionRank(connection, season, after0, faction0), winStreakBefore0, winStreak0),
-                ToSettlement(player1Account, before1, after1, calculation1, faction1, FactionRank(connection, season, after1, faction1), winStreakBefore1, winStreak1));
+                ToSettlement(player0Account, before0, after0, calculation0, faction0, FactionRank(connection, season, after0, faction0), winStreakBefore0, winStreak0, winStreakBefore1),
+                ToSettlement(player1Account, before1, after1, calculation1, faction1, FactionRank(connection, season, after1, faction1), winStreakBefore1, winStreak1, winStreakBefore0));
         }
     }
 
-    private static RankPointCalculation CalculateRankPoints(Profile self, Profile opponent, bool won, int resultStreak)
+    private static int CalculateWinStreakEndedBounty(int defeatedRankPoints, int endedWinStreak)
     {
-        if (self.PlacementGames < PlacementRequired)
-            return new RankPointCalculation(0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
+        if (endedWinStreak < GlobalAnnouncementPolicy.RankedWinStreakAnnouncementThreshold) return 0;
+        if (defeatedRankPoints < NewWorldRankPoints) return 0;
 
-        var settlementRules = self.RankPoints switch
+        return SettlementRulesFor(defeatedRankPoints).WinStreakCap;
+    }
+
+    private static SettlementRules SettlementRulesFor(int rankPoints)
+        => rankPoints switch
         {
             >= TenBillionBountyRankPoints => new SettlementRules(250, 125, 63, 63),
             >= SixHundredMillionBountyRankPoints => new SettlementRules(150, 75, 38, 38),
@@ -476,6 +490,18 @@ public sealed class RankedStore
             >= NewWorldRankPoints => new SettlementRules(40, 20, 10, 10),
             _ => new SettlementRules(20, 10, 5, 5),
         };
+
+    private static RankPointCalculation CalculateRankPoints(
+        Profile self,
+        Profile opponent,
+        bool won,
+        int resultStreak,
+        int winStreakEndedBounty)
+    {
+        if (self.PlacementGames < PlacementRequired)
+            return new RankPointCalculation(0, 0, 0, self.RankPoints - opponent.RankPoints, 0, 0, resultStreak, won, false);
+
+        var settlementRules = SettlementRulesFor(self.RankPoints);
         var baseDelta = won ? settlementRules.BaseDelta : -settlementRules.BaseDelta;
         var streakAdjustment = Math.Clamp(resultStreak - 1, 0,
             won ? settlementRules.WinStreakCap : settlementRules.LossStreakCap);
@@ -490,8 +516,8 @@ public sealed class RankedStore
             > 0 => -Math.Clamp(rankDifference / 100, 0, rankDifferenceAdjustmentCap),
             _ => 0,
         };
-        return new RankPointCalculation(baseDelta, streakAdjustment, rankDifference,
-            rankDifferenceAdjustment, baseDelta + streakAdjustment + rankDifferenceAdjustment,
+        return new RankPointCalculation(baseDelta, streakAdjustment, winStreakEndedBounty, rankDifference,
+            rankDifferenceAdjustment, baseDelta + streakAdjustment + winStreakEndedBounty + rankDifferenceAdjustment,
             resultStreak, won, true);
     }
 
@@ -625,7 +651,8 @@ public sealed class RankedStore
         string? faction,
         int? factionRank,
         int winStreakBefore,
-        int winStreak)
+        int winStreak,
+        int opponentWinStreakBefore)
     {
         var (tier, division) = RankLabel(after.RankPoints, faction, factionRank);
         var actualDelta = after.RankPoints - before.RankPoints;
@@ -633,7 +660,8 @@ public sealed class RankedStore
             ? actualDelta - calculation.IntendedDelta
             : 0;
         return new RankPlayerSettlement(account, before.RankPoints, after.RankPoints,
-            actualDelta, calculation.BaseDelta, calculation.StreakAdjustment, calculation.RankDifference,
+            actualDelta, calculation.BaseDelta, calculation.StreakAdjustment, calculation.WinStreakEndedBounty,
+            calculation.WinStreakEndedBounty > 0 ? opponentWinStreakBefore : 0, calculation.RankDifference,
             calculation.RankDifferenceAdjustment, rankProtectionAdjustment, calculation.ResultStreak,
             calculation.Won, calculation.FormulaApplied, faction ?? string.Empty, tier, division, after.PlacementGames,
             PlacementRequired, before.PlacementGames < PlacementRequired && after.PlacementGames == PlacementRequired,
@@ -1020,6 +1048,7 @@ public sealed class RankedStore
     private sealed record RankPointCalculation(
         int BaseDelta,
         int StreakAdjustment,
+        int WinStreakEndedBounty,
         int RankDifference,
         int RankDifferenceAdjustment,
         int IntendedDelta,
