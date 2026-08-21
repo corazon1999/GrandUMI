@@ -77,4 +77,26 @@ public sealed class QqFeedback20260822RegressionTests
         Assert.Contains(me.Trash.Single(), new[] { firstMarco, secondMarco });
         Assert.Empty(me.Deck);
     }
+
+    [Fact]
+    public async Task OP17_082_GainsPowerAlongsideOP17_095WhenTwelveCostCharacterExists()
+    {
+        var state = TestScene.New("OP13-004")
+            .MyCharacter("OP17-082")
+            .MyCharacter("OP17-095")
+            .OppCharacter("OP15-003")
+            .Build();
+        var me = state.Players[0];
+        var sanji = me.Characters.Single(card => card.Info.Number == "OP17-082");
+        var zoro = me.Characters.Single(card => card.Info.Number == "OP17-095");
+        var twelveCostCharacter = Assert.Single(state.Players[1].Characters);
+        twelveCostCharacter.CostModThisTurn = 12 - twelveCostCharacter.Info.Cost;
+
+        await EffectRuntime.Resolve(state, 0, sanji, EffectTrigger.OnEnterField, new MockPromptService());
+        await EffectRuntime.Resolve(state, 0, zoro, EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(12, state.CurrentCostOf(1, twelveCostCharacter));
+        Assert.Equal(3000, state.ContinuousPowerBonus(0, sanji));
+        Assert.Equal(3000, state.ContinuousPowerBonus(0, zoro));
+    }
 }
