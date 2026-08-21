@@ -1,10 +1,11 @@
 {
   "ST11-001": {
     "_name": "乌塔（领袖）",
-    "_note": "【咚×1】【攻击时】公开卡组顶1张，将最多1张《FILM》加入手牌，其余放回卡组底（原文【每回合1次】，triggers 无 oncePerTurn 通道，未强制限次）。",
+    "_note": "【咚×1】【攻击时】【每回合1次】公开卡组顶1张，将最多1张《FILM》加入手牌，其余放回卡组底。",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "oncePerTurn": true,
         "if": { "donAttachedGte": 1 },
         "then": [
           { "op": "LookTopReveal", "count": 1, "max": 1, "restTo": "bottom", "match": { "keyword": "FILM" } }

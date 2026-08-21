@@ -782,11 +782,12 @@
   },
   "OP01-052": {
     "_name": "雷藏",
-    "_matcher": "攻击时若我方休息角色≥2则抽1张（每回合1次语义由触发本身承载）。",
+    "_matcher": "攻击时若我方休息角色≥2则抽1张（每回合1次）。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "oncePerTurn": true,
         "if": {
           "ownRestedCharCountGte": 2
         },

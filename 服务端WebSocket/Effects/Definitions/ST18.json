@@ -29,10 +29,11 @@
   },
   "ST18-003": {
     "_name": "山五郎",
-    "_note": "【攻击时】我方场上有≥8咚时抽1张（原文【每回合1次】，triggers 无 oncePerTurn 通道，未强制限次）。",
+    "_note": "【攻击时】【每回合1次】我方场上有≥8咚时抽1张。",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "oncePerTurn": true,
         "if": { "selfDonTotalGte": 8 },
         "then": [
           { "op": "Draw", "n": 1 }

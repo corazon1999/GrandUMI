@@ -536,13 +536,17 @@ public static class GameRoomManager
                         ChargeOperationClockLocked(activeRoom, Stopwatch.GetTimestamp());
                         if (current is 0 or 1 && IsOperationClockExpired(activeRoom.Engine.State, current))
                             expired = current;
+                        else
+                            // Task.Delay 允许因系统调度精度而比权威扣时点早醒极短时间。
+                            // 此时必须按尚余时间重新挂载任务，否则棋钟会继续在客户端归零，
+                            // 服务端却再也没有超时任务来完成判负。
+                            StartOperationClockLocked(activeRoom, DetermineOperationClockPlayer(activeRoom));
                     }
                     if (expired is 0 or 1)
                     {
                         FinishByOperationTimeout(activeRoom, expired.Value);
                         CleanupRoom(activeRoom.RoomId);
                     }
-                    else EnsureOperationClockRunning(activeRoom);
                     return Task.CompletedTask;
                 }), CancellationToken.None);
         });

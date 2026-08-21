@@ -19,6 +19,7 @@ import CardZoneTransitionLayer from "@/components/game/CardZoneTransitionLayer";
 import RevealOverlay from "@/components/game/RevealOverlay";
 import GameChatPanel from "@/components/game/GameChatPanel";
 import { useGameStore } from "@/store/gameStore";
+import { elapsedMillisecondsFromServerSync } from "@/lib/serverCountdown.mjs";
 import { useStageScale } from "@/hooks/useStageScale";
 import { CardSizeOverride } from "@/hooks/useResponsive";
 import { PHASE_LABELS } from "@/game/battle/BattlePhase";
@@ -270,26 +271,43 @@ function formatOperationTime(milliseconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function monotonicNow(): number {
+  return typeof performance === "undefined" ? 0 : performance.now();
+}
+
 function OperationClock({ side }: { side: "my" | "opponent" }) {
   const enabled = useGameStore((s) => s.operationClockEnabled);
   const totalBase = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
   const turnBase = useGameStore((s) => side === "my" ? s.myTurnOperationTimeMs : s.opponentTurnOperationTimeMs);
   const active = useGameStore((s) => s.operationClockActive);
   const syncUtc = useGameStore((s) => s.operationClockSyncUtc);
+  const serverNowUtc = useGameStore((s) => s.serverNowUtc);
   const paused = useGameStore((s) => s.operationClockPaused);
   const matchKind = useGameStore((s) => s.matchKind);
-  const [now, setNow] = useState(() => Date.now());
+  const [anchor, setAnchor] = useState(() => ({ syncUtc, serverNowUtc, receivedAt: monotonicNow() }));
+  const [now, setNow] = useState(() => monotonicNow());
+
+  useEffect(() => {
+    const receivedAt = monotonicNow();
+    setAnchor({ syncUtc, serverNowUtc, receivedAt });
+    setNow(receivedAt);
+  }, [serverNowUtc, syncUtc]);
 
   useEffect(() => {
     if (!enabled || active !== side || paused) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), Math.min(totalBase, turnBase) < 12_000 ? 100 : 500);
+    setNow(monotonicNow());
+    const timer = window.setInterval(() => setNow(monotonicNow()), Math.min(totalBase, turnBase) < 12_000 ? 100 : 500);
     return () => window.clearInterval(timer);
   }, [active, enabled, paused, side, syncUtc, totalBase, turnBase]);
 
   if (!enabled) return null;
+  const anchorMatchesSnapshot = anchor.syncUtc === syncUtc && anchor.serverNowUtc === serverNowUtc;
   const elapsed = active === side && !paused && syncUtc
-    ? Math.max(0, now - Date.parse(syncUtc))
+    ? elapsedMillisecondsFromServerSync(
+        syncUtc,
+        serverNowUtc,
+        anchorMatchesSnapshot ? now - anchor.receivedAt : 0,
+      )
     : 0;
   const totalRemaining = Math.max(0, totalBase - elapsed);
   const turnRemaining = Math.min(totalRemaining, Math.max(0, turnBase - elapsed));

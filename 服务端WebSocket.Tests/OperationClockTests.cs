@@ -121,6 +121,35 @@ public class OperationClockTests
     }
 
     [Fact]
+    public async Task 超时任务提前唤醒_会按剩余回合时间重新挂载并判负()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            var active = room.Engine.State.CurrentTurnPlayer;
+
+            // 先让服务端挂载一个很快到期的任务，再模拟该任务醒来前权威剩余时间被校正得更长。
+            // 第一次回调不会判负，但必须重新按校正后的剩余时间挂载，而不能静默停钟。
+            room.Engine.State.OperationTurnClockRemainingMs[active] = 30;
+            room.Engine.Broadcast("TurnClockEarlyWakeTest");
+            room.Engine.State.OperationTurnClockRemainingMs[active] = 500;
+
+            await WaitUntilAsync(() => room.Engine.State.IsGameOver);
+
+            Assert.Equal(1 - active, room.Engine.State.WinnerIndex);
+            Assert.Equal(0, room.Engine.State.OperationTurnClockRemainingMs[active]);
+            Assert.Contains("本回合操作时间耗尽", room.Engine.State.GameOverReason);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public void 新回合操作时间重置为八分钟与总剩余时间的较小值()
     {
         TestScene.New();

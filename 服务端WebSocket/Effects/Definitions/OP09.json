@@ -273,10 +273,11 @@
   },
   "OP09-027": {
     "_name": "萨波",
-    "_matcher": "攻击时 我方休息角色≥3则抽1（每回合1次未严格限制）",
+    "_matcher": "攻击时 我方休息角色≥3则抽1（每回合1次）",
     "triggers": [
       {
         "on": "OnAttackDeclare",
+        "oncePerTurn": true,
         "if": {
           "ownRestedCharCountGte": 3
         },

@@ -60,6 +60,36 @@ public class OncePerTurnEffectIndicatorTests
         Assert.False(OncePerTurnEffectCatalog.Contains("OP12-043"));
     }
 
+    [Theory]
+    [InlineData("OP01-052")]
+    [InlineData("OP09-027")]
+    [InlineData("ST11-001")]
+    [InlineData("ST18-003")]
+    [InlineData("OP10-003")]
+    [InlineData("ST34-001")]
+    [InlineData("OP17-001")]
+    [InlineData("OP17-010")]
+    [InlineData("OP17-020")]
+    [InlineData("OP17-025")]
+    [InlineData("OP17-030")]
+    [InlineData("OP17-034")]
+    [InlineData("OP17-040")]
+    [InlineData("OP17-048")]
+    [InlineData("OP17-049")]
+    [InlineData("OP17-053")]
+    [InlineData("OP17-058")]
+    [InlineData("OP17-062")]
+    [InlineData("OP17-063")]
+    [InlineData("OP17-064")]
+    [InlineData("OP17-072")]
+    [InlineData("OP17-101")]
+    public void 全量审计发现的每回合一次卡牌_均会下发可用标识(string cardNumber)
+    {
+        _ = TestScene.New().Build();
+
+        Assert.True(OncePerTurnEffectCatalog.Contains(cardNumber));
+    }
+
     private static bool LeaderAvailable(GameState state)
     {
         var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
