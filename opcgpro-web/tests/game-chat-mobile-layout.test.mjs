@@ -29,6 +29,15 @@ test("旋转手机聊天记录自适应剩余高度且快捷语只横向滚动",
   assert.ok((panel.match(/min-h-12/g)?.length ?? 0) >= 7);
 });
 
+test("旋转手机的局内聊天提示保留可读宽度", async () => {
+  const panel = await read("src/components/game/GameChatPanel.tsx");
+
+  assert.match(panel, /data-game-chat-toast/);
+  assert.match(panel, /min\(15rem, calc\(100cqw - 5\.25rem/);
+  assert.match(panel, /var\(--layout-safe-left, 0px\)/);
+  assert.match(panel, /var\(--layout-safe-right, 0px\)/);
+});
+
 test("两档手机竖屏旋转后聊天按钮仍保留至少44像素触控尺寸", () => {
   for (const [hostWidth, hostHeight] of [[390, 844], [360, 780]]) {
     const scale = calculateLayoutScale({

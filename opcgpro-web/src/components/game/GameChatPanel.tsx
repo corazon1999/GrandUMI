@@ -8,6 +8,7 @@ import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
+import SpectatorArena from "@/components/game/SpectatorArena";
 
 /** 左下角局内聊天与独立好友中心入口。 */
 
@@ -35,6 +36,7 @@ interface GameChatItem {
 interface ChatToast {
   text: string;
   fromName: string;
+  fromRole: "player" | "spectator";
 }
 
 export default function GameChatPanel({
@@ -152,7 +154,11 @@ export default function GameChatPanel({
       setGameMessages((previous) => [...previous.slice(-49), item]);
       if (!isSelf && !openRef.current) {
         setGameUnread((count) => count + 1);
-        showToast({ text: item.text, fromName: item.fromName });
+        showToast({
+          text: item.text,
+          fromName: item.fromName,
+          fromRole: item.fromRole,
+        });
       }
     };
     eventBus.on("gameChat", handler);
@@ -235,6 +241,15 @@ export default function GameChatPanel({
 
   return (
     <>
+      {showSpectatorIndicator && (
+        <SpectatorArena
+          spectatorNames={spectatorNames}
+          spectatorDetails={spectatorDetails}
+          muted={muted}
+          onKick={kickSpectator}
+          kickConfirm={kickConfirm}
+        />
+      )}
       <div
         data-game-chat-root
         data-layout-rotated={rotateQuarterTurn ? "true" : "false"}
@@ -291,7 +306,18 @@ export default function GameChatPanel({
             </div>
           ))}
         {!open && toast && (
-          <div className="pointer-events-none max-w-[240px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15">
+          <div
+            data-game-chat-toast
+            className={`pointer-events-none max-w-[240px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15 ${toast.fromRole === "spectator" && !isObserver ? "md:hidden" : ""}`}
+            style={
+              rotateQuarterTurn
+                ? {
+                    width:
+                      "min(15rem, calc(100cqw - 5.25rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px)))",
+                  }
+                : undefined
+            }
+          >
             <span className="font-bold text-amber-300">{toast.fromName}：</span>
             {toast.text}
           </div>
@@ -487,7 +513,7 @@ export default function GameChatPanel({
 
           {showSpectatorIndicator && (
             <div
-              className="relative"
+              className="relative md:hidden"
               onMouseEnter={() => setSpectatorHovered(true)}
               onMouseLeave={() => setSpectatorHovered(false)}
             >
@@ -537,6 +563,7 @@ export default function GameChatPanel({
               )}
               <button
                 type="button"
+                data-mobile-spectator-trigger
                 onClick={() => {
                   setOpen(false);
                   setSpectatorPinned((value) => !value);
