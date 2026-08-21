@@ -520,14 +520,16 @@ public static class DeclaredOmissionEffects
         => ctx.Vars.TryGetValue("owner", out var value) && value is int owner ? owner : -1;
 
     private static async Task<CardInstance?> ChooseUpToOne(
-        EffectContext ctx, string kind, string text, IReadOnlyList<CardInstance> candidates)
+        EffectContext ctx, string kind, string text, IReadOnlyList<CardInstance> candidates,
+        IReadOnlyList<CardInstance>? displayedCards = null)
     {
         if (candidates.Count == 0) return null;
         var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, kind, text,
             candidates.Select(card => card.Id.ToString()).ToList(), 0, 1,
             new Dictionary<string, object?>
             {
-                ["choiceCards"] = candidates.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                ["choiceCards"] = (displayedCards ?? candidates)
+                    .Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
             });
         return selected.Count == 0 ? null
             : candidates.FirstOrDefault(card => card.Id.ToString() == selected[0]);
@@ -867,7 +869,9 @@ public static class DeclaredOmissionEffects
         if (looked.Count == 0) return;
 
         var candidates = looked.Where(predicate).ToList();
-        var picked = await ChooseUpToOne(ctx, "LookTopReveal", prompt, candidates);
+        // 检索时 validChoices 只包含合法目标，但 choiceCards 必须携带确认到的全部牌，
+        // 让玩家先看完整牌面，再从其中选择可检索卡；不合法目标由客户端置灰展示。
+        var picked = await ChooseUpToOne(ctx, "LookTopReveal", prompt, candidates, looked);
         if (picked is not null)
         {
             ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new[] { picked.Info.Number });
@@ -878,7 +882,7 @@ public static class DeclaredOmissionEffects
 
         if (looked.Count == 0) return;
         var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OrderDeckCards",
-            "按顺序排列剩余卡牌（先选择的卡牌最靠近卡组顶或最先进入卡组底）",
+            "将剩余卡牌自选顺序排列（先选择的卡牌最靠近卡组顶或最先进入卡组底）",
             looked.Select(card => card.Id.ToString()).ToList(), looked.Count, looked.Count,
             new Dictionary<string, object?>
             {
