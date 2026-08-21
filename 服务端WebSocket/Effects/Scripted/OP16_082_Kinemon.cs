@@ -7,13 +7,13 @@ namespace GrandUMI.Effects.Scripted;
 /// This character gains +3 cost continuously. Its OnEnterField search remains
 /// implemented by the OP16 DSL definition.
 /// </summary>
-public sealed class OP16_082_Kinemon : IScriptedEffect
+public sealed class OP16_082_Kinemon : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP16-082";
 
     public bool HandlesTrigger(EffectTrigger trigger) => trigger == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
@@ -33,6 +33,13 @@ public sealed class OP16_082_Kinemon : IScriptedEffect
             Predicate = (_, side, card) =>
                 side == owner && card.Id == selfId && !card.IsEffectsNullified,
         });
+
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        await RegisterFieldStatic(ctx);
 
         await Dsl.DslInterpreter.TryResolve(ctx);
     }

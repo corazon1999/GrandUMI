@@ -195,6 +195,31 @@ public class OP16EffectTests
     }
 
     [Fact]
+    public async Task OP16_082_KeepsPrintedCostIncreaseWhenOnEnterEffectIsNullified()
+    {
+        var state = TestScene.New("OP09-081").Build();
+        var leader = state.Players[0].Leader;
+        var kinemon = Card("OP16-082");
+        state.Players[0].Characters.Add(kinemon);
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            leader,
+            EffectTrigger.OnGameStart,
+            new MockPromptService());
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            kinemon,
+            EffectTrigger.OnEnterField,
+            new MockPromptService());
+
+        Assert.True(state.IsTriggerNullified(kinemon, EffectTrigger.OnEnterField));
+        Assert.Equal(7, state.CurrentCostOf(0, kinemon));
+    }
+
+    [Fact]
     public void OP16_118_Changes8000PowerCharactersInHandToCounter2000()
     {
         var state = TestScene.New("OP16-001").Build();
