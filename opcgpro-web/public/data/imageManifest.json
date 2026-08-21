@@ -689,8 +689,9 @@
     "/cards/eb04/EB04-006.png"
   ],
   "EB04-007": [
-    "/cards/eb04/EB04-007.png",
-    "/cards/eb04/EB04-007_01.png"
+    "/cards/eb04/EB04-007.png?v=5f7694e47514",
+    "/cards/eb04/EB04-007_01.png?v=8ac7efd6ae9d",
+    "/cards/eb04/EB04-007_02.png?v=5bd28f06cf54"
   ],
   "EB04-008": [
     "/cards/eb04/EB04-008.png"
@@ -869,8 +870,9 @@
     "/cards/eb04/EB04-060.png"
   ],
   "EB04-061": [
-    "/cards/eb04/EB04-061.png",
-    "/cards/eb04/EB04-061_01.png"
+    "/cards/eb04/EB04-061.png?v=58d364ae88ba",
+    "/cards/eb04/EB04-061_01.png?v=281b76696bf5",
+    "/cards/eb04/EB04-061_03.png?v=d6731ed88299"
   ],
   "OP01-001": [
     "/cards/op01/OP01-001.png",
@@ -6102,8 +6104,9 @@
     "/cards/op12/OP12-055.png"
   ],
   "OP12-056": [
-    "/cards/op12/OP12-056.png",
-    "/cards/op12/OP12-056_01.png"
+    "/cards/op12/OP12-056.png?v=3301cc045032",
+    "/cards/op12/OP12-056_01.png?v=6ab576ab3f7f",
+    "/cards/op12/OP12-056_02.png?v=0803fbd19f00"
   ],
   "OP12-057": [
     "/cards/op12/OP12-057.png"
@@ -6418,8 +6421,9 @@
     "/cards/op13/OP13-027_01.png"
   ],
   "OP13-028": [
-    "/cards/op13/OP13-028.png",
-    "/cards/op13/OP13-028_01.png"
+    "/cards/op13/OP13-028.png?v=b55fc8c3c38e",
+    "/cards/op13/OP13-028_01.png?v=8251759be36b",
+    "/cards/op13/OP13-028_02.png?v=c50a7d1ad8ca"
   ],
   "OP13-029": [
     "/cards/op13/OP13-029.png"
@@ -7100,7 +7104,8 @@
     "/cards/op14/OP14-107_01.png"
   ],
   "OP14-108": [
-    "/cards/op14/OP14-108.png"
+    "/cards/op14/OP14-108.png?v=cbdeedd8586b",
+    "/cards/op14/OP14-108_01.png?v=ee60b1caa56a"
   ],
   "OP14-109": [
     "/cards/op14/OP14-109.png"
@@ -7809,7 +7814,8 @@
     "/cards/p/P-082_02.png"
   ],
   "P-084": [
-    "/cards/p/P-084.png"
+    "/cards/p/P-084.png?v=dfa2097b1c84",
+    "/cards/p/P-084_01.png?v=9c085f6098da"
   ],
   "P-088": [
     "/cards/p/P-088.png",
@@ -7849,8 +7855,9 @@
     "/cards/p/P-105_01.png"
   ],
   "P-107": [
-    "/cards/p/P-107.png",
-    "/cards/p/P-107_01.png"
+    "/cards/p/P-107.png?v=22f935518f59",
+    "/cards/p/P-107_01.png?v=46b7a3d89b5c",
+    "/cards/p/P-107_02.png?v=da8f8dd349dd"
   ],
   "P-111": [
     "/cards/p/P-111.png",
@@ -9211,7 +9218,8 @@
     "/cards/st27/ST27-004.png"
   ],
   "ST27-005": [
-    "/cards/st27/ST27-005.png"
+    "/cards/st27/ST27-005.png?v=c90d56b5a6c6",
+    "/cards/st27/ST27-005_01.png?v=827c1b7d4ea5"
   ],
   "ST28-001": [
     "/cards/st28/ST28-001.png"
@@ -9355,7 +9363,8 @@
     "/cards/st31/ST31-003_01.png"
   ],
   "ST31-004": [
-    "/cards/st31/ST31-004.png"
+    "/cards/st31/ST31-004.png?v=25298bf79a93",
+    "/cards/st31/ST31-004_01.png?v=02da06d44608"
   ],
   "ST31-005": [
     "/cards/st31/ST31-005.png"
@@ -9364,7 +9373,8 @@
     "/cards/st32/ST32-001.png"
   ],
   "ST32-002": [
-    "/cards/st32/ST32-002.png"
+    "/cards/st32/ST32-002.png?v=9786d0f58804",
+    "/cards/st32/ST32-002_01.png?v=ab71dc9a89d3"
   ],
   "ST32-003": [
     "/cards/st32/ST32-003.png"
@@ -9757,8 +9767,9 @@
     "/cards/op16/OP16-097.png"
   ],
   "OP16-098": [
-    "/cards/op16/OP16-098.png",
-    "/cards/op16/OP16-098_01.png"
+    "/cards/op16/OP16-098.png?v=01ab349adb5b",
+    "/cards/op16/OP16-098_01.png?v=c77665706a90",
+    "/cards/op16/OP16-098_02.png?v=e1dee81a6210"
   ],
   "OP16-099": [
     "/cards/op16/OP16-099.png"
@@ -9828,360 +9839,399 @@
     "/cards/op16/OP16-119_01.png"
   ],
   "OP17-001": [
-    "/cards/op17/OP17-001.png"
+    "/cards/op17/OP17-001.png?v=2ef0f512cb3a",
+    "/cards/op17/OP17-001_01.png?v=29491a556062"
   ],
   "OP17-002": [
-    "/cards/op17/OP17-002.png"
+    "/cards/op17/OP17-002.png?v=b6c5c3bc7718"
   ],
   "OP17-003": [
-    "/cards/op17/OP17-003.png"
+    "/cards/op17/OP17-003.png?v=68b374bda5c8"
   ],
   "OP17-004": [
-    "/cards/op17/OP17-004.png"
+    "/cards/op17/OP17-004.png?v=964d4e39a56d"
   ],
   "OP17-005": [
-    "/cards/op17/OP17-005.png"
+    "/cards/op17/OP17-005.png?v=2f4aefa5a9bb",
+    "/cards/op17/OP17-005_01.png?v=92aa8c8cbaa8",
+    "/cards/op17/OP17-005_02.png?v=78b3016084bf"
   ],
   "OP17-006": [
-    "/cards/op17/OP17-006.png"
+    "/cards/op17/OP17-006.png?v=134422bca681",
+    "/cards/op17/OP17-006_01.png?v=dd0fabcb3ed8"
   ],
   "OP17-007": [
-    "/cards/op17/OP17-007.png"
+    "/cards/op17/OP17-007.png?v=b67a9e2ec3f6"
   ],
   "OP17-008": [
-    "/cards/op17/OP17-008.png"
+    "/cards/op17/OP17-008.png?v=fd16d42f5fbe"
   ],
   "OP17-009": [
-    "/cards/op17/OP17-009.png?v=51be5e495e63&rev=20260810"
+    "/cards/op17/OP17-009.png?v=9a547367a241"
   ],
   "OP17-010": [
-    "/cards/op17/OP17-010.png?v=7ce72917cacb"
+    "/cards/op17/OP17-010.png?v=77af164ba4ea"
   ],
   "OP17-011": [
-    "/cards/op17/OP17-011.png?v=d3707ea9a4f"
+    "/cards/op17/OP17-011.png?v=ffc3b74b9335"
   ],
   "OP17-012": [
-    "/cards/op17/OP17-012.png"
+    "/cards/op17/OP17-012.png?v=f60be0d7694d"
   ],
   "OP17-013": [
-    "/cards/op17/OP17-013.png"
+    "/cards/op17/OP17-013.png?v=7f082c58c5ac"
   ],
   "OP17-014": [
-    "/cards/op17/OP17-014.png"
+    "/cards/op17/OP17-014.png?v=af210bbdd055"
   ],
   "OP17-015": [
-    "/cards/op17/OP17-015.png"
+    "/cards/op17/OP17-015.png?v=7045c87a98f4"
   ],
   "OP17-016": [
-    "/cards/op17/OP17-016.png"
+    "/cards/op17/OP17-016.png?v=05ae11c1da7a"
   ],
   "OP17-017": [
-    "/cards/op17/OP17-017.png?v=6d2855375eaa-r2"
+    "/cards/op17/OP17-017.png?v=87d47a16bef7"
   ],
   "OP17-018": [
-    "/cards/op17/OP17-018.png?v=4492564aaa22-r2"
+    "/cards/op17/OP17-018.png?v=fc3f927a4e8e"
   ],
   "OP17-019": [
-    "/cards/op17/OP17-019.png"
+    "/cards/op17/OP17-019.png?v=370160b6c034"
   ],
   "OP17-020": [
-    "/cards/op17/OP17-020.png"
+    "/cards/op17/OP17-020.png?v=1b962ae3a698",
+    "/cards/op17/OP17-020_01.png?v=998a2cf5ec56"
   ],
   "OP17-021": [
-    "/cards/op17/OP17-021.png"
+    "/cards/op17/OP17-021.png?v=12db331937fe"
   ],
   "OP17-022": [
-    "/cards/op17/OP17-022.png"
+    "/cards/op17/OP17-022.png?v=53b29cb93d85",
+    "/cards/op17/OP17-022_01.png?v=dec3b82fe3de",
+    "/cards/op17/OP17-022_02.png?v=05623daa6fc3"
   ],
   "OP17-023": [
-    "/cards/op17/OP17-023.png"
+    "/cards/op17/OP17-023.png?v=a3dc74ed0f34"
   ],
   "OP17-024": [
-    "/cards/op17/OP17-024.png"
+    "/cards/op17/OP17-024.png?v=c391381cc22f"
   ],
   "OP17-025": [
-    "/cards/op17/OP17-025.png"
+    "/cards/op17/OP17-025.png?v=b0fe1b10c0c1",
+    "/cards/op17/OP17-025_01.png?v=a198236d3ea1"
   ],
   "OP17-026": [
-    "/cards/op17/OP17-026.png"
+    "/cards/op17/OP17-026.png?v=3ba825220e27"
   ],
   "OP17-027": [
-    "/cards/op17/OP17-027.png"
+    "/cards/op17/OP17-027.png?v=741af24a2eab",
+    "/cards/op17/OP17-027_01.png?v=f1831da15b53"
   ],
   "OP17-028": [
-    "/cards/op17/OP17-028.png"
+    "/cards/op17/OP17-028.png?v=27e7f0b8cb54"
   ],
   "OP17-029": [
-    "/cards/op17/OP17-029.png"
+    "/cards/op17/OP17-029.png?v=04833de9edcf"
   ],
   "OP17-030": [
-    "/cards/op17/OP17-030.png"
+    "/cards/op17/OP17-030.png?v=bb7e46cc1c67"
   ],
   "OP17-031": [
-    "/cards/op17/OP17-031.png"
+    "/cards/op17/OP17-031.png?v=365026b81cbc",
+    "/cards/op17/OP17-031_01.png?v=a18c96e8a4e1"
   ],
   "OP17-032": [
-    "/cards/op17/OP17-032.png"
+    "/cards/op17/OP17-032.png?v=98f12c95ecb7"
   ],
   "OP17-033": [
-    "/cards/op17/OP17-033.png"
+    "/cards/op17/OP17-033.png?v=91d34c498b6d"
   ],
   "OP17-034": [
-    "/cards/op17/OP17-034.png"
+    "/cards/op17/OP17-034.png?v=0160b95f29d6"
   ],
   "OP17-035": [
-    "/cards/op17/OP17-035.png"
+    "/cards/op17/OP17-035.png?v=7b34d68a66e3"
   ],
   "OP17-036": [
-    "/cards/op17/OP17-036.png"
+    "/cards/op17/OP17-036.png?v=4e686f958603"
   ],
   "OP17-037": [
-    "/cards/op17/OP17-037.png"
+    "/cards/op17/OP17-037.png?v=d5c2a49f5208",
+    "/cards/op17/OP17-037_01.png?v=6c4ff4c28840"
   ],
   "OP17-038": [
-    "/cards/op17/OP17-038.png"
+    "/cards/op17/OP17-038.png?v=29b55086de1e"
   ],
   "OP17-039": [
-    "/cards/op17/OP17-039.png"
+    "/cards/op17/OP17-039.png?v=01dd10803ffa",
+    "/cards/op17/OP17-039_01.png?v=c650c4138e48"
   ],
   "OP17-040": [
-    "/cards/op17/OP17-040.png"
+    "/cards/op17/OP17-040.png?v=c3e44cc44145"
   ],
   "OP17-041": [
-    "/cards/op17/OP17-041.png"
+    "/cards/op17/OP17-041.png?v=01c63b2804bd"
   ],
   "OP17-042": [
-    "/cards/op17/OP17-042.png"
+    "/cards/op17/OP17-042.png?v=00cd857b54ce"
   ],
   "OP17-043": [
-    "/cards/op17/OP17-043.png"
+    "/cards/op17/OP17-043.png?v=e74aa118b449"
   ],
   "OP17-044": [
-    "/cards/op17/OP17-044.png"
+    "/cards/op17/OP17-044.png?v=f71204f065a9"
   ],
   "OP17-045": [
-    "/cards/op17/OP17-045.png"
+    "/cards/op17/OP17-045.png?v=a737ef20b948",
+    "/cards/op17/OP17-045_01.png?v=f485ee7d8ab3"
   ],
   "OP17-046": [
-    "/cards/op17/OP17-046.png"
+    "/cards/op17/OP17-046.png?v=03b6243aaa0c",
+    "/cards/op17/OP17-046_01.png?v=2617121c4341"
   ],
   "OP17-047": [
-    "/cards/op17/OP17-047_v2.png"
+    "/cards/op17/OP17-047.png?v=5a4495e9540e"
   ],
   "OP17-048": [
-    "/cards/op17/OP17-048.png"
+    "/cards/op17/OP17-048.png?v=71f761d188b9",
+    "/cards/op17/OP17-048_01.png?v=5763b334eec4"
   ],
   "OP17-049": [
-    "/cards/op17/OP17-049.png"
+    "/cards/op17/OP17-049.png?v=a1f6f29010c0",
+    "/cards/op17/OP17-049_01.png?v=6a808f0054cf"
   ],
   "OP17-050": [
-    "/cards/op17/OP17-050.png"
+    "/cards/op17/OP17-050.png?v=b883ea843637"
   ],
   "OP17-051": [
-    "/cards/op17/OP17-051.png"
+    "/cards/op17/OP17-051.png?v=425da67d6834"
   ],
   "OP17-052": [
-    "/cards/op17/OP17-052.png"
+    "/cards/op17/OP17-052.png?v=b98cf358849b"
   ],
   "OP17-053": [
-    "/cards/op17/OP17-053.png"
+    "/cards/op17/OP17-053.png?v=da5f0e5799c4"
   ],
   "OP17-054": [
-    "/cards/op17/OP17-054.png"
+    "/cards/op17/OP17-054.png?v=c20fc8cb29db",
+    "/cards/op17/OP17-054_01.png?v=cd395fa45326"
   ],
   "OP17-055": [
-    "/cards/op17/OP17-055.png"
+    "/cards/op17/OP17-055.png?v=cd93fa93c6c9"
   ],
   "OP17-056": [
-    "/cards/op17/OP17-056.png"
+    "/cards/op17/OP17-056.png?v=3a9111df359e"
   ],
   "OP17-057": [
-    "/cards/op17/OP17-057.png"
+    "/cards/op17/OP17-057.png?v=e570ec0d069d"
   ],
   "OP17-058": [
-    "/cards/op17/OP17-058.png"
+    "/cards/op17/OP17-058.png?v=09cda6021d31",
+    "/cards/op17/OP17-058_01.png?v=b58298403ca9"
   ],
   "OP17-059": [
-    "/cards/op17/OP17-059.png"
+    "/cards/op17/OP17-059.png?v=c0a9c4c780fc"
   ],
   "OP17-060": [
-    "/cards/op17/OP17-060.png"
+    "/cards/op17/OP17-060.png?v=4faa63c1fb60"
   ],
   "OP17-061": [
-    "/cards/op17/OP17-061.png"
+    "/cards/op17/OP17-061.png?v=cfe4b0ce0282",
+    "/cards/op17/OP17-061_01.png?v=bad057e1afd4"
   ],
   "OP17-062": [
-    "/cards/op17/OP17-062.png"
+    "/cards/op17/OP17-062.png?v=2592772d1ce7",
+    "/cards/op17/OP17-062_01.png?v=e5a7adda938d",
+    "/cards/op17/OP17-062_02.png?v=1831d3a347a8",
+    "/cards/op17/OP17-062_03.png?v=249ff20bf7e5"
   ],
   "OP17-063": [
-    "/cards/op17/OP17-063.png"
+    "/cards/op17/OP17-063.png?v=de07b038257f",
+    "/cards/op17/OP17-063_01.png?v=defff0629248"
   ],
   "OP17-064": [
-    "/cards/op17/OP17-064.png"
+    "/cards/op17/OP17-064.png?v=cf7fda0423ed"
   ],
   "OP17-065": [
-    "/cards/op17/OP17-065.png"
+    "/cards/op17/OP17-065.png?v=c1bb54032449"
   ],
   "OP17-066": [
-    "/cards/op17/OP17-066.png"
+    "/cards/op17/OP17-066.png?v=6d289ba0321f"
   ],
   "OP17-067": [
-    "/cards/op17/OP17-067.png?v=682586018363"
+    "/cards/op17/OP17-067.png?v=0c631ecec90b"
   ],
   "OP17-068": [
-    "/cards/op17/OP17-068.png?v=eb5d0342667b"
+    "/cards/op17/OP17-068.png?v=ce7c38b4d8f7"
   ],
   "OP17-069": [
-    "/cards/op17/OP17-069.png?v=47a9c6bd0014"
+    "/cards/op17/OP17-069.png?v=80eebb7ee05f"
   ],
   "OP17-070": [
-    "/cards/op17/OP17-070.png?v=2979c1f578b6"
+    "/cards/op17/OP17-070.png?v=858e65995a3f",
+    "/cards/op17/OP17-070_01.png?v=3f4d5bffd35b"
   ],
   "OP17-071": [
-    "/cards/op17/OP17-071.png"
+    "/cards/op17/OP17-071.png?v=4a9a831c3247"
   ],
   "OP17-072": [
-    "/cards/op17/OP17-072.jpg"
+    "/cards/op17/OP17-072.png?v=30ee1c02c2bc"
   ],
   "OP17-073": [
-    "/cards/op17/OP17-073.png?v=ff692d3d9f0d"
+    "/cards/op17/OP17-073.png?v=ff2166513c42"
   ],
   "OP17-074": [
-    "/cards/op17/OP17-074.png"
+    "/cards/op17/OP17-074.png?v=0ab276d97be6"
   ],
   "OP17-075": [
-    "/cards/op17/OP17-075.png?v=dc0f75fe3429"
+    "/cards/op17/OP17-075.png?v=7a76a6530136"
   ],
   "OP17-076": [
-    "/cards/op17/OP17-076.png"
+    "/cards/op17/OP17-076.png?v=69049b3060c9"
   ],
   "OP17-077": [
-    "/cards/op17/OP17-077_v2.png"
+    "/cards/op17/OP17-077.png?v=09c54c1f11a1"
   ],
   "OP17-078": [
-    "/cards/op17/OP17-078.png"
+    "/cards/op17/OP17-078.png?v=2e4eb0ae6392"
   ],
   "OP17-079": [
-    "/cards/op17/OP17-079.png"
+    "/cards/op17/OP17-079.png?v=0c958670fc27",
+    "/cards/op17/OP17-079_01.png?v=c95bd3438a54",
+    "/cards/op17/OP17-079_02.png?v=a8a8d6f356ad"
   ],
   "OP17-080": [
-    "/cards/op17/OP17-080.png"
+    "/cards/op17/OP17-080.png?v=57472d02815a",
+    "/cards/op17/OP17-080_01.png?v=f06ec395a193"
   ],
   "OP17-081": [
-    "/cards/op17/OP17-081.png"
+    "/cards/op17/OP17-081.png?v=a95de7d64ec2"
   ],
   "OP17-082": [
-    "/cards/op17/OP17-082.png"
+    "/cards/op17/OP17-082.png?v=b9a676b9acca",
+    "/cards/op17/OP17-082_01.png?v=31261cc65415"
   ],
   "OP17-083": [
-    "/cards/op17/OP17-083.png"
+    "/cards/op17/OP17-083.png?v=dcc0efcba77a"
   ],
   "OP17-084": [
-    "/cards/op17/OP17-084.jpg"
+    "/cards/op17/OP17-084.png?v=83d86941d7ca"
   ],
   "OP17-085": [
-    "/cards/op17/OP17-085.png"
+    "/cards/op17/OP17-085.png?v=c24b21e17947"
   ],
   "OP17-086": [
-    "/cards/op17/OP17-086.png"
+    "/cards/op17/OP17-086.png?v=6a1d5449deba"
   ],
   "OP17-087": [
-    "/cards/op17/OP17-087.png"
+    "/cards/op17/OP17-087.png?v=dd3e6a8e51da",
+    "/cards/op17/OP17-087_01.png?v=297e4fe1f80e"
   ],
   "OP17-088": [
-    "/cards/op17/OP17-088.png?v=34f53b10b6a7"
+    "/cards/op17/OP17-088.png?v=a5c9c53805a6",
+    "/cards/op17/OP17-088_01.png?v=0c02856546a3"
   ],
   "OP17-089": [
-    "/cards/op17/OP17-089.png"
+    "/cards/op17/OP17-089.png?v=3d2c0595049f"
   ],
   "OP17-090": [
-    "/cards/op17/OP17-090.jpg"
+    "/cards/op17/OP17-090.png?v=be36f8931029"
   ],
   "OP17-091": [
-    "/cards/op17/OP17-091.png"
+    "/cards/op17/OP17-091.png?v=680f60b9288a"
   ],
   "OP17-092": [
-    "/cards/op17/OP17-092.png"
+    "/cards/op17/OP17-092.png?v=58683d518e75"
   ],
   "OP17-093": [
-    "/cards/op17/OP17-093.png"
+    "/cards/op17/OP17-093.png?v=4d94e2fec5af",
+    "/cards/op17/OP17-093_01.png?v=a6064a725fcc"
   ],
   "OP17-094": [
-    "/cards/op17/OP17-094.png"
+    "/cards/op17/OP17-094.png?v=e6ba99a9db10"
   ],
   "OP17-095": [
-    "/cards/op17/OP17-095.png"
+    "/cards/op17/OP17-095.png?v=8d4cbdb8b54c"
   ],
   "OP17-096": [
-    "/cards/op17/OP17-096.png"
+    "/cards/op17/OP17-096.png?v=f57e3828efca"
   ],
   "OP17-097": [
-    "/cards/op17/OP17-097.png?v=4e62bb0218df"
+    "/cards/op17/OP17-097.png?v=1b232cf41fb3"
   ],
   "OP17-098": [
-    "/cards/op17/OP17-098.png"
+    "/cards/op17/OP17-098.png?v=736846f033cd"
   ],
   "OP17-099": [
-    "/cards/op17/OP17-099.png"
+    "/cards/op17/OP17-099.png?v=8f4325893d0d",
+    "/cards/op17/OP17-099_01.png?v=fa8cd2862c32"
   ],
   "OP17-100": [
-    "/cards/op17/OP17-100.png"
+    "/cards/op17/OP17-100.png?v=bd2261bfb000"
   ],
   "OP17-101": [
-    "/cards/op17/OP17-101.png"
+    "/cards/op17/OP17-101.png?v=454212508364"
   ],
   "OP17-102": [
-    "/cards/op17/OP17-102.png"
+    "/cards/op17/OP17-102.png?v=fa7d90a937ab"
   ],
   "OP17-103": [
-    "/cards/op17/OP17-103.png"
+    "/cards/op17/OP17-103.png?v=70c27472e6eb"
   ],
   "OP17-104": [
-    "/cards/op17/OP17-104.png"
+    "/cards/op17/OP17-104.png?v=37892e712c7e"
   ],
   "OP17-105": [
-    "/cards/op17/OP17-105.png"
+    "/cards/op17/OP17-105.png?v=9b23521fb784"
   ],
   "OP17-106": [
-    "/cards/op17/OP17-106.png"
+    "/cards/op17/OP17-106.png?v=0df75244331f"
   ],
   "OP17-107": [
-    "/cards/op17/OP17-107.png"
+    "/cards/op17/OP17-107.png?v=2151a8966718",
+    "/cards/op17/OP17-107_01.png?v=a41d8479e486"
   ],
   "OP17-108": [
-    "/cards/op17/OP17-108.png"
+    "/cards/op17/OP17-108.png?v=d8c0e662d8a6"
   ],
   "OP17-109": [
-    "/cards/op17/OP17-109.png"
+    "/cards/op17/OP17-109.png?v=ecbc2e04565b"
   ],
   "OP17-110": [
-    "/cards/op17/OP17-110.png"
+    "/cards/op17/OP17-110.png?v=e5bf39447e91"
   ],
   "OP17-111": [
-    "/cards/op17/OP17-111.png"
+    "/cards/op17/OP17-111.png?v=cb7c808396df"
   ],
   "OP17-112": [
-    "/cards/op17/OP17-112.png"
+    "/cards/op17/OP17-112.png?v=56c025eb8bc1",
+    "/cards/op17/OP17-112_01.png?v=f497680dcd40",
+    "/cards/op17/OP17-112_02.png?v=223a4ea24916"
   ],
   "OP17-113": [
-    "/cards/op17/OP17-113.png"
+    "/cards/op17/OP17-113.png?v=53a3bb4526a0"
   ],
   "OP17-114": [
-    "/cards/op17/OP17-114.png"
+    "/cards/op17/OP17-114.png?v=22d5c3bdaea1",
+    "/cards/op17/OP17-114_01.png?v=291e10730b36"
   ],
   "OP17-115": [
-    "/cards/op17/OP17-115.png"
+    "/cards/op17/OP17-115.png?v=912bc6f6f4da"
   ],
   "OP17-116": [
-    "/cards/op17/OP17-116.png"
+    "/cards/op17/OP17-116.png?v=d1c343bcd64b"
   ],
   "OP17-117": [
-    "/cards/op17/OP17-117.png"
+    "/cards/op17/OP17-117.png?v=0a7c7a316f5c"
   ],
   "OP17-118": [
-    "/cards/op17/OP17-118.png"
+    "/cards/op17/OP17-118.png?v=257c5ccbb25f",
+    "/cards/op17/OP17-118_01.png?v=dfd85dd0eb1b",
+    "/cards/op17/OP17-118_02.png?v=9e8053ec96e6"
   ],
   "OP17-119": [
-    "/cards/op17/OP17-119.png"
+    "/cards/op17/OP17-119.png?v=5bb6e1e73d6a",
+    "/cards/op17/OP17-119_01.png?v=03459f4fa38a"
   ]
 }

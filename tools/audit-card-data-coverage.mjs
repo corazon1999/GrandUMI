@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA_DIR = path.join(ROOT, "卡牌数据");
-const API = "https://webadmin.windoent.com/op-public/cardList/cardlist/weblist?limit=10000&page=1";
+const API = "https://webadmin.windoent.com/front/op-public/cardList/cardlist/weblist?limit=10000&page=1";
 const STRICT = process.argv.includes("--strict");
 
 function canonicalNumber(value) {

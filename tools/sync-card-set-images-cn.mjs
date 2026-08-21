@@ -4,18 +4,20 @@
  *
  * 用法：
  *   node tools/sync-card-set-images-cn.mjs OP16
+ *   node tools/sync-card-set-images-cn.mjs OP17 --include-offer-reprints
  *   node tools/sync-card-set-images-cn.mjs P --numbers=P-120,P-121
  *
  * 数据源：简中官网卡表接口与图片 CDN。
  */
 
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const API_BASE = "https://webadmin.windoent.com/op-public";
+const API_BASE = "https://webadmin.windoent.com/front/op-public";
 const REFERER = "https://www.onepiece-cardgame.cn/";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
@@ -35,12 +37,13 @@ const numbersArg = process.argv.find((arg) => arg.startsWith("--numbers="));
 const requestedNumbers = numbersArg
   ? new Set(numbersArg.slice("--numbers=".length).split(",").map((value) => value.trim().toUpperCase()).filter(Boolean))
   : null;
+const includeOfferReprints = process.argv.includes("--include-offer-reprints");
 
 function canonicalCardNumber(value) {
   return String(value ?? "").toUpperCase().match(/^([A-Z]{1,5}\d{0,2}-\d{3,})/)?.[1] ?? null;
 }
 
-const outputDir = path.join(ROOT, "CardImages", setCode.toLowerCase());
+const outputRoot = path.join(ROOT, "CardImages");
 const manifestPath = path.join(
   ROOT,
   "opcgpro-web",
@@ -70,24 +73,31 @@ async function fetchWithRetry(url, responseType = "json", retry = 0) {
 }
 
 async function scanCardRows() {
-  const firstUrl = `${API_BASE}/cardList/cardlist/weblist?limit=${PAGE_SIZE}&page=0`;
+  const firstUrl = `${API_BASE}/cardList/cardlist/weblist?limit=${PAGE_SIZE}&page=1`;
   const first = await fetchWithRetry(firstUrl);
   if (first.code !== 0 || !first.page) {
     throw new Error(`卡表接口返回异常：${first.msg ?? "缺少分页数据"}`);
   }
 
-  // 官网分页同时兼容从 0 和从 1 开始；最终按记录 ID 去重。
   const totalPages = Number(first.page.totalPage) || 1;
   const pages = [first.page.list ?? []];
-  for (let page = 1; page <= totalPages; page++) {
+  for (let page = 2; page <= totalPages; page++) {
     const url = `${API_BASE}/cardList/cardlist/weblist?limit=${PAGE_SIZE}&page=${page}`;
     const data = await fetchWithRetry(url);
     if (data.code === 0 && data.page?.list) pages.push(data.page.list);
   }
 
   const byId = new Map();
+  const setMatch = setCode.match(/^([A-Z]+)(\d+)$/);
+  const offerToken = setMatch
+    ? `【${setMatch[1]}-${setMatch[2]}】`
+    : null;
   for (const item of pages.flat()) {
-    if (!String(item.cardNumber ?? "").startsWith(`${setCode}-`)) continue;
+    const belongsToNumberedSet = String(item.cardNumber ?? "").startsWith(`${setCode}-`);
+    const isOfferReprint = includeOfferReprints
+      && offerToken
+      && String(item.cardOfferType ?? "").includes(offerToken);
+    if (!belongsToNumberedSet && !isOfferReprint) continue;
     const canonical = canonicalCardNumber(item.cardNumber);
     if (!canonical || (requestedNumbers && !requestedNumbers.has(canonical))) continue;
     byId.set(String(item.id), item);
@@ -129,8 +139,13 @@ async function loadImageTasks(rows) {
       imageUrl.match(/\.(png|jpg|jpeg|webp)(?:\?|$)/i)?.[1]?.toLowerCase() ??
       "png";
     const fullNumber = String(row.cardNumber).toUpperCase();
+    const canonical = canonicalCardNumber(fullNumber);
+    if (!canonical) throw new Error(`无法识别官网卡号：${fullNumber}`);
+    const assetSetCode = canonical.split("-")[0].toLowerCase();
     process.stdout.write(`\r读取官网卡图地址 ${index + 1}/${rows.length}`);
     return {
+      canonical,
+      assetSetCode,
       cardNumber: fullNumber,
       imageUrl,
       filename: `${fullNumber}.${extension}`,
@@ -143,9 +158,10 @@ async function loadImageTasks(rows) {
 }
 
 async function downloadImages(tasks) {
-  await fs.mkdir(outputDir, { recursive: true });
   let completed = 0;
   await mapConcurrent(tasks, async (task) => {
+    const outputDir = path.join(outputRoot, task.assetSetCode);
+    await fs.mkdir(outputDir, { recursive: true });
     const buffer = await fetchWithRetry(task.imageUrl, "buffer");
     if (buffer.length < 1024) {
       throw new Error(`${task.cardNumber} 图片内容异常，仅 ${buffer.length} 字节`);
@@ -159,7 +175,7 @@ async function downloadImages(tasks) {
 
 function canonicalNumber(filename) {
   const match = filename.match(
-    new RegExp(`^(${setCode}-\\d{3})(?:_[A-Za-z0-9-]+)?\\.(?:png|jpg|jpeg|webp)$`, "i"),
+    /^([A-Z]{1,5}\d{0,2}-\d{3,})(?:_[A-Za-z0-9-]+)?\.(?:png|jpg|jpeg|webp)$/i,
   );
   return match?.[1]?.toUpperCase() ?? null;
 }
@@ -171,17 +187,29 @@ function spriteSort(a, b) {
   return a.localeCompare(b, "en", { numeric: true });
 }
 
-async function updateManifest() {
+async function versionedSpritePath(assetSetCode, filename) {
+  const filePath = path.join(outputRoot, assetSetCode, filename);
+  const digest = createHash("sha256")
+    .update(await fs.readFile(filePath))
+    .digest("hex")
+    .slice(0, 12);
+  return `/cards/${assetSetCode}/${filename}?v=${digest}`;
+}
+
+async function updateManifest(tasks) {
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
-  const files = await fs.readdir(outputDir);
+  const targetNumbers = new Set(tasks.map((task) => task.canonical));
   const groups = new Map();
 
-  for (const filename of files) {
-    const number = canonicalNumber(filename);
-    if (!number) continue;
-    if (requestedNumbers && !requestedNumbers.has(number)) continue;
-    const sprites = groups.get(number) ?? [];
-    sprites.push(`/cards/${setCode.toLowerCase()}/${filename}`);
+  for (const number of targetNumbers) {
+    const assetSetCode = number.split("-")[0].toLowerCase();
+    const files = await fs.readdir(path.join(outputRoot, assetSetCode));
+    const matchingFiles = files
+      .filter((filename) => canonicalNumber(filename) === number)
+      .sort(spriteSort);
+    const sprites = await Promise.all(
+      matchingFiles.map((filename) => versionedSpritePath(assetSetCode, filename)),
+    );
     groups.set(number, sprites);
   }
 
@@ -190,18 +218,18 @@ async function updateManifest() {
   const setIndex = Number(setMatch?.[2] ?? 0);
   const setEntries = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
-    .map(([number, sprites]) => [number, sprites.sort(spriteSort)]);
+    .map(([number, sprites]) => [number, sprites]);
 
   // 按卡号过滤同步时，仅原位替换指定卡号，并把新增卡号接在该卡集末尾。
   // 这样补少量宣传卡不会顺带重写整个 P 卡集的异画清单。
   const updatedManifest = {};
-  if (requestedNumbers) {
+  if (requestedNumbers || includeOfferReprints) {
     const entries = Object.entries(manifest);
     const lastSetIndex = entries.findLastIndex(([key]) => key.startsWith(`${setCode}-`));
     const written = new Set();
     entries.forEach(([key, sprites], index) => {
       if (groups.has(key)) {
-        updatedManifest[key] = groups.get(key).sort(spriteSort);
+        updatedManifest[key] = groups.get(key);
         written.add(key);
       } else {
         updatedManifest[key] = sprites;
@@ -275,11 +303,11 @@ async function main() {
 
   const tasks = await loadImageTasks(rows);
   await downloadImages(tasks);
-  const summary = await updateManifest();
+  const summary = await updateManifest(tasks);
 
   console.log(
-    `同步完成：${summary.cardCount} 个卡号，` +
-      `${summary.variantCardCount} 个卡号含异画，共 ${summary.variantCount} 张异画。`,
+    `同步完成：官网记录 ${tasks.length} 条，清单更新 ${summary.cardCount} 个卡号，` +
+      `${summary.variantCardCount} 个卡号含异画，当前共 ${summary.variantCount} 张异画。`,
   );
 }
 

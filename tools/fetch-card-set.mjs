@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT       = path.resolve(__dirname, "..");
 const OUT_DIR    = path.join(ROOT, "卡牌数据");
 
-const API_BASE   = "https://webadmin.windoent.com/op-public";
+const API_BASE   = "https://webadmin.windoent.com/front/op-public";
 const REFERER    = "https://www.onepiece-cardgame.cn/";
 const UA         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
 // 官网列表接口经本地代理传输超大响应时可能被中途切断；500 条/页既能
@@ -94,10 +94,10 @@ async function fetchCardSet(setCode) {
   //    先保留全部候选，详情阶段优先选择卡号无后缀的正画记录。
   console.log("[1/2] 扫描卡牌列表...");
   const byNumber = new Map(); // cardNumber -> id[]
-  let page = 0;
+  let page = 1;
   let totalPage = 1;
   let dupCount = 0;
-  while (page < totalPage) {
+  while (page <= totalPage) {
     const url = `${API_BASE}/cardList/cardlist/weblist?limit=${PAGE_SIZE}&page=${page}`;
     const data = await fetchJson(url);
     if (data.code !== 0) throw new Error(`API 返回错误：${data.msg}`);
