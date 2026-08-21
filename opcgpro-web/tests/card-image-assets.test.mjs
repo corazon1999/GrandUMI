@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,24 @@ test("原始 PNG 和 JPEG 会映射到同目录的 WebP", () => {
     derivedRelativePath("op17/OP17-011.png?v=d3707ea9a4f"),
     "op17/OP17-011.webp",
   );
+});
+
+test("宣传卡数据中的每张主卡图都有缩略图和高清展示图", async () => {
+  const publicDir = path.join(repoRoot, "opcgpro-web", "public");
+  const [cards, manifest] = await Promise.all([
+    readFile(path.join(publicDir, "data", "P.json"), "utf8").then(JSON.parse),
+    readFile(path.join(publicDir, "data", "imageManifest.json"), "utf8").then(JSON.parse),
+  ]);
+
+  for (const card of cards) {
+    const source = manifest[card.number]?.[0] ?? `/cards/p/${card.number}.png`;
+    assert.match(source, /^\/cards\//, `${card.number} 的主卡图必须使用本地卡图资源`);
+    const relativePath = derivedRelativePath(source.slice("/cards/".length));
+    await Promise.all([
+      access(path.join(publicDir, "cards-thumb", relativePath)),
+      access(path.join(publicDir, "cards-webp", relativePath)),
+    ]);
+  }
 });
 
 test("卡图生成结束后会执行完整性审计", async () => {
