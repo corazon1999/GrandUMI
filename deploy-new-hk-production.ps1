@@ -12,7 +12,8 @@ if ($Server -ne "root@103.146.230.37") { Stop-WithError "安全检查失败：�
 if ((git branch --show-current).Trim() -ne "main") { Stop-WithError "新正式服部署必须从 main 分支执行。" }
 if (git status --porcelain) { Stop-WithError "工作区存在未提交改动，已停止新正式服部署。" }
 $directAddresses = @(Resolve-DnsName -Type A direct.grand-umi.com -ErrorAction Stop |
-  Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
+  Where-Object { $_.Type -eq "A" -and $_.IPAddress } |
+  ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
 if ($directAddresses.Count -ne 1 -or $directAddresses[0] -ne "103.146.230.37") {
   Stop-WithError "低延迟直连 DNS 未独占指向新正式服：direct.grand-umi.com -> $($directAddresses -join ', ')"
 }
