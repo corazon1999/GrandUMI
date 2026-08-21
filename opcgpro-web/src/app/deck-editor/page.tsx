@@ -110,9 +110,18 @@ export default function DeckEditorPage() {
       {/* 手机竖屏主导航：牌池与卡组各自占满可用宽度，避免三栏互相挤压。 */}
       <nav
         data-deck-mobile-nav
-        className="grid h-12 shrink-0 grid-cols-[auto_1fr_1fr] border-b border-gray-800 bg-gray-950 md:hidden"
+        className="grid h-12 shrink-0 grid-cols-[auto_auto_1fr_1fr] border-b border-gray-800 bg-gray-950 md:hidden"
         aria-label="卡组编辑视图"
       >
+        <a
+          href="/home"
+          data-deck-mobile-back
+          className="flex min-h-11 min-w-11 items-center justify-center border-r border-gray-800 px-2 text-sm text-gray-400 transition-colors hover:bg-gray-900 hover:text-white"
+          title="返回大厅"
+          aria-label="返回大厅"
+        >
+          ←
+        </a>
         <button
           type="button"
           onClick={() => setMobileFiltersOpen(true)}

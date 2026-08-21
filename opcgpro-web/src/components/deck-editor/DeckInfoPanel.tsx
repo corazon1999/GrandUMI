@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { useDeckStore, type DeckEntry } from "@/store/deckStore";
 import { useNetStore } from "@/store/netStore";
@@ -29,7 +28,6 @@ interface DeckImagePreview {
 }
 
 export default function DeckInfoPanel() {
-  const router = useRouter();
   const { leader, entries, totalCards, isValid, removeCard, addCard, clearDeck, setLeader, getMainSize, notice, clearNotice } =
     useDeckStore();
   const [deckName, setDeckName]     = useState("我的卡组");
@@ -243,13 +241,15 @@ export default function DeckInfoPanel() {
           className="flex min-h-11 items-center px-3 pr-16"
         >
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push("/home")}
+            <a
+              href="/home"
+              data-deck-editor-back-link
               className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
               title="返回大厅"
+              aria-label="返回大厅"
             >
               ← 返回
-            </button>
+            </a>
             <span className="text-white font-bold text-sm">卡组</span>
           </div>
         </div>
