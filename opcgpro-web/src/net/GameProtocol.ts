@@ -26,7 +26,11 @@ import type {
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { matchRecorder } from "@/data/matchRecorder";
-import { completePendingActionLatency, completeRejectedActionLatency } from "./GameRequest";
+import {
+  completePendingActionLatency,
+  completeRejectedActionLatency,
+  reapplyPendingAttachDonOptimistic,
+} from "./GameRequest";
 import { showMessage } from "@/components/ui/MessageBox";
 
 let registered = false;
@@ -41,6 +45,7 @@ export function registerGameProtocols() {
         const gs = msg as MsgGameState;
         completePendingActionLatency(gs.requestId, gs.tick ?? 0);
         useGameStore.getState().syncFromServer(gs);
+        reapplyPendingAttachDonOptimistic();
         // 本地录制对局快照流（仅玩家视角；观战不记）→ 供首页战绩/回放
         matchRecorder.onSnapshot(gs);
         // 重启恢复/刷新后：若收到己方对局快照（非观战、未结束）但当前不在 /game，
@@ -60,6 +65,7 @@ export function registerGameProtocols() {
       case "MsgActionRejected":
         completeRejectedActionLatency((msg as MsgActionRejected).requestId);
         useGameStore.getState().rollbackOptimistic();
+        reapplyPendingAttachDonOptimistic();
         useGameStore.getState().setPending(false);
         eventBus.emit("actionRejected", { reason: (msg as MsgActionRejected).reason });
         console.warn("[GameProtocol] action rejected:", (msg as MsgActionRejected).reason);

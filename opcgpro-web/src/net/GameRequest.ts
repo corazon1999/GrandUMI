@@ -19,20 +19,44 @@ export type PendingAttachDonConfirmation = {
   count: number;
 };
 
-let pendingAttachDon: PendingAttachDonConfirmation | null = null;
-const pendingAttachDonListeners = new Set<() => void>();
+export type PendingAttachDonUndo = PendingAttachDonConfirmation & {
+  queuedCount: number;
+};
 
-function notifyPendingAttachDon() {
-  pendingAttachDonListeners.forEach((listener) => listener());
+let pendingAttachDonConfirmation: PendingAttachDonConfirmation | null = null;
+const pendingAttachDonConfirmationListeners = new Set<() => void>();
+const pendingAttachDonUndoQueue: PendingAttachDonConfirmation[] = [];
+const pendingAttachDonUndoListeners = new Set<() => void>();
+let pendingAttachDonUndoSnapshot: PendingAttachDonUndo | null = null;
+
+function notifyPendingAttachDonConfirmation() {
+  pendingAttachDonConfirmationListeners.forEach((listener) => listener());
+}
+
+function notifyPendingAttachDonUndo() {
+  const latest = pendingAttachDonUndoQueue[pendingAttachDonUndoQueue.length - 1];
+  pendingAttachDonUndoSnapshot = latest
+    ? { ...latest, queuedCount: pendingAttachDonUndoQueue.length }
+    : null;
+  pendingAttachDonUndoListeners.forEach((listener) => listener());
 }
 
 export function getPendingAttachDonConfirmation(): PendingAttachDonConfirmation | null {
-  return pendingAttachDon;
+  return pendingAttachDonConfirmation;
 }
 
 export function subscribePendingAttachDonConfirmation(listener: () => void) {
-  pendingAttachDonListeners.add(listener);
-  return () => pendingAttachDonListeners.delete(listener);
+  pendingAttachDonConfirmationListeners.add(listener);
+  return () => pendingAttachDonConfirmationListeners.delete(listener);
+}
+
+export function getPendingAttachDonUndo(): PendingAttachDonUndo | null {
+  return pendingAttachDonUndoSnapshot;
+}
+
+export function subscribePendingAttachDonUndo(listener: () => void) {
+  pendingAttachDonUndoListeners.add(listener);
+  return () => pendingAttachDonUndoListeners.delete(listener);
 }
 
 function createRequestId(): string {
@@ -73,7 +97,7 @@ function completeLatency(requestId: string | null | undefined, suffix: string) {
   }
 }
 
-function send(
+function sendNow(
   action: GameActionType,
   data: Record<string, unknown> = {},
   optimistic?: () => void,
@@ -97,37 +121,93 @@ function send(
   return sent;
 }
 
-function requestAttachDonConfirmation(targetId: string | "leader", count: number) {
-  const safeCount = Math.max(1, Math.floor(count));
-  pendingAttachDon = {
-    targetId,
-    count: safeCount,
-  };
-  notifyPendingAttachDon();
-  return true;
-}
-
-function sendAttachDon(targetId: string | "leader", count: number) {
-  return send(
-    "AttachDon",
-    { targetId, count },
-    () => useGameStore.getState().optimisticAttachDon(targetId, count),
+/**
+ * 发送下一项真实操作前，先按玩家的贴咚顺序提交仍可撤回的操作。
+ * WebSocket 保证同一连接内的消息顺序，服务端会先结算贴咚再处理后续动作。
+ */
+export function commitPendingAttachDonUndo() {
+  if (pendingAttachDonUndoQueue.length === 0) return true;
+  const queued = pendingAttachDonUndoQueue.splice(0);
+  notifyPendingAttachDonUndo();
+  return queued.every((pending) =>
+    sendNow("AttachDon", { targetId: pending.targetId, count: pending.count }),
   );
 }
 
+function send(
+  action: GameActionType,
+  data: Record<string, unknown> = {},
+  optimistic?: () => void,
+) {
+  if (action !== "AttachDon" && !commitPendingAttachDonUndo()) return false;
+  return sendNow(action, data, optimistic);
+}
+
+function queueAttachDonUndo(targetId: string | "leader", count: number) {
+  const safeCount = Math.max(1, Math.floor(count));
+  pendingAttachDonUndoQueue.push({ targetId, count: safeCount });
+  useGameStore.getState().optimisticAttachDon(targetId, safeCount);
+  notifyPendingAttachDonUndo();
+  return true;
+}
+
+/** 收到其他权威快照后，重新叠加尚未提交的贴咚视觉状态。 */
+export function reapplyPendingAttachDonOptimistic() {
+  const store = useGameStore.getState();
+  pendingAttachDonUndoQueue.forEach((pending) => {
+    store.optimisticAttachDon(pending.targetId, pending.count);
+  });
+}
+
+/** 撤回最近一次尚未提交的贴咚；连续贴咚可逐次撤回。 */
+export function undoLastPendingAttachDon() {
+  if (!pendingAttachDonUndoQueue.pop()) return false;
+  const store = useGameStore.getState();
+  store.rollbackOptimistic();
+  reapplyPendingAttachDonOptimistic();
+  store.setPending(false);
+  notifyPendingAttachDonUndo();
+  return true;
+}
+
+function requestAttachDonConfirmation(targetId: string | "leader", count: number) {
+  const safeCount = Math.max(1, Math.floor(count));
+  pendingAttachDonConfirmation = {
+    targetId,
+    count: safeCount,
+  };
+  notifyPendingAttachDonConfirmation();
+  return true;
+}
+
 export function confirmPendingAttachDon() {
-  const pending = pendingAttachDon;
+  const pending = pendingAttachDonConfirmation;
   if (!pending) return false;
-  pendingAttachDon = null;
-  notifyPendingAttachDon();
-  return sendAttachDon(pending.targetId, pending.count);
+  pendingAttachDonConfirmation = null;
+  notifyPendingAttachDonConfirmation();
+  return queueAttachDonUndo(pending.targetId, pending.count);
 }
 
 export function cancelPendingAttachDonConfirmation() {
-  if (!pendingAttachDon) return false;
-  pendingAttachDon = null;
-  notifyPendingAttachDon();
+  if (!pendingAttachDonConfirmation) return false;
+  pendingAttachDonConfirmation = null;
+  notifyPendingAttachDonConfirmation();
   return true;
+}
+
+/** 离开对局或重连时清理所有只存在于客户端的贴咚暂态。 */
+export function clearPendingAttachDonState() {
+  const hadConfirmation = pendingAttachDonConfirmation !== null;
+  const hadUndo = pendingAttachDonUndoQueue.length > 0;
+  pendingAttachDonConfirmation = null;
+  pendingAttachDonUndoQueue.splice(0);
+  if (hadUndo) {
+    useGameStore.getState().rollbackOptimistic();
+    useGameStore.getState().setPending(false);
+  }
+  if (hadConfirmation) notifyPendingAttachDonConfirmation();
+  if (hadUndo) notifyPendingAttachDonUndo();
+  return hadConfirmation || hadUndo;
 }
 
 export const GameRequest = {
@@ -144,16 +224,16 @@ export const GameRequest = {
       ...(overflowTrashCardId ? { overflowTrashCardId } : {}),
     }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
-  /** 请求赋予咚；玩家确认后立即将活跃咚附给领袖或场上角色。 */
+  /** 请求赋予咚；立即显示结果，并保留到下一项真实操作前供玩家撤回。 */
   attachDon: (targetId: string | "leader", count = 1) => {
     const safeCount = Math.max(1, Math.floor(count));
     return useSettingsStore.getState().confirmAttachDon
       ? requestAttachDonConfirmation(targetId, safeCount)
-      : sendAttachDon(targetId, safeCount);
+      : queueAttachDonUndo(targetId, safeCount);
   },
 
-  /** 关闭尚未确认的贴咚弹窗。 */
-  cancelPendingAttachDon: cancelPendingAttachDonConfirmation,
+  /** 离开对局时关闭确认弹窗，并撤销所有尚未提交的贴咚。 */
+  cancelPendingAttachDon: clearPendingAttachDonState,
 
   /** 攻击宣言 */
   attack: (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>
@@ -208,6 +288,7 @@ export const GameRequest = {
 
   /** 响应服务器发起的 Prompt */
   respondPrompt: (promptId: string, chosen: string[]) => {
+    if (!commitPendingAttachDonUndo()) return false;
     useGameStore.getState().setPending(true);
     const requestId = createRequestId();
     const sent = NetManager.send({ proto: "MsgPromptResponse", promptId, chosen, requestId } as MsgPromptResponse);
@@ -222,6 +303,7 @@ export const GameRequest = {
 
   /** 断线重连后请求完整快照 */
   requestState: () => {
+    clearPendingAttachDonState();
     NetManager.send({ proto: "MsgRequestState" } as MsgRequestState);
   },
 
