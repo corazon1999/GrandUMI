@@ -376,6 +376,10 @@ public static class AtomicOps
             if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
             await EffectRuntime.Resolve(s, victimOwner, g, EffectTrigger.OnAllyWillLeaveField, prompts,
                 new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = victimOwner, ["kind"] = kind });
+            // 代替效果可能以当前受害角色自身离场作为成本（例如两张 OP16-014 同时被处理时，
+            // 其中一张马尔高 KO 自己来代替整批离场）。此时原离场已被置换，不能继续用
+            // 结算前缓存的守护者列表询问下一张同名守护卡。
+            if (!side.Characters.Contains(card)) return true;
             if (s.PreventLeaveCardIds.Contains(card.Id)) { s.PreventLeaveCardIds.Remove(card.Id); return true; }
         }
         return false;

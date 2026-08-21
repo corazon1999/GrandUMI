@@ -328,6 +328,7 @@ public static class BattleEngine
             if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
             await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
                 new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
+            if (!guardSide.Characters.Contains(card)) return true;
             if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return true; }
         }
 
@@ -345,6 +346,7 @@ public static class BattleEngine
                         ["victimOwner"] = ownerIdx,
                         ["kind"] = "ko",
                     });
+                if (!guardSide.Characters.Contains(card)) return true;
                 if (s.PreventLeaveCardIds.Contains(card.Id))
                 {
                     s.PreventLeaveCardIds.Remove(card.Id);
