@@ -129,10 +129,10 @@ function RankedLeaderboard({ items, standings }: { items: RankLeaderboardItem[];
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@[640px]:flex @[640px]:h-full @[640px]:min-h-0 @[640px]:flex-col">
       <div
         data-testid="ranked-leaderboard-scroll"
-        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        className="overflow-visible @[640px]:min-h-0 @[640px]:flex-1 @[640px]:touch-pan-y @[640px]:overflow-y-auto @[640px]:overscroll-contain @[640px]:[-webkit-overflow-scrolling:touch]"
       >
         <div className="border-b border-gray-800 bg-gray-950/90 p-2.5">
           <div className="grid grid-cols-2 gap-2 @[720px]:grid-cols-4">
@@ -403,7 +403,10 @@ export default function LeaderLeaderboardPanel() {
     : undefined;
 
   return (
-    <section className="flex h-full min-h-0 flex-col p-3 @[640px]:p-6">
+    <section
+      data-testid="leaderboard-page-scroll"
+      className="h-full min-h-0 touch-pan-y overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] @[640px]:flex @[640px]:flex-col @[640px]:overflow-hidden @[640px]:p-6"
+    >
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">排行榜</h2>
@@ -542,7 +545,7 @@ export default function LeaderLeaderboardPanel() {
         </div>}
       </div>
 
-      <div className={`min-h-0 flex-1 touch-pan-y overscroll-contain rounded-xl border border-gray-800 bg-gray-950/60 [-webkit-overflow-scrolling:touch] ${rankingTab === "ranked" ? "overflow-hidden" : "overflow-auto"}`}>
+      <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-clip @[640px]:overflow-hidden" : "overflow-clip @[640px]:touch-pan-y @[640px]:overflow-auto @[640px]:overscroll-contain @[640px]:[-webkit-overflow-scrolling:touch]"}`}>
         {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : (
           <p className="py-16 text-center text-sm text-gray-600">正在加载{rankedMode === "standard" ? "标准" : "狂野"}排位榜…</p>
         ) : loading ? (
