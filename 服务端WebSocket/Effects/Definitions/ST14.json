@@ -75,12 +75,14 @@
   },
   "ST14-008": {
     "_name": "哈雷达斯",
-    "_note": "【启动主要】横置自身：直到下个对方回合结束，我方最多1张《草帽一伙》角色费用+2（原文“之后场上有费用≥8角色则抽1弃1”因 then 无条件分支已略去）。",
+    "_note": "【启动主要】横置自身：直到下个对方回合结束，我方最多1张黑色《草帽一伙》角色费用+2；之后场上有费用≥8角色则抽1弃1。",
     "activated": {
       "cost": { "restSelf": true },
       "then": [
-        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙" }, "text": "我方最多1张《草帽一伙》角色费用+2" },
-        { "op": "AddCostMod", "target": "$t", "delta": 2, "duration": "UntilNextOpponentEndPhase" }
+        { "op": "Choose", "prompt": "OwnCharacter", "max": 1, "min": 0, "as": "$t", "filter": { "keyword": "草帽一伙", "color": "黑" }, "text": "我方最多1张黑色《草帽一伙》角色费用+2" },
+        { "op": "AddCostMod", "target": "$t", "delta": 2, "duration": "UntilNextOpponentEndPhase" },
+        { "op": "Draw", "n": 1, "if": { "ownHasCharCostGte": 8 } },
+        { "op": "DiscardOwnChosen", "n": 1, "if": { "ownHasCharCostGte": 8 } }
       ]
     }
   },
@@ -112,17 +114,22 @@
   },
   "ST14-015": {
     "_name": "橡皮橡皮…攻城炮",
-    "_note": "【主要】我方最多1张领袖或角色+3000（原文“之后场上有费用≥8则KO对方费用≤2”因 then 无条件分支已略去）；【触发】KO 对方最多1张费用≤5 角色。",
+    "_note": "【主要】我方最多1张领袖或角色+3000，之后场上有费用≥8则KO对方费用≤2；【触发】场上有费用≥8时KO对方最多1张费用≤5角色。",
     "main": {
       "then": [
         { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本回合我方最多1张领袖或角色+3000" },
-        { "op": "AddPowerThisTurn", "target": "$t", "delta": 3000 }
+        { "op": "AddPowerThisTurn", "target": "$t", "delta": 3000 },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$mainKo", "filter": { "originalCostLte": 2 }, "text": "KO 对方最多1张费用≤2 的角色", "if": { "ownHasCharCostGte": 8 } },
+        { "op": "KO", "target": "$mainKo", "if": { "ownHasCharCostGte": 8 } }
       ]
     },
-    "trigger": [
-      { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
-      { "op": "KO", "target": "$tgt" }
-    ]
+    "trigger": {
+      "if": { "ownHasCharCostGte": 8 },
+      "then": [
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+        { "op": "KO", "target": "$tgt" }
+      ]
+    }
   },
   "ST14-016": {
     "_name": "我还有伙伴们!!!",

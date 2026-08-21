@@ -30,7 +30,7 @@ public class OP12_027_Koshiro : IScriptedEffect
         var victim = me.Characters.FirstOrDefault(c => c.Id.ToString() == victimId);
         if (victim is null) return;
         if (ctx.State.CurrentCostOf(victim) > 5) return;             // 费用≤5
-        if (victim.Info.Property != "斩") return;      // 属性〈斩〉
+        if (!victim.HasProperty("斩")) return;      // 属性〈斩〉
         if (self.IsTapped) return;                     // 成本：自身需活跃
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

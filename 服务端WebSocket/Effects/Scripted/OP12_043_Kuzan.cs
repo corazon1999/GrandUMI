@@ -7,8 +7,7 @@ namespace GrandUMI.Effects.Scripted;
 /// OP12-043 库赞
 /// 【登场时】可以丢弃我方的 1 张手牌：直到下个对方的结束阶段结束时为止，对方最多 1 张角色无法攻击。
 ///
-/// 简化点：
-/// - 卡面常驻被动"我方手牌为 5 张或更多的场合，此角色的费用+1"未实现（引擎条件式静态费用修正缺口）。
+/// - 卡面常驻被动"我方手牌为 5 张或更多的场合，此角色的费用+1"通过条件式持续费用修正实现。
 /// - "丢弃 1 张手牌"为可选支付：玩家在手牌选择中选 0 张则跳过整个效果，选 1 张则继续指定目标。
 /// </summary>
 public class OP12_043_Kuzan : IScriptedEffect
@@ -22,6 +21,16 @@ public class OP12_043_Kuzan : IScriptedEffect
         var s = ctx.State;
         var me = s.Players[ctx.OwnerIndex];
         var opp = s.Players[1 - ctx.OwnerIndex];
+        var selfId = ctx.Source.Id;
+        int ownerIdx = ctx.OwnerIndex;
+        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        s.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            CostDelta = 1,
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true, Filter = c => c.Id == selfId },
+            Predicate = (state, side, card) => card.Id == selfId && state.Players[ownerIdx].Hand.Count >= 5,
+        });
 
         if (me.Hand.Count == 0) return;
 

@@ -4,66 +4,70 @@ using GrandUMI.Game;
 namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
-/// OP11-110 鲛星（角色 / 光 3 费 5000，人鱼族/鱼人岛）
-/// 此角色将要被 KO 的场合，可以改为将我方的 1 张"鱼人岛"或领袖"白星"转为休息状态，使此角色不会被 KO。
-/// 【登场时】可以将我方生命区最上方或最下方的 1 张卡牌加入手牌：将对方最多 1 张费用不高于 1 的角色 KO。
-///
-/// 实现范围：本脚本实现【登场时】可选效果。
-///   成本：将我方生命区最上方或最下方的 1 张卡牌加入手牌（需生命区非空，二选一上/下）。
-///   效果：将对方最多 1 张费用 ≤1 的角色 KO。
-///
-/// 未实现（complex 部分，已在卡上以注释说明）：
-///   - "将要被 KO 时改为休息我方鱼人岛/白星领袖以避免被 KO"为替代/防 KO 机制，
-///     引擎无对应的可脚本化通道（PreKO 替代行为），此部分未实现。
+/// OP11-110 鲛星。
+/// 将要被 KO 时，可横置我方一张《鱼人岛》卡或“白星”领袖代替；登场时可取生命顶/底并 KO 费用不高于 1 的角色。
 /// </summary>
-public class OP11_110_Samezvezda : IScriptedEffect
+public sealed class OP11_110_Samezvezda : IScriptedEffect
 {
     public string CardNumber => "OP11-110";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger trigger)
+        => trigger is EffectTrigger.PreKO or EffectTrigger.OnEnterField;
 
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        // 成本：需生命区非空
-        if (me.LifeArea.Count == 0) return;
-
-        bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "鲛星【登场时】：将生命区最上方或最下方 1 张加入手牌，KO 对方最多 1 张费用≤1 的角色？");
-        if (!use) return;
-
-        // 二选一：生命区最上方 / 最下方
-        int pos;
-        if (me.LifeArea.Count == 1)
+        if (ctx.Trigger == EffectTrigger.PreKO)
         {
-            pos = 0;
+            var costs = new List<CardInstance>();
+            if (!me.Leader.IsTapped && me.Leader.Info.NameIs("白星")) costs.Add(me.Leader);
+            costs.AddRange(me.Characters.Where(card =>
+                card.Id != ctx.Source.Id && !card.IsTapped && card.Info.HasKeyword("鱼人岛")));
+            if (me.StageCard is { IsTapped: false } stage && stage.Info.HasKeyword("鱼人岛")) costs.Add(stage);
+            if (costs.Count == 0) return;
+
+            var chosen = await ctx.Prompts.ChooseCards(
+                ctx.OwnerIndex,
+                "OwnCardToRest",
+                "将我方 1 张《鱼人岛》卡或“白星”领袖转为休息状态，使鲛星不会被 KO（可放弃）",
+                costs.Select(card => card.Id.ToString()).ToList(),
+                0,
+                1,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = costs.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                });
+            if (chosen.Count == 0) return;
+            var cost = costs.First(card => card.Id.ToString() == chosen[0]);
+            AtomicOps.RestCard(cost);
+            if (cost.IsTapped) ctx.State.MarkPreventKO(ctx.Source.Id);
+            return;
         }
-        else
+
+        if (me.LifeArea.Count == 0 || ctx.State.NoEffectLifeToHandThisTurn.Contains(ctx.OwnerIndex)) return;
+        if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+                "鲛星【登场时】：将生命区最上方或最下方 1 张加入手牌，并 KO 对方最多 1 张费用不高于 1 的角色？"))
+            return;
+
+        int position = 0;
+        if (me.LifeArea.Count > 1)
         {
-            int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
-                "将生命区哪一张加入手牌？", new[] { "最上方", "最下方" });
-            pos = opt == 1 ? me.LifeArea.Count - 1 : 0;
+            int option = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                "选择加入手牌的生命卡", new[] { "最上方", "最下方" });
+            position = option == 1 ? me.LifeArea.Count - 1 : 0;
         }
+        var life = me.LifeArea[position];
+        me.LifeArea.RemoveAt(position);
+        life.IsLifeFaceUp = false;
+        me.Hand.Add(life);
 
-        var card = me.LifeArea[pos];
-        me.LifeArea.RemoveAt(pos);
-        me.Hand.Add(card);
-
-        // 效果：将对方最多 1 张费用≤1 的角色 KO
-        var cands = opp.Characters
-            .Where(c => ctx.State.CurrentCostOf(1 - ctx.OwnerIndex, c) <= 1)
-            .ToList();
-        if (cands.Count == 0) return;
-
-        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-            "将对方最多 1 张费用≤1 的角色 KO",
-            cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
-        if (chosen.Count > 0)
-        {
-            var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, tgt);
-        }
+        int opponent = 1 - ctx.OwnerIndex;
+        var candidates = ctx.State.Players[opponent].Characters
+            .Where(card => ctx.State.CurrentCostOf(opponent, card) <= 1).ToList();
+        var target = await ConfirmedMissingHelpers.ChooseUpToOne(
+            ctx, "OpponentCharacter", "KO 对方最多 1 张费用不高于 1 的角色", candidates);
+        if (target is not null)
+            await AtomicOps.KOByEffectAsync(ctx.State, opponent, target, ctx.Prompts, ctx.OwnerIndex);
     }
 }

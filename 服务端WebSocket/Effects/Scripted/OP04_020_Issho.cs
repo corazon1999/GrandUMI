@@ -12,9 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 持续费用修正：ContinuousEffect.CostDelta（领袖在 OnGameStart 注册）。
 ///     Side=1（对方）所有角色费用-1，条件：本卡被赋予咚!!≥1 且我方的回合中。
-///   - 【我方的回合结束时】用 OnMyTurnEnd：可选发动，将我方最多 1 张费用≤5 的角色转为活跃。
-///     局限：成本"将①个咚转为休息状态"为非标准触发节可选成本，触发节无法表达此成本，
-///     按惯例仅实现收益（玩家用 ConfirmOptional 自行决定是否发动），成本未扣减。
+///   - 【我方的回合结束时】用 OnMyTurnEnd：支付横置 1 张活跃咚的成本后，
+///     将我方最多 1 张费用≤5 的角色转为活跃。
 /// </summary>
 public class OP04_020_Issho : IScriptedEffect
 {
@@ -50,11 +49,14 @@ public class OP04_020_Issho : IScriptedEffect
         var cands = me.Characters
             .Where(c => c.IsTapped && ctx.State.CurrentCostOf(owner, c) <= 5)
             .ToList();
-        if (cands.Count == 0) return;
+        var costDon = me.CostArea.FirstOrDefault(d => d.State == DonState.Active && d.AttachedToCardId is null);
+        if (cands.Count == 0 || costDon is null) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "一生【我方的回合结束时】：将我方最多 1 张费用≤5 的角色转为活跃状态?");
         if (!use) return;
+
+        costDon.State = DonState.Rest;
 
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "将我方最多 1 张费用不高于 5 的角色转为活跃状态",

@@ -106,10 +106,11 @@
   },
   "ST03-017": {
     "_name": "颓靡甜风",
-    "_note": "【反击】我方最多1张领袖或角色+4000（原文“之后手牌≤3则抽1”因反击数组无条件分支，已略去抽牌部分）。",
+    "_note": "【反击】我方最多1张领袖或角色+4000，之后手牌≤3则抽1张。",
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
-      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 }
+      { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 },
+      { "op": "Draw", "n": 1, "if": { "selfHandCountLte": 3 } }
     ]
   }
 }

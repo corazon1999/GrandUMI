@@ -121,7 +121,7 @@ public static class PrivateStateSnapshotBuilder
             name = card.Info.Name,
             color = card.Info.Color,
             kind = card.Info.Kind.ToString(),
-            property = card.Info.Property,
+            property = card.CurrentProperty,
             basePower = card.Info.Power,
             baseCost = card.Info.Cost,
             currentCost = card.CurrentCost(),

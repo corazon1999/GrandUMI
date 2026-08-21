@@ -7,7 +7,7 @@ namespace GrandUMI.Effects.Scripted;
 internal static class ConfirmedMissingHelpers
 {
     public static bool HasProperty(CardInstance card, string property)
-        => card.Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains(property);
+        => card.HasProperty(property);
 
     public static CardInstance? BattleOpponent(GameState state, int owner, Guid selfId)
     {

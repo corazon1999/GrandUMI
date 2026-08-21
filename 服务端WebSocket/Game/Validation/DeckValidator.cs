@@ -127,6 +127,8 @@ public static class DeckValidator
                 return new(false, $"{rule.Name} 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
             if (leader.Number == "P-117" && !card.HasKeyword("东海"))
                 return new(false, $"P-117 奈美的主卡组只能包含拥有《东海》特征的卡牌：{num}", leader.Number);
+            if (leader.Number == "OP12-001" && card.Cost >= 5)
+                return new(false, $"OP12-001 希尔巴兹·雷利的主卡组不能包含费用为 5 或更高的卡牌：{num}", leader.Number);
             if (!card.SharesColorWith(leader))
                 return new(false, $"颜色不符：{num}（{card.Color}）与领航（{leader.Color}）无共同颜色", leader.Number);
         }

@@ -13,10 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【KO时】从手牌选最多 1 张原本费用 ≤5 的角色，以休息状态免费登场
 ///     （手牌私有区，经 extra.choiceCards 下发卡面）。
 ///
-/// 简化点（引擎缺口）：
-///   - "本回合中，我方无法登场原本的费用为5或更高的角色卡牌" 属于玩家级出牌限制，
-///     当前引擎无该限制钩子（CanPlayCard 不读取此类玩家级标记），故此惩罚部分未实现。
-///     该部分仅对乌塔的控制者不利，省略不影响对手且不会越权造成非法收益。
+///   - 费用 5 以上角色禁登场由玩家级标记与所有登场入口统一拦截。
 /// </summary>
 public class OP13_023_Uta : IScriptedEffect
 {
@@ -43,7 +40,7 @@ public class OP13_023_Uta : IScriptedEffect
                     activated++;
                 }
             }
-            // “本回合无法登场费用≥5角色”属玩家级出牌限制，引擎暂无钩子 → 略（见类注释）
+            ctx.State.NoPlayCharacterOriginalCostGteThisTurn[ctx.OwnerIndex] = 5;
             return;
         }
 

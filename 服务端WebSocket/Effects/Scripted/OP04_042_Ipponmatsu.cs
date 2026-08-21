@@ -24,7 +24,7 @@ public class OP04_042_Ipponmatsu : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 第一段：我方最多 1 张属性（斩）角色 +3000
-        var cands = me.Characters.Where(c => c.Info.Property.Split('/').Contains("斩")).ToList();
+        var cands = me.Characters.Where(c => c.HasProperty("斩")).ToList();
         if (cands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",

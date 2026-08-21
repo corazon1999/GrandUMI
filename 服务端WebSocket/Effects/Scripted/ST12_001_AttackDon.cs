@@ -44,7 +44,7 @@ public class ST12_001_AttackDon : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 收益:我方最多1张力量≤7000的休息角色转为活跃
-        var actCands = me.Characters.Where(c => c.IsTapped && ctx.State.CurrentPowerOf(ctx.OwnerIndex, c) <= 7000).ToList();
+        var actCands = me.Characters.Where(c => ctx.State.CurrentPowerOf(ctx.OwnerIndex, c) <= 7000).ToList();
         if (actCands.Count == 0) return;
         var actExtra = new Dictionary<string, object?>
         {

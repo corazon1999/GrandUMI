@@ -90,7 +90,7 @@
   {
     "number": "P-005",
     "name": "盖德",
-    "color": "紫",
+    "color": "黑",
     "type": "角色",
     "property": "打",
     "power": "8000",
@@ -2206,7 +2206,9 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "阻挡者"
+    ],
     "effectEvent": "",
     "rarity": "P",
     "subscript": 4,

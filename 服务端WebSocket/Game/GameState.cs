@@ -380,6 +380,17 @@ public class GameState
     {
         int side = SideOf(card);
         if (side < 0) return false;
+
+        // OP14-079：该领袖的效果属于对手角色的离场保护，而非保护己方卡。
+        // 仅拦截由该领袖控制方正在结算的效果，不影响规则离场、战斗 KO 或对手自己的效果。
+        int actingSide = Effects.EffectRuntime.CurrentActingSide;
+        if (context == "effect"
+            && actingSide >= 0
+            && actingSide != side
+            && Players[actingSide].Leader.Info.Number == "OP14-079"
+            && Players[side].Characters.Contains(card))
+            return true;
+
         foreach (var eff in ContinuousEffects)
         {
             if (eff.LeaveGuard is null) continue;

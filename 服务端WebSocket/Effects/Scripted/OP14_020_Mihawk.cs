@@ -90,7 +90,7 @@ public class OP14_020_Mihawk : IScriptedEffect
             // 仅此领袖自身；且对方领袖属性含"斩"时生效
             Predicate = (s, sideIdx, card) =>
                 card.Id == selfId &&
-                s.Players[1 - owner].Leader.Info.Property.Contains("斩"),
+                s.Players[1 - owner].Leader.HasProperty("斩"),
         });
     }
 }

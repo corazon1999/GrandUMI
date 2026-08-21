@@ -1,9 +1,10 @@
 {
   "ST27-001": {
     "_name": "阿瓦罗·匹萨罗",
-    "_note": "【启动主要】【每回合1次】领袖含《黑胡子海盗团》时本回合此角色+4000（原文成本“横置我方哈奇诺斯”无对应通道已略去）；【KO时】抽1张。",
+    "_note": "【启动主要】【每回合1次】横置我方1张“哈奇诺斯”：领袖含《黑胡子海盗团》时本回合此角色+4000；【KO时】抽1张。",
     "activated": {
       "oncePerTurn": true,
+      "cost": { "restOwnKeyworded": { "keyword": "哈奇诺斯" } },
       "if": { "leaderHasKeyword": "黑胡子海盗团" },
       "then": [
         { "op": "AddPowerThisTurn", "target": "self", "delta": 4000 }

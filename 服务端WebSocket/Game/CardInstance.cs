@@ -75,6 +75,19 @@ public class CardInstance
     /// <summary>卡名替身（"卡牌名也视为 X"），过滤 nameEquals 时同时匹配主名与别名</summary>
     public List<string> NameAliases { get; } = new();
 
+    /// <summary>本回合临时获得的属性（例如 OP15-093 赋予“斩”）。</summary>
+    public HashSet<string> GainedPropertiesThisTurn { get; } = new(StringComparer.Ordinal);
+
+    public bool HasProperty(string property)
+        => Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains(property)
+            || GainedPropertiesThisTurn.Contains(property);
+
+    public string CurrentProperty
+        => string.Join('/', Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Concat(GainedPropertiesThisTurn).Distinct(StringComparer.Ordinal));
+
+    public bool HasAnyProperty => !string.IsNullOrEmpty(CurrentProperty);
+
     public bool MatchesName(string name)
         => Info.NameIs(name) || NameAliases.Contains(name);  // 静态视为别名(Info.AlsoNames) + 运行时别名
 

@@ -33,7 +33,7 @@ public class OP11_088_Shoun : IScriptedEffect
         // 攻击角色：对方场上与 AttackerCardId 匹配的角色（领袖不计）
         var attacker = opp.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
         if (attacker is null) return;
-        if (!attacker.Info.Property.Contains("斩")) return;
+        if (!attacker.HasProperty("斩")) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "肖恩【对方的攻击时】：攻击角色拥有属性（斩），本次战斗此角色力量+5000？");

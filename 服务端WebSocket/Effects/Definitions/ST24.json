@@ -59,14 +59,15 @@
   },
   "ST24-005": {
     "_name": "X·德雷克",
-    "_note": "【登场时】领袖含《超新星》时，将对方最多1张费用≤5 角色转休息（原文后半“本回合结束时活跃1咚”因无延迟触发通道已略去）。",
+    "_note": "【登场时】领袖含《超新星》时，将对方最多1张费用≤5角色转休息；本回合结束时活跃最多1张咚。",
     "triggers": [
       {
         "on": "OnEnterField",
         "if": { "leaderHasKeyword": "超新星" },
         "then": [
           { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "将对方最多1张费用≤5 角色转为休息状态" },
-          { "op": "Rest", "target": "$tgt" }
+          { "op": "Rest", "target": "$tgt" },
+          { "op": "ScheduleRefreshOwnDon", "n": 1 }
         ]
       }
     ]

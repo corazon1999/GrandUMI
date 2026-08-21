@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现范围：将我方最多 1 张休息状态的咚!! 转为活跃状态，并登记本回合中
 /// “我方无法通过角色效果将咚!!转为活跃状态”的限制。该限制也会阻止本卡再次直起咚!!。
-/// 【流放】为触发效果替换（给予伤害时不发动触发、放入废弃区），引擎未实现该机制，仍作为纯关键词忽略。
+/// 【流放】由 LifeRevealManager 在伤害结算时统一处理。
 /// </summary>
 public class OP10_030_Smoker : IScriptedEffect
 {

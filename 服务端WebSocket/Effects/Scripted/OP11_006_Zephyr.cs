@@ -26,7 +26,7 @@ public class OP11_006_Zephyr : IScriptedEffect
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
 
-        var cands = opp.Characters.Where(c => c.Info.Property.Split('/').Contains("特")).ToList();
+        var cands = opp.Characters.Where(c => c.HasProperty("特")).ToList();
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

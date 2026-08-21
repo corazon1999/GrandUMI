@@ -54,7 +54,7 @@ public class P_025_Smoker : IScriptedEffect
                         : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
                 }
                 if (foe is null) return false;
-                return string.IsNullOrEmpty(foe.Info.Property); // 对手无属性
+                return !foe.HasAnyProperty; // 对手无属性
             },
         });
         return Task.CompletedTask;

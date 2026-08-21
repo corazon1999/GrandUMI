@@ -56,7 +56,7 @@ public class OP03_032_Buggy : IScriptedEffect
                         : atkPlayer.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
                 }
 
-                return foe is not null && foe.Info.Property.Contains("斩");
+                return foe is not null && foe.HasProperty("斩");
             },
         });
         return Task.CompletedTask;

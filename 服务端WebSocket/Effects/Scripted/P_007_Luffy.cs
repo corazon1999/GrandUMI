@@ -39,7 +39,7 @@ public class P_007_Luffy : IScriptedEffect
                 var attacker = atk.Leader.Id == b.AttackerCardId
                     ? atk.Leader
                     : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
-                return attacker is not null && attacker.Info.Property.Split('/').Contains("打");
+                return attacker is not null && attacker.HasProperty("打");
             },
         });
 

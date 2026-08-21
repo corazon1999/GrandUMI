@@ -71,36 +71,3 @@ internal static class BigMomChoice
         }
     }
 }
-
-/// <summary>
-/// ST12-001 罗罗诺亚·佐罗&山智（领航）
-/// 【咚!!×1】【攻击时】【每回合1次】可以将我方1张费用≥2的角色放回手牌：将我方最多1张力量≤7000的角色转为活跃状态。
-/// </summary>
-public class ST12_001_ZoroSanji : IScriptedEffect
-{
-    public string CardNumber => "ST12-001";
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnAttackDeclare;
-
-    public async Task Resolve(EffectContext ctx)
-    {
-        var me = ctx.State.Players[ctx.OwnerIndex];
-        if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
-        var key = "ST12-001-Activated" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return;
-        // 成本：退回我方1张费用≥2角色（可选；不退则不发动）
-        var costCands = me.Characters.Where(c => ctx.State.CurrentCostOf(c) >= 2).ToList();
-        if (costCands.Count == 0) return;
-        var costCh = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
-            "将我方1张费用≥2的角色放回手牌（成本，可放弃）", costCands.Select(c => c.Id.ToString()).ToList(), 0, 1);
-        if (costCh.Count == 0) return;
-        var costCard = costCands.First(c => c.Id.ToString() == costCh[0]);
-        AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, costCard);
-        me.TurnOnceUsed.Add(key);
-        // 效果：活跃我方最多1张力量≤7000角色
-        var cands = me.Characters.Where(c => ctx.State.CurrentPowerOf(ctx.OwnerIndex, c) <= 7000).ToList();
-        if (cands.Count == 0) return;
-        var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
-            "将我方最多1张力量≤7000角色转为活跃状态", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
-        if (ch.Count > 0) AtomicOps.ActivateCard(cands.First(c => c.Id.ToString() == ch[0]));
-    }
-}

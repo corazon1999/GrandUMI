@@ -8,10 +8,9 @@ namespace GrandUMI.Effects.Scripted;
 /// 【启动主要】【每回合1次】我方领袖拥有《黑胡子海盗团》特征的场合，直到下个对方的回合结束时为止，
 ///   此角色获得【双重攻击】或【流放】或【阻挡者】效果。
 ///
-/// 实现说明 / 简化点：
+/// 实现说明：
 /// - 用 ChooseOption 三选一，再用 GiveKeyword(self, kw, UntilNextOpponentEndPhase) 赋予所选关键词。
-/// - 【双重攻击】【阻挡者】由引擎按关键词生效；【流放】关键词引擎未实现，选它仅记录关键词但无机制收益
-///   （与文本一致提供选项，玩家自行权衡）。
+/// - 【双重攻击】【阻挡者】【流放】均由通用关键词与伤害结算生效。
 /// - 每回合 1 次用 TurnOnceUsed 防重复发动。
 /// </summary>
 public class OP09_084_CatarinaDevon : IScriptedEffect

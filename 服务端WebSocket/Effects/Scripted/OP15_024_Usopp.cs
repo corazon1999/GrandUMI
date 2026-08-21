@@ -8,12 +8,10 @@ namespace GrandUMI.Effects.Scripted;
 /// 【对方的回合中】此角色不会因对方领袖和角色的效果而转为休息状态，并获得【阻挡者】效果。（持续状态）
 /// 【KO时】将对方最多 1 张领袖或费用不高于 7 的角色转为休息状态。
 ///
-/// 实现说明 / 简化点：
+/// 实现说明：
 ///   - 【对方的回合中】持续获得【阻挡者】：在 OnEnterField 注册 ContinuousEffect.GrantKeyword="阻挡者"，
 ///     Predicate 限定为"自身 且 当前为对方回合"（规范 13.1）。来源卡离场时引擎自动清理。
-///   - 【对方的回合中】"不会因对方领袖和角色的效果而转为休息" 属于条件化(仅对方回合、仅对方效果)的
-///     持续免疫，引擎无该类持续通道（RestrictionKind.CannotBeRested 为固定时长且不区分来源，
-///     无法表达"仅对方效果导致的休息"），故此细分免疫未实现。
+///   - 条件休息免疫由 AtomicOps.RestCard 根据回合、效果控制方及效果源类型精确拦截。
 ///   - 【KO时】用 OnKO 钩子：从"对方领袖 + 费用≤7 的对方角色"中选最多 1 张转为休息状态（RestCard）。
 /// </summary>
 public class OP15_024_Usopp : IScriptedEffect

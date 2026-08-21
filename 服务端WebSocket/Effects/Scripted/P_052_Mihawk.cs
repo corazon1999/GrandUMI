@@ -42,7 +42,7 @@ public class P_052_Mihawk : IScriptedEffect
                 var attacker = atkP.Leader.Id == b.AttackerCardId ? atkP.Leader
                     : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
                 if (attacker is null) return false;
-                return attacker.Info.Property.Contains("斩");
+                return attacker.HasProperty("斩");
             },
         });
         return Task.CompletedTask;

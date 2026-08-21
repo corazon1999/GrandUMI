@@ -57,7 +57,7 @@ public class OP08_114_SHawk : IScriptedEffect
                 var attacker = atkP.Leader.Id == b.AttackerCardId
                     ? atkP.Leader
                     : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
-                return attacker is not null && attacker.Info.Property.Split('/').Contains("斩");
+                return attacker is not null && attacker.HasProperty("斩");
             },
         });
 

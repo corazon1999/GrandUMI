@@ -11,11 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现：登场时把我方最多 4 张休息状态的咚!! 转为活跃状态（自动取前 4 张，不需玩家选择，
 /// 因为咚!! 之间无区别）。
-///
-/// 简化点（未实现）：
-///   - "本回合中我方无法登场原本费用 7+ 的角色" 需要玩家级"出牌限制"引擎机制
-///     （CanPlayCard 时按本回合标记拦截费用 ≥7 的角色），当前引擎无此能力，故省略。
-///     该限制不影响本卡 ramp 的核心收益，已在 summary 注明。
+/// 之后写入玩家级出牌限制，本回合不能登场原本费用不低于 7 的角色。
 /// </summary>
 public class OP12_030_Mihawk : IScriptedEffect
 {
@@ -39,6 +35,8 @@ public class OP12_030_Mihawk : IScriptedEffect
                 activated++;
             }
         }
+
+        ctx.State.NoPlayCharacterOriginalCostGteThisTurn[ctx.OwnerIndex] = 7;
 
         return Task.CompletedTask;
     }

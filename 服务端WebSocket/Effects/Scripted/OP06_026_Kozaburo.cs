@@ -26,7 +26,7 @@ public class OP06_026_Kozaburo : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         var cands = me.Characters
-            .Where(c => ctx.State.CurrentCostOf(c) <= 4 && c.Info.Property.Contains("斩") && c.IsTapped)
+            .Where(c => ctx.State.CurrentCostOf(c) <= 4 && c.HasProperty("斩") && c.IsTapped)
             .ToList();
         if (cands.Count == 0) return;
 

@@ -39,7 +39,7 @@ public class P_054_Garp : IScriptedEffect
                 var attacker = atkP.Leader.Id == b.AttackerCardId ? atkP.Leader
                     : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
                 if (attacker is null) return false;
-                return attacker.Info.Property.Contains("打");
+                return attacker.HasProperty("打");
             },
         });
         return Task.CompletedTask;

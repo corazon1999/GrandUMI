@@ -8,11 +8,11 @@ namespace GrandUMI.Effects.Scripted;
 /// 【启动主要】可以将此角色放置到废弃区：我方废弃区中有 15 张或更多卡牌的场合，
 ///   本回合中，我方最多 1 张角色"蒙奇·D·路飞"获得【速攻：角色】效果和属性（斩）。
 ///
-/// 实现说明 / 简化点：
+/// 实现说明：
 ///   - 成本：将此角色放置到废弃区（先支付）。"可以"=可选，先 ConfirmOptional。
 ///   - 收益条件：我方废弃区 ≥15 张（含放入的此卡）。
 ///   - "获得【速攻：角色】"用 GiveKeyword(target, "速攻", ThisTurn) 表达（引擎据此本回合放行登场回合攻击）。
-///     "属性（斩）"为属性追加，引擎无属性临时修正通道，故未实现该副效果（仅影响极少数属性联动）。
+///     “属性（斩）”写入 GainedPropertiesThisTurn，属性筛选与状态快照均读取合并后的当前属性。
 /// </summary>
 public class OP15_093_RisukiBrothers : IScriptedEffect
 {
@@ -60,5 +60,6 @@ public class OP15_093_RisukiBrothers : IScriptedEffect
 
         var tgt = liveTargets.First(c => c.Id.ToString() == pick[0]);
         AtomicOps.GiveKeyword(tgt, "速攻", KeywordDuration.ThisTurn);
+        tgt.GainedPropertiesThisTurn.Add("斩");
     }
 }

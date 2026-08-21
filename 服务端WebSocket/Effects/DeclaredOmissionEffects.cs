@@ -493,7 +493,7 @@ public static class DeclaredOmissionEffects
         => new() { Side = 0, IncludeLeader = true, IncludeCharacters = true };
 
     private static bool HasProperty(CardInstance card, string property)
-        => card.Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains(property);
+        => card.HasProperty(property);
 
     private static CardInstance? BattleOpponent(GameState state, Guid sourceId)
     {

@@ -7,9 +7,8 @@ namespace GrandUMI.Effects.Scripted;
 /// OP12-042 爱比达
 /// 【登场时】将对方最多 1 张原本的费用不高于 1 的角色放回其持有者的卡组最下方。
 ///
-/// 简化点：
 /// - 卡面常驻被动"我方场上存在 2 张或更多原本的费用为 5 或更高的角色的场合，此角色的费用+1"
-///   未实现（引擎的条件式静态费用修正缺口，ContinuousEffect 仅支持力量修正）。本脚本只实现【登场时】。
+///   通过条件式持续费用修正实现。
 /// - 候选用"原本的费用"= CardInfo.Cost 过滤（≤1）。
 /// </summary>
 public class OP12_042_Abida : IScriptedEffect
@@ -21,6 +20,17 @@ public class OP12_042_Abida : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var s = ctx.State;
+        var selfId = ctx.Source.Id;
+        int ownerIdx = ctx.OwnerIndex;
+        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        s.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            CostDelta = 1,
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true, Filter = c => c.Id == selfId },
+            Predicate = (state, side, card) => card.Id == selfId
+                && state.Players[ownerIdx].Characters.Count(c => c.Info.Cost >= 5) >= 2,
+        });
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = s.Players[oppIdx];
 

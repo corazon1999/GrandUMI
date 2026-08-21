@@ -58,7 +58,7 @@ public class ST13_002_Ace : IScriptedEffect
 /// <summary>
 /// ST13-003 蒙奇·D·路飞（领航）
 /// 【咚!!×2】【启动主要】【每回合1次】可以丢弃我方1张手牌：我方生命为0张时，将手牌或废弃区中最多2张费用5的角色正面朝上加入生命区顶。
-/// 实现说明：原文“规则上 正面朝上生命入手改为放回卡组底”需 LifeRevealManager 规则钩子，暂未实现；此处实现启动主要部分。
+/// 实现说明：正面朝上的生命加入手牌时改放卡组底由 LifeRevealManager 统一处理；此处实现启动主要部分。
 /// </summary>
 public class ST13_003_Luffy : IScriptedEffect
 {

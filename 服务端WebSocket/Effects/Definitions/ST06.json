@@ -116,13 +116,14 @@
   },
   "ST06-016": {
     "_name": "白色烟雾弹",
-    "_note": "【反击】我方最多1张领袖或角色+2000；【触发】抽1张（原文附带“本回合我方角色不会被KO”因无全体保护op已略去）。",
+    "_note": "【反击】我方最多1张领袖或角色+2000；【触发】抽1张，本回合我方角色不会被KO。",
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 }
     ],
     "trigger": [
-      { "op": "Draw", "n": 1 }
+      { "op": "Draw", "n": 1 },
+      { "op": "ProtectOwnCharactersFromKOThisTurn" }
     ]
   },
   "ST06-017": {

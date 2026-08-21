@@ -297,6 +297,32 @@ public static class DslInterpreter
             if (!await AtomicOps.PromptReturnAtLeastOneDonToDeck(ctx)) return false;
         }
 
+        // detachAttachedDon: 将指定数量被赋予中的咚以休息状态放回费用区。
+        if (cost.TryGetProperty("detachAttachedDon", out var dad) && dad.ValueKind == JsonValueKind.Number)
+        {
+            int n = dad.GetInt32();
+            var attached = me.CostArea.Where(don => don.State == DonState.Attached).ToList();
+            if (attached.Count < n) return false;
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnAttachedDon",
+                $"选择 {n} 张被赋予中的咚!!，以休息状态放回费用区（可放弃）",
+                attached.Select(don => don.Id.ToString()).ToList(), 0, n,
+                new Dictionary<string, object?>
+                {
+                    ["choiceDons"] = attached.Select(don => new
+                    {
+                        id = don.Id.ToString(),
+                        attachedToCardId = don.AttachedToCardId?.ToString(),
+                    }).ToList(),
+                });
+            if (chosen.Count < n) return false;
+            foreach (var id in chosen)
+            {
+                var don = attached.First(item => item.Id.ToString() == id);
+                don.State = DonState.Rest;
+                don.AttachedToCardId = null;
+            }
+        }
+
         // restSelf: 把自身转休息
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
         {
@@ -642,6 +668,8 @@ public static class DslInterpreter
             if (me.TotalDonInCostArea < dr.GetInt32()) return false;
         if (cost.TryGetProperty("donReturnAtLeastOne", out var dra) && dra.ValueKind == JsonValueKind.True
             && me.TotalDonInCostArea < 1) return false;
+        if (cost.TryGetProperty("detachAttachedDon", out var dad) && dad.ValueKind == JsonValueKind.Number
+            && me.CostArea.Count(don => don.State == DonState.Attached) < dad.GetInt32()) return false;
 
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
             if (ctx.Source.IsTapped) return false;
@@ -788,7 +816,7 @@ public static class DslInterpreter
                     break;
                 case "leaderHasProperty":
                     // 多属性卡（如"斩/打"）按 / 拆分匹配，精确比较会漏掉（反馈#225）
-                    if (!me.Leader.Info.Property.Split('/').Contains(p.Value.GetString() ?? "")) return false;
+                    if (!me.Leader.HasProperty(p.Value.GetString() ?? "")) return false;
                     break;
                 case "leaderColorIncludes":
                     if (!ColorMatches(me.Leader, p.Value.GetString() ?? "")) return false;
@@ -1622,6 +1650,30 @@ public static class DslInterpreter
                     }
                     break;
                 }
+            case "ScheduleRefreshOwnDon":
+                ctx.State.EndOfTurnTasks.Add(new EndTurnTask
+                {
+                    Kind = "RefreshOwnDon",
+                    Owner = ctx.OwnerIndex,
+                    Count = GetInt(op, "n", 1),
+                    SourceCardId = ctx.Source.Id.ToString(),
+                });
+                break;
+            case "ProtectOwnCharactersFromKOThisTurn":
+                {
+                    int owner = ctx.OwnerIndex;
+                    var leader = me.Leader;
+                    ctx.State.ContinuousEffects.Add(new ContinuousEffect
+                    {
+                        SourceCardId = $"{leader.Id}:protect-characters-{ctx.State.TurnCount}",
+                        SourceCardNumber = ctx.Source.Info.Number,
+                        ExpiresAtEndOfTurnForSide = ctx.State.CurrentTurnPlayer,
+                        Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+                        KoGuard = "any",
+                        Predicate = (state, side, card) => side == owner,
+                    });
+                    break;
+                }
             case "NoPlayCharacter":
                 // 本回合中我方无法登场角色卡牌（回合结束自动清除）
                 ctx.State.NoPlayCharacterThisTurn.Add(ctx.OwnerIndex);
@@ -1899,7 +1951,7 @@ public static class DslInterpreter
             // property: 属性（斩/打/特/知/…）。多属性卡形如"斩/打"，按 / 拆分匹配（反馈#225：精确比较漏双属性卡）
             if (node.TryGetProperty("property", out var prop))
             {
-                if (!c.Info.Property.Split('/').Contains(prop.GetString() ?? "")) return false;
+                if (!c.HasProperty(prop.GetString() ?? "")) return false;
             }
             // 明确写了“原本”的费用过滤看卡面值；原本力量还须应用“原本力量变为X”的持续覆盖。
             // fieldUsesCurrentValues 仅用于未标明基准的场上筛选，不能把贴咚或普通力量修正混入原本力量。

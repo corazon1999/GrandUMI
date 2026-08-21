@@ -74,6 +74,17 @@ public static class AtomicOps
         if (c.HasRestriction(RestrictionKind.CannotBeRested)) return; // "无法转为休息状态"（瞬时来源）
         // 持续来源（ContinuousEffect.GrantRestriction=CannotBeRested，如 OP11-046/GERMA 光环）同样拦截
         var st = EffectRuntime.CurrentState;
+        if (st is not null && c.Info.Number == "OP15-024")
+        {
+            int owner = st.SideOf(c);
+            int acting = EffectRuntime.CurrentActingSide;
+            var sourceKind = EffectRuntime.CurrentSource?.Info.Kind;
+            if (owner >= 0
+                && st.CurrentTurnPlayer != owner
+                && acting == 1 - owner
+                && sourceKind is CardKind.Leader or CardKind.Character)
+                return;
+        }
         if (st is not null && st.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return;
         bool was = c.IsTapped;
         c.IsTapped = true;

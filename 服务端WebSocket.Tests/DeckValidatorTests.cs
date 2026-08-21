@@ -95,6 +95,25 @@ public class DeckValidatorTests
     }
 
     [Fact]
+    public void OP12001_拒绝费用五以上卡牌()
+    {
+        var leader = CardDatabase.Get("OP12-001")!;
+        var lowCostPool = CardDatabase.GetBySet("OP12")
+            .Where(card => card.Kind != CardKind.Leader && card.Cost < 5 && card.SharesColorWith(leader))
+            .ToList();
+        var lines = BuildValidDeck(leader, lowCostPool);
+        var highCost = CardDatabase.GetBySet("OP12")
+            .First(card => card.Kind != CardKind.Leader && card.Cost >= 5 && card.SharesColorWith(leader));
+        lines[^1] = highCost.Number;
+
+        var result = DeckValidator.Validate(string.Join('\n', lines));
+
+        Assert.False(result.Ok);
+        Assert.Contains("费用为 5 或更高", result.Reason ?? "");
+        Assert.Contains(highCost.Number, result.Reason ?? "");
+    }
+
+    [Fact]
     public void 标准排位拒绝角标一卡_狂野排位允许同一卡组()
     {
         var leader = CardDatabase.Get("OP01-001")!;

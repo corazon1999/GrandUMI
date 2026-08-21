@@ -8,10 +8,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 【对方的攻击时】【每回合1次】①（可以将费用区中指定数量的咚!!转为休息状态）：
 ///   将对方最多1张费用不高于6的角色转为休息状态。
 ///
-/// 实现说明 / 简化点：
-///   - 触发节带有"将咚!!转为休息状态"的可选成本。触发节无法表达可选成本（惯例：只实现收益），
-///     故此处不真正横置费用区咚，仅实现"将对方角色转为休息状态"的收益部分；
-///     用 ConfirmOptional 保留"可以"的可选语义。
+/// 实现说明：
+///   - 玩家确认发动后，横置 1 张未被赋予的活跃咚支付成本。
 ///   - "费用不高于6"按当前费用判定。
 /// </summary>
 public class OP05_029_Doflamingo : IScriptedEffect
@@ -31,12 +29,14 @@ public class OP05_029_Doflamingo : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         var candidates = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 6).ToList();
-        if (candidates.Count == 0) return;
+        var costDon = me.CostArea.FirstOrDefault(d => d.State == DonState.Active && d.AttachedToCardId is null);
+        if (candidates.Count == 0 || costDon is null) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "多弗拉门戈【对方的攻击时】：将对方最多1张费用不高于6的角色转为休息状态？");
         if (!use) return;
 
+        costDon.State = DonState.Rest;
         me.TurnOnceUsed.Add(key);
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

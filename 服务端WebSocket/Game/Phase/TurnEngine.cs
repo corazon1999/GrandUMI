@@ -250,6 +250,7 @@ public static class TurnEngine
         c.IsEffectsNullified = false;
         c.NoAttackCostLeThisTurn = 0;
         c.BattledOpponentCharacterThisTurn = false;
+        c.GainedPropertiesThisTurn.Clear();
         // 注意：UntilNextOpponentEndPhase 不在此清除——它须保留到"对方"的结束阶段，
         // 否则会在施加者自己的结束阶段就失效（#146/#147）。改由 ClearUntilNextOpponentEndPhase 处理。
         c.GainedKeywords.RemoveAll(k =>
