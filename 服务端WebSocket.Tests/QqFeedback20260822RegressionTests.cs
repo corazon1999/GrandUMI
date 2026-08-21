@@ -99,4 +99,26 @@ public sealed class QqFeedback20260822RegressionTests
         Assert.Equal(3000, state.ContinuousPowerBonus(0, sanji));
         Assert.Equal(3000, state.ContinuousPowerBonus(0, zoro));
     }
+
+    [Fact]
+    public async Task EB01_001_StacksAttackPowerAfterEB04_012_ReactivatesLeader()
+    {
+        var state = TestScene.New("EB01-001")
+            .MyCharacter("EB04-012")
+            .AttachDonToMyLeader(1)
+            .Build();
+        var me = state.Players[0];
+        var leader = me.Leader;
+        var kikunojo = Assert.Single(me.Characters);
+        kikunojo.TurnPlayed = state.TurnCount;
+
+        await EffectRuntime.Resolve(state, 0, leader, EffectTrigger.OnAttackDeclare, new MockPromptService());
+        leader.IsTapped = true;
+        await EffectRuntime.Resolve(state, 0, kikunojo, EffectTrigger.ActivatedMain, new MockPromptService());
+        await EffectRuntime.Resolve(state, 0, leader, EffectTrigger.OnAttackDeclare, new MockPromptService());
+
+        Assert.False(leader.IsTapped);
+        Assert.Equal(2, leader.PowerModsUntilOppEnd.Count(modifier => modifier.Delta == 1000));
+        Assert.Equal(8000, state.CurrentPowerOf(0, leader));
+    }
 }
