@@ -65,12 +65,14 @@ export default function PlayerSafetyActions({
   currentOpponent = false,
   compact = false,
   toolbar = false,
+  className,
 }: {
   targetAccount?: string;
   targetName: string;
   currentOpponent?: boolean;
   compact?: boolean;
   toolbar?: boolean;
+  className?: string;
 }) {
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -111,7 +113,7 @@ export default function PlayerSafetyActions({
       <div
         className={toolbar
           ? "pointer-events-auto fixed z-[70] flex gap-2"
-          : "flex flex-wrap justify-end gap-1"}
+          : className ?? "flex flex-wrap justify-end gap-1"}
         style={toolbar
           ? {
               right: "calc(7.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",

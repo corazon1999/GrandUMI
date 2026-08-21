@@ -88,7 +88,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
               return (
                 <div
                   key={p.account}
-                  className="flex min-h-14 items-center gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
+                  className="grid min-h-14 shrink-0 grid-cols-1 gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1">
@@ -106,7 +106,10 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                     <p className={`text-[10px] ${st.cls}`}>{st.text}</p>
                   </div>
                   {!isMe && (
-                    <div className="flex max-w-48 flex-wrap justify-end gap-1">
+                    <div
+                      className="grid auto-rows-[3rem] grid-cols-2 gap-1 @[640px]:grid-cols-4"
+                      aria-label={`${p.name} 的玩家操作`}
+                    >
                       {!relationship && (
                         <button
                           type="button"
@@ -169,7 +172,12 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                           邀请对战
                         </button>
                       )}
-                      <PlayerSafetyActions targetAccount={p.account} targetName={p.name} compact />
+                      <PlayerSafetyActions
+                        targetAccount={p.account}
+                        targetName={p.name}
+                        compact
+                        className="col-span-2 grid grid-cols-2 gap-1"
+                      />
                     </div>
                   )}
                 </div>
