@@ -192,11 +192,38 @@ public static class TurnEngine
     public static async Task ResolvePromptedEndPhaseTasksAsync(GameState state, IPromptService prompts)
     {
         var tasks = state.EndOfTurnTasks
-            .Where(task => task.Kind is "ReturnCharacterToDeckBottom" or "PreventOpponentDonCharacterReset")
+            .Where(task => task.Kind is "ReturnCharacterToDeckBottom"
+                or "PreventOpponentDonCharacterReset"
+                or "ReturnExcessDonToOpponentCount")
             .ToList();
         foreach (var task in tasks)
         {
             state.EndOfTurnTasks.Remove(task);
+
+            if (task.Kind == "ReturnExcessDonToOpponentCount")
+            {
+                var returnOwner = state.Players[task.Owner];
+                var source = returnOwner.Characters
+                    .Concat(returnOwner.Hand)
+                    .Concat(returnOwner.Trash)
+                    .Concat(returnOwner.Deck)
+                    .Concat(returnOwner.LifeArea)
+                    .Append(returnOwner.StageCard)
+                    .FirstOrDefault(card => card?.Id.ToString() == task.SourceCardId);
+                if (source is null) continue;
+
+                await EffectRuntime.Resolve(
+                    state,
+                    task.Owner,
+                    source,
+                    EffectTrigger.OnMyTurnEnd,
+                    prompts,
+                    new Dictionary<string, object?>
+                {
+                    ["scheduled"] = true,
+                });
+                continue;
+            }
 
             if (task.Kind == "PreventOpponentDonCharacterReset")
             {

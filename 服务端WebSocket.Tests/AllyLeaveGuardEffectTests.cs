@@ -22,6 +22,7 @@ public class AllyLeaveGuardEffectTests
     [Theory]
     [InlineData("OP11-001")]
     [InlineData("OP12-102")]
+    [InlineData("OP14-016")]
     [InlineData("OP14-061")]
     [InlineData("OP15-098")]
     [InlineData("OP16-014")]

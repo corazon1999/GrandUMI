@@ -13,6 +13,124 @@ public class FFeedbackCardRegressionTests
         => new() { Info = CardDatabase.Get(number)! };
 
     [Fact]
+    public async Task OP04_066_SearchIncludesFormerBaroqueWorksCards()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP02-053", "OP15-050", "OP15-051", "OP15-052", "OP15-053")
+            .Build();
+        var formerBaroqueWorks = state.Players[0].Deck[0];
+        var prompts = new MockPromptService().QueueChoose(formerBaroqueWorks.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, Card("OP04-066"), EffectTrigger.OnEnterField, prompts);
+
+        var search = Assert.Single(prompts.ChooseHistory.Where(prompt => prompt.kind == "LookTopReveal"));
+        Assert.Contains(formerBaroqueWorks.Id.ToString(), search.choices);
+        Assert.Contains(formerBaroqueWorks, state.Players[0].Hand);
+    }
+
+    [Fact]
+    public async Task OP01_039_DrawsOnBlockOnlyWithAttachedDon()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP15-050", "OP15-051")
+            .MyCharacter("OP01-039")
+            .MyCharacter("OP15-052")
+            .MyCharacter("OP15-053")
+            .MyActiveDon(1)
+            .Build();
+        var killer = state.Players[0].Characters[0];
+
+        await EffectRuntime.Resolve(
+            state, 0, killer, EffectTrigger.OnBlockDeclare, new MockPromptService());
+        Assert.Empty(state.Players[0].Hand);
+
+        AtomicOps.AttachDonFromCost(state.Players[0], killer.Id, 1, DonState.Active);
+        await EffectRuntime.Resolve(
+            state, 0, killer, EffectTrigger.OnBlockDeclare, new MockPromptService());
+        Assert.Single(state.Players[0].Hand);
+    }
+
+    [Fact]
+    public async Task OP13_054_DoesNotAttachDonWhenLifeConditionFails()
+    {
+        var state = TestScene.New().MyActiveDon(1).Build();
+        for (int index = 0; index < 4; index++)
+            state.Players[0].LifeArea.Add(Card("OP15-050"));
+
+        await EffectRuntime.Resolve(
+            state, 0, Card("OP13-054"), EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(DonState.Active, Assert.Single(state.Players[0].CostArea).State);
+        Assert.Empty(state.Players[0].Hand);
+    }
+
+    [Fact]
+    public async Task OP14_016_ProtectsSupernovaByReducingLeaderPower()
+    {
+        var state = TestScene.New().Build();
+        state.CurrentTurnPlayer = 1;
+        var drake = Card("OP14-016");
+        var victim = Card("OP01-039");
+        state.Players[0].Characters.AddRange([drake, victim]);
+        var bounceSource = Card("ST03-009");
+        state.Players[1].Characters.Add(bounceSource);
+        var prompts = new MockPromptService()
+            .QueueChoose(victim.Id.ToString())
+            .QueueConfirm(true);
+
+        await EffectRuntime.Resolve(
+            state, 1, bounceSource, EffectTrigger.OnEnterField, prompts);
+
+        Assert.Contains(victim, state.Players[0].Characters);
+        Assert.DoesNotContain(victim, state.Players[0].Hand);
+        Assert.Equal(-2000, state.Players[0].Leader.PowerModThisTurn);
+    }
+
+    [Fact]
+    public async Task OP14_078_CanBoostCharacterAndPaysDonReturn()
+    {
+        var state = TestScene.New(myLeaderNumber: "OP14-060")
+            .MyActiveDon(1)
+            .MyCharacter("OP14-062")
+            .Build();
+        var target = Assert.Single(state.Players[0].Characters);
+        var prompts = new MockPromptService().QueueChoose(target.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, Card("OP14-078"), EffectTrigger.EventCounter, prompts);
+
+        Assert.Empty(state.Players[0].CostArea);
+        Assert.Equal(2000, target.PowerModThisBattle);
+        Assert.Equal(2000, target.PowerModThisTurn);
+        var targetPrompt = Assert.Single(prompts.ChooseHistory.Where(prompt => prompt.kind == "OwnLeaderOrCharacter"));
+        Assert.Contains(target.Id.ToString(), targetPrompt.choices);
+    }
+
+    [Fact]
+    public async Task OP08_074_ReturnsExcessDonEvenAfterSourceLeavesField()
+    {
+        var state = TestScene.New()
+            .MyCharacter("OP08-074")
+            .MyActiveDon(1)
+            .OppActiveDon(1)
+            .Build();
+        var maria = Assert.Single(state.Players[0].Characters);
+        for (int index = 0; index < 5; index++)
+            state.Players[0].DonDeck.Add(new DonCard { State = DonState.InDeck });
+
+        await EffectRuntime.Resolve(
+            state, 0, maria, EffectTrigger.ActivatedMain, new MockPromptService());
+        BattleEngine.KOCard(state, 0, maria);
+        await TurnEngine.ResolvePromptedEndPhaseTasksAsync(state, new MockPromptService());
+
+        Assert.DoesNotContain(maria, state.Players[0].Characters);
+        Assert.Equal(state.Players[1].CostArea.Count, state.Players[0].CostArea.Count);
+        Assert.DoesNotContain(state.EndOfTurnTasks,
+            task => task.Kind == "ReturnExcessDonToOpponentCount");
+    }
+
+    [Fact]
     public async Task OP16_074_ForcesOpponentToReturnDon_OnEnterAndOnKO()
     {
         var enterState = TestScene.New(myLeaderNumber: "OP16-022")

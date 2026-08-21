@@ -792,7 +792,7 @@
             "max": 1,
             "restTo": "bottom",
             "match": {
-              "keyword": "巴洛克工作室",
+              "keywordContains": "巴洛克工作室",
               "excludeName": "Ms.情人节(美琪塔)"
             }
           }

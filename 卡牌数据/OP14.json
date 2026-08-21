@@ -344,7 +344,7 @@
     "counter": "",
     "effectTags": [
       "OnAttackDeclare",
-      "OnCharLeaveField",
+      "OnAllyWillLeaveField",
       "OnAllyWillBeKOd"
     ],
     "abilities": [],

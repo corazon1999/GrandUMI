@@ -24,14 +24,12 @@ public class OP13_054_Yamato : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 1. 生命卡牌不多于 3 张：抽取 2 张
+        // 生命卡牌不多于 3 张时，抽取 2 张；“之后”的赋予咚也属于该条件效果。
         if (me.LifeCount <= 3)
         {
             AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            AtomicOps.AttachDonFromCost(me, me.Leader.Id, 1, DonState.Rest);
         }
-
-        // 2. 之后，赋予我方领袖最多 1 张休息状态的咚!!（无条件）
-        AtomicOps.AttachDonFromCost(me, me.Leader.Id, 1, DonState.Rest);
 
         return Task.CompletedTask;
     }

@@ -577,6 +577,7 @@
       {
         "on": "OnBlockDeclare",
         "if": {
+          "donAttachedGte": 1,
           "ownCharCountGte": 3
         },
         "then": [
