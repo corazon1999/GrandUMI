@@ -30,6 +30,11 @@ const TYPE_MAP: Record<string, CardData["type"]> = {
 
 const cardCache = new Map<string, CardData>();
 
+function parseNumericField(value: string | number | undefined): number {
+  const parsed = Number(String(value ?? "").normalize("NFKC"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // 图片 manifest：cardNumber → 所有版本 URL（正画在 [0]）
 let imageManifest: Record<string, string[]> = {};
 let manifestLoaded = false;
@@ -62,12 +67,12 @@ function parseCard(raw: RawCardData): CardData {
     color: raw.color,
     type: (TYPE_MAP[raw.type] ?? raw.type) as CardData["type"],
     property: raw.property as CardData["property"],
-    power: Number(raw.power) || 0,
-    cost: Number(raw.cost) || 0,
+    power: parseNumericField(raw.power),
+    cost: parseNumericField(raw.cost),
     counter: (() => {
-      const v = raw.counter;
+      const v = String(raw.counter ?? "").normalize("NFKC");
       if (!v) return 0;
-      const match = String(v).match(/\+?(\d+)/);
+      const match = v.match(/\+?(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
     })(),
     keyWords: raw.keyWords ? raw.keyWords.split("/").filter(Boolean) : [],
@@ -78,7 +83,7 @@ function parseCard(raw: RawCardData): CardData {
     image: raw.image,
     sprites,
     rarity: raw.rarity ?? "",
-    subscript: Number(raw.subscript) || 0,
+    subscript: parseNumericField(raw.subscript),
     trigger: raw.trigger ?? "",
   };
 }
