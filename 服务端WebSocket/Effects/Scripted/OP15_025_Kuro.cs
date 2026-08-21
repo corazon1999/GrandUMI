@@ -4,65 +4,51 @@ using GrandUMI.Game;
 namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
-/// OP15-025 克洛（角色）
-/// 【阻挡者】（关键词，由引擎处理）
-/// 【登场时】赋予对方 1 张角色最多 2 张对方费用区中的咚!!。
-///   之后，当本回合结束时，对方最多 1 张被赋予 3 张或更多咚!! 且处于休息状态的角色，
-///   在下个对方的重置阶段中不会转为活跃状态。
-///
-/// 实现说明 / 简化点：
-///   - 按官方卡表与 Q&amp;A，只能赋予对方费用区中的休息咚，不能改取活跃咚。
-///   - 第二段"当本回合结束时…不会转为活跃状态"原文为延迟到回合结束触发；本引擎在【登场时】
-///     时机内一并结算（PreventActivateNextReset 标记会保留到对方下个重置阶段，效果等价）。
-///     选择对象时即时判定"被赋予 3 张或更多咚且休息状态"，故先附咚再判定。
+/// OP15-025 克洛（角色）。
+/// 【登场时】赋予对方一张角色最多两张对方费用区中休息状态的咚；
+/// 之后，在本回合结束时，可以选择对方一张被赋予三张或更多咚且处于休息状态的角色，
+/// 使其在下一个对方重置阶段中不会转为活跃状态。
 /// </summary>
 public class OP15_025_Kuro : IScriptedEffect
 {
     public string CardNumber => "OP15-025";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger trigger) => trigger == EffectTrigger.OnEnterField;
 
     public async Task Resolve(EffectContext ctx)
     {
-        var opp = ctx.State.Players[1 - ctx.OwnerIndex];
-        int oppIdx = 1 - ctx.OwnerIndex;
+        var opponent = ctx.State.Players[1 - ctx.OwnerIndex];
 
-        // ── 赋予对方 1 张角色最多 2 张对方费用区中的咚!! ──
-        if (opp.Characters.Count > 0)
+        if (opponent.Characters.Count > 0)
         {
-            var targets = opp.Characters;
+            var targets = opponent.Characters;
             var extra = new Dictionary<string, object?>
             {
-                ["choiceCards"] = targets.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                ["choiceCards"] = targets
+                    .Select(card => new { id = card.Id.ToString(), number = card.Info.Number })
+                    .ToList(),
             };
-            var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                "选择对方 1 张角色，赋予其最多 2 张对方费用区中的咚!!",
-                targets.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
-            if (pick.Count > 0)
+            var picked = await ctx.Prompts.ChooseCards(
+                ctx.OwnerIndex,
+                "OpponentCharacter",
+                "选择对方一张角色，赋予其最多两张对方费用区中休息状态的咚",
+                targets.Select(card => card.Id.ToString()).ToList(),
+                0,
+                1,
+                extra);
+            if (picked.Count > 0)
             {
-                var tgt = targets.First(c => c.Id.ToString() == pick[0]);
-                AtomicOps.AttachDonFromCost(opp, tgt.Id, 2, DonState.Rest);
+                var target = targets.First(card => card.Id.ToString() == picked[0]);
+                AtomicOps.AttachDonFromCost(opponent, target.Id, 2, DonState.Rest);
             }
         }
 
-        // ── 之后：对方最多 1 张被赋予 3 张或更多咚且处于休息状态的角色，下个重置阶段不会转为活跃 ──
-        var lockable = opp.Characters
-            .Where(c => c.IsTapped && opp.AttachedDonCount(c.Id) >= 3)
-            .ToList();
-        if (lockable.Count > 0)
+        // “之后”这一段要等到本回合结束时才检查目标是否满足条件。
+        ctx.State.EndOfTurnTasks.Add(new EndTurnTask
         {
-            var extra2 = new Dictionary<string, object?>
-            {
-                ["choiceCards"] = lockable.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
-            };
-            var pick2 = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                "选择对方最多 1 张被赋予≥3张咚且休息状态的角色，使其在下个重置阶段不转为活跃",
-                lockable.Select(c => c.Id.ToString()).ToList(), 0, 1, extra2);
-            if (pick2.Count > 0)
-            {
-                var locked = lockable.First(c => c.Id.ToString() == pick2[0]);
-                AtomicOps.PreventActivateNextReset(locked);
-            }
-        }
+            Kind = "PreventOpponentDonCharacterReset",
+            Owner = ctx.OwnerIndex,
+            SourceCardId = ctx.Source.Id.ToString(),
+        });
     }
 }

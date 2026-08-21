@@ -192,11 +192,42 @@ public static class TurnEngine
     public static async Task ResolvePromptedEndPhaseTasksAsync(GameState state, IPromptService prompts)
     {
         var tasks = state.EndOfTurnTasks
-            .Where(task => task.Kind == "ReturnCharacterToDeckBottom")
+            .Where(task => task.Kind is "ReturnCharacterToDeckBottom" or "PreventOpponentDonCharacterReset")
             .ToList();
         foreach (var task in tasks)
         {
             state.EndOfTurnTasks.Remove(task);
+
+            if (task.Kind == "PreventOpponentDonCharacterReset")
+            {
+                var opponent = state.Players[1 - task.Owner];
+                var lockable = opponent.Characters
+                    .Where(card => card.IsTapped && opponent.AttachedDonCount(card.Id) >= 3)
+                    .ToList();
+                if (lockable.Count == 0) continue;
+
+                var extra = new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = lockable
+                        .Select(card => new { id = card.Id.ToString(), number = card.Info.Number })
+                        .ToList(),
+                };
+                var picked = await prompts.ChooseCards(
+                    task.Owner,
+                    "OpponentCharacter",
+                    "选择对方最多一张被赋予三张或更多咚且处于休息状态的角色，使其在下个重置阶段不转为活跃",
+                    lockable.Select(card => card.Id.ToString()).ToList(),
+                    0,
+                    1,
+                    extra);
+                if (picked.Count > 0)
+                {
+                    var locked = lockable.First(card => card.Id.ToString() == picked[0]);
+                    AtomicOps.PreventActivateNextReset(locked);
+                }
+                continue;
+            }
+
             var owner = state.Players[task.Owner];
             var card = owner.Characters.FirstOrDefault(c => c.Id.ToString() == task.SourceCardId);
             if (card is null) continue;
