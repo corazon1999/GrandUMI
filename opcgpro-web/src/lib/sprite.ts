@@ -11,10 +11,16 @@ const PRODUCTION_HOST = "grand-umi.com";
 const PRODUCTION_DIRECT_ORIGIN = "https://grand-umi.com";
 const CONFIGURED_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
 // 正式服迁移期间源站曾短暂返回整批 404；追加修订号绕过 CDN 和浏览器中的负缓存。
-const CARD_ASSET_VERSION = `${DATA_VERSION}-r5`;
+const CARD_ASSET_VERSION = `${DATA_VERSION}-r6`;
 
 const CARD_SOURCE_RE = /^\/cards\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 const SPRITE_SOURCE_RE = /^\/sprites\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
+
+function withCardAssetVersion(suffix?: string): string {
+  if (!suffix) return `?v=${CARD_ASSET_VERSION}`;
+  if (suffix.startsWith("?")) return `${suffix}&r=${CARD_ASSET_VERSION}`;
+  return `?v=${CARD_ASSET_VERSION}${suffix}`;
+}
 
 function mapLocalSource(
   src: string,
@@ -22,7 +28,7 @@ function mapLocalSource(
 ): string {
   const cardMatch = src.match(CARD_SOURCE_RE);
   if (cardMatch) {
-    return `/${cardDirectory}/${cardMatch[1]}.webp${cardMatch[3] ?? `?v=${CARD_ASSET_VERSION}`}`;
+    return `/${cardDirectory}/${cardMatch[1]}.webp${withCardAssetVersion(cardMatch[3])}`;
   }
 
   const spriteMatch = src.match(SPRITE_SOURCE_RE);
@@ -79,6 +85,12 @@ function absoluteImageSrc(src: string): string {
   return typeof window === "undefined" ? src : new URL(src, window.location.href).href;
 }
 
+/** 异画资源缺失时回退同卡默认画面，避免整张卡退化为文字占位。 */
+function alternateBaseCardSrc(src: string): string | null {
+  const base = src.replace(/_\d{2}(?=\.(?:png|jpe?g)(?:[?#]|$))/i, "");
+  return base === src ? null : base;
+}
+
 /** React 图片状态在加载失败时取得下一个候选，确保不会在原图和外部图之间循环。 */
 export function nextCardImageSrc(
   currentSrc: string,
@@ -87,9 +99,21 @@ export function nextCardImageSrc(
   variant: "thumb" | "display",
 ): string {
   const derivedSrc = variant === "thumb" ? thumbSrc(rawSrc) : displaySrc(rawSrc);
+  const lowResolutionSrc = variant === "display" ? thumbSrc(rawSrc) : null;
+  const baseRawSrc = alternateBaseCardSrc(rawSrc);
+  const baseDerivedSrc = baseRawSrc
+    ? (variant === "thumb" ? thumbSrc(baseRawSrc) : displaySrc(baseRawSrc))
+    : null;
+  const baseLowResolutionSrc = variant === "display" && baseRawSrc
+    ? thumbSrc(baseRawSrc)
+    : null;
   const sources = imageFallbackSources([
     derivedSrc,
+    lowResolutionSrc,
+    baseDerivedSrc,
+    baseLowResolutionSrc,
     derivedSrc !== rawSrc ? rawSrc : null,
+    baseRawSrc,
     externalSrc,
     CARD_BACK_SRC,
   ]);

@@ -23,6 +23,15 @@ test("卡牌图鉴会依次尝试派生图、原图与外部图后再显示占�
   assert.match(catalog, /图片暂不可用/);
 });
 
+test("高清卡图或异画缺失时会回退缩略图与同卡默认画面", () => {
+  assert.match(sprite, /const lowResolutionSrc = variant === "display" \? thumbSrc\(rawSrc\) : null/);
+  assert.match(sprite, /const baseRawSrc = alternateBaseCardSrc\(rawSrc\)/);
+  assert.match(sprite, /const baseLowResolutionSrc = variant === "display" && baseRawSrc/);
+  assert.match(sprite, /derivedSrc,\s*lowResolutionSrc,\s*baseDerivedSrc,\s*baseLowResolutionSrc/);
+  assert.match(sprite, /return `\?v=\$\{CARD_ASSET_VERSION\}`/);
+  assert.match(sprite, /return `\$\{suffix\}&r=\$\{CARD_ASSET_VERSION\}`/);
+});
+
 test("自定义卡背超时后仅重试直连入口并回退内置卡背", () => {
   assert.match(cardBack, /const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000/);
   assert.match(cardBack, /assetSrc\(customImagePath\)/);
