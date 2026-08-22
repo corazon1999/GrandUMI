@@ -48,6 +48,12 @@ cleanup
 mkdir -p "$(dirname "$build_root")" "$release_dir"
 git -C "$repo" worktree add --detach "$build_root" "$target" >/dev/null
 
+# 清单会随 Git 发布，但卡图二进制位于共享目录。必须在构建前逐项核对，避免清单先上线、
+# 异画文件仍未同步时把整批 404 带入正式版本。
+node "$build_root/opcgpro-web/scripts/check-card-image-manifest.mjs" \
+  "$build_root/opcgpro-web/public/data/imageManifest.json" \
+  "$shared_asset_root"
+
 rm -rf "$publish_next" "$release_dir/frontend.next"
 dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$publish_next" --nologo \
   -p:InformationalVersion="1.0.0+$target" \

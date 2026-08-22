@@ -12,6 +12,12 @@ set -Eeuo pipefail
 SRV="root@103.146.230.37"
 REPO="/d/Self/GrandUMI"
 cd "$REPO"
+
+# 先确认本地清单引用的派生图完整，避免把本地半成品同步到正式服。
+node "opcgpro-web/scripts/check-card-image-manifest.mjs" \
+  "opcgpro-web/public/data/imageManifest.json" \
+  "opcgpro-web/public"
+
 sync_one() {
   local src="$1" dst="$2" label="$3"
   local remote_manifest pending_lines pending_paths cnt
@@ -44,6 +50,32 @@ ssh -o BatchMode=yes "$SRV" '
     rsync -a "/www/$asset_dir/" "$source_dir/"
   done
 '
+
+# 用当前本地清单逐项核对正式服共享目录。清单路径通过标准输入传递，不依赖服务器
+# 是否已经拉取包含本校验器的最新提交。
+node "opcgpro-web/scripts/check-card-image-manifest.mjs" \
+  "opcgpro-web/public/data/imageManifest.json" \
+  "opcgpro-web/public" \
+  --list \
+  | ssh -o BatchMode=yes "$SRV" '
+      set -Eeuo pipefail
+      missing=0
+      while IFS= read -r relative_path; do
+        case "$relative_path" in
+          cards-thumb/*|cards-webp/*) ;;
+          *) echo "拒绝校验异常卡图路径：$relative_path" >&2; exit 2 ;;
+        esac
+        if [ ! -s "/www/$relative_path" ]; then
+          echo "缺少正式服卡图：/www/$relative_path" >&2
+          missing=$((missing + 1))
+        fi
+      done
+      if [ "$missing" -ne 0 ]; then
+        echo "正式服卡图清单校验失败：缺少 $missing 个文件。" >&2
+        exit 1
+      fi
+      echo "正式服卡图清单校验通过。"
+    '
 
 echo "===== 卡图同步完成 ====="
 echo "提示:若同时新增了卡牌数据,记得再跑  .\\deploy-hk.ps1  推送代码+重建前端。"

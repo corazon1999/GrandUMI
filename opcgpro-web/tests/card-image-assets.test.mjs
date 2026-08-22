@@ -4,6 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { derivedRelativePath } from "../scripts/check-card-image-assets.mjs";
+import {
+  expectedManifestAssetPaths,
+  manifestSpriteToWebpPath,
+} from "../scripts/check-card-image-manifest.mjs";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..", "..");
@@ -14,6 +18,24 @@ test("原始 PNG 和 JPEG 会映射到同目录的 WebP", () => {
   assert.equal(
     derivedRelativePath("op17/OP17-011.png?v=d3707ea9a4f"),
     "op17/OP17-011.webp",
+  );
+});
+
+test("卡图发布清单会展开为缩略图和高清图，并忽略缓存参数", () => {
+  assert.equal(
+    manifestSpriteToWebpPath("/cards/op17/OP17-046_01.png?v=2617121c4341"),
+    "op17/OP17-046_01.webp",
+  );
+  assert.deepEqual(
+    expectedManifestAssetPaths({
+      "OP17-046": ["/cards/op17/OP17-046.png", "/cards/op17/OP17-046_01.png?v=1"],
+    }),
+    [
+      "cards-thumb/op17/OP17-046.webp",
+      "cards-thumb/op17/OP17-046_01.webp",
+      "cards-webp/op17/OP17-046.webp",
+      "cards-webp/op17/OP17-046_01.webp",
+    ],
   );
 });
 
@@ -52,6 +74,9 @@ test("线上资源同步同时覆盖缩略图和高清展示图", async () => {
   assert.match(syncScript, /root@103\.146\.230\.37/);
   assert.match(syncScript, /"\/www\/cards-thumb"/);
   assert.match(syncScript, /"\/www\/cards-webp"/);
+  assert.match(syncScript, /check-card-image-manifest\.mjs/);
+  assert.match(syncScript, /--list/);
+  assert.match(syncScript, /正式服卡图清单校验通过/);
 });
 
 test("测试服部署会校验全部卡图而不只校验最新异画", async () => {

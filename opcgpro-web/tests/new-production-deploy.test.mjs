@@ -54,6 +54,9 @@ test("正式服发布槽始终挂载不进入 Git 的共享卡图资源", () => 
   assert.match(stage, /rsync -a "\$source_dir\/" "\$shared_dir\/"/);
   assert.match(stage, /ln -s "\$shared_asset_root\/\$asset_dir" "\$slot_asset_path"/);
   assert.match(stage, /正式服共享卡图目录为空/);
+  assert.match(stage, /check-card-image-manifest\.mjs/);
+  assert.match(stage, /public\/data\/imageManifest\.json/);
+  assert.match(stage, /"\$shared_asset_root"/);
 });
 
 test("正式入口同时承载主域名和独立证书的低延迟直连域名", () => {
