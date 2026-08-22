@@ -45,10 +45,11 @@ test("对局同时显示八分钟回合时钟与总操作时钟", async () => {
 });
 
 test("贴咚不再计时提交，并在下一项操作前提供撤回按钮", async () => {
-  const [request, actions, protocol] = await Promise.all([
+  const [request, actions, protocol, store] = await Promise.all([
     readSource("../src/net/GameRequest.ts"),
     readSource("../src/components/game/GameActions.tsx"),
     readSource("../src/net/GameProtocol.ts"),
+    readSource("../src/store/gameStore.ts"),
   ]);
   assert.doesNotMatch(request, /expiresAt|setTimeout\([^)]*commitPendingAttachDon/);
   assert.match(request, /pendingAttachDonUndoQueue\.push/);
@@ -60,6 +61,9 @@ test("贴咚不再计时提交，并在下一项操作前提供撤回按钮", as
   assert.match(actions, /执行下一项操作后将无法撤回/);
   assert.match(actions, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);
   assert.match(protocol, /reapplyPendingAttachDonOptimistic\(\)/);
+  assert.match(store, /const powerBonus = s\.currentTurn \? actual \* 1_000 : 0/);
+  assert.match(store, /s\.my\.leaderPower \+= powerBonus/);
+  assert.match(store, /target\.powerCurrent \+= powerBonus/);
 });
 
 test("在线玩家、好友与局内对手均提供屏蔽和举报入口", async () => {

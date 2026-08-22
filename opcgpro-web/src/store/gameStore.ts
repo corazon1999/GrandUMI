@@ -434,13 +434,19 @@ export const useGameStore = create<GameStore>()(
       if (!s.my) return;
       const actual = Math.max(0, Math.min(count, s.my.costActive));
       if (actual === 0) return;
+      // 咚!!只在持有者回合提供力量；暂存贴咚尚未送达服务端时，也要立即反映基础力量变化。
+      const powerBonus = s.currentTurn ? actual * 1_000 : 0;
       s.my.costActive -= actual;
       s.my.costAttached += actual;
       if (targetId === "leader" || targetId === s.my.leaderId) {
         s.my.leaderAttachedDon += actual;
+        s.my.leaderPower += powerBonus;
       } else {
         const target = s.my.fieldCards.find((c) => c.id === targetId);
-        if (target) target.attachedDon += actual;
+        if (target) {
+          target.attachedDon += actual;
+          target.powerCurrent += powerBonus;
+        }
       }
     }),
     optimisticAttack: (attackerId) => set((s) => {
