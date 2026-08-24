@@ -90,6 +90,6 @@ test("测试服部署会校验全部卡图而不只校验最新异画", async ()
   assert.match(deployScript, /rsync -au "\$source_dir\/" "\$target_dir\/"/);
   assert.match(
     deployEntry,
-    /bash \/opt\/grandumi-test\/ops\/server\/deploy-test\.sh/,
+    /ops\/server\/deploy-test\.sh' \| bash -s --/,
   );
 });

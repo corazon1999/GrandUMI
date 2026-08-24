@@ -66,7 +66,8 @@ try {
 }
 
 $forceArg = if ($All -or -not $hasServerHead) { "all" } else { "" }
-& $ssh -o BatchMode=yes $Server "bash /opt/grandumi-test/ops/server/deploy-test.sh '$target' '$forceArg'"
+# 直接执行目标提交中的脚本，避免部署脚本自身更新时仍运行远端旧版本。
+& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test show '$target`:ops/server/deploy-test.sh' | bash -s -- '$target' '$forceArg'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服部署失败，请检查服务器日志。" }
 
 $code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://test.grand-umi.com/"

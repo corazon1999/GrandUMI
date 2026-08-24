@@ -17,6 +17,7 @@ test("测试服部署入口默认指向香港新服务器并支持首次初始�
   assert.doesNotMatch(entry, /8\.210\.155\.25/);
   assert.match(entry, /git -C \/opt\/grandumi-test init/);
   assert.match(entry, /-not \$hasServerHead/);
+  assert.match(entry, /git -C \/opt\/grandumi-test show '\$target`:ops\/server\/deploy-test\.sh' \| bash -s --/);
   assert.doesNotMatch(entry, /git add -A/);
 });
 
@@ -32,6 +33,8 @@ test("测试服数据、端口与进程权限均和正式服隔离", () => {
   assert.match(deploy, /original_cards_source=\/opt\/grandumi\/opcgpro-vue\/public\/cards/);
   assert.match(deploy, /original_cards_target="\$test_assets\/cards"/);
   assert.match(deploy, /ln -sfn "\$original_cards_target" "\$public_cards_link"/);
+  assert.match(deploy, /if ! node scripts\/check-card-image-assets\.mjs/);
+  assert.match(deploy, /npm run gen:card-thumbs/);
   assert.doesNotMatch(deploy, /production_stats_db|--backfill-leader-stats/);
 });
 

@@ -34,7 +34,7 @@ test("test build keeps its assets on the test origin", () => {
 test("active deployment entry no longer depends on a candidate environment", async () => {
   const deployEntry = await readFile(new URL("../../deploy-test.ps1", import.meta.url), "utf8");
   assert.doesNotMatch(deployEntry, /deploy-new-hk-candidate|candidate\.grand-umi\.com/);
-  assert.match(deployEntry, /bash \/opt\/grandumi-test\/ops\/server\/deploy-test\.sh/);
+  assert.match(deployEntry, /ops\/server\/deploy-test\.sh' \| bash -s --/);
 });
 
 test("asset host exposes only cacheable public resources with cross-origin access", () => {

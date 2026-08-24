@@ -122,7 +122,11 @@ if [[ "$need_front" == 1 ]]; then
   done
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci --no-audit --no-fund
   node scripts/check-latest-card-art.mjs
-  node scripts/check-card-image-assets.mjs
+  if ! node scripts/check-card-image-assets.mjs; then
+    echo "测试服派生卡图需要刷新，按原始卡图增量重新生成"
+    npm run gen:card-thumbs
+    node scripts/check-card-image-assets.mjs
+  fi
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
   if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' \
