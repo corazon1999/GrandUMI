@@ -513,7 +513,9 @@ public sealed class RankedStore
         var rankDifferenceAdjustment = rankDifference switch
         {
             < 0 => Math.Clamp((-rankDifference) / 100, 0, rankDifferenceAdjustmentCap),
-            > 0 => -Math.Clamp(rankDifference / 100, 0, rankDifferenceAdjustmentCap),
+            // 分差只用于奖励低悬赏玩家以下克上、减轻失败损失。
+            // 高悬赏玩家维持本档位的基础胜负变化，不再因匹配到低悬赏对手而少赢或多扣。
+            > 0 => 0,
             _ => 0,
         };
         return new RankPointCalculation(baseDelta, streakAdjustment, winStreakEndedBounty, rankDifference,

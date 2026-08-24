@@ -290,12 +290,12 @@ public class RankedStoreTests
 
     [Theory]
     [InlineData(99, 0, 0)]
-    [InlineData(100, 1, -1)]
-    [InlineData(299, 2, -2)]
-    [InlineData(300, 3, -3)]
-    [InlineData(499, 4, -4)]
-    [InlineData(500, 5, -5)]
-    public void 排位结算_低分方与高分方每百分差修正一分且均封顶五分(
+    [InlineData(100, 1, 0)]
+    [InlineData(299, 2, 0)]
+    [InlineData(300, 3, 0)]
+    [InlineData(499, 4, 0)]
+    [InlineData(500, 5, 0)]
+    public void 排位结算_低分方每百分差修正一分且高分方不受分差修正(
         int rankDifference,
         int expectedLowAdjustment,
         int expectedHighAdjustment)
@@ -362,8 +362,8 @@ public class RankedStoreTests
             Assert.Equal(5, result.Player0.RankDifferenceAdjustment);
             Assert.Equal(35, result.Player0.RankPointDelta);
             Assert.Equal(10, result.Player1.StreakAdjustment);
-            Assert.Equal(-5, result.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-35,
+            Assert.Equal(0, result.Player1.RankDifferenceAdjustment);
+            Assert.Equal(-30,
                 result.Player1.RankPointDelta - result.Player1.RankProtectionAdjustment);
         }
         finally
@@ -430,7 +430,7 @@ public class RankedStoreTests
     [InlineData(3000, 5000, 80, 20)]
     [InlineData(6000, 9800, 150, 38)]
     [InlineData(10000, 16300, 250, 63)]
-    public void 排位结算_各悬赏档位高低分修正上限正确(
+    public void 排位结算_各悬赏档位低分方修正上限正确且高分方维持基础变化(
         int lowRankPoints,
         int highRankPoints,
         int baseDelta,
@@ -449,9 +449,9 @@ public class RankedStoreTests
 
             Assert.NotNull(lowWins);
             Assert.Equal(differenceCap, lowWins!.Player0.RankDifferenceAdjustment);
-            Assert.Equal(-differenceCap, lowWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(0, lowWins.Player1.RankDifferenceAdjustment);
             Assert.Equal(baseDelta + differenceCap, lowWins.Player0.RankPointDelta);
-            Assert.Equal(-baseDelta - differenceCap, lowWins.Player1.RankPointDelta);
+            Assert.Equal(-baseDelta, lowWins.Player1.RankPointDelta);
 
             SetRankPoints(path, ("爱丽丝", lowRankPoints), ("鲍勃", highRankPoints));
             var highWins = store.RecordMatch($"bounty-gap-high-win-{lowRankPoints}", now.AddMinutes(11),
@@ -459,10 +459,10 @@ public class RankedStoreTests
 
             Assert.NotNull(highWins);
             Assert.Equal(differenceCap, highWins!.Player0.RankDifferenceAdjustment);
-            Assert.Equal(-differenceCap, highWins.Player1.RankDifferenceAdjustment);
+            Assert.Equal(0, highWins.Player1.RankDifferenceAdjustment);
             Assert.Equal(-baseDelta + differenceCap,
                 highWins.Player0.RankPointDelta - highWins.Player0.RankProtectionAdjustment);
-            Assert.Equal(baseDelta - differenceCap, highWins.Player1.RankPointDelta);
+            Assert.Equal(baseDelta, highWins.Player1.RankPointDelta);
         }
         finally
         {
