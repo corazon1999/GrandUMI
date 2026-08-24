@@ -1294,6 +1294,40 @@ export interface MsgActivateRuleset extends MsgBase {
   rulesetId: string;
 }
 
+export type AdminDeploymentEnvironment = "test" | "production";
+export type AdminDeploymentState = "idle" | "queued" | "running" | "success" | "failed" | "unavailable";
+
+export interface OnlinePlayerPeakPoint {
+  date: string;
+  peak: number;
+}
+
+export interface AdminDeploymentStatus {
+  environment: AdminDeploymentEnvironment;
+  state: AdminDeploymentState;
+  targetCommit?: string | null;
+  deployedCommit?: string | null;
+  message: string;
+  updatedAt?: number | null;
+}
+
+export interface MsgAdminOperations extends MsgBase {
+  proto: "MsgAdminOperations";
+  result?: boolean;
+  logStr?: string;
+  currentCommit?: string;
+  deploymentAvailable?: boolean;
+  peaks7?: OnlinePlayerPeakPoint[];
+  peaks30?: OnlinePlayerPeakPoint[];
+  test?: AdminDeploymentStatus;
+  production?: AdminDeploymentStatus;
+}
+
+export interface MsgAdminDeploy extends MsgBase {
+  proto: "MsgAdminDeploy";
+  environment: AdminDeploymentEnvironment;
+}
+
 // ── 联合类型（用于分发时的类型收窄）──────────────────────────────────────
 export type AnyMsg =
   | MsgSecret
@@ -1353,6 +1387,8 @@ export type AnyMsg =
   | MsgPlayerReconnected
   | MsgRulesetUpdated
   | MsgRulesetState
+  | MsgAdminOperations
+  | MsgAdminDeploy
   | MsgBugReport
   | MsgChatMsg
   | MsgGlobalAnnouncement

@@ -36,7 +36,7 @@ public static class WebSocketBridge
     {
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
-        "MsgRulesetState", "MsgRulesetUpdated",
+        "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
@@ -87,6 +87,8 @@ public static class WebSocketBridge
     private static CancellationTokenSource _cts = new();
     private static PlayerDataStore _playerDataStore = null!;
     private static AccountAuthenticationStore _accountAuthenticationStore = null!;
+    private static OnlinePlayerHistoryStore? _onlinePlayerHistoryStore;
+    private static AdminDeploymentCoordinator? _adminDeploymentCoordinator;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
     private static int _onlineBroadcastVersion;
@@ -116,14 +118,20 @@ public static class WebSocketBridge
     // ── 生命周期 ──────────────────────────────────────────────────────────
     public static void Initialize(
         PlayerDataStore playerDataStore,
-        AccountAuthenticationStore accountAuthenticationStore)
+        AccountAuthenticationStore accountAuthenticationStore,
+        OnlinePlayerHistoryStore? onlinePlayerHistoryStore = null,
+        AdminDeploymentCoordinator? adminDeploymentCoordinator = null)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _accountAuthenticationStore = accountAuthenticationStore
             ?? throw new ArgumentNullException(nameof(accountAuthenticationStore));
+        _onlinePlayerHistoryStore = onlinePlayerHistoryStore;
+        _adminDeploymentCoordinator = adminDeploymentCoordinator;
+        _cts.Cancel();
         _cts.Dispose();
         _cts = new CancellationTokenSource();
         Volatile.Write(ref _accepting, 1);
+        _ = RunOnlinePlayerSamplingAsync(_cts.Token);
     }
 
     public static void Stop()
@@ -316,6 +324,8 @@ public static class WebSocketBridge
             case "MsgSetMaintenance": OnSetMaintenance(session, msg); break;
             case "MsgRulesetState": OnRulesetState(session); break;
             case "MsgActivateRuleset": OnActivateRuleset(session, msg); break;
+            case "MsgAdminOperations": OnAdminOperations(session); break;
+            case "MsgAdminDeploy": OnAdminDeploy(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -3349,6 +3359,125 @@ public static class WebSocketBridge
                 SendRulesetState(session);
     }
 
+    private static void OnAdminOperations(WsSession session)
+    {
+        if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(session.Account))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "没有查看管理员运维状态的权限" });
+            return;
+        }
+        SendAdminOperations(session);
+    }
+
+    private static void OnAdminDeploy(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "请先登录" });
+            return;
+        }
+        if (!GlobalAnnouncementPolicy.IsAuthorized(session.Account))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "没有执行版本发布的权限" });
+            return;
+        }
+        if (!session.TryConsumeRateLimit("admin-deploy", capacity: 1, refillPerSecond: 1d / 30d))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "发布请求过于频繁，请稍后再试" });
+            return;
+        }
+        if (_adminDeploymentCoordinator is null)
+        {
+            Send(session.SessionId, new { proto = "MsgAdminOperations", result = false, logStr = "当前服务器尚未配置网页发布执行器" });
+            return;
+        }
+
+        var environment = Str(msg, "environment")?.Trim().ToLowerInvariant() ?? "";
+        try
+        {
+            if (environment == "production")
+            {
+                var maintenance = GameRoomManager.GetMaintenanceSnapshot();
+                if (maintenance.ActiveRoomCount > 0)
+                    throw new InvalidOperationException($"正式发布前仍有 {maintenance.ActiveRoomCount} 个进行中房间；请先启动维护并等待对局结束。");
+                if (!maintenance.Enabled)
+                {
+                    GameRoomManager.SetMaintenanceMode(true);
+                    CancelWaitingGameActivities();
+                    BroadcastMaintenanceState();
+                }
+            }
+            _adminDeploymentCoordinator.Queue(environment);
+            SendAdminOperations(session, result: true, logStr: environment == "production"
+                ? "正式服发布任务已排队；执行器仍会检查测试服版本、更新日志和进行中房间。"
+                : "测试服更新任务已排队，将部署远端 main 的最新提交。");
+            Log($"管理员发布任务已排队：{environment}，操作者={session.Account}");
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            LogErr($"管理员发布任务排队失败：{ex.Message}");
+            SendAdminOperations(session, result: false, logStr: ex.Message);
+        }
+    }
+
+    private static void SendAdminOperations(WsSession session, bool? result = null, string? logStr = null)
+    {
+        IReadOnlyList<OnlinePlayerPeakPoint> peaks7 = [];
+        IReadOnlyList<OnlinePlayerPeakPoint> peaks30 = [];
+        try
+        {
+            if (_onlinePlayerHistoryStore is not null)
+            {
+                peaks7 = _onlinePlayerHistoryStore.GetRecentDailyPeaks(7);
+                peaks30 = _onlinePlayerHistoryStore.GetRecentDailyPeaks(30);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取在线峰值失败：{ex.Message}");
+        }
+
+        AdminDeploymentStatus? test = null;
+        AdminDeploymentStatus? production = null;
+        try
+        {
+            test = _adminDeploymentCoordinator?.GetStatus("test");
+            production = _adminDeploymentCoordinator?.GetStatus("production");
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取管理员发布状态失败：{ex.Message}");
+        }
+
+        Send(session.SessionId, new
+        {
+            proto = "MsgAdminOperations",
+            result,
+            logStr,
+            currentCommit = BuildInfo.Commit,
+            deploymentAvailable = _adminDeploymentCoordinator is not null,
+            peaks7 = peaks7.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
+            peaks30 = peaks30.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
+            test = ToDeploymentPayload(test, "test"),
+            production = ToDeploymentPayload(production, "production"),
+        });
+    }
+
+    private static object ToDeploymentPayload(AdminDeploymentStatus? status, string environment) => new
+    {
+        environment,
+        state = status?.State ?? "unavailable",
+        targetCommit = status?.TargetCommit,
+        deployedCommit = status?.DeployedCommit,
+        message = status?.Message ?? "发布执行器未配置。",
+        updatedAt = status?.UpdatedAt,
+    };
+
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。
     /// 限频(1.2s/条)+长度上限(100)防刷屏。瞬时消息,不进对局状态/快照。区别于大厅全局 OnChatMsg(BroadcastAll)。</summary>
     private static void OnGameChat(WsSession s, Dictionary<string, JsonElement> msg)
@@ -3972,6 +4101,7 @@ public static class WebSocketBridge
                     deliveredVersion = Volatile.Read(ref _onlineBroadcastVersion);
                     await Task.Delay(500, _cts.Token);
                     int count = Sessions.Count(kv => kv.Value.IsLoggedIn);
+                    RecordOnlinePlayerCount(count);
                     BroadcastAll(new { proto = "MsgOnlineCount", count });
                     if (deliveredVersion == Volatile.Read(ref _onlineBroadcastVersion)) break;
                 }
@@ -3985,6 +4115,22 @@ public static class WebSocketBridge
                     BroadcastOnlineCount();
             }
         });
+    }
+
+    private static async Task RunOnlinePlayerSamplingAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            RecordOnlinePlayerCount(LoggedInCount);
+            try { await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken); }
+            catch (OperationCanceledException) { break; }
+        }
+    }
+
+    private static void RecordOnlinePlayerCount(int count)
+    {
+        try { _onlinePlayerHistoryStore?.Record(count); }
+        catch (Exception ex) { LogErr($"记录在线峰值失败：{ex.Message}"); }
     }
 
     private static bool IsReplaceableStateSnapshot(object data)

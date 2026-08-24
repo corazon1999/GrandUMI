@@ -49,6 +49,15 @@ playerDataStore.Initialize();
 var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore);
 accountAuthenticationStore.Initialize();
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
+var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
+    Path.GetDirectoryName(playerDataStore.DatabasePath)!,
+    "online-player-history.db"));
+onlinePlayerHistoryStore.Initialize();
+Console.WriteLine($"[在线峰值] SQLite: {onlinePlayerHistoryStore.DatabasePath}");
+var adminDeploymentCoordinator = AdminDeploymentCoordinator.FromEnvironment();
+adminDeploymentCoordinator?.Initialize();
+if (adminDeploymentCoordinator is not null)
+    Console.WriteLine("[管理员发布] 已连接受限发布队列");
 
 CardDatabase.LoadFrom(ResolveCardDataPath());
 GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
@@ -74,7 +83,11 @@ GameRoomManager.InitializeMaintenance(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "maintenance-state.json"));
 await GameRoomManager.RestoreAll();
-WebSocketBridge.Initialize(playerDataStore, accountAuthenticationStore);
+WebSocketBridge.Initialize(
+    playerDataStore,
+    accountAuthenticationStore,
+    onlinePlayerHistoryStore,
+    adminDeploymentCoordinator);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
 builder.Logging.ClearProviders();
@@ -120,6 +133,7 @@ app.MapGet("/ready", () =>
         },
         connections = WebSocketBridge.ConnectionCount,
         rooms = GameRoomManager.RoomCount,
+        maintenance = GameRoomManager.GetMaintenanceSnapshot().Enabled,
         activeRuleset = CardRulesetManager.Current.Id,
         rulesetRooms = GameRoomManager.RoomCountsByRuleset,
     }, statusCode: ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);

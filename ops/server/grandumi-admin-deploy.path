@@ -1,0 +1,9 @@
+[Unit]
+Description=监听 GrandUMI 管理面板发布请求
+
+[Path]
+PathChanged=/var/lib/grandumi-admin-deploy/requests
+Unit=grandumi-admin-deploy.service
+
+[Install]
+WantedBy=multi-user.target

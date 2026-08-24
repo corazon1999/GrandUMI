@@ -1,0 +1,13 @@
+[Unit]
+Description=执行 GrandUMI 管理面板受限发布任务
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/grandumi-admin-deploy
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true

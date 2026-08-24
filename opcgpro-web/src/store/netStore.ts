@@ -22,6 +22,8 @@ import type {
   MatchQueueKind,
   SpectateMode,
   CardRulesetSummary,
+  AdminDeploymentStatus,
+  OnlinePlayerPeakPoint,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -51,6 +53,15 @@ export type RulesetAdminState = {
   activeRulesetId: string;
   availableRulesets: CardRulesetSummary[];
   activeRoomCounts: Record<string, number>;
+};
+
+export type AdminOperationsState = {
+  currentCommit: string;
+  deploymentAvailable: boolean;
+  peaks7: OnlinePlayerPeakPoint[];
+  peaks30: OnlinePlayerPeakPoint[];
+  test: AdminDeploymentStatus;
+  production: AdminDeploymentStatus;
 };
 
 export interface ChatMessage {
@@ -107,6 +118,7 @@ interface NetStore {
   onlineCount: number;
   maintenance: MaintenanceState;
   rulesets: RulesetAdminState;
+  adminOperations: AdminOperationsState;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
   friends: FriendInfo[];
@@ -166,6 +178,7 @@ interface NetStore {
   setOnlineCount: (n: number) => void;
   setMaintenance: (maintenance: MaintenanceState) => void;
   setRulesets: (rulesets: RulesetAdminState) => void;
+  setAdminOperations: (operations: AdminOperationsState) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
@@ -226,6 +239,14 @@ const initialState = {
   onlineCount: 0,
   maintenance: { enabled: false, activeRoomCount: 0, startedAt: null, canManage: false },
   rulesets: { activeRulesetId: "", availableRulesets: [], activeRoomCounts: {} } as RulesetAdminState,
+  adminOperations: {
+    currentCommit: "",
+    deploymentAvailable: false,
+    peaks7: [],
+    peaks30: [],
+    test: { environment: "test", state: "unavailable", message: "等待服务器状态" },
+    production: { environment: "production", state: "unavailable", message: "等待服务器状态" },
+  } as AdminOperationsState,
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
   incomingFriendRequests: [] as FriendRequestInfo[],
@@ -314,6 +335,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setOnlineCount: (n) => set({ onlineCount: n }),
   setMaintenance: (maintenance) => set({ maintenance }),
   setRulesets: (rulesets) => set({ rulesets }),
+  setAdminOperations: (adminOperations) => set({ adminOperations }),
 
   setPlayerList: (list) => set({ playerList: list }),
 

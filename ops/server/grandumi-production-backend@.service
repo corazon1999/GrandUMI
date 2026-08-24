@@ -26,6 +26,7 @@ Environment=GRANDUMI_MAX_ROOMS=600
 Environment=GRANDUMI_PRIVATE_SNAPSHOT_LOG=0
 Environment=GRANDUMI_PROTOCOL_LOG=0
 Environment=GRANDUMI_LATENCY_SUMMARY_SECONDS=60
+Environment=GRANDUMI_ADMIN_DEPLOY_DIR=/var/lib/grandumi-admin-deploy
 LimitNOFILE=262144
 CPUQuota=650%
 MemoryMax=5G
@@ -34,7 +35,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/data/grandumi
+ReadWritePaths=/data/grandumi /var/lib/grandumi-admin-deploy/requests
 
 [Install]
 WantedBy=multi-user.target

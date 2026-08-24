@@ -86,6 +86,9 @@ import type {
   SpectateMode,
   MsgRulesetState,
   MsgActivateRuleset,
+  MsgAdminOperations,
+  MsgAdminDeploy,
+  AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
 import { useNetStore } from "@/store/netStore";
@@ -236,6 +239,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgRulesetState":
         handleRulesetState(msg as MsgRulesetState);
+        break;
+      case "MsgAdminOperations":
+        handleAdminOperations(msg as MsgAdminOperations);
         break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
@@ -716,6 +722,21 @@ function handleRulesetState(msg: MsgRulesetState) {
   if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
 }
 
+function handleAdminOperations(msg: MsgAdminOperations) {
+  const store = useNetStore.getState();
+  if (msg.currentCommit && msg.test && msg.production) {
+    store.setAdminOperations({
+      currentCommit: msg.currentCommit,
+      deploymentAvailable: msg.deploymentAvailable === true,
+      peaks7: Array.isArray(msg.peaks7) ? msg.peaks7 : [],
+      peaks30: Array.isArray(msg.peaks30) ? msg.peaks30 : [],
+      test: msg.test,
+      production: msg.production,
+    });
+  }
+  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
+}
+
 /**
  * MsgOnlineCount — 在线人数广播
  * 服务器在有人登录/断开时推送，更新角落徽标
@@ -1178,6 +1199,14 @@ export const HomeRequest = {
 
   activateRuleset(rulesetId: string) {
     return NetManager.send({ proto: "MsgActivateRuleset", rulesetId } as MsgActivateRuleset);
+  },
+
+  requestAdminOperations() {
+    return NetManager.send({ proto: "MsgAdminOperations" } as MsgAdminOperations);
+  },
+
+  deployLatest(environment: AdminDeploymentEnvironment) {
+    return NetManager.send({ proto: "MsgAdminDeploy", environment } as MsgAdminDeploy);
   },
 
   requestPlayerList(offset = 0, limit = 200) {

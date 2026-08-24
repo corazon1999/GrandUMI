@@ -114,12 +114,17 @@ install -m 0755 "$build_root/ops/server/grandumi-production-switch.sh" /usr/loca
 install -m 0755 "$build_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$build_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$build_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
+install -d -m 0755 /var/lib/grandumi-admin-deploy/status
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
+install -m 0755 "$build_root/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
+install -m 0644 "$build_root/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
+install -m 0644 "$build_root/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path
 install -m 0644 "$build_root/ops/server/grandumi-production-health.service" /etc/systemd/system/grandumi-production-health.service
 install -m 0644 "$build_root/ops/server/grandumi-production-health.timer" /etc/systemd/system/grandumi-production-health.timer
 install -m 0644 "$build_root/ops/server/grandumi-matchlog-maintenance.service" /etc/systemd/system/grandumi-matchlog-maintenance.service
 install -m 0644 "$build_root/ops/server/grandumi-matchlog-maintenance.timer" /etc/systemd/system/grandumi-matchlog-maintenance.timer
 systemctl daemon-reload
-systemctl enable --now grandumi-matchlog-maintenance.timer
+systemctl enable --now grandumi-matchlog-maintenance.timer grandumi-admin-deploy.path
 
 printf '%s\n' "$target" > /var/lib/grandumi-production-staged
 echo "新正式服 A/B 发布包已在受限资源组内预构建，尚未切换服务：$target"

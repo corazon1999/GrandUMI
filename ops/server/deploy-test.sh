@@ -36,6 +36,13 @@ git -C "$repo" restore --worktree --staged -- "$generated" 2>/dev/null || true
 git -C "$repo" restore --worktree --staged -- '服务端WebSocket/publish' 2>/dev/null || true
 
 git -C "$repo" checkout --detach "$target"
+install -d -m 0755 /var/lib/grandumi-admin-deploy/status
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
+install -m 0755 "$repo/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
+install -m 0644 "$repo/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
+install -m 0644 "$repo/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path
+systemctl daemon-reload
+systemctl enable --now grandumi-admin-deploy.path
 changed="$(git -C "$repo" -c core.quotepath=false diff --name-only "$old" "$target" 2>/dev/null || true)"
 need_back=0
 need_front=0

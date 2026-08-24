@@ -20,6 +20,8 @@ install -d -o grandumi -g grandumi -m 0750 /data/grandumi
 install -d -m 0755 /etc/nginx/snippets /var/www/certbot /etc/grandumi
 install -d -o grandumi -g grandumi -m 0755 /opt/grandumi/releases /opt/grandumi/slots/a /opt/grandumi/slots/b
 install -d -m 0755 /var/lib/grandumi-ha
+install -d -m 0755 /var/lib/grandumi-admin-deploy/status
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
 
 cat > /etc/grandumi/backend-a.env <<'EOF'
 GRANDUMI_BACKEND_PORT=8080
@@ -45,6 +47,9 @@ install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /u
 install -m 0755 "$source_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$source_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
 install -m 0755 "$source_root/ops/server/enable-grandumi-assets.sh" /usr/local/sbin/enable-grandumi-assets
+install -m 0755 "$source_root/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
+install -m 0644 "$source_root/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
+install -m 0644 "$source_root/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path
 install -m 0644 "$source_root/ops/server/grandumi-production-health.service" /etc/systemd/system/grandumi-production-health.service
 install -m 0644 "$source_root/ops/server/grandumi-production-health.timer" /etc/systemd/system/grandumi-production-health.timer
 install -m 0644 "$source_root/ops/server/grandumi-matchlog-maintenance.service" /etc/systemd/system/grandumi-matchlog-maintenance.service
@@ -72,7 +77,7 @@ rm -f /etc/nginx/sites-enabled/default
 [[ -s /var/lib/grandumi-ha/active-slot ]] || printf 'a\n' > /var/lib/grandumi-ha/active-slot
 
 systemctl daemon-reload
-systemctl enable --now grandumi-production-health.timer grandumi-matchlog-maintenance.timer
+systemctl enable --now grandumi-production-health.timer grandumi-matchlog-maintenance.timer grandumi-admin-deploy.path
 nginx -t
 systemctl reload nginx
 
