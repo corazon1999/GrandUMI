@@ -1,17 +1,28 @@
 [Unit]
 Description=GrandUMI 测试服前端（Next 3001）
-After=network.target grandumi-test-backend.service
+After=network-online.target grandumi-test-backend.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=8
 
 [Service]
 Type=simple
+User=grandumi
+Group=grandumi
 WorkingDirectory=/opt/grandumi-test/opcgpro-web
-ExecStart=/usr/bin/node /opt/grandumi-test/opcgpro-web/node_modules/next/dist/bin/next start -p 3001
+ExecStart=/opt/node/bin/node /opt/grandumi-test/opcgpro-web/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3001
 Restart=always
-RestartSec=3
+RestartSec=2
+TimeoutStartSec=45
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_WS_URL=wss://test.grand-umi.com/ws
+LimitNOFILE=65536
 CPUQuota=50%
 MemoryMax=768M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/grandumi-test/opcgpro-web/.next
 
 [Install]
 WantedBy=multi-user.target

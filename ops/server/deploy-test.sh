@@ -2,9 +2,9 @@
 set -Eeuo pipefail
 
 repo=/opt/grandumi-test
-state_dir=/var/lib/grandumi-release
+state_dir=/var/lib/grandumi-test-release
 target="$1"
-force="$2"
+force="${2:-}"
 
 die() {
   echo "错误：$*" >&2
@@ -55,17 +55,12 @@ if [[ "$need_back" == 1 ]]; then
   next_publish="$repo/服务端WebSocket/publish.next"
   previous_publish="$repo/服务端WebSocket/publish.previous"
   rm -rf "$next_publish"
-  dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
+  /opt/dotnet/dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
     -p:InformationalVersion="1.0.0+$target" \
     -p:IncludeSourceRevisionInInformationalVersion=false
 
-  echo "增量回填正式服 Leader 排行榜数据"
-  production_stats_db="/opt/grandumi/服务端WebSocket/Data/leader-stats.db"
-  mkdir -p "$(dirname "$production_stats_db")"
-  dotnet "$next_publish/GrandUMIServer.dll" \
-    --backfill-leader-stats \
-    "/opt/grandumi/服务端WebSocket/MatchLogs" \
-    "$production_stats_db"
+  # 测试服使用完全独立的数据目录，任何账号、卡组或统计写入都不会触碰正式服。
+  install -d -o grandumi -g grandumi -m 0750 /data/grandumi-test
 
   install -m 0644 "$repo/ops/server/grandumi-test-backend.service" \
     /etc/systemd/system/grandumi-test-backend.service
@@ -74,7 +69,8 @@ if [[ "$need_back" == 1 ]]; then
   rm -rf "$previous_publish"
   [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
   mv "$next_publish" "$repo/服务端WebSocket/publish"
-  if ! systemctl restart grandumi-test-backend.service \
+  if ! systemctl enable grandumi-test-backend.service \
+      || ! systemctl restart grandumi-test-backend.service \
       || ! systemctl is-active --quiet grandumi-test-backend.service \
       || ! backend_ready \
       || ! backend_matches_target; then
@@ -101,8 +97,15 @@ if [[ "$need_front" == 1 ]]; then
     mkdir -p "$target_dir"
     # 测试服可能先行验证本机补齐的资源；保留目标端时间更新的修正版，正式资源更新后仍可继续增量同步。
     rsync -au "$source_dir/" "$target_dir/"
+    # 构建与运行时均通过测试服自己的链接读取资源，不修改正式服资源目录。
+    public_link="$repo/opcgpro-web/public/$asset_dir"
+    if [[ -e "$public_link" && ! -L "$public_link" ]]; then
+      rsync -au "$public_link/" "$target_dir/"
+      rm -rf "$public_link"
+    fi
+    ln -sfn "$target_dir" "$public_link"
   done
-  [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
+  [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci --no-audit --no-fund
   node scripts/check-latest-card-art.mjs
   node scripts/check-card-image-assets.mjs
   rm -rf .next.previous
@@ -110,6 +113,11 @@ if [[ "$need_front" == 1 ]]; then
   if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' \
       NEXT_PUBLIC_ASSET_ORIGIN='https://test.grand-umi.com' \
       CARD_BACK_API_URL='http://127.0.0.1:8081' npm run build; then
+    chown -R grandumi:grandumi .next
+    install -m 0644 "$repo/ops/server/grandumi-test-frontend.service" \
+      /etc/systemd/system/grandumi-test-frontend.service
+    systemctl daemon-reload
+    systemctl enable grandumi-test-frontend.service
     systemctl restart grandumi-test-frontend.service
     systemctl is-active --quiet grandumi-test-frontend.service || die "测试服前端启动失败。"
     rm -rf .next.previous
@@ -121,9 +129,16 @@ if [[ "$need_front" == 1 ]]; then
   fi
 fi
 
-sleep 3
+# 首次迁移先安装仅含 HTTP 与 ACME 挑战的站点；DNS 切换并签发证书后再启用 TLS 配置。
+if [[ ! -e /etc/nginx/sites-enabled/grandumi-test ]]; then
+  install -m 0644 "$repo/ops/server/grandumi-test-acme.nginx" /etc/nginx/sites-available/grandumi-test
+  ln -s /etc/nginx/sites-available/grandumi-test /etc/nginx/sites-enabled/grandumi-test
+  nginx -t
+  systemctl reload nginx
+fi
+
 backend_ready
-curl -fsS --retry 5 --retry-delay 1 -o /dev/null http://127.0.0.1:3001/
+curl -fsS --retry 10 --retry-delay 1 --retry-connrefused -o /dev/null http://127.0.0.1:3001/
 echo "$target" > "$state_dir/test-deployed.next"
 mv "$state_dir/test-deployed.next" "$state_dir/test-deployed"
 echo "测试服部署成功：$target"
