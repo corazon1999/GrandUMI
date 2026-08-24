@@ -2,20 +2,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [lobby, protocol, banner, bridge, gamePage] = await Promise.all([
-  readFile(new URL("../src/components/home/LobbyPanel.tsx", import.meta.url), "utf8"),
+const [admin, protocol, banner, bridge, gamePage] = await Promise.all([
+  readFile(new URL("../src/components/home/AdminPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/net/HomeProtocol.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/ui/GlobalAnnouncementBanner.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../服务端WebSocket/WebSocketBridge.cs", import.meta.url), "utf8"),
   readFile(new URL("../src/app/game/page.tsx", import.meta.url), "utf8"),
 ]);
 
-test("only configured administrator accounts see the announcement composer", () => {
-  assert.match(lobby, /const ADMIN_ACCOUNTS = new Set\(\["释迦", "释迦2号", "栗子"\]\)/);
-  assert.match(lobby, /ADMIN_ACCOUNTS\.has\(account\)/);
-  assert.match(lobby, /aria-label="公告内容"/);
-  assert.match(lobby, /maxLength=\{200\}/);
-  assert.match(lobby, /min-h-11/);
+test("只有服务端授权管理员可以看到公告编辑器", () => {
+  assert.match(admin, /if \(!maintenance\.canManage\)/);
+  assert.match(admin, /aria-label="公告内容"/);
+  assert.match(admin, /maxLength=\{200\}/);
+  assert.match(admin, /min-h-11/);
 });
 
 test("announcements use a dedicated protocol and render as a moving banner", () => {
@@ -42,11 +41,11 @@ test("排位连胜播报不显示全服公告前缀且连续消息排队展示",
 });
 
 test("管理员发送公告后保留输入内容", () => {
-  const sendHandler = lobby.match(
-    /const sendGlobalAnnouncement = \(\) => \{[\s\S]*?\n  \};/,
+  const sendHandler = admin.match(
+    /const sendAnnouncement = \(\) => \{[\s\S]*?\n  \};/,
   )?.[0];
 
   assert.ok(sendHandler, "应定义全服公告发送处理函数");
   assert.match(sendHandler, /HomeRequest\.sendGlobalAnnouncement\(content\)/);
-  assert.doesNotMatch(sendHandler, /setAnnouncementInput\(\s*""\s*\)/);
+  assert.doesNotMatch(sendHandler, /setAnnouncement\(\s*""\s*\)/);
 });

@@ -28,8 +28,9 @@ import ProfilePanel from "./ProfilePanel";
 import CardBackPlazaPanel from "./CardBackPlazaPanel";
 import CardBackReviewPanel from "./CardBackReviewPanel";
 import MaintenanceControlPanel from "./MaintenanceControlPanel";
+import AdminPanel from "./AdminPanel";
 
-type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "cardBackReview" | "history" | "profile";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "cardBackPlaza" | "admin" | "cardBackReview" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
@@ -315,6 +316,9 @@ function NavIcon({ name }: { name: NavIconName }) {
   if (name === "cardBackReview") {
     return <><path d="M12 3 5 6v5c0 4.6 2.7 8 7 10 4.3-2 7-5.4 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-5" /></>;
   }
+  if (name === "admin") {
+    return <><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h3v3H8zM14 9h2M14 12h2M8 16h8" /></>;
+  }
   if (name === "profile") {
     return <><circle cx="12" cy="8" r="4" /><path d="M4.5 20c.8-4.2 3.3-6 7.5-6s6.7 1.8 7.5 6" /></>;
   }
@@ -483,7 +487,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
     { view: "profile", label: "我的" },
   ];
   if (maintenance.canManage) {
-    mobileNavItems.splice(5, 0, { view: "cardBackReview", label: "审核" });
+    mobileNavItems.splice(5, 0, { view: "admin", label: "管理" });
   }
 
   return (
@@ -550,7 +554,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
             <SidebarButton label="排行榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
             <SidebarButton label="卡背广场" icon="cardBackPlaza" active={view === "cardBackPlaza"} onClick={() => setView("cardBackPlaza")} />
             {maintenance.canManage && (
-              <SidebarButton label="卡背审核" icon="cardBackReview" badge={pendingCardBackReviews} active={view === "cardBackReview"} onClick={() => setView("cardBackReview")} />
+              <SidebarButton label="管理中心" icon="admin" badge={pendingCardBackReviews} active={view === "admin" || view === "cardBackReview"} onClick={() => setView("admin")} />
             )}
             <SidebarButton label="我的" icon="profile" active={view === "profile"} onClick={() => setView("profile")} />
             <SidebarButton label="对局记录" icon="history" active={view === "history"} onClick={() => setView("history")} />
@@ -571,6 +575,13 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
             {view === "catalog" && <CardCatalogPanel />}
             {view === "leaderboard" && <LeaderLeaderboardPanel />}
             {view === "cardBackPlaza" && <CardBackPlazaPanel onOpenProfile={() => setView("profile")} />}
+            {view === "admin" && (
+              <AdminPanel
+                onOpenCardBackReview={() => setView("cardBackReview")}
+                onOpenPlayers={() => setShowPlayerList(true)}
+                onReturnToLobby={() => setView("lobby")}
+              />
+            )}
             {view === "cardBackReview" && <CardBackReviewPanel />}
             {view === "history" && <HistoryPanel />}
             {view === "profile" && (
