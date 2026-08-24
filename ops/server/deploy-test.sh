@@ -90,6 +90,21 @@ if [[ "$need_front" == 1 ]]; then
   # 再核对 manifest 中每张多画卡的最新异画，避免清单已更新但图鉴只能回退到正画。
   production_assets=/opt/grandumi/opcgpro-web/public
   test_assets=/opt/grandumi-test-assets
+
+  # Windows 开发目录中的 public/cards 是指向 CardImages 的 junction，不会进入 Git。
+  # 新服务器从现有正式卡图库复制到独立测试资源目录，再建立只供测试前端使用的链接。
+  original_cards_source=/opt/grandumi/opcgpro-vue/public/cards
+  original_cards_target="$test_assets/cards"
+  [[ -d "$original_cards_source" ]] || die "正式服原始卡图目录不存在：$original_cards_source"
+  mkdir -p "$original_cards_target"
+  rsync -au "$original_cards_source/" "$original_cards_target/"
+  public_cards_link="$repo/opcgpro-web/public/cards"
+  if [[ -e "$public_cards_link" && ! -L "$public_cards_link" ]]; then
+    rsync -au "$public_cards_link/" "$original_cards_target/"
+    rm -rf "$public_cards_link"
+  fi
+  ln -sfn "$original_cards_target" "$public_cards_link"
+
   for asset_dir in cards-thumb cards-webp; do
     source_dir="$production_assets/$asset_dir"
     target_dir="$test_assets/$asset_dir"

@@ -29,6 +29,9 @@ test("测试服数据、端口与进程权限均和正式服隔离", () => {
   assert.match(frontendService, /User=grandumi/);
   assert.match(frontendService, /127\.0\.0\.1 -p 3001/);
   assert.match(deploy, /install -d -o grandumi -g grandumi -m 0750 \/data\/grandumi-test/);
+  assert.match(deploy, /original_cards_source=\/opt\/grandumi\/opcgpro-vue\/public\/cards/);
+  assert.match(deploy, /original_cards_target="\$test_assets\/cards"/);
+  assert.match(deploy, /ln -sfn "\$original_cards_target" "\$public_cards_link"/);
   assert.doesNotMatch(deploy, /production_stats_db|--backfill-leader-stats/);
 });
 
