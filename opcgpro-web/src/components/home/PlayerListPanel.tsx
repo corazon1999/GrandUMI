@@ -16,6 +16,38 @@ const STATUS_LABEL: Record<PlayerInfo["status"], { text: string; cls: string }> 
   spectating:{ text: "观战中", cls: "text-purple-400" },
 };
 
+function AddFriendIcon({ accepted = false }: { accepted?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8.5" cy="8" r="3" />
+      <path d="M3.5 19c.6-3.5 2.3-5 5-5 1.7 0 3 .5 3.9 1.5" />
+      {accepted ? <path d="m14.5 17 2 2 4-5" /> : <><path d="M17 9v6" /><path d="M14 12h6" /></>}
+    </svg>
+  );
+}
+
+function PendingFriendIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M3 19c.6-3.5 2.3-5 5-5 1.4 0 2.6.3 3.5 1" />
+      <circle cx="17" cy="16" r="4" />
+      <path d="M17 14v2.3l1.5.9" />
+    </svg>
+  );
+}
+
+function BattleInviteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 4 5.5 5.5M3.5 2.5 5 7l2-2 2-2-4.5-.5Z" />
+      <path d="m19 4-5.5 5.5M20.5 2.5 19 7l-2-2-2-2 4.5-.5Z" />
+      <path d="m8.5 11.5 7 7M15.5 11.5l-7 7" />
+      <path d="m6.5 16.5-2 2 1 1 2-2M17.5 16.5l2 2-1 1-2-2" />
+    </svg>
+  );
+}
+
 export default function PlayerListPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const players = useNetStore((s) => s.playerList);
   const account = useNetStore((s) => s.account);
@@ -88,7 +120,7 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
               return (
                 <div
                   key={p.account}
-                  className="grid min-h-14 shrink-0 grid-cols-1 gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
+                  className="flex min-h-16 shrink-0 items-center gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1">
@@ -107,48 +139,43 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                   </div>
                   {!isMe && (
                     <div
-                      className="grid auto-rows-[3rem] grid-cols-2 gap-1 @[640px]:grid-cols-4"
+                      className="flex shrink-0 items-center gap-1"
                       aria-label={`${p.name} 的玩家操作`}
                     >
                       {!relationship && (
                         <button
                           type="button"
                           onClick={() => HomeRequest.sendFriendRequest(p.account)}
-                          className="min-h-11 rounded-lg bg-sky-700 px-3 text-xs font-bold text-white transition-colors hover:bg-sky-600"
+                          className="flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-lg bg-sky-700 p-0 text-white transition-colors hover:bg-sky-600"
+                          aria-label={`添加好友 ${p.name}`}
+                          title="添加好友"
                         >
-                          添加好友
+                          <AddFriendIcon />
                         </button>
                       )}
                       {relationship?.kind === "friend" && (
                         <span
-                          className="flex min-h-11 min-w-11 items-center justify-center text-emerald-400"
+                          className="flex h-11 w-11 min-h-11 min-w-11 items-center justify-center text-emerald-400"
                           aria-label="已是好友"
                           title="已是好友"
                         >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="h-6 w-6"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="8.5" cy="8" r="3" />
-                            <path d="M3.5 19c.6-3.5 2.3-5 5-5 1.7 0 3 .5 3.9 1.5" />
-                            <path d="m14.5 17 2 2 4-5" />
-                          </svg>
+                          <AddFriendIcon accepted />
                         </span>
                       )}
-                      {relationship?.kind === "outgoing" && <span className="flex min-h-11 items-center px-2 text-xs font-bold text-amber-400">已申请</span>}
+                      {relationship?.kind === "outgoing" && (
+                        <span className="flex h-11 w-11 min-h-11 min-w-11 items-center justify-center text-amber-400" aria-label="好友申请已发送" title="好友申请已发送">
+                          <PendingFriendIcon />
+                        </span>
+                      )}
                       {relationship?.kind === "incoming" && relationship.requestId && (
                         <button
                           type="button"
                           onClick={() => HomeRequest.respondFriendRequest(relationship.requestId!, true)}
-                          className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white transition-colors hover:bg-emerald-600"
+                          className="flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-lg bg-emerald-700 p-0 text-white transition-colors hover:bg-emerald-600"
+                          aria-label={`接受 ${p.name} 的好友申请`}
+                          title="接受好友申请"
                         >
-                          接受好友
+                          <AddFriendIcon accepted />
                         </button>
                       )}
                       {p.status === "playing" && p.roomId ? (
@@ -157,26 +184,30 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                           seatIndex={p.seatIndex ?? 0}
                           mode={p.spectateMode}
                           isFriend={relationship?.kind === "friend"}
+                          iconOnly
                         />
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleInvite(p)}
                           disabled={p.status !== "idle"}
-                          className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${
+                          className={`flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-lg p-0 transition-colors ${
                             p.status === "idle"
                               ? "bg-orange-500 hover:bg-orange-400 text-white"
                               : "bg-gray-700 text-gray-500 cursor-not-allowed"
                           }`}
+                          aria-label={`邀请 ${p.name} 对战`}
+                          title={p.status === "idle" ? "邀请对战" : "玩家当前不可邀请"}
                         >
-                          邀请对战
+                          <BattleInviteIcon />
                         </button>
                       )}
                       <PlayerSafetyActions
                         targetAccount={p.account}
                         targetName={p.name}
-                        compact
-                        className="col-span-2 grid grid-cols-2 gap-1"
+                        showBlock={false}
+                        iconOnly
+                        className="flex shrink-0"
                       />
                     </div>
                   )}

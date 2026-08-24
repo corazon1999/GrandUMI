@@ -11,11 +11,13 @@ export default function SpectateJoinButton({
   seatIndex,
   mode = "open",
   isFriend = false,
+  iconOnly = false,
 }: {
   roomId: string;
   seatIndex: 0 | 1;
   mode?: SpectateMode | null;
   isFriend?: boolean;
+  iconOnly?: boolean;
 }) {
   const spectateState = useNetStore((state) => state.spectateState);
   const spectateRoomId = useNetStore((state) => state.spectateRoomId);
@@ -49,9 +51,18 @@ export default function SpectateJoinButton({
         type="button"
         onClick={() => enter()}
         disabled={blocked || spectateState === "joining"}
-        className="min-h-11 rounded-lg bg-purple-600 px-3 text-xs font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+        className={iconOnly
+          ? "flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-lg bg-purple-600 p-0 text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+          : "min-h-11 rounded-lg bg-purple-600 px-3 text-xs font-bold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"}
+        aria-label={label}
+        title={label}
       >
-        {label}
+        {iconOnly ? (
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" strokeLinejoin="round" />
+            <circle cx="12" cy="12" r="2.5" />
+          </svg>
+        ) : label}
       </button>
       {showCode && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 px-0 pt-[env(safe-area-inset-top)] sm:items-center sm:p-4" role="presentation" onMouseDown={() => setShowCode(false)}>

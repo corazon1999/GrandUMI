@@ -65,6 +65,8 @@ export default function PlayerSafetyActions({
   currentOpponent = false,
   compact = false,
   toolbar = false,
+  showBlock = true,
+  iconOnly = false,
   className,
 }: {
   targetAccount?: string;
@@ -72,6 +74,8 @@ export default function PlayerSafetyActions({
   currentOpponent?: boolean;
   compact?: boolean;
   toolbar?: boolean;
+  showBlock?: boolean;
+  iconOnly?: boolean;
   className?: string;
 }) {
   const [confirmBlock, setConfirmBlock] = useState(false);
@@ -108,6 +112,12 @@ export default function PlayerSafetyActions({
     setReportOpen(false);
   };
 
+  const actionButtonSizeClass = toolbar
+    ? "flex h-12 w-12 min-h-12 min-w-12 items-center justify-center p-0 shadow-lg backdrop-blur-md"
+    : iconOnly
+      ? "flex h-11 w-11 min-h-11 min-w-11 items-center justify-center p-0"
+      : "min-h-12 min-w-12 px-2";
+
   return (
     <>
       <div
@@ -122,31 +132,29 @@ export default function PlayerSafetyActions({
           : undefined}
         aria-label={`${targetName} 的安全操作`}
       >
-        <button
-          type="button"
-          onClick={block}
-          onBlur={() => setConfirmBlock(false)}
-          aria-label={confirmBlock ? `确认屏蔽玩家 ${targetName}` : `屏蔽玩家 ${targetName}`}
-          title={confirmBlock ? "再次点击确认屏蔽" : "屏蔽玩家"}
-          className={`min-h-12 min-w-12 rounded-lg border text-xs font-bold transition-colors ${
-            toolbar ? "flex h-12 w-12 items-center justify-center p-0 shadow-lg backdrop-blur-md" : "px-2"
-          } ${confirmBlock ? "border-red-400 bg-red-950 text-red-200" : "border-gray-700 bg-slate-900/90 text-gray-400 hover:border-red-700 hover:text-red-300"}`}
-        >
-          {toolbar ? <BlockPlayerIcon /> : confirmBlock ? "确认屏蔽" : compact ? "屏蔽" : "屏蔽玩家"}
-        </button>
+        {showBlock && (
+          <button
+            type="button"
+            onClick={block}
+            onBlur={() => setConfirmBlock(false)}
+            aria-label={confirmBlock ? `确认屏蔽玩家 ${targetName}` : `屏蔽玩家 ${targetName}`}
+            title={confirmBlock ? "再次点击确认屏蔽" : "屏蔽玩家"}
+            className={`${actionButtonSizeClass} rounded-lg border text-xs font-bold transition-colors ${confirmBlock ? "border-red-400 bg-red-950 text-red-200" : "border-gray-700 bg-slate-900/90 text-gray-400 hover:border-red-700 hover:text-red-300"}`}
+          >
+            {toolbar || iconOnly ? <BlockPlayerIcon /> : confirmBlock ? "确认屏蔽" : compact ? "屏蔽" : "屏蔽玩家"}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
             setSubmitError("");
             setReportOpen(true);
           }}
-          className={`min-h-12 min-w-12 rounded-lg border border-amber-800/80 bg-slate-900/90 text-xs font-bold text-amber-300 transition-colors hover:bg-amber-950 ${
-            toolbar ? "flex h-12 w-12 items-center justify-center p-0 shadow-lg backdrop-blur-md" : "px-2"
-          }`}
+          className={`${actionButtonSizeClass} rounded-lg border border-amber-800/80 bg-slate-900/90 text-xs font-bold text-amber-300 transition-colors hover:bg-amber-950`}
           aria-label={`举报玩家 ${targetName}`}
           title="举报玩家"
         >
-          {toolbar ? <ReportPlayerIcon /> : "举报"}
+          {toolbar || iconOnly ? <ReportPlayerIcon /> : "举报"}
         </button>
       </div>
 
