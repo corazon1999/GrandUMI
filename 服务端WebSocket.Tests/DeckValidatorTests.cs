@@ -139,6 +139,91 @@ public class DeckValidatorTests
         Assert.True(standard.Ok, standard.Reason);
     }
 
+    [Theory]
+    [InlineData("OP03-040")]
+    [InlineData("ST10-001")]
+    public void 标准排位拒绝官网完全禁用领航_狂野排位允许(string leaderNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standard.Ok);
+        Assert.Contains("官方禁卡", standard.Reason ?? "");
+        Assert.Contains(leaderNumber, standard.Reason ?? "");
+        Assert.True(wild.Ok, wild.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP06-047", "OP15-039")]
+    [InlineData("OP06-086", "OP16-079")]
+    [InlineData("OP06-116", "OP15-098")]
+    public void 标准排位拒绝官网完全禁用主卡组卡牌_狂野排位允许(string bannedCardNumber, string leaderNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        lines[^1] = bannedCardNumber;
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standard.Ok);
+        Assert.Contains("官方禁卡", standard.Reason ?? "");
+        Assert.Contains(bannedCardNumber, standard.Reason ?? "");
+        Assert.True(wild.Ok, wild.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP11-040", "OP11-067", "OP11-040")]
+    [InlineData("OP11-040", "OP08-069", "OP11-040")]
+    [InlineData("OP07-115", "EB04-058", "OP15-098")]
+    public void 标准排位拒绝官网禁用组合_狂野排位允许(string cardA, string cardB, string leaderNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        if (!string.Equals(leaderNumber, cardA, StringComparison.OrdinalIgnoreCase))
+            lines[^2] = cardA;
+        lines[^1] = cardB;
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standard.Ok);
+        Assert.Contains("官方禁用组合", standard.Reason ?? "");
+        Assert.Contains(cardA, standard.Reason ?? "");
+        Assert.Contains(cardB, standard.Reason ?? "");
+        Assert.True(wild.Ok, wild.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP15-058", "OP11-067")]
+    [InlineData("OP15-058", "OP08-069")]
+    [InlineData("OP15-098", "OP07-115")]
+    [InlineData("OP15-098", "EB04-058")]
+    public void 标准排位允许禁用组合中的卡牌单独使用(string leaderNumber, string singleCardNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        lines[^1] = singleCardNumber;
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+
+        Assert.True(standard.Ok, standard.Reason);
+    }
+
+    [Fact]
+    public void 标准排位允许禁用组合领航单独使用()
+    {
+        var leader = CardDatabase.Get("OP11-040")!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+
+        Assert.True(standard.Ok, standard.Reason);
+    }
+
     private static List<string> BuildValidDeck(CardInfo leader, IReadOnlyList<CardInfo> pool)
     {
         var lines = new List<string> { leader.Number };
