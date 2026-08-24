@@ -874,6 +874,13 @@
     "/cards/eb04/EB04-061_01.png?v=281b76696bf5",
     "/cards/eb04/EB04-061_03.png?v=d6731ed88299"
   ],
+  "EB05-010": [
+    "/cards/eb05/EB05-010.png?v=c8bed8eac523"
+  ],
+  "EB05-016": [
+    "/cards/eb05/EB05-016.png?v=c19d3416116c",
+    "/cards/eb05/EB05-016_01.png?v=7cf7a69087a4"
+  ],
   "OP01-001": [
     "/cards/op01/OP01-001.png",
     "/cards/op01/OP01-001P.png",
@@ -10233,5 +10240,27 @@
   "OP17-119": [
     "/cards/op17/OP17-119.png?v=5bb6e1e73d6a",
     "/cards/op17/OP17-119_01.png?v=03459f4fa38a"
+  ],
+  "OP18-021": [
+    "/cards/op18/OP18-021.png?v=cdaa96e4fe47",
+    "/cards/op18/OP18-021_01.png?v=d3e616decc79"
+  ],
+  "OP18-031": [
+    "/cards/op18/OP18-031.png?v=887c312ffa1e",
+    "/cards/op18/OP18-031_01.png?v=aeb1de6c2f96"
+  ],
+  "OP18-060": [
+    "/cards/op18/OP18-060.png?v=13bca49af46e",
+    "/cards/op18/OP18-060_01.png?v=f1c74a7cf34e"
+  ],
+  "OP18-065": [
+    "/cards/op18/OP18-065.png?v=1bae692ec298",
+    "/cards/op18/OP18-065_01.png?v=314bf77d4899"
+  ],
+  "OP18-078": [
+    "/cards/op18/OP18-078.png?v=d96c3c5c4f46"
+  ],
+  "OP18-119": [
+    "/cards/op18/OP18-119.png?v=eee0fd5feb36"
   ]
 }

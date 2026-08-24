@@ -1,0 +1,141 @@
+[
+  {
+    "number": "OP18-021",
+    "name": "弗兰奇",
+    "color": "绿",
+    "type": "领航",
+    "property": "打",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "七水之城/弗兰奇一家/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-021.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-031",
+    "name": "妮古·罗宾",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnMyTurnEnd",
+      "OnCharLeaveField",
+      "OnAllyWillBeKOd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-031.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-060",
+    "name": "军子宫",
+    "color": "紫",
+    "type": "领航",
+    "property": "特",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyCharEnter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-060.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-065",
+    "name": "军子宫",
+    "color": "紫",
+    "type": "角色",
+    "property": "?",
+    "power": "11000",
+    "cost": "10",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-065.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-078",
+    "name": "迷你梅利2号",
+    "color": "紫",
+    "type": "舞台",
+    "property": "舞台卡",
+    "power": "",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-078.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-119",
+    "name": "夏姆洛克宫",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "9000",
+    "cost": "8",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "OnKO",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SEC",
+    "subscript": 4,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-119.png",
+    "cartograph": ""
+  }
+]

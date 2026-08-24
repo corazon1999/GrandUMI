@@ -1,0 +1,47 @@
+[
+  {
+    "number": "EB05-010",
+    "name": "妮古·罗宾",
+    "color": "绿",
+    "type": "领航",
+    "property": "知",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "ActivatedMain",
+      "OnAnyCharKOd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 4,
+    "trigger": "",
+    "set": "特别补充包【EBC-05】",
+    "image": "/cards/eb05/EB05-010.png",
+    "cartograph": ""
+  },
+  {
+    "number": "EB05-016",
+    "name": "妮古·罗宾",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "6000",
+    "cost": "6",
+    "keyWords": "草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 4,
+    "trigger": "【触发】将对方最多1张费用不高于6的角色转为休息状态。",
+    "set": "特别补充包【EBC-05】",
+    "image": "/cards/eb05/EB05-016.png",
+    "cartograph": ""
+  }
+]

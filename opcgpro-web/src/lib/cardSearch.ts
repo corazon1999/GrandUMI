@@ -118,6 +118,7 @@ const SET_RELEASE_ORDER: Record<string, number> = (() => {
     "OP14",    "ST29","ST30",
     "OP15",
     "OP16",    "ST31","ST32","ST33","ST34","ST35","ST36",
+    "OP17",    "EB05", "OP18",
     "P",
   ];
   const map: Record<string, number> = {};

@@ -141,6 +141,8 @@ const EFFECT_TAG_OVERRIDES = new Map([
   ['ST02-001', ['ActivatedMain']],
   ['P-133', ['OnEnterField']],
   ['ST19-004', ['OnEnterField', 'ActivatedMain']],
+  ['OP18-060', ['OnAllyCharEnter']],
+  ['EB05-010', ['OnAnyCharKOd']],
 ])
 
 function computeEffectTags(text) {
