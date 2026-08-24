@@ -560,7 +560,7 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.EventCounter) return;
         var own = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择《白胡子海盗团》领袖或角色，本次战斗力量+2000",
-            OwnLeaderAndCharacters(c).Where(x => x.Info.HasKeyword("白胡子海盗团")), 0, 1);
+            OwnLeaderAndCharacters(c).Where(x => x.Info.HasKeywordContaining("白胡子海盗团")), 0, 1);
         if (own.Count > 0) AtomicOps.AddPowerThisBattle(own[0], 2000);
         var opp = await Pick(c, c.OwnerIndex, "OpponentLeaderOrCharacter", "选择对方1张领袖或角色，本回合力量-2000",
             OppLeaderAndCharacters(c), 0, 1);

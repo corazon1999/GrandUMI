@@ -84,8 +84,13 @@ public sealed class ST30_014_Mr3 : IScriptedEffect
         foreach (var id in chosen.Distinct())
         {
             var target = candidates.FirstOrDefault(card => card.Id.ToString() == id);
-            if (target is not null)
-                AtomicOps.AttachDonFromCost(me, target.Id, 2, DonState.Rest);
+            int max = Math.Min(2, me.RestDonCount);
+            if (target is null || max == 0) continue;
+            int option = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                $"选择赋予「{target.Info.Name}」的休息咚!!数量",
+                Enumerable.Range(0, max + 1).Select(n => $"{n} 张").ToList());
+            int count = Math.Clamp(option, 0, max);
+            AtomicOps.AttachDonFromCost(me, target.Id, count, DonState.Rest);
         }
     }
 }

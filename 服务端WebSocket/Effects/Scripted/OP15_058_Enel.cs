@@ -17,7 +17,8 @@ public class OP15_058_Enel : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var key = "OP15-058-MainOncePerTurn" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
-        if (ctx.State.TurnCount < 2) return;
+        if (!Game.Validation.ActionValidator.HasMetCardSpecificActivationTiming(
+                ctx.State, ctx.OwnerIndex, ctx.Source)) return;
 
         // ① 两段均为「最多」：分别选择追加数量，不再自动把可追加数量全部用完。
         int activeMax = Math.Min(1, Math.Min(me.DonDeck.Count, 10 - me.CostArea.Count));

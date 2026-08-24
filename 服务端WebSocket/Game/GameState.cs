@@ -52,6 +52,9 @@ public class GameState
     /// <summary>是否已经确定第一回合的先攻方。</summary>
     public bool StartingPlayerChosen => FirstPlayer is 0 or 1;
 
+    /// <summary>开局权威阶段；客户端不得再通过“骰子列表是否为空”推断当前进度。</summary>
+    public OpeningStage OpeningStage { get; set; } = OpeningStage.NotStarted;
+
     public int TurnCount { get; set; } = 1;
 
     public Phase Phase { get; set; } = Phase.Reset;
@@ -596,6 +599,16 @@ public class GameState
     public PlayerState Op(int idx)  => Players[1 - idx];
     public PlayerState Turn        => Players[CurrentTurnPlayer];
     public PlayerState NonTurn     => Players[1 - CurrentTurnPlayer];
+}
+
+public enum OpeningStage
+{
+    NotStarted,
+    ResolvingOpeningEffects,
+    RollingDice,
+    WaitingFirstPlayerChoice,
+    Mulligan,
+    Playing,
 }
 
 /// <summary>延迟到回合结束执行的任务</summary>

@@ -69,7 +69,7 @@ public class RobotBugBatch20260815Tests
     public async Task OP15_058_AllowsChoosingDonAddAndAttachCounts()
     {
         var state = TestScene.New("OP15-058").MyCharacter("OP15-050").Build();
-        state.TurnCount = 2;
+        state.TurnCount = 3;
         var me = state.Players[0];
         for (int i = 0; i < 6; i++) me.DonDeck.Add(new DonCard { State = DonState.InDeck });
         var target = me.Characters.Single();

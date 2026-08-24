@@ -24,20 +24,10 @@ public static class EffectRuntime
     public static async Task TriggerEvent(GameState s, EffectTrigger trigger, IPromptService prompts, Dictionary<string, object?>? payload = null)
     {
         var candidates = CollectListeners(s, trigger, payload);
-        // 排序：回合玩家在前，同方按场上从左到右
-        candidates.Sort((a, b) =>
-        {
-            int aTurn = a.OwnerIdx == s.CurrentTurnPlayer ? 0 : 1;
-            int bTurn = b.OwnerIdx == s.CurrentTurnPlayer ? 0 : 1;
-            return aTurn.CompareTo(bTurn);
-        });
-
-        foreach (var c in candidates)
-        {
-            await Resolve(s, c.OwnerIdx, c.Source, trigger, prompts, payload);
-            // 规则处理点：若已分胜负则中断
-            if (s.IsGameOver) return;
-        }
+        var effects = candidates
+            .Select(candidate => new TriggeredCandidate(candidate.OwnerIdx, candidate.Source, trigger, payload))
+            .ToList();
+        await ResolveTriggeredCandidatesInOrder(s, prompts, effects);
     }
 
     // ── Wave2 反应式 watcher 基础设施 ──
@@ -391,20 +381,82 @@ public static class EffectRuntime
         CardInstance? card = p.Characters.FirstOrDefault(c => c.Id == ef.CardId);
         if (card is null && p.StageCard is { } st && st.Id == ef.CardId) card = st;
         if (card is null) return; // 已离场，跳过
-        await Resolve(s, ef.Owner, card, EffectTrigger.OnEnterField, prompts);
-        if (!s.IsGameOver && card.Info.Kind == CardKind.Character)
-            await TriggerEvent(s, EffectTrigger.OnAllyCharEnter, prompts,
-                new Dictionary<string, object?>
-                {
-                    ["cardId"] = card.Id.ToString(),
-                    ["owner"] = ef.Owner,
-                    ["from"] = ef.From,
-                    ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
-                    ["effectSourceNumber"] = ef.EffectSourceNumber,
-                });
+        var enterPayload = new Dictionary<string, object?>
+        {
+            ["cardId"] = card.Id.ToString(),
+            ["owner"] = ef.Owner,
+            ["from"] = ef.From,
+            ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
+            ["effectSourceNumber"] = ef.EffectSourceNumber,
+        };
+
+        // 没有登场时效果的卡仍要经过 Resolve 注册静态场上能力，但不应作为排序候选展示。
+        if (!HasEffectForTrigger(card, EffectTrigger.OnEnterField))
+        {
+            await Resolve(s, ef.Owner, card, EffectTrigger.OnEnterField, prompts);
+            if (s.IsGameOver) return;
+        }
+
+        var effects = new List<TriggeredCandidate>();
+        if (HasEffectForTrigger(card, EffectTrigger.OnEnterField))
+            effects.Add(new TriggeredCandidate(ef.Owner, card, EffectTrigger.OnEnterField, null));
+        if (card.Info.Kind == CardKind.Character)
+            effects.AddRange(CollectListeners(s, EffectTrigger.OnAllyCharEnter, enterPayload)
+                .Select(candidate => new TriggeredCandidate(candidate.OwnerIdx, candidate.Source,
+                    EffectTrigger.OnAllyCharEnter, enterPayload)));
+        await ResolveTriggeredCandidatesInOrder(s, prompts, effects);
     }
 
     private record Candidate(int OwnerIdx, CardInstance Source);
+    private record TriggeredCandidate(
+        int OwnerIdx,
+        CardInstance Source,
+        EffectTrigger Trigger,
+        Dictionary<string, object?>? Payload);
+
+    /// <summary>同一规则处理点内，回合玩家优先；同一玩家有多个待发效果时由该玩家决定顺序。</summary>
+    private static async Task ResolveTriggeredCandidatesInOrder(
+        GameState state,
+        IPromptService prompts,
+        List<TriggeredCandidate> remaining)
+    {
+        while (remaining.Count > 0 && !state.IsGameOver)
+        {
+            int owner = remaining.Any(candidate => candidate.OwnerIdx == state.CurrentTurnPlayer)
+                ? state.CurrentTurnPlayer
+                : remaining[0].OwnerIdx;
+            var owned = remaining.Where(candidate => candidate.OwnerIdx == owner).ToList();
+            var selected = owned[0];
+            if (owned.Count > 1)
+            {
+                var duplicateSourceIds = owned.GroupBy(candidate => candidate.Source.Id)
+                    .Where(group => group.Count() > 1)
+                    .Select(group => group.Key)
+                    .ToHashSet();
+                string Token(TriggeredCandidate candidate) => duplicateSourceIds.Contains(candidate.Source.Id)
+                    ? $"{candidate.Source.Id}:{candidate.Trigger}"
+                    : candidate.Source.Id.ToString();
+                var tokens = owned.Select(Token).ToList();
+                var chosen = await prompts.ChooseCards(owner, "EffectOrder",
+                    "多个效果同时触发，请选择下一个要结算的效果",
+                    tokens, 1, 1,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = owned.Select(candidate => new
+                        {
+                            id = Token(candidate),
+                            number = candidate.Source.Info.Number,
+                            trigger = candidate.Trigger.ToString(),
+                        }).ToList(),
+                    });
+                if (chosen.Count > 0)
+                    selected = owned.FirstOrDefault(candidate => Token(candidate) == chosen[0]) ?? selected;
+            }
+
+            remaining.Remove(selected);
+            await Resolve(state, selected.OwnerIdx, selected.Source, selected.Trigger, prompts, selected.Payload);
+        }
+    }
 
     private static List<Candidate> CollectListeners(GameState s, EffectTrigger trigger, Dictionary<string, object?>? payload)
     {

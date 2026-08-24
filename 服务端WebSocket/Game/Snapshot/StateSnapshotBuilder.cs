@@ -124,6 +124,10 @@ public static class StateSnapshotBuilder
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
             firstPlayerChosen = state.StartingPlayerChosen,
+            openingStage = state.PendingPrompt is not null
+                && state.OpeningStage == OpeningStage.ResolvingOpeningEffects
+                    ? "WaitingOpeningPrompt"
+                    : state.OpeningStage.ToString(),
             isFirstPlayer = !isSpectator && state.StartingPlayerChosen && state.FirstPlayer == myIdx,
             canChooseFirstPlayer = !isSpectator && !state.StartingPlayerChosen && state.StartingPlayerChooser == myIdx,
             diceWinnerIsMe = !isSpectator && state.StartingPlayerChooser == myIdx,
@@ -389,8 +393,12 @@ public static class StateSnapshotBuilder
            || p.TurnOnceUsed.Contains($"{c.Info.Number}-act:{c.Id}");
 
     private static bool OncePerTurnEffectAvailable(GameState state, PlayerState p, CardInstance c)
-        => Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number, state)
-           && !p.OncePerTurnEffectUsedCardIds.Contains(c.Id);
+    {
+        int owner = ReferenceEquals(p, state.Players[0]) ? 0 : 1;
+        return Effects.OncePerTurnEffectCatalog.Contains(c.Info.Number, state)
+            && !p.OncePerTurnEffectUsedCardIds.Contains(c.Id)
+            && Validation.ActionValidator.HasMetCardSpecificActivationTiming(state, owner, c);
+    }
 
     /// <summary>
     /// 客户端的攻击按钮表示“至少存在一个合法攻击对象”，不能只用对方领袖做探测。

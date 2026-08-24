@@ -52,12 +52,16 @@ public static class MatchReplay
             rngSeed: seed,
             leaderKeywordWildcard: leaderKeywordWildcard,
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
+            deferInitialSetupUntilStart: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset);
 
         // 必须在喂入动作之前恢复"防触发信息泄露"开关：它决定生命揭示是否暂停发 prompt，
         // 进而决定动作磁带里有没有对应的 PromptResponse —— 不还原会导致重放分歧。
         engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
         engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
+
+        if (openingSetupAfterFirstPlayerChoice)
+            engine.BeginOpeningSequence();
 
         // 构造后理论上无在途链，仍等一次以防万一
         await engine.WaitSettledAsync();

@@ -165,7 +165,9 @@ public class GameEngine
         State.TurnCount = 0; // 在双方完成 mulligan 后调用 TurnEngine.StartFirstTurn 才进入 turn 1
         if (!_deferInitialSetupUntilStart && firstPlayer < 0)
         {
+            State.OpeningStage = OpeningStage.RollingDice;
             RollStartingDice();
+            State.OpeningStage = OpeningStage.WaitingFirstPlayerChoice;
             State.StartingPlayerChoiceDeadlineUtc = DateTime.UtcNow.AddSeconds(StartingPlayerChoiceTimeoutSeconds);
         }
         Prompts = new PromptSystem(this);
@@ -182,6 +184,7 @@ public class GameEngine
     {
         if (!_deferInitialSetupUntilStart || _openingSequenceStarted) return;
         _openingSequenceStarted = true;
+        State.OpeningStage = OpeningStage.ResolvingOpeningEffects;
         _ = Track(CompleteInitialOpeningSequenceAsync());
     }
 
@@ -199,7 +202,9 @@ public class GameEngine
         }
         else
         {
+            State.OpeningStage = OpeningStage.RollingDice;
             RollStartingDice();
+            State.OpeningStage = OpeningStage.WaitingFirstPlayerChoice;
             State.StartingPlayerChoiceDeadlineUtc = DateTime.UtcNow.AddSeconds(StartingPlayerChoiceTimeoutSeconds);
         }
 
@@ -339,6 +344,7 @@ public class GameEngine
         }
 
         var goFirst = goFirstElement.GetBoolean();
+        State.OpeningStage = OpeningStage.Mulligan;
         State.StartingPlayerChoiceDeadlineUtc = null;
         State.FirstPlayer = goFirst ? playerIndex : 1 - playerIndex;
         State.CurrentTurnPlayer = State.FirstPlayer;
@@ -1328,7 +1334,10 @@ public class GameEngine
     // ── Mulligan ─────────────────────────────────────────────────────────
 
     private void BeginMulliganPhase()
-        => State.MulliganDeadlineUtc = DateTime.UtcNow.AddSeconds(MulliganTimeoutSeconds);
+    {
+        State.OpeningStage = OpeningStage.Mulligan;
+        State.MulliganDeadlineUtc = DateTime.UtcNow.AddSeconds(MulliganTimeoutSeconds);
+    }
 
     /// <summary>调度截止时，令所有尚未决定的玩家自动保留手牌。由房间串行队列调用。</summary>
     public IReadOnlyList<int> AutoKeepMulligans(DateTime utcNow)
@@ -1388,6 +1397,7 @@ public class GameEngine
             State.MulliganDeadlineUtc = null;
             CaptureStartingHands();
             TurnEngine.StartFirstTurn(State);
+            State.OpeningStage = OpeningStage.Playing;
             // 注册双方领袖的永续被动（如 OP16-080【对方回合中】我方角色费用+1）。
             // 注册为纯状态写入（无 prompt），同步完成后再广播，使快照立即包含该效果。
             RegisterLeaderPassives();

@@ -34,6 +34,7 @@ public static class GameRoomManager
 
     /// <summary>房间池</summary>
     private static readonly ConcurrentDictionary<string, RoomEntry> _rooms = new();
+    private static readonly ConcurrentDictionary<string, string> _accountRoom = new(StringComparer.OrdinalIgnoreCase);
     private static GameMaintenanceState Maintenance = new();
 
     public static int RoomCount => _rooms.Count;
@@ -160,6 +161,9 @@ public static class GameRoomManager
             throw new InvalidOperationException("同一连接不能同时作为对局双方");
         if (!vsBot && string.Equals(p0Account, p1Account, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("同一账号不能同时作为真人对局双方");
+
+        using var accountAdmission = ReserveAccountSeats(
+            vsBot ? [p0Account] : [p0Account, p1Account]);
 
         if (!ServerCapacity.CanCreateRoom(out var overloadReason))
             throw new InvalidOperationException($"服务器暂时无法创建新对局：{overloadReason}");
@@ -290,6 +294,7 @@ public static class GameRoomManager
         StartActionWorker(entry);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
+        accountAdmission.Commit(roomId);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         if (broadcastInitialState)
@@ -304,6 +309,46 @@ public static class GameRoomManager
         if (source is null) return;
         foreach (var (number, sprite) in source)
             target[number] = sprite;
+    }
+
+    private static AccountSeatLease ReserveAccountSeats(IEnumerable<string> accounts)
+    {
+        var normalized = accounts.Where(account => !string.IsNullOrWhiteSpace(account))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string reservationId = "creating:" + Guid.NewGuid().ToString("N");
+        var claimed = new List<string>();
+        foreach (var account in normalized)
+        {
+            if (_accountRoom.TryAdd(account, reservationId))
+            {
+                claimed.Add(account);
+                continue;
+            }
+            foreach (var existing in claimed)
+                _accountRoom.TryRemove(new KeyValuePair<string, string>(existing, reservationId));
+            throw new InvalidOperationException($"账号「{account}」已在其他对局中");
+        }
+        return new AccountSeatLease(reservationId, claimed);
+    }
+
+    private sealed class AccountSeatLease(string reservationId, IReadOnlyList<string> accounts) : IDisposable
+    {
+        private string? _roomId;
+
+        public void Commit(string roomId)
+        {
+            foreach (var account in accounts)
+                _accountRoom.TryUpdate(account, roomId, reservationId);
+            _roomId = roomId;
+        }
+
+        public void Dispose()
+        {
+            if (_roomId is not null) return;
+            foreach (var account in accounts)
+                _accountRoom.TryRemove(new KeyValuePair<string, string>(account, reservationId));
+        }
     }
 
     private static IDisposable ReserveRoomCreation()
@@ -929,6 +974,7 @@ public static class GameRoomManager
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
+            room.Engine.BeginOpeningSequence();
             await ResolveExpiredStartingPlayerChoiceAsync(room, DateTime.UtcNow);
             EnsureStartingPlayerChoiceTimeout(room);
             await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
@@ -1456,6 +1502,8 @@ public static class GameRoomManager
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
+            foreach (var account in r.PlayerAccounts.Where(account => !string.IsNullOrWhiteSpace(account)))
+                _accountRoom.TryRemove(new KeyValuePair<string, string>(account, roomId));
             lock (r.ClockGate) CancelOperationClockTimerLocked(r);
             TrySettleRankedMatch(r);
             WebSocketBridge.OnGameRoomClosed(
@@ -1847,7 +1895,8 @@ public static class GameRoomManager
             p1AlwaysPrompt: p1Always,
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset);
-        if (!engine.State.StartingPlayerChosen)
+        if (!engine.State.StartingPlayerChosen
+            && engine.State.OpeningStage == OpeningStage.WaitingFirstPlayerChoice)
             engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
         engine.State.Players[0].DisplayName = p0DisplayName;
@@ -1930,6 +1979,8 @@ public static class GameRoomManager
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）
 
         _rooms[roomId] = entry;
+        foreach (var account in entry.PlayerAccounts.Where(account => !string.IsNullOrWhiteSpace(account)))
+            _accountRoom[account] = roomId;
         RoomDirectory.RegisterLocal(roomId);
         StartActionWorker(entry);
         StartDisconnectGraceTimer(entry, 0, entry.PlayerSessionIds[0], entry.DisconnectGraceRemainingMs[0]);

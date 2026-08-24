@@ -137,6 +137,7 @@ interface GameStore {
   turnCount: number;
   firstPlayer: number;
   firstPlayerChosen: boolean;
+  openingStage: NonNullable<MsgGameState["openingStage"]>;
   isFirstPlayer: boolean;
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;
@@ -248,6 +249,7 @@ export const useGameStore = create<GameStore>()(
     turnCount: 0,
     firstPlayer: -1,
     firstPlayerChosen: false,
+    openingStage: "NotStarted",
     isFirstPlayer: false,
     canChooseFirstPlayer: false,
     diceWinnerIsMe: false,
@@ -318,6 +320,7 @@ export const useGameStore = create<GameStore>()(
         // firstPlayerChosen 是骰点流程上线后新增的字段。旧回放虽没有该字段，
         // 但 firstPlayer 已是 0/1；据此兼容推断，避免 HandArea 把整局手牌隐藏。
         s.firstPlayerChosen = msg.firstPlayerChosen ?? (firstPlayer === 0 || firstPlayer === 1);
+        s.openingStage = msg.openingStage ?? (s.firstPlayerChosen ? "Mulligan" : "NotStarted");
         s.isFirstPlayer = msg.isFirstPlayer ?? false;
         s.canChooseFirstPlayer = msg.canChooseFirstPlayer ?? false;
         s.diceWinnerIsMe = msg.diceWinnerIsMe ?? false;
@@ -501,6 +504,7 @@ export const useGameStore = create<GameStore>()(
       s.turnCount = 0;
       s.firstPlayer = -1;
       s.firstPlayerChosen = false;
+      s.openingStage = "NotStarted";
       s.isFirstPlayer = false;
       s.canChooseFirstPlayer = false;
       s.diceWinnerIsMe = false;

@@ -80,6 +80,8 @@ export default function FirstPlayerOverlay() {
   const my = useGameStore((s) => s.my);
   const opponent = useGameStore((s) => s.opponent);
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
+  const openingStage = useGameStore((s) => s.openingStage);
+  const pendingPrompt = useGameStore((s) => s.pendingPrompt);
   const canChooseFirstPlayer = useGameStore((s) => s.canChooseFirstPlayer);
   const diceWinnerIsMe = useGameStore((s) => s.diceWinnerIsMe);
   const startingPlayerChoiceDeadlineUtc = useGameStore((s) => s.startingPlayerChoiceDeadlineUtc);
@@ -155,10 +157,13 @@ export default function FirstPlayerOverlay() {
     };
   }, [firstPlayerChosen, startingDiceRolls]);
 
-  if (!my || firstPlayerChosen) return null;
+  // 开局卡效选择优先于骰子遮罩；重连快照同时带回 PendingPrompt 时必须让选择框接管画面。
+  if (!my || firstPlayerChosen || pendingPrompt) return null;
 
   const currentRoll = startingDiceRolls[roundIndex];
   const isTie = settled && currentRoll?.tie;
+  const resolvingOpeningEffects = openingStage === "ResolvingOpeningEffects"
+    || openingStage === "WaitingOpeningPrompt";
 
   return (
     <AnimatePresence>
@@ -175,9 +180,13 @@ export default function FirstPlayerOverlay() {
         exit={{ opacity: 0 }}
       >
         <div className="text-center">
-          <p className="text-2xl font-black tracking-wide text-white">投骰决定选择权</p>
+          <p className="text-2xl font-black tracking-wide text-white">
+            {resolvingOpeningEffects ? "正在处理开局效果" : "投骰决定选择权"}
+          </p>
           <p className="mt-2 text-sm text-slate-400">
-            {startingDiceRolls.length > 0 ? `第 ${roundIndex + 1} 次投掷` : "正在准备骰子..."}
+            {resolvingOpeningEffects
+              ? "完成卡牌效果后将自动投骰"
+              : startingDiceRolls.length > 0 ? `第 ${roundIndex + 1} 次投掷` : "正在准备骰子..."}
           </p>
         </div>
 

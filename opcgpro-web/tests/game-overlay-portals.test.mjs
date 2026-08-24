@@ -94,3 +94,20 @@ test("对局设置的同类浮层不再使用未旋转的视口宽高", async ()
   assert.ok((menu.match(/min-h-12/g)?.length ?? 0) >= 2);
   assert.match(menu, /h-12 w-12/);
 });
+
+test("开局卡效提示优先于骰子遮罩且保留安全区", async () => {
+  const [overlay, feedback] = await Promise.all([
+    readSource("../src/components/game/FirstPlayerOverlay.tsx"),
+    readSource("../src/components/game/FeedbackOverlay.tsx"),
+  ]);
+
+  assert.match(overlay, /const pendingPrompt = useGameStore/);
+  assert.match(overlay, /if \(!my \|\| firstPlayerChosen \|\| pendingPrompt\) return null/);
+  assert.match(overlay, /openingStage === "ResolvingOpeningEffects"[\s\S]*?openingStage === "WaitingOpeningPrompt"/);
+  assert.match(overlay, /var\(--layout-safe-top/);
+  assert.match(overlay, /var\(--layout-safe-right/);
+  assert.match(overlay, /var\(--layout-safe-bottom/);
+  assert.match(overlay, /var\(--layout-safe-left/);
+  assert.ok((overlay.match(/min-h-11/g)?.length ?? 0) >= 2);
+  assert.match(feedback, /right: "calc\(6\.75rem \+ var\(--layout-safe-right/);
+});

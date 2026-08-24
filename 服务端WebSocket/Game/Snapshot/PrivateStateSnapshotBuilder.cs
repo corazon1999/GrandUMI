@@ -14,6 +14,10 @@ public static class PrivateStateSnapshotBuilder
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
             firstPlayerChosen = state.StartingPlayerChosen,
+            openingStage = state.PendingPrompt is not null
+                && state.OpeningStage == OpeningStage.ResolvingOpeningEffects
+                    ? "WaitingOpeningPrompt"
+                    : state.OpeningStage.ToString(),
             startingPlayerChooser = state.StartingPlayerChooser,
             startingPlayerChoiceDeadlineUtc = state.StartingPlayerChoiceDeadlineUtc,
             startingDiceRolls = state.StartingDiceRounds.Select(round => new

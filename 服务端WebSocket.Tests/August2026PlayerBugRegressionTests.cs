@@ -299,7 +299,9 @@ public class August2026PlayerBugRegressionTests
         var source = me.Characters[0];
         var target = me.Characters[1];
         for (int i = 0; i < 4; i++) me.CostArea.Add(new DonCard { State = DonState.Rest });
-        var prompts = new MockPromptService().QueueChoose(target.Id.ToString());
+        var prompts = new MockPromptService()
+            .QueueChoose(target.Id.ToString())
+            .QueueOption(2);
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.ActivatedMain, prompts);
 

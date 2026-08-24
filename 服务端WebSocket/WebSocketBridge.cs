@@ -51,6 +51,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              WildRankedMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
+    private static readonly ConcurrentDictionary<string, string>    MatchAccountReservations = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
     private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
     private static readonly ConcurrentDictionary<string, InviteInfo> PendingInvites = new(); // inviteId → 邀请对战
@@ -943,6 +944,7 @@ public static class WebSocketBridge
         if (!IsCurrentAccountSession(s))
         {
             s.IsMatching = false;
+            ReleaseMatchAccountReservation(s);
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "登录会话已失效，请重新连接" });
             return;
         }
@@ -970,16 +972,26 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择阵营，阵营选定后不可更改" });
             return;
         }
-        s.Deck = deck;
-        s.DeckName = Str(msg, "deckName");
-        s.MatchQueueKind = queueKind;
-        s.MatchEnqueuedAtUtc = DateTime.UtcNow;
-        s.MatchRating = ranked
-            ? RankedStore.ForMode(rankedMode).GetMatchRating(s.Account!, s.PlayerName)
-            : 1500;
-        s.IsMatching = true;
         var queue = QueueFor(queueKind);
-        queue.Enqueue(s);
+        lock (MatchQueueGate)
+        {
+            // 从“校验空闲”到“加入队列”必须是账号级原子操作。配对取出后、房间索引建立前，
+            // IsMatching 会短暂为 false，账号占位仍保留，防止另一条并发请求进入其它队列。
+            if (StatusOf(s) != "idle" || !TryReserveMatchAccount(s))
+            {
+                Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在匹配、房间或对局中" });
+                return;
+            }
+            s.Deck = deck;
+            s.DeckName = Str(msg, "deckName");
+            s.MatchQueueKind = queueKind;
+            s.MatchEnqueuedAtUtc = DateTime.UtcNow;
+            s.MatchRating = ranked
+                ? RankedStore.ForMode(rankedMode).GetMatchRating(s.Account!, s.PlayerName)
+                : 1500;
+            s.IsMatching = true;
+            queue.Enqueue(s);
+        }
         Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind });
         Log($"{QueueLabel(queueKind)}匹配加入 {s.Account}");
         TryMatch(queueKind);
@@ -1004,6 +1016,11 @@ public static class WebSocketBridge
             return;
         }
 
+        if (!TryReserveMatchAccount(s))
+        {
+            Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间或对局中" });
+            return;
+        }
         s.IsMatching = false;
         var botSid = "BOT-" + Guid.NewGuid().ToString("N")[..8];
         const string botName = "测试机器人";
@@ -1043,6 +1060,7 @@ public static class WebSocketBridge
             LogErr($"单人测试建房失败: {ex.Message}");
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
         }
+        finally { ReleaseMatchAccountReservation(s); }
     }
 
     private static void OnCancelMatch(WsSession s, Dictionary<string, JsonElement> _)
@@ -1109,6 +1127,11 @@ public static class WebSocketBridge
                 LogErr($"创建房间失败: {ex.Message}");
                 Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
                 Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "服务器繁忙，请稍后重试" });
+            }
+            finally
+            {
+                ReleaseMatchAccountReservation(p1);
+                ReleaseMatchAccountReservation(p2);
             }
         }
     }
@@ -1187,6 +1210,7 @@ public static class WebSocketBridge
                     if (string.Equals(first.Account, second.Account, StringComparison.OrdinalIgnoreCase))
                     {
                         second.IsMatching = false;
+                        ReleaseMatchAccountReservation(second);
                         continue;
                     }
                     var gap = Math.Abs(first.MatchRating - second.MatchRating);
@@ -1231,10 +1255,16 @@ public static class WebSocketBridge
     {
         while (queue.TryDequeue(out var candidate))
         {
-            if (!candidate.IsMatching || candidate.Socket.State != WebSocketState.Open) continue;
+            if (!candidate.IsMatching || candidate.Socket.State != WebSocketState.Open)
+            {
+                if (candidate.Socket.State != WebSocketState.Open)
+                    ReleaseMatchAccountReservation(candidate);
+                continue;
+            }
             if (!IsCurrentAccountSession(candidate))
             {
                 candidate.IsMatching = false;
+                ReleaseMatchAccountReservation(candidate);
                 continue;
             }
             session = candidate;
@@ -1259,6 +1289,19 @@ public static class WebSocketBridge
         // ConcurrentQueue 不支持按项删除；把取消项标记为墓碑，由下一次匹配 O(1) 跳过。
         // 避免每次取消或断线都重建整条队列，形成高峰期 O(N²) 开销。
         exclude.IsMatching = false;
+        ReleaseMatchAccountReservation(exclude);
+    }
+
+    private static bool TryReserveMatchAccount(WsSession session)
+        => session.Account is { Length: > 0 } account
+           && MatchAccountReservations.TryAdd(account, session.SessionId);
+
+    private static void ReleaseMatchAccountReservation(WsSession session)
+    {
+        if (session.Account is not { Length: > 0 } account) return;
+        if (MatchAccountReservations.TryGetValue(account, out var ownerSessionId)
+            && ownerSessionId == session.SessionId)
+            MatchAccountReservations.TryRemove(new KeyValuePair<string, string>(account, ownerSessionId));
     }
 
     private static void SendRankSnapshot(WsSession session, RankedMode mode = RankedMode.Standard)
@@ -3180,6 +3223,7 @@ public static class WebSocketBridge
         {
             if (!session.IsMatching) continue;
             session.IsMatching = false;
+            ReleaseMatchAccountReservation(session);
             session.Deck = null;
             session.DeckName = null;
             Send(session.SessionId, new

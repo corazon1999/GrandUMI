@@ -1059,6 +1059,7 @@ export interface MsgGameState extends MsgBase {
   turnCount: number;
   firstPlayer: number;
   firstPlayerChosen: boolean;
+  openingStage?: "NotStarted" | "ResolvingOpeningEffects" | "WaitingOpeningPrompt" | "RollingDice" | "WaitingFirstPlayerChoice" | "Mulligan" | "Playing";
   isFirstPlayer: boolean;
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;

@@ -3,6 +3,7 @@ using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Snapshot;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -208,9 +209,14 @@ public class QqFeedback20260816RegressionTests
 
         var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
         Assert.Equal(0, prompt.PlayerIndex);
+        Assert.Equal(OpeningStage.ResolvingOpeningEffects, engine.State.OpeningStage);
         Assert.Empty(engine.State.StartingDiceRounds);
         Assert.Empty(engine.State.Players[0].Hand);
         Assert.Empty(engine.State.Players[0].LifeArea);
+
+        var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(engine.State, 0));
+        Assert.Equal("WaitingOpeningPrompt", snapshot.GetProperty("openingStage").GetString());
+        Assert.Equal(prompt.PromptId, snapshot.GetProperty("pendingPrompt").GetProperty("promptId").GetString());
 
         Assert.True(engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
         {
@@ -221,9 +227,48 @@ public class QqFeedback20260816RegressionTests
 
         Assert.Equal("OP13-099", engine.State.Players[0].StageCard?.Info.Number);
         Assert.NotEmpty(engine.State.StartingDiceRounds);
+        Assert.Equal(OpeningStage.WaitingFirstPlayerChoice, engine.State.OpeningStage);
         Assert.False(engine.State.StartingPlayerChosen);
         Assert.Empty(engine.State.Players[0].Hand);
         Assert.Empty(engine.State.Players[0].LifeArea);
+        Assert.False(engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        })));
+    }
+
+    [Fact]
+    public async Task OP13_079_RestartRebuildKeepsOpeningPromptAndContinuesToDice()
+    {
+        _ = TestScene.New().Build();
+        string imuDeck = "OP13-079\n" + string.Join('\n', Enumerable.Repeat("OP13-099", 4))
+            + "\n" + string.Join('\n', Enumerable.Repeat("OP13-080", 6));
+        string otherDeck = "OP15-001\n" + string.Join('\n', Enumerable.Repeat("OP15-003", 10));
+
+        var rebuilt = await MatchReplay.RebuildAsync(
+            "rebuild-deferred-online-opening",
+            seed: 23,
+            firstPlayer: -1,
+            ("p0", imuDeck),
+            ("p1", otherDeck),
+            Array.Empty<MatchReplay.ActionEntry>(),
+            openingSetupAfterFirstPlayerChoice: true);
+
+        var prompt = Assert.IsType<PendingPrompt>(rebuilt.State.PendingPrompt);
+        Assert.Equal(OpeningStage.ResolvingOpeningEffects, rebuilt.State.OpeningStage);
+        Assert.Empty(rebuilt.State.StartingDiceRounds);
+
+        Assert.True(rebuilt.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        })));
+        await rebuilt.WaitSettledAsync(resolvingPromptId: prompt.PromptId);
+
+        Assert.Null(rebuilt.State.PendingPrompt);
+        Assert.NotEmpty(rebuilt.State.StartingDiceRounds);
+        Assert.Equal(OpeningStage.WaitingFirstPlayerChoice, rebuilt.State.OpeningStage);
     }
 
     private static BattleContext BattleWithBlocker(GameState state, CardInstance blocker)

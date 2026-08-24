@@ -16,21 +16,33 @@ public sealed class MatchmakingIdentityTests : IDisposable
         "MatchQueue", BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly FieldInfo AccountIndexField = typeof(WebSocketBridge).GetField(
         "AccountIndex", BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly FieldInfo MatchAccountReservationsField = typeof(WebSocketBridge).GetField(
+        "MatchAccountReservations", BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo TryTakeMatchPairMethod = typeof(WebSocketBridge).GetMethod(
         "TryTakeMatchPair", BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly MethodInfo TryReserveMatchAccountMethod = typeof(WebSocketBridge).GetMethod(
+        "TryReserveMatchAccount", BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly MethodInfo ReleaseMatchAccountReservationMethod = typeof(WebSocketBridge).GetMethod(
+        "ReleaseMatchAccountReservation", BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private readonly ConcurrentQueue<WsSession> _matchQueue =
         (ConcurrentQueue<WsSession>)MatchQueueField.GetValue(null)!;
     private readonly ConcurrentDictionary<string, string> _accountIndex =
         (ConcurrentDictionary<string, string>)AccountIndexField.GetValue(null)!;
+    private readonly ConcurrentDictionary<string, string> _matchAccountReservations =
+        (ConcurrentDictionary<string, string>)MatchAccountReservationsField.GetValue(null)!;
     private readonly List<WsSession> _sessions = [];
 
     public MatchmakingIdentityTests()
     {
         Assert.NotNull(MatchQueueField);
         Assert.NotNull(AccountIndexField);
+        Assert.NotNull(MatchAccountReservationsField);
         Assert.NotNull(TryTakeMatchPairMethod);
+        Assert.NotNull(TryReserveMatchAccountMethod);
+        Assert.NotNull(ReleaseMatchAccountReservationMethod);
         DrainQueue();
+        _matchAccountReservations.Clear();
     }
 
     [Fact]
@@ -106,6 +118,42 @@ public sealed class MatchmakingIdentityTests : IDisposable
         Assert.Equal(roomCount, GameRoomManager.RoomCount);
     }
 
+    [Fact]
+    public void 同账号并发申请匹配占位_只有一个请求成功()
+    {
+        var session = Session("并发匹配玩家");
+        var results = new bool[2];
+
+        Parallel.For(0, 2, index =>
+            results[index] = (bool)TryReserveMatchAccountMethod.Invoke(null, [session])!);
+
+        Assert.Single(results.Where(result => result));
+        ReleaseMatchAccountReservationMethod.Invoke(null, [session]);
+        Assert.Empty(_matchAccountReservations);
+    }
+
+    [Fact]
+    public void 已在房间中的账号_不能被创建进第二个房间()
+    {
+        var deck = string.Join('\n', new[] { "OP15-001" }.Concat(Enumerable.Repeat("OP15-003", 50)));
+        var room = GameRoomManager.CreateRoom(
+            "seat-a", "占座玩家", deck,
+            "seat-b", "对手甲", deck,
+            broadcastInitialState: false);
+        try
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => GameRoomManager.CreateRoom(
+                "seat-c", "占座玩家", deck,
+                "seat-d", "对手乙", deck,
+                broadcastInitialState: false));
+            Assert.Contains("已在其他对局", error.Message);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(room.RoomId);
+        }
+    }
+
     public void Dispose()
     {
         foreach (var session in _sessions)
@@ -118,6 +166,7 @@ public sealed class MatchmakingIdentityTests : IDisposable
             session.Socket.Dispose();
         }
         DrainQueue();
+        _matchAccountReservations.Clear();
     }
 
     private WsSession Session(string account)

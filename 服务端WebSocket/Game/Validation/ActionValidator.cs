@@ -168,6 +168,9 @@ public static class ActionValidator
               ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
         if (source is null) return Fail("效果来源不在你场上");
 
+        if (!HasMetCardSpecificActivationTiming(s, playerIdx, source))
+            return Fail("该效果要到你的第2回合及以后才能发动");
+
         // OP17-044 的「将此角色转为休息状态」是发动成本；无法完成该状态变更时不能发动。
         if (source.Info.Number == "OP17-044"
             && (source.IsTapped
@@ -175,6 +178,14 @@ public static class ActionValidator
                 || s.HasContinuousRestriction(source, RestrictionKind.CannotBeRested)))
             return Fail("约翰船长当前无法转为休息状态，不能支付发动成本");
         return OkResult;
+    }
+
+    /// <summary>卡牌专属的启动主要时点限制；同时供动作校验与快照按钮可用性复用。</summary>
+    public static bool HasMetCardSpecificActivationTiming(GameState s, int playerIdx, CardInstance source)
+    {
+        if (source.Info.Number != "OP15-058") return true;
+        int secondOwnTurn = s.FirstPlayer == playerIdx ? 3 : 4;
+        return s.TurnCount >= secondOwnTurn;
     }
 
     public static Result CanDeclareBlocker(GameState s, int playerIdx, Guid blockerId)

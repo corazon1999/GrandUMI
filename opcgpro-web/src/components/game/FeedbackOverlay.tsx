@@ -197,7 +197,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
           onClick={() => setOpen(true)}
           className="fixed z-[90] flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-amber-300/50 bg-slate-950/95 px-3 text-xs font-black text-amber-100 shadow-xl shadow-black/50 md:hidden"
           style={{
-            right: "calc(0.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+            right: "calc(6.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
             bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
           }}
           aria-label="打开 Bug 和建议反馈（快捷键 F）"
