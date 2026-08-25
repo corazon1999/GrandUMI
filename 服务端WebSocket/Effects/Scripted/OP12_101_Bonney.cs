@@ -14,10 +14,6 @@ namespace GrandUMI.Effects.Scripted;
 ///     故此处从废弃区免费登场；仅当我方领袖拥有《超新星》特征时才登场（否则留在废弃区）。
 ///   - 【启动主要】(ActivatedMain)：代价为将此角色转为休息状态（自身需为活跃）；
 ///     若我方领袖拥有《超新星》特征，则领袖力量 +1000。
-///
-/// 简化点：
-///   - "直到下个对方的回合结束时为止"用 AddPowerThisTurn 近似（引擎无该精确持续力量通道，
-///     PowerModThisTurn 在本回合结束阶段清除）。对己方回合内的进攻配合实战意义一致。
 /// </summary>
 public class OP12_101_Bonney : IScriptedEffect
 {
@@ -46,9 +42,9 @@ public class OP12_101_Bonney : IScriptedEffect
             if (ctx.Source.IsTapped) return;
             ctx.Source.IsTapped = true;
 
-            // 效果：我方领袖拥有《超新星》特征时，领袖力量 +1000（近似为本回合）
+            // 效果：我方领袖拥有《超新星》特征时，领袖力量 +1000，持续到下个对方回合结束。
             if (me.Leader.Info.HasKeyword("超新星"))
-                AtomicOps.AddPowerThisTurn(me.Leader, 1000);
+                AtomicOps.AddPowerUntilOppEnd(me.Leader, 1000, ctx.OwnerIndex);
 
             await Task.CompletedTask;
         }

@@ -1597,6 +1597,9 @@ internal static class OP17Effects
             return;
         }
         if (c.Trigger != EffectTrigger.OnEnterField) return;
+        if (!Me(c).Hand.Any(x => !string.IsNullOrEmpty(x.Info.Trigger))
+            || !await c.Prompts.ConfirmOptional(c.OwnerIndex,
+                "丢弃1张拥有【触发】的手牌，抽取3张卡牌？")) return;
         if (!await DiscardOwnFiltered(c, x => !string.IsNullOrEmpty(x.Info.Trigger), 1, "选择丢弃1张拥有【触发】的手牌")) return;
         AtomicOps.Draw(c.State, c.OwnerIndex, 3);
     }

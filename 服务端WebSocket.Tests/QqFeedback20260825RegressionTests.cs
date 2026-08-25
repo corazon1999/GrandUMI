@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
 using System.Text.Json;
@@ -164,6 +165,115 @@ public class QqFeedback20260825RegressionTests
         Assert.Contains(entering.Id.ToString(), orderPrompt.choices);
         Assert.Contains(me.Hand, card => card.Info.Number == "OP14-042");
         Assert.Empty(me.Deck);
+    }
+
+    [Fact]
+    public async Task OP12_101_PowerBoostLastsUntilNextOpponentEndPhase()
+    {
+        var state = TestScene.New("OP14-001").Build();
+        var me = state.Players[0];
+        var bonney = Card("OP12-101");
+        me.Characters.Add(bonney);
+
+        await EffectRuntime.Resolve(state, 0, bonney, EffectTrigger.ActivatedMain, new MockPromptService());
+
+        var modifier = Assert.Single(me.Leader.PowerModsUntilOppEnd);
+        Assert.Equal(1000, modifier.Delta);
+        Assert.Equal(0, modifier.AppliedBySide);
+        Assert.Equal(0, me.Leader.PowerModThisTurn);
+
+        state.CurrentTurnPlayer = 0;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Single(me.Leader.PowerModsUntilOppEnd);
+
+        state.CurrentTurnPlayer = 1;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Empty(me.Leader.PowerModsUntilOppEnd);
+    }
+
+    [Fact]
+    public async Task OP17_109_OnEnterEffectCanBeDeclined()
+    {
+        var state = TestScene.New()
+            .MyHandAdd("OP17-104")
+            .MyDeckTop("OP17-101", "OP17-102", "OP17-103")
+            .Build();
+        var me = state.Players[0];
+        var originalHand = Assert.Single(me.Hand);
+
+        await EffectRuntime.Resolve(state, 0, Card("OP17-109"), EffectTrigger.OnEnterField,
+            new MockPromptService().QueueConfirm(false));
+
+        Assert.Equal(new[] { originalHand.Id }, me.Hand.Select(card => card.Id));
+        Assert.Equal(3, me.Deck.Count);
+        Assert.Empty(me.Trash);
+    }
+
+    [Fact]
+    public async Task OP17_109_AcceptedEffectDiscardsSelectedTriggerCardThenDrawsThree()
+    {
+        var state = TestScene.New()
+            .MyHandAdd("OP17-104")
+            .MyHandAdd("OP17-105")
+            .MyDeckTop("OP17-101", "OP17-102", "OP17-103")
+            .Build();
+        var me = state.Players[0];
+        var discard = me.Hand.Single(card => card.Info.Number == "OP17-104");
+        var keep = me.Hand.Single(card => card.Info.Number == "OP17-105");
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, Card("OP17-109"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Contains(discard, me.Trash);
+        Assert.Contains(keep, me.Hand);
+        Assert.Equal(4, me.Hand.Count);
+        Assert.Empty(me.Deck);
+    }
+
+    [Fact]
+    public async Task OP15_045_OnEnterEffectLetsPlayerChooseEventCostBeforeDrawingTwo()
+    {
+        var state = TestScene.New()
+            .MyHandAdd("OP14-117")
+            .MyHandAdd("OP14-116")
+            .MyDeckTop("OP15-040", "OP15-041")
+            .Build();
+        var me = state.Players[0];
+        var discard = me.Hand.Single(card => card.Info.Number == "OP14-117");
+        var keep = me.Hand.Single(card => card.Info.Number == "OP14-116");
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(discard.Id.ToString());
+
+        await EffectRuntime.Resolve(state, 0, Card("OP15-045"), EffectTrigger.OnEnterField, prompts);
+
+        var costPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OP15_045_DiscardEvent", costPrompt.kind);
+        Assert.Contains(discard.Id.ToString(), costPrompt.choices);
+        Assert.Contains(keep.Id.ToString(), costPrompt.choices);
+        Assert.Contains(discard, me.Trash);
+        Assert.Contains(keep, me.Hand);
+        Assert.Equal(3, me.Hand.Count);
+        Assert.Empty(me.Deck);
+    }
+
+    [Fact]
+    public async Task OP15_045_OnEnterEffectCanBeDeclinedWithoutDiscardOrDraw()
+    {
+        var state = TestScene.New()
+            .MyHandAdd("OP14-117")
+            .MyDeckTop("OP15-040", "OP15-041")
+            .Build();
+        var me = state.Players[0];
+
+        await EffectRuntime.Resolve(state, 0, Card("OP15-045"), EffectTrigger.OnEnterField,
+            new MockPromptService().QueueConfirm(false));
+
+        Assert.Single(me.Hand);
+        Assert.Equal(2, me.Deck.Count);
+        Assert.Empty(me.Trash);
     }
 
     private static bool LeaderOncePerTurnAvailable(GameState state)
