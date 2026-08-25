@@ -54,6 +54,19 @@ test("管理面板展示低频缓存的每日场次与磁盘容量", () => {
   assert.match(types, /interface AdminStorageSnapshot/);
 });
 
+test("所有折线图数据点都支持悬停、键盘和触摸查看具体数值", () => {
+  assert.match(admin, /function InteractiveLinePoints/);
+  assert.equal([...admin.matchAll(/<InteractiveLinePoints/g)].length, 2);
+  assert.match(admin, /data-line-point=/);
+  assert.match(admin, /data-line-tooltip=/);
+  assert.match(admin, /onPointerEnter=/);
+  assert.match(admin, /onFocus=/);
+  assert.match(admin, /onClick=\{toggleSelected\}/);
+  assert.match(admin, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(admin, /r="16" fill="transparent"/);
+  assert.match(admin, /aria-label=\{`\$\{point\.label\}，\$\{point\.value\} \$\{unit\}`\}/);
+});
+
 test("管理员先搜索并选中玩家再执行改名或密码重置", () => {
   assert.match(admin, /玩家账号管理/);
   assert.match(admin, /HomeRequest\.searchAdminPlayers\(query\)/);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { showMessage } from "@/components/ui/MessageBox";
+import { positionLineChartTooltip } from "@/lib/lineChartTooltip";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import type {
@@ -65,6 +66,89 @@ function StatusCard({
   return <article className={`min-w-0 rounded-2xl border p-4 ${toneClasses}`}>{content}</article>;
 }
 
+type InteractiveChartPoint = {
+  key: string;
+  label: string;
+  value: number;
+  x: number;
+  y: number;
+};
+
+function InteractiveLinePoints({
+  points,
+  width,
+  height,
+  unit,
+  dotFill,
+  dotStroke,
+  accent,
+}: {
+  points: InteractiveChartPoint[];
+  width: number;
+  height: number;
+  unit: string;
+  dotFill: string;
+  dotStroke: string;
+  accent: string;
+}) {
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const activeKey = hoveredKey ?? focusedKey ?? selectedKey;
+  const activePoint = points.find((point) => point.key === activeKey) ?? null;
+  const tooltipWidth = 168;
+  const tooltipHeight = 58;
+  const tooltipPosition = activePoint
+    ? positionLineChartTooltip(activePoint.x, activePoint.y, width, height, tooltipWidth, tooltipHeight)
+    : { x: 0, y: 0 };
+
+  return (
+    <>
+      {points.map((point) => {
+        const active = point.key === activeKey;
+        const toggleSelected = () => setSelectedKey((current) => current === point.key ? null : point.key);
+        return (
+          <g
+            key={point.key}
+            role="button"
+            tabIndex={0}
+            focusable="true"
+            aria-label={`${point.label}，${point.value} ${unit}`}
+            data-line-point={point.key}
+            className="cursor-pointer outline-none"
+            onPointerEnter={() => setHoveredKey(point.key)}
+            onPointerLeave={() => setHoveredKey(null)}
+            onFocus={() => setFocusedKey(point.key)}
+            onBlur={() => setFocusedKey(null)}
+            onClick={toggleSelected}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleSelected();
+              } else if (event.key === "Escape") {
+                setSelectedKey(null);
+                event.currentTarget.blur();
+              }
+            }}
+          >
+            <circle cx={point.x} cy={point.y} r="16" fill="transparent" stroke="transparent" pointerEvents="all" />
+            {active && <circle cx={point.x} cy={point.y} r="10" fill={accent} fillOpacity="0.18" stroke={accent} strokeWidth="1.5" pointerEvents="none" />}
+            <circle cx={point.x} cy={point.y} r={active ? 6 : 5} fill={dotFill} stroke={dotStroke} strokeWidth="2" pointerEvents="none" />
+          </g>
+        );
+      })}
+      {activePoint && (
+        <g data-line-tooltip={activePoint.key} pointerEvents="none" aria-hidden="true">
+          <line x1={activePoint.x} x2={activePoint.x} y1="24" y2={height - 24} stroke={accent} strokeWidth="1" strokeDasharray="4 4" opacity="0.45" />
+          <rect x={tooltipPosition.x} y={tooltipPosition.y} width={tooltipWidth} height={tooltipHeight} rx="10" fill="rgb(3 7 18)" fillOpacity="0.97" stroke={accent} strokeWidth="1.5" />
+          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 21} fill="rgb(156 163 175)" fontSize="12">{activePoint.label}</text>
+          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 44} fill="white" fontSize="17" fontWeight="800">{activePoint.value} {unit}</text>
+        </g>
+      )}
+    </>
+  );
+}
+
 function MatchChart({ points }: { points: DailyMatchCountPoint[] }) {
   const chart = useMemo(() => {
     const width = 720;
@@ -104,11 +188,15 @@ function MatchChart({ points }: { points: DailyMatchCountPoint[] }) {
         })}
         <polygon points={chart.area} fill="rgba(139,92,246,0.14)" />
         <polyline points={chart.line} fill="none" stroke="rgb(167 139 250)" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
-        {chart.coordinates.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="5" fill="rgb(109 40 217)" stroke="rgb(221 214 254)" strokeWidth="2">
-            <title>{`${point.date}：${point.count} 场`}</title>
-          </circle>
-        ))}
+        <InteractiveLinePoints
+          points={chart.coordinates.map((point) => ({ key: point.date, label: point.date, value: point.count, x: point.x, y: point.y }))}
+          width={chart.width}
+          height={chart.height}
+          unit="场"
+          dotFill="rgb(109 40 217)"
+          dotStroke="rgb(221 214 254)"
+          accent="rgb(167 139 250)"
+        />
       </svg>
       <div className="mt-2 flex justify-between text-[11px] text-gray-500">
         <span>{points[0]?.date.slice(5)}</span>
@@ -179,13 +267,15 @@ function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
         })}
         <polygon points={chart.area} fill="rgba(34,211,238,0.12)" />
         <polyline points={chart.line} fill="none" stroke="rgb(34 211 238)" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
-        {chart.coordinates.map((point) => (
-          <g key={point.date}>
-            <circle cx={point.x} cy={point.y} r="5" fill="rgb(8 145 178)" stroke="rgb(165 243 252)" strokeWidth="2">
-              <title>{`${point.date}：${point.peak} 人`}</title>
-            </circle>
-          </g>
-        ))}
+        <InteractiveLinePoints
+          points={chart.coordinates.map((point) => ({ key: point.date, label: point.date, value: point.peak, x: point.x, y: point.y }))}
+          width={chart.width}
+          height={chart.height}
+          unit="人"
+          dotFill="rgb(8 145 178)"
+          dotStroke="rgb(165 243 252)"
+          accent="rgb(34 211 238)"
+        />
       </svg>
       <div className="mt-2 flex justify-between text-[11px] text-gray-500">
         <span>{points[0]?.date.slice(5)}</span>
