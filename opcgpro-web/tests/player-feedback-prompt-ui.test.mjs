@@ -125,6 +125,24 @@ test("反馈窗口适配手机安全区且主要操作触控区不少于44像素
   assert.match(feedback, /min-w-11/);
 });
 
+test("问题反馈提示要求使用卡牌编号并提供三语翻译", async () => {
+  const [feedback, i18n] = await Promise.all([
+    readSource("../src/components/game/FeedbackOverlay.tsx"),
+    readSource("../src/i18n/core.mjs"),
+  ]);
+  const gamePrompt =
+    "描述触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前对局信息。";
+  const lobbyPrompt =
+    "描述大厅中触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前页面信息。";
+
+  assert.ok(feedback.includes(gamePrompt));
+  assert.ok(feedback.includes(lobbyPrompt));
+  assert.ok(i18n.includes(`"${gamePrompt}": "Describe`));
+  assert.ok(i18n.includes(`"${lobbyPrompt}": "Describe`));
+  assert.ok(i18n.includes(`"${gamePrompt}": "不具合`));
+  assert.ok(i18n.includes(`"${lobbyPrompt}": "ロビー`));
+});
+
 test("对局反馈在桌面侧栏与手机旋转画布均有入口且弹窗高于公告", async () => {
   const [page, board, feedback] = await Promise.all([
     readSource("../src/app/game/page.tsx"),

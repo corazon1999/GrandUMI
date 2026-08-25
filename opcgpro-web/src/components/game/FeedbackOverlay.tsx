@@ -35,7 +35,7 @@ const CATEGORY_CONFIG: Record<
   bug: {
     tab: "提交 Bug",
     label: "问题描述",
-    placeholder: "描述触发 Bug 的操作、实际现象和期望结果……提交时会自动附带当前对局信息。",
+    placeholder: "描述触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前对局信息。",
   },
   suggestion: {
     tab: "优化建议",
@@ -61,7 +61,7 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
   const title = context === "lobby" ? "问题反馈" : "游戏反馈（F）";
   const placeholder =
     category === "bug" && context === "lobby"
-      ? "描述大厅中触发 Bug 的操作、实际现象和期望结果……提交时会自动附带当前页面信息。"
+      ? "描述大厅中触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前页面信息。"
       : config.placeholder;
 
   useEffect(() => setMounted(true), []);
