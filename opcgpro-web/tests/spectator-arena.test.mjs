@@ -28,7 +28,9 @@ test("观战者发言按账号或名称映射到对应席位并显示限时文�
 
   assert.match(arena, /message\.fromRole !== "spectator"/);
   assert.match(arena, /normalizeIdentity\(message\.fromAccount\)/);
-  assert.match(arena, /normalizeIdentity\(candidate\.account\) === account/);
+  assert.match(arena, /const candidateAccount = normalizeIdentity\(candidate\.account\)/);
+  assert.match(arena, /account && candidateAccount === account/);
+  assert.match(arena, /!candidateAccount && normalizeIdentity\(candidate\.name\) === name/);
   assert.match(arena, /normalizeIdentity\(candidate\.name\) === name/);
   assert.match(arena, /data-spectator-chat-bubble/);
   assert.match(arena, /bubble\.text/);
@@ -39,13 +41,42 @@ test("观战者发言按账号或名称映射到对应席位并显示限时文�
 test("电脑端使用竞技场观战席，手机端保留紧凑观战人数入口", async () => {
   const panel = await read("src/components/game/GameChatPanel.tsx");
 
+  assert.match(
+    panel,
+    /const showSpectatorIndicator = spectatorNames\.length > 0/,
+  );
+  assert.doesNotMatch(
+    panel,
+    /!isObserver && spectatorNames\.length > 0/,
+  );
   assert.match(panel, /<SpectatorArena/);
   assert.match(panel, /spectatorNames=\{spectatorNames\}/);
-  assert.match(panel, /spectatorDetails=\{spectatorDetails\}/);
+  assert.match(
+    panel,
+    /const spectatorDetailsForViewer = isObserver \? \[\] : spectatorDetails/,
+  );
+  assert.match(
+    panel,
+    /spectatorDetails=\{spectatorDetailsForViewer\}/,
+  );
   assert.match(panel, /className="relative md:hidden"/);
   assert.match(panel, /data-mobile-spectator-trigger/);
+  assert.match(panel, /className="relative flex h-12 w-12/);
   assert.match(
     panel,
     /toast\.fromRole === "spectator" && !isObserver \? "md:hidden"/,
+  );
+});
+
+test("观战者的公开名单回包会清空旧的玩家管理详情", async () => {
+  const protocol = await read("src/net/GameProtocol.ts");
+
+  assert.match(
+    protocol,
+    /setSpectatorNames\(spectatorList\.spectators \?\? \[\]\)/,
+  );
+  assert.match(
+    protocol,
+    /setSpectatorDetails\(spectatorList\.details \?\? \[\]\)/,
   );
 });

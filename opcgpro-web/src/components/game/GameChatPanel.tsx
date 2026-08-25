@@ -178,7 +178,8 @@ export default function GameChatPanel({
 
   if (isPlayback) return null;
 
-  const showSpectatorIndicator = !isObserver && spectatorNames.length > 0;
+  const spectatorDetailsForViewer = isObserver ? [] : spectatorDetails;
+  const showSpectatorIndicator = spectatorNames.length > 0;
   const showSpectatorList =
     showSpectatorIndicator && (spectatorHovered || spectatorPinned);
 
@@ -244,7 +245,7 @@ export default function GameChatPanel({
       {showSpectatorIndicator && (
         <SpectatorArena
           spectatorNames={spectatorNames}
-          spectatorDetails={spectatorDetails}
+          spectatorDetails={spectatorDetailsForViewer}
           muted={muted}
           onKick={kickSpectator}
           kickConfirm={kickConfirm}
@@ -523,8 +524,8 @@ export default function GameChatPanel({
                     {spectatorNames.length} 人正在观战
                   </p>
                   <div className="max-h-40 space-y-1 overflow-y-auto">
-                    {(spectatorDetails.length > 0
-                      ? spectatorDetails
+                    {(spectatorDetailsForViewer.length > 0
+                      ? spectatorDetailsForViewer
                       : spectatorNames.map((name) => ({
                           account: name,
                           name,
@@ -545,7 +546,7 @@ export default function GameChatPanel({
                             </p>
                           )}
                         </div>
-                        {spectatorDetails.length > 0 && (
+                        {spectatorDetailsForViewer.length > 0 && (
                           <button
                             type="button"
                             onClick={() => kickSpectator(spectator.account)}

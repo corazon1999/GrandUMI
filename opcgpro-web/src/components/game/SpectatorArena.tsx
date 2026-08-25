@@ -112,9 +112,13 @@ export default function SpectatorArena({
       const account = normalizeIdentity(message.fromAccount);
       const name = normalizeIdentity(message.fromName);
       const seat = seatsRef.current.find(
-        (candidate) =>
-          (account && normalizeIdentity(candidate.account) === account) ||
-          (!account && normalizeIdentity(candidate.name) === name),
+        (candidate) => {
+          const candidateAccount = normalizeIdentity(candidate.account);
+          return (
+            (account && candidateAccount === account) ||
+            (!candidateAccount && normalizeIdentity(candidate.name) === name)
+          );
+        },
       );
       if (!seat) return;
 

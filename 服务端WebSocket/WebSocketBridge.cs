@@ -3033,7 +3033,10 @@ public static class WebSocketBridge
         GameRoomManager.RemoveSpectator(s.SessionId);
     }
 
-    /// <summary>向对战双方推送当前观战者名称列表。</summary>
+    /// <summary>
+    /// 向对战双方和观战者推送当前观战列表。
+    /// 账号、主视角归属和手牌授权只对对战玩家可见。
+    /// </summary>
     public static void BroadcastSpectatorList(GameRoomManager.RoomEntry room)
     {
         var spectators = room.Spectators.Values
@@ -3055,6 +3058,14 @@ public static class WebSocketBridge
                 details,
             });
         }
+
+        var publicPayload = new
+        {
+            proto = "MsgSpectatorList",
+            spectators = spectators.Select(item => item.DisplayName).ToArray(),
+        };
+        foreach (var spectator in spectators)
+            Send(spectator.SessionId, publicPayload);
     }
 
     private static void OnRequestSpectatorHand(WsSession s)

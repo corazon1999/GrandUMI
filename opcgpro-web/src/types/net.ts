@@ -1171,10 +1171,11 @@ export interface MsgLeaveSpectate extends MsgBase {
   logStr?: string;
 }
 
-/** 服务端 → 对战双方：当前观战者名称列表 */
+/** 服务端 → 对战双方/观战者：当前观战者名称列表 */
 export interface MsgSpectatorList extends MsgBase {
   proto: "MsgSpectatorList";
   spectators: string[];
+  /** 仅对战玩家会收到用于管理观战席的详情，观战者不会收到。 */
   details?: Array<{
     account: string;
     name: string;
