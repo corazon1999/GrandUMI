@@ -200,7 +200,7 @@
     "type": "角色",
     "property": "特",
     "power": "8000",
-    "cost": "-",
+    "cost": "7",
     "keyWords": "四皇/大妈海盗团",
     "counter": "",
     "effectTags": [
@@ -306,7 +306,7 @@
     "type": "事件",
     "property": "-",
     "power": "-",
-    "cost": "-",
+    "cost": "5",
     "keyWords": "四皇/大妈海盗团",
     "counter": "",
     "effectTags": [
@@ -328,7 +328,7 @@
     "type": "事件",
     "property": "-",
     "power": "-",
-    "cost": "-",
+    "cost": "1",
     "keyWords": "大妈海盗团",
     "counter": "",
     "effectTags": [

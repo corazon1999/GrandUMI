@@ -929,13 +929,13 @@
   },
   "OP10-063": {
     "_name": "温思默克·山智",
-    "_matcher": "【登场时】领袖含GERMA时确认顶5公开1张含GERMA特征加手牌，用 leaderHasKeyword + LookTopReveal(keywordContains) 表达",
+    "_matcher": "【登场时】领袖特征中包含GERMA时确认顶5公开1张含GERMA特征加手牌，用 leaderKeywordContains + LookTopReveal(keywordContains) 表达",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
         "if": {
-          "leaderHasKeyword": "GERMA"
+          "leaderKeywordContains": "GERMA"
         },
         "then": [
           {

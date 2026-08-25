@@ -317,27 +317,32 @@ public class GameState
         return sum;
     }
 
-    /// <summary>评估持续效果对指定卡“原本力量”的覆盖；多条同时生效时以后注册者为准。</summary>
+    /// <summary>评估持续效果对指定卡“原本力量”的覆盖；多条同时生效时取最高值。</summary>
     public int? ContinuousOriginalPowerOverride(int sideIdx, CardInstance card)
     {
-        int? value = null;
+        int? highest = null;
         foreach (var eff in ContinuousEffects)
         {
             if (!eff.OriginalPowerOverride.HasValue) continue;
             if (!IsContinuousEffectActive(eff)) continue;
             if (!MatchesContinuousScope(eff, sideIdx, card)) continue;
             if (!eff.Predicate(this, sideIdx, card)) continue;
-            value = eff.OriginalPowerOverride.Value;
+            highest = highest.HasValue
+                ? Math.Max(highest.Value, eff.OriginalPowerOverride.Value)
+                : eff.OriginalPowerOverride.Value;
         }
-        return value;
+        return highest;
     }
 
     /// <summary>统一计算规则意义上的“原本力量”，包含卡实例及持续效果的“变为X”覆盖。</summary>
     public int OriginalPowerOf(int sideIdx, CardInstance card)
-        => ContinuousOriginalPowerOverride(sideIdx, card)
-           ?? card.OriginalPowerOverride
-           ?? card.OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
-           ?? card.Info.Power;
+    {
+        int? instance = card.HighestInstanceOriginalPowerOverride;
+        int? continuous = ContinuousOriginalPowerOverride(sideIdx, card);
+        if (instance.HasValue && continuous.HasValue)
+            return Math.Max(instance.Value, continuous.Value);
+        return instance ?? continuous ?? card.Info.Power;
+    }
 
     /// <summary>统一计算某张卡当前力量：基础 + 咚 + 临时修正 + 永续修正</summary>
     public int CurrentPowerOf(int sideIdx, CardInstance card)
@@ -346,9 +351,7 @@ public class GameState
         int donCount = p.AttachedDonCount(card.Id);
         bool ownerTurn = CurrentTurnPlayer == sideIdx;
         int basePower = card.CurrentPower(donCount, ownerTurn);
-        int instanceOriginalPower = card.OriginalPowerOverride
-            ?? card.OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
-            ?? card.Info.Power;
+        int instanceOriginalPower = card.HighestInstanceOriginalPowerOverride ?? card.Info.Power;
         basePower += OriginalPowerOf(sideIdx, card) - instanceOriginalPower;
         return basePower + ContinuousPowerBonus(sideIdx, card);
     }

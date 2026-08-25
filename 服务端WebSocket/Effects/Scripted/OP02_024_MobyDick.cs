@@ -29,9 +29,12 @@ public class OP02_024_MobyDick : IScriptedEffect
             Scope = new ContinuousScope
             {
                 Side = 0,
-                IncludeLeader = false,
+                // “我方的『爱德华·纽哥特』”同时包含同名领袖；
+                // 仅“所有拥有〈白胡子海盗团〉特征的角色”受角色类型限定。
+                IncludeLeader = true,
                 IncludeCharacters = true,
-                Filter = c => c.Info.NameContains("爱德华·纽哥特") || c.Info.HasKeyword("白胡子海盗团"),
+                Filter = c => c.Info.NameContains("爱德华·纽哥特")
+                    || (c.Info.Kind == CardKind.Character && c.Info.HasKeyword("白胡子海盗团")),
             },
             PowerDelta = 2000,
             Predicate = (s, sideIdx, c) =>

@@ -527,8 +527,19 @@ internal static class OP17Effects
     private static async Task C012(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnKO) return;
-        await PlayOneFromHand(c, x => x.Info.Cost == 1 && x.Info.HasKeyword("白胡子海盗团"),
-            "将手牌中最多1张费用1的《白胡子海盗团》卡牌登场");
+        var candidates = Me(c).Hand
+            .Where(x => x.Info.Cost == 1 && x.Info.HasKeywordContaining("白胡子海盗团"))
+            .ToList();
+        var pick = await Pick(c, c.OwnerIndex, "OwnHand",
+            "将手牌中最多1张费用1且特征中包含《白胡子海盗团》的卡牌正面朝上加入生命区最上方",
+            candidates, 0, 1);
+        if (pick.Count == 0) return;
+
+        // Prompt 等待后按实例与权威区域重新确认，避免恢复/重放后移动已不在手牌的同名卡。
+        var chosen = pick[0];
+        if (!Me(c).Hand.Remove(chosen)) return;
+        chosen.IsLifeFaceUp = true;
+        Me(c).LifeArea.Insert(0, chosen);
     }
 
     private static async Task C013(EffectContext c)
@@ -543,7 +554,9 @@ internal static class OP17Effects
         if (c.Trigger == EffectTrigger.OnAllyWillLeaveField)
         {
             if (!c.Vars.TryGetValue("victimId", out var raw) || raw is not string id || !Guid.TryParse(id, out var victimId)) return;
-            if (victimId == c.Source.Id || !Me(c).Characters.Contains(c.Source)) return;
+            // 卡文未限定“此角色以外”；自身被对方效果送离场时，也可改为 KO 自身，
+            // 从而取消原离场并正常进入本卡的【KO时】结算。
+            if (!Me(c).Characters.Contains(c.Source)) return;
             if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "KO马尔高，使将要因对方效果离场的角色不离场？")) return;
             bool ko = await AtomicOps.KOByEffectAsync(c.State, c.OwnerIndex, c.Source, c.Prompts, c.OwnerIndex);
             if (ko) c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victimId, _ => true);
@@ -842,10 +855,10 @@ internal static class OP17Effects
     private static async Task C042(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        var revealable = Me(c).Hand.Count(x => x.Info.HasKeyword("洛克斯海盗团"));
+        var revealable = Me(c).Hand.Count(x => x.Info.HasKeywordContaining("洛克斯海盗团"));
         if (revealable < 3 || !await c.Prompts.ConfirmOptional(c.OwnerIndex,
             "公开手牌中3张《洛克斯海盗团》卡牌，使对方1张角色本回合力量-3000？")) return;
-        if (!await DiscardOwnFiltered(c, x => x.Info.HasKeyword("洛克斯海盗团"), 3,
+        if (!await DiscardOwnFiltered(c, x => x.Info.HasKeywordContaining("洛克斯海盗团"), 3,
             "公开手牌中3张《洛克斯海盗团》卡牌", revealOnly: true)) return;
         var pick = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-3000");
         if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -3000);
@@ -1002,7 +1015,9 @@ internal static class OP17Effects
                 KeywordDuration.UntilNextOpponentEndPhase, c.OwnerIndex);
             return;
         }
-        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.IsTapped || Me(c).ActiveDonCount < 3) return;
+        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.IsTapped || Me(c).ActiveDonCount < 3
+            || c.Source.HasRestriction(RestrictionKind.CannotBeRested)
+            || c.State.HasContinuousRestriction(c.Source, RestrictionKind.CannotBeRested)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将3张咚!!和此角色转为休息状态，使对方1张角色无法攻击？")) return;
         RestActiveDon(c, 3);
         AtomicOps.RestCard(c.Source);
@@ -1111,14 +1126,19 @@ internal static class OP17Effects
 
     private static async Task C063(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.ActivatedMain || c.Source.TurnPlayed != c.State.TurnCount) return;
+        if (c.Trigger != EffectTrigger.ActivatedMain) return;
         string key = $"OP17-063-act:{c.Source.Id}";
         if (Me(c).TurnOnceUsed.Contains(key) || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
-        var pick = await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 6, 1, "选择费用≤6的角色，使其效果无效并KO");
-        if (pick.Count > 0)
+        // 「在此角色登场的回合的场合」只约束收益，不约束【启动主要】本身。
+        // 因此后续回合仍可完整支付咚!!-1并消耗每回合1次，只是不执行无效化与KO。
+        if (c.Source.TurnPlayed == c.State.TurnCount)
         {
-            AtomicOps.NullifyEffects(pick[0], KeywordDuration.ThisTurn);
-            await KOByEffect(c, pick);
+            var pick = await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 6, 1, "选择费用≤6的角色，使其效果无效并KO");
+            if (pick.Count > 0)
+            {
+                AtomicOps.NullifyEffects(pick[0], KeywordDuration.ThisTurn);
+                await KOByEffect(c, pick);
+            }
         }
         Me(c).TurnOnceUsed.Add(key);
     }

@@ -6,7 +6,7 @@ namespace GrandUMI.Effects.Scripted;
 /// <summary>
 /// OP06-092 布鲁克（角色）
 /// 【登场时】选择以下的 1 项：
-///   ・将对方最多 1 张费用不高于 4 的角色放置到废弃区（KO）。
+///   ・将对方最多 1 张费用不高于 4 的角色放置到废弃区（非 KO）。
 ///   ・对方将其废弃区中的 3 张卡牌自选顺序放回其卡组最下方。
 ///
 /// 实现说明 / 简化点：
@@ -25,18 +25,24 @@ public class OP06_092_Brook : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         int opt = await ctx.Prompts.ChooseOption(ctx.OwnerIndex, "选择以下的 1 项",
-            new[] { "将对方 1 张费用≤4 的角色 KO", "对方将其废弃区 3 张放回卡组最下方" });
+            new[] { "将对方 1 张费用≤4 的角色放置到废弃区", "对方将其废弃区 3 张放回卡组最下方" });
 
         if (opt == 0)
         {
             var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 4).ToList();
             if (cands.Count == 0) return;
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                "选择最多 1 张费用≤4 的对方角色 KO", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
+                "选择最多 1 张费用≤4 的对方角色放置到废弃区", cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
             if (chosen.Count > 0)
             {
-                var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-                AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, tgt);
+                var tgt = opp.Characters.FirstOrDefault(c =>
+                    c.Id.ToString() == chosen[0] && ctx.State.CurrentCostOf(c) <= 4);
+                if (tgt is not null &&
+                    !await AtomicOps.TryEffectLeaveGuard(
+                        ctx.State, 1 - ctx.OwnerIndex, tgt, ctx.Prompts, "trash"))
+                {
+                    AtomicOps.TrashFieldCard(ctx.State, 1 - ctx.OwnerIndex, tgt);
+                }
             }
         }
         else

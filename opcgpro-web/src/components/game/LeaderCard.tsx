@@ -6,6 +6,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
 import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
+import BattleTargetBadge from "@/components/game/BattleTargetBadge";
 
 interface Props {
   side: "my" | "opponent";
@@ -37,6 +38,7 @@ export default function LeaderCard({ side }: Props) {
   const isSelectingTarget = useBattleStore((s) => s.isSelectingTarget);
   const confirmAttackTarget = useBattleStore((s) => s.confirmAttackTarget);
   const battle = useGameStore((s) => s.battle);
+  const phase = useGameStore((s) => s.phase);
   const currentTurn = useGameStore((s) => s.currentTurn);
   const { cardSize } = useResponsive();
   const dimensions = slotSizes[cardSize];
@@ -101,11 +103,11 @@ export default function LeaderCard({ side }: Props) {
           攻击
         </span>
       )}
-      {isBattleTarget && (
-        <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">
-          目标
-        </span>
-      )}
+      <BattleTargetBadge
+        phase={phase}
+        isBattleTarget={isBattleTarget}
+        isBlocker={false}
+      />
       <CardItem
         card={leader}
         size={cardSize}

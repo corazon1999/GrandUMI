@@ -56,6 +56,7 @@ public class OP14_104_Moria : IScriptedEffect
         if (opt == 0)
         {
             me.Trash.Remove(picked);
+            picked.IsLifeFaceUp = true;
             me.LifeArea.Insert(0, picked);
         }
         else

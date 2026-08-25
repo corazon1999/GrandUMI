@@ -4,7 +4,7 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("桌面与手机竖屏旋转布局中的贴咚确认及撤回可由个人设置控制", async () => {
+test("桌面与手机竖屏旋转布局中的贴咚确认及立即提交可由个人设置控制", async () => {
   const [actions, request, dialog, page, settings, store] = await Promise.all([
     readSource("../src/components/game/GameActions.tsx"),
     readSource("../src/net/GameRequest.ts"),
@@ -17,11 +17,13 @@ test("桌面与手机竖屏旋转布局中的贴咚确认及撤回可由个人�
   assert.match(actions, /GameRequest\.attachDon\(attachTargetId, count\)/);
   assert.match(request, /requestAttachDonConfirmation/);
   assert.match(request, /useSettingsStore\.getState\(\)\.confirmAttachDon/);
-  assert.match(request, /: queueAttachDonUndo\(targetId, safeCount\)/);
-  assert.match(request, /undoLastPendingAttachDon/);
-  assert.match(actions, /撤回贴咚/);
-  assert.match(actions, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);
+  assert.match(request, /: submitAttachDon\(targetId, safeCount\)/);
+  assert.match(request, /"AttachDon",\s*\{ targetId, count: safeCount \}/);
+  assert.match(request, /optimisticAttachDon\(targetId, safeCount\)/);
+  assert.doesNotMatch(request, /pendingAttachDonUndo|undoLastPendingAttachDon|queueAttachDonUndo/);
+  assert.doesNotMatch(actions, /撤回贴咚|执行下一项操作后将无法撤回/);
   assert.match(dialog, /确认贴\{pending\.count\}咚？/);
+  assert.match(dialog, /确认后会立即提交并生效，无法撤回/);
   assert.match(dialog, />\s*取消\s*</);
   assert.match(dialog, />\s*确认\s*</);
   assert.match(dialog, /--layout-safe-bottom/);
@@ -30,7 +32,8 @@ test("桌面与手机竖屏旋转布局中的贴咚确认及撤回可由个人�
   assert.match(settings, /role="switch"/);
   assert.match(settings, /aria-checked=\{confirmAttachDon\}/);
   assert.match(settings, /setConfirmAttachDon\(!confirmAttachDon\)/);
-  assert.match(settings, /此设置默认关闭/);
+  assert.match(settings, /关闭时点选数量即提交/);
+  assert.match(settings, /提交后会立即生效，无法撤回/);
   assert.match(store, /confirmAttachDon: false/);
   assert.match(store, /localStorage\.setItem\(KEY/);
 });

@@ -88,15 +88,15 @@ public static class LifeRevealManager
                         var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
                         await EffectRuntime.Resolve(s, targetPlayerIdx, top,
                             revealTrigger, engine.Prompts);
-                        // 「此卡牌登场」通用兜底：纯自登场角色(无 DSL/脚本触发逻辑处理它)在此自动从废弃区登场。
-                        // 带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op 处理(那时卡已离开废弃区→不再命中此兜底)。
-                        if (!s.IsGameOver && top.Info.Kind == CardKind.Character
+                        // 「此卡牌登场」通用兜底：纯自登场角色或舞台（无 DSL/脚本触发逻辑处理它）
+                        // 在此自动从废弃区登场。带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op
+                        // 处理；该卡届时已离开废弃区，因此不会再次命中此兜底。
+                        if (!s.IsGameOver && top.Info.Kind is CardKind.Character or CardKind.Stage
                             && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                         {
                             await AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
-                            // 反馈#203：PlayFromTrashFree 只把【登场时】入 PendingEnterFields 延迟队列；
-                            // 这条"纯自登场"链路后续未必有 depth-0 的 Resolve 来排空该队列，
-                            // 会导致自登场角色(如 PRB02-012 奈美)的【登场时】延迟甚至不触发。此处显式排空一次。
+                            // PlayFromTrashFree 只把【登场时】加入延迟队列；这条兜底位于 Resolve 之外，
+                            // 必须显式排空一次。角色与舞台均由同一队列确保【登场时】恰好结算一次。
                             if (!s.IsGameOver)
                                 await EffectRuntime.DrainPendingEnterFields(s, engine.Prompts);
                         }
@@ -132,7 +132,7 @@ public static class LifeRevealManager
     }
 
     /// <summary>是否为"纯【触发】此卡牌登场"(无成本「：」、无条件「场合」、无后续「之后」)。
-    /// 这类由引擎通用兜底自动从废弃区登场；带条件/成本的自登场卡用各自 DSL trigger 的 PlaySelf op 处理。</summary>
+    /// 这类角色或舞台由引擎通用兜底自动从废弃区登场；带条件/成本的自登场卡用各自 DSL trigger 的 PlaySelf op 处理。</summary>
     private static bool IsPlainPlaySelfTrigger(string? trigger)
     {
         if (string.IsNullOrEmpty(trigger) || !trigger.Contains("此卡牌登场")) return false;

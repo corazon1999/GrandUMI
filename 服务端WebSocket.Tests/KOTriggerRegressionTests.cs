@@ -95,6 +95,39 @@ public class KOTriggerRegressionTests
     }
 
     [Fact]
+    public async Task Q491_OP17_063_EffectKO_AllowsOP12_061ToProtectEB04_038()
+    {
+        var state = TestScene.New("OP17-039", "OP12-061")
+            .MyActiveDon(1)
+            .OppCharacter("EB04-038")
+            .Build();
+        var attacker = state.Players[0];
+        var defender = state.Players[1];
+        var ged = Card("OP17-063");
+        ged.TurnPlayed = state.TurnCount;
+        attacker.Characters.Add(ged);
+        var returnedDon = attacker.CostArea.Single();
+        var victim = defender.Characters.Single();
+        var lifeTop = Card("OP15-003");
+        defender.LifeArea.Add(lifeTop);
+        var prompts = new MockPromptService()
+            .QueueChoose(returnedDon.Id.ToString())
+            .QueueChoose(victim.Id.ToString())
+            .QueueConfirm(true);
+
+        await EffectRuntime.Resolve(state, 0, ged, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.True(victim.IsEffectsNullified);
+        Assert.Contains(victim, defender.Characters);
+        Assert.DoesNotContain(victim, defender.Trash);
+        Assert.Empty(defender.LifeArea);
+        Assert.Contains(lifeTop, defender.Hand);
+        Assert.Single(prompts.ConfirmHistory);
+        Assert.Contains("生命区最上方", prompts.ConfirmHistory[0]);
+        Assert.Contains($"OP12-061-guard:{defender.Leader.Id}", defender.TurnOnceUsed);
+    }
+
+    [Fact]
     public async Task EffectBatchKO_PreservesEffectReasonForConditionalOnKO()
     {
         var state = TestScene.New().MyCharacter("EB01-057").Build();

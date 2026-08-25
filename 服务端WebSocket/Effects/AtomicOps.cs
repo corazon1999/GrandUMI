@@ -538,6 +538,115 @@ public static class AtomicOps
     public static Task<bool> PromptReturnDonToDeck(EffectContext ctx, int n, bool optional = true)
         => PromptReturnDonToDeck(ctx, ctx.OwnerIndex, n, optional);
 
+    /// <summary>
+    /// 原子支付“咚!!-1，并丢弃 1 张手牌”复合成本。
+    /// 先按卡文顺序收集咚与手牌选择，两个选择都完整、合法且仍在原区域时才一次性提交；
+    /// 取消、超时、重复 id、越权 id 或恢复后状态已变化时均保持零修改。
+    /// </summary>
+    public static async Task<bool> PromptReturnOneDonAndDiscardOneHand(
+        EffectContext ctx,
+        Func<CardInstance, bool> discardPredicate)
+    {
+        var player = ctx.State.Players[ctx.OwnerIndex];
+        var eligibleDons = player.CostArea
+            .Where(don => don.State is DonState.Active or DonState.Rest or DonState.Attached)
+            .ToList();
+        var discardCandidates = player.Hand.Where(discardPredicate).ToList();
+        if (eligibleDons.Count == 0 || discardCandidates.Count == 0) return false;
+
+        var donAnswer = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReturnOwnDon",
+            "选择 1 张咚!!放回咚!!卡组，或取消发动",
+            eligibleDons.Select(don => don.Id.ToString()).ToList(), 0, 1,
+            new Dictionary<string, object?>
+            {
+                ["donChoices"] = BuildDonPromptChoices(player, eligibleDons),
+                ["canCancel"] = true,
+            });
+        if (donAnswer.Count != 1) return false;
+        var chosenDon = eligibleDons.FirstOrDefault(don => don.Id.ToString() == donAnswer[0]);
+        if (chosenDon is null) return false;
+
+        var discardAnswer = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard",
+            "丢弃 1 张手牌（成本）",
+            discardCandidates.Select(card => card.Id.ToString()).ToList(), 1, 1,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = discardCandidates
+                    .Select(card => new { id = card.Id.ToString(), number = card.Info.Number })
+                    .ToList(),
+            });
+        if (discardAnswer.Count != 1) return false;
+        var chosenDiscard = discardCandidates
+            .FirstOrDefault(card => card.Id.ToString() == discardAnswer[0]);
+        if (chosenDiscard is null) return false;
+
+        // 两次等待期间可能发生取消、恢复或状态重放；提交前以当前权威状态重新验证。
+        if (!player.CostArea.Contains(chosenDon)
+            || chosenDon.State is not (DonState.Active or DonState.Rest or DonState.Attached)
+            || !player.Hand.Contains(chosenDiscard)
+            || !discardPredicate(chosenDiscard))
+            return false;
+
+        // 完整验证后无 await，按卡文顺序一次性提交，避免只支付一半成本。
+        chosenDon.State = DonState.InDeck;
+        chosenDon.AttachedToCardId = null;
+        player.CostArea.Remove(chosenDon);
+        player.DonDeck.Add(chosenDon);
+
+        EffectRuntime.PayingCost = true;
+        try { DiscardHand(player, chosenDiscard); }
+        finally { EffectRuntime.PayingCost = false; }
+
+        EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
+            new Dictionary<string, object?> { ["count"] = 1, ["owner"] = ctx.OwnerIndex });
+        return true;
+    }
+
+    /// <summary>
+    /// 原子支付“将 N 张活跃咚!!转为休息状态，并丢弃 1 张手牌”的复合成本。
+    /// 活跃咚没有附着关系，彼此规则等价，因此无需额外选咚；手牌选择完成后重新验证同一批咚与手牌，
+    /// 再在无等待窗口内一次提交。取消、超时或状态已变化时保持零修改。
+    /// </summary>
+    public static async Task<bool> PromptRestActiveDonAndDiscardOneHand(
+        EffectContext ctx,
+        int donCount,
+        Func<CardInstance, bool> discardPredicate)
+    {
+        if (donCount <= 0) return false;
+        var player = ctx.State.Players[ctx.OwnerIndex];
+        var activeDons = player.CostArea
+            .Where(don => don.State == DonState.Active)
+            .Take(donCount)
+            .ToList();
+        var discardCandidates = player.Hand.Where(discardPredicate).ToList();
+        if (activeDons.Count != donCount || discardCandidates.Count == 0) return false;
+
+        var answer = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard",
+            "选择丢弃 1 张手牌（成本）",
+            discardCandidates.Select(card => card.Id.ToString()).ToList(), 1, 1,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = discardCandidates
+                    .Select(card => new { id = card.Id.ToString(), number = card.Info.Number })
+                    .ToList(),
+            });
+        if (answer.Count != 1) return false;
+        var discard = discardCandidates.FirstOrDefault(card => card.Id.ToString() == answer[0]);
+        if (discard is null) return false;
+
+        // 等待选择期间可能发生取消、恢复或状态重放；只接受最初选定资源仍全部有效的情况。
+        if (activeDons.Any(don => !player.CostArea.Contains(don) || don.State != DonState.Active)
+            || !player.Hand.Contains(discard)
+            || !discardPredicate(discard))
+            return false;
+
+        foreach (var don in activeDons) don.State = DonState.Rest;
+        EffectRuntime.PayingCost = true;
+        try { DiscardHand(player, discard); }
+        finally { EffectRuntime.PayingCost = false; }
+        return true;
+    }
+
     /// <summary>构造咚选择项，并补充附着目标实例、卡号与卡名，供客户端明确区分领袖和同名角色。</summary>
     private static List<object> BuildDonPromptChoices(PlayerState player, IEnumerable<DonCard> dons)
     {
@@ -581,20 +690,25 @@ public static class AtomicOps
                 ["canCancel"] = true,
                 ["allowVariableReturnCount"] = true,
             });
-        if (chosen.Count == 0) return false;
-        int returned = 0;
-        foreach (var id in chosen.Distinct())
+        if (chosen.Count == 0 || chosen.Count != chosen.Distinct(StringComparer.Ordinal).Count()) return false;
+        var selected = chosen
+            .Select(id => eligible.FirstOrDefault(item => item.Id.ToString() == id))
+            .ToList();
+        if (selected.Any(don => don is null
+                || !player.CostArea.Contains(don)
+                || don.State is not (DonState.Active or DonState.Rest or DonState.Attached)))
+            return false;
+
+        // 完整复验后无 await，一次提交全部选择，避免恢复/重放导致部分返还。
+        foreach (var don in selected.OfType<DonCard>())
         {
-            var don = eligible.FirstOrDefault(item => item.Id.ToString() == id);
-            if (don is null || !player.CostArea.Remove(don)) continue;
+            player.CostArea.Remove(don);
             don.State = DonState.InDeck;
             don.AttachedToCardId = null;
             player.DonDeck.Add(don);
-            returned++;
         }
-        if (returned == 0) return false;
         EffectRuntime.NotifyWatcher(EffectTrigger.OnDonReturnedToDeck,
-            new Dictionary<string, object?> { ["count"] = returned, ["owner"] = ctx.OwnerIndex });
+            new Dictionary<string, object?> { ["count"] = selected.Count, ["owner"] = ctx.OwnerIndex });
         return true;
     }
 

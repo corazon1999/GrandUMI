@@ -90,6 +90,36 @@ public class OncePerTurnEffectIndicatorTests
         Assert.True(OncePerTurnEffectCatalog.Contains(cardNumber));
     }
 
+    [Fact]
+    public async Task OP09_027_ReactivatedByOP10_029_DoesNotDrawOnSecondAttackInSameTurn()
+    {
+        var state = TestScene.New()
+            .MyCharacter("OP09-027")
+            .MyCharacter("OP09-026")
+            .MyCharacter("OP09-025")
+            .MyDeckTop("OP15-003", "OP15-004")
+            .Build();
+        var me = state.Players[0];
+        var sabo = me.Characters.Single(card => card.Info.Number == "OP09-027");
+        foreach (var character in me.Characters) character.IsTapped = true;
+
+        await EffectRuntime.Resolve(
+            state, 0, sabo, EffectTrigger.OnAttackDeclare, new MockPromptService());
+
+        var reactivationPrompts = new MockPromptService().QueueChoose(sabo.Id.ToString());
+        await EffectRuntime.Resolve(
+            state, 0, new CardInstance { Info = Cards.CardDatabase.Get("OP10-029")! },
+            EffectTrigger.OnEnterField, reactivationPrompts);
+        Assert.False(sabo.IsTapped);
+
+        sabo.IsTapped = true;
+        await EffectRuntime.Resolve(
+            state, 0, sabo, EffectTrigger.OnAttackDeclare, new MockPromptService());
+
+        Assert.Single(me.Hand);
+        Assert.Single(me.Deck);
+    }
+
     private static bool LeaderAvailable(GameState state)
     {
         var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));

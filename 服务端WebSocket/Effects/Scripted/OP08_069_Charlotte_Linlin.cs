@@ -35,18 +35,10 @@ public class OP08_069_Charlotte_Linlin : IScriptedEffect
             "玲玲【登场时】：咚!!-1 并丢弃 1 张手牌，将卡组顶 1 张加入生命区，并把对方 1 张费用≤6角色加入其生命区？");
         if (!use) return;
 
-        // 成本 1：咚!!-1
-        if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-
-        // 成本 2：丢弃我方 1 张手牌
-        var discardCands = me.Hand.Where(c => c.Id != ctx.Source.Id).ToList();
-        var dch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
-            "丢弃 1 张手牌（成本）", discardCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
-        if (dch.Count > 0)
-        {
-            var d = discardCands.First(c => c.Id.ToString() == dch[0]);
-            AtomicOps.DiscardHand(me, d);
-        }
+        // 复合成本先完整收集选择，再按“咚!!-1 → 丢弃手牌”的卡文顺序原子提交。
+        // 任一步取消、超时、重复或非法响应都不得部分支付，也不得继续获得生命。
+        if (!await AtomicOps.PromptReturnOneDonAndDiscardOneHand(
+                ctx, card => card.Id != ctx.Source.Id)) return;
 
         // 效果 1：卡组最上方的最多 1 张加入生命区最上方
         AtomicOps.AddLifeFromDeckTop(me, 1);
@@ -67,6 +59,9 @@ public class OP08_069_Charlotte_Linlin : IScriptedEffect
         var tgt = tgts.First(c => c.Id.ToString() == ch[0]);
         int where = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
             "将该角色加入对方生命区的位置", new[] { "最上方", "最下方" });
-        AtomicOps.MoveCharToLife(ctx.State, 1 - ctx.OwnerIndex, tgt, toTop: where == 0);
+        int targetOwner = 1 - ctx.OwnerIndex;
+        if (!await AtomicOps.TryEffectLeaveGuard(
+                ctx.State, targetOwner, tgt, ctx.Prompts, "life"))
+            AtomicOps.MoveCharToLife(ctx.State, targetOwner, tgt, toTop: where == 0);
     }
 }

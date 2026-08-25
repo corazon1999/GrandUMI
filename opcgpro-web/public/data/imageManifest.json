@@ -3937,6 +3937,8 @@
   ],
   "OP07-051": [
     "/cards/op07/OP07-051.png",
+    "/cards/op07/OP07-051_01.png",
+    "/cards/op07/OP07-051_02.png",
     "/cards/op07/OP07-051_03.png",
     "/cards/op07/OP07-051_D.jpg",
     "/cards/op07/OP07-051P_D.jpg"
@@ -8475,10 +8477,10 @@
     "/cards/st07/ST07-014.png"
   ],
   "ST07-015": [
-    "/cards/st07/ST07-015.png"
+    "/cards/st07/ST07-016.png"
   ],
   "ST07-016": [
-    "/cards/st07/ST07-016.png"
+    "/cards/st07/ST07-015.png"
   ],
   "ST07-017": [
     "/cards/st07/ST07-017.png"

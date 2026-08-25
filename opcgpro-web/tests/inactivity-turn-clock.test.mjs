@@ -4,13 +4,14 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("贴咚与撤回都会发送不阻塞牌桌的玩家活动消息", async () => {
+test("贴咚直接发送真实动作，玩家活动消息只用于明确在线确认", async () => {
   const request = await readSource("../src/net/GameRequest.ts");
 
   assert.match(request, /function sendClockControl/);
   assert.match(request, /requestId: createRequestId\(\)/);
-  assert.match(request, /sendClockControl\("PlayerActivity", \{ kind: "attachDon" \}\)/);
-  assert.match(request, /sendClockControl\("PlayerActivity", \{ kind: "undoAttachDon" \}\)/);
+  assert.match(request, /function submitAttachDon/);
+  assert.match(request, /"AttachDon",\s*\{ targetId, count: safeCount \}/);
+  assert.doesNotMatch(request, /kind: "attachDon"|kind: "undoAttachDon"/);
   assert.match(request, /confirmInactivityPresence: \(\) => sendClockControl\("PlayerActivity", \{ kind: "presence" \}\)/);
   const controlBody = request.slice(
     request.indexOf("function sendClockControl"),

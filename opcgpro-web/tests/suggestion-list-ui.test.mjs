@@ -46,7 +46,7 @@ test("对局同时显示六分钟回合时钟、一次加时与总操作时钟",
   assert.match(types, /opponentTurnOperationTimeMs\?: number/);
 });
 
-test("贴咚不再计时提交，并在下一项操作前提供撤回按钮", async () => {
+test("贴咚确认后立即提交，并依靠拒绝回滚与重连权威快照恢复", async () => {
   const [request, actions, protocol, store] = await Promise.all([
     readSource("../src/net/GameRequest.ts"),
     readSource("../src/components/game/GameActions.tsx"),
@@ -54,15 +54,15 @@ test("贴咚不再计时提交，并在下一项操作前提供撤回按钮", as
     readSource("../src/store/gameStore.ts"),
   ]);
   assert.doesNotMatch(request, /expiresAt|setTimeout\([^)]*commitPendingAttachDon/);
-  assert.match(request, /pendingAttachDonUndoQueue\.push/);
-  assert.match(request, /commitPendingAttachDonUndo\(\)/);
-  assert.match(request, /if \(action !== "AttachDon" && !commitPendingAttachDonUndo\(\)\) return false/);
+  assert.match(request, /function submitAttachDon/);
+  assert.match(request, /"AttachDon",\s*\{ targetId, count: safeCount \}/);
+  assert.match(request, /optimisticAttachDon\(targetId, safeCount\)/);
+  assert.doesNotMatch(request, /pendingAttachDonUndoQueue|commitPendingAttachDonUndo|undoLastPendingAttachDon/);
   assert.match(request, /rollbackOptimistic\(\)/);
-  assert.match(actions, /getPendingAttachDonUndo/);
-  assert.match(actions, />\s*撤回贴咚\s*</);
-  assert.match(actions, /执行下一项操作后将无法撤回/);
-  assert.match(actions, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);
-  assert.match(protocol, /reapplyPendingAttachDonOptimistic\(\)/);
+  assert.match(request, /requestState:[\s\S]*rollbackOptimistic\(\)[\s\S]*MsgRequestState/);
+  assert.doesNotMatch(actions, /getPendingAttachDonUndo|撤回贴咚|执行下一项操作后将无法撤回/);
+  assert.match(protocol, /case "MsgActionRejected":[\s\S]*rollbackOptimistic\(\)/);
+  assert.doesNotMatch(protocol, /reapplyPendingAttachDonOptimistic/);
   assert.match(store, /const powerBonus = s\.currentTurn \? actual \* 1_000 : 0/);
   assert.match(store, /s\.my\.leaderPower \+= powerBonus/);
   assert.match(store, /target\.powerCurrent \+= powerBonus/);

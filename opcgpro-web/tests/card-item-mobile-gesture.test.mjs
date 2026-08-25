@@ -154,7 +154,8 @@ test("pointercancel、卡牌身份变化清理和组件卸载都会取消未完�
 test("CardItem 仅允许鼠标悬停，并在窗口捕获阶段拦截长按后的祖先点击", async () => {
   const source = await readSource("../src/components/ui/CardItem.tsx");
 
-  assert.match(source, /if \(e\.pointerType !== "mouse"/);
+  assert.match(source, /shouldShowDesktopCardHoverPreview/);
+  assert.match(source, /if \(!shouldShowDesktopCardHoverPreview\(e\.pointerType\)/);
   assert.doesNotMatch(source, /onMouseEnter=/);
   assert.match(source, /window\.addEventListener\("pointermove", handleWindowPointerMove, true\)/);
   assert.match(source, /window\.addEventListener\("pointerup", handleWindowPointerUp, true\)/);

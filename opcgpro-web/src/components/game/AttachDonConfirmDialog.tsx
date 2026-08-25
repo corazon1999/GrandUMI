@@ -41,10 +41,17 @@ export default function AttachDonConfirmDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="attach-don-confirm-title"
+        aria-describedby="attach-don-confirm-description"
         className="w-full max-w-xs rounded-xl border border-amber-300/45 bg-slate-950/95 p-4 text-white shadow-2xl backdrop-blur"
       >
         <p id="attach-don-confirm-title" className="text-center text-base font-black text-amber-50">
           确认贴{pending.count}咚？
+        </p>
+        <p
+          id="attach-don-confirm-description"
+          className="mt-2 text-center text-sm font-medium leading-5 text-slate-300"
+        >
+          确认后会立即提交并生效，无法撤回。
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button

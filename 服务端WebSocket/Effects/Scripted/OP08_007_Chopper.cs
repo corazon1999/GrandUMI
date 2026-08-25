@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 时机：OnEnterField（登场时）/ OnAttackDeclare（攻击时），二者均发生在我方回合，
 ///     额外校验 CurrentTurnPlayer == OwnerIndex 以满足【我方的回合中】。
-///   - 看顶 5 张，公开候选（力量≤4000 且《动物》角色），玩家选最多 1 张以休息状态登场。
+///   - 看顶 5 张，公开候选（力量≤4000 且《动物》角色），玩家选最多 1 张并通过统一的卡组登场入口以休息状态登场。
 ///   - 剩余牌按原相对顺序放回卡组最下方（自选顺序简化为原序）。
 /// </summary>
 public class OP08_007_Chopper : IScriptedEffect
@@ -51,13 +51,7 @@ public class OP08_007_Chopper : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-                me.Deck.Remove(picked);
-                // 以休息状态登场（直接进入角色区；角色区满 5 张时牺牲最左侧）
-                if (me.Characters.Count >= 5)
-                    await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
-                picked.TurnPlayed = ctx.State.TurnCount;
-                picked.IsTapped = true;
-                me.Characters.Add(picked);
+                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, picked, restState: true);
             }
         }
 

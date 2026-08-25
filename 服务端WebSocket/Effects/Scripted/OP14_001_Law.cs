@@ -12,8 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "本回合中原本的力量互换"用 CardInstance.OriginalPowerOverride 实现：把 A 的原本力量
 ///     设为 B 的原本力量、把 B 的原本力量设为 A 的原本力量。该字段在回合结束时由 TurnEngine
 ///     自动清零，符合"本回合中"语义。
-///   - 取"原本的力量"为各自当前生效的原本值（OriginalPowerOverride ?? Info.Power），
-///     以正确处理同回合内的连续/叠加互换。
+///   - 取“原本的力量”统一走 GameState.OriginalPowerOf，包含本回合、跨回合与持续来源；
+///     多条“变为”效果同时存在时由该查询取最高值。
 /// </summary>
 public class OP14_001_Law : IScriptedEffect
 {
@@ -44,8 +44,8 @@ public class OP14_001_Law : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
 
-        int aBase = a.OriginalPowerOverride ?? a.Info.Power;
-        int bBase = b.OriginalPowerOverride ?? b.Info.Power;
+        int aBase = ctx.State.OriginalPowerOf(ctx.OwnerIndex, a);
+        int bBase = ctx.State.OriginalPowerOf(ctx.OwnerIndex, b);
         a.OriginalPowerOverride = bBase;
         b.OriginalPowerOverride = aBase;
     }

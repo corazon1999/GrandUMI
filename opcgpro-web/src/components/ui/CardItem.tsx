@@ -12,6 +12,7 @@ import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/Card
 import CardBack from "@/components/ui/CardBack";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { createCardLongPressGesture } from "@/lib/cardLongPressGesture";
+import { shouldShowDesktopCardHoverPreview } from "@/lib/cardHoverPlacement";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
@@ -191,7 +192,7 @@ export default function CardItem({
   }, [cardIdentity, longPressGesture]);
 
   const handlePointerEnter = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" || showFaceDown || !card || !cardIdentity) return;
+    if (!shouldShowDesktopCardHoverPreview(e.pointerType) || showFaceDown || !card || !cardIdentity) return;
     const rect = e.currentTarget.getBoundingClientRect();
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     const hoveredIdentity = cardIdentity;

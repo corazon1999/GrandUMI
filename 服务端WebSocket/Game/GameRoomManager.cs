@@ -469,7 +469,14 @@ public static class GameRoomManager
             if (accepted)
             {
                 lock (room.ClockGate)
+                {
+                    // 动作同步分派期间若创建了 Prompt，Prompt 快照的 BeforeSnapshot 会先行同步并
+                    // 重启棋钟。此处重新收拢到“动作处理中”状态，再提交本次有效活动；否则活动
+                    // 清零后 EnsureOperationClockRunning 会误以为棋钟已运行，留下无操作计时未启动
+                    // 的窗口。效果达到稳定点后由下方 Ensure 以权威决策者统一重新开钟。
+                    StopOperationClockLocked(room);
                     CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
+                }
                 room.MarkActivity();
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
                 AppendClockState(room);

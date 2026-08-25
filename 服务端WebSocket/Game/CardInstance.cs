@@ -54,11 +54,34 @@ public class CardInstance
     /// 数值同时计入 CostModPersistent，此列表负责记录到期方与精确回收的增量。</summary>
     public List<CardCostMod> CostModsUntilOppEnd { get; } = new();
 
-    /// <summary>原本力量修正（"原本的力量变为 X"）</summary>
-    public int? OriginalPowerOverride { get; set; }
+    private int? _originalPowerOverride;
 
-    /// <summary>“原本力量变为X，直到下个对方结束阶段”为止的跨回合覆盖；后加入者优先。</summary>
+    /// <summary>
+    /// 本回合的“原本力量变为 X”。同一时点有多条此类效果时规则取最高值；
+    /// 因而重复写入只提升当前聚合值，写入 null 才在回合清理或离场重置时清空。
+    /// </summary>
+    public int? OriginalPowerOverride
+    {
+        get => _originalPowerOverride;
+        set => _originalPowerOverride = value.HasValue && _originalPowerOverride.HasValue
+            ? Math.Max(_originalPowerOverride.Value, value.Value)
+            : value;
+    }
+
+    /// <summary>“原本力量变为X，直到下个对方结束阶段”为止的跨回合覆盖。</summary>
     public List<OriginalPowerOverrideUntilOppEnd> OriginalPowerOverridesUntilOppEnd { get; } = new();
+
+    /// <summary>当前实例上所有仍有效的“原本力量变为 X”效果的最高值；没有效果时为 null。</summary>
+    internal int? HighestInstanceOriginalPowerOverride
+    {
+        get
+        {
+            int? highest = OriginalPowerOverride;
+            foreach (var change in OriginalPowerOverridesUntilOppEnd)
+                highest = highest.HasValue ? Math.Max(highest.Value, change.Value) : change.Value;
+            return highest;
+        }
+    }
 
     /// <summary>效果是否被无效化（OnXxx 触发被跳过）</summary>
     public bool IsEffectsNullified { get; set; }
@@ -107,9 +130,7 @@ public class CardInstance
     /// <summary>当前总力量（含修正，可为负）</summary>
     public int CurrentPower(int donAttachedCount, bool ownerTurn)
     {
-        int baseP = OriginalPowerOverride
-            ?? OriginalPowerOverridesUntilOppEnd.LastOrDefault()?.Value
-            ?? Info.Power;
+        int baseP = HighestInstanceOriginalPowerOverride ?? Info.Power;
         int donBonus = ownerTurn ? donAttachedCount * 1000 : 0;
         int untilOppEnd = 0;
         foreach (var m in PowerModsUntilOppEnd) untilOppEnd += m.Delta;

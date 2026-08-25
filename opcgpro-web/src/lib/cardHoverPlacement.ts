@@ -18,6 +18,14 @@ export interface CardHoverPlacement {
   showRight: boolean;
 }
 
+/** PC 鼠标悬停详情使用的大图尺寸；触摸和手写笔不触发该预览。 */
+export const DESKTOP_CARD_HOVER_PREVIEW_WIDTH = 300;
+export const DESKTOP_CARD_HOVER_PREVIEW_HEIGHT_APPROX = 560;
+
+export function shouldShowDesktopCardHoverPreview(pointerType: string): boolean {
+  return pointerType === "mouse";
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }

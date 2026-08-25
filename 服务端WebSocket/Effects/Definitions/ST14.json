@@ -21,7 +21,7 @@
         "on": "OnEnterField",
         "if": { "ownHasCharCostGte": 6 },
         "then": [
-          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
+          { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentCostLte": 5 }, "text": "KO 对方最多1张费用≤5 的角色" },
           { "op": "KO", "target": "$tgt" }
         ]
       }

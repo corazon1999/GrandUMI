@@ -9,11 +9,9 @@ namespace GrandUMI.Effects.Scripted;
 ///   将我方卡组最上方的 2 张卡牌放置到废弃区，
 ///   将我方废弃区中最多 1 张费用不高于 4 且拥有《恐怖之船海盗团》特征的角色卡牌登场。
 ///
-/// 说明 / 简化点：
-///   - 攻击时触发不支持复合可选成本表达；引擎亦无"将费用区咚转为休息状态"的原子操作。
-///     故按惯例只实现效果收益（弃顶 2 张 + 废弃区条件登场），不实现"横置 2 咚 / 丢 1 手牌"成本。
-///     （此点见规范第十节，触发节无法表达的可选成本只实现收益。）
+/// 说明：
 ///   - 效果整体作为"可以"（可选）发动，先以 ConfirmOptional 询问。
+///   - "横置 2 张活跃咚 + 丢弃 1 张手牌"先收集并复验全部成本，再原子提交，避免只支付一半。
 ///   - 登场目标：废弃区中费用不高于 4 且拥有《恐怖之船海盗团》特征的角色卡牌，最多 1 张。
 /// </summary>
 public class OP06_080_Moria : IScriptedEffect
@@ -28,10 +26,12 @@ public class OP06_080_Moria : IScriptedEffect
 
         // 【咚!!×1】：本卡需被赋予咚≥1才发动（引擎不预检攻击时咚门槛，须脚本自检）
         if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
+        if (me.ActiveDonCount < 2 || me.Hand.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "莫利亚【攻击时】：将卡组顶 2 张放入废弃区，并从废弃区登场 1 张费用≤4 且拥有《恐怖之船海盗团》特征的角色？");
+            "莫利亚【攻击时】：将2张咚!!转为休息并丢弃1张手牌，将卡组顶2张放入废弃区，再从废弃区登场1张费用≤4的《恐怖之船海盗团》角色？");
         if (!use) return;
+        if (!await AtomicOps.PromptRestActiveDonAndDiscardOneHand(ctx, 2, _ => true)) return;
 
         // 将卡组最上方 2 张放入废弃区
         AtomicOps.MillTop(me, 2);

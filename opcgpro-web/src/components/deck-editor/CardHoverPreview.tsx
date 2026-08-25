@@ -6,11 +6,15 @@ import NextImage from "next/image";
 import type { CardData } from "@/types/card";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
-import { calculateCardHoverPlacement } from "@/lib/cardHoverPlacement";
+import {
+  calculateCardHoverPlacement,
+  DESKTOP_CARD_HOVER_PREVIEW_HEIGHT_APPROX,
+  DESKTOP_CARD_HOVER_PREVIEW_WIDTH,
+} from "@/lib/cardHoverPlacement";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
-export const PREVIEW_W = 240;
-const PREVIEW_H_APPROX = 480;
+export const PREVIEW_W = DESKTOP_CARD_HOVER_PREVIEW_WIDTH;
+const PREVIEW_H_APPROX = DESKTOP_CARD_HOVER_PREVIEW_HEIGHT_APPROX;
 
 export interface HoverInfo {
   card: CardData;

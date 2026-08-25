@@ -1098,12 +1098,12 @@ public static class DslInterpreter
                         c.OriginalPowerOverride = GetInt(op, "value", 0);
                     break;
                 }
-            // 「原本的力量变为 N，直到下个对方的结束阶段结束时为止」：以 delta = N - 卡面Power 经
-            // AddPowerUntilOppEnd 近似（与库内"变为X"持续实现惯例一致）。如 ST26-005 草帽领袖变7000。
+            // 「原本的力量变为 N，直到下个对方的结束阶段结束时为止」：记录精确原本力量值，
+            // 与普通力量±N分离；多条“变为”效果同时存在时由统一查询取最高值。
             case "SetOriginalPowerUntilOppEnd":
                 {
                     foreach (var target in ResolveTargets(op, "target", ctx))
-                        AtomicOps.AddPowerUntilOppEnd(target, GetInt(op, "value", 0) - target.Info.Power, ctx.OwnerIndex);
+                        AtomicOps.SetOriginalPowerUntilOppEnd(target, GetInt(op, "value", 0), ctx.OwnerIndex);
                     break;
                 }
             // 「对方将其 N 张手牌放回卡组最下方」（对方自选，如 EB04-025）。手牌不足时按实有张数。
@@ -1152,7 +1152,10 @@ public static class DslInterpreter
                     if (target is not null)
                     {
                         int owner = FindOwner(s, target);
-                        if (owner >= 0 && !s.IsLeaveGuarded(target, "effect"))
+                        if (owner >= 0 &&
+                            !s.IsLeaveGuarded(target, "effect") &&
+                            !await AtomicOps.TryEffectLeaveGuard(
+                                s, owner, target, ctx.Prompts, "trash"))
                         {
                             BattleEngine.KOCard(s, owner, target);
                             EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
@@ -1363,11 +1366,13 @@ public static class DslInterpreter
                     await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
                     break;
                 }
-            // PlaySelf:「此卡牌登场」生命触发——把此卡(发动触发时已被移入废弃区)从废弃区登场到场上(触发其登场时)。
+            // PlaySelf:「此卡牌登场」生命触发——把此卡（发动触发时已被移入废弃区）
+            // 从废弃区登场到场上并触发其【登场时】；角色与舞台共用免费登场入口。
             case "PlaySelf":
-                if (ctx.Source.Info.Kind == CardKind.Character)
+                if (ctx.Source.Info.Kind is CardKind.Character or CardKind.Stage)
                 {
-                    await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, ctx.Source);
+                    if (ctx.Source.Info.Kind == CardKind.Character)
+                        await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, ctx.Source);
                     await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source);
                 }
                 break;

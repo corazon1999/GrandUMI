@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 发动成本为"将 1 张费用为 1 的舞台放回其持有者的卡组最下方"。该成本不在 DSL 既有 cost 集合内，
-///     故用脚本实现：在我方场上费用为 1 的舞台中选 1 张放回卡组底（含我方舞台；本套以我方舞台为目标）。
+///     故用脚本实现：从双方场上费用为 1 的舞台中选 1 张，放回其持有者的卡组底。
 ///   - 无可作为成本的费用 1 舞台时不发动。
 ///   - 【触发】"我方生命≤2 时此卡牌登场"为条件性从生命登场的特殊机制，不在本脚本范围内（仅实现启动主要）。
 /// </summary>
@@ -30,9 +30,12 @@ public class OP06_111_Braham : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        // 成本候选：我方场上费用为 1 的舞台
-        var stages = new List<CardInstance>();
-        if (me.StageCard != null && ctx.State.CurrentCostOf(me.StageCard) == 1) stages.Add(me.StageCard);
+        // 成本候选：双方场上费用为 1 的舞台。卡文没有限定“我方”，归属方随候选保留。
+        var stages = new List<(CardInstance Stage, int OwnerIndex)>();
+        if (me.StageCard is { } myStage && ctx.State.CurrentCostOf(myStage) == 1)
+            stages.Add((myStage, ctx.OwnerIndex));
+        if (opp.StageCard is { } opponentStage && ctx.State.CurrentCostOf(opponentStage) == 1)
+            stages.Add((opponentStage, 1 - ctx.OwnerIndex));
         if (stages.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -40,13 +43,27 @@ public class OP06_111_Braham : IScriptedEffect
         if (!use) return;
 
         // 选择作为成本放回卡组底的费用 1 舞台
-        var stagePick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnStage",
-            "选择 1 张费用 1 的舞台放回卡组最下方（成本）",
-            stages.Select(c => c.Id.ToString()).ToList(), 1, 1);
+        var stagePick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "Stage",
+            "选择 1 张费用 1 的舞台放回其持有者卡组最下方（成本）",
+            stages.Select(candidate => candidate.Stage.Id.ToString()).ToList(), 1, 1,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = stages.Select(candidate => new
+                {
+                    id = candidate.Stage.Id.ToString(),
+                    number = candidate.Stage.Info.Number,
+                    ownerIndex = candidate.OwnerIndex,
+                }).ToList(),
+            });
         if (stagePick.Count < 1) return; // 未支付成本
 
-        var stage = stages.First(c => c.Id.ToString() == stagePick[0]);
-        AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, stage);
+        var picked = stages.FirstOrDefault(candidate => candidate.Stage.Id.ToString() == stagePick[0]);
+        if (picked.Stage is null) return;
+        var stageOwner = ctx.State.Players[picked.OwnerIndex];
+        if (!ReferenceEquals(stageOwner.StageCard, picked.Stage)
+            || ctx.State.CurrentCostOf(picked.Stage) != 1)
+            return;
+        AtomicOps.ReturnFieldToDeckBottom(ctx.State, picked.OwnerIndex, picked.Stage);
 
         me.TurnOnceUsed.Add(key);
 

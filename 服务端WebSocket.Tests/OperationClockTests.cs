@@ -429,6 +429,214 @@ public class OperationClockTests
     }
 
     [Fact]
+    public async Task Q488_真实贴咚会重置无操作计时且重复RequestId不会重复效果()
+    {
+        TestScene.New();
+        var room = CreateTimedRoom(MatchKind.Ranked, "OP02-002");
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var state = room.Engine.State;
+            var active = state.CurrentTurnPlayer;
+            var me = state.Players[active];
+            var opponent = state.Players[1 - active];
+            state.Phase = Phase.Main;
+            state.TurnCount = 3;
+            state.OperationTurnClockTurnCount = state.TurnCount;
+            me.CostArea.Clear();
+            me.CostArea.AddRange([
+                new DonCard { State = DonState.Active },
+                new DonCard { State = DonState.Active },
+            ]);
+            opponent.Characters.Clear();
+            var costTarget = new CardInstance { Info = CardDatabase.Get("OP15-003")! };
+            opponent.Characters.Add(costTarget);
+
+            var inactivityBefore = Stopwatch.GetTimestamp() - StopwatchTicks(61_000);
+            room.InactivityActivePlayer = active;
+            room.InactivityActiveSince = inactivityBefore;
+            var totalBefore = state.OperationClockRemainingMs[active];
+            var turnBefore = state.OperationTurnClockRemainingMs[active];
+            var originalSendToPlayer = room.Engine.OnSendToPlayer;
+            var delayedPromptSnapshot = 0;
+            room.Engine.OnSendToPlayer = (playerIndex, payload) =>
+            {
+                var snapshot = JsonSerializer.SerializeToElement(payload);
+                if (playerIndex == active
+                    && snapshot.TryGetProperty("lastAction", out var lastAction)
+                    && lastAction.GetString() == "Prompt"
+                    && Interlocked.Exchange(ref delayedPromptSnapshot, 1) == 0)
+                {
+                    // BeforeSnapshot 已经运行；模拟随后仍有较慢的服务端效果下发工作。
+                    Thread.Sleep(400);
+                }
+                originalSendToPlayer?.Invoke(playerIndex, payload);
+            };
+            const string attachRequestId = "q488-attach-don-once";
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "AttachDon",
+                JsonSerializer.SerializeToElement(new { targetId = "leader", count = 2 }),
+                requestId: attachRequestId,
+                receivedAt: Stopwatch.GetTimestamp());
+
+            await WaitUntilAsync(() =>
+                me.AttachedDonCount(me.Leader.Id) == 2
+                && state.PendingPrompt is not null);
+            await WaitUntilAsync(() =>
+                room.InactivityActiveSince > inactivityBefore
+                && state.InactivityLossRemainingMs > 238_000
+                && state.OperationClockActivePlayer == active
+                && state.InactivityActivePlayer == active);
+            var prompt = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+            Assert.Equal(1, Volatile.Read(ref delayedPromptSnapshot));
+            Assert.InRange(state.OperationClockRemainingMs[active], totalBefore - 200, totalBefore);
+            Assert.InRange(state.OperationTurnClockRemainingMs[active], turnBefore - 200, turnBefore);
+
+            // 首个动作尚在效果选择窗口内就重发同一 requestId，仍只能回权威快照，不能再赋咚或再派发效果。
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "AttachDon",
+                JsonSerializer.SerializeToElement(new { targetId = "leader", count = 2 }),
+                requestId: attachRequestId,
+                receivedAt: Stopwatch.GetTimestamp());
+            await Task.Delay(100);
+
+            Assert.Equal(2, me.AttachedDonCount(me.Leader.Id));
+            Assert.Same(prompt, state.PendingPrompt);
+            Assert.Equal(0, costTarget.CostModThisTurn);
+            Assert.False(state.InactivityWarningActive);
+            Assert.InRange(state.InactivityLossRemainingMs, 238_000, 240_000);
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "PromptResponse",
+                JsonSerializer.SerializeToElement(new
+                {
+                    promptId = prompt.PromptId,
+                    chosen = new[] { costTarget.Id.ToString() },
+                }),
+                requestId: "q488-garp-target",
+                receivedAt: Stopwatch.GetTimestamp());
+            await WaitUntilAsync(() => state.PendingPrompt is null && costTarget.CostModThisTurn == -1);
+
+            Assert.Equal(-1, costTarget.CostModThisTurn);
+            Assert.Equal(2, me.AttachedDonCount(me.Leader.Id));
+            Assert.InRange(state.OperationClockRemainingMs[active], totalBefore - 2_000, totalBefore);
+            Assert.InRange(state.OperationTurnClockRemainingMs[active], turnBefore - 2_000, turnBefore);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task Q488_无Prompt贴咚后棋钟与无操作计时保持同一权威玩家()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var state = room.Engine.State;
+            var active = state.CurrentTurnPlayer;
+            var me = state.Players[active];
+            state.Phase = Phase.Main;
+            state.TurnCount = 3;
+            state.OperationTurnClockTurnCount = state.TurnCount;
+            me.CostArea.Clear();
+            me.CostArea.Add(new DonCard { State = DonState.Active });
+            var inactivityBefore = Stopwatch.GetTimestamp() - StopwatchTicks(61_000);
+            room.InactivityActivePlayer = active;
+            room.InactivityActiveSince = inactivityBefore;
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "AttachDon",
+                JsonSerializer.SerializeToElement(new { targetId = "leader", count = 1 }),
+                requestId: "q488-no-prompt-attach-don",
+                receivedAt: Stopwatch.GetTimestamp());
+
+            await WaitUntilAsync(() =>
+                me.AttachedDonCount(me.Leader.Id) == 1
+                && state.PendingPrompt is null
+                && room.InactivityActiveSince > inactivityBefore
+                && state.InactivityLossRemainingMs > 238_000
+                && state.OperationClockActivePlayer == active
+                && state.InactivityActivePlayer == active);
+
+            Assert.False(state.InactivityWarningActive);
+            Assert.InRange(state.InactivityLossRemainingMs, 238_000, 240_000);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task Q488_非法贴咚不会重置无操作计时或改变状态()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var state = room.Engine.State;
+            var active = state.CurrentTurnPlayer;
+            var me = state.Players[active];
+            state.Phase = Phase.Main;
+            state.TurnCount = 3;
+            me.CostArea.Clear();
+            me.CostArea.AddRange([
+                new DonCard { State = DonState.Active },
+                new DonCard { State = DonState.Active },
+            ]);
+            var inactivityBefore = Stopwatch.GetTimestamp() - StopwatchTicks(61_000);
+            room.InactivityActivePlayer = active;
+            room.InactivityActiveSince = inactivityBefore;
+            var rejected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            room.Engine.OnSendToPlayer = (playerIndex, payload) =>
+            {
+                var message = JsonSerializer.SerializeToElement(payload);
+                if (playerIndex == active
+                    && message.TryGetProperty("proto", out var proto)
+                    && proto.GetString() == "MsgActionRejected")
+                    rejected.TrySetResult(true);
+            };
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "AttachDon",
+                JsonSerializer.SerializeToElement(new { targetId = "leader", count = 0 }),
+                requestId: "q488-invalid-attach-don",
+                receivedAt: Stopwatch.GetTimestamp());
+
+            await rejected.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await WaitUntilAsync(() =>
+                room.InactivityActivePlayer == active
+                && room.InactivityActiveSince > 0
+                && state.InactivityWarningActive);
+
+            Assert.Equal(2, me.ActiveDonCount);
+            Assert.Equal(0, me.AttachedDonCount(me.Leader.Id));
+            Assert.InRange(state.InactivityLossRemainingMs, 178_000, 180_000);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public async Task 连续四分钟没有操作后由服务端判负()
     {
         TestScene.New();
@@ -524,15 +732,86 @@ public class OperationClockTests
         }
     }
 
+    [Fact]
+    public async Task G620_攻击效果等待选择时只扣提示决策方的操作时间()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            var state = room.Engine.State;
+            var attacker = state.CurrentTurnPlayer;
+            var defender = 1 - attacker;
+            state.Phase = Phase.BattleCounter;
+            state.CurrentBattle = new BattleContext
+            {
+                AttackerPlayerIndex = attacker,
+                DefenderPlayerIndex = defender,
+                AttackerCardId = state.Players[attacker].Leader.Id,
+                TargetIsLeader = true,
+            };
+            room.Engine.Broadcast("G620BeforePrompt");
+            await WaitUntilAsync(() => state.OperationClockActivePlayer == defender);
+
+            var choiceTask = room.Engine.Prompts.ChooseCards(
+                attacker,
+                "AttackEffect",
+                "选择攻击时效果对象",
+                ["attack-choice"],
+                1,
+                1);
+            await WaitUntilAsync(() =>
+                state.PendingPrompt is { PlayerIndex: var player } && player == attacker
+                && state.OperationClockActivePlayer == attacker);
+
+            var prompt = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+            var attackerBefore = state.OperationClockRemainingMs[attacker];
+            var defenderBefore = state.OperationClockRemainingMs[defender];
+            room.OperationClockActiveSince = Stopwatch.GetTimestamp() - StopwatchTicks(1_000);
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[attacker],
+                "PromptResponse",
+                JsonSerializer.SerializeToElement(new
+                {
+                    promptId = prompt.PromptId,
+                    chosen = new[] { "attack-choice" },
+                }),
+                requestId: "g620-attack-choice",
+                receivedAt: Stopwatch.GetTimestamp());
+
+            Assert.Equal(["attack-choice"], await choiceTask.WaitAsync(TimeSpan.FromSeconds(3)));
+            await WaitUntilAsync(() =>
+                state.PendingPrompt is null && state.OperationClockActivePlayer == defender);
+
+            Assert.InRange(
+                attackerBefore - state.OperationClockRemainingMs[attacker],
+                900,
+                1_200);
+            Assert.InRange(
+                defenderBefore - state.OperationClockRemainingMs[defender],
+                0,
+                200);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
     private static GameRoomManager.RoomEntry CreateRankedRoom()
         => CreateTimedRoom(MatchKind.Ranked);
 
-    private static GameRoomManager.RoomEntry CreateTimedRoom(MatchKind matchKind)
+    private static GameRoomManager.RoomEntry CreateTimedRoom(
+        MatchKind matchKind,
+        string leaderNumber = "OP15-001")
     {
         var suffix = Guid.NewGuid().ToString("N");
         return GameRoomManager.CreateRoom(
-            $"clock-s0-{suffix}", $"clock-a-{suffix}", BuildLegalDeck("OP15-001"),
-            $"clock-s1-{suffix}", $"clock-b-{suffix}", BuildLegalDeck("OP15-001"),
+            $"clock-s0-{suffix}", $"clock-a-{suffix}", BuildLegalDeck(leaderNumber),
+            $"clock-s1-{suffix}", $"clock-b-{suffix}", BuildLegalDeck(leaderNumber),
             p0First: true,
             matchKind: matchKind,
             broadcastInitialState: false);

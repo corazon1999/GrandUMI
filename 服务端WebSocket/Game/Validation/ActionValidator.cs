@@ -29,6 +29,9 @@ public static class ActionValidator
         if (handIndex < 0 || handIndex >= p.Hand.Count) return Fail("手牌索引非法");
         var card = p.Hand[handIndex].Info;
         if (card.Kind == CardKind.Leader)     return Fail("领航不能从手牌出");
+        if (card.Kind == CardKind.Event
+            && Array.IndexOf(card.EffectTags, "EventMain") < 0)
+            return Fail("该事件没有【主要】效果，不能在主要阶段发动");
         if (card.Kind == CardKind.Character && s.NoPlayCharacterThisTurn.Contains(playerIdx))
             return Fail("本回合无法登场角色卡牌");
         if (card.Kind == CardKind.Character
@@ -42,13 +45,14 @@ public static class ActionValidator
         return OkResult;
     }
 
-    public static Result CanAttachDon(GameState s, int playerIdx, string targetId)
+    public static Result CanAttachDon(GameState s, int playerIdx, string targetId, int count = 1)
     {
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段赋予咚");
         if (s.CurrentBattle is not null)      return Fail("战斗中不能赋予咚");
+        if (count < 1)                        return Fail("赋予咚数量必须是正整数");
         var p = s.Players[playerIdx];
-        if (p.ActiveDonCount < 1)             return Fail("没有活跃咚");
+        if (p.ActiveDonCount < count)         return Fail($"活跃咚不足，需要 {count} 张");
         if (targetId == "leader") return OkResult;
         if (!Guid.TryParse(targetId, out var gid)) return Fail("目标非法");
         if (!p.Characters.Any(c => c.Id == gid))    return Fail("目标不在场上");

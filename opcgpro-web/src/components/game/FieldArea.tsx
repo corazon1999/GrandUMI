@@ -6,6 +6,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 import CardItem from "@/components/ui/CardItem";
 import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
+import BattleTargetBadge from "@/components/game/BattleTargetBadge";
 
 interface Props {
   side: "my" | "opponent";
@@ -21,6 +22,7 @@ export default function FieldArea({ side }: Props) {
   const setSelectedDon = useGameStore((s) => s.setSelectedDon);
 
   const battle = useGameStore((s) => s.battle);
+  const phase = useGameStore((s) => s.phase);
   const currentTurn = useGameStore((s) => s.currentTurn);
   const turnCount = useGameStore((s) => s.turnCount);
 
@@ -104,11 +106,11 @@ export default function FieldArea({ side }: Props) {
                   攻击
                 </span>
               )}
-              {isBattleTarget && (
-                <span className={`pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded px-1.5 text-[10px] font-black text-black shadow ${isBlocker ? "bg-cyan-300" : "bg-amber-500"}`}>
-                  {isBlocker ? "阻挡" : "目标"}
-                </span>
-              )}
+              <BattleTargetBadge
+                phase={phase}
+                isBattleTarget={isBattleTarget}
+                isBlocker={isBlocker}
+              />
               {fc.effectsNullified && (
                 <span
                   title="本回合角色效果无效"

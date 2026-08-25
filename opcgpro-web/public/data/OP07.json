@@ -705,7 +705,9 @@
     "effectTags": [
       "OnEnterField"
     ],
-    "abilities": [],
+    "abilities": [
+      "速攻：角色"
+    ],
     "effectEvent": "",
     "rarity": "R",
     "subscript": 2,

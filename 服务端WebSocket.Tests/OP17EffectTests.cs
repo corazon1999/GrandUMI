@@ -754,6 +754,28 @@ public class OP17EffectTests
     }
 
     [Fact]
+    public async Task Q318_OP17_014_RealOpponentAttackEvent_TrashesSelfAndBoostsLeader()
+    {
+        var state = TestScene.New().MyCharacter("OP17-014").Build();
+        var defender = state.Players[0];
+        var whiteyBay = defender.Characters.Single();
+        state.CurrentTurnPlayer = 1;
+        state.TurnCount = 3;
+
+        BattleEngine.StartAttack(
+            state,
+            state.Players[1].Leader.Id,
+            targetIsLeader: true,
+            targetId: null);
+        await BattleEngine.TriggerAttackDeclareAsync(state, new MockPromptService());
+
+        Assert.DoesNotContain(whiteyBay, defender.Characters);
+        Assert.Contains(whiteyBay, defender.Trash);
+        Assert.Equal(1000, defender.Leader.PowerModThisBattle);
+        Assert.Equal(Phase.BattleBlock, state.Phase);
+    }
+
+    [Fact]
     public async Task OP17_018_HandlesMainAndCounterModes()
     {
         var main = TestScene.New().MyActiveDon(2).Build();

@@ -10,8 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - 确认卡组顶 3 张：用 prompt 的 extra.choiceCards 展示卡面（卡组牌默认不下发身份）。
-///   - "从卡组顶直接登场角色"：DSL 的 LookTopReveal 只能加入手牌，无从卡组顶登场角色的 op，故用脚本
-///     直接操作 State（与引擎 PlayFromHandFree 的角色登场逻辑一致：满 5 时弃最左一张后登场）。
+///   - "从卡组顶直接登场角色"统一使用 PlayFromDeckFree，确保被登场角色的【登场时】进入权威队列。
 ///   - "自选顺序放回卡组最下方"实现为保持原相对顺序放底（对实战影响极小）。
 /// </summary>
 public class OP06_003_Ivankov : IScriptedEffect
@@ -46,12 +45,7 @@ public class OP06_003_Ivankov : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-                me.Deck.Remove(picked);
-                // 从卡组顶登场角色（与 PlayFromHandFree 角色登场逻辑一致）
-                if (me.Characters.Count >= 5)
-                    await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
-                picked.TurnPlayed = ctx.State.TurnCount;
-                me.Characters.Add(picked);
+                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, picked);
             }
         }
 

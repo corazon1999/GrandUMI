@@ -12,7 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 仅在领袖为"堂吉诃德·罗西南德"时本效果有收益，故仅在该前提下询问发动。
 ///   - 成本：横置我方1张活跃咚!!（用 ReturnDonToDeck 不对，应是转为休息——直接将1张活跃咚置为休息状态）+ 横置此角色。
-///   - 确认卡组顶5张，公开（让玩家选）最多1张费用≤2角色，从卡组以休息状态直接登场（手动 Deck.Remove → Characters.Add，IsTapped=true）。
+///   - 确认卡组顶5张，公开（让玩家选）最多1张费用≤2角色，通过统一的卡组登场入口以休息状态登场并触发其【登场时】。
 ///   - 剩余按原相对顺序放回卡组最下方。
 /// </summary>
 public class EB02_025_Rosinante : IScriptedEffect
@@ -62,12 +62,7 @@ public class EB02_025_Rosinante : IScriptedEffect
             if (chosen.Count > 0)
             {
                 var picked = cand.First(c => c.Id.ToString() == chosen[0]);
-                me.Deck.Remove(picked);
-                if (me.Characters.Count >= 5)
-                    await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
-                picked.TurnPlayed = ctx.State.TurnCount;
-                picked.IsTapped = true; // 以休息状态登场
-                me.Characters.Add(picked);
+                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, picked, restState: true);
             }
         }
 

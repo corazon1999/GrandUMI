@@ -1184,13 +1184,17 @@
   },
   "OP16-089": {
     "_name": "杰拉基尔·米霍克",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时抽2张，之后丢弃2张手牌",
     "triggers": [
       {
         "on": "OnEnterField",
         "then": [
           {
             "op": "Draw",
+            "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
             "n": 2
           }
         ]
@@ -1478,7 +1482,8 @@
   },
   "OP16-102": {
     "_name": "阿瓦罗·匹萨罗",
-    "_matcher": "KO时抽 N",
+    "_matcher": "【KO时】抽1张，之后将手牌或废弃区中最多1张名为“哈奇诺斯”的卡牌登场；合并候选和来源区移动由专用脚本实现。",
+    "_src": "scripted",
     "triggers": [
       {
         "on": "OnKO",

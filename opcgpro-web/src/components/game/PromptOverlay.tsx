@@ -634,11 +634,26 @@ export default function PromptOverlay() {
                     : -1;
                 const isLeaderChoice =
                   id === "leader" || id === my?.leaderId || id === opp?.leaderId || choiceZone === "leader";
+                // 目标协议始终提交唯一实例 id；显式徽标让同名、同卡图目标也能看清当前选择，
+                // 不能只依赖黄边/轻微缩放（手机触控和横置卡尤其不明显）。
+                const isSelectedChoice = selectable && selected.includes(id);
                 const orderIdx = isOrdered ? selected.indexOf(id) : -1;
                 return (
                   <div
                     key={id}
                     onClick={selectable ? () => toggle(id) : undefined}
+                    onKeyDown={selectable ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      toggle(id);
+                    } : undefined}
+                    role={selectable ? "button" : undefined}
+                    tabIndex={selectable ? 0 : undefined}
+                    aria-pressed={selectable ? isSelectedChoice : undefined}
+                    aria-label={selectable
+                      ? `${card?.name ?? "卡牌目标"}${fieldSide === "my" ? "，己方" : fieldSide === "opponent" ? "，对方" : ""}${fieldIndex >= 0 ? `，第${fieldIndex + 1}位` : ""}${isSelectedChoice ? "，已选择" : "，未选择"}`
+                      : undefined}
+                    data-prompt-choice-id={id}
                     className={`relative ${selectable ? "cursor-pointer" : "cursor-default"}`}
                     title={selectable ? undefined : "仅供确认，不可选择"}
                   >
@@ -646,7 +661,7 @@ export default function PromptOverlay() {
                     <CardItem
                       card={card}
                       size="md"
-                      isSelected={selectable && selected.includes(id)}
+                      isSelected={isSelectedChoice}
                       isTapped={fieldState?.isTapped ?? false}
                       attachedDonCount={fieldState?.attachedDonCount ?? 0}
                       powerBuff={fieldState?.powerBuff ?? 0}
@@ -674,6 +689,16 @@ export default function PromptOverlay() {
                     {orderIdx >= 0 && (
                       <span className="pointer-events-none absolute -top-1.5 -left-1.5 z-30 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-black shadow-md ring-2 ring-white">
                         第{orderIdx + 1}张
+                      </span>
+                    )}
+                    {isSelectedChoice && !isOrdered && (
+                      <span
+                        data-selected-target-marker
+                        className="pointer-events-none absolute -bottom-2 -right-2 z-40 flex h-7 min-w-7 items-center justify-center gap-0.5 rounded-full bg-emerald-500 px-1.5 text-[10px] font-black text-white shadow-lg ring-2 ring-white"
+                        aria-hidden="true"
+                      >
+                        <span className="text-sm leading-none">✓</span>
+                        <span>已选</span>
                       </span>
                     )}
                   </div>

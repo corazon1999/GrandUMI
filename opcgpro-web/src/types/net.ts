@@ -927,7 +927,7 @@ export type GameActionType =
   | "UseEffect"         // { sourceId, effectKey, ... }
   | "EndTurn"           // {}
   | "ConfirmDamage"     // {}
-  | "PlayerActivity"    // { kind?: "attachDon" | "undoAttachDon" | "presence" }
+  | "PlayerActivity"    // { kind?: "presence" }，仅用于挂机提醒中的明确在线确认
   | "RequestTurnExtension" // {}：每位玩家每局一次，当前回合最多加至 8 分钟
   | "RequestDraw"       // { description: string }
   | "RespondDraw"       // { accept: boolean }

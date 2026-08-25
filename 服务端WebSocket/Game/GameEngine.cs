@@ -815,13 +815,31 @@ public class GameEngine
         if (!data.TryGetProperty("targetId", out var ti) || ti.ValueKind != JsonValueKind.String)
         { SendError(playerIndex, "缺少 targetId"); return; }
         var targetIdStr = ti.GetString()!;
-        var v = ActionValidator.CanAttachDon(State, playerIndex, targetIdStr);
+        int count = 1;
+        if (data.TryGetProperty("count", out var countElement)
+            && (countElement.ValueKind != JsonValueKind.Number || !countElement.TryGetInt32(out count)))
+        {
+            SendError(playerIndex, "赋予咚数量必须是整数");
+            return;
+        }
+
+        var v = ActionValidator.CanAttachDon(State, playerIndex, targetIdStr, count);
         if (!v.Ok) { SendError(playerIndex, v.Reason!); return; }
 
         var p = State.Players[playerIndex];
         Guid targetId = targetIdStr == "leader" ? p.Leader.Id : Guid.Parse(targetIdStr);
-        int count = data.TryGetProperty("count", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 1;
-        for (int i = 0; i < count; i++) CardPlayer.AttachDon(p, targetId);
+        // 先取得完整批次再变更，确保伪造的超额/负数请求不会出现部分赋予。
+        var activeDons = p.CostArea.Where(don => don.State == DonState.Active).Take(count).ToArray();
+        if (activeDons.Length != count)
+        {
+            SendError(playerIndex, $"活跃咚不足，需要 {count} 张");
+            return;
+        }
+        foreach (var don in activeDons)
+        {
+            don.State = DonState.Attached;
+            don.AttachedToCardId = targetId;
+        }
         // 赋予咚!! 时触发（OP02-002 戈普领袖：我方回合赋予咚→对方角色减费），
         // 效果链稳定后再以 AttachDon 语义发送最终快照，避免 AttachDon + EffectResolved 连发两包。
         _ = Track(ResolveDonAttachedAsync(playerIndex, targetId, targetIdStr, count));
@@ -864,8 +882,11 @@ public class GameEngine
         var v = ActionValidator.CanAttack(State, playerIndex, attackerId, targetIsLeader, targetId);
         if (!v.Ok) { SendError(playerIndex, v.Reason!); return; }
 
-        // 攻击前置弃牌税（OP08-043：对方所有角色攻击前须弃 N 张手牌）
-        int tax = State.AttackTaxDiscard[playerIndex];
+        // 攻击前置弃牌税（OP08-043：仅对方“角色”攻击前须弃 N 张手牌）。
+        // 领袖与角色共用 Attack 入口，必须先按权威场上实例判定攻击者类型，
+        // 否则领袖攻击也会被错误征税；角色原有征税与异步选择链保持不变。
+        bool isCharacterAttack = State.Players[playerIndex].Characters.Any(card => card.Id == attackerId);
+        int tax = isCharacterAttack ? State.AttackTaxDiscard[playerIndex] : 0;
         if (tax > 0)
         {
             if (State.Players[playerIndex].Hand.Count < tax)

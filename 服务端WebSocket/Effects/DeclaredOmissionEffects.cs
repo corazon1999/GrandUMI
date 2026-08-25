@@ -1111,13 +1111,19 @@ public static class DeclaredOmissionEffects
     private static async Task ResolveOP15_116(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        if (!me.Leader.Info.HasKeyword("草帽一伙") || me.LifeArea.Count == 0
-            || me.Hand.Count == 0) return;
-        var life = me.LifeArea[0];
-        me.LifeArea.RemoveAt(0);
-        life.IsLifeFaceUp = false;
-        me.Trash.Add(life);
+        if (!me.Leader.Info.HasKeyword("草帽一伙")) return;
+
+        // 各句按卡面顺序独立执行：生命区为空时只跳过“生命顶送废弃”，
+        // 不能把后续“卡组顶加入生命”和“弃 1 手牌”一并取消。
+        if (me.LifeArea.Count > 0)
+        {
+            var life = me.LifeArea[0];
+            me.LifeArea.RemoveAt(0);
+            life.IsLifeFaceUp = false;
+            me.Trash.Add(life);
+        }
         AtomicOps.AddLifeFromDeckTop(me, 1);
+        if (me.Hand.Count == 0) return;
         var discardIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard", "选择丢弃的 1 张手牌",
             me.Hand.Select(card => card.Id.ToString()).ToList(), 1, 1,
             new Dictionary<string, object?>

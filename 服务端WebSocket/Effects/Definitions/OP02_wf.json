@@ -744,21 +744,29 @@
   },
   "OP02-068": {
     "_name": "橡皮橡皮雨",
-    "_matcher": "反击弃1手牌给我方领袖或角色本战斗+3000(弃牌成本经 cost 不可挂可选弦，按收益实现)；触发将费用≤2角色放回手牌。",
+    "_matcher": "反击弃1手牌给我方领袖或角色本战斗+3000；触发将费用≤2角色放回手牌。",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
-        "max": 1,
-        "as": "$t"
+    "counter": {
+      "cost": {
+        "handDiscard": {
+          "n": 1,
+          "text": "可以丢弃 1 张手牌作为反击效果的成本（选 0 张放弃）"
+        }
       },
-      {
-        "op": "AddPowerThisBattle",
-        "target": "$t",
-        "delta": 3000
-      }
-    ],
+      "then": [
+        {
+          "op": "Choose",
+          "prompt": "OwnLeaderOrCharacter",
+          "max": 1,
+          "as": "$t"
+        },
+        {
+          "op": "AddPowerThisBattle",
+          "target": "$t",
+          "delta": 3000
+        }
+      ]
+    },
     "trigger": [
       {
         "op": "Choose",

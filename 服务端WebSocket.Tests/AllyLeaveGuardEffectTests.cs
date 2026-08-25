@@ -149,6 +149,136 @@ public class AllyLeaveGuardEffectTests
     }
 
     [Fact]
+    public async Task OP09_009_TrashTarget_PromptsOP16_014AndAllowsItsKoReplacement()
+    {
+        var state = TestScene.New().Build();
+        var marco = Card("OP16-014");
+        marco.PowerModThisTurn = -2000;
+        var reviveCost = Card("OP16-014");
+        state.Players[0].Characters.Add(marco);
+        state.Players[0].Hand.Add(reviveCost);
+        var prompts = new MockPromptService()
+            .QueueChoose(marco.Id.ToString())
+            .QueueConfirm(true)
+            .QueueConfirm(true)
+            .QueueChoose(reviveCost.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 1, Card("OP09-009"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(2, prompts.ConfirmHistory.Count);
+        Assert.Contains(marco, state.Players[0].Characters);
+        Assert.DoesNotContain(marco, state.Players[0].Trash);
+        Assert.Contains(reviveCost, state.Players[0].Trash);
+    }
+
+    [Fact]
+    public async Task OP09_009_TrashTarget_ContinuesOriginalLeaveWhenOP16_014DeclinesReplacement()
+    {
+        var state = TestScene.New().Build();
+        var marco = Card("OP16-014");
+        marco.PowerModThisTurn = -2000;
+        state.Players[0].Characters.Add(marco);
+        var prompts = new MockPromptService()
+            .QueueChoose(marco.Id.ToString())
+            .QueueConfirm(false);
+
+        await EffectRuntime.Resolve(
+            state, 1, Card("OP09-009"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Single(prompts.ConfirmHistory);
+        Assert.DoesNotContain(marco, state.Players[0].Characters);
+        Assert.Contains(marco, state.Players[0].Trash);
+    }
+
+    [Fact]
+    public async Task OP09_009_TrashTarget_StopsOriginalLeaveAfterReplacementEvenWithoutReviveCost()
+    {
+        var state = TestScene.New().Build();
+        var marco = Card("OP16-014");
+        marco.PowerModThisTurn = -2000;
+        state.Players[0].Characters.Add(marco);
+        var prompts = new MockPromptService()
+            .QueueChoose(marco.Id.ToString())
+            .QueueConfirm(true);
+
+        await EffectRuntime.Resolve(
+            state, 1, Card("OP09-009"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Single(prompts.ConfirmHistory);
+        Assert.DoesNotContain(marco, state.Players[0].Characters);
+        Assert.Contains(marco, state.Players[0].Trash);
+        Assert.Empty(state.Players[0].Hand);
+    }
+
+    [Fact]
+    public async Task OP08_069_MoveToLife_PromptsOP16_014AndAllowsItsKoReplacement()
+    {
+        var state = TestScene.New().Build();
+        var defender = state.Players[0];
+        var attacker = state.Players[1];
+        var marco = Card("OP16-014");
+        var reviveCost = Card("OP16-014");
+        defender.Characters.Add(marco);
+        defender.Hand.Add(reviveCost);
+
+        var don = new DonCard { State = DonState.Active };
+        var discard = Card("OP15-003");
+        attacker.CostArea.Add(don);
+        attacker.Hand.Add(discard);
+        attacker.Deck.Add(Card("OP15-004"));
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueConfirm(true)
+            .QueueConfirm(true)
+            .QueueChoose(don.Id.ToString())
+            .QueueChoose(discard.Id.ToString())
+            .QueueChoose(marco.Id.ToString())
+            .QueueOption(0)
+            .QueueChoose(reviveCost.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 1, Card("OP08-069"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(3, prompts.ConfirmHistory.Count);
+        Assert.Contains(marco, defender.Characters);
+        Assert.DoesNotContain(marco, defender.LifeArea);
+        Assert.DoesNotContain(marco, defender.Trash);
+        Assert.Contains(reviveCost, defender.Trash);
+    }
+
+    [Fact]
+    public async Task OP08_069_MoveToLife_ContinuesOriginalLeaveWhenOP16_014DeclinesReplacement()
+    {
+        var state = TestScene.New().Build();
+        var defender = state.Players[0];
+        var attacker = state.Players[1];
+        var marco = Card("OP16-014");
+        defender.Characters.Add(marco);
+
+        var don = new DonCard { State = DonState.Active };
+        var discard = Card("OP15-003");
+        attacker.CostArea.Add(don);
+        attacker.Hand.Add(discard);
+        attacker.Deck.Add(Card("OP15-004"));
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueConfirm(false)
+            .QueueChoose(don.Id.ToString())
+            .QueueChoose(discard.Id.ToString())
+            .QueueChoose(marco.Id.ToString())
+            .QueueOption(0);
+
+        await EffectRuntime.Resolve(
+            state, 1, Card("OP08-069"), EffectTrigger.OnEnterField, prompts);
+
+        Assert.Equal(2, prompts.ConfirmHistory.Count);
+        Assert.DoesNotContain(marco, defender.Characters);
+        Assert.Contains(marco, defender.LifeArea);
+        Assert.DoesNotContain(marco, defender.Trash);
+    }
+
+    [Fact]
     public async Task ST25_003_DiscardsOneHandCard_AndProtectsCrossGuildCharacter()
     {
         var state = TestScene.New().Build();

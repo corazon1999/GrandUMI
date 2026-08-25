@@ -28,7 +28,7 @@
   },
   "ST26-005": {
     "_name": "蒙奇·D·路飞",
-    "_note": "【登场时】/【攻击时】咚-2：领袖多色且对方场上≥5咚时，我方《草帽一伙》领袖原本力量变为7000直到下个对方结束阶段（反馈#206补整卡，SetOriginalPowerUntilOppEnd 以 delta 近似；leaderHasKeyword 限定草帽领袖）。",
+    "_note": "【登场时】/【攻击时】咚-2：领袖多色且对方场上≥5咚时，我方《草帽一伙》领袖原本力量变为7000直到下个对方结束阶段（SetOriginalPowerUntilOppEnd 记录精确原本力量；leaderHasKeyword 限定草帽领袖）。",
     "triggers": [
       {
         "on": "OnEnterField",

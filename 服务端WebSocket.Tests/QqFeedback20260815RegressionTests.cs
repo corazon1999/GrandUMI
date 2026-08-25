@@ -17,6 +17,7 @@ public class QqFeedback20260815RegressionTests
 
     [Theory]
     [InlineData("OP17-003")]
+    [InlineData("OP17-027")]
     [InlineData("OP17-048")]
     public void RushCharacter_SnapshotKeepsAttackButtonWhenRestedCharacterIsLegal(string number)
     {

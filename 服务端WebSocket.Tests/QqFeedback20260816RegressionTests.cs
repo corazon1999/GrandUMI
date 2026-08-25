@@ -81,7 +81,7 @@ public class QqFeedback20260816RegressionTests
     }
 
     [Fact]
-    public async Task OP17_063_CannotActivateAfterItsEntryTurn()
+    public async Task OP17_063_AfterEntryTurn_CanPayButConditionalEffectDoesNothing()
     {
         var state = TestScene.New("OP17-039").MyActiveDon(1).OppCharacter("OP17-011").Build();
         state.TurnCount = 4;
@@ -91,15 +91,17 @@ public class QqFeedback20260816RegressionTests
         var don = Assert.Single(state.Players[0].CostArea);
         var victim = Assert.Single(state.Players[1].Characters);
         var prompts = new MockPromptService()
-            .QueueChoose(don.Id.ToString())
-            .QueueChoose(victim.Id.ToString());
+            .QueueChoose(don.Id.ToString());
 
         await EffectRuntime.Resolve(state, 0, ged, EffectTrigger.ActivatedMain, prompts);
 
         Assert.False(victim.IsEffectsNullified);
         Assert.Contains(victim, state.Players[1].Characters);
-        Assert.Contains(don, state.Players[0].CostArea);
-        Assert.Empty(prompts.ChooseHistory);
+        Assert.DoesNotContain(don, state.Players[0].CostArea);
+        Assert.Contains(don, state.Players[0].DonDeck);
+        Assert.Contains($"OP17-063-act:{ged.Id}", state.Players[0].TurnOnceUsed);
+        var costPrompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("ReturnOwnDon", costPrompt.kind);
     }
 
     [Fact]
