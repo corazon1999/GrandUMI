@@ -66,7 +66,7 @@ export default function CardZoomOverlay({
       <button
         type="button"
         onClick={(event) => { event.stopPropagation(); onClose(); }}
-        className="absolute right-[calc(0.75rem+var(--layout-safe-right,env(safe-area-inset-right)))] top-[calc(0.75rem+var(--layout-safe-top,env(safe-area-inset-top)))] z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/30 bg-slate-950/95 text-xl font-black text-white shadow-xl hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-white"
+        className="absolute right-[calc(0.75rem+var(--layout-safe-right,env(safe-area-inset-right)))] top-[calc(0.75rem+var(--layout-safe-top,env(safe-area-inset-top)))] z-10 flex min-h-12 min-w-12 items-center justify-center rounded-full border border-white/30 bg-slate-950/95 text-xl font-black text-white shadow-xl hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-white"
         aria-label="关闭卡牌详情"
         title="关闭卡牌详情"
       >

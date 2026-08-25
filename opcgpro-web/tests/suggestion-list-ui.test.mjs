@@ -29,7 +29,7 @@ test("卡图失败时显示效果文字且卡牌详情有明确关闭按钮", as
   assert.match(item, /card!\.effectEvent \|\| card!\.trigger/);
   assert.match(zoom, /卡图暂不可用/);
   assert.match(zoom, /aria-label="关闭卡牌详情"/);
-  assert.match(zoom, /min-h-11 min-w-11/);
+  assert.match(zoom, /min-h-12 min-w-12/);
 });
 
 test("对局同时显示六分钟回合时钟、一次加时与总操作时钟", async () => {

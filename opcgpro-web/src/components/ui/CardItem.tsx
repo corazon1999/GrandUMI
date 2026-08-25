@@ -11,6 +11,7 @@ import CardZoomOverlay from "@/components/ui/CardZoomOverlay";
 import CardKeywordEffects, { resolveVisibleKeywords } from "@/components/ui/CardKeywordEffects";
 import CardBack from "@/components/ui/CardBack";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
+import { createCardLongPressGesture } from "@/lib/cardLongPressGesture";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 
@@ -127,44 +128,127 @@ export default function CardItem({
   // 悬停详情预览（仅正面且有卡牌数据时显示，避免泄露对手暗置手牌）
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 右键大图详情（同样仅正面有卡牌时可开，避免泄露对手暗置牌）
-  const [zoomOpen, setZoomOpen] = useState(false);
+  // 右键或触屏长按大图详情；保存打开时的卡牌身份，避免卡牌切换瞬间展示新牌信息。
+  const [zoomCardIdentity, setZoomCardIdentity] = useState<string | null>(null);
+  const cardIdentity = showFaceDown || !card ? null : `${card.number}\u0000${rawSprite}`;
+  const currentCardRef = useRef({ card, cardIdentity, showFaceDown });
+  currentCardRef.current = { card, cardIdentity, showFaceDown };
+
+  const clearHoverPreview = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    setHoverInfo(null);
+  };
+
+  const [longPressGesture] = useState(() => createCardLongPressGesture({
+    onLongPress: (pressedIdentity) => {
+      const current = currentCardRef.current;
+      if (current.showFaceDown || !current.card || current.cardIdentity !== pressedIdentity) return;
+      clearHoverPreview();
+      setZoomCardIdentity(pressedIdentity);
+    },
+  }));
 
   useEffect(() => {
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      longPressGesture.move(event);
+    };
+    const handleWindowPointerUp = (event: PointerEvent) => {
+      const result = longPressGesture.finish(event);
+      if (result === "ignored") return;
+      clearHoverPreview();
+      if (result === "long-press") event.preventDefault();
+    };
+    const handleWindowPointerCancel = (event: PointerEvent) => {
+      const result = longPressGesture.cancelPointer(event);
+      if (result !== "ignored") clearHoverPreview();
+    };
+    const handleWindowClick = (event: MouseEvent) => {
+      if (!longPressGesture.consumeSuppressedClick(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    // HandArea 会把触控指针捕获到外层；窗口捕获阶段仍能稳定看到移动和释放。
+    window.addEventListener("pointermove", handleWindowPointerMove, true);
+    window.addEventListener("pointerup", handleWindowPointerUp, true);
+    window.addEventListener("pointercancel", handleWindowPointerCancel, true);
+    window.addEventListener("click", handleWindowClick, true);
     return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove, true);
+      window.removeEventListener("pointerup", handleWindowPointerUp, true);
+      window.removeEventListener("pointercancel", handleWindowPointerCancel, true);
+      window.removeEventListener("click", handleWindowClick, true);
+      longPressGesture.dispose();
       if (hoverTimer.current) clearTimeout(hoverTimer.current);
     };
-  }, []);
+  }, [longPressGesture]);
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (showFaceDown || !card) return;
+  useEffect(() => {
+    longPressGesture.cancelActive();
+    clearHoverPreview();
+    setZoomCardIdentity(null);
+  }, [cardIdentity, longPressGesture]);
+
+  const handlePointerEnter = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse" || showFaceDown || !card || !cardIdentity) return;
     const rect = e.currentTarget.getBoundingClientRect();
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    const hoveredIdentity = cardIdentity;
     hoverTimer.current = setTimeout(
-      () => setHoverInfo({ card, rect, currentSprite: rawSprite }),
+      () => {
+        hoverTimer.current = null;
+        if (currentCardRef.current.cardIdentity !== hoveredIdentity) return;
+        setHoverInfo({ card, rect, currentSprite: rawSprite });
+      },
       HOVER_DELAY,
     );
   };
 
-  const handleMouseLeave = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setHoverInfo(null);
+  const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") clearHoverPreview();
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") {
+      longPressGesture.noteMousePointerDown(e, e.button);
+      return;
+    }
+    if (!e.isPrimary || showFaceDown || !cardIdentity) return;
+    clearHoverPreview();
+    // 不在按下时 preventDefault，保留普通短按和非 HandArea 场景的页面滚动。
+    longPressGesture.start(e, cardIdentity);
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // 即使没有业务 onClick，也保留节点级兜底，避免合成 click 冒泡到牌区祖先。
+    if (longPressGesture.consumeSuppressedClick(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
+      return;
+    }
+    onClick?.();
   };
 
   // 右键 → 居中大图详情；屏蔽浏览器原生菜单，背面/无卡数据不弹（防泄露暗置牌）
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (showFaceDown || !card) return;
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setHoverInfo(null);
-    setZoomOpen(true);
+    // 部分浏览器把触摸长按产生的 contextmenu 标成 mouse，故按近期触控坐标判定。
+    if (longPressGesture.shouldSuppressContextMenu(e)) {
+      e.stopPropagation();
+      return;
+    }
+    if (showFaceDown || !card || !cardIdentity) return;
+    clearHoverPreview();
+    setZoomCardIdentity(cardIdentity);
   };
 
   return (
     <motion.div
       className={clsx(
         sizes[size],
-        "relative shrink-0 cursor-pointer overflow-hidden rounded-md border-2 shadow-xl",
+        "relative shrink-0 cursor-pointer select-none overflow-hidden rounded-md border-2 shadow-xl",
         "transform-gpu backface-hidden transition-colors",
         isSelected
           ? "z-30 border-yellow-300"
@@ -185,11 +269,13 @@ export default function CardItem({
         scale: isSelected ? (liftOnSelect ? 1.05 : 1.03) : 1,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      style={{ WebkitTouchCallout: "none" }}
       data-game-board-interactive={onClick ? "true" : undefined}
-      onClick={onClick}
+      onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       whileHover={!isSelected ? { scale: 1.03 } : {}}
     >
       {showFaceDown ? (
@@ -369,12 +455,12 @@ export default function CardItem({
         )}
       <GameOverlayPortal>
         <AnimatePresence>
-          {zoomOpen && card && (
+          {zoomCardIdentity !== null && zoomCardIdentity === cardIdentity && card && !showFaceDown && (
             <CardZoomOverlay
               card={card}
               sprite={rawSprite}
               counterValue={displayCounter}
-              onClose={() => setZoomOpen(false)}
+              onClose={() => setZoomCardIdentity(null)}
             />
           )}
         </AnimatePresence>
