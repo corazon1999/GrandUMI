@@ -16,12 +16,12 @@ test("标准与狂野排位使用独立队列、资料和榜单", async () => {
   ]);
 
   assert.match(types, /RankedMode = "standard" \| "wild"/);
-  assert.match(types, /MatchQueueKind = "ranked" \| "rankedWild" \| "casual"/);
+  assert.match(types, /MatchQueueKind = "ranked" \| "rankedWild" \| "casualStandard" \| "casual"/);
   assert.match(store, /rankProfiles: Record<RankedMode/);
   assert.match(store, /rankLeaderboards: Record<RankedMode/);
   assert.match(protocol, /requestRankSnapshot\(mode: RankedMode = "standard"\)/);
-  assert.match(lobby, /aria-label="排位模式"/);
-  assert.match(lobby, /setMatchQueueKind\("rankedWild"\)/);
+  assert.match(lobby, /aria-label=\{isRanked \? "排位模式" : "休闲模式"\}/);
+  assert.match(lobby, /setMatchQueueKind\(isRanked \? "rankedWild" : "casual"\)/);
   assert.match(leaderboard, /useState<RankedMode>\("standard"\)/);
   assert.match(leaderboard, /aria-label="排位榜模式"/);
   assert.match(bridge, /WildRankedMatchQueue/);
@@ -54,7 +54,7 @@ test("排位模式切换在手机竖屏保持可见且触控区域合格", async
 
   assert.match(lobby, /overflow-y-auto px-4 py-3/);
   assert.match(lobby, /\[@media\(max-height:800px\)\]:hidden/);
-  assert.match(lobby, /aria-label="排位模式"/);
+  assert.match(lobby, /aria-label=\{isRanked \? "排位模式" : "休闲模式"\}/);
   assert.match(lobby, /min-h-11 rounded-lg px-3 text-sm font-black/);
   assert.match(leaderboard, /aria-label="排位榜模式"/);
   assert.match(leaderboard, /min-h-11 rounded-md px-4/);

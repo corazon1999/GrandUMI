@@ -325,7 +325,8 @@ export interface MsgCancelMatch extends MsgBase {
 
 export type RankFaction = "pirate" | "marine" | "government";
 export type RankedMode = "standard" | "wild";
-export type MatchQueueKind = "ranked" | "rankedWild" | "casual";
+// casual 保留为旧客户端兼容值，语义等同狂野休闲；新客户端默认使用 casualStandard。
+export type MatchQueueKind = "ranked" | "rankedWild" | "casualStandard" | "casual";
 
 export interface MsgSelectRankFaction extends MsgBase {
   proto: "MsgSelectRankFaction";
@@ -1083,7 +1084,7 @@ export interface MsgGameState extends MsgBase {
   operationClockActive?: "my" | "opponent" | null;
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
-  matchKind?: "Ranked" | "RankedWild" | "Casual" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
+  matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
   isGameOver: boolean;
   isDraw?: boolean;
   winnerIsMe: boolean;

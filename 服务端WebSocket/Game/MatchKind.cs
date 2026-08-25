@@ -13,4 +13,8 @@ public enum MatchKind
     RoomCode,
     Friendly,
     Bot,
+    /// <summary>遵循当前环境禁限卡表的休闲公开匹配。</summary>
+    CasualStandard,
+    /// <summary>使用无限制卡池的休闲公开匹配；新建对局使用此值，旧快照 Casual 仍可恢复。</summary>
+    CasualWild,
 }

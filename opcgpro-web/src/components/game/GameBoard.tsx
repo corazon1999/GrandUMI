@@ -326,7 +326,13 @@ function OperationClock({
         ? urgent ? "border-red-400/70 bg-red-500/20 text-red-200" : "border-sky-400/60 bg-sky-500/15 text-sky-100"
         : "border-white/10 bg-black/20 text-slate-400"
     }`}>
-      <span className="text-[9px] font-bold tracking-wide">{matchKind === "RankedWild" ? "狂野排位" : matchKind === "Ranked" ? "标准排位" : "休闲"}</span>
+      <span className="text-[9px] font-bold tracking-wide">{
+        matchKind === "RankedWild" ? "狂野排位"
+          : matchKind === "Ranked" ? "标准排位"
+            : matchKind === "CasualWild" ? "狂野休闲"
+              : matchKind === "CasualStandard" ? "标准休闲"
+                : "休闲"
+      }</span>
       <span className="justify-self-end text-sm" aria-label={`本回合剩余 ${formatOperationTime(turnRemaining)}`}>
         回合 {formatOperationTime(turnRemaining)}
       </span>

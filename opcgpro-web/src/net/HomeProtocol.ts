@@ -1158,7 +1158,7 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgDeleteDeckPlaza", publicationId } as MsgDeleteDeckPlaza);
   },
 
-  enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casual") {
+  enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casualStandard") {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     useNetStore.getState().setMatchQueueKind(queueKind);
     useNetStore.getState().setLastRankResult(null);

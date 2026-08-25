@@ -255,7 +255,12 @@ public sealed class LeaderChampionStore
     }
 
     private static bool IsEligible(LeaderMatchResult result)
-        => result.MatchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking
+        => result.MatchKind is MatchKind.Ranked
+            or MatchKind.RankedWild
+            or MatchKind.Casual
+            or MatchKind.CasualStandard
+            or MatchKind.CasualWild
+            or MatchKind.Matchmaking
            && result.WinnerIndex is 0 or 1
            && result.TurnCount >= LeaderStatsStore.MinimumCountedTurn
            && !IsDisconnectFinish(result.FinishReason)
@@ -304,7 +309,7 @@ public sealed class LeaderChampionStore
                    player0_leader, player1_leader, winner_index
             FROM match_results
             WHERE counted = 1
-              AND match_kind IN ('Ranked', 'Casual', 'Matchmaking')
+              AND match_kind IN ('Ranked', 'RankedWild', 'Casual', 'CasualStandard', 'CasualWild', 'Matchmaking')
               AND finish_reason NOT LIKE '%断线%'
               AND LOWER(finish_reason) NOT LIKE '%disconnect%';
             """;

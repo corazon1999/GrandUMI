@@ -241,7 +241,7 @@ const initialState = {
   canChangeDisplayName: false,
   error: null as string | null,
   matchState: "idle" as MatchState,
-  matchQueueKind: "casual" as const,
+  matchQueueKind: "casualStandard" as const,
   selectedDeck: null as SelectedDeck | null,
   opponentName: "",
   rankProfile: null as RankProfileSnapshot | null,

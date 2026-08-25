@@ -28,7 +28,7 @@ public class WsSession
     public string?   Deck       { get; set; }
     public string?   DeckName   { get; set; }
     public bool      IsMatching       { get; set; }
-    /// <summary>公开匹配队列类型；旧客户端未传时默认休闲。</summary>
+    /// <summary>公开匹配队列类型；旧客户端未传时默认兼容原有的无限制休闲。</summary>
     public string    MatchQueueKind   { get; set; } = "casual";
     public DateTime  MatchEnqueuedAtUtc { get; set; }
     public double    MatchRating      { get; set; } = 1500;

@@ -47,7 +47,9 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime>  SupersededClientInstances = new(StringComparer.Ordinal);
     private static readonly object                                  AccountIndexGate = new();
+    // 兼容旧客户端：历史 casual 协议值继续表示无限制（狂野）休闲匹配。
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
+    private static readonly ConcurrentQueue<WsSession>              StandardCasualMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              WildRankedMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
@@ -978,6 +980,7 @@ public static class WebSocketBridge
 
         var queueKind = Str(msg, "queueKind") switch
         {
+            var value when string.Equals(value, "casualStandard", StringComparison.OrdinalIgnoreCase) => "casualStandard",
             var value when string.Equals(value, "rankedWild", StringComparison.OrdinalIgnoreCase) => "rankedWild",
             var value when string.Equals(value, "ranked", StringComparison.OrdinalIgnoreCase) => "ranked",
             _ => "casual",
@@ -985,7 +988,7 @@ public static class WebSocketBridge
         var ranked = IsRankedQueue(queueKind);
         var rankedMode = RankedModeForQueue(queueKind);
         var deck = Str(msg, "deck") ?? "";
-        var v = DeckValidator.Validate(deck, queueKind == "ranked" ? DeckValidator.FormatStandard : DeckValidator.FormatUnrestricted);
+        var v = DeckValidator.Validate(deck, DeckFormatForQueue(queueKind));
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = $"卡组不合法: {v.Reason}" });
@@ -1179,8 +1182,14 @@ public static class WebSocketBridge
     private static RankedMode RankedModeForQueue(string queueKind)
         => queueKind == "rankedWild" ? RankedMode.Wild : RankedMode.Standard;
 
+    private static string DeckFormatForQueue(string queueKind)
+        => queueKind is "ranked" or "casualStandard"
+            ? DeckValidator.FormatStandard
+            : DeckValidator.FormatUnrestricted;
+
     private static ConcurrentQueue<WsSession> QueueFor(string queueKind) => queueKind switch
     {
+        "casualStandard" => StandardCasualMatchQueue,
         "ranked" => RankedMatchQueue,
         "rankedWild" => WildRankedMatchQueue,
         _ => MatchQueue,
@@ -1188,16 +1197,18 @@ public static class WebSocketBridge
 
     private static MatchKind MatchKindForQueue(string queueKind) => queueKind switch
     {
+        "casualStandard" => MatchKind.CasualStandard,
         "ranked" => MatchKind.Ranked,
         "rankedWild" => MatchKind.RankedWild,
-        _ => MatchKind.Casual,
+        _ => MatchKind.CasualWild,
     };
 
     private static string QueueLabel(string queueKind) => queueKind switch
     {
+        "casualStandard" => "标准休闲",
         "ranked" => "标准排位",
         "rankedWild" => "狂野排位",
-        _ => "休闲",
+        _ => "狂野休闲",
     };
 
     /// <summary>

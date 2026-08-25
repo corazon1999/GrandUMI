@@ -76,7 +76,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const selectedDeck  = useNetStore((s) => s.selectedDeck);
   const opponentName  = useNetStore((s) => s.opponentName);
   const matchQueueKind = useNetStore((s) => s.matchQueueKind);
-  const rankedMode: RankedMode = matchQueueKind === "rankedWild" ? "wild" : "standard";
+  const rankedMode: RankedMode = matchQueueKind === "rankedWild" || matchQueueKind === "casual" ? "wild" : "standard";
   const rankProfile = useNetStore((s) => s.rankProfiles[rankedMode]);
   const playerName    = useNetStore((s) => s.playerName);
   const roomCode      = useNetStore((s) => s.roomCode);
@@ -99,7 +99,14 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const mainCount     = selectedDeck ? countMainCards(selectedDeck.cards) : 0;
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
   const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle" && !maintenance.enabled;
-  const isRanked = matchQueueKind !== "casual";
+  const isRanked = matchQueueKind === "ranked" || matchQueueKind === "rankedWild";
+  const matchQueueLabel = matchQueueKind === "rankedWild"
+    ? "狂野排位"
+    : matchQueueKind === "ranked"
+      ? "标准排位"
+      : matchQueueKind === "casual"
+        ? "狂野休闲"
+        : "标准休闲";
   const canQueue = canEnter && (!isRanked || Boolean(rankProfile?.faction));
 
   useEffect(() => {
@@ -285,7 +292,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                     <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
                       <button
                         type="button"
-                        onClick={() => useNetStore.getState().setMatchQueueKind("ranked")}
+                        onClick={() => useNetStore.getState().setMatchQueueKind(rankedMode === "wild" ? "rankedWild" : "ranked")}
                         aria-pressed={isRanked}
                         className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${isRanked ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                       >
@@ -293,19 +300,18 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => useNetStore.getState().setMatchQueueKind("casual")}
-                        aria-pressed={matchQueueKind === "casual"}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${matchQueueKind === "casual" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        onClick={() => useNetStore.getState().setMatchQueueKind(rankedMode === "wild" ? "casual" : "casualStandard")}
+                        aria-pressed={!isRanked}
+                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${!isRanked ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                       >
                         休闲匹配
                       </button>
                     </div>
 
-                    {isRanked && (
-                      <div className="grid grid-cols-2 rounded-xl border border-violet-900/70 bg-gray-950 p-1" aria-label="排位模式">
+                    <div className="grid grid-cols-2 rounded-xl border border-violet-900/70 bg-gray-950 p-1" aria-label={isRanked ? "排位模式" : "休闲模式"}>
                         <button
                           type="button"
-                          onClick={() => useNetStore.getState().setMatchQueueKind("ranked")}
+                          onClick={() => useNetStore.getState().setMatchQueueKind(isRanked ? "ranked" : "casualStandard")}
                           aria-pressed={rankedMode === "standard"}
                           className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${rankedMode === "standard" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                         >
@@ -313,19 +319,20 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => useNetStore.getState().setMatchQueueKind("rankedWild")}
+                          onClick={() => useNetStore.getState().setMatchQueueKind(isRanked ? "rankedWild" : "casual")}
                           aria-pressed={rankedMode === "wild"}
                           className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${rankedMode === "wild" ? "bg-fuchsia-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                         >
                           狂野
                         </button>
                       </div>
-                    )}
-                    {isRanked && (
-                      <p className="text-xs leading-5 text-gray-500">
-                        {rankedMode === "standard" ? "标准排位遵循当前环境禁限卡表。" : "狂野排位可使用角标 1 等标准禁限卡，积分与榜单独立。"}
-                      </p>
-                    )}
+                    <p className="text-xs leading-5 text-gray-500">
+                      {rankedMode === "standard"
+                        ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
+                        : isRanked
+                          ? "狂野排位可使用角标 1 等标准禁限卡，积分与榜单独立。"
+                          : "狂野休闲可使用角标 1 等标准禁限卡，且不影响排名。"}
+                    </p>
 
                     {isRanked && rankProfile && (
                       <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
@@ -417,14 +424,14 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       disabled={!canQueue}
                       className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${isRanked ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
                     >
-                      开始{matchQueueKind === "rankedWild" ? "狂野排位" : matchQueueKind === "ranked" ? "标准排位" : "休闲"}匹配
+                      开始{matchQueueLabel}匹配
                     </button>
                   </>
                 )}
                 {matchState === "matching" && (
                   <div className="flex flex-col items-center gap-3 py-2" role="status">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                    <p className="font-bold text-orange-300">正在寻找{matchQueueKind === "rankedWild" ? "狂野排位" : matchQueueKind === "ranked" ? "标准排位" : "休闲"}对手…</p>
+                    <p className="font-bold text-orange-300">正在寻找{matchQueueLabel}对手…</p>
                     <button type="button" onClick={handleCancelMatch} className="min-h-11 rounded-lg px-4 text-sm text-gray-400 hover:bg-gray-800 hover:text-white">
                       取消匹配
                     </button>

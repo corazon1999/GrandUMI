@@ -47,7 +47,7 @@ public static class DeckValidator
 
     /// <summary>
     /// ONE PIECE CARD GAME 亚洲官网自 2026-05-01 起生效的完全禁用卡。
-    /// 仅应用于标准排位；狂野排位保留完整卡池。
+    /// 仅应用于标准模式；狂野模式保留完整卡池。
     /// </summary>
     private static readonly HashSet<string> StandardBannedCards = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -122,9 +122,9 @@ public static class DeckValidator
         if (allowed is not null && !allowed.Contains(leader.SetCode))
             return new(false, $"{rule.Name} 格式：领航必须来自 {setList}（当前 {leader.SetCode}）", leader.Number);
         if (enforceStandardLegality && StandardBannedCards.Contains(leader.Number))
-            return new(false, $"标准排位不能使用官方禁卡：{leader.Number}；可改用狂野排位", leader.Number);
+            return new(false, $"标准模式不能使用官方禁卡：{leader.Number}；可改用狂野模式", leader.Number);
         if (enforceStandardLegality && IsRotatedOutOfStandard(leader))
-            return new(false, $"标准排位不能使用禁限领航卡：{leader.Number}；可改用狂野排位", leader.Number);
+            return new(false, $"标准模式不能使用禁限领航卡：{leader.Number}；可改用狂野模式", leader.Number);
 
         // 2. 主卡组张数
         if (mainCards.Length != rule.MainSize)
@@ -145,7 +145,7 @@ public static class DeckValidator
             foreach (var (cardA, cardB) in StandardBannedPairs)
             {
                 if (includedCards.Contains(cardA) && includedCards.Contains(cardB))
-                    return new(false, $"标准排位不能同时使用官方禁用组合：{cardA} + {cardB}；可改用狂野排位", leader.Number);
+                    return new(false, $"标准模式不能同时使用官方禁用组合：{cardA} + {cardB}；可改用狂野模式", leader.Number);
             }
         }
 
@@ -158,9 +158,9 @@ public static class DeckValidator
             if (card.Kind == CardKind.Leader)
                 return new(false, $"主卡组不能包含领航卡：{num}", leader.Number);
             if (enforceStandardLegality && StandardBannedCards.Contains(card.Number))
-                return new(false, $"标准排位不能使用官方禁卡：{num}；可改用狂野排位", leader.Number);
+                return new(false, $"标准模式不能使用官方禁卡：{num}；可改用狂野模式", leader.Number);
             if (enforceStandardLegality && IsRotatedOutOfStandard(card))
-                return new(false, $"标准排位不能使用禁限卡：{num}；可改用狂野排位", leader.Number);
+                return new(false, $"标准模式不能使用禁限卡：{num}；可改用狂野模式", leader.Number);
             if (allowed is not null && !allowed.Contains(card.SetCode))
                 return new(false, $"{rule.Name} 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
             if (leader.Number == "P-117" && !card.HasKeyword("东海"))

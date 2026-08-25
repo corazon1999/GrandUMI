@@ -13,10 +13,10 @@ test("公开匹配明确保留排位与休闲两个入口", async () => {
 
   assert.match(lobby, />\s*排位匹配\s*</);
   assert.match(lobby, />\s*休闲匹配\s*</);
-  assert.match(lobby, /setMatchQueueKind\("ranked"\)/);
-  assert.match(lobby, /setMatchQueueKind\("casual"\)/);
-  assert.match(protocol, /enterMatch\(deck: string, deckName\?: string, queueKind: MatchQueueKind = "casual"\)/);
-  assert.match(types, /MatchQueueKind = "ranked" \| "rankedWild" \| "casual"/);
+  assert.match(lobby, /setMatchQueueKind\(isRanked \? "ranked" : "casualStandard"\)/);
+  assert.match(lobby, /setMatchQueueKind\(isRanked \? "rankedWild" : "casual"\)/);
+  assert.match(protocol, /enterMatch\(deck: string, deckName\?: string, queueKind: MatchQueueKind = "casualStandard"\)/);
+  assert.match(types, /MatchQueueKind = "ranked" \| "rankedWild" \| "casualStandard" \| "casual"/);
 });
 
 test("排位前必须选择阵营，更换阵营须确认并清空排位进度", async () => {
@@ -164,7 +164,9 @@ test("休闲公开匹配也使用双方各二十分钟的操作棋钟", async ()
   const manager = await readSource("../../服务端WebSocket/Game/GameRoomManager.cs");
 
   assert.match(manager, /private const long OperationTimeLimitMs = 20 \* 60 \* 1000/);
-  assert.match(manager, /OperationClockEnabled = matchKind is MatchKind\.Ranked or MatchKind\.RankedWild or MatchKind\.Casual or MatchKind\.Matchmaking/);
+  assert.match(manager, /OperationClockEnabled = UsesPublicMatchClock\(matchKind\)/);
+  assert.match(manager, /or MatchKind\.CasualStandard/);
+  assert.match(manager, /or MatchKind\.CasualWild/);
   assert.match(manager, /OperationClockRemainingMs\[0\] = OperationTimeLimitMs/);
   assert.match(manager, /OperationClockRemainingMs\[1\] = OperationTimeLimitMs/);
 });

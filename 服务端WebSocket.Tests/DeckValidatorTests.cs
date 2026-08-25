@@ -124,7 +124,7 @@ public class DeckValidatorTests
         var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
 
         Assert.False(standard.Ok);
-        Assert.Contains("标准排位不能使用禁限领航卡", standard.Reason ?? "");
+        Assert.Contains("标准模式不能使用禁限领航卡", standard.Reason ?? "");
         Assert.True(wild.Ok, wild.Reason);
     }
 

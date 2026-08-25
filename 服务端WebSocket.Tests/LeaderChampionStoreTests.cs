@@ -104,8 +104,14 @@ public sealed class LeaderChampionStoreTests : IDisposable
         Assert.True(testServerStore.IsChampion("Alice", "OP16-001", now));
     }
 
-    [Fact]
-    public void 初始化时会从历史排行榜数据回填最强使用者()
+    [Theory]
+    [InlineData(MatchKind.Ranked)]
+    [InlineData(MatchKind.RankedWild)]
+    [InlineData(MatchKind.Casual)]
+    [InlineData(MatchKind.CasualStandard)]
+    [InlineData(MatchKind.CasualWild)]
+    [InlineData(MatchKind.Matchmaking)]
+    public void 初始化时会从各种公开匹配历史回填最强使用者(MatchKind matchKind)
     {
         var now = new DateTime(2026, 8, 11, 8, 0, 0, DateTimeKind.Utc);
         Directory.CreateDirectory(_tempDir);
@@ -114,7 +120,7 @@ public sealed class LeaderChampionStoreTests : IDisposable
         for (var index = 0; index < LeaderChampionStore.MinimumChampionGames; index++)
         {
             Assert.True(statsStore.RecordMatch(Match(
-                $"history-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 0)));
+                $"history-{index}", now, "Alice", "Opponent-A", "OP16-001", "OP01-001", 0, matchKind)));
         }
 
         var championStore = new LeaderChampionStore(databasePath);

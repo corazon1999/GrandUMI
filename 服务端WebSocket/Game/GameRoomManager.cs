@@ -218,7 +218,7 @@ public static class GameRoomManager
         };
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
-        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking;
+        engine.State.OperationClockEnabled = UsesPublicMatchClock(matchKind);
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
         engine.State.OperationClockRemainingMs[1] = OperationTimeLimitMs;
         ResetOperationTurnClock(engine.State);
@@ -2293,7 +2293,7 @@ public static class GameRoomManager
         entry.ProcessedPlayerRequests.Restore(processedRequests);
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
-        engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking;
+        engine.State.OperationClockEnabled = UsesPublicMatchClock(matchKind);
         engine.State.OperationClockRemainingMs[0] = restoredClockMs[0];
         engine.State.OperationClockRemainingMs[1] = restoredClockMs[1];
         engine.State.OperationTurnClockRemainingMs[0] = Math.Min(
@@ -2443,6 +2443,14 @@ public static class GameRoomManager
 
     private static RankedMode RankedModeForMatch(MatchKind matchKind)
         => matchKind == MatchKind.RankedWild ? RankedMode.Wild : RankedMode.Standard;
+
+    private static bool UsesPublicMatchClock(MatchKind matchKind)
+        => matchKind is MatchKind.Ranked
+            or MatchKind.RankedWild
+            or MatchKind.Casual
+            or MatchKind.CasualStandard
+            or MatchKind.CasualWild
+            or MatchKind.Matchmaking;
 
     private static void TryRecordLeaderStats(
         string roomId,
