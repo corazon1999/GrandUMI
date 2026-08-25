@@ -87,12 +87,78 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.All(room!.DisconnectedPlayers, Assert.True);
             Assert.All(room.DisconnectStartedAt, value => Assert.True(value > 0));
             Assert.True(room.Engine.State.OperationClockPaused);
+            Assert.All(room.Engine.State.OperationTurnExtensionUsed, Assert.False);
+            Assert.Equal(240_000, room.Engine.State.InactivityLossRemainingMs);
 
             var graceField = typeof(GameRoomManager).GetField(
                 "_grace", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
             var grace = (System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource>)graceField.GetValue(null)!;
             Assert.Contains($"{roomId}:offline-0", grace.Keys);
             Assert.Contains($"{roomId}:offline-1", grace.Keys);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(30);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task 重启恢复会保留一次性加时并兼容旧挂机字段()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        var roomId = $"restore-clock-{Guid.NewGuid():N}"[..24];
+        try
+        {
+            var deck = BuildLegalDeck("OP15-001");
+            var now = DateTime.UtcNow;
+            var header = new
+            {
+                kind = "create",
+                roomId,
+                seed = 123456,
+                firstPlayer = 0,
+                openingSetupAfterFirstPlayerChoice = false,
+                p0 = new { account = $"restore-a-{roomId}", displayName = "恢复玩家A", deckRaw = deck },
+                p1 = new { account = $"restore-b-{roomId}", displayName = "恢复玩家B", deckRaw = deck },
+                vsBot = false,
+                matchKind = MatchKind.Ranked.ToString(),
+                createdAtUtc = now,
+            };
+            var clock = new
+            {
+                kind = "clock",
+                player0RemainingMs = 900_000,
+                player1RemainingMs = 800_000,
+                player0TurnRemainingMs = 520_000,
+                player1TurnRemainingMs = 300_000,
+                turnCount = 3,
+                player0TurnExtensionUsed = true,
+                player1TurnExtensionUsed = false,
+                player0InactivityPenaltyMs = 75_000,
+                player1InactivityPenaltyMs = 12_000,
+                tsUtc = now,
+            };
+            await File.WriteAllLinesAsync(
+                Path.Combine(root, $"{roomId}.jsonl"),
+                [JsonSerializer.Serialize(header), JsonSerializer.Serialize(clock)]);
+
+            await GameRoomManager.RestoreAll();
+            var room = GameRoomManager.GetRoom(roomId);
+
+            Assert.NotNull(room);
+            Assert.Equal(new bool[] { true, false }, room!.Engine.State.OperationTurnExtensionUsed);
+            Assert.Equal(new long[] { 480_000, 300_000 }, room.Engine.State.OperationTurnClockRemainingMs);
+            Assert.Equal(3, room.Engine.State.OperationTurnClockTurnCount);
+            Assert.All(room.DisconnectedPlayers, Assert.True);
+            Assert.Equal(-1, room.Engine.State.InactivityActivePlayer);
+            Assert.Equal(240_000, room.Engine.State.InactivityLossRemainingMs);
         }
         finally
         {

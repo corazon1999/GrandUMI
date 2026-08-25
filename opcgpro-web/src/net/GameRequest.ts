@@ -72,6 +72,22 @@ function markActionSent(requestId: string, action: string) {
   }
 }
 
+/**
+ * 棋钟控制消息不改变卡牌状态，也不占用全屏 pending 遮罩。
+ * requestId 仍交给服务端去重，双击加时或网络重发都不会重复增加时间。
+ */
+function sendClockControl(
+  action: "PlayerActivity" | "RequestTurnExtension",
+  data: Record<string, unknown> = {},
+) {
+  return NetManager.send({
+    proto: "MsgGameAction",
+    action,
+    data,
+    requestId: createRequestId(),
+  } as MsgGameAction);
+}
+
 /** 收到对应权威快照时结束本次客户端→服务端→客户端计时。 */
 export function completePendingActionLatency(requestId: string | null | undefined, tick: number) {
   completeLatency(requestId, `到快照 Tick=${tick}`);
@@ -148,6 +164,7 @@ function queueAttachDonUndo(targetId: string | "leader", count: number) {
   pendingAttachDonUndoQueue.push({ targetId, count: safeCount });
   useGameStore.getState().optimisticAttachDon(targetId, safeCount);
   notifyPendingAttachDonUndo();
+  sendClockControl("PlayerActivity", { kind: "attachDon" });
   return true;
 }
 
@@ -167,6 +184,7 @@ export function undoLastPendingAttachDon() {
   reapplyPendingAttachDonOptimistic();
   store.setPending(false);
   notifyPendingAttachDonUndo();
+  sendClockControl("PlayerActivity", { kind: "undoAttachDon" });
   return true;
 }
 
@@ -262,6 +280,12 @@ export const GameRequest = {
   surrender:     () => send("Surrender"),
   requestDraw:   () => send("RequestDraw"),
   respondDraw:   (accept: boolean) => send("RespondDraw", { accept }),
+
+  /** 每位玩家每局一次，将当前回合剩余时间增加 2 分钟（最高不超过 8 分钟）。 */
+  requestTurnExtension: () => sendClockControl("RequestTurnExtension"),
+
+  /** 挂机提醒弹窗中的明确在线确认；服务端据此把本段连续无操作计时归零。 */
+  confirmInactivityPresence: () => sendClockControl("PlayerActivity", { kind: "presence" }),
 
   /** GM 调试：按编号加一张牌到自己手牌 */
   debugAddCard: (cardNumber: string) => send("DebugAddCard", { cardNumber }),

@@ -111,6 +111,7 @@ let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
+const HOME_REFRESH_RESUME_KEY = "grandumi_resume_home_after_refresh";
 const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
 const AUTH_TOKEN_KEY = "grandumi_auth_token";
 
@@ -339,10 +340,15 @@ export function registerHomeProtocols() {
   // 避免普通首页访问静默登录，同时让服务端 TryReclaim 能自动找回原房间。
   eventBus.on("connectSucc", () => {
     if (typeof window === "undefined") return;
-    if (sessionStorage.getItem(GAME_REFRESH_RESUME_KEY) !== "1") return;
+    const resumeGame = sessionStorage.getItem(GAME_REFRESH_RESUME_KEY) === "1";
+    const resumeHome = sessionStorage.getItem(HOME_REFRESH_RESUME_KEY) === "1";
+    if (!resumeGame && !resumeHome) return;
     const savedAccount = localStorage.getItem("grandumi_account")?.trim();
     if (savedAccount) HomeRequest.login(savedAccount, undefined, true);
-    else sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+    else {
+      sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+      sessionStorage.removeItem(HOME_REFRESH_RESUME_KEY);
+    }
   });
 
   // 已登录会话发生普通网络断线时继续沿用当前账号自动恢复。
@@ -356,6 +362,7 @@ export function registerHomeProtocols() {
     const notice = rememberSessionReplacedNotice(reason);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+      sessionStorage.removeItem(HOME_REFRESH_RESUME_KEY);
     }
     clearRoomRequestTimer();
     clearSpectateRequestTimer();
@@ -417,7 +424,10 @@ function handleSecret(msg: MsgSecret) {
 function handleLogin(msg: MsgLogin) {
   const store = useNetStore.getState();
   // 收到明确登录结果后才消费标记；若握手后、回包前再次断线，下一次连接仍可继续恢复。
-  if (typeof window !== "undefined") sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(GAME_REFRESH_RESUME_KEY);
+    sessionStorage.removeItem(HOME_REFRESH_RESUME_KEY);
+  }
   if (msg.result === true) {
     const account = msg.account ?? "";
     const displayName = msg.name || account;
@@ -1020,6 +1030,14 @@ function handleUpdateSpectateSettings(msg: MsgUpdateSpectateSettings) {
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
 export const HomeRequest = {
+  /** 原生返回大厅会整页刷新；刷新前留下单次恢复标记，握手后使用会话令牌恢复登录态。 */
+  prepareHomeReload() {
+    if (typeof window === "undefined") return;
+    const { loggedIn, account } = useNetStore.getState();
+    if (!loggedIn || !account) return;
+    sessionStorage.setItem(HOME_REFRESH_RESUME_KEY, "1");
+  },
+
   login(account: string, password?: string, resume = false) {
     return NetManager.send({
       proto: "MsgLogin",

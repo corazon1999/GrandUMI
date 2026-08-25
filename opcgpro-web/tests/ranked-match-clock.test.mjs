@@ -130,11 +130,13 @@ test("对局界面展示双方独立的权威操作棋钟", async () => {
     readSource("../src/types/net.ts"),
   ]);
 
-  assert.match(board, /<OperationClock side="opponent" \/>/);
-  assert.match(board, /<OperationClock side="my" \/>/);
+  assert.match(board, /<OperationClock side="opponent" allowExtension=\{false\} \/>/);
+  assert.match(board, /<OperationClock side="my" allowExtension=\{!isObserver && !isPlayback\} \/>/);
   assert.match(store, /s\.myOperationTimeMs = msg\.myOperationTimeMs \?\? 1_200_000/);
   assert.match(store, /s\.opponentOperationTimeMs = msg\.opponentOperationTimeMs \?\? 1_200_000/);
   assert.match(netTypes, /operationClockActive\?: "my" \| "opponent" \| null/);
+  assert.match(netTypes, /myTurnExtensionUsed\?: boolean/);
+  assert.match(netTypes, /inactivityLossRemainingMs\?: number/);
 });
 
 test("排位对局右上角展示双方阵营和段位", async () => {

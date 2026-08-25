@@ -20,7 +20,10 @@ public static class GameRoomManager
     public static IRoomPlacementDirectory RoomDirectory { get; set; } = LocalRoomPlacementDirectory.Instance;
     private const int GracePeriodSeconds = 90;
     private const long OperationTimeLimitMs = 20 * 60 * 1000;
-    private const long OperationTurnTimeLimitMs = 8 * 60 * 1000;
+    internal const long OperationTurnTimeLimitMs = 6 * 60 * 1000;
+    internal const long OperationTurnExtendedTimeLimitMs = 8 * 60 * 1000;
+    internal const long InactivityWarningThresholdMs = 60 * 1000;
+    internal const long InactivityLossLimitMs = 4 * 60 * 1000;
     /// <summary>仅排障时开启；私有快照平均约 63 KB，不应作为正式服常态日志。</summary>
     private static readonly bool PrivateSnapshotLogEnabled =
         string.Equals(Environment.GetEnvironmentVariable("GRANDUMI_PRIVATE_SNAPSHOT_LOG"), "1", StringComparison.OrdinalIgnoreCase)
@@ -110,6 +113,12 @@ public static class GameRoomManager
         internal long OperationClockActiveSince;
         internal CancellationTokenSource? OperationClockTimer;
         internal int OperationClockTimerVersion;
+        /// <summary>挂机计时只使用单调时钟；与操作棋钟共用 ClockGate 和唯一计时任务。</summary>
+        internal int InactivityActivePlayer = -1;
+        internal long InactivityActiveSince;
+        /// <summary>等待动作判定、断线或平局协商暂停时保存的本段连续无操作时长；合法操作被接受后会清零。</summary>
+        internal int InactivityPausedPlayer = -1;
+        internal long InactivityPausedElapsedMs;
         internal bool[] DisconnectedPlayers { get; } = new bool[2];
         internal long[] DisconnectGraceRemainingMs { get; } = [GracePeriodSeconds * 1000L, GracePeriodSeconds * 1000L];
         internal long[] DisconnectStartedAt { get; } = new long[2];
@@ -437,11 +446,20 @@ public static class GameRoomManager
         var promptIdBefore = action == "PromptResponse" ? room.Engine.State.PendingPrompt?.PromptId : null;
         return EnqueueWork(room, new RoomWork(action, LatencyDiagnostics.Start(), async () =>
         {
-            var expiredPlayer = PauseOperationClockForAction(room, playerIndex, action, receivedAt);
-            if (expiredPlayer is 0 or 1)
+            var pause = PauseOperationClockForAction(room, playerIndex, action, receivedAt);
+            if (pause.ExpiredPlayer is 0 or 1)
             {
-                FinishByOperationTimeout(room, expiredPlayer.Value);
+                if (pause.ExpirationKind == ClockExpirationKind.Inactivity)
+                    FinishByInactivityTimeout(room, pause.ExpiredPlayer.Value);
+                else
+                    FinishByOperationTimeout(room, pause.ExpiredPlayer.Value);
                 CleanupRoom(room.RoomId);
+                return;
+            }
+            if (action is "PlayerActivity" or "RequestTurnExtension")
+            {
+                HandleClockControlAction(room, playerIndex, action, data, requestId, pause);
+                EnsureOperationClockRunning(room);
                 return;
             }
             room.Engine.RecordMatchLog("player_action_requested", playerIndex, new { action, data });
@@ -450,13 +468,11 @@ public static class GameRoomManager
             // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
             if (accepted)
             {
+                lock (room.ClockGate)
+                    CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
                 room.MarkActivity();
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
-                RoomJournal.AppendClock(
-                    room.RoomId,
-                    room.Engine.State.OperationClockRemainingMs,
-                    room.Engine.State.OperationTurnClockRemainingMs,
-                    room.Engine.State.OperationTurnClockTurnCount);
+                AppendClockState(room);
                 MaybeCaptureRecoverySnapshot(room);
             }
             EnsureOperationClockRunning(room);
@@ -467,28 +483,130 @@ public static class GameRoomManager
         }, receivedAt));
     }
 
-    private static int? PauseOperationClockForAction(
+    private enum ClockExpirationKind { None, Operation, Inactivity }
+
+    private readonly record struct ActionClockPause(
+        int? ExpiredPlayer,
+        ClockExpirationKind ExpirationKind,
+        long CutoffTimestamp);
+
+    private readonly record struct ClockExpiration(int? ExpiredPlayer, ClockExpirationKind Kind);
+
+    private static ActionClockPause PauseOperationClockForAction(
         RoomEntry room,
         int playerIndex,
         string action,
         long receivedAt)
     {
-        if (!room.Engine.State.OperationClockEnabled) return null;
+        var fallbackCutoff = receivedAt > 0 ? receivedAt : Stopwatch.GetTimestamp();
+        if (!room.Engine.State.OperationClockEnabled)
+            return new ActionClockPause(null, ClockExpirationKind.None, fallbackCutoff);
         lock (room.ClockGate)
         {
-            var cutoff = receivedAt > 0 ? receivedAt : Stopwatch.GetTimestamp();
+            // 已在队列中等待的后续动作，其接收时间可能早于上一动作处理完成后重新开钟的时点。
+            // 此时从重新开钟时点起算 0ms，绝不能把服务端排队/结算耗时转嫁给玩家。
+            var cutoff = NormalizeClockCutoffLocked(room, fallbackCutoff);
             var activePlayer = room.Engine.State.OperationClockActivePlayer;
+            var operationDeadline = GetOperationExpirationTimestampLocked(room, activePlayer);
+            var inactivityPlayer = room.InactivityActivePlayer;
+            var inactivityDeadline = GetInactivityExpirationTimestampLocked(room, inactivityPlayer);
             ChargeOperationClockLocked(room, cutoff);
-            if (activePlayer is 0 or 1 && IsOperationClockExpired(room.Engine.State, activePlayer))
-                return activePlayer;
+            UpdateInactivitySnapshotLocked(room, cutoff);
+            var expiration = SelectExpiredClockLocked(
+                room,
+                activePlayer,
+                operationDeadline,
+                inactivityPlayer,
+                inactivityDeadline,
+                cutoff);
+            if (expiration.ExpiredPlayer is 0 or 1)
+                return new ActionClockPause(expiration.ExpiredPlayer, expiration.Kind, cutoff);
 
             // 非当前决策者发来的非法动作不能暂停对手棋钟；投降和平局协商是例外。
             if (action is not "Surrender" and not "RequestDraw" and not "RespondDraw"
-                && activePlayer != playerIndex) return null;
+                && activePlayer != playerIndex)
+                return new ActionClockPause(null, ClockExpirationKind.None, cutoff);
+            PauseInactivityTrackingLocked(room, cutoff);
             StopOperationClockLocked(room);
-            return null;
+            return new ActionClockPause(null, ClockExpirationKind.None, cutoff);
         }
     }
+
+    private static void HandleClockControlAction(
+        RoomEntry room,
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string? requestId,
+        ActionClockPause pause)
+    {
+        var accepted = false;
+        var shouldBroadcast = false;
+        var rejection = "当前不是你的操作时点";
+        lock (room.ClockGate)
+        {
+            if (room.InactivityPausedPlayer != playerIndex)
+            {
+                // 非当前决策者的心跳不能替对手清除挂机计时。
+            }
+            else if (action == "PlayerActivity")
+            {
+                shouldBroadcast = room.InactivityPausedElapsedMs >= InactivityWarningThresholdMs;
+                CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
+                accepted = true;
+            }
+            else if (room.Engine.State.OperationTurnExtensionUsed[playerIndex])
+            {
+                rejection = "本局的回合加时已经使用过";
+            }
+            else
+            {
+                var state = room.Engine.State;
+                var before = state.OperationTurnClockRemainingMs[playerIndex];
+                var extension = OperationTurnExtendedTimeLimitMs - OperationTurnTimeLimitMs;
+                state.OperationTurnClockRemainingMs[playerIndex] = Math.Min(
+                    OperationTurnExtendedTimeLimitMs,
+                    Math.Min(state.OperationClockRemainingMs[playerIndex], before + extension));
+                state.OperationTurnExtensionUsed[playerIndex] = true;
+                CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
+                accepted = true;
+                shouldBroadcast = true;
+            }
+        }
+
+        if (!accepted)
+        {
+            // 控制动作不进入卡牌动作磁带；拒绝回包仍带请求 ID，便于未来客户端安全重试。
+            if (action != "PlayerActivity")
+                WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], new
+                {
+                    proto = "MsgActionRejected",
+                    reason = rejection,
+                    requestId,
+                });
+            return;
+        }
+
+        room.MarkActivity();
+        AppendClockState(room);
+        room.Engine.RecordMatchLog("player_clock_control", playerIndex, new
+        {
+            action,
+            kind = data.ValueKind == JsonValueKind.Object && data.TryGetProperty("kind", out var kind)
+                ? kind.GetString()
+                : null,
+        });
+        if (shouldBroadcast)
+            room.Engine.Broadcast(action, new { player = playerIndex });
+    }
+
+    private static void AppendClockState(RoomEntry room)
+        => RoomJournal.AppendClock(
+            room.RoomId,
+            room.Engine.State.OperationClockRemainingMs,
+            room.Engine.State.OperationTurnClockRemainingMs,
+            room.Engine.State.OperationTurnClockTurnCount,
+            room.Engine.State.OperationTurnExtensionUsed);
 
     private static void EnsureOperationClockRunning(RoomEntry room)
     {
@@ -503,10 +621,12 @@ public static class GameRoomManager
     private static void SyncOperationClock(RoomEntry room)
     {
         var state = room.Engine.State;
-        if (!state.OperationClockEnabled) return;
+        if (!state.OperationClockEnabled || state.IsGameOver) return;
         lock (room.ClockGate)
         {
-            ChargeOperationClockLocked(room, Stopwatch.GetTimestamp());
+            var cutoff = Stopwatch.GetTimestamp();
+            ChargeOperationClockLocked(room, cutoff);
+            UpdateInactivitySnapshotLocked(room, cutoff);
             StartOperationClockLocked(room, DetermineOperationClockPlayer(room));
         }
     }
@@ -528,7 +648,7 @@ public static class GameRoomManager
         var state = room.Engine.State;
         var active = state.OperationClockActivePlayer;
         if (active is not (0 or 1) || room.OperationClockActiveSince <= 0) return;
-        if (cutoff < room.OperationClockActiveSince) cutoff = Stopwatch.GetTimestamp();
+        if (cutoff < room.OperationClockActiveSince) cutoff = room.OperationClockActiveSince;
         var elapsed = Stopwatch.GetElapsedTime(room.OperationClockActiveSince, cutoff).TotalMilliseconds;
         if (elapsed > 0)
         {
@@ -545,6 +665,174 @@ public static class GameRoomManager
         state.OperationClockSyncUtc = DateTime.UtcNow;
     }
 
+    private static long NormalizeClockCutoffLocked(RoomEntry room, long cutoff)
+    {
+        if (room.OperationClockActiveSince > cutoff)
+            cutoff = room.OperationClockActiveSince;
+        if (room.InactivityActiveSince > cutoff)
+            cutoff = room.InactivityActiveSince;
+        return cutoff;
+    }
+
+    private static long ElapsedMilliseconds(long startedAt, long cutoff)
+    {
+        if (startedAt <= 0 || cutoff <= startedAt) return 0;
+        return (long)Math.Ceiling(Stopwatch.GetElapsedTime(startedAt, cutoff).TotalMilliseconds);
+    }
+
+    private static long AddMillisecondsToTimestamp(long timestamp, long milliseconds)
+    {
+        if (timestamp <= 0) return long.MaxValue;
+        var ticks = (long)Math.Ceiling(Math.Max(0, milliseconds) * (double)Stopwatch.Frequency / 1000d);
+        return timestamp > long.MaxValue - ticks ? long.MaxValue : timestamp + ticks;
+    }
+
+    private static long GetOperationExpirationTimestampLocked(RoomEntry room, int playerIndex)
+    {
+        if (playerIndex is not (0 or 1) || room.OperationClockActiveSince <= 0)
+            return long.MaxValue;
+        var state = room.Engine.State;
+        var remaining = Math.Min(
+            state.OperationClockRemainingMs[playerIndex],
+            state.OperationTurnClockRemainingMs[playerIndex]);
+        return AddMillisecondsToTimestamp(room.OperationClockActiveSince, remaining);
+    }
+
+    private static long GetInactivityExpirationTimestampLocked(RoomEntry room, int playerIndex)
+    {
+        if (playerIndex is not (0 or 1)
+            || room.InactivityActivePlayer != playerIndex
+            || room.InactivityActiveSince <= 0)
+            return long.MaxValue;
+        return AddMillisecondsToTimestamp(room.InactivityActiveSince, InactivityLossLimitMs);
+    }
+
+    private static ClockExpiration SelectExpiredClockLocked(
+        RoomEntry room,
+        int operationPlayer,
+        long operationDeadline,
+        int inactivityPlayer,
+        long inactivityDeadline,
+        long cutoff)
+    {
+        var operationExpired = operationPlayer is 0 or 1
+            && IsOperationClockExpired(room.Engine.State, operationPlayer);
+        var inactivityExpired = inactivityPlayer is 0 or 1
+            && IsInactivityExpiredLocked(room, inactivityPlayer, cutoff);
+        if (!operationExpired && !inactivityExpired)
+            return new ClockExpiration(null, ClockExpirationKind.None);
+        if (inactivityExpired && (!operationExpired || inactivityDeadline < operationDeadline))
+            return new ClockExpiration(inactivityPlayer, ClockExpirationKind.Inactivity);
+        return new ClockExpiration(operationPlayer, ClockExpirationKind.Operation);
+    }
+
+    private static void UpdateInactivitySnapshotLocked(RoomEntry room, long cutoff)
+    {
+        var state = room.Engine.State;
+        var playerIndex = room.InactivityActivePlayer;
+        if (playerIndex is not (0 or 1) || room.InactivityActiveSince <= 0)
+        {
+            state.InactivityActivePlayer = -1;
+            state.InactivityWarningActive = false;
+            if (room.InactivityPausedPlayer is 0 or 1)
+            {
+                state.InactivityLossRemainingMs = Math.Max(0,
+                    InactivityLossLimitMs - room.InactivityPausedElapsedMs);
+            }
+            else
+            {
+                state.InactivityLossRemainingMs = InactivityLossLimitMs;
+            }
+            state.InactivitySyncUtc = DateTime.UtcNow;
+            return;
+        }
+
+        if (cutoff < room.InactivityActiveSince) cutoff = room.InactivityActiveSince;
+        var elapsedMs = ElapsedMilliseconds(room.InactivityActiveSince, cutoff);
+        state.InactivityActivePlayer = playerIndex;
+        state.InactivityWarningActive = elapsedMs >= InactivityWarningThresholdMs;
+        state.InactivityLossRemainingMs = Math.Max(0, InactivityLossLimitMs - elapsedMs);
+        state.InactivitySyncUtc = DateTime.UtcNow;
+    }
+
+    private static bool IsInactivityExpiredLocked(RoomEntry room, int playerIndex, long cutoff)
+    {
+        if (room.InactivityActivePlayer != playerIndex || playerIndex is not (0 or 1)) return false;
+        var elapsedMs = ElapsedMilliseconds(room.InactivityActiveSince, cutoff);
+        return elapsedMs >= InactivityLossLimitMs;
+    }
+
+    private static void PauseInactivityTrackingLocked(RoomEntry room, long cutoff)
+    {
+        var playerIndex = room.InactivityActivePlayer;
+        if (playerIndex is not (0 or 1) || room.InactivityActiveSince <= 0)
+        {
+            UpdateInactivitySnapshotLocked(room, cutoff);
+            return;
+        }
+        if (cutoff < room.InactivityActiveSince) cutoff = room.InactivityActiveSince;
+        room.InactivityPausedPlayer = playerIndex;
+        room.InactivityPausedElapsedMs = ElapsedMilliseconds(room.InactivityActiveSince, cutoff);
+        room.InactivityActivePlayer = -1;
+        room.InactivityActiveSince = 0;
+        UpdateInactivitySnapshotLocked(room, cutoff);
+    }
+
+    private static void CommitPlayerActivityLocked(RoomEntry room, int playerIndex, long cutoff)
+    {
+        if (room.InactivityActivePlayer == playerIndex)
+            PauseInactivityTrackingLocked(room, cutoff);
+        if (room.InactivityPausedPlayer == playerIndex)
+        {
+            room.InactivityPausedPlayer = -1;
+            room.InactivityPausedElapsedMs = 0;
+        }
+        room.Engine.State.InactivityActivePlayer = -1;
+        room.Engine.State.InactivityWarningActive = false;
+        room.Engine.State.InactivityLossRemainingMs = InactivityLossLimitMs;
+        room.Engine.State.InactivitySyncUtc = DateTime.UtcNow;
+    }
+
+    private static void StartInactivityTrackingLocked(RoomEntry room, int playerIndex, long startedAt)
+    {
+        if (playerIndex is not (0 or 1))
+        {
+            PauseInactivityTrackingLocked(room, startedAt);
+            return;
+        }
+        if (room.InactivityActivePlayer == playerIndex && room.InactivityActiveSince > 0)
+        {
+            UpdateInactivitySnapshotLocked(room, startedAt);
+            return;
+        }
+        if (room.InactivityActivePlayer is 0 or 1)
+        {
+            // 决策权只会在一个已接受动作后转移；结束旧决策者的等待段并归零后再切换。
+            CommitPlayerActivityLocked(room, room.InactivityActivePlayer, startedAt);
+        }
+
+        var restoredElapsedMs = room.InactivityPausedPlayer == playerIndex
+            ? room.InactivityPausedElapsedMs
+            : 0;
+        room.InactivityPausedPlayer = -1;
+        room.InactivityPausedElapsedMs = 0;
+        room.InactivityActivePlayer = playerIndex;
+        room.InactivityActiveSince = startedAt - (long)Math.Floor(
+            restoredElapsedMs * (double)Stopwatch.Frequency / 1000d);
+        UpdateInactivitySnapshotLocked(room, startedAt);
+    }
+
+    private static long GetInactivityNextBoundaryDelayLocked(RoomEntry room, long cutoff)
+    {
+        var playerIndex = room.InactivityActivePlayer;
+        if (playerIndex is not (0 or 1) || room.InactivityActiveSince <= 0)
+            return long.MaxValue;
+        var elapsedMs = ElapsedMilliseconds(room.InactivityActiveSince, cutoff);
+        if (elapsedMs < InactivityWarningThresholdMs)
+            return Math.Max(1, InactivityWarningThresholdMs - elapsedMs);
+        return Math.Max(1, InactivityLossLimitMs - elapsedMs);
+    }
+
     private static void StartOperationClockLocked(RoomEntry room, int playerIndex)
     {
         var state = room.Engine.State;
@@ -555,12 +843,16 @@ public static class GameRoomManager
         state.OperationClockPaused = state.MulliganBothDone
             && (room.DisconnectedPlayers[0] || room.DisconnectedPlayers[1]);
         state.OperationClockSyncUtc = DateTime.UtcNow;
-        room.OperationClockActiveSince = playerIndex is 0 or 1 ? Stopwatch.GetTimestamp() : 0;
+        var startedAt = Stopwatch.GetTimestamp();
+        room.OperationClockActiveSince = playerIndex is 0 or 1 ? startedAt : 0;
+        StartInactivityTrackingLocked(room, playerIndex, startedAt);
         if (playerIndex is not (0 or 1)) return;
 
-        var remaining = Math.Min(
+        var operationRemaining = Math.Min(
             state.OperationClockRemainingMs[playerIndex],
             state.OperationTurnClockRemainingMs[playerIndex]);
+        var inactivityRemaining = GetInactivityNextBoundaryDelayLocked(room, startedAt);
+        var remaining = Math.Min(operationRemaining, inactivityRemaining);
         var version = ++room.OperationClockTimerVersion;
         var cancellation = new CancellationTokenSource();
         room.OperationClockTimer = cancellation;
@@ -573,24 +865,50 @@ public static class GameRoomManager
             await EnqueueCriticalWorkAsync(activeRoom,
                 new RoomWork("OperationTimeout", LatencyDiagnostics.Start(), () =>
                 {
-                    int? expired = null;
+                    var expiration = new ClockExpiration(null, ClockExpirationKind.None);
+                    var shouldBroadcastWarning = false;
                     lock (activeRoom.ClockGate)
                     {
                         if (version != activeRoom.OperationClockTimerVersion) return Task.CompletedTask;
+                        var warningBefore = activeRoom.Engine.State.InactivityWarningActive;
                         var current = activeRoom.Engine.State.OperationClockActivePlayer;
-                        ChargeOperationClockLocked(activeRoom, Stopwatch.GetTimestamp());
-                        if (current is 0 or 1 && IsOperationClockExpired(activeRoom.Engine.State, current))
-                            expired = current;
-                        else
+                        var operationDeadline = GetOperationExpirationTimestampLocked(activeRoom, current);
+                        var inactivityPlayer = activeRoom.InactivityActivePlayer;
+                        var inactivityDeadline = GetInactivityExpirationTimestampLocked(activeRoom, inactivityPlayer);
+                        var cutoff = Stopwatch.GetTimestamp();
+                        ChargeOperationClockLocked(activeRoom, cutoff);
+                        UpdateInactivitySnapshotLocked(activeRoom, cutoff);
+                        expiration = SelectExpiredClockLocked(
+                            activeRoom,
+                            current,
+                            operationDeadline,
+                            inactivityPlayer,
+                            inactivityDeadline,
+                            cutoff);
+                        if (expiration.ExpiredPlayer is not (0 or 1))
+                        {
+                            shouldBroadcastWarning = !warningBefore
+                                && activeRoom.Engine.State.InactivityWarningActive;
                             // Task.Delay 允许因系统调度精度而比权威扣时点早醒极短时间。
                             // 此时必须按尚余时间重新挂载任务，否则棋钟会继续在客户端归零，
                             // 服务端却再也没有超时任务来完成判负。
                             StartOperationClockLocked(activeRoom, DetermineOperationClockPlayer(activeRoom));
+                        }
                     }
-                    if (expired is 0 or 1)
+                    if (expiration.ExpiredPlayer is 0 or 1)
                     {
-                        FinishByOperationTimeout(activeRoom, expired.Value);
+                        if (expiration.Kind == ClockExpirationKind.Inactivity)
+                            FinishByInactivityTimeout(activeRoom, expiration.ExpiredPlayer.Value);
+                        else
+                            FinishByOperationTimeout(activeRoom, expiration.ExpiredPlayer.Value);
                         CleanupRoom(activeRoom.RoomId);
+                    }
+                    else if (shouldBroadcastWarning)
+                    {
+                        activeRoom.Engine.Broadcast("InactivityWarning", new
+                        {
+                            player = activeRoom.Engine.State.InactivityActivePlayer,
+                        });
                     }
                     return Task.CompletedTask;
                 }), CancellationToken.None);
@@ -622,6 +940,7 @@ public static class GameRoomManager
             var turnExpired = room.Engine.State.OperationTurnClockRemainingMs[expiredPlayer] <= 0;
             if (!turnExpired) room.Engine.State.OperationClockRemainingMs[expiredPlayer] = 0;
             room.Engine.State.OperationTurnClockRemainingMs[expiredPlayer] = 0;
+            StopInactivityTrackingLocked(room);
             StopOperationClockLocked(room);
         }
         room.Engine.State.WinnerIndex = 1 - expiredPlayer;
@@ -630,6 +949,33 @@ public static class GameRoomManager
             : "本回合操作时间耗尽";
         room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[expiredPlayer]} {reason}";
         room.Engine.Broadcast("OperationTimeout", new { expiredPlayer, reason });
+    }
+
+    private static void FinishByInactivityTimeout(RoomEntry room, int expiredPlayer)
+    {
+        if (room.Engine.State.IsGameOver) return;
+        lock (room.ClockGate)
+        {
+            room.Engine.State.InactivityLossRemainingMs = 0;
+            StopInactivityTrackingLocked(room, preserveLossRemaining: true);
+            StopOperationClockLocked(room);
+        }
+        room.Engine.State.WinnerIndex = 1 - expiredPlayer;
+        room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[expiredPlayer]} 连续 4 分钟没有操作";
+        room.Engine.Broadcast("InactivityTimeout", new { expiredPlayer });
+    }
+
+    private static void StopInactivityTrackingLocked(RoomEntry room, bool preserveLossRemaining = false)
+    {
+        room.InactivityActivePlayer = -1;
+        room.InactivityActiveSince = 0;
+        room.InactivityPausedPlayer = -1;
+        room.InactivityPausedElapsedMs = 0;
+        room.Engine.State.InactivityActivePlayer = -1;
+        room.Engine.State.InactivityWarningActive = false;
+        if (!preserveLossRemaining)
+            room.Engine.State.InactivityLossRemainingMs = InactivityLossLimitMs;
+        room.Engine.State.InactivitySyncUtc = DateTime.UtcNow;
     }
 
     private static bool IsOperationClockExpired(GameState state, int playerIndex)
@@ -1023,9 +1369,12 @@ public static class GameRoomManager
         lock (room.ClockGate)
         {
             if (room.DisconnectedPlayers[idx]) return;
-            ChargeOperationClockLocked(room, Stopwatch.GetTimestamp());
+            var cutoff = Stopwatch.GetTimestamp();
+            ChargeOperationClockLocked(room, cutoff);
+            UpdateInactivitySnapshotLocked(room, cutoff);
+            PauseInactivityTrackingLocked(room, cutoff);
             room.DisconnectedPlayers[idx] = true;
-            room.DisconnectStartedAt[idx] = Stopwatch.GetTimestamp();
+            room.DisconnectStartedAt[idx] = cutoff;
             StopOperationClockLocked(room);
             room.Engine.State.OperationClockPaused = room.Engine.State.OperationClockEnabled;
             graceRemaining = room.DisconnectGraceRemainingMs[idx];
@@ -1840,6 +2189,7 @@ public static class GameRoomManager
         var restoredClockMs = new long[] { OperationTimeLimitMs, OperationTimeLimitMs };
         var restoredTurnClockMs = new long[] { OperationTurnTimeLimitMs, OperationTurnTimeLimitMs };
         var restoredTurnClockTurnCount = 0;
+        var restoredTurnExtensionUsed = new bool[2];
         DateTime lastActivity = h.TryGetProperty("createdAtUtc", out var ca)
             ? ca.GetDateTime() : DateTime.UtcNow;
         for (int i = 1; i < lines.Length; i++)
@@ -1855,6 +2205,8 @@ public static class GameRoomManager
                 if (e.TryGetProperty("player0TurnRemainingMs", out var tc0)) restoredTurnClockMs[0] = Math.Max(0, tc0.GetInt64());
                 if (e.TryGetProperty("player1TurnRemainingMs", out var tc1)) restoredTurnClockMs[1] = Math.Max(0, tc1.GetInt64());
                 if (e.TryGetProperty("turnCount", out var turnCount)) restoredTurnClockTurnCount = Math.Max(0, turnCount.GetInt32());
+                if (e.TryGetProperty("player0TurnExtensionUsed", out var te0)) restoredTurnExtensionUsed[0] = te0.GetBoolean();
+                if (e.TryGetProperty("player1TurnExtensionUsed", out var te1)) restoredTurnExtensionUsed[1] = te1.GetBoolean();
                 if (e.TryGetProperty("tsUtc", out var clockTs)) lastActivity = clockTs.GetDateTime();
                 continue;
             }
@@ -1944,9 +2296,15 @@ public static class GameRoomManager
         engine.State.OperationClockEnabled = matchKind is MatchKind.Ranked or MatchKind.RankedWild or MatchKind.Casual or MatchKind.Matchmaking;
         engine.State.OperationClockRemainingMs[0] = restoredClockMs[0];
         engine.State.OperationClockRemainingMs[1] = restoredClockMs[1];
-        engine.State.OperationTurnClockRemainingMs[0] = Math.Min(restoredTurnClockMs[0], restoredClockMs[0]);
-        engine.State.OperationTurnClockRemainingMs[1] = Math.Min(restoredTurnClockMs[1], restoredClockMs[1]);
+        engine.State.OperationTurnClockRemainingMs[0] = Math.Min(
+            OperationTurnExtendedTimeLimitMs,
+            Math.Min(restoredTurnClockMs[0], restoredClockMs[0]));
+        engine.State.OperationTurnClockRemainingMs[1] = Math.Min(
+            OperationTurnExtendedTimeLimitMs,
+            Math.Min(restoredTurnClockMs[1], restoredClockMs[1]));
         engine.State.OperationTurnClockTurnCount = restoredTurnClockTurnCount;
+        engine.State.OperationTurnExtensionUsed[0] = restoredTurnExtensionUsed[0];
+        engine.State.OperationTurnExtensionUsed[1] = restoredTurnExtensionUsed[1];
         entry.DisconnectedPlayers[0] = true;
         entry.DisconnectedPlayers[1] = true;
         var restoredDisconnectStartedAt = Stopwatch.GetTimestamp();

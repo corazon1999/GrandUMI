@@ -89,9 +89,13 @@ public static class RoomJournal
         string roomId,
         IReadOnlyList<long> remainingMs,
         IReadOnlyList<long> turnRemainingMs,
-        int turnCount)
+        int turnCount,
+        IReadOnlyList<bool> turnExtensionUsed)
     {
-        if (remainingMs.Count < 2 || turnRemainingMs.Count < 2) return;
+        if (remainingMs.Count < 2
+            || turnRemainingMs.Count < 2
+            || turnExtensionUsed.Count < 2)
+            return;
         try
         {
             Writer.Append(roomId, new
@@ -102,6 +106,8 @@ public static class RoomJournal
                 player0TurnRemainingMs = turnRemainingMs[0],
                 player1TurnRemainingMs = turnRemainingMs[1],
                 turnCount,
+                player0TurnExtensionUsed = turnExtensionUsed[0],
+                player1TurnExtensionUsed = turnExtensionUsed[1],
                 tsUtc = DateTime.UtcNow,
             });
         }

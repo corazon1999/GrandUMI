@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Reflection;
+using System.Diagnostics;
 using GrandUMI.Cards;
 using GrandUMI.Game;
 using GrandUMI.Game.Snapshot;
@@ -43,7 +44,7 @@ public class OperationClockTests
             Assert.True(room.Engine.State.OperationClockEnabled);
             Assert.Equal(-1, room.Engine.State.OperationClockActivePlayer);
             Assert.All(room.Engine.State.OperationClockRemainingMs, value => Assert.Equal(1_200_000, value));
-            Assert.All(room.Engine.State.OperationTurnClockRemainingMs, value => Assert.Equal(480_000, value));
+            Assert.All(room.Engine.State.OperationTurnClockRemainingMs, value => Assert.Equal(360_000, value));
 
             room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
             await Task.Delay(40);
@@ -92,7 +93,7 @@ public class OperationClockTests
     }
 
     [Fact]
-    public async Task 单方本回合八分钟操作时间耗尽_直接判负()
+    public async Task 单方本回合六分钟操作时间耗尽_直接判负()
     {
         TestScene.New();
         var room = CreateRankedRoom();
@@ -150,7 +151,7 @@ public class OperationClockTests
     }
 
     [Fact]
-    public void 新回合操作时间重置为八分钟与总剩余时间的较小值()
+    public void 新回合操作时间重置为六分钟与总剩余时间的较小值()
     {
         TestScene.New();
         var room = CreateRankedRoom();
@@ -301,6 +302,192 @@ public class OperationClockTests
     }
 
     [Fact]
+    public async Task 每位玩家每局只能把当前回合加时一次至最多八分钟()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var active = room.Engine.State.CurrentTurnPlayer;
+            var before = room.Engine.State.OperationTurnClockRemainingMs[active];
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "RequestTurnExtension",
+                JsonSerializer.SerializeToElement(new { }),
+                requestId: $"extend-{Guid.NewGuid():N}",
+                receivedAt: Stopwatch.GetTimestamp());
+            await WaitUntilAsync(() => room.Engine.State.OperationTurnExtensionUsed[active]);
+            var afterFirst = room.Engine.State.OperationTurnClockRemainingMs[active];
+
+            Assert.InRange(afterFirst, before + 118_000, before + 120_000);
+            Assert.True(afterFirst <= GameRoomManager.OperationTurnExtendedTimeLimitMs);
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "RequestTurnExtension",
+                JsonSerializer.SerializeToElement(new { }),
+                requestId: $"extend-{Guid.NewGuid():N}",
+                receivedAt: Stopwatch.GetTimestamp());
+            await Task.Delay(80);
+
+            Assert.True(room.Engine.State.OperationTurnExtensionUsed[active]);
+            Assert.InRange(
+                room.Engine.State.OperationTurnClockRemainingMs[active],
+                afterFirst - 2_000,
+                afterFirst);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 旧房间已有接近八分钟时申请加时仍不会突破上限()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var active = room.Engine.State.CurrentTurnPlayer;
+            room.Engine.State.OperationTurnClockRemainingMs[active] = 470_000;
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "RequestTurnExtension",
+                JsonSerializer.SerializeToElement(new { }),
+                requestId: $"extend-cap-{Guid.NewGuid():N}",
+                receivedAt: Stopwatch.GetTimestamp());
+            await WaitUntilAsync(() => room.Engine.State.OperationTurnExtensionUsed[active]);
+
+            Assert.InRange(
+                room.Engine.State.OperationTurnClockRemainingMs[active],
+                478_000,
+                GameRoomManager.OperationTurnExtendedTimeLimitMs);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 玩家活动会把连续无操作计时归零并重新开始()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var active = room.Engine.State.CurrentTurnPlayer;
+            var firstStartedAt = Stopwatch.GetTimestamp() - StopwatchTicks(61_000);
+            room.InactivityActiveSince = firstStartedAt;
+
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "PlayerActivity",
+                JsonSerializer.SerializeToElement(new { kind = "attachDon" }),
+                receivedAt: Stopwatch.GetTimestamp());
+            await WaitUntilAsync(() =>
+                room.InactivityActiveSince > firstStartedAt
+                && room.Engine.State.InactivityActivePlayer == active
+                && room.Engine.State.InactivityLossRemainingMs > 238_000);
+
+            Assert.Equal(active, room.Engine.State.InactivityActivePlayer);
+            Assert.False(room.Engine.State.InactivityWarningActive);
+            Assert.InRange(room.Engine.State.InactivityLossRemainingMs, 238_000, 240_000);
+
+            // 第二段等待同样独立计算，不会与上一段跨操作累计。
+            var secondStartedAt = Stopwatch.GetTimestamp() - StopwatchTicks(61_000);
+            room.InactivityActiveSince = secondStartedAt;
+            GameRoomManager.HandleAction(
+                room.PlayerSessionIds[active],
+                "PlayerActivity",
+                JsonSerializer.SerializeToElement(new { kind = "undoAttachDon" }),
+                receivedAt: Stopwatch.GetTimestamp());
+            await WaitUntilAsync(() =>
+                room.InactivityActiveSince > secondStartedAt
+                && room.Engine.State.InactivityActivePlayer == active
+                && room.Engine.State.InactivityLossRemainingMs > 238_000);
+
+            Assert.False(room.Engine.State.InactivityWarningActive);
+            Assert.InRange(room.Engine.State.InactivityLossRemainingMs, 238_000, 240_000);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 连续四分钟没有操作后由服务端判负()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var active = room.Engine.State.CurrentTurnPlayer;
+            room.InactivityActiveSince = Stopwatch.GetTimestamp() - StopwatchTicks(240_100);
+            room.Engine.Broadcast("InactivityTimeoutTest");
+
+            await WaitUntilAsync(() => room.Engine.State.IsGameOver);
+
+            Assert.Equal(1 - active, room.Engine.State.WinnerIndex);
+            Assert.Equal(0, room.Engine.State.InactivityLossRemainingMs);
+            Assert.Contains("连续 4 分钟没有操作", room.Engine.State.GameOverReason);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public async Task 对手断线暂停后重连不会清空当前玩家的连续等待段()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
+            room.Engine.Broadcast("ClockTest");
+            var active = room.Engine.State.CurrentTurnPlayer;
+            var other = 1 - active;
+            room.InactivityActiveSince = Stopwatch.GetTimestamp() - StopwatchTicks(70_000);
+
+            var oldSession = room.PlayerSessionIds[other];
+            GameRoomManager.OnPlayerDisconnect(oldSession);
+            Assert.Equal(active, room.InactivityPausedPlayer);
+            Assert.InRange(room.InactivityPausedElapsedMs, 69_900, 72_000);
+
+            var newSession = $"clock-inactivity-resume-{Guid.NewGuid():N}";
+            Assert.True(GameRoomManager.TryReclaim(newSession, room.PlayerAccounts[other]));
+            await WaitUntilAsync(() => room.Engine.State.OperationClockActivePlayer == active);
+
+            Assert.Equal(active, room.Engine.State.InactivityActivePlayer);
+            Assert.True(room.Engine.State.InactivityWarningActive);
+            Assert.InRange(room.Engine.State.InactivityLossRemainingMs, 168_000, 171_000);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public void 私有诊断快照包含对局类型与完整棋钟状态()
     {
         TestScene.New();
@@ -320,6 +507,12 @@ public class OperationClockTests
             Assert.Equal(2, root.GetProperty("operationTurnClockRemainingMs").GetArrayLength());
             Assert.Equal(room.Engine.State.TurnCount,
                 root.GetProperty("operationTurnClockTurnCount").GetInt32());
+            Assert.Equal(2, root.GetProperty("operationTurnExtensionUsed").GetArrayLength());
+            Assert.False(root.TryGetProperty("inactivityPenaltyAccumulatedMs", out _));
+            Assert.Equal(room.Engine.State.InactivityLossRemainingMs,
+                root.GetProperty("inactivityLossRemainingMs").GetInt64());
+            Assert.Equal(room.Engine.State.InactivityActivePlayer,
+                root.GetProperty("inactivityActivePlayer").GetInt32());
             Assert.Equal(room.Engine.State.CurrentTurnPlayer,
                 root.GetProperty("operationClockActivePlayer").GetInt32());
             Assert.False(root.GetProperty("operationClockPaused").GetBoolean());
@@ -358,6 +551,9 @@ public class OperationClockTests
             "DisconnectGraceRemainingMs", BindingFlags.Instance | BindingFlags.NonPublic)!;
         return ((long[])property.GetValue(room)!)[playerIndex];
     }
+
+    private static long StopwatchTicks(long milliseconds)
+        => (long)Math.Ceiling(milliseconds * (double)Stopwatch.Frequency / 1000d);
 
     private static void Cleanup(GameRoomManager.RoomEntry room)
     {

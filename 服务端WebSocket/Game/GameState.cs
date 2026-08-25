@@ -87,10 +87,20 @@ public class GameState
     /// <summary>公开匹配的双方独立操作棋钟；选择先后手与调度手牌阶段不启用。</summary>
     public bool OperationClockEnabled { get; set; }
     public long[] OperationClockRemainingMs { get; } = [1_200_000, 1_200_000];
-    /// <summary>当前游戏回合内双方各自剩余的操作时间；新回合重置为 8 分钟或总剩余时间中的较小值。</summary>
-    public long[] OperationTurnClockRemainingMs { get; } = [480_000, 480_000];
+    /// <summary>当前游戏回合内双方各自剩余的操作时间；新回合重置为 6 分钟或总剩余时间中的较小值。</summary>
+    public long[] OperationTurnClockRemainingMs { get; } = [360_000, 360_000];
     /// <summary>回合操作时钟最近一次重置时对应的 TurnCount。</summary>
     public int OperationTurnClockTurnCount { get; set; }
+    /// <summary>双方是否已经使用本局唯一一次的回合加时。</summary>
+    public bool[] OperationTurnExtensionUsed { get; } = [false, false];
+    /// <summary>当前由哪一方承担挂机计时；-1 表示暂停或当前无需玩家决策。</summary>
+    public int InactivityActivePlayer { get; set; } = -1;
+    /// <summary>当前决策者是否已连续 1 分钟无操作，需要显示挂机倒计时。</summary>
+    public bool InactivityWarningActive { get; set; }
+    /// <summary>当前决策者距离连续无操作满 4 分钟判负的服务端权威剩余时间。</summary>
+    public long InactivityLossRemainingMs { get; set; } = 240_000;
+    /// <summary>挂机倒计时最近一次服务端同步时间。</summary>
+    public DateTime? InactivitySyncUtc { get; set; }
     public int OperationClockActivePlayer { get; set; } = -1;
     public DateTime? OperationClockSyncUtc { get; set; }
     public bool OperationClockPaused { get; set; }

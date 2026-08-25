@@ -145,6 +145,14 @@ public static class StateSnapshotBuilder
             opponentOperationTimeMs = state.OperationClockRemainingMs[oppIdx],
             myTurnOperationTimeMs = state.OperationTurnClockRemainingMs[myIdx],
             opponentTurnOperationTimeMs = state.OperationTurnClockRemainingMs[oppIdx],
+            myTurnExtensionUsed = state.OperationTurnExtensionUsed[myIdx],
+            opponentTurnExtensionUsed = state.OperationTurnExtensionUsed[oppIdx],
+            inactivityActive = state.InactivityActivePlayer < 0
+                ? null
+                : state.InactivityActivePlayer == myIdx ? "my" : "opponent",
+            inactivityWarningActive = state.InactivityWarningActive,
+            inactivityLossRemainingMs = state.InactivityLossRemainingMs,
+            inactivitySyncUtc = state.InactivitySyncUtc,
             operationClockActive = state.OperationClockActivePlayer < 0
                 ? null
                 : state.OperationClockActivePlayer == myIdx ? "my" : "opponent",

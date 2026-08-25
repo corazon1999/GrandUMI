@@ -150,6 +150,12 @@ interface GameStore {
   opponentOperationTimeMs: number;
   myTurnOperationTimeMs: number;
   opponentTurnOperationTimeMs: number;
+  myTurnExtensionUsed: boolean;
+  opponentTurnExtensionUsed: boolean;
+  inactivityActive: "my" | "opponent" | null;
+  inactivityWarningActive: boolean;
+  inactivityLossRemainingMs: number;
+  inactivitySyncUtc: string | null;
   operationClockActive: "my" | "opponent" | null;
   operationClockSyncUtc: string | null;
   operationClockPaused: boolean;
@@ -260,8 +266,14 @@ export const useGameStore = create<GameStore>()(
     operationClockEnabled: false,
     myOperationTimeMs: 1_200_000,
     opponentOperationTimeMs: 1_200_000,
-    myTurnOperationTimeMs: 480_000,
-    opponentTurnOperationTimeMs: 480_000,
+    myTurnOperationTimeMs: 360_000,
+    opponentTurnOperationTimeMs: 360_000,
+    myTurnExtensionUsed: false,
+    opponentTurnExtensionUsed: false,
+    inactivityActive: null,
+    inactivityWarningActive: false,
+    inactivityLossRemainingMs: 240_000,
+    inactivitySyncUtc: null,
     operationClockActive: null,
     operationClockSyncUtc: null,
     operationClockPaused: false,
@@ -331,8 +343,14 @@ export const useGameStore = create<GameStore>()(
         s.operationClockEnabled = msg.operationClockEnabled ?? false;
         s.myOperationTimeMs = msg.myOperationTimeMs ?? 1_200_000;
         s.opponentOperationTimeMs = msg.opponentOperationTimeMs ?? 1_200_000;
-        s.myTurnOperationTimeMs = msg.myTurnOperationTimeMs ?? Math.min(480_000, s.myOperationTimeMs);
-        s.opponentTurnOperationTimeMs = msg.opponentTurnOperationTimeMs ?? Math.min(480_000, s.opponentOperationTimeMs);
+        s.myTurnOperationTimeMs = msg.myTurnOperationTimeMs ?? Math.min(360_000, s.myOperationTimeMs);
+        s.opponentTurnOperationTimeMs = msg.opponentTurnOperationTimeMs ?? Math.min(360_000, s.opponentOperationTimeMs);
+        s.myTurnExtensionUsed = msg.myTurnExtensionUsed ?? false;
+        s.opponentTurnExtensionUsed = msg.opponentTurnExtensionUsed ?? false;
+        s.inactivityActive = msg.inactivityActive ?? null;
+        s.inactivityWarningActive = msg.inactivityWarningActive ?? false;
+        s.inactivityLossRemainingMs = msg.inactivityLossRemainingMs ?? 240_000;
+        s.inactivitySyncUtc = msg.inactivitySyncUtc ?? null;
         s.operationClockActive = msg.operationClockActive ?? null;
         s.operationClockSyncUtc = msg.operationClockSyncUtc ?? null;
         s.operationClockPaused = msg.operationClockPaused ?? false;
@@ -515,8 +533,14 @@ export const useGameStore = create<GameStore>()(
       s.operationClockEnabled = false;
       s.myOperationTimeMs = 1_200_000;
       s.opponentOperationTimeMs = 1_200_000;
-      s.myTurnOperationTimeMs = 480_000;
-      s.opponentTurnOperationTimeMs = 480_000;
+      s.myTurnOperationTimeMs = 360_000;
+      s.opponentTurnOperationTimeMs = 360_000;
+      s.myTurnExtensionUsed = false;
+      s.opponentTurnExtensionUsed = false;
+      s.inactivityActive = null;
+      s.inactivityWarningActive = false;
+      s.inactivityLossRemainingMs = 240_000;
+      s.inactivitySyncUtc = null;
       s.operationClockActive = null;
       s.operationClockSyncUtc = null;
       s.operationClockPaused = false;

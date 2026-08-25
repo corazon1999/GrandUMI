@@ -16,6 +16,8 @@ import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
 import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
 import AttachDonConfirmDialog from "@/components/game/AttachDonConfirmDialog";
+import InactivityWarningOverlay from "@/components/game/InactivityWarningOverlay";
+import MobileTurnExtensionButton from "@/components/game/MobileTurnExtensionButton";
 import GameOverOverlay from "@/components/game/GameOverOverlay";
 import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 import { useGameStore } from "@/store/gameStore";
@@ -94,6 +96,8 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <GMPanel />}
       {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
       {!isObserver && !isPlayback && <AttachDonConfirmDialog />}
+      {!isObserver && !isPlayback && <InactivityWarningOverlay />}
+      {!isObserver && !isPlayback && <MobileTurnExtensionButton />}
 
       {isObserver && (
         <div

@@ -926,6 +926,8 @@ export type GameActionType =
   | "UseEffect"         // { sourceId, effectKey, ... }
   | "EndTurn"           // {}
   | "ConfirmDamage"     // {}
+  | "PlayerActivity"    // { kind?: "attachDon" | "undoAttachDon" | "presence" }
+  | "RequestTurnExtension" // {}：每位玩家每局一次，当前回合最多加至 8 分钟
   | "RequestDraw"       // {}
   | "RespondDraw"       // { accept: boolean }
   | "DebugAddCard"      // { cardNumber: string }  ← GM 调试：加牌到手牌
@@ -1072,6 +1074,12 @@ export interface MsgGameState extends MsgBase {
   opponentOperationTimeMs?: number;
   myTurnOperationTimeMs?: number;
   opponentTurnOperationTimeMs?: number;
+  myTurnExtensionUsed?: boolean;
+  opponentTurnExtensionUsed?: boolean;
+  inactivityActive?: "my" | "opponent" | null;
+  inactivityWarningActive?: boolean;
+  inactivityLossRemainingMs?: number;
+  inactivitySyncUtc?: string | null;
   operationClockActive?: "my" | "opponent" | null;
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;

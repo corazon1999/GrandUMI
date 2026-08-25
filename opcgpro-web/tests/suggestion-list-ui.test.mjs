@@ -32,7 +32,7 @@ test("卡图失败时显示效果文字且卡牌详情有明确关闭按钮", as
   assert.match(zoom, /min-h-11 min-w-11/);
 });
 
-test("对局同时显示八分钟回合时钟与总操作时钟", async () => {
+test("对局同时显示六分钟回合时钟、一次加时与总操作时钟", async () => {
   const [board, store, types] = await Promise.all([
     readSource("../src/components/game/GameBoard.tsx"),
     readSource("../src/store/gameStore.ts"),
@@ -40,7 +40,9 @@ test("对局同时显示八分钟回合时钟与总操作时钟", async () => {
   ]);
   assert.match(board, /回合 \{formatOperationTime\(turnRemaining\)\}/);
   assert.match(board, /总计 \{formatOperationTime\(totalRemaining\)\}/);
-  assert.match(store, /myTurnOperationTimeMs: 480_000/);
+  assert.match(store, /myTurnOperationTimeMs: 360_000/);
+  assert.match(store, /myTurnExtensionUsed: false/);
+  assert.match(board, /加时 \+2:00/);
   assert.match(types, /opponentTurnOperationTimeMs\?: number/);
 });
 

@@ -8,6 +8,7 @@ import { useDeckStore } from "@/store/deckStore";
 import SearchPanel from "@/components/deck-editor/SearchPanel";
 import SearchResultPanel from "@/components/deck-editor/SearchResultPanel";
 import DeckInfoPanel from "@/components/deck-editor/DeckInfoPanel";
+import { HomeRequest } from "@/net/HomeProtocol";
 
 type LoadState = "loading" | "done" | "error";
 type MobilePanel = "cards" | "deck";
@@ -115,6 +116,7 @@ export default function DeckEditorPage() {
       >
         <a
           href="/home"
+          onClick={() => HomeRequest.prepareHomeReload()}
           data-deck-mobile-back
           className="flex min-h-11 min-w-11 items-center justify-center border-r border-gray-800 px-2 text-sm text-gray-400 transition-colors hover:bg-gray-900 hover:text-white"
           title="返回大厅"

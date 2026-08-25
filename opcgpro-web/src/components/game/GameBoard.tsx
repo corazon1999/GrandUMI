@@ -25,6 +25,7 @@ import { CardSizeOverride } from "@/hooks/useResponsive";
 import { PHASE_LABELS } from "@/game/battle/BattlePhase";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 import type { PlayerRankIdentitySnapshot, RankFaction } from "@/types/net";
+import { GameRequest } from "@/net/GameRequest";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -233,13 +234,13 @@ function RightRail({
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
         <PlayerRankIdentity rank={opponentRankIdentity} />
         <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
-        <OperationClock side="opponent" />
+        <OperationClock side="opponent" allowExtension={false} />
         <div className="my-3 h-px bg-white/10" />
         <p className="text-xs font-black text-slate-300">我</p>
         <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
         <PlayerRankIdentity rank={myRankIdentity} />
         <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
-        <OperationClock side="my" />
+        <OperationClock side="my" allowExtension={!isObserver && !isPlayback} />
       </section>
       <div className="mt-auto flex flex-col gap-3">
         {!isObserver && !isPlayback && (
@@ -275,7 +276,13 @@ function monotonicNow(): number {
   return typeof performance === "undefined" ? 0 : performance.now();
 }
 
-function OperationClock({ side }: { side: "my" | "opponent" }) {
+function OperationClock({
+  side,
+  allowExtension,
+}: {
+  side: "my" | "opponent";
+  allowExtension: boolean;
+}) {
   const enabled = useGameStore((s) => s.operationClockEnabled);
   const totalBase = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
   const turnBase = useGameStore((s) => side === "my" ? s.myTurnOperationTimeMs : s.opponentTurnOperationTimeMs);
@@ -283,6 +290,7 @@ function OperationClock({ side }: { side: "my" | "opponent" }) {
   const syncUtc = useGameStore((s) => s.operationClockSyncUtc);
   const serverNowUtc = useGameStore((s) => s.serverNowUtc);
   const paused = useGameStore((s) => s.operationClockPaused);
+  const extensionUsed = useGameStore((s) => side === "my" ? s.myTurnExtensionUsed : s.opponentTurnExtensionUsed);
   const matchKind = useGameStore((s) => s.matchKind);
   const [anchor, setAnchor] = useState(() => ({ syncUtc, serverNowUtc, receivedAt: monotonicNow() }));
   const [now, setNow] = useState(() => monotonicNow());
@@ -325,6 +333,19 @@ function OperationClock({ side }: { side: "my" | "opponent" }) {
       <span className="col-span-2 justify-self-end text-[9px] font-bold opacity-75" aria-label={`总操作剩余 ${formatOperationTime(totalRemaining)}`}>
         总计 {formatOperationTime(totalRemaining)}
       </span>
+      {allowExtension && side === "my" && active === "my" && !paused && !extensionUsed && (
+        <button
+          type="button"
+          onClick={() => GameRequest.requestTurnExtension()}
+          className="col-span-2 mt-1 min-h-11 w-full rounded border border-amber-300/50 bg-amber-400/15 px-2 text-[10px] font-black text-amber-100 transition-colors hover:bg-amber-400/25 focus-visible:outline-2 focus-visible:outline-amber-200 max-md:hidden"
+          aria-label="使用本局唯一一次回合加时，增加两分钟"
+        >
+          加时 +2:00
+        </button>
+      )}
+      {extensionUsed && (
+        <span className="col-span-2 justify-self-end text-[9px] font-bold text-amber-200/75">加时已用</span>
+      )}
     </div>
   );
 }

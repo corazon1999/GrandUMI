@@ -243,6 +243,7 @@ export default function DeckInfoPanel() {
           <div className="flex items-center gap-2">
             <a
               href="/home"
+              onClick={() => HomeRequest.prepareHomeReload()}
               data-deck-editor-back-link
               className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
               title="返回大厅"
