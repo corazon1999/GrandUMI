@@ -9,9 +9,16 @@ public static class HandStaticCounter
     public static int Value(GameState state, int playerIdx, CardInstance card)
     {
         int value = card.Info.Counter;
-        if (card.Info.Kind != CardKind.Character) return value;
-
         var me = state.Players[playerIdx];
+
+        // OP18-021 弗兰奇：领袖效果生效时，手牌中的所有舞台卡牌变为反击+3000。
+        if (card.Info.Kind == CardKind.Stage
+            && me.Leader.Info.Number == "OP18-021"
+            && !me.Leader.IsEffectsNullified
+            && !state.IsContinuouslyNullified(me.Leader))
+            return 3000;
+
+        if (card.Info.Kind != CardKind.Character) return value;
 
         // EB01-001 光月御殿：这是“规则上”的卡牌规则，不属于可被效果无效化的领袖效果。
         // 我方所有原本没有反击值的《和之国》角色卡牌均变为拥有反击+1000。

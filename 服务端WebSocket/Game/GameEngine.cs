@@ -1001,7 +1001,8 @@ public class GameEngine
 
         if (useCounterIcon)
         {
-            // 从手牌选一张有 counter 值的角色卡，丢入废弃区，并给当前被攻击目标加力量
+            // 从手牌选一张有反击值的卡牌（通常为角色；OP18-021 可使舞台获得反击），
+            // 丢入废弃区，并给当前被攻击目标加力量。
             if (!data.TryGetProperty("handIndex", out var hi) || hi.ValueKind != JsonValueKind.Number)
             { SendError(playerIndex, "缺少 handIndex"); return; }
             int handIndex = hi.GetInt32();

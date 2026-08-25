@@ -34,7 +34,8 @@
     "effectTags": [
       "OnMyTurnEnd",
       "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

@@ -567,7 +567,7 @@ public static class OncePerTurnEffectCatalog
         "PRB02-002", "ST02-010", "ST03-007", "ST04-001", "ST05-010", "ST09-010", "ST10-002", "ST10-006",
         "ST10-007", "ST10-011", "ST10-014", "ST12-001", "ST12-010", "ST13-001", "ST13-002", "ST13-003",
         "ST15-005", "ST19-003", "ST19-004", "ST19-005", "ST20-002", "ST22-001", "ST22-005", "ST25-003",
-        "ST31-001", "ST34-001", "ST36-005",
+        "ST31-001", "ST34-001", "ST36-005", "OP18-021", "OP18-060", "OP18-119", "EB05-010",
     };
 
     public static bool Contains(string cardNumber, GameState? state = null)
