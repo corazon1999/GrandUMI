@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useDeckStore, type DeckEntry } from "@/store/deckStore";
 import { useNetStore } from "@/store/netStore";
-import { saveDeck, loadAllDecks, loadDeck, deleteDeck, deckExists, nextDeckName, exportDeckString, importDeckString, getSelectedDeckName, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
+import { saveDeck, loadAllDecks, loadDeck, deleteDeck, nextDeckName, exportDeckString, importDeckString, getSelectedDeckName, subscribeDecksUpdated, type SavedDeck } from "@/data/DeckMapper";
 import { HomeRequest } from "@/net/HomeProtocol";
 import type { CardData } from "@/types/card";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
@@ -35,10 +35,6 @@ export default function DeckInfoPanel() {
   const [showLoad, setShowLoad]     = useState(false);
   const [savedDecks, setSavedDecks] = useState<Record<string, SavedDeck>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  // 当前编辑内容的来源卡组名（载入过/已保存过的名字）；新建时为 null。
-  // 用于判断「保存目标名」是否撞了别的已存在卡组，从而决定是否需要二次确认覆盖。
-  const [loadedName, setLoadedName] = useState<string | null>(null);
-  const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exportText, setExportText] = useState("");
@@ -74,10 +70,9 @@ export default function DeckInfoPanel() {
     const isNew = new URLSearchParams(window.location.search).get("new") === "1";
     if (isNew) {
       setDeckName(nextDeckName());
-      setLoadedName(null); // 新建明确无来源卡组，防软导航残留旧 loadedName 导致保存时静默覆盖
     } else {
       const sel = getSelectedDeckName();
-      if (sel) { setDeckName(sel); setLoadedName(sel); }
+      if (sel) setDeckName(sel);
     }
   }, []);
 
@@ -98,7 +93,6 @@ export default function DeckInfoPanel() {
     clearDeck();
     clearNotice();
     setDeckName(nextDeckName());
-    setLoadedName(null);
     setShowLoad(false);
   };
 
@@ -110,7 +104,6 @@ export default function DeckInfoPanel() {
         throw new Error("未登录，云端同步请求发送失败");
       }
       setSavedDecks(loadAllDecks());
-      setLoadedName(name);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
     } catch {
@@ -121,12 +114,6 @@ export default function DeckInfoPanel() {
 
   const handleSave = () => {
     if (!isValid()) return;
-    // 目标名已存在 → 仅当确实在编辑同名来源卡组(loadedName===deckName)时才静默覆盖自己；
-    // 新建(loadedName===null)或改成别的已存在名都必须二次确认，杜绝「新建卡组误覆盖已有卡组」。
-    if (deckExists(deckName) && (loadedName === null || deckName !== loadedName)) {
-      setOverwriteTarget(deckName);
-      return;
-    }
     doSave(deckName);
   };
 
@@ -139,7 +126,6 @@ export default function DeckInfoPanel() {
     const { addCard } = useDeckStore.getState();
     result.cards.forEach((c) => addCard(c));
     setDeckName(name);
-    setLoadedName(name);
     setShowLoad(false);
   };
 
@@ -478,31 +464,6 @@ export default function DeckInfoPanel() {
                 className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-500 transition-colors"
               >
                 确认删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 覆盖同名卡组确认弹窗（方案A：仅当目标名撞了别的已存在卡组时才弹，防新建/改名误覆盖） */}
-      {overwriteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-72 shadow-2xl">
-            <p className="text-white text-sm text-center mb-1">已存在同名卡组</p>
-            <p className="text-gray-400 text-xs text-center mb-4 truncate">「{overwriteTarget}」</p>
-            <p className="text-gray-600 text-[10px] text-center mb-4">继续保存将覆盖它，原内容不可恢复</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOverwriteTarget(null)}
-                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-300 text-xs hover:bg-gray-700 transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => { doSave(overwriteTarget); setOverwriteTarget(null); }}
-                className="flex-1 py-2 rounded-lg bg-orange-600 text-white text-xs font-bold hover:bg-orange-500 transition-colors"
-              >
-                覆盖保存
               </button>
             </div>
           </div>
