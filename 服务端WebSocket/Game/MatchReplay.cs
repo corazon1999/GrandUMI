@@ -69,10 +69,30 @@ public static class MatchReplay
         foreach (var a in actions)
         {
             if (engine.State.IsGameOver) break;
-            engine.HandleAction(a.PlayerIndex, a.Action, a.Data);
+            // 功能上线前 RequestDraw 没有 description。旧动作日志必须仍能重建，
+            // 但实时请求继续由 GameEngine 严格拒绝空描述，避免兼容逻辑削弱新协议校验。
+            var replayData = PrepareReplayData(a);
+            engine.HandleAction(a.PlayerIndex, a.Action, replayData);
             await engine.WaitSettledAsync();
         }
 
         return engine;
+    }
+
+    private static JsonElement PrepareReplayData(ActionEntry entry)
+    {
+        if (!string.Equals(entry.Action, "RequestDraw", StringComparison.Ordinal))
+            return entry.Data;
+
+        if (entry.Data.ValueKind != JsonValueKind.Object
+            || entry.Data.TryGetProperty("description", out _))
+            return entry.Data;
+
+        // 旧协议的 RequestDraw payload 是空对象；迁移仅覆盖“字段不存在”。
+        // 非文字、空白或超长字段表示日志已损坏，不得冒充旧协议申请而被接受。
+        return JsonSerializer.SerializeToElement(new
+        {
+            description = GameState.LegacyDrawRequestDescription,
+        });
     }
 }

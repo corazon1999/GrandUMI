@@ -205,6 +205,7 @@ interface GameStore {
   gameOverReason: string;
   drawRequestPendingFromMe: boolean;
   drawRequestPendingFromOpponent: boolean;
+  drawRequestDescription: string | null;
   drawRequestRejectionCount: number;
   drawRequestRejectionLimit: number;
 
@@ -305,6 +306,7 @@ export const useGameStore = create<GameStore>()(
     gameOverReason: "",
     drawRequestPendingFromMe: false,
     drawRequestPendingFromOpponent: false,
+    drawRequestDescription: null,
     drawRequestRejectionCount: 0,
     drawRequestRejectionLimit: 3,
     selectedHandIndex: null,
@@ -361,6 +363,7 @@ export const useGameStore = create<GameStore>()(
         s.gameOverReason = msg.gameOverReason ?? "";
         s.drawRequestPendingFromMe = msg.drawRequestPendingFromMe ?? false;
         s.drawRequestPendingFromOpponent = msg.drawRequestPendingFromOpponent ?? false;
+        s.drawRequestDescription = msg.drawRequestDescription ?? null;
         s.drawRequestRejectionCount = msg.drawRequestRejectionCount ?? 0;
         s.drawRequestRejectionLimit = msg.drawRequestRejectionLimit ?? 3;
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
@@ -567,6 +570,7 @@ export const useGameStore = create<GameStore>()(
       s.gameOverReason = "";
       s.drawRequestPendingFromMe = false;
       s.drawRequestPendingFromOpponent = false;
+      s.drawRequestDescription = null;
       s.drawRequestRejectionCount = 0;
       s.drawRequestRejectionLimit = 3;
       s.selectedHandIndex = null;

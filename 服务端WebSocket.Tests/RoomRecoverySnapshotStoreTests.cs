@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.Snapshot;
 using Xunit;
 
 namespace GrandUMIServer.Tests;
@@ -159,6 +160,74 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.All(room.DisconnectedPlayers, Assert.True);
             Assert.Equal(-1, room.Engine.State.InactivityActivePlayer);
             Assert.Equal(240_000, room.Engine.State.InactivityLossRemainingMs);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(30);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task 服务重启从动作日志恢复待回应平局申请及Bug描述()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        var roomId = $"restore-draw-{Guid.NewGuid():N}"[..23];
+        try
+        {
+            var deck = BuildLegalDeck("OP15-001");
+            var now = DateTime.UtcNow;
+            var header = new
+            {
+                kind = "create",
+                roomId,
+                seed = 123456,
+                firstPlayer = 0,
+                openingSetupAfterFirstPlayerChoice = false,
+                p0 = new { account = $"restore-a-{roomId}", displayName = "恢复玩家A", deckRaw = deck },
+                p1 = new { account = $"restore-b-{roomId}", displayName = "恢复玩家B", deckRaw = deck },
+                vsBot = false,
+                matchKind = MatchKind.Ranked.ToString(),
+                createdAtUtc = now,
+            };
+            var requestDraw = new
+            {
+                kind = "action",
+                journalSequence = 1,
+                playerIndex = 0,
+                action = "RequestDraw",
+                data = new { description = "  服务重启后仍要展示这段描述  " },
+                requestId = "draw-request-1",
+                operationSequence = 1,
+                tsUtc = now,
+            };
+            await File.WriteAllLinesAsync(
+                Path.Combine(root, $"{roomId}.jsonl"),
+                [JsonSerializer.Serialize(header), JsonSerializer.Serialize(requestDraw)]);
+
+            await GameRoomManager.RestoreAll();
+            var room = GameRoomManager.GetRoom(roomId);
+
+            Assert.NotNull(room);
+            Assert.Equal(0, room!.Engine.State.PendingDrawRequester);
+            Assert.Equal("服务重启后仍要展示这段描述", room.Engine.State.PendingDrawRequestDescription);
+
+            var opponentResync = JsonSerializer.SerializeToElement(
+                StateSnapshotBuilder.Build(room.Engine.State, viewerIndex: 1));
+            Assert.True(opponentResync.GetProperty("drawRequestPendingFromOpponent").GetBoolean());
+            Assert.Equal("服务重启后仍要展示这段描述",
+                opponentResync.GetProperty("drawRequestDescription").GetString());
+
+            var privateState = JsonSerializer.SerializeToElement(
+                PrivateStateSnapshotBuilder.Build(room.Engine.State));
+            Assert.Equal("服务重启后仍要展示这段描述",
+                privateState.GetProperty("pendingDrawRequestDescription").GetString());
         }
         finally
         {

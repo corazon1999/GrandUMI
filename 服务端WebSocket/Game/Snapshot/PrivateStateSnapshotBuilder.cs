@@ -47,6 +47,7 @@ public static class PrivateStateSnapshotBuilder
             winnerIndex = state.WinnerIndex,
             gameOverReason = state.GameOverReason,
             pendingDrawRequester = state.PendingDrawRequester,
+            pendingDrawRequestDescription = state.PendingDrawRequestDescription,
             drawRequestRejectionCounts = state.DrawRequestRejectionCounts,
             players = state.Players.Select((p, idx) => SnapshotPlayer(state, p, idx)).ToArray(),
             pendingPrompt = state.PendingPrompt is { } prompt

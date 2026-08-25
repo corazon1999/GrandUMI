@@ -278,7 +278,7 @@ export const GameRequest = {
   endTurn:       () => send("EndTurn"),
   confirmDamage: () => send("ConfirmDamage"),
   surrender:     () => send("Surrender"),
-  requestDraw:   () => send("RequestDraw"),
+  requestDraw:   (description: string) => send("RequestDraw", { description }),
   respondDraw:   (accept: boolean) => send("RespondDraw", { accept }),
 
   /** 每位玩家每局一次，将当前回合剩余时间增加 2 分钟（最高不超过 8 分钟）。 */

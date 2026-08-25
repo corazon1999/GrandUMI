@@ -165,6 +165,8 @@ public static class StateSnapshotBuilder
             gameOverReason = state.GameOverReason,
             drawRequestPendingFromMe = !isSpectator && state.PendingDrawRequester == myIdx,
             drawRequestPendingFromOpponent = !isSpectator && state.PendingDrawRequester == oppIdx,
+            // Bug 描述只属于协商双方，不通过观战快照泄露。
+            drawRequestDescription = isSpectator ? null : state.PendingDrawRequestDescription,
             drawRequestRejectionCount = isSpectator ? 0 : state.DrawRequestRejectionCounts[myIdx],
             drawRequestRejectionLimit = GameState.DrawRequestRejectionLimit,
             viewerKind = isSpectator ? "spectator" : "player",

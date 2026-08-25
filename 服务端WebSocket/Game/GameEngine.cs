@@ -264,7 +264,7 @@ public class GameEngine
             case "PassCounter":    HandlePassCounter(playerIndex); break;
             case "EndTurn":        HandleEndTurn(playerIndex); break;
             case "Surrender":      HandleSurrender(playerIndex); break;
-            case "RequestDraw":    HandleRequestDraw(playerIndex); break;
+            case "RequestDraw":    HandleRequestDraw(playerIndex, data); break;
             case "RespondDraw":    HandleRespondDraw(playerIndex, data); break;
             case "PromptResponse": HandlePromptResponse(playerIndex, data); break;
             case "UseEffect":      HandleUseEffect(playerIndex, data); break;
@@ -1572,7 +1572,7 @@ public class GameEngine
 
     private void HandleSurrender(int playerIndex)
     {
-        State.PendingDrawRequester = null;
+        State.ClearPendingDrawRequest();
         State.WinnerIndex = 1 - playerIndex;
         State.GameOverReason = $"{State.Players[playerIndex].VisibleName} 投降";
         Broadcast("Surrender", new { surrendered = playerIndex });
@@ -1580,7 +1580,7 @@ public class GameEngine
 
     // ── 协商平局 ────────────────────────────────────────────────────────
 
-    private void HandleRequestDraw(int playerIndex)
+    private void HandleRequestDraw(int playerIndex, JsonElement data)
     {
         if (State.MatchKind == MatchKind.Bot)
         {
@@ -1597,8 +1597,31 @@ public class GameEngine
             SendError(playerIndex, "本局平局申请已连续被拒绝 3 次，无法再次申请");
             return;
         }
+        if (data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("description", out var descriptionElement))
+        {
+            SendError(playerIndex, "请填写发生了什么 Bug");
+            return;
+        }
+        if (descriptionElement.ValueKind != JsonValueKind.String)
+        {
+            SendError(playerIndex, "Bug 描述格式无效，请填写文字");
+            return;
+        }
 
-        State.PendingDrawRequester = playerIndex;
+        var description = descriptionElement.GetString()?.Trim() ?? "";
+        if (description.Length == 0)
+        {
+            SendError(playerIndex, "请填写发生了什么 Bug");
+            return;
+        }
+        if (description.Length > GameState.DrawRequestDescriptionMaxLength)
+        {
+            SendError(playerIndex, $"Bug 描述不能超过 {GameState.DrawRequestDescriptionMaxLength} 个字符");
+            return;
+        }
+
+        State.SetPendingDrawRequest(playerIndex, description);
         Broadcast("DrawRequested", new { requester = playerIndex });
     }
 
@@ -1622,7 +1645,7 @@ public class GameEngine
             return;
         }
 
-        State.PendingDrawRequester = null;
+        State.ClearPendingDrawRequest();
         if (!acceptElement.GetBoolean())
         {
             State.DrawRequestRejectionCounts[requester] = Math.Min(

@@ -928,7 +928,7 @@ export type GameActionType =
   | "ConfirmDamage"     // {}
   | "PlayerActivity"    // { kind?: "attachDon" | "undoAttachDon" | "presence" }
   | "RequestTurnExtension" // {}：每位玩家每局一次，当前回合最多加至 8 分钟
-  | "RequestDraw"       // {}
+  | "RequestDraw"       // { description: string }
   | "RespondDraw"       // { accept: boolean }
   | "DebugAddCard"      // { cardNumber: string }  ← GM 调试：加牌到手牌
   | "DebugAddLife"      // { cardNumber: string; target: "self" | "opponent" } ← GM 调试：置于生命区顶端
@@ -1090,6 +1090,7 @@ export interface MsgGameState extends MsgBase {
   gameOverReason: string;
   drawRequestPendingFromMe?: boolean;
   drawRequestPendingFromOpponent?: boolean;
+  drawRequestDescription?: string | null;
   drawRequestRejectionCount?: number;
   drawRequestRejectionLimit?: number;
   viewerKind: "player" | "spectator";
