@@ -24,8 +24,10 @@ test("测试服部署入口默认指向香港新服务器并支持首次初始�
 test("测试服数据、端口与进程权限均和正式服隔离", () => {
   assert.match(backendService, /User=grandumi/);
   assert.match(backendService, /GRANDUMI_DATA_DIR=\/data\/grandumi-test/);
+  assert.match(backendService, /GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH=\/data\/grandumi\/online-player-history\.db/);
+  assert.match(backendService, /ReadOnlyPaths=\/data\/grandumi/);
   assert.match(backendService, /GrandUMIServer\.dll 8081/);
-  assert.doesNotMatch(backendService, /\/data\/grandumi(?:\s|$)/m);
+  assert.doesNotMatch(backendService, /GRANDUMI_DATA_DIR=\/data\/grandumi(?:\s|$)/m);
   assert.doesNotMatch(backendService, /GRANDUMI_PLAYER_DB/);
   assert.match(frontendService, /User=grandumi/);
   assert.match(frontendService, /127\.0\.0\.1 -p 3001/);

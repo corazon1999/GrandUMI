@@ -88,6 +88,7 @@ public static class WebSocketBridge
     private static PlayerDataStore _playerDataStore = null!;
     private static AccountAuthenticationStore _accountAuthenticationStore = null!;
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryStore;
+    private static OnlinePlayerHistoryStore? _onlinePlayerHistoryReadStore;
     private static AdminDeploymentCoordinator? _adminDeploymentCoordinator;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
@@ -120,12 +121,14 @@ public static class WebSocketBridge
         PlayerDataStore playerDataStore,
         AccountAuthenticationStore accountAuthenticationStore,
         OnlinePlayerHistoryStore? onlinePlayerHistoryStore = null,
+        OnlinePlayerHistoryStore? onlinePlayerHistoryReadStore = null,
         AdminDeploymentCoordinator? adminDeploymentCoordinator = null)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _accountAuthenticationStore = accountAuthenticationStore
             ?? throw new ArgumentNullException(nameof(accountAuthenticationStore));
         _onlinePlayerHistoryStore = onlinePlayerHistoryStore;
+        _onlinePlayerHistoryReadStore = onlinePlayerHistoryReadStore ?? onlinePlayerHistoryStore;
         _adminDeploymentCoordinator = adminDeploymentCoordinator;
         _cts.Cancel();
         _cts.Dispose();
@@ -3429,12 +3432,14 @@ public static class WebSocketBridge
     {
         IReadOnlyList<OnlinePlayerPeakPoint> peaks7 = [];
         IReadOnlyList<OnlinePlayerPeakPoint> peaks30 = [];
+        int? authoritativeOnlineCount = null;
         try
         {
-            if (_onlinePlayerHistoryStore is not null)
+            if (_onlinePlayerHistoryReadStore is not null)
             {
-                peaks7 = _onlinePlayerHistoryStore.GetRecentDailyPeaks(7);
-                peaks30 = _onlinePlayerHistoryStore.GetRecentDailyPeaks(30);
+                authoritativeOnlineCount = _onlinePlayerHistoryReadStore.GetCurrentOnlineCount();
+                peaks7 = _onlinePlayerHistoryReadStore.GetRecentDailyPeaks(7);
+                peaks30 = _onlinePlayerHistoryReadStore.GetRecentDailyPeaks(30);
             }
         }
         catch (Exception ex)
@@ -3461,6 +3466,7 @@ public static class WebSocketBridge
             logStr,
             currentCommit = BuildInfo.Commit,
             deploymentAvailable = _adminDeploymentCoordinator is not null,
+            onlineCount = authoritativeOnlineCount,
             peaks7 = peaks7.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
             peaks30 = peaks30.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
             test = ToDeploymentPayload(test, "test"),

@@ -54,6 +54,15 @@ var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
     "online-player-history.db"));
 onlinePlayerHistoryStore.Initialize();
 Console.WriteLine($"[在线峰值] SQLite: {onlinePlayerHistoryStore.DatabasePath}");
+var onlinePlayerHistoryReadPath = Environment.GetEnvironmentVariable("GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH");
+var onlinePlayerHistoryReadStore = string.IsNullOrWhiteSpace(onlinePlayerHistoryReadPath)
+    || string.Equals(
+        Path.GetFullPath(onlinePlayerHistoryReadPath),
+        onlinePlayerHistoryStore.DatabasePath,
+        StringComparison.OrdinalIgnoreCase)
+    ? onlinePlayerHistoryStore
+    : new OnlinePlayerHistoryStore(onlinePlayerHistoryReadPath, readOnly: true);
+Console.WriteLine($"[在线峰值读取源] SQLite: {onlinePlayerHistoryReadStore.DatabasePath}");
 var adminDeploymentCoordinator = AdminDeploymentCoordinator.FromEnvironment();
 adminDeploymentCoordinator?.Initialize();
 if (adminDeploymentCoordinator is not null)
@@ -87,6 +96,7 @@ WebSocketBridge.Initialize(
     playerDataStore,
     accountAuthenticationStore,
     onlinePlayerHistoryStore,
+    onlinePlayerHistoryReadStore,
     adminDeploymentCoordinator);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());

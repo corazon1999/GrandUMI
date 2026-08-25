@@ -58,6 +58,7 @@ export type RulesetAdminState = {
 export type AdminOperationsState = {
   currentCommit: string;
   deploymentAvailable: boolean;
+  onlineCount: number | null;
   peaks7: OnlinePlayerPeakPoint[];
   peaks30: OnlinePlayerPeakPoint[];
   test: AdminDeploymentStatus;
@@ -242,6 +243,7 @@ const initialState = {
   adminOperations: {
     currentCommit: "",
     deploymentAvailable: false,
+    onlineCount: null,
     peaks7: [],
     peaks30: [],
     test: { environment: "test", state: "unavailable", message: "等待服务器状态" },

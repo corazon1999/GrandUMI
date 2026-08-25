@@ -728,6 +728,7 @@ function handleAdminOperations(msg: MsgAdminOperations) {
     store.setAdminOperations({
       currentCommit: msg.currentCommit,
       deploymentAvailable: msg.deploymentAvailable === true,
+      onlineCount: typeof msg.onlineCount === "number" && Number.isFinite(msg.onlineCount) ? msg.onlineCount : null,
       peaks7: Array.isArray(msg.peaks7) ? msg.peaks7 : [],
       peaks30: Array.isArray(msg.peaks30) ? msg.peaks30 : [],
       test: msg.test,

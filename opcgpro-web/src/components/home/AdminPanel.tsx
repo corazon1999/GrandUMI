@@ -142,7 +142,6 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const account = useNetStore((state) => state.account);
   const playerName = useNetStore((state) => state.playerName);
   const connState = useNetStore((state) => state.connState);
-  const onlineCount = useNetStore((state) => state.onlineCount);
   const maintenance = useNetStore((state) => state.maintenance);
   const reviewQueue = useNetStore((state) => state.cardBackReviewQueue);
   const adminOperations = useNetStore((state) => state.adminOperations);
@@ -153,6 +152,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
   const connected = connState === "connected";
   const pendingReviews = reviewQueue?.length;
+  const authoritativeOnlineCount = adminOperations.onlineCount ?? "—";
 
   useEffect(() => {
     if (!connected || !maintenance.canManage) return;
@@ -258,7 +258,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           />
           <StatusCard
             label="在线玩家"
-            value={onlineCount}
+            value={authoritativeOnlineCount}
             detail={showPeakChart ? "点击收起峰值趋势" : "点击查看近一周/月峰值"}
             tone="cyan"
             onClick={() => setShowPeakChart((visible) => !visible)}
@@ -362,7 +362,9 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                   <span className="block text-sm font-black text-white">在线玩家</span>
                   <span className="mt-0.5 block text-xs text-gray-500">查看玩家与当前对局状态</span>
                 </span>
-                <span className="text-sm font-black text-cyan-300">{onlineCount} 人</span>
+                <span className="text-sm font-black text-cyan-300">
+                  {typeof authoritativeOnlineCount === "number" ? `${authoritativeOnlineCount} 人` : "暂无数据"}
+                </span>
               </button>
             </div>
           </section>

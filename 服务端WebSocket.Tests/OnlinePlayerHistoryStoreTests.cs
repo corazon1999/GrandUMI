@@ -43,6 +43,26 @@ public sealed class OnlinePlayerHistoryStoreTests : IDisposable
         Assert.Equal(11, point.Peak);
     }
 
+    [Fact]
+    public void 只读数据源可读取正式峰值但不能混入测试服采样()
+    {
+        Directory.CreateDirectory(_directory);
+        var databasePath = Path.Combine(_directory, "history.db");
+        var productionStore = new OnlinePlayerHistoryStore(databasePath);
+        productionStore.Initialize();
+        var observedAt = new DateTimeOffset(2026, 8, 25, 3, 0, 0, TimeSpan.Zero);
+        productionStore.Record(23, observedAt);
+
+        var testReadStore = new OnlinePlayerHistoryStore(databasePath, readOnly: true);
+
+        Assert.Equal(23, Assert.Single(testReadStore.GetRecentDailyPeaks(1, observedAt)).Peak);
+        Assert.Throws<InvalidOperationException>(() => testReadStore.Record(99, observedAt));
+        Assert.Throws<InvalidOperationException>(() => testReadStore.Initialize());
+        Assert.Equal(23, testReadStore.GetCurrentOnlineCount(observedAt.AddMinutes(1)));
+        Assert.Null(testReadStore.GetCurrentOnlineCount(observedAt.AddMinutes(3)));
+        Assert.Equal(23, Assert.Single(productionStore.GetRecentDailyPeaks(1, observedAt)).Peak);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_directory, recursive: true); } catch { }

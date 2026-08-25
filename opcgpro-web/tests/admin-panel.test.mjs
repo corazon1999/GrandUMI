@@ -30,6 +30,7 @@ test("点击在线玩家状态卡可查看近一周和近一月峰值图", () =>
   assert.match(admin, /<table className="sr-only">/);
   assert.match(protocol, /case "MsgAdminOperations"/);
   assert.match(store, /peaks7: \[\]/);
+  assert.match(admin, /adminOperations\.onlineCount \?\? "—"/);
   assert.match(types, /interface OnlinePlayerPeakPoint/);
 });
 

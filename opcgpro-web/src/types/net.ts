@@ -1317,6 +1317,7 @@ export interface MsgAdminOperations extends MsgBase {
   logStr?: string;
   currentCommit?: string;
   deploymentAvailable?: boolean;
+  onlineCount?: number | null;
   peaks7?: OnlinePlayerPeakPoint[];
   peaks30?: OnlinePlayerPeakPoint[];
   test?: AdminDeploymentStatus;

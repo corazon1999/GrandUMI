@@ -11,7 +11,7 @@ public sealed class OnlinePlayerHistoryStore
     private readonly string _databasePath;
     private readonly string _connectionString;
 
-    public OnlinePlayerHistoryStore(string databasePath)
+    public OnlinePlayerHistoryStore(string databasePath, bool readOnly = false)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
             throw new ArgumentException("数据库路径不能为空。", nameof(databasePath));
@@ -19,17 +19,21 @@ public sealed class OnlinePlayerHistoryStore
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
+            Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Shared,
             Pooling = true,
             DefaultTimeout = 5,
         }.ToString();
+        IsReadOnly = readOnly;
     }
 
     public string DatabasePath => _databasePath;
+    public bool IsReadOnly { get; }
 
     public void Initialize()
     {
+        if (IsReadOnly)
+            throw new InvalidOperationException("只读在线峰值数据源不能执行初始化。");
         Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -42,12 +46,19 @@ public sealed class OnlinePlayerHistoryStore
                 peak_count INTEGER NOT NULL CHECK (peak_count >= 0),
                 updated_at_utc INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS online_player_current (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                online_count INTEGER NOT NULL CHECK (online_count >= 0),
+                observed_at_utc INTEGER NOT NULL
+            );
             """;
         command.ExecuteNonQuery();
     }
 
     public void Record(int count, DateTimeOffset? observedAt = null)
     {
+        if (IsReadOnly)
+            throw new InvalidOperationException("只读在线峰值数据源不能记录数据。");
         count = Math.Max(0, count);
         var timestamp = observedAt ?? DateTimeOffset.UtcNow;
         var localDate = TimeZoneInfo.ConvertTime(timestamp, DisplayTimeZone).ToString("yyyy-MM-dd");
@@ -61,12 +72,33 @@ public sealed class OnlinePlayerHistoryStore
                 updated_at_utc = excluded.updated_at_utc;
             DELETE FROM online_player_daily_peaks
             WHERE local_date < $retentionStart;
+            INSERT INTO online_player_current(singleton, online_count, observed_at_utc)
+            VALUES (1, $count, $updated)
+            ON CONFLICT(singleton) DO UPDATE SET
+                online_count = excluded.online_count,
+                observed_at_utc = excluded.observed_at_utc;
             """;
         command.Parameters.AddWithValue("$date", localDate);
         command.Parameters.AddWithValue("$count", count);
         command.Parameters.AddWithValue("$updated", timestamp.ToUnixTimeMilliseconds());
         command.Parameters.AddWithValue("$retentionStart", TimeZoneInfo.ConvertTime(timestamp, DisplayTimeZone).Date.AddDays(-45).ToString("yyyy-MM-dd"));
         command.ExecuteNonQuery();
+    }
+
+    public int? GetCurrentOnlineCount(DateTimeOffset? now = null, TimeSpan? maxAge = null)
+    {
+        var timestamp = now ?? DateTimeOffset.UtcNow;
+        var freshness = maxAge ?? TimeSpan.FromMinutes(2);
+        if (freshness <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maxAge));
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT online_count
+            FROM online_player_current
+            WHERE singleton = 1 AND observed_at_utc >= $freshAfter;
+            """;
+        command.Parameters.AddWithValue("$freshAfter", timestamp.Subtract(freshness).ToUnixTimeMilliseconds());
+        return command.ExecuteScalar() is long count ? checked((int)count) : null;
     }
 
     public IReadOnlyList<OnlinePlayerPeakPoint> GetRecentDailyPeaks(int days, DateTimeOffset? now = null)
