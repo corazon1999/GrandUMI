@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { listMeta, deleteMatch, clearAll, type MatchMeta } from "@/data/matchHistoryDB";
 import { getCard } from "@/data/CardLoader";
+import { getMatchOpeningLabels } from "@/data/matchHistoryOpening";
 import { useLanguage } from "@/i18n/LanguageProvider";
 
 function fmtTime(ts: number, locale: string): string {
@@ -85,50 +86,65 @@ export default function HistoryPanel() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {list.map((m) => (
-              <li
-                key={m.id}
-                className="group flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-2 py-2 transition-colors hover:border-orange-600/60 @[640px]:gap-3 @[640px]:px-4 @[640px]:py-3"
-              >
-                <button
-                  onClick={() => router.push(`/replay/${encodeURIComponent(m.id)}`)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                  title="点击观看回放"
+            {list.map((m) => {
+              const openingLabels = getMatchOpeningLabels(m);
+              return (
+                <li
+                  key={m.id}
+                  className="group flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-2 py-2 transition-colors hover:border-orange-600/60 @[640px]:gap-3 @[640px]:px-4 @[640px]:py-3"
                 >
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${
-                      m.isDraw
-                        ? "bg-sky-500/20 text-sky-300"
-                        : m.winnerIsMe
-                        ? "bg-yellow-500/20 text-yellow-400"
-                        : "bg-gray-700/60 text-gray-400"
-                    }`}
+                  <button
+                    onClick={() => router.push(`/replay/${encodeURIComponent(m.id)}`)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    title="点击观看回放"
                   >
-                    {m.isDraw ? "平" : m.winnerIsMe ? "胜" : "负"}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-white">
-                      <span className="text-sky-300">{leaderLabel(m.myLeader)}</span>
-                      <span className="mx-1.5 text-gray-600">vs</span>
-                      <span className="text-red-300">{leaderLabel(m.opponentLeader)}</span>
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-gray-500">
-                      对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt, locale)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm text-gray-600 transition-colors group-hover:text-orange-400">
-                    ▶ <span className="hidden @[640px]:inline">回放</span>
-                  </span>
-                </button>
-                <button
-                  onClick={() => handleDelete(m.id)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm text-gray-600 transition-colors hover:bg-gray-800 hover:text-red-400"
-                  title="删除此记录"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${
+                        m.isDraw
+                          ? "bg-sky-500/20 text-sky-300"
+                          : m.winnerIsMe
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-gray-700/60 text-gray-400"
+                      }`}
+                    >
+                      {m.isDraw ? "平" : m.winnerIsMe ? "胜" : "负"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-white">
+                        <span className="text-sky-300">{leaderLabel(m.myLeader)}</span>
+                        <span className="mx-1.5 text-gray-600">vs</span>
+                        <span className="text-red-300">{leaderLabel(m.opponentLeader)}</span>
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-gray-500">
+                        对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt, locale)}
+                      </p>
+                      {openingLabels.length > 0 && (
+                        <div className="mt-1 flex min-w-0 flex-wrap gap-1" aria-label="开局结果">
+                          {openingLabels.map((label) => (
+                            <span
+                              key={label}
+                              className="max-w-full rounded border border-gray-700 bg-gray-800/80 px-1.5 py-0.5 text-[11px] leading-4 text-gray-300"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-sm text-gray-600 transition-colors group-hover:text-orange-400">
+                      ▶ <span className="hidden @[640px]:inline">回放</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(m.id)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm text-gray-600 transition-colors hover:bg-gray-800 hover:text-red-400"
+                    title="删除此记录"
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

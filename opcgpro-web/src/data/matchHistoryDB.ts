@@ -33,6 +33,10 @@ export interface MatchMeta {
   opponentLeader: string;   // 对手领航卡号
   winnerIsMe: boolean;
   isDraw?: boolean;
+  /** 骰点流程上线前保存的旧记录没有该字段。 */
+  diceWinnerIsMe?: boolean;
+  /** 骰点流程上线前保存的旧记录没有该字段。 */
+  isFirstPlayer?: boolean;
   gameOverReason: string;
   turnCount: number;
   snapshotCount: number;

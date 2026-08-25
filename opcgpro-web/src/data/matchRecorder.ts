@@ -19,6 +19,7 @@ import {
   type MatchMeta,
 } from "./matchHistoryDB";
 import { shouldHideDisconnectLoss } from "./matchHistoryPolicy";
+import { extractMatchOpeningMeta } from "./matchHistoryOpening";
 
 const SNAPSHOT_CHUNK_SIZE = 16;
 
@@ -60,6 +61,7 @@ function finalize(s: Session, last: MsgGameState): void {
     opponentLeader: last.opponent?.leaderNumber ?? "",
     winnerIsMe: last.winnerIsMe ?? false,
     isDraw: last.isDraw ?? false,
+    ...extractMatchOpeningMeta(last),
     gameOverReason: last.gameOverReason ?? "",
     turnCount: last.turnCount ?? 0,
     snapshotCount: s.snapshotCount,
