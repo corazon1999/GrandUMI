@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { loadAllCards, loadCardSet } from "@/data/CardLoader";
 import { getSelectedDeckName, loadDeck } from "@/data/DeckMapper";
 import { DEFAULT_SEARCH_SETS, ALL_SET_NAMES } from "@/data/cardSets";
@@ -8,7 +9,6 @@ import { useDeckStore } from "@/store/deckStore";
 import SearchPanel from "@/components/deck-editor/SearchPanel";
 import SearchResultPanel from "@/components/deck-editor/SearchResultPanel";
 import DeckInfoPanel from "@/components/deck-editor/DeckInfoPanel";
-import { HomeRequest } from "@/net/HomeProtocol";
 
 type LoadState = "loading" | "done" | "error";
 type MobilePanel = "cards" | "deck";
@@ -114,16 +114,15 @@ export default function DeckEditorPage() {
         className="grid h-12 shrink-0 grid-cols-[auto_auto_1fr_1fr] border-b border-gray-800 bg-gray-950 md:hidden"
         aria-label="卡组编辑视图"
       >
-        <a
+        <Link
           href="/home"
-          onClick={() => HomeRequest.prepareHomeReload()}
           data-deck-mobile-back
           className="flex min-h-11 min-w-11 items-center justify-center border-r border-gray-800 px-2 text-sm text-gray-400 transition-colors hover:bg-gray-900 hover:text-white"
           title="返回大厅"
           aria-label="返回大厅"
         >
           ←
-        </a>
+        </Link>
         <button
           type="button"
           onClick={() => setMobileFiltersOpen(true)}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { AnimatePresence } from "framer-motion";
 import { useDeckStore, type DeckEntry } from "@/store/deckStore";
 import { useNetStore } from "@/store/netStore";
@@ -227,16 +228,15 @@ export default function DeckInfoPanel() {
           className="flex min-h-11 items-center px-3 pr-16"
         >
           <div className="flex items-center gap-2">
-            <a
+            <Link
               href="/home"
-              onClick={() => HomeRequest.prepareHomeReload()}
               data-deck-editor-back-link
               className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
               title="返回大厅"
               aria-label="返回大厅"
             >
               ← 返回
-            </a>
+            </Link>
             <span className="text-white font-bold text-sm">卡组</span>
           </div>
         </div>
