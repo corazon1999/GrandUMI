@@ -19,6 +19,7 @@ KillSignal=SIGINT
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 Environment=GRANDUMI_DATA_DIR=/data/grandumi-test
 Environment=GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH=/data/grandumi/online-player-history.db
+Environment=GRANDUMI_RECORD_DAILY_ACTIVE=0
 Environment=GRANDUMI_LEADER_STATS_READ_PATH=/data/grandumi/leader-stats.db
 Environment=GRANDUMI_REQUIRE_SINGLE_WRITER=1
 Environment=GRANDUMI_NODE_ID=hk-test-01

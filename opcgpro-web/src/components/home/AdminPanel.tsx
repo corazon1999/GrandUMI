@@ -8,6 +8,7 @@ import { useNetStore } from "@/store/netStore";
 import type {
   AdminDeploymentEnvironment,
   AdminDeploymentStatus,
+  DailyActivePlayerPoint,
   DailyMatchCountPoint,
   OnlinePlayerPeakPoint,
 } from "@/types/net";
@@ -225,7 +226,15 @@ function formatTimestamp(timestamp?: number | null) {
   return new Date(timestamp).toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
+function PlayerCountChart({
+  points,
+  chartName,
+  emptyMessage,
+}: {
+  points: OnlinePlayerPeakPoint[];
+  chartName: "峰值在线玩家" | "日活玩家";
+  emptyMessage: string;
+}) {
   const chart = useMemo(() => {
     const width = 720;
     const height = 220;
@@ -253,7 +262,7 @@ function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
   }, [points]);
 
   if (!points.length) {
-    return <div className="flex min-h-48 items-center justify-center text-sm text-gray-500">峰值数据正在初始化</div>;
+    return <div className="flex min-h-48 items-center justify-center px-4 text-center text-sm text-gray-500">{emptyMessage}</div>;
   }
 
   return (
@@ -262,7 +271,7 @@ function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
         viewBox={`0 0 ${chart.width} ${chart.height}`}
         className="h-auto min-h-48 w-full overflow-visible"
         role="img"
-        aria-label={`每日在线玩家峰值折线图，最高 ${chart.displayMax} 人`}
+        aria-label={`${chartName}折线图，最高 ${chart.displayMax} 人`}
       >
         {[0, 0.5, 1].map((ratio) => {
           const y = 24 + ratio * 172;
@@ -287,11 +296,21 @@ function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
         <span>{points.at(-1)?.date.slice(5)}</span>
       </div>
       <table className="sr-only">
-        <caption>每日在线玩家峰值</caption>
-        <thead><tr><th>日期</th><th>峰值人数</th></tr></thead>
+        <caption>{chartName}</caption>
+        <thead><tr><th>日期</th><th>人数</th></tr></thead>
         <tbody>{points.map((point) => <tr key={point.date}><td>{point.date}</td><td>{point.peak}</td></tr>)}</tbody>
       </table>
     </div>
+  );
+}
+
+function DailyActiveChart({ points }: { points: DailyActivePlayerPoint[] }) {
+  return (
+    <PlayerCountChart
+      points={points.map((point) => ({ date: point.date, peak: point.count }))}
+      chartName="日活玩家"
+      emptyMessage="正式服日活统计尚未启用"
+    />
   );
 }
 
@@ -321,6 +340,8 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
   const [showPeakChart, setShowPeakChart] = useState(false);
   const [peakRange, setPeakRange] = useState<7 | 30>(7);
+  const [showDailyActiveChart, setShowDailyActiveChart] = useState(false);
+  const [dailyActiveRange, setDailyActiveRange] = useState<7 | 30>(7);
   const [showMatchChart, setShowMatchChart] = useState(false);
   const [matchRange, setMatchRange] = useState<7 | 30>(7);
   const [playerQuery, setPlayerQuery] = useState("");
@@ -330,6 +351,8 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const connected = connState === "connected";
   const pendingReviews = reviewQueue?.length;
   const authoritativeOnlineCount = adminOperations.onlineCount ?? "—";
+  const todayPeak = adminOperations.peaks7.at(-1)?.peak ?? "—";
+  const todayDailyActive = adminOperations.dailyActive7.at(-1)?.count ?? "—";
   const todayMatches = adminOperations.matches7.at(-1)?.count ?? "—";
   const storage = adminOperations.storage;
   const usedStoragePercent = storage?.totalBytes
@@ -476,7 +499,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           </div>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 @[720px]:grid-cols-3 @[1040px]:grid-cols-6">
+        <div className="mt-6 grid grid-cols-2 gap-3 @[720px]:grid-cols-3 @[1040px]:grid-cols-4">
           <StatusCard
             label="服务连接"
             value={connected ? "已连接" : "未连接"}
@@ -486,11 +509,26 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           <StatusCard
             label="在线玩家"
             value={authoritativeOnlineCount}
-            detail={showPeakChart ? "点击收起峰值趋势" : "点击查看近一周/月峰值"}
+            detail="正式服当前在线人数"
+            tone="cyan"
+          />
+          <StatusCard
+            label="峰值在线玩家"
+            value={todayPeak}
+            detail={showPeakChart ? "点击收起峰值在线玩家趋势" : "点击查看近一周/月峰值在线玩家"}
             tone="cyan"
             onClick={() => setShowPeakChart((visible) => !visible)}
             expanded={showPeakChart}
             controls="online-peak-panel"
+          />
+          <StatusCard
+            label="日活玩家"
+            value={todayDailyActive}
+            detail={showDailyActiveChart ? "点击收起日活玩家趋势" : "点击查看近一周/月日活玩家"}
+            tone="cyan"
+            onClick={() => setShowDailyActiveChart((visible) => !visible)}
+            expanded={showDailyActiveChart}
+            controls="daily-active-panel"
           />
           <StatusCard
             label="今日完成场次"
@@ -522,12 +560,12 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
         </div>
 
         {showPeakChart && (
-          <section id="online-peak-panel" aria-label="在线玩家峰值" className="mt-4 rounded-2xl border border-cyan-900/70 bg-cyan-950/15 p-4 @[640px]:p-5">
+          <section id="online-peak-panel" aria-label="峰值在线玩家" className="mt-4 rounded-2xl border border-cyan-900/70 bg-cyan-950/15 p-4 @[640px]:p-5">
             <div className="flex flex-col gap-3 @[520px]:flex-row @[520px]:items-center @[520px]:justify-between">
               <div>
                 <p className="text-xs font-bold tracking-[0.16em] text-cyan-400">PLAYER TRAFFIC</p>
-                <h2 className="mt-1 text-lg font-black text-white">每日在线玩家峰值</h2>
-                <p className="mt-1 text-xs leading-5 text-gray-400">按 UTC+8 自然日统计；当天数据会随在线人数增长实时更新。</p>
+                <h2 className="mt-1 text-lg font-black text-white">峰值在线玩家</h2>
+                <p className="mt-1 text-xs leading-5 text-gray-400">按 UTC+8 自然日统计正式服单日最高在线人数；测试服与正式服均展示正式服权威数据，服务端每分钟更新展示缓存。</p>
               </div>
               <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="统计周期">
                 {([7, 30] as const).map((range) => (
@@ -544,8 +582,44 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
               </div>
             </div>
             <div className="mt-4 overflow-x-auto">
-              <div className="min-w-[34rem]"><PeakChart points={peakRange === 7 ? adminOperations.peaks7 : adminOperations.peaks30} /></div>
+              <div className="min-w-[34rem]">
+                <PlayerCountChart
+                  points={peakRange === 7 ? adminOperations.peaks7 : adminOperations.peaks30}
+                  chartName="峰值在线玩家"
+                  emptyMessage="正式服峰值统计尚未启用"
+                />
+              </div>
             </div>
+            <p className="mt-2 text-[11px] text-gray-500">统计缓存更新于 {formatTimestamp(adminOperations.playerTrafficUpdatedAt)}</p>
+          </section>
+        )}
+
+        {showDailyActiveChart && (
+          <section id="daily-active-panel" aria-label="日活玩家" className="mt-4 rounded-2xl border border-sky-900/70 bg-sky-950/15 p-4 @[640px]:p-5">
+            <div className="flex flex-col gap-3 @[520px]:flex-row @[520px]:items-center @[520px]:justify-between">
+              <div>
+                <p className="text-xs font-bold tracking-[0.16em] text-sky-400">DAILY ACTIVE PLAYERS</p>
+                <h2 className="mt-1 text-lg font-black text-white">日活玩家</h2>
+                <p className="mt-1 text-xs leading-5 text-gray-400">按 UTC+8 自然日统计正式服当天至少成功登录一次的去重玩家；测试服登录不会计入，服务端每分钟更新展示缓存。</p>
+              </div>
+              <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="日活玩家统计周期">
+                {([7, 30] as const).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setDailyActiveRange(range)}
+                    aria-pressed={dailyActiveRange === range}
+                    className={`min-h-11 rounded-lg px-4 text-sm font-bold ${dailyActiveRange === range ? "bg-sky-500 text-gray-950" : "text-gray-400 hover:text-white"}`}
+                  >
+                    近{range === 7 ? "一周" : "一月"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <div className="min-w-[34rem]"><DailyActiveChart points={dailyActiveRange === 7 ? adminOperations.dailyActive7 : adminOperations.dailyActive30} /></div>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">统计缓存更新于 {formatTimestamp(adminOperations.playerTrafficUpdatedAt)}</p>
           </section>
         )}
 

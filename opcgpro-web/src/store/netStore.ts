@@ -25,6 +25,7 @@ import type {
   AdminDeploymentStatus,
   OnlinePlayerPeakPoint,
   DailyMatchCountPoint,
+  DailyActivePlayerPoint,
   AdminStorageSnapshot,
   AdminPlayerSummary,
 } from "@/types/net";
@@ -64,6 +65,9 @@ export type AdminOperationsState = {
   onlineCount: number | null;
   peaks7: OnlinePlayerPeakPoint[];
   peaks30: OnlinePlayerPeakPoint[];
+  dailyActive7: DailyActivePlayerPoint[];
+  dailyActive30: DailyActivePlayerPoint[];
+  playerTrafficUpdatedAt: number | null;
   matches7: DailyMatchCountPoint[];
   matches30: DailyMatchCountPoint[];
   matchesUpdatedAt: number | null;
@@ -257,6 +261,9 @@ const initialState = {
     onlineCount: null,
     peaks7: [],
     peaks30: [],
+    dailyActive7: [],
+    dailyActive30: [],
+    playerTrafficUpdatedAt: null,
     matches7: [],
     matches30: [],
     matchesUpdatedAt: null,

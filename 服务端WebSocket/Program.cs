@@ -54,6 +54,18 @@ var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
     "online-player-history.db"));
 onlinePlayerHistoryStore.Initialize();
 Console.WriteLine($"[在线峰值] SQLite: {onlinePlayerHistoryStore.DatabasePath}");
+var recordDailyActivePlayers = string.Equals(
+    Environment.GetEnvironmentVariable("GRANDUMI_RECORD_DAILY_ACTIVE"),
+    "1",
+    StringComparison.Ordinal);
+if (recordDailyActivePlayers)
+{
+    Console.WriteLine("[日活玩家] 正式统计写入已启用");
+}
+else
+{
+    Console.WriteLine("[日活玩家] 本环境仅展示权威数据，不记录登录活动");
+}
 var onlinePlayerHistoryReadPath = Environment.GetEnvironmentVariable("GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH");
 var onlinePlayerHistoryReadStore = string.IsNullOrWhiteSpace(onlinePlayerHistoryReadPath)
     || string.Equals(
@@ -87,7 +99,9 @@ if (string.Equals(RankedStore.Default.DatabasePath, RankedStore.Wild.DatabasePat
     throw new InvalidOperationException("标准排位与狂野排位数据库不能使用同一路径");
 RankedStore.Wild.Initialize();
 Console.WriteLine($"[狂野排位] SQLite: {RankedStore.Wild.DatabasePath}");
-var adminOperationsMetricsCache = new AdminOperationsMetricsCache(LeaderStatsStore.Default);
+var adminOperationsMetricsCache = new AdminOperationsMetricsCache(
+    LeaderStatsStore.Default,
+    onlinePlayerHistoryReadStore);
 
 GameRoomManager.InitializeMaintenance(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
@@ -99,7 +113,8 @@ WebSocketBridge.Initialize(
     onlinePlayerHistoryStore,
     onlinePlayerHistoryReadStore,
     adminOperationsMetricsCache,
-    adminDeploymentCoordinator);
+    adminDeploymentCoordinator,
+    recordDailyActivePlayers);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
 builder.Logging.ClearProviders();

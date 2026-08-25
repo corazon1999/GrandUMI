@@ -18,6 +18,7 @@ TimeoutStopSec=25
 KillSignal=SIGINT
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 Environment=GRANDUMI_DATA_DIR=/data/grandumi
+Environment=GRANDUMI_RECORD_DAILY_ACTIVE=1
 Environment=GRANDUMI_REQUIRE_SINGLE_WRITER=1
 Environment=GRANDUMI_NODE_ID=hk-production-01
 Environment=GRANDUMI_MAX_CONNECTIONS=3000

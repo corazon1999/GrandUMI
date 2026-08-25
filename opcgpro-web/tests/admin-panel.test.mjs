@@ -21,17 +21,32 @@ test("管理员控制台集中展示服务状态和管理能力", () => {
   assert.match(admin, /onOpenPlayers/);
 });
 
-test("点击在线玩家状态卡可查看近一周和近一月峰值图", () => {
+test("峰值在线玩家标题统一且可查看近一周和近一月趋势", () => {
   assert.match(admin, /controls="online-peak-panel"/);
   assert.match(admin, /setShowPeakChart/);
-  assert.match(admin, /<PeakChart points=/);
+  assert.match(admin, /<PlayerCountChart/);
   assert.match(admin, /peakRange === range/);
-  assert.match(admin, /每日在线玩家峰值/);
+  assert.match(admin, /chartName="峰值在线玩家"/);
+  assert.match(admin, /aria-label="峰值在线玩家"/);
+  assert.doesNotMatch(admin, /每日在线玩家峰值/);
   assert.match(admin, /<table className="sr-only">/);
   assert.match(protocol, /case "MsgAdminOperations"/);
   assert.match(store, /peaks7: \[\]/);
   assert.match(admin, /adminOperations\.onlineCount \?\? "—"/);
   assert.match(types, /interface OnlinePlayerPeakPoint/);
+});
+
+test("日活玩家按正式服口径提供今日值和近一周一月趋势", () => {
+  assert.match(admin, /label="日活玩家"/);
+  assert.match(admin, /controls="daily-active-panel"/);
+  assert.match(admin, /当天至少成功登录一次的去重玩家/);
+  assert.match(admin, /测试服登录不会计入/);
+  assert.match(admin, /<DailyActiveChart points=/);
+  assert.match(admin, /dailyActiveRange === range/);
+  assert.match(protocol, /dailyActive7:/);
+  assert.match(store, /dailyActive30: \[\]/);
+  assert.match(types, /interface DailyActivePlayerPoint/);
+  assert.match(types, /playerTrafficUpdatedAt/);
 });
 
 test("管理员可提交测试服与正式服最新版本发布任务", () => {
@@ -69,6 +84,7 @@ test("所有折线图数据点都支持悬停、键盘和触摸查看具体数�
   assert.match(admin, /aria-label=\{`日期：\$\{point\.label\}，\$\{valueLabel\}：\$\{point\.value\} \$\{unit\}`\}/);
   assert.match(admin, /valueLabel="场次"/);
   assert.match(admin, /valueLabel="人数"/);
+  assert.match(admin, /chartName="日活玩家"/);
 });
 
 test("管理员先搜索并选中玩家再执行改名或密码重置", () => {
@@ -95,7 +111,7 @@ test("管理入口只对服务端授权账号显示且无权限状态可安全�
 test("手机竖屏布局保持单列操作区和至少44px触控尺寸", () => {
   assert.match(admin, /grid-cols-2/);
   assert.match(admin, /@\[720px\]:grid-cols-3/);
-  assert.match(admin, /@\[1040px\]:grid-cols-6/);
+  assert.match(admin, /@\[1040px\]:grid-cols-4/);
   assert.match(admin, /@\[760px\]:grid-cols-2/);
   assert.match(admin, /@\[680px\]:grid-cols-/);
   assert.match(admin, /min-h-11/);

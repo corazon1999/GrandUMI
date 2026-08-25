@@ -91,6 +91,7 @@ public static class WebSocketBridge
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryReadStore;
     private static AdminOperationsMetricsCache? _adminOperationsMetricsCache;
     private static AdminDeploymentCoordinator? _adminDeploymentCoordinator;
+    private static bool _recordDailyActivePlayers;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
     private static int _onlineBroadcastVersion;
@@ -124,7 +125,8 @@ public static class WebSocketBridge
         OnlinePlayerHistoryStore? onlinePlayerHistoryStore = null,
         OnlinePlayerHistoryStore? onlinePlayerHistoryReadStore = null,
         AdminOperationsMetricsCache? adminOperationsMetricsCache = null,
-        AdminDeploymentCoordinator? adminDeploymentCoordinator = null)
+        AdminDeploymentCoordinator? adminDeploymentCoordinator = null,
+        bool recordDailyActivePlayers = false)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _accountAuthenticationStore = accountAuthenticationStore
@@ -133,6 +135,7 @@ public static class WebSocketBridge
         _onlinePlayerHistoryReadStore = onlinePlayerHistoryReadStore ?? onlinePlayerHistoryStore;
         _adminOperationsMetricsCache = adminOperationsMetricsCache;
         _adminDeploymentCoordinator = adminDeploymentCoordinator;
+        _recordDailyActivePlayers = recordDailyActivePlayers;
         _cts.Cancel();
         _cts.Dispose();
         _cts = new CancellationTokenSource();
@@ -449,6 +452,11 @@ public static class WebSocketBridge
                 SupersededClientInstances.TryRemove(clientInstanceId, out _);
 
             var playerData = _playerDataStore.Login(authentication.Account);
+            if (_recordDailyActivePlayers)
+            {
+                try { _onlinePlayerHistoryStore?.RecordActivePlayer(playerData.Account); }
+                catch (Exception ex) { LogErr($"记录日活玩家失败 {playerData.Account}: {ex.Message}"); }
+            }
 
             string? supersededSessionId = null;
             lock (AccountIndexGate)
@@ -3534,18 +3542,34 @@ public static class WebSocketBridge
     {
         IReadOnlyList<OnlinePlayerPeakPoint> peaks7 = [];
         IReadOnlyList<OnlinePlayerPeakPoint> peaks30 = [];
+        IReadOnlyList<DailyActivePlayerPoint> dailyActive7 = [];
+        IReadOnlyList<DailyActivePlayerPoint> dailyActive30 = [];
         int? authoritativeOnlineCount = null;
+        long? playerTrafficUpdatedAt = null;
         IReadOnlyList<DailyMatchCountPoint> matches7 = [];
         IReadOnlyList<DailyMatchCountPoint> matches30 = [];
         long? matchesUpdatedAt = null;
         CachedStorageHealth? storage = null;
         try
         {
-            if (_onlinePlayerHistoryReadStore is not null)
+            if (_adminOperationsMetricsCache is not null)
             {
-                authoritativeOnlineCount = _onlinePlayerHistoryReadStore.GetCurrentOnlineCount();
-                peaks7 = _onlinePlayerHistoryReadStore.GetRecentDailyPeaks(7);
-                peaks30 = _onlinePlayerHistoryReadStore.GetRecentDailyPeaks(30);
+                var cachedTraffic = _adminOperationsMetricsCache.GetPlayerTraffic();
+                authoritativeOnlineCount = cachedTraffic.Snapshot.CurrentOnlineCount;
+                peaks30 = cachedTraffic.Snapshot.Peaks;
+                peaks7 = peaks30.TakeLast(7).ToArray();
+                dailyActive30 = cachedTraffic.Snapshot.DailyActivePlayers;
+                dailyActive7 = dailyActive30.TakeLast(7).ToArray();
+                playerTrafficUpdatedAt = cachedTraffic.RefreshedAt.ToUnixTimeMilliseconds();
+            }
+            else if (_onlinePlayerHistoryReadStore is not null)
+            {
+                var traffic = _onlinePlayerHistoryReadStore.GetSnapshot(30);
+                authoritativeOnlineCount = traffic.CurrentOnlineCount;
+                peaks30 = traffic.Peaks;
+                peaks7 = peaks30.TakeLast(7).ToArray();
+                dailyActive30 = traffic.DailyActivePlayers;
+                dailyActive7 = dailyActive30.TakeLast(7).ToArray();
             }
         }
         catch (Exception ex)
@@ -3599,6 +3623,9 @@ public static class WebSocketBridge
             onlineCount = authoritativeOnlineCount,
             peaks7 = peaks7.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
             peaks30 = peaks30.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
+            dailyActive7 = dailyActive7.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
+            dailyActive30 = dailyActive30.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
+            playerTrafficUpdatedAt,
             matches7 = matches7.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
             matches30 = matches30.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
             matchesUpdatedAt,

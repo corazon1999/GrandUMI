@@ -1307,6 +1307,11 @@ export interface DailyMatchCountPoint {
   count: number;
 }
 
+export interface DailyActivePlayerPoint {
+  date: string;
+  count: number;
+}
+
 export interface AdminStorageSnapshot {
   healthy: boolean;
   reason: string;
@@ -1343,6 +1348,9 @@ export interface MsgAdminOperations extends MsgBase {
   onlineCount?: number | null;
   peaks7?: OnlinePlayerPeakPoint[];
   peaks30?: OnlinePlayerPeakPoint[];
+  dailyActive7?: DailyActivePlayerPoint[];
+  dailyActive30?: DailyActivePlayerPoint[];
+  playerTrafficUpdatedAt?: number | null;
   matches7?: DailyMatchCountPoint[];
   matches30?: DailyMatchCountPoint[];
   matchesUpdatedAt?: number | null;

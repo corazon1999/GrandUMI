@@ -34,6 +34,18 @@ test("网页后端只写请求目录，root执行器由systemd path隔离触发"
   assert.doesNotMatch(testBackend, /User=root/);
 });
 
+test("测试服只读正式玩家流量且绝不写入正式日活", () => {
+  assert.match(testBackend, /GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH=\/data\/grandumi\/online-player-history\.db/);
+  assert.match(testBackend, /GRANDUMI_RECORD_DAILY_ACTIVE=0/);
+  assert.match(testBackend, /ReadOnlyPaths=\/data\/grandumi/);
+  assert.doesNotMatch(testBackend, /ReadWritePaths=[^\n]*\/data\/grandumi(?:\s|$)/);
+  assert.match(productionBackend, /GRANDUMI_RECORD_DAILY_ACTIVE=1/);
+  assert.match(program, /readOnly: true/);
+  assert.match(program, /var recordDailyActivePlayers = string\.Equals\([\s\S]*GRANDUMI_RECORD_DAILY_ACTIVE[\s\S]*"1"/);
+  assert.match(bridge, /if \(_recordDailyActivePlayers\)/);
+  assert.ok(bridge.indexOf("var playerData = _playerDataStore.Login") < bridge.indexOf("if (_recordDailyActivePlayers)"));
+});
+
 test("发布执行器只接受精确环境并固定从远端main取版本", () => {
   assert.match(runner, /\^\(test\|production\)-\(\[0-9a-f\]\{32\}\)/);
   assert.match(runner, /refs\/heads\/main:refs\/remotes\/admin\/main/);
