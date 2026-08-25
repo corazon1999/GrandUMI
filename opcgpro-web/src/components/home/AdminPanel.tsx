@@ -79,6 +79,7 @@ function InteractiveLinePoints({
   width,
   height,
   unit,
+  valueLabel,
   dotFill,
   dotStroke,
   accent,
@@ -87,6 +88,7 @@ function InteractiveLinePoints({
   width: number;
   height: number;
   unit: string;
+  valueLabel: string;
   dotFill: string;
   dotStroke: string;
   accent: string;
@@ -113,7 +115,7 @@ function InteractiveLinePoints({
             role="button"
             tabIndex={0}
             focusable="true"
-            aria-label={`${point.label}，${point.value} ${unit}`}
+            aria-label={`日期：${point.label}，${valueLabel}：${point.value} ${unit}`}
             data-line-point={point.key}
             className="cursor-pointer outline-none"
             onPointerEnter={() => setHoveredKey(point.key)}
@@ -141,8 +143,8 @@ function InteractiveLinePoints({
         <g data-line-tooltip={activePoint.key} pointerEvents="none" aria-hidden="true">
           <line x1={activePoint.x} x2={activePoint.x} y1="24" y2={height - 24} stroke={accent} strokeWidth="1" strokeDasharray="4 4" opacity="0.45" />
           <rect x={tooltipPosition.x} y={tooltipPosition.y} width={tooltipWidth} height={tooltipHeight} rx="10" fill="rgb(3 7 18)" fillOpacity="0.97" stroke={accent} strokeWidth="1.5" />
-          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 21} fill="rgb(156 163 175)" fontSize="12">{activePoint.label}</text>
-          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 44} fill="white" fontSize="17" fontWeight="800">{activePoint.value} {unit}</text>
+          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 21} fill="rgb(156 163 175)" fontSize="12">日期：{activePoint.label}</text>
+          <text x={tooltipPosition.x + 12} y={tooltipPosition.y + 44} fill="white" fontSize="17" fontWeight="800">{valueLabel}：{activePoint.value} {unit}</text>
         </g>
       )}
     </>
@@ -193,6 +195,7 @@ function MatchChart({ points }: { points: DailyMatchCountPoint[] }) {
           width={chart.width}
           height={chart.height}
           unit="场"
+          valueLabel="场次"
           dotFill="rgb(109 40 217)"
           dotStroke="rgb(221 214 254)"
           accent="rgb(167 139 250)"
@@ -272,6 +275,7 @@ function PeakChart({ points }: { points: OnlinePlayerPeakPoint[] }) {
           width={chart.width}
           height={chart.height}
           unit="人"
+          valueLabel="人数"
           dotFill="rgb(8 145 178)"
           dotStroke="rgb(165 243 252)"
           accent="rgb(34 211 238)"

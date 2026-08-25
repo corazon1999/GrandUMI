@@ -64,7 +64,11 @@ test("所有折线图数据点都支持悬停、键盘和触摸查看具体数�
   assert.match(admin, /onClick=\{toggleSelected\}/);
   assert.match(admin, /event\.key === "Enter" \|\| event\.key === " "/);
   assert.match(admin, /r="16" fill="transparent"/);
-  assert.match(admin, /aria-label=\{`\$\{point\.label\}，\$\{point\.value\} \$\{unit\}`\}/);
+  assert.match(admin, /日期：\{activePoint\.label\}/);
+  assert.match(admin, /\{valueLabel\}：\{activePoint\.value\} \{unit\}/);
+  assert.match(admin, /aria-label=\{`日期：\$\{point\.label\}，\$\{valueLabel\}：\$\{point\.value\} \$\{unit\}`\}/);
+  assert.match(admin, /valueLabel="场次"/);
+  assert.match(admin, /valueLabel="人数"/);
 });
 
 test("管理员先搜索并选中玩家再执行改名或密码重置", () => {
