@@ -25,6 +25,7 @@ test("测试服数据、端口与进程权限均和正式服隔离", () => {
   assert.match(backendService, /User=grandumi/);
   assert.match(backendService, /GRANDUMI_DATA_DIR=\/data\/grandumi-test/);
   assert.match(backendService, /GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH=\/data\/grandumi\/online-player-history\.db/);
+  assert.match(backendService, /GRANDUMI_LEADER_STATS_READ_PATH=\/data\/grandumi\/leader-stats\.db/);
   assert.match(backendService, /ReadOnlyPaths=\/data\/grandumi/);
   assert.match(backendService, /GrandUMIServer\.dll 8081/);
   assert.doesNotMatch(backendService, /GRANDUMI_DATA_DIR=\/data\/grandumi(?:\s|$)/m);

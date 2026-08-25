@@ -93,6 +93,45 @@ public sealed class AccountAuthenticationStoreTests : IDisposable
         Assert.True(auth.Authenticate("Nami", null, changed.AuthToken).Success);
     }
 
+    [Fact]
+    public void 管理员重置密码会生成临时密码撤销旧凭据并写入审计()
+    {
+        var players = CreatePlayers();
+        var auth = CreateAuth(players);
+        var login = auth.Authenticate("Robin", "old-password", null);
+
+        var reset = auth.AdminResetPassword("释迦", "robin");
+
+        Assert.Equal("Robin", reset.Account);
+        Assert.Equal(18, reset.TemporaryPassword.Length);
+        Assert.False(auth.Authenticate("Robin", "old-password", null).Success);
+        Assert.False(auth.Authenticate("Robin", null, login.AuthToken).Success);
+        Assert.True(auth.Authenticate("Robin", reset.TemporaryPassword, null).Success);
+        using var connection = new SqliteConnection($"Data Source={_databasePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT action, detail_json FROM admin_player_audit;";
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("reset_password", reader.GetString(0));
+        Assert.Equal("{}", reader.GetString(1));
+        Assert.DoesNotContain(reset.TemporaryPassword, reader.GetString(1), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 管理员不能在当前会话重置自己的密码()
+    {
+        var players = CreatePlayers();
+        var auth = CreateAuth(players);
+        auth.Authenticate("释迦", "original-password", null);
+
+        var error = Assert.Throws<PlayerDataValidationException>(
+            () => auth.AdminResetPassword("释迦", "释迦"));
+
+        Assert.Contains("不能", error.Message);
+        Assert.True(auth.Authenticate("释迦", "original-password", null).Success);
+    }
+
     private PlayerDataStore CreatePlayers()
     {
         var players = new PlayerDataStore(_databasePath);

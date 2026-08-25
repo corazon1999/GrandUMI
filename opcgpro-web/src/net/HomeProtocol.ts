@@ -88,6 +88,8 @@ import type {
   MsgActivateRuleset,
   MsgAdminOperations,
   MsgAdminDeploy,
+  MsgAdminPlayerSearch,
+  MsgAdminPlayerUpdate,
   AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
@@ -242,6 +244,12 @@ export function registerHomeProtocols() {
         break;
       case "MsgAdminOperations":
         handleAdminOperations(msg as MsgAdminOperations);
+        break;
+      case "MsgAdminPlayerSearch":
+        handleAdminPlayerSearch(msg as MsgAdminPlayerSearch);
+        break;
+      case "MsgAdminPlayerUpdate":
+        handleAdminPlayerUpdate(msg as MsgAdminPlayerUpdate);
         break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
@@ -731,11 +739,42 @@ function handleAdminOperations(msg: MsgAdminOperations) {
       onlineCount: typeof msg.onlineCount === "number" && Number.isFinite(msg.onlineCount) ? msg.onlineCount : null,
       peaks7: Array.isArray(msg.peaks7) ? msg.peaks7 : [],
       peaks30: Array.isArray(msg.peaks30) ? msg.peaks30 : [],
+      matches7: Array.isArray(msg.matches7) ? msg.matches7 : [],
+      matches30: Array.isArray(msg.matches30) ? msg.matches30 : [],
+      matchesUpdatedAt: typeof msg.matchesUpdatedAt === "number" ? msg.matchesUpdatedAt : null,
+      storage: msg.storage ?? null,
       test: msg.test,
       production: msg.production,
     });
   }
   if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
+}
+
+function handleAdminPlayerSearch(msg: MsgAdminPlayerSearch) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "搜索玩家失败", "error");
+    return;
+  }
+  useNetStore.getState().setAdminPlayerSearchResults(Array.isArray(msg.players) ? msg.players : []);
+}
+
+function handleAdminPlayerUpdate(msg: MsgAdminPlayerUpdate) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "玩家账号操作失败", "error");
+    return;
+  }
+  const store = useNetStore.getState();
+  if (msg.player) {
+    const next = store.adminPlayerSearchResults.map((player) =>
+      player.account.toLocaleLowerCase("zh-CN") === msg.player!.account.toLocaleLowerCase("zh-CN")
+        ? msg.player!
+        : player);
+    store.setAdminPlayerSearchResults(next);
+  }
+  store.setAdminTemporaryPassword(msg.temporaryPassword && msg.player
+    ? { account: msg.player.account, password: msg.temporaryPassword }
+    : null);
+  showMessage(msg.logStr ?? "玩家账号操作已完成", "info");
 }
 
 /**
@@ -1208,6 +1247,30 @@ export const HomeRequest = {
 
   deployLatest(environment: AdminDeploymentEnvironment) {
     return NetManager.send({ proto: "MsgAdminDeploy", environment } as MsgAdminDeploy);
+  },
+
+  searchAdminPlayers(query: string) {
+    useNetStore.getState().setAdminTemporaryPassword(null);
+    return NetManager.send({ proto: "MsgAdminPlayerSearch", query } as MsgAdminPlayerSearch);
+  },
+
+  renameAdminPlayer(targetAccount: string, displayName: string) {
+    useNetStore.getState().setAdminTemporaryPassword(null);
+    return NetManager.send({
+      proto: "MsgAdminPlayerUpdate",
+      action: "rename",
+      targetAccount,
+      displayName,
+    } as MsgAdminPlayerUpdate);
+  },
+
+  resetAdminPlayerPassword(targetAccount: string) {
+    useNetStore.getState().setAdminTemporaryPassword(null);
+    return NetManager.send({
+      proto: "MsgAdminPlayerUpdate",
+      action: "resetPassword",
+      targetAccount,
+    } as MsgAdminPlayerUpdate);
   },
 
   requestPlayerList(offset = 0, limit = 200) {

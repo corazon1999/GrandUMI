@@ -149,6 +149,13 @@ public sealed record FriendSearchPlayer(
     string Avatar,
     string Relationship);
 
+public sealed record AdminPlayerSummary(
+    string Account,
+    string DisplayName,
+    long CreatedAt,
+    long LastLoginAt,
+    bool HasPassword);
+
 /// <summary>好友关系写操作结果。</summary>
 public sealed record FriendMutationResult(
     FriendDataSnapshot Snapshot,

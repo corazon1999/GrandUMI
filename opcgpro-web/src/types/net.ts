@@ -1302,6 +1302,29 @@ export interface OnlinePlayerPeakPoint {
   peak: number;
 }
 
+export interface DailyMatchCountPoint {
+  date: string;
+  count: number;
+}
+
+export interface AdminStorageSnapshot {
+  healthy: boolean;
+  reason: string;
+  totalBytes: number;
+  availableBytes: number;
+  updatedAt: number;
+  refreshIntervalHours: number;
+}
+
+export interface AdminPlayerSummary {
+  account: string;
+  displayName: string;
+  createdAt: number;
+  lastLoginAt: number;
+  hasPassword: boolean;
+  online: boolean;
+}
+
 export interface AdminDeploymentStatus {
   environment: AdminDeploymentEnvironment;
   state: AdminDeploymentState;
@@ -1320,6 +1343,10 @@ export interface MsgAdminOperations extends MsgBase {
   onlineCount?: number | null;
   peaks7?: OnlinePlayerPeakPoint[];
   peaks30?: OnlinePlayerPeakPoint[];
+  matches7?: DailyMatchCountPoint[];
+  matches30?: DailyMatchCountPoint[];
+  matchesUpdatedAt?: number | null;
+  storage?: AdminStorageSnapshot | null;
   test?: AdminDeploymentStatus;
   production?: AdminDeploymentStatus;
 }
@@ -1327,6 +1354,25 @@ export interface MsgAdminOperations extends MsgBase {
 export interface MsgAdminDeploy extends MsgBase {
   proto: "MsgAdminDeploy";
   environment: AdminDeploymentEnvironment;
+}
+
+export interface MsgAdminPlayerSearch extends MsgBase {
+  proto: "MsgAdminPlayerSearch";
+  result?: boolean;
+  logStr?: string;
+  query?: string;
+  players?: AdminPlayerSummary[];
+}
+
+export interface MsgAdminPlayerUpdate extends MsgBase {
+  proto: "MsgAdminPlayerUpdate";
+  result?: boolean;
+  logStr?: string;
+  action: "rename" | "resetPassword";
+  targetAccount?: string;
+  displayName?: string;
+  player?: AdminPlayerSummary | null;
+  temporaryPassword?: string | null;
 }
 
 // ── 联合类型（用于分发时的类型收窄）──────────────────────────────────────
@@ -1390,6 +1436,8 @@ export type AnyMsg =
   | MsgRulesetState
   | MsgAdminOperations
   | MsgAdminDeploy
+  | MsgAdminPlayerSearch
+  | MsgAdminPlayerUpdate
   | MsgBugReport
   | MsgChatMsg
   | MsgGlobalAnnouncement

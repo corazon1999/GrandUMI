@@ -117,6 +117,8 @@ public sealed record PlayerProfileStatsSnapshot(
     IReadOnlyList<PlayerLeaderStatsItem> TopLeaders,
     IReadOnlyList<PlayerStatsTrendPoint> Trend);
 
+public sealed record DailyMatchCountPoint(string Date, int Count);
+
 /// <summary>
 /// Leader 排行榜的逐局事实存储。以 match_id 幂等写入，榜单按时间窗口即时聚合。
 /// </summary>
@@ -275,6 +277,47 @@ public sealed class LeaderStatsStore
             transaction.Commit();
             if (inserted) _leaderboardCache.Clear();
             return inserted;
+        }
+    }
+
+    /// <summary>按 UTC+8 自然日统计已完成的真人对局；不包含机器人局和同账号测试局。</summary>
+    public IReadOnlyList<DailyMatchCountPoint> GetRecentDailyMatchCounts(int days, DateTime? nowUtc = null)
+    {
+        if (days is < 1 or > 45) throw new ArgumentOutOfRangeException(nameof(days));
+        var now = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        var localToday = now.AddHours(8).Date;
+        var firstLocalDate = localToday.AddDays(-(days - 1));
+        var firstUtc = DateTime.SpecifyKind(firstLocalDate.AddHours(-8), DateTimeKind.Utc);
+        var endUtc = DateTime.SpecifyKind(localToday.AddDays(1).AddHours(-8), DateTimeKind.Utc);
+
+        lock (_lock)
+        {
+            Initialize();
+            if (!File.Exists(_leaderboardDatabasePath))
+                throw new FileNotFoundException("对局统计数据源不存在。", _leaderboardDatabasePath);
+
+            using var connection = OpenLeaderboardConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT date(ended_at_utc, '+8 hours') AS local_date, COUNT(*)
+                FROM match_results
+                WHERE ended_at_utc >= $firstUtc
+                  AND ended_at_utc < $endUtc
+                  AND match_kind <> 'Bot'
+                  AND player0_key <> player1_key
+                GROUP BY local_date
+                ORDER BY local_date;
+                """;
+            command.Parameters.AddWithValue("$firstUtc", ToDatabaseUtc(firstUtc));
+            command.Parameters.AddWithValue("$endUtc", ToDatabaseUtc(endUtc));
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) counts[reader.GetString(0)] = reader.GetInt32(1);
+
+            return Enumerable.Range(0, days)
+                .Select(offset => firstLocalDate.AddDays(offset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .Select(date => new DailyMatchCountPoint(date, counts.GetValueOrDefault(date)))
+                .ToArray();
         }
     }
 

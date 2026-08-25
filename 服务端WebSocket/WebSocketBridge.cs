@@ -36,7 +36,7 @@ public static class WebSocketBridge
     {
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
-        "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations",
+        "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
@@ -89,6 +89,7 @@ public static class WebSocketBridge
     private static AccountAuthenticationStore _accountAuthenticationStore = null!;
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryStore;
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryReadStore;
+    private static AdminOperationsMetricsCache? _adminOperationsMetricsCache;
     private static AdminDeploymentCoordinator? _adminDeploymentCoordinator;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
@@ -122,6 +123,7 @@ public static class WebSocketBridge
         AccountAuthenticationStore accountAuthenticationStore,
         OnlinePlayerHistoryStore? onlinePlayerHistoryStore = null,
         OnlinePlayerHistoryStore? onlinePlayerHistoryReadStore = null,
+        AdminOperationsMetricsCache? adminOperationsMetricsCache = null,
         AdminDeploymentCoordinator? adminDeploymentCoordinator = null)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
@@ -129,6 +131,7 @@ public static class WebSocketBridge
             ?? throw new ArgumentNullException(nameof(accountAuthenticationStore));
         _onlinePlayerHistoryStore = onlinePlayerHistoryStore;
         _onlinePlayerHistoryReadStore = onlinePlayerHistoryReadStore ?? onlinePlayerHistoryStore;
+        _adminOperationsMetricsCache = adminOperationsMetricsCache;
         _adminDeploymentCoordinator = adminDeploymentCoordinator;
         _cts.Cancel();
         _cts.Dispose();
@@ -329,6 +332,8 @@ public static class WebSocketBridge
             case "MsgActivateRuleset": OnActivateRuleset(session, msg); break;
             case "MsgAdminOperations": OnAdminOperations(session); break;
             case "MsgAdminDeploy": OnAdminDeploy(session, msg); break;
+            case "MsgAdminPlayerSearch": OnAdminPlayerSearch(session, msg); break;
+            case "MsgAdminPlayerUpdate": OnAdminPlayerUpdate(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -522,7 +527,7 @@ public static class WebSocketBridge
         }
     }
 
-    private static void SupersedeSession(WsSession session)
+    private static void SupersedeSession(WsSession session, string reason = SessionReplacedMessage)
     {
         _ = Task.Run(async () =>
         {
@@ -531,8 +536,8 @@ public static class WebSocketBridge
                 await session.EnqueueTerminalAsync(new
                 {
                     proto = "MsgSessionReplaced",
-                    reason = SessionReplacedMessage,
-                    logStr = SessionReplacedMessage,
+                    reason,
+                    logStr = reason,
                 });
                 if (session.Socket.State == WebSocketState.Open)
                 {
@@ -3428,11 +3433,112 @@ public static class WebSocketBridge
         }
     }
 
+    private static void OnAdminPlayerSearch(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(session)) return;
+        if (!AdministratorPolicy.IsAuthorized(session.Account))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = false, logStr = "没有管理玩家账号的权限" });
+            return;
+        }
+        if (!session.TryConsumeRateLimit("admin-player-search", capacity: 10, refillPerSecond: 0.5))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = false, logStr = "搜索过于频繁，请稍后再试" });
+            return;
+        }
+
+        try
+        {
+            var players = _playerDataStore.SearchPlayersForAdmin(Str(msg, "query") ?? "")
+                .Select(ToAdminPlayerPayload)
+                .ToArray();
+            Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = true, players });
+        }
+        catch (Exception ex)
+        {
+            var message = ex is PlayerDataValidationException ? ex.Message : "搜索玩家失败，请稍后再试。";
+            LogErr($"管理员搜索玩家失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = false, logStr = message });
+        }
+    }
+
+    private static void OnAdminPlayerUpdate(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(session)) return;
+        if (!AdministratorPolicy.IsAuthorized(session.Account))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminPlayerUpdate", result = false, logStr = "没有管理玩家账号的权限" });
+            return;
+        }
+        if (!session.TryConsumeRateLimit("admin-player-update", capacity: 4, refillPerSecond: 1d / 30d))
+        {
+            Send(session.SessionId, new { proto = "MsgAdminPlayerUpdate", result = false, logStr = "账号操作过于频繁，请稍后再试" });
+            return;
+        }
+
+        var action = Str(msg, "action")?.Trim();
+        var targetAccount = Str(msg, "targetAccount")?.Trim() ?? "";
+        try
+        {
+            string? temporaryPassword = null;
+            if (string.Equals(action, "rename", StringComparison.Ordinal))
+            {
+                var snapshot = _playerDataStore.AdminRenamePlayer(
+                    session.Account!,
+                    targetAccount,
+                    Str(msg, "displayName") ?? "");
+                if (TryGetActiveSession(snapshot.Account, out var targetSession))
+                {
+                    targetSession.PlayerName = snapshot.DisplayName;
+                    SendPlayerData(targetSession, snapshot, "管理员已更新你的昵称");
+                    PushFriendPresenceToFriends(snapshot.Account);
+                }
+                targetAccount = snapshot.Account;
+                Log($"管理员玩家操作 rename：{session.Account} -> {targetAccount}");
+            }
+            else if (string.Equals(action, "resetPassword", StringComparison.Ordinal))
+            {
+                var reset = _accountAuthenticationStore.AdminResetPassword(session.Account!, targetAccount);
+                targetAccount = reset.Account;
+                temporaryPassword = reset.TemporaryPassword;
+                if (TryGetActiveSession(reset.Account, out var targetSession))
+                    SupersedeSession(targetSession, "管理员已重置此账号密码，请使用临时密码重新登录。");
+                Log($"管理员玩家操作 reset_password：{session.Account} -> {targetAccount}");
+            }
+            else
+            {
+                throw new PlayerDataValidationException("不支持的玩家管理操作。");
+            }
+
+            var player = _playerDataStore.SearchPlayersForAdmin(targetAccount)
+                .FirstOrDefault(item => string.Equals(item.Account, targetAccount, StringComparison.OrdinalIgnoreCase));
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminPlayerUpdate",
+                result = true,
+                action,
+                player = player is null ? null : ToAdminPlayerPayload(player),
+                temporaryPassword,
+                logStr = action == "rename" ? "玩家昵称已更新" : "密码已重置；临时密码只在本次结果中显示",
+            });
+        }
+        catch (Exception ex)
+        {
+            var message = ex is PlayerDataValidationException ? ex.Message : "玩家账号操作失败，请稍后再试。";
+            LogErr($"管理员玩家操作失败 {session.Account} -> {targetAccount}: {ex.Message}");
+            Send(session.SessionId, new { proto = "MsgAdminPlayerUpdate", result = false, action, logStr = message });
+        }
+    }
+
     private static void SendAdminOperations(WsSession session, bool? result = null, string? logStr = null)
     {
         IReadOnlyList<OnlinePlayerPeakPoint> peaks7 = [];
         IReadOnlyList<OnlinePlayerPeakPoint> peaks30 = [];
         int? authoritativeOnlineCount = null;
+        IReadOnlyList<DailyMatchCountPoint> matches7 = [];
+        IReadOnlyList<DailyMatchCountPoint> matches30 = [];
+        long? matchesUpdatedAt = null;
+        CachedStorageHealth? storage = null;
         try
         {
             if (_onlinePlayerHistoryReadStore is not null)
@@ -3445,6 +3551,30 @@ public static class WebSocketBridge
         catch (Exception ex)
         {
             LogErr($"读取在线峰值失败：{ex.Message}");
+        }
+
+        try
+        {
+            if (_adminOperationsMetricsCache is not null)
+            {
+                var cachedMatches = _adminOperationsMetricsCache.GetDailyMatchCounts();
+                matches30 = cachedMatches.Points;
+                matches7 = matches30.TakeLast(7).ToArray();
+                matchesUpdatedAt = cachedMatches.RefreshedAt.ToUnixTimeMilliseconds();
+            }
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取每日场次统计失败：{ex.Message}");
+        }
+
+        try
+        {
+            storage = _adminOperationsMetricsCache?.GetStorageHealth();
+        }
+        catch (Exception ex)
+        {
+            LogErr($"读取服务端磁盘状态失败：{ex.Message}");
         }
 
         AdminDeploymentStatus? test = null;
@@ -3469,6 +3599,18 @@ public static class WebSocketBridge
             onlineCount = authoritativeOnlineCount,
             peaks7 = peaks7.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
             peaks30 = peaks30.Select(point => new { date = point.Date, peak = point.Peak }).ToArray(),
+            matches7 = matches7.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
+            matches30 = matches30.Select(point => new { date = point.Date, count = point.Count }).ToArray(),
+            matchesUpdatedAt,
+            storage = storage is null ? null : new
+            {
+                healthy = storage.Snapshot.Healthy,
+                reason = storage.Snapshot.Reason,
+                totalBytes = storage.Snapshot.TotalBytes,
+                availableBytes = storage.Snapshot.AvailableBytes,
+                updatedAt = storage.RefreshedAt.ToUnixTimeMilliseconds(),
+                refreshIntervalHours = (int)storage.RefreshInterval.TotalHours,
+            },
             test = ToDeploymentPayload(test, "test"),
             production = ToDeploymentPayload(production, "production"),
         });
@@ -3483,6 +3625,20 @@ public static class WebSocketBridge
         message = status?.Message ?? "发布执行器未配置。",
         updatedAt = status?.UpdatedAt,
     };
+
+    private static object ToAdminPlayerPayload(AdminPlayerSummary player)
+    {
+        var presence = PresenceOf(player.Account);
+        return new
+        {
+            account = player.Account,
+            displayName = player.DisplayName,
+            createdAt = player.CreatedAt,
+            lastLoginAt = player.LastLoginAt,
+            hasPassword = player.HasPassword,
+            online = presence.Online,
+        };
+    }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。
     /// 限频(1.2s/条)+长度上限(100)防刷屏。瞬时消息,不进对局状态/快照。区别于大厅全局 OnChatMsg(BroadcastAll)。</summary>

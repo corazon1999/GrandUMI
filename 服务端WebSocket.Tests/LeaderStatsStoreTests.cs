@@ -391,6 +391,20 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Equal(1, profile.Wins);
     }
 
+    [Fact]
+    public void 每日场次按UTC加八统计真人完成局并补齐空日期()
+    {
+        var store = CreateStore();
+        store.RecordMatch(Match("day-25", new DateTime(2026, 8, 25, 15, 59, 0, DateTimeKind.Utc), MatchKind.Friendly, "L-A", "L-B", 0, 0, 2));
+        store.RecordMatch(Match("day-26", new DateTime(2026, 8, 25, 16, 1, 0, DateTimeKind.Utc), MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
+        store.RecordMatch(Match("bot", new DateTime(2026, 8, 25, 17, 0, 0, DateTimeKind.Utc), MatchKind.Bot, "L-A", "L-B", 0, 0, 8));
+
+        var points = store.GetRecentDailyMatchCounts(3, new DateTime(2026, 8, 26, 1, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(["2026-08-24", "2026-08-25", "2026-08-26"], points.Select(point => point.Date));
+        Assert.Equal([0, 1, 1], points.Select(point => point.Count));
+    }
+
     private LeaderStatsStore CreateStore()
     {
         Directory.CreateDirectory(_tempDir);

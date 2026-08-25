@@ -273,6 +273,18 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_deck_publication_likes_publication
                 ON deck_publication_likes(publication_id);
 
+            CREATE TABLE IF NOT EXISTS admin_player_audit (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_account  TEXT NOT NULL,
+                target_account TEXT NOT NULL,
+                action         TEXT NOT NULL,
+                detail_json    TEXT NOT NULL DEFAULT '{}',
+                created_at     INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_admin_player_audit_target_created
+                ON admin_player_audit(target_account, created_at DESC);
+
             PRAGMA user_version=5;
             """;
         command.ExecuteNonQuery();
@@ -565,6 +577,93 @@ public sealed class PlayerDataStore
         }
         transaction.Commit();
         return results;
+    }
+
+    public IReadOnlyList<AdminPlayerSummary> SearchPlayersForAdmin(string query, int limit = 20)
+    {
+        var normalizedQuery = (query ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalizedQuery.Length is < 1 or > MaxAccountLength)
+            throw new PlayerDataValidationException($"请输入 1–{MaxAccountLength} 个字符搜索玩家。");
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT p.account, p.display_name, p.created_at, p.last_login_at,
+                   EXISTS(SELECT 1 FROM player_credentials c WHERE c.player_id=p.id)
+            FROM players p
+            WHERE p.account_key LIKE $pattern ESCAPE '\' COLLATE NOCASE
+               OR p.display_name LIKE $pattern ESCAPE '\' COLLATE NOCASE
+            ORDER BY CASE WHEN p.account_key=$exact COLLATE NOCASE THEN 0 ELSE 1 END,
+                     p.last_login_at DESC,
+                     p.account_key
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$pattern", $"%{EscapeLike(normalizedQuery)}%");
+        command.Parameters.AddWithValue("$exact", NormalizeAccountKey(normalizedQuery));
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 20));
+        var results = new List<AdminPlayerSummary>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new AdminPlayerSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetInt64(2),
+                reader.GetInt64(3),
+                reader.GetInt64(4) != 0));
+        }
+        return results;
+    }
+
+    public PlayerDataSnapshot AdminRenamePlayer(string adminAccount, string targetAccount, string displayName)
+    {
+        var normalizedAdmin = ValidateAccount(adminAccount);
+        var name = (displayName ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (name.Length is < 1 or > MaxDisplayNameLength)
+            throw new PlayerDataValidationException($"昵称长度需为 1–{MaxDisplayNameLength} 个字符。");
+        if (name.Any(char.IsControl))
+            throw new PlayerDataValidationException("昵称不能包含控制字符。");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var playerId = RequirePlayerId(connection, transaction, targetAccount);
+        if (DisplayNameInUse(connection, transaction, name, playerId))
+            throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换一个昵称。");
+
+        string canonicalAccount;
+        string previousName;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT account, display_name FROM players WHERE id=$id;";
+            read.Parameters.AddWithValue("$id", playerId);
+            using var reader = read.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("玩家账号不存在。");
+            canonicalAccount = reader.GetString(0);
+            previousName = reader.GetString(1);
+        }
+        if (string.Equals(previousName, name, StringComparison.Ordinal))
+            throw new PlayerDataValidationException("新昵称与当前昵称相同。");
+
+        using (var update = connection.CreateCommand())
+        {
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE players SET display_name=$name, updated_at=$now WHERE id=$id;";
+            update.Parameters.AddWithValue("$name", name);
+            update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            update.Parameters.AddWithValue("$id", playerId);
+            update.ExecuteNonQuery();
+        }
+        InsertAdminAudit(
+            connection,
+            transaction,
+            normalizedAdmin,
+            canonicalAccount,
+            "rename",
+            JsonSerializer.Serialize(new { previousDisplayName = previousName, newDisplayName = name }));
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        transaction.Commit();
+        return snapshot;
     }
 
     /// <summary>将战绩库的不可逆账号哈希映射为当前公开昵称；未命中的账号不会返回。</summary>
@@ -2509,6 +2608,28 @@ public sealed class PlayerDataStore
         using var alter = connection.CreateCommand();
         alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
         alter.ExecuteNonQuery();
+    }
+
+    internal static void InsertAdminAudit(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string adminAccount,
+        string targetAccount,
+        string action,
+        string detailJson)
+    {
+        using var audit = connection.CreateCommand();
+        audit.Transaction = transaction;
+        audit.CommandText = """
+            INSERT INTO admin_player_audit(admin_account, target_account, action, detail_json, created_at)
+            VALUES($admin, $target, $action, $detail, $createdAt);
+            """;
+        audit.Parameters.AddWithValue("$admin", adminAccount);
+        audit.Parameters.AddWithValue("$target", targetAccount);
+        audit.Parameters.AddWithValue("$action", action);
+        audit.Parameters.AddWithValue("$detail", detailJson);
+        audit.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        audit.ExecuteNonQuery();
     }
 
     private static bool DisplayNameInUse(

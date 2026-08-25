@@ -24,6 +24,9 @@ import type {
   CardRulesetSummary,
   AdminDeploymentStatus,
   OnlinePlayerPeakPoint,
+  DailyMatchCountPoint,
+  AdminStorageSnapshot,
+  AdminPlayerSummary,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -61,6 +64,10 @@ export type AdminOperationsState = {
   onlineCount: number | null;
   peaks7: OnlinePlayerPeakPoint[];
   peaks30: OnlinePlayerPeakPoint[];
+  matches7: DailyMatchCountPoint[];
+  matches30: DailyMatchCountPoint[];
+  matchesUpdatedAt: number | null;
+  storage: AdminStorageSnapshot | null;
   test: AdminDeploymentStatus;
   production: AdminDeploymentStatus;
 };
@@ -120,6 +127,8 @@ interface NetStore {
   maintenance: MaintenanceState;
   rulesets: RulesetAdminState;
   adminOperations: AdminOperationsState;
+  adminPlayerSearchResults: AdminPlayerSummary[];
+  adminTemporaryPassword: { account: string; password: string } | null;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
   friends: FriendInfo[];
@@ -180,6 +189,8 @@ interface NetStore {
   setMaintenance: (maintenance: MaintenanceState) => void;
   setRulesets: (rulesets: RulesetAdminState) => void;
   setAdminOperations: (operations: AdminOperationsState) => void;
+  setAdminPlayerSearchResults: (players: AdminPlayerSummary[]) => void;
+  setAdminTemporaryPassword: (value: NetStore["adminTemporaryPassword"]) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
@@ -246,9 +257,15 @@ const initialState = {
     onlineCount: null,
     peaks7: [],
     peaks30: [],
+    matches7: [],
+    matches30: [],
+    matchesUpdatedAt: null,
+    storage: null,
     test: { environment: "test", state: "unavailable", message: "等待服务器状态" },
     production: { environment: "production", state: "unavailable", message: "等待服务器状态" },
   } as AdminOperationsState,
+  adminPlayerSearchResults: [] as AdminPlayerSummary[],
+  adminTemporaryPassword: null as NetStore["adminTemporaryPassword"],
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
   incomingFriendRequests: [] as FriendRequestInfo[],
@@ -338,6 +355,8 @@ export const useNetStore = create<NetStore>((set) => ({
   setMaintenance: (maintenance) => set({ maintenance }),
   setRulesets: (rulesets) => set({ rulesets }),
   setAdminOperations: (adminOperations) => set({ adminOperations }),
+  setAdminPlayerSearchResults: (adminPlayerSearchResults) => set({ adminPlayerSearchResults }),
+  setAdminTemporaryPassword: (adminTemporaryPassword) => set({ adminTemporaryPassword }),
 
   setPlayerList: (list) => set({ playerList: list }),
 

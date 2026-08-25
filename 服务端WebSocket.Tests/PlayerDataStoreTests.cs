@@ -1,4 +1,5 @@
 using GrandUMI.Persistence;
+using System.Text.Json;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -29,6 +30,36 @@ public sealed class PlayerDataStoreTests : IDisposable
 
         Assert.Equal("Alice", afterRestart.Account);
         Assert.Equal("Alice", afterRestart.DisplayName);
+    }
+
+    [Fact]
+    public void 管理员可搜索并改名且保留玩家自己的改名机会和审计记录()
+    {
+        var store = CreateStore();
+        store.Login("TargetAccount");
+        var auth = new AccountAuthenticationStore(store);
+        auth.Initialize();
+        auth.Authenticate("TargetAccount", "target-password", null);
+
+        var result = Assert.Single(store.SearchPlayersForAdmin("target"));
+        Assert.Equal("TargetAccount", result.Account);
+        Assert.True(result.HasPassword);
+
+        var renamed = store.AdminRenamePlayer("释迦", "targetaccount", "新昵称");
+
+        Assert.Equal("新昵称", renamed.DisplayName);
+        Assert.True(renamed.CanChangeDisplayName);
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT admin_account, target_account, action, detail_json FROM admin_player_audit;";
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("释迦", reader.GetString(0));
+        Assert.Equal("TargetAccount", reader.GetString(1));
+        Assert.Equal("rename", reader.GetString(2));
+        using var detail = JsonDocument.Parse(reader.GetString(3));
+        Assert.Equal("新昵称", detail.RootElement.GetProperty("newDisplayName").GetString());
     }
 
     [Fact]

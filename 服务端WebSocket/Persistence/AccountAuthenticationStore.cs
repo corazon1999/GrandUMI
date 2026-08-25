@@ -16,6 +16,7 @@ public sealed record AccountAuthenticationResult(
     string Message);
 
 public sealed record PasswordChangeResult(bool Success, string? AuthToken, string Message);
+public sealed record AdminPasswordResetResult(string Account, string TemporaryPassword);
 
 /// <summary>账号密码与短期会话令牌存储。密码仅以 ASP.NET Core Identity 哈希格式保存。</summary>
 public sealed class AccountAuthenticationStore
@@ -178,6 +179,52 @@ public sealed class AccountAuthenticationStore
         }
     }
 
+    public AdminPasswordResetResult AdminResetPassword(string adminAccount, string targetAccount)
+    {
+        var normalizedAdmin = NormalizeAccount(adminAccount);
+        var normalizedTarget = NormalizeAccount(targetAccount);
+        var accountKey = normalizedTarget.ToUpperInvariant();
+        var accountGate = _accountLocks.GetOrAdd(accountKey, static _ => new object());
+
+        lock (accountGate)
+        {
+            using var connection = OpenConnection();
+            var player = FindPlayer(connection, accountKey)
+                ?? throw new PlayerDataValidationException("玩家账号不存在。");
+            if (string.Equals(normalizedAdmin, player.Account, StringComparison.OrdinalIgnoreCase))
+                throw new PlayerDataValidationException("不能在当前管理员会话中重置自己的密码，请由另一位管理员操作。");
+            var temporaryPassword = CreateTemporaryPassword();
+            using var transaction = connection.BeginTransaction();
+            using (var credential = connection.CreateCommand())
+            {
+                credential.Transaction = transaction;
+                credential.CommandText = """
+                    INSERT INTO player_credentials(player_id, password_hash, created_at, updated_at)
+                    VALUES($playerId, $passwordHash, $now, $now)
+                    ON CONFLICT(player_id) DO UPDATE SET
+                        password_hash=excluded.password_hash,
+                        updated_at=excluded.updated_at;
+                    DELETE FROM player_auth_sessions WHERE player_id=$playerId;
+                    """;
+                credential.Parameters.AddWithValue("$playerId", player.PlayerId);
+                credential.Parameters.AddWithValue(
+                    "$passwordHash",
+                    _passwordHasher.HashPassword(player.Account, temporaryPassword));
+                credential.Parameters.AddWithValue("$now", Now());
+                credential.ExecuteNonQuery();
+            }
+            PlayerDataStore.InsertAdminAudit(
+                connection,
+                transaction,
+                normalizedAdmin,
+                player.Account,
+                "reset_password",
+                "{}");
+            transaction.Commit();
+            return new AdminPasswordResetResult(player.Account, temporaryPassword);
+        }
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(_connectionString);
@@ -301,6 +348,14 @@ public sealed class AccountAuthenticationStore
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
         return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string CreateTemporaryPassword()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+        return new string(Enumerable.Range(0, 18)
+            .Select(_ => alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)])
+            .ToArray());
     }
 
     private static string HashToken(string token)

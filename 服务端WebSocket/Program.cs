@@ -87,6 +87,7 @@ if (string.Equals(RankedStore.Default.DatabasePath, RankedStore.Wild.DatabasePat
     throw new InvalidOperationException("标准排位与狂野排位数据库不能使用同一路径");
 RankedStore.Wild.Initialize();
 Console.WriteLine($"[狂野排位] SQLite: {RankedStore.Wild.DatabasePath}");
+var adminOperationsMetricsCache = new AdminOperationsMetricsCache(LeaderStatsStore.Default);
 
 GameRoomManager.InitializeMaintenance(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
@@ -97,6 +98,7 @@ WebSocketBridge.Initialize(
     accountAuthenticationStore,
     onlinePlayerHistoryStore,
     onlinePlayerHistoryReadStore,
+    adminOperationsMetricsCache,
     adminDeploymentCoordinator);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
