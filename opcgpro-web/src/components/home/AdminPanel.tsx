@@ -27,6 +27,7 @@ function StatusCard({
   value,
   detail,
   tone,
+  className = "",
   onClick,
   expanded,
   controls,
@@ -35,6 +36,7 @@ function StatusCard({
   value: string | number;
   detail: string;
   tone: "emerald" | "amber" | "cyan" | "violet";
+  className?: string;
   onClick?: () => void;
   expanded?: boolean;
   controls?: string;
@@ -76,13 +78,13 @@ function StatusCard({
         aria-expanded={expanded}
         aria-controls={controls}
         data-selected={expanded ? "true" : "false"}
-        className={`min-h-28 min-w-0 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${toneClasses} ${interactiveClasses}`}
+        className={`min-h-28 min-w-0 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${toneClasses} ${interactiveClasses} ${className}`}
       >
         {content}
       </button>
     );
   }
-  return <article className={`min-w-0 rounded-2xl border p-4 ${toneClasses}`}>{content}</article>;
+  return <article className={`min-w-0 rounded-2xl border p-4 ${toneClasses} ${className}`}>{content}</article>;
 }
 
 type InteractiveChartPoint = {
@@ -527,12 +529,6 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             tone={connected ? "emerald" : "amber"}
           />
           <StatusCard
-            label="在线玩家"
-            value={authoritativeOnlineCount}
-            detail="正式服当前在线人数"
-            tone="cyan"
-          />
-          <StatusCard
             label="峰值在线玩家"
             value={todayPeak}
             detail={expandedTrend === "peak" ? "趋势已展开 · 点击收起" : "点击查看近一周/月峰值在线玩家"}
@@ -576,6 +572,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             value={storage ? formatBytes(storage.availableBytes) : "—"}
             detail={usedStoragePercent === null ? "等待低频采样" : `已用 ${usedStoragePercent.toFixed(1)}% · ${storage?.refreshIntervalHours ?? 3} 小时缓存`}
             tone={storage?.healthy === false ? "amber" : "emerald"}
+            className="col-span-2 @[720px]:col-span-3 @[1040px]:col-span-2"
           />
         </div>
 

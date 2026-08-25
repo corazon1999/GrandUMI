@@ -36,6 +36,16 @@ test("峰值在线玩家标题统一且可查看近一周和近一月趋势", ()
   assert.match(types, /interface OnlinePlayerPeakPoint/);
 });
 
+test("统计区移除当前在线玩家卡并保留峰值趋势与快捷入口", () => {
+  assert.doesNotMatch(admin, /label="在线玩家"/);
+  assert.doesNotMatch(admin, /detail="正式服当前在线人数"/);
+  assert.match(admin, /label="峰值在线玩家"/);
+  assert.match(admin, /controls="online-peak-panel"/);
+  assert.match(admin, /<span className="block text-sm font-black text-white">在线玩家<\/span>/);
+  assert.match(admin, /typeof authoritativeOnlineCount === "number"/);
+  assert.match(admin, /className="col-span-2 @\[720px\]:col-span-3 @\[1040px\]:col-span-2"/);
+});
+
 test("三个趋势统计卡互斥展开且再次点击当前卡可收起", () => {
   assert.match(admin, /type ExpandedTrend = "peak" \| "dailyActive" \| "matches" \| null/);
   assert.equal([...admin.matchAll(/useState<ExpandedTrend>\(null\)/g)].length, 1);
