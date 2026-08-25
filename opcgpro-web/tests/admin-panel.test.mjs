@@ -23,7 +23,7 @@ test("管理员控制台集中展示服务状态和管理能力", () => {
 
 test("峰值在线玩家标题统一且可查看近一周和近一月趋势", () => {
   assert.match(admin, /controls="online-peak-panel"/);
-  assert.match(admin, /setShowPeakChart/);
+  assert.match(admin, /toggleTrend\("peak"\)/);
   assert.match(admin, /<PlayerCountChart/);
   assert.match(admin, /peakRange === range/);
   assert.match(admin, /chartName="峰值在线玩家"/);
@@ -34,6 +34,26 @@ test("峰值在线玩家标题统一且可查看近一周和近一月趋势", ()
   assert.match(store, /peaks7: \[\]/);
   assert.match(admin, /adminOperations\.onlineCount \?\? "—"/);
   assert.match(types, /interface OnlinePlayerPeakPoint/);
+});
+
+test("三个趋势统计卡互斥展开且再次点击当前卡可收起", () => {
+  assert.match(admin, /type ExpandedTrend = "peak" \| "dailyActive" \| "matches" \| null/);
+  assert.equal([...admin.matchAll(/useState<ExpandedTrend>\(null\)/g)].length, 1);
+  assert.match(admin, /setExpandedTrend\(\(current\) => current === trend \? null : trend\)/);
+  assert.match(admin, /expandedTrend === "peak" &&/);
+  assert.match(admin, /expandedTrend === "dailyActive" &&/);
+  assert.match(admin, /expandedTrend === "matches" &&/);
+  assert.doesNotMatch(admin, /setShow(?:Peak|DailyActive|Match)Chart/);
+});
+
+test("趋势统计卡明确显示选中与收起状态并关联对应面板", () => {
+  assert.match(admin, /aria-expanded=\{expanded\}/);
+  assert.match(admin, /aria-controls=\{controls\}/);
+  assert.match(admin, /data-selected=\{expanded \? "true" : "false"\}/);
+  assert.match(admin, /expanded \? "已展开" : "点击查看"/);
+  assert.match(admin, /expanded \? "▲" : "▼"/);
+  assert.match(admin, /border-white\/80 bg-gray-800\/90 shadow-/);
+  assert.equal([...admin.matchAll(/controls="(?:online-peak|daily-active|daily-match)-panel"/g)].length, 3);
 });
 
 test("日活玩家按正式服口径提供今日值和近一周一月趋势", () => {

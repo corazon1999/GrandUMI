@@ -20,6 +20,8 @@ type AdminPanelProps = {
   onReturnToLobby: () => void;
 };
 
+type ExpandedTrend = "peak" | "dailyActive" | "matches" | null;
+
 function StatusCard({
   label,
   value,
@@ -44,9 +46,24 @@ function StatusCard({
     violet: "border-violet-800/70 bg-violet-950/20 text-violet-300",
   }[tone];
 
+  const interactiveClasses = expanded
+    ? "border-white/80 bg-gray-800/90 shadow-[0_0_0_2px_rgba(255,255,255,0.16),0_0_24px_rgba(34,211,238,0.18)]"
+    : "hover:-translate-y-0.5 hover:border-cyan-400";
+
   const content = (
     <>
-      <p className="text-xs font-bold tracking-[0.12em] text-gray-400">{label}</p>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className="min-w-0 text-xs font-bold tracking-[0.12em] text-gray-400">{label}</p>
+        {onClick && (
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-black leading-none ${expanded ? "border-white/60 bg-white/15 text-white" : "border-current/30 bg-black/20"}`}
+            aria-hidden="true"
+          >
+            {expanded ? "已展开" : "点击查看"}
+            <span className="text-sm leading-none">{expanded ? "▲" : "▼"}</span>
+          </span>
+        )}
+      </div>
       <p className="mt-3 truncate text-2xl font-black text-white">{value}</p>
       <p className="mt-1 text-left text-xs">{detail}</p>
     </>
@@ -58,7 +75,8 @@ function StatusCard({
         onClick={onClick}
         aria-expanded={expanded}
         aria-controls={controls}
-        className={`min-h-28 min-w-0 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${toneClasses}`}
+        data-selected={expanded ? "true" : "false"}
+        className={`min-h-28 min-w-0 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${toneClasses} ${interactiveClasses}`}
       >
         {content}
       </button>
@@ -338,11 +356,9 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const adminTemporaryPassword = useNetStore((state) => state.adminTemporaryPassword);
   const [announcement, setAnnouncement] = useState("");
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
-  const [showPeakChart, setShowPeakChart] = useState(false);
+  const [expandedTrend, setExpandedTrend] = useState<ExpandedTrend>(null);
   const [peakRange, setPeakRange] = useState<7 | 30>(7);
-  const [showDailyActiveChart, setShowDailyActiveChart] = useState(false);
   const [dailyActiveRange, setDailyActiveRange] = useState<7 | 30>(7);
-  const [showMatchChart, setShowMatchChart] = useState(false);
   const [matchRange, setMatchRange] = useState<7 | 30>(7);
   const [playerQuery, setPlayerQuery] = useState("");
   const [selectedPlayerAccount, setSelectedPlayerAccount] = useState<string | null>(null);
@@ -359,6 +375,10 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
     ? Math.max(0, Math.min(100, ((storage.totalBytes - storage.availableBytes) / storage.totalBytes) * 100))
     : null;
   const selectedPlayer = adminPlayerSearchResults.find((player) => player.account === selectedPlayerAccount) ?? null;
+
+  const toggleTrend = (trend: Exclude<ExpandedTrend, null>) => {
+    setExpandedTrend((current) => current === trend ? null : trend);
+  };
 
   useEffect(() => {
     if (!connected || !maintenance.canManage) return;
@@ -515,28 +535,28 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           <StatusCard
             label="峰值在线玩家"
             value={todayPeak}
-            detail={showPeakChart ? "点击收起峰值在线玩家趋势" : "点击查看近一周/月峰值在线玩家"}
+            detail={expandedTrend === "peak" ? "趋势已展开 · 点击收起" : "点击查看近一周/月峰值在线玩家"}
             tone="cyan"
-            onClick={() => setShowPeakChart((visible) => !visible)}
-            expanded={showPeakChart}
+            onClick={() => toggleTrend("peak")}
+            expanded={expandedTrend === "peak"}
             controls="online-peak-panel"
           />
           <StatusCard
             label="日活玩家"
             value={todayDailyActive}
-            detail={showDailyActiveChart ? "点击收起日活玩家趋势" : "点击查看近一周/月日活玩家"}
+            detail={expandedTrend === "dailyActive" ? "趋势已展开 · 点击收起" : "点击查看近一周/月日活玩家"}
             tone="cyan"
-            onClick={() => setShowDailyActiveChart((visible) => !visible)}
-            expanded={showDailyActiveChart}
+            onClick={() => toggleTrend("dailyActive")}
+            expanded={expandedTrend === "dailyActive"}
             controls="daily-active-panel"
           />
           <StatusCard
             label="今日完成场次"
             value={todayMatches}
-            detail={showMatchChart ? "点击收起场次趋势" : "点击查看近一周/月场次"}
+            detail={expandedTrend === "matches" ? "趋势已展开 · 点击收起" : "点击查看近一周/月场次"}
             tone="violet"
-            onClick={() => setShowMatchChart((visible) => !visible)}
-            expanded={showMatchChart}
+            onClick={() => toggleTrend("matches")}
+            expanded={expandedTrend === "matches"}
             controls="daily-match-panel"
           />
           <StatusCard
@@ -559,7 +579,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           />
         </div>
 
-        {showPeakChart && (
+        {expandedTrend === "peak" && (
           <section id="online-peak-panel" aria-label="峰值在线玩家" className="mt-4 rounded-2xl border border-cyan-900/70 bg-cyan-950/15 p-4 @[640px]:p-5">
             <div className="flex flex-col gap-3 @[520px]:flex-row @[520px]:items-center @[520px]:justify-between">
               <div>
@@ -594,7 +614,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           </section>
         )}
 
-        {showDailyActiveChart && (
+        {expandedTrend === "dailyActive" && (
           <section id="daily-active-panel" aria-label="日活玩家" className="mt-4 rounded-2xl border border-sky-900/70 bg-sky-950/15 p-4 @[640px]:p-5">
             <div className="flex flex-col gap-3 @[520px]:flex-row @[520px]:items-center @[520px]:justify-between">
               <div>
@@ -623,7 +643,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           </section>
         )}
 
-        {showMatchChart && (
+        {expandedTrend === "matches" && (
           <section id="daily-match-panel" aria-label="每日完成场次" className="mt-4 rounded-2xl border border-violet-900/70 bg-violet-950/15 p-4 @[640px]:p-5">
             <div className="flex flex-col gap-3 @[520px]:flex-row @[520px]:items-center @[520px]:justify-between">
               <div>
