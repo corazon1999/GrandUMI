@@ -11,7 +11,8 @@ test("排位榜返回前100并在底部固定显示当前玩家", async () => {
     readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs"),
   ]);
 
-  assert.match(rankedStore, /global_rank <= 100 OR faction_rank <= 100 OR account_key = \$currentAccountKey/);
+  assert.match(rankedStore, /entry\.Item\.Rank <= 100[\s\S]*entry\.Item\.FactionRank <= 100[\s\S]*entry\.AccountKey, player\.Profile\.AccountKey/);
+  assert.match(rankedStore, /ReadRankedLeaderboardEntries/);
   assert.match(rankedStore, /isCurrentPlayer = value\.IsCurrentPlayer/);
   assert.match(types, /isCurrentPlayer\?: boolean/);
   assert.match(panel, /item\.rank <= 100/);

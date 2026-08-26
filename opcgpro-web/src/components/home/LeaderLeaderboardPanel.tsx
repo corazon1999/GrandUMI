@@ -8,6 +8,7 @@ import { leaderMatchupKey, useNetStore } from "@/store/netStore";
 import { getCard, loadAllCards } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { formatRankBounty } from "@/lib/rankBounty";
+import { isRankSnapshotStale } from "@/lib/rankSnapshotState";
 import { LeaderChampionBadge, LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import RankTierBadge from "@/components/ui/RankTierBadge";
 import Modal from "@/components/ui/Modal";
@@ -321,6 +322,7 @@ export default function LeaderLeaderboardPanel() {
   const rankProfiles = useNetStore((s) => s.rankProfiles);
   const rankLeaderboards = useNetStore((s) => s.rankLeaderboards);
   const factionStandingsByMode = useNetStore((s) => s.factionStandingsByMode);
+  const rankSnapshotRequests = useNetStore((s) => s.rankSnapshotRequests);
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
@@ -332,9 +334,12 @@ export default function LeaderLeaderboardPanel() {
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
   const [championRulesOpen, setChampionRulesOpen] = useState(false);
+  const [rankSnapshotClock, setRankSnapshotClock] = useState(() => Date.now());
   const rankProfile = rankProfiles[rankedMode];
   const rankLeaderboard = rankLeaderboards[rankedMode];
   const factionStandings = factionStandingsByMode[rankedMode];
+  const rankSnapshotRequest = rankSnapshotRequests[rankedMode];
+  const rankSnapshotStale = isRankSnapshotStale(rankSnapshotRequest.generatedAtUtc, rankSnapshotClock);
 
   const request = (nextPeriod: LeaderboardPeriod) => {
     setSelectedLeader(null);
@@ -373,6 +378,13 @@ export default function LeaderLeaderboardPanel() {
   useEffect(() => {
     if (rankingTab === "ranked" && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
   }, [rankProfile, rankedMode, rankingTab]);
+
+  useEffect(() => {
+    if (rankingTab !== "ranked" || !rankSnapshotRequest.generatedAtUtc) return;
+    setRankSnapshotClock(Date.now());
+    const timer = setInterval(() => setRankSnapshotClock(Date.now()), 5_000);
+    return () => clearInterval(timer);
+  }, [rankSnapshotRequest.generatedAtUtc, rankingTab]);
 
   useEffect(() => {
     if (
@@ -511,7 +523,15 @@ export default function LeaderLeaderboardPanel() {
         </div> : <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400 @[640px]:text-xs">
           <span>赛季 <strong className="ml-1 text-white">{rankProfile?.seasonId ?? "加载中"}</strong></span>
           <span>已上榜 <strong className="ml-1 text-white">{rankLeaderboard.length}</strong> 名玩家</span>
-          <span className="text-gray-600">{rankedMode === "standard" ? "标准排位" : "狂野排位"}完成定级后进入排行榜</span>
+          <span className="text-emerald-400/80">个人积分实时</span>
+          <span className="text-gray-500">公共榜单约每 15 秒更新</span>
+          {rankSnapshotRequest.generatedAtUtc && (
+            <span className={rankSnapshotStale ? "font-bold text-amber-300" : "text-gray-600"}>
+              {rankSnapshotStale ? "当前显示上一版 · " : ""}
+              更新于 {formatGeneratedAt(rankSnapshotRequest.generatedAtUtc, locale)}
+            </span>
+          )}
+          {rankSnapshotRequest.phase === "loading" && <span className="text-violet-300">正在刷新…</span>}
         </div>}
         {rankingTab === "leader" && <div className="flex w-full flex-wrap items-center gap-2 @[640px]:w-auto">
           <div className="grid flex-1 grid-cols-2 rounded-lg border border-gray-800 bg-gray-950 p-1 @[640px]:flex-none">
@@ -545,8 +565,42 @@ export default function LeaderLeaderboardPanel() {
         </div>}
       </div>
 
+      {rankingTab === "ranked" && rankProfile && (rankSnapshotRequest.phase === "error" || rankSnapshotStale) && (
+        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 @[640px]:flex-row @[640px]:items-center @[640px]:justify-between @[640px]:text-xs">
+          <p>
+            {rankSnapshotRequest.phase === "error"
+              ? rankSnapshotRequest.error
+              : "公共榜单更新有延迟，当前继续显示上一版成功数据。"}
+            <span className="ml-1 text-emerald-300">你的个人积分仍是实时数据。</span>
+          </p>
+          {rankSnapshotRequest.retryable && (
+            <button
+              type="button"
+              onClick={() => HomeRequest.requestRankSnapshot(rankedMode)}
+              className="min-h-11 min-w-11 shrink-0 rounded-lg border border-amber-400/50 px-4 font-bold text-amber-100 transition-colors hover:bg-amber-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              重试加载
+            </button>
+          )}
+        </div>
+      )}
+
       <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-clip @[640px]:overflow-hidden" : "overflow-clip @[640px]:touch-pan-y @[640px]:overflow-auto @[640px]:overscroll-contain @[640px]:[-webkit-overflow-scrolling:touch]"}`}>
-        {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : (
+        {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : rankSnapshotRequest.phase === "error" ? (
+          <div className="px-4 py-16 text-center">
+            <p className="text-sm font-bold text-red-400">{rankSnapshotRequest.error ?? "排位榜暂时不可用"}</p>
+            <p className="mt-2 text-xs text-gray-600">请确认网络已连接，然后重新请求。</p>
+            {rankSnapshotRequest.retryable && (
+              <button
+                type="button"
+                onClick={() => HomeRequest.requestRankSnapshot(rankedMode)}
+                className="mt-4 min-h-11 min-w-11 rounded-lg border border-gray-700 px-5 text-sm font-bold text-gray-200 transition-colors hover:border-violet-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                重试
+              </button>
+            )}
+          </div>
+        ) : (
           <p className="py-16 text-center text-sm text-gray-600">正在加载{rankedMode === "standard" ? "标准" : "狂野"}排位榜…</p>
         ) : loading ? (
           <p className="py-16 text-center text-sm text-gray-600">正在加载排行榜…</p>
@@ -556,7 +610,7 @@ export default function LeaderLeaderboardPanel() {
             <button
               type="button"
               onClick={() => request(period)}
-              className="mt-3 rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-orange-500"
+              className="mt-3 min-h-11 min-w-11 rounded-lg border border-gray-700 px-4 text-xs text-gray-300 hover:border-orange-500"
             >
               重试
             </button>

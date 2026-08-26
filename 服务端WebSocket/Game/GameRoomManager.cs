@@ -1991,16 +1991,35 @@ public static class GameRoomManager
             var players = new[] { settlement.Player0, settlement.Player1 };
             for (var i = 0; i < 2; i++)
             {
-                var snapshot = store.GetSnapshot(room.PlayerAccounts[i], room.PlayerDisplayNames[i]);
-                WebSocketBridge.Send(room.PlayerSessionIds[i], new
+                try
                 {
-                    proto = "MsgRankResult",
-                    mode = RankedModeWire.Value(mode),
-                    result = RankWire.Settlement(players[i]),
-                    profile = RankWire.Profile(snapshot.Profile),
-                    leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
-                    factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
-                });
+                    var snapshot = store.GetSnapshot(room.PlayerAccounts[i], room.PlayerDisplayNames[i]);
+                    WebSocketBridge.Send(room.PlayerSessionIds[i], new
+                    {
+                        proto = "MsgRankResult",
+                        mode = RankedModeWire.Value(mode),
+                        result = RankWire.Settlement(players[i]),
+                        profile = RankWire.Profile(snapshot.Profile),
+                        leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+                        factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
+                        snapshotVersion = snapshot.SnapshotVersion,
+                        generatedAtUtc = snapshot.GeneratedAtUtc,
+                    });
+                }
+                catch (RankLeaderboardUnavailableException ex)
+                {
+                    // 结算已权威落库；公共榜单不可用时仍立即回传实时个人积分和结算。
+                    var profile = store.GetProfileSnapshot(room.PlayerAccounts[i], room.PlayerDisplayNames[i]);
+                    WebSocketBridge.Send(room.PlayerSessionIds[i], new
+                    {
+                        proto = "MsgRankResult",
+                        mode = RankedModeWire.Value(mode),
+                        result = RankWire.Settlement(players[i]),
+                        profile = RankWire.Profile(profile),
+                        leaderboardError = "排位榜暂时未更新，个人积分已实时结算",
+                    });
+                    Console.Error.WriteLine($"[排位榜] 对局 {room.RoomId} 返回上一版失败：{ex.Message}");
+                }
             }
 
             var winnerIndex = room.Engine.State.WinnerIndex.GetValueOrDefault();

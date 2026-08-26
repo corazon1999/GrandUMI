@@ -328,7 +328,7 @@ public static class WebSocketBridge
             case "MsgCopyDeckPlaza": OnCopyDeckPlaza(session, msg); break;
             case "MsgDeleteDeckPlaza": OnDeleteDeckPlaza(session, msg); break;
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
-            case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode"))); break;
+            case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode")), Str(msg, "requestId")); break;
             case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -1459,9 +1459,24 @@ public static class WebSocketBridge
             MatchAccountReservations.TryRemove(new KeyValuePair<string, string>(account, ownerSessionId));
     }
 
-    private static void SendRankSnapshot(WsSession session, RankedMode mode = RankedMode.Standard)
+    private static void SendRankSnapshot(
+        WsSession session,
+        RankedMode mode = RankedMode.Standard,
+        string? requestId = null)
     {
-        if (session.Account is null) return;
+        if (session.Account is null)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgRankSnapshot",
+                mode = RankedModeWire.Value(mode),
+                requestId,
+                result = false,
+                error = "请先登录后再加载排位榜",
+                retryable = false,
+            });
+            return;
+        }
         try
         {
             var snapshot = RankedStore.ForMode(mode).GetSnapshot(session.Account, session.PlayerName);
@@ -1469,14 +1484,27 @@ public static class WebSocketBridge
             {
                 proto = "MsgRankSnapshot",
                 mode = RankedModeWire.Value(mode),
+                requestId,
+                result = true,
                 profile = RankWire.Profile(snapshot.Profile),
                 leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
                 factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
+                snapshotVersion = snapshot.SnapshotVersion,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
             });
         }
         catch (Exception ex)
         {
             LogErr($"排位资料读取失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new
+            {
+                proto = "MsgRankSnapshot",
+                mode = RankedModeWire.Value(mode),
+                requestId,
+                result = false,
+                error = "排位榜暂时不可用，请稍后重试",
+                retryable = true,
+            });
         }
     }
 
@@ -1517,6 +1545,8 @@ public static class WebSocketBridge
                 profile = RankWire.Profile(snapshot.Profile),
                 leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
                 factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
+                snapshotVersion = snapshot.SnapshotVersion,
+                generatedAtUtc = snapshot.GeneratedAtUtc,
             });
         }
         catch (Exception ex)

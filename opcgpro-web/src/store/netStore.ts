@@ -1,4 +1,14 @@
 import { create } from "zustand";
+import {
+  INITIAL_RANK_SNAPSHOT_REQUEST_STATE,
+  acceptRankSnapshot,
+  beginRankSnapshotRequest as beginRankSnapshotRequestState,
+  failRankSnapshotRequest as failRankSnapshotRequestState,
+  shouldReplaceRankProfile,
+  transitionRankSnapshotSeason,
+  type IncomingRankSnapshotMetadata,
+  type RankSnapshotRequestState,
+} from "@/lib/rankSnapshotState";
 import type {
   PlayerInfo,
   FriendInfo,
@@ -122,6 +132,7 @@ interface NetStore {
   rankProfiles: Record<RankedMode, RankProfileSnapshot | null>;
   rankLeaderboards: Record<RankedMode, RankLeaderboardItem[]>;
   factionStandingsByMode: Record<RankedMode, FactionStanding[]>;
+  rankSnapshotRequests: Record<RankedMode, RankSnapshotRequestState>;
   lastRankResult: RankPlayerSettlement | null;
   // 房间码
   roomCode: string | null;
@@ -185,7 +196,18 @@ interface NetStore {
   setMatchQueueKind: (kind: MatchQueueKind) => void;
   setSelectedDeck: (deck: SelectedDeck | null) => void;
   setOpponentName: (name: string) => void;
-  setRankSnapshot: (mode: RankedMode, profile: RankProfileSnapshot, leaderboard: RankLeaderboardItem[], factionStandings?: FactionStanding[]) => void;
+  beginRankSnapshotRequest: (mode: RankedMode, requestId: string) => void;
+  failRankSnapshotRequest: (mode: RankedMode, requestId: string | null, error: string, retryable?: boolean) => void;
+  setRankProfile: (mode: RankedMode, profile: RankProfileSnapshot) => void;
+  setRankSnapshot: (
+    mode: RankedMode,
+    profile: RankProfileSnapshot,
+    leaderboard: RankLeaderboardItem[],
+    factionStandings: FactionStanding[] | undefined,
+    metadata?: Omit<IncomingRankSnapshotMetadata, "seasonId"> & {
+      allowSameSeasonProfileRegression?: boolean;
+    },
+  ) => void;
   setLastRankResult: (result: RankPlayerSettlement | null) => void;
   setRoomCode: (code: string | null) => void;
   setRoomOperation: (operation: RoomOperation) => void;
@@ -249,6 +271,10 @@ const initialState = {
   rankProfiles: { standard: null, wild: null } as Record<RankedMode, RankProfileSnapshot | null>,
   rankLeaderboards: { standard: [], wild: [] } as Record<RankedMode, RankLeaderboardItem[]>,
   factionStandingsByMode: { standard: [], wild: [] } as Record<RankedMode, FactionStanding[]>,
+  rankSnapshotRequests: {
+    standard: { ...INITIAL_RANK_SNAPSHOT_REQUEST_STATE },
+    wild: { ...INITIAL_RANK_SNAPSHOT_REQUEST_STATE },
+  } as Record<RankedMode, RankSnapshotRequestState>,
   lastRankResult: null as RankPlayerSettlement | null,
   roomCode: null as string | null,
   roomOperation: "idle" as RoomOperation,
@@ -335,21 +361,71 @@ export const useNetStore = create<NetStore>((set) => ({
   setSelectedDeck: (deck) => set({ selectedDeck: deck }),
 
   setOpponentName: (name) => set({ opponentName: name }),
-  setRankSnapshot: (mode, rankProfile, rankLeaderboard, factionStandings = []) => set((state) => {
-    // 排位结算与大厅快照可能由不同异步请求返回。拒绝同赛季局数更旧的快照，
-    // 避免胜利结算刚更新后又被在途旧响应短暂覆盖，随后再“自行恢复”。
+  beginRankSnapshotRequest: (mode, requestId) => set((state) => ({
+    rankSnapshotRequests: {
+      ...state.rankSnapshotRequests,
+      [mode]: beginRankSnapshotRequestState(state.rankSnapshotRequests[mode], requestId),
+    },
+  })),
+  failRankSnapshotRequest: (mode, requestId, error, retryable = true) => set((state) => ({
+    rankSnapshotRequests: {
+      ...state.rankSnapshotRequests,
+      [mode]: failRankSnapshotRequestState(state.rankSnapshotRequests[mode], requestId, error, retryable),
+    },
+  })),
+  setRankProfile: (mode, rankProfile) => set((state) => {
     const current = state.rankProfiles[mode];
-    if (current?.seasonId === rankProfile.seasonId
-        && rankProfile.games < current.games)
-      return {};
+    if (!shouldReplaceRankProfile(current, rankProfile)) return {};
+    const seasonTransition = transitionRankSnapshotSeason(
+      state.rankSnapshotRequests[mode],
+      rankProfile.seasonId,
+    );
     const rankProfiles = { ...state.rankProfiles, [mode]: rankProfile };
-    const rankLeaderboards = { ...state.rankLeaderboards, [mode]: rankLeaderboard };
-    const factionStandingsByMode = { ...state.factionStandingsByMode, [mode]: factionStandings };
+    return {
+      rankProfiles,
+      ...(seasonTransition.clearPublicSnapshot ? {
+        rankLeaderboards: { ...state.rankLeaderboards, [mode]: [] },
+        factionStandingsByMode: { ...state.factionStandingsByMode, [mode]: [] },
+        rankSnapshotRequests: {
+          ...state.rankSnapshotRequests,
+          [mode]: seasonTransition.state,
+        },
+      } : {}),
+      ...(mode === "standard" ? {
+        rankProfile,
+        ...(seasonTransition.clearPublicSnapshot ? { rankLeaderboard: [] } : {}),
+      } : {}),
+    };
+  }),
+  setRankSnapshot: (mode, rankProfile, rankLeaderboard, factionStandings = [], metadata = {}) => set((state) => {
+    const accepted = acceptRankSnapshot(state.rankSnapshotRequests[mode], {
+      ...metadata,
+      seasonId: rankProfile.seasonId,
+    });
+    const currentProfile = state.rankProfiles[mode];
+    const replaceProfile = shouldReplaceRankProfile(
+      currentProfile,
+      rankProfile,
+      metadata.allowSameSeasonProfileRegression,
+    );
+    const rankProfiles = replaceProfile
+      ? { ...state.rankProfiles, [mode]: rankProfile }
+      : state.rankProfiles;
+    const rankLeaderboards = accepted.replacePublicSnapshot
+      ? { ...state.rankLeaderboards, [mode]: rankLeaderboard }
+      : state.rankLeaderboards;
+    const factionStandingsByMode = accepted.replacePublicSnapshot
+      ? { ...state.factionStandingsByMode, [mode]: factionStandings }
+      : state.factionStandingsByMode;
     return {
       rankProfiles,
       rankLeaderboards,
       factionStandingsByMode,
-      ...(mode === "standard" ? { rankProfile, rankLeaderboard } : {}),
+      rankSnapshotRequests: { ...state.rankSnapshotRequests, [mode]: accepted.state },
+      ...(mode === "standard" ? {
+        ...(replaceProfile ? { rankProfile } : {}),
+        ...(accepted.replacePublicSnapshot ? { rankLeaderboard } : {}),
+      } : {}),
     };
   }),
   setLastRankResult: (lastRankResult) => set({ lastRankResult }),

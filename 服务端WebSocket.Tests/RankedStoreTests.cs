@@ -44,6 +44,7 @@ public class RankedStoreTests
             Assert.Null(store.RecordMatch("ranked-4", now.AddMinutes(10),
                 "alice", "爱丽丝", "bob-4", "对手4", winnerIndex: 0));
 
+            Assert.True(store.TryRefreshLeaderboardSnapshot(now.AddMinutes(19)));
             var settled = store.GetSnapshot("alice", "爱丽丝", now.AddMinutes(20));
             Assert.Equal(5, settled.Profile.PlacementGames);
             Assert.Equal(5, settled.Profile.Games);
@@ -529,6 +530,7 @@ public class RankedStoreTests
             Assert.NotNull(rankedStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(rankedStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             CompletePlacements(rankedStore, now, "champion-rank");
+            Assert.True(rankedStore.TryRefreshLeaderboardSnapshot(now.AddMinutes(19)));
             var snapshot = rankedStore.GetSnapshot("alice", "爱丽丝", now.AddMinutes(20));
             var item = Assert.Single(snapshot.Leaderboard,
                 entry => entry.DisplayName == "爱丽丝");
@@ -577,6 +579,7 @@ public class RankedStoreTests
                 }
             }
 
+            Assert.True(store.TryRefreshLeaderboardSnapshot(now.AddSeconds(30)));
             var snapshot = store.GetSnapshot("player-101", "玩家101", now.AddMinutes(1));
 
             Assert.Equal(101, snapshot.Leaderboard.Count);

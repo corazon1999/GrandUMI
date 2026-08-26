@@ -99,6 +99,10 @@ if (string.Equals(RankedStore.Default.DatabasePath, RankedStore.Wild.DatabasePat
     throw new InvalidOperationException("标准排位与狂野排位数据库不能使用同一路径");
 RankedStore.Wild.Initialize();
 Console.WriteLine($"[狂野排位] SQLite: {RankedStore.Wild.DatabasePath}");
+if (!RankedStore.Default.TryRefreshLeaderboardSnapshot())
+    Console.Error.WriteLine($"[排位榜] 启动预热失败：{RankedStore.Default.LastLeaderboardRefreshError ?? "正在生成"}");
+if (!RankedStore.Wild.TryRefreshLeaderboardSnapshot())
+    Console.Error.WriteLine($"[狂野排位榜] 启动预热失败：{RankedStore.Wild.LastLeaderboardRefreshError ?? "正在生成"}");
 var adminOperationsMetricsCache = new AdminOperationsMetricsCache(
     LeaderStatsStore.Default,
     onlinePlayerHistoryReadStore);
@@ -216,6 +220,18 @@ app.Lifetime.ApplicationStopping.Register(WebSocketBridge.Stop);
 using var roomExpirationCancellation = new CancellationTokenSource();
 var roomExpirationTask = GameRoomManager.RunExpirationMonitorAsync(roomExpirationCancellation.Token);
 app.Lifetime.ApplicationStopping.Register(roomExpirationCancellation.Cancel);
+using var rankedLeaderboardCancellation = new CancellationTokenSource();
+var standardRankedLeaderboardTask = RankedStore.Default.RunLeaderboardRefreshLoopAsync(
+    RankedStore.LeaderboardRefreshInterval,
+    RankedStore.LeaderboardRefreshInterval,
+    rankedLeaderboardCancellation.Token,
+    error => Console.Error.WriteLine($"[排位榜] 刷新失败，继续服务上一版：{error}"));
+var wildRankedLeaderboardTask = RankedStore.Wild.RunLeaderboardRefreshLoopAsync(
+    RankedStore.LeaderboardRefreshInterval,
+    TimeSpan.FromTicks(RankedStore.LeaderboardRefreshInterval.Ticks / 2),
+    rankedLeaderboardCancellation.Token,
+    error => Console.Error.WriteLine($"[狂野排位榜] 刷新失败，继续服务上一版：{error}"));
+app.Lifetime.ApplicationStopping.Register(rankedLeaderboardCancellation.Cancel);
 Console.WriteLine($"[网络] Kestrel 监听 http://127.0.0.1:{port}，WebSocket 路径 /ws");
 Console.WriteLine($"[构建] version={BuildInfo.Version}, commit={BuildInfo.Commit}, node={BuildInfo.NodeId}");
 
@@ -226,7 +242,9 @@ try
 finally
 {
     roomExpirationCancellation.Cancel();
+    rankedLeaderboardCancellation.Cancel();
     await roomExpirationTask;
+    await Task.WhenAll(standardRankedLeaderboardTask, wildRankedLeaderboardTask);
     GameRoomManager.CaptureAllRecoverySnapshots();
     await RoomRecoverySnapshotStore.FlushAsync();
     WebSocketBridge.Stop();

@@ -339,6 +339,8 @@ export interface MsgSelectRankFaction extends MsgBase {
   profile?: RankProfileSnapshot;
   leaderboard?: RankLeaderboardItem[];
   factionStandings?: FactionStanding[];
+  snapshotVersion?: number;
+  generatedAtUtc?: string;
 }
 
 // 单人测试模式：与机器人对战
@@ -426,9 +428,15 @@ export interface RankPlayerSettlement {
 export interface MsgRankSnapshot extends MsgBase {
   proto: "MsgRankSnapshot";
   mode?: RankedMode;
+  requestId?: string;
+  result?: boolean;
   profile?: RankProfileSnapshot;
   leaderboard?: RankLeaderboardItem[];
   factionStandings?: FactionStanding[];
+  snapshotVersion?: number;
+  generatedAtUtc?: string;
+  error?: string;
+  retryable?: boolean;
 }
 
 export interface MsgRankResult extends MsgBase {
@@ -438,6 +446,9 @@ export interface MsgRankResult extends MsgBase {
   profile?: RankProfileSnapshot;
   leaderboard?: RankLeaderboardItem[];
   factionStandings?: FactionStanding[];
+  snapshotVersion?: number;
+  generatedAtUtc?: string;
+  leaderboardError?: string;
   error?: string;
 }
 

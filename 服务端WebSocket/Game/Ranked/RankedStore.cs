@@ -65,7 +65,16 @@ public sealed record FactionStanding(
 public sealed record RankSnapshot(
     RankProfileSnapshot Profile,
     IReadOnlyList<RankLeaderboardItem> Leaderboard,
-    IReadOnlyList<FactionStanding> FactionStandings);
+    IReadOnlyList<FactionStanding> FactionStandings,
+    long SnapshotVersion,
+    DateTime GeneratedAtUtc);
+
+public sealed class RankLeaderboardUnavailableException : Exception
+{
+    public RankLeaderboardUnavailableException(string message) : base(message)
+    {
+    }
+}
 
 public sealed record RankPlayerSettlement(
     string Account,
@@ -185,6 +194,7 @@ public sealed class RankedStore
     public const int ThreeHundredMillionBountyRankPoints = 3000;
     public const int SixHundredMillionBountyRankPoints = 6000;
     public const int TenBillionBountyRankPoints = 10000;
+    public static readonly TimeSpan LeaderboardRefreshInterval = TimeSpan.FromSeconds(15);
     private static readonly int[] PermanentBountyProtectionFloors =
     [
         TenBillionBountyRankPoints,
@@ -203,17 +213,27 @@ public sealed class RankedStore
     private readonly string _databasePath;
     private readonly string _connectionString;
     private readonly LeaderChampionStore _championStore;
+    private readonly LeaderStatsStore _leaderStatsStore;
+    private readonly SemaphoreSlim _leaderboardRefreshGate = new(1, 1);
+    private PublicLeaderboardSnapshot? _publicLeaderboardSnapshot;
+    private string? _lastLeaderboardRefreshError;
     private bool _initialized;
+
+    internal Action? BeforeLeaderboardSnapshotBuildForTesting { get; set; }
 
     public static RankedStore Default { get; } = new();
     public static RankedStore Wild { get; } = new(ResolveWildDefaultPath());
 
     public static RankedStore ForMode(RankedMode mode) => mode == RankedMode.Wild ? Wild : Default;
 
-    public RankedStore(string? databasePath = null, LeaderChampionStore? championStore = null)
+    public RankedStore(
+        string? databasePath = null,
+        LeaderChampionStore? championStore = null,
+        LeaderStatsStore? leaderStatsStore = null)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
         _championStore = championStore ?? LeaderChampionStore.Default;
+        _leaderStatsStore = leaderStatsStore ?? LeaderStatsStore.Default;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -225,6 +245,7 @@ public sealed class RankedStore
     }
 
     public string DatabasePath => _databasePath;
+    public string? LastLeaderboardRefreshError => Volatile.Read(ref _lastLeaderboardRefreshError);
 
     public static string ResolveDefaultPath()
     {
@@ -310,6 +331,11 @@ public sealed class RankedStore
                     ON ranked_matches(season_id, player0_key, ended_at_utc DESC);
                 CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player1_ended
                     ON ranked_matches(season_id, player1_key, ended_at_utc DESC);
+
+                CREATE TABLE IF NOT EXISTS rank_public_snapshot_state (
+                    id                  INTEGER PRIMARY KEY CHECK(id = 1),
+                    last_version        INTEGER NOT NULL
+                );
                 """;
             command.ExecuteNonQuery();
             _initialized = true;
@@ -318,10 +344,27 @@ public sealed class RankedStore
 
     public RankSnapshot GetSnapshot(string account, string? displayName = null, DateTime? nowUtc = null)
     {
+        var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        // 冷启动同步补热期间仍可能发生结算；先固定公共版本，再读取个人资料，
+        // 确保同一响应里的实时资料不会早于刚生成的公共榜单。
+        var publicSnapshot = GetCurrentPublicSnapshot(SeasonAt(observedAtUtc), observedAtUtc);
+        var player = ReadRealtimePlayer(account, displayName, observedAtUtc);
+        return CombineSnapshot(player, publicSnapshot, account, nowUtc);
+    }
+
+    public RankProfileSnapshot GetProfileSnapshot(string account, string? displayName = null, DateTime? nowUtc = null)
+    {
+        var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        var player = ReadRealtimePlayer(account, displayName, observedAtUtc);
+        return ToSnapshot(player.Profile, player.Season, player.Faction, player.FactionRank, account, nowUtc);
+    }
+
+    private RealtimePlayer ReadRealtimePlayer(string account, string? displayName, DateTime observedAtUtc)
+    {
         lock (_gate)
         {
             Initialize();
-            var season = SeasonAt(nowUtc ?? DateTime.UtcNow);
+            var season = SeasonAt(observedAtUtc);
             using var connection = Open();
             using var transaction = connection.BeginTransaction();
             var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
@@ -331,12 +374,9 @@ public sealed class RankedStore
                 Save(connection, transaction, profile);
             }
             var faction = ReadFaction(connection, transaction, profile.AccountKey);
-            var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
+            var factionRank = FactionRank(connection, season, profile, faction, transaction);
             transaction.Commit();
-            return new RankSnapshot(
-                ToSnapshot(profile, season, faction, FactionRank(connection, season, profile, faction), account, nowUtc),
-                leaderboard,
-                ReadFactionStandings(connection, season));
+            return new RealtimePlayer(profile, season, faction, factionRank);
         }
     }
 
@@ -347,10 +387,15 @@ public sealed class RankedStore
         faction = NormalizeFaction(faction) ?? string.Empty;
         if (faction.Length == 0) return null;
 
+        var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        var season = SeasonAt(observedAtUtc);
+        // 先确保当前赛季有可用公共快照，避免阵营已写入却因榜单失败返回整体失败。
+        var publicSnapshot = GetCurrentPublicSnapshot(season, observedAtUtc);
+        RealtimePlayer player;
+
         lock (_gate)
         {
             Initialize();
-            var season = SeasonAt(nowUtc ?? DateTime.UtcNow);
             using var connection = Open();
             using var transaction = connection.BeginTransaction();
             var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
@@ -362,41 +407,33 @@ public sealed class RankedStore
                 insert.CommandText = "INSERT INTO rank_factions(account_key,faction,selected_at_utc) VALUES($key,$faction,$selected);";
                 insert.Parameters.AddWithValue("$key", profile.AccountKey);
                 insert.Parameters.AddWithValue("$faction", faction);
-                insert.Parameters.AddWithValue("$selected", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                insert.Parameters.AddWithValue("$selected", observedAtUtc.ToString("O", CultureInfo.InvariantCulture));
                 insert.ExecuteNonQuery();
                 selected = faction;
             }
             else if (!string.Equals(selected, faction, StringComparison.Ordinal))
             {
-                // The caller must explicitly acknowledge the reset. Returning the existing snapshot keeps
-                // the request non-destructive when an old or malformed client omits that acknowledgement.
-                if (!resetRankProgress)
+                // 旧客户端未明确确认时保持原阵营，确保请求不会意外清空进度。
+                if (resetRankProgress)
                 {
-                    var unchangedLeaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
-                    transaction.Commit();
-                    return new RankSnapshot(ToSnapshot(profile, season, selected,
-                        FactionRank(connection, season, profile, selected), account, nowUtc), unchangedLeaderboard,
-                        ReadFactionStandings(connection, season));
+                    profile = ResetRankProgress(profile, observedAtUtc);
+                    Save(connection, transaction, profile);
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE rank_factions SET faction=$faction, selected_at_utc=$selected WHERE account_key=$key;";
+                    update.Parameters.AddWithValue("$key", profile.AccountKey);
+                    update.Parameters.AddWithValue("$faction", faction);
+                    update.Parameters.AddWithValue("$selected", observedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+                    update.ExecuteNonQuery();
+                    selected = faction;
                 }
-
-                profile = ResetRankProgress(profile, nowUtc ?? DateTime.UtcNow);
-                Save(connection, transaction, profile);
-                using var update = connection.CreateCommand();
-                update.Transaction = transaction;
-                update.CommandText = "UPDATE rank_factions SET faction=$faction, selected_at_utc=$selected WHERE account_key=$key;";
-                update.Parameters.AddWithValue("$key", profile.AccountKey);
-                update.Parameters.AddWithValue("$faction", faction);
-                update.Parameters.AddWithValue("$selected", (nowUtc ?? DateTime.UtcNow).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-                update.ExecuteNonQuery();
-                selected = faction;
             }
-            var leaderboard = ReadLeaderboard(connection, season, profile.AccountKey, nowUtc);
+            var factionRank = FactionRank(connection, season, profile, selected, transaction);
             transaction.Commit();
-            return new RankSnapshot(
-                ToSnapshot(profile, season, selected, FactionRank(connection, season, profile, selected), account, nowUtc),
-                leaderboard,
-                ReadFactionStandings(connection, season));
+            player = new RealtimePlayer(profile, season, selected, factionRank);
         }
+
+        return CombineSnapshot(player, publicSnapshot, account, nowUtc);
     }
 
     public double GetMatchRating(string account, string? displayName = null, DateTime? nowUtc = null)
@@ -734,13 +771,171 @@ public sealed class RankedStore
         return new Season($"S{index}", start, start.Add(SeasonLength));
     }
 
-    private IReadOnlyList<RankLeaderboardItem> ReadLeaderboard(
-        SqliteConnection connection,
-        Season season,
-        string currentAccountKey,
+    public bool TryRefreshLeaderboardSnapshot(DateTime? nowUtc = null)
+    {
+        Initialize();
+        if (!_leaderboardRefreshGate.Wait(0)) return false;
+
+        try
+        {
+            Volatile.Write(ref _lastLeaderboardRefreshError, null);
+            var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+            BeforeLeaderboardSnapshotBuildForTesting?.Invoke();
+            var candidate = BuildPublicLeaderboardSnapshot(observedAtUtc);
+            ValidatePublicLeaderboardSnapshot(candidate);
+
+            // 真实时钟跨越赛季边界时丢弃旧赛季候选，不让它成为新的可见版本。
+            if (nowUtc is null && !string.Equals(
+                    candidate.SeasonId,
+                    SeasonAt(DateTime.UtcNow).Id,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("赛季已切换，丢弃旧赛季排位榜候选快照");
+
+            var version = ReserveNextSnapshotVersion();
+            var published = new PublicLeaderboardSnapshot(
+                candidate.SeasonId,
+                version,
+                candidate.GeneratedAtUtc,
+                Array.AsReadOnly(candidate.Items.ToArray()),
+                Array.AsReadOnly(candidate.FactionStandings.ToArray()));
+            Volatile.Write(ref _publicLeaderboardSnapshot, published);
+            Volatile.Write(ref _lastLeaderboardRefreshError, null);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Volatile.Write(ref _lastLeaderboardRefreshError, ex.Message);
+            return false;
+        }
+        finally
+        {
+            _leaderboardRefreshGate.Release();
+        }
+    }
+
+    public async Task RunLeaderboardRefreshLoopAsync(
+        TimeSpan interval,
+        TimeSpan initialDelay,
+        CancellationToken cancellationToken,
+        Action<string>? logError = null)
+    {
+        if (interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
+        if (initialDelay < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(initialDelay));
+
+        try
+        {
+            if (initialDelay > TimeSpan.Zero) await Task.Delay(initialDelay, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                if (!TryRefreshLeaderboardSnapshot() && LastLeaderboardRefreshError is { Length: > 0 } error)
+                    logError?.Invoke(error);
+                await Task.Delay(interval, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // 正常关服：取消后不再启动新一轮快照。
+        }
+    }
+
+    private PublicLeaderboardSnapshot GetCurrentPublicSnapshot(Season season, DateTime observedAtUtc)
+    {
+        var current = Volatile.Read(ref _publicLeaderboardSnapshot);
+        if (current is not null && string.Equals(current.SeasonId, season.Id, StringComparison.Ordinal))
+            return current;
+
+        // 启动预热失败或赛季刚切换时，首个请求允许单次同步补热。
+        TryRefreshLeaderboardSnapshot(observedAtUtc);
+        current = Volatile.Read(ref _publicLeaderboardSnapshot);
+        if (current is not null && string.Equals(current.SeasonId, season.Id, StringComparison.Ordinal))
+            return current;
+
+        throw new RankLeaderboardUnavailableException(
+            LastLeaderboardRefreshError is { Length: > 0 } error
+                ? $"排位榜快照暂时不可用：{error}"
+                : "排位榜正在生成，请稍后重试");
+    }
+
+    private RankSnapshot CombineSnapshot(
+        RealtimePlayer player,
+        PublicLeaderboardSnapshot publicSnapshot,
+        string account,
         DateTime? nowUtc)
     {
+        var leaderboard = publicSnapshot.Items
+            .Where(entry => entry.Item.Rank <= 100
+                || entry.Item.FactionRank <= 100
+                || string.Equals(entry.AccountKey, player.Profile.AccountKey, StringComparison.Ordinal))
+            .Select(entry => entry.Item with
+            {
+                IsCurrentPlayer = string.Equals(entry.AccountKey, player.Profile.AccountKey, StringComparison.Ordinal),
+            })
+            .ToArray();
+        return new RankSnapshot(
+            ToSnapshot(player.Profile, player.Season, player.Faction, player.FactionRank, account, nowUtc),
+            leaderboard,
+            publicSnapshot.FactionStandings,
+            publicSnapshot.Version,
+            publicSnapshot.GeneratedAtUtc);
+    }
+
+    private PublicLeaderboardCandidate BuildPublicLeaderboardSnapshot(DateTime observedAtUtc)
+    {
+        var season = SeasonAt(observedAtUtc);
+        List<RankedLeaderboardEntry> entries;
+        IReadOnlyList<FactionStanding> factionStandings;
+        using (var connection = Open())
+        using (var transaction = connection.BeginTransaction(deferred: true))
+        {
+            entries = ReadRankedLeaderboardEntries(connection, transaction, season);
+            factionStandings = ReadFactionStandings(connection, transaction, season);
+            transaction.Commit();
+        }
+
+        // 外部统计是快照的必要组成部分；任一数据源失败都放弃候选，继续服务上一版。
+        var accountKeys = entries.Select(entry => entry.AccountKey).ToArray();
+        var favoriteLeaders = _leaderStatsStore.GetFavoriteLeaders(accountKeys);
+        var championLeaderNumbersByPlayer = _championStore.GetChampionLeaderNumbersByPlayerKeys(
+            accountKeys,
+            observedAtUtc);
+
+        var items = entries.Select(entry =>
+        {
+            var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
+            favoriteLeaders.TryGetValue(entry.AccountKey, out var favoriteLeader);
+            championLeaderNumbersByPlayer.TryGetValue(entry.AccountKey, out var championLeaderNumbers);
+            return new CachedRankLeaderboardItem(
+                entry.AccountKey,
+                new RankLeaderboardItem(
+                    entry.GlobalRank,
+                    entry.FactionRank,
+                    entry.DisplayName,
+                    entry.RankPoints,
+                    entry.Faction,
+                    label.Tier,
+                    label.Division,
+                    entry.Games,
+                    entry.Wins,
+                    entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1),
+                    favoriteLeader?.LeaderNumber,
+                    championLeaderNumbers ?? Array.Empty<string>(),
+                    false));
+        }).ToArray();
+
+        return new PublicLeaderboardCandidate(
+            season.Id,
+            observedAtUtc,
+            items,
+            factionStandings);
+    }
+
+    private static List<RankedLeaderboardEntry> ReadRankedLeaderboardEntries(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Season season)
+    {
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             WITH eligible AS (
                 SELECT p.account_key, p.display_name, p.rank_points, p.games, p.wins, f.faction,
@@ -750,67 +945,40 @@ public sealed class RankedStore
                 WHERE p.season_id=$season AND p.placement_games >= $placements
             ), ranked AS (
                 SELECT *,
-                       ROW_NUMBER() OVER (ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC) AS global_rank,
-                       ROW_NUMBER() OVER (PARTITION BY faction ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC) AS faction_rank
+                       ROW_NUMBER() OVER (ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC, account_key ASC) AS global_rank,
+                       ROW_NUMBER() OVER (PARTITION BY faction ORDER BY rank_points DESC, (rating - 2 * rating_deviation) DESC, updated_at_utc ASC, account_key ASC) AS faction_rank
                 FROM eligible
             )
             SELECT account_key, display_name, rank_points, games, wins, faction, global_rank, faction_rank
             FROM ranked
-            WHERE global_rank <= 100 OR faction_rank <= 100 OR account_key = $currentAccountKey
             ORDER BY global_rank ASC;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
         command.Parameters.AddWithValue("$placements", PlacementRequired);
-        command.Parameters.AddWithValue("$currentAccountKey", currentAccountKey);
         using var reader = command.ExecuteReader();
-        var entries = new List<(string AccountKey, string DisplayName, int RankPoints, int Games, int Wins, string Faction, int GlobalRank, int FactionRank)>();
+        var result = new List<RankedLeaderboardEntry>();
         while (reader.Read())
         {
-            entries.Add((reader.GetString(0), reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetString(5), reader.GetInt32(6), reader.GetInt32(7)));
-        }
-        IReadOnlyDictionary<string, PlayerFavoriteLeader> favoriteLeaders;
-        try
-        {
-            favoriteLeaders = LeaderStatsStore.Default.GetFavoriteLeaders(entries.Select(entry => entry.AccountKey));
-        }
-        catch
-        {
-            // 排位数据库仍需在 Leader 统计源暂不可用时正常工作。
-            favoriteLeaders = new Dictionary<string, PlayerFavoriteLeader>(StringComparer.Ordinal);
-        }
-
-        IReadOnlyDictionary<string, IReadOnlyList<string>> championLeaderNumbersByPlayer;
-        try
-        {
-            championLeaderNumbersByPlayer = _championStore.GetChampionLeaderNumbersByPlayerKeys(
-                entries.Select(entry => entry.AccountKey), nowUtc);
-        }
-        catch
-        {
-            // 称号数据源暂不可用时只隐藏称号，不影响排位榜主体加载。
-            championLeaderNumbersByPlayer = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        }
-
-        var result = new List<RankLeaderboardItem>();
-        foreach (var entry in entries)
-        {
-            var label = RankLabel(entry.RankPoints, entry.Faction, entry.FactionRank);
-            favoriteLeaders.TryGetValue(entry.AccountKey, out var favoriteLeader);
-            championLeaderNumbersByPlayer.TryGetValue(entry.AccountKey, out var championLeaderNumbers);
-            result.Add(new RankLeaderboardItem(entry.GlobalRank, entry.FactionRank, entry.DisplayName, entry.RankPoints, entry.Faction,
-                label.Tier, label.Division, entry.Games, entry.Wins,
-                entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1), favoriteLeader?.LeaderNumber,
-                championLeaderNumbers ?? Array.Empty<string>(),
-                string.Equals(entry.AccountKey, currentAccountKey, StringComparison.Ordinal)));
+            result.Add(new RankedLeaderboardEntry(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3),
+                reader.GetInt32(4),
+                reader.GetString(5),
+                reader.GetInt32(6),
+                reader.GetInt32(7)));
         }
         return result;
     }
 
     private static IReadOnlyList<FactionStanding> ReadFactionStandings(
         SqliteConnection connection,
+        SqliteTransaction transaction,
         Season season)
     {
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             WITH totals AS (
                 SELECT f.faction,
@@ -841,10 +1009,57 @@ public sealed class RankedStore
         return result;
     }
 
-    private static int? FactionRank(SqliteConnection connection, Season season, Profile profile, string? faction)
+    private long ReserveNextSnapshotVersion()
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO rank_public_snapshot_state(id,last_version) VALUES(1,1)
+            ON CONFLICT(id) DO UPDATE SET last_version=last_version+1
+            RETURNING last_version;
+            """;
+        var version = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        transaction.Commit();
+        return version;
+    }
+
+    private static void ValidatePublicLeaderboardSnapshot(PublicLeaderboardCandidate candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate.SeasonId))
+            throw new InvalidOperationException("排位榜候选快照缺少赛季");
+        if (candidate.GeneratedAtUtc.Kind != DateTimeKind.Utc)
+            throw new InvalidOperationException("排位榜候选快照时间必须为 UTC");
+
+        var accountKeys = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < candidate.Items.Count; index++)
+        {
+            var entry = candidate.Items[index];
+            if (!accountKeys.Add(entry.AccountKey))
+                throw new InvalidOperationException("排位榜候选快照包含重复玩家");
+            if (entry.Item.Rank != index + 1 || entry.Item.FactionRank <= 0 || entry.Item.IsCurrentPlayer)
+                throw new InvalidOperationException("排位榜候选快照名次不完整");
+        }
+
+        var factions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var standing in candidate.FactionStandings)
+        {
+            if (!factions.Add(standing.Faction) || standing.Rank <= 0)
+                throw new InvalidOperationException("排位榜候选快照阵营汇总不完整");
+        }
+    }
+
+    private static int? FactionRank(
+        SqliteConnection connection,
+        Season season,
+        Profile profile,
+        string? faction,
+        SqliteTransaction? transaction = null)
     {
         if (faction is null || profile.PlacementGames < PlacementRequired) return null;
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             SELECT COUNT(*) + 1
             FROM rank_profiles p
@@ -854,6 +1069,7 @@ public sealed class RankedStore
                 p.rank_points > $points
                 OR (p.rank_points = $points AND (p.rating - 2 * p.rating_deviation) > $conservativeRating)
                 OR (p.rank_points = $points AND (p.rating - 2 * p.rating_deviation) = $conservativeRating AND p.updated_at_utc < $updated)
+                OR (p.rank_points = $points AND (p.rating - 2 * p.rating_deviation) = $conservativeRating AND p.updated_at_utc = $updated AND p.account_key < $key)
               );
             """;
         command.Parameters.AddWithValue("$season", season.Id);
@@ -862,6 +1078,7 @@ public sealed class RankedStore
         command.Parameters.AddWithValue("$points", profile.RankPoints);
         command.Parameters.AddWithValue("$conservativeRating", profile.Rating - 2 * profile.RatingDeviation);
         command.Parameters.AddWithValue("$updated", profile.UpdatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$key", profile.AccountKey);
         return Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
@@ -1041,6 +1258,28 @@ public sealed class RankedStore
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant()))).ToLowerInvariant();
 
     private sealed record Season(string Id, DateTime StartsAtUtc, DateTime EndsAtUtc);
+    private sealed record RealtimePlayer(Profile Profile, Season Season, string? Faction, int? FactionRank);
+    private sealed record RankedLeaderboardEntry(
+        string AccountKey,
+        string DisplayName,
+        int RankPoints,
+        int Games,
+        int Wins,
+        string Faction,
+        int GlobalRank,
+        int FactionRank);
+    private sealed record CachedRankLeaderboardItem(string AccountKey, RankLeaderboardItem Item);
+    private sealed record PublicLeaderboardCandidate(
+        string SeasonId,
+        DateTime GeneratedAtUtc,
+        IReadOnlyList<CachedRankLeaderboardItem> Items,
+        IReadOnlyList<FactionStanding> FactionStandings);
+    private sealed record PublicLeaderboardSnapshot(
+        string SeasonId,
+        long Version,
+        DateTime GeneratedAtUtc,
+        IReadOnlyList<CachedRankLeaderboardItem> Items,
+        IReadOnlyList<FactionStanding> FactionStandings);
     private sealed record RatingUpdate(double Rating, double Deviation, double Volatility);
     private sealed record SettlementRules(
         int BaseDelta,

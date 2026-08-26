@@ -109,11 +109,17 @@ import {
 let registered = false;
 let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
+const rankSnapshotRequestTimers: Partial<Record<RankedMode, {
+  requestId: string;
+  timer: ReturnType<typeof setTimeout>;
+}>> = {};
+let rankSnapshotRequestSequence = 0;
 let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
 const HOME_REFRESH_RESUME_KEY = "grandumi_resume_home_after_refresh";
 const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
 const AUTH_TOKEN_KEY = "grandumi_auth_token";
+const RANK_SNAPSHOT_REQUEST_TIMEOUT_MS = 8_000;
 
 interface MsgMaintenanceState extends MsgBase {
   proto: "MsgMaintenanceState";
@@ -159,6 +165,22 @@ function clearSpectateRequestTimer() {
 function clearRoomRequestTimer() {
   if (roomRequestTimer) clearTimeout(roomRequestTimer);
   roomRequestTimer = null;
+}
+
+function clearRankSnapshotRequestTimer(mode: RankedMode, requestId?: string) {
+  const pending = rankSnapshotRequestTimers[mode];
+  if (!pending || (requestId && pending.requestId !== requestId)) return;
+  clearTimeout(pending.timer);
+  delete rankSnapshotRequestTimers[mode];
+}
+
+function failPendingRankSnapshotRequests(error: string) {
+  const store = useNetStore.getState();
+  for (const mode of ["standard", "wild"] as const) {
+    const pending = rankSnapshotRequestTimers[mode];
+    if (pending) clearRankSnapshotRequestTimer(mode, pending.requestId);
+    store.failRankSnapshotRequest(mode, pending?.requestId ?? null, error);
+  }
 }
 
 function armRoomRequestTimer() {
@@ -366,6 +388,7 @@ export function registerHomeProtocols() {
     }
     clearRoomRequestTimer();
     clearSpectateRequestTimer();
+    for (const mode of ["standard", "wild"] as const) clearRankSnapshotRequestTimer(mode);
     pendingLegacyImport = null;
     useGameStore.getState().resetGame();
     const store = useNetStore.getState();
@@ -379,6 +402,7 @@ export function registerHomeProtocols() {
 
   eventBus.on("close", () => {
     const store = useNetStore.getState();
+    failPendingRankSnapshotRequests("网络已断开，当前显示的榜单可能已过期，请重连后重试");
     const { spectateState, roomOperation } = store;
     if (roomOperation !== "idle") {
       clearRoomRequestTimer();
@@ -599,7 +623,11 @@ function handleSelectRankFaction(msg: MsgSelectRankFaction) {
   }
   const mode = msg.mode ?? "standard";
   const previousFaction = useNetStore.getState().rankProfiles[mode]?.faction;
-  useNetStore.getState().setRankSnapshot(mode, msg.profile, msg.leaderboard ?? [], msg.factionStandings);
+  useNetStore.getState().setRankSnapshot(mode, msg.profile, msg.leaderboard ?? [], msg.factionStandings, {
+    snapshotVersion: msg.snapshotVersion,
+    generatedAtUtc: msg.generatedAtUtc,
+    allowSameSeasonProfileRegression: true,
+  });
   showMessage(previousFaction && previousFaction !== msg.profile.faction
     ? "阵营已更换，排位进度已清空，请重新定级"
     : "阵营已选定", "info");
@@ -619,8 +647,26 @@ function handleMatchFound(msg: MsgMatchFound) {
 }
 
 function handleRankSnapshot(msg: MsgRankSnapshot) {
-  if (!msg.profile) return;
-  useNetStore.getState().setRankSnapshot(msg.mode ?? "standard", msg.profile, msg.leaderboard ?? [], msg.factionStandings);
+  const mode = msg.mode ?? "standard";
+  const store = useNetStore.getState();
+  if (msg.result === false || msg.error || !msg.profile) {
+    store.failRankSnapshotRequest(
+      mode,
+      msg.requestId ?? null,
+      msg.error ?? "排位榜返回了无效数据，请重试",
+      msg.retryable ?? true,
+    );
+    clearRankSnapshotRequestTimer(mode, msg.requestId);
+    return;
+  }
+  store.setRankSnapshot(mode, msg.profile, msg.leaderboard ?? [], msg.factionStandings, {
+    requestId: msg.requestId,
+    snapshotVersion: msg.snapshotVersion,
+    generatedAtUtc: msg.generatedAtUtc,
+  });
+  if (useNetStore.getState().rankSnapshotRequests[mode].requestId !== msg.requestId) {
+    clearRankSnapshotRequestTimer(mode, msg.requestId);
+  }
 }
 
 function handleRankResult(msg: MsgRankResult) {
@@ -628,8 +674,23 @@ function handleRankResult(msg: MsgRankResult) {
     showMessage(msg.error, "error");
     return;
   }
-  if (msg.profile) useNetStore.getState().setRankSnapshot(msg.mode ?? "standard", msg.profile, msg.leaderboard ?? [], msg.factionStandings);
-  if (msg.result) useNetStore.getState().setLastRankResult(msg.result);
+  const mode = msg.mode ?? "standard";
+  const store = useNetStore.getState();
+  if (msg.profile) {
+    if (msg.leaderboard || msg.snapshotVersion != null || msg.generatedAtUtc) {
+      store.setRankSnapshot(mode, msg.profile, msg.leaderboard ?? [], msg.factionStandings, {
+        snapshotVersion: msg.snapshotVersion,
+        generatedAtUtc: msg.generatedAtUtc,
+      });
+    } else {
+      store.setRankProfile(mode, msg.profile);
+    }
+  }
+  if (msg.leaderboardError) {
+    store.failRankSnapshotRequest(mode, null, msg.leaderboardError);
+    showMessage(msg.leaderboardError, "error");
+  }
+  if (msg.result) store.setLastRankResult(msg.result);
 }
 
 /**
@@ -1188,7 +1249,27 @@ export const HomeRequest = {
   },
 
   requestRankSnapshot(mode: RankedMode = "standard") {
-    return NetManager.send({ proto: "MsgRankSnapshot", mode } as MsgRankSnapshot);
+    clearRankSnapshotRequestTimer(mode);
+    const requestId = `rank-${mode}-${Date.now().toString(36)}-${(++rankSnapshotRequestSequence).toString(36)}`;
+    const store = useNetStore.getState();
+    store.beginRankSnapshotRequest(mode, requestId);
+    const sent = NetManager.send({ proto: "MsgRankSnapshot", mode, requestId } as MsgRankSnapshot);
+    if (!sent) {
+      store.failRankSnapshotRequest(mode, requestId, "排位榜请求发送失败，请确认网络已重连后重试");
+      return false;
+    }
+    const timer = setTimeout(() => {
+      const pending = rankSnapshotRequestTimers[mode];
+      if (!pending || pending.requestId !== requestId) return;
+      delete rankSnapshotRequestTimers[mode];
+      useNetStore.getState().failRankSnapshotRequest(
+        mode,
+        requestId,
+        "排位榜加载超时，网络或服务器响应较慢，请重试",
+      );
+    }, RANK_SNAPSHOT_REQUEST_TIMEOUT_MS);
+    rankSnapshotRequestTimers[mode] = { requestId, timer };
+    return true;
   },
 
   selectRankFaction(faction: RankFaction, resetRankProgress = false, mode: RankedMode = "standard") {
