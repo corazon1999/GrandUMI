@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { inflateSync } from "node:zlib";
+import { normalizeCardColor } from "./card-color-normalizer.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -210,7 +211,7 @@ function normalizeCard(card, setCode) {
   return {
     number: card.number,
     name: card.name,
-    color: card.color.replaceAll("・", "/"),
+    color: normalizeCardColor(card.number, card.color),
     type,
     property: card.property.replaceAll("斬", "斩").replaceAll("？", "?"),
     power: card.power === "-" ? "" : card.power,
