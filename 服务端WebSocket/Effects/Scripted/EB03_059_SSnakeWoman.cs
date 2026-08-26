@@ -11,8 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 条件：领袖含《艾格赫德》且我方生命 ≥2 张。
 ///   - "拥有【触发】效果的角色卡牌"用 c.Info.Trigger 非空判定（Kind==Character）。
-///   - 手牌牌移入生命区最上方：手动 Hand.Remove + LifeArea.Insert(0,...)
-///     （生命牌无正/反面字段，"正面朝上"按惯例省略，仅做位置转移）。
+///   - 手牌牌移入生命区最上方：设置 IsLifeFaceUp 后执行 Hand.Remove + LifeArea.Insert(0,...)。
 /// </summary>
 public class EB03_059_SSnakeWoman : IScriptedEffect
 {
@@ -43,6 +42,7 @@ public class EB03_059_SSnakeWoman : IScriptedEffect
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
         me.Hand.Remove(picked);
+        picked.IsLifeFaceUp = true;
         me.LifeArea.Insert(0, picked);
     }
 }

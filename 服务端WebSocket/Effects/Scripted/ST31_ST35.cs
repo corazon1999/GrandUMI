@@ -148,7 +148,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
             await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, target, ctx.Prompts, ctx.OwnerIndex);
     }
 
-    private static void RegisterSelfKeyword(EffectContext ctx, string keyword,
+    protected static void RegisterSelfKeyword(EffectContext ctx, string keyword,
         Func<GameState, int, CardInstance, bool> condition)
     {
         var id = ctx.Source.Id;
@@ -316,8 +316,6 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     private static Task ST32_005(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var id = ctx.Source.Id;
-        RegisterSelfKeyword(ctx, "登场回合可攻击角色", (_, _, card) => card.Id == id);
         return SlashLeader(me) ? RestUpTo(ctx, 1, 2) : Task.CompletedTask;
     }
 
@@ -494,7 +492,18 @@ public sealed class ST32_001_Effect : ST31To35EffectBase { public override strin
 public sealed class ST32_002_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-002"; }
 public sealed class ST32_003_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-003"; }
 public sealed class ST32_004_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-004"; }
-public sealed class ST32_005_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-005"; }
+public sealed class ST32_005_Effect : ST31To35EffectBase, IFieldStaticEffect
+{
+    public override string CardNumber => "ST32-005";
+
+    public Task RegisterFieldStatic(EffectContext ctx)
+    {
+        var id = ctx.Source.Id;
+        RegisterSelfKeyword(ctx, "登场回合可攻击角色", (_, side, card) =>
+            side == ctx.OwnerIndex && card.Id == id);
+        return Task.CompletedTask;
+    }
+}
 public sealed class ST33_001_Effect : ST31To35EffectBase { public override string CardNumber => "ST33-001"; }
 public sealed class ST33_002_Effect : ST31To35EffectBase { public override string CardNumber => "ST33-002"; }
 public sealed class ST33_003_Effect : ST31To35EffectBase { public override string CardNumber => "ST33-003"; }

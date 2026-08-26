@@ -6,7 +6,7 @@ namespace GrandUMI.Effects.Scripted;
 /// <summary>
 /// OP08-079 盖德（角色 / 地 / 9 费 / 9000 / 原洛克斯海盗团·百兽海盗团）
 /// 【启动主要】【每回合1次】可以丢弃我方的 1 张手牌：在此角色登场的回合的场合，
-///   将对方最多 1 张费用不高于 7 的角色放置到废弃区（KO）。之后，对方丢弃其 1 张手牌。
+///   将对方最多 1 张费用不高于 7 的角色放置到废弃区。之后，对方丢弃其 1 张手牌。
 ///
 /// 说明 / 简化点：
 ///   - 【每回合1次】用 me.TurnOnceUsed 去重。
@@ -38,7 +38,7 @@ public class OP08_079_Kaido : IScriptedEffect
 
         // 可选成本：丢弃我方 1 张手牌
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "盖德【启动主要】：丢弃我方 1 张手牌，将对方最多 1 张费用≤7 的角色 KO，之后对方丢 1 张手牌？");
+            "盖德【启动主要】：丢弃我方 1 张手牌，将对方最多 1 张费用≤7 的角色放置到废弃区，之后对方丢 1 张手牌？");
         if (!use) return;
 
         var discardPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
@@ -51,17 +51,22 @@ public class OP08_079_Kaido : IScriptedEffect
         // 成本已支付 → 记录每回合1次
         me.TurnOnceUsed.Add(key);
 
-        // 效果 1：将对方最多 1 张费用≤7 的角色 KO
+        // 效果 1：将对方最多 1 张费用≤7 的角色放置到废弃区（非 KO，不触发【KO时】）
         var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 7).ToList();
         if (cands.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                "将对方最多 1 张费用≤7 的角色 KO",
+                "将对方最多 1 张费用≤7 的角色放置到废弃区",
                 cands.Select(c => c.Id.ToString()).ToList(), 0, 1);
             if (chosen.Count > 0)
             {
                 var tgt = cands.First(c => c.Id.ToString() == chosen[0]);
-                AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, tgt);
+                int opponentIndex = 1 - ctx.OwnerIndex;
+                if (!await AtomicOps.TryEffectLeaveGuard(
+                    ctx.State, opponentIndex, tgt, ctx.Prompts, "trash"))
+                {
+                    AtomicOps.TrashFieldCard(ctx.State, opponentIndex, tgt);
+                }
             }
         }
 

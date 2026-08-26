@@ -11,12 +11,12 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现：登场时注册固定 +3000 的 ContinuousEffect（门槛【咚×1】+【我方回合】+手牌≥5 写进 Predicate，仅作用自身）；
 ///       登场时抽1沿用 DSL（脚本结尾委托解释器）。
 /// </summary>
-public class OP16_054_DazBones : IScriptedEffect
+public class OP16_054_DazBones : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP16-054";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
@@ -34,7 +34,9 @@ public class OP16_054_DazBones : IScriptedEffect
                 && s.Players[owner].AttachedDonCount(selfId) >= 1,
         });
 
-        // 登场时抽1沿用 DSL
-        await Dsl.DslInterpreter.TryResolve(ctx);
+        return Task.CompletedTask;
     }
+
+    // 登场时抽1沿用 DSL；静态力量能力由 EffectRuntime 在选择性登场时无效判定之前注册。
+    public Task Resolve(EffectContext ctx) => Dsl.DslInterpreter.TryResolve(ctx);
 }

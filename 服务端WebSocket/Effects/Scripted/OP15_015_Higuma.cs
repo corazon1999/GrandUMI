@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   之后，本回合中，对方最多 1 张被赋予咚!! 的角色力量 -1000。
 ///
 /// 实现说明 / 简化点：
-///   - "赋予对方角色对方休息状态的咚!!"：从对方费用区取一张活跃咚附着到所选对方角色
+///   - "赋予对方角色对方休息状态的咚!!"：从对方费用区取一张休息咚附着到所选对方角色
 ///     （引擎置为 Attached），与"对方持有的咚贴到对方角色"语义一致。
 ///   - "之后，对方最多 1 张被赋予咚!! 的角色 -1000(本回合)"：在被赋予咚的对方角色中选 1 张，
 ///     用 AddPowerThisTurn(-1000)。
@@ -33,7 +33,7 @@ public class OP15_015_Higuma : IScriptedEffect
             if (pick.Count > 0)
             {
                 var tgt = opp.Characters.First(c => c.Id.ToString() == pick[0]);
-                AtomicOps.AttachDonFromCost(opp, tgt.Id, 1, DonState.Active);
+                AtomicOps.AttachDonFromCost(opp, tgt.Id, 1, DonState.Rest);
             }
         }
 

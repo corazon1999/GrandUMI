@@ -101,9 +101,7 @@
     "cost": "2",
     "keyWords": "FILM/超新星/草帽一伙",
     "counter": "2000",
-    "effectTags": [
-      "OnEnterField"
-    ],
+    "effectTags": [],
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",

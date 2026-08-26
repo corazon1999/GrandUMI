@@ -312,8 +312,7 @@
     "keyWords": "草帽一伙",
     "counter": "1000",
     "effectTags": [
-      "OnKO",
-      "OnEnterField"
+      "OnKO"
     ],
     "abilities": [],
     "effectEvent": "",

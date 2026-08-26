@@ -1319,7 +1319,7 @@
           {
             "op": "GiveKeyword",
             "target": "$tgt",
-            "keyword": "Unblockable",
+            "keyword": "不可阻挡",
             "duration": "ThisTurn"
           }
         ]

@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 成本为"将生命区最上方或最下方 1 张加入手牌"。生命牌不公开，用 ChooseOption 让玩家选
 ///     最上/最下，再把对应位置的卡加入手牌。
-///   - 收益"正面朝上加入生命区最上方"：生命区数据结构不区分正反面，直接 Insert 到最上方。
+///   - 收益"正面朝上加入生命区最上方"：写入 IsLifeFaceUp 后 Insert 到最上方。
 ///   - 生命区为空则无法支付成本，效果不发动。
 /// </summary>
 public class OP10_103_CaponeBege : IScriptedEffect
@@ -60,6 +60,7 @@ public class OP10_103_CaponeBege : IScriptedEffect
         if (me.Hand.Contains(target))
         {
             me.Hand.Remove(target);
+            target.IsLifeFaceUp = true;
             me.LifeArea.Insert(0, target);
         }
     }

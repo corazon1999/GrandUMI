@@ -12,9 +12,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 【登场时】：让玩家选择最多 1 张对方角色，本回合 -2000（AddPowerThisTurn 负值）。
 ///   - 【攻击时】：此角色本回合 +1000（AddPowerThisTurn）。
-///   - "我方海军领袖也可以攻击活跃状态角色" 这一部分依赖"允许攻击活跃角色"机制，
-///     引擎攻击合法性校验中"不能攻击活跃状态角色"为硬编码、无可授予的开关 → 该子句无法表达，
-///     故省略，仅实现可表达的力量增减部分（与文本其余结果一致）。
+///   - 【攻击时】结算力量后，若我方领袖拥有《海军》特征，可选择该领袖并赋予本回合
+///     "可攻击活跃"关键词；攻击合法性校验会据此放行攻击对方活跃角色。
 /// </summary>
 public class OP11_010_Tashigi : IScriptedEffect
 {
@@ -51,6 +50,13 @@ public class OP11_010_Tashigi : IScriptedEffect
             var b = ctx.State.CurrentBattle;
             if (b is null || b.AttackerCardId != self.Id) return;
             AtomicOps.AddPowerThisTurn(self, 1000);
+
+            if (!me.Leader.Info.HasKeyword("海军")) return;
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeader",
+                "选择我方《海军》领袖，本回合可攻击对方活跃状态的角色",
+                new[] { me.Leader.Id.ToString() }, 0, 1);
+            if (chosen.Count > 0)
+                AtomicOps.GiveKeyword(me.Leader, "可攻击活跃", KeywordDuration.ThisTurn, ctx.OwnerIndex);
         }
     }
 }
