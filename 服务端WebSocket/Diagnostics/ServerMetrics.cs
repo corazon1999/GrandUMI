@@ -22,8 +22,14 @@ public static class ServerMetrics
         Gauge(output, "grandumi_gc_heap_bytes", GC.GetTotalMemory(forceFullCollection: false));
         Gauge(output, "grandumi_threadpool_busy_workers", maxWorkers - availableWorkers);
         Gauge(output, "grandumi_threadpool_busy_io", maxIo - availableIo);
-        Gauge(output, "grandumi_connections", WebSocketBridge.ConnectionCount);
-        Gauge(output, "grandumi_logged_in_players", WebSocketBridge.LoggedInCount);
+        var sessions = WebSocketBridge.GetSessionMetrics();
+        Gauge(output, "grandumi_connections", sessions.ConnectionCount);
+        Gauge(output, "grandumi_logged_in_sessions", sessions.LoggedInSessionCount);
+        // 保留原指标名兼容现有看板，但语义修正为账号索引中的唯一权威在线玩家。
+        Gauge(output, "grandumi_logged_in_players", sessions.UniqueLoggedInAccountCount);
+        Gauge(output, "grandumi_unique_logged_in_accounts", sessions.UniqueLoggedInAccountCount);
+        Gauge(output, "grandumi_superseded_sessions", sessions.SupersededSessionCount);
+        Counter(output, "grandumi_superseded_sessions_total", sessions.SupersededSessionTotal);
         Gauge(output, "grandumi_rooms", GameRoomManager.RoomCount);
         Gauge(output, "grandumi_spectators", GameRoomManager.SpectatorCount);
         Gauge(output, "grandumi_room_action_queue_depth", GameRoomManager.TotalActionQueueDepth);

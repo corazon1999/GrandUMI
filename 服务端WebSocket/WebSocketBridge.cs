@@ -67,6 +67,7 @@ public static class WebSocketBridge
     private static readonly TimeSpan LobbyReconnectGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActiveSessionMaxIdle = TimeSpan.FromSeconds(35);
     private static readonly TimeSpan SupersededClientLifetime = TimeSpan.FromDays(30);
+    private static readonly TimeSpan SupersededSessionCleanupTimeout = TimeSpan.FromSeconds(2);
     private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
@@ -97,6 +98,7 @@ public static class WebSocketBridge
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
     private static int _onlineBroadcastVersion;
+    private static long _supersededSessionTotal;
 
     // ── JSON 工具 ─────────────────────────────────────────────────────────
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -154,9 +156,36 @@ public static class WebSocketBridge
     // ── 连接接受 ──────────────────────────────────────────────────────────
     public static bool IsReady => Volatile.Read(ref _accepting) != 0;
     public static int ConnectionCount => Sessions.Count;
-    public static int LoggedInCount => Sessions.Count(item => item.Value.IsLoggedIn);
+    /// <summary>兼容既有调用：在线玩家数始终表示账号索引中的唯一权威会话数。</summary>
+    public static int LoggedInCount => GetSessionMetrics().UniqueLoggedInAccountCount;
+    public static int LoggedInSessionCount => Sessions.Count(item => item.Value.IsLoggedIn);
+    public static int UniqueLoggedInAccountCount => GetSessionMetrics().UniqueLoggedInAccountCount;
+    public static int SupersededSessionCount => Sessions.Count(item => item.Value.IsSuperseded);
+    public static long SupersededSessionTotal => Interlocked.Read(ref _supersededSessionTotal);
     public static long DroppedOutboundCount => Sessions.Values.Sum(item => item.DroppedOutboundCount);
     public static int MaxCurrentOutboundDepth => Sessions.IsEmpty ? 0 : Sessions.Values.Max(item => item.OutboundDepth);
+
+    internal readonly record struct SessionMetricSnapshot(
+        int ConnectionCount,
+        int LoggedInSessionCount,
+        int UniqueLoggedInAccountCount,
+        int SupersededSessionCount,
+        long SupersededSessionTotal);
+
+    internal static SessionMetricSnapshot GetSessionMetrics()
+    {
+        lock (AccountIndexGate)
+        {
+            var sessions = Sessions.Values.ToArray();
+            var uniqueLoggedInAccounts = SnapshotCurrentAccountSessionsLocked().Length;
+            return new SessionMetricSnapshot(
+                sessions.Length,
+                sessions.Count(session => session.IsLoggedIn),
+                uniqueLoggedInAccounts,
+                sessions.Count(session => session.IsSuperseded),
+                Interlocked.Read(ref _supersededSessionTotal));
+        }
+    }
 
     public static async Task AcceptClientAsync(WebSocket socket, CancellationToken requestAborted)
     {
@@ -217,18 +246,16 @@ public static class WebSocketBridge
 
     private static void CloseSession(WsSession session)
     {
-        Sessions.TryRemove(session.SessionId, out _);
         var wasCurrentAccountSession = false;
-        if (session.Account is not null)
+        lock (AccountIndexGate)
         {
-            lock (AccountIndexGate)
+            Sessions.TryRemove(session.SessionId, out _);
+            if (session.Account is not null &&
+                AccountIndex.TryGetValue(session.Account, out var indexedSession) &&
+                indexedSession == session.SessionId)
             {
-                if (AccountIndex.TryGetValue(session.Account, out var indexedSession) &&
-                    indexedSession == session.SessionId)
-                {
-                    AccountIndex.TryRemove(session.Account, out _);
-                    wasCurrentAccountSession = true;
-                }
+                AccountIndex.TryRemove(session.Account, out _);
+                wasCurrentAccountSession = true;
             }
         }
         if (session.IsMatching) RebuildMatchQueue(session);
@@ -242,8 +269,9 @@ public static class WebSocketBridge
             HandleFriendlyDisconnect(session.Account);
         GameRoomManager.OnPlayerDisconnect(session.SessionId);
         Log($"断开 {session.SessionId} ({session.Account ?? "未登录"})");
-        // 在线人数变化，广播给剩余客户端
-        BroadcastOnlineCount();
+        // 被替代旧会话的迟到清理不会改变权威在线人数，也不应放大广播风暴。
+        if (wasCurrentAccountSession)
+            BroadcastOnlineCount();
         if (session.Account is not null && wasCurrentAccountSession)
             PushFriendPresenceToFriends(session.Account);
     }
@@ -251,7 +279,7 @@ public static class WebSocketBridge
     // ── 消息路由 ──────────────────────────────────────────────────────────
     private static void Route(string sessionId, string json)
     {
-        if (!Sessions.TryGetValue(sessionId, out var session)) return;
+        if (!Sessions.TryGetValue(sessionId, out var session) || session.IsSuperseded) return;
         session.MarkSeen();
 
         Dictionary<string, JsonElement>? msg;
@@ -450,8 +478,6 @@ public static class WebSocketBridge
                 SupersedeSession(s);
                 return;
             }
-            if (!isResume && !string.IsNullOrEmpty(clientInstanceId))
-                SupersededClientInstances.TryRemove(clientInstanceId, out _);
 
             var playerData = _playerDataStore.Login(authentication.Account);
             if (_recordDailyActivePlayers)
@@ -460,25 +486,26 @@ public static class WebSocketBridge
                 catch (Exception ex) { LogErr($"记录日活玩家失败 {playerData.Account}: {ex.Message}"); }
             }
 
-            string? supersededSessionId = null;
-            lock (AccountIndexGate)
+            s.PlayerName = playerData.DisplayName;
+            s.CardBackId = playerData.CardBackId;
+            if (!TryBindAccountSession(
+                    s,
+                    playerData.Account,
+                    clientInstanceId,
+                    rejectSupersededClientInstance: isResume,
+                    out var supersededSession))
             {
-                if (s.Account is not null &&
-                    !string.Equals(s.Account, playerData.Account, StringComparison.OrdinalIgnoreCase) &&
-                    AccountIndex.TryGetValue(s.Account, out var previousForOldAccount) &&
-                    previousForOldAccount == s.SessionId)
-                    AccountIndex.TryRemove(s.Account, out _);
-
-                if (AccountIndex.TryGetValue(playerData.Account, out var previousForAccount) &&
-                    previousForAccount != s.SessionId)
-                    supersededSessionId = previousForAccount;
-
-                s.Account = playerData.Account;
-                s.ClientInstanceId = clientInstanceId;
-                s.PlayerName = playerData.DisplayName;
-                s.CardBackId = playerData.CardBackId;
-                AccountIndex[playerData.Account] = s.SessionId;
+                // 认证可能与另一处主动登录并发完成；已失权的迟到恢复不得重新夺回账号索引。
+                SupersedeSession(s);
+                return;
             }
+
+            // 旧会话在索引切换锁内已经立即失权；此处只启动一次有界终止与回收流程。
+            if (supersededSession is not null)
+                SupersedeSession(supersededSession);
+
+            // 后续登录回包和恢复只能由此刻仍为权威的连接执行。
+            if (!IsCurrentAccountSession(s)) return;
 
             Send(s.SessionId, new
             {
@@ -500,21 +527,8 @@ public static class WebSocketBridge
             SendMaintenanceState(s);
             Log($"登录 ✅ {playerData.Account}");
 
-            // 同账号只保留最新连接。旧连接稍后关闭时不会再清理新连接绑定的房间。
-            if (supersededSessionId is not null && Sessions.TryGetValue(supersededSessionId, out var superseded))
-            {
-                if (!string.Equals(superseded.ClientInstanceId, clientInstanceId, StringComparison.Ordinal))
-                    MarkClientInstanceSuperseded(superseded.ClientInstanceId);
-                SupersedeSession(superseded);
-            }
-
             // 两个登录请求并发时，只有当前账号索引指向的最新连接有权恢复房间。
-            lock (AccountIndexGate)
-            {
-                if (!AccountIndex.TryGetValue(playerData.Account, out var currentSessionId) ||
-                    currentSessionId != s.SessionId)
-                    return;
-            }
+            if (!IsCurrentAccountSession(s)) return;
 
             // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复。
             if (GameRoomManager.TryReclaim(s.SessionId, playerData.Account, playerData.CardBackId))
@@ -537,29 +551,99 @@ public static class WebSocketBridge
         }
     }
 
+    /// <summary>
+    /// 在账号索引锁内原子切换权威会话。旧会话先被标记为失权，再发布新索引，
+    /// 因此统计、路由和迟到清理都不会把两个连接同时视为在线账号。
+    /// </summary>
+    private static bool TryBindAccountSession(
+        WsSession session,
+        string account,
+        string? clientInstanceId,
+        bool rejectSupersededClientInstance,
+        out WsSession? supersededSession)
+    {
+        supersededSession = null;
+        lock (AccountIndexGate)
+        {
+            if (session.IsSuperseded ||
+                (rejectSupersededClientInstance && IsSupersededClientInstance(clientInstanceId)))
+                return false;
+
+            if (!rejectSupersededClientInstance && !string.IsNullOrEmpty(clientInstanceId))
+                SupersededClientInstances.TryRemove(clientInstanceId, out _);
+
+            if (session.Account is not null &&
+                !string.Equals(session.Account, account, StringComparison.OrdinalIgnoreCase) &&
+                AccountIndex.TryGetValue(session.Account, out var previousForOldAccount) &&
+                previousForOldAccount == session.SessionId)
+                AccountIndex.TryRemove(session.Account, out _);
+
+            if (AccountIndex.TryGetValue(account, out var previousForAccount) &&
+                previousForAccount != session.SessionId &&
+                Sessions.TryGetValue(previousForAccount, out var previousSession))
+            {
+                supersededSession = previousSession;
+                MarkSessionSuperseded(previousSession);
+                if (!string.Equals(previousSession.ClientInstanceId, clientInstanceId, StringComparison.Ordinal))
+                    MarkClientInstanceSuperseded(previousSession.ClientInstanceId);
+            }
+
+            session.Account = account;
+            session.ClientInstanceId = clientInstanceId;
+            AccountIndex[account] = session.SessionId;
+            return true;
+        }
+    }
+
+    private static bool MarkSessionSuperseded(WsSession session)
+    {
+        if (!session.TryMarkSuperseded()) return false;
+        Interlocked.Increment(ref _supersededSessionTotal);
+        return true;
+    }
+
     private static void SupersedeSession(WsSession session, string reason = SessionReplacedMessage)
     {
+        MarkSessionSuperseded(session);
+        if (session.IsMatching) RebuildMatchQueue(session);
+        if (!session.TryBeginSupersededCleanup()) return;
+
         _ = Task.Run(async () =>
         {
+            using var cleanupTimeout = new CancellationTokenSource(SupersededSessionCleanupTimeout);
             try
             {
                 await session.EnqueueTerminalAsync(new
-                {
-                    proto = "MsgSessionReplaced",
-                    reason,
-                    logStr = reason,
-                });
+                    {
+                        proto = "MsgSessionReplaced",
+                        reason,
+                        logStr = reason,
+                    })
+                    .WaitAsync(cleanupTimeout.Token);
                 if (session.Socket.State == WebSocketState.Open)
                 {
                     await session.Socket.CloseOutputAsync(
-                        (WebSocketCloseStatus)SessionReplacedCloseCode,
-                        SessionReplacedMessage,
-                        CancellationToken.None);
+                            (WebSocketCloseStatus)SessionReplacedCloseCode,
+                            SessionReplacedMessage,
+                            cleanupTimeout.Token)
+                        .WaitAsync(cleanupTimeout.Token);
                 }
+
+                // 给遵守关闭握手的客户端一个主动退出窗口；不响应的旧连接在总超时后强制回收。
+                // 使用单个取消计时器，避免重连风暴下为每个旧会话反复轮询注册表。
+                await Task.Delay(Timeout.InfiniteTimeSpan, cleanupTimeout.Token);
             }
+            catch (OperationCanceledException) { }
             catch
             {
-                try { session.Socket.Abort(); } catch { }
+                // 统一在 finally 中按注册表状态决定是否仍需强制回收。
+            }
+            finally
+            {
+                if (Sessions.ContainsKey(session.SessionId))
+                {
+                    try { session.Socket.Abort(); } catch { }
+                }
             }
         });
     }
@@ -597,9 +681,15 @@ public static class WebSocketBridge
 
         if (ok)
         {
-            s.Account    = account;
             s.PlayerName = name;
-            AccountIndex[account] = s.SessionId;
+            ok = TryBindAccountSession(
+                s,
+                account,
+                clientInstanceId: null,
+                rejectSupersededClientInstance: false,
+                out var supersededSession);
+            if (supersededSession is not null)
+                SupersedeSession(supersededSession);
         }
 
         Send(s.SessionId, new { proto = "MsgLogin", account, name, result = ok,
@@ -607,7 +697,7 @@ public static class WebSocketBridge
         Log($"登录 {(ok ? "✅" : "❌")} {account}");
 
         // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复
-        if (ok && GameRoomManager.TryReclaim(s.SessionId, account))
+        if (ok && IsCurrentAccountSession(s) && GameRoomManager.TryReclaim(s.SessionId, account))
             Log($"断线重连成功 {account}");
 
         // 在线人数变化，广播给所有客户端（含刚登录的本会话）
@@ -1313,12 +1403,33 @@ public static class WebSocketBridge
 
     private static bool IsCurrentAccountSession(WsSession session)
     {
-        if (session.Account is null) return false;
+        if (session.Account is null || session.IsSuperseded) return false;
         lock (AccountIndexGate)
         {
             return AccountIndex.TryGetValue(session.Account, out var currentSessionId)
                    && currentSessionId == session.SessionId;
         }
+    }
+
+    private static WsSession[] SnapshotCurrentAccountSessions()
+    {
+        lock (AccountIndexGate)
+            return SnapshotCurrentAccountSessionsLocked();
+    }
+
+    private static WsSession[] SnapshotCurrentAccountSessionsLocked()
+    {
+        var current = new List<WsSession>(AccountIndex.Count);
+        foreach (var binding in AccountIndex)
+        {
+            if (!Sessions.TryGetValue(binding.Value, out var session) ||
+                session.IsSuperseded ||
+                !session.IsLoggedIn ||
+                !string.Equals(session.Account, binding.Key, StringComparison.OrdinalIgnoreCase))
+                continue;
+            current.Add(session);
+        }
+        return current.ToArray();
     }
 
     private static void RebuildMatchQueue(WsSession exclude)
@@ -1644,8 +1755,7 @@ public static class WebSocketBridge
         var blockedAccounts = s.Account is null
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : _playerDataStore.GetBlockedRelatedAccountKeys(s.Account);
-        var loggedIn = Sessions.Values
-            .Where(x => x.IsLoggedIn)
+        var loggedIn = SnapshotCurrentAccountSessions()
             .Where(x => x.Account is null || !blockedAccounts.Contains(x.Account))
             .OrderBy(x => x.Account, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -4297,7 +4407,7 @@ public static class WebSocketBridge
         }
     }
 
-    /// <summary>广播当前在线人数（已登录会话数）给所有客户端</summary>
+    /// <summary>广播当前在线人数（账号索引中的唯一权威会话数）给所有客户端</summary>
     private static void BroadcastOnlineCount()
     {
         Interlocked.Increment(ref _onlineBroadcastVersion);
@@ -4311,7 +4421,7 @@ public static class WebSocketBridge
                 {
                     deliveredVersion = Volatile.Read(ref _onlineBroadcastVersion);
                     await Task.Delay(500, _cts.Token);
-                    int count = Sessions.Count(kv => kv.Value.IsLoggedIn);
+                    int count = LoggedInCount;
                     RecordOnlinePlayerCount(count);
                     BroadcastAll(new { proto = "MsgOnlineCount", count });
                     if (deliveredVersion == Volatile.Read(ref _onlineBroadcastVersion)) break;

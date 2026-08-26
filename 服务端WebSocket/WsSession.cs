@@ -56,6 +56,8 @@ public class WsSession
     private int _maxOutboundDepth;
     private readonly object _rateLimitGate = new();
     private readonly Dictionary<string, RateBucket> _rateBuckets = new(StringComparer.Ordinal);
+    private int _superseded;
+    private int _supersededCleanupStarted;
 
     /// <summary>由握手能力协商决定；旧客户端保持完整快照。</summary>
     public bool SupportsDeltaSnapshots { get; set; }
@@ -64,6 +66,11 @@ public class WsSession
     internal int SnapshotDeltasSinceFull { get; private set; }
 
     public bool IsLoggedIn => Account is not null;
+    /// <summary>
+    /// 当前连接已被同账号的新连接替代。该状态不可逆；一旦失去账号权威，旧连接不得再收发业务消息，
+    /// 但仍保留 Account 供乱序断开时完成房间、邀请等会话级清理。
+    /// </summary>
+    public bool IsSuperseded => Volatile.Read(ref _superseded) != 0;
     public long MergedStateCount => Interlocked.Read(ref _mergedStateCount);
     public long DroppedOutboundCount => Interlocked.Read(ref _droppedOutboundCount);
     public int OutboundDepth { get { lock (_outboundGate) return _outbound.Count; } }
@@ -113,7 +120,7 @@ public class WsSession
     {
         lock (_outboundGate)
         {
-            if (_senderStopping || _sender is null) return false;
+            if (_senderStopping || _sender is null || IsSuperseded) return false;
             var enqueuedAt = LatencyDiagnostics.Start();
 
             if (coalesceKey is not null && _coalesced.TryGetValue(coalesceKey, out var replaceable))
@@ -184,6 +191,22 @@ public class WsSession
         }
         return completion.Task;
     }
+
+    /// <summary>原子标记为已被替代，并丢弃尚未发送的普通消息；终止通知由专用入口随后入队。</summary>
+    internal bool TryMarkSuperseded()
+    {
+        if (Interlocked.CompareExchange(ref _superseded, 1, 0) != 0) return false;
+        lock (_outboundGate)
+        {
+            _outbound.Clear();
+            _coalesced.Clear();
+        }
+        return true;
+    }
+
+    /// <summary>保证同一旧会话只启动一个终止与强制回收流程。</summary>
+    internal bool TryBeginSupersededCleanup()
+        => Interlocked.CompareExchange(ref _supersededCleanupStarted, 1, 0) == 0;
 
     private async Task SenderLoopAsync()
     {
