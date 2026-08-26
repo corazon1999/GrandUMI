@@ -524,7 +524,7 @@ export default function LeaderLeaderboardPanel() {
           <span>赛季 <strong className="ml-1 text-white">{rankProfile?.seasonId ?? "加载中"}</strong></span>
           <span>已上榜 <strong className="ml-1 text-white">{rankLeaderboard.length}</strong> 名玩家</span>
           <span className="text-emerald-400/80">个人积分实时</span>
-          <span className="text-gray-500">公共榜单约每 15 秒更新</span>
+          <span className="text-gray-500">公共榜单每 10 分钟更新</span>
           {rankSnapshotRequest.generatedAtUtc && (
             <span className={rankSnapshotStale ? "font-bold text-amber-300" : "text-gray-600"}>
               {rankSnapshotStale ? "当前显示上一版 · " : ""}

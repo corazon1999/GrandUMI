@@ -32,6 +32,10 @@ export interface RankSnapshotSeasonTransition {
   clearPublicSnapshot: boolean;
 }
 
+export const RANK_LEADERBOARD_REFRESH_INTERVAL_MS = 10 * 60_000;
+// 连续约三轮公共快照未成功才提示陈旧，避免正常刷新间隔被误报为故障。
+export const RANK_SNAPSHOT_STALE_AFTER_MS = RANK_LEADERBOARD_REFRESH_INTERVAL_MS * 3;
+
 export const INITIAL_RANK_SNAPSHOT_REQUEST_STATE: RankSnapshotRequestState = {
   phase: "idle",
   requestId: null,
@@ -170,7 +174,7 @@ export function acceptRankSnapshot(
 export function isRankSnapshotStale(
   generatedAtUtc: string | null,
   nowMs = Date.now(),
-  staleAfterMs = 45_000,
+  staleAfterMs = RANK_SNAPSHOT_STALE_AFTER_MS,
 ): boolean {
   if (!generatedAtUtc) return false;
   const generatedAtMs = Date.parse(generatedAtUtc);

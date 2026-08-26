@@ -194,7 +194,7 @@ public sealed class RankedStore
     public const int ThreeHundredMillionBountyRankPoints = 3000;
     public const int SixHundredMillionBountyRankPoints = 6000;
     public const int TenBillionBountyRankPoints = 10000;
-    public static readonly TimeSpan LeaderboardRefreshInterval = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan LeaderboardRefreshInterval = TimeSpan.FromMinutes(10);
     private static readonly int[] PermanentBountyProtectionFloors =
     [
         TenBillionBountyRankPoints,

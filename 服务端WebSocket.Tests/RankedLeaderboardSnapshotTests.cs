@@ -7,6 +7,12 @@ namespace GrandUMI.Tests;
 public sealed class RankedLeaderboardSnapshotTests
 {
     [Fact]
+    public void 标准与狂野公共榜单共用十分钟刷新周期()
+    {
+        Assert.Equal(TimeSpan.FromMinutes(10), RankedStore.LeaderboardRefreshInterval);
+    }
+
+    [Fact]
     public void 请求组合实时个人资料与上一版公共榜单()
     {
         using var fixture = new SnapshotFixture();

@@ -4,6 +4,8 @@ import test from "node:test";
 
 import {
   INITIAL_RANK_SNAPSHOT_REQUEST_STATE,
+  RANK_LEADERBOARD_REFRESH_INTERVAL_MS,
+  RANK_SNAPSHOT_STALE_AFTER_MS,
   acceptRankSnapshot,
   beginRankSnapshotRequest,
   failRankSnapshotRequest,
@@ -94,8 +96,10 @@ test("新赛季与陈旧快照状态按边界处理", () => {
   assert.equal(lateOldSeason.state.seasonId, "S2");
   assert.equal(lateOldSeason.state.snapshotVersion, 21);
 
-  assert.equal(isRankSnapshotStale("2026-08-26T10:00:00.000Z", Date.parse("2026-08-26T10:00:44.000Z")), false);
-  assert.equal(isRankSnapshotStale("2026-08-26T10:00:00.000Z", Date.parse("2026-08-26T10:00:46.000Z")), true);
+  assert.equal(RANK_LEADERBOARD_REFRESH_INTERVAL_MS, 10 * 60_000);
+  assert.equal(RANK_SNAPSHOT_STALE_AFTER_MS, 30 * 60_000);
+  assert.equal(isRankSnapshotStale("2026-08-26T10:00:00.000Z", Date.parse("2026-08-26T10:29:59.000Z")), false);
+  assert.equal(isRankSnapshotStale("2026-08-26T10:00:00.000Z", Date.parse("2026-08-26T10:30:01.000Z")), true);
 });
 
 test("实时资料切换到新赛季时清空旧榜单版本且拒绝旧赛季资料回放", () => {
@@ -135,4 +139,5 @@ test("协议层实际接入 8 秒超时、发送失败和 44px 重试按钮", as
   assert.match(store, /transitionRankSnapshotSeason[\s\S]*rankLeaderboards:[\s\S]*\[mode\]: \[\]/);
   assert.match(panel, /重试加载[\s\S]*|min-h-11 min-w-11/);
   assert.match(panel, /min-h-11 min-w-11[\s\S]*重试/);
+  assert.match(panel, /公共榜单每 10 分钟更新/);
 });
