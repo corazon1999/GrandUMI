@@ -190,7 +190,8 @@ public sealed class AuthoritativeOnlineSessionTests : IDisposable
         bool isResume,
         out WsSession? supersededSession)
     {
-        _clientInstanceIds.Add(clientInstanceId);
+        // 并发重连风暴测试会从多个工作线程同时登记清理键，普通 HashSet 不能并发写。
+        lock (_clientInstanceIds) _clientInstanceIds.Add(clientInstanceId);
         object?[] args = [session, account, clientInstanceId, isResume, null];
         var result = (bool)TryBindAccountSession.Invoke(null, args)!;
         supersededSession = args[4] as WsSession;

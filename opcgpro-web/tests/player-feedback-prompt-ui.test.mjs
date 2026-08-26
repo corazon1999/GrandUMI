@@ -176,9 +176,11 @@ test("公开牌浮层不会因普通快照或卡图映射变化反复重置计�
 
 test("同赛季更旧的排位快照不会覆盖刚完成的结算", async () => {
   const store = await readSource("../src/store/netStore.ts");
+  const snapshotState = await readSource("../src/lib/rankSnapshotState.ts");
 
   assert.match(store, /const current = state\.rankProfiles\[mode\]/);
-  assert.match(store, /current\?\.seasonId === rankProfile\.seasonId/);
-  assert.match(store, /rankProfile\.games < current\.games/);
+  assert.match(store, /shouldReplaceRankProfile\(current, rankProfile\)/);
   assert.match(store, /return \{\};/);
+  assert.match(snapshotState, /current\.seasonId === incoming\.seasonId/);
+  assert.match(snapshotState, /incoming\.games >= current\.games/);
 });

@@ -10,10 +10,12 @@ test("同账号新登录会向旧连接发送终止通知和专用关闭码", as
 
   assert.match(server, /SessionReplacedCloseCode = 4009/);
   assert.match(server, /proto = "MsgSessionReplaced"/);
-  assert.match(server, /SupersedeSession\(superseded\)/);
+  assert.match(server, /if \(supersededSession is not null\)\s+SupersedeSession\(supersededSession\)/);
   assert.match(server, /IsSupersededClientInstance\(clientInstanceId\)/);
-  assert.match(server, /!string\.Equals\(superseded\.ClientInstanceId, clientInstanceId, StringComparison\.Ordinal\)/);
-  assert.match(server, /MarkClientInstanceSuperseded\(superseded\.ClientInstanceId\)/);
+  assert.match(
+    server,
+    /!string\.Equals\((\w+)\.ClientInstanceId, clientInstanceId, StringComparison\.Ordinal\)\)\s+MarkClientInstanceSuperseded\(\1\.ClientInstanceId\)/,
+  );
   assert.doesNotMatch(server, /superseded\.Socket\.Abort\(\)/);
   assert.match(session, /EnqueueTerminalAsync/);
 });
