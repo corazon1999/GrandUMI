@@ -2,8 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { cardBackImageSrc, cardBackName, normalizeCardBackId } from "@/lib/cardBacks";
+import {
+  cardBackImageSrc,
+  cardBackName,
+  DEFAULT_CARD_BACK_ID,
+  normalizeCardBackId,
+} from "@/lib/cardBacks";
+import { resolveVisibleCardBackId } from "@/lib/cardBackVisibility.mjs";
 import { assetSrc, directAssetSrc } from "@/lib/sprite";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000;
 
@@ -44,16 +51,26 @@ const themes = {
 
 export default function CardBack({
   cardBackId,
+  side,
   className,
   decorative = false,
   lazy = false,
 }: {
   cardBackId?: string | null;
+  /** 牌桌按当前主视角归一化后的区域归属；非牌桌预览不传。 */
+  side?: "my" | "opponent";
   className?: string;
   decorative?: boolean;
   lazy?: boolean;
 }) {
-  const id = normalizeCardBackId(cardBackId);
+  const hideOpponentCardBack = useSettingsStore((state) => state.hideOpponentCardBack);
+  const visibleCardBackId = resolveVisibleCardBackId(
+    cardBackId,
+    side,
+    hideOpponentCardBack,
+    DEFAULT_CARD_BACK_ID,
+  );
+  const id = normalizeCardBackId(visibleCardBackId);
   const customImagePath = cardBackImageSrc(id);
   const customImage = customImagePath ? assetSrc(customImagePath) : null;
   const [customImageSrc, setCustomImageSrc] = useState(customImage ?? "");

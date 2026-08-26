@@ -217,7 +217,7 @@ function FlyingCard({
           className="absolute inset-0 overflow-hidden rounded-md"
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
-          <CardBack cardBackId={flight.cardBackId} decorative />
+          <CardBack cardBackId={flight.cardBackId} side={flight.side} decorative />
         </div>
       </motion.div>
     </motion.div>

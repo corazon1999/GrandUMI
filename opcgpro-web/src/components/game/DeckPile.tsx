@@ -30,7 +30,7 @@ export default function DeckPile({ side }: Props) {
         <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-md border border-sky-300/20 bg-slate-950" />
         <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-md border border-sky-300/30 bg-blue-950" />
         <div className="absolute inset-0 overflow-hidden rounded-md shadow-xl shadow-black/40">
-          <CardBack cardBackId={player?.cardBackId} />
+          <CardBack cardBackId={player?.cardBackId} side={side} />
         </div>
         <div className="absolute -right-3 -top-3 flex h-8 min-w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950 px-1 text-base font-black text-white shadow">
           {count}

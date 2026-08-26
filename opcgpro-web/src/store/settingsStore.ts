@@ -11,6 +11,7 @@ import { NetManager } from "@/net/NetManager";
  *   - cardSize: 卡牌显示大小
  *   - animationSpeed: 对局动画速度
  *   - confirmAttachDon: 贴咚前是否需要二次确认
+ *   - hideOpponentCardBack: 是否将当前主视角看到的敌方卡背统一显示为经典款
  */
 
 const KEY = "grandumi_settings";
@@ -23,6 +24,7 @@ interface Settings {
   cardSize: CardSizePreference;
   animationSpeed: AnimationSpeed;
   confirmAttachDon: boolean;
+  hideOpponentCardBack: boolean;
 }
 
 const defaults: Settings = {
@@ -30,6 +32,7 @@ const defaults: Settings = {
   cardSize: "auto",
   animationSpeed: "standard",
   confirmAttachDon: false,
+  hideOpponentCardBack: false,
 };
 
 function loadFromStorage(): Settings {
@@ -51,6 +54,9 @@ function loadFromStorage(): Settings {
       confirmAttachDon: typeof parsed.confirmAttachDon === "boolean"
         ? parsed.confirmAttachDon
         : defaults.confirmAttachDon,
+      hideOpponentCardBack: typeof parsed.hideOpponentCardBack === "boolean"
+        ? parsed.hideOpponentCardBack
+        : defaults.hideOpponentCardBack,
     };
   } catch { return defaults; }
 }
@@ -66,11 +72,24 @@ interface SettingsStore extends Settings {
   setCardSize: (v: CardSizePreference) => void;
   setAnimationSpeed: (v: AnimationSpeed) => void;
   setConfirmAttachDon: (v: boolean) => void;
+  setHideOpponentCardBack: (v: boolean) => void;
 }
 
 function persistCurrent() {
-  const { alwaysPromptOnLifeReveal, cardSize, animationSpeed, confirmAttachDon } = useSettingsStore.getState();
-  saveToStorage({ alwaysPromptOnLifeReveal, cardSize, animationSpeed, confirmAttachDon });
+  const {
+    alwaysPromptOnLifeReveal,
+    cardSize,
+    animationSpeed,
+    confirmAttachDon,
+    hideOpponentCardBack,
+  } = useSettingsStore.getState();
+  saveToStorage({
+    alwaysPromptOnLifeReveal,
+    cardSize,
+    animationSpeed,
+    confirmAttachDon,
+    hideOpponentCardBack,
+  });
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -101,6 +120,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setConfirmAttachDon: (v) => {
     set({ confirmAttachDon: v });
+    persistCurrent();
+  },
+
+  setHideOpponentCardBack: (v) => {
+    set({ hideOpponentCardBack: v });
     persistCurrent();
   },
 }));

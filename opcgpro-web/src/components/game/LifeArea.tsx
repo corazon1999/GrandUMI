@@ -96,7 +96,7 @@ export default function LifeArea({ side }: Props) {
                     liftOnSelect={false}
                   />
                 ) : (
-                  <CardBack cardBackId={player?.cardBackId} className="shadow-xl shadow-black/35" />
+                  <CardBack cardBackId={player?.cardBackId} side={side} className="shadow-xl shadow-black/35" />
                 )}
               </div>
             );
@@ -154,6 +154,7 @@ export default function LifeArea({ side }: Props) {
                           card={isFaceUp ? getGameCard(info!.number!, player?.spriteMap) ?? null : null}
                           faceDown={!isFaceUp}
                           cardBackId={player?.cardBackId}
+                          cardBackSide={side}
                           size="md"
                           hideCounter
                           hidePower

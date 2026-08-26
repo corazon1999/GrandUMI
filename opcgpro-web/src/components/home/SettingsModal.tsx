@@ -64,9 +64,11 @@ export default function SettingsModal({
   const cardSize = useSettingsStore((state) => state.cardSize);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const confirmAttachDon = useSettingsStore((state) => state.confirmAttachDon);
+  const hideOpponentCardBack = useSettingsStore((state) => state.hideOpponentCardBack);
   const setCardSize = useSettingsStore((state) => state.setCardSize);
   const setAnimationSpeed = useSettingsStore((state) => state.setAnimationSpeed);
   const setConfirmAttachDon = useSettingsStore((state) => state.setConfirmAttachDon);
+  const setHideOpponentCardBack = useSettingsStore((state) => state.setHideOpponentCardBack);
   const compactLandscape = useLayoutQuarterTurn();
   const compactSectionClass = compactLandscape
     ? "rounded-xl border border-gray-800 bg-gray-950/40 p-3"
@@ -182,6 +184,40 @@ export default function SettingsModal({
               {label}
             </button>
           ))}
+        </div>
+        <div
+          data-opponent-card-back-setting
+          className="mt-4 flex flex-col items-stretch gap-3 rounded-xl border border-gray-800 bg-gray-950/60 p-3 @[420px]:flex-row @[420px]:items-center @[420px]:justify-between"
+        >
+          <div>
+            <h4 id="hide-opponent-card-back-title" className="text-sm font-bold text-gray-200">屏蔽对手卡背</h4>
+            <p id="hide-opponent-card-back-description" className="mt-1 text-xs leading-5 text-gray-500">
+              开启后，敌方手牌、牌库、生命区等背面牌统一显示为经典卡背；不影响我方卡背和公开牌。
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hideOpponentCardBack}
+            aria-labelledby="hide-opponent-card-back-title"
+            aria-describedby="hide-opponent-card-back-description"
+            onClick={() => setHideOpponentCardBack(!hideOpponentCardBack)}
+            className={`flex min-h-12 min-w-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold transition-colors @[420px]:w-auto ${
+              hideOpponentCardBack
+                ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                : "border-gray-700 bg-gray-950 text-gray-400 hover:border-gray-500"
+            }`}
+          >
+            <span>{hideOpponentCardBack ? "屏蔽开启" : "屏蔽关闭"}</span>
+            <span
+              aria-hidden="true"
+              className={`relative h-6 w-11 rounded-full transition-colors ${hideOpponentCardBack ? "bg-emerald-500" : "bg-gray-700"}`}
+            >
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${hideOpponentCardBack ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </span>
+          </button>
         </div>
       </section>
 

@@ -27,6 +27,8 @@ interface Props {
   faceDown?: boolean;
   /** 暗置时使用的公开卡背外观；旧快照或无效值自动回退经典款。 */
   cardBackId?: string;
+  /** 暗置牌所在的主视角区域；用于仅屏蔽 opponent 卡背。 */
+  cardBackSide?: "my" | "opponent";
   /** 隐藏反击值徽标（卡牌在场上时反击值无意义，仅手牌防御时显示） */
   hideCounter?: boolean;
   /** 当前有效反击值（含场上静态效果）；未提供时使用卡牌印刷值 */
@@ -72,6 +74,7 @@ export default function CardItem({
   attachedDonCount = 0,
   faceDown = false,
   cardBackId,
+  cardBackSide,
   hideCounter = false,
   counterValue,
   hidePower = false,
@@ -280,7 +283,7 @@ export default function CardItem({
       whileHover={!isSelected ? { scale: 1.03 } : {}}
     >
       {showFaceDown ? (
-        <CardBack cardBackId={cardBackId} />
+        <CardBack cardBackId={cardBackId} side={cardBackSide} />
       ) : (
         <>
           {!imageFailed ? (
