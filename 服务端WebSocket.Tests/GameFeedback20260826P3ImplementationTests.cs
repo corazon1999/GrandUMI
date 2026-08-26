@@ -22,14 +22,16 @@ public class GameFeedback20260826P3ImplementationTests
         ]);
         var prompts = new MockPromptService()
             .QueueConfirm(true)
-            .QueueConfirm(true);
+            .QueueChoose(opponent.CostArea.Select(don => don.Id.ToString()).ToArray());
 
         await EffectRuntime.Resolve(
             state, 0, Card("OP12-037"), EffectTrigger.EventMain, prompts);
 
         Assert.Equal(3, me.CostArea.Count(don => don.State == DonState.Rest));
         Assert.All(opponent.CostArea, don => Assert.Equal(DonState.Rest, don.State));
-        Assert.Empty(prompts.ChooseHistory);
+        var prompt = Assert.Single(prompts.ChooseHistory);
+        Assert.Equal("OpponentCharacterOrDon", prompt.kind);
+        Assert.Equal(opponent.CostArea.Select(don => don.Id.ToString()).ToArray(), prompt.choices);
     }
 
     [Fact]

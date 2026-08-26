@@ -12,8 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "将我方的 3 张咚!! 转为休息状态" 是发动【主要】的可选额外成本（需 ≥3 张活跃咚）。
 ///     与事件本身的印刷费用（1 费，由引擎在打出事件时支付）相互独立。
 ///   - 目标为"对方角色或咚!!"，合计最多 2 张：玩家可任意分配在对方角色与对方活跃咚上。
-///     先选要转休息的对方角色（0..2），剩余张数再从对方活跃咚中扣（自动取活跃咚）。
-///   - 咚不是 CardInstance，无法与角色放进同一 ChooseCards 候选，故拆成两步交互。
+///     角色与咚使用实例 ID 放进同一个选择提示，咚的展示信息通过 donChoices 下发。
 /// </summary>
 public class OP12_037_Asura : IScriptedEffect
 {
@@ -51,42 +50,50 @@ public class OP12_037_Asura : IScriptedEffect
         }
         if (rested < 3) return; // 理论上不会发生
 
-        // 效果：对方合计最多 2 张「角色或咚!!」转为休息
-        int budget = 2;
+        // 效果：从对方可被横置的活跃角色与活跃咚中，合计选择最多 2 张。
+        // 角色和咚必须处于同一个提示中，玩家才能自由组合，而不是先选角色后自动处理咚。
+        bool CanChooseCharacter(CardInstance card)
+            => !card.IsTapped
+               && !card.HasRestriction(RestrictionKind.CannotBeChosen)
+               && !card.HasRestriction(RestrictionKind.CannotBeRested)
+               && !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeChosen)
+               && !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested);
 
-        // 第一步：选择要转休息的对方角色（只在活跃角色中选，休息的转休息无意义）
-        var oppActiveChars = opp.Characters.Where(c => !c.IsTapped).ToList();
-        if (oppActiveChars.Count > 0)
-        {
-            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
-                $"选择最多 {budget} 张对方角色转为休息状态",
-                oppActiveChars.Select(c => c.Id.ToString()).ToList(), 0, budget);
-            foreach (var cid in chosen)
-            {
-                var card = oppActiveChars.FirstOrDefault(c => c.Id.ToString() == cid);
-                if (card is not null) { AtomicOps.RestCard(card); budget--; }
-            }
-        }
+        var activeCharacters = opp.Characters.Where(CanChooseCharacter).ToList();
+        var activeDons = opp.CostArea.Where(don => don.State == DonState.Active).ToList();
+        var validChoices = activeCharacters.Select(card => card.Id.ToString())
+            .Concat(activeDons.Select(don => don.Id.ToString()))
+            .ToList();
+        if (validChoices.Count == 0) return;
 
-        // 第二步：剩余预算从对方活跃咚中扣，转为休息
-        if (budget > 0)
-        {
-            int oppActiveDon = opp.CostArea.Count(d => d.State == DonState.Active);
-            int restDon = Math.Min(budget, oppActiveDon);
-            if (restDon > 0)
+        var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterOrDon",
+            "选择对方最多 2 张活跃角色或活跃咚!!转为休息状态",
+            validChoices, 0, 2,
+            new Dictionary<string, object?>
             {
-                bool restThem = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-                    $"将对方 {restDon} 张活跃咚!! 转为休息状态？");
-                if (restThem)
+                ["choiceCards"] = activeCharacters.Select(card => new
                 {
-                    int done = 0;
-                    foreach (var d in opp.CostArea)
-                    {
-                        if (done >= restDon) break;
-                        if (d.State == DonState.Active) { d.State = DonState.Rest; done++; }
-                    }
-                }
+                    id = card.Id.ToString(),
+                    number = card.Info.Number,
+                }).ToList(),
+                ["donChoices"] = activeDons.Select(don => new
+                {
+                    id = don.Id.ToString(),
+                    state = don.State.ToString(),
+                }).ToList(),
+            });
+
+        foreach (var id in chosen)
+        {
+            var character = activeCharacters.FirstOrDefault(card => card.Id.ToString() == id);
+            if (character is not null)
+            {
+                AtomicOps.RestCard(character);
+                continue;
             }
+
+            var don = activeDons.FirstOrDefault(candidate => candidate.Id.ToString() == id);
+            if (don is not null && don.State == DonState.Active) don.State = DonState.Rest;
         }
     }
 }
