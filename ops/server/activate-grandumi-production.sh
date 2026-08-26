@@ -6,8 +6,26 @@ repo=/opt/grandumi
 import_dir=/data/grandumi-import/final
 archive_dir="/data/grandumi-archives/pre-production-$(date -u +%Y%m%dT%H%M%SZ)"
 switched=0
+domain_mode="$(cat /etc/grandumi/primary-domain-mode 2>/dev/null || echo legacy)"
+
+case "$domain_mode" in
+  legacy) primary_domain=grand-umi.com ;;
+  ygo) primary_domain=ygo.grand-umi.com ;;
+  *) echo "错误：未知正式主域模式：$domain_mode" >&2; exit 1 ;;
+esac
 
 die() { echo "错误：$*" >&2; exit 1; }
+verify_production_routes() {
+  curl -fsS --resolve "$primary_domain:443:127.0.0.1" \
+    "https://$primary_domain/backend/ready" >/dev/null
+  curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
+    https://direct.grand-umi.com/backend/ready >/dev/null
+  if [[ "$domain_mode" == ygo ]]; then
+    old_code="$(curl -sS --resolve grand-umi.com:443:127.0.0.1 \
+      -o /dev/null -w '%{http_code}' https://grand-umi.com/)"
+    [[ "$old_code" == 403 ]] || die "旧主域未拒绝访问：HTTP $old_code"
+  fi
+}
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位提交号"
 [[ "$(tr -d '\r\n' < /var/lib/grandumi-production-staged)" == "$target" ]] || die "预构建版本与目标版本不一致"
 [[ -d "$repo/releases/$target/backend" && -d "$repo/releases/$target/frontend" ]] \
@@ -24,10 +42,7 @@ if [[ "$active_slot" =~ ^[ab]$ \
   port=8080; [[ "$active" == b ]] && port=8082
   curl -fsS "http://127.0.0.1:$port/version" | grep -Fq "$target" \
     || die "切换后版本与目标提交不一致"
-  curl -kfsS --resolve grand-umi.com:443:127.0.0.1 \
-    https://grand-umi.com/backend/ready >/dev/null
-  curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
-    https://direct.grand-umi.com/backend/ready >/dev/null
+  verify_production_routes
   printf '%s\n' "$target" > /var/lib/grandumi-production-deployed.next
   mv /var/lib/grandumi-production-deployed.next /var/lib/grandumi-production-deployed
   echo "新正式服 A/B 发布成功：$target（活动槽位 $active）"
@@ -60,8 +75,8 @@ else
   die "正式数据目录只存在 $existing_count/${#database_names[@]} 个数据库，拒绝覆盖或激活"
 fi
 
-# 候选服自动部署可能在预构建后重新创建旧站点；正式双域名站点已经同时
-# 服务 grand-umi.com 与 candidate.grand-umi.com，激活前必须清理重复监听。
+# 候选服自动部署可能在预构建后重新创建旧站点；正式站点激活前必须清理
+# 候选域的重复监听，主域由持久化模式文件决定，不能在这里隐式切换。
 systemctl daemon-reload
 ln -sfn /etc/nginx/sites-available/grandumi-production /etc/nginx/sites-enabled/grandumi-production
 rm -f /etc/nginx/sites-enabled/grandumi-candidate
@@ -119,9 +134,7 @@ curl -fsS --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/ 
 nginx -t
 systemctl reload nginx
 systemctl enable --now grandumi-production-health.timer
-curl -kfsS --resolve grand-umi.com:443:127.0.0.1 https://grand-umi.com/backend/ready >/dev/null
-curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
-  https://direct.grand-umi.com/backend/ready >/dev/null
+verify_production_routes
 printf '%s\n' "$target" > /var/lib/grandumi-production-deployed.next
 mv /var/lib/grandumi-production-deployed.next /var/lib/grandumi-production-deployed
 

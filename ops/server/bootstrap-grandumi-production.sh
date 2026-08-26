@@ -4,6 +4,7 @@ set -Eeuo pipefail
 repo=/opt/grandumi
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
+domain_mode_file=/etc/grandumi/primary-domain-mode
 
 [[ "$production_ip" == "103.146.230.37" ]] || { echo "拒绝在未登记主机上初始化：$production_ip" >&2; exit 1; }
 [[ -f /etc/letsencrypt/live/grand-umi.com/fullchain.pem ]] || { echo "缺少 grand-umi.com 证书" >&2; exit 1; }
@@ -14,6 +15,27 @@ production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
 openssl x509 -in /etc/letsencrypt/live/direct.grand-umi.com/fullchain.pem \
   -noout -checkhost direct.grand-umi.com >/dev/null \
   || { echo "direct.grand-umi.com 证书主机名校验失败" >&2; exit 1; }
+
+domain_mode="$(cat "$domain_mode_file" 2>/dev/null || echo legacy)"
+case "$domain_mode" in
+  legacy)
+    primary_domain=grand-umi.com
+    production_nginx_source="$source_root/ops/server/grandumi-production.nginx"
+    ;;
+  ygo)
+    primary_domain=ygo.grand-umi.com
+    production_nginx_source="$source_root/ops/server/grandumi-production-ygo.nginx"
+    [[ -f /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem ]] \
+      || { echo "域名模式为 ygo，但缺少 ygo.grand-umi.com 证书" >&2; exit 1; }
+    openssl x509 -in /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem \
+      -noout -checkhost ygo.grand-umi.com >/dev/null \
+      || { echo "ygo.grand-umi.com 证书主机名校验失败" >&2; exit 1; }
+    ;;
+  *)
+    echo "未知正式主域模式：$domain_mode" >&2
+    exit 1
+    ;;
+esac
 
 id grandumi >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin grandumi
 install -d -o grandumi -g grandumi -m 0750 /data/grandumi
@@ -47,6 +69,8 @@ install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /u
 install -m 0755 "$source_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$source_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
 install -m 0755 "$source_root/ops/server/enable-grandumi-assets.sh" /usr/local/sbin/enable-grandumi-assets
+install -m 0755 "$source_root/ops/server/prepare-grandumi-ygo-tls.sh" /usr/local/sbin/prepare-grandumi-ygo-tls
+install -m 0755 "$source_root/ops/server/switch-grandumi-primary-domain.sh" /usr/local/sbin/switch-grandumi-primary-domain
 install -m 0755 "$source_root/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
 install -m 0644 "$source_root/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
 install -m 0644 "$source_root/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path
@@ -55,10 +79,29 @@ install -m 0644 "$source_root/ops/server/grandumi-production-health.timer" /etc/
 install -m 0644 "$source_root/ops/server/grandumi-matchlog-maintenance.service" /etc/systemd/system/grandumi-matchlog-maintenance.service
 install -m 0644 "$source_root/ops/server/grandumi-matchlog-maintenance.timer" /etc/systemd/system/grandumi-matchlog-maintenance.timer
 install -m 0644 "$source_root/ops/server/grandumi-production-proxy.nginx" /etc/nginx/snippets/grandumi-production-proxy.conf
-install -m 0644 "$source_root/ops/server/grandumi-production.nginx" /etc/nginx/sites-available/grandumi-production
+install -m 0644 "$source_root/ops/server/grandumi-production.nginx" /etc/nginx/sites-available/grandumi-production-legacy
+install -m 0644 "$source_root/ops/server/grandumi-production-ygo.nginx" /etc/nginx/sites-available/grandumi-production-ygo
+install -m 0644 "$source_root/ops/server/grandumi-ygo-acme.nginx" /etc/nginx/sites-available/grandumi-ygo-acme-template
+install -m 0644 "$source_root/ops/server/grandumi-ygo-precut.nginx" /etc/nginx/sites-available/grandumi-ygo-precut-template
+install -m 0644 "$production_nginx_source" /etc/nginx/sites-available/grandumi-production
 install -m 0644 "$source_root/ops/server/grandumi-assets-acme.nginx" /etc/nginx/sites-available/grandumi-assets-acme
 install -m 0644 "$source_root/ops/server/grandumi-assets.nginx" /etc/nginx/sites-available/grandumi-assets
 ln -sfn /etc/nginx/sites-available/grandumi-production /etc/nginx/sites-enabled/grandumi-production
+if [[ "$domain_mode" == legacy ]]; then
+  if [[ -f /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem ]] \
+      && openssl x509 -in /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem \
+        -noout -checkhost ygo.grand-umi.com >/dev/null 2>&1; then
+    install -m 0644 "$source_root/ops/server/grandumi-ygo-precut.nginx" \
+      /etc/nginx/sites-available/grandumi-ygo-precut
+  else
+    install -m 0644 "$source_root/ops/server/grandumi-ygo-acme.nginx" \
+      /etc/nginx/sites-available/grandumi-ygo-precut
+  fi
+  ln -sfn /etc/nginx/sites-available/grandumi-ygo-precut \
+    /etc/nginx/sites-enabled/grandumi-ygo-precut
+else
+  rm -f /etc/nginx/sites-enabled/grandumi-ygo-precut
+fi
 if [[ -f /etc/letsencrypt/live/assets.grand-umi.com/fullchain.pem ]] \
     && openssl x509 -in /etc/letsencrypt/live/assets.grand-umi.com/fullchain.pem \
       -noout -checkhost assets.grand-umi.com >/dev/null 2>&1; then
@@ -81,7 +124,14 @@ systemctl enable --now grandumi-production-health.timer grandumi-matchlog-mainte
 nginx -t
 systemctl reload nginx
 
-curl -kfsS --resolve grand-umi.com:443:127.0.0.1 https://grand-umi.com/backend/ready >/dev/null
-curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
-  https://direct.grand-umi.com/backend/ready >/dev/null
-echo "新正式服主域名与低延迟直连入口已预置：IP=$production_ip"
+if systemctl is-active --quiet grandumi-production-backend.service \
+    || systemctl is-active --quiet grandumi-production-backend@a.service \
+    || systemctl is-active --quiet grandumi-production-backend@b.service; then
+  curl -fsS --resolve "$primary_domain:443:127.0.0.1" \
+    "https://$primary_domain/backend/ready" >/dev/null
+  curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
+    https://direct.grand-umi.com/backend/ready >/dev/null
+  echo "新正式服主域名与低延迟直连入口已预置：模式=$domain_mode，IP=$production_ip"
+else
+  echo "正式后端当前已停止；已完成主域配置预置但跳过就绪探测：模式=$domain_mode，IP=$production_ip"
+fi

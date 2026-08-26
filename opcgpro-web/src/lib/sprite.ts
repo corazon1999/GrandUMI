@@ -7,8 +7,8 @@ import { DATA_VERSION } from "@/data/dataVersion";
 // 外部 URL、data URL 和已经是派生图的路径保持原样。
 
 export const CARD_BACK_SRC = "/sprites-thumb/CardBack.webp";
-const PRODUCTION_HOST = "grand-umi.com";
-const PRODUCTION_DIRECT_ORIGIN = "https://grand-umi.com";
+const PRODUCTION_HOSTS = new Set(["ygo.grand-umi.com", "grand-umi.com"]);
+const PRODUCTION_DIRECT_ORIGIN = "https://direct.grand-umi.com";
 const CONFIGURED_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
 // 正式服迁移期间源站曾短暂返回整批 404；追加修订号绕过 CDN 和浏览器中的负缓存。
 const CARD_ASSET_VERSION = `${DATA_VERSION}-r6`;
@@ -60,7 +60,7 @@ export function displaySrc(src?: string | null): string {
  * 只在正式主域启用，避免本地和测试环境意外跨环境读取资源。
  */
 export function directAssetSrc(src: string): string | null {
-  if (typeof window === "undefined" || window.location.hostname !== PRODUCTION_HOST) return null;
+  if (typeof window === "undefined" || !PRODUCTION_HOSTS.has(window.location.hostname)) return null;
 
   const source = new URL(src, window.location.href);
   const configuredOrigin = CONFIGURED_ASSET_ORIGIN

@@ -5,6 +5,9 @@ import test from "node:test";
 const stage = await readFile(new URL("../../ops/server/stage-grandumi-production.sh", import.meta.url), "utf8");
 const activate = await readFile(new URL("../../ops/server/activate-grandumi-production.sh", import.meta.url), "utf8");
 const nginx = await readFile(new URL("../../ops/server/grandumi-production.nginx", import.meta.url), "utf8");
+const ygoNginx = await readFile(new URL("../../ops/server/grandumi-production-ygo.nginx", import.meta.url), "utf8");
+const ygoAcmeNginx = await readFile(new URL("../../ops/server/grandumi-ygo-acme.nginx", import.meta.url), "utf8");
+const ygoPrecutNginx = await readFile(new URL("../../ops/server/grandumi-ygo-precut.nginx", import.meta.url), "utf8");
 const backendService = await readFile(new URL("../../ops/server/grandumi-production-backend.service", import.meta.url), "utf8");
 const candidateNginx = await readFile(new URL("../../ops/server/grandumi-candidate-tls.nginx", import.meta.url), "utf8");
 const candidateBackendService = await readFile(new URL("../../ops/server/grandumi-candidate-backend.service", import.meta.url), "utf8");
@@ -13,6 +16,7 @@ const candidateBackup = await readFile(new URL("../../ops/server/grandumi-candid
 const candidateDeploy = await readFile(new URL("../../ops/server/deploy-grandumi-candidate.sh", import.meta.url), "utf8");
 const productionBootstrap = await readFile(new URL("../../ops/server/bootstrap-grandumi-production.sh", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../../deploy-new-hk-production.ps1", import.meta.url), "utf8");
+const emergencyDeploy = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
 const directTls = await readFile(new URL("../../ops/server/enable-grandumi-production-direct-tls.sh", import.meta.url), "utf8");
 const directTlsRenewHook = await readFile(new URL("../../ops/server/renew-grandumi-direct-certificate.sh", import.meta.url), "utf8");
 const directTlsCompatChain = await readFile(new URL("../../ops/server/isrg-root-x2-cross-signed.pem", import.meta.url), "utf8");
@@ -21,14 +25,26 @@ const enableEmergencyDirectRelay = await readFile(new URL("../../ops/server/enab
 const assetsNginx = await readFile(new URL("../../ops/server/grandumi-assets.nginx", import.meta.url), "utf8");
 const enableAssets = await readFile(new URL("../../ops/server/enable-grandumi-assets.sh", import.meta.url), "utf8");
 const productionSwitch = await readFile(new URL("../../ops/server/grandumi-production-switch.sh", import.meta.url), "utf8");
+const prepareYgoTls = await readFile(new URL("../../ops/server/prepare-grandumi-ygo-tls.sh", import.meta.url), "utf8");
+const switchPrimaryDomain = await readFile(new URL("../../ops/server/switch-grandumi-primary-domain.sh", import.meta.url), "utf8");
+const promoteApproved = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
+const bridge = await readFile(new URL("../../服务端WebSocket/WebSocketBridge.cs", import.meta.url), "utf8");
 
 test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
-  assert.match(stage, /NEXT_PUBLIC_WS_URL='wss:\/\/grand-umi\.com\/ws'/);
+  assert.match(stage, /NEXT_PUBLIC_WS_URL='wss:\/\/ygo\.grand-umi\.com\/ws'/);
   assert.match(stage, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
-  assert.match(stage, /"hosts":\["grand-umi\.com","direct\.grand-umi\.com"\]/);
+  assert.match(stage, /"hosts":\["ygo\.grand-umi\.com","direct\.grand-umi\.com"\]/);
   assert.match(stage, /wss:\/\/direct\.grand-umi\.com\/ws/);
+  assert.match(stage, /wss:\/\/ygo\.grand-umi\.com\/ws/);
   assert.doesNotMatch(stage, /wss:\/\/candidate\.grand-umi\.com\/ws/);
   assert.match(stage, /尚未切换服务/);
+  assert.match(emergencyDeploy, /NEXT_PUBLIC_WS_URL='wss:\/\/ygo\.grand-umi\.com\/ws'/);
+  assert.match(promoteApproved, /NEXT_PUBLIC_WS_URL='wss:\/\/ygo\.grand-umi\.com\/ws'/);
+  assert.doesNotMatch(
+    `${stage}\n${emergencyDeploy}\n${promoteApproved}`,
+    /NEXT_PUBLIC_WS_URL='wss:\/\/grand-umi\.com\/ws'/,
+  );
+  assert.match(bridge, /"ygo\.grand-umi\.com" => "ygo\.grand-umi\.com"/);
 });
 
 test("新正式服独立承载静态资源域名并跟随活动槽切换", () => {
@@ -59,7 +75,7 @@ test("正式服发布槽始终挂载不进入 Git 的共享卡图资源", () => 
   assert.match(stage, /"\$shared_asset_root"/);
 });
 
-test("正式入口同时承载主域名和独立证书的低延迟直连域名", () => {
+test("切换前模板继续承载旧主域，预构建不会提前拒绝现网", () => {
   assert.match(nginx, /server_name grand-umi\.com;/);
   assert.match(nginx, /live\/grand-umi\.com\/fullchain\.pem/);
   assert.match(nginx, /server_name direct\.grand-umi\.com;/);
@@ -69,6 +85,46 @@ test("正式入口同时承载主域名和独立证书的低延迟直连域名",
   assert.match(candidateNginx, /server_name candidate\.grand-umi\.com;/);
   assert.match(candidateNginx, /live\/candidate\.grand-umi\.com\/fullchain\.pem/);
   assert.doesNotMatch(candidateNginx, /default_server/);
+});
+
+test("切换后新主域与直连共享正式代理，旧主域只返回 403", () => {
+  assert.match(ygoNginx, /server_name ygo\.grand-umi\.com;/);
+  assert.match(ygoNginx, /live\/ygo\.grand-umi\.com\/fullchain\.pem/);
+  assert.match(ygoNginx, /server_name direct\.grand-umi\.com;/);
+  assert.match(ygoNginx, /live\/direct\.grand-umi\.com\/fullchain\.pem/);
+  assert.match(ygoNginx, /server_name grand-umi\.com;[\s\S]*return 403;/);
+  assert.equal((ygoNginx.match(/grandumi-production-proxy\.conf/g) ?? []).length, 2);
+});
+
+test("新主域证书准备始终保持 503 隔离，不会提前开放正式站点", () => {
+  assert.match(ygoAcmeNginx, /server_name ygo\.grand-umi\.com;/);
+  assert.match(ygoAcmeNginx, /live\/grand-umi\.com\/fullchain\.pem/);
+  assert.match(ygoAcmeNginx, /return 503;/);
+  assert.match(ygoPrecutNginx, /live\/ygo\.grand-umi\.com\/fullchain\.pem/);
+  assert.match(ygoPrecutNginx, /return 503;/);
+  assert.match(prepareYgoTls, /HTTP-01 预检/);
+  assert.match(prepareYgoTls, /certbot certonly --webroot/);
+  assert.match(prepareYgoTls, /-checkhost "\$domain"/);
+  assert.match(prepareYgoTls, /strict_code[\s\S]*503/);
+});
+
+test("主域切换只允许停机显式执行，并带并发锁、失败回滚和双槽配置更新", () => {
+  assert.match(switchPrimaryDomain, /cutover\|rollback/);
+  assert.match(switchPrimaryDomain, /flock -n 9/);
+  assert.match(switchPrimaryDomain, /systemctl is-active --quiet "\$unit"/);
+  assert.match(switchPrimaryDomain, /请先完成维护排空并停服/);
+  assert.match(switchPrimaryDomain, /8080\/8082 仍在监听/);
+  assert.match(switchPrimaryDomain, /rollback_failed_switch\(\)/);
+  assert.match(switchPrimaryDomain, /trap rollback_failed_switch ERR/);
+  assert.match(switchPrimaryDomain, /rollback_failed_switch 130/);
+  assert.match(switchPrimaryDomain, /old_code[\s\S]*== 403/);
+  assert.match(switchPrimaryDomain, /for slot in a b/);
+  assert.match(switchPrimaryDomain, /primary-domain-mode/);
+  assert.match(productionBootstrap, /cat "\$domain_mode_file"[\s\S]*echo legacy/);
+  assert.match(productionBootstrap, /grandumi-production-ygo\.nginx/);
+  assert.doesNotMatch(productionBootstrap, /switch-grandumi-primary-domain[^\n]*cutover/);
+  assert.match(activate, /primary_domain=ygo\.grand-umi\.com/);
+  assert.match(activate, /旧主域未拒绝访问/);
 });
 
 test("直连启用前必须完成 DNS 独占、证书主机名和活动槽运行时配置校验", () => {
@@ -131,11 +187,20 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /低延迟直连 TLS\/健康检查失败/);
 });
 
-test("应急直连中转固定进入新正式服并保留自动回滚", () => {
+test("应急直连中转按持久主域模式安全选择上游并保留自动回滚", () => {
   assert.match(emergencyDirectRelay, /direct\.grand-umi\.com/);
   assert.match(emergencyDirectRelay, /reverse_proxy https:\/\/103\.146\.230\.37/);
-  assert.match(emergencyDirectRelay, /header_up Host grand-umi\.com/);
-  assert.match(emergencyDirectRelay, /tls_server_name grand-umi\.com/);
+  assert.match(emergencyDirectRelay, /header_up Host __GRANDUMI_PRIMARY_DOMAIN__/);
+  assert.match(emergencyDirectRelay, /tls_server_name __GRANDUMI_PRIMARY_DOMAIN__/);
+  assert.doesNotMatch(emergencyDirectRelay, /header_up Host (?:grand-umi|ygo\.grand-umi)\.com/);
+  assert.match(enableEmergencyDirectRelay, /primary-domain-mode/);
+  assert.match(enableEmergencyDirectRelay, /legacy\) upstream_host=grand-umi\.com/);
+  assert.match(enableEmergencyDirectRelay, /ygo\) upstream_host=ygo\.grand-umi\.com/);
+  assert.match(enableEmergencyDirectRelay, /未知正式主域模式/);
+  assert.match(enableEmergencyDirectRelay, /flock -n 9/);
+  assert.match(enableEmergencyDirectRelay, /--resolve "\$upstream_host:443:103\.146\.230\.37"/);
+  assert.match(enableEmergencyDirectRelay, /"https:\/\/\$upstream_host\/backend\/ready"/);
+  assert.match(enableEmergencyDirectRelay, /placeholder_count[\s\S]*-eq 2/);
   assert.match(enableEmergencyDirectRelay, /direct\.grand-umi\.com\.caddy\.pre-relay-/);
   assert.match(enableEmergencyDirectRelay, /rollback\(\)/);
   assert.match(enableEmergencyDirectRelay, /caddy validate/);

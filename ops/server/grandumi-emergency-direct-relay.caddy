@@ -2,9 +2,9 @@
 # obtain a dedicated certificate for direct.grand-umi.com.
 direct.grand-umi.com {
 	reverse_proxy https://103.146.230.37 {
-		header_up Host grand-umi.com
+		header_up Host __GRANDUMI_PRIMARY_DOMAIN__
 		transport http {
-			tls_server_name grand-umi.com
+			tls_server_name __GRANDUMI_PRIMARY_DOMAIN__
 		}
 	}
 }

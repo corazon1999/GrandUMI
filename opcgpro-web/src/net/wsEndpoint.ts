@@ -1,5 +1,6 @@
 const LOCAL_WS_URL = "ws://localhost:8080/ws";
-const PRIMARY_HOST = "grand-umi.com";
+const PRIMARY_HOST = "ygo.grand-umi.com";
+const LEGACY_HOST = "grand-umi.com";
 const DIRECT_HOST = "direct.grand-umi.com";
 const RUNTIME_CONFIG_PATH = "/network-endpoints.json";
 const RUNTIME_CACHE_KEY = "grandumi_network_endpoints_v1";
@@ -21,11 +22,14 @@ export function buildWebSocketEndpoints(
   hostname?: string,
   pageProtocol = "https:",
 ): string[] {
-  if (hostname !== PRIMARY_HOST && hostname !== DIRECT_HOST) return [configuredUrl];
+  if (hostname !== PRIMARY_HOST && hostname !== DIRECT_HOST && hostname !== LEGACY_HOST) {
+    return [configuredUrl];
+  }
 
   const socketProtocol = pageProtocol === "http:" ? "ws" : "wss";
   const directUrl = `${socketProtocol}://${DIRECT_HOST}/ws`;
-  // 正式服优先香港直连，主域的代理入口作为跨线路兜底。
+  // 正式服优先香港直连，新主域的代理入口作为跨线路兜底。
+  // 切换窗口仍识别旧主域，确保已打开页面不会因域名切换失去直连能力。
   return uniqueEndpoints([directUrl, configuredUrl]);
 }
 

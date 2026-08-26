@@ -1,0 +1,29 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ygo.grand-umi.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        add_header Retry-After 3600 always;
+        return 503;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ygo.grand-umi.com;
+
+    ssl_certificate /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ygo.grand-umi.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    add_header Cache-Control "no-store" always;
+    add_header Retry-After 3600 always;
+    return 503;
+}

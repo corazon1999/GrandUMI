@@ -6,6 +6,28 @@ production_ip=103.146.230.37
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compat_source="$source_root/ops/server/isrg-root-x2-cross-signed.pem"
 renew_hook_source="$source_root/ops/server/renew-grandumi-direct-certificate.sh"
+domain_mode="$(cat /etc/grandumi/primary-domain-mode 2>/dev/null || echo legacy)"
+
+case "$domain_mode" in
+  legacy)
+    production_nginx_source="$source_root/ops/server/grandumi-production.nginx"
+    runtime_hosts='["grand-umi.com","direct.grand-umi.com"]'
+    runtime_fallback=wss://grand-umi.com/ws
+    ;;
+  ygo)
+    production_nginx_source="$source_root/ops/server/grandumi-production-ygo.nginx"
+    runtime_hosts='["ygo.grand-umi.com","direct.grand-umi.com"]'
+    runtime_fallback=wss://ygo.grand-umi.com/ws
+    [[ -f /etc/letsencrypt/live/ygo.grand-umi.com/fullchain.pem ]] || {
+      echo "域名模式为 ygo，但缺少 ygo.grand-umi.com 证书" >&2
+      exit 1
+    }
+    ;;
+  *)
+    echo "未知正式主域模式：$domain_mode" >&2
+    exit 1
+    ;;
+esac
 
 mapfile -t resolved_ipv4 < <(getent ahostsv4 "$domain" | awk '{ print $1 }' | sort -u)
 printf '%s\n' "${resolved_ipv4[@]}" | grep -Fxq "$production_ip" || {
@@ -36,7 +58,7 @@ openssl x509 -in "/etc/letsencrypt/live/$domain/fullchain.pem" \
 
 install -m 0644 "$source_root/ops/server/grandumi-production-proxy.nginx" \
   /etc/nginx/snippets/grandumi-production-proxy.conf
-install -m 0644 "$source_root/ops/server/grandumi-production.nginx" \
+install -m 0644 "$production_nginx_source" \
   /etc/nginx/sites-available/grandumi-production
 ln -sfn /etc/nginx/sites-available/grandumi-production \
   /etc/nginx/sites-enabled/grandumi-production
@@ -49,8 +71,8 @@ runtime_config="/opt/grandumi/slots/$active_slot/frontend/public/network-endpoin
   echo "活动前端槽不存在：$active_slot" >&2
   exit 1
 }
-cat > "$runtime_config.next" <<'JSON'
-{"version":1,"hosts":["grand-umi.com","direct.grand-umi.com"],"endpoints":[{"url":"wss://direct.grand-umi.com/ws","enabled":true},{"url":"wss://grand-umi.com/ws","enabled":true}]}
+cat > "$runtime_config.next" <<JSON
+{"version":1,"hosts":$runtime_hosts,"endpoints":[{"url":"wss://direct.grand-umi.com/ws","enabled":true},{"url":"$runtime_fallback","enabled":true}]}
 JSON
 mv "$runtime_config.next" "$runtime_config"
 

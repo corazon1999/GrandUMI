@@ -419,6 +419,7 @@ public static class WebSocketBridge
         if (endpointHost.Length > 100) endpointHost = endpointHost[..100];
         endpointHost = endpointHost.ToLowerInvariant() switch
         {
+            "ygo.grand-umi.com" => "ygo.grand-umi.com",
             "grand-umi.com" => "grand-umi.com",
             "direct.grand-umi.com" => "direct.grand-umi.com",
             "test.grand-umi.com" => "test.grand-umi.com",

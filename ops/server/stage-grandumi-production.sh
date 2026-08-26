@@ -62,9 +62,9 @@ dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release
 cd "$build_root/opcgpro-web"
 npm ci --no-audit --no-fund
 cat > public/network-endpoints.json <<'JSON'
-{"version":1,"hosts":["grand-umi.com","direct.grand-umi.com"],"endpoints":[{"url":"wss://direct.grand-umi.com/ws","enabled":true},{"url":"wss://grand-umi.com/ws","enabled":true}]}
+{"version":1,"hosts":["ygo.grand-umi.com","direct.grand-umi.com"],"endpoints":[{"url":"wss://direct.grand-umi.com/ws","enabled":true},{"url":"wss://ygo.grand-umi.com/ws","enabled":true}]}
 JSON
-if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' \
+if ! NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' \
     NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' \
     CARD_BACK_API_URL=http://127.0.0.1:8080 npm run build; then
   die "新正式服前端构建失败"

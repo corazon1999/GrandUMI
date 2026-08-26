@@ -124,7 +124,7 @@ if [[ "$need_front" == 1 ]]; then
   [[ "$need_npm" == 1 || ! -d node_modules ]] && npm ci
   rm -rf .next.previous
   [[ -d .next ]] && mv .next .next.previous
-  if ! NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' \
+  if ! NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' \
       NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' \
       CARD_BACK_API_URL='http://127.0.0.1:8080' npm run build; then
     rm -rf .next

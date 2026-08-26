@@ -6,12 +6,13 @@ const sprite = await readFile(new URL("../src/lib/sprite.ts", import.meta.url), 
 const catalog = await readFile(new URL("../src/components/home/CardCatalogPanel.tsx", import.meta.url), "utf8");
 const cardBack = await readFile(new URL("../src/components/ui/CardBack.tsx", import.meta.url), "utf8");
 
-test("正式主域图片可回退到 IPv4 直连入口", () => {
+test("新旧正式主域图片均可回退到保持不变的 IPv4 直连入口", () => {
   assert.match(sprite, /process\.env\.NEXT_PUBLIC_ASSET_ORIGIN/);
-  assert.match(sprite, /const PRODUCTION_DIRECT_ORIGIN = "https:\/\/grand-umi\.com"/);
+  assert.match(sprite, /"ygo\.grand-umi\.com", "grand-umi\.com"/);
+  assert.match(sprite, /const PRODUCTION_DIRECT_ORIGIN = "https:\/\/direct\.grand-umi\.com"/);
   assert.match(sprite, /export function assetSrc/);
   assert.match(sprite, /return assetSrc\(mapLocalSource/);
-  assert.match(sprite, /window\.location\.hostname !== PRODUCTION_HOST/);
+  assert.match(sprite, /PRODUCTION_HOSTS\.has\(window\.location\.hostname\)/);
   assert.match(sprite, /imageFallbackSources\(\[/);
 });
 

@@ -1,5 +1,5 @@
 ﻿# ============================================================
-#  deploy-hk.ps1 — 一键热更香港线上 (grand-umi.com @ 8.210.155.25)
+#  deploy-hk.ps1 — 一键热更香港线上 (ygo.grand-umi.com @ 8.210.155.25)
 #  用法:
 #    .\deploy-hk.ps1 -Emergency       # 紧急情况下直接发布正式服
 #    .\deploy-test.ps1                # 日常改动应先发布测试服
@@ -99,7 +99,7 @@ if ($serverHead -ne $localHead) {
 }
 
 $arg = if ($All) { "all" } else { "" }
-$productionBuildEnvironment = "NEXT_PUBLIC_WS_URL='wss://grand-umi.com/ws' NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' CARD_BACK_API_URL='http://127.0.0.1:8080'"
+$productionBuildEnvironment = "NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' CARD_BACK_API_URL='http://127.0.0.1:8080'"
 & $ssh -o BatchMode=yes $SRV "$productionBuildEnvironment bash /opt/grandumi/deploy.sh $arg"
 if ($LASTEXITCODE -ne 0) { Die "香港 deploy.sh 执行报错,请查香港日志。" }
 
@@ -107,7 +107,7 @@ $deployedHead = (& $ssh -o BatchMode=yes $SRV "git -C /opt/grandumi rev-parse HE
 if ($deployedHead -ne $localHead) { Die "香港版本校验失败：期望 $localHead，实际 $deployedHead" }
 
 # 用 curl.exe --noproxy 绕过本机代理(127.0.0.1:9098),否则代理会把直连香港的请求误判为失败
-$code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://grand-umi.com/"
+$code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://ygo.grand-umi.com/"
 if ($code -eq "200") {
   Write-Host "线上首页 HTTP 200 ✓ 部署成功" -ForegroundColor Green
 } else {

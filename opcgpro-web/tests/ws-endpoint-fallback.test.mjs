@@ -5,7 +5,7 @@ import ts from "typescript";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("正式服主域名和备用域名均优先香港直连，Cloudflare 作为兜底", async () => {
+test("新正式主域、直连域和切换前旧域均优先香港直连，新主域作为兜底", async () => {
   const source = await readSource("../src/net/wsEndpoint.ts");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -14,12 +14,16 @@ test("正式服主域名和备用域名均优先香港直连，Cloudflare 作为
   const { buildWebSocketEndpoints } = await import(moduleUrl);
 
   assert.deepEqual(
-    buildWebSocketEndpoints("wss://grand-umi.com/ws", "grand-umi.com", "https:"),
-    ["wss://direct.grand-umi.com/ws", "wss://grand-umi.com/ws"],
+    buildWebSocketEndpoints("wss://ygo.grand-umi.com/ws", "ygo.grand-umi.com", "https:"),
+    ["wss://direct.grand-umi.com/ws", "wss://ygo.grand-umi.com/ws"],
   );
   assert.deepEqual(
-    buildWebSocketEndpoints("wss://grand-umi.com/ws", "direct.grand-umi.com", "https:"),
-    ["wss://direct.grand-umi.com/ws", "wss://grand-umi.com/ws"],
+    buildWebSocketEndpoints("wss://ygo.grand-umi.com/ws", "direct.grand-umi.com", "https:"),
+    ["wss://direct.grand-umi.com/ws", "wss://ygo.grand-umi.com/ws"],
+  );
+  assert.deepEqual(
+    buildWebSocketEndpoints("wss://ygo.grand-umi.com/ws", "grand-umi.com", "https:"),
+    ["wss://direct.grand-umi.com/ws", "wss://ygo.grand-umi.com/ws"],
   );
   assert.deepEqual(
     buildWebSocketEndpoints("wss://test.grand-umi.com/ws", "test.grand-umi.com", "https:"),

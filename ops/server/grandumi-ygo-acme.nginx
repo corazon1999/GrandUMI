@@ -1,0 +1,32 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ygo.grand-umi.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        add_header Retry-After 3600 always;
+        return 503;
+    }
+}
+
+# ygo 证书签发前也必须显式隔离该 SNI，避免 Cloudflare Full 模式把
+# 尚未宣布的新域名送入当前 default_server。证书主机名不匹配时 Strict
+# 模式会拒绝；Full 模式仍只会得到 503，不会提前开放正式站点。
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ygo.grand-umi.com;
+
+    ssl_certificate /etc/letsencrypt/live/grand-umi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/grand-umi.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    add_header Cache-Control "no-store" always;
+    add_header Retry-After 3600 always;
+    return 503;
+}
