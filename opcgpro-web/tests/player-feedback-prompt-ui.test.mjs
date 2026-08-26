@@ -143,23 +143,25 @@ test("问题反馈提示要求使用卡牌编号并提供三语翻译", async ()
   assert.ok(i18n.includes(`"${lobbyPrompt}": "ロビー`));
 });
 
-test("对局反馈在桌面侧栏与手机旋转画布均有入口且弹窗高于公告", async () => {
-  const [page, board, feedback] = await Promise.all([
+test("对局反馈统一从更多菜单进入且弹窗挂到旋转宿主并高于公告", async () => {
+  const [page, board, chat, menu, feedback] = await Promise.all([
     readSource("../src/app/game/page.tsx"),
     readSource("../src/components/game/GameBoard.tsx"),
+    readSource("../src/components/game/GameChatPanel.tsx"),
+    readSource("../src/components/game/GameMenu.tsx"),
     readSource("../src/components/game/FeedbackOverlay.tsx"),
   ]);
 
   assert.match(page, /feedbackOpenRequest/);
-  assert.match(page, /<FeedbackOverlay context="game" openRequest=\{feedbackOpenRequest\}/);
+  assert.match(page, /<FeedbackOverlay[\s\S]*?context="game"[\s\S]*?openRequest=\{feedbackOpenRequest\}[\s\S]*?showTrigger=\{false\}/);
   assert.match(page, /onOpenFeedback=/);
-  assert.match(board, /F · 反馈 Bug 和建议/);
-  assert.match(board, /hidden min-h-11[\s\S]*md:block/);
-  assert.match(feedback, /createPortal\(/);
-  assert.match(feedback, /createPortal\(\s*<AnimatePresence>[\s\S]*document\.body/);
-  assert.match(feedback, /right: "calc\(6\.75rem \+ var\(--layout-safe-right/);
-  assert.match(feedback, /md:hidden/);
-  assert.match(feedback, /min-h-11 min-w-11/);
+  assert.doesNotMatch(board, /F · 反馈 Bug 和建议/);
+  assert.match(chat, /<GameMenu/);
+  assert.match(menu, /反馈 Bug \/ 建议/);
+  assert.match(menu, /onOpenFeedback\(\)/);
+  assert.match(feedback, /<GameOverlayPortal>/);
+  assert.doesNotMatch(feedback, /createPortal|document\.body/);
+  assert.match(feedback, /pointer-events-auto fixed inset-0/);
   assert.match(feedback, /z-\[100\]/);
 });
 

@@ -69,15 +69,17 @@ test("贴咚确认后立即提交，并依靠拒绝回滚与重连权威快照�
 });
 
 test("在线玩家、好友与局内对手均提供屏蔽和举报入口", async () => {
-  const [actions, players, friends, gamePage] = await Promise.all([
+  const [actions, players, friends, gameMenu] = await Promise.all([
     readSource("../src/components/ui/PlayerSafetyActions.tsx"),
     readSource("../src/components/home/PlayerListPanel.tsx"),
     readSource("../src/components/home/FriendsPanel.tsx"),
-    readSource("../src/app/game/page.tsx"),
+    readSource("../src/components/game/GameMenu.tsx"),
   ]);
   assert.match(actions, /确认屏蔽/);
   assert.match(actions, /提交举报/);
   assert.match(players, /<PlayerSafetyActions/);
   assert.match(friends, /解除屏蔽/);
-  assert.match(gamePage, /currentOpponent compact toolbar/);
+  assert.match(gameMenu, /<PlayerSafetyActions[\s\S]*?currentOpponent[\s\S]*?renderActions=/);
+  assert.match(gameMenu, /屏蔽对手/);
+  assert.match(gameMenu, /举报对手/);
 });

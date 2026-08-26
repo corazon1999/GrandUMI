@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { createPortal } from "react-dom";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { useGameStore } from "@/store/gameStore";
@@ -20,6 +20,8 @@ interface Props {
   context: "lobby" | "game";
   /** 外部入口每次递增该值即可打开反馈窗口；F 键仍可独立切换。 */
   openRequest?: number;
+  /** 对局页可将入口统一收进“更多”；大厅保持默认入口行为。 */
+  showTrigger?: boolean;
 }
 
 type SubmitState =
@@ -44,8 +46,7 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
-export default function FeedbackOverlay({ context, openRequest }: Props) {
-  const [mounted, setMounted] = useState(false);
+export default function FeedbackOverlay({ context, openRequest, showTrigger = true }: Props) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [drafts, setDrafts] = useState<Record<FeedbackCategory, string>>({
@@ -63,8 +64,6 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
     category === "bug" && context === "lobby"
       ? "描述大厅中触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前页面信息。"
       : config.placeholder;
-
-  useEffect(() => setMounted(true), []);
 
   // F 切换显隐；在输入区域打字时不抢占按键。
   useEffect(() => {
@@ -191,26 +190,27 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
 
   return (
     <>
-      {mounted && context === "game" && !open && createPortal(
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="fixed z-[90] flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-amber-300/50 bg-slate-950/95 px-3 text-xs font-black text-amber-100 shadow-xl shadow-black/50 md:hidden"
-          style={{
-            right: "calc(6.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
-            bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
-          }}
-          aria-label="打开 Bug 和建议反馈（快捷键 F）"
-        >
-          F · 反馈
-        </button>,
-        document.body,
+      {context === "game" && showTrigger && !open && (
+        <GameOverlayPortal>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="pointer-events-auto fixed z-[90] flex h-12 min-w-12 items-center justify-center rounded-lg border border-amber-300/50 bg-slate-950/95 px-3 text-xs font-black text-amber-100 shadow-xl shadow-black/50 md:hidden"
+            style={{
+              right: "calc(6.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+              bottom: "calc(0.75rem + var(--layout-safe-bottom, env(safe-area-inset-bottom)))",
+            }}
+            aria-label="打开 Bug 和建议反馈（快捷键 F）"
+          >
+            F · 反馈
+          </button>
+        </GameOverlayPortal>
       )}
-      {mounted && createPortal(
+      <GameOverlayPortal>
         <AnimatePresence>
           {open && (
             <motion.div
-              className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
+              className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -312,9 +312,8 @@ export default function FeedbackOverlay({ context, openRequest }: Props) {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>,
-        document.body,
-      )}
+        </AnimatePresence>
+      </GameOverlayPortal>
     </>
   );
 }

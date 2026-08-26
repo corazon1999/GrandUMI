@@ -4,14 +4,19 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("局内对手卡片提供可触控的举报入口，观战和回放不显示", async () => {
-  const [page, actions] = await Promise.all([
+test("局内更多菜单提供可触控的举报入口，观战和回放不显示", async () => {
+  const [page, chat, menu, actions] = await Promise.all([
     readSource("../src/app/game/page.tsx"),
+    readSource("../src/components/game/GameChatPanel.tsx"),
+    readSource("../src/components/game/GameMenu.tsx"),
     readSource("../src/components/ui/PlayerSafetyActions.tsx"),
   ]);
 
   assert.match(page, /!isObserver && !isPlayback/);
-  assert.match(page, /<PlayerSafetyActions targetName=\{opponentName \|\| "对手"\} currentOpponent compact toolbar/);
+  assert.match(chat, /playerToolsEnabled=\{!isObserver\}/);
+  assert.match(chat, /<GameMenu/);
+  assert.match(menu, /<PlayerSafetyActions[\s\S]*?currentOpponent/);
+  assert.match(menu, /举报对手/);
   assert.match(actions, /aria-label=\{`举报玩家 \$\{targetName\}`\}/);
   assert.ok((actions.match(/min-h-12 min-w-12/g) ?? []).length >= 2);
 });

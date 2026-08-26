@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FriendsPanel from "@/components/home/FriendsPanel";
 import { eventBus } from "@/net/eventBus";
 import { GameRequest } from "@/net/GameRequest";
-import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import SpectatorArena from "@/components/game/SpectatorArena";
+import GameMenu from "@/components/game/GameMenu";
+import MobileTurnExtensionButton from "@/components/game/MobileTurnExtensionButton";
 
 /** 左下角局内聊天与独立好友中心入口。 */
 
@@ -39,12 +40,16 @@ interface ChatToast {
   fromRole: "player" | "spectator";
 }
 
+type ActiveControl = "chat" | "friends" | "spectators" | "more" | null;
+
 export default function GameChatPanel({
   isPlayback,
   isObserver,
+  onOpenFeedback,
 }: {
   isPlayback: boolean;
   isObserver: boolean;
+  onOpenFeedback?: () => void;
 }) {
   const rotateQuarterTurn = useLayoutQuarterTurn();
   const myAccount = useNetStore((s) => s.account);
@@ -54,7 +59,7 @@ export default function GameChatPanel({
   const incomingFriendCount = useNetStore(
     (s) => s.incomingFriendRequests.length,
   );
-  const matchKind = useGameStore((s) => s.matchKind);
+  const opponentName = useGameStore((s) => s.opponentName);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const spectatorDetails = useGameStore((s) => s.spectatorDetails);
   const spectatorHandRequests = useGameStore((s) => s.spectatorHandRequests);
@@ -65,20 +70,20 @@ export default function GameChatPanel({
   const observerHandRequestRetryAt = useGameStore(
     (s) => s.observerHandRequestRetryAt,
   );
-  const [open, setOpen] = useState(false);
-  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [activeControl, setActiveControl] = useState<ActiveControl>(null);
   const [muted, setMuted] = useState(false);
   const [gameInput, setGameInput] = useState("");
   const [gameMessages, setGameMessages] = useState<GameChatItem[]>([]);
   const [coolingDown, setCoolingDown] = useState(false);
   const [gameUnread, setGameUnread] = useState(0);
   const [spectatorHovered, setSpectatorHovered] = useState(false);
-  const [spectatorPinned, setSpectatorPinned] = useState(false);
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [kickConfirm, setKickConfirm] = useState("");
-  const [opponentFriendRequestSent, setOpponentFriendRequestSent] =
-    useState(false);
+
+  const open = activeControl === "chat";
+  const friendsOpen = activeControl === "friends";
+  const spectatorPinned = activeControl === "spectators";
 
   const idRef = useRef(0);
   const mutedRef = useRef(muted);
@@ -87,8 +92,6 @@ export default function GameChatPanel({
   const listRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const opponentFriendRequestTimer =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce(
     (total, count) => total + count,
@@ -106,8 +109,10 @@ export default function GameChatPanel({
     openRef.current = open;
   }, [open]);
   useEffect(() => {
-    if (spectatorNames.length === 0) setSpectatorPinned(false);
-  }, [spectatorNames.length]);
+    if (spectatorNames.length === 0 && activeControl === "spectators") {
+      setActiveControl(null);
+    }
+  }, [activeControl, spectatorNames.length]);
 
   useEffect(() => {
     if (observerHandRequestStatus !== "cooldown") {
@@ -166,8 +171,6 @@ export default function GameChatPanel({
       eventBus.off("gameChat", handler);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
-      if (opponentFriendRequestTimer.current)
-        clearTimeout(opponentFriendRequestTimer.current);
     };
   }, []);
 
@@ -227,18 +230,9 @@ export default function GameChatPanel({
     setKickConfirm("");
   };
 
-  const handleOpponentFriendAction = () => {
-    if (opponentFriendRequestSent) return;
-    if (HomeRequest.sendOpponentFriendRequest()) {
-      setOpponentFriendRequestSent(true);
-      if (opponentFriendRequestTimer.current)
-        clearTimeout(opponentFriendRequestTimer.current);
-      opponentFriendRequestTimer.current = setTimeout(
-        () => setOpponentFriendRequestSent(false),
-        2500,
-      );
-    }
-  };
+  const handleMoreOpenChange = useCallback((nextOpen: boolean) => {
+    setActiveControl((current) => nextOpen ? "more" : current === "more" ? null : current);
+  }, []);
 
   return (
     <>
@@ -254,12 +248,13 @@ export default function GameChatPanel({
       <div
         data-game-chat-root
         data-layout-rotated={rotateQuarterTurn ? "true" : "false"}
+        data-visual-anchor="left-bottom"
         className="pointer-events-none fixed z-50"
         style={{
           ...(rotateQuarterTurn
             ? {
                 right:
-                  "calc(0.75rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+                  "max(0.75rem, var(--layout-safe-right, env(safe-area-inset-right)))",
               }
             : {
                 left: "calc(0.75rem + var(--layout-safe-left, env(safe-area-inset-left)))",
@@ -358,7 +353,7 @@ export default function GameChatPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => setActiveControl(null)}
                   aria-label="收起局内聊天"
                   className="flex h-12 w-12 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white"
                   title="收起"
@@ -420,21 +415,23 @@ export default function GameChatPanel({
         </div>
 
         <div
-          className={`pointer-events-auto flex gap-2 ${rotateQuarterTurn ? "flex-col items-end" : "items-center"}`}
+          data-game-control-dock
+          className={`pointer-events-auto flex gap-1 ${rotateQuarterTurn ? "flex-col items-end" : "items-center"}`}
         >
           <button
             type="button"
             onClick={() => {
-              setSpectatorPinned(false);
-              setFriendsOpen(false);
-              setOpen((value) => !value);
+              setActiveControl((current) => current === "chat" ? null : "chat");
               if (!open) setGameUnread(0);
             }}
-            className="relative flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-lg shadow-lg ring-1 ring-white/15 hover:bg-slate-700"
+            className="relative flex h-12 w-12 items-center justify-center rounded-full text-base focus-visible:outline-2 focus-visible:outline-sky-300"
             title="局内聊天"
             aria-label="打开局内聊天"
+            aria-expanded={open}
           >
-            💬
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800/90 shadow-lg ring-1 ring-white/15 transition-colors hover:bg-slate-700">
+              💬
+            </span>
             {!open && gameUnread > 0 && (
               <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
                 {gameUnread > 9 ? "9+" : gameUnread}
@@ -442,27 +439,20 @@ export default function GameChatPanel({
             )}
           </button>
 
-          {!isObserver && matchKind !== "Bot" && (
-            <button
-              type="button"
-              onClick={handleOpponentFriendAction}
-              disabled={opponentFriendRequestSent}
-              data-opponent-friend-action
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-800/95 text-sky-50 shadow-lg ring-1 ring-sky-300/30 transition-colors hover:bg-sky-700 disabled:cursor-wait disabled:bg-emerald-900/90 disabled:text-emerald-200"
-              title={
-                opponentFriendRequestSent
-                  ? "好友申请已发送"
-                  : "添加交战对手为好友"
-              }
-              aria-label={
-                opponentFriendRequestSent
-                  ? "好友申请已发送"
-                  : "添加交战对手为好友"
-              }
-            >
+          <button
+            type="button"
+            onClick={() => {
+              setActiveControl("friends");
+            }}
+            className="relative flex h-12 w-12 items-center justify-center rounded-full text-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-300"
+            title="好友中心"
+            aria-label={`打开好友中心${totalFriendUnread ? `，${totalFriendUnread} 条好友消息` : ""}${incomingFriendCount ? `，${incomingFriendCount} 条新申请` : ""}`}
+            aria-expanded={friendsOpen}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-800/90 shadow-lg ring-1 ring-emerald-300/25 transition-colors hover:bg-emerald-700">
               <svg
                 viewBox="0 0 24 24"
-                className="h-5 w-5"
+                className="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
@@ -470,41 +460,10 @@ export default function GameChatPanel({
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <circle cx="8.5" cy="8" r="3" />
-                <path d="M3.5 19c.6-3.5 2.3-5 5-5 1.7 0 3 .5 3.9 1.5" />
-                {opponentFriendRequestSent ? (
-                  <path d="m14.5 17 2 2 4-5" />
-                ) : (
-                  <path d="M17.5 14v6M14.5 17h6" />
-                )}
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3.5 19c.6-3.5 2.4-5 5.5-5s4.9 1.5 5.5 5M16 8h5M18.5 5.5v5" />
               </svg>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              setSpectatorPinned(false);
-              setFriendsOpen(true);
-            }}
-            className="relative flex h-12 w-12 items-center justify-center rounded-full bg-emerald-800/90 text-emerald-50 shadow-lg ring-1 ring-emerald-300/25 transition-colors hover:bg-emerald-700"
-            title="好友中心"
-            aria-label={`打开好友中心${totalFriendUnread ? `，${totalFriendUnread} 条好友消息` : ""}${incomingFriendCount ? `，${incomingFriendCount} 条新申请` : ""}`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="9" cy="8" r="3" />
-              <path d="M3.5 19c.6-3.5 2.4-5 5.5-5s4.9 1.5 5.5 5M16 8h5M18.5 5.5v5" />
-            </svg>
+            </span>
             {friendAlertCount > 0 && (
               <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
                 {friendAlertCount > 9 ? "9+" : friendAlertCount}
@@ -566,28 +525,39 @@ export default function GameChatPanel({
                 type="button"
                 data-mobile-spectator-trigger
                 onClick={() => {
-                  setOpen(false);
-                  setSpectatorPinned((value) => !value);
+                  setActiveControl((current) => current === "spectators" ? null : "spectators");
                 }}
-                className="relative flex h-12 w-12 items-center justify-center rounded-full bg-purple-900/90 text-purple-100 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800"
+                className="relative flex h-12 w-12 items-center justify-center rounded-full text-purple-100 focus-visible:outline-2 focus-visible:outline-purple-300"
                 title={`${spectatorNames.length} 人正在观战`}
                 aria-label={`查看正在观战的 ${spectatorNames.length} 人`}
                 aria-expanded={showSpectatorList}
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  className="h-5 w-5 fill-none stroke-current stroke-2"
-                >
-                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-                  <circle cx="12" cy="12" r="2.75" />
-                </svg>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-900/90 shadow-lg ring-1 ring-purple-300/30 transition-colors hover:bg-purple-800">
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className="h-4 w-4 fill-none stroke-current stroke-2"
+                  >
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                    <circle cx="12" cy="12" r="2.75" />
+                  </svg>
+                </span>
                 <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white ring-2 ring-slate-900">
                   {spectatorNames.length > 99 ? "99+" : spectatorNames.length}
                 </span>
               </button>
             </div>
           )}
+          {onOpenFeedback && (
+            <GameMenu
+              open={activeControl === "more"}
+              onOpenChange={handleMoreOpenChange}
+              onOpenFeedback={onOpenFeedback}
+              targetName={opponentName || "对手"}
+              playerToolsEnabled={!isObserver}
+            />
+          )}
+          {!isObserver && <MobileTurnExtensionButton />}
           {isObserver && !spectatorHandVisible && (
             <button
               type="button"
@@ -604,7 +574,10 @@ export default function GameChatPanel({
           )}
         </div>
       </div>
-      <FriendsPanel open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+      <FriendsPanel
+        open={friendsOpen}
+        onClose={() => setActiveControl((current) => current === "friends" ? null : current)}
+      />
     </>
   );
 }

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import {
   ContainerResponsiveProvider,
   LayoutQuarterTurnProvider,
@@ -23,6 +24,7 @@ interface LayoutSettingsContextValue {
   mode: SelectableLayoutPreviewMode;
   setMode: (mode: SelectableLayoutPreviewMode) => void;
   openSettings: () => void;
+  suppressSettingsTrigger: () => () => void;
   gameOverlayHost: HTMLDivElement | null;
   setGameOverlayHost: (host: HTMLDivElement | null, rotateQuarterTurn?: boolean) => void;
 }
@@ -38,11 +40,22 @@ export function useLayoutSettings(): LayoutSettingsContextValue {
 }
 
 export default function LayoutSettingsProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [mode, setMode] = useLayoutPreviewMode();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTriggerSuppressionCount, setSettingsTriggerSuppressionCount] = useState(0);
   const [gameOverlayHost, setGameOverlayHostState] = useState<HTMLDivElement | null>(null);
   const [gameOverlayQuarterTurn, setGameOverlayQuarterTurn] = useState(false);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const suppressSettingsTrigger = useCallback(() => {
+    let active = true;
+    setSettingsTriggerSuppressionCount((count) => count + 1);
+    return () => {
+      if (!active) return;
+      active = false;
+      setSettingsTriggerSuppressionCount((count) => Math.max(0, count - 1));
+    };
+  }, []);
   const setGameOverlayHost = useCallback((
     host: HTMLDivElement | null,
     rotateQuarterTurn = false,
@@ -51,13 +64,20 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
     setGameOverlayQuarterTurn(host ? rotateQuarterTurn : false);
   }, []);
   const contextValue = useMemo(
-    () => ({ mode, setMode, openSettings, gameOverlayHost, setGameOverlayHost }),
-    [gameOverlayHost, mode, openSettings, setGameOverlayHost, setMode],
+    () => ({
+      mode,
+      setMode,
+      openSettings,
+      suppressSettingsTrigger,
+      gameOverlayHost,
+      setGameOverlayHost,
+    }),
+    [gameOverlayHost, mode, openSettings, setGameOverlayHost, setMode, suppressSettingsTrigger],
   );
 
   const settingsUi = (
     <>
-      {!settingsOpen && (
+      {!settingsOpen && pathname !== "/game" && settingsTriggerSuppressionCount === 0 && (
         <button
           type="button"
           onClick={openSettings}

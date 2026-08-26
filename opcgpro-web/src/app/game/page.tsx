@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import GameBoard from "@/components/game/GameBoard";
-import GameMenu from "@/components/game/GameMenu";
 import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
@@ -17,9 +16,7 @@ import GMPanel from "@/components/game/GMPanel";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
 import AttachDonConfirmDialog from "@/components/game/AttachDonConfirmDialog";
 import InactivityWarningOverlay from "@/components/game/InactivityWarningOverlay";
-import MobileTurnExtensionButton from "@/components/game/MobileTurnExtensionButton";
 import GameOverOverlay from "@/components/game/GameOverOverlay";
-import PlayerSafetyActions from "@/components/ui/PlayerSafetyActions";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -35,7 +32,6 @@ export default function GamePage() {
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
-  const opponentName = useGameStore((s) => s.opponentName);
 
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
@@ -89,15 +85,16 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <PromptOverlay />}
       {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
-      {!isObserver && !isPlayback && <GameMenu />}
-      {!isObserver && !isPlayback && (
-        <PlayerSafetyActions targetName={opponentName || "对手"} currentOpponent compact toolbar />
-      )}
       {!isObserver && !isPlayback && <GMPanel />}
-      {!isPlayback && <FeedbackOverlay context="game" openRequest={feedbackOpenRequest} />}
+      {!isPlayback && (
+        <FeedbackOverlay
+          context="game"
+          openRequest={feedbackOpenRequest}
+          showTrigger={false}
+        />
+      )}
       {!isObserver && !isPlayback && <AttachDonConfirmDialog />}
       {!isObserver && !isPlayback && <InactivityWarningOverlay />}
-      {!isObserver && !isPlayback && <MobileTurnExtensionButton />}
 
       {isObserver && (
         <div
@@ -148,7 +145,7 @@ export default function GamePage() {
         isObserver={isObserver}
         isPlayback={isPlayback}
         onOpenFeedback={
-          !isObserver && !isPlayback
+          !isPlayback
             ? () => setFeedbackOpenRequest((request) => request + 1)
             : undefined
         }

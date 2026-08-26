@@ -90,9 +90,10 @@ test("对局设置的同类浮层不再使用未旋转的视口宽高", async ()
   assert.match(life, /75cqh/);
   assert.match(trash, /75cqh/);
   assert.match(menu, /maxWidthClass="max-w-sm"/);
-  assert.match(menu, /var\(--layout-safe-right/);
   assert.ok((menu.match(/min-h-12/g)?.length ?? 0) >= 2);
-  assert.match(menu, /h-12 w-12/);
+  assert.match(menu, /data-game-more-trigger/);
+  assert.match(menu, /h-12 w-12 min-h-12 min-w-12/);
+  assert.doesNotMatch(menu, /right: "calc\(/);
 });
 
 test("开局卡效提示优先于骰子遮罩且保留安全区", async () => {
@@ -109,5 +110,6 @@ test("开局卡效提示优先于骰子遮罩且保留安全区", async () => {
   assert.match(overlay, /var\(--layout-safe-bottom/);
   assert.match(overlay, /var\(--layout-safe-left/);
   assert.ok((overlay.match(/min-h-11/g)?.length ?? 0) >= 2);
-  assert.match(feedback, /right: "calc\(6\.75rem \+ var\(--layout-safe-right/);
+  assert.match(feedback, /<GameOverlayPortal>/);
+  assert.match(feedback, /pointer-events-auto fixed inset-0/);
 });

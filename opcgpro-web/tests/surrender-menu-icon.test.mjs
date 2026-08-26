@@ -4,13 +4,15 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("局内投降菜单入口使用白旗图标", async () => {
+test("局内低频工具使用更多图标且投降保留在面板内", async () => {
   const source = await readSource("../src/components/game/GameMenu.tsx");
 
-  assert.match(source, /function SurrenderFlagIcon/);
+  assert.match(source, /function MoreIcon/);
   assert.match(source, /fill="currentColor"/);
-  assert.match(source, /text-white/);
-  assert.match(source, /aria-label="打开投降菜单"/);
-  assert.match(source, /title="投降"/);
+  assert.match(source, /data-game-more-trigger/);
+  assert.match(source, /aria-label="打开更多对局工具"/);
+  assert.match(source, /title="更多"/);
+  assert.match(source, /GameRequest\.surrender\(\)/);
+  assert.match(source, />\s*投降\s*</);
   assert.doesNotMatch(source, />\s*≡\s*</);
 });

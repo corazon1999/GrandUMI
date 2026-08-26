@@ -20,20 +20,30 @@ test("贴咚直接发送真实动作，玩家活动消息只用于明确在线�
   assert.doesNotMatch(controlBody, /setPending\(true\)/);
 });
 
-test("桌面和手机均提供一次性回合加时入口", async () => {
-  const [board, mobile, page] = await Promise.all([
+test("桌面和旋转手机均提供图标化的一次性回合加时入口", async () => {
+  const [board, mobile, icon, page, chat] = await Promise.all([
     readSource("../src/components/game/GameBoard.tsx"),
     readSource("../src/components/game/MobileTurnExtensionButton.tsx"),
+    readSource("../src/components/game/TurnExtensionIcon.tsx"),
     readSource("../src/app/game/page.tsx"),
+    readSource("../src/components/game/GameChatPanel.tsx"),
   ]);
 
   assert.match(board, /GameRequest\.requestTurnExtension\(\)/);
   assert.match(board, /min-h-11/);
-  assert.match(board, /max-md:hidden/);
-  assert.match(mobile, /min-h-12 min-w-32/);
-  assert.match(mobile, /--layout-safe-right/);
-  assert.match(mobile, /max-md:block/);
-  assert.match(page, /<MobileTurnExtensionButton \/>/);
+  assert.match(board, /!rotateQuarterTurn/);
+  assert.match(board, /<TurnExtensionIcon \/>/);
+  assert.match(board, /title="回合加时 \+2:00"/);
+  assert.match(mobile, /useLayoutQuarterTurn/);
+  assert.match(mobile, /h-12 w-12 min-h-12 min-w-12/);
+  assert.match(mobile, /h-9 w-9/);
+  assert.doesNotMatch(mobile, /\bfixed\b|--layout-safe-right|top:|right:/);
+  assert.match(mobile, /aria-label="使用本局唯一一次回合加时，增加两分钟"/);
+  assert.match(mobile, /title="回合加时 \+2:00"/);
+  assert.match(icon, /<circle cx="10\.5" cy="12" r="7"/);
+  assert.match(icon, /M18\.5 14\.5v6M15\.5 17\.5h6/);
+  assert.doesNotMatch(page, /MobileTurnExtensionButton/);
+  assert.match(chat, /!isObserver && <MobileTurnExtensionButton \/>/);
 });
 
 test("挂机提醒使用服务端校准倒计时且只挂载给真实玩家", async () => {

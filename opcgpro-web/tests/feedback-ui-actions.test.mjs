@@ -38,22 +38,41 @@ test("桌面与手机竖屏旋转布局中的贴咚确认及立即提交可由�
   assert.match(store, /localStorage\.setItem\(KEY/);
 });
 
-test("屏蔽和举报与投降、设置在右上角组成紧凑水平工具栏", async () => {
-  const [page, board, safety, menu, settingsProvider] = await Promise.all([
+test("低频对局工具统一收进左下更多菜单并移除右侧独立入口", async () => {
+  const [page, board, chat, safety, menu, settingsProvider, feedback] = await Promise.all([
     readSource("../src/app/game/page.tsx"),
     readSource("../src/components/game/GameBoard.tsx"),
+    readSource("../src/components/game/GameChatPanel.tsx"),
     readSource("../src/components/ui/PlayerSafetyActions.tsx"),
     readSource("../src/components/game/GameMenu.tsx"),
     readSource("../src/components/home/LayoutSettingsProvider.tsx"),
+    readSource("../src/components/game/FeedbackOverlay.tsx"),
   ]);
 
-  assert.match(page, /<PlayerSafetyActions[^>]+currentOpponent compact toolbar/);
+  assert.doesNotMatch(page, /<PlayerSafetyActions/);
+  assert.doesNotMatch(page, /<GameMenu/);
+  assert.match(page, /showTrigger=\{false\}/);
   assert.doesNotMatch(board, /<PlayerSafetyActions/);
-  assert.match(safety, /right: "calc\(7\.625rem \+ var\(--layout-safe-right/);
-  assert.match(safety, /pointer-events-auto fixed z-\[70\] flex gap-2/);
-  assert.match(safety, /h-12 w-12/);
-  assert.match(menu, /right: "calc\(4\.125rem \+ var\(--layout-safe-right/);
-  assert.match(settingsProvider, /right: "calc\(0\.625rem \+ var\(--layout-safe-right/);
+  assert.doesNotMatch(board, /F · 反馈 Bug 和建议/);
+  assert.match(chat, /data-game-control-dock/);
+  assert.match(chat, /type ActiveControl = "chat" \| "friends" \| "spectators" \| "more" \| null/);
+  assert.match(chat, /<GameMenu/);
+  assert.match(menu, /data-game-more-trigger/);
+  assert.match(menu, /title="更多"/);
+  assert.match(menu, /设置/);
+  assert.match(menu, /反馈 Bug \/ 建议/);
+  assert.match(menu, /请求平局/);
+  assert.match(menu, />\s*投降\s*</);
+  assert.match(menu, /屏蔽对手/);
+  assert.match(menu, /举报对手/);
+  assert.match(menu, /<PlayerSafetyActions[\s\S]*?currentOpponent[\s\S]*?renderActions=/);
+  assert.match(safety, /renderActions\?: \(controller: PlayerSafetyActionController\)/);
+  assert.match(settingsProvider, /pathname !== "\/game" && settingsTriggerSuppressionCount === 0/);
+  assert.match(settingsProvider, /setSettingsTriggerSuppressionCount\(\(count\) => count \+ 1\)/);
+  assert.match(settingsProvider, /setSettingsTriggerSuppressionCount\(\(count\) => Math\.max\(0, count - 1\)\)/);
+  assert.match(menu, /useEffect\(\(\) => suppressSettingsTrigger\(\), \[suppressSettingsTrigger\]\)/);
+  assert.match(feedback, /<GameOverlayPortal>/);
+  assert.doesNotMatch(feedback, /document\.body/);
 });
 
 test("全服广播横幅可关闭并为安全区预留空间", async () => {

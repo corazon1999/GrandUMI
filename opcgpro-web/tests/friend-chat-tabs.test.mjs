@@ -19,7 +19,7 @@ test("在线玩家列表可直接申请或接受好友", async () => {
   assert.match(playerList, /<svg[\s\S]*?m14\.5 17 2 2 4-5/);
 });
 
-test("对局内通过服务端安全解析交战对手并直接发送好友申请", async () => {
+test("对局内移除直接添加当前对手入口但保留好友中心", async () => {
   const [panel, request, bridge, displayNameTests] = await Promise.all([
     readSource("../src/components/game/GameChatPanel.tsx"),
     readSource("../src/net/HomeProtocol.ts"),
@@ -27,10 +27,10 @@ test("对局内通过服务端安全解析交战对手并直接发送好友申�
     readSource("../../服务端WebSocket.Tests/GameDisplayNameTests.cs"),
   ]);
 
-  assert.match(panel, /data-opponent-friend-action/);
-  assert.match(panel, /HomeRequest\.sendOpponentFriendRequest\(\)/);
-  assert.match(panel, /matchKind !== "Bot"/);
-  assert.match(panel, /h-12 w-12/);
+  assert.doesNotMatch(panel, /data-opponent-friend-action/);
+  assert.doesNotMatch(panel, /HomeRequest\.sendOpponentFriendRequest\(\)/);
+  assert.doesNotMatch(panel, /添加交战对手为好友/);
+  assert.match(panel, /aria-label=\{`打开好友中心/);
   assert.match(request, /currentOpponent: true/);
   assert.match(bridge, /Bool\(msg, "currentOpponent"\)/);
   assert.match(bridge, /GameOpponent\.TryGetValue\(s\.SessionId/);
@@ -49,13 +49,13 @@ test("局内聊天气泡只保留局内消息并通过独立按钮打开完整�
 
   assert.match(panel, /局内聊天/);
   assert.match(panel, /aria-label="打开局内聊天"/);
-  assert.match(panel, /<FriendsPanel open={friendsOpen}/);
+  assert.match(panel, /<FriendsPanel[\s\S]*?open=\{friendsOpen\}/);
   assert.match(panel, /aria-label={`打开好友中心/);
   assert.match(panel, /friendChatUnreadByAccount/);
   assert.match(panel, /incomingFriendRequests\.length/);
   assert.match(panel, /GameRequest\.sendGameChat\(text\)/);
   assert.match(panel, /"老板来了，等我一会"/);
-  assert.match(panel, /min-h-12 min-w-12 rounded-full/);
+  assert.match(panel, /h-12 w-12 items-center justify-center rounded-full/);
   assert.doesNotMatch(panel, /type ChatTab/);
   assert.doesNotMatch(panel, /FriendConversationPicker/);
   assert.doesNotMatch(panel, /GameRequest\.sendFriendChat/);

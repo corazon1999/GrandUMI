@@ -40,7 +40,7 @@ export default function PromptOverlay() {
   const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   // 手机竖屏的对局画布会顺时针旋转 90°，这里必须使用布局层映射后的安全区变量，
-  // 选择面板开关固定在聊天入口上方，避开聊天、添加对手与好友中心三个常驻按钮。
+  // 选择面板开关固定在左下控制坞上方，避开聊天、好友、观战与“更多”入口。
   const promptToggleStyle = {
     left: "calc(0.75rem + var(--layout-safe-left, 0px))",
     bottom: "calc(4.5rem + var(--layout-safe-bottom, 0px))",

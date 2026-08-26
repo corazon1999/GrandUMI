@@ -26,6 +26,8 @@ import { PHASE_LABELS } from "@/game/battle/BattlePhase";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 import type { PlayerRankIdentitySnapshot, RankFaction } from "@/types/net";
 import { GameRequest } from "@/net/GameRequest";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
+import TurnExtensionIcon from "@/components/game/TurnExtensionIcon";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -215,7 +217,6 @@ function RightRail({
   opponentChampionLeaderNumber,
   isObserver,
   isPlayback,
-  onOpenFeedback,
 }: {
   myName: string;
   opponentName: string;
@@ -225,10 +226,12 @@ function RightRail({
   opponentChampionLeaderNumber?: string | null;
   isObserver: boolean;
   isPlayback: boolean;
-  onOpenFeedback?: () => void;
 }) {
   return (
-    <aside className="relative z-40 flex h-full min-h-0 w-44 shrink-0 flex-col gap-3">
+    <aside
+      data-game-right-rail
+      className="relative z-40 flex h-full min-h-0 w-44 shrink-0 flex-col gap-3"
+    >
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>
         <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
@@ -244,20 +247,13 @@ function RightRail({
       </section>
       <div className="mt-auto flex flex-col gap-3">
         {!isObserver && !isPlayback && (
-          <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
+          <section
+            data-game-actions-panel
+            className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30"
+          >
             <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
             <GameActions />
           </section>
-        )}
-        {onOpenFeedback && (
-          <button
-            type="button"
-            onClick={onOpenFeedback}
-            className="hidden min-h-11 rounded-md border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-left text-xs font-black text-amber-100 transition-colors hover:border-amber-200/60 hover:bg-amber-400/20 md:block"
-            aria-label="打开 Bug 和建议反馈（快捷键 F）"
-          >
-            F · 反馈 Bug 和建议
-          </button>
         )}
       </div>
     </aside>
@@ -283,6 +279,7 @@ function OperationClock({
   side: "my" | "opponent";
   allowExtension: boolean;
 }) {
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const enabled = useGameStore((s) => s.operationClockEnabled);
   const totalBase = useGameStore((s) => side === "my" ? s.myOperationTimeMs : s.opponentOperationTimeMs);
   const turnBase = useGameStore((s) => side === "my" ? s.myTurnOperationTimeMs : s.opponentTurnOperationTimeMs);
@@ -339,14 +336,15 @@ function OperationClock({
       <span className="col-span-2 justify-self-end text-[9px] font-bold opacity-75" aria-label={`总操作剩余 ${formatOperationTime(totalRemaining)}`}>
         总计 {formatOperationTime(totalRemaining)}
       </span>
-      {allowExtension && side === "my" && active === "my" && !paused && !extensionUsed && (
+      {allowExtension && !rotateQuarterTurn && side === "my" && active === "my" && !paused && !extensionUsed && (
         <button
           type="button"
           onClick={() => GameRequest.requestTurnExtension()}
-          className="col-span-2 mt-1 min-h-11 w-full rounded border border-amber-300/50 bg-amber-400/15 px-2 text-[10px] font-black text-amber-100 transition-colors hover:bg-amber-400/25 focus-visible:outline-2 focus-visible:outline-amber-200 max-md:hidden"
+          className="col-span-2 mt-1 flex h-11 w-11 min-h-11 min-w-11 items-center justify-center justify-self-end rounded-full border border-amber-300/50 bg-amber-400/15 text-amber-100 transition-colors hover:bg-amber-400/25 focus-visible:outline-2 focus-visible:outline-amber-200"
           aria-label="使用本局唯一一次回合加时，增加两分钟"
+          title="回合加时 +2:00"
         >
-          加时 +2:00
+          <TurnExtensionIcon />
         </button>
       )}
       {extensionUsed && (
@@ -463,7 +461,6 @@ export default function GameBoard({
                 opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                 isObserver={isObserver}
                 isPlayback={isPlayback}
-                onOpenFeedback={onOpenFeedback}
               />
             </div>
 
@@ -472,7 +469,11 @@ export default function GameBoard({
       </div>
 
       {/* 局内聊天（固定屏幕角，不随画布缩放；回放模式内部自隐） */}
-      <GameChatPanel isPlayback={isPlayback} isObserver={isObserver} />
+      <GameChatPanel
+        isPlayback={isPlayback}
+        isObserver={isObserver}
+        onOpenFeedback={onOpenFeedback}
+      />
     </>
   );
 }
