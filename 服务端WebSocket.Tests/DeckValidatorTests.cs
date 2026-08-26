@@ -134,9 +134,48 @@ public class DeckValidatorTests
         var leader = CardDatabase.Get("OP15-001")!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
 
-        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
 
         Assert.True(standard.Ok, standard.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP18-021")]
+    [InlineData("EB05-010")]
+    public void 标准排位拒绝OP18与EB05领航_狂野与休闲允许(string leaderNumber)
+    {
+        var leader = CardDatabase.Get(leaderNumber)!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+
+        var standardRanked = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
+        var standardCasual = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var unrestricted = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standardRanked.Ok);
+        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
+        Assert.Contains(leaderNumber, standardRanked.Reason ?? "");
+        Assert.True(standardCasual.Ok, standardCasual.Reason);
+        Assert.True(unrestricted.Ok, unrestricted.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP18-031")]
+    [InlineData("EB05-016")]
+    public void 标准排位拒绝OP18与EB05主卡组卡_狂野与休闲允许(string cardNumber)
+    {
+        var leader = CardDatabase.Get("OP15-001")!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        lines[^1] = cardNumber;
+
+        var standardRanked = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
+        var standardCasual = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var unrestricted = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+
+        Assert.False(standardRanked.Ok);
+        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
+        Assert.Contains(cardNumber, standardRanked.Reason ?? "");
+        Assert.True(standardCasual.Ok, standardCasual.Reason);
+        Assert.True(unrestricted.Ok, unrestricted.Reason);
     }
 
     [Theory]

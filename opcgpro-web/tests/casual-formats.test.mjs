@@ -33,7 +33,8 @@ test("标准与狂野休闲贯穿牌组校验、独立队列和房间快照", as
 
   assert.match(bridge, /StandardCasualMatchQueue/);
   assert.match(bridge, /"casualStandard" => StandardCasualMatchQueue/);
-  assert.match(bridge, /queueKind is "ranked" or "casualStandard"/);
+  assert.match(bridge, /"ranked" => DeckValidator\.FormatStandardRanked/);
+  assert.match(bridge, /"casualStandard" => DeckValidator\.FormatStandard/);
   assert.match(bridge, /"casualStandard" => MatchKind\.CasualStandard/);
   assert.match(bridge, /_ => MatchKind\.CasualWild/);
   assert.match(matchKind, /CasualStandard/);

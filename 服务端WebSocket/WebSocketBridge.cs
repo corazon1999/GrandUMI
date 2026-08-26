@@ -1273,9 +1273,12 @@ public static class WebSocketBridge
         => queueKind == "rankedWild" ? RankedMode.Wild : RankedMode.Standard;
 
     private static string DeckFormatForQueue(string queueKind)
-        => queueKind is "ranked" or "casualStandard"
-            ? DeckValidator.FormatStandard
-            : DeckValidator.FormatUnrestricted;
+        => queueKind switch
+        {
+            "ranked" => DeckValidator.FormatStandardRanked,
+            "casualStandard" => DeckValidator.FormatStandard,
+            _ => DeckValidator.FormatUnrestricted,
+        };
 
     private static ConcurrentQueue<WsSession> QueueFor(string queueKind) => queueKind switch
     {

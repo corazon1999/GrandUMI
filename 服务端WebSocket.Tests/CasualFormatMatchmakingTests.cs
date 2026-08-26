@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 using GrandUMI.Game.Validation;
 using Xunit;
@@ -34,7 +35,7 @@ public sealed class CasualFormatMatchmakingTests
     [Theory]
     [InlineData("casualStandard", DeckValidator.FormatStandard, MatchKind.CasualStandard)]
     [InlineData("casual", DeckValidator.FormatUnrestricted, MatchKind.CasualWild)]
-    [InlineData("ranked", DeckValidator.FormatStandard, MatchKind.Ranked)]
+    [InlineData("ranked", DeckValidator.FormatStandardRanked, MatchKind.Ranked)]
     [InlineData("rankedWild", DeckValidator.FormatUnrestricted, MatchKind.RankedWild)]
     public void 队列协议_同时决定牌组规则与房间来源(
         string queueKind,
@@ -59,6 +60,29 @@ public sealed class CasualFormatMatchmakingTests
     }
 
     [Theory]
+    [InlineData("OP18-031")]
+    [InlineData("EB05-016")]
+    public void 匹配入口_仅标准排位拒绝OP18与EB05卡组(string cardNumber)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP15-001")!;
+        var lines = BuildValidDeck(leader);
+        lines[^1] = cardNumber;
+        var deck = string.Join('\n', lines);
+
+        var standardRanked = ValidateForQueue(deck, "ranked");
+        var wildRanked = ValidateForQueue(deck, "rankedWild");
+        var standardCasual = ValidateForQueue(deck, "casualStandard");
+        var wildCasual = ValidateForQueue(deck, "casual");
+
+        Assert.False(standardRanked.Ok);
+        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
+        Assert.True(wildRanked.Ok, wildRanked.Reason);
+        Assert.True(standardCasual.Ok, standardCasual.Reason);
+        Assert.True(wildCasual.Ok, wildCasual.Reason);
+    }
+
+    [Theory]
     [InlineData(MatchKind.CasualStandard)]
     [InlineData(MatchKind.CasualWild)]
     [InlineData(MatchKind.Casual)]
@@ -73,4 +97,22 @@ public sealed class CasualFormatMatchmakingTests
 
     private static ConcurrentQueue<WsSession> QueueFor(string queueKind)
         => (ConcurrentQueue<WsSession>)QueueForMethod.Invoke(null, [queueKind])!;
+
+    private static DeckValidator.Result ValidateForQueue(string deck, string queueKind)
+        => DeckValidator.Validate(
+            deck,
+            (string)DeckFormatForQueueMethod.Invoke(null, [queueKind])!);
+
+    private static List<string> BuildValidDeck(CardInfo leader)
+    {
+        var lines = new List<string> { leader.Number };
+        foreach (var card in CardDatabase.GetBySet("OP15")
+                     .Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leader)))
+        {
+            for (var copy = 0; copy < 4 && lines.Count < 51; copy++) lines.Add(card.Number);
+            if (lines.Count == 51) break;
+        }
+        Assert.Equal(51, lines.Count);
+        return lines;
+    }
 }

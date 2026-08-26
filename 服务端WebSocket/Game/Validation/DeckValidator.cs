@@ -14,6 +14,7 @@ public static class DeckValidator
 {
     public const string FormatUnrestricted = "Unrestricted";
     public const string FormatStandard = "Standard";
+    public const string FormatStandardRanked = "StandardRanked";
     public const string FormatOp15Only = "OP15-Only";
     public const string FormatOp16Only = "OP16-Only";
     public const string FormatOp15Op16 = "OP15-OP16";
@@ -68,10 +69,21 @@ public static class DeckValidator
         ("OP07-115", "EB04-058"),
     };
 
+    /// <summary>
+    /// 尚未开放进入标准排位的系列。该限制不属于通用标准环境禁限卡，
+    /// 因此标准休闲、狂野排位及其他休闲玩法仍可使用。
+    /// </summary>
+    private static readonly string[] StandardRankedUnavailablePrefixes =
+    {
+        "OP18-",
+        "EB05-",
+    };
+
     private static readonly Dictionary<string, FormatRule> Rules = new()
     {
         [FormatUnrestricted] = new(FormatUnrestricted, null,             50, 4),
         [FormatStandard] = new(FormatStandard, null,                     50, 4),
+        [FormatStandardRanked] = new(FormatStandard, null,               50, 4),
         [FormatOp15Only] = new(FormatOp15Only, new[] { "OP15" },         50, 4),
         [FormatOp16Only] = new(FormatOp16Only, new[] { "OP16" },         50, 4),
         [FormatOp15Op16] = new(FormatOp15Op16, new[] { "OP15", "OP16" }, 50, 4),
@@ -110,10 +122,22 @@ public static class DeckValidator
             return new(false, $"指定的领航卡 {leaderNum} 不是领航类型", null);
 
         var mainCards = lines.Skip(1).ToArray();
-        return ValidateAgainstRule(leader, mainCards, rule, format == FormatStandard);
+        var enforceStandardLegality = format is FormatStandard or FormatStandardRanked;
+        var enforceStandardRankedAvailability = format == FormatStandardRanked;
+        return ValidateAgainstRule(
+            leader,
+            mainCards,
+            rule,
+            enforceStandardLegality,
+            enforceStandardRankedAvailability);
     }
 
-    private static Result ValidateAgainstRule(CardInfo leader, string[] mainCards, FormatRule rule, bool enforceStandardLegality)
+    private static Result ValidateAgainstRule(
+        CardInfo leader,
+        string[] mainCards,
+        FormatRule rule,
+        bool enforceStandardLegality,
+        bool enforceStandardRankedAvailability)
     {
         var allowed = rule.AllowedSets;
         var setList = allowed is null ? "" : string.Join("/", allowed);
@@ -121,6 +145,8 @@ public static class DeckValidator
         // 1. 领航必须来自白名单卡集（allowed=null 表示不限卡集，跳过此检查）
         if (allowed is not null && !allowed.Contains(leader.SetCode))
             return new(false, $"{rule.Name} 格式：领航必须来自 {setList}（当前 {leader.SetCode}）", leader.Number);
+        if (enforceStandardRankedAvailability && IsUnavailableInStandardRanked(leader.Number))
+            return StandardRankedUnavailable(leader.Number, leader.Number);
         if (enforceStandardLegality && StandardBannedCards.Contains(leader.Number))
             return new(false, $"标准模式不能使用官方禁卡：{leader.Number}；可改用狂野模式", leader.Number);
         if (enforceStandardLegality && IsRotatedOutOfStandard(leader))
@@ -137,6 +163,13 @@ public static class DeckValidator
         foreach (var (num, cnt) in counts)
             if (cnt > rule.CopyLimit && !UnlimitedCopyCards.Contains(num))
                 return new(false, $"同名卡超过 {rule.CopyLimit} 张：{num} × {cnt}", leader.Number);
+
+        if (enforceStandardRankedAvailability)
+        {
+            var unavailableCard = counts.Keys.FirstOrDefault(IsUnavailableInStandardRanked);
+            if (unavailableCard is not null)
+                return StandardRankedUnavailable(unavailableCard, leader.Number);
+        }
 
         if (enforceStandardLegality)
         {
@@ -176,4 +209,14 @@ public static class DeckValidator
 
     private static bool IsRotatedOutOfStandard(CardInfo card)
         => card.Subscript == 1 && !StandardLegalSubscriptOneCards.Contains(card.Number);
+
+    private static bool IsUnavailableInStandardRanked(string cardNumber)
+        => StandardRankedUnavailablePrefixes.Any(prefix =>
+            cardNumber.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private static Result StandardRankedUnavailable(string cardNumber, string leaderNumber)
+        => new(
+            false,
+            $"OP18/EB05 系列暂不可用于标准排位：{cardNumber}；可改用狂野排位或休闲玩法",
+            leaderNumber);
 }
