@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -129,7 +130,10 @@ public sealed class LeaderStatsStore
     public const int MatchupLeaderboardLimit = 20;
     public const int MatchupMatrixLeaderLimit = 20;
     public const int StartingHandCardLimit = 10;
-    public const int StatsVersion = 1;
+    public const int StatsVersion = 2;
+
+    private static readonly ConcurrentDictionary<string, object> InitializationGates = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     private readonly object _lock = new();
     private readonly string _databasePath;
@@ -181,47 +185,33 @@ public sealed class LeaderStatsStore
         {
             if (_initialized) return;
 
-            var parent = Path.GetDirectoryName(_databasePath);
-            if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+            // 同一进程可能为同一路径构造多个 Store（测试服读写分离、回填与测试均会发生）。
+            // SQLitePCL 在多个连接同时为一份空库协商 journal_mode 时并不可靠，先按绝对路径串行建库；
+            // 跨进程生产写入另由 SingleWriterLease 约束，事务仍负责崩溃恢复与最终原子性。
+            lock (InitializationGates.GetOrAdd(_databasePath, static _ => new object()))
+            {
+                var parent = Path.GetDirectoryName(_databasePath);
+                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
 
-            using var connection = OpenWriteConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                PRAGMA journal_mode = WAL;
-                PRAGMA busy_timeout = 5000;
+                using var connection = OpenWriteConnection();
+                ConfigureConnection(connection);
+                var databaseVersion = ReadDatabaseVersion(connection);
+                if (databaseVersion > StatsVersion)
+                {
+                    throw new InvalidOperationException(
+                        $"Leader 统计数据库版本 {databaseVersion} 高于当前程序支持的 {StatsVersion}，拒绝以旧程序写入。");
+                }
 
-                CREATE TABLE IF NOT EXISTS match_results (
-                    match_id            TEXT PRIMARY KEY,
-                    ended_at_utc         TEXT NOT NULL,
-                    match_kind          TEXT NOT NULL,
-                    player0_key          TEXT NOT NULL,
-                    player1_key          TEXT NOT NULL,
-                    player0_leader       TEXT NOT NULL,
-                    player1_leader       TEXT NOT NULL,
-                    winner_index         INTEGER NULL,
-                    first_player_index   INTEGER NOT NULL,
-                    turn_count           INTEGER NOT NULL,
-                    finish_reason        TEXT NOT NULL,
-                    counted              INTEGER NOT NULL,
-                    exclude_reason       TEXT NULL,
-                    stats_version        INTEGER NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS ix_match_results_counted_ended
-                    ON match_results(counted, ended_at_utc);
-
-                CREATE TABLE IF NOT EXISTS match_starting_hand_cards (
-                    match_id            TEXT NOT NULL,
-                    player_index        INTEGER NOT NULL,
-                    card_number         TEXT NOT NULL,
-                    PRIMARY KEY (match_id, player_index, card_number)
-                );
-
-                CREATE INDEX IF NOT EXISTS ix_match_starting_hand_cards_match
-                    ON match_starting_hand_cards(match_id, player_index);
-                """;
-            command.ExecuteNonQuery();
-            _initialized = true;
+                // 立即事务让建表、历史资格重算、兼容触发器与版本标记一次提交。
+                // 进程在任意一步退出都会整体回滚；跨连接写入由 SQLite 写锁串行化。
+                using var transaction = connection.BeginTransaction(deferred: false);
+                CreateSchema(connection, transaction);
+                ReclassifyLegacyMatches(connection, transaction);
+                InstallLegacyWriterCompatibilityTrigger(connection, transaction);
+                SetDatabaseVersion(connection, transaction);
+                transaction.Commit();
+                _initialized = true;
+            }
         }
     }
 
@@ -280,7 +270,10 @@ public sealed class LeaderStatsStore
         }
     }
 
-    /// <summary>按 UTC+8 自然日统计已完成的真人对局；不包含机器人局和同账号测试局。</summary>
+    /// <summary>
+    /// 按 UTC+8 自然日统计已完成的真人对局；不包含机器人局和同账号测试局。
+    /// 这是独立的运营场次口径，仍包含好友与房间码对局，不参与公开 Leader 榜资格判断。
+    /// </summary>
     public IReadOnlyList<DailyMatchCountPoint> GetRecentDailyMatchCounts(int days, DateTime? nowUtc = null)
     {
         if (days is < 1 or > 45) throw new ArgumentOutOfRangeException(nameof(days));
@@ -617,12 +610,16 @@ public sealed class LeaderStatsStore
                     SELECT player0_key AS player_key, player0_leader AS leader_number,
                            CASE WHEN winner_index = 0 THEN 1 ELSE 0 END AS won
                     FROM match_results
-                    WHERE counted = 1 AND player0_key IN ({string.Join(",", parameters)})
+                    WHERE counted = 1
+                      AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
+                      AND player0_key IN ({string.Join(",", parameters)})
                     UNION ALL
                     SELECT player1_key AS player_key, player1_leader AS leader_number,
                            CASE WHEN winner_index = 1 THEN 1 ELSE 0 END AS won
                     FROM match_results
-                    WHERE counted = 1 AND player1_key IN ({string.Join(",", parameters)})
+                    WHERE counted = 1
+                      AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
+                      AND player1_key IN ({string.Join(",", parameters)})
                 ), grouped AS (
                     SELECT player_key, leader_number, COUNT(*) AS games, SUM(won) AS wins,
                            ROW_NUMBER() OVER (
@@ -676,13 +673,165 @@ public sealed class LeaderStatsStore
         return connection;
     }
 
+    private static void ConfigureConnection(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA busy_timeout = 5000;";
+        command.ExecuteNonQuery();
+
+        // journal_mode 会返回结果集，不能与其他 PRAGMA 拼成 ExecuteNonQuery 批处理；
+        // Microsoft.Data.Sqlite 在多个初始化连接并发消费该批处理时可能错误枚举语句。
+        command.CommandText = "PRAGMA journal_mode;";
+        var currentMode = Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        if (string.Equals(currentMode, "wal", StringComparison.OrdinalIgnoreCase)) return;
+
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        var configuredMode = Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        if (!string.Equals(configuredMode, "wal", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Leader 统计数据库无法启用 WAL，当前模式：{configuredMode ?? "未知"}。");
+    }
+
+    private static int ReadDatabaseVersion(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        return Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private static void CreateSchema(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS match_results (
+                match_id            TEXT PRIMARY KEY,
+                ended_at_utc         TEXT NOT NULL,
+                match_kind          TEXT NOT NULL,
+                player0_key          TEXT NOT NULL,
+                player1_key          TEXT NOT NULL,
+                player0_leader       TEXT NOT NULL,
+                player1_leader       TEXT NOT NULL,
+                winner_index         INTEGER NULL,
+                first_player_index   INTEGER NOT NULL,
+                turn_count           INTEGER NOT NULL,
+                finish_reason        TEXT NOT NULL,
+                counted              INTEGER NOT NULL,
+                exclude_reason       TEXT NULL,
+                stats_version        INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_match_results_counted_ended
+                ON match_results(counted, ended_at_utc);
+
+            CREATE TABLE IF NOT EXISTS match_starting_hand_cards (
+                match_id            TEXT NOT NULL,
+                player_index        INTEGER NOT NULL,
+                card_number         TEXT NOT NULL,
+                PRIMARY KEY (match_id, player_index, card_number)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_match_starting_hand_cards_match
+                ON match_starting_hand_cards(match_id, player_index);
+
+            CREATE TABLE IF NOT EXISTS leader_stats_migrations (
+                version             INTEGER PRIMARY KEY,
+                applied_at_utc      TEXT NOT NULL,
+                description         TEXT NOT NULL
+            );
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private static void ReclassifyLegacyMatches(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var countedSql = BuildCountedEligibilitySql();
+        var excludeReasonSql = BuildExcludeReasonSql();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            UPDATE match_results
+            SET counted = {countedSql},
+                exclude_reason = {excludeReasonSql},
+                stats_version = {StatsVersion}
+            WHERE stats_version < {StatsVersion};
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private static void InstallLegacyWriterCompatibilityTrigger(
+        SqliteConnection connection,
+        SqliteTransaction transaction)
+    {
+        var countedSql = BuildCountedEligibilitySql();
+        var excludeReasonSql = BuildExcludeReasonSql();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            DROP TRIGGER IF EXISTS trg_match_results_upgrade_legacy_insert;
+            CREATE TRIGGER trg_match_results_upgrade_legacy_insert
+            AFTER INSERT ON match_results
+            WHEN NEW.stats_version < {StatsVersion}
+            BEGIN
+                UPDATE match_results
+                SET counted = {countedSql},
+                    exclude_reason = {excludeReasonSql},
+                    stats_version = {StatsVersion}
+                WHERE match_id = NEW.match_id;
+            END;
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private static void SetDatabaseVersion(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            INSERT OR IGNORE INTO leader_stats_migrations (version, applied_at_utc, description)
+            VALUES ({StatsVersion}, $appliedAtUtc, 'public_match_only');
+            PRAGMA user_version = {StatsVersion};
+            """;
+        command.Parameters.AddWithValue("$appliedAtUtc", ToDatabaseUtc(DateTime.UtcNow));
+        command.ExecuteNonQuery();
+    }
+
+    private static string BuildCountedEligibilitySql()
+        => $"""
+            CASE
+                WHEN match_kind IS NULL OR match_kind NOT IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql}) THEN 0
+                WHEN winner_index IS NULL OR winner_index NOT IN (0, 1) THEN 0
+                WHEN finish_reason LIKE '%断线%' OR LOWER(finish_reason) LIKE '%disconnect%' THEN 0
+                WHEN turn_count < {MinimumCountedTurn} THEN 0
+                WHEN player0_key = player1_key THEN 0
+                ELSE 1
+            END
+            """;
+
+    private static string BuildExcludeReasonSql()
+        => $"""
+            CASE
+                WHEN match_kind = 'Bot' THEN 'bot'
+                WHEN match_kind IN ('Friendly', 'RoomCode') THEN 'private_match'
+                WHEN match_kind IS NULL OR match_kind NOT IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql}) THEN 'unsupported_match_kind'
+                WHEN winner_index IS NULL OR winner_index NOT IN (0, 1) THEN 'no_winner'
+                WHEN finish_reason LIKE '%断线%' OR LOWER(finish_reason) LIKE '%disconnect%' THEN 'disconnect'
+                WHEN turn_count < {MinimumCountedTurn} THEN 'too_short'
+                WHEN player0_key = player1_key THEN 'same_account'
+                ELSE NULL
+            END
+            """;
+
     private static (bool Counted, string? ExcludeReason) EvaluateEligibility(LeaderMatchResult result)
     {
-        if (result.MatchKind == MatchKind.Bot) return (false, "bot");
+        if (!LeaderStatsEligibilityPolicy.IsPublicMatch(result.MatchKind))
+            return (false, LeaderStatsEligibilityPolicy.ExcludedMatchKindReason(result.MatchKind));
         if (result.WinnerIndex is not (0 or 1)) return (false, "no_winner");
         if (IsDisconnectFinish(result.FinishReason)) return (false, "disconnect");
         if (result.TurnCount < MinimumCountedTurn) return (false, "too_short");
-        if (string.Equals(result.Player0Account, result.Player1Account, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(
+                result.Player0Account.Trim(),
+                result.Player1Account.Trim(),
+                StringComparison.OrdinalIgnoreCase))
             return (false, "same_account");
         return (true, null);
     }
@@ -695,10 +844,11 @@ public sealed class LeaderStatsStore
     private static int ReadTotalMatches(SqliteConnection connection, DateTime? sinceUtc)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT COUNT(*)
             FROM match_results
             WHERE counted = 1
+              AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
               AND finish_reason NOT LIKE '%断线%'
               AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc);
@@ -710,11 +860,12 @@ public sealed class LeaderStatsStore
     private static List<AggregateRow> ReadLeaderboardRows(SqliteConnection connection, DateTime? sinceUtc)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             WITH filtered AS (
                 SELECT player0_leader, player1_leader, winner_index, first_player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
                   AND finish_reason NOT LIKE '%断线%'
                   AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
@@ -812,11 +963,12 @@ public sealed class LeaderStatsStore
         }
 
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             WITH leader_matches AS (
                 SELECT match_id, 0 AS player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
                   AND finish_reason NOT LIKE '%断线%'
                   AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
@@ -825,6 +977,7 @@ public sealed class LeaderStatsStore
                 SELECT match_id, 1 AS player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
                   AND finish_reason NOT LIKE '%断线%'
                   AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
@@ -876,11 +1029,12 @@ public sealed class LeaderStatsStore
         DateTime? sinceUtc)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             WITH filtered AS (
                 SELECT player0_leader, player1_leader, winner_index, first_player_index
                 FROM match_results
                 WHERE counted = 1
+                  AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
                   AND finish_reason NOT LIKE '%断线%'
                   AND LOWER(finish_reason) NOT LIKE '%disconnect%'
                   AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
@@ -940,13 +1094,14 @@ public sealed class LeaderStatsStore
         DateTime? sinceUtc)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT
                 COUNT(*) AS games,
                 COALESCE(SUM(CASE WHEN winner_index = first_player_index THEN 1 ELSE 0 END), 0) AS first_wins,
                 COALESCE(SUM(CASE WHEN winner_index <> first_player_index THEN 1 ELSE 0 END), 0) AS second_wins
             FROM match_results
             WHERE counted = 1
+              AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
               AND finish_reason NOT LIKE '%断线%'
               AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND ($sinceUtc IS NULL OR ended_at_utc >= $sinceUtc)
@@ -967,7 +1122,7 @@ public sealed class LeaderStatsStore
         DateTime? sinceUtc)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT
                 ended_at_utc,
                 CASE WHEN player0_key = $playerKey THEN player0_leader ELSE player1_leader END AS leader_number,
@@ -983,6 +1138,7 @@ public sealed class LeaderStatsStore
                 END AS went_first
             FROM match_results
             WHERE counted = 1
+              AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
               AND finish_reason NOT LIKE '%断线%'
               AND LOWER(finish_reason) NOT LIKE '%disconnect%'
               AND (player0_key = $playerKey OR player1_key = $playerKey)

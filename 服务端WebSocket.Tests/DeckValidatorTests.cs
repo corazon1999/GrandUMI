@@ -121,7 +121,7 @@ public class DeckValidatorTests
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP01"));
 
         var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
-        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatPublicUnrestricted);
 
         Assert.False(standard.Ok);
         Assert.Contains("标准模式不能使用禁限领航卡", standard.Reason ?? "");
@@ -181,59 +181,76 @@ public class DeckValidatorTests
     [Theory]
     [InlineData("OP03-040")]
     [InlineData("ST10-001")]
-    public void 标准排位拒绝官网完全禁用领航_狂野排位允许(string leaderNumber)
+    public void 公开标准与狂野均拒绝官网完全禁用领航_好友房允许(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        var deck = string.Join('\n', lines);
 
-        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
-        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+        var standard = DeckValidator.Validate(deck, DeckValidator.FormatStandard);
+        var publicWild = DeckValidator.Validate(deck, DeckValidator.FormatPublicUnrestricted);
+        var privateRoom = DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted);
 
         Assert.False(standard.Ok);
         Assert.Contains("官方禁卡", standard.Reason ?? "");
         Assert.Contains(leaderNumber, standard.Reason ?? "");
-        Assert.True(wild.Ok, wild.Reason);
+        Assert.Contains("仅好友或房间对战允许", standard.Reason ?? "");
+        Assert.False(publicWild.Ok);
+        Assert.Contains("官方禁卡", publicWild.Reason ?? "");
+        Assert.Contains(leaderNumber, publicWild.Reason ?? "");
+        Assert.True(privateRoom.Ok, privateRoom.Reason);
     }
 
     [Theory]
     [InlineData("OP06-047", "OP15-039")]
     [InlineData("OP06-086", "OP16-079")]
     [InlineData("OP06-116", "OP15-098")]
-    public void 标准排位拒绝官网完全禁用主卡组卡牌_狂野排位允许(string bannedCardNumber, string leaderNumber)
+    public void 公开标准与狂野均拒绝官网完全禁用主卡组卡牌_好友房允许(string bannedCardNumber, string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
         lines[^1] = bannedCardNumber;
+        var deck = string.Join('\n', lines);
 
-        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
-        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+        var standard = DeckValidator.Validate(deck, DeckValidator.FormatStandard);
+        var publicWild = DeckValidator.Validate(deck, DeckValidator.FormatPublicUnrestricted);
+        var privateRoom = DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted);
 
         Assert.False(standard.Ok);
         Assert.Contains("官方禁卡", standard.Reason ?? "");
         Assert.Contains(bannedCardNumber, standard.Reason ?? "");
-        Assert.True(wild.Ok, wild.Reason);
+        Assert.False(publicWild.Ok);
+        Assert.Contains("官方禁卡", publicWild.Reason ?? "");
+        Assert.Contains(bannedCardNumber, publicWild.Reason ?? "");
+        Assert.True(privateRoom.Ok, privateRoom.Reason);
     }
 
     [Theory]
     [InlineData("OP11-040", "OP11-067", "OP11-040")]
     [InlineData("OP11-040", "OP08-069", "OP11-040")]
     [InlineData("OP07-115", "EB04-058", "OP15-098")]
-    public void 标准排位拒绝官网禁用组合_狂野排位允许(string cardA, string cardB, string leaderNumber)
+    public void 公开标准与狂野均拒绝官网禁用组合_好友房允许(string cardA, string cardB, string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
         if (!string.Equals(leaderNumber, cardA, StringComparison.OrdinalIgnoreCase))
             lines[^2] = cardA;
         lines[^1] = cardB;
+        var deck = string.Join('\n', lines);
 
-        var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
-        var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
+        var standard = DeckValidator.Validate(deck, DeckValidator.FormatStandard);
+        var publicWild = DeckValidator.Validate(deck, DeckValidator.FormatPublicUnrestricted);
+        var privateRoom = DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted);
 
         Assert.False(standard.Ok);
         Assert.Contains("官方禁用组合", standard.Reason ?? "");
         Assert.Contains(cardA, standard.Reason ?? "");
         Assert.Contains(cardB, standard.Reason ?? "");
-        Assert.True(wild.Ok, wild.Reason);
+        Assert.False(publicWild.Ok);
+        Assert.Contains("官方禁用组合", publicWild.Reason ?? "");
+        Assert.Contains(cardA, publicWild.Reason ?? "");
+        Assert.Contains(cardB, publicWild.Reason ?? "");
+        Assert.True(privateRoom.Ok, privateRoom.Reason);
     }
 
     [Theory]

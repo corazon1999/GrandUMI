@@ -29,7 +29,7 @@ test("标准与狂野排位使用独立队列、资料和榜单", async () => {
   assert.match(roomManager, /MatchKind\.RankedWild/);
 });
 
-test("标准排位默认展示且狂野排位允许标准禁限卡", async () => {
+test("标准排位默认展示且狂野排位只放宽轮换卡", async () => {
   const [validator, cardInfo, cardDatabase, rankedStore] = await Promise.all([
     readSource("../../服务端WebSocket/Game/Validation/DeckValidator.cs"),
     readSource("../../服务端WebSocket/Cards/CardInfo.cs"),
@@ -38,6 +38,7 @@ test("标准排位默认展示且狂野排位允许标准禁限卡", async () =>
   ]);
 
   assert.match(validator, /FormatStandard = "Standard"/);
+  assert.match(validator, /FormatPublicUnrestricted = "PublicUnrestricted"/);
   assert.match(validator, /StandardLegalSubscriptOneCards/);
   assert.match(validator, /card\.Subscript == 1/);
   assert.match(cardInfo, /public int Subscript/);

@@ -11,7 +11,7 @@ public sealed class LeaderStatsBackfillTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void 可回填新旧正式日志并保持幂等且排除机器人局()
+    public void 可回填新旧日志并保持幂等且公开榜排除私下战和机器人局()
     {
         var logs = Path.Combine(_tempDir, "MatchLogs", "2026-08-07");
         var database = Path.Combine(_tempDir, "leader-stats.db");
@@ -44,9 +44,9 @@ public sealed class LeaderStatsBackfillTests : IDisposable
         Assert.Empty(first.Errors);
         Assert.Equal(3, second.AlreadyRecorded);
         Assert.Equal(1, second.SkippedIncomplete);
-        Assert.Equal(2, leaderboard.TotalMatches);
+        Assert.Equal(1, leaderboard.TotalMatches);
         Assert.Contains(leaderboard.Items, x => x.LeaderNumber == "L-OLD-A" && x.SecondGames == 1);
-        Assert.Contains(leaderboard.Items, x => x.LeaderNumber == "L-NEW-A" && x.FirstGames == 1);
+        Assert.DoesNotContain(leaderboard.Items, x => x.LeaderNumber.StartsWith("L-NEW", StringComparison.Ordinal));
         Assert.DoesNotContain(leaderboard.Items, x => x.LeaderNumber.StartsWith("L-BOT", StringComparison.Ordinal));
     }
 

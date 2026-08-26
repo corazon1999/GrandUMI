@@ -17,27 +17,52 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void 全部真人模式计入且七回合以内和机器人对局排除()
+    public void 公开统计来源使用显式白名单且未知来源默认关闭()
+    {
+        var expectedPublicKinds = new HashSet<MatchKind>
+        {
+            MatchKind.Matchmaking,
+            MatchKind.Casual,
+            MatchKind.CasualStandard,
+            MatchKind.CasualWild,
+            MatchKind.Ranked,
+            MatchKind.RankedWild,
+        };
+
+        Assert.All(Enum.GetValues<MatchKind>(), matchKind =>
+            Assert.Equal(expectedPublicKinds.Contains(matchKind), LeaderStatsEligibilityPolicy.IsPublicMatch(matchKind)));
+    }
+
+    [Fact]
+    public void 只有显式公开模式计入且好友房间禁卡对局不污染榜单()
     {
         var now = new DateTime(2026, 8, 7, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
 
-        store.RecordMatch(Match("matchmaking", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
-        store.RecordMatch(Match("room-code", now, MatchKind.RoomCode, "L-A", "L-C", 1, 1, 10));
-        store.RecordMatch(Match("friendly", now, MatchKind.Friendly, "L-D", "L-A", 1, 0, 12));
-        store.RecordMatch(Match("too-short", now, MatchKind.Friendly, "L-A", "L-E", 0, 0, 7));
-        store.RecordMatch(Match("bot", now, MatchKind.Bot, "L-A", "L-F", 0, 0, 20));
+        var publicKinds = new[]
+        {
+            MatchKind.Matchmaking,
+            MatchKind.Casual,
+            MatchKind.CasualStandard,
+            MatchKind.CasualWild,
+            MatchKind.Ranked,
+            MatchKind.RankedWild,
+        };
+        foreach (var matchKind in publicKinds)
+            store.RecordMatch(Match($"public-{matchKind}", now, matchKind, $"L-{matchKind}", "L-PUBLIC-OPPONENT", 0, 0, 8));
+
+        store.RecordMatch(Match("room-code", now, MatchKind.RoomCode, "OP03-040", "L-ROOM", 0, 0, 20));
+        store.RecordMatch(Match("friendly", now, MatchKind.Friendly, "OP03-040", "L-FRIEND", 0, 0, 20));
+        store.RecordMatch(Match("unknown", now, MatchKind.UnknownHuman, "OP03-040", "L-UNKNOWN", 0, 0, 20));
+        store.RecordMatch(Match("too-short", now, MatchKind.CasualWild, "L-SHORT", "L-OTHER", 0, 0, 7));
+        store.RecordMatch(Match("bot", now, MatchKind.Bot, "OP03-040", "L-BOT", 0, 0, 20));
 
         var result = store.GetLeaderboard("all", now);
 
-        Assert.Equal(3, result.TotalMatches);
-        var leaderA = Assert.Single(result.Items, x => x.LeaderNumber == "L-A");
-        Assert.Equal(3, leaderA.Games);
-        Assert.Equal(2, leaderA.Wins);
-        Assert.Equal(1, leaderA.Losses);
-        Assert.Equal(2d / 3d, leaderA.WinRate, precision: 8);
-        Assert.Equal(0.5, leaderA.UsageRate, precision: 8);
-        Assert.DoesNotContain(result.Items, x => x.LeaderNumber is "L-E" or "L-F");
+        Assert.Equal(publicKinds.Length, result.TotalMatches);
+        Assert.All(publicKinds, matchKind =>
+            Assert.Contains(result.Items, x => x.LeaderNumber == $"L-{matchKind}"));
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber is "OP03-040" or "L-ROOM" or "L-FRIEND" or "L-UNKNOWN" or "L-SHORT" or "L-BOT");
     }
 
     [Fact]
@@ -45,7 +70,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
     {
         var now = new DateTime(2026, 8, 7, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
-        var match = Match("same-id", now, MatchKind.RoomCode, "L-A", "L-B", 0, 1, 8);
+        var match = Match("same-id", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 1, 8);
 
         Assert.True(store.RecordMatch(match));
         Assert.False(store.RecordMatch(match));
@@ -97,7 +122,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
-    public void 测试服可独立写入但榜单只读取正式服数据库()
+    public void 测试服独立写入且读取未迁移正式库时仍只展示公开匹配()
     {
         var now = new DateTime(2026, 8, 7, 8, 0, 0, DateTimeKind.Utc);
         Directory.CreateDirectory(_tempDir);
@@ -106,19 +131,58 @@ public sealed class LeaderStatsStoreTests : IDisposable
         var productionStore = new LeaderStatsStore(productionPath);
         var testStore = new LeaderStatsStore(testPath, productionPath);
 
+        for (var index = 0; index < LeaderStatsStore.MinimumRankedGames; index++)
+        {
+            productionStore.RecordMatch(Match(
+                $"production-{index}",
+                now,
+                MatchKind.Matchmaking,
+                "L-PROD-A",
+                "L-PROD-B",
+                0,
+                index % 2,
+                8,
+                index == 0 ? ["PUBLIC-CARD"] : null));
+        }
         productionStore.RecordMatch(Match(
-            "production-match", now, MatchKind.Matchmaking, "L-PROD-A", "L-PROD-B", 0, 0, 8));
+            "legacy-private", now, MatchKind.Friendly, "OP03-040", "L-PROD-A", 0, 0, 20));
         testStore.RecordMatch(Match(
             "test-match", now, MatchKind.Matchmaking, "L-TEST-A", "L-TEST-B", 0, 0, 8));
+        using (var connection = new SqliteConnection($"Data Source={productionPath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            // 模拟测试服先升级、正式只读数据源仍保留 v1 误标资格的部署窗口。
+            command.CommandText = """
+                UPDATE match_results
+                SET counted = 1, exclude_reason = NULL, stats_version = 1
+                WHERE match_id = 'legacy-private';
+                INSERT INTO match_starting_hand_cards (match_id, player_index, card_number)
+                VALUES ('legacy-private', 1, 'PRIVATE-CARD');
+                """;
+            command.ExecuteNonQuery();
+        }
 
         var result = testStore.GetLeaderboard("all", now);
+        var profile = testStore.GetPlayerProfile("Alice", "all", now);
+        var favorites = testStore.GetFavoriteLeaders([HashAccount("Alice")]);
+        var matchups = testStore.GetMatchups("L-PROD-A", "all", now);
+        var matrix = testStore.GetMatchupMatrix("all", now);
 
         Assert.Equal(productionPath, testStore.LeaderboardDatabasePath);
-        Assert.Equal(1, result.TotalMatches);
+        Assert.Equal(LeaderStatsStore.MinimumRankedGames, result.TotalMatches);
         Assert.Contains(result.Items, x => x.LeaderNumber == "L-PROD-A");
         Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "L-TEST-A");
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber == "OP03-040");
+        Assert.Equal(LeaderStatsStore.MinimumRankedGames, profile.Games);
+        Assert.DoesNotContain(profile.TopLeaders, x => x.LeaderNumber == "OP03-040");
+        Assert.Equal("L-PROD-A", favorites[HashAccount("Alice")].LeaderNumber);
+        Assert.Equal(1, matchups.StartingHandSampleGames);
+        Assert.Contains(matchups.StartingHandItems, x => x.CardNumber == "PUBLIC-CARD");
+        Assert.DoesNotContain(matchups.StartingHandItems, x => x.CardNumber == "PRIVATE-CARD");
+        Assert.DoesNotContain(matrix.Rows, x => x.LeaderNumber == "OP03-040");
         Assert.True(testStore.ContainsMatch("test-match"));
-        Assert.False(testStore.ContainsMatch("production-match"));
+        Assert.False(testStore.ContainsMatch("production-0"));
     }
 
     [Fact]
@@ -155,13 +219,13 @@ public sealed class LeaderStatsStoreTests : IDisposable
             var firstPlayer = gameIndex % 2;
             var winner = gameIndex < 12 ? firstPlayer : 1 - firstPlayer;
             store.RecordMatch(Match(
-                $"mirror-{gameIndex}", now, MatchKind.Friendly, target, target, winner, firstPlayer, 10));
+                $"mirror-{gameIndex}", now, MatchKind.RankedWild, target, target, winner, firstPlayer, 10));
         }
 
         for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames - 1; gameIndex++)
         {
             store.RecordMatch(Match(
-                $"unranked-{gameIndex}", now, MatchKind.RoomCode, target, "L-20", 1, gameIndex % 2, 12));
+                $"unranked-{gameIndex}", now, MatchKind.CasualStandard, target, "L-20", 1, gameIndex % 2, 12));
         }
 
         var result = store.GetMatchups(target, "all", now);
@@ -283,19 +347,19 @@ public sealed class LeaderStatsStoreTests : IDisposable
 
         var result = store.GetPlayerProfile("alice", "30d", now);
 
-        Assert.Equal(3, result.Games);
-        Assert.Equal(2, result.Wins);
-        Assert.Equal(1, result.Losses);
-        Assert.Equal(2d / 3d, result.WinRate, precision: 8);
+        Assert.Equal(1, result.Games);
+        Assert.Equal(1, result.Wins);
+        Assert.Equal(0, result.Losses);
+        Assert.Equal(1, result.WinRate, precision: 8);
         var favorite = Assert.Single(result.TopLeaders, item => item.LeaderNumber == "L-A");
-        Assert.Equal(2, favorite.Games);
+        Assert.Equal(1, favorite.Games);
         Assert.Equal(1, favorite.Wins);
         Assert.Equal(10, result.Trend.Count);
-        Assert.Equal(3, result.Trend.Sum(point => point.Games));
+        Assert.Equal(1, result.Trend.Sum(point => point.Games));
 
         var bob = store.GetPlayerProfile("Bob", "30d", now);
-        Assert.Equal(2, bob.Games);
-        Assert.Equal(2, bob.TopLeaders.Count);
+        Assert.Equal(1, bob.Games);
+        Assert.Single(bob.TopLeaders);
     }
 
     [Fact]
@@ -306,6 +370,8 @@ public sealed class LeaderStatsStoreTests : IDisposable
         store.RecordMatch(Match("favorite-1", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
         store.RecordMatch(Match("favorite-2", now.AddMinutes(1), MatchKind.Matchmaking, "L-A", "L-C", 1, 0, 8));
         store.RecordMatch(Match("favorite-3", now.AddMinutes(2), MatchKind.Matchmaking, "L-D", "L-B", 0, 0, 8));
+        for (var index = 0; index < 5; index++)
+            store.RecordMatch(Match($"private-favorite-{index}", now, MatchKind.Friendly, "OP03-040", "L-X", 0, 0, 20));
 
         var favorites = store.GetFavoriteLeaders(new[] { HashAccount("Alice"), HashAccount("Bob"), "missing" });
 
@@ -313,6 +379,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Equal("L-A", alice.LeaderNumber);
         Assert.Equal(2, alice.Games);
         Assert.Equal(1, alice.Wins);
+        Assert.NotEqual("OP03-040", alice.LeaderNumber);
         Assert.Equal("L-B", favorites[HashAccount("Bob")].LeaderNumber);
         Assert.DoesNotContain("missing", favorites.Keys);
     }
@@ -403,6 +470,299 @@ public sealed class LeaderStatsStoreTests : IDisposable
 
         Assert.Equal(["2026-08-24", "2026-08-25", "2026-08-26"], points.Select(point => point.Date));
         Assert.Equal([0, 1, 1], points.Select(point => point.Count));
+    }
+
+    [Fact]
+    public void V1历史资格会原子重算且保留逐局事实和合法公开战绩()
+    {
+        var now = new DateTime(2026, 8, 26, 8, 0, 0, DateTimeKind.Utc);
+        var databasePath = SeedLegacyV1Database(now);
+
+        var store = new LeaderStatsStore(databasePath);
+        store.Initialize();
+
+        var rows = ReadEligibilityRows(databasePath);
+        Assert.Equal((1L, (string?)null, 2L), rows["public"]);
+        Assert.Equal((0L, "private_match", 2L), rows["friendly"]);
+        Assert.Equal((0L, "private_match", 2L), rows["room-code"]);
+        Assert.Equal((0L, "unsupported_match_kind", 2L), rows["unknown"]);
+        Assert.Equal((0L, "bot", 2L), rows["bot"]);
+        Assert.Equal((0L, "no_winner", 2L), rows["no-winner"]);
+        Assert.Equal((0L, "disconnect", 2L), rows["disconnect"]);
+        Assert.Equal((0L, "too_short", 2L), rows["too-short"]);
+        Assert.Equal((0L, "same_account", 2L), rows["same-account"]);
+
+        var leaderboard = store.GetLeaderboard("all", now);
+        var namiMatchups = store.GetMatchups("OP03-040", "all", now);
+        Assert.Equal(1, leaderboard.TotalMatches);
+        Assert.Contains(leaderboard.Items, item => item.LeaderNumber == "L-PUBLIC");
+        Assert.DoesNotContain(leaderboard.Items, item => item.LeaderNumber == "OP03-040");
+        Assert.Equal(0, namiMatchups.StartingHandSampleGames);
+
+        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            connection.Open();
+            Assert.Equal(LeaderStatsStore.StatsVersion, ReadIntScalar(connection, "PRAGMA user_version;"));
+            Assert.Equal(1, ReadIntScalar(connection,
+                "SELECT COUNT(*) FROM leader_stats_migrations WHERE version = 2 AND description = 'public_match_only';"));
+            Assert.Equal(rows.Count, ReadIntScalar(connection, "SELECT COUNT(*) FROM match_results;"));
+            Assert.Equal(2, ReadIntScalar(connection, "SELECT COUNT(*) FROM match_starting_hand_cards;"));
+            Assert.Equal("ok", ReadStringScalar(connection, "PRAGMA integrity_check;"));
+        }
+
+        // 重启重复执行不改变事实、不重复登记迁移。
+        new LeaderStatsStore(databasePath).Initialize();
+        Assert.Equal(
+            rows.OrderBy(pair => pair.Key, StringComparer.Ordinal),
+            ReadEligibilityRows(databasePath).OrderBy(pair => pair.Key, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void V2触发器会约束回滚后的旧程序写入且重复对局仍幂等()
+    {
+        var now = new DateTime(2026, 8, 26, 8, 0, 0, DateTimeKind.Utc);
+        var databasePath = SeedLegacyV1Database(now);
+        var store = new LeaderStatsStore(databasePath);
+        store.Initialize();
+
+        InsertLegacyV1Match(databasePath, "rollback-private", MatchKind.Friendly, "OP03-040", "L-FRIEND");
+        InsertLegacyV1Match(databasePath, "rollback-public", MatchKind.RankedWild, "L-ROLLBACK", "L-OPPONENT");
+
+        var rows = ReadEligibilityRows(databasePath);
+        Assert.Equal((0L, "private_match", 2L), rows["rollback-private"]);
+        Assert.Equal((1L, (string?)null, 2L), rows["rollback-public"]);
+        Assert.False(store.RecordMatch(Match(
+            "rollback-public", now, MatchKind.RankedWild, "L-CHANGED", "L-CHANGED-OPPONENT", 1, 1, 20)));
+
+        var leaderboard = store.GetLeaderboard("all", now);
+        Assert.Equal(2, leaderboard.TotalMatches);
+        Assert.Contains(leaderboard.Items, item => item.LeaderNumber == "L-ROLLBACK");
+        Assert.DoesNotContain(leaderboard.Items, item => item.LeaderNumber is "OP03-040" or "L-CHANGED");
+    }
+
+    [Fact]
+    public async Task 多实例并发初始化会串行完成同一份可重入迁移()
+    {
+        var databasePath = SeedLegacyV1Database(new DateTime(2026, 8, 26, 8, 0, 0, DateTimeKind.Utc));
+        var emptyDatabasePath = Path.Combine(_tempDir, "concurrent-empty.db");
+
+        await Task.WhenAll(new[] { databasePath, emptyDatabasePath }.SelectMany(path =>
+            Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+            {
+                var store = new LeaderStatsStore(path);
+                store.Initialize();
+            }))));
+
+        var rows = ReadEligibilityRows(databasePath);
+        Assert.Equal((0L, "private_match", 2L), rows["friendly"]);
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        Assert.Equal(1, ReadIntScalar(connection,
+            "SELECT COUNT(*) FROM leader_stats_migrations WHERE version = 2;"));
+        Assert.Equal(1, ReadIntScalar(connection,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_match_results_upgrade_legacy_insert';"));
+        Assert.Equal("ok", ReadStringScalar(connection, "PRAGMA integrity_check;"));
+
+        using var emptyConnection = new SqliteConnection($"Data Source={emptyDatabasePath}");
+        emptyConnection.Open();
+        Assert.Equal(LeaderStatsStore.StatsVersion, ReadIntScalar(emptyConnection, "PRAGMA user_version;"));
+        Assert.Equal("wal", ReadStringScalar(emptyConnection, "PRAGMA journal_mode;"));
+        Assert.Equal("ok", ReadStringScalar(emptyConnection, "PRAGMA integrity_check;"));
+    }
+
+    [Fact]
+    public void 较新数据库版本会拒绝旧程序写入而不是降级覆盖()
+    {
+        var databasePath = Path.Combine(_tempDir, "future-version.db");
+        Directory.CreateDirectory(_tempDir);
+        new LeaderStatsStore(databasePath).Initialize();
+        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA user_version = {LeaderStatsStore.StatsVersion + 1};";
+            command.ExecuteNonQuery();
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new LeaderStatsStore(databasePath).Initialize());
+        Assert.Contains("高于当前程序支持", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 迁移中途失败会整体回滚且修复结构后可安全重试()
+    {
+        var databasePath = Path.Combine(_tempDir, "interrupted-migration.db");
+        Directory.CreateDirectory(_tempDir);
+        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            // 故意模拟旧库缺列：建迁移审计表之后，资格重算会失败。
+            command.CommandText = """
+                CREATE TABLE match_results (
+                    match_id TEXT PRIMARY KEY,
+                    ended_at_utc TEXT NOT NULL,
+                    match_kind TEXT NOT NULL,
+                    player0_key TEXT NOT NULL,
+                    player1_key TEXT NOT NULL,
+                    player0_leader TEXT NOT NULL,
+                    player1_leader TEXT NOT NULL,
+                    winner_index INTEGER NULL,
+                    first_player_index INTEGER NOT NULL,
+                    turn_count INTEGER NOT NULL,
+                    finish_reason TEXT NOT NULL,
+                    counted INTEGER NOT NULL,
+                    exclude_reason TEXT NULL
+                );
+                INSERT INTO match_results VALUES (
+                    'private-before-retry', '2026-08-26T08:00:00.0000000Z', 'Friendly',
+                    'alice-key', 'bob-key', 'OP03-040', 'L-B', 0, 0, 20, '测试结束', 1, NULL
+                );
+                PRAGMA user_version = 1;
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var store = new LeaderStatsStore(databasePath);
+        var exception = Assert.Throws<SqliteException>(() => store.Initialize());
+        Assert.Contains("stats_version", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            connection.Open();
+            Assert.Equal(1, ReadIntScalar(connection, "PRAGMA user_version;"));
+            Assert.Equal(0, ReadIntScalar(connection,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'leader_stats_migrations';"));
+
+            using var repair = connection.CreateCommand();
+            repair.CommandText = "ALTER TABLE match_results ADD COLUMN stats_version INTEGER NOT NULL DEFAULT 1;";
+            repair.ExecuteNonQuery();
+        }
+
+        // 同一个 Store 在失败后仍可重试；成功时审计、触发器和版本号一次提交。
+        store.Initialize();
+        Assert.Equal((0L, "private_match", 2L), ReadEligibilityRows(databasePath)["private-before-retry"]);
+        using var verified = new SqliteConnection($"Data Source={databasePath}");
+        verified.Open();
+        Assert.Equal(LeaderStatsStore.StatsVersion, ReadIntScalar(verified, "PRAGMA user_version;"));
+        Assert.Equal(1, ReadIntScalar(verified,
+            "SELECT COUNT(*) FROM leader_stats_migrations WHERE version = 2;"));
+        Assert.Equal("ok", ReadStringScalar(verified, "PRAGMA integrity_check;"));
+    }
+
+    private string SeedLegacyV1Database(DateTime now)
+    {
+        Directory.CreateDirectory(_tempDir);
+        var databasePath = Path.Combine(_tempDir, "legacy-v1.db");
+        var seedStore = new LeaderStatsStore(databasePath);
+        seedStore.RecordMatch(Match(
+            "public", now, MatchKind.Matchmaking, "L-PUBLIC", "L-PUBLIC-OPPONENT", 0, 0, 20,
+            ["PUBLIC-CARD"]));
+        seedStore.RecordMatch(Match(
+            "friendly", now, MatchKind.Friendly, "OP03-040", "L-FRIEND", 0, 0, 20));
+        seedStore.RecordMatch(Match(
+            "room-code", now, MatchKind.RoomCode, "OP03-040", "L-ROOM", 0, 0, 20));
+        seedStore.RecordMatch(Match(
+            "unknown", now, MatchKind.UnknownHuman, "OP03-040", "L-UNKNOWN", 0, 0, 20));
+        seedStore.RecordMatch(Match(
+            "bot", now, MatchKind.Bot, "OP03-040", "L-BOT", 0, 0, 20));
+        seedStore.RecordMatch(new LeaderMatchResult(
+            "no-winner", now, MatchKind.CasualWild,
+            "Alice", "Bob", "L-NO-WINNER", "L-OTHER", null, 0, 20, "未分胜负"));
+        seedStore.RecordMatch(new LeaderMatchResult(
+            "disconnect", now, MatchKind.Ranked,
+            "Alice", "Bob", "L-DISCONNECT", "L-OTHER", 0, 0, 20, "Bob 断线超时"));
+        seedStore.RecordMatch(Match(
+            "too-short", now, MatchKind.CasualStandard, "L-SHORT", "L-OTHER", 0, 0, 7));
+        seedStore.RecordMatch(new LeaderMatchResult(
+            "same-account", now, MatchKind.RankedWild,
+            "Alice", " alice ", "L-SAME", "L-OTHER", 0, 0, 20, "测试结束"));
+
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            DROP TRIGGER IF EXISTS trg_match_results_upgrade_legacy_insert;
+            DELETE FROM leader_stats_migrations;
+            PRAGMA user_version = 0;
+            UPDATE match_results
+            SET counted = 1,
+                exclude_reason = NULL,
+                stats_version = 1;
+            INSERT INTO match_starting_hand_cards (match_id, player_index, card_number)
+            VALUES ('friendly', 0, 'PRIVATE-CARD');
+            """;
+        command.ExecuteNonQuery();
+        return databasePath;
+    }
+
+    private static void InsertLegacyV1Match(
+        string databasePath,
+        string matchId,
+        MatchKind matchKind,
+        string player0Leader,
+        string player1Leader)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO match_results (
+                match_id, ended_at_utc, match_kind,
+                player0_key, player1_key, player0_leader, player1_leader,
+                winner_index, first_player_index, turn_count, finish_reason,
+                counted, exclude_reason, stats_version
+            ) VALUES (
+                $matchId, '2026-08-26T08:00:00.0000000Z', $matchKind,
+                $player0Key, $player1Key, $player0Leader, $player1Leader,
+                0, 0, 20, '旧程序写入',
+                1, NULL, 1
+            );
+            """;
+        command.Parameters.AddWithValue("$matchId", matchId);
+        command.Parameters.AddWithValue("$matchKind", matchKind.ToString());
+        command.Parameters.AddWithValue("$player0Key", HashAccount("Alice"));
+        command.Parameters.AddWithValue("$player1Key", HashAccount("Bob"));
+        command.Parameters.AddWithValue("$player0Leader", player0Leader);
+        command.Parameters.AddWithValue("$player1Leader", player1Leader);
+        command.ExecuteNonQuery();
+    }
+
+    private static Dictionary<string, (long Counted, string? ExcludeReason, long StatsVersion)> ReadEligibilityRows(
+        string databasePath)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath};Mode=ReadOnly");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT match_id, counted, exclude_reason, stats_version
+            FROM match_results
+            ORDER BY match_id;
+            """;
+        var result = new Dictionary<string, (long, string?, long)>(StringComparer.Ordinal);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            result[reader.GetString(0)] = (
+                reader.GetInt64(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.GetInt64(3));
+        }
+        return result;
+    }
+
+    private static int ReadIntScalar(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    private static string ReadStringScalar(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToString(command.ExecuteScalar()) ?? "";
     }
 
     private LeaderStatsStore CreateStore()

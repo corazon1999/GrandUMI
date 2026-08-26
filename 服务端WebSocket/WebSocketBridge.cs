@@ -47,7 +47,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentDictionary<string, string>    AccountIndex = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime>  SupersededClientInstances = new(StringComparer.Ordinal);
     private static readonly object                                  AccountIndexGate = new();
-    // 兼容旧客户端：历史 casual 协议值继续表示无限制（狂野）休闲匹配。
+    // 兼容旧客户端：历史 casual 协议值继续表示狂野休闲匹配，但公开对战仍执行官网禁卡表。
     private static readonly ConcurrentQueue<WsSession>              MatchQueue   = new();
     private static readonly ConcurrentQueue<WsSession>              StandardCasualMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
@@ -1128,7 +1128,7 @@ public static class WebSocketBridge
         var deckName = Str(msg, "deckName");
         // 单人测试先后手（前端可选）：默认人类先手，仅显式 goFirst=false 时人类后手
         bool goFirst = !(msg.TryGetValue("goFirst", out var gfEl) && gfEl.ValueKind == JsonValueKind.False);
-        var v = DeckValidator.Validate(deck);
+        var v = DeckValidator.Validate(deck, DeckFormatForMatchKind(MatchKind.Bot));
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = $"卡组不合法: {v.Reason}" });
@@ -1273,11 +1273,15 @@ public static class WebSocketBridge
         => queueKind == "rankedWild" ? RankedMode.Wild : RankedMode.Standard;
 
     private static string DeckFormatForQueue(string queueKind)
-        => queueKind switch
+        => DeckFormatForMatchKind(MatchKindForQueue(queueKind));
+
+    private static string DeckFormatForMatchKind(MatchKind matchKind)
+        => matchKind switch
         {
-            "ranked" => DeckValidator.FormatStandardRanked,
-            "casualStandard" => DeckValidator.FormatStandard,
-            _ => DeckValidator.FormatUnrestricted,
+            MatchKind.Ranked => DeckValidator.FormatStandardRanked,
+            MatchKind.CasualStandard => DeckValidator.FormatStandard,
+            MatchKind.Friendly or MatchKind.RoomCode => DeckValidator.FormatUnrestricted,
+            _ => DeckValidator.FormatPublicUnrestricted,
         };
 
     private static ConcurrentQueue<WsSession> QueueFor(string queueKind) => queueKind switch
@@ -1559,7 +1563,7 @@ public static class WebSocketBridge
 
         var deck = Str(msg, "deck") ?? "";
         var deckName = Str(msg, "deckName") ?? "大厅所选卡组";
-        var v    = DeckValidator.Validate(deck);
+        var v = DeckValidator.Validate(deck, DeckFormatForMatchKind(MatchKind.RoomCode));
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = $"卡组不合法: {v.Reason}" });
@@ -1613,7 +1617,7 @@ public static class WebSocketBridge
             return;
         }
 
-        var v = DeckValidator.Validate(deck);
+        var v = DeckValidator.Validate(deck, DeckFormatForMatchKind(MatchKind.RoomCode));
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = $"卡组不合法: {v.Reason}" });
@@ -2712,7 +2716,7 @@ public static class WebSocketBridge
         if (room is null || s.Account is null) return;
 
         var deck = Str(msg, "deck") ?? "";
-        var v = DeckValidator.Validate(deck);
+        var v = DeckValidator.Validate(deck, DeckFormatForMatchKind(MatchKind.Friendly));
         if (!v.Ok) { PushFriendlyRoom(room, $"卡组不合法: {v.Reason}"); return; }
 
         lock (room.Gate)
@@ -3943,7 +3947,8 @@ public static class WebSocketBridge
     private static void ValidatePlayableDeck(StoredDeck deck)
     {
         var deckText = string.Join('\n', new[] { deck.Leader }.Concat(deck.Cards ?? []));
-        var validation = DeckValidator.Validate(deckText);
+        // 保存卡组不等于参加公开对战；保留禁卡卡组，供好友邀请或房间码对战选择。
+        var validation = DeckValidator.Validate(deckText, DeckValidator.FormatUnrestricted);
         if (!validation.Ok)
             throw new PlayerDataValidationException($"卡组不合法: {validation.Reason}");
     }

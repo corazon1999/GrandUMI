@@ -12,6 +12,7 @@ public sealed class CasualFormatMatchmakingTests
 {
     private static readonly MethodInfo QueueForMethod = RequiredMethod("QueueFor");
     private static readonly MethodInfo DeckFormatForQueueMethod = RequiredMethod("DeckFormatForQueue");
+    private static readonly MethodInfo DeckFormatForMatchKindMethod = RequiredMethod("DeckFormatForMatchKind");
     private static readonly MethodInfo MatchKindForQueueMethod = RequiredMethod("MatchKindForQueue");
     private static readonly MethodInfo UsesPublicMatchClockMethod = typeof(GameRoomManager).GetMethod(
         "UsesPublicMatchClock", BindingFlags.NonPublic | BindingFlags.Static)
@@ -34,9 +35,9 @@ public sealed class CasualFormatMatchmakingTests
 
     [Theory]
     [InlineData("casualStandard", DeckValidator.FormatStandard, MatchKind.CasualStandard)]
-    [InlineData("casual", DeckValidator.FormatUnrestricted, MatchKind.CasualWild)]
+    [InlineData("casual", DeckValidator.FormatPublicUnrestricted, MatchKind.CasualWild)]
     [InlineData("ranked", DeckValidator.FormatStandardRanked, MatchKind.Ranked)]
-    [InlineData("rankedWild", DeckValidator.FormatUnrestricted, MatchKind.RankedWild)]
+    [InlineData("rankedWild", DeckValidator.FormatPublicUnrestricted, MatchKind.RankedWild)]
     public void 队列协议_同时决定牌组规则与房间来源(
         string queueKind,
         string expectedDeckFormat,
@@ -50,13 +51,64 @@ public sealed class CasualFormatMatchmakingTests
     }
 
     [Fact]
-    public void 旧客户端休闲协议_继续进入原有无限制休闲队列()
+    public void 旧客户端休闲协议_继续进入狂野休闲队列并执行公开禁卡规则()
     {
         Assert.Same(QueueFor("casual"), QueueFor("unknown-client-value"));
-        Assert.Equal(DeckValidator.FormatUnrestricted,
+        Assert.Equal(DeckValidator.FormatPublicUnrestricted,
             DeckFormatForQueueMethod.Invoke(null, ["unknown-client-value"]));
         Assert.Equal(MatchKind.CasualWild,
             MatchKindForQueueMethod.Invoke(null, ["unknown-client-value"]));
+    }
+
+    [Theory]
+    [InlineData("casualStandard")]
+    [InlineData("casual")]
+    [InlineData("ranked")]
+    [InlineData("rankedWild")]
+    [InlineData("unknown-client-value")]
+    public void 所有公开匹配队列_包括旧客户端回退_都拒绝官网禁卡(string queueKind)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP03-040")!;
+        var deck = string.Join('\n', BuildValidDeck(leader));
+
+        var result = ValidateForQueue(deck, queueKind);
+
+        Assert.False(result.Ok);
+        Assert.Contains("官方禁卡", result.Reason ?? "");
+        Assert.Contains("OP03-040", result.Reason ?? "");
+        Assert.Contains("仅好友或房间对战允许", result.Reason ?? "");
+    }
+
+    [Theory]
+    [InlineData(MatchKind.CasualStandard, DeckValidator.FormatStandard)]
+    [InlineData(MatchKind.CasualWild, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Casual, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Matchmaking, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Ranked, DeckValidator.FormatStandardRanked)]
+    [InlineData(MatchKind.RankedWild, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Bot, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Friendly, DeckValidator.FormatUnrestricted)]
+    [InlineData(MatchKind.RoomCode, DeckValidator.FormatUnrestricted)]
+    public void 对局来源_统一决定公开禁卡与好友房放行边界(MatchKind matchKind, string expectedDeckFormat)
+    {
+        Assert.Equal(expectedDeckFormat, DeckFormatForMatchKindMethod.Invoke(null, [matchKind]));
+    }
+
+    [Theory]
+    [InlineData("casualStandard")]
+    [InlineData("casual")]
+    [InlineData("ranked")]
+    [InlineData("rankedWild")]
+    public void 所有公开匹配队列_继续允许合法卡组(string queueKind)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP15-001")!;
+        var deck = string.Join('\n', BuildValidDeck(leader));
+
+        var result = ValidateForQueue(deck, queueKind);
+
+        Assert.True(result.Ok, result.Reason);
     }
 
     [Theory]

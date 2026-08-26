@@ -330,8 +330,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       {rankedMode === "standard"
                         ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
                         : isRanked
-                          ? "狂野排位可使用角标 1 等标准禁限卡，积分与榜单独立。"
-                          : "狂野休闲可使用角标 1 等标准禁限卡，且不影响排名。"}
+                          ? "狂野排位可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"
+                          : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
                     </p>
 
                     {isRanked && rankProfile && (

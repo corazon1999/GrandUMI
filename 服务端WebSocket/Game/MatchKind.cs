@@ -15,6 +15,6 @@ public enum MatchKind
     Bot,
     /// <summary>遵循当前环境禁限卡表的休闲公开匹配。</summary>
     CasualStandard,
-    /// <summary>使用无限制卡池的休闲公开匹配；新建对局使用此值，旧快照 Casual 仍可恢复。</summary>
+    /// <summary>放宽标准轮换限制的休闲公开匹配；仍执行官网禁卡表。新建对局使用此值，旧快照 Casual 仍可恢复。</summary>
     CasualWild,
 }

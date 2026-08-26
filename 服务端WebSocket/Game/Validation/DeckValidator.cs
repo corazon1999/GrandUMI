@@ -13,6 +13,7 @@ namespace GrandUMI.Game.Validation;
 public static class DeckValidator
 {
     public const string FormatUnrestricted = "Unrestricted";
+    public const string FormatPublicUnrestricted = "PublicUnrestricted";
     public const string FormatStandard = "Standard";
     public const string FormatStandardRanked = "StandardRanked";
     public const string FormatOp15Only = "OP15-Only";
@@ -48,9 +49,9 @@ public static class DeckValidator
 
     /// <summary>
     /// ONE PIECE CARD GAME 亚洲官网自 2026-05-01 起生效的完全禁用卡。
-    /// 仅应用于标准模式；狂野模式保留完整卡池。
+    /// 所有公开对战与单人测试均禁用；仅好友对战和房间码对战允许使用。
     /// </summary>
-    private static readonly HashSet<string> StandardBannedCards = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> OfficialBannedCards = new(StringComparer.OrdinalIgnoreCase)
     {
         "OP06-047", // 夏洛特·布玲
         "OP03-040", // 奈美
@@ -62,7 +63,7 @@ public static class DeckValidator
     /// <summary>
     /// 官网当前禁用组合：组合内两张卡不能同时出现在同一卡组中，单独使用合法。
     /// </summary>
-    private static readonly (string CardA, string CardB)[] StandardBannedPairs =
+    private static readonly (string CardA, string CardB)[] OfficialBannedPairs =
     {
         ("OP11-040", "OP11-067"),
         ("OP11-040", "OP08-069"),
@@ -82,6 +83,7 @@ public static class DeckValidator
     private static readonly Dictionary<string, FormatRule> Rules = new()
     {
         [FormatUnrestricted] = new(FormatUnrestricted, null,             50, 4),
+        [FormatPublicUnrestricted] = new(FormatPublicUnrestricted, null, 50, 4),
         [FormatStandard] = new(FormatStandard, null,                     50, 4),
         [FormatStandardRanked] = new(FormatStandard, null,               50, 4),
         [FormatOp15Only] = new(FormatOp15Only, new[] { "OP15" },         50, 4),
@@ -94,9 +96,10 @@ public static class DeckValidator
     /// <summary>
     /// 解析客户端 deck 字符串（DeckMapper 格式：
     ///   第 1 行 = 领航卡号，第 2~51 行 = 50 张主卡组）
-    /// 并校验是否符合指定格式
+    /// 并校验是否符合指定格式。默认按公开狂野校验，避免新增公开入口漏传格式时放行禁卡；
+    /// 好友邀请、房间码对战和卡组保存必须显式传入 FormatUnrestricted。
     /// </summary>
-    public static Result Validate(string deckRaw, string format = FormatUnrestricted)
+    public static Result Validate(string deckRaw, string format = FormatPublicUnrestricted)
     {
         if (string.IsNullOrWhiteSpace(deckRaw))
             return new(false, "卡组为空", null);
@@ -122,13 +125,15 @@ public static class DeckValidator
             return new(false, $"指定的领航卡 {leaderNum} 不是领航类型", null);
 
         var mainCards = lines.Skip(1).ToArray();
-        var enforceStandardLegality = format is FormatStandard or FormatStandardRanked;
+        var enforceOfficialBanList = format is FormatPublicUnrestricted or FormatStandard or FormatStandardRanked;
+        var enforceStandardRotation = format is FormatStandard or FormatStandardRanked;
         var enforceStandardRankedAvailability = format == FormatStandardRanked;
         return ValidateAgainstRule(
             leader,
             mainCards,
             rule,
-            enforceStandardLegality,
+            enforceOfficialBanList,
+            enforceStandardRotation,
             enforceStandardRankedAvailability);
     }
 
@@ -136,7 +141,8 @@ public static class DeckValidator
         CardInfo leader,
         string[] mainCards,
         FormatRule rule,
-        bool enforceStandardLegality,
+        bool enforceOfficialBanList,
+        bool enforceStandardRotation,
         bool enforceStandardRankedAvailability)
     {
         var allowed = rule.AllowedSets;
@@ -147,9 +153,9 @@ public static class DeckValidator
             return new(false, $"{rule.Name} 格式：领航必须来自 {setList}（当前 {leader.SetCode}）", leader.Number);
         if (enforceStandardRankedAvailability && IsUnavailableInStandardRanked(leader.Number))
             return StandardRankedUnavailable(leader.Number, leader.Number);
-        if (enforceStandardLegality && StandardBannedCards.Contains(leader.Number))
-            return new(false, $"标准模式不能使用官方禁卡：{leader.Number}；可改用狂野模式", leader.Number);
-        if (enforceStandardLegality && IsRotatedOutOfStandard(leader))
+        if (enforceOfficialBanList && OfficialBannedCards.Contains(leader.Number))
+            return OfficialBannedCard(leader.Number, leader.Number);
+        if (enforceStandardRotation && IsRotatedOutOfStandard(leader))
             return new(false, $"标准模式不能使用禁限领航卡：{leader.Number}；可改用狂野模式", leader.Number);
 
         // 2. 主卡组张数
@@ -171,14 +177,14 @@ public static class DeckValidator
                 return StandardRankedUnavailable(unavailableCard, leader.Number);
         }
 
-        if (enforceStandardLegality)
+        if (enforceOfficialBanList)
         {
             var includedCards = counts.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
             includedCards.Add(leader.Number);
-            foreach (var (cardA, cardB) in StandardBannedPairs)
+            foreach (var (cardA, cardB) in OfficialBannedPairs)
             {
                 if (includedCards.Contains(cardA) && includedCards.Contains(cardB))
-                    return new(false, $"标准模式不能同时使用官方禁用组合：{cardA} + {cardB}；可改用狂野模式", leader.Number);
+                    return new(false, $"公开对战不能同时使用官方禁用组合：{cardA} + {cardB}；仅好友或房间对战允许", leader.Number);
             }
         }
 
@@ -190,9 +196,9 @@ public static class DeckValidator
                 return new(false, $"卡牌不存在：{num}", leader.Number);
             if (card.Kind == CardKind.Leader)
                 return new(false, $"主卡组不能包含领航卡：{num}", leader.Number);
-            if (enforceStandardLegality && StandardBannedCards.Contains(card.Number))
-                return new(false, $"标准模式不能使用官方禁卡：{num}；可改用狂野模式", leader.Number);
-            if (enforceStandardLegality && IsRotatedOutOfStandard(card))
+            if (enforceOfficialBanList && OfficialBannedCards.Contains(card.Number))
+                return OfficialBannedCard(num, leader.Number);
+            if (enforceStandardRotation && IsRotatedOutOfStandard(card))
                 return new(false, $"标准模式不能使用禁限卡：{num}；可改用狂野模式", leader.Number);
             if (allowed is not null && !allowed.Contains(card.SetCode))
                 return new(false, $"{rule.Name} 格式：主卡组不能包含 {num}（{card.SetCode} 卡集）", leader.Number);
@@ -209,6 +215,12 @@ public static class DeckValidator
 
     private static bool IsRotatedOutOfStandard(CardInfo card)
         => card.Subscript == 1 && !StandardLegalSubscriptOneCards.Contains(card.Number);
+
+    private static Result OfficialBannedCard(string cardNumber, string leaderNumber)
+        => new(
+            false,
+            $"公开对战不能使用官方禁卡：{cardNumber}；仅好友或房间对战允许",
+            leaderNumber);
 
     private static bool IsUnavailableInStandardRanked(string cardNumber)
         => StandardRankedUnavailablePrefixes.Any(prefix =>
