@@ -501,11 +501,18 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             chat_protocol.build_chat_prompt({"personality": "unknown"}),
         )
 
-    def test白名单更新时间使用固定回复且禁止引导联系管理员(self):
+    def test白名单申请和更新时间使用统一固定回复且禁止引导联系管理员(self):
         prompt = chat_protocol.build_chat_prompt(
-            {"nickname": "玩家", "content": "白名单什么时候更新？"}
+            {"nickname": "玩家", "content": "怎么申请加入白名单？"}
         )
-        self.assertIn("reply 必须恰好为“白名单每1小时整点自动更新”", prompt)
+        self.assertIn("申请加入白名单、要求加白名单、询问如何申请白名单", prompt)
+        self.assertIn("白名单什么时候更新", prompt)
+        self.assertIn("白名单多久更新一次", prompt)
+        self.assertIn("白名单更新频率", prompt)
+        self.assertIn(
+            "reply 必须恰好为“白名单每1小时整点自动更新，申请没有意义。”",
+            prompt,
+        )
         self.assertIn("不得建议群友联系、添加或私聊管理员", prompt)
         self.assertIn("也不得附加其他内容", prompt)
 
