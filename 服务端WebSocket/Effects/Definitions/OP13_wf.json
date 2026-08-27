@@ -1,12 +1,12 @@
 {
   "OP13-014": {
     "_name": "波特夹斯·D·露秀",
-    "_matcher": "生命【触发】：选我方1张名为艾斯的角色本回合力量+3000",
+    "_matcher": "生命【触发】：选我方领航或角色区最多1张名为艾斯的卡本回合力量+3000",
     "_src": "wf-dsl",
     "trigger": [
       {
         "op": "Choose",
-        "prompt": "OwnCharacter",
+        "prompt": "OwnLeaderOrCharacter",
         "max": 1,
         "min": 0,
         "as": "$tgt",
