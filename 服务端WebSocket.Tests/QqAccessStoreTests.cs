@@ -42,8 +42,8 @@ public sealed class QqAccessStoreTests : IDisposable
         connection.Open();
         foreach (var table in new[]
                  {
-                     "qq_whitelist_state", "qq_whitelist_members",
-                     "player_qq_bindings", "qq_whitelist_import_audit",
+                     "shared_qq_whitelist_state", "shared_qq_whitelist_members",
+                     "shared_account_qq_bindings", "shared_qq_whitelist_import_audit",
                  })
         {
             using var command = connection.CreateCommand();
@@ -58,16 +58,21 @@ public sealed class QqAccessStoreTests : IDisposable
     {
         var players = CreatePlayers();
         players.Login("ExistingAdmin");
-        var first = new QqAccessStore(players, new[] { "ExistingAdmin", "LateAdmin" });
-        first.Initialize();
+        var accounts = new SharedAccountDatabase(_databasePath);
+        accounts.Initialize(
+            [new LegacyAccountSource("local", _databasePath, Authoritative: true)],
+            new[] { "ExistingAdmin", "LateAdmin" });
+        var first = new QqAccessStore(accounts, new[] { "ExistingAdmin", "LateAdmin" });
 
         Assert.True(first.IsBootstrapAdministrator("existingadmin"));
         Assert.False(first.IsBootstrapAdministrator("LateAdmin"));
 
         // 首次迁移后才注册同名账号，重启也不能把它提升为初始化管理员。
         players.Login("LateAdmin");
-        var restarted = new QqAccessStore(players, new[] { "ExistingAdmin", "LateAdmin" });
-        restarted.Initialize();
+        accounts.Initialize(
+            [new LegacyAccountSource("local", _databasePath, Authoritative: true)],
+            new[] { "ExistingAdmin", "LateAdmin" });
+        var restarted = new QqAccessStore(accounts, new[] { "ExistingAdmin", "LateAdmin" });
         Assert.True(restarted.IsBootstrapAdministrator("ExistingAdmin"));
         Assert.False(restarted.IsBootstrapAdministrator("LateAdmin"));
     }
@@ -129,8 +134,7 @@ public sealed class QqAccessStoreTests : IDisposable
     public void ExistingAndNewAccounts_首次绑定后可登录且玩家不能改绑()
     {
         var store = CreateStore(out var players);
-        players.Login("Existing");
-        players.Login("NewAccount");
+        RegisterAccounts(players, "Existing", "NewAccount");
         store.Import("释迦", "[\"12345\",\"23456\",\"34567\"]");
 
         Assert.Equal(QqLoginAccessKind.NeedsBinding, store.EvaluateLogin("Existing", null).Kind);
@@ -148,8 +152,7 @@ public sealed class QqAccessStoreTests : IDisposable
     public async Task ConcurrentBinding_同一Qq只能有一个账号成功()
     {
         var store = CreateStore(out var players);
-        players.Login("Alice");
-        players.Login("Bob");
+        RegisterAccounts(players, "Alice", "Bob");
         store.Import("释迦", "[\"12345\"]");
 
         var start = new ManualResetEventSlim(false);
@@ -172,8 +175,7 @@ public sealed class QqAccessStoreTests : IDisposable
     public void Replacement_返回增删重复和被移出绑定人数并立即撤销资格()
     {
         var store = CreateStore(out var players);
-        players.Login("Alice");
-        players.Login("Bob");
+        RegisterAccounts(players, "Alice", "Bob");
         store.Import("释迦", "[\"12345\",\"23456\"]");
         Assert.True(store.EvaluateLogin("Alice", "12345").Allowed);
         Assert.True(store.EvaluateLogin("Bob", "23456").Allowed);
@@ -195,7 +197,7 @@ public sealed class QqAccessStoreTests : IDisposable
     public async Task ImportAndGameStart_按同一门锁线性化且移出后禁止下一局()
     {
         var store = CreateStore(out var players);
-        players.Login("Alice");
+        RegisterAccounts(players, "Alice");
         store.Import("释迦", "[\"12345\"]");
         Assert.True(store.EvaluateLogin("Alice", "12345").Allowed);
 
@@ -224,7 +226,7 @@ public sealed class QqAccessStoreTests : IDisposable
     public void Restart_白名单绑定和审计摘要持续存在但不保存原始Json()
     {
         var store = CreateStore(out var players);
-        players.Login("Alice");
+        RegisterAccounts(players, "Alice");
         var originalJson = "[\"12345\",\"23456\",\"12345\"]";
         store.Import("释迦", originalJson);
         store.EvaluateLogin("Alice", "12345");
@@ -237,7 +239,7 @@ public sealed class QqAccessStoreTests : IDisposable
         using var connection = new SqliteConnection($"Data Source={_databasePath};Pooling=False");
         connection.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT imported_by, member_count, duplicate_count FROM qq_whitelist_import_audit;";
+        command.CommandText = "SELECT imported_by, member_count, duplicate_count FROM shared_qq_whitelist_import_audit;";
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
         Assert.Equal("释迦", reader.GetString(0));
@@ -296,13 +298,13 @@ public sealed class QqAccessStoreTests : IDisposable
 
         store.Import("释迦", "[\"23456\"]");
 
-        // 凭据层的 30 天令牌仍然有效，但业务会话必须再次经过 QQ 权威层。
+        // 白名单移除与会话撤销在同一共享事务中提交，旧令牌不得跨环境继续使用。
         var recoveredCredential = authentication.Authenticate("Alice", null, initialLogin.AuthToken);
-        Assert.True(recoveredCredential.Success);
+        Assert.False(recoveredCredential.Success);
         Assert.Equal(QqLoginAccessKind.NotWhitelisted,
-            store.EvaluateLogin(recoveredCredential.Account, null).Kind);
+            store.EvaluateLogin("Alice", null).Kind);
         Assert.Throws<QqAccessDeniedException>(() =>
-            store.ExecuteNewGameAdmission(new[] { recoveredCredential.Account }, () => "room"));
+            store.ExecuteNewGameAdmission(new[] { "Alice" }, () => "room"));
     }
 
     public void Dispose()
@@ -314,10 +316,17 @@ public sealed class QqAccessStoreTests : IDisposable
     private QqAccessStore CreateStore(out PlayerDataStore players)
     {
         players = CreatePlayers();
-        players.Login("Alice");
-        var store = new QqAccessStore(players);
+        RegisterAccounts(players, "Alice");
+        var store = new QqAccessStore(new SharedAccountDatabase(_databasePath));
         store.Initialize();
         return store;
+    }
+
+    private void RegisterAccounts(PlayerDataStore players, params string[] accounts)
+    {
+        foreach (var account in accounts) players.Login(account);
+        new SharedAccountDatabase(_databasePath).Initialize(
+            [new LegacyAccountSource("local", _databasePath, Authoritative: true)]);
     }
 
     private PlayerDataStore CreatePlayers()

@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 repo=/opt/grandumi-test
 state_dir=/var/lib/grandumi-test-release
+account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
 target="$1"
 force="${2:-}"
 
@@ -58,6 +59,8 @@ grep -Eq '^opcgpro-web/(package|package-lock)\.json$' <<<"$changed" && need_npm=
 echo "测试服代码：$(git -C "$repo" rev-parse --short=12 "$old") -> $(git -C "$repo" rev-parse --short=12 "$target")"
 
 if [[ "$need_back" == 1 ]]; then
+  exec 8>"$account_cutover_lock"
+  flock -n 8 || die "共享账号权威切换正在进行，拒绝并发重启测试后端"
   echo "构建测试服后端"
   next_publish="$repo/服务端WebSocket/publish.next"
   previous_publish="$repo/服务端WebSocket/publish.previous"
@@ -65,12 +68,19 @@ if [[ "$need_back" == 1 ]]; then
   /opt/dotnet/dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
     -p:InformationalVersion="1.0.0+$target" \
     -p:IncludeSourceRevisionInInformationalVersion=false
+  [[ -f "$next_publish/.grandumi-shared-account-v1" ]] \
+    || die "测试服后端发布包缺少共享账号兼容标记"
 
-  # 测试服使用完全独立的数据目录，任何账号、卡组或统计写入都不会触碰正式服。
+  # 玩法资料仍只写 /data/grandumi-test。此处只准备共享目录，
+  # 绝不读取或迁移正式 players.db，也绝不创建 active 激活标记。
   install -d -o grandumi -g grandumi -m 0750 /data/grandumi-test
+  install -d -o grandumi -g grandumi -m 0750 /data/grandumi-shared
 
   install -m 0644 "$repo/ops/server/grandumi-test-backend.service" \
     /etc/systemd/system/grandumi-test-backend.service
+  install -d -m 0755 /etc/grandumi
+  install -m 0644 "$repo/ops/server/grandumi-qq-whitelist-sync.env.example" \
+    /etc/grandumi/qq-whitelist-sync.env.example
   systemctl daemon-reload
 
   rm -rf "$previous_publish"
@@ -156,7 +166,12 @@ if [[ "$need_front" == 1 ]]; then
 fi
 
 # 首次迁移先安装仅含 HTTP 与 ACME 挑战的站点；DNS 切换并签发证书后再启用 TLS 配置。
-if [[ ! -e /etc/nginx/sites-enabled/grandumi-test ]]; then
+if [[ -f /etc/letsencrypt/live/test.grand-umi.com/fullchain.pem ]]; then
+  install -m 0644 "$repo/ops/server/grandumi-test.nginx" /etc/nginx/sites-available/grandumi-test
+  ln -sfn /etc/nginx/sites-available/grandumi-test /etc/nginx/sites-enabled/grandumi-test
+  nginx -t
+  systemctl reload nginx
+elif [[ ! -e /etc/nginx/sites-enabled/grandumi-test ]]; then
   install -m 0644 "$repo/ops/server/grandumi-test-acme.nginx" /etc/nginx/sites-available/grandumi-test
   ln -s /etc/nginx/sites-available/grandumi-test /etc/nginx/sites-enabled/grandumi-test
   nginx -t

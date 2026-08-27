@@ -93,6 +93,7 @@ import type {
   MsgQqWhitelistStatus,
   MsgQqWhitelistImport,
   MsgQqAccessDenied,
+  MsgQqBindingChanged,
   AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
@@ -222,6 +223,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgQqAccessDenied":
         handleQqAccessDenied(msg as MsgQqAccessDenied);
+        break;
+      case "MsgQqBindingChanged":
+        handleQqBindingChanged(msg as MsgQqBindingChanged);
         break;
       case "MsgPlayerData":
         handlePlayerData(msg as MsgPlayerData);
@@ -539,6 +543,10 @@ function handleQqWhitelistImport(msg: MsgQqWhitelistImport) {
 
 function handleQqAccessDenied(msg: MsgQqAccessDenied) {
   showMessage(msg.logStr ?? "当前会话没有执行该操作的权限", "error");
+}
+
+function handleQqBindingChanged(msg: MsgQqBindingChanged) {
+  showMessage(msg.logStr ?? "QQ 绑定状态已更新", msg.result === false ? "error" : "info");
 }
 
 function applyPlayerData(
@@ -1404,9 +1412,9 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgAdminDeploy", environment } as MsgAdminDeploy);
   },
 
-  searchAdminPlayers(query: string) {
+  searchAdminPlayers(query: string, searchBy: "player" | "qq" = "player") {
     useNetStore.getState().setAdminTemporaryPassword(null);
-    return NetManager.send({ proto: "MsgAdminPlayerSearch", query } as MsgAdminPlayerSearch);
+    return NetManager.send({ proto: "MsgAdminPlayerSearch", query, searchBy } as MsgAdminPlayerSearch);
   },
 
   renameAdminPlayer(targetAccount: string, displayName: string) {
@@ -1425,6 +1433,38 @@ export const HomeRequest = {
       proto: "MsgAdminPlayerUpdate",
       action: "resetPassword",
       targetAccount,
+    } as MsgAdminPlayerUpdate);
+  },
+
+  setAdminPlayerQq(
+    targetAccount: string,
+    qq: string,
+    expectedBindingRevision: number,
+    requestId: string,
+  ) {
+    useNetStore.getState().setAdminTemporaryPassword(null);
+    return NetManager.send({
+      proto: "MsgAdminPlayerUpdate",
+      action: "setQq",
+      targetAccount,
+      qq,
+      expectedBindingRevision,
+      requestId,
+    } as MsgAdminPlayerUpdate);
+  },
+
+  unbindAdminPlayerQq(
+    targetAccount: string,
+    expectedBindingRevision: number,
+    requestId: string,
+  ) {
+    useNetStore.getState().setAdminTemporaryPassword(null);
+    return NetManager.send({
+      proto: "MsgAdminPlayerUpdate",
+      action: "unbindQq",
+      targetAccount,
+      expectedBindingRevision,
+      requestId,
     } as MsgAdminPlayerUpdate);
   },
 

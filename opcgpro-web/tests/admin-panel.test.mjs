@@ -119,7 +119,7 @@ test("所有折线图数据点都支持悬停、键盘和触摸查看具体数�
 
 test("管理员先搜索并选中玩家再执行改名或密码重置", () => {
   assert.match(admin, /玩家账号管理/);
-  assert.match(admin, /HomeRequest\.searchAdminPlayers\(query\)/);
+  assert.match(admin, /HomeRequest\.searchAdminPlayers\(query, playerSearchBy\)/);
   assert.match(admin, /HomeRequest\.renameAdminPlayer/);
   assert.match(admin, /HomeRequest\.resetAdminPlayerPassword/);
   assert.match(admin, /临时密码（请立即交给玩家）/);

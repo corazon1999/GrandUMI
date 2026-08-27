@@ -10,6 +10,47 @@ location = /backend/version {
     proxy_set_header Host localhost;
 }
 
+# 仅 QQ 机器人固定出口与本机运维可进入；游戏服务还会校验本机代理标记和随机密钥。
+location = /internal/qq-whitelist/sync {
+    if ($host != "direct.grand-umi.com") { return 404; }
+    allow 8.210.155.25;
+    allow 127.0.0.1;
+    allow ::1;
+    deny all;
+    client_max_body_size 256k;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
+    proxy_set_header Host localhost;
+    proxy_set_header X-GrandUMI-Internal-Source "qq-bug-bot@8.210.155.25";
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 30s;
+}
+
+location = /internal/qq-whitelist/sync/status {
+    if ($host != "direct.grand-umi.com") { return 404; }
+    allow 8.210.155.25;
+    allow 127.0.0.1;
+    allow ::1;
+    deny all;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
+    proxy_set_header Host localhost;
+    proxy_set_header X-GrandUMI-Internal-Source "qq-bug-bot@8.210.155.25";
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 15s;
+}
+
+location = /internal/qq-whitelist/sync/notification-ack {
+    if ($host != "direct.grand-umi.com") { return 404; }
+    allow 8.210.155.25;
+    allow 127.0.0.1;
+    allow ::1;
+    deny all;
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
+    proxy_set_header Host localhost;
+    proxy_set_header X-GrandUMI-Internal-Source "qq-bug-bot@8.210.155.25";
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 15s;
+}
+
 location /ws {
     include /etc/nginx/snippets/grandumi-active-backend.conf;
     proxy_http_version 1.1;

@@ -28,6 +28,7 @@ from websockets.legacy.client import connect as ws_connect
 
 import storage
 import media_pipeline
+import qq_whitelist_sync
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get(
@@ -1164,6 +1165,7 @@ def _finish_event_task(tasks: set, task) -> None:
 async def run() -> None:
     cfg = load_config()
     storage.init_db()
+    whitelist_sync_config = qq_whitelist_sync.SyncConfig.from_bot_config(cfg)
     verification_groups = member_verification_groups(cfg)
     cancelled = storage.cancel_member_verifications_outside_groups(
         verification_groups
@@ -1174,6 +1176,14 @@ async def run() -> None:
     print(f"GrandUMI bug 反馈机器人启动,连接 {cfg['ws_url']} …")
     if cfg.get("new_member_verification_enabled", False) and not verification_groups:
         print("[新人验证] 已配置启用，但目标群列表为空或无效；为避免误踢，功能不会生效")
+    if whitelist_sync_config.enabled:
+        print(
+            "[QQ 白名单同步] 已启用："
+            f"{whitelist_sync_config.group_name}（{whitelist_sync_config.group_id}），"
+            "每个 Asia/Singapore 自然整点执行"
+        )
+    else:
+        print("[QQ 白名单同步] 安全关闭")
 
     # 断线自动重连
     while True:
@@ -1183,6 +1193,7 @@ async def run() -> None:
                 client = OneBotClient(ws)
                 notifier = None
                 verifier = None
+                whitelist_syncer = None
                 event_tasks = set()
                 event_lock = asyncio.Lock()
                 if cfg.get("agent_enabled", False) or cfg.get(
@@ -1192,6 +1203,12 @@ async def run() -> None:
                 if verification_groups:
                     verifier = asyncio.create_task(
                         member_verification_loop(client, cfg, event_lock)
+                    )
+                if whitelist_sync_config.enabled:
+                    whitelist_syncer = asyncio.create_task(
+                        qq_whitelist_sync.run_sync_loop(
+                            client, whitelist_sync_config
+                        )
                     )
                 try:
                     async for raw in ws:
@@ -1226,6 +1243,10 @@ async def run() -> None:
                         verifier.cancel()
                         with contextlib.suppress(asyncio.CancelledError):
                             await verifier
+                    if whitelist_syncer:
+                        whitelist_syncer.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await whitelist_syncer
         except (OSError, websockets.exceptions.WebSocketException) as e:
             print(f"连接断开/失败: {e};5 秒后重连…")
             await asyncio.sleep(5)

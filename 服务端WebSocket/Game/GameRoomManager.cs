@@ -41,6 +41,10 @@ public static class GameRoomManager
     private static GameMaintenanceState Maintenance = new();
 
     public static int RoomCount => _rooms.Count;
+    public static bool HasActivePlayerAccount(string account)
+        => !string.IsNullOrWhiteSpace(account)
+           && _accountRoom.TryGetValue(account, out var roomId)
+           && _rooms.ContainsKey(roomId);
     public static int SpectatorCount => _rooms.Values.Sum(room => room.Spectators.Count);
     public static int TotalActionQueueDepth => _rooms.Values.Sum(room => Math.Max(0, Volatile.Read(ref room.ActionQueueDepth)));
     public static IReadOnlyDictionary<string, int> RoomCountsByRuleset

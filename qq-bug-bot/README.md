@@ -73,6 +73,14 @@ copy config.example.json config.json
 | `new_member_verification_groups` | **明确启用验证的群号数组**；空数组表示不对任何群生效，不会沿用“空白名单等于全部群”的规则 |
 | `new_member_verification_timeout_seconds` | 提示被 OneBot 确认发送成功后的验证时限，默认 1800 秒（30 分钟），允许范围 60～86400 秒 |
 | `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与超时核查的后台轮询间隔，默认 300 秒（5 分钟），允许范围 1～3600 秒 |
+| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单自然整点同步；默认关闭 |
+| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权目标群，当前为 `297542853` / `GrandUMI测试群` |
+| `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
+| `qq_whitelist_sync_endpoint` | 游戏服务受限内部 HTTPS 端点；跨主机禁止使用明文 HTTP |
+| `qq_whitelist_sync_secret_env` | 读取随机密钥的环境变量名；配置文件中不得填写真实密钥 |
+| `qq_whitelist_sync_min_members` | 自动同步的绝对人数下限，默认 100 |
+| `qq_whitelist_sync_max_shrink_percent` | 相较上一成功快照允许的最大缩水比例，默认 25% |
+| `qq_whitelist_sync_max_delay_seconds` | 整点请求允许的最长延迟，默认 600 秒；过期小时不补发 |
 
 ### 新人验证安全边界
 
@@ -93,6 +101,24 @@ copy config.example.json config.json
 - 成员列表接口失败时既不会通过也不会踢人；已收到的答案会留在 SQLite 中自动重试。到期后也会先重新获取成员列表，再原子核对会话仍未完成，最后调用 `set_group_kick`。`reject_add_request` 固定为 `false`，不会联动拒绝玩家之后的加群请求。
 - 提示动作没有得到 OneBot 成功响应时不会开始倒计时，后台会重试。极端情况下若 QQ 已收到提示、但进程在写入成功状态前崩溃，重启后可能重复提示一次；不会因此缩短验证时间或误通过。
 - 5 分钟轮询只用于提示失败、成员 API 失败、重启恢复和到期动作等后台任务，因此这些动作最多可能再延后约 5 分钟。正常群消息回答仍由事件实时处理，新人入群时也会立即尝试发送第一次提示，不会等待下一轮后台轮询。
+
+### 游戏 QQ 白名单整点同步
+
+该功能默认关闭。启用后，机器人每次都按 `Asia/Singapore` 墙钟重新计算下一个
+`hh:00:00`，通过 OneBot 的 `get_group_info` 和 `get_group_member_list` 实时读取目标群，
+两个动作都显式使用 `no_cache=true`。只有群号、群名、接口成员数与唯一有效成员列表
+完全一致，且未触发空名单、人数下限或异常缩水门禁时，才调用游戏服务。
+
+游戏服务自身再次校验群身份和人数门禁，并由 `QqAccessStore` 在共享账号 SQLite 的
+同一个立即事务内完成成员替换、版本递增、导入审计、会话撤销和整点幂等记录。
+测试服与正式服使用 `/data/grandumi-shared/accounts.db` 时只需命中一次权威接口，
+不得分别更新两个环境。机器人成功收到已提交版本后才向群发送包含“白名单已更新”的
+消息；OneBot 明确拒绝会有限重试，超时等未知送达状态则坚持至多一次，避免重复群通知。
+
+重启时只恢复当前小时已经开始或已经提交的任务，不创建漏过小时的任务。服务端以
+`群号 + 整点` 唯一约束线性化多实例请求；机器人实例 ID、提交状态和通知 outbox
+保存在 `feedback.db` 中。`notifying` 状态下崩溃会在重启后标记为送达不确定并停止自动
+重发，这是在 OneBot 不提供消息幂等键时避免重复通知的安全边界。
 
 ## 可切换人格聊天 Agent
 
@@ -197,6 +223,8 @@ chown -R 10001:10001 data
 
 - `GH_TOKEN` 使用只允许目标仓库创建 Issue 的细粒度 GitHub Token。
 - `TZ` 使用服务器业务时区。
+- 白名单同步启用前，用 `openssl rand -hex 32` 生成
+  `GRANDUMI_QQ_WHITELIST_SYNC_SECRET`；不得提交、打印或放进 `config.server.json`。
 
 在 Windows 部署电脑上也可以运行以下脚本。脚本会隐藏输入、先验证目标仓库与
 Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token 放进命令行：
@@ -210,11 +238,14 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
 - `ws_url` 保持 `ws://napcat:3001`。
 - `access_token` 设置随机长字符串,并在 NapCat 的正向 WebSocket 配置中填写相同值。
 - `allowed_groups` 填实际群号白名单,不要留空开放所有群。
+- 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
+  两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
+  并开启；不能只在机器人一侧单独打开。
 
 ### 2. 启动和查看日志
 
 ```bash
-docker compose config
+docker compose config -q
 docker compose build
 docker compose up -d
 docker compose logs -f --tail=200

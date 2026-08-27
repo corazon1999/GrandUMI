@@ -38,11 +38,16 @@ public static class WebSocketBridge
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
         "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
-        "MsgQqWhitelistStatus", "MsgQqWhitelistImport", "MsgQqAccessDenied",
+        "MsgQqWhitelistStatus", "MsgQqWhitelistImport", "MsgQqAccessDenied", "MsgQqBindingChanged",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
         "MsgOnlineCount", "MsgPlayerList", "MsgChatMsg", "MsgFriendChat", "MsgRateLimited",
+    };
+    private static readonly HashSet<string> RevokedQqGameProtocols = new(StringComparer.Ordinal)
+    {
+        "MsgPing", "MsgNetworkDiagnostics", "MsgGameAction", "MsgPromptResponse", "MsgRequestState",
+        "MsgSurrender", "MsgEndByDisconnect", "MsgGameChat", "MsgBugReport", "MsgUpdateSettings",
     };
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
@@ -102,6 +107,7 @@ public static class WebSocketBridge
     private static int _onlineBroadcastScheduled;
     private static int _onlineBroadcastVersion;
     private static long _supersededSessionTotal;
+    private static long _qqSecurityEventCursor;
 
     // ── JSON 工具 ─────────────────────────────────────────────────────────
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -122,6 +128,11 @@ public static class WebSocketBridge
 
     private static int Int(IReadOnlyDictionary<string, JsonElement> d, string key, int def = 0)
         => d.TryGetValue(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var result)
+            ? result
+            : def;
+
+    private static long Long(IReadOnlyDictionary<string, JsonElement> d, string key, long def = 0)
+        => d.TryGetValue(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var result)
             ? result
             : def;
 
@@ -148,8 +159,10 @@ public static class WebSocketBridge
         _cts.Cancel();
         _cts.Dispose();
         _cts = new CancellationTokenSource();
+        _qqSecurityEventCursor = _qqAccessStore.GetLatestSecurityEventId();
         Volatile.Write(ref _accepting, 1);
         _ = RunOnlinePlayerSamplingAsync(_cts.Token);
+        _ = RunQqSecurityEventPollingAsync(_cts.Token);
     }
 
     public static void Stop()
@@ -304,6 +317,18 @@ public static class WebSocketBridge
                 proto = "MsgQqAccessDenied",
                 result = false,
                 logStr = "当前仅可初始化 QQ 群白名单；导入后请先完成 QQ 绑定。",
+            });
+            return;
+        }
+
+        if (session.IsQqAccessRevoked && !RevokedQqGameProtocols.Contains(proto))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqAccessDenied",
+                result = false,
+                currentGameContinues = true,
+                logStr = "QQ 绑定资格已变化；当前已注册对局可继续，其他操作需要重新登录并完成绑定。",
             });
             return;
         }
@@ -507,6 +532,7 @@ public static class WebSocketBridge
             // 密码或会话令牌认证只是第一道门。每一次登录/恢复都必须重新读取服务端 QQ 权威状态；
             // 只有 Allowed 才能进入账号索引、恢复赛前房间或重领进行中的对局。
             var qqAccess = _qqAccessStore.EvaluateLogin(authentication.Account, submittedQq);
+            var restrictedGameRecovery = false;
             if (qqAccess.Kind == QqLoginAccessKind.WhitelistUninitialized)
             {
                 if (AdministratorPolicy.IsAuthorized(authentication.Account)
@@ -550,24 +576,30 @@ public static class WebSocketBridge
 
             if (!qqAccess.Allowed)
             {
-                s.QqBootstrapAccount = null;
-                Send(s.SessionId, new
+                // 管理员解绑或白名单变化不打断已经注册的对局。网络中断后允许玩家凭密码
+                // 只恢复该局；恢复会话仍被标记为受限，不能进入大厅或发起下一局。
+                restrictedGameRecovery = GameRoomManager.HasActivePlayerAccount(authentication.Account);
+                if (!restrictedGameRecovery)
                 {
-                    proto = "MsgLogin",
-                    account = authentication.Account,
-                    result = false,
-                    needsPassword = false,
-                    needsPasswordSetup = false,
-                    needsQqBinding = qqAccess.NeedsBinding,
-                    needsQqWhitelistInitialization = false,
-                    canInitializeQqWhitelist = false,
-                    authChallenge = qqAccess.NeedsBinding,
-                    authToken = qqAccess.NeedsBinding ? authentication.AuthToken : null,
-                    qqWhitelistVersion = qqAccess.WhitelistVersion,
-                    qqMasked = qqAccess.MaskedQq,
-                    logStr = qqAccess.Message,
-                });
-                return;
+                    s.QqBootstrapAccount = null;
+                    Send(s.SessionId, new
+                    {
+                        proto = "MsgLogin",
+                        account = authentication.Account,
+                        result = false,
+                        needsPassword = false,
+                        needsPasswordSetup = false,
+                        needsQqBinding = qqAccess.NeedsBinding,
+                        needsQqWhitelistInitialization = false,
+                        canInitializeQqWhitelist = false,
+                        authChallenge = qqAccess.NeedsBinding,
+                        authToken = qqAccess.NeedsBinding ? authentication.AuthToken : null,
+                        qqWhitelistVersion = qqAccess.WhitelistVersion,
+                        qqMasked = qqAccess.MaskedQq,
+                        logStr = qqAccess.Message,
+                    });
+                    return;
+                }
             }
 
             s.QqBootstrapAccount = null;
@@ -587,6 +619,8 @@ public static class WebSocketBridge
 
             s.PlayerName = playerData.DisplayName;
             s.CardBackId = playerData.CardBackId;
+            if (restrictedGameRecovery) s.MarkQqAccessRevoked();
+            else s.ClearQqAccessRevoked();
             if (!TryBindAccountSession(
                     s,
                     playerData.Account,
@@ -619,13 +653,19 @@ public static class WebSocketBridge
                 authToken = authentication.AuthToken,
                 qqMasked = qqAccess.MaskedQq,
                 qqWhitelistVersion = qqAccess.WhitelistVersion,
+                qqAccessRestricted = restrictedGameRecovery,
                 result = true,
-                logStr = submittedQq is null ? authentication.Message : qqAccess.Message,
+                logStr = restrictedGameRecovery
+                    ? "QQ 资格已变化，本次只恢复正在进行的对局；对局结束后需重新绑定。"
+                    : submittedQq is null ? authentication.Message : qqAccess.Message,
             });
-            SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
-            PushQueuedFriendMessages(s);
-            SendRankSnapshot(s);
-            SendMaintenanceState(s);
+            if (!restrictedGameRecovery)
+            {
+                SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
+                PushQueuedFriendMessages(s);
+                SendRankSnapshot(s);
+                SendMaintenanceState(s);
+            }
             Log($"登录 ✅ {playerData.Account}");
 
             // 两个登录请求并发时，只有当前账号索引指向的最新连接有权恢复房间。
@@ -633,7 +673,15 @@ public static class WebSocketBridge
 
             // 登录后尝试断线重连：如该账号还有未结束的对局，自动恢复。
             if (GameRoomManager.TryReclaim(s.SessionId, playerData.Account, playerData.CardBackId))
+            {
                 Log($"断线重连成功 {playerData.Account}");
+                if (restrictedGameRecovery) ScheduleQqRevokedSessionClose(s);
+            }
+            else if (restrictedGameRecovery)
+            {
+                SupersedeSession(s, "原对局已经结束，请重新登录并完成 QQ 绑定。");
+                return;
+            }
             else
                 TryRestoreFriendlyRoom(s, playerData.Account);
 
@@ -898,8 +946,20 @@ public static class WebSocketBridge
                 s.Account!,
                 Str(msg, "displayName") ?? "",
                 Str(msg, "avatar") ?? "");
+            var directorySynchronized = true;
+            try { _accountAuthenticationStore.UpdateDirectorySearchName(snapshot.Account, snapshot.DisplayName); }
+            catch (Exception directoryError)
+            {
+                directorySynchronized = false;
+                LogErr($"共享账号检索昵称同步失败 {snapshot.Account}: {directoryError.Message}");
+            }
             s.PlayerName = snapshot.DisplayName;
-            SendPlayerData(s, snapshot);
+            SendPlayerData(
+                s,
+                snapshot,
+                directorySynchronized
+                    ? null
+                    : "昵称已在当前环境更新，但跨环境检索目录同步失败，请稍后重新保存。");
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "更新玩家资料失败"); }
     }
@@ -4096,14 +4156,23 @@ public static class WebSocketBridge
 
         try
         {
-            var players = _playerDataStore.SearchPlayersForAdmin(Str(msg, "query") ?? "")
+            var searchBy = Str(msg, "searchBy") ?? "player";
+            var players = _qqAccessStore.SearchAccountsForAdmin(Str(msg, "query") ?? "", searchBy)
                 .Select(ToAdminPlayerPayload)
                 .ToArray();
-            Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = true, players });
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminPlayerSearch",
+                result = true,
+                searchBy = string.Equals(searchBy, "qq", StringComparison.OrdinalIgnoreCase) ? "qq" : "player",
+                players,
+            });
         }
         catch (Exception ex)
         {
-            var message = ex is PlayerDataValidationException ? ex.Message : "搜索玩家失败，请稍后再试。";
+            var message = ex is PlayerDataValidationException or QqAccessValidationException
+                ? ex.Message
+                : "搜索玩家失败，请稍后再试。";
             LogErr($"管理员搜索玩家失败 {session.Account}: {ex.Message}");
             Send(session.SessionId, new { proto = "MsgAdminPlayerSearch", result = false, logStr = message });
         }
@@ -4128,6 +4197,8 @@ public static class WebSocketBridge
         try
         {
             string? temporaryPassword = null;
+            var replayed = false;
+            var directorySynchronized = true;
             if (string.Equals(action, "rename", StringComparison.Ordinal))
             {
                 var snapshot = _playerDataStore.AdminRenamePlayer(
@@ -4139,6 +4210,13 @@ public static class WebSocketBridge
                     targetSession.PlayerName = snapshot.DisplayName;
                     SendPlayerData(targetSession, snapshot, "管理员已更新你的昵称");
                     PushFriendPresenceToFriends(snapshot.Account);
+                }
+                try { _accountAuthenticationStore.UpdateDirectorySearchName(snapshot.Account, snapshot.DisplayName); }
+                catch (Exception directoryError)
+                {
+                    directorySynchronized = false;
+                    // 当前环境的玩法改名已经提交，不能伪装为整体回滚；检索目录可由后续改名重试修正。
+                    LogErr($"共享账号检索昵称同步失败 {snapshot.Account}: {directoryError.Message}");
                 }
                 targetAccount = snapshot.Account;
                 Log($"管理员玩家操作 rename：{session.Account} -> {targetAccount}");
@@ -4152,12 +4230,27 @@ public static class WebSocketBridge
                     SupersedeSession(targetSession, "管理员已重置此账号密码，请使用临时密码重新登录。");
                 Log($"管理员玩家操作 reset_password：{session.Account} -> {targetAccount}");
             }
+            else if (string.Equals(action, "setQq", StringComparison.Ordinal)
+                     || string.Equals(action, "unbindQq", StringComparison.Ordinal))
+            {
+                var mutation = _qqAccessStore.AdminUpdateBinding(
+                    session.Account!,
+                    targetAccount,
+                    action == "setQq" ? "set" : "unbind",
+                    Str(msg, "qq"),
+                    Long(msg, "expectedBindingRevision", -1),
+                    Str(msg, "requestId") ?? "");
+                targetAccount = mutation.Account;
+                replayed = mutation.Replayed;
+                if (!mutation.Replayed) ApplyQqBindingSecurityMutation(mutation.Account);
+                Log($"管理员玩家操作 {(action == "setQq" ? "set_qq_binding" : "unbind_qq")}：{session.Account} -> {targetAccount}，版本={mutation.Revision}，QQ={mutation.QqMasked ?? "未绑定"}");
+            }
             else
             {
                 throw new PlayerDataValidationException("不支持的玩家管理操作。");
             }
 
-            var player = _playerDataStore.SearchPlayersForAdmin(targetAccount)
+            var player = _qqAccessStore.SearchAccountsForAdmin(targetAccount, "player")
                 .FirstOrDefault(item => string.Equals(item.Account, targetAccount, StringComparison.OrdinalIgnoreCase));
             Send(session.SessionId, new
             {
@@ -4166,12 +4259,24 @@ public static class WebSocketBridge
                 action,
                 player = player is null ? null : ToAdminPlayerPayload(player),
                 temporaryPassword,
-                logStr = action == "rename" ? "玩家昵称已更新" : "密码已重置；临时密码只在本次结果中显示",
+                replayed,
+                logStr = action switch
+                {
+                    "rename" => directorySynchronized
+                        ? "当前环境的玩法昵称已更新，跨环境检索目录已同步"
+                        : "当前环境的玩法昵称已更新，但跨环境检索目录同步失败，请稍后重试",
+                    "resetPassword" => "密码已重置；临时密码只在本次结果中显示",
+                    "setQq" => replayed ? "该改绑请求已经执行，已返回当前结果" : "玩家 QQ 绑定已原子更新",
+                    "unbindQq" => replayed ? "该解绑请求已经执行，已返回当前结果" : "玩家 QQ 已解绑，旧登录令牌已失效",
+                    _ => "账号操作已完成",
+                },
             });
         }
         catch (Exception ex)
         {
-            var message = ex is PlayerDataValidationException ? ex.Message : "玩家账号操作失败，请稍后再试。";
+            var message = ex is PlayerDataValidationException or QqAccessValidationException
+                ? ex.Message
+                : "玩家账号操作失败，请稍后再试。";
             LogErr($"管理员玩家操作失败 {session.Account} -> {targetAccount}: {ex.Message}");
             Send(session.SessionId, new { proto = "MsgAdminPlayerUpdate", result = false, action, logStr = message });
         }
@@ -4308,6 +4413,28 @@ public static class WebSocketBridge
             qqMasked = qqBinding.MaskedQq,
             qqCurrentlyWhitelisted = qqBinding.CurrentlyWhitelisted,
             qqBoundAt = qqBinding.BoundAt,
+            bindingRevision = qqBinding.Revision,
+        };
+    }
+
+    private static object ToAdminPlayerPayload(AdminQqAccountSummary player)
+    {
+        var presence = PresenceOf(player.Account);
+        return new
+        {
+            account = player.Account,
+            displayName = player.DisplayName,
+            createdAt = player.CreatedAt,
+            lastLoginAt = player.LastLoginAt,
+            hasPassword = player.HasPassword,
+            online = presence.Online,
+            qqBound = player.Qq is not null,
+            qq = player.Qq,
+            qqMasked = player.QqMasked,
+            qqCurrentlyWhitelisted = player.QqCurrentlyWhitelisted,
+            qqBoundAt = player.QqBoundAt,
+            bindingRevision = player.BindingRevision,
+            matchKind = player.MatchKind,
         };
     }
 
@@ -4959,6 +5086,144 @@ public static class WebSocketBridge
             try { await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    private static async Task RunQqSecurityEventPollingAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                var events = _qqAccessStore.GetSecurityEventsAfter(
+                    Volatile.Read(ref _qqSecurityEventCursor), 100);
+                foreach (var securityEvent in events)
+                {
+                    ApplyAccountSecurityEvent(securityEvent);
+                    Volatile.Write(ref _qqSecurityEventCursor, securityEvent.Id);
+                }
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                LogErr($"同步共享账号安全事件失败：{ex.Message}");
+                try { await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken); }
+                catch (OperationCanceledException) { break; }
+            }
+        }
+    }
+
+    private static void ApplyAccountSecurityEvent(AccountSecurityEvent securityEvent)
+    {
+        if (string.Equals(securityEvent.EventType, "credentials_reset", StringComparison.Ordinal))
+        {
+            if (securityEvent.TargetAccount is { Length: > 0 } target
+                && TryGetActiveSession(target, out var targetSession))
+                SupersedeSession(targetSession, "管理员已重置此账号密码，请使用临时密码重新登录。");
+            return;
+        }
+
+        if (string.Equals(securityEvent.EventType, "whitelist_replaced", StringComparison.Ordinal))
+        {
+            EvictIneligibleWaitingActivities();
+            foreach (var currentSession in Sessions.Values.Where(IsCurrentAccountSession).ToArray())
+                ReconcileQqAccessForSession(currentSession);
+            return;
+        }
+
+        if (string.Equals(securityEvent.EventType, "qq_binding_changed", StringComparison.Ordinal)
+            && securityEvent.TargetAccount is { Length: > 0 } account)
+        {
+            ApplyQqBindingSecurityMutation(account);
+        }
+    }
+
+    private static void ApplyQqBindingSecurityMutation(string account)
+    {
+        EvictIneligibleWaitingActivities();
+        if (!TryGetActiveSession(account, out var session)) return;
+        if (IsRegisteredPlayerSession(session))
+        {
+            session.MarkQqAccessRevoked();
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqAccessDenied",
+                result = false,
+                currentGameContinues = true,
+                logStr = "QQ 绑定已被管理员更新。当前对局不会中断；对局结束后请重新认证。",
+            });
+            ScheduleQqRevokedSessionClose(session);
+            return;
+        }
+
+        SupersedeSession(session, "QQ 绑定已被管理员更新，请重新登录认证。");
+    }
+
+    private static void ReconcileQqAccessForSession(WsSession session)
+    {
+        if (session.Account is null || !IsCurrentAccountSession(session)) return;
+        QqLoginAccessResult access;
+        try { access = _qqAccessStore.CheckNewGameAccess(session.Account); }
+        catch (Exception ex)
+        {
+            LogErr($"同步会话 QQ 资格失败 {session.Account}: {ex.Message}");
+            return;
+        }
+
+        if (access.Allowed)
+        {
+            session.ClearQqAccessRevoked();
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqBindingChanged",
+                result = true,
+                bound = true,
+                qqMasked = access.MaskedQq,
+                currentlyWhitelisted = true,
+                logStr = "管理员已更新 QQ 绑定；当前会话可继续使用，后续重连需要重新认证。",
+            });
+            return;
+        }
+
+        if (IsRegisteredPlayerSession(session))
+        {
+            session.MarkQqAccessRevoked();
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqAccessDenied",
+                result = false,
+                currentGameContinues = true,
+                logStr = "QQ 绑定资格已变化。当前对局不会被中断；对局结束后请重新登录并完成绑定。",
+            });
+            ScheduleQqRevokedSessionClose(session);
+            return;
+        }
+
+        SupersedeSession(session, "QQ 绑定资格已变化，请重新登录并完成绑定。");
+    }
+
+    private static bool IsRegisteredPlayerSession(WsSession session)
+    {
+        var room = GameRoomManager.GetRoomBySession(session.SessionId);
+        return room is not null && Array.IndexOf(room.PlayerSessionIds, session.SessionId) >= 0;
+    }
+
+    private static void ScheduleQqRevokedSessionClose(WsSession session)
+    {
+        if (!session.TryStartQqRevokedCloseMonitor()) return;
+        _ = Task.Run(async () =>
+        {
+            while (!_cts.IsCancellationRequested && !session.IsSuperseded)
+            {
+                if (session.IsQqAccessRevoked && !IsRegisteredPlayerSession(session))
+                {
+                    SupersedeSession(session, "当前对局已结束；请重新登录并完成 QQ 绑定。");
+                    return;
+                }
+                try { await Task.Delay(TimeSpan.FromSeconds(1), _cts.Token); }
+                catch (OperationCanceledException) { return; }
+            }
+        });
     }
 
     private static void RecordOnlinePlayerCount(int count)

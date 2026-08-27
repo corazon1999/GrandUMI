@@ -6,13 +6,19 @@ namespace GrandUMI.Tests;
 
 public sealed class AccountAuthenticationStoreTests : IDisposable
 {
-    private readonly string _tempDir = Path.Combine(
-        Path.GetTempPath(), "grandumi-auth-tests", Guid.NewGuid().ToString("N"));
+    private readonly string _tempDir;
     private readonly string _databasePath;
+    private readonly string _sharedDatabasePath;
 
     public AccountAuthenticationStoreTests()
     {
+        var tempRoot = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT");
+        if (string.IsNullOrWhiteSpace(tempRoot))
+            throw new InvalidOperationException(
+                "账号认证测试必须先通过 ops/windows/GrandUmiTemp.ps1 设置 GRANDUMI_TEST_TEMP_ROOT。");
+        _tempDir = Path.Combine(Path.GetFullPath(tempRoot), Guid.NewGuid().ToString("N"));
         _databasePath = Path.Combine(_tempDir, "players.db");
+        _sharedDatabasePath = Path.Combine(_tempDir, "accounts.db");
     }
 
     [Fact]
@@ -40,10 +46,10 @@ public sealed class AccountAuthenticationStoreTests : IDisposable
         Assert.True(laterLogin.Success);
         Assert.NotEqual(firstLogin.AuthToken, laterLogin.AuthToken);
 
-        using var connection = new SqliteConnection($"Data Source={_databasePath};Pooling=False");
+        using var connection = new SqliteConnection($"Data Source={_sharedDatabasePath};Pooling=False");
         connection.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT password_hash FROM player_credentials;";
+        command.CommandText = "SELECT password_hash FROM shared_player_credentials;";
         var storedHash = Assert.IsType<string>(command.ExecuteScalar());
         Assert.DoesNotContain("correct horse", storedHash, StringComparison.Ordinal);
     }
@@ -107,10 +113,10 @@ public sealed class AccountAuthenticationStoreTests : IDisposable
         Assert.False(auth.Authenticate("Robin", "old-password", null).Success);
         Assert.False(auth.Authenticate("Robin", null, login.AuthToken).Success);
         Assert.True(auth.Authenticate("Robin", reset.TemporaryPassword, null).Success);
-        using var connection = new SqliteConnection($"Data Source={_databasePath};Pooling=False");
+        using var connection = new SqliteConnection($"Data Source={_sharedDatabasePath};Pooling=False");
         connection.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT action, detail_json FROM admin_player_audit;";
+        command.CommandText = "SELECT action, detail_json FROM shared_admin_player_audit;";
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
         Assert.Equal("reset_password", reader.GetString(0));
@@ -132,6 +138,65 @@ public sealed class AccountAuthenticationStoreTests : IDisposable
         Assert.True(auth.Authenticate("释迦", "original-password", null).Success);
     }
 
+    [Fact]
+    public void 测试服与正式服共享密码和会话撤销但玩法资料隔离()
+    {
+        var formalPlayers = CreatePlayers();
+        var testPlayersPath = Path.Combine(_tempDir, "test-players.db");
+        var testPlayers = new PlayerDataStore(testPlayersPath);
+        testPlayers.Initialize();
+        var accounts = new SharedAccountDatabase(_sharedDatabasePath);
+        accounts.Initialize();
+        var formalAuth = new AccountAuthenticationStore(formalPlayers, accounts);
+        var testAuth = new AccountAuthenticationStore(testPlayers, accounts);
+
+        var formalLogin = formalAuth.Authenticate("SharedUser", "formal-password", null);
+        Assert.True(formalLogin.Success);
+        Assert.Throws<PlayerDataValidationException>(() => testPlayers.GetPlayerData("SharedUser"));
+
+        var testLogin = testAuth.Authenticate("shareduser", "formal-password", null);
+        Assert.True(testLogin.Success);
+        Assert.Equal("SharedUser", testPlayers.GetPlayerData("SHAREDUSER").Account);
+
+        var changed = testAuth.ChangePassword("SharedUser", "formal-password", "changed-password");
+        Assert.True(changed.Success);
+        Assert.False(formalAuth.Authenticate("SharedUser", null, formalLogin.AuthToken).Success);
+        Assert.False(formalAuth.Authenticate("SharedUser", "formal-password", null).Success);
+        Assert.True(formalAuth.Authenticate("SharedUser", "changed-password", null).Success);
+    }
+
+    [Fact]
+    public void 共享检索昵称与环境玩法昵称冲突时仍可物化且既有昵称不被跨环境覆盖()
+    {
+        var formalPlayers = CreatePlayers();
+        var testPlayersPath = Path.Combine(_tempDir, "test-players.db");
+        var testPlayers = new PlayerDataStore(testPlayersPath);
+        testPlayers.Initialize();
+        testPlayers.Login("LocalOwner");
+        testPlayers.UpdateProfile("LocalOwner", "SharedName", "");
+
+        var accounts = new SharedAccountDatabase(_sharedDatabasePath);
+        accounts.Initialize();
+        var formalAuth = new AccountAuthenticationStore(formalPlayers, accounts);
+        Assert.True(formalAuth.Authenticate("RemoteUser", "shared-password", null).Success);
+        formalAuth.UpdateDirectorySearchName("RemoteUser", "SharedName");
+
+        var testAuth = new AccountAuthenticationStore(testPlayers, accounts);
+        Assert.True(testAuth.Authenticate("RemoteUser", "shared-password", null).Success);
+        var materialized = testPlayers.GetPlayerData("RemoteUser");
+        Assert.StartsWith("SharedName·", materialized.DisplayName, StringComparison.Ordinal);
+        Assert.Equal("SharedName", testPlayers.GetPlayerData("LocalOwner").DisplayName);
+
+        testPlayers.AdminRenamePlayer("测试管理员", "RemoteUser", "TestGameplayName");
+        testAuth.UpdateDirectorySearchName("RemoteUser", "TestGameplayName");
+        Assert.Equal(
+            "RemoteUser",
+            Assert.Single(new QqAccessStore(accounts).SearchAccountsForAdmin("TestGameplayName", "player")).Account);
+        Assert.True(testAuth.Authenticate("RemoteUser", "shared-password", null).Success);
+        Assert.Equal("TestGameplayName", testPlayers.GetPlayerData("RemoteUser").DisplayName);
+        Assert.Equal("RemoteUser", formalPlayers.GetPlayerData("RemoteUser").DisplayName);
+    }
+
     private PlayerDataStore CreatePlayers()
     {
         var players = new PlayerDataStore(_databasePath);
@@ -139,9 +204,12 @@ public sealed class AccountAuthenticationStoreTests : IDisposable
         return players;
     }
 
-    private static AccountAuthenticationStore CreateAuth(PlayerDataStore players)
+    private AccountAuthenticationStore CreateAuth(PlayerDataStore players)
     {
-        var auth = new AccountAuthenticationStore(players);
+        var accounts = new SharedAccountDatabase(_sharedDatabasePath);
+        accounts.Initialize(
+            [new LegacyAccountSource("local", players.DatabasePath, Authoritative: true)]);
+        var auth = new AccountAuthenticationStore(players, accounts);
         auth.Initialize();
         return auth;
     }

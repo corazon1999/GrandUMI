@@ -9,6 +9,7 @@ StartLimitBurst=8
 Type=simple
 User=grandumi
 Group=grandumi
+EnvironmentFile=-/etc/grandumi/qq-whitelist-sync.env
 EnvironmentFile=/etc/grandumi/backend-%i.env
 WorkingDirectory=/opt/grandumi/slots/%i/backend
 ExecStart=/opt/dotnet/dotnet /opt/grandumi/slots/%i/backend/GrandUMIServer.dll ${GRANDUMI_BACKEND_PORT}
@@ -19,6 +20,9 @@ TimeoutStopSec=25
 KillSignal=SIGINT
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 Environment=GRANDUMI_DATA_DIR=/data/grandumi
+Environment=GRANDUMI_ACCOUNT_DB=/data/grandumi-shared/accounts.db
+Environment=GRANDUMI_ACCOUNT_DB_ACTIVATION_MARKER=/data/grandumi-shared/active
+Environment=GRANDUMI_ACCOUNT_DB_PREPARED_MARKER=/data/grandumi-shared/prepared
 Environment=GRANDUMI_RECORD_DAILY_ACTIVE=1
 Environment=GRANDUMI_REQUIRE_SINGLE_WRITER=1
 Environment=GRANDUMI_NODE_ID=hk-production-%i
@@ -36,7 +40,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/data/grandumi /var/lib/grandumi-admin-deploy/requests
+ReadWritePaths=/data/grandumi /data/grandumi-shared /var/lib/grandumi-admin-deploy/requests
 
 [Install]
 WantedBy=multi-user.target

@@ -6,6 +6,8 @@ archive_root=/data/grandumi-archives
 lock_file=/run/lock/grandumi-production-snapshot.lock
 release="${1:-}"
 required_databases=(players.db ranked.db leader-stats.db)
+shared_database=/data/grandumi-shared/accounts.db
+shared_active_marker=/data/grandumi-shared/active
 
 die() { echo "错误：$*" >&2; exit 1; }
 [[ "$data_dir" == /data/grandumi ]] || die "正式数据目录安全检查失败"
@@ -17,6 +19,17 @@ command -v sha256sum >/dev/null || die "缺少 sha256sum，无法生成快照清
 for name in "${required_databases[@]}"; do
   [[ -s "$data_dir/$name" ]] || die "缺少正式关键数据库：$name"
 done
+
+database_sources=()
+while IFS= read -r -d '' database; do
+  database_sources+=("$database")
+done < <(find "$data_dir" -maxdepth 1 -type f -name '*.db' -print0 | sort -z)
+if [[ -f "$shared_active_marker" ]]; then
+  [[ -s "$shared_database" ]] || die "共享账号已激活但数据库缺失"
+  [[ ! -e "$data_dir/accounts.db" ]] \
+    || die "正式数据目录存在同名 accounts.db，无法生成无歧义快照"
+  database_sources+=("$shared_database")
+fi
 
 install -d -m 0750 "$archive_root"
 exec 9>"$lock_file"
@@ -39,9 +52,9 @@ on_exit() {
 trap on_exit EXIT
 
 total_bytes=0
-while IFS= read -r -d '' database; do
+for database in "${database_sources[@]}"; do
   total_bytes=$((total_bytes + $(stat -c %s "$database")))
-done < <(find "$data_dir" -maxdepth 1 -type f -name '*.db' -print0)
+done
 available_bytes="$(df -PB1 "$archive_root" | awk 'NR==2 {print $4}')"
 [[ "$available_bytes" =~ ^[0-9]+$ ]] || die "无法读取正式归档目录可用空间"
 minimum_free_after=$((512 * 1024 * 1024))
@@ -51,7 +64,7 @@ minimum_free_after=$((512 * 1024 * 1024))
 entries="$target/manifest.entries"
 : > "$entries"
 count=0
-while IFS= read -r -d '' database; do
+for database in "${database_sources[@]}"; do
   name="$(basename "$database")"
   [[ "$name" =~ ^[A-Za-z0-9._-]+\.db$ ]] || die "数据库文件名不安全：$name"
   destination="$target/$name"
@@ -64,7 +77,7 @@ while IFS= read -r -d '' database; do
   size="$(stat -c %s "$destination")"
   printf '%s\t%s\t%s\n' "$name" "$size" "$checksum" >> "$entries"
   count=$((count + 1))
-done < <(find "$data_dir" -maxdepth 1 -type f -name '*.db' -print0 | sort -z)
+done
 
 (( count >= ${#required_databases[@]} )) || die "正式 SQLite 快照数量异常：$count"
 {

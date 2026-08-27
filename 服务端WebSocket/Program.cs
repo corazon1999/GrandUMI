@@ -11,6 +11,52 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
+
+if (args.Length > 0 && string.Equals(args[0], "--migrate-shared-accounts", StringComparison.Ordinal))
+{
+    if (args.Length is < 3 or > 4)
+    {
+        Console.Error.WriteLine(
+            "用法：GrandUMIServer --migrate-shared-accounts <新共享库路径> <正式 players.db> [测试 players.db]");
+        Environment.ExitCode = 2;
+        return;
+    }
+
+    var targetPath = Path.GetFullPath(args[1]);
+    var primaryPath = Path.GetFullPath(args[2]);
+    if (File.Exists(targetPath))
+    {
+        Console.Error.WriteLine("共享账号迁移目标已存在；为避免覆盖，必须使用全新的 .next 路径。");
+        Environment.ExitCode = 2;
+        return;
+    }
+    if (!File.Exists(primaryPath))
+    {
+        Console.Error.WriteLine("正式账号源数据库不存在，拒绝创建共享账号库。");
+        Environment.ExitCode = 2;
+        return;
+    }
+
+    try
+    {
+        var sources = new List<LegacyAccountSource>
+        {
+            new("production", primaryPath, Authoritative: true),
+        };
+        if (args.Length == 4 && File.Exists(args[3]))
+            sources.Add(new LegacyAccountSource("test", Path.GetFullPath(args[3]), Authoritative: false));
+        var database = new SharedAccountDatabase(targetPath);
+        var summary = database.Initialize(sources, AdministratorPolicy.GetAuthorizedAccounts());
+        Console.WriteLine(JsonSerializer.Serialize(summary));
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"共享账号迁移失败：{ex.Message}");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 
 if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringComparison.Ordinal))
 {
@@ -45,16 +91,31 @@ using var writerLease = SingleWriterLease.IsRequired
 if (writerLease is not null)
     Console.WriteLine($"[单写者] 已锁定正式数据目录：{writerLease.LeasePath}");
 var playerDataStore = new PlayerDataStore(playerDatabasePath, deferLoginWrites: true);
+var accountDatabasePath = SharedAccountDatabase.ResolveDefaultPath(playerDataStore.DatabasePath);
 playerDataStore.Initialize();
-var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore);
-accountAuthenticationStore.Initialize();
-var qqAccessStore = new QqAccessStore(playerDataStore, AdministratorPolicy.GetAuthorizedAccounts());
-qqAccessStore.Initialize();
+var sharedAccountDatabase = new SharedAccountDatabase(accountDatabasePath);
+var usesIndependentSharedAccountDatabase = !string.Equals(
+    Path.GetFullPath(accountDatabasePath),
+    Path.GetFullPath(playerDataStore.DatabasePath),
+    StringComparison.OrdinalIgnoreCase);
+var sharedAccountSummary = sharedAccountDatabase.Initialize(
+    usesIndependentSharedAccountDatabase
+        ? null
+        : [new LegacyAccountSource("current-environment", playerDataStore.DatabasePath, Authoritative: true)],
+    AdministratorPolicy.GetAuthorizedAccounts(),
+    requirePreparedMigration: usesIndependentSharedAccountDatabase);
+var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore, sharedAccountDatabase);
+var qqAccessStore = new QqAccessStore(sharedAccountDatabase, AdministratorPolicy.GetAuthorizedAccounts());
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
+Console.WriteLine($"[共享账号] SQLite: {sharedAccountDatabase.DatabasePath}；账号 {sharedAccountSummary.AccountCount}，绑定 {sharedAccountSummary.BindingCount}");
 var qqWhitelistStatus = qqAccessStore.GetStatus();
 Console.WriteLine(qqWhitelistStatus.Initialized
     ? $"[QQ 准入] 白名单 v{qqWhitelistStatus.Version}，{qqWhitelistStatus.MemberCount} 人"
     : "[QQ 准入] 白名单尚未初始化，仅既有授权管理员可导入首份名单");
+var qqWhitelistSyncOptions = QqWhitelistSyncOptions.FromEnvironment();
+Console.WriteLine(qqWhitelistSyncOptions is null
+    ? "[QQ 白名单同步] 自动整点同步安全关闭"
+    : $"[QQ 白名单同步] 已授权群 {qqWhitelistSyncOptions.GroupName}（{qqWhitelistSyncOptions.GroupId}）");
 var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "online-player-history.db"));
@@ -189,6 +250,9 @@ app.MapGet("/version", () => Results.Json(new
 app.MapGet("/metrics", () => Results.Text(
     ServerMetrics.RenderPrometheus(playerDataStore),
     "text/plain; version=0.0.4; charset=utf-8"));
+
+if (qqWhitelistSyncOptions is not null)
+    QqWhitelistSyncHttpEndpoint.Map(app, qqAccessStore, qqWhitelistSyncOptions);
 
 app.MapGet("/card-back-images/{id:long}", (long id, HttpContext context) =>
 {

@@ -60,6 +60,8 @@ dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release
   -p:IncludeSourceRevisionInInformationalVersion=false
 [[ -f "$publish_next/.grandumi-qq-access-enforcement-v1" ]] \
   || die "后端发布包缺少 QQ 准入兼容标记，拒绝进入正式 A/B 槽位"
+[[ -f "$publish_next/.grandumi-shared-account-v1" ]] \
+  || die "后端发布包缺少共享账号兼容标记，拒绝进入正式 A/B 槽位"
 
 cd "$build_root/opcgpro-web"
 npm ci --no-audit --no-fund
@@ -112,7 +114,10 @@ install -m 0644 "$build_root/ops/server/grandumi-production.slice" /etc/systemd/
 install -m 0644 "$build_root/ops/server/grandumi-build.slice" /etc/systemd/system/grandumi-build.slice
 install -m 0644 "$build_root/ops/server/grandumi-production-backend@.service" /etc/systemd/system/grandumi-production-backend@.service
 install -m 0644 "$build_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
+install -m 0644 "$build_root/ops/server/grandumi-qq-whitelist-sync.env.example" /etc/grandumi/qq-whitelist-sync.env.example
+install -m 0644 "$build_root/ops/server/grandumi-production-proxy.nginx" /etc/nginx/snippets/grandumi-production-proxy.conf
 install -m 0755 "$build_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
+install -m 0755 "$build_root/ops/server/grandumi-shared-account-migration.sh" /usr/local/sbin/grandumi-shared-account-migration
 install -m 0755 "$build_root/ops/server/grandumi-production-snapshot.sh" /usr/local/sbin/grandumi-production-snapshot
 install -m 0755 "$build_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$build_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance

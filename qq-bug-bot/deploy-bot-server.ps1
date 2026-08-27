@@ -26,6 +26,7 @@ $files = @(
     "requirements.txt",
     "bot.py",
     "storage.py",
+    "qq_whitelist_sync.py",
     "github_issue.py",
     "agent_bridge.py",
     "media_pipeline.py",

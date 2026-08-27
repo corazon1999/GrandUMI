@@ -63,6 +63,8 @@ public class WsSession
     private readonly Dictionary<string, RateBucket> _rateBuckets = new(StringComparer.Ordinal);
     private int _superseded;
     private int _supersededCleanupStarted;
+    private int _qqAccessRevoked;
+    private int _qqRevokedCloseMonitorStarted;
 
     /// <summary>由握手能力协商决定；旧客户端保持完整快照。</summary>
     public bool SupportsDeltaSnapshots { get; set; }
@@ -76,6 +78,8 @@ public class WsSession
     /// 但仍保留 Account 供乱序断开时完成房间、邀请等会话级清理。
     /// </summary>
     public bool IsSuperseded => Volatile.Read(ref _superseded) != 0;
+    /// <summary>管理员解绑或白名单变化后，仅允许当前已注册对局继续；离开对局即终止会话。</summary>
+    public bool IsQqAccessRevoked => Volatile.Read(ref _qqAccessRevoked) != 0;
     public long MergedStateCount => Interlocked.Read(ref _mergedStateCount);
     public long DroppedOutboundCount => Interlocked.Read(ref _droppedOutboundCount);
     public int OutboundDepth { get { lock (_outboundGate) return _outbound.Count; } }
@@ -87,6 +91,11 @@ public class WsSession
 
     public bool IsRecentlyActive(TimeSpan maxIdle)
         => DateTime.UtcNow - LastSeenUtc <= maxIdle;
+
+    public void MarkQqAccessRevoked() => Volatile.Write(ref _qqAccessRevoked, 1);
+    public void ClearQqAccessRevoked() => Volatile.Write(ref _qqAccessRevoked, 0);
+    public bool TryStartQqRevokedCloseMonitor()
+        => Interlocked.CompareExchange(ref _qqRevokedCloseMonitorStarted, 1, 0) == 0;
 
     public sealed record OutboundMessage(
         object Data,

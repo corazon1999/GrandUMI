@@ -6,6 +6,11 @@ repo=/opt/grandumi
 import_dir=/data/grandumi-import/final
 archive_dir="/data/grandumi-archives/pre-production-$(date -u +%Y%m%dT%H%M%SZ)"
 switched=0
+test_backend_was_active=0
+shared_authority_committed=0
+shared_migration=/usr/local/sbin/grandumi-shared-account-migration
+account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
+[[ -f /data/grandumi-shared/active ]] && shared_authority_committed=1
 domain_mode="$(cat /etc/grandumi/primary-domain-mode 2>/dev/null || echo legacy)"
 
 case "$domain_mode" in
@@ -55,6 +60,10 @@ converge_standby_release() {
 [[ "$(tr -d '\r\n' < /var/lib/grandumi-production-staged)" == "$target" ]] || die "预构建版本与目标版本不一致"
 [[ -d "$repo/releases/$target/backend" && -d "$repo/releases/$target/frontend" ]] \
   || die "目标 A/B 发布包不存在"
+[[ -x "$shared_migration" ]] || die "共享账号迁移工具未安装"
+[[ -f "$repo/releases/$target/backend/.grandumi-shared-account-v1" ]] \
+  || die "目标发布不兼容共享账号库"
+"$shared_migration" verify-test
 
 # 已进入 A/B 模式后，发布只切换到空闲槽位；失败由切换脚本自动回滚。
 active_slot="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || true)"
@@ -118,6 +127,11 @@ systemctl reload nginx
 
 rollback() {
   status=$?
+  if [[ "$shared_authority_committed" == 1 ]]; then
+    trap - ERR
+    echo "激活失败，但共享账号权威已经不可逆提交；禁止恢复旧账号库，请修复后重跑同一正式版本。" >&2
+    exit "$status"
+  fi
   if [[ "$switched" == 1 ]]; then
     systemctl stop grandumi-production-frontend@a.service grandumi-production-backend@a.service || true
     if [[ "$data_source" == existing ]]; then
@@ -131,11 +145,23 @@ rollback() {
       systemctl start grandumi-candidate-backend.service grandumi-candidate-frontend.service || true
     fi
   fi
+  if [[ "$test_backend_was_active" == 1 \
+      && ! -f /data/grandumi-shared/active ]]; then
+    systemctl start grandumi-test-backend.service || true
+  fi
   exit "$status"
 }
 trap rollback ERR
 
+exec 8>"$account_cutover_lock"
+flock -n 8 || die "测试后端部署或另一账号权威切换正在进行"
+
 install -d -m 0750 "$archive_dir"
+if [[ ! -f /data/grandumi-shared/active ]] \
+    && systemctl is-active --quiet grandumi-test-backend.service; then
+  test_backend_was_active=1
+  systemctl stop grandumi-test-backend.service
+fi
 systemctl stop grandumi-candidate-frontend.service grandumi-candidate-backend.service \
   grandumi-production-frontend.service grandumi-production-backend.service || true
 switched=1
@@ -145,6 +171,12 @@ for name in "${database_names[@]}"; do
     install -o grandumi -g grandumi -m 0640 "$import_dir/$name" "/data/grandumi/$name"
   fi
 done
+
+"$shared_migration" prepare "$repo/releases/$target/backend"
+if [[ ! -f /data/grandumi-shared/active ]]; then
+  "$shared_migration" commit-authority "$repo/releases/$target/backend"
+  shared_authority_committed=1
+fi
 
 ln -sfn "$repo/releases/$target/backend" "$repo/slots/a/backend"
 ln -sfn "$repo/releases/$target/frontend" "$repo/slots/a/frontend"
@@ -172,4 +204,5 @@ printf '%s\n' "$target" > /var/lib/grandumi-production-deployed.next
 mv /var/lib/grandumi-production-deployed.next /var/lib/grandumi-production-deployed
 
 trap - ERR
+"$shared_migration" activate-test
 echo "新正式服服务已激活：$target；数据来源：$data_source；切换前归档：$archive_dir"

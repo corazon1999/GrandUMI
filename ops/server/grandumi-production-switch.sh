@@ -7,16 +7,25 @@ slot_root=/opt/grandumi/slots
 active_file="$state_dir/active-slot"
 standby_file="$state_dir/standby-slot"
 lock_file="$state_dir/switch.lock"
+account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
 mode="${1:-}"
 release="${2:-}"
 previous_target_backend=""
 previous_target_frontend=""
+test_backend_was_active=0
+shared_authority_committed=0
+shared_active_marker=/data/grandumi-shared/active
+shared_migration=/usr/local/sbin/grandumi-shared-account-migration
 
 die() { echo "错误：$*" >&2; exit 1; }
 verify_qq_access_rollback_compatibility() {
   local target_backend="$1"
   local players_db=/data/grandumi/players.db
   local table_exists initialized marker
+  if [[ -f "$shared_active_marker" ]]; then
+    [[ -f "$target_backend/.grandumi-shared-account-v1" ]] || die \
+      "共享账号库已激活，目标槽位不兼容，拒绝切换或回滚"
+  fi
   [[ -s "$players_db" ]] || return 0
   command -v sqlite3 >/dev/null || die "缺少 sqlite3，无法验证 QQ 准入回滚兼容性"
 
@@ -39,10 +48,18 @@ verify_qq_access_rollback_compatibility() {
 mkdir -p "$state_dir" "$slot_root/a" "$slot_root/b"
 exec 9>"$lock_file"
 flock -n 9 || die "另一个切换任务正在执行"
+exec 8>"$account_cutover_lock"
+flock -n 8 || die "测试后端部署或另一账号权威切换正在进行"
 
 active="$(cat "$active_file" 2>/dev/null || echo a)"
 [[ "$active" == a || "$active" == b ]] || active=a
 other=b; [[ "$active" == b ]] && other=a
+# 首次权威提交后若进程在更新 active-slot 前退出，状态文件仍指向旧版槽位。
+# 重跑时必须识别该恢复态并继续禁止回滚，而不能把旧槽误当作安全恢复目标。
+if [[ -f "$shared_active_marker" \
+    && ! -f "$slot_root/$active/backend/.grandumi-shared-account-v1" ]]; then
+  shared_authority_committed=1
+fi
 
 case "$mode" in
   --release)
@@ -65,6 +82,16 @@ case "$mode" in
     ;;
   *) die "用法：grandumi-production-switch --release <commit> | --failover" ;;
 esac
+
+[[ -x "$shared_migration" ]] || die "共享账号迁移工具未安装"
+if [[ "$mode" == --release ]]; then
+  [[ -f "$slot_root/$target/backend/.grandumi-shared-account-v1" ]] \
+    || die "目标发布不兼容共享账号库"
+fi
+"$shared_migration" verify-target "$slot_root/$target/backend"
+if [[ "$mode" == --release || -f "$shared_active_marker" ]]; then
+  "$shared_migration" verify-test
+fi
 
 backend_port=8080; frontend_port=3000
 [[ "$target" == b ]] && backend_port=8082 && frontend_port=3002
@@ -94,6 +121,12 @@ write_proxy() {
 }
 
 rollback() {
+  local status=$?
+  if [[ "$shared_authority_committed" == 1 ]]; then
+    trap - ERR
+    echo "切换失败，但共享账号权威已经不可逆提交；保持目标新版，禁止回滚旧本地账号库，请修复后重跑同一发布。" >&2
+    exit "$status"
+  fi
   systemctl stop "grandumi-production-backend@$target.service" \
     "grandumi-production-frontend@$target.service" || true
   systemctl start "grandumi-production-backend@$active.service" \
@@ -111,6 +144,9 @@ rollback() {
       rm -f "$slot_root/$target/frontend"
     fi
   fi
+  if [[ "$test_backend_was_active" == 1 && ! -f "$shared_active_marker" ]]; then
+    systemctl start grandumi-test-backend.service || true
+  fi
   echo "切换失败，已尝试恢复槽位 $active" >&2
 }
 
@@ -120,7 +156,19 @@ trap rollback ERR
 systemctl start "grandumi-production-frontend@$target.service"
 curl -fsS --retry 15 --retry-delay 1 --retry-connrefused \
   "http://127.0.0.1:$frontend_port/" >/dev/null
+if [[ "$mode" == --release && ! -f "$shared_active_marker" ]] \
+    && systemctl is-active --quiet grandumi-test-backend.service; then
+  test_backend_was_active=1
+  systemctl stop grandumi-test-backend.service
+fi
 systemctl stop "grandumi-production-backend@$active.service"
+if [[ "$mode" == --release ]]; then
+  "$shared_migration" prepare "$slot_root/$target/backend"
+  if [[ ! -f "$shared_active_marker" ]]; then
+    "$shared_migration" commit-authority "$slot_root/$target/backend"
+    shared_authority_committed=1
+  fi
+fi
 systemctl start "grandumi-production-backend@$target.service"
 curl -fsS --retry 25 --retry-delay 1 --retry-connrefused \
   "http://127.0.0.1:$backend_port/ready" >/dev/null
@@ -137,4 +185,7 @@ printf '%s\n' "$target" > "$active_file.next"
 mv "$active_file.next" "$active_file"
 printf '0\n' > "$state_dir/health-failures"
 trap - ERR
+if [[ "$mode" == --release || -f "$shared_active_marker" ]]; then
+  "$shared_migration" activate-test
+fi
 echo "正式服已切换：$active -> $target（后端 $backend_port，前端 $frontend_port）"

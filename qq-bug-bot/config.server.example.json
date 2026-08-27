@@ -2,7 +2,7 @@
   "ws_url": "ws://napcat:3001",
   "access_token": "请替换为随机访问令牌",
   "command_prefix": "#bug ",
-  "allowed_groups": [],
+  "allowed_groups": [297542853],
   "create_issue": true,
   "github_repo": "corazon1999/GrandUMI",
   "reply_enabled": true,
@@ -26,5 +26,15 @@
   "new_member_verification_enabled": false,
   "new_member_verification_groups": [],
   "new_member_verification_timeout_seconds": 1800,
-  "new_member_verification_poll_interval_seconds": 300
+  "new_member_verification_poll_interval_seconds": 300,
+  "qq_whitelist_sync_enabled": false,
+  "qq_whitelist_sync_group_id": 297542853,
+  "qq_whitelist_sync_group_name": "GrandUMI测试群",
+  "qq_whitelist_sync_timezone": "Asia/Singapore",
+  "qq_whitelist_sync_endpoint": "https://direct.grand-umi.com/internal/qq-whitelist/sync",
+  "qq_whitelist_sync_secret_env": "GRANDUMI_QQ_WHITELIST_SYNC_SECRET",
+  "qq_whitelist_sync_min_members": 100,
+  "qq_whitelist_sync_max_shrink_percent": 25,
+  "qq_whitelist_sync_max_delay_seconds": 600,
+  "qq_whitelist_sync_http_timeout_seconds": 20
 }

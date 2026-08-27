@@ -41,7 +41,9 @@ public sealed class PlayerDataStoreTests : IDisposable
         auth.Initialize();
         auth.Authenticate("TargetAccount", "target-password", null);
 
-        var result = Assert.Single(store.SearchPlayersForAdmin("target"));
+        var accountDirectory = new QqAccessStore(store);
+        accountDirectory.Initialize();
+        var result = Assert.Single(accountDirectory.SearchAccountsForAdmin("target", "player"));
         Assert.Equal("TargetAccount", result.Account);
         Assert.True(result.HasPassword);
 

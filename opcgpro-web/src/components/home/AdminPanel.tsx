@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { showMessage } from "@/components/ui/MessageBox";
 import { positionLineChartTooltip } from "@/lib/lineChartTooltip";
+import { normalizeQq } from "@/lib/qqWhitelist.mjs";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import type {
@@ -364,8 +365,11 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const [dailyActiveRange, setDailyActiveRange] = useState<7 | 30>(7);
   const [matchRange, setMatchRange] = useState<7 | 30>(7);
   const [playerQuery, setPlayerQuery] = useState("");
+  const [playerSearchBy, setPlayerSearchBy] = useState<"player" | "qq">("player");
   const [selectedPlayerAccount, setSelectedPlayerAccount] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [qqBindingValue, setQqBindingValue] = useState("");
+  const qqMutationRequestRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
 
   const connected = connState === "connected";
   const pendingReviews = reviewQueue?.length;
@@ -398,6 +402,12 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
     const timer = window.setInterval(() => HomeRequest.requestAdminOperations(), 5_000);
     return () => window.clearInterval(timer);
   }, [connected, maintenance.canManage]);
+
+  useEffect(() => {
+    if (!selectedPlayer) return;
+    setQqBindingValue(selectedPlayer.qq ?? "");
+    qqMutationRequestRef.current = null;
+  }, [selectedPlayer?.account, selectedPlayer?.bindingRevision]);
 
   if (!maintenance.canManage) {
     return (
@@ -452,20 +462,75 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   };
 
   const searchPlayers = () => {
-    const query = playerQuery.trim();
+    let query = playerQuery.trim();
     if (!query) {
-      showMessage("请输入玩家账号或昵称", "error");
+      showMessage(playerSearchBy === "qq" ? "请输入 QQ 号" : "请输入玩家账号或昵称", "error");
       return;
+    }
+    if (playerSearchBy === "qq") {
+      try { query = normalizeQq(query); }
+      catch (validationError) {
+        showMessage(validationError instanceof Error ? validationError.message : "QQ 格式无效", "error");
+        return;
+      }
     }
     setSelectedPlayerAccount(null);
     setRenameValue("");
-    HomeRequest.searchAdminPlayers(query);
+    setQqBindingValue("");
+    qqMutationRequestRef.current = null;
+    useNetStore.getState().setAdminPlayerSearchResults([]);
+    HomeRequest.searchAdminPlayers(query, playerSearchBy);
   };
 
   const selectPlayer = (target: (typeof adminPlayerSearchResults)[number]) => {
     setSelectedPlayerAccount(target.account);
     setRenameValue(target.displayName);
+    setQqBindingValue(target.qq ?? "");
+    qqMutationRequestRef.current = null;
     useNetStore.getState().setAdminTemporaryPassword(null);
+  };
+
+  const qqMutationRequestId = (fingerprint: string) => {
+    if (qqMutationRequestRef.current?.fingerprint === fingerprint) {
+      return qqMutationRequestRef.current.requestId;
+    }
+    const requestId = crypto.randomUUID();
+    qqMutationRequestRef.current = { fingerprint, requestId };
+    return requestId;
+  };
+
+  const setPlayerQq = () => {
+    if (!selectedPlayer) return;
+    let normalizedQq: string;
+    try { normalizedQq = normalizeQq(qqBindingValue); }
+    catch (validationError) {
+      showMessage(validationError instanceof Error ? validationError.message : "QQ 格式无效", "error");
+      return;
+    }
+    if (normalizedQq === selectedPlayer.qq) {
+      showMessage("新 QQ 与当前绑定相同", "error");
+      return;
+    }
+    const revision = selectedPlayer.bindingRevision ?? 0;
+    if (!window.confirm(
+      `确认将“${selectedPlayer.displayName}”（账号 ${selectedPlayer.account}）绑定到 QQ ${normalizedQq}？旧登录令牌会失效；若玩家正在对局，本局仍可继续。`,
+    )) return;
+    const requestId = qqMutationRequestId(`set:${selectedPlayer.account}:${revision}:${normalizedQq}`);
+    if (!HomeRequest.setAdminPlayerQq(selectedPlayer.account, normalizedQq, revision, requestId)) {
+      showMessage("服务器未连接，QQ 绑定没有提交", "error");
+    }
+  };
+
+  const unbindPlayerQq = () => {
+    if (!selectedPlayer?.qqBound) return;
+    const revision = selectedPlayer.bindingRevision ?? 0;
+    if (!window.confirm(
+      `确认解绑“${selectedPlayer.displayName}”（账号 ${selectedPlayer.account}）当前 QQ ${selectedPlayer.qq ?? selectedPlayer.qqMasked ?? ""}？玩家需要重新绑定后才能进入大厅或新对局。`,
+    )) return;
+    const requestId = qqMutationRequestId(`unbind:${selectedPlayer.account}:${revision}`);
+    if (!HomeRequest.unbindAdminPlayerQq(selectedPlayer.account, revision, requestId)) {
+      showMessage("服务器未连接，解绑没有提交", "error");
+    }
   };
 
   const renamePlayer = () => {
@@ -765,19 +830,46 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           <section aria-label="玩家账号管理" className="rounded-2xl border border-fuchsia-900/70 bg-fuchsia-950/10 p-4 @[640px]:p-5">
             <p className="text-xs font-bold tracking-[0.16em] text-fuchsia-400">PLAYER ADMIN</p>
             <h2 className="mt-1 text-lg font-black text-white">玩家账号管理</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-400">先按账号或昵称搜索并选中玩家。账号本身不可修改；改名和密码重置均记录管理员、目标账号与操作时间。</p>
+            <p className="mt-1 text-xs leading-5 text-gray-400">可按账号/昵称模糊查询绑定 QQ，也可用完整 QQ 反查玩家。重名和模糊命中会全部列出，请同时核对账号；改绑、解绑、改名和密码重置均由服务端鉴权并审计。</p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="玩家搜索方式">
+              {(["player", "qq"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    setPlayerSearchBy(mode);
+                    setPlayerQuery("");
+                    setSelectedPlayerAccount(null);
+                    useNetStore.getState().setAdminPlayerSearchResults([]);
+                  }}
+                  aria-pressed={playerSearchBy === mode}
+                  className={`min-h-11 rounded-lg px-3 text-sm font-bold ${playerSearchBy === mode ? "bg-fuchsia-500 text-white" : "text-gray-400 hover:bg-gray-900 hover:text-white"}`}
+                >
+                  {mode === "player" ? "按账号 / 昵称" : "按 QQ 反查"}
+                </button>
+              ))}
+            </div>
 
             <form className="mt-4 flex flex-col gap-2 @[520px]:flex-row" onSubmit={(event) => { event.preventDefault(); searchPlayers(); }}>
               <input
                 value={playerQuery}
                 onChange={(event) => setPlayerQuery(event.target.value)}
-                placeholder="输入玩家账号或昵称"
-                aria-label="搜索要管理的玩家"
-                maxLength={32}
+                placeholder={playerSearchBy === "qq" ? "输入完整 QQ 号" : "输入玩家账号或昵称"}
+                aria-label={playerSearchBy === "qq" ? "通过 QQ 号反查绑定玩家" : "通过账号或昵称搜索玩家"}
+                inputMode={playerSearchBy === "qq" ? "numeric" : "text"}
+                autoComplete="off"
+                maxLength={playerSearchBy === "qq" ? 12 : 32}
                 className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-800 bg-gray-950 px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-fuchsia-500"
               />
-              <button type="submit" disabled={!connected || !playerQuery.trim()} className="min-h-11 rounded-xl bg-fuchsia-500 px-5 text-sm font-black text-white hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600">搜索玩家</button>
+              <button type="submit" disabled={!connected || !playerQuery.trim()} className="min-h-11 rounded-xl bg-fuchsia-500 px-5 text-sm font-black text-white hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600">{playerSearchBy === "qq" ? "反查玩家" : "搜索玩家"}</button>
             </form>
+
+            {adminPlayerSearchResults.length > 0 && (
+              <p className="mt-2 text-xs leading-5 text-gray-500" role="status">
+                共 {adminPlayerSearchResults.length} 条结果{adminPlayerSearchResults.length > 1 ? "；存在重名或模糊命中，请按账号逐一核对。" : "。"}
+              </p>
+            )}
 
             <div className="mt-4 grid gap-4 @[680px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
               <div className="max-h-64 space-y-2 overflow-y-auto pr-1" aria-label="玩家搜索结果">
@@ -789,7 +881,14 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                     aria-pressed={selectedPlayerAccount === player.account}
                     className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left ${selectedPlayerAccount === player.account ? "border-fuchsia-400 bg-fuchsia-950/40" : "border-gray-800 bg-gray-950 hover:border-gray-700"}`}
                   >
-                    <span className="min-w-0"><span className="block truncate text-sm font-bold text-white">{player.displayName}</span><span className="mt-0.5 block truncate text-xs text-gray-500">账号 {player.account}</span></span>
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-bold text-white">{player.displayName}</span>
+                        {player.matchKind === "fuzzy" && <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-bold text-gray-400">模糊命中</span>}
+                        {player.matchKind === "nickname_exact" && <span className="shrink-0 rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-300">昵称完全匹配</span>}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-500">账号 {player.account} · QQ {player.qq ?? "未绑定"}</span>
+                    </span>
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${player.online ? "bg-emerald-400" : "bg-gray-700"}`} aria-label={player.online ? "在线" : "离线"} />
                   </button>
                 )) : (
@@ -806,8 +905,26 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                     </div>
                     <p className="mt-2 text-[11px] text-gray-600">最近登录 {formatTimestamp(selectedPlayer.lastLoginAt)} · {selectedPlayer.hasPassword ? "已设置密码" : "尚未设置密码"}</p>
                     <p className={`mt-1 text-xs font-bold ${selectedPlayer.qqCurrentlyWhitelisted ? "text-emerald-300" : selectedPlayer.qqBound ? "text-red-300" : "text-amber-300"}`}>
-                      QQ：{selectedPlayer.qqBound ? `${selectedPlayer.qqMasked ?? "已绑定"}${selectedPlayer.qqCurrentlyWhitelisted ? " · 当前在白名单" : " · 当前已移出白名单"}` : "尚未绑定"}
+                      QQ：{selectedPlayer.qqBound ? `${selectedPlayer.qq ?? selectedPlayer.qqMasked ?? "已绑定"}${selectedPlayer.qqCurrentlyWhitelisted ? " · 当前在白名单" : " · 当前已移出白名单"}` : "尚未绑定"} · 绑定版本 {selectedPlayer.bindingRevision ?? 0}
                     </p>
+                    <div className="mt-4 rounded-xl border border-cyan-900/70 bg-cyan-950/15 p-3">
+                      <label htmlFor="admin-player-qq" className="text-xs font-bold text-cyan-200">修改绑定 QQ</label>
+                      <div className="mt-2 flex flex-col gap-2 @[520px]:flex-row">
+                        <input
+                          id="admin-player-qq"
+                          value={qqBindingValue}
+                          onChange={(event) => setQqBindingValue(event.target.value)}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={12}
+                          placeholder="5–12 位 QQ 号"
+                          className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-800 bg-gray-900 px-3 text-sm text-white outline-none focus:border-cyan-500"
+                        />
+                        <button type="button" onClick={setPlayerQq} disabled={!qqBindingValue.trim()} className="min-h-11 rounded-xl bg-cyan-500 px-4 text-sm font-black text-gray-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600">{selectedPlayer.qqBound ? "确认改绑" : "确认绑定"}</button>
+                      </div>
+                      <button type="button" onClick={unbindPlayerQq} disabled={!selectedPlayer.qqBound} className="mt-2 min-h-11 w-full rounded-xl border border-red-800 px-4 text-sm font-bold text-red-300 hover:bg-red-950/40 disabled:cursor-not-allowed disabled:border-gray-800 disabled:text-gray-600">解绑当前 QQ</button>
+                      <p className="mt-2 text-[11px] leading-5 text-gray-500">只允许绑定当前白名单内且未被其他账号使用的 QQ。更新采用绑定版本校验；页面数据过期时服务端会拒绝覆盖。改绑或解绑会同时注销测试服与正式服旧登录令牌。</p>
+                    </div>
                     <div className="mt-4">
                       <label htmlFor="admin-player-name" className="text-xs font-bold text-gray-400">修改昵称</label>
                       <div className="mt-2 flex flex-col gap-2 @[520px]:flex-row">

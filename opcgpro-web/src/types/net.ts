@@ -1365,9 +1365,13 @@ export interface AdminPlayerSummary {
   hasPassword: boolean;
   online: boolean;
   qqBound?: boolean;
+  /** 仅管理员协议返回；始终为字符串，禁止转为 JS number。 */
+  qq?: string | null;
   qqMasked?: string | null;
   qqCurrentlyWhitelisted?: boolean;
   qqBoundAt?: number | null;
+  bindingRevision?: number;
+  matchKind?: "account_exact" | "nickname_exact" | "qq_exact" | "fuzzy";
 }
 
 export interface QqAccountBindingStatus {
@@ -1375,6 +1379,7 @@ export interface QqAccountBindingStatus {
   maskedQq?: string | null;
   currentlyWhitelisted: boolean;
   boundAt?: number | null;
+  revision?: number;
 }
 
 export interface MsgQqWhitelistStatus extends MsgBase {
@@ -1415,6 +1420,16 @@ export interface MsgQqWhitelistImport extends MsgBase {
 export interface MsgQqAccessDenied extends MsgBase {
   proto: "MsgQqAccessDenied";
   result?: false;
+  logStr?: string;
+  currentGameContinues?: boolean;
+}
+
+export interface MsgQqBindingChanged extends MsgBase {
+  proto: "MsgQqBindingChanged";
+  result?: boolean;
+  bound?: boolean;
+  qqMasked?: string | null;
+  currentlyWhitelisted?: boolean;
   logStr?: string;
 }
 
@@ -1457,6 +1472,7 @@ export interface MsgAdminPlayerSearch extends MsgBase {
   result?: boolean;
   logStr?: string;
   query?: string;
+  searchBy?: "player" | "qq";
   players?: AdminPlayerSummary[];
 }
 
@@ -1464,11 +1480,15 @@ export interface MsgAdminPlayerUpdate extends MsgBase {
   proto: "MsgAdminPlayerUpdate";
   result?: boolean;
   logStr?: string;
-  action: "rename" | "resetPassword";
+  action: "rename" | "resetPassword" | "setQq" | "unbindQq";
   targetAccount?: string;
   displayName?: string;
+  qq?: string;
+  expectedBindingRevision?: number;
+  requestId?: string;
   player?: AdminPlayerSummary | null;
   temporaryPassword?: string | null;
+  replayed?: boolean;
 }
 
 // ── 联合类型（用于分发时的类型收窄）──────────────────────────────────────
@@ -1479,6 +1499,7 @@ export type AnyMsg =
   | MsgQqWhitelistStatus
   | MsgQqWhitelistImport
   | MsgQqAccessDenied
+  | MsgQqBindingChanged
   | MsgAddAccount
   | MsgUpdatePs
   | MsgPlayerData

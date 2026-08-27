@@ -307,6 +307,30 @@ public sealed class PlayerDataStore
     public PlayerDataSnapshot Login(string account)
     {
         var normalizedAccount = ValidateAccount(account);
+        return LoginCore(normalizedAccount, normalizedAccount, allowDisplayNameFallback: false);
+    }
+
+    /// <summary>
+    /// 将共享账号幂等物化为当前环境的玩法资料。
+    /// 共享检索目录昵称与本环境历史昵称冲突时，使用稳定后缀昵称保证账号仍可登录；
+    /// 已经物化的玩法显示昵称保持环境隔离，不会在后续登录时被目录字段覆盖。
+    /// </summary>
+    public PlayerDataSnapshot LoginSharedAccount(string account, string displayName)
+    {
+        var normalizedDisplayName = (displayName ?? "").Trim().Normalize(NormalizationForm.FormKC);
+        if (normalizedDisplayName.Length is < 1 or > MaxDisplayNameLength)
+            throw new PlayerDataValidationException($"昵称长度需为 1–{MaxDisplayNameLength} 个字符。");
+        if (normalizedDisplayName.Any(char.IsControl))
+            throw new PlayerDataValidationException("昵称不能包含控制字符。");
+        return LoginCore(account, normalizedDisplayName, allowDisplayNameFallback: true);
+    }
+
+    private PlayerDataSnapshot LoginCore(
+        string account,
+        string preferredDisplayName,
+        bool allowDisplayNameFallback)
+    {
+        var normalizedAccount = ValidateAccount(account);
         var accountKey = NormalizeAccountKey(normalizedAccount);
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -316,8 +340,17 @@ public sealed class PlayerDataStore
         var playerId = FindPlayerId(connection, transaction, accountKey);
         if (playerId is null)
         {
-            if (DisplayNameInUse(connection, transaction, normalizedAccount))
-                throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换账号名后重试。");
+            var materializedDisplayName = preferredDisplayName;
+            if (DisplayNameInUse(connection, transaction, materializedDisplayName))
+            {
+                if (!allowDisplayNameFallback)
+                    throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换账号名后重试。");
+                materializedDisplayName = BuildAvailableSharedDisplayName(
+                    connection,
+                    transaction,
+                    preferredDisplayName,
+                    accountKey);
+            }
 
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
@@ -328,7 +361,7 @@ public sealed class PlayerDataStore
                 """;
             insert.Parameters.AddWithValue("$accountKey", accountKey);
             insert.Parameters.AddWithValue("$account", normalizedAccount);
-            insert.Parameters.AddWithValue("$displayName", normalizedAccount);
+            insert.Parameters.AddWithValue("$displayName", materializedDisplayName);
             insert.Parameters.AddWithValue("$now", now);
             playerId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
@@ -588,8 +621,7 @@ public sealed class PlayerDataStore
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT p.account, p.display_name, p.created_at, p.last_login_at,
-                   EXISTS(SELECT 1 FROM player_credentials c WHERE c.player_id=p.id)
+            SELECT p.account, p.display_name, p.created_at, p.last_login_at, 0
             FROM players p
             WHERE p.account_key LIKE $pattern ESCAPE '\' COLLATE NOCASE
                OR p.display_name LIKE $pattern ESCAPE '\' COLLATE NOCASE
@@ -2647,6 +2679,27 @@ public sealed class PlayerDataStore
         if (excludingPlayerId is not null)
             command.Parameters.AddWithValue("$playerId", excludingPlayerId.Value);
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
+    }
+
+    private static string BuildAvailableSharedDisplayName(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string preferredDisplayName,
+        string accountKey)
+    {
+        var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(accountKey)))[..6];
+        for (var attempt = 1; attempt <= 999; attempt++)
+        {
+            var suffix = attempt == 1 ? $"·{digest}" : $"·{digest}-{attempt}";
+            var prefixLength = Math.Max(1, MaxDisplayNameLength - suffix.Length);
+            var prefix = preferredDisplayName.Length <= prefixLength
+                ? preferredDisplayName
+                : preferredDisplayName[..prefixLength];
+            var candidate = prefix + suffix;
+            if (!DisplayNameInUse(connection, transaction, candidate)) return candidate;
+        }
+
+        throw new PlayerDataValidationException("无法为共享账号分配当前环境的玩法昵称，请联系管理员。");
     }
 
     private static PlayerDataSnapshot LoadSnapshot(SqliteConnection connection, SqliteTransaction transaction, long playerId)

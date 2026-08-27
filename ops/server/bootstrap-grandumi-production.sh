@@ -39,6 +39,7 @@ esac
 
 id grandumi >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin grandumi
 install -d -o grandumi -g grandumi -m 0750 /data/grandumi
+install -d -o grandumi -g grandumi -m 0750 /data/grandumi-shared /data/grandumi-shared/rollback
 install -d -m 0755 /etc/nginx/snippets /var/www/certbot /etc/grandumi
 install -d -o grandumi -g grandumi -m 0755 /opt/grandumi/releases /opt/grandumi/slots/a /opt/grandumi/slots/b
 install -d -m 0755 /var/lib/grandumi-ha
@@ -64,7 +65,9 @@ install -m 0644 "$source_root/ops/server/grandumi-production.slice" /etc/systemd
 install -m 0644 "$source_root/ops/server/grandumi-build.slice" /etc/systemd/system/grandumi-build.slice
 install -m 0644 "$source_root/ops/server/grandumi-production-backend@.service" /etc/systemd/system/grandumi-production-backend@.service
 install -m 0644 "$source_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
+install -m 0644 "$source_root/ops/server/grandumi-qq-whitelist-sync.env.example" /etc/grandumi/qq-whitelist-sync.env.example
 install -m 0755 "$source_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
+install -m 0755 "$source_root/ops/server/grandumi-shared-account-migration.sh" /usr/local/sbin/grandumi-shared-account-migration
 install -m 0755 "$source_root/ops/server/grandumi-production-snapshot.sh" /usr/local/sbin/grandumi-production-snapshot
 install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$source_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
