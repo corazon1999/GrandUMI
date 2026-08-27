@@ -266,8 +266,8 @@ public sealed class OP18_078_MiniMerryII : IScriptedEffect
             || ctx.Source.HasRestriction(RestrictionKind.CannotBeRested)
             || ctx.State.HasContinuousRestriction(ctx.Source, RestrictionKind.CannotBeRested)) return;
 
-        var availableDons = me.CostArea.Where(don => don.State is DonState.Active or DonState.Rest).ToList();
-        if (availableDons.Count == 0) return;
+        var restedDons = me.CostArea.Where(don => don.State == DonState.Rest).ToList();
+        if (restedDons.Count == 0) return;
         var targets = new[] { me.Leader }.Concat(me.Characters);
         var picked = await OP18EB05EffectHelpers.Pick(
             ctx,
@@ -275,13 +275,12 @@ public sealed class OP18_078_MiniMerryII : IScriptedEffect
             "选择合计最多4张领袖或角色，分别赋予各1张咚!!",
             targets,
             0,
-            Math.Min(4, availableDons.Count));
+            Math.Min(4, restedDons.Count));
 
         AtomicOps.RestCard(ctx.Source);
         foreach (var target in picked)
         {
-            var don = me.CostArea.FirstOrDefault(item => item.State == DonState.Rest)
-                ?? me.CostArea.FirstOrDefault(item => item.State == DonState.Active);
+            var don = me.CostArea.FirstOrDefault(item => item.State == DonState.Rest);
             if (don is null) break;
             don.State = DonState.Attached;
             don.AttachedToCardId = target.Id;

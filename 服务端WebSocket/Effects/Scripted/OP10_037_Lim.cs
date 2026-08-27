@@ -10,8 +10,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 2. 【我方的回合结束时】将我方最多 1 张拥有《时光旅诗》特征的角色转为活跃状态。
 ///
 /// 实现说明 / 简化点：
-///   - 第 1 条用 PreKO 钩子近似实现：引擎当前仅向 PreKO 暴露"将要被 KO"，无法覆盖"退回手牌/
-///     放回卡组"等其他离场，故仅拦截 KO（实战中"离开场上"绝大多数即 KO）。
+///   - 第 1 条用 PreKO 钩子实现效果 KO 的置换，并通过 KOReason/KOActingSide 精确限定为对方效果；
+///     当前仍无法覆盖退回手牌、放回卡组等非 KO 离场。
 ///   - 替换成本为"将我方 1 张《时光旅诗》角色（可为自身以外）转休息"，无可休息目标则不替换。
 ///   - 每回合 1 次用 TurnOnceUsed 记录。
 /// </summary>
@@ -29,8 +29,8 @@ public class OP10_037_Lim : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.PreKO)
         {
-            // 仅"因对方的效果"近似：非战斗结算中
-            if (ctx.State.CurrentBattle is not null) return;
+            // 攻击时触发的卡牌效果结算期间 CurrentBattle 仍存在，必须按权威 KO 来源判定。
+            if (ctx.State.KOReason != "effect" || ctx.State.KOActingSide != 1 - ctx.OwnerIndex) return;
 
             var key = self.Info.Number + "-prevent" + ":" + self.Id;
             if (me.TurnOnceUsed.Contains(key)) return;

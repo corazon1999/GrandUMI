@@ -1898,8 +1898,39 @@ public static class DslInterpreter
             // 检索规范：公开加入手牌的牌，短暂向双方展示
             ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
         }
-        // 废弃区的处理不涉及排序。放回卡组底时，原文要求由玩家决定余卡顺序。
+        // 废弃区的处理不涉及排序。部分卡牌允许玩家将余卡自选顺序放回卡组顶或底。
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();
+        if (rest.Count == 0) return;
+        if (restTo == "topOrBottom")
+        {
+            var ordered = rest;
+            if (rest.Count > 1)
+            {
+                var orderedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OrderDeckCards",
+                    "将剩余卡牌自选顺序排列（先选的牌在较上方）",
+                    rest.Select(c => c.Id.ToString()).ToList(), rest.Count, rest.Count,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = rest.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+                    });
+                ordered = orderedIds
+                    .Select(id => rest.FirstOrDefault(c => c.Id.ToString() == id))
+                    .Where(c => c is not null)
+                    .Cast<CardInstance>()
+                    .Distinct()
+                    .ToList();
+                // 内部重放或兼容服务若返回不完整/重复顺序，仍保持卡牌完整；实时非法响应会在入口被拒绝。
+                ordered.AddRange(rest.Where(c => !ordered.Contains(c)));
+            }
+
+            int placement = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+                "将剩余卡牌放置到卡组最上方还是最下方？", new[] { "卡组最上方", "卡组最下方" });
+            foreach (var card in rest) me.Deck.Remove(card);
+            if (placement == 0) me.Deck.InsertRange(0, ordered);
+            else me.Deck.AddRange(ordered);
+            return;
+        }
+
         foreach (var c in rest) me.Deck.Remove(c);
         if (restTo == "trash") me.Trash.AddRange(rest);
         else if (rest.Count <= 1) me.Deck.AddRange(rest);

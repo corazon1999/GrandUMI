@@ -378,8 +378,7 @@
                 {
                   "nameEquals": "白星"
                 }
-              ],
-              "excludeName": "斑点"
+              ]
             }
           }
         ]
@@ -1021,10 +1020,9 @@
             "op": "LookTopReveal",
             "count": 3,
             "max": 1,
-            "restTo": "bottom",
+            "restTo": "topOrBottom",
             "match": {
-              "keyword": "鱼人岛",
-              "excludeName": "夏莉"
+              "keyword": "鱼人岛"
             }
           }
         ],

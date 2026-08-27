@@ -184,9 +184,9 @@ public class OP18EB05EffectTests
         var first = Card("OP18-031");
         var second = Card("EB05-016");
         me.Characters.AddRange([first, second]);
-        var activeDon1 = new DonCard { State = DonState.Active };
-        var activeDon2 = new DonCard { State = DonState.Active };
-        me.CostArea.AddRange([activeDon1, activeDon2]);
+        var restedDon1 = new DonCard { State = DonState.Rest };
+        var restedDon2 = new DonCard { State = DonState.Rest };
+        me.CostArea.AddRange([restedDon1, restedDon2]);
         var prompts = new MockPromptService()
             .QueueChoose(me.Leader.Id.ToString(), first.Id.ToString(), second.Id.ToString());
 

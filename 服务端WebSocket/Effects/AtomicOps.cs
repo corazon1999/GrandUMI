@@ -780,6 +780,14 @@ public static class AtomicOps
     {
         if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
         var p = s.Players[ownerIdx];
+        bool removed = p.Characters.Remove(card);
+        if (ReferenceEquals(p.StageCard, card))
+        {
+            p.StageCard = null;
+            removed = true;
+        }
+        // 重复、乱序或错误持有者请求不得把同一实例再次加入手牌。
+        if (!removed) return;
         // 归还附着咚
         foreach (var d in p.CostArea)
         {
@@ -789,18 +797,7 @@ public static class AtomicOps
                 d.AttachedToCardId = null;
             }
         }
-        p.Characters.Remove(card);
-        if (p.StageCard == card) p.StageCard = null;
-        // 清除卡的临时状态
-        card.IsTapped = false;
-        card.PowerModThisTurn = 0;
-        card.PowerModThisBattle = 0;
-        card.PowerModPersistent = 0;
-        card.PowerModsUntilOppEnd.Clear();
-        card.CostModThisTurn = 0;
-        card.CostModPersistent = 0;
-        card.CostModsUntilOppEnd.Clear();
-        card.GainedKeywords.Clear();
+        ResetCardEphemeralState(card);
         p.Hand.Add(card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
             new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx });
@@ -1076,6 +1073,10 @@ public static class AtomicOps
         c.IsEffectsNullified = false;
         c.Restrictions.Clear();
         c.IsLifeFaceUp = false;
+        c.NoAttackCostLeThisTurn = 0;
+        c.BattledOpponentCharacterThisTurn = false;
+        c.NameAliases.Clear();
+        c.GainedPropertiesThisTurn.Clear();
     }
 
     // ── M2 生命牌正反朝向 ──────────────────────────────────────────────
