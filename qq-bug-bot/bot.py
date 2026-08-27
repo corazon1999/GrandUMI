@@ -324,7 +324,7 @@ def at_message(qq: str, text: str) -> list[dict]:
 
 
 def member_verification_groups(cfg: dict) -> set[str]:
-    """新人验证必须显式配置目标群；自动审批群会从二次验证中排除。"""
+    """新人验证必须显式配置目标群；可与申请阶段自动审批顺序共存。"""
     if not cfg.get("new_member_verification_enabled", False):
         return set()
     groups = set()
@@ -332,11 +332,6 @@ def member_verification_groups(cfg: dict) -> set[str]:
         text = str(value).strip()
         if text.isdigit() and int(text) > 0:
             groups.add(str(int(text)))
-    if cfg.get("group_add_auto_approval_enabled", False):
-        for value in cfg.get("group_add_auto_approval_groups") or []:
-            text = str(value).strip()
-            if text.isdigit() and int(text) > 0:
-                groups.discard(str(int(text)))
     return groups
 
 
@@ -522,16 +517,55 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
 
     approve = candidate in members
     reason = "" if approve else f"邀请人 QQ {candidate} 当前不在本群。"
+    verification = None
+    if approve and group_id in member_verification_groups(cfg):
+        try:
+            # 必须先落一条不可踢人的预备授权，再调用外部审批动作。这样即使
+            # 审批响应后进程退出，后续真实入群通知仍能原子恢复同一会话。
+            verification = storage.prepare_member_verification_approval(
+                group_id,
+                applicant,
+                candidate,
+                _event_source_time(event),
+                _member_verification_timeout(cfg),
+                now=_event_received_at(event),
+            )
+        except Exception as exc:
+            print(
+                f"[加群审批] 群{group_id}申请人{applicant}登记验证授权失败，"
+                f"保持待审批：{exc}"
+            )
+            return True
     try:
         await _set_group_add_request_result(client, flag, approve, reason)
     except asyncio.CancelledError:
+        if verification:
+            with contextlib.suppress(Exception):
+                storage.record_member_verification_approval_failure(
+                    verification["id"], "审批响应中断，等待事件重试"
+                )
         raise
     except Exception as exc:
+        if verification:
+            with contextlib.suppress(Exception):
+                storage.record_member_verification_approval_failure(
+                    verification["id"], f"OneBot 审批动作失败：{exc}"
+                )
         print(
             f"[加群审批] 群{group_id}申请人{applicant}"
             f"{'同意' if approve else '拒绝'}动作失败，保持待审批：{exc}"
         )
         return True
+    if verification:
+        try:
+            storage.complete_member_verification_approval(verification["id"])
+        except Exception as exc:
+            # 外部动作已经成功，不能反向伪装成未审批；预备记录仍是非踢人状态，
+            # 后续真实入群通知可继续把它推进到提示阶段。
+            print(
+                f"[加群审批] 群{group_id}申请人{applicant}已同意，"
+                f"但验证授权待入群通知恢复：{exc}"
+            )
     _remember_handled_group_add_request(request_key)
     if approve:
         print(f"[加群审批] 群{group_id}已同意申请人{applicant}，邀请人{candidate}在群")
@@ -562,6 +596,34 @@ def extract_inviter_qq(event: dict):
     if len(candidates) != 1:
         return None, "识别到多个 QQ 号，请只保留一位邀请人的 QQ 后重新 @机器人。"
     return next(iter(candidates)), ""
+
+
+_INVITER_REGISTRATION_BODY_RE = re.compile(
+    r"^\s*邀请人\s*(?:的\s*)?QQ(?:号|号码)?\s*[：:=]\s*([1-9]\d{4,11})\s*$",
+    re.IGNORECASE,
+)
+
+
+def extract_strict_inviter_registration_qq(event: dict):
+    """识别无会话提示专用的严格登记正文，避免把普通含 QQ 聊天误判为登记。"""
+    if not is_real_at_self(event):
+        return None
+    self_id = str(event.get("self_id") or "")
+    text_parts = []
+    for segment in event.get("message") or []:
+        if not isinstance(segment, dict):
+            return None
+        segment_type = segment.get("type")
+        data = segment.get("data") or {}
+        if segment_type == "text":
+            text_parts.append(str(data.get("text") or ""))
+            continue
+        if segment_type == "at" and str(data.get("qq") or "") == self_id:
+            continue
+        # 图片、引用、转发或对其他成员的 @ 都不属于严格登记正文。
+        return None
+    match = _INVITER_REGISTRATION_BODY_RE.fullmatch("".join(text_parts))
+    return match.group(1) if match else None
 
 
 def member_verification_message_key(event: dict) -> str:
@@ -691,11 +753,19 @@ async def process_member_verification_prompt(
     token = str(job["claim_token"])
     timeout_seconds = _member_verification_timeout(cfg)
     minutes = max(1, (timeout_seconds + 59) // 60)
-    text = (
-        f"欢迎加入本群。请在 {minutes} 分钟内回答邀请人的 QQ 号；"
-        "回复时请真正 @“释迦的助理”，例如“@释迦的助理 123456789”。"
-        "机器人确认邀请人当前在群后才算验证完成，逾期未完成会被移出群。"
-    )
+    approved_inviter = str(job.get("inviter_qq") or "")
+    if approved_inviter:
+        text = (
+            f"欢迎加入本群。加群申请已审核邀请人 QQ：{approved_inviter}。"
+            f"请在 {minutes} 分钟内真正 @“释迦的助理”，并回复同一 QQ 完成登记；"
+            "审核记录不能在群消息中改写。逾期未完成会被移出群。"
+        )
+    else:
+        text = (
+            f"欢迎加入本群。请在 {minutes} 分钟内回答邀请人的 QQ 号；"
+            "回复时请真正 @“释迦的助理”，例如“@释迦的助理 123456789”。"
+            "机器人确认邀请人当前在群后才算验证完成，逾期未完成会被移出群。"
+        )
     try:
         await send_group_msg_confirmed(
             client,
@@ -915,10 +985,46 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
     newcomer = str(event.get("user_id") or "")
     if group_id not in member_verification_groups(cfg):
         return False
-    active = storage.get_active_member_verification(group_id, newcomer)
-    if not active or not is_real_at_self(event):
+    if not is_real_at_self(event):
         return False
     received_at = _event_received_at(event)
+    active = storage.get_active_member_verification(group_id, newcomer)
+    strict_registration_qq = extract_strict_inviter_registration_qq(event)
+    if active and active["state"] == "approval_pending":
+        # 申请虽然可信，但外部审批结果尚未确认；此状态不能仅凭正文升级权限。
+        if strict_registration_qq:
+            await _try_send_verification_message(
+                client,
+                group_id,
+                newcomer,
+                "加群审批结果尚未确认，请稍后再试或联系释迦大人。",
+            )
+            return True
+        return False
+    if active and active["state"] == "awaiting_join":
+        active = storage.activate_member_verification_from_reply(
+            group_id,
+            newcomer,
+            _member_verification_timeout(cfg),
+            event_time=_event_source_time(event),
+            now=received_at,
+        )
+    if not active:
+        if storage.has_member_verification_response(
+            group_id,
+            newcomer,
+            member_verification_message_key(event),
+        ):
+            return True
+        if strict_registration_qq:
+            await _try_send_verification_message(
+                client,
+                group_id,
+                newcomer,
+                "当前没有待登记的邀请人验证，请联系释迦大人核对。",
+            )
+            return True
+        return False
     if active["state"] == "kicking" or (
         active.get("deadline_at") is not None
         and received_at > int(active["deadline_at"])
@@ -940,6 +1046,16 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
     if candidate == str(event.get("self_id") or ""):
         await _try_send_verification_message(
             client, group_id, newcomer, "不能把本群机器人填写为邀请人，请核对后重新回答。"
+        )
+        return True
+    approved_inviter = str(active.get("inviter_qq") or "")
+    if approved_inviter and candidate != approved_inviter:
+        await _try_send_verification_message(
+            client,
+            group_id,
+            newcomer,
+            "填写的邀请人 QQ 与已审核的加群申请不一致，不能通过群消息改写；"
+            f"请回复已审核的 QQ：{approved_inviter}。",
         )
         return True
 
@@ -1370,8 +1486,7 @@ async def run() -> None:
     print(f"GrandUMI bug 反馈机器人启动,连接 {cfg['ws_url']} …")
     if cfg.get("new_member_verification_enabled", False) and not verification_groups:
         print(
-            "[新人验证] 没有独立生效的目标群（列表为空、无效或已由自动审批接管）；"
-            "为避免误踢，功能不会生效"
+            "[新人验证] 目标群列表为空或无效；为避免误踢，功能不会生效"
         )
     if cfg.get("group_add_auto_approval_enabled", False) and not auto_approval_groups:
         print("[加群审批] 已配置启用，但目标群列表为空或无效；为避免误审批，功能不会生效")

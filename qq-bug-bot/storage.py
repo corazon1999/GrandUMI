@@ -189,11 +189,15 @@ def init_db() -> None:
             ON chat_messages(state, created_at, id)
             """
         )
+        # 旧索引不包含“审批已受理、等待入群”两种恢复状态。启动时幂等重建，
+        # 让同一群同一 QQ 在审批、入群、回答和超时全链路始终只有一个活动会话。
+        conn.execute("DROP INDEX IF EXISTS idx_member_verifications_active")
         conn.execute(
             """
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_member_verifications_active
+            CREATE UNIQUE INDEX idx_member_verifications_active
             ON member_verifications(group_id, newcomer_qq)
             WHERE state IN (
+                'approval_pending', 'awaiting_join',
                 'awaiting_prompt', 'pending', 'checking_inviter',
                 'checking_timeout', 'kicking'
             )
@@ -586,6 +590,7 @@ def get_active_member_verification(group_id: str, newcomer_qq: str):
              WHERE group_id = ?
                AND newcomer_qq = ?
                AND state IN (
+                   'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
                    'checking_timeout', 'kicking'
                )
@@ -595,6 +600,228 @@ def get_active_member_verification(group_id: str, newcomer_qq: str):
             (str(group_id), str(newcomer_qq)),
         ).fetchone()
         return _verification_dict(row)
+
+
+def prepare_member_verification_approval(
+    group_id: str,
+    newcomer_qq: str,
+    inviter_qq: str,
+    request_event_time: int,
+    authorization_seconds: int,
+    now=None,
+):
+    """在外部审批动作前持久化可信申请，避免成功响应与入群通知之间丢会话。"""
+    group_id = str(group_id)
+    newcomer_qq = str(newcomer_qq)
+    inviter_qq = str(inviter_qq)
+    event_value = _verification_now(request_event_time)
+    now_value = _verification_now(now)
+    expires_at = now_value + max(60, int(authorization_seconds))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'cancelled',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = '加群审批登记授权已过期',
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN ('approval_pending', 'awaiting_join')
+               AND deadline_at IS NOT NULL
+               AND deadline_at < ?
+            """,
+            (now_value, now_value, group_id, newcomer_qq, now_value),
+        )
+        active = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN (
+                   'approval_pending', 'awaiting_join',
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (group_id, newcomer_qq),
+        ).fetchone()
+        if active:
+            if active["state"] == "approval_pending":
+                conn.execute(
+                    """
+                    UPDATE member_verifications
+                       SET inviter_qq = ?,
+                           candidate_qq = ?,
+                           deadline_at = ?,
+                           last_error = NULL,
+                           updated_at = ?
+                     WHERE id = ? AND state = 'approval_pending'
+                    """,
+                    (
+                        inviter_qq,
+                        inviter_qq,
+                        expires_at,
+                        now_value,
+                        active["id"],
+                    ),
+                )
+                active = conn.execute(
+                    "SELECT * FROM member_verifications WHERE id = ?",
+                    (active["id"],),
+                ).fetchone()
+            conn.commit()
+            result = dict(active)
+            result["created"] = False
+            result["reason"] = "active"
+            return result
+
+        cur = conn.execute(
+            """
+            INSERT INTO member_verifications (
+                group_id, newcomer_qq, nickname, join_event_time, state,
+                inviter_qq, candidate_qq, deadline_at, created_at, updated_at
+            ) VALUES (?, ?, '', ?, 'approval_pending', ?, ?, ?, ?, ?)
+            """,
+            (
+                group_id,
+                newcomer_qq,
+                event_value,
+                inviter_qq,
+                inviter_qq,
+                expires_at,
+                now_value,
+                now_value,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+        conn.commit()
+        result = dict(row)
+        result["created"] = True
+        result["reason"] = "approval_prepared"
+        return result
+
+
+def complete_member_verification_approval(verification_id: int, now=None) -> bool:
+    """OneBot 明确同意申请后，将预备记录推进到等待真实入群通知。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'awaiting_join',
+                   last_error = NULL,
+                   updated_at = ?
+             WHERE id = ? AND state = 'approval_pending'
+            """,
+            (now_value, int(verification_id)),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def record_member_verification_approval_failure(
+    verification_id: int, detail: str, now=None
+) -> bool:
+    """审批失败或响应不确定时只记错误，不把申请提升为可回答会话。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET last_error = ?, updated_at = ?
+             WHERE id = ? AND state = 'approval_pending'
+            """,
+            (
+                str(detail or "加群审批动作失败")[:1000],
+                now_value,
+                int(verification_id),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def activate_member_verification_from_reply(
+    group_id: str,
+    newcomer_qq: str,
+    timeout_seconds: int,
+    event_time=None,
+    now=None,
+):
+    """入群通知丢失时，以真实群消息恢复审批后登记；过期授权绝不复活。"""
+    now_value = _verification_now(now)
+    event_value = _verification_now(now_value if event_time is None else event_time)
+    deadline = now_value + max(1, int(timeout_seconds))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state = 'awaiting_join'
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (str(group_id), str(newcomer_qq)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        if row["deadline_at"] is None or now_value > int(row["deadline_at"]):
+            conn.execute(
+                """
+                UPDATE member_verifications
+                   SET state = 'cancelled',
+                       last_error = '加群审批登记授权已过期',
+                       ended_at = ?,
+                       updated_at = ?
+                 WHERE id = ? AND state = 'awaiting_join'
+                """,
+                (now_value, now_value, row["id"]),
+            )
+            conn.commit()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'pending',
+                   join_event_time = ?,
+                   candidate_qq = NULL,
+                   response_message_key = NULL,
+                   response_event_time = NULL,
+                   prompt_sent_at = ?,
+                   deadline_at = ?,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   last_error = '入群通知缺失，已由真实群消息恢复登记会话',
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'awaiting_join'
+            """,
+            (event_value, now_value, deadline, now_value, row["id"]),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        updated = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(updated)
 
 
 def get_member_verification_responses(verification_id: int):
@@ -612,6 +839,24 @@ def get_member_verification_responses(verification_id: int):
         return [dict(row) for row in rows]
 
 
+def has_member_verification_response(
+    group_id: str, newcomer_qq: str, message_key: str
+) -> bool:
+    """识别已持久化的 OneBot 回放，完成会话后也不得落入普通聊天兜底。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT 1 FROM member_verification_responses
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND message_key = ?
+             LIMIT 1
+            """,
+            (str(group_id), str(newcomer_qq), str(message_key)),
+        ).fetchone()
+        return row is not None
+
+
 def start_member_verification(
     group_id: str,
     newcomer_qq: str,
@@ -627,12 +872,31 @@ def start_member_verification(
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'cancelled',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = '加群审批登记授权已过期',
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN ('approval_pending', 'awaiting_join')
+               AND deadline_at IS NOT NULL
+               AND deadline_at < ?
+            """,
+            (now_value, now_value, group_id, newcomer_qq, now_value),
+        )
         active = conn.execute(
             """
             SELECT * FROM member_verifications
              WHERE group_id = ?
                AND newcomer_qq = ?
                AND state IN (
+                   'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
                    'checking_timeout', 'kicking'
                )
@@ -642,6 +906,96 @@ def start_member_verification(
             (group_id, newcomer_qq),
         ).fetchone()
         if active:
+            if active["state"] in ("approval_pending", "awaiting_join"):
+                replay = conn.execute(
+                    """
+                    SELECT * FROM member_verifications
+                     WHERE group_id = ?
+                       AND newcomer_qq = ?
+                       AND join_event_time = ?
+                       AND id <> ?
+                     ORDER BY id DESC
+                     LIMIT 1
+                    """,
+                    (group_id, newcomer_qq, join_event_time, active["id"]),
+                ).fetchone()
+                if replay:
+                    conn.execute(
+                        """
+                        UPDATE member_verifications
+                           SET state = 'cancelled',
+                               last_error = '同一入群通知已有持久会话',
+                               ended_at = ?,
+                               updated_at = ?
+                         WHERE id = ?
+                           AND state IN ('approval_pending', 'awaiting_join')
+                        """,
+                        (now_value, now_value, active["id"]),
+                    )
+                    conn.commit()
+                    result = dict(replay)
+                    result["created"] = False
+                    result["reason"] = "replayed_notice"
+                    return result
+                cur = conn.execute(
+                    """
+                    UPDATE member_verifications
+                       SET state = 'awaiting_prompt',
+                           nickname = ?,
+                           join_event_time = ?,
+                           inviter_qq = ?,
+                           candidate_qq = ?,
+                           response_message_key = NULL,
+                           response_event_time = NULL,
+                           prompt_sent_at = NULL,
+                           deadline_at = NULL,
+                           claim_token = NULL,
+                           claim_kind = NULL,
+                           claimed_at = NULL,
+                           next_attempt_at = NULL,
+                           last_error = NULL,
+                           updated_at = ?
+                     WHERE id = ?
+                       AND state IN ('approval_pending', 'awaiting_join')
+                    """,
+                    (
+                        str(nickname or ""),
+                        join_event_time,
+                        (
+                            str(active["inviter_qq"])
+                            if active["state"] == "awaiting_join"
+                            and active["inviter_qq"] not in (None, "")
+                            else None
+                        ),
+                        (
+                            str(active["inviter_qq"])
+                            if active["state"] == "awaiting_join"
+                            and active["inviter_qq"] not in (None, "")
+                            else None
+                        ),
+                        now_value,
+                        active["id"],
+                    ),
+                )
+                if cur.rowcount != 1:
+                    conn.rollback()
+                    result = dict(active)
+                    result["created"] = False
+                    result["reason"] = "activation_conflict"
+                    return result
+                activated = conn.execute(
+                    "SELECT * FROM member_verifications WHERE id = ?",
+                    (active["id"],),
+                ).fetchone()
+                conn.commit()
+                result = dict(activated)
+                result["created"] = True
+                result["reason"] = (
+                    "approved_join"
+                    if active["state"] == "awaiting_join"
+                    else "joined_after_unconfirmed_approval"
+                )
+                return result
             conn.commit()
             result = dict(active)
             result["created"] = False
@@ -709,6 +1063,7 @@ def mark_member_verification_left(
              WHERE group_id = ?
                AND newcomer_qq = ?
                AND state IN (
+                   'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
                    'checking_timeout', 'kicking'
                )
@@ -747,6 +1102,7 @@ def cancel_member_verifications_outside_groups(group_ids, now=None) -> int:
                    ended_at = ?,
                    updated_at = ?
              WHERE state IN (
+                   'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
                    'checking_timeout', 'kicking'
                )

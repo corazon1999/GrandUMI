@@ -7,6 +7,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BOT_DIR = Path(__file__).resolve().parents[1]
@@ -127,6 +128,148 @@ class MemberVerificationTestCase(unittest.TestCase):
 
 
 class MemberVerificationStorageTests(MemberVerificationTestCase):
+    def test完成登记后可按群成员和消息键识别回放(self):
+        row = self.create_prompted_session()
+        answer = storage.begin_member_inviter_check(
+            "456",
+            "10001",
+            "20002",
+            "onebot:completed-reply",
+            1100,
+            received_at=1100,
+        )
+        self.assertEqual("claimed", answer["status"])
+        self.assertTrue(
+            storage.complete_member_inviter_check(
+                row["id"],
+                answer["verification"]["claim_token"],
+                "20002",
+                now=1101,
+            )
+        )
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
+        self.assertTrue(
+            storage.has_member_verification_response(
+                "456", "10001", "onebot:completed-reply"
+            )
+        )
+        self.assertFalse(
+            storage.has_member_verification_response(
+                "456", "10001", "onebot:different-reply"
+            )
+        )
+        self.assertFalse(
+            storage.has_member_verification_response(
+                "789", "10001", "onebot:completed-reply"
+            )
+        )
+        self.assertFalse(
+            storage.has_member_verification_response(
+                "456", "10002", "onebot:completed-reply"
+            )
+        )
+
+    def test审批预授权只有明确成功后才能由真实群消息恢复(self):
+        prepared = storage.prepare_member_verification_approval(
+            "456", "10001", "20002", 100, 600, now=100
+        )
+        self.assertEqual("approval_pending", prepared["state"])
+        self.assertEqual("20002", prepared["inviter_qq"])
+        self.assertIsNone(storage.claim_member_verification_prompt(now=100))
+        self.assertIsNone(
+            storage.activate_member_verification_from_reply(
+                "456", "10001", 600, event_time=101, now=101
+            )
+        )
+
+        self.assertTrue(
+            storage.record_member_verification_approval_failure(
+                prepared["id"], "审批动作失败", now=102
+            )
+        )
+        self.assertIsNone(
+            storage.activate_member_verification_from_reply(
+                "456", "10001", 600, event_time=103, now=103
+            )
+        )
+        self.assertTrue(
+            storage.complete_member_verification_approval(prepared["id"], now=104)
+        )
+        activated = storage.activate_member_verification_from_reply(
+            "456", "10001", 600, event_time=105, now=105
+        )
+        self.assertEqual("pending", activated["state"])
+        self.assertEqual("20002", activated["inviter_qq"])
+        self.assertEqual(105, activated["join_event_time"])
+        self.assertEqual(705, activated["deadline_at"])
+
+        expired = storage.prepare_member_verification_approval(
+            "456", "10002", "20002", 200, 60, now=200
+        )
+        self.assertTrue(
+            storage.complete_member_verification_approval(expired["id"], now=201)
+        )
+        self.assertIsNone(
+            storage.activate_member_verification_from_reply(
+                "456", "10002", 600, event_time=261, now=261
+            )
+        )
+        self.assertEqual(
+            "cancelled", storage.get_member_verification(expired["id"])["state"]
+        )
+
+    def test审批授权并发幂等且并发回答只能领取一次(self):
+        def prepare():
+            return storage.prepare_member_verification_approval(
+                "456", "10001", "20002", 100, 600, now=100
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            prepared = list(pool.map(lambda _: prepare(), range(8)))
+        self.assertEqual(1, sum(bool(row["created"]) for row in prepared))
+        self.assertEqual(1, len({row["id"] for row in prepared}))
+
+        row = prepared[0]
+        self.assertTrue(
+            storage.complete_member_verification_approval(row["id"], now=101)
+        )
+        joined = storage.start_member_verification(
+            "456", "10001", "新人", 102, now=102
+        )
+        prompt = storage.claim_member_verification_prompt(joined["id"], now=102)
+        self.assertTrue(
+            storage.complete_member_verification_prompt(
+                joined["id"], prompt["claim_token"], 600, sent_at=102
+            )
+        )
+
+        def answer(index):
+            return storage.begin_member_inviter_check(
+                "456",
+                "10001",
+                "20002",
+                f"onebot:{index}",
+                110 + index,
+                received_at=110 + index,
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            answers = list(pool.map(answer, range(8)))
+        claimed = [result for result in answers if result["status"] == "claimed"]
+        self.assertEqual(1, len(claimed))
+        self.assertTrue(
+            all(result["status"] in ("claimed", "busy") for result in answers)
+        )
+        self.assertEqual(
+            1, len(storage.get_member_verification_responses(joined["id"]))
+        )
+        token = claimed[0]["verification"]["claim_token"]
+        self.assertTrue(
+            storage.complete_member_inviter_check(
+                joined["id"], token, "20002", now=120
+            )
+        )
+
     def test重复通知不重置倒计时_离群重进创建新会话(self):
         first = storage.start_member_verification("456", "10001", "新人", 100, now=100)
         prompt = storage.claim_member_verification_prompt(first["id"], now=100)
