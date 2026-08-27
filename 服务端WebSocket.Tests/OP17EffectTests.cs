@@ -2,6 +2,7 @@ using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -338,11 +339,66 @@ public class OP17EffectTests
         var rocksState = TestScene.New("OP17-039").Build();
         var rocks = Card("OP17-118");
         rocksState.Players[0].Hand.Add(rocks);
+
+        Assert.Equal(0, HandStaticCounter.Value(rocksState, 0, rocks));
+
         rocksState.Players[0].Characters.Add(Card("OP17-044"));
         Assert.Equal(2000, HandStaticCounter.Value(rocksState, 0, rocks));
 
         rocksState.Players[0].Characters.Add(Card("OP17-085"));
         Assert.Equal(0, HandStaticCounter.Value(rocksState, 0, rocks));
+    }
+
+    [Fact]
+    public async Task OP17_118_EmptyField_IsHiddenAndRejectedByAuthoritativeCounterPath()
+    {
+        _ = TestScene.New().Build();
+        string deck = "OP15-001\n" + string.Join('\n', Enumerable.Repeat("OP15-003", 10));
+        var engine = new GameEngine(
+            "op17-118-counter-rule",
+            ("s0", "p0", deck),
+            ("s1", "p1", deck),
+            firstPlayer: 1,
+            rngSeed: 118);
+        var state = engine.State;
+        var defender = state.Players[0];
+        var rocks = Card("OP17-118");
+
+        defender.Hand.Clear();
+        defender.Hand.Add(rocks);
+        defender.Characters.Clear();
+        state.CurrentTurnPlayer = 1;
+        state.TurnCount = 3;
+        state.Phase = Phase.Main;
+
+        var emptyFieldSnapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        Assert.Equal(0, emptyFieldSnapshot.GetProperty("my").GetProperty("handCardCounters")[0].GetInt32());
+
+        BattleEngine.StartAttack(state, state.Players[1].Leader.Id, targetIsLeader: true, targetId: null);
+        await BattleEngine.TriggerAttackDeclareAsync(state, new MockPromptService());
+        BattleEngine.PassBlock(state);
+
+        Assert.False(engine.HandleAction(0, "PlayCounter", JsonSerializer.SerializeToElement(new
+        {
+            handIndex = 0,
+            useCounterIcon = true,
+        })));
+        Assert.Same(rocks, Assert.Single(defender.Hand));
+        Assert.DoesNotContain(rocks, defender.Trash);
+        Assert.Equal(0, defender.Leader.PowerModThisBattle);
+
+        defender.Characters.Add(Card("OP17-044"));
+        var eligibleSnapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        Assert.Equal(2000, eligibleSnapshot.GetProperty("my").GetProperty("handCardCounters")[0].GetInt32());
+
+        Assert.True(engine.HandleAction(0, "PlayCounter", JsonSerializer.SerializeToElement(new
+        {
+            handIndex = 0,
+            useCounterIcon = true,
+        })));
+        Assert.Empty(defender.Hand);
+        Assert.Contains(rocks, defender.Trash);
+        Assert.Equal(2000, defender.Leader.PowerModThisBattle);
     }
 
     [Fact]

@@ -39,8 +39,10 @@ public static class HandStaticCounter
                 && !state.IsContinuouslyNullified(c)))
             value = 2000;
 
-        // OP17-118 洛克斯：我方场上仅存在没有反击值的角色时，手牌中的自身反击+2000。
+        // OP17-118 洛克斯：我方场上存在角色，且仅存在没有印刷反击值的角色时，
+        // 手牌中的自身反击+2000。空角色区不满足“仅为……角色”的条件。
         if (card.Info.Number == "OP17-118"
+            && me.Characters.Count > 0
             && me.Characters.All(c => c.Info.Counter == 0))
             value = Math.Max(value, 2000);
 
