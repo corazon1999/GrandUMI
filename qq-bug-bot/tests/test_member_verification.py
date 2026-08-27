@@ -22,7 +22,6 @@ class FakeOneBotClient:
         self.members = {str(value) for value in (members or [])}
         self.actions = []
         self.member_error = None
-        self.kick_error = None
         self.send_error = None
 
     async def call_action(self, action, params, timeout=20):
@@ -43,19 +42,14 @@ class FakeOneBotClient:
                     for qq in sorted(self.members)
                 ],
             }
-        if action == "set_group_kick":
-            if self.kick_error:
-                raise self.kick_error
-            self.members.discard(str(params["user_id"]))
-            return {"status": "ok", "retcode": 0, "data": None}
         raise AssertionError(f"未预期的 OneBot 动作：{action}")
 
 
-def verification_cfg(groups=(456,), timeout=1800, poll_interval=300):
+def verification_cfg(groups=(456,), reminder=1800, poll_interval=300):
     return {
         "new_member_verification_enabled": True,
         "new_member_verification_groups": list(groups),
-        "new_member_verification_timeout_seconds": timeout,
+        "new_member_verification_timeout_seconds": reminder,
         "new_member_verification_poll_interval_seconds": poll_interval,
         "allowed_groups": list(groups),
         "chat_agent_enabled": False,
@@ -116,13 +110,13 @@ class MemberVerificationTestCase(unittest.TestCase):
         self.temp.cleanup()
 
     @staticmethod
-    def create_prompted_session(now=1000, timeout=600, group_id="456"):
+    def create_prompted_session(now=1000, reminder=600, group_id="456"):
         row = storage.start_member_verification(
             group_id, "10001", "新人", now, now=now
         )
         prompt = storage.claim_member_verification_prompt(row["id"], now=now)
         assert storage.complete_member_verification_prompt(
-            row["id"], prompt["claim_token"], timeout, sent_at=now
+            row["id"], prompt["claim_token"], reminder, sent_at=now
         )
         return storage.get_member_verification(row["id"])
 
@@ -350,17 +344,17 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
             ],
         )
 
-    def test及时回答可抢占超时检查_旧令牌不得踢人(self):
-        row = self.create_prompted_session(now=100, timeout=600)
-        timeout_job = storage.claim_due_member_verification_timeout(now=700)
-        self.assertEqual("checking_timeout", timeout_job["state"])
+    def test到期回答可抢占提醒租约_旧令牌不能完成提醒(self):
+        row = self.create_prompted_session(now=100, reminder=600)
+        reminder_job = storage.claim_due_member_verification_reminder(now=700)
+        self.assertEqual("reminding", reminder_job["state"])
         answer = storage.begin_member_inviter_check(
             "456", "10001", "20002", "onebot:3", 700, received_at=700
         )
         self.assertEqual("claimed", answer["status"])
         self.assertFalse(
-            storage.authorize_member_verification_kick(
-                row["id"], timeout_job["claim_token"], now=700
+            storage.complete_member_verification_reminder(
+                row["id"], reminder_job["claim_token"], now=700
             )
         )
         self.assertTrue(
@@ -369,8 +363,8 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
             )
         )
 
-    def test成员接口失败保留答案且到期后仍先重试答案(self):
-        row = self.create_prompted_session(now=100, timeout=600)
+    def test成员接口失败保留答案且追问到点后仍先重试答案(self):
+        row = self.create_prompted_session(now=100, reminder=600)
         answer = storage.begin_member_inviter_check(
             "456", "10001", "20002", "onebot:4", 650, received_at=650
         )
@@ -378,13 +372,13 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
         self.assertTrue(
             storage.defer_member_inviter_check(row["id"], token, "接口失败", now=800)
         )
-        self.assertIsNone(storage.claim_due_member_verification_timeout(now=900))
+        self.assertIsNone(storage.claim_due_member_verification_reminder(now=900))
         retry = storage.claim_pending_member_inviter_check(now=900)
         self.assertEqual(row["id"], retry["id"])
         self.assertEqual("20002", retry["candidate_qq"])
 
     def test目标群筛选不会领取其他群任务(self):
-        self.create_prompted_session(now=100, timeout=60, group_id="456")
+        self.create_prompted_session(now=100, reminder=60, group_id="456")
         other = storage.start_member_verification("999", "10002", "", 100, now=100)
         self.assertIsNone(
             storage.claim_member_verification_prompt(
@@ -392,18 +386,18 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
             )
         )
         self.assertIsNone(
-            storage.claim_due_member_verification_timeout(
+            storage.claim_due_member_verification_reminder(
                 now=200, group_ids={"9999"}
             )
         )
         self.assertIsNotNone(
-            storage.claim_due_member_verification_timeout(
+            storage.claim_due_member_verification_reminder(
                 now=200, group_ids={"456"}
             )
         )
 
-    def test配置移除目标群会取消遗留会话防止重新启用补踢(self):
-        kept = self.create_prompted_session(now=100, timeout=60, group_id="456")
+    def test配置移除目标群会取消遗留会话防止重新启用后追问(self):
+        kept = self.create_prompted_session(now=100, reminder=60, group_id="456")
         removed = storage.start_member_verification("999", "10002", "", 100, now=100)
         prompt = storage.claim_member_verification_prompt(removed["id"], now=100)
         storage.complete_member_verification_prompt(
@@ -418,12 +412,119 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
             "cancelled", storage.get_member_verification(removed["id"])["state"]
         )
         self.assertIsNone(
-            storage.claim_due_member_verification_timeout(
+            storage.claim_due_member_verification_reminder(
                 now=1000, group_ids={"999"}
             )
         )
 
-    def test新表迁移幂等并带活动会话唯一约束(self):
+    def test并发后台只领取一次提醒且成功后持久防重(self):
+        row = self.create_prompted_session(now=100, reminder=60)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            jobs = list(
+                pool.map(
+                    lambda _: storage.claim_due_member_verification_reminder(now=160),
+                    range(8),
+                )
+            )
+        claimed = [job for job in jobs if job]
+        self.assertEqual(1, len(claimed))
+        self.assertEqual(1, claimed[0]["reminder_attempts"])
+        self.assertTrue(
+            storage.complete_member_verification_reminder(
+                row["id"], claimed[0]["claim_token"], now=161
+            )
+        )
+        completed = storage.get_member_verification(row["id"])
+        self.assertEqual("pending", completed["state"])
+        self.assertIsNone(completed["deadline_at"])
+        self.assertEqual(161, completed["reminder_sent_at"])
+        self.assertIsNone(storage.claim_due_member_verification_reminder(now=9999))
+
+    def test崩溃恢复和发送失败均有界退避且停止提醒后仍可回答(self):
+        crashed = self.create_prompted_session(now=100, reminder=60)
+        for attempt, now_value in enumerate((160, 190, 220, 250, 280), start=1):
+            job = storage.claim_due_member_verification_reminder(
+                now=now_value, lease_seconds=30
+            )
+            self.assertIsNotNone(job)
+            self.assertEqual(attempt, job["reminder_attempts"])
+        self.assertIsNone(
+            storage.claim_due_member_verification_reminder(now=310, lease_seconds=30)
+        )
+        recovered = storage.get_member_verification(crashed["id"])
+        self.assertEqual("pending", recovered["state"])
+        self.assertIsNone(recovered["deadline_at"])
+        self.assertIsNone(recovered["reminder_sent_at"])
+
+        answer = storage.begin_member_inviter_check(
+            "456", "10001", "20002", "onebot:after-crashes", 311, received_at=311
+        )
+        self.assertEqual("claimed", answer["status"])
+        self.assertTrue(
+            storage.complete_member_inviter_check(
+                crashed["id"], answer["verification"]["claim_token"], "20002", now=312
+            )
+        )
+
+        failed = storage.start_member_verification(
+            "456", "10002", "另一位新人", 100, now=100
+        )
+        prompt = storage.claim_member_verification_prompt(failed["id"], now=100)
+        self.assertTrue(
+            storage.complete_member_verification_prompt(
+                failed["id"], prompt["claim_token"], 60, sent_at=100
+            )
+        )
+        expected_next_attempts = (165, 175, 195, 235, None)
+        for attempt, (now_value, expected_next) in enumerate(
+            zip((160, 165, 175, 195, 235), expected_next_attempts), start=1
+        ):
+            job = storage.claim_due_member_verification_reminder(now=now_value)
+            self.assertEqual(attempt, job["reminder_attempts"])
+            self.assertTrue(
+                storage.release_member_verification_reminder(
+                    failed["id"], job["claim_token"], "模拟发送失败", now=now_value
+                )
+            )
+            current = storage.get_member_verification(failed["id"])
+            self.assertEqual(expected_next, current["next_attempt_at"])
+        exhausted = storage.get_member_verification(failed["id"])
+        self.assertEqual("pending", exhausted["state"])
+        self.assertIsNone(exhausted["deadline_at"])
+        self.assertEqual(5, exhausted["reminder_attempts"])
+        self.assertEqual(
+            "claimed",
+            storage.begin_member_inviter_check(
+                "456", "10002", "20002", "onebot:after-failures", 236, received_at=236
+            )["status"],
+        )
+
+    def test旧超时和踢人租约启动时前向迁移并带活动唯一约束(self):
+        checking = storage.start_member_verification(
+            "456", "10001", "新人甲", 100, now=100
+        )
+        kicking = storage.start_member_verification(
+            "456", "10002", "新人乙", 100, now=100
+        )
+        with sqlite3.connect(storage.DB_PATH) as conn:
+            for row, state, kind in (
+                (checking, "checking_timeout", "timeout"),
+                (kicking, "kicking", "kick"),
+            ):
+                conn.execute(
+                    """
+                    UPDATE member_verifications
+                       SET state = ?, prompt_sent_at = 100, deadline_at = 160,
+                           claim_token = 'legacy-token', claim_kind = ?,
+                           claimed_at = 150, next_attempt_at = 170,
+                           kick_requested_at = 155
+                     WHERE id = ?
+                    """,
+                    (state, kind, row["id"]),
+                )
+
+        storage.init_db()
         storage.init_db()
         with sqlite3.connect(storage.DB_PATH) as conn:
             tables = {
@@ -438,9 +539,31 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
                     "SELECT name FROM sqlite_master WHERE type = 'index'"
                 )
             }
+            index_sql = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name = ?",
+                ("idx_member_verifications_active",),
+            ).fetchone()[0]
+            columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(member_verifications)")
+            }
         self.assertIn("member_verifications", tables)
         self.assertIn("member_verification_responses", tables)
         self.assertIn("idx_member_verifications_active", indexes)
+        self.assertIn("reminder_attempts", columns)
+        self.assertIn("reminder_sent_at", columns)
+        self.assertIn("reminding", index_sql)
+        self.assertNotIn("checking_timeout", index_sql)
+        self.assertNotIn("kicking", index_sql)
+        for original in (checking, kicking):
+            migrated = storage.get_member_verification(original["id"])
+            self.assertEqual("pending", migrated["state"])
+            self.assertIsNone(migrated["deadline_at"])
+            self.assertIsNone(migrated["claim_token"])
+            self.assertIsNone(migrated["claim_kind"])
+            self.assertIsNone(migrated["claimed_at"])
+            self.assertIsNone(migrated["next_attempt_at"])
+            self.assertIsNone(migrated["kick_requested_at"])
 
 
 class MemberVerificationBotTests(MemberVerificationTestCase):
@@ -479,9 +602,10 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
         self.assertEqual("send_group_msg", client.actions[0][0])
         prompt = client.actions[0][1]["message"]
         self.assertEqual("at", prompt[0]["type"])
-        self.assertIn("30 分钟内", prompt[1]["data"]["text"])
         self.assertIn("请真正 @“释迦的助理”", prompt[1]["data"]["text"])
-        self.assertIn("@释迦的助理 123456789", prompt[1]["data"]["text"])
+        self.assertIn("邀请人QQ：123456789", prompt[1]["data"]["text"])
+        self.assertNotIn("逾期", prompt[1]["data"]["text"])
+        self.assertNotIn("移出群", prompt[1]["data"]["text"])
 
         asyncio.run(bot.on_event(client, cfg, reply_event()))
         completed = storage.get_member_verification(row["id"])
@@ -568,50 +692,71 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
             "verified", storage.get_member_verification(row["id"])["state"]
         )
 
-    def test超时查询失败绝不踢_恢复后才踢且不拒绝后续申请(self):
-        row = self.create_prompted_session(now=100, timeout=60)
-        client = FakeOneBotClient({"10001", "99999"})
-        client.member_error = RuntimeError("列表失败")
-        job = storage.claim_due_member_verification_timeout(now=160)
-        asyncio.run(bot.process_member_verification_timeout(client, job))
-        self.assertEqual("pending", storage.get_member_verification(row["id"])["state"])
-        self.assertNotIn("set_group_kick", [name for name, _ in client.actions])
-
-        client.member_error = None
-        with sqlite3.connect(storage.DB_PATH) as conn:
-            conn.execute(
-                "UPDATE member_verifications SET next_attempt_at = 0 WHERE id = ?",
-                (row["id"],),
-            )
-        job = storage.claim_due_member_verification_timeout(now=165)
-        asyncio.run(bot.process_member_verification_timeout(client, job))
+    def test到期只追问一次_成功持久防重且之后仍能登记(self):
+        row = self.create_prompted_session(now=100, reminder=60)
+        client = FakeOneBotClient({"10001", "20002", "99999"})
+        job = storage.claim_due_member_verification_reminder(now=160)
+        asyncio.run(bot.process_member_verification_reminder(client, job))
         completed = storage.get_member_verification(row["id"])
-        self.assertEqual("kicked", completed["state"])
-        kick = [params for name, params in client.actions if name == "set_group_kick"]
-        self.assertEqual(1, len(kick))
-        self.assertIs(False, kick[0]["reject_add_request"])
+        self.assertEqual("pending", completed["state"])
+        self.assertIsNone(completed["deadline_at"])
+        self.assertIsNotNone(completed["reminder_sent_at"])
+        self.assertEqual(["send_group_msg"], [name for name, _ in client.actions])
+        reminder_text = client.actions[0][1]["message"][1]["data"]["text"]
+        self.assertIn("还没有收到邀请人 QQ", reminder_text)
+        self.assertNotIn("逾期", reminder_text)
+        self.assertNotIn("移出群", reminder_text)
+        self.assertIsNone(storage.claim_due_member_verification_reminder(now=9999))
 
-    def test踢人动作失败不标记成功_新人已离群时不再踢(self):
-        row = self.create_prompted_session(now=100, timeout=60)
-        client = FakeOneBotClient({"10001", "99999"})
-        client.kick_error = RuntimeError("权限不足")
-        job = storage.claim_due_member_verification_timeout(now=160)
-        asyncio.run(bot.process_member_verification_timeout(client, job))
-        self.assertEqual("pending", storage.get_member_verification(row["id"])["state"])
+        action_count = len(client.actions)
+        asyncio.run(
+            bot.on_event(
+                client,
+                verification_cfg(reminder=60),
+                reply_event(when=10000, message_id=90),
+            )
+        )
+        self.assertEqual("verified", storage.get_member_verification(row["id"])["state"])
+        self.assertEqual(
+            ["get_group_member_list", "send_group_msg"],
+            [name for name, _ in client.actions[action_count:]],
+        )
 
-        client.kick_error = None
-        client.members.discard("10001")
+    def test追问发送失败可恢复且全程不查询成员(self):
+        row = self.create_prompted_session(now=100, reminder=60)
+        client = FakeOneBotClient()
+        client.send_error = RuntimeError("发送接口暂时失败")
+        job = storage.claim_due_member_verification_reminder(now=160)
+        asyncio.run(bot.process_member_verification_reminder(client, job))
+        failed = storage.get_member_verification(row["id"])
+        self.assertEqual("pending", failed["state"])
+        self.assertEqual(160, failed["deadline_at"])
+        self.assertEqual(1, failed["reminder_attempts"])
+        self.assertIsNotNone(failed["next_attempt_at"])
+        self.assertEqual(["send_group_msg"], [name for name, _ in client.actions])
+
+        client.send_error = None
         with sqlite3.connect(storage.DB_PATH) as conn:
             conn.execute(
                 "UPDATE member_verifications SET next_attempt_at = 0 WHERE id = ?",
                 (row["id"],),
             )
-        job = storage.claim_due_member_verification_timeout(now=165)
-        before = len([name for name, _ in client.actions if name == "set_group_kick"])
-        asyncio.run(bot.process_member_verification_timeout(client, job))
-        after = len([name for name, _ in client.actions if name == "set_group_kick"])
-        self.assertEqual(before, after)
-        self.assertEqual("left", storage.get_member_verification(row["id"])["state"])
+        job = storage.claim_due_member_verification_reminder(now=165)
+        asyncio.run(bot.process_member_verification_reminder(client, job))
+        recovered = storage.get_member_verification(row["id"])
+        self.assertEqual("pending", recovered["state"])
+        self.assertIsNone(recovered["deadline_at"])
+        self.assertEqual(2, recovered["reminder_attempts"])
+        self.assertIsNotNone(recovered["reminder_sent_at"])
+        self.assertEqual(
+            ["send_group_msg", "send_group_msg"],
+            [name for name, _ in client.actions],
+        )
+
+    def test运行源码不包含OneBot自动踢人动作(self):
+        for name in ("bot.py", "storage.py"):
+            source = (BOT_DIR / name).read_text(encoding="utf-8")
+            self.assertNotIn("set_group_kick", source)
 
     def test离群通知取消活动验证且重复回答不生效(self):
         client = FakeOneBotClient({"10001", "20002", "99999"})

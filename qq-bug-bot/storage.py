@@ -23,13 +23,18 @@ CHAT_TERMINAL_STATES = ("completed", "failed")
 PERSONALITIES = ("hancock", "nami", "robin")
 DEFAULT_PERSONALITY = "hancock"
 MEMBER_VERIFICATION_ACTIVE_STATES = (
+    "approval_pending",
+    "awaiting_join",
     "awaiting_prompt",
     "pending",
     "checking_inviter",
-    "checking_timeout",
-    "kicking",
+    "reminding",
 )
+# kicked 仅用于识别旧版本已经完成的历史记录；新版本不会再产生该状态。
 MEMBER_VERIFICATION_TERMINAL_STATES = ("verified", "kicked", "left", "cancelled")
+MEMBER_VERIFICATION_REMINDER_MAX_ATTEMPTS = 5
+MEMBER_VERIFICATION_REMINDER_RETRY_BASE_SECONDS = 5
+MEMBER_VERIFICATION_REMINDER_RETRY_MAX_SECONDS = 300
 
 
 def init_db() -> None:
@@ -117,6 +122,8 @@ def init_db() -> None:
                 deadline_at INTEGER,
                 invalid_attempts INTEGER NOT NULL DEFAULT 0,
                 prompt_attempts INTEGER NOT NULL DEFAULT 0,
+                reminder_attempts INTEGER NOT NULL DEFAULT 0,
+                reminder_sent_at INTEGER,
                 check_attempts INTEGER NOT NULL DEFAULT 0,
                 kick_attempts INTEGER NOT NULL DEFAULT 0,
                 claim_token TEXT,
@@ -189,8 +196,27 @@ def init_db() -> None:
             ON chat_messages(state, created_at, id)
             """
         )
-        # 旧索引不包含“审批已受理、等待入群”两种恢复状态。启动时幂等重建，
-        # 让同一群同一 QQ 在审批、入群、回答和超时全链路始终只有一个活动会话。
+        # 旧版会把到期会话推进到最终检查或踢人租约。启动时必须前向恢复为
+        # 可无限期回答的 pending，并清除所有可能继续执行旧动作的租约与截止时间。
+        migration_now = int(time.time())
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'pending',
+                   deadline_at = NULL,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   kick_requested_at = NULL,
+                   ended_at = NULL,
+                   last_error = '已取消旧版超时移出流程，可继续回答邀请人 QQ',
+                   updated_at = ?
+             WHERE state IN ('checking_timeout', 'kicking')
+            """,
+            (migration_now,),
+        )
+        # 幂等重建活动索引，让审批、入群、回答和提醒全链路始终只有一个活动会话。
         conn.execute("DROP INDEX IF EXISTS idx_member_verifications_active")
         conn.execute(
             """
@@ -199,7 +225,7 @@ def init_db() -> None:
             WHERE state IN (
                 'approval_pending', 'awaiting_join',
                 'awaiting_prompt', 'pending', 'checking_inviter',
-                'checking_timeout', 'kicking'
+                'reminding'
             )
             """
         )
@@ -272,6 +298,15 @@ def init_db() -> None:
         if "next_attempt_at" not in verification_cols:
             conn.execute(
                 "ALTER TABLE member_verifications ADD COLUMN next_attempt_at INTEGER"
+            )
+        if "reminder_attempts" not in verification_cols:
+            conn.execute(
+                "ALTER TABLE member_verifications "
+                "ADD COLUMN reminder_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        if "reminder_sent_at" not in verification_cols:
+            conn.execute(
+                "ALTER TABLE member_verifications ADD COLUMN reminder_sent_at INTEGER"
             )
         conn.commit()
 
@@ -592,7 +627,7 @@ def get_active_member_verification(group_id: str, newcomer_qq: str):
                AND state IN (
                    'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'reminding'
                )
              ORDER BY id DESC
              LIMIT 1
@@ -646,7 +681,7 @@ def prepare_member_verification_approval(
                AND state IN (
                    'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'reminding'
                )
              ORDER BY id DESC
              LIMIT 1
@@ -754,14 +789,14 @@ def record_member_verification_approval_failure(
 def activate_member_verification_from_reply(
     group_id: str,
     newcomer_qq: str,
-    timeout_seconds: int,
+    reminder_seconds: int,
     event_time=None,
     now=None,
 ):
     """入群通知丢失时，以真实群消息恢复审批后登记；过期授权绝不复活。"""
     now_value = _verification_now(now)
     event_value = _verification_now(now_value if event_time is None else event_time)
-    deadline = now_value + max(1, int(timeout_seconds))
+    deadline = now_value + max(1, int(reminder_seconds))
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
@@ -803,6 +838,8 @@ def activate_member_verification_from_reply(
                    response_event_time = NULL,
                    prompt_sent_at = ?,
                    deadline_at = ?,
+                   reminder_attempts = 0,
+                   reminder_sent_at = NULL,
                    claim_token = NULL,
                    claim_kind = NULL,
                    claimed_at = NULL,
@@ -898,7 +935,7 @@ def start_member_verification(
                AND state IN (
                    'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'reminding'
                )
              ORDER BY id DESC
              LIMIT 1
@@ -949,6 +986,8 @@ def start_member_verification(
                            response_event_time = NULL,
                            prompt_sent_at = NULL,
                            deadline_at = NULL,
+                           reminder_attempts = 0,
+                           reminder_sent_at = NULL,
                            claim_token = NULL,
                            claim_kind = NULL,
                            claimed_at = NULL,
@@ -1065,7 +1104,7 @@ def mark_member_verification_left(
                AND state IN (
                    'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'reminding'
                )
             """,
             (
@@ -1104,7 +1143,7 @@ def cancel_member_verifications_outside_groups(group_ids, now=None) -> int:
              WHERE state IN (
                    'approval_pending', 'awaiting_join',
                    'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'reminding'
                )
                {group_clause}
             """,
@@ -1185,12 +1224,12 @@ def claim_member_verification_prompt(
 def complete_member_verification_prompt(
     verification_id: int,
     claim_token: str,
-    timeout_seconds: int,
+    reminder_seconds: int,
     sent_at=None,
 ) -> bool:
-    """只在 OneBot 确认提示发送成功后启动倒计时。"""
+    """只在 OneBot 确认首次提示发送成功后启动一次提醒计时。"""
     sent_value = _verification_now(sent_at)
-    timeout_value = max(1, int(timeout_seconds))
+    reminder_value = max(1, int(reminder_seconds))
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             """
@@ -1198,6 +1237,8 @@ def complete_member_verification_prompt(
                SET state = 'pending',
                    prompt_sent_at = ?,
                    deadline_at = ?,
+                   reminder_attempts = 0,
+                   reminder_sent_at = NULL,
                    claim_token = NULL,
                    claim_kind = NULL,
                    claimed_at = NULL,
@@ -1211,7 +1252,7 @@ def complete_member_verification_prompt(
             """,
             (
                 sent_value,
-                sent_value + timeout_value,
+                sent_value + reminder_value,
                 sent_value,
                 int(verification_id),
                 str(claim_token),
@@ -1263,7 +1304,7 @@ def begin_member_inviter_check(
     event_time: int,
     received_at=None,
 ):
-    """原子接收一条回答，并使超时任务失效；返回 status 与已领取会话。"""
+    """原子接收一条回答，并抢占可能并发的提醒租约。"""
     now_value = _verification_now(received_at)
     event_value = _verification_now(event_time)
     token = uuid4().hex
@@ -1276,8 +1317,7 @@ def begin_member_inviter_check(
              WHERE group_id = ?
                AND newcomer_qq = ?
                AND state IN (
-                   'awaiting_prompt', 'pending', 'checking_inviter',
-                   'checking_timeout', 'kicking'
+                   'awaiting_prompt', 'pending', 'checking_inviter', 'reminding'
                )
              ORDER BY id DESC
              LIMIT 1
@@ -1287,16 +1327,9 @@ def begin_member_inviter_check(
         if not row:
             conn.rollback()
             return {"status": "no_session"}
-        if row["state"] == "kicking":
-            conn.rollback()
-            return {"status": "expired", "verification": dict(row)}
         if row["state"] == "checking_inviter":
             conn.rollback()
             return {"status": "busy", "verification": dict(row)}
-        deadline = row["deadline_at"]
-        if deadline is not None and now_value > int(deadline):
-            conn.rollback()
-            return {"status": "expired", "verification": dict(row)}
         try:
             conn.execute(
                 """
@@ -1334,7 +1367,7 @@ def begin_member_inviter_check(
                    last_error = NULL,
                    updated_at = ?
              WHERE id = ?
-               AND state IN ('awaiting_prompt', 'pending', 'checking_timeout')
+               AND state IN ('awaiting_prompt', 'pending', 'reminding')
             """,
             (
                 str(candidate_qq),
@@ -1424,7 +1457,7 @@ def defer_member_inviter_check(
     now=None,
     retry_delay_seconds: int = 5,
 ) -> bool:
-    """权威成员接口失败时保留玩家答案，不通过也不进入超时踢人。"""
+    """权威成员接口失败时保留玩家答案，不通过也不触发自动移出。"""
     now_value = _verification_now(now)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -1595,23 +1628,43 @@ def reject_member_inviter_check(
         ).fetchone()
         conn.commit()
         result = dict(updated)
-        result["can_retry"] = (
-            result["deadline_at"] is None
-            or now_value <= int(result["deadline_at"])
-        )
+        # 截止时间只决定一次提醒何时发送，不再限制玩家回答。
+        result["can_retry"] = True
         return result
 
 
-def claim_due_member_verification_timeout(
-    now=None, lease_seconds: int = 30, group_ids=None
+def claim_due_member_verification_reminder(
+    now=None,
+    lease_seconds: int = 30,
+    group_ids=None,
+    max_attempts: int = MEMBER_VERIFICATION_REMINDER_MAX_ATTEMPTS,
 ):
-    """领取到期会话；也恢复中断的最终检查/踢人动作。"""
+    """原子领取到期提醒；崩溃租约最多恢复有限次数，不会无限刷屏。"""
     now_value = _verification_now(now)
     stale = now_value - max(5, int(lease_seconds))
+    attempt_limit = max(1, int(max_attempts))
     token = uuid4().hex
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
+        # 若实例连续在提醒租约内崩溃，达到上限后直接停止提醒并保留回答资格。
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'pending',
+                   deadline_at = NULL,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   last_error = '提醒恢复次数已达上限，停止提醒但仍可回答邀请人 QQ',
+                   updated_at = ?
+             WHERE state = 'reminding'
+               AND reminder_attempts >= ?
+               AND (claimed_at IS NULL OR claimed_at <= ?)
+            """,
+            (now_value, attempt_limit, stale),
+        )
         group_clause = ""
         args = []
         if group_ids is not None:
@@ -1622,17 +1675,23 @@ def claim_due_member_verification_timeout(
             placeholders = ",".join("?" for _ in normalized_groups)
             group_clause = f"group_id IN ({placeholders}) AND "
             args.extend(normalized_groups)
-        args.extend((now_value, now_value, stale))
+        args.extend(
+            (now_value, now_value, attempt_limit, attempt_limit, stale)
+        )
         row = conn.execute(
             f"""
             SELECT * FROM member_verifications
              WHERE {group_clause}((
                     state = 'pending'
                 AND deadline_at IS NOT NULL
+                AND reminder_sent_at IS NULL
                 AND deadline_at <= ?
                 AND COALESCE(next_attempt_at, 0) <= ?
+                AND reminder_attempts < ?
              ) OR (
-                    state IN ('checking_timeout', 'kicking')
+                    state = 'reminding'
+                AND reminder_sent_at IS NULL
+                AND reminder_attempts < ?
                 AND (claimed_at IS NULL OR claimed_at <= ?)
              ))
              ORDER BY COALESCE(deadline_at, updated_at), id
@@ -1641,22 +1700,28 @@ def claim_due_member_verification_timeout(
             tuple(args),
         ).fetchone()
         if not row:
-            conn.rollback()
+            # 可能已经把达到崩溃恢复上限的提醒前向收敛为无限期 pending。
+            conn.commit()
             return None
         cur = conn.execute(
             """
             UPDATE member_verifications
-               SET state = 'checking_timeout',
+               SET state = 'reminding',
                    claim_token = ?,
-                   claim_kind = 'timeout',
+                   claim_kind = 'reminder',
                    claimed_at = ?,
                    next_attempt_at = NULL,
+                   reminder_attempts = reminder_attempts + 1,
                    updated_at = ?
              WHERE id = ?
                AND (
                     (state = 'pending' AND deadline_at IS NOT NULL
-                     AND deadline_at <= ? AND COALESCE(next_attempt_at, 0) <= ?)
-                 OR (state IN ('checking_timeout', 'kicking')
+                     AND reminder_sent_at IS NULL
+                     AND deadline_at <= ? AND COALESCE(next_attempt_at, 0) <= ?
+                     AND reminder_attempts < ?)
+                 OR (state = 'reminding'
+                     AND reminder_sent_at IS NULL
+                     AND reminder_attempts < ?
                      AND (claimed_at IS NULL OR claimed_at <= ?))
                )
             """,
@@ -1667,6 +1732,8 @@ def claim_due_member_verification_timeout(
                 row["id"],
                 now_value,
                 now_value,
+                attempt_limit,
+                attempt_limit,
                 stale,
             ),
         )
@@ -1680,29 +1747,30 @@ def claim_due_member_verification_timeout(
         return dict(claimed)
 
 
-def authorize_member_verification_kick(
+def complete_member_verification_reminder(
     verification_id: int, claim_token: str, now=None
 ) -> bool:
-    """踢人前最后一次原子核验会话仍处于同一个超时租约。"""
+    """提醒确认送达后清除截止时间，使会话可无限期回答且不再提醒。"""
     now_value = _verification_now(now)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             """
             UPDATE member_verifications
-               SET state = 'kicking',
-                   claim_kind = 'kick',
-                   claimed_at = ?,
+               SET state = 'pending',
+                   deadline_at = NULL,
+                   reminder_sent_at = ?,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
                    next_attempt_at = NULL,
-                   kick_attempts = kick_attempts + 1,
-                   kick_requested_at = COALESCE(kick_requested_at, ?),
+                   last_error = NULL,
                    updated_at = ?
              WHERE id = ?
-               AND state = 'checking_timeout'
-               AND claim_kind = 'timeout'
+               AND state = 'reminding'
+               AND claim_kind = 'reminder'
                AND claim_token = ?
             """,
             (
-                now_value,
                 now_value,
                 now_value,
                 int(verification_id),
@@ -1713,23 +1781,48 @@ def authorize_member_verification_kick(
         return cur.rowcount == 1
 
 
-def release_member_verification_timeout(
+def release_member_verification_reminder(
     verification_id: int,
     claim_token: str,
     error: str,
     now=None,
-    retry_delay_seconds: int = 5,
+    max_attempts: int = MEMBER_VERIFICATION_REMINDER_MAX_ATTEMPTS,
+    retry_base_seconds: int = MEMBER_VERIFICATION_REMINDER_RETRY_BASE_SECONDS,
+    retry_max_seconds: int = MEMBER_VERIFICATION_REMINDER_RETRY_MAX_SECONDS,
 ) -> bool:
-    """最终成员查询或踢人失败时回到到期队列，不把失败当成功。"""
+    """提醒失败时指数退避；到达上限便停止提醒，但会话仍可继续回答。"""
     now_value = _verification_now(now)
     with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT reminder_attempts FROM member_verifications
+             WHERE id = ?
+               AND state = 'reminding'
+               AND claim_token = ?
+               AND claim_kind = 'reminder'
+            """,
+            (int(verification_id), str(claim_token)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        attempts = int(row["reminder_attempts"] or 0)
+        exhausted = attempts >= max(1, int(max_attempts))
+        retry_delay = min(
+            max(1, int(retry_max_seconds)),
+            max(1, int(retry_base_seconds))
+            * (2 ** min(30, max(0, attempts - 1))),
+        )
+        detail = str(error or "提醒发送失败")[:1000]
+        if exhausted:
+            detail += "；已停止提醒，玩家仍可继续回答邀请人 QQ"
         cur = conn.execute(
             """
             UPDATE member_verifications
-               SET state = CASE
-                       WHEN prompt_sent_at IS NULL THEN 'awaiting_prompt'
-                       ELSE 'pending'
-                   END,
+               SET state = 'pending',
+                   deadline_at = CASE WHEN ? = 1 THEN NULL ELSE deadline_at END,
                    claim_token = NULL,
                    claim_kind = NULL,
                    claimed_at = NULL,
@@ -1737,13 +1830,14 @@ def release_member_verification_timeout(
                    last_error = ?,
                    updated_at = ?
              WHERE id = ?
-               AND state IN ('checking_timeout', 'kicking')
+               AND state = 'reminding'
                AND claim_token = ?
-               AND claim_kind IN ('timeout', 'kick')
+               AND claim_kind = 'reminder'
             """,
             (
-                now_value + max(1, int(retry_delay_seconds)),
-                str(error or "超时处理失败")[:1000],
+                int(exhausted),
+                None if exhausted else now_value + retry_delay,
+                detail,
                 now_value,
                 int(verification_id),
                 str(claim_token),
@@ -1756,7 +1850,7 @@ def release_member_verification_timeout(
 def complete_member_verification_absent(
     verification_id: int, claim_token: str, now=None
 ) -> bool:
-    """权威成员列表确认新人已不在群时安全结束，不再调用踢人。"""
+    """核查邀请人答案时确认新人已离群，安全结束会话。"""
     now_value = _verification_now(now)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
@@ -1770,43 +1864,10 @@ def complete_member_verification_absent(
                    ended_at = ?,
                    updated_at = ?
              WHERE id = ?
-               AND state IN ('checking_inviter', 'checking_timeout', 'kicking')
+               AND state = 'checking_inviter'
                AND claim_token = ?
             """,
             (now_value, now_value, int(verification_id), str(claim_token)),
-        )
-        conn.commit()
-        return cur.rowcount == 1
-
-
-def complete_member_verification_kick(
-    verification_id: int, claim_token: str, now=None
-) -> bool:
-    now_value = _verification_now(now)
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            """
-            UPDATE member_verifications
-               SET state = 'kicked',
-                   claim_token = NULL,
-                   claim_kind = NULL,
-                   claimed_at = NULL,
-                   last_error = NULL,
-                   kicked_at = ?,
-                   ended_at = ?,
-                   updated_at = ?
-             WHERE id = ?
-               AND state = 'kicking'
-               AND claim_kind = 'kick'
-               AND claim_token = ?
-            """,
-            (
-                now_value,
-                now_value,
-                now_value,
-                int(verification_id),
-                str(claim_token),
-            ),
         )
         conn.commit()
         return cur.rowcount == 1

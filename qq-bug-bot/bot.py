@@ -527,7 +527,7 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
                 applicant,
                 candidate,
                 _event_source_time(event),
-                _member_verification_timeout(cfg),
+                _member_verification_reminder_delay(cfg),
                 now=_event_received_at(event),
             )
         except Exception as exc:
@@ -702,7 +702,8 @@ async def get_authoritative_group_members(client, group_id) -> set[str]:
     return members
 
 
-def _member_verification_timeout(cfg: dict) -> int:
+def _member_verification_reminder_delay(cfg: dict) -> int:
+    """历史 timeout 配置现仅决定首次追问时间，不再限制回答或触发移出。"""
     return max(
         60,
         min(86400, int(cfg.get("new_member_verification_timeout_seconds", 1800))),
@@ -741,7 +742,7 @@ async def _try_send_verification_message(client, group_id, qq, text) -> bool:
 async def process_member_verification_prompt(
     client, cfg: dict, verification_id: int | None = None
 ) -> bool:
-    """发送并确认新人提示；提示未确认送达时不开始倒计时。"""
+    """发送并确认新人提示；提示未确认送达时不开始一次提醒计时。"""
     groups = member_verification_groups(cfg)
     job = storage.claim_member_verification_prompt(
         verification_id,
@@ -751,20 +752,20 @@ async def process_member_verification_prompt(
     if not job:
         return False
     token = str(job["claim_token"])
-    timeout_seconds = _member_verification_timeout(cfg)
-    minutes = max(1, (timeout_seconds + 59) // 60)
+    reminder_seconds = _member_verification_reminder_delay(cfg)
     approved_inviter = str(job.get("inviter_qq") or "")
     if approved_inviter:
         text = (
             f"欢迎加入本群。加群申请已审核邀请人 QQ：{approved_inviter}。"
-            f"请在 {minutes} 分钟内真正 @“释迦的助理”，并回复同一 QQ 完成登记；"
-            "审核记录不能在群消息中改写。逾期未完成会被移出群。"
+            "请真正 @“释迦的助理”，并回复同一 QQ 完成登记；"
+            "审核记录不能在群消息中改写。"
         )
     else:
         text = (
-            f"欢迎加入本群。请在 {minutes} 分钟内回答邀请人的 QQ 号；"
-            "回复时请真正 @“释迦的助理”，例如“@释迦的助理 123456789”。"
-            "机器人确认邀请人当前在群后才算验证完成，逾期未完成会被移出群。"
+            "欢迎加入本群。请回答邀请人的 QQ 号；"
+            "回复时请真正 @“释迦的助理”，例如"
+            "“@释迦的助理 邀请人QQ：123456789”。"
+            "机器人确认邀请人当前在群后才算验证完成。"
         )
     try:
         await send_group_msg_confirmed(
@@ -787,13 +788,13 @@ async def process_member_verification_prompt(
         )
         return True
     if not storage.complete_member_verification_prompt(
-        job["id"], token, timeout_seconds
+        job["id"], token, reminder_seconds
     ):
         print(f"[新人验证#{job['id']}] 提示已发送，但会话状态已变化")
         return True
     print(
         f"[新人验证#{job['id']}] 已提示群{job['group_id']}新人"
-        f"{job['newcomer_qq']}，{timeout_seconds}秒后到期"
+        f"{job['newcomer_qq']}，{reminder_seconds}秒后追问一次"
     )
     return True
 
@@ -857,59 +858,49 @@ async def process_member_inviter_check(
     return True
 
 
-async def process_member_verification_timeout(client, job: dict) -> bool:
-    """到期后先查新人仍在群，再原子授权并执行移出动作。"""
+async def process_member_verification_reminder(client, job: dict) -> bool:
+    """到点后只发送一次确认式追问；失败保留租约恢复，绝不查询或移出成员。"""
     token = str(job.get("claim_token") or "")
+    approved_inviter = str(job.get("inviter_qq") or "")
+    if approved_inviter:
+        text = (
+            "还没有完成邀请人登记。请真正 @“释迦的助理”，并回复已审核的"
+            f"邀请人 QQ：{approved_inviter}；之后补充即可。"
+        )
+    else:
+        text = (
+            "还没有收到邀请人 QQ。请真正 @“释迦的助理”并回复邀请人 QQ；"
+            "之后补充即可。"
+        )
     try:
-        members = await get_authoritative_group_members(client, job["group_id"])
+        await send_group_msg_confirmed(
+            client,
+            job["group_id"],
+            at_message(str(job["newcomer_qq"]), text),
+        )
     except asyncio.CancelledError:
-        storage.release_member_verification_timeout(
-            job["id"], token, "连接中断，等待重新核查"
+        storage.release_member_verification_reminder(
+            job["id"], token, "连接中断，等待重新发送提醒"
         )
         raise
     except Exception as exc:
-        storage.release_member_verification_timeout(
-            job["id"], token, f"踢人前成员核查失败：{exc}"
+        storage.release_member_verification_reminder(
+            job["id"], token, f"提醒发送失败：{exc}"
         )
-        print(f"[新人验证#{job['id']}] 踢人前核查失败，不执行踢人：{exc}")
+        print(f"[新人验证#{job['id']}] 追问发送失败，将自动重试：{exc}")
         return True
-
-    newcomer = str(job["newcomer_qq"])
-    if newcomer not in members:
-        storage.complete_member_verification_absent(job["id"], token)
-        print(f"[新人验证#{job['id']}] 到期时新人已离群，不再踢人")
-        return True
-    if not storage.authorize_member_verification_kick(job["id"], token):
-        print(f"[新人验证#{job['id']}] 踢人前状态已变化，取消动作")
-        return True
-    try:
-        await client.call_action(
-            "set_group_kick",
-            {
-                "group_id": int(job["group_id"]),
-                "user_id": int(newcomer),
-                # false 只移出本次成员，不联动拒绝其后续加群请求。
-                "reject_add_request": False,
-            },
+    if storage.complete_member_verification_reminder(job["id"], token):
+        print(
+            f"[新人验证#{job['id']}] 已追问群{job['group_id']}新人"
+            f"{job['newcomer_qq']}，后续可无限期回答"
         )
-    except asyncio.CancelledError:
-        storage.release_member_verification_timeout(
-            job["id"], token, "踢人响应中断，等待重新核查成员状态"
-        )
-        raise
-    except Exception as exc:
-        storage.release_member_verification_timeout(
-            job["id"], token, f"OneBot 踢人失败：{exc}"
-        )
-        print(f"[新人验证#{job['id']}] 踢人动作失败，未标记成功：{exc}")
-        return True
-    if storage.complete_member_verification_kick(job["id"], token):
-        print(f"[新人验证#{job['id']}] 新人{newcomer}超时，已移出群")
+    else:
+        print(f"[新人验证#{job['id']}] 追问已发送，但会话状态已变化")
     return True
 
 
 async def run_member_verification_job_once(client, cfg: dict) -> bool:
-    """按答案恢复、提示恢复、超时处理的优先级执行一个持久任务。"""
+    """按答案恢复、首次提示、一次追问的优先级执行一个持久任务。"""
     groups = member_verification_groups(cfg)
     if not groups:
         return False
@@ -921,16 +912,16 @@ async def run_member_verification_job_once(client, cfg: dict) -> bool:
         return await process_member_inviter_check(client, job)
     if await process_member_verification_prompt(client, cfg):
         return True
-    job = storage.claim_due_member_verification_timeout(
+    job = storage.claim_due_member_verification_reminder(
         lease_seconds=lease, group_ids=groups
     )
     if job:
-        return await process_member_verification_timeout(client, job)
+        return await process_member_verification_reminder(client, job)
     return False
 
 
 async def member_verification_loop(client, cfg: dict, event_lock) -> None:
-    """连接恢复后从 SQLite 继续未完成的提示、答案核查和超时任务。"""
+    """连接恢复后从 SQLite 继续未完成的提示、答案核查和一次追问。"""
     interval = _member_verification_poll_interval(cfg)
     while True:
         try:
@@ -1005,7 +996,7 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
         active = storage.activate_member_verification_from_reply(
             group_id,
             newcomer,
-            _member_verification_timeout(cfg),
+            _member_verification_reminder_delay(cfg),
             event_time=_event_source_time(event),
             now=received_at,
         )
@@ -1025,15 +1016,6 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
             )
             return True
         return False
-    if active["state"] == "kicking" or (
-        active.get("deadline_at") is not None
-        and received_at > int(active["deadline_at"])
-    ):
-        await _try_send_verification_message(
-            client, group_id, newcomer, "验证时间已经结束，机器人正在进行最终状态核查。"
-        )
-        return True
-
     candidate, error = extract_inviter_qq(event)
     if error:
         await _try_send_verification_message(client, group_id, newcomer, error)
