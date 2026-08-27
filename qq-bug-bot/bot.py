@@ -435,7 +435,7 @@ async def _set_group_add_request_result(
 
 
 async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool:
-    """按申请答案中的邀请人 QQ 实时核验并审批目标群加群申请。"""
+    """按实时群成员身份区分好友邀请与普通申请，并审批目标群请求。"""
     group_id = str(event.get("group_id") or "")
     if (
         event.get("post_type") != "request"
@@ -445,23 +445,56 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
     ):
         return False
 
-    flag = str(event.get("flag") or "").strip()
+    raw_flag = event.get("flag")
     applicant = str(event.get("user_id") or "").strip()
     bot_qq = str(event.get("self_id") or "").strip()
     if (
-        not flag
+        not isinstance(raw_flag, str)
+        or not raw_flag.strip()
         or not _QQ_NUMBER_RE.fullmatch(applicant)
         or not _QQ_NUMBER_RE.fullmatch(bot_qq)
     ):
         print(
             f"[加群审批] 群{group_id}收到字段不完整的申请事件，保持待审批："
-            f"flag={'有' if flag else '无'}，申请人={applicant or '无'}，"
+            f"flag={'有效' if isinstance(raw_flag, str) and raw_flag.strip() else '无效'}，"
+            f"申请人={applicant or '无'}，"
             f"机器人={bot_qq or '无'}"
         )
         return True
+
+    # flag 是 OneBot 的不透明请求标识，审批动作必须原样回传。
+    flag = raw_flag
     request_key = f"{group_id}:{flag}"
     if request_key in _handled_group_add_requests:
         print(f"[加群审批] 群{group_id}申请{flag}已处理，忽略重复事件")
+        return True
+
+    try:
+        members = await get_authoritative_group_members(client, group_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(
+            f"[加群审批] 群{group_id}请求发起人{applicant}获取实时成员列表失败，"
+            f"保持待审批：{exc}"
+        )
+        return True
+
+    # NapCat 将“群成员邀请他人且需管理员审核”也上报为 add，且 user_id 是邀请人。
+    # 普通主动申请的 user_id 是申请人，当前不应在群；因此必须先用实时成员列表区分。
+    if applicant in members:
+        try:
+            await _set_group_add_request_result(client, flag, True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                f"[加群审批] 群{group_id}群内发起人{applicant}的请求同意动作失败，"
+                f"保持待审批：{exc}"
+            )
+            return True
+        _remember_handled_group_add_request(request_key)
+        print(f"[加群审批] 群{group_id}已同意群内发起人{applicant}对应的好友入群邀请")
         return True
 
     candidate, error = extract_group_request_inviter_qq(event)
@@ -484,23 +517,6 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
             return True
         _remember_handled_group_add_request(request_key)
         print(f"[加群审批] 群{group_id}已拒绝申请人{applicant}：{reject_reason}")
-        return True
-
-    try:
-        members = await get_authoritative_group_members(client, group_id)
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:
-        print(
-            f"[加群审批] 群{group_id}申请人{applicant}核验邀请人{candidate}失败，"
-            f"保持待审批：{exc}"
-        )
-        return True
-
-    # 动作响应超时但实际已成功时，重投事件会看到申请人已在群；此时不再操作过期 flag。
-    if applicant in members:
-        _remember_handled_group_add_request(request_key)
-        print(f"[加群审批] 群{group_id}申请人{applicant}已在群，忽略重复或过期事件")
         return True
 
     approve = candidate in members

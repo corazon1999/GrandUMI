@@ -45,6 +45,7 @@ class FakeOneBotClient:
         self.actions = []
         self.member_error = None
         self.set_error_count = 0
+        self.set_error = RuntimeError("审批动作失败")
 
     async def call_action(self, action, params, timeout=20):
         self.actions.append((action, params))
@@ -62,7 +63,7 @@ class FakeOneBotClient:
         if action == "set_group_add_request":
             if self.set_error_count:
                 self.set_error_count -= 1
-                raise RuntimeError("审批动作失败")
+                raise self.set_error
             return {"status": "ok", "retcode": 0, "data": None}
         raise AssertionError(f"未预期的 OneBot 动作：{action}")
 
@@ -133,12 +134,15 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         )
         for index, (comment, reason) in enumerate(cases):
             with self.subTest(comment=comment):
-                client = FakeOneBotClient({"10001", "99999"})
+                client = FakeOneBotClient({"99999"})
                 event = add_request(comment=comment, flag=f"invalid-{index}")
                 asyncio.run(bot.on_event(client, approval_cfg(), event))
-                self.assertEqual(["set_group_add_request"], [a for a, _ in client.actions])
-                self.assertIs(False, client.actions[0][1]["approve"])
-                self.assertIn(reason, client.actions[0][1]["reason"])
+                self.assertEqual(
+                    ["get_group_member_list", "set_group_add_request"],
+                    [a for a, _ in client.actions],
+                )
+                self.assertIs(False, client.actions[1][1]["approve"])
+                self.assertIn(reason, client.actions[1][1]["reason"])
 
     def test成员查询失败保持待审批_相同事件恢复后可重试(self):
         client = FakeOneBotClient({"20002", "99999"})
@@ -155,9 +159,26 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
             sum(name == "set_group_add_request" for name, _ in client.actions),
         )
 
-    def test缺少flag或机器人身份时保持待审批(self):
-        for event in (add_request(flag=""), add_request(self_id=None)):
-            with self.subTest(flag=event["flag"], self_id=event["self_id"]):
+    def test缺少或无效关键字段时保持待审批(self):
+        missing_flag = add_request()
+        missing_flag.pop("flag")
+        missing_applicant = add_request()
+        missing_applicant.pop("user_id")
+        cases = (
+            missing_flag,
+            add_request(flag=""),
+            add_request(flag="   "),
+            add_request(flag=12345),
+            missing_applicant,
+            add_request(applicant="无效QQ"),
+            add_request(self_id=None),
+        )
+        for event in cases:
+            with self.subTest(
+                flag=event.get("flag"),
+                applicant=event.get("user_id"),
+                self_id=event.get("self_id"),
+            ):
                 client = FakeOneBotClient({"20002"})
                 self.assertTrue(
                     asyncio.run(
@@ -205,10 +226,27 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
             sum(a == "set_group_add_request" for a, _ in retry_client.actions),
         )
 
-    def test申请人已在群时不再操作可能过期的flag(self):
-        client = FakeOneBotClient({"10001", "20002", "99999"})
-        asyncio.run(bot.on_event(client, approval_cfg(), add_request()))
-        self.assertEqual(["get_group_member_list"], [name for name, _ in client.actions])
+    def test群成员邀请好友时空白或乱填comment仍用原add事件直接同意(self):
+        cases = (
+            (None, " member-invite-0 "),
+            ("", "member-invite-1"),
+            ("完全无效的答案", "member-invite-2"),
+        )
+        for comment, flag in cases:
+            with self.subTest(comment=comment, flag=flag):
+                client = FakeOneBotClient({"10001", "99999"})
+                event = add_request(comment=comment, flag=flag)
+
+                asyncio.run(bot.on_event(client, approval_cfg(), event))
+
+                self.assertEqual(
+                    ["get_group_member_list", "set_group_add_request"],
+                    [name for name, _ in client.actions],
+                )
+                self.assertEqual(
+                    {"flag": flag, "sub_type": "add", "approve": True},
+                    client.actions[1][1],
+                )
 
     def test自动审批与旧入群后验证同时配置时不启动二次验证(self):
         cfg = approval_cfg()
@@ -232,6 +270,41 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         )
         self.assertEqual(set(), bot.member_verification_groups(cfg))
         self.assertEqual([], client.actions)
+
+    def test群内发起人的过期flag动作失败不去重并允许重试(self):
+        client = FakeOneBotClient({"10001", "99999"})
+        client.set_error_count = 2
+        client.set_error = RuntimeError("flag 已过期")
+        event = add_request(comment="", flag="expired-member-invite")
+
+        asyncio.run(bot.on_event(client, approval_cfg(), event))
+        asyncio.run(bot.on_event(client, approval_cfg(), event))
+
+        self.assertEqual(
+            [
+                "get_group_member_list",
+                "set_group_add_request",
+                "get_group_member_list",
+                "set_group_add_request",
+            ],
+            [name for name, _ in client.actions],
+        )
+        self.assertNotIn(
+            "456:expired-member-invite", bot._handled_group_add_requests
+        )
+        for name, params in client.actions:
+            if name == "set_group_add_request":
+                self.assertEqual("add", params["sub_type"])
+                self.assertIs(True, params["approve"])
+
+    def test审批成功去重缓存保持固定上限(self):
+        limit = bot._HANDLED_GROUP_ADD_REQUEST_LIMIT
+        for index in range(limit + 1):
+            bot._remember_handled_group_add_request(f"456:request-{index}")
+
+        self.assertEqual(limit, len(bot._handled_group_add_requests))
+        self.assertNotIn("456:request-0", bot._handled_group_add_requests)
+        self.assertIn(f"456:request-{limit}", bot._handled_group_add_requests)
 
 
 if __name__ == "__main__":
