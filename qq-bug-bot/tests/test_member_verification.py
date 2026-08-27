@@ -337,7 +337,8 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
         prompt = client.actions[0][1]["message"]
         self.assertEqual("at", prompt[0]["type"])
         self.assertIn("30 分钟内", prompt[1]["data"]["text"])
-        self.assertIn("必须真正 @本群机器人", prompt[1]["data"]["text"])
+        self.assertIn("请真正 @“释迦的助理”", prompt[1]["data"]["text"])
+        self.assertIn("@释迦的助理 123456789", prompt[1]["data"]["text"])
 
         asyncio.run(bot.on_event(client, cfg, reply_event()))
         completed = storage.get_member_verification(row["id"])

@@ -503,7 +503,7 @@ async def process_member_verification_prompt(
     minutes = max(1, (timeout_seconds + 59) // 60)
     text = (
         f"欢迎加入本群。请在 {minutes} 分钟内回答邀请人的 QQ 号；"
-        "回复时必须真正 @本群机器人，例如“@机器人 123456789”。"
+        "回复时请真正 @“释迦的助理”，例如“@释迦的助理 123456789”。"
         "机器人确认邀请人当前在群后才算验证完成，逾期未完成会被移出群。"
     )
     try:
