@@ -4012,7 +4012,18 @@ public static class WebSocketBridge
         catch (Exception ex) when (ex is QqAccessValidationException or SqliteException or InvalidOperationException)
         {
             var message = ex is QqAccessValidationException ? ex.Message : "QQ 白名单导入失败，请稍后重试。";
+            try
+            {
+                _qqAccessStore.RecordManualWhitelistFailure(adminAccount, message);
+            }
+            catch (Exception eventException)
+            {
+                LogErr($"QQ 白名单失败事件落库失败：操作者={adminAccount}，原因={eventException.Message}");
+            }
             Send(session.SessionId, new { proto = "MsgQqWhitelistImport", result = false, logStr = message });
+            foreach (var current in Sessions.Values)
+                if (TryResolveQqAdministrator(current, out _, out _))
+                    SendQqWhitelistStatus(current);
             LogErr($"QQ 白名单导入失败：操作者={adminAccount}，原因={ex.Message}");
         }
     }
@@ -4046,6 +4057,24 @@ public static class WebSocketBridge
     {
         if (!TryResolveQqAdministrator(session, out var account, out var bootstrapOnly)) return;
         var status = _qqAccessStore.GetStatus();
+        var recentUpdates = _qqAccessStore.GetRecentWhitelistUpdateEvents()
+            .Select(update => new
+            {
+                id = update.Id,
+                eventKey = update.EventKey,
+                outcome = update.Outcome,
+                source = update.Source,
+                operationKey = update.OperationKey,
+                occurredAt = update.OccurredAt,
+                scheduledHour = update.ScheduledHour,
+                version = update.Version,
+                memberCount = update.MemberCount,
+                addedCount = update.AddedCount,
+                removedCount = update.RemovedCount,
+                removedBoundCount = update.RemovedBoundCount,
+                error = update.Error,
+            })
+            .ToArray();
         var binding = _qqAccessStore.GetAccountBindingStatus(account);
         Send(session.SessionId, new
         {
@@ -4064,6 +4093,7 @@ public static class WebSocketBridge
             maxImportMembers = QqAccessStore.MaxImportMembers,
             bootstrapOnly,
             canImport = !bootstrapOnly || !status.Initialized,
+            recentUpdates,
             accountBinding = new
             {
                 bound = binding.Bound,

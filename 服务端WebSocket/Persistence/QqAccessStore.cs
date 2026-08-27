@@ -68,6 +68,35 @@ public sealed record QqWhitelistScheduledSyncResult(
     bool NotificationOwner,
     long? NotificationAcknowledgedAt);
 
+public sealed record QqWhitelistScheduledFailureRequest(
+    string OperationKey,
+    long ScheduledHour,
+    string GroupId,
+    string GroupName,
+    string ClientInstanceId,
+    string Error);
+
+public sealed record QqWhitelistUpdateEvent(
+    long Id,
+    string EventKey,
+    string Outcome,
+    string Source,
+    string? OperationKey,
+    long OccurredAt,
+    long? ScheduledHour,
+    long? Version,
+    int? MemberCount,
+    int? AddedCount,
+    int? RemovedCount,
+    int? RemovedBoundCount,
+    string? Error);
+
+public sealed record QqWhitelistFailureReportResult(
+    string OperationKey,
+    QqWhitelistScheduledSyncResult? Committed,
+    QqWhitelistUpdateEvent? Failure,
+    bool Replayed);
+
 public sealed record QqAccountBindingStatus(
     bool Bound,
     string? MaskedQq,
@@ -184,6 +213,135 @@ public sealed partial class QqAccessStore
         finally { _gate.ExitReadLock(); }
     }
 
+    public IReadOnlyList<QqWhitelistUpdateEvent> GetRecentWhitelistUpdateEvents(int limit = 20)
+    {
+        limit = Math.Clamp(limit, 1, 100);
+        _gate.EnterReadLock();
+        try
+        {
+            using var connection = _accounts.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id, event_key, outcome, source, operation_key, occurred_at,
+                       scheduled_hour, version, member_count, added_count, removed_count,
+                       removed_bound_count, error
+                FROM shared_qq_whitelist_update_events
+                ORDER BY occurred_at DESC, id DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$limit", limit);
+            using var reader = command.ExecuteReader();
+            var events = new List<QqWhitelistUpdateEvent>();
+            while (reader.Read()) events.Add(ReadUpdateEvent(reader));
+            return events;
+        }
+        finally { _gate.ExitReadLock(); }
+    }
+
+    public QqWhitelistFailureReportResult ReportScheduledGroupFailure(
+        QqWhitelistScheduledFailureRequest request,
+        string expectedGroupId,
+        string expectedGroupName,
+        long nowUnixSeconds)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var normalized = NormalizeScheduledFailureRequest(
+            request, expectedGroupId, expectedGroupName, nowUnixSeconds);
+
+        _gate.EnterWriteLock();
+        try
+        {
+            using var connection = _accounts.OpenConnection();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            var committed = ReadScheduledSyncRun(
+                connection, transaction, normalized.OperationKey);
+            if (committed is not null)
+            {
+                transaction.Commit();
+                return new QqWhitelistFailureReportResult(
+                    normalized.OperationKey,
+                    ToScheduledSyncResult(
+                        committed, normalized.ClientInstanceId, replayed: true),
+                    Failure: null,
+                    Replayed: true);
+            }
+
+            var eventKey = $"failure:{normalized.OperationKey}";
+            var existing = ReadUpdateEventByKey(connection, transaction, eventKey);
+            if (existing is not null)
+            {
+                transaction.Commit();
+                return new QqWhitelistFailureReportResult(
+                    normalized.OperationKey,
+                    Committed: null,
+                    Failure: existing,
+                    Replayed: true);
+            }
+
+            var status = ReadStatus(connection, transaction);
+            var failure = InsertUpdateEvent(
+                connection,
+                transaction,
+                eventKey,
+                outcome: "failure",
+                source: $"qq-sync:{normalized.GroupId}",
+                operationKey: normalized.OperationKey,
+                occurredAt: Now(),
+                scheduledHour: normalized.ScheduledHour,
+                version: status.Initialized ? status.Version : null,
+                memberCount: status.Initialized ? status.MemberCount : null,
+                addedCount: null,
+                removedCount: null,
+                removedBoundCount: null,
+                error: normalized.Error);
+            transaction.Commit();
+            return new QqWhitelistFailureReportResult(
+                normalized.OperationKey,
+                Committed: null,
+                Failure: failure,
+                Replayed: false);
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode is 5 or 6)
+        {
+            throw new QqAccessValidationException("共享账号数据库正忙，请稍后重试。", ex);
+        }
+        finally { _gate.ExitWriteLock(); }
+    }
+
+    public void RecordManualWhitelistFailure(string adminAccount, string error)
+    {
+        var normalizedAdmin = NormalizeAccount(adminAccount);
+        var normalizedError = NormalizeUpdateError(error);
+        _gate.EnterWriteLock();
+        try
+        {
+            using var connection = _accounts.OpenConnection();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            var status = ReadStatus(connection, transaction);
+            InsertUpdateEvent(
+                connection,
+                transaction,
+                $"manual-failure:{Guid.NewGuid():D}",
+                outcome: "failure",
+                source: $"manual:{normalizedAdmin}",
+                operationKey: null,
+                occurredAt: Now(),
+                scheduledHour: null,
+                version: status.Initialized ? status.Version : null,
+                memberCount: status.Initialized ? status.MemberCount : null,
+                addedCount: null,
+                removedCount: null,
+                removedBoundCount: null,
+                error: normalizedError);
+            transaction.Commit();
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode is 5 or 6)
+        {
+            throw new QqAccessValidationException("共享账号数据库正忙，请稍后重试。", ex);
+        }
+        finally { _gate.ExitWriteLock(); }
+    }
+
     public bool IsBootstrapAdministrator(string account)
     {
         var normalizedAccount = NormalizeAccount(account);
@@ -280,7 +438,13 @@ public sealed partial class QqAccessStore
 
             var importedBy = $"qq-sync:{normalized.GroupId}";
             var imported = ImportParsed(
-                connection, transaction, importedBy, parsed, initializationOnly: false);
+                connection,
+                transaction,
+                importedBy,
+                parsed,
+                initializationOnly: false,
+                operationKey: normalized.OperationKey,
+                scheduledHour: normalized.ScheduledHour);
             using (var insert = connection.CreateCommand())
             {
                 insert.Transaction = transaction;
@@ -903,7 +1067,9 @@ public sealed partial class QqAccessStore
         SqliteTransaction transaction,
         string importedBy,
         ParsedImport parsed,
-        bool initializationOnly)
+        bool initializationOnly,
+        string? operationKey = null,
+        long? scheduledHour = null)
     {
         var previousStatus = ReadStatus(connection, transaction);
         if (initializationOnly && previousStatus.Initialized)
@@ -991,8 +1157,54 @@ public sealed partial class QqAccessStore
         }
         AccountAuthenticationStore.InsertSecurityEvent(
             connection, transaction, "whitelist_replaced", targetAccount: null, version);
-        return new QqWhitelistImportResult(version, importedAt, parsed.QqNumbers.Count,
+        var result = new QqWhitelistImportResult(version, importedAt, parsed.QqNumbers.Count,
             parsed.DuplicateCount, added, removed.Count, removedBoundCount);
+        InsertUpdateEvent(
+            connection,
+            transaction,
+            $"success:{version}",
+            outcome: "success",
+            source: importedBy,
+            operationKey: operationKey,
+            occurredAt: importedAt,
+            scheduledHour: scheduledHour,
+            version: version,
+            memberCount: result.MemberCount,
+            addedCount: result.AddedCount,
+            removedCount: result.RemovedCount,
+            removedBoundCount: result.RemovedBoundCount,
+            error: null);
+        return result;
+    }
+
+    private static QqWhitelistScheduledFailureRequest NormalizeScheduledFailureRequest(
+        QqWhitelistScheduledFailureRequest request,
+        string expectedGroupId,
+        string expectedGroupName,
+        long nowUnixSeconds)
+    {
+        var normalizedExpectedGroupId = NormalizeQq(expectedGroupId);
+        var normalizedGroupId = NormalizeQq(request.GroupId);
+        if (!string.Equals(normalizedExpectedGroupId, normalizedGroupId, StringComparison.Ordinal))
+            throw new QqAccessValidationException("QQ 群号与服务端授权目标不一致。");
+        var normalizedExpectedGroupName = NormalizeSyncGroupName(expectedGroupName);
+        var normalizedGroupName = NormalizeSyncGroupName(request.GroupName);
+        if (!string.Equals(normalizedExpectedGroupName, normalizedGroupName, StringComparison.Ordinal))
+            throw new QqAccessValidationException("QQ 群名与服务端授权目标不一致。");
+        var operationKey = NormalizeSyncOperationKey(request.OperationKey);
+        var expectedOperationKey = BuildScheduledSyncOperationKey(
+            normalizedGroupId, request.ScheduledHour);
+        if (!string.Equals(operationKey, expectedOperationKey, StringComparison.Ordinal))
+            throw new QqAccessValidationException("整点同步失败报告的幂等键格式无效。");
+        ValidateScheduledHourShape(request.ScheduledHour, nowUnixSeconds);
+        return request with
+        {
+            OperationKey = operationKey,
+            GroupId = normalizedGroupId,
+            GroupName = normalizedGroupName,
+            ClientInstanceId = NormalizeClientInstanceId(request.ClientInstanceId),
+            Error = NormalizeUpdateError(request.Error),
+        };
     }
 
     private static QqWhitelistScheduledSyncRequest NormalizeScheduledSyncRequest(
@@ -1045,6 +1257,17 @@ public sealed partial class QqAccessStore
         return normalized;
     }
 
+    private static string NormalizeUpdateError(string error)
+    {
+        var characters = (error ?? "")
+            .Normalize(NormalizationForm.FormKC)
+            .Select(static character => char.IsControl(character) ? ' ' : character)
+            .ToArray();
+        var normalized = new string(characters).Trim();
+        if (normalized.Length == 0) normalized = "未提供失败原因";
+        return normalized.Length <= 1000 ? normalized : normalized[..1000];
+    }
+
     private static string NormalizeClientInstanceId(string clientInstanceId)
     {
         if (!Guid.TryParseExact((clientInstanceId ?? "").Trim(), "D", out var parsed))
@@ -1057,6 +1280,13 @@ public sealed partial class QqAccessStore
         long nowUnixSeconds,
         int maximumDelaySeconds)
     {
+        ValidateScheduledHourShape(scheduledHour, nowUnixSeconds);
+        if (nowUnixSeconds - scheduledHour > maximumDelaySeconds)
+            throw new QqAccessValidationException("整点同步请求已经过期，拒绝补发陈旧小时。");
+    }
+
+    private static void ValidateScheduledHourShape(long scheduledHour, long nowUnixSeconds)
+    {
         DateTimeOffset scheduled;
         try { scheduled = DateTimeOffset.FromUnixTimeSeconds(scheduledHour); }
         catch (ArgumentOutOfRangeException ex)
@@ -1068,8 +1298,6 @@ public sealed partial class QqAccessStore
             throw new QqAccessValidationException("同步时间不是 UTC+8 的自然整点。");
         if (scheduledHour > nowUnixSeconds)
             throw new QqAccessValidationException("拒绝提前执行尚未到达的整点同步。");
-        if (nowUnixSeconds - scheduledHour > maximumDelaySeconds)
-            throw new QqAccessValidationException("整点同步请求已经过期，拒绝补发陈旧小时。");
     }
 
     private static string HashScheduledSyncRequest(
@@ -1138,6 +1366,83 @@ public sealed partial class QqAccessStore
                 reader.GetInt64(6), reader.GetInt64(7), reader.GetInt32(8),
                 reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11), reader.GetInt32(12)),
             reader.IsDBNull(13) ? null : reader.GetInt64(13));
+
+    private static QqWhitelistUpdateEvent InsertUpdateEvent(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string eventKey,
+        string outcome,
+        string source,
+        string? operationKey,
+        long occurredAt,
+        long? scheduledHour,
+        long? version,
+        int? memberCount,
+        int? addedCount,
+        int? removedCount,
+        int? removedBoundCount,
+        string? error)
+    {
+        using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText = """
+            INSERT INTO shared_qq_whitelist_update_events(
+                event_key, outcome, source, operation_key, occurred_at, scheduled_hour,
+                version, member_count, added_count, removed_count, removed_bound_count, error)
+            VALUES($eventKey, $outcome, $source, $operationKey, $occurredAt, $scheduledHour,
+                $version, $memberCount, $addedCount, $removedCount, $removedBoundCount, $error);
+            """;
+        insert.Parameters.AddWithValue("$eventKey", eventKey);
+        insert.Parameters.AddWithValue("$outcome", outcome);
+        insert.Parameters.AddWithValue("$source", source);
+        insert.Parameters.AddWithValue("$operationKey", (object?)operationKey ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$occurredAt", occurredAt);
+        insert.Parameters.AddWithValue("$scheduledHour", (object?)scheduledHour ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$version", (object?)version ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$memberCount", (object?)memberCount ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$addedCount", (object?)addedCount ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$removedCount", (object?)removedCount ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$removedBoundCount", (object?)removedBoundCount ?? DBNull.Value);
+        insert.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
+        insert.ExecuteNonQuery();
+        return ReadUpdateEventByKey(connection, transaction, eventKey)
+            ?? throw new InvalidOperationException("QQ 白名单更新事件写入后无法读取。");
+    }
+
+    private static QqWhitelistUpdateEvent? ReadUpdateEventByKey(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string eventKey)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT id, event_key, outcome, source, operation_key, occurred_at,
+                   scheduled_hour, version, member_count, added_count, removed_count,
+                   removed_bound_count, error
+            FROM shared_qq_whitelist_update_events
+            WHERE event_key=$eventKey;
+            """;
+        command.Parameters.AddWithValue("$eventKey", eventKey);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadUpdateEvent(reader) : null;
+    }
+
+    private static QqWhitelistUpdateEvent ReadUpdateEvent(SqliteDataReader reader)
+        => new(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.GetInt64(5),
+            reader.IsDBNull(6) ? null : reader.GetInt64(6),
+            reader.IsDBNull(7) ? null : reader.GetInt64(7),
+            reader.IsDBNull(8) ? null : reader.GetInt32(8),
+            reader.IsDBNull(9) ? null : reader.GetInt32(9),
+            reader.IsDBNull(10) ? null : reader.GetInt32(10),
+            reader.IsDBNull(11) ? null : reader.GetInt32(11),
+            reader.IsDBNull(12) ? null : reader.GetString(12));
 
     private static QqWhitelistScheduledSyncResult ToScheduledSyncResult(
         StoredScheduledSyncRun stored,

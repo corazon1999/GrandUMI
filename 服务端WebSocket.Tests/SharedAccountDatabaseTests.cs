@@ -132,6 +132,8 @@ public sealed class SharedAccountDatabaseTests : IDisposable
             "SELECT qq FROM shared_account_qq_bindings WHERE account_key='PREVIEWONLY';"));
         Assert.Equal(2L, ScalarLong(targetPath,
             "SELECT COUNT(*) FROM shared_qq_whitelist_members WHERE qq IN ('55555','66666');"));
+        Assert.Equal(1L, ScalarLong(targetPath,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_update_events WHERE outcome='success';"));
 
         var verificationPlayers = CreatePlayers(
             Path.Combine(_tempDirectory, "verification-players.db"));

@@ -44,6 +44,7 @@ public sealed class QqAccessStoreTests : IDisposable
                  {
                      "shared_qq_whitelist_state", "shared_qq_whitelist_members",
                      "shared_account_qq_bindings", "shared_qq_whitelist_import_audit",
+                     "shared_qq_whitelist_update_events",
                  })
         {
             using var command = connection.CreateCommand();

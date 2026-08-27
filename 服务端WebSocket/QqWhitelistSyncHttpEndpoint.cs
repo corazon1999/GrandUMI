@@ -176,6 +176,10 @@ internal static class QqWhitelistSyncHttpEndpoint
             (Delegate)(Func<HttpContext, Task<IResult>>)(context =>
                 HandleStatus(context, store, options)));
         app.MapPost(
+            "/internal/qq-whitelist/sync/failure",
+            (Delegate)(Func<HttpContext, Task<IResult>>)(context =>
+                HandleFailure(context, store, options, clock)));
+        app.MapPost(
             "/internal/qq-whitelist/sync/notification-ack",
             (Delegate)(Func<HttpContext, Task<IResult>>)(context =>
                 HandleNotificationAck(context, store, options)));
@@ -276,6 +280,73 @@ internal static class QqWhitelistSyncHttpEndpoint
         }
     }
 
+    private static async Task<IResult> HandleFailure(
+        HttpContext context,
+        QqAccessStore store,
+        QqWhitelistSyncOptions options,
+        Func<DateTimeOffset> clock)
+    {
+        if (!options.IsAuthorized(context)) return Results.NotFound();
+        if (context.Request.ContentLength is > MaximumEnvelopeBytes)
+            return Results.Json(
+                new { error = "失败报告请求体过大。" },
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+        try
+        {
+            var request = await JsonSerializer.DeserializeAsync<QqWhitelistSyncFailureHttpRequest>(
+                context.Request.Body, JsonOptions, context.RequestAborted)
+                ?? throw new QqAccessValidationException("同步失败报告为空。");
+            var result = store.ReportScheduledGroupFailure(
+                new QqWhitelistScheduledFailureRequest(
+                    request.OperationKey ?? "",
+                    request.ScheduledHour,
+                    request.GroupId ?? "",
+                    request.GroupName ?? "",
+                    request.ClientInstanceId ?? "",
+                    request.Error ?? ""),
+                options.GroupId,
+                options.GroupName,
+                clock().ToUnixTimeSeconds());
+            if (result.Committed is { } committed)
+                Console.WriteLine(
+                    $"[QQ 白名单同步失败核对] {result.OperationKey} 实际已提交 v{committed.Import.Version}");
+            else
+                Console.Error.WriteLine(
+                    $"[QQ 白名单同步失败] {result.OperationKey}，重放={result.Replayed}，" +
+                    $"原因={result.Failure?.Error}");
+            return Results.Json(ToFailureResponse(result));
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            return Results.StatusCode(499);
+        }
+        catch (JsonException)
+        {
+            return Results.Json(
+                new { error = "同步失败报告 JSON 无效。" },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (QqAccessValidationException ex) when (IsTransientStorageFailure(ex))
+        {
+            return Results.Json(
+                new { error = "共享账号数据库正忙，请稍后重试。" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (QqAccessValidationException ex)
+        {
+            return Results.Json(
+                new { error = ex.Message },
+                statusCode: StatusCodes.Status409Conflict);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[QQ 白名单同步失败报告落库失败] {ex.Message}");
+            return Results.Json(
+                new { error = "同步失败报告暂时无法保存，请稍后重试。" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
     private static async Task<IResult> HandleNotificationAck(
         HttpContext context,
         QqAccessStore store,
@@ -342,6 +413,52 @@ internal static class QqWhitelistSyncHttpEndpoint
             notificationAcknowledgedAt = result.NotificationAcknowledgedAt,
         };
 
+    private static object ToFailureResponse(QqWhitelistFailureReportResult result)
+    {
+        if (result.Committed is { } committed)
+            return new
+            {
+                status = "committed",
+                committed = true,
+                operationKey = committed.OperationKey,
+                scheduledHour = committed.ScheduledHour,
+                groupId = committed.GroupId,
+                groupName = committed.GroupName,
+                version = committed.Import.Version,
+                importedAt = committed.Import.ImportedAt,
+                memberCount = committed.Import.MemberCount,
+                addedCount = committed.Import.AddedCount,
+                removedCount = committed.Import.RemovedCount,
+                removedBoundCount = committed.Import.RemovedBoundCount,
+                replayed = committed.Replayed,
+                notificationOwner = committed.NotificationOwner,
+                notificationAcknowledgedAt = committed.NotificationAcknowledgedAt,
+            };
+
+        var failure = result.Failure
+            ?? throw new InvalidOperationException("同步失败报告既无提交结果也无失败事件。");
+        return new
+        {
+            status = "failure_recorded",
+            committed = false,
+            operationKey = result.OperationKey,
+            replayed = result.Replayed,
+            update = new
+            {
+                id = failure.Id,
+                eventKey = failure.EventKey,
+                outcome = failure.Outcome,
+                source = failure.Source,
+                operationKey = failure.OperationKey,
+                occurredAt = failure.OccurredAt,
+                scheduledHour = failure.ScheduledHour,
+                version = failure.Version,
+                memberCount = failure.MemberCount,
+                error = failure.Error,
+            },
+        };
+    }
+
     private sealed class QqWhitelistSyncHttpRequest
     {
         public string? OperationKey { get; init; }
@@ -358,5 +475,15 @@ internal static class QqWhitelistSyncHttpEndpoint
         public string? OperationKey { get; init; }
         public string? ClientInstanceId { get; init; }
         public long Version { get; init; }
+    }
+
+    private sealed class QqWhitelistSyncFailureHttpRequest
+    {
+        public string? OperationKey { get; init; }
+        public long ScheduledHour { get; init; }
+        public string? GroupId { get; init; }
+        public string? GroupName { get; init; }
+        public string? ClientInstanceId { get; init; }
+        public string? Error { get; init; }
     }
 }

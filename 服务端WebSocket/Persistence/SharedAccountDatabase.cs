@@ -291,6 +291,33 @@ public sealed class SharedAccountDatabase
             CREATE INDEX IF NOT EXISTS ix_shared_qq_sync_scheduled
                 ON shared_qq_whitelist_sync_runs(scheduled_hour DESC, group_id);
 
+            CREATE TABLE IF NOT EXISTS shared_qq_whitelist_update_events (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_key             TEXT NOT NULL UNIQUE
+                                        CHECK(length(event_key) BETWEEN 1 AND 256),
+                outcome               TEXT NOT NULL
+                                        CHECK(outcome IN ('success', 'failure')),
+                source                TEXT NOT NULL CHECK(length(source) BETWEEN 1 AND 200),
+                operation_key         TEXT NULL CHECK(
+                                        operation_key IS NULL
+                                        OR length(operation_key) BETWEEN 1 AND 128),
+                occurred_at           INTEGER NOT NULL,
+                scheduled_hour        INTEGER NULL,
+                version               INTEGER NULL CHECK(version IS NULL OR version > 0),
+                member_count          INTEGER NULL CHECK(member_count IS NULL OR member_count > 0),
+                added_count           INTEGER NULL CHECK(added_count IS NULL OR added_count >= 0),
+                removed_count         INTEGER NULL CHECK(removed_count IS NULL OR removed_count >= 0),
+                removed_bound_count   INTEGER NULL CHECK(
+                                        removed_bound_count IS NULL OR removed_bound_count >= 0),
+                error                 TEXT NULL CHECK(error IS NULL OR length(error) BETWEEN 1 AND 1000),
+                CHECK(
+                    (outcome='success' AND version IS NOT NULL AND member_count IS NOT NULL AND error IS NULL)
+                    OR outcome='failure')
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_shared_qq_update_events_occurred
+                ON shared_qq_whitelist_update_events(occurred_at DESC, id DESC);
+
             CREATE TABLE IF NOT EXISTS shared_qq_bootstrap_capture_state (
                 singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
                 captured_at  INTEGER NOT NULL
@@ -646,6 +673,23 @@ public sealed class SharedAccountDatabase
                     FROM {schema}.shared_qq_whitelist_sync_runs;
                     """;
                 syncRuns.ExecuteNonQuery();
+            }
+
+            if (TableExists(connection, transaction, schema, "shared_qq_whitelist_update_events"))
+            {
+                using var updateEvents = connection.CreateCommand();
+                updateEvents.Transaction = transaction;
+                updateEvents.CommandText = $"""
+                    INSERT OR IGNORE INTO shared_qq_whitelist_update_events(
+                        event_key, outcome, source, operation_key, occurred_at, scheduled_hour,
+                        version, member_count, added_count, removed_count,
+                        removed_bound_count, error)
+                    SELECT event_key, outcome, source, operation_key, occurred_at, scheduled_hour,
+                        version, member_count, added_count, removed_count,
+                        removed_bound_count, error
+                    FROM {schema}.shared_qq_whitelist_update_events;
+                    """;
+                updateEvents.ExecuteNonQuery();
             }
         }
 

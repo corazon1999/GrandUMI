@@ -64,6 +64,19 @@ server {
         proxy_read_timeout 15s;
     }
 
+    location = /internal/qq-whitelist/sync/failure {
+        allow 8.210.155.25;
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+        client_max_body_size 256k;
+        proxy_pass http://127.0.0.1:8081/internal/qq-whitelist/sync/failure;
+        proxy_set_header Host localhost;
+        proxy_set_header X-GrandUMI-Internal-Source "qq-bug-bot@8.210.155.25";
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 15s;
+    }
+
     location = /internal/qq-whitelist/sync/notification-ack {
         allow 8.210.155.25;
         allow 127.0.0.1;

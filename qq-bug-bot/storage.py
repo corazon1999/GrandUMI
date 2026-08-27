@@ -183,6 +183,7 @@ def init_db() -> None:
                 notification_message TEXT,
                 notification_attempts INTEGER NOT NULL DEFAULT 0,
                 notification_acked_at INTEGER,
+                failure_reported_at INTEGER,
                 last_error TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
@@ -307,6 +308,14 @@ def init_db() -> None:
         if "reminder_sent_at" not in verification_cols:
             conn.execute(
                 "ALTER TABLE member_verifications ADD COLUMN reminder_sent_at INTEGER"
+            )
+        sync_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(qq_whitelist_sync_runs)")
+        }
+        if "failure_reported_at" not in sync_cols:
+            conn.execute(
+                "ALTER TABLE qq_whitelist_sync_runs "
+                "ADD COLUMN failure_reported_at INTEGER"
             )
         conn.commit()
 
@@ -443,7 +452,8 @@ def mark_qq_whitelist_sync_committed(
             """
             UPDATE qq_whitelist_sync_runs
             SET state = ?, version = ?, member_count = ?, notification_owner = ?,
-                notification_message = ?, last_error = NULL, updated_at = ?
+                notification_message = ?, failure_reported_at = NULL,
+                last_error = NULL, updated_at = ?
             WHERE operation_key = ?
               AND state NOT IN ('notified', 'notification_uncertain', 'expired')
             """,
@@ -486,6 +496,36 @@ def fail_qq_whitelist_sync(operation_key: str, error: str, now=None) -> bool:
             WHERE operation_key = ? AND state = 'started'
             """,
             (str(error)[:1000], current, operation_key),
+        ).rowcount
+        conn.commit()
+        return changed == 1
+
+
+def list_unreported_qq_whitelist_sync_failures(group_id: str, limit=24):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE group_id = ? AND state = 'failed' AND failure_reported_at IS NULL
+            ORDER BY scheduled_hour ASC
+            LIMIT ?
+            """,
+            (str(group_id), max(1, min(int(limit), 168))),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_qq_whitelist_sync_failure_reported(operation_key: str, now=None) -> bool:
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_runs
+            SET failure_reported_at = COALESCE(failure_reported_at, ?), updated_at = ?
+            WHERE operation_key = ? AND state = 'failed'
+            """,
+            (current, current, operation_key),
         ).rowcount
         conn.commit()
         return changed == 1

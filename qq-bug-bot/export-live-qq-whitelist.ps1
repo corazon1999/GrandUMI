@@ -1,7 +1,9 @@
 ﻿[CmdletBinding()]
 param(
     [string]$SshTarget = 'root@8.210.155.25',
-    [string]$RemoteDir = '/opt/qq-bug-bot'
+    [string]$RemoteDir = '/opt/qq-bug-bot',
+    [Parameter(DontShow = $true)]
+    [switch]$TransportSelfTest
 )
 
 Set-StrictMode -Version Latest
@@ -35,11 +37,75 @@ function Get-SafeDiagnostic {
     return $safe
 }
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function New-RemoteSourcePayload {
+    param([Parameter(Mandatory = $true)][byte[]]$SourceBytes)
+
+    if ($SourceBytes.Length -eq 0) {
+        throw '远端导出器源码为空。'
+    }
+
+    $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    try {
+        $null = $strictUtf8.GetString($SourceBytes)
+    }
+    catch {
+        throw '远端导出器不是有效的 UTF-8 文件。'
+    }
+
+    $sourceSha256 = Get-Sha256Hex -Bytes $SourceBytes
+    $payloadText = [Convert]::ToBase64String($SourceBytes)
+    if ($payloadText -notmatch '^[A-Za-z0-9+/]+={0,2}$') {
+        throw '远端导出器 Base64 载荷包含非 ASCII 字符。'
+    }
+    $payloadBytes = [Text.Encoding]::ASCII.GetBytes($payloadText)
+    if ($payloadBytes.Length -ne $payloadText.Length) {
+        throw '远端导出器 Base64 载荷无法无损转换为 ASCII。'
+    }
+
+    try {
+        $roundTripBytes = [Convert]::FromBase64String(
+            [Text.Encoding]::ASCII.GetString($payloadBytes)
+        )
+    }
+    catch {
+        throw '远端导出器 Base64 本地往返解码失败。'
+    }
+    $roundTripSha256 = Get-Sha256Hex -Bytes $roundTripBytes
+    if ($roundTripBytes.Length -ne $SourceBytes.Length -or $roundTripSha256 -ne $sourceSha256) {
+        throw '远端导出器 Base64 本地往返完整性校验失败。'
+    }
+    for ($index = 0; $index -lt $SourceBytes.Length; $index++) {
+        if ($roundTripBytes[$index] -ne $SourceBytes[$index]) {
+            throw '远端导出器 Base64 本地往返字节不一致。'
+        }
+    }
+
+    return [pscustomobject]@{
+        PayloadBytes = $payloadBytes
+        PayloadLength = $payloadBytes.Length
+        SourceByteLength = $SourceBytes.Length
+        SourceSha256 = $sourceSha256
+        RoundTripSha256 = $roundTripSha256
+    }
+}
+
 function Invoke-NativeProcess {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [Parameter(Mandatory = $true)][string[]]$Arguments,
-        [AllowNull()][string]$InputText,
+        [AllowNull()][byte[]]$InputBytes,
         [Parameter(Mandatory = $true)][int]$TimeoutMilliseconds
     )
 
@@ -50,14 +116,29 @@ function Invoke-NativeProcess {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    $startInfo.RedirectStandardInput = $null -ne $InputText
+    $startInfo.RedirectStandardInput = $null -ne $InputBytes
     $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
     $startInfo.StandardOutputEncoding = $utf8WithoutBom
     $startInfo.StandardErrorEncoding = $utf8WithoutBom
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $startInfo
+    $standardInput = $null
+    $originalConsoleInputEncoding = $null
     try {
-        $started = $process.Start()
+        if ($startInfo.RedirectStandardInput) {
+            # Windows PowerShell 5.1 在 Start() 内用 Console.InputEncoding 创建
+            # StandardInput StreamWriter；必须在启动前临时切换为无 BOM UTF-8。
+            $originalConsoleInputEncoding = [Console]::InputEncoding
+            [Console]::InputEncoding = $utf8WithoutBom
+        }
+        try {
+            $started = $process.Start()
+        }
+        finally {
+            if ($null -ne $originalConsoleInputEncoding) {
+                [Console]::InputEncoding = $originalConsoleInputEncoding
+            }
+        }
     }
     catch {
         $process.Dispose()
@@ -70,19 +151,24 @@ function Invoke-NativeProcess {
     try {
         $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
         $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        $stopwatch = [Diagnostics.Stopwatch]::StartNew()
         if ($startInfo.RedirectStandardInput) {
-            if ($process.StandardInput.Encoding.WebName -ne 'utf-8') {
-                $process.StandardInput.Close()
-                $process.Kill()
-                $process.WaitForExit()
-                throw '当前 PowerShell 无法以 UTF-8 向远端脚本传输数据。'
+            $standardInput = $process.StandardInput
+            $inputWriteTask = $standardInput.BaseStream.WriteAsync(
+                $InputBytes,
+                0,
+                $InputBytes.Length
+            )
+            $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+            if ($remainingMilliseconds -le 0 -or -not $inputWriteTask.Wait($remainingMilliseconds)) {
+                throw "外部命令执行超时（$([Math]::Round($TimeoutMilliseconds / 1000)) 秒）"
             }
-            $process.StandardInput.Write($InputText)
-            $process.StandardInput.Close()
+            $null = $inputWriteTask.GetAwaiter().GetResult()
+            $standardInput.BaseStream.Flush()
+            $standardInput.Close()
         }
-        if (-not $process.WaitForExit($TimeoutMilliseconds)) {
-            $process.Kill()
-            $process.WaitForExit()
+        $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+        if ($remainingMilliseconds -le 0 -or -not $process.WaitForExit($remainingMilliseconds)) {
             throw "外部命令执行超时（$([Math]::Round($TimeoutMilliseconds / 1000)) 秒）"
         }
         $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
@@ -92,6 +178,25 @@ function Invoke-NativeProcess {
             StandardOutput = $standardOutput
             StandardError = $standardError
         }
+    }
+    catch {
+        $originalError = $_
+        try {
+            if ($null -ne $standardInput) {
+                $standardInput.Close()
+            }
+        }
+        catch {
+        }
+        try {
+            if (-not $process.HasExited) {
+                $process.Kill()
+                $process.WaitForExit()
+            }
+        }
+        catch {
+        }
+        throw $originalError
     }
     finally {
         $process.Dispose()
@@ -108,7 +213,7 @@ function Invoke-LocalVerifier {
     $verification = Invoke-NativeProcess `
         -FilePath $NodePath `
         -Arguments @($VerifierPath, $JsonPath) `
-        -InputText $null `
+        -InputBytes $null `
         -TimeoutMilliseconds 30000
     if ($verification.ExitCode -ne 0) {
         throw (Get-SafeDiagnostic -Text $verification.StandardError)
@@ -118,6 +223,71 @@ function Invoke-LocalVerifier {
     }
     catch {
         throw '本地 Node 校验器没有返回有效结果。'
+    }
+}
+
+function Invoke-TransportSelfTest {
+    $scriptDirectory = Split-Path -Parent $PSCommandPath
+    $remoteExporter = Join-Path $scriptDirectory 'export_live_qq_whitelist.py'
+    if (-not [IO.File]::Exists($remoteExporter)) {
+        throw "缺少导出组件：$remoteExporter"
+    }
+    try {
+        $node = Get-Command node.exe -CommandType Application -ErrorAction Stop
+    }
+    catch {
+        throw '找不到 Node.js；无法执行传输自检。'
+    }
+
+    $sourceBytes = [IO.File]::ReadAllBytes($remoteExporter)
+    $transport = New-RemoteSourcePayload -SourceBytes $sourceBytes
+    $probeCode = "const c=require('node:crypto'),b=[];process.stdin.on('data',x=>b.push(x)).on('end',()=>{const p=Buffer.concat(b),s=Buffer.from(p.toString('ascii'),'base64');process.stdout.write(JSON.stringify({payloadAscii:p.every(x=>x<128),decodedSha256:c.createHash('sha256').update(s).digest('hex'),decodedLength:s.length}))})"
+    $probeResult = Invoke-NativeProcess `
+        -FilePath $node.Source `
+        -Arguments @('-e', $probeCode) `
+        -InputBytes $transport.PayloadBytes `
+        -TimeoutMilliseconds 30000
+    if ($probeResult.ExitCode -ne 0) {
+        throw (Get-SafeDiagnostic -Text $probeResult.StandardError)
+    }
+    try {
+        $probe = $probeResult.StandardOutput | ConvertFrom-Json
+    }
+    catch {
+        throw '传输自检子进程没有返回有效结果。'
+    }
+    if (
+        $probe.payloadAscii -ne $true `
+        -or [int]$probe.decodedLength -ne $transport.SourceByteLength `
+        -or [string]$probe.decodedSha256 -ne $transport.SourceSha256
+    ) {
+        throw (
+            '传输自检子进程收到的源码与本地 UTF-8 原字节不一致' +
+            "（ASCII=$($probe.payloadAscii)，长度=$($probe.decodedLength)/$($transport.SourceByteLength)，" +
+            "SHA-256=$($probe.decodedSha256)/$($transport.SourceSha256)）。"
+        )
+    }
+
+    return [pscustomobject]@{
+        powershellVersion = $PSVersionTable.PSVersion.ToString()
+        powershellMajor = $PSVersionTable.PSVersion.Major
+        payloadAscii = [bool]$probe.payloadAscii
+        payloadLength = $transport.PayloadLength
+        sourceByteLength = $transport.SourceByteLength
+        sourceSha256 = $transport.SourceSha256
+        roundTripSha256 = $transport.RoundTripSha256
+        childDecodedSha256 = [string]$probe.decodedSha256
+    }
+}
+
+if ($TransportSelfTest) {
+    try {
+        Invoke-TransportSelfTest | ConvertTo-Json -Compress
+        exit 0
+    }
+    catch {
+        Write-Error (Get-SafeDiagnostic -Text $_.Exception.Message)
+        exit 1
     }
 }
 
@@ -169,8 +339,10 @@ try {
     catch {
         throw '找不到 Node.js；无法使用游戏白名单解析器验证导出。'
     }
-    $remoteSource = [IO.File]::ReadAllText($remoteExporter, [Text.Encoding]::UTF8)
-    $remoteCommand = "cd -- '$RemoteDir' && docker compose exec -T bug-bot python -"
+    $remoteSourceBytes = [IO.File]::ReadAllBytes($remoteExporter)
+    $remoteTransport = New-RemoteSourcePayload -SourceBytes $remoteSourceBytes
+    $remotePythonBootstrap = 'import base64,hashlib,sys; source=base64.b64decode(sys.stdin.buffer.read(),validate=True); actual=hashlib.sha256(source).hexdigest(); sys.exit("source hash mismatch") if actual != sys.argv[1] else exec(compile(source,"<grandumi-live-export>","exec"))'
+    $remoteCommand = "cd -- '$RemoteDir' && docker compose exec -T bug-bot python -c '$remotePythonBootstrap' '$($remoteTransport.SourceSha256)'"
     $sshArguments = @(
         '-o', 'BatchMode=yes',
         '-o', 'StrictHostKeyChecking=yes',
@@ -186,7 +358,7 @@ try {
     $remoteResult = Invoke-NativeProcess `
         -FilePath $ssh.Source `
         -Arguments $sshArguments `
-        -InputText $remoteSource `
+        -InputBytes $remoteTransport.PayloadBytes `
         -TimeoutMilliseconds 70000
     if ($remoteResult.ExitCode -ne 0) {
         throw ("实时拉取失败：{0}" -f (Get-SafeDiagnostic -Text $remoteResult.StandardError))

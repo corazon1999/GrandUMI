@@ -57,6 +57,13 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
             "SELECT COUNT(*) FROM shared_account_security_events WHERE event_type='whitelist_replaced';"));
         Assert.Equal(3L, Scalar(connection,
             "SELECT COUNT(*) FROM shared_qq_whitelist_members WHERE version=2;"));
+        Assert.Equal(2L, Scalar(connection,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_update_events WHERE outcome='success';"));
+        var latest = Assert.Single(store.GetRecentWhitelistUpdateEvents().Take(1));
+        Assert.Equal("success", latest.Outcome);
+        Assert.Equal(result.OperationKey, latest.OperationKey);
+        Assert.Equal(2, latest.Version);
+        Assert.Equal(3, latest.MemberCount);
     }
 
     [Fact]
@@ -169,7 +176,101 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
         Assert.Equal(0L, Scalar(verify,
             "SELECT COUNT(*) FROM shared_qq_whitelist_sync_runs;"));
         Assert.Equal(1L, Scalar(verify,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_update_events;"));
+        Assert.Equal(1L, Scalar(verify,
             "SELECT COUNT(*) FROM shared_qq_whitelist_members WHERE qq='10001';"));
+    }
+
+    [Fact]
+    public void UpdateEventInsertFailure_白名单替换和整点记录全部回滚()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001", "10002"));
+        using (var connection = OpenConnection())
+        {
+            using var trigger = connection.CreateCommand();
+            trigger.CommandText = """
+                CREATE TRIGGER fail_qq_update_event
+                BEFORE INSERT ON shared_qq_whitelist_update_events
+                BEGIN SELECT RAISE(ABORT, 'injected update event failure'); END;
+                """;
+            trigger.ExecuteNonQuery();
+        }
+        var hour = Hour(19);
+
+        Assert.Throws<SqliteException>(() => store.SynchronizeScheduledGroup(
+            Request(hour, ClientA, "10002", "10003"),
+            GroupId, GroupName, 1, 25, 600, hour + 1));
+
+        Assert.Equal(1, store.GetStatus().Version);
+        Assert.Equal(2, store.GetStatus().MemberCount);
+        using var verify = OpenConnection();
+        Assert.Equal(1L, Scalar(verify,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_update_events;"));
+        Assert.Equal(0L, Scalar(verify,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_sync_runs;"));
+        Assert.Equal(1L, Scalar(verify,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_members WHERE qq='10001';"));
+    }
+
+    [Fact]
+    public void FailureReport_重复请求幂等且记录当前保留版本与失败原因()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001", "10002"));
+        var hour = Hour(20);
+        var request = new QqWhitelistScheduledFailureRequest(
+            QqAccessStore.BuildScheduledSyncOperationKey(GroupId, hour),
+            hour,
+            GroupId,
+            GroupName,
+            ClientA,
+            "OneBot 群成员接口暂时不可用");
+
+        var first = store.ReportScheduledGroupFailure(
+            request, GroupId, GroupName, hour + 700);
+        var replay = store.ReportScheduledGroupFailure(
+            request with { Error = "重复请求不得改写首个失败原因" },
+            GroupId, GroupName, hour + 3600);
+
+        Assert.Null(first.Committed);
+        Assert.False(first.Replayed);
+        Assert.True(replay.Replayed);
+        Assert.Equal(first.Failure, replay.Failure);
+        Assert.Equal(1, first.Failure!.Version);
+        Assert.Equal(2, first.Failure.MemberCount);
+        Assert.Equal("OneBot 群成员接口暂时不可用", first.Failure.Error);
+        Assert.Equal(2, store.GetRecentWhitelistUpdateEvents().Count);
+    }
+
+    [Fact]
+    public void FailureReport_响应丢失但服务端已提交时返回权威提交且不伪造失败()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001"));
+        var hour = Hour(20);
+        var synced = store.SynchronizeScheduledGroup(
+            Request(hour, ClientA, "10001", "10002"),
+            GroupId, GroupName, 1, 25, 600, hour + 1);
+
+        var result = store.ReportScheduledGroupFailure(
+            new QqWhitelistScheduledFailureRequest(
+                synced.OperationKey,
+                hour,
+                GroupId,
+                GroupName,
+                ClientA,
+                "提交响应连接中断"),
+            GroupId,
+            GroupName,
+            hour + 700);
+
+        Assert.NotNull(result.Committed);
+        Assert.Null(result.Failure);
+        Assert.Equal(synced.Import.Version, result.Committed!.Import.Version);
+        Assert.DoesNotContain(
+            store.GetRecentWhitelistUpdateEvents(),
+            update => update.Outcome == "failure");
     }
 
     [Fact]

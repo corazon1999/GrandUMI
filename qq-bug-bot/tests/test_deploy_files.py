@@ -81,6 +81,7 @@ class DeployFileTests(unittest.TestCase):
         ]
         for nginx in (production_nginx, test_nginx):
             self.assertIn("location = /internal/qq-whitelist/sync", nginx)
+            self.assertIn("location = /internal/qq-whitelist/sync/failure", nginx)
             self.assertIn("allow 8.210.155.25;", nginx)
             self.assertIn("deny all;", nginx)
             self.assertIn("X-GrandUMI-Internal-Source", nginx)

@@ -1382,6 +1382,24 @@ export interface QqAccountBindingStatus {
   revision?: number;
 }
 
+export interface QqWhitelistUpdateEvent {
+  id: number;
+  eventKey: string;
+  outcome: "success" | "failure";
+  source: string;
+  operationKey?: string | null;
+  /** Unix 毫秒，与账号、审计和导入时间字段保持一致。 */
+  occurredAt: number;
+  /** UTC+8 自然整点对应的 Unix 秒，仅用于同步任务关联。 */
+  scheduledHour?: number | null;
+  version?: number | null;
+  memberCount?: number | null;
+  addedCount?: number | null;
+  removedCount?: number | null;
+  removedBoundCount?: number | null;
+  error?: string | null;
+}
+
 export interface MsgQqWhitelistStatus extends MsgBase {
   proto: "MsgQqWhitelistStatus";
   result?: boolean;
@@ -1399,6 +1417,7 @@ export interface MsgQqWhitelistStatus extends MsgBase {
   maxImportMembers?: number;
   bootstrapOnly?: boolean;
   canImport?: boolean;
+  recentUpdates?: QqWhitelistUpdateEvent[];
   accountBinding?: QqAccountBindingStatus;
 }
 

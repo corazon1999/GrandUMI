@@ -7,8 +7,24 @@ import {
   QQ_WHITELIST_MAX_BYTES,
   QQ_WHITELIST_MAX_MEMBERS,
 } from "../src/lib/qqWhitelist.mjs";
+import {
+  formatQqWhitelistUpdateTime,
+  qqWhitelistUpdateDateFromUnixMilliseconds,
+} from "../src/lib/qqWhitelistUpdateTime.ts";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
+
+test("持久更新时间按服务端 Unix 毫秒显示而不是误落到 1970 年", () => {
+  const occurredAt = Date.UTC(2026, 7, 28, 5, 45, 2);
+  const date = qqWhitelistUpdateDateFromUnixMilliseconds(occurredAt);
+  assert.equal(date.toISOString(), "2026-08-28T05:45:02.000Z");
+  assert.equal(date.getUTCFullYear(), 2026);
+  assert.notEqual(date.getUTCFullYear(), 1970);
+
+  const formatted = formatQqWhitelistUpdateTime(occurredAt, "UTC");
+  assert.match(formatted, /2026/);
+  assert.doesNotMatch(formatted, /1970/);
+});
 
 test("本地预览兼容常见 QQ 群成员 JSON 并全量去重", () => {
   for (const json of [
@@ -70,6 +86,13 @@ test("管理员导入界面提供选择、预览、确认、摘要和移动端�
   assert.match(panel, /服务端结果为最终权威/);
   assert.match(panel, /已绑定但被移出/);
   assert.match(panel, /原始 JSON 仅用于本次导入校验，不作为审计副本保存/);
+  assert.match(panel, /持久更新通知/);
+  assert.match(panel, /每 15 秒自动刷新/);
+  assert.match(panel, /更新成功 · v/);
+  assert.match(panel, /更新失败 ·/);
+  assert.match(panel, /status\.recentUpdates\.map/);
+  assert.match(panel, /aria-live="polite"/);
+  assert.match(protocol, /requestQqWhitelistStatus/);
   assert.match(panel, /fileReadGenerationRef/);
   assert.match(panel, /readGeneration !== fileReadGenerationRef\.current/);
   assert.match(panel, /setRawJson\(""\)/);
@@ -107,6 +130,7 @@ test("390×844 与 360×780 手机竖屏下 QQ 登录和导入保持可滚动且
   assert.match(panel, /mt-4 flex flex-col gap-3 sm:flex-row/);
   assert.match(panel, /break-words/);
   assert.match(panel, /min-h-11 w-full/);
+  assert.match(panel, /max-h-72[^"]*overflow-y-auto/);
 });
 
 test("服务端登录、清退和全部新对局入口都接入统一 QQ 权威门禁", async () => {

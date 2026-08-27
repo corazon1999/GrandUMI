@@ -163,11 +163,47 @@ class OneClickEntryStaticTests(unittest.TestCase):
             self.assertNotIn(forbidden, self.ps)
 
     def test远端通过标准输入执行且不留下远端临时文件(self):
-        self.assertIn("docker compose exec -T bug-bot python -", self.ps)
-        self.assertIn("StandardInput.Write($InputText)", self.ps)
+        self.assertIn("docker compose exec -T bug-bot python -c", self.ps)
+        self.assertIn("sys.stdin.buffer.read()", self.ps)
+        self.assertIn("base64.b64decode", self.ps)
+        self.assertIn("source hash mismatch", self.ps)
+        self.assertIn("$standardInput.BaseStream.WriteAsync", self.ps)
+        self.assertIn("-InputBytes $remoteTransport.PayloadBytes", self.ps)
         self.assertNotIn("/tmp/", self.ps + self.remote)
         self.assertNotIn("tempfile", self.remote)
         self.assertNotIn("send_group_msg", self.remote)
+
+    def test传输自检证明WindowsPowerShell子进程收到的源码逐字节一致(self):
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(self.ps_path),
+                "-TransportSelfTest",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=45,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(result.stdout.strip())
+        self.assertTrue(payload["payloadAscii"])
+        self.assertGreaterEqual(payload["powershellMajor"], 5)
+        self.assertEqual(payload["sourceSha256"], payload["roundTripSha256"])
+        self.assertEqual(payload["sourceSha256"], payload["childDecodedSha256"])
+        self.assertGreater(payload["sourceByteLength"], 0)
+
+    def test命令行入口允许自动化保留退出码且默认双击仍暂停(self):
+        self.assertIn('if /I "%~1"=="-NoPause" goto :finished', self.cmd)
+        self.assertIn(":finished", self.cmd)
 
     def test目标群不可由一键脚本参数改写且远端命令输入受限(self):
         self.assertNotRegex(self.ps, r"param\([\s\S]*Group")

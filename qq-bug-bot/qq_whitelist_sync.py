@@ -271,6 +271,14 @@ class GameWhitelistClient:
             False,
         )
 
+    async def report_failure(self, payload):
+        return await asyncio.to_thread(
+            self._post,
+            self.endpoint + "/failure",
+            payload,
+            False,
+        )
+
     def _post(self, url, payload, allow_not_found):
         encoded = json.dumps(
             payload, ensure_ascii=False, separators=(",", ":")
@@ -384,9 +392,23 @@ async def execute_sync_hour(
     if row["state"] == "notified":
         await _acknowledge_notification(game_client, row, instance_id)
         return {"status": "notified"}
+    if row["state"] == "failed":
+        recovered, report_error = await _report_failed_row(
+            game_client, row, config, now
+        )
+        if recovered and recovered["state"] == "committed":
+            return await _notify_committed(
+                onebot, config, game_client, recovered, instance_id, sleep_fn
+            )
+        if recovered and recovered["state"] == "suppressed":
+            return {"status": "suppressed"}
+        return {
+            "status": "failed",
+            "error": row.get("last_error"),
+            **({"reportError": report_error} if report_error else {}),
+        }
     if row["state"] in {
         "suppressed",
-        "failed",
         "expired",
         "notification_uncertain",
     }:
@@ -430,11 +452,16 @@ async def execute_sync_hour(
             )
         except SyncRejectedError as exc:
             last_error = str(exc)
-            storage.fail_qq_whitelist_sync(
-                operation_key, last_error, now=int(now_fn())
+            return await _finalize_failed_sync(
+                onebot,
+                config,
+                game_client,
+                operation_key,
+                instance_id,
+                last_error,
+                int(now_fn()),
+                sleep_fn,
             )
-            print(f"[QQ 白名单同步] {operation_key} 已拒绝：{last_error}")
-            return {"status": "failed", "error": last_error}
         except (
             RuntimeError,
             asyncio.TimeoutError,
@@ -487,11 +514,16 @@ async def execute_sync_hour(
             if recovery_error:
                 last_error = f"{last_error}；状态核对失败：{recovery_error}"
             if isinstance(exc, SyncRejectedError):
-                storage.fail_qq_whitelist_sync(
-                    operation_key, last_error, now=int(now_fn())
+                return await _finalize_failed_sync(
+                    onebot,
+                    config,
+                    game_client,
+                    operation_key,
+                    instance_id,
+                    last_error,
+                    int(now_fn()),
+                    sleep_fn,
                 )
-                print(f"[QQ 白名单同步] {operation_key} 已拒绝：{last_error}")
-                return {"status": "failed", "error": last_error}
             storage.record_qq_whitelist_sync_error(
                 operation_key, last_error, now=int(now_fn())
             )
@@ -503,8 +535,16 @@ async def execute_sync_hour(
             onebot, config, game_client, row, instance_id, sleep_fn
         )
     last_error = last_error or "当前整点同步已超过允许延迟"
-    storage.fail_qq_whitelist_sync(operation_key, last_error, now=int(now_fn()))
-    return {"status": "failed", "error": last_error}
+    return await _finalize_failed_sync(
+        onebot,
+        config,
+        game_client,
+        operation_key,
+        instance_id,
+        last_error,
+        int(now_fn()),
+        sleep_fn,
+    )
 
 
 def _persist_committed_response(
@@ -543,6 +583,91 @@ async def _recover_committed_row(
         return storage.get_qq_whitelist_sync(operation_key), None
     except (SyncTransportError, SyncRejectedError, RuntimeError) as exc:
         return None, str(exc) or type(exc).__name__
+
+
+async def _finalize_failed_sync(
+    onebot,
+    config,
+    game_client,
+    operation_key,
+    instance_id,
+    error,
+    now,
+    sleep_fn,
+):
+    storage.fail_qq_whitelist_sync(operation_key, error, now=now)
+    row = storage.get_qq_whitelist_sync(operation_key)
+    recovered, report_error = await _report_failed_row(
+        game_client, row, config, now
+    )
+    if recovered and recovered["state"] == "committed":
+        return await _notify_committed(
+            onebot, config, game_client, recovered, instance_id, sleep_fn
+        )
+    if recovered and recovered["state"] == "suppressed":
+        return {"status": "suppressed"}
+    print(f"[QQ 白名单同步] {operation_key} 已失败：{error}")
+    return {
+        "status": "failed",
+        "error": error,
+        **({"reportError": report_error} if report_error else {}),
+    }
+
+
+async def _report_failed_row(game_client, row, config, now):
+    """把本地失败幂等写入游戏权威库；若 POST 实际已成功则以前者纠正本地状态。"""
+    if (
+        not row
+        or row.get("state") != "failed"
+        or row.get("failure_reported_at") is not None
+    ):
+        return row, None
+    try:
+        response = await game_client.report_failure(
+            {
+                "operationKey": row["operation_key"],
+                "scheduledHour": int(row["scheduled_hour"]),
+                "groupId": row["group_id"],
+                "groupName": row["group_name"],
+                "clientInstanceId": row["client_instance_id"],
+                "error": row.get("last_error") or "未提供失败原因",
+            }
+        )
+        if not isinstance(response, dict):
+            raise SyncTransportError("游戏服务失败报告响应格式异常")
+        if response.get("operationKey") != row["operation_key"]:
+            raise SyncTransportError("游戏服务失败报告返回了错误幂等键")
+        if response.get("committed") is True and response.get("status") == "committed":
+            _persist_committed_response(
+                response,
+                row["operation_key"],
+                config,
+                row["scheduled_hour"],
+                now,
+            )
+            return storage.get_qq_whitelist_sync(row["operation_key"]), None
+        update = response.get("update")
+        if (
+            response.get("committed") is not False
+            or response.get("status") != "failure_recorded"
+            or not isinstance(update, dict)
+            or update.get("outcome") != "failure"
+            or update.get("operationKey") != row["operation_key"]
+            or update.get("scheduledHour") != int(row["scheduled_hour"])
+        ):
+            raise SyncTransportError("游戏服务失败报告确认字段不一致")
+        if not storage.mark_qq_whitelist_sync_failure_reported(
+            row["operation_key"], now=now
+        ):
+            current = storage.get_qq_whitelist_sync(row["operation_key"])
+            if not current or current.get("state") != "failed":
+                return current, None
+            raise RuntimeError("失败报告已保存，但本地确认状态发生竞争")
+        return storage.get_qq_whitelist_sync(row["operation_key"]), None
+    except (SyncTransportError, SyncRejectedError, RuntimeError) as exc:
+        detail = str(exc) or type(exc).__name__
+        print(f"[QQ 白名单同步] 失败报告暂未落入游戏权威库：{detail}")
+        return row, detail
 
 
 async def _notify_committed(
@@ -645,11 +770,54 @@ async def recover_current_hour(
     )
 
 
+async def recover_unreported_failure_reports(
+    config, game_client=None, now_fn=time.time
+):
+    """只补报持久化失败事件，不重新拉群成员或重跑旧小时更新。"""
+    game_client = game_client or GameWhitelistClient(config)
+    now = int(now_fn())
+    failures = storage.list_unreported_qq_whitelist_sync_failures(
+        config.group_id
+    )
+    recovered = 0
+    pending = 0
+    current_hour = current_hour_epoch(
+        datetime.fromtimestamp(now, tz=timezone.utc),
+        config.timezone_name,
+    )
+    current_committed = False
+    for row in failures:
+        current, report_error = await _report_failed_row(
+            game_client, row, config, now
+        )
+        if report_error:
+            pending += 1
+        else:
+            recovered += 1
+        if current and current.get("state") == "committed":
+            if int(current["scheduled_hour"]) == current_hour:
+                current_committed = True
+            else:
+                # 旧小时只恢复权威结果，不补发可能已过时的群消息。
+                storage.expire_old_qq_whitelist_sync_runs(
+                    config.group_id, current_hour, now=now
+                )
+    return {
+        "recovered": recovered,
+        "pending": pending,
+        "currentCommitted": current_committed,
+    }
+
+
 async def run_sync_loop(onebot, config: SyncConfig):
     """连接存续期间运行；断线取消后，下次连接只恢复当前小时已开始任务。"""
     if not config.enabled:
         return
     game_client = GameWhitelistClient(config)
+    try:
+        await recover_unreported_failure_reports(config, game_client)
+    except Exception as exc:
+        print(f"[QQ 白名单同步] 失败报告恢复异常，将继续恢复当前小时：{exc}")
     try:
         await recover_current_hour(onebot, config, game_client)
     except Exception as exc:
@@ -664,6 +832,14 @@ async def run_sync_loop(onebot, config: SyncConfig):
                 break
             # 分段按墙钟复核，系统校时或暂停恢复不会造成固定间隔漂移。
             await asyncio.sleep(min(remaining, 60))
+            try:
+                recovery = await recover_unreported_failure_reports(
+                    config, game_client
+                )
+                if recovery["currentCommitted"]:
+                    await recover_current_hour(onebot, config, game_client)
+            except Exception as exc:
+                print(f"[QQ 白名单同步] 失败报告恢复异常，将继续保留本地记录：{exc}")
         actual_hour = current_hour_epoch(
             datetime.now(timezone.utc), config.timezone_name
         )

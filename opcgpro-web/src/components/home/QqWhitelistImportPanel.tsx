@@ -4,17 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { eventBus } from "@/net/eventBus";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
-import type { MsgQqWhitelistImport } from "@/types/net";
+import type { MsgQqWhitelistImport, QqWhitelistUpdateEvent } from "@/types/net";
 import {
   previewQqWhitelistJson,
   QQ_WHITELIST_MAX_BYTES,
   QQ_WHITELIST_MAX_MEMBERS,
 } from "@/lib/qqWhitelist.mjs";
+import { formatQqWhitelistUpdateTime } from "@/lib/qqWhitelistUpdateTime";
 
 type QqWhitelistPreview = {
   totalCount: number;
   uniqueCount: number;
   duplicateCount: number;
+};
+
+const describeUpdate = (update: QqWhitelistUpdateEvent) => {
+  if (update.outcome === "success") {
+    return `更新成功 · v${update.version ?? "?"} · ${update.memberCount ?? "?"} 人`
+      + ` · 新增 ${update.addedCount ?? 0} · 移除 ${update.removedCount ?? 0}`;
+  }
+  const retained = update.version && update.memberCount
+    ? `白名单保持 v${update.version} · ${update.memberCount} 人`
+    : "白名单仍未初始化";
+  return `更新失败 · ${retained} · ${update.error ?? "未提供失败原因"}`;
 };
 
 export default function QqWhitelistImportPanel({
@@ -44,6 +56,10 @@ export default function QqWhitelistImportPanel({
 
   useEffect(() => {
     HomeRequest.requestQqWhitelistStatus();
+    const statusTimer = window.setInterval(
+      () => HomeRequest.requestQqWhitelistStatus(),
+      15_000,
+    );
     const onMessage = (message: { proto: string }) => {
       if (message.proto !== "MsgQqWhitelistImport") return;
       const result = message as MsgQqWhitelistImport;
@@ -62,6 +78,7 @@ export default function QqWhitelistImportPanel({
     eventBus.on("close", onClose);
     return () => {
       fileReadGenerationRef.current += 1;
+      window.clearInterval(statusTimer);
       eventBus.off("message", onMessage);
       eventBus.off("close", onClose);
     };
@@ -127,6 +144,31 @@ export default function QqWhitelistImportPanel({
           <div className="rounded-lg bg-gray-950/70 p-3"><dt className="text-gray-500">移出已绑定</dt><dd className="mt-1 font-black text-red-300">{status.removedBoundCount ?? 0}</dd></div>
           <div className="rounded-lg bg-gray-950/70 p-3"><dt className="text-gray-500">当前账号</dt><dd className="mt-1 font-black text-cyan-200">{status.accountBinding?.bound ? `${status.accountBinding.maskedQq ?? "已绑定"}${status.accountBinding.currentlyWhitelisted ? " · 有效" : " · 已移出"}` : "未绑定"}</dd></div>
         </dl>
+      )}
+
+      {!!status?.recentUpdates?.length && (
+        <div className="mt-4 rounded-xl border border-gray-800 bg-gray-950/60 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-black text-white">持久更新通知</h3>
+            <span className="text-[11px] text-gray-500">每 15 秒自动刷新</span>
+          </div>
+          <p className="sr-only" aria-live="polite">{describeUpdate(status.recentUpdates[0])}</p>
+          <ol className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {status.recentUpdates.map((update) => (
+              <li
+                key={update.eventKey}
+                className={`rounded-lg border px-3 py-2 text-xs leading-5 ${update.outcome === "success"
+                  ? "border-emerald-900/70 bg-emerald-950/20 text-emerald-200"
+                  : "border-red-900/70 bg-red-950/25 text-red-200"}`}
+              >
+                <div className="font-bold">{describeUpdate(update)}</div>
+                <div className="mt-1 text-[11px] text-gray-400">
+                  {formatQqWhitelistUpdateTime(update.occurredAt)} · {update.source.startsWith("qq-sync:") ? "机器人整点同步" : "管理员手工导入"}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       <input
