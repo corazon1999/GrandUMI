@@ -27,6 +27,8 @@
   "new_member_verification_groups": [],
   "new_member_verification_timeout_seconds": 1800,
   "new_member_verification_poll_interval_seconds": 300,
+  "group_add_auto_approval_enabled": false,
+  "group_add_auto_approval_groups": [],
   "qq_whitelist_sync_enabled": false,
   "qq_whitelist_sync_group_id": 297542853,
   "qq_whitelist_sync_group_name": "GrandUMI测试群",

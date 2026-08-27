@@ -323,11 +323,28 @@ def at_message(qq: str, text: str) -> list[dict]:
 
 
 def member_verification_groups(cfg: dict) -> set[str]:
-    """新人验证必须显式配置目标群；空列表永远不表示全部群。"""
+    """新人验证必须显式配置目标群；自动审批群会从二次验证中排除。"""
     if not cfg.get("new_member_verification_enabled", False):
         return set()
     groups = set()
     for value in cfg.get("new_member_verification_groups") or []:
+        text = str(value).strip()
+        if text.isdigit() and int(text) > 0:
+            groups.add(str(int(text)))
+    if cfg.get("group_add_auto_approval_enabled", False):
+        for value in cfg.get("group_add_auto_approval_groups") or []:
+            text = str(value).strip()
+            if text.isdigit() and int(text) > 0:
+                groups.discard(str(int(text)))
+    return groups
+
+
+def group_add_auto_approval_groups(cfg: dict) -> set[str]:
+    """自动审批只对显式配置的群生效；空列表永远不表示全部群。"""
+    if not cfg.get("group_add_auto_approval_enabled", False):
+        return set()
+    groups = set()
+    for value in cfg.get("group_add_auto_approval_groups") or []:
         text = str(value).strip()
         if text.isdigit() and int(text) > 0:
             groups.add(str(int(text)))
@@ -349,6 +366,161 @@ def is_real_at_self(event: dict) -> bool:
 
 
 _QQ_NUMBER_RE = re.compile(r"(?<!\d)([1-9]\d{4,11})(?!\d)")
+
+
+_GROUP_REQUEST_ANSWER_RE = re.compile(
+    r"(?:^|[\r\n])\s*(?:答案|回答|answer)\s*[：:]\s*([^\r\n]*)",
+    re.IGNORECASE,
+)
+_GROUP_REQUEST_QQ_WRAPPERS = (
+    re.compile(r"([1-9]\d{4,11})"),
+    re.compile(
+        r"(?:邀请人(?:的)?\s*)?(?:QQ|qq)(?:号|号码)?\s*(?:是|为|[：:=])?\s*"
+        r"([1-9]\d{4,11})"
+    ),
+    re.compile(
+        r"邀请人(?:的)?(?:\s*(?:QQ|qq)(?:号|号码)?)?\s*(?:是|为)?\s*[：:=]?\s*"
+        r"([1-9]\d{4,11})"
+    ),
+    re.compile(
+        r"([1-9]\d{4,11})\s*(?:是|为)?\s*邀请人(?:的)?"
+        r"(?:\s*(?:QQ|qq)(?:号|号码)?)?"
+    ),
+)
+
+
+def extract_group_request_inviter_qq(event: dict):
+    """从加群申请答案中严格提取唯一邀请人 QQ，避免扫描无关事件字段。"""
+    comment = event.get("comment")
+    if not isinstance(comment, str) or not comment.strip():
+        return None, "未填写有效的邀请人 QQ 号。"
+    text = comment.strip()
+    labelled_answers = [
+        value.strip() for value in _GROUP_REQUEST_ANSWER_RE.findall(text)
+    ]
+    if labelled_answers:
+        if len(labelled_answers) != 1 or not labelled_answers[0]:
+            return None, "回答格式无效，请只填写一位邀请人的 QQ 号。"
+        text = labelled_answers[0]
+
+    candidates = _QQ_NUMBER_RE.findall(text)
+    if len(candidates) != 1:
+        return None, "回答格式无效，请只填写一位邀请人的 QQ 号。"
+    for pattern in _GROUP_REQUEST_QQ_WRAPPERS:
+        match = pattern.fullmatch(text.strip())
+        if match:
+            return match.group(1), ""
+    return None, "回答格式无效，请只填写一位邀请人的 QQ 号。"
+
+
+# 同一进程内只在 OneBot 明确确认动作成功后去重。动作失败或查询失败不会写入，
+# 让 NapCat 重投同一申请时仍可安全重试；上限用于避免长时间运行后无限增长。
+_HANDLED_GROUP_ADD_REQUEST_LIMIT = 2048
+_handled_group_add_requests: dict[str, None] = {}
+
+
+def _remember_handled_group_add_request(key: str) -> None:
+    _handled_group_add_requests[key] = None
+    while len(_handled_group_add_requests) > _HANDLED_GROUP_ADD_REQUEST_LIMIT:
+        _handled_group_add_requests.pop(next(iter(_handled_group_add_requests)))
+
+
+async def _set_group_add_request_result(
+    client, flag: str, approve: bool, reason: str = ""
+) -> None:
+    params = {"flag": flag, "sub_type": "add", "approve": approve}
+    if not approve:
+        params["reason"] = reason
+    await client.call_action("set_group_add_request", params)
+
+
+async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool:
+    """按申请答案中的邀请人 QQ 实时核验并审批目标群加群申请。"""
+    group_id = str(event.get("group_id") or "")
+    if (
+        event.get("post_type") != "request"
+        or event.get("request_type") != "group"
+        or event.get("sub_type") != "add"
+        or group_id not in group_add_auto_approval_groups(cfg)
+    ):
+        return False
+
+    flag = str(event.get("flag") or "").strip()
+    applicant = str(event.get("user_id") or "").strip()
+    bot_qq = str(event.get("self_id") or "").strip()
+    if (
+        not flag
+        or not _QQ_NUMBER_RE.fullmatch(applicant)
+        or not _QQ_NUMBER_RE.fullmatch(bot_qq)
+    ):
+        print(
+            f"[加群审批] 群{group_id}收到字段不完整的申请事件，保持待审批："
+            f"flag={'有' if flag else '无'}，申请人={applicant or '无'}，"
+            f"机器人={bot_qq or '无'}"
+        )
+        return True
+    request_key = f"{group_id}:{flag}"
+    if request_key in _handled_group_add_requests:
+        print(f"[加群审批] 群{group_id}申请{flag}已处理，忽略重复事件")
+        return True
+
+    candidate, error = extract_group_request_inviter_qq(event)
+    reject_reason = error
+    if not reject_reason and candidate == applicant:
+        reject_reason = "不能填写申请人自己的 QQ 号作为邀请人。"
+    if not reject_reason and candidate == bot_qq:
+        reject_reason = "不能填写本群机器人 QQ 号作为邀请人。"
+
+    if reject_reason:
+        try:
+            await _set_group_add_request_result(client, flag, False, reject_reason)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                f"[加群审批] 群{group_id}申请人{applicant}拒绝动作失败，"
+                f"保持待审批：{exc}"
+            )
+            return True
+        _remember_handled_group_add_request(request_key)
+        print(f"[加群审批] 群{group_id}已拒绝申请人{applicant}：{reject_reason}")
+        return True
+
+    try:
+        members = await get_authoritative_group_members(client, group_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(
+            f"[加群审批] 群{group_id}申请人{applicant}核验邀请人{candidate}失败，"
+            f"保持待审批：{exc}"
+        )
+        return True
+
+    # 动作响应超时但实际已成功时，重投事件会看到申请人已在群；此时不再操作过期 flag。
+    if applicant in members:
+        _remember_handled_group_add_request(request_key)
+        print(f"[加群审批] 群{group_id}申请人{applicant}已在群，忽略重复或过期事件")
+        return True
+
+    approve = candidate in members
+    reason = "" if approve else f"邀请人 QQ {candidate} 当前不在本群。"
+    try:
+        await _set_group_add_request_result(client, flag, approve, reason)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(
+            f"[加群审批] 群{group_id}申请人{applicant}"
+            f"{'同意' if approve else '拒绝'}动作失败，保持待审批：{exc}"
+        )
+        return True
+    _remember_handled_group_add_request(request_key)
+    if approve:
+        print(f"[加群审批] 群{group_id}已同意申请人{applicant}，邀请人{candidate}在群")
+    else:
+        print(f"[加群审批] 群{group_id}已拒绝申请人{applicant}：{reason}")
+    return True
 
 
 def extract_inviter_qq(event: dict):
@@ -1055,6 +1227,9 @@ async def notification_loop(ws, cfg) -> None:
 
 
 async def on_event(ws, cfg, event) -> None:
+    if await handle_group_add_auto_approval(ws, cfg, event):
+        return
+
     if await handle_member_verification_notice(ws, cfg, event):
         return
 
@@ -1167,6 +1342,7 @@ async def run() -> None:
     storage.init_db()
     whitelist_sync_config = qq_whitelist_sync.SyncConfig.from_bot_config(cfg)
     verification_groups = member_verification_groups(cfg)
+    auto_approval_groups = group_add_auto_approval_groups(cfg)
     cancelled = storage.cancel_member_verifications_outside_groups(
         verification_groups
     )
@@ -1175,7 +1351,14 @@ async def run() -> None:
     url = build_ws_url(cfg)
     print(f"GrandUMI bug 反馈机器人启动,连接 {cfg['ws_url']} …")
     if cfg.get("new_member_verification_enabled", False) and not verification_groups:
-        print("[新人验证] 已配置启用，但目标群列表为空或无效；为避免误踢，功能不会生效")
+        print(
+            "[新人验证] 没有独立生效的目标群（列表为空、无效或已由自动审批接管）；"
+            "为避免误踢，功能不会生效"
+        )
+    if cfg.get("group_add_auto_approval_enabled", False) and not auto_approval_groups:
+        print("[加群审批] 已配置启用，但目标群列表为空或无效；为避免误审批，功能不会生效")
+    elif auto_approval_groups:
+        print(f"[加群审批] 已启用，目标群：{', '.join(sorted(auto_approval_groups))}")
     if whitelist_sync_config.enabled:
         print(
             "[QQ 白名单同步] 已启用："

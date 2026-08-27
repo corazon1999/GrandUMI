@@ -10,6 +10,8 @@
 
 @机器人时可以同时发送 PNG、JPEG、WebP 图片或合并转发消息。机器人会展开合并转发中的说话人、文字和图片，把最多 4 张受限下载的图片交给只读视觉模型识别；图片同样可用于补充 Bug 描述。
 
+可按群开启加群申请自动审批。群验证问题设置为“请填写邀请人qq号”后，机器人会从申请答案中读取唯一 QQ，并使用不走缓存的实时群成员列表核验：邀请人在群则同意，答案无效、填写本人/机器人或邀请人不在群则拒绝；成员查询失败时保持申请待管理员处理，不会误批或误拒。
+
 可按群开启新人邀请人验证。新人入群后，机器人会主动 @新人，要求其在 30 分钟内真正 @“释迦的助理”并回答邀请人 QQ。机器人只通过 OneBot 当前群成员列表核验邀请人；候选 QQ 不在群时继续追问，核验成功后持久记录，超时仍未完成才会在最终成员与会话状态复核后移出群。机器人断线或重启不会丢失待验证会话。
 
 ```
@@ -73,6 +75,8 @@ copy config.example.json config.json
 | `new_member_verification_groups` | **明确启用验证的群号数组**；空数组表示不对任何群生效，不会沿用“空白名单等于全部群”的规则 |
 | `new_member_verification_timeout_seconds` | 提示被 OneBot 确认发送成功后的验证时限，默认 1800 秒（30 分钟），允许范围 60～86400 秒 |
 | `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与超时核查的后台轮询间隔，默认 300 秒（5 分钟），允许范围 1～3600 秒 |
+| `group_add_auto_approval_enabled` | 是否启用加群申请自动审批；默认关闭 |
+| `group_add_auto_approval_groups` | **明确启用自动审批的群号数组**；空数组表示不审批任何群，绝不表示全部群 |
 | `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单自然整点同步；默认关闭 |
 | `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权目标群，当前为 `297542853` / `GrandUMI测试群` |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
@@ -81,6 +85,23 @@ copy config.example.json config.json
 | `qq_whitelist_sync_min_members` | 自动同步的绝对人数下限，默认 100 |
 | `qq_whitelist_sync_max_shrink_percent` | 相较上一成功快照允许的最大缩水比例，默认 25% |
 | `qq_whitelist_sync_max_delay_seconds` | 整点请求允许的最长延迟，默认 600 秒；过期小时不补发 |
+
+### 加群申请自动审批安全边界
+
+先在 QQ 群“加群方式”中选择“需要回答问题并由管理员审核”，问题填写“请填写邀请人qq号”；机器人 QQ 必须是该群的群主或管理员。然后在私密 `config.json` 中显式开启并填写目标群：
+
+```json
+{
+  "group_add_auto_approval_enabled": true,
+  "group_add_auto_approval_groups": [123456789]
+}
+```
+
+- 只处理目标群的 OneBot `post_type=request`、`request_type=group`、`sub_type=add` 事件；成员邀请机器人等 `invite` 申请不会被误处理。目标群列表为空时功能不会生效。
+- 接受纯 QQ 号，以及 `QQ号：123456789`、`邀请人QQ是 123456789` 和 NapCat 的“问题/答案”包装；答案必须只包含一位完整 QQ，不能填写申请人自己或机器人。
+- 有效答案会调用 `get_group_member_list`，并强制传递 `no_cache=true`。邀请人在实时成员列表中才调用 `set_group_add_request` 同意，否则附带清晰中文原因拒绝。
+- 成员查询失败、申请事件缺少 `flag`，或审批动作失败时只记录日志并保持待审批；不会把未知结果当作成功。同一进程内，OneBot 已确认成功的重复事件会被忽略；动作响应失败的事件允许 NapCat 重投后重试。如果查询时申请人已经在群，则视为重复或过期事件，不再操作旧 `flag`。
+- 这是独立于下方“入群后新人验证”的配置。若同一群同时出现在两套目标群中，申请阶段自动审批优先，玩家入群后不会再次开始邀请人验证，避免重复追问和超时误踢。
 
 ### 新人验证安全边界
 
@@ -183,9 +204,10 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 
 部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
 它会构建并检查新容器，失败时恢复原文件与配置。脚本读取并原样保留私密
-`config.server.json` 中的新人验证字段，但不会猜测目标群；首次启用前需要在服务器
-私密配置中明确写入 `new_member_verification_enabled` 和
-`new_member_verification_groups`。
+`config.server.json` 中的机器人安全功能字段，但不会猜测目标群；首次启用前需要在服务器
+私密配置中明确写入相应开关与目标群。加群自动审批使用
+`group_add_auto_approval_enabled` / `group_add_auto_approval_groups`，入群后二次验证使用
+`new_member_verification_enabled` / `new_member_verification_groups`。
 
 ## 三、运行
 
