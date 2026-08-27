@@ -50,12 +50,12 @@ class FakeOneBotClient:
         raise AssertionError(f"未预期的 OneBot 动作：{action}")
 
 
-def verification_cfg(groups=(456,), timeout=600):
+def verification_cfg(groups=(456,), timeout=1800, poll_interval=300):
     return {
         "new_member_verification_enabled": True,
         "new_member_verification_groups": list(groups),
         "new_member_verification_timeout_seconds": timeout,
-        "new_member_verification_poll_interval_seconds": 1,
+        "new_member_verification_poll_interval_seconds": poll_interval,
         "allowed_groups": list(groups),
         "chat_agent_enabled": False,
         "admin_agent_enabled": False,
@@ -306,17 +306,37 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
             data = json.loads((BOT_DIR / name).read_text(encoding="utf-8"))
             self.assertIs(False, data["new_member_verification_enabled"])
             self.assertEqual([], data["new_member_verification_groups"])
-            self.assertEqual(600, data["new_member_verification_timeout_seconds"])
+            self.assertEqual(1800, data["new_member_verification_timeout_seconds"])
+            self.assertEqual(
+                300, data["new_member_verification_poll_interval_seconds"]
+            )
+
+    def test五分钟后台轮询不会被旧上限截断(self):
+        self.assertEqual(300, bot._member_verification_poll_interval({}))
+        self.assertEqual(
+            300,
+            bot._member_verification_poll_interval(
+                {"new_member_verification_poll_interval_seconds": 300}
+            ),
+        )
+        self.assertEqual(
+            3600,
+            bot._member_verification_poll_interval(
+                {"new_member_verification_poll_interval_seconds": 7200}
+            ),
+        )
 
     def test目标群入群提示与有效回答完成验证(self):
         client = FakeOneBotClient({"10001", "20002", "99999"})
         cfg = verification_cfg()
+        self.assertEqual(300, bot._member_verification_poll_interval(cfg))
         asyncio.run(bot.on_event(client, cfg, join_event()))
         row = storage.get_active_member_verification("456", "10001")
         self.assertEqual("pending", row["state"])
         self.assertEqual("send_group_msg", client.actions[0][0])
         prompt = client.actions[0][1]["message"]
         self.assertEqual("at", prompt[0]["type"])
+        self.assertIn("30 分钟内", prompt[1]["data"]["text"])
         self.assertIn("必须真正 @本群机器人", prompt[1]["data"]["text"])
 
         asyncio.run(bot.on_event(client, cfg, reply_event()))

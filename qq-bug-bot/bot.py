@@ -453,7 +453,18 @@ async def get_authoritative_group_members(client, group_id) -> set[str]:
 def _member_verification_timeout(cfg: dict) -> int:
     return max(
         60,
-        min(86400, int(cfg.get("new_member_verification_timeout_seconds", 600))),
+        min(86400, int(cfg.get("new_member_verification_timeout_seconds", 1800))),
+    )
+
+
+def _member_verification_poll_interval(cfg: dict) -> int:
+    """后台恢复任务允许最长一小时轮询；群消息事件不经过此间隔。"""
+    return max(
+        1,
+        min(
+            3600,
+            int(cfg.get("new_member_verification_poll_interval_seconds", 300)),
+        ),
     )
 
 
@@ -660,10 +671,7 @@ async def run_member_verification_job_once(client, cfg: dict) -> bool:
 
 async def member_verification_loop(client, cfg: dict, event_lock) -> None:
     """连接恢复后从 SQLite 继续未完成的提示、答案核查和超时任务。"""
-    interval = max(
-        1,
-        min(60, int(cfg.get("new_member_verification_poll_interval_seconds", 2))),
-    )
+    interval = _member_verification_poll_interval(cfg)
     while True:
         try:
             async with event_lock:
@@ -1195,7 +1203,7 @@ async def run() -> None:
                         if "post_type" not in event:
                             client.resolve_response(event)
                             continue
-                        # 本机接收时间用于十分钟边界，不能由群消息正文伪造。
+                        # 本机接收时间用于验证时限边界，不能由群消息正文伪造。
                         event["_grandumi_received_at"] = int(time.time())
                         task = asyncio.create_task(
                             _dispatch_event(event_lock, client, cfg, event)

@@ -25,6 +25,6 @@
   "chat_cooldown_seconds": 15,
   "new_member_verification_enabled": false,
   "new_member_verification_groups": [],
-  "new_member_verification_timeout_seconds": 600,
-  "new_member_verification_poll_interval_seconds": 2
+  "new_member_verification_timeout_seconds": 1800,
+  "new_member_verification_poll_interval_seconds": 300
 }

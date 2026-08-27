@@ -10,7 +10,7 @@
 
 @机器人时可以同时发送 PNG、JPEG、WebP 图片或合并转发消息。机器人会展开合并转发中的说话人、文字和图片，把最多 4 张受限下载的图片交给只读视觉模型识别；图片同样可用于补充 Bug 描述。
 
-可按群开启新人邀请人验证。新人入群后，机器人会主动 @新人，要求其在 10 分钟内真正 @机器人并回答邀请人 QQ。机器人只通过 OneBot 当前群成员列表核验邀请人；候选 QQ 不在群时继续追问，核验成功后持久记录，超时仍未完成才会在最终成员与会话状态复核后移出群。机器人断线或重启不会丢失待验证会话。
+可按群开启新人邀请人验证。新人入群后，机器人会主动 @新人，要求其在 30 分钟内真正 @机器人并回答邀请人 QQ。机器人只通过 OneBot 当前群成员列表核验邀请人；候选 QQ 不在群时继续追问，核验成功后持久记录，超时仍未完成才会在最终成员与会话状态复核后移出群。机器人断线或重启不会丢失待验证会话。
 
 ```
 QQ群用户:  这张卡有 bug
@@ -71,8 +71,8 @@ copy config.example.json config.json
 | `forward_max_depth` | 嵌套合并转发最大深度，默认 3 |
 | `new_member_verification_enabled` | 是否启用新人邀请人验证；默认关闭 |
 | `new_member_verification_groups` | **明确启用验证的群号数组**；空数组表示不对任何群生效，不会沿用“空白名单等于全部群”的规则 |
-| `new_member_verification_timeout_seconds` | 提示被 OneBot 确认发送成功后的验证时限，默认 600 秒，允许范围 60～86400 秒 |
-| `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与超时核查的轮询间隔，默认 2 秒 |
+| `new_member_verification_timeout_seconds` | 提示被 OneBot 确认发送成功后的验证时限，默认 1800 秒（30 分钟），允许范围 60～86400 秒 |
+| `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与超时核查的后台轮询间隔，默认 300 秒（5 分钟），允许范围 1～3600 秒 |
 
 ### 新人验证安全边界
 
@@ -82,8 +82,8 @@ copy config.example.json config.json
 {
   "new_member_verification_enabled": true,
   "new_member_verification_groups": [123456789],
-  "new_member_verification_timeout_seconds": 600,
-  "new_member_verification_poll_interval_seconds": 2
+  "new_member_verification_timeout_seconds": 1800,
+  "new_member_verification_poll_interval_seconds": 300
 }
 ```
 
@@ -92,6 +92,7 @@ copy config.example.json config.json
 - 邀请人 QQ 只从该条消息的顶层文字或真实 @成员段提取，必须唯一，且不能填写新人自己或机器人。
 - 成员列表接口失败时既不会通过也不会踢人；已收到的答案会留在 SQLite 中自动重试。到期后也会先重新获取成员列表，再原子核对会话仍未完成，最后调用 `set_group_kick`。`reject_add_request` 固定为 `false`，不会联动拒绝玩家之后的加群请求。
 - 提示动作没有得到 OneBot 成功响应时不会开始倒计时，后台会重试。极端情况下若 QQ 已收到提示、但进程在写入成功状态前崩溃，重启后可能重复提示一次；不会因此缩短验证时间或误通过。
+- 5 分钟轮询只用于提示失败、成员 API 失败、重启恢复和到期动作等后台任务，因此这些动作最多可能再延后约 5 分钟。正常群消息回答仍由事件实时处理，新人入群时也会立即尝试发送第一次提示，不会等待下一轮后台轮询。
 
 ## 可切换人格聊天 Agent
 

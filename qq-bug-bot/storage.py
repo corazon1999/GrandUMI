@@ -296,7 +296,7 @@ def start_member_verification(
     join_event_time: int,
     now=None,
 ):
-    """幂等创建入群验证；重复通知不会重置十分钟窗口。"""
+    """幂等创建入群验证；重复通知不会重置当前验证窗口。"""
     group_id = str(group_id)
     newcomer_qq = str(newcomer_qq)
     join_event_time = _verification_now(join_event_time)
