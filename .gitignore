@@ -103,6 +103,7 @@ _归档_卡效工作流/
 # =========================
 qq-bug-bot/config.json
 qq-bug-bot/feedback.db
+/qq-whitelist-297542853-*-live.json
 __pycache__/
 *.py[cod]
 
