@@ -11,6 +11,10 @@ public static class AdministratorPolicy
 
     public static bool IsAuthorized(string? account)
         => account is not null && AuthorizedAccounts.Contains(account);
+
+    /// <summary>仅供服务启动迁移时固化“当时已存在”的白名单初始化管理员。</summary>
+    public static IReadOnlyList<string> GetAuthorizedAccounts()
+        => AuthorizedAccounts.Order(StringComparer.Ordinal).ToArray();
 }
 
 public static class GlobalAnnouncementPolicy

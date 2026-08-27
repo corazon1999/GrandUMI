@@ -11,6 +11,7 @@ using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Validation;
 using GrandUMI.Persistence;
+using Microsoft.Data.Sqlite;
 
 namespace GrandUMI;
 
@@ -37,6 +38,7 @@ public static class WebSocketBridge
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
         "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
+        "MsgQqWhitelistStatus", "MsgQqWhitelistImport", "MsgQqAccessDenied",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
     {
@@ -90,6 +92,7 @@ public static class WebSocketBridge
     private static CancellationTokenSource _cts = new();
     private static PlayerDataStore _playerDataStore = null!;
     private static AccountAuthenticationStore _accountAuthenticationStore = null!;
+    private static QqAccessStore _qqAccessStore = null!;
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryStore;
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryReadStore;
     private static AdminOperationsMetricsCache? _adminOperationsMetricsCache;
@@ -126,6 +129,7 @@ public static class WebSocketBridge
     public static void Initialize(
         PlayerDataStore playerDataStore,
         AccountAuthenticationStore accountAuthenticationStore,
+        QqAccessStore qqAccessStore,
         OnlinePlayerHistoryStore? onlinePlayerHistoryStore = null,
         OnlinePlayerHistoryStore? onlinePlayerHistoryReadStore = null,
         AdminOperationsMetricsCache? adminOperationsMetricsCache = null,
@@ -135,6 +139,7 @@ public static class WebSocketBridge
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _accountAuthenticationStore = accountAuthenticationStore
             ?? throw new ArgumentNullException(nameof(accountAuthenticationStore));
+        _qqAccessStore = qqAccessStore ?? throw new ArgumentNullException(nameof(qqAccessStore));
         _onlinePlayerHistoryStore = onlinePlayerHistoryStore;
         _onlinePlayerHistoryReadStore = onlinePlayerHistoryReadStore ?? onlinePlayerHistoryStore;
         _adminOperationsMetricsCache = adminOperationsMetricsCache;
@@ -290,6 +295,19 @@ public static class WebSocketBridge
         var proto = Str(msg, "proto");
         if (proto is null) return;
 
+        if (session.QqBootstrapAccount is not null
+            && proto is not ("MsgSecret" or "MsgPing" or "MsgNetworkDiagnostics" or "MsgLogin"
+                or "MsgQqWhitelistStatus" or "MsgQqWhitelistImport"))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqAccessDenied",
+                result = false,
+                logStr = "当前仅可初始化 QQ 群白名单；导入后请先完成 QQ 绑定。",
+            });
+            return;
+        }
+
         var allowed = proto == "MsgPing"
             ? session.TryConsumeRateLimit("ping", capacity: 6, refillPerSecond: 0.5)
             : session.TryConsumeRateLimit("messages", capacity: 120, refillPerSecond: 40);
@@ -308,6 +326,8 @@ public static class WebSocketBridge
             case "MsgPing":        OnPing(session, msg);         break;
             case "MsgNetworkDiagnostics": OnNetworkDiagnostics(session, msg); break;
             case "MsgLogin":       OnLogin(session, msg);        break;
+            case "MsgQqWhitelistStatus": OnQqWhitelistStatus(session); break;
+            case "MsgQqWhitelistImport": OnQqWhitelistImport(session, msg); break;
             case "MsgAddAccount":  OnAddAccount(session, msg);   break;
             case "MsgUpdatePs":    OnUpdatePs(session, msg);     break;
             case "MsgSaveDeck":    OnSaveDeck(session, msg);     break;
@@ -448,6 +468,7 @@ public static class WebSocketBridge
                 result = false,
                 needsPassword = true,
                 needsPasswordSetup = false,
+                needsQqBinding = false,
                 authChallenge = false,
                 logStr = "登录尝试过于频繁，请稍后再试。",
             });
@@ -468,11 +489,88 @@ public static class WebSocketBridge
                     result = false,
                     needsPassword = authentication.NeedsPassword,
                     needsPasswordSetup = authentication.NeedsPasswordSetup,
+                    needsQqBinding = false,
                     authChallenge = authentication.IsChallenge,
                     logStr = authentication.Message,
                 });
                 return;
             }
+
+            string? submittedQq = null;
+            if (msg.TryGetValue("qq", out var qqElement))
+            {
+                if (qqElement.ValueKind != JsonValueKind.String)
+                    throw new QqAccessValidationException("QQ 必须以字符串提交，不能使用 JSON number。");
+                submittedQq = qqElement.GetString();
+            }
+
+            // 密码或会话令牌认证只是第一道门。每一次登录/恢复都必须重新读取服务端 QQ 权威状态；
+            // 只有 Allowed 才能进入账号索引、恢复赛前房间或重领进行中的对局。
+            var qqAccess = _qqAccessStore.EvaluateLogin(authentication.Account, submittedQq);
+            if (qqAccess.Kind == QqLoginAccessKind.WhitelistUninitialized)
+            {
+                if (AdministratorPolicy.IsAuthorized(authentication.Account)
+                    && _qqAccessStore.IsBootstrapAdministrator(authentication.Account))
+                {
+                    s.QqBootstrapAccount = authentication.Account;
+                    Send(s.SessionId, new
+                    {
+                        proto = "MsgLogin",
+                        account = authentication.Account,
+                        result = false,
+                        needsPassword = false,
+                        needsPasswordSetup = false,
+                        needsQqBinding = false,
+                        needsQqWhitelistInitialization = true,
+                        canInitializeQqWhitelist = true,
+                        authChallenge = true,
+                        authToken = authentication.AuthToken,
+                        logStr = "QQ 群白名单尚未初始化。当前会话仅可导入首份名单；导入后仍需绑定名单内 QQ。",
+                    });
+                }
+                else
+                {
+                    s.QqBootstrapAccount = null;
+                    Send(s.SessionId, new
+                    {
+                        proto = "MsgLogin",
+                        account = authentication.Account,
+                        result = false,
+                        needsPassword = false,
+                        needsPasswordSetup = false,
+                        needsQqBinding = false,
+                        needsQqWhitelistInitialization = true,
+                        canInitializeQqWhitelist = false,
+                        authChallenge = false,
+                        logStr = qqAccess.Message,
+                    });
+                }
+                return;
+            }
+
+            if (!qqAccess.Allowed)
+            {
+                s.QqBootstrapAccount = null;
+                Send(s.SessionId, new
+                {
+                    proto = "MsgLogin",
+                    account = authentication.Account,
+                    result = false,
+                    needsPassword = false,
+                    needsPasswordSetup = false,
+                    needsQqBinding = qqAccess.NeedsBinding,
+                    needsQqWhitelistInitialization = false,
+                    canInitializeQqWhitelist = false,
+                    authChallenge = qqAccess.NeedsBinding,
+                    authToken = qqAccess.NeedsBinding ? authentication.AuthToken : null,
+                    qqWhitelistVersion = qqAccess.WhitelistVersion,
+                    qqMasked = qqAccess.MaskedQq,
+                    logStr = qqAccess.Message,
+                });
+                return;
+            }
+
+            s.QqBootstrapAccount = null;
 
             if (isResume && IsSupersededClientInstance(clientInstanceId))
             {
@@ -519,8 +617,10 @@ public static class WebSocketBridge
                 selectedDeckName = playerData.SelectedDeckName,
                 decks = playerData.Decks,
                 authToken = authentication.AuthToken,
+                qqMasked = qqAccess.MaskedQq,
+                qqWhitelistVersion = qqAccess.WhitelistVersion,
                 result = true,
-                logStr = authentication.Message,
+                logStr = submittedQq is null ? authentication.Message : qqAccess.Message,
             });
             SendFriendData(s, _playerDataStore.GetFriendData(playerData.Account));
             PushQueuedFriendMessages(s);
@@ -544,6 +644,22 @@ public static class WebSocketBridge
         {
             Send(s.SessionId, new { proto = "MsgLogin", account = requestedAccount, name = "", result = false, logStr = ex.Message });
             Log($"登录 ❌ {requestedAccount}: {ex.Message}");
+        }
+        catch (QqAccessValidationException ex)
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLogin",
+                account = requestedAccount,
+                name = "",
+                result = false,
+                needsPassword = false,
+                needsPasswordSetup = false,
+                needsQqBinding = true,
+                authChallenge = false,
+                logStr = ex.Message,
+            });
+            Log($"QQ 准入拒绝 {requestedAccount}: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -1056,17 +1172,45 @@ public static class WebSocketBridge
 
     // ── 匹配相关 ──────────────────────────────────────────────────────────
 
+    private static bool TryRequireNewGameAccess(WsSession session, string responseProto, bool sendFailure = true)
+    {
+        if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
+        {
+            if (sendFailure)
+                Send(session.SessionId, new { proto = responseProto, result = false, logStr = "请先重新登录。" });
+            return false;
+        }
+
+        // 仅兼容未调用 Initialize 的纯匹配算法单元测试。生产 WebSocket 在完成
+        // Initialize（其中 QqAccessStore 为必填项）前不会进入可接收状态。
+        if (_qqAccessStore is null) return true;
+
+        QqLoginAccessResult access;
+        try { access = _qqAccessStore.CheckNewGameAccess(session.Account!); }
+        catch (Exception ex)
+        {
+            LogErr($"QQ 新对局准入检查失败 {session.Account}: {ex.Message}");
+            if (sendFailure)
+                Send(session.SessionId, new { proto = responseProto, result = false, logStr = "QQ 群白名单暂时无法验证，请稍后重试。" });
+            return false;
+        }
+        if (access.Allowed) return true;
+
+        if (session.IsMatching) RebuildMatchQueue(session);
+        if (sendFailure)
+            Send(session.SessionId, new
+            {
+                proto = responseProto,
+                result = false,
+                logStr = QqAccessStore.NewGameDeniedMessage,
+            });
+        return false;
+    }
+
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "请先登录" }); return; }
+        if (!TryRequireNewGameAccess(s, "MsgEnterMatch")) return;
         if (RejectForMaintenance(s, "MsgEnterMatch")) return;
-        if (!IsCurrentAccountSession(s))
-        {
-            s.IsMatching = false;
-            ReleaseMatchAccountReservation(s);
-            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "登录会话已失效，请重新连接" });
-            return;
-        }
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在房间、观战或对局中" }); return; }
 
         var queueKind = Str(msg, "queueKind") switch
@@ -1121,7 +1265,7 @@ public static class WebSocketBridge
     /// <summary>单人测试模式：人类(P0,先手) vs 机器人(P1,同卡组)，立即建房</summary>
     private static void OnEnterBotMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn) { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "请先登录" }); return; }
+        if (!TryRequireNewGameAccess(s, "MsgEnterBotMatch")) return;
         if (RejectForMaintenance(s, "MsgEnterBotMatch")) return;
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间、观战或对局中" }); return; }
 
@@ -1147,7 +1291,9 @@ public static class WebSocketBridge
 
         try
         {
-            var room = GameRoomManager.CreateRoom(
+            var room = _qqAccessStore.ExecuteNewGameAdmission(
+                new[] { s.Account },
+                () => GameRoomManager.CreateRoom(
                 s.SessionId, s.Account ?? "玩家", deck,
                 botSid, botName, deck,        // 机器人用同一套卡组
                 p0First: goFirst,             // 单人测试先后手（前端可选，默认先手）
@@ -1164,12 +1310,16 @@ public static class WebSocketBridge
                 p0SpectateMode: s.SpectateMode,
                 p0SpectatorHandsPublic: s.SpectatorHandsPublic,
                 p0SpectateCode: s.SpectateCode,
-                p1SpectateMode: SpectatingRules.Closed);
+                p1SpectateMode: SpectatingRules.Closed));
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = true });
             Send(s.SessionId, new { proto = "MsgMatchFound", opponentName = botName });
             Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst });
             room.Engine.BroadcastInitialState();
             Log($"单人测试开局 {s.Account} vs 机器人");
+        }
+        catch (QqAccessDeniedException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = ex.Message });
         }
         catch (GameMaintenanceException ex)
         {
@@ -1208,7 +1358,9 @@ public static class WebSocketBridge
             var deck2 = p2.Deck ?? "";
             try
             {
-                var room = GameRoomManager.CreateRoom(
+                var room = _qqAccessStore.ExecuteNewGameAdmission(
+                    new[] { p1.Account, p2.Account },
+                    () => GameRoomManager.CreateRoom(
                     p1.SessionId, p1.Account ?? "?", deck1,
                     p2.SessionId, p2.Account ?? "?", deck2,
                     p0AlwaysPrompt: p1.AlwaysPromptOnLifeReveal,
@@ -1226,7 +1378,7 @@ public static class WebSocketBridge
                     p0SpectatorHandsPublic: p1.SpectatorHandsPublic,
                     p1SpectatorHandsPublic: p2.SpectatorHandsPublic,
                     p0SpectateCode: p1.SpectateCode,
-                    p1SpectateCode: p2.SpectateCode);
+                    p1SpectateCode: p2.SpectateCode));
 
                 GameOpponent[p1.SessionId] = p2.SessionId;
                 GameOpponent[p2.SessionId] = p1.SessionId;
@@ -1236,6 +1388,11 @@ public static class WebSocketBridge
                 Send(p2.SessionId, new { proto = "MsgGameStart" });
                 room.Engine.BroadcastInitialState();
                 Log($"{QueueLabel(queueKind)}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
+            }
+            catch (QqAccessDeniedException ex)
+            {
+                Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
+                Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
             }
             catch (GameMaintenanceException ex)
             {
@@ -1397,6 +1554,12 @@ public static class WebSocketBridge
                 continue;
             }
             if (!IsCurrentAccountSession(candidate))
+            {
+                candidate.IsMatching = false;
+                ReleaseMatchAccountReservation(candidate);
+                continue;
+            }
+            if (!TryRequireNewGameAccess(candidate, "MsgEnterMatch"))
             {
                 candidate.IsMatching = false;
                 ReleaseMatchAccountReservation(candidate);
@@ -1572,11 +1735,7 @@ public static class WebSocketBridge
 
     private static void OnCreateRoom(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn)
-        {
-            Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = "请先登录" });
-            return;
-        }
+        if (!TryRequireNewGameAccess(s, "MsgCreateRoom")) return;
         if (RejectForMaintenance(s, "MsgCreateRoom")) return;
 
         var existingRoom = GetFriendlyRoomOf(s);
@@ -1613,15 +1772,32 @@ public static class WebSocketBridge
         room.Decks[0] = deck;
         room.DeckNames[0] = deckName;
 
-        FriendlyRooms[roomId] = room;
-        if (!FriendlyByAccount.TryAdd(s.Account!, roomId))
+        bool registered;
+        try
         {
-            FriendlyRooms.TryRemove(roomId, out _);
+            registered = _qqAccessStore.ExecuteNewGameAdmission(new[] { s.Account }, () =>
+            {
+                FriendlyRooms[roomId] = room;
+                if (!FriendlyByAccount.TryAdd(s.Account!, roomId))
+                {
+                    FriendlyRooms.TryRemove(roomId, out _);
+                    return false;
+                }
+                while (!PendingRooms.TryAdd(room.JoinCode!, roomId))
+                    room = ReplaceRoomCode(room, GenerateRoomCode());
+                return true;
+            });
+        }
+        catch (QqAccessDeniedException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = ex.Message });
+            return;
+        }
+        if (!registered)
+        {
             Send(s.SessionId, new { proto = "MsgCreateRoom", result = false, logStr = "你已经在其他房间中" });
             return;
         }
-        while (!PendingRooms.TryAdd(room.JoinCode!, roomId))
-            room = ReplaceRoomCode(room, GenerateRoomCode());
 
         Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = room.JoinCode, result = true });
         PushFriendlyRoom(room);
@@ -1631,11 +1807,7 @@ public static class WebSocketBridge
 
     private static void OnJoinRoom(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn)
-        {
-            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = "请先登录" });
-            return;
-        }
+        if (!TryRequireNewGameAccess(s, "MsgJoinRoom")) return;
         if (RejectForMaintenance(s, "MsgJoinRoom")) return;
 
         var code = Str(msg, "roomCode")?.ToUpperInvariant() ?? "";
@@ -1680,38 +1852,50 @@ public static class WebSocketBridge
             return;
         }
 
-        string? joinError;
-        WsSession? host;
-        lock (room.Gate)
+        string? joinError = null;
+        WsSession? host = null;
+        try
         {
-            var hostAccount = room.Accounts[0];
-            if (hostAccount is null ||
-                !PendingRooms.TryGetValue(code, out var currentRoomId) || currentRoomId != room.RoomId)
+            _qqAccessStore.ExecuteNewGameAdmission(new[] { s.Account, room.Accounts[0] }, () =>
             {
-                joinError = "房间不存在或已失效";
-                host = null;
-            }
-            else if (!TryGetActiveSession(hostAccount, out host))
-            {
-                AbortInactiveSession(hostAccount);
-                joinError = "房主正在重连，请稍后重试";
-            }
-            else if (!room.TryAddGuest(s.Account!, s.PlayerName ?? s.Account!, deck, deckName, out joinError))
-            {
-                // TryAddGuest 已返回具体原因。
-            }
-            else if (!FriendlyByAccount.TryAdd(s.Account!, room.RoomId))
-            {
-                room.Accounts[1] = null;
-                room.Names[1] = null;
-                room.Decks[1] = null;
-                room.DeckNames[1] = null;
-                joinError = "你已经在其他房间中";
-            }
-            else
-            {
-                PendingRooms.TryRemove(code, out _);
-            }
+                lock (room.Gate)
+                {
+                    var hostAccount = room.Accounts[0];
+                    if (hostAccount is null ||
+                        !PendingRooms.TryGetValue(code, out var currentRoomId) || currentRoomId != room.RoomId)
+                    {
+                        joinError = "房间不存在或已失效";
+                        host = null;
+                    }
+                    else if (!TryGetActiveSession(hostAccount, out host))
+                    {
+                        AbortInactiveSession(hostAccount);
+                        joinError = "房主正在重连，请稍后重试";
+                    }
+                    else if (!room.TryAddGuest(s.Account!, s.PlayerName ?? s.Account!, deck, deckName, out joinError))
+                    {
+                        // TryAddGuest 已返回具体原因。
+                    }
+                    else if (!FriendlyByAccount.TryAdd(s.Account!, room.RoomId))
+                    {
+                        room.Accounts[1] = null;
+                        room.Names[1] = null;
+                        room.Decks[1] = null;
+                        room.DeckNames[1] = null;
+                        joinError = "你已经在其他房间中";
+                    }
+                    else
+                    {
+                        PendingRooms.TryRemove(code, out _);
+                    }
+                }
+                return true;
+            });
+        }
+        catch (QqAccessDeniedException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgJoinRoom", result = false, logStr = ex.Message });
+            return;
         }
 
         if (joinError is not null)
@@ -2452,11 +2636,7 @@ public static class WebSocketBridge
 
     private static void OnInvitePlayer(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        if (!s.IsLoggedIn)
-        {
-            Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "请先登录" });
-            return;
-        }
+        if (!TryRequireNewGameAccess(s, "MsgInvitePlayer")) return;
         if (RejectForMaintenance(s, "MsgInvitePlayer")) return;
         var toAccount = Str(msg, "toAccount") ?? "";
 
@@ -2470,6 +2650,11 @@ public static class WebSocketBridge
             !Sessions.TryGetValue(toSid, out var target) || !target.IsLoggedIn)
         {
             Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "对方不在线" });
+            return;
+        }
+        if (!TryRequireNewGameAccess(target, "MsgInviteResult", sendFailure: false))
+        {
+            Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = "对方当前不具备新对局准入资格" });
             return;
         }
         if (_playerDataStore.GetBlockedRelatedAccountKeys(s.Account!).Contains(toAccount))
@@ -2490,8 +2675,20 @@ public static class WebSocketBridge
         }
 
         var inviteId = Guid.NewGuid().ToString("N")[..12];
-        PendingInvites[inviteId] = new InviteInfo(
-            inviteId, s.SessionId, s.Account!, s.PlayerName ?? s.Account!, toSid);
+        try
+        {
+            _qqAccessStore.ExecuteNewGameAdmission(new[] { s.Account, target.Account }, () =>
+            {
+                PendingInvites[inviteId] = new InviteInfo(
+                    inviteId, s.SessionId, s.Account!, s.PlayerName ?? s.Account!, toSid);
+                return true;
+            });
+        }
+        catch (QqAccessDeniedException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgInvitePlayer", result = false, logStr = ex.Message });
+            return;
+        }
 
         Send(toSid, new { proto = "MsgInviteNotify", inviteId, fromName = s.PlayerName ?? s.Account });
         Send(s.SessionId, new { proto = "MsgInvitePlayer", result = true, toName = target.PlayerName ?? target.Account });
@@ -2529,6 +2726,13 @@ public static class WebSocketBridge
             return;
         }
 
+        if (!TryRequireNewGameAccess(s, "MsgInviteResult")
+            || !TryRequireNewGameAccess(from, "MsgInviteResult", sendFailure: false))
+        {
+            Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = QqAccessStore.NewGameDeniedMessage });
+            return;
+        }
+
         // 接受:校验双方仍空闲 → 建立友谊战房间(不直接开战,房间内选卡组+准备)
         if (StatusOf(from) != "idle" || StatusOf(s) != "idle")
         {
@@ -2537,7 +2741,15 @@ public static class WebSocketBridge
             return;
         }
 
-        if (!CreateFriendlyRoom(from, s))
+        bool created;
+        try { created = CreateFriendlyRoom(from, s); }
+        catch (QqAccessDeniedException ex)
+        {
+            Send(s.SessionId, new { proto = "MsgInviteResult", accepted = false, logStr = ex.Message });
+            Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = ex.Message });
+            return;
+        }
+        if (!created)
         {
             Send(s.SessionId, new { proto = "MsgInviteResult", accepted = false, logStr = "一方已进入其他房间" });
             Send(inv.FromSid, new { proto = "MsgInviteResult", accepted = false, logStr = "一方已进入其他房间" });
@@ -2616,7 +2828,9 @@ public static class WebSocketBridge
     {
         try
         {
-            var room = GameRoomManager.CreateRoom(
+            var room = _qqAccessStore.ExecuteNewGameAdmission(
+                new[] { host.Account, guest.Account },
+                () => GameRoomManager.CreateRoom(
                 host.SessionId,  host.Account  ?? "?", hostDeck,
                 guest.SessionId, guest.Account ?? "?", guestDeck,
                 p0AlwaysPrompt: host.AlwaysPromptOnLifeReveal,
@@ -2635,13 +2849,19 @@ public static class WebSocketBridge
                 p0SpectatorHandsPublic: host.SpectatorHandsPublic,
                 p1SpectatorHandsPublic: guest.SpectatorHandsPublic,
                 p0SpectateCode: host.SpectateCode,
-                p1SpectateCode: guest.SpectateCode);
+                p1SpectateCode: guest.SpectateCode));
             GameOpponent[host.SessionId]  = guest.SessionId;
             GameOpponent[guest.SessionId] = host.SessionId;
             Send(host.SessionId,  new { proto = "MsgGameStart" });
             Send(guest.SessionId, new { proto = "MsgGameStart" });
             room.Engine.BroadcastInitialState();
             return room.RoomId;
+        }
+        catch (QqAccessDeniedException ex)
+        {
+            if (FriendlyRooms.TryGetValue(friendlyRoomId, out var lobby))
+                PushFriendlyRoom(lobby, ex.Message);
+            return null;
         }
         catch (GameMaintenanceException ex)
         {
@@ -2714,37 +2934,45 @@ public static class WebSocketBridge
 
     private static bool CreateFriendlyRoom(WsSession host, WsSession guest)
     {
-        var roomId = Guid.NewGuid().ToString("N")[..12];
-        var room = new DuelLobby
+        return _qqAccessStore.ExecuteNewGameAdmission(new[] { host.Account, guest.Account }, () =>
         {
-            RoomId = roomId,
-            MatchKind = MatchKind.Friendly,
-        };
-        room.Accounts[0] = host.Account!;
-        room.Accounts[1] = guest.Account!;
-        room.Names[0] = host.PlayerName ?? host.Account!;
-        room.Names[1] = guest.PlayerName ?? guest.Account!;
-        FriendlyRooms[roomId] = room;
-        if (!FriendlyByAccount.TryAdd(host.Account!, roomId))
-        {
-            FriendlyRooms.TryRemove(roomId, out _);
-            return false;
-        }
-        if (!FriendlyByAccount.TryAdd(guest.Account!, roomId))
-        {
-            if (FriendlyByAccount.TryGetValue(host.Account!, out var hostRoomId) && hostRoomId == roomId)
-                FriendlyByAccount.TryRemove(host.Account!, out _);
-            FriendlyRooms.TryRemove(roomId, out _);
-            return false;
-        }
-        PushFriendlyRoom(room);
-        return true;
+            var roomId = Guid.NewGuid().ToString("N")[..12];
+            var room = new DuelLobby
+            {
+                RoomId = roomId,
+                MatchKind = MatchKind.Friendly,
+            };
+            room.Accounts[0] = host.Account!;
+            room.Accounts[1] = guest.Account!;
+            room.Names[0] = host.PlayerName ?? host.Account!;
+            room.Names[1] = guest.PlayerName ?? guest.Account!;
+            FriendlyRooms[roomId] = room;
+            if (!FriendlyByAccount.TryAdd(host.Account!, roomId))
+            {
+                FriendlyRooms.TryRemove(roomId, out _);
+                return false;
+            }
+            if (!FriendlyByAccount.TryAdd(guest.Account!, roomId))
+            {
+                if (FriendlyByAccount.TryGetValue(host.Account!, out var hostRoomId) && hostRoomId == roomId)
+                    FriendlyByAccount.TryRemove(host.Account!, out _);
+                FriendlyRooms.TryRemove(roomId, out _);
+                return false;
+            }
+            PushFriendlyRoom(room);
+            return true;
+        });
     }
 
     private static void OnFriendlySelectDeck(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var room = GetFriendlyRoomOf(s);
         if (room is null || s.Account is null) return;
+        if (!TryRequireNewGameAccess(s, "MsgFriendlyRoom", sendFailure: false))
+        {
+            PushFriendlyRoom(room, QqAccessStore.NewGameDeniedMessage);
+            return;
+        }
 
         var deck = Str(msg, "deck") ?? "";
         var v = DeckValidator.Validate(deck, DeckFormatForMatchKind(MatchKind.Friendly));
@@ -2766,6 +2994,11 @@ public static class WebSocketBridge
     {
         var room = GetFriendlyRoomOf(s);
         if (room is null || s.Account is null) return;
+        if (!TryRequireNewGameAccess(s, "MsgFriendlyRoom", sendFailure: false))
+        {
+            PushFriendlyRoom(room, QqAccessStore.NewGameDeniedMessage);
+            return;
+        }
         if (GameRoomManager.GetMaintenanceSnapshot().Enabled)
         {
             PushFriendlyRoom(room, GameMaintenanceState.PlayerMessage);
@@ -2798,6 +3031,13 @@ public static class WebSocketBridge
         {
             room.CompleteStart(success: false);
             PushFriendlyRoom(room, "有玩家连接中断，请等待重连后重新准备");
+            return;
+        }
+        if (!TryRequireNewGameAccess(host, "MsgFriendlyRoom", sendFailure: false)
+            || !TryRequireNewGameAccess(guest, "MsgFriendlyRoom", sendFailure: false))
+        {
+            room.CompleteStart(success: false);
+            PushFriendlyRoom(room, QqAccessStore.NewGameDeniedMessage);
             return;
         }
 
@@ -2858,6 +3098,15 @@ public static class WebSocketBridge
         foreach (var acc in room.Accounts)
             if (acc is not null && AccountIndex.TryGetValue(acc, out var sid))
                 GameOpponent.TryRemove(sid, out _);
+        if (room.Accounts.Where(static account => account is not null)
+            .Any(account => !HasNewGameAccess(account)))
+        {
+            DisbandFriendlyRoom(
+                room,
+                leaverAccount: null,
+                otherMessage: "QQ 群白名单资格已变化，本场结束后房间已关闭。");
+            return;
+        }
         PushFriendlyRoom(room);
     }
 
@@ -3413,6 +3662,85 @@ public static class WebSocketBridge
         }
     }
 
+    /// <summary>
+    /// 白名单整表替换提交后清理所有尚未注册为正式对局的等待路径。
+    /// 已经出现在 GameRoomManager 中的对局保持运行；结束回到赛前房间时会再次复核并关闭。
+    /// </summary>
+    private static void EvictIneligibleWaitingActivities()
+    {
+        foreach (var session in Sessions.Values)
+        {
+            if (!session.IsMatching || HasNewGameAccess(session.Account)) continue;
+            RebuildMatchQueue(session);
+            Send(session.SessionId, new
+            {
+                proto = "MsgEnterMatch",
+                result = false,
+                logStr = QqAccessStore.NewGameDeniedMessage,
+            });
+        }
+
+        foreach (var entry in PendingInvites.ToArray())
+        {
+            var invite = entry.Value;
+            Sessions.TryGetValue(invite.ToSid, out var target);
+            if (HasNewGameAccess(invite.FromAccount) && HasNewGameAccess(target?.Account)) continue;
+            if (!PendingInvites.TryRemove(entry.Key, out _)) continue;
+            Send(invite.FromSid, new
+            {
+                proto = "MsgInviteResult",
+                accepted = false,
+                logStr = QqAccessStore.NewGameDeniedMessage,
+            });
+            Send(invite.ToSid, new
+            {
+                proto = "MsgInviteResult",
+                accepted = false,
+                logStr = QqAccessStore.NewGameDeniedMessage,
+            });
+        }
+
+        foreach (var room in FriendlyRooms.Values.Distinct().ToArray())
+        {
+            string state;
+            string?[] accounts;
+            lock (room.Gate)
+            {
+                state = room.State;
+                accounts = room.Accounts.ToArray();
+            }
+            if (state is "closed" or "playing" || HasRegisteredGame(accounts)) continue;
+            if (accounts.Where(static account => account is not null).All(HasNewGameAccess)) continue;
+            DisbandFriendlyRoom(
+                room,
+                leaverAccount: null,
+                otherMessage: "QQ 群白名单资格已变化，赛前房间已关闭。");
+        }
+    }
+
+    private static bool HasNewGameAccess(string? account)
+    {
+        if (string.IsNullOrWhiteSpace(account)) return false;
+        try { return _qqAccessStore.CheckNewGameAccess(account).Allowed; }
+        catch (Exception ex)
+        {
+            LogErr($"QQ 新对局资格读取失败 {account}: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool HasRegisteredGame(IEnumerable<string?> accounts)
+    {
+        foreach (var account in accounts)
+        {
+            if (account is null || !AccountIndex.TryGetValue(account, out var sessionId)) continue;
+            var gameRoom = GameRoomManager.GetRoomBySession(sessionId);
+            if (gameRoom is not null && Array.IndexOf(gameRoom.PlayerSessionIds, sessionId) >= 0)
+                return true;
+        }
+        return false;
+    }
+
     private static void CancelMatchingSessions()
     {
         foreach (var session in Sessions.Values)
@@ -3543,6 +3871,147 @@ public static class WebSocketBridge
                 && session.IsLoggedIn
                 && GlobalAnnouncementPolicy.IsAuthorized(session.Account))
                 SendRulesetState(session);
+    }
+
+    private static void OnQqWhitelistStatus(WsSession session)
+    {
+        if (!TryResolveQqAdministrator(session, out _, out _))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqWhitelistStatus",
+                result = false,
+                logStr = "没有查看 QQ 白名单状态的权限。",
+            });
+            return;
+        }
+        SendQqWhitelistStatus(session);
+    }
+
+    private static void OnQqWhitelistImport(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!TryResolveQqAdministrator(session, out var adminAccount, out var bootstrapOnly))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqWhitelistImport",
+                result = false,
+                logStr = "没有导入 QQ 白名单的权限。",
+            });
+            return;
+        }
+        if (!session.TryConsumeRateLimit("admin-qq-whitelist-import", capacity: 3, refillPerSecond: 1d / 60d))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqWhitelistImport",
+                result = false,
+                logStr = "白名单导入请求过于频繁，请稍后再试。",
+            });
+            return;
+        }
+        if (!msg.TryGetValue("json", out var jsonElement) || jsonElement.ValueKind != JsonValueKind.String)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqWhitelistImport",
+                result = false,
+                logStr = "请选择有效的 .json 文件，QQ 必须按字符串语义处理。",
+            });
+            return;
+        }
+
+        try
+        {
+            var result = _qqAccessStore.Import(
+                adminAccount,
+                jsonElement.GetString() ?? "",
+                initializationOnly: bootstrapOnly);
+            EvictIneligibleWaitingActivities();
+            Send(session.SessionId, new
+            {
+                proto = "MsgQqWhitelistImport",
+                result = true,
+                version = result.Version,
+                importedAt = result.ImportedAt,
+                memberCount = result.MemberCount,
+                duplicateCount = result.DuplicateCount,
+                addedCount = result.AddedCount,
+                removedCount = result.RemovedCount,
+                removedBoundCount = result.RemovedBoundCount,
+                requiresQqBinding = bootstrapOnly,
+                logStr = bootstrapOnly
+                    ? "首份 QQ 白名单已导入。请立即绑定名单内 QQ，完成后才能正常登录。"
+                    : "QQ 白名单已原子替换。",
+            });
+            foreach (var current in Sessions.Values)
+                if (TryResolveQqAdministrator(current, out _, out _))
+                    SendQqWhitelistStatus(current);
+            Log($"QQ 白名单导入完成：操作者={adminAccount}，版本={result.Version}，人数={result.MemberCount}，新增={result.AddedCount}，移除={result.RemovedCount}");
+        }
+        catch (Exception ex) when (ex is QqAccessValidationException or SqliteException or InvalidOperationException)
+        {
+            var message = ex is QqAccessValidationException ? ex.Message : "QQ 白名单导入失败，请稍后重试。";
+            Send(session.SessionId, new { proto = "MsgQqWhitelistImport", result = false, logStr = message });
+            LogErr($"QQ 白名单导入失败：操作者={adminAccount}，原因={ex.Message}");
+        }
+    }
+
+    private static bool TryResolveQqAdministrator(
+        WsSession session,
+        out string adminAccount,
+        out bool bootstrapOnly)
+    {
+        adminAccount = "";
+        bootstrapOnly = false;
+        if (session.QqBootstrapAccount is { Length: > 0 } bootstrapAccount
+            && AdministratorPolicy.IsAuthorized(bootstrapAccount)
+            && _qqAccessStore.IsBootstrapAdministrator(bootstrapAccount))
+        {
+            adminAccount = bootstrapAccount;
+            bootstrapOnly = true;
+            return true;
+        }
+        if (session.Account is { Length: > 0 } account
+            && IsCurrentAccountSession(session)
+            && AdministratorPolicy.IsAuthorized(account))
+        {
+            adminAccount = account;
+            return true;
+        }
+        return false;
+    }
+
+    private static void SendQqWhitelistStatus(WsSession session)
+    {
+        if (!TryResolveQqAdministrator(session, out var account, out var bootstrapOnly)) return;
+        var status = _qqAccessStore.GetStatus();
+        var binding = _qqAccessStore.GetAccountBindingStatus(account);
+        Send(session.SessionId, new
+        {
+            proto = "MsgQqWhitelistStatus",
+            result = true,
+            initialized = status.Initialized,
+            version = status.Version,
+            memberCount = status.MemberCount,
+            importedAt = status.ImportedAt,
+            importedBy = status.ImportedBy,
+            duplicateCount = status.DuplicateCount,
+            addedCount = status.AddedCount,
+            removedCount = status.RemovedCount,
+            removedBoundCount = status.RemovedBoundCount,
+            maxImportBytes = QqAccessStore.MaxImportBytes,
+            maxImportMembers = QqAccessStore.MaxImportMembers,
+            bootstrapOnly,
+            canImport = !bootstrapOnly || !status.Initialized,
+            accountBinding = new
+            {
+                bound = binding.Bound,
+                maskedQq = binding.MaskedQq,
+                currentlyWhitelisted = binding.CurrentlyWhitelisted,
+                boundAt = binding.BoundAt,
+            },
+        });
     }
 
     private static void OnAdminOperations(WsSession session)
@@ -3826,6 +4295,7 @@ public static class WebSocketBridge
     private static object ToAdminPlayerPayload(AdminPlayerSummary player)
     {
         var presence = PresenceOf(player.Account);
+        var qqBinding = _qqAccessStore.GetAccountBindingStatus(player.Account);
         return new
         {
             account = player.Account,
@@ -3834,6 +4304,10 @@ public static class WebSocketBridge
             lastLoginAt = player.LastLoginAt,
             hasPassword = player.HasPassword,
             online = presence.Online,
+            qqBound = qqBinding.Bound,
+            qqMasked = qqBinding.MaskedQq,
+            qqCurrentlyWhitelisted = qqBinding.CurrentlyWhitelisted,
+            qqBoundAt = qqBinding.BoundAt,
         };
     }
 

@@ -21,6 +21,11 @@ public class WsSession
     public WebSocket Socket     { get; init; } = null!;
 
     public string?   Account    { get; set; }
+    /// <summary>
+    /// 白名单从未导入时，经账号密码认证且在首次迁移快照中的管理员账号。
+    /// 此字段不代表完整登录，不计在线，也不能访问白名单状态/导入之外的业务协议。
+    /// </summary>
+    public string?   QqBootstrapAccount { get; set; }
     public string?   ClientInstanceId { get; set; }
     public string?   PlayerName { get; set; }
     public string    CardBackId { get; set; } = Persistence.PlayerDataStore.DefaultCardBackId;

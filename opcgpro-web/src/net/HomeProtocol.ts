@@ -90,6 +90,9 @@ import type {
   MsgAdminDeploy,
   MsgAdminPlayerSearch,
   MsgAdminPlayerUpdate,
+  MsgQqWhitelistStatus,
+  MsgQqWhitelistImport,
+  MsgQqAccessDenied,
   AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
@@ -210,6 +213,15 @@ export function registerHomeProtocols() {
         break;
       case "MsgLogin":
         handleLogin(msg as MsgLogin);
+        break;
+      case "MsgQqWhitelistStatus":
+        handleQqWhitelistStatus(msg as MsgQqWhitelistStatus);
+        break;
+      case "MsgQqWhitelistImport":
+        handleQqWhitelistImport(msg as MsgQqWhitelistImport);
+        break;
+      case "MsgQqAccessDenied":
+        handleQqAccessDenied(msg as MsgQqAccessDenied);
         break;
       case "MsgPlayerData":
         handlePlayerData(msg as MsgPlayerData);
@@ -494,6 +506,12 @@ function handleLogin(msg: MsgLogin) {
         store.setNavigateTo("/home");
       }
     }
+    if (msg.needsQqBinding || msg.needsQqWhitelistInitialization) {
+      store.setLoggedIn(false);
+      if (typeof window !== "undefined" && window.location.pathname === "/game") {
+        store.setNavigateTo("/home");
+      }
+    }
     if (msg.authChallenge) {
       store.setError(null);
     } else {
@@ -501,6 +519,26 @@ function handleLogin(msg: MsgLogin) {
       if (msg.logStr) showMessage(msg.logStr, "error");
     }
   }
+}
+
+function handleQqWhitelistStatus(msg: MsgQqWhitelistStatus) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "QQ 白名单状态读取失败", "error");
+    return;
+  }
+  useNetStore.getState().setQqWhitelistStatus(msg);
+}
+
+function handleQqWhitelistImport(msg: MsgQqWhitelistImport) {
+  showMessage(
+    msg.logStr ?? (msg.result ? "QQ 白名单已导入" : "QQ 白名单导入失败"),
+    msg.result ? "info" : "error",
+  );
+  if (msg.result) HomeRequest.requestQqWhitelistStatus();
+}
+
+function handleQqAccessDenied(msg: MsgQqAccessDenied) {
+  showMessage(msg.logStr ?? "当前会话没有执行该操作的权限", "error");
 }
 
 function applyPlayerData(
@@ -1099,16 +1137,31 @@ export const HomeRequest = {
     sessionStorage.setItem(HOME_REFRESH_RESUME_KEY, "1");
   },
 
-  login(account: string, password?: string, resume = false) {
+  login(
+    account: string,
+    password?: string,
+    resume = false,
+    qq?: string,
+    authTokenOverride?: string,
+  ) {
     return NetManager.send({
       proto: "MsgLogin",
       account,
       clientInstanceId: getClientInstanceId(),
       resume,
       ...(password === undefined
-        ? { authToken: readAuthToken(account) }
+        ? { authToken: authTokenOverride ?? readAuthToken(account) }
         : { password }),
+      ...(qq === undefined ? {} : { qq }),
     } as MsgLogin);
+  },
+
+  requestQqWhitelistStatus() {
+    return NetManager.send({ proto: "MsgQqWhitelistStatus" } as MsgQqWhitelistStatus);
+  },
+
+  importQqWhitelist(json: string) {
+    return NetManager.send({ proto: "MsgQqWhitelistImport", json } as MsgQqWhitelistImport);
   },
 
   addAccount(id: string, password: string, name: string) {

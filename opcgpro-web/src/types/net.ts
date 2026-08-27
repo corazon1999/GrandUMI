@@ -94,11 +94,18 @@ export interface MsgLogin extends MsgBase {
   account: string;
   password?: string;
   authToken?: string;
+  /** QQ 始终作为字符串传输，禁止用 JS number。 */
+  qq?: string;
   clientInstanceId?: string;
   resume?: boolean;
   needsPassword?: boolean;
   needsPasswordSetup?: boolean;
+  needsQqBinding?: boolean;
+  needsQqWhitelistInitialization?: boolean;
+  canInitializeQqWhitelist?: boolean;
   authChallenge?: boolean;
+  qqMasked?: string | null;
+  qqWhitelistVersion?: number | null;
   name?: string;     // 服务器返回的玩家昵称
   avatar?: string;
   cardBackId?: string;
@@ -1350,6 +1357,58 @@ export interface AdminPlayerSummary {
   lastLoginAt: number;
   hasPassword: boolean;
   online: boolean;
+  qqBound?: boolean;
+  qqMasked?: string | null;
+  qqCurrentlyWhitelisted?: boolean;
+  qqBoundAt?: number | null;
+}
+
+export interface QqAccountBindingStatus {
+  bound: boolean;
+  maskedQq?: string | null;
+  currentlyWhitelisted: boolean;
+  boundAt?: number | null;
+}
+
+export interface MsgQqWhitelistStatus extends MsgBase {
+  proto: "MsgQqWhitelistStatus";
+  result?: boolean;
+  logStr?: string;
+  initialized?: boolean;
+  version?: number;
+  memberCount?: number;
+  importedAt?: number | null;
+  importedBy?: string | null;
+  duplicateCount?: number;
+  addedCount?: number;
+  removedCount?: number;
+  removedBoundCount?: number;
+  maxImportBytes?: number;
+  maxImportMembers?: number;
+  bootstrapOnly?: boolean;
+  canImport?: boolean;
+  accountBinding?: QqAccountBindingStatus;
+}
+
+export interface MsgQqWhitelistImport extends MsgBase {
+  proto: "MsgQqWhitelistImport";
+  json?: string;
+  result?: boolean;
+  logStr?: string;
+  version?: number;
+  importedAt?: number;
+  memberCount?: number;
+  duplicateCount?: number;
+  addedCount?: number;
+  removedCount?: number;
+  removedBoundCount?: number;
+  requiresQqBinding?: boolean;
+}
+
+export interface MsgQqAccessDenied extends MsgBase {
+  proto: "MsgQqAccessDenied";
+  result?: false;
+  logStr?: string;
 }
 
 export interface AdminDeploymentStatus {
@@ -1410,6 +1469,9 @@ export type AnyMsg =
   | MsgSecret
   | MsgPing
   | MsgLogin
+  | MsgQqWhitelistStatus
+  | MsgQqWhitelistImport
+  | MsgQqAccessDenied
   | MsgAddAccount
   | MsgUpdatePs
   | MsgPlayerData

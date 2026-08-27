@@ -38,6 +38,7 @@ import type {
   DailyActivePlayerPoint,
   AdminStorageSnapshot,
   AdminPlayerSummary,
+  MsgQqWhitelistStatus,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -144,6 +145,7 @@ interface NetStore {
   adminOperations: AdminOperationsState;
   adminPlayerSearchResults: AdminPlayerSummary[];
   adminTemporaryPassword: { account: string; password: string } | null;
+  qqWhitelistStatus: MsgQqWhitelistStatus | null;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
   friends: FriendInfo[];
@@ -217,6 +219,7 @@ interface NetStore {
   setAdminOperations: (operations: AdminOperationsState) => void;
   setAdminPlayerSearchResults: (players: AdminPlayerSummary[]) => void;
   setAdminTemporaryPassword: (value: NetStore["adminTemporaryPassword"]) => void;
+  setQqWhitelistStatus: (status: MsgQqWhitelistStatus | null) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
   setFriendSearchResults: (players: FriendSearchPlayer[]) => void;
@@ -299,6 +302,7 @@ const initialState = {
   } as AdminOperationsState,
   adminPlayerSearchResults: [] as AdminPlayerSummary[],
   adminTemporaryPassword: null as NetStore["adminTemporaryPassword"],
+  qqWhitelistStatus: null as MsgQqWhitelistStatus | null,
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
   incomingFriendRequests: [] as FriendRequestInfo[],
@@ -440,6 +444,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setAdminOperations: (adminOperations) => set({ adminOperations }),
   setAdminPlayerSearchResults: (adminPlayerSearchResults) => set({ adminPlayerSearchResults }),
   setAdminTemporaryPassword: (adminTemporaryPassword) => set({ adminTemporaryPassword }),
+  setQqWhitelistStatus: (qqWhitelistStatus) => set({ qqWhitelistStatus }),
 
   setPlayerList: (list) => set({ playerList: list }),
 

@@ -13,6 +13,7 @@ import type {
   OnlinePlayerPeakPoint,
 } from "@/types/net";
 import RulesetControlPanel from "./RulesetControlPanel";
+import QqWhitelistImportPanel from "./QqWhitelistImportPanel";
 
 type AdminPanelProps = {
   onOpenCardBackReview: () => void;
@@ -388,6 +389,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
     HomeRequest.requestRulesetState();
     HomeRequest.requestCardBackReviewQueue();
     HomeRequest.requestAdminOperations();
+    HomeRequest.requestQqWhitelistStatus();
     setLastRefreshAt(new Date());
   }, [connected, maintenance.canManage]);
 
@@ -425,6 +427,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
     HomeRequest.requestRulesetState();
     HomeRequest.requestCardBackReviewQueue();
     HomeRequest.requestAdminOperations();
+    HomeRequest.requestQqWhitelistStatus();
     setLastRefreshAt(new Date());
   };
 
@@ -725,6 +728,10 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           </section>
         </div>
 
+        <div className="mt-6">
+          <QqWhitelistImportPanel />
+        </div>
+
         <div className="mt-6 grid gap-4 @[900px]:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1.35fr)]">
           <section aria-label="服务器磁盘空间" className="rounded-2xl border border-emerald-900/70 bg-emerald-950/15 p-4 @[640px]:p-5">
             <p className="text-xs font-bold tracking-[0.16em] text-emerald-400">STORAGE</p>
@@ -798,6 +805,9 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedPlayer.online ? "bg-emerald-500/15 text-emerald-300" : "bg-gray-800 text-gray-400"}`}>{selectedPlayer.online ? "当前在线" : "当前离线"}</span>
                     </div>
                     <p className="mt-2 text-[11px] text-gray-600">最近登录 {formatTimestamp(selectedPlayer.lastLoginAt)} · {selectedPlayer.hasPassword ? "已设置密码" : "尚未设置密码"}</p>
+                    <p className={`mt-1 text-xs font-bold ${selectedPlayer.qqCurrentlyWhitelisted ? "text-emerald-300" : selectedPlayer.qqBound ? "text-red-300" : "text-amber-300"}`}>
+                      QQ：{selectedPlayer.qqBound ? `${selectedPlayer.qqMasked ?? "已绑定"}${selectedPlayer.qqCurrentlyWhitelisted ? " · 当前在白名单" : " · 当前已移出白名单"}` : "尚未绑定"}
+                    </p>
                     <div className="mt-4">
                       <label htmlFor="admin-player-name" className="text-xs font-bold text-gray-400">修改昵称</label>
                       <div className="mt-2 flex flex-col gap-2 @[520px]:flex-row">

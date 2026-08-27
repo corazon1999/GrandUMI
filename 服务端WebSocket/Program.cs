@@ -48,7 +48,13 @@ var playerDataStore = new PlayerDataStore(playerDatabasePath, deferLoginWrites: 
 playerDataStore.Initialize();
 var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore);
 accountAuthenticationStore.Initialize();
+var qqAccessStore = new QqAccessStore(playerDataStore, AdministratorPolicy.GetAuthorizedAccounts());
+qqAccessStore.Initialize();
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
+var qqWhitelistStatus = qqAccessStore.GetStatus();
+Console.WriteLine(qqWhitelistStatus.Initialized
+    ? $"[QQ 准入] 白名单 v{qqWhitelistStatus.Version}，{qqWhitelistStatus.MemberCount} 人"
+    : "[QQ 准入] 白名单尚未初始化，仅既有授权管理员可导入首份名单");
 var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "online-player-history.db"));
@@ -114,6 +120,7 @@ await GameRoomManager.RestoreAll();
 WebSocketBridge.Initialize(
     playerDataStore,
     accountAuthenticationStore,
+    qqAccessStore,
     onlinePlayerHistoryStore,
     onlinePlayerHistoryReadStore,
     adminOperationsMetricsCache,

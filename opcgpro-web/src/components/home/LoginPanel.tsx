@@ -8,6 +8,8 @@ import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 import type { MsgLogin } from "@/types/net";
+import { normalizeQq } from "@/lib/qqWhitelist.mjs";
+import QqWhitelistImportPanel from "./QqWhitelistImportPanel";
 import {
   clearSessionReplacedNotice,
   getSessionReplacedNotice,
@@ -45,10 +47,12 @@ export default function LoginPanel() {
   const [account, setAccount] = useState("");
   const [storedAccount, setStoredAccount] = useState("");
   const [editingAccount, setEditingAccount] = useState(true);
-  const [authStep, setAuthStep] = useState<"account" | "password" | "setup">("account");
+  const [authStep, setAuthStep] = useState<"account" | "password" | "setup" | "qq" | "bootstrap">("account");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [qq, setQq] = useState("");
+  const [qqAuthToken, setQqAuthToken] = useState("");
   const [pending, setPending] = useState(false);
   const submittedLoginRef = useRef<{ account: string; password?: string } | null>(null);
   const connState = useNetStore((s) => s.connState);
@@ -76,6 +80,27 @@ export default function LoginPanel() {
         const submitted = submittedLoginRef.current;
         if (submitted?.password) rememberPassword(submitted.account, submitted.password);
         setConfirmPassword("");
+        setQq("");
+        setQqAuthToken("");
+        return;
+      }
+      if (login.needsQqWhitelistInitialization && login.canInitializeQqWhitelist) {
+        const nextAccount = (login.account || submittedLoginRef.current?.account || "").trim();
+        if (nextAccount) setAccount(nextAccount);
+        setQqAuthToken((current) => login.authToken ?? current);
+        setAuthStep("bootstrap");
+        setConfirmPassword("");
+        setShowPassword(false);
+        HomeRequest.requestQqWhitelistStatus();
+        return;
+      }
+      if (login.needsQqBinding) {
+        const nextAccount = (login.account || submittedLoginRef.current?.account || "").trim();
+        if (nextAccount) setAccount(nextAccount);
+        if (login.authToken) setQqAuthToken(login.authToken);
+        setAuthStep("qq");
+        setConfirmPassword("");
+        setShowPassword(false);
         return;
       }
       if (login.needsPassword) {
@@ -103,7 +128,7 @@ export default function LoginPanel() {
     clearSessionReplacedNotice();
     store.setError(null);
 
-    if (authStep !== "account" && !password) {
+    if ((authStep === "password" || authStep === "setup") && !password) {
       store.setError("请输入密码。");
       return;
     }
@@ -117,6 +142,34 @@ export default function LoginPanel() {
         return;
       }
     }
+
+    if (authStep === "qq") {
+      let normalizedQq: string;
+      try { normalizedQq = normalizeQq(qq); }
+      catch (validationError) {
+        store.setError(validationError instanceof Error ? validationError.message : "QQ 格式无效。");
+        return;
+      }
+      const normalizedAccount = account.trim();
+      const fallbackPassword = qqAuthToken ? undefined : submittedLoginRef.current?.password;
+      const sent = HomeRequest.login(
+        normalizedAccount,
+        fallbackPassword,
+        false,
+        normalizedQq,
+        qqAuthToken || undefined,
+      );
+      if (sent) {
+        submittedLoginRef.current = {
+          account: normalizedAccount,
+          password: submittedLoginRef.current?.password,
+        };
+        setPending(true);
+      }
+      return;
+    }
+
+    if (authStep === "bootstrap") return;
 
     const normalizedAccount = account.trim();
     const submittedPassword = authStep === "account" ? undefined : password;
@@ -140,6 +193,8 @@ export default function LoginPanel() {
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
+    setQq("");
+    setQqAuthToken("");
     setPending(false);
     useNetStore.getState().setError(null);
   };
@@ -153,7 +208,7 @@ export default function LoginPanel() {
       }}
     >
       <motion.div
-        className="mt-auto w-full max-w-sm rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-2xl sm:p-8"
+        className={`mt-auto w-full rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-2xl sm:p-8 ${authStep === "bootstrap" ? "max-w-xl" : "max-w-sm"}`}
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -173,6 +228,54 @@ export default function LoginPanel() {
             <p className="text-sm text-gray-500">欢迎回来</p>
             <p className="mt-1 truncate text-lg font-bold text-white">{storedAccount}</p>
           </div>
+        ) : authStep === "bootstrap" ? (
+          <div className="mb-5 space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-amber-800/70 bg-amber-950/20 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs text-amber-300">受限初始化管理员</p>
+                <p className="truncate font-bold text-white">{account}</p>
+              </div>
+              <button type="button" onClick={startChangingAccount} className="min-h-11 shrink-0 px-3 text-sm text-amber-200 hover:text-white">
+                更换账号
+              </button>
+            </div>
+            <p className="rounded-xl border border-amber-800/70 bg-amber-950/25 px-4 py-3 text-sm leading-6 text-amber-100">
+              当前会话只能导入首份 QQ 白名单。导入完成后，你也必须绑定名单内 QQ 才能进入大厅或对局。
+            </p>
+            <QqWhitelistImportPanel bootstrap onImported={() => setAuthStep("qq")} />
+          </div>
+        ) : authStep === "qq" ? (
+          <div className="mb-5 space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-950/70 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500">已验证登录账号</p>
+                <p className="truncate font-bold text-white">{account}</p>
+              </div>
+              <button type="button" onClick={startChangingAccount} className="min-h-11 shrink-0 px-3 text-sm text-orange-300 hover:text-orange-200">
+                更换账号
+              </button>
+            </div>
+            <div>
+              <label htmlFor="login-qq" className="mb-2 block text-sm font-medium text-gray-300">绑定 QQ</label>
+              <input
+                id="login-qq"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="h-12 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-base text-white outline-none transition-colors placeholder:text-gray-600 focus:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/30"
+                placeholder="5–12 位 QQ 号"
+                value={qq}
+                onChange={(event) => setQq(event.target.value.normalize("NFKC").replace(/[^0-9]/g, "").slice(0, 12))}
+                onKeyDown={(event) => event.key === "Enter" && handleLogin()}
+                autoComplete="off"
+                maxLength={12}
+                autoFocus
+              />
+              <p className="mt-2 rounded-xl border border-amber-900/70 bg-amber-950/20 px-3 py-2 text-sm leading-6 text-amber-200">
+                QQ 必须位于当前群白名单；一经绑定，玩家不能自行修改或解绑。
+              </p>
+            </div>
+          </div>
         ) : authStep !== "account" ? (
           <div className="mb-5 space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-950/70 px-4 py-3">
@@ -180,7 +283,7 @@ export default function LoginPanel() {
                 <p className="text-xs text-gray-500">登录账号</p>
                 <p className="truncate font-bold text-white">{account}</p>
               </div>
-              <button type="button" onClick={startChangingAccount} className="min-h-10 shrink-0 px-3 text-sm text-orange-300 hover:text-orange-200">
+              <button type="button" onClick={startChangingAccount} className="min-h-11 shrink-0 px-3 text-sm text-orange-300 hover:text-orange-200">
                 更换账号
               </button>
             </div>
@@ -279,24 +382,28 @@ export default function LoginPanel() {
           </p>
         )}
 
-        <button
-          onClick={handleLogin}
-          disabled={!canLogin || !accountReady || pending}
-          aria-busy={isConnecting || pending}
-          className="h-12 w-full rounded-xl bg-orange-500 text-base font-bold text-white transition-colors hover:bg-orange-400 active:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
-        >
-          {canLogin
-            ? pending
-              ? "正在验证..."
-              : authStep === "setup"
-                ? "设置密码并登录"
-                : authStep === "password"
-                  ? "登录"
-                  : storedAccount && !editingAccount
-                    ? `以 ${storedAccount} 继续`
-                    : "继续"
-            : STATE_LABEL[connState]}
-        </button>
+        {authStep !== "bootstrap" && (
+          <button
+            onClick={handleLogin}
+            disabled={!canLogin || !accountReady || pending}
+            aria-busy={isConnecting || pending}
+            className="h-12 w-full rounded-xl bg-orange-500 text-base font-bold text-white transition-colors hover:bg-orange-400 active:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+          >
+            {canLogin
+              ? pending
+                ? "正在验证..."
+                : authStep === "setup"
+                  ? "设置密码并继续绑定 QQ"
+                  : authStep === "password"
+                    ? "验证密码"
+                    : authStep === "qq"
+                      ? "绑定 QQ 并登录"
+                      : storedAccount && !editingAccount
+                        ? `以 ${storedAccount} 继续`
+                        : "继续"
+              : STATE_LABEL[connState]}
+          </button>
+        )}
 
         {authStep === "account" && storedAccount && !editingAccount && (
           <button
