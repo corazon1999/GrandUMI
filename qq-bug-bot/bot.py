@@ -12,10 +12,12 @@
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 import re
 import sys
+import time
 from uuid import uuid4
 
 import websockets
@@ -319,6 +321,96 @@ def at_message(qq: str, text: str) -> list[dict]:
     ]
 
 
+def member_verification_groups(cfg: dict) -> set[str]:
+    """新人验证必须显式配置目标群；空列表永远不表示全部群。"""
+    if not cfg.get("new_member_verification_enabled", False):
+        return set()
+    groups = set()
+    for value in cfg.get("new_member_verification_groups") or []:
+        text = str(value).strip()
+        if text.isdigit() and int(text) > 0:
+            groups.add(str(int(text)))
+    return groups
+
+
+def is_real_at_self(event: dict) -> bool:
+    """验证流程只接受 OneBot 顶层结构化 at 段，不信任正文或 CQ 字符串。"""
+    self_id = str(event.get("self_id") or "")
+    message = event.get("message")
+    if not self_id or not isinstance(message, list):
+        return False
+    return any(
+        isinstance(segment, dict)
+        and segment.get("type") == "at"
+        and str((segment.get("data") or {}).get("qq") or "") == self_id
+        for segment in message
+    )
+
+
+_QQ_NUMBER_RE = re.compile(r"(?<!\d)([1-9]\d{4,11})(?!\d)")
+
+
+def extract_inviter_qq(event: dict):
+    """只从顶层文字和真实 at 段提取唯一 QQ，不读取引用/转发/昵称。"""
+    message = event.get("message")
+    if not isinstance(message, list):
+        return None, "请真正 @机器人，并在正文里填写邀请人的 QQ 号。"
+    self_id = str(event.get("self_id") or "")
+    candidates = set()
+    for segment in message:
+        if not isinstance(segment, dict):
+            continue
+        data = segment.get("data") or {}
+        if segment.get("type") == "at":
+            qq = str(data.get("qq") or "").strip()
+            if qq not in ("", "all", self_id) and _QQ_NUMBER_RE.fullmatch(qq):
+                candidates.add(qq)
+        elif segment.get("type") == "text":
+            candidates.update(_QQ_NUMBER_RE.findall(str(data.get("text") or "")))
+    if not candidates:
+        return None, "没有识别到邀请人 QQ，请只填写一个完整 QQ 号后重新 @机器人。"
+    if len(candidates) != 1:
+        return None, "识别到多个 QQ 号，请只保留一位邀请人的 QQ 后重新 @机器人。"
+    return next(iter(candidates)), ""
+
+
+def member_verification_message_key(event: dict) -> str:
+    """优先使用 OneBot 消息号；缺失时对可信事件字段做稳定摘要。"""
+    message_id = event.get("message_id")
+    if message_id not in (None, ""):
+        return f"onebot:{message_id}"
+    payload = {
+        "group_id": str(event.get("group_id") or ""),
+        "user_id": str(event.get("user_id") or ""),
+        "time": int(event.get("time") or 0),
+        "message": event.get("message") if isinstance(event.get("message"), list) else [],
+    }
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _event_received_at(event: dict) -> int:
+    value = event.get("_grandumi_received_at")
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(time.time())
+
+
+def _event_source_time(event: dict) -> int:
+    """OneBot 时间只用于审计/通知去重，异常时间退回本机接收时间。"""
+    received_at = _event_received_at(event)
+    try:
+        source_time = int(event.get("time"))
+    except (TypeError, ValueError):
+        return received_at
+    if abs(source_time - received_at) > 86400:
+        return received_at
+    return source_time
+
+
 async def send_group_msg(ws, group_id, message) -> None:
     """发送群消息(动作经同一条正向 WS 下发)。"""
     payload = {
@@ -326,6 +418,361 @@ async def send_group_msg(ws, group_id, message) -> None:
         "params": {"group_id": int(group_id), "message": message},
     }
     await ws.send(json.dumps(payload, ensure_ascii=False))
+
+
+async def send_group_msg_confirmed(client, group_id, message) -> dict:
+    """安全关键消息必须等待 OneBot 成功响应，不能把“已写入 WS”当作已送达。"""
+    if not hasattr(client, "call_action"):
+        raise RuntimeError("当前 OneBot 客户端不支持确认式动作调用")
+    return await client.call_action(
+        "send_group_msg",
+        {"group_id": int(group_id), "message": message},
+    )
+
+
+async def get_authoritative_group_members(client, group_id) -> set[str]:
+    """通过成功返回的 OneBot 成员列表核验，不信任玩家正文或本地缓存。"""
+    response = await client.call_action(
+        "get_group_member_list",
+        {"group_id": int(group_id), "no_cache": True},
+    )
+    data = response.get("data")
+    if not isinstance(data, list):
+        raise RuntimeError("OneBot 成员列表响应格式异常")
+    members = set()
+    for item in data:
+        if not isinstance(item, dict) or item.get("user_id") in (None, ""):
+            raise RuntimeError("OneBot 成员列表包含无效成员记录")
+        returned_group = item.get("group_id")
+        if returned_group not in (None, "") and str(returned_group) != str(group_id):
+            raise RuntimeError("OneBot 成员列表混入其他群的数据")
+        members.add(str(item["user_id"]))
+    return members
+
+
+def _member_verification_timeout(cfg: dict) -> int:
+    return max(
+        60,
+        min(86400, int(cfg.get("new_member_verification_timeout_seconds", 600))),
+    )
+
+
+def _member_verification_lease(cfg: dict) -> int:
+    return max(
+        30,
+        min(300, int(cfg.get("new_member_verification_claim_lease_seconds", 60))),
+    )
+
+
+async def _try_send_verification_message(client, group_id, qq, text) -> bool:
+    try:
+        await send_group_msg_confirmed(client, group_id, at_message(str(qq), text))
+        return True
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(f"[新人验证] 群{group_id} 给{qq}发送消息失败：{exc}")
+        return False
+
+
+async def process_member_verification_prompt(
+    client, cfg: dict, verification_id: int | None = None
+) -> bool:
+    """发送并确认新人提示；提示未确认送达时不开始倒计时。"""
+    groups = member_verification_groups(cfg)
+    job = storage.claim_member_verification_prompt(
+        verification_id,
+        lease_seconds=_member_verification_lease(cfg),
+        group_ids=groups,
+    )
+    if not job:
+        return False
+    token = str(job["claim_token"])
+    timeout_seconds = _member_verification_timeout(cfg)
+    minutes = max(1, (timeout_seconds + 59) // 60)
+    text = (
+        f"欢迎加入本群。请在 {minutes} 分钟内回答邀请人的 QQ 号；"
+        "回复时必须真正 @本群机器人，例如“@机器人 123456789”。"
+        "机器人确认邀请人当前在群后才算验证完成，逾期未完成会被移出群。"
+    )
+    try:
+        await send_group_msg_confirmed(
+            client,
+            job["group_id"],
+            at_message(str(job["newcomer_qq"]), text),
+        )
+    except asyncio.CancelledError:
+        storage.release_member_verification_claim(
+            job["id"], token, "prompt", "连接中断，等待重试"
+        )
+        raise
+    except Exception as exc:
+        storage.release_member_verification_claim(
+            job["id"], token, "prompt", f"提示发送失败：{exc}"
+        )
+        print(
+            f"[新人验证#{job['id']}] 群{job['group_id']}提示发送失败，"
+            f"将自动重试：{exc}"
+        )
+        return True
+    if not storage.complete_member_verification_prompt(
+        job["id"], token, timeout_seconds
+    ):
+        print(f"[新人验证#{job['id']}] 提示已发送，但会话状态已变化")
+        return True
+    print(
+        f"[新人验证#{job['id']}] 已提示群{job['group_id']}新人"
+        f"{job['newcomer_qq']}，{timeout_seconds}秒后到期"
+    )
+    return True
+
+
+async def process_member_inviter_check(
+    client, job: dict, notify_on_failure: bool = False
+) -> bool:
+    """核查已持久化的邀请人答案；网络失败时保留答案等待恢复。"""
+    token = str(job.get("claim_token") or "")
+    candidate = str(job.get("candidate_qq") or "")
+    try:
+        members = await get_authoritative_group_members(client, job["group_id"])
+    except asyncio.CancelledError:
+        storage.defer_member_inviter_check(
+            job["id"], token, "连接中断，等待自动重试"
+        )
+        raise
+    except Exception as exc:
+        storage.defer_member_inviter_check(
+            job["id"], token, f"成员列表核查失败：{exc}"
+        )
+        print(f"[新人验证#{job['id']}] 成员列表核查失败，将自动重试：{exc}")
+        if notify_on_failure:
+            await _try_send_verification_message(
+                client,
+                job["group_id"],
+                job["newcomer_qq"],
+                "成员列表暂时无法核查，答案已经保存，机器人会自动重试，请勿重复发送。",
+            )
+        return True
+
+    newcomer = str(job["newcomer_qq"])
+    if newcomer not in members:
+        storage.complete_member_verification_absent(job["id"], token)
+        print(f"[新人验证#{job['id']}] 新人已不在群，结束验证")
+        return True
+    if candidate in members:
+        if storage.complete_member_inviter_check(job["id"], token, candidate):
+            await _try_send_verification_message(
+                client,
+                job["group_id"],
+                newcomer,
+                f"验证完成，已记录邀请人 QQ：{candidate}。",
+            )
+            print(
+                f"[新人验证#{job['id']}] 验证完成：新人{newcomer}，"
+                f"邀请人{candidate}"
+            )
+        return True
+
+    result = storage.reject_member_inviter_check(
+        job["id"], token, f"QQ {candidate} 不在当前群成员列表"
+    )
+    if result and result.get("can_retry"):
+        await _try_send_verification_message(
+            client,
+            job["group_id"],
+            newcomer,
+            f"QQ {candidate} 当前不在本群，请核对后重新 @机器人，回答另一位邀请人 QQ。",
+        )
+    return True
+
+
+async def process_member_verification_timeout(client, job: dict) -> bool:
+    """到期后先查新人仍在群，再原子授权并执行移出动作。"""
+    token = str(job.get("claim_token") or "")
+    try:
+        members = await get_authoritative_group_members(client, job["group_id"])
+    except asyncio.CancelledError:
+        storage.release_member_verification_timeout(
+            job["id"], token, "连接中断，等待重新核查"
+        )
+        raise
+    except Exception as exc:
+        storage.release_member_verification_timeout(
+            job["id"], token, f"踢人前成员核查失败：{exc}"
+        )
+        print(f"[新人验证#{job['id']}] 踢人前核查失败，不执行踢人：{exc}")
+        return True
+
+    newcomer = str(job["newcomer_qq"])
+    if newcomer not in members:
+        storage.complete_member_verification_absent(job["id"], token)
+        print(f"[新人验证#{job['id']}] 到期时新人已离群，不再踢人")
+        return True
+    if not storage.authorize_member_verification_kick(job["id"], token):
+        print(f"[新人验证#{job['id']}] 踢人前状态已变化，取消动作")
+        return True
+    try:
+        await client.call_action(
+            "set_group_kick",
+            {
+                "group_id": int(job["group_id"]),
+                "user_id": int(newcomer),
+                # false 只移出本次成员，不联动拒绝其后续加群请求。
+                "reject_add_request": False,
+            },
+        )
+    except asyncio.CancelledError:
+        storage.release_member_verification_timeout(
+            job["id"], token, "踢人响应中断，等待重新核查成员状态"
+        )
+        raise
+    except Exception as exc:
+        storage.release_member_verification_timeout(
+            job["id"], token, f"OneBot 踢人失败：{exc}"
+        )
+        print(f"[新人验证#{job['id']}] 踢人动作失败，未标记成功：{exc}")
+        return True
+    if storage.complete_member_verification_kick(job["id"], token):
+        print(f"[新人验证#{job['id']}] 新人{newcomer}超时，已移出群")
+    return True
+
+
+async def run_member_verification_job_once(client, cfg: dict) -> bool:
+    """按答案恢复、提示恢复、超时处理的优先级执行一个持久任务。"""
+    groups = member_verification_groups(cfg)
+    if not groups:
+        return False
+    lease = _member_verification_lease(cfg)
+    job = storage.claim_pending_member_inviter_check(
+        lease_seconds=lease, group_ids=groups
+    )
+    if job:
+        return await process_member_inviter_check(client, job)
+    if await process_member_verification_prompt(client, cfg):
+        return True
+    job = storage.claim_due_member_verification_timeout(
+        lease_seconds=lease, group_ids=groups
+    )
+    if job:
+        return await process_member_verification_timeout(client, job)
+    return False
+
+
+async def member_verification_loop(client, cfg: dict, event_lock) -> None:
+    """连接恢复后从 SQLite 继续未完成的提示、答案核查和超时任务。"""
+    interval = max(
+        1,
+        min(60, int(cfg.get("new_member_verification_poll_interval_seconds", 2))),
+    )
+    while True:
+        try:
+            async with event_lock:
+                await run_member_verification_job_once(client, cfg)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(f"[新人验证] 后台调度异常：{exc}")
+        await asyncio.sleep(interval)
+
+
+async def handle_member_verification_notice(client, cfg: dict, event: dict) -> bool:
+    groups = member_verification_groups(cfg)
+    group_id = str(event.get("group_id") or "")
+    if (
+        event.get("post_type") != "notice"
+        or group_id not in groups
+        or event.get("notice_type") not in ("group_increase", "group_decrease")
+    ):
+        return False
+    newcomer = str(event.get("user_id") or "")
+    if not newcomer or newcomer == str(event.get("self_id") or ""):
+        return True
+    if event.get("notice_type") == "group_decrease":
+        storage.mark_member_verification_left(
+            group_id,
+            newcomer,
+            now=_event_received_at(event),
+            detail=f"收到 OneBot 退群通知：{event.get('sub_type') or 'unknown'}",
+        )
+        return True
+
+    sender = event.get("sender") or {}
+    nickname = str(
+        sender.get("card") or sender.get("nickname") or event.get("nickname") or ""
+    )
+    verification = storage.start_member_verification(
+        group_id,
+        newcomer,
+        nickname,
+        _event_source_time(event),
+        now=_event_received_at(event),
+    )
+    if verification.get("created"):
+        await process_member_verification_prompt(client, cfg, verification["id"])
+    return True
+
+
+async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bool:
+    group_id = str(event.get("group_id") or "")
+    newcomer = str(event.get("user_id") or "")
+    if group_id not in member_verification_groups(cfg):
+        return False
+    active = storage.get_active_member_verification(group_id, newcomer)
+    if not active or not is_real_at_self(event):
+        return False
+    received_at = _event_received_at(event)
+    if active["state"] == "kicking" or (
+        active.get("deadline_at") is not None
+        and received_at > int(active["deadline_at"])
+    ):
+        await _try_send_verification_message(
+            client, group_id, newcomer, "验证时间已经结束，机器人正在进行最终状态核查。"
+        )
+        return True
+
+    candidate, error = extract_inviter_qq(event)
+    if error:
+        await _try_send_verification_message(client, group_id, newcomer, error)
+        return True
+    if candidate == newcomer:
+        await _try_send_verification_message(
+            client, group_id, newcomer, "不能把自己填写为邀请人，请核对后重新回答。"
+        )
+        return True
+    if candidate == str(event.get("self_id") or ""):
+        await _try_send_verification_message(
+            client, group_id, newcomer, "不能把本群机器人填写为邀请人，请核对后重新回答。"
+        )
+        return True
+
+    started = storage.begin_member_inviter_check(
+        group_id,
+        newcomer,
+        candidate,
+        member_verification_message_key(event),
+        _event_source_time(event),
+        received_at=received_at,
+    )
+    status = started.get("status")
+    if status in ("duplicate", "conflict", "no_session"):
+        return True
+    if status == "busy":
+        await _try_send_verification_message(
+            client, group_id, newcomer, "上一次回答仍在核查中，请稍候，不用重复发送。"
+        )
+        return True
+    if status == "expired":
+        await _try_send_verification_message(
+            client, group_id, newcomer, "验证时间已经结束，机器人正在进行最终状态核查。"
+        )
+        return True
+    if status != "claimed":
+        print(f"[新人验证] 未知回答领取结果：{status}")
+        return True
+    await process_member_inviter_check(
+        client, started["verification"], notify_on_failure=True
+    )
+    return True
 
 
 async def handle_feedback(ws, cfg, event, content, media=None) -> None:
@@ -599,8 +1046,14 @@ async def notification_loop(ws, cfg) -> None:
 
 
 async def on_event(ws, cfg, event) -> None:
-    # 只处理群消息
+    if await handle_member_verification_notice(ws, cfg, event):
+        return
+
+    # 其余路由只处理群消息
     if event.get("post_type") != "message" or event.get("message_type") != "group":
+        return
+
+    if await handle_member_verification_reply(ws, cfg, event):
         return
 
     allowed = cfg.get("allowed_groups") or []
@@ -703,8 +1156,16 @@ def _finish_event_task(tasks: set, task) -> None:
 async def run() -> None:
     cfg = load_config()
     storage.init_db()
+    verification_groups = member_verification_groups(cfg)
+    cancelled = storage.cancel_member_verifications_outside_groups(
+        verification_groups
+    )
+    if cancelled:
+        print(f"[新人验证] 因目标群配置变化取消了 {cancelled} 条遗留会话")
     url = build_ws_url(cfg)
     print(f"GrandUMI bug 反馈机器人启动,连接 {cfg['ws_url']} …")
+    if cfg.get("new_member_verification_enabled", False) and not verification_groups:
+        print("[新人验证] 已配置启用，但目标群列表为空或无效；为避免误踢，功能不会生效")
 
     # 断线自动重连
     while True:
@@ -713,12 +1174,17 @@ async def run() -> None:
                 print("已连接 NapCat,等待群消息…")
                 client = OneBotClient(ws)
                 notifier = None
+                verifier = None
                 event_tasks = set()
                 event_lock = asyncio.Lock()
                 if cfg.get("agent_enabled", False) or cfg.get(
                     "chat_agent_enabled", False
                 ):
                     notifier = asyncio.create_task(notification_loop(client, cfg))
+                if verification_groups:
+                    verifier = asyncio.create_task(
+                        member_verification_loop(client, cfg, event_lock)
+                    )
                 try:
                     async for raw in ws:
                         try:
@@ -729,6 +1195,8 @@ async def run() -> None:
                         if "post_type" not in event:
                             client.resolve_response(event)
                             continue
+                        # 本机接收时间用于十分钟边界，不能由群消息正文伪造。
+                        event["_grandumi_received_at"] = int(time.time())
                         task = asyncio.create_task(
                             _dispatch_event(event_lock, client, cfg, event)
                         )
@@ -746,6 +1214,10 @@ async def run() -> None:
                         notifier.cancel()
                         with contextlib.suppress(asyncio.CancelledError):
                             await notifier
+                    if verifier:
+                        verifier.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await verifier
         except (OSError, websockets.exceptions.WebSocketException) as e:
             print(f"连接断开/失败: {e};5 秒后重连…")
             await asyncio.sleep(5)

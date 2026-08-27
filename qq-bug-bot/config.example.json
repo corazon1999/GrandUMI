@@ -22,5 +22,9 @@
   "forward_max_nodes": 40,
   "forward_max_depth": 3,
   "chat_max_pending_per_user": 1,
-  "chat_cooldown_seconds": 15
+  "chat_cooldown_seconds": 15,
+  "new_member_verification_enabled": false,
+  "new_member_verification_groups": [],
+  "new_member_verification_timeout_seconds": 600,
+  "new_member_verification_poll_interval_seconds": 2
 }

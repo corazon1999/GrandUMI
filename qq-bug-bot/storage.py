@@ -7,6 +7,7 @@
 import os
 import json
 import sqlite3
+import time
 from datetime import datetime
 from datetime import timedelta
 from uuid import uuid4
@@ -21,6 +22,14 @@ CHAT_QUEUE_STATES = ("queued", "claimed")
 CHAT_TERMINAL_STATES = ("completed", "failed")
 PERSONALITIES = ("hancock", "nami", "robin")
 DEFAULT_PERSONALITY = "hancock"
+MEMBER_VERIFICATION_ACTIVE_STATES = (
+    "awaiting_prompt",
+    "pending",
+    "checking_inviter",
+    "checking_timeout",
+    "kicking",
+)
+MEMBER_VERIFICATION_TERMINAL_STATES = ("verified", "kicked", "left", "cancelled")
 
 
 def init_db() -> None:
@@ -93,8 +102,76 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS member_verifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id TEXT NOT NULL,
+                newcomer_qq TEXT NOT NULL,
+                nickname TEXT,
+                join_event_time INTEGER NOT NULL,
+                state TEXT NOT NULL DEFAULT 'awaiting_prompt',
+                inviter_qq TEXT,
+                candidate_qq TEXT,
+                response_message_key TEXT,
+                response_event_time INTEGER,
+                prompt_sent_at INTEGER,
+                deadline_at INTEGER,
+                invalid_attempts INTEGER NOT NULL DEFAULT 0,
+                prompt_attempts INTEGER NOT NULL DEFAULT 0,
+                check_attempts INTEGER NOT NULL DEFAULT 0,
+                kick_attempts INTEGER NOT NULL DEFAULT 0,
+                claim_token TEXT,
+                claim_kind TEXT,
+                claimed_at INTEGER,
+                next_attempt_at INTEGER,
+                last_error TEXT,
+                verified_at INTEGER,
+                kick_requested_at INTEGER,
+                kicked_at INTEGER,
+                ended_at INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                UNIQUE(group_id, newcomer_qq, join_event_time)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS member_verification_responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                verification_id INTEGER NOT NULL,
+                group_id TEXT NOT NULL,
+                newcomer_qq TEXT NOT NULL,
+                message_key TEXT NOT NULL,
+                candidate_qq TEXT NOT NULL,
+                event_time INTEGER NOT NULL,
+                received_at INTEGER NOT NULL,
+                result TEXT NOT NULL,
+                detail TEXT,
+                updated_at INTEGER NOT NULL,
+                UNIQUE(verification_id, message_key)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_chat_messages_queue
             ON chat_messages(state, created_at, id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_member_verifications_active
+            ON member_verifications(group_id, newcomer_qq)
+            WHERE state IN (
+                'awaiting_prompt', 'pending', 'checking_inviter',
+                'checking_timeout', 'kicking'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_member_verifications_jobs
+            ON member_verifications(state, deadline_at, claimed_at, id)
             """
         )
         # 幂等迁移:给老库补上新列(缺了才加)
@@ -148,7 +225,912 @@ def init_db() -> None:
                 "ALTER TABLE chat_messages "
                 "ADD COLUMN personality TEXT NOT NULL DEFAULT 'hancock'"
             )
+        verification_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(member_verifications)")
+        }
+        if "next_attempt_at" not in verification_cols:
+            conn.execute(
+                "ALTER TABLE member_verifications ADD COLUMN next_attempt_at INTEGER"
+            )
         conn.commit()
+
+
+def _verification_now(value=None) -> int:
+    return int(time.time() if value is None else value)
+
+
+def _verification_dict(row):
+    return dict(row) if row else None
+
+
+def get_member_verification(verification_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?",
+            (int(verification_id),),
+        ).fetchone()
+        return _verification_dict(row)
+
+
+def get_active_member_verification(group_id: str, newcomer_qq: str):
+    """读取某位群成员当前唯一的验证会话。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN (
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (str(group_id), str(newcomer_qq)),
+        ).fetchone()
+        return _verification_dict(row)
+
+
+def get_member_verification_responses(verification_id: int):
+    """测试和审计使用：按收到顺序读取回答核查记录。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM member_verification_responses
+             WHERE verification_id = ?
+             ORDER BY id
+            """,
+            (int(verification_id),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def start_member_verification(
+    group_id: str,
+    newcomer_qq: str,
+    nickname: str,
+    join_event_time: int,
+    now=None,
+):
+    """幂等创建入群验证；重复通知不会重置十分钟窗口。"""
+    group_id = str(group_id)
+    newcomer_qq = str(newcomer_qq)
+    join_event_time = _verification_now(join_event_time)
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        active = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN (
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (group_id, newcomer_qq),
+        ).fetchone()
+        if active:
+            conn.commit()
+            result = dict(active)
+            result["created"] = False
+            result["reason"] = "active"
+            return result
+
+        latest = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ? AND newcomer_qq = ?
+             ORDER BY join_event_time DESC, id DESC
+             LIMIT 1
+            """,
+            (group_id, newcomer_qq),
+        ).fetchone()
+        if latest and int(latest["join_event_time"]) >= join_event_time:
+            conn.commit()
+            result = dict(latest)
+            result["created"] = False
+            result["reason"] = "replayed_notice"
+            return result
+
+        cur = conn.execute(
+            """
+            INSERT INTO member_verifications (
+                group_id, newcomer_qq, nickname, join_event_time, state,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'awaiting_prompt', ?, ?)
+            """,
+            (
+                group_id,
+                newcomer_qq,
+                str(nickname or ""),
+                join_event_time,
+                now_value,
+                now_value,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+        conn.commit()
+        result = dict(row)
+        result["created"] = True
+        result["reason"] = "created"
+        return result
+
+
+def mark_member_verification_left(
+    group_id: str, newcomer_qq: str, now=None, detail: str = "成员已离群"
+) -> bool:
+    """收到权威退群通知后结束活动会话，避免之后误踢。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'left',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = ?,
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN (
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+            """,
+            (
+                str(detail or "成员已离群")[:1000],
+                now_value,
+                now_value,
+                str(group_id),
+                str(newcomer_qq),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def cancel_member_verifications_outside_groups(group_ids, now=None) -> int:
+    """配置停用或移除目标群时取消遗留会话，防止以后重新启用时补踢。"""
+    now_value = _verification_now(now)
+    normalized = sorted({str(value) for value in (group_ids or [])})
+    with sqlite3.connect(DB_PATH) as conn:
+        args = [now_value, now_value]
+        group_clause = ""
+        if normalized:
+            placeholders = ",".join("?" for _ in normalized)
+            group_clause = f" AND group_id NOT IN ({placeholders})"
+            args.extend(normalized)
+        cur = conn.execute(
+            f"""
+            UPDATE member_verifications
+               SET state = 'cancelled',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = '目标群配置已停用，取消遗留验证',
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE state IN (
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+               {group_clause}
+            """,
+            tuple(args),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def claim_member_verification_prompt(
+    verification_id: int | None = None,
+    now=None,
+    lease_seconds: int = 30,
+    group_ids=None,
+):
+    """领取一条尚未成功发出提示的会话；租约过期后可由重启实例恢复。"""
+    now_value = _verification_now(now)
+    stale = now_value - max(5, int(lease_seconds))
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        args = [now_value, stale]
+        group_clause = ""
+        if group_ids is not None:
+            normalized_groups = sorted({str(value) for value in group_ids})
+            if not normalized_groups:
+                conn.rollback()
+                return None
+            placeholders = ",".join("?" for _ in normalized_groups)
+            group_clause = f" AND group_id IN ({placeholders})"
+            args.extend(normalized_groups)
+        id_clause = ""
+        if verification_id is not None:
+            id_clause = " AND id = ?"
+            args.append(int(verification_id))
+        row = conn.execute(
+            f"""
+            SELECT * FROM member_verifications
+             WHERE state = 'awaiting_prompt'
+               AND COALESCE(next_attempt_at, 0) <= ?
+               AND (claim_token IS NULL OR claimed_at IS NULL OR claimed_at <= ?)
+               {group_clause}
+               {id_clause}
+             ORDER BY created_at, id
+             LIMIT 1
+            """,
+            tuple(args),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET claim_token = ?,
+                   claim_kind = 'prompt',
+                   claimed_at = ?,
+                   next_attempt_at = NULL,
+                   prompt_attempts = prompt_attempts + 1,
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'awaiting_prompt'
+               AND (claim_token IS NULL OR claimed_at IS NULL OR claimed_at <= ?)
+            """,
+            (token, now_value, now_value, row["id"], stale),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        claimed = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(claimed)
+
+
+def complete_member_verification_prompt(
+    verification_id: int,
+    claim_token: str,
+    timeout_seconds: int,
+    sent_at=None,
+) -> bool:
+    """只在 OneBot 确认提示发送成功后启动倒计时。"""
+    sent_value = _verification_now(sent_at)
+    timeout_value = max(1, int(timeout_seconds))
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'pending',
+                   prompt_sent_at = ?,
+                   deadline_at = ?,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   last_error = NULL,
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'awaiting_prompt'
+               AND claim_kind = 'prompt'
+               AND claim_token = ?
+            """,
+            (
+                sent_value,
+                sent_value + timeout_value,
+                sent_value,
+                int(verification_id),
+                str(claim_token),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def release_member_verification_claim(
+    verification_id: int,
+    claim_token: str,
+    claim_kind: str,
+    error: str,
+    now=None,
+    retry_delay_seconds: int = 5,
+) -> bool:
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = ?,
+                   last_error = ?,
+                   updated_at = ?
+             WHERE id = ? AND claim_token = ? AND claim_kind = ?
+            """,
+            (
+                now_value + max(1, int(retry_delay_seconds)),
+                str(error or "未知错误")[:1000],
+                now_value,
+                int(verification_id),
+                str(claim_token),
+                str(claim_kind),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def begin_member_inviter_check(
+    group_id: str,
+    newcomer_qq: str,
+    candidate_qq: str,
+    message_key: str,
+    event_time: int,
+    received_at=None,
+):
+    """原子接收一条回答，并使超时任务失效；返回 status 与已领取会话。"""
+    now_value = _verification_now(received_at)
+    event_value = _verification_now(event_time)
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE group_id = ?
+               AND newcomer_qq = ?
+               AND state IN (
+                   'awaiting_prompt', 'pending', 'checking_inviter',
+                   'checking_timeout', 'kicking'
+               )
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (str(group_id), str(newcomer_qq)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return {"status": "no_session"}
+        if row["state"] == "kicking":
+            conn.rollback()
+            return {"status": "expired", "verification": dict(row)}
+        if row["state"] == "checking_inviter":
+            conn.rollback()
+            return {"status": "busy", "verification": dict(row)}
+        deadline = row["deadline_at"]
+        if deadline is not None and now_value > int(deadline):
+            conn.rollback()
+            return {"status": "expired", "verification": dict(row)}
+        try:
+            conn.execute(
+                """
+                INSERT INTO member_verification_responses (
+                    verification_id, group_id, newcomer_qq, message_key,
+                    candidate_qq, event_time, received_at, result, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'checking', ?)
+                """,
+                (
+                    row["id"],
+                    str(group_id),
+                    str(newcomer_qq),
+                    str(message_key),
+                    str(candidate_qq),
+                    event_value,
+                    now_value,
+                    now_value,
+                ),
+            )
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            return {"status": "duplicate", "verification": dict(row)}
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'checking_inviter',
+                   candidate_qq = ?,
+                   response_message_key = ?,
+                   response_event_time = ?,
+                   claim_token = ?,
+                   claim_kind = 'inviter',
+                   claimed_at = ?,
+                   next_attempt_at = NULL,
+                   check_attempts = check_attempts + 1,
+                   last_error = NULL,
+                   updated_at = ?
+             WHERE id = ?
+               AND state IN ('awaiting_prompt', 'pending', 'checking_timeout')
+            """,
+            (
+                str(candidate_qq),
+                str(message_key),
+                event_value,
+                token,
+                now_value,
+                now_value,
+                row["id"],
+            ),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return {"status": "conflict"}
+        claimed = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return {"status": "claimed", "verification": dict(claimed)}
+
+
+def claim_pending_member_inviter_check(
+    now=None, lease_seconds: int = 30, group_ids=None
+):
+    """恢复 API 失败、断线或进程中止时留下的邀请人核查。"""
+    now_value = _verification_now(now)
+    stale = now_value - max(5, int(lease_seconds))
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        args = [now_value, stale]
+        group_clause = ""
+        if group_ids is not None:
+            normalized_groups = sorted({str(value) for value in group_ids})
+            if not normalized_groups:
+                conn.rollback()
+                return None
+            placeholders = ",".join("?" for _ in normalized_groups)
+            group_clause = f" AND group_id IN ({placeholders})"
+            args.extend(normalized_groups)
+        row = conn.execute(
+            f"""
+            SELECT * FROM member_verifications
+             WHERE state = 'checking_inviter'
+               AND candidate_qq IS NOT NULL
+               AND COALESCE(next_attempt_at, 0) <= ?
+               AND (claim_token IS NULL OR claimed_at IS NULL OR claimed_at <= ?)
+               {group_clause}
+             ORDER BY updated_at, id
+             LIMIT 1
+            """,
+            tuple(args),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET claim_token = ?,
+                   claim_kind = 'inviter',
+                   claimed_at = ?,
+                   next_attempt_at = NULL,
+                   check_attempts = check_attempts + 1,
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'checking_inviter'
+               AND (claim_token IS NULL OR claimed_at IS NULL OR claimed_at <= ?)
+            """,
+            (token, now_value, now_value, row["id"], stale),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        claimed = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(claimed)
+
+
+def defer_member_inviter_check(
+    verification_id: int,
+    claim_token: str,
+    error: str,
+    now=None,
+    retry_delay_seconds: int = 5,
+) -> bool:
+    """权威成员接口失败时保留玩家答案，不通过也不进入超时踢人。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT response_message_key FROM member_verifications
+             WHERE id = ?
+               AND state = 'checking_inviter'
+               AND claim_kind = 'inviter'
+               AND claim_token = ?
+            """,
+            (int(verification_id), str(claim_token)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        detail = str(error or "成员接口暂时不可用")[:1000]
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = ?,
+                   last_error = ?,
+                   updated_at = ?
+             WHERE id = ?
+            """,
+            (
+                now_value + max(1, int(retry_delay_seconds)),
+                detail,
+                now_value,
+                int(verification_id),
+            ),
+        )
+        conn.execute(
+            """
+            UPDATE member_verification_responses
+               SET result = 'retrying', detail = ?, updated_at = ?
+             WHERE verification_id = ? AND message_key = ?
+            """,
+            (
+                detail,
+                now_value,
+                int(verification_id),
+                str(row["response_message_key"] or ""),
+            ),
+        )
+        conn.commit()
+        return True
+
+
+def complete_member_inviter_check(
+    verification_id: int, claim_token: str, inviter_qq: str, now=None
+) -> bool:
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT response_message_key FROM member_verifications
+             WHERE id = ?
+               AND state = 'checking_inviter'
+               AND claim_kind = 'inviter'
+               AND claim_token = ?
+            """,
+            (int(verification_id), str(claim_token)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'verified',
+                   inviter_qq = ?,
+                   candidate_qq = ?,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   last_error = NULL,
+                   verified_at = ?,
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE id = ?
+            """,
+            (
+                str(inviter_qq),
+                str(inviter_qq),
+                now_value,
+                now_value,
+                now_value,
+                int(verification_id),
+            ),
+        )
+        conn.execute(
+            """
+            UPDATE member_verification_responses
+               SET result = 'verified', detail = NULL, updated_at = ?
+             WHERE verification_id = ? AND message_key = ?
+            """,
+            (
+                now_value,
+                int(verification_id),
+                str(row["response_message_key"] or ""),
+            ),
+        )
+        conn.commit()
+        return True
+
+
+def reject_member_inviter_check(
+    verification_id: int, claim_token: str, detail: str, now=None
+):
+    """候选 QQ 不在群时回到待回答状态；已过期则交给超时任务。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM member_verifications
+             WHERE id = ?
+               AND state = 'checking_inviter'
+               AND claim_kind = 'inviter'
+               AND claim_token = ?
+            """,
+            (int(verification_id), str(claim_token)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        next_state = "pending" if row["prompt_sent_at"] is not None else "awaiting_prompt"
+        conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = ?,
+                   invalid_attempts = invalid_attempts + 1,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = NULL,
+                   last_error = NULL,
+                   updated_at = ?
+             WHERE id = ?
+            """,
+            (next_state, now_value, int(verification_id)),
+        )
+        conn.execute(
+            """
+            UPDATE member_verification_responses
+               SET result = 'not_member', detail = ?, updated_at = ?
+             WHERE verification_id = ? AND message_key = ?
+            """,
+            (
+                str(detail or "邀请人不在群内")[:1000],
+                now_value,
+                int(verification_id),
+                str(row["response_message_key"] or ""),
+            ),
+        )
+        updated = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?",
+            (int(verification_id),),
+        ).fetchone()
+        conn.commit()
+        result = dict(updated)
+        result["can_retry"] = (
+            result["deadline_at"] is None
+            or now_value <= int(result["deadline_at"])
+        )
+        return result
+
+
+def claim_due_member_verification_timeout(
+    now=None, lease_seconds: int = 30, group_ids=None
+):
+    """领取到期会话；也恢复中断的最终检查/踢人动作。"""
+    now_value = _verification_now(now)
+    stale = now_value - max(5, int(lease_seconds))
+    token = uuid4().hex
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        group_clause = ""
+        args = []
+        if group_ids is not None:
+            normalized_groups = sorted({str(value) for value in group_ids})
+            if not normalized_groups:
+                conn.rollback()
+                return None
+            placeholders = ",".join("?" for _ in normalized_groups)
+            group_clause = f"group_id IN ({placeholders}) AND "
+            args.extend(normalized_groups)
+        args.extend((now_value, now_value, stale))
+        row = conn.execute(
+            f"""
+            SELECT * FROM member_verifications
+             WHERE {group_clause}((
+                    state = 'pending'
+                AND deadline_at IS NOT NULL
+                AND deadline_at <= ?
+                AND COALESCE(next_attempt_at, 0) <= ?
+             ) OR (
+                    state IN ('checking_timeout', 'kicking')
+                AND (claimed_at IS NULL OR claimed_at <= ?)
+             ))
+             ORDER BY COALESCE(deadline_at, updated_at), id
+             LIMIT 1
+            """,
+            tuple(args),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'checking_timeout',
+                   claim_token = ?,
+                   claim_kind = 'timeout',
+                   claimed_at = ?,
+                   next_attempt_at = NULL,
+                   updated_at = ?
+             WHERE id = ?
+               AND (
+                    (state = 'pending' AND deadline_at IS NOT NULL
+                     AND deadline_at <= ? AND COALESCE(next_attempt_at, 0) <= ?)
+                 OR (state IN ('checking_timeout', 'kicking')
+                     AND (claimed_at IS NULL OR claimed_at <= ?))
+               )
+            """,
+            (
+                token,
+                now_value,
+                now_value,
+                row["id"],
+                now_value,
+                now_value,
+                stale,
+            ),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        claimed = conn.execute(
+            "SELECT * FROM member_verifications WHERE id = ?", (row["id"],)
+        ).fetchone()
+        conn.commit()
+        return dict(claimed)
+
+
+def authorize_member_verification_kick(
+    verification_id: int, claim_token: str, now=None
+) -> bool:
+    """踢人前最后一次原子核验会话仍处于同一个超时租约。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'kicking',
+                   claim_kind = 'kick',
+                   claimed_at = ?,
+                   next_attempt_at = NULL,
+                   kick_attempts = kick_attempts + 1,
+                   kick_requested_at = COALESCE(kick_requested_at, ?),
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'checking_timeout'
+               AND claim_kind = 'timeout'
+               AND claim_token = ?
+            """,
+            (
+                now_value,
+                now_value,
+                now_value,
+                int(verification_id),
+                str(claim_token),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def release_member_verification_timeout(
+    verification_id: int,
+    claim_token: str,
+    error: str,
+    now=None,
+    retry_delay_seconds: int = 5,
+) -> bool:
+    """最终成员查询或踢人失败时回到到期队列，不把失败当成功。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = CASE
+                       WHEN prompt_sent_at IS NULL THEN 'awaiting_prompt'
+                       ELSE 'pending'
+                   END,
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   next_attempt_at = ?,
+                   last_error = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND state IN ('checking_timeout', 'kicking')
+               AND claim_token = ?
+               AND claim_kind IN ('timeout', 'kick')
+            """,
+            (
+                now_value + max(1, int(retry_delay_seconds)),
+                str(error or "超时处理失败")[:1000],
+                now_value,
+                int(verification_id),
+                str(claim_token),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def complete_member_verification_absent(
+    verification_id: int, claim_token: str, now=None
+) -> bool:
+    """权威成员列表确认新人已不在群时安全结束，不再调用踢人。"""
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'left',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = '权威成员列表确认成员已离群',
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND state IN ('checking_inviter', 'checking_timeout', 'kicking')
+               AND claim_token = ?
+            """,
+            (now_value, now_value, int(verification_id), str(claim_token)),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def complete_member_verification_kick(
+    verification_id: int, claim_token: str, now=None
+) -> bool:
+    now_value = _verification_now(now)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE member_verifications
+               SET state = 'kicked',
+                   claim_token = NULL,
+                   claim_kind = NULL,
+                   claimed_at = NULL,
+                   last_error = NULL,
+                   kicked_at = ?,
+                   ended_at = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND state = 'kicking'
+               AND claim_kind = 'kick'
+               AND claim_token = ?
+            """,
+            (
+                now_value,
+                now_value,
+                now_value,
+                int(verification_id),
+                str(claim_token),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
 
 
 def normalize_personality(value: str | None) -> str:

@@ -1,0 +1,24 @@
+# QQ 群新人邀请人验证
+
+- 日期：2026-08-27
+- 分类：新增
+- 影响范围：QQ 群机器人、新人入群管理
+- 状态：已完成
+
+## 玩家可见说明
+
+- 可在指定 QQ 群开启新人验证：机器人会主动提醒新人真正 @机器人并回答邀请人 QQ，确认邀请人仍在群后完成验证；回答无效时继续提示，十分钟内始终未完成才会移出群。
+
+## 技术说明
+
+- 新增 SQLite 持久状态机和回答审计记录，覆盖重复通知、并发回答、超时竞争、机器人断线重启、动作响应丢失与配置停用等恢复路径。
+- 只接受待验证成员本人发送的顶层结构化真实 @消息，候选 QQ 仅从顶层文字或真实 @成员段提取；成员身份统一通过 OneBot `get_group_member_list` 成功响应核验。
+- 提示确认送达后才开始倒计时；成员查询或踢人 API 失败时不会误通过或误标记踢出。超时动作会先复查新人仍在群，再原子核对会话状态并调用 `set_group_kick`，且固定 `reject_add_request=false`。
+- 功能默认关闭并要求显式目标群列表；部署脚本会保留服务器私密配置中的新增字段，不会猜测或自动扩大生效群范围。
+
+## 验证结果
+
+- `py -B -m unittest -v tests.test_member_verification`：18 项通过。
+- `py -B -m unittest discover -s tests -v`：78 项通过。
+- `git diff --check`：通过。
+- 对照 OneBot 11 与 NapCat 官方 API 文档核对了 `get_group_member_list(no_cache)`、`set_group_kick` 和 `reject_add_request` 参数语义。
