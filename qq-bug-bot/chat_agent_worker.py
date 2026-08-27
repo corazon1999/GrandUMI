@@ -34,8 +34,10 @@ class ChatAgentWorker:
         media_root: Path | None = None,
         mode: str = "chat",
         admin_workspace: Path | None = None,
+        config_path: Path | None = None,
     ):
         self.cfg = cfg
+        self.config_path = Path(config_path).resolve() if config_path else None
         self.repo = Path(cfg["repository_root"]).resolve()
         if mode not in ("chat", "admin"):
             raise WorkerError(f"不支持的聊天工作器模式: {mode}")
@@ -76,6 +78,12 @@ class ChatAgentWorker:
                 "GRANDUMI_QQ_MEDIA_ROOT", "E:/GrandUMI-Temp/QQBotMedia"
             )
         ).resolve()
+
+    def resolve_current_codex_command(self) -> str:
+        """重新读取可热更新的 Codex 路径，但不切换任务所连接的远端队列。"""
+        cfg = load_config(self.config_path) if self.config_path else self.cfg
+        command = str(cfg.get("codex_command") or "codex")
+        return resolve_codex_command(command)
 
     def log(self, message: str) -> None:
         line = f"{datetime.now().isoformat(timespec='seconds')} {message}"
@@ -142,7 +150,7 @@ class ChatAgentWorker:
         if not schema.is_file():
             raise WorkerError(f"找不到 Agent 输出 Schema: {schema}")
         args = [
-            resolve_codex_command(str(self.cfg.get("codex_command") or "codex")),
+            self.resolve_current_codex_command(),
             "--ask-for-approval", "never",
         ]
         if admin_mode:
@@ -400,7 +408,7 @@ class ChatAgentWorker:
         for name in ("ssh",):
             if not shutil.which(name):
                 raise WorkerError(f"未找到命令: {name}")
-        resolve_codex_command(str(self.cfg.get("codex_command") or "codex"))
+        self.resolve_current_codex_command()
         self.bridge("status")
         admin_mode = self.mode == "admin"
         result = self.run_codex(
@@ -413,6 +421,9 @@ class ChatAgentWorker:
         self.log("自检通过")
 
     def run_once(self) -> bool:
+        # 先确认本机依赖，再领取有次数上限的远端任务。CLI 更新或配置切换期间
+        # 保持任务排队，避免同一故障在数秒内耗尽全部尝试次数。
+        self.resolve_current_codex_command()
         command = "admin-claim" if self.mode == "admin" else "chat-claim"
         data = self.bridge(command)
         job = data.get("job")
@@ -449,11 +460,13 @@ def main() -> int:
     parser.add_argument("--admin-workspace", type=Path)
     args = parser.parse_args()
     try:
+        config_path = args.config.resolve()
         worker = ChatAgentWorker(
-            load_config(args.config.resolve()),
+            load_config(config_path),
             args.media_root.resolve() if args.media_root else None,
             args.mode,
             args.admin_workspace.resolve() if args.admin_workspace else None,
+            config_path,
         )
         if args.self_check:
             worker.self_check()

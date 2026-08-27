@@ -566,6 +566,78 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             self.assertEqual(str(image_path), args[args.index("--image") + 1])
             self.assertLess(args.index("测试"), args.index("--image"))
 
+    def test工作器每次调用前重新读取Codex命令配置(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            schema_dir = repo / "qq-bug-bot" / "schemas"
+            schema_dir.mkdir(parents=True)
+            (schema_dir / "chat.schema.json").write_text("{}", encoding="utf-8")
+            config_path = root / "agent-worker.json"
+            cfg = {
+                "server": "root@example.com",
+                "remote_bot_dir": "/opt/qq-bug-bot",
+                "repository_root": str(repo),
+                "jobs_root": str(root / "jobs"),
+                "logs_root": str(root / "logs"),
+                "codex_command": "旧路径/codex.exe",
+            }
+            config_path.write_text(
+                json.dumps(cfg, ensure_ascii=False), encoding="utf-8"
+            )
+            worker = chat_agent_worker.ChatAgentWorker(
+                cfg, config_path=config_path
+            )
+            cfg["codex_command"] = "新路径/codex.exe"
+            config_path.write_text(
+                json.dumps(cfg, ensure_ascii=False), encoding="utf-8"
+            )
+            event = {
+                "type": "item.completed",
+                "item": {
+                    "type": "agent_message",
+                    "text": json.dumps({"reply": "已恢复。"}, ensure_ascii=False),
+                },
+            }
+            completed = subprocess.CompletedProcess(
+                [], 0, json.dumps(event, ensure_ascii=False) + "\n", ""
+            )
+            with mock.patch.object(
+                chat_agent_worker,
+                "resolve_codex_command",
+                return_value="新路径/codex.exe",
+            ) as resolve_mock, mock.patch.object(
+                chat_agent_worker, "run_process", return_value=completed
+            ):
+                result = worker.run_codex("测试动态配置")
+            self.assertEqual("已恢复。", result["reply"])
+            resolve_mock.assert_called_once_with("新路径/codex.exe")
+
+    def testCodex不可用时不领取远端任务(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            repo.mkdir()
+            cfg = {
+                "server": "root@example.com",
+                "remote_bot_dir": "/opt/qq-bug-bot",
+                "repository_root": str(repo),
+                "jobs_root": str(root / "jobs"),
+                "logs_root": str(root / "logs"),
+                "codex_command": "已失效/codex.exe",
+            }
+            worker = chat_agent_worker.ChatAgentWorker(cfg)
+            with mock.patch.object(
+                worker,
+                "resolve_current_codex_command",
+                side_effect=chat_agent_worker.WorkerError("未找到 Codex 命令"),
+            ), mock.patch.object(worker, "bridge") as bridge_mock:
+                with self.assertRaisesRegex(
+                    chat_agent_worker.WorkerError, "未找到 Codex 命令"
+                ):
+                    worker.run_once()
+            bridge_mock.assert_not_called()
+
     def test_admin_worker_uses_full_access_in_real_workspace(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = Path(temp)
