@@ -516,6 +516,22 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
         self.assertIn("不得建议群友联系、添加或私聊管理员", prompt)
         self.assertIn("也不得附加其他内容", prompt)
 
+    def test谁强和战力对比类问题统一让群友去问豆包(self):
+        prompt = chat_protocol.build_chat_prompt(
+            {"nickname": "玩家", "content": "路飞和索隆谁更强？"}
+        )
+        for wording in (
+            "A 和 B 谁强",
+            "谁更强",
+            "哪个或哪位更强",
+            "孰强孰弱",
+            "战力高低、强弱",
+        ):
+            with self.subTest(wording=wording):
+                self.assertIn(wording, prompt)
+        self.assertIn('reply 必须恰好为“去问豆包。”', prompt)
+        self.assertIn("不得实际比较、解释理由，也不得附加其他内容", prompt)
+
     def testBug检查提示要求合格回复编号且不合格精准追问(self):
         prompt = chat_protocol.build_bug_intake_prompt(
             {"nickname": "玩家", "content": "这个有 bug"}
