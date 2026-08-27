@@ -42,6 +42,7 @@ test("A/B 后端共享正式数据但由应用单写租约防双写", () => {
   assert.match(backendTemplate, /Slice=grandumi-production\.slice/);
   assert.match(frontendTemplate, /frontend-%i\.env/);
   assert.match(frontendTemplate, /slots\/%i\/frontend\/node_modules\/next/);
+  assert.match(frontendTemplate, /^SuccessExitStatus=143$/m);
 });
 
 test("健康检查连续三次失败才自愈，并优先原槽重启", () => {

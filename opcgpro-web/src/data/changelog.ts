@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-27-production-frontend-clean-stop-fix",
+    version: "2026.08.27.2",
+    date: "2026-08-27",
+    title: "正式发布稳定性修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复正式服蓝绿切换后备用前端被正常停止时误显示为失败的问题，使发布与故障恢复状态更准确。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-27-access-card-rules-domain-release",
     version: "2026.08.27.1",
     date: "2026-08-27",

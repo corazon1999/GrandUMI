@@ -12,6 +12,7 @@ Group=grandumi
 EnvironmentFile=/etc/grandumi/frontend-%i.env
 WorkingDirectory=/opt/grandumi/slots/%i/frontend
 ExecStart=/opt/node/bin/node /opt/grandumi/slots/%i/frontend/node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${GRANDUMI_FRONTEND_PORT}
+SuccessExitStatus=143
 Restart=always
 RestartSec=2
 TimeoutStartSec=45
