@@ -3,7 +3,7 @@
 
 工作流程:
   1. 主动连接 NapCat 的正向 WS 服务端(同一条连接收事件 + 发动作)。
-  2. @机器人时展开文字、图片和合并转发，交给只读视觉聊天 Agent。
+  2. 普通成员 @机器人时固定回复；管理员 @与 Bug 路由按需处理图片。
   3. 含 bug 的消息先检查描述完整性，合格后只记录到 SQLite/Issue。
 
 运行: py bot.py
@@ -290,6 +290,7 @@ _PERSONALITY_FAILED_REPLIES = {
     "nami": "我现在暂时回答不了，过一会儿再来吧。",
     "robin": "我现在暂时无法回答，稍后再聊吧。",
 }
+_ORDINARY_CHAT_DISABLED_REPLY = "我只跟释迦大人聊天"
 
 
 def match_feedback(text: str):
@@ -1326,16 +1327,17 @@ async def on_event(ws, cfg, event) -> None:
             media_pipeline.cleanup_media(media)
             print(f"[错误] 处理 Bug 补充异常: {exc}")
     if is_at_self(event):
-        media = []
         try:
-            media, failures = await download_media_refs(ws, image_refs, cfg)
-            chat_text = text.strip()
-            if failures:
-                chat_text += f"\n（有 {failures} 张图片读取失败）"
-            await handle_chat(ws, cfg, event, chat_text.strip(), media)
+            await send_group_msg(
+                ws,
+                event.get("group_id"),
+                at_message(
+                    str(event.get("user_id", "")),
+                    _ORDINARY_CHAT_DISABLED_REPLY,
+                ),
+            )
         except Exception as e:  # 单条消息出错不应拖垮整个连接
-            media_pipeline.cleanup_media(media)
-            print(f"[错误] 处理聊天异常: {e}")
+            print(f"[错误] 发送普通聊天关闭提示异常: {e}")
 
 
 async def _dispatch_event(lock, client, cfg, event) -> None:

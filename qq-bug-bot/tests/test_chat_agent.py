@@ -84,6 +84,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         switch["user_id"] = 651846226
         cfg = {
             "chat_agent_enabled": True,
+            "admin_agent_enabled": True,
             "admin_agent_owner_qq": 651846226,
         }
         asyncio.run(bot.on_event(ws, cfg, switch))
@@ -92,8 +93,10 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual(1, len(ws.sent))
         self.assertIn("已经切换成娜美", json.dumps(ws.sent[0], ensure_ascii=False))
 
-        asyncio.run(bot.on_event(FakeWebSocket(), cfg, self.event("帮我看看")))
-        first = storage.claim_chat_job("worker")
+        admin_event = self.event("帮我看看")
+        admin_event["user_id"] = 651846226
+        asyncio.run(bot.on_event(FakeWebSocket(), cfg, admin_event))
+        first = storage.claim_chat_job("worker", kinds=("admin_agent",))
         self.assertEqual("nami", first["personality"])
 
         switch["message"] = [{"type": "text", "data": {"text": "#切换罗宾"}}]
@@ -137,36 +140,80 @@ class ChatStorageAndBotTests(unittest.TestCase):
         response = asyncio.run(scenario())
         self.assertEqual([], response["data"]["messages"])
 
-    def test只要艾特机器人就进入队列且不发送等待回执(self):
+    def test普通成员艾特只安全回复且不下载媒体不入队(self):
         ws = FakeWebSocket()
+        event = self.event()
+        event["message"].append(
+            {
+                "type": "image",
+                "data": {
+                    "file": "qq-image.jpg",
+                    "url": "https://multimedia.nt.qq.com.cn/example.jpg",
+                },
+            }
+        )
         cfg = {
             "chat_agent_enabled": True,
             "chat_cooldown_seconds": 0,
             "chat_max_pending_per_user": 1,
         }
-        asyncio.run(bot.on_event(ws, cfg, self.event()))
-        job = storage.claim_chat_job("chat-worker")
-        self.assertEqual("你好", job["content"])
-        self.assertEqual("chat", job["kind"])
-        self.assertEqual("路飞", job["nickname"])
-        self.assertEqual([], ws.sent)
+        with mock.patch.object(
+            bot, "download_media_refs", new=mock.AsyncMock()
+        ) as download:
+            asyncio.run(bot.on_event(ws, cfg, event))
+        download.assert_not_awaited()
+        self.assertIsNone(storage.claim_chat_job("chat-worker"))
+        self.assertEqual(
+            [
+                {
+                    "action": "send_group_msg",
+                    "params": {
+                        "group_id": 456,
+                        "message": bot.at_message("123", "我只跟释迦大人聊天"),
+                    },
+                }
+            ],
+            ws.sent,
+        )
 
     def test_admin_at_has_priority_over_bug_intake(self):
         ws = FakeWebSocket()
         event = self.event("请检查这个 bug 并运行测试")
         event["user_id"] = 651846226
+        event["message"].append(
+            {
+                "type": "image",
+                "data": {
+                    "file": "admin-image.jpg",
+                    "url": "https://multimedia.nt.qq.com.cn/admin.jpg",
+                },
+            }
+        )
+        media = {
+            "name": "a" * 32 + ".jpg",
+            "size": 123,
+            "sha256": "b" * 64,
+            "mime": "image/jpeg",
+        }
         cfg = {
             "chat_agent_enabled": True,
             "admin_agent_enabled": True,
             "admin_agent_owner_qq": 651846226,
         }
-        asyncio.run(bot.on_event(ws, cfg, event))
+        with mock.patch.object(
+            bot,
+            "download_media_refs",
+            new=mock.AsyncMock(return_value=([media], 0)),
+        ) as download:
+            asyncio.run(bot.on_event(ws, cfg, event))
+        download.assert_awaited_once()
         self.assertIsNone(storage.claim_chat_job("chat-worker"))
         job = storage.claim_chat_job(
             "admin-worker", kinds=("admin_agent",)
         )
         self.assertEqual("admin_agent", job["kind"])
         self.assertIn("bug", job["content"])
+        self.assertEqual([media], job["media"])
         self.assertEqual([], ws.sent)
 
     def test_non_admin_cannot_spoof_admin_identity(self):
@@ -178,12 +225,15 @@ class ChatStorageAndBotTests(unittest.TestCase):
             "admin_agent_owner_qq": 651846226,
         }
         asyncio.run(bot.on_event(ws, cfg, event))
-        job = storage.claim_chat_job("chat-worker")
-        self.assertEqual("chat", job["kind"])
+        self.assertIsNone(storage.claim_chat_job("chat-worker"))
         self.assertIsNone(
             storage.claim_chat_job(
                 "admin-worker", kinds=("admin_agent",)
             )
+        )
+        self.assertEqual(
+            bot.at_message("123", "我只跟释迦大人聊天"),
+            ws.sent[0]["params"]["message"],
         )
 
     def test_owner_without_at_still_uses_bug_intake(self):
@@ -199,7 +249,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         job = storage.claim_chat_job("chat-worker")
         self.assertEqual("bug_intake", job["kind"])
 
-    def test艾特机器人时展开合并转发并把图片写入视觉队列(self):
+    def test普通成员艾特含合并转发也不下载图片或入队(self):
         ws = FakeOneBotClient(
             {
                 "messages": [
@@ -223,24 +273,21 @@ class ChatStorageAndBotTests(unittest.TestCase):
         event["message"].append(
             {"type": "forward", "data": {"id": "forward-123"}}
         )
-        media = {
-            "name": "a" * 32 + ".jpg",
-            "size": 123,
-            "sha256": "b" * 64,
-            "mime": "image/jpeg",
-        }
         with mock.patch.object(
             bot,
             "download_media_refs",
-            new=mock.AsyncMock(return_value=([media], 0)),
-        ):
+            new=mock.AsyncMock(),
+        ) as download:
             asyncio.run(bot.on_event(ws, {"chat_agent_enabled": True}, event))
-        job = storage.claim_chat_job("chat-worker")
-        self.assertIn("山治：这个界面怎么设置", job["content"])
-        self.assertEqual([media], job["media"])
+        download.assert_not_awaited()
+        self.assertIsNone(storage.claim_chat_job("chat-worker"))
         self.assertEqual(
             ("get_forward_msg", {"message_id": "forward-123"}),
             ws.actions[0],
+        )
+        self.assertEqual(
+            bot.at_message("123", "我只跟释迦大人聊天"),
+            ws.sent[0]["params"]["message"],
         )
 
     def test未艾特的普通聊天不触发(self):
@@ -273,6 +320,36 @@ class ChatStorageAndBotTests(unittest.TestCase):
                     job["id"], job["claim_token"], "clarify", "", "具体哪里打不开？", True
                 )
                 storage.mark_chat_result_sent(job["id"])
+
+    def test普通成员艾特提交Bug仍下载图片并进入检查队列(self):
+        ws = FakeWebSocket()
+        event = self.event("这张卡有 bug，效果没有生效")
+        event["message"].append(
+            {
+                "type": "image",
+                "data": {
+                    "file": "bug-image.jpg",
+                    "url": "https://multimedia.nt.qq.com.cn/bug.jpg",
+                },
+            }
+        )
+        media = {
+            "name": "a" * 32 + ".jpg",
+            "size": 123,
+            "sha256": "b" * 64,
+            "mime": "image/jpeg",
+        }
+        with mock.patch.object(
+            bot,
+            "download_media_refs",
+            new=mock.AsyncMock(return_value=([media], 0)),
+        ) as download:
+            asyncio.run(bot.on_event(ws, {"chat_agent_enabled": True}, event))
+        download.assert_awaited_once()
+        job = storage.claim_chat_job("chat-worker")
+        self.assertEqual("bug_intake", job["kind"])
+        self.assertEqual([media], job["media"])
+        self.assertEqual([], ws.sent)
 
     def test聊天状态机历史与回执幂等(self):
         first = storage.add_chat_message("1", "路飞", "10", "你好")
@@ -324,7 +401,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         )
         self.assertEqual("failed", storage.get_chat_result_to_send()["state"])
 
-    def test连续艾特都会排队且没有中间确认(self):
+    def test连续艾特都固定回复且不累计聊天任务(self):
         ws = FakeWebSocket()
         cfg = {
             "chat_agent_enabled": True,
@@ -334,8 +411,13 @@ class ChatStorageAndBotTests(unittest.TestCase):
         asyncio.run(bot.on_event(ws, cfg, self.event("第一条")))
         asyncio.run(bot.on_event(ws, cfg, self.event("第二条")))
         status = storage.chat_request_status("123", "456")
-        self.assertEqual(2, status["pending"])
-        self.assertEqual([], ws.sent)
+        self.assertEqual(0, status["pending"])
+        self.assertEqual(2, len(ws.sent))
+        for sent in ws.sent:
+            self.assertEqual(
+                bot.at_message("123", "我只跟释迦大人聊天"),
+                sent["params"]["message"],
+            )
 
     def test完整bug回复记录编号而模糊bug只产生追问(self):
         vague = storage.add_chat_message(
