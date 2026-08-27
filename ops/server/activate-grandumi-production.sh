@@ -26,6 +26,31 @@ verify_production_routes() {
     [[ "$old_code" == 403 ]] || die "旧主域未拒绝访问：HTTP $old_code"
   fi
 }
+converge_standby_release() {
+  local active standby expected_backend expected_frontend
+  active="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || true)"
+  standby="$(cat /var/lib/grandumi-ha/standby-slot 2>/dev/null || true)"
+  [[ "$active" =~ ^[ab]$ && "$standby" =~ ^[ab]$ && "$active" != "$standby" ]] \
+    || die "A/B 活动槽或备用槽状态无效，无法收敛兼容备用版本"
+  if systemctl is-active --quiet "grandumi-production-backend@$standby.service"; then
+    die "备用后端槽位仍在运行，拒绝改写其发布链接"
+  fi
+  if systemctl is-active --quiet "grandumi-production-frontend@$standby.service"; then
+    die "备用前端槽位仍在运行，拒绝改写其发布链接"
+  fi
+  [[ -L "$repo/slots/$standby/backend" && -L "$repo/slots/$standby/frontend" ]] \
+    || die "备用槽位发布链接结构异常"
+
+  expected_backend="$repo/releases/$target/backend"
+  expected_frontend="$repo/releases/$target/frontend"
+  ln -sfn "$expected_backend" "$repo/slots/$standby/backend"
+  ln -sfn "$expected_frontend" "$repo/slots/$standby/frontend"
+  [[ "$(readlink -f "$repo/slots/$standby/backend")" == "$expected_backend" \
+      && "$(readlink -f "$repo/slots/$standby/frontend")" == "$expected_frontend" ]] \
+    || die "备用槽位未能收敛到当前正式版本"
+  printf '%s\n' "$target" > /var/lib/grandumi-ha/standby-release.next
+  mv /var/lib/grandumi-ha/standby-release.next /var/lib/grandumi-ha/standby-release
+}
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位提交号"
 [[ "$(tr -d '\r\n' < /var/lib/grandumi-production-staged)" == "$target" ]] || die "预构建版本与目标版本不一致"
 [[ -d "$repo/releases/$target/backend" && -d "$repo/releases/$target/frontend" ]] \
@@ -37,15 +62,23 @@ if [[ "$active_slot" =~ ^[ab]$ \
       && -e "$repo/slots/$active_slot/backend/GrandUMIServer.dll" ]] \
       && systemctl is-active --quiet "grandumi-production-backend@$active_slot.service" \
       && systemctl is-active --quiet "grandumi-production-frontend@$active_slot.service"; then
+  snapshot_archive="$(/usr/local/sbin/grandumi-production-snapshot "$target")"
+  [[ "$snapshot_archive" == /data/grandumi-archives/pre-release-* \
+      && -f "$snapshot_archive/.complete" ]] \
+    || die "正式切槽前 SQLite 一致性快照未完成"
   /usr/local/sbin/grandumi-production-switch --release "$target"
   active="$(cat /var/lib/grandumi-ha/active-slot)"
   port=8080; [[ "$active" == b ]] && port=8082
   curl -fsS "http://127.0.0.1:$port/version" | grep -Fq "$target" \
     || die "切换后版本与目标提交不一致"
   verify_production_routes
+  # 只有切槽和外部路由验证全部成功后，才把已经停止的备用槽预置为同一发布包。
+  # 这样切换中的任何失败仍能回滚旧槽；发布成功后则立即拥有支持同一 QQ 准入契约的
+  # 冷备用进程，白名单初始化不会以牺牲自动故障转移为代价。
+  converge_standby_release
   printf '%s\n' "$target" > /var/lib/grandumi-production-deployed.next
   mv /var/lib/grandumi-production-deployed.next /var/lib/grandumi-production-deployed
-  echo "新正式服 A/B 发布成功：$target（活动槽位 $active）"
+  echo "新正式服 A/B 发布成功：$target（活动槽位 $active；切槽前快照 $snapshot_archive）"
   exit 0
 fi
 
@@ -60,7 +93,7 @@ done
 if [[ "$existing_count" == "${#database_names[@]}" ]]; then
   data_source=existing
   for name in "${database_names[@]}"; do
-    [[ "$(sqlite3 "/data/grandumi/$name" 'PRAGMA integrity_check;')" == ok ]] \
+    [[ "$(sqlite3 -readonly "/data/grandumi/$name" 'PRAGMA integrity_check;')" == ok ]] \
       || die "现有正式数据完整性失败：$name"
   done
 elif [[ "$existing_count" == 0 ]]; then
@@ -68,7 +101,7 @@ elif [[ "$existing_count" == 0 ]]; then
   [[ -f "$import_dir/.ready" ]] || die "空白服务器首次激活所需数据尚未标记就绪"
   for name in "${database_names[@]}"; do
     [[ -s "$import_dir/$name" ]] || die "缺少首次导入数据：$name"
-    [[ "$(sqlite3 "$import_dir/$name" 'PRAGMA integrity_check;')" == ok ]] \
+    [[ "$(sqlite3 -readonly "$import_dir/$name" 'PRAGMA integrity_check;')" == ok ]] \
       || die "首次导入数据完整性失败：$name"
   done
 else

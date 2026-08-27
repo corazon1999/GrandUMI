@@ -46,23 +46,36 @@ test("对局同时显示六分钟回合时钟、一次加时与总操作时钟",
   assert.match(types, /opponentTurnOperationTimeMs\?: number/);
 });
 
-test("贴咚确认后立即提交，并依靠拒绝回滚与重连权威快照恢复", async () => {
-  const [request, actions, protocol, store] = await Promise.all([
+test("贴咚确认后立即提交，并由服务端令牌控制撤回、拒绝回滚与重连恢复", async () => {
+  const [request, actions, protocol, store, types] = await Promise.all([
     readSource("../src/net/GameRequest.ts"),
     readSource("../src/components/game/GameActions.tsx"),
     readSource("../src/net/GameProtocol.ts"),
     readSource("../src/store/gameStore.ts"),
+    readSource("../src/types/net.ts"),
   ]);
   assert.doesNotMatch(request, /expiresAt|setTimeout\([^)]*commitPendingAttachDon/);
   assert.match(request, /function submitAttachDon/);
   assert.match(request, /"AttachDon",\s*\{ targetId, count: safeCount \}/);
   assert.match(request, /optimisticAttachDon\(targetId, safeCount\)/);
   assert.doesNotMatch(request, /pendingAttachDonUndoQueue|commitPendingAttachDonUndo|undoLastPendingAttachDon/);
+  assert.match(request, /send\("UndoAttachDon", \{ operationId \}\)/);
   assert.match(request, /rollbackOptimistic\(\)/);
   assert.match(request, /requestState:[\s\S]*rollbackOptimistic\(\)[\s\S]*MsgRequestState/);
-  assert.doesNotMatch(actions, /getPendingAttachDonUndo|撤回贴咚|执行下一项操作后将无法撤回/);
+  assert.doesNotMatch(actions, /getPendingAttachDonUndo/);
+  assert.match(actions, /useGameStore\(\(s\) => s\.canUndoAttachDon\)/);
+  assert.match(actions, /useGameStore\(\(s\) => s\.undoAttachDonOperationId\)/);
+  assert.match(actions, /GameRequest\.undoAttachDon\(undoAttachDonOperationId\)/);
+  assert.match(actions, /撤回贴咚/);
+  assert.match(actions, /执行其他对局操作后将无法撤回/);
   assert.match(protocol, /case "MsgActionRejected":[\s\S]*rollbackOptimistic\(\)/);
   assert.doesNotMatch(protocol, /reapplyPendingAttachDonOptimistic/);
+  assert.match(store, /s\.canUndoAttachDon = msg\.canUndoAttachDon \?\? false/);
+  assert.match(store, /s\.undoAttachDonOperationId = msg\.undoAttachDonOperationId \?\? null/);
+  assert.match(store, /s\.undoAttachDonCount = msg\.undoAttachDonCount \?\? 0/);
+  assert.match(store, /s\.undoAttachDonDepth = msg\.undoAttachDonDepth \?\? 0/);
+  assert.match(types, /canUndoAttachDon\?: boolean/);
+  assert.match(types, /undoAttachDonOperationId\?: string \| null/);
   assert.match(store, /const powerBonus = s\.currentTurn \? actual \* 1_000 : 0/);
   assert.match(store, /s\.my\.leaderPower \+= powerBonus/);
   assert.match(store, /target\.powerCurrent \+= powerBonus/);

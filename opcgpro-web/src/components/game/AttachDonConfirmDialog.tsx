@@ -51,7 +51,7 @@ export default function AttachDonConfirmDialog() {
           id="attach-don-confirm-description"
           className="mt-2 text-center text-sm font-medium leading-5 text-slate-300"
         >
-          确认后会立即提交并生效，无法撤回。
+          确认后会立即提交并生效；若尚未执行其他对局操作，可在操作区撤回。
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button

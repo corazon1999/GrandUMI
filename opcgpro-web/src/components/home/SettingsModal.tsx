@@ -258,7 +258,7 @@ export default function SettingsModal({
           <div>
             <h3 id="attach-don-settings-title" className="text-sm font-bold text-white">贴咚操作</h3>
             <p className="mt-1 text-sm leading-5 text-gray-500">
-              此设置默认关闭；开启后会先询问确认，关闭时点选数量即提交。提交后会立即生效，无法撤回。
+              此设置默认关闭；开启后会先询问确认，关闭时点选数量即提交。贴咚会立即生效，执行其他对局操作前仍可撤回。
             </p>
           </div>
           <button

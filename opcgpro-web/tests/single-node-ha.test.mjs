@@ -16,6 +16,8 @@ const [
   productionSlice,
   buildSlice,
   activateScript,
+  backendProject,
+  productionSnapshot,
 ] = await Promise.all([
   read("ops/server/grandumi-production-backend@.service"),
   read("ops/server/grandumi-production-frontend@.service"),
@@ -27,6 +29,8 @@ const [
   read("ops/server/grandumi-production.slice"),
   read("ops/server/grandumi-build.slice"),
   read("ops/server/activate-grandumi-production.sh"),
+  read("服务端WebSocket/GrandUMIServer.csproj"),
+  read("ops/server/grandumi-production-snapshot.sh"),
 ]);
 
 test("A/B 后端共享正式数据但由应用单写租约防双写", () => {
@@ -70,6 +74,49 @@ test("蓝绿切换先验证目标，失败自动恢复原槽", () => {
   assert.match(activateScript, /data_source=import/);
   assert.match(activateScript, /拒绝覆盖或激活/);
   assert.match(activateScript, /if \[\[ "\$data_source" == import \]\]/);
+});
+
+test("QQ 白名单生效后只允许回退到具备同等准入能力的槽位", () => {
+  assert.match(backendProject, /qq-access-enforcement-v1\.marker/);
+  assert.match(backendProject, /TargetPath="\.grandumi-qq-access-enforcement-v1"/);
+  assert.match(stageScript, /publish_next\/\.grandumi-qq-access-enforcement-v1/);
+  assert.match(stageScript, /缺少 QQ 准入兼容标记/);
+  assert.match(switchScript, /sqlite_master[\s\S]*qq_whitelist_state/);
+  assert.match(switchScript, /SELECT count\(\*\) FROM qq_whitelist_state WHERE singleton_id=1/);
+  assert.match(switchScript, /marker="\$target_backend\/\.grandumi-qq-access-enforcement-v1"/);
+  assert.match(switchScript, /拒绝回退到旧版本/);
+  assert.match(
+    switchScript,
+    /--release\)[\s\S]*verify_qq_access_rollback_compatibility "\$release_root\/\$release\/backend"[\s\S]*ln -sfn/,
+  );
+  assert.match(
+    switchScript,
+    /--failover\)[\s\S]*verify_qq_access_rollback_compatibility "\$slot_root\/\$target\/backend"/,
+  );
+  assert.match(activateScript, /converge_standby_release/);
+  assert.match(activateScript, /systemctl is-active --quiet "grandumi-production-backend@\$standby\.service"/);
+  assert.match(activateScript, /ln -sfn "\$expected_backend" "\$repo\/slots\/\$standby\/backend"/);
+  assert.match(activateScript, /standby-release\.next/);
+  const releaseSwitch = activateScript.indexOf('grandumi-production-switch --release "$target"');
+  const routeVerification = activateScript.indexOf("verify_production_routes", releaseSwitch);
+  const standbyConvergence = activateScript.indexOf("converge_standby_release", releaseSwitch);
+  assert.ok(releaseSwitch >= 0 && routeVerification > releaseSwitch && standbyConvergence > routeVerification);
+});
+
+test("正式切槽前对全部 SQLite 做在线一致性快照并校验离线副本", () => {
+  assert.match(productionSnapshot, /data_dir=\/data\/grandumi/);
+  assert.match(productionSnapshot, /archive_root=\/data\/grandumi-archives/);
+  assert.match(productionSnapshot, /required_databases=\(players\.db ranked\.db leader-stats\.db\)/);
+  assert.match(productionSnapshot, /sqlite3 -readonly "\$database"[\s\S]*\.backup '\$destination'/);
+  assert.match(productionSnapshot, /sqlite3 "\$destination" 'PRAGMA integrity_check;'/);
+  assert.match(productionSnapshot, /sha256sum "\$destination"/);
+  assert.match(productionSnapshot, /find "\$data_dir" -maxdepth 1 -type f -name '\*\.db'/);
+  assert.match(productionSnapshot, /"\$target\/\.complete"/);
+  const snapshot = activateScript.indexOf('grandumi-production-snapshot "$target"');
+  const switchSlot = activateScript.indexOf('grandumi-production-switch --release "$target"');
+  assert.ok(snapshot >= 0 && switchSlot > snapshot);
+  assert.match(activateScript, /-f "\$snapshot_archive\/\.complete"/);
+  assert.match(stageScript, /grandumi-production-snapshot\.sh" \/usr\/local\/sbin\/grandumi-production-snapshot/);
 });
 
 test("发布构建进入低优先级资源组且产物按提交隔离", () => {

@@ -437,6 +437,24 @@ public class PromptSystem : IPromptService
         tcs.TrySetResult(new PromptAnswer(chosen.ToList()));
     }
 
+    /// <summary>
+    /// 撤回刚刚同步的贴咚时，取消由该次贴咚触发、尚未作答的效果选择。
+    /// 调用方必须先以服务端贴咚操作序号确认该 Prompt 确实属于当前可撤回操作。
+    /// </summary>
+    internal bool CancelCurrentForAttachDonUndo()
+    {
+        var pending = _engine.State.PendingPrompt;
+        if (pending is null || !_pending.TryGetValue(pending.PromptId, out var tcs)) return false;
+
+        _engine.RecordMatchLog("prompt_canceled", pending.PlayerIndex, new
+        {
+            promptId = pending.PromptId,
+            reason = "attach_don_undo",
+        });
+        _engine.State.PendingPrompt = null;
+        return tcs.TrySetException(new AttachDonUndoCanceledException());
+    }
+
     public record PromptAnswer(List<string> Chosen);
 
     private sealed record OptionalConfirmation(
@@ -452,5 +470,10 @@ public class PromptSystem : IPromptService
 
 /// <summary>玩家从成本选择返回确认框后改为不发动；由效果运行时当作正常取消结束。</summary>
 public sealed class OptionalEffectDeclinedException : Exception
+{
+}
+
+/// <summary>贴咚被玩家权威撤回时中止该次贴咚触发的尚未完成效果链。</summary>
+public sealed class AttachDonUndoCanceledException : Exception
 {
 }

@@ -10,7 +10,11 @@ namespace GrandUMI.Game;
 /// </summary>
 internal static class RoomRecoverySnapshotStore
 {
-    internal const int SchemaVersion = 1;
+    // v2：私有状态哈希纳入服务端权威贴咚撤回序号与栈。
+    // v1 仍须读取其请求去重窗口；只跳过旧结构的状态哈希比对，并在重放后刷新为 v2。
+    // 若整份忽略 v1，升级重启后的迟到重试可能再次执行已接受的贴咚等非幂等动作。
+    internal const int MinimumCompatibleSchemaVersion = 1;
+    internal const int SchemaVersion = 2;
     internal const int CaptureEveryAcceptedActions = 16;
     private static readonly Channel<SnapshotCommand> Queue = Channel.CreateBounded<SnapshotCommand>(
         new BoundedChannelOptions(2_048)
@@ -50,7 +54,9 @@ internal static class RoomRecoverySnapshotStore
             var path = PathOf(roomId);
             if (!File.Exists(path)) return null;
             var snapshot = JsonSerializer.Deserialize<RoomRecoverySnapshot>(File.ReadAllBytes(path));
-            return snapshot is { SchemaVersion: SchemaVersion } && snapshot.RoomId == roomId
+            return snapshot is not null
+                   && snapshot.SchemaVersion is >= MinimumCompatibleSchemaVersion and <= SchemaVersion
+                   && snapshot.RoomId == roomId
                 ? snapshot
                 : null;
         }

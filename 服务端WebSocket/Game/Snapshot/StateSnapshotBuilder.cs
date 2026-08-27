@@ -98,6 +98,10 @@ public static class StateSnapshotBuilder
             asSelf: false,
             revealHand: state.IsGameOver,
             board: boards[oppIdx]);
+        var latestAttachDonUndo = state.AttachDonUndoStack.LastOrDefault();
+        var myAttachDonUndo = !isSpectator && latestAttachDonUndo?.PlayerIndex == myIdx
+            ? latestAttachDonUndo
+            : null;
 
         var logLines = new List<string>();
         if (queuedLogEvents is not null)
@@ -121,6 +125,10 @@ public static class StateSnapshotBuilder
             rulesetId = state.RulesetId,
             phase = PhaseLabels.Of(state.Phase),
             currentTurn = !isSpectator && state.CurrentTurnPlayer == myIdx,
+            canUndoAttachDon = myAttachDonUndo is not null,
+            undoAttachDonOperationId = myAttachDonUndo?.OperationSequence.ToString(),
+            undoAttachDonCount = myAttachDonUndo?.DonIds.Count ?? 0,
+            undoAttachDonDepth = myAttachDonUndo is null ? 0 : state.AttachDonUndoStack.Count,
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
             firstPlayerChosen = state.StartingPlayerChosen,

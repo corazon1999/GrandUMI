@@ -52,6 +52,17 @@ public static class ActionLogFormatter
                 return $"[咚] {Side(player)}为【{targetName}】附加 {count} 个咚";
             }
 
+            case "UndoAttachDon":
+            {
+                int player = GetInt(payload, "player");
+                int count = GetInt(payload, "count", 1);
+                string targetId = GetStr(payload, "targetId");
+                string targetName = targetId == "leader"
+                    ? "领袖"
+                    : (FindCard(state, targetId) is { } target ? target.Card.Info.Name : "角色");
+                return $"[咚] {Side(player)}撤回了为【{targetName}】附加的 {count} 个咚";
+            }
+
             case "Attack":
             {
                 string attackerId = GetStr(payload, "attacker");

@@ -11,6 +11,15 @@ public static class PrivateStateSnapshotBuilder
             tick = state.Tick,
             phase = PhaseLabels.Of(state.Phase),
             currentTurnPlayer = state.CurrentTurnPlayer,
+            attachDonOperationSequence = state.AttachDonOperationSequence,
+            attachDonUndoStack = state.AttachDonUndoStack.Select(entry => new
+            {
+                operationSequence = entry.OperationSequence,
+                playerIndex = entry.PlayerIndex,
+                targetId = entry.TargetId,
+                targetCardId = entry.TargetCardId.ToString(),
+                donIds = entry.DonIds.Select(id => id.ToString()).ToArray(),
+            }).ToArray(),
             turnCount = state.TurnCount,
             firstPlayer = state.FirstPlayer,
             firstPlayerChosen = state.StartingPlayerChosen,

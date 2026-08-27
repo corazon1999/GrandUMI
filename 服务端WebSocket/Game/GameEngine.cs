@@ -51,6 +51,11 @@ public class GameEngine
     private readonly List<ActionLogEvent> _pendingActionLogs = new();
     private readonly List<EffectActivationEvent> _pendingEffectActivations = new();
     private readonly List<StateSnapshotBuilder.ReplayHandFrame> _replayHandTimeline = new();
+    /// <summary>
+    /// 当前仍在解析 OnDonAttached 的服务端贴咚操作序号。若解析停在 Prompt，只有匹配该序号的
+    /// 权威撤回才能取消 Prompt；避免普通效果 Prompt 被越权中止。
+    /// </summary>
+    private long? _resolvingAttachDonOperationSequence;
 
     /// <summary>本局确定性卡实例 ID 工厂（由 RngSeed 派生，全局唯一计数器）。重放重建依赖它。</summary>
     private readonly Func<Guid> _idFactory;
@@ -90,6 +95,7 @@ public class GameEngine
     {
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
+        "UndoAttachDon",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
         "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
         "OperationTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
@@ -232,6 +238,14 @@ public class GameEngine
         _activeActor = playerIndex;
         _activeActionRejected = false;
 
+        // 撤回资格必须在后续动作的任何即时快照之前失效，否则 Attack/PlayCard 等屏障快照会
+        // 短暂把已经失效的按钮重新下发。先暂存并清空；若动作最终被拒绝，再原样恢复。
+        var undoStackBeforeOtherAction = action is "AttachDon" or "UndoAttachDon"
+            ? null
+            : State.AttachDonUndoStack.ToArray();
+        if (undoStackBeforeOtherAction is { Length: > 0 })
+            State.AttachDonUndoStack.Clear();
+
         // 平局申请期间冻结牌局，只允许对方回应或任一方直接投降。
         if (State.PendingDrawRequester is not null
             && action is not "RespondDraw" and not "Surrender")
@@ -241,7 +255,8 @@ public class GameEngine
         // 卡牌效果等待玩家选择时，必须先完成当前效果链，不能让任何一方抢先推进牌局。
         // 投降、平局申请与回应不受卡牌 Prompt 限制。
         else if (State.PendingPrompt is not null
-            && action is not "PromptResponse" and not "Surrender" and not "RequestDraw" and not "RespondDraw")
+            && action is not "PromptResponse" and not "UndoAttachDon"
+                and not "Surrender" and not "RequestDraw" and not "RespondDraw")
         {
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
@@ -257,6 +272,7 @@ public class GameEngine
             case "Mulligan":       HandleMulligan(playerIndex, data); break;
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
             case "AttachDon":      HandleAttachDon(playerIndex, data); break;
+            case "UndoAttachDon":  HandleUndoAttachDon(playerIndex, data); break;
             case "Attack":         HandleAttack(playerIndex, data); break;
             case "DeclareBlocker": HandleDeclareBlocker(playerIndex, data); break;
             case "PassBlock":      HandlePassBlock(playerIndex); break;
@@ -283,6 +299,11 @@ public class GameEngine
         }
 
         var accepted = !_activeActionRejected;
+        if (!accepted && undoStackBeforeOtherAction is { Length: > 0 })
+        {
+            State.AttachDonUndoStack.Clear();
+            State.AttachDonUndoStack.AddRange(undoStackBeforeOtherAction);
+        }
         if (accepted)
         {
             RecordMatchLog("player_action_accepted", playerIndex, new { action });
@@ -840,26 +861,112 @@ public class GameEngine
             don.State = DonState.Attached;
             don.AttachedToCardId = targetId;
         }
+        var operationSequence = ++State.AttachDonOperationSequence;
+        State.AttachDonUndoStack.Add(new AttachDonUndoEntry(
+            operationSequence,
+            playerIndex,
+            targetIdStr,
+            targetId,
+            activeDons.Select(don => don.Id).ToArray()));
         // 赋予咚!! 时触发（OP02-002 戈普领袖：我方回合赋予咚→对方角色减费），
         // 效果链稳定后再以 AttachDon 语义发送最终快照，避免 AttachDon + EffectResolved 连发两包。
-        _ = Track(ResolveDonAttachedAsync(playerIndex, targetId, targetIdStr, count));
+        _resolvingAttachDonOperationSequence = operationSequence;
+        _ = Track(ResolveDonAttachedAsync(playerIndex, targetId, targetIdStr, count, operationSequence));
     }
 
     /// <summary>赋予咚!! 后派发 OnDonAttached（监听卡如 OP02-002 据此发动），随后刷新状态</summary>
-    private async Task ResolveDonAttachedAsync(int playerIndex, Guid targetId, string targetIdStr, int count)
+    private async Task ResolveDonAttachedAsync(
+        int playerIndex,
+        Guid targetId,
+        string targetIdStr,
+        int count,
+        long operationSequence)
     {
+        var canceledByUndo = false;
         try
         {
             await EffectRuntime.TriggerEvent(State, EffectTrigger.OnDonAttached, Prompts,
                 new Dictionary<string, object?> { ["targetId"] = targetId.ToString(), ["owner"] = playerIndex });
             CheckGameOver();
         }
+        catch (AttachDonUndoCanceledException)
+        {
+            // 撤回动作已负责恢复咚与下发权威快照；取消属于正常路径，不记录为卡效异常。
+            canceledByUndo = true;
+        }
         catch (Exception ex) { Console.Error.WriteLine($"[DonAttached] 派发异常: {ex.Message}"); }
         finally
         {
-            if (!State.IsGameOver)
-                Broadcast("AttachDon", new { player = playerIndex, targetId = targetIdStr, count });
+            if (_resolvingAttachDonOperationSequence == operationSequence)
+                _resolvingAttachDonOperationSequence = null;
+            if (!canceledByUndo && !State.IsGameOver)
+                Broadcast("AttachDon", new
+                {
+                    player = playerIndex,
+                    targetId = targetIdStr,
+                    count,
+                    operationId = operationSequence.ToString(),
+                });
         }
+    }
+
+    private void HandleUndoAttachDon(int playerIndex, JsonElement data)
+    {
+        if (!data.TryGetProperty("operationId", out var operationElement)
+            || operationElement.ValueKind != JsonValueKind.String
+            || !long.TryParse(operationElement.GetString(), out var operationSequence)
+            || operationSequence <= 0)
+        {
+            SendError(playerIndex, "撤回贴咚操作序号非法");
+            return;
+        }
+
+        var validation = ActionValidator.CanUndoAttachDon(State, playerIndex, operationSequence);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
+
+        var entry = State.AttachDonUndoStack[^1];
+        var player = State.Players[playerIndex];
+        var dons = entry.DonIds
+            .Select(id => player.CostArea.FirstOrDefault(don => don.Id == id))
+            .ToArray();
+        if (dons.Any(don => don is null)
+            || dons.Any(don => don!.State != DonState.Attached || don.AttachedToCardId != entry.TargetCardId))
+        {
+            // 先完整核对再变更，绝不在内部状态已偏离时做部分撤回。
+            SendError(playerIndex, "贴咚状态已经变化，无法撤回");
+            return;
+        }
+
+        if (_resolvingAttachDonOperationSequence is { } resolvingSequence)
+        {
+            if (resolvingSequence != operationSequence
+                || State.PendingPrompt is null
+                || !Prompts.CancelCurrentForAttachDonUndo())
+            {
+                SendError(playerIndex, "贴咚效果仍在结算，请稍后再试");
+                return;
+            }
+        }
+        else if (State.PendingPrompt is not null)
+        {
+            // 普通效果 Prompt 与贴咚撤回无关，不允许借撤回动作取消。
+            SendError(playerIndex, "当前有效果等待处理，无法撤回贴咚");
+            return;
+        }
+
+        foreach (var don in dons)
+        {
+            don!.State = DonState.Active;
+            don.AttachedToCardId = null;
+        }
+        State.AttachDonUndoStack.RemoveAt(State.AttachDonUndoStack.Count - 1);
+        Broadcast("UndoAttachDon", new
+        {
+            player = playerIndex,
+            targetId = entry.TargetId,
+            count = dons.Length,
+            operationId = operationSequence.ToString(),
+        });
     }
 
     // ── 攻击 ───────────────────────────────────────────────────────────────

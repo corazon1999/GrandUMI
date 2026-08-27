@@ -22,6 +22,10 @@
     <None Update="Effects\Definitions\**\*.json"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
+    <None Update="qq-access-enforcement-v1.marker"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          TargetPath=".grandumi-qq-access-enforcement-v1" />
     <None Include="..\卡牌数据\**\*.json"
           Link="卡牌数据\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest"

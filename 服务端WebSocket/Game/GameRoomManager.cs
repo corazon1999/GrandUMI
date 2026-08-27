@@ -2389,7 +2389,10 @@ public static class GameRoomManager
         if (snapshot is not null)
         {
             room.ProcessedPlayerRequests.Restore(snapshot.ProcessedRequests);
-            if (snapshot.JournalSequence == room.JournalSequence)
+            // 旧结构中的私有状态没有当前新增字段，哈希必然不同；但请求去重窗口仍然有效，
+            // 必须先恢复它，再由下方 CaptureRecoverySnapshot 写出当前结构的完整检查点。
+            if (snapshot.SchemaVersion == RoomRecoverySnapshotStore.SchemaVersion
+                && snapshot.JournalSequence == room.JournalSequence)
             {
                 var current = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
                 var currentHash = RoomRecoverySnapshotStore.ComputeStateSha256(current);

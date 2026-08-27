@@ -134,6 +134,10 @@ interface GameStore {
   tick: number;
   serverNowUtc: string | null;
   currentTurn: boolean;
+  canUndoAttachDon: boolean;
+  undoAttachDonOperationId: string | null;
+  undoAttachDonCount: number;
+  undoAttachDonDepth: number;
   turnCount: number;
   firstPlayer: number;
   firstPlayerChosen: boolean;
@@ -253,6 +257,10 @@ export const useGameStore = create<GameStore>()(
     tick: 0,
     serverNowUtc: null,
     currentTurn: false,
+    canUndoAttachDon: false,
+    undoAttachDonOperationId: null,
+    undoAttachDonCount: 0,
+    undoAttachDonDepth: 0,
     turnCount: 0,
     firstPlayer: -1,
     firstPlayerChosen: false,
@@ -329,6 +337,10 @@ export const useGameStore = create<GameStore>()(
         s.serverNowUtc = msg.serverNowUtc ?? null;
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
+        s.canUndoAttachDon = msg.canUndoAttachDon ?? false;
+        s.undoAttachDonOperationId = msg.undoAttachDonOperationId ?? null;
+        s.undoAttachDonCount = msg.undoAttachDonCount ?? 0;
+        s.undoAttachDonDepth = msg.undoAttachDonDepth ?? 0;
         s.turnCount = msg.turnCount;
         s.firstPlayer = firstPlayer;
         // firstPlayerChosen 是骰点流程上线后新增的字段。旧回放虽没有该字段，
@@ -522,6 +534,10 @@ export const useGameStore = create<GameStore>()(
       s.tick = 0;
       s.serverNowUtc = null;
       s.currentTurn = false;
+      s.canUndoAttachDon = false;
+      s.undoAttachDonOperationId = null;
+      s.undoAttachDonCount = 0;
+      s.undoAttachDonDepth = 0;
       s.turnCount = 0;
       s.firstPlayer = -1;
       s.firstPlayerChosen = false;

@@ -10,6 +10,7 @@ import { canPayActivatedMainCost } from "@/lib/activatedMainCost";
 import CounterEventConfirmModal, {
   type PendingCounterEvent,
 } from "@/components/game/CounterEventConfirmModal";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 /**
  * 上下文操作按钮区：根据当前阶段/选中状态展示可用动作。
@@ -18,7 +19,12 @@ import CounterEventConfirmModal, {
 export default function GameActions() {
   const [isEndTurnConfirming, setIsEndTurnConfirming] = useState(false);
   const [pendingMainEvent, setPendingMainEvent] = useState<PendingCounterEvent | null>(null);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const currentTurn = useGameStore((s) => s.currentTurn);
+  const canUndoAttachDon = useGameStore((s) => s.canUndoAttachDon);
+  const undoAttachDonOperationId = useGameStore((s) => s.undoAttachDonOperationId);
+  const undoAttachDonCount = useGameStore((s) => s.undoAttachDonCount);
+  const undoAttachDonDepth = useGameStore((s) => s.undoAttachDonDepth);
   const phase = useGameStore((s) => s.phase);
   const isPending = useGameStore((s) => s.isPending);
   const selectedHandIndex = useGameStore((s) => s.selectedHandIndex);
@@ -127,7 +133,7 @@ export default function GameActions() {
   const btn =
     "min-h-12 w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
 
-  const hasAny = canAttack || isSelectingTarget || canPlay || canActivate || canPassCounter || currentTurn;
+  const hasAny = canUndoAttachDon || canAttack || isSelectingTarget || canPlay || canActivate || canPassCounter || currentTurn;
 
   const activateEffect = () => {
     if (!selectedFieldId) return;
@@ -173,6 +179,27 @@ export default function GameActions() {
 
   return (
     <div className="flex flex-col gap-2">
+      {canUndoAttachDon && undoAttachDonOperationId && (
+        <div
+          className="rounded-md border border-amber-300/40 bg-amber-950/45 p-2 shadow-inner shadow-black/20"
+          role="status"
+        >
+          <p className="mb-2 text-center text-[11px] font-bold leading-4 text-amber-50">
+            最近贴了 {undoAttachDonCount} 咚
+            {undoAttachDonDepth > 1 ? `（还有 ${undoAttachDonDepth - 1} 次可逐次撤回）` : ""}
+            ；执行其他对局操作后将无法撤回
+          </p>
+          <button
+            type="button"
+            onClick={() => GameRequest.undoAttachDon(undoAttachDonOperationId)}
+            disabled={isPending}
+            className={`${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} w-full rounded-md border border-amber-200/60 bg-amber-400 px-3 py-2 text-sm font-black text-slate-950 shadow transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300`}
+          >
+            撤回贴咚
+          </button>
+        </div>
+      )}
+
       {canAttack && (
         <button
           onClick={() => selectedFieldId && startAttack(selectedFieldId)}

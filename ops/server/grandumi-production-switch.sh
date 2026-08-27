@@ -13,6 +13,29 @@ previous_target_backend=""
 previous_target_frontend=""
 
 die() { echo "错误：$*" >&2; exit 1; }
+verify_qq_access_rollback_compatibility() {
+  local target_backend="$1"
+  local players_db=/data/grandumi/players.db
+  local table_exists initialized marker
+  [[ -s "$players_db" ]] || return 0
+  command -v sqlite3 >/dev/null || die "缺少 sqlite3，无法验证 QQ 准入回滚兼容性"
+
+  table_exists="$(sqlite3 -readonly "$players_db" \
+    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='qq_whitelist_state';")"
+  [[ "$table_exists" == 0 || "$table_exists" == 1 ]] \
+    || die "无法判定 players.db 的 QQ 白名单结构"
+  [[ "$table_exists" == 1 ]] || return 0
+
+  initialized="$(sqlite3 -readonly "$players_db" \
+    'SELECT count(*) FROM qq_whitelist_state WHERE singleton_id=1;')"
+  [[ "$initialized" == 0 || "$initialized" == 1 ]] \
+    || die "players.db 的 QQ 白名单状态异常"
+  [[ "$initialized" == 1 ]] || return 0
+
+  marker="$target_backend/.grandumi-qq-access-enforcement-v1"
+  [[ -f "$marker" ]] || die \
+    "QQ 白名单已生效，目标槽位不具备准入校验能力，拒绝回退到旧版本"
+}
 mkdir -p "$state_dir" "$slot_root/a" "$slot_root/b"
 exec 9>"$lock_file"
 flock -n 9 || die "另一个切换任务正在执行"
@@ -26,6 +49,7 @@ case "$mode" in
     [[ "$release" =~ ^[0-9a-f]{40}$ ]] || die "发布切换必须提供 40 位提交号"
     [[ -d "$release_root/$release/backend" && -d "$release_root/$release/frontend" ]] \
       || die "发布包不存在：$release"
+    verify_qq_access_rollback_compatibility "$release_root/$release/backend"
     target="$other"
     previous_target_backend="$(readlink "$slot_root/$target/backend" 2>/dev/null || true)"
     previous_target_frontend="$(readlink "$slot_root/$target/frontend" 2>/dev/null || true)"
@@ -37,6 +61,7 @@ case "$mode" in
     [[ "$target" == a || "$target" == b ]] || die "尚无已知可用备用槽位"
     [[ "$target" != "$active" ]] || die "备用槽位不能与活动槽位相同"
     [[ -e "$slot_root/$target/backend/GrandUMIServer.dll" ]] || die "备用后端发布包不存在"
+    verify_qq_access_rollback_compatibility "$slot_root/$target/backend"
     ;;
   *) die "用法：grandumi-production-switch --release <commit> | --failover" ;;
 esac
@@ -88,6 +113,7 @@ rollback() {
   fi
   echo "切换失败，已尝试恢复槽位 $active" >&2
 }
+
 trap rollback ERR
 
 # 前端可并行预热；后端受数据目录单写租约保护，必须先停旧后启新。

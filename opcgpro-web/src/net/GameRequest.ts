@@ -3,7 +3,7 @@
  *
  * 所有动作均通过 MsgGameAction 发到服务器；服务器结算后通过 MsgGameState 推回。
  * 对贴咚、攻击横置和出牌仅做可回滚的即时视觉反馈；规则结算仍完全以服务端为准。
- * 贴咚一经确认就立即发往服务端，不在客户端保留可撤回的未提交队列。
+ * 贴咚一经确认就立即发往服务端；撤回资格与操作顺序也完全来自服务端权威快照。
  */
 
 import { NetManager } from "./NetManager";
@@ -178,7 +178,7 @@ export const GameRequest = {
       ...(overflowTrashCardId ? { overflowTrashCardId } : {}),
     }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
-  /** 请求赋予咚；可先本地确认，但确认后立即提交且不可撤回。 */
+  /** 请求赋予咚；可先本地确认，但确认后会立即提交到服务端。 */
   attachDon: (targetId: string | "leader", count = 1) => {
     const safeCount = Math.max(1, Math.floor(count));
     return useSettingsStore.getState().confirmAttachDon
@@ -188,6 +188,9 @@ export const GameRequest = {
 
   /** 离开对局时关闭尚未发送的确认弹窗。 */
   cancelPendingAttachDon: clearPendingAttachDonState,
+
+  /** 撤回服务端确认的最近一次贴咚；旧令牌由服务端拒绝，不在客户端自行改牌桌。 */
+  undoAttachDon: (operationId: string) => send("UndoAttachDon", { operationId }),
 
   /** 攻击宣言 */
   attack: (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>

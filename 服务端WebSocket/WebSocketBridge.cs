@@ -29,7 +29,7 @@ public static class WebSocketBridge
     {
         "GameStart", "Resync", "DuplicateRequest", "SpectateJoin", "FirstPlayerChosen",
         "Prompt", "PromptTimeout", "RevealCards",
-        "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
+        "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard", "UndoAttachDon",
         "MulliganComplete", "MulliganUpdate", "DuelOver", "Surrender", "DisconnectTimeout",
         "OperationTimeout", "PlayerDisconnected", "PlayerReconnected",
     };

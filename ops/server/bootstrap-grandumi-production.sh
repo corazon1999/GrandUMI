@@ -65,6 +65,7 @@ install -m 0644 "$source_root/ops/server/grandumi-build.slice" /etc/systemd/syst
 install -m 0644 "$source_root/ops/server/grandumi-production-backend@.service" /etc/systemd/system/grandumi-production-backend@.service
 install -m 0644 "$source_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
 install -m 0755 "$source_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
+install -m 0755 "$source_root/ops/server/grandumi-production-snapshot.sh" /usr/local/sbin/grandumi-production-snapshot
 install -m 0755 "$source_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$source_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$source_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha

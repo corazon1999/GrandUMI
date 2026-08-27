@@ -59,6 +59,19 @@ public static class ActionValidator
         return OkResult;
     }
 
+    public static Result CanUndoAttachDon(GameState s, int playerIdx, long operationSequence)
+    {
+        if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
+        if (s.Phase != Phase.Main)            return Fail("只能在主要阶段撤回贴咚");
+        if (s.CurrentBattle is not null)      return Fail("战斗中不能撤回贴咚");
+        var latest = s.AttachDonUndoStack.LastOrDefault();
+        if (latest is null || latest.PlayerIndex != playerIdx)
+            return Fail("当前没有可撤回的贴咚");
+        if (latest.OperationSequence != operationSequence)
+            return Fail("撤回目标已过期，请以最新对局状态为准");
+        return OkResult;
+    }
+
     public static Result CanAttack(GameState s, int playerIdx, Guid attackerId, bool targetIsLeader, Guid? targetId)
     {
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");

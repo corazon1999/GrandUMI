@@ -937,6 +937,7 @@ export type GameActionType =
   | "Mulligan"          // { redraw: boolean }
   | "PlayCard"          // { handIndex: number, freeCost?: boolean }
   | "AttachDon"         // { targetId: "leader" | cardId, count: number }
+  | "UndoAttachDon"     // { operationId: string }，只能撤回服务端快照确认的最近一次贴咚
   | "Attack"            // { attackerId: cardId | "leader", targetIsLeader: boolean, targetId?: cardId }
   | "DeclareBlocker"    // { blockerId: cardId }
   | "PassBlock"         // {}
@@ -1077,6 +1078,12 @@ export interface MsgGameState extends MsgBase {
   opponent: PlayerSnapshot;
   phase: string;
   currentTurn: boolean;
+  /** 服务端权威撤回资格；刷新/重连后仍由最新快照恢复。 */
+  canUndoAttachDon?: boolean;
+  /** 当前可撤回贴咚的服务端单调操作令牌；撤回请求必须原样回传。 */
+  undoAttachDonOperationId?: string | null;
+  undoAttachDonCount?: number;
+  undoAttachDonDepth?: number;
   turnCount: number;
   firstPlayer: number;
   firstPlayerChosen: boolean;

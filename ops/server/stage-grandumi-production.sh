@@ -58,6 +58,8 @@ rm -rf "$publish_next" "$release_dir/frontend.next"
 dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$publish_next" --nologo \
   -p:InformationalVersion="1.0.0+$target" \
   -p:IncludeSourceRevisionInInformationalVersion=false
+[[ -f "$publish_next/.grandumi-qq-access-enforcement-v1" ]] \
+  || die "后端发布包缺少 QQ 准入兼容标记，拒绝进入正式 A/B 槽位"
 
 cd "$build_root/opcgpro-web"
 npm ci --no-audit --no-fund
@@ -111,6 +113,7 @@ install -m 0644 "$build_root/ops/server/grandumi-build.slice" /etc/systemd/syste
 install -m 0644 "$build_root/ops/server/grandumi-production-backend@.service" /etc/systemd/system/grandumi-production-backend@.service
 install -m 0644 "$build_root/ops/server/grandumi-production-frontend@.service" /etc/systemd/system/grandumi-production-frontend@.service
 install -m 0755 "$build_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
+install -m 0755 "$build_root/ops/server/grandumi-production-snapshot.sh" /usr/local/sbin/grandumi-production-snapshot
 install -m 0755 "$build_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check
 install -m 0755 "$build_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/local/sbin/grandumi-matchlog-maintenance
 install -m 0755 "$build_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha

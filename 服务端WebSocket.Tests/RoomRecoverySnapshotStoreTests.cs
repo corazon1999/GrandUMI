@@ -13,6 +13,51 @@ public sealed class PersistenceDirectoryCollectionDefinition;
 public sealed class RoomRecoverySnapshotStoreTests
 {
     [Fact]
+    public async Task 旧版恢复检查点仍可读取请求去重窗口并由重放路径刷新()
+    {
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        try
+        {
+            var state = JsonSerializer.SerializeToElement(new { tick = 16, phase = "主阶段" });
+            var acceptedAtUtc = DateTime.UtcNow;
+            var legacy = new RoomRecoverySnapshot(
+                RoomRecoverySnapshotStore.SchemaVersion - 1,
+                "legacy-room-snapshot-test",
+                16,
+                acceptedAtUtc,
+                [15, 16],
+                [600_000, 590_000],
+                [new RequestDedupeEntry(0, "attach-don-request-16", acceptedAtUtc)],
+                RoomRecoverySnapshotStore.ComputeStateSha256(state),
+                state);
+
+            RoomRecoverySnapshotStore.Capture(legacy);
+            await RoomRecoverySnapshotStore.FlushAsync();
+
+            var restored = Assert.IsType<RoomRecoverySnapshot>(
+                RoomRecoverySnapshotStore.TryRead(legacy.RoomId));
+            Assert.Equal(RoomRecoverySnapshotStore.MinimumCompatibleSchemaVersion, restored.SchemaVersion);
+            var request = Assert.Single(restored.ProcessedRequests);
+            Assert.Equal(0, request.PlayerIndex);
+            Assert.Equal("attach-don-request-16", request.RequestId);
+
+            var future = legacy with { SchemaVersion = RoomRecoverySnapshotStore.SchemaVersion + 1 };
+            RoomRecoverySnapshotStore.Capture(future);
+            await RoomRecoverySnapshotStore.FlushAsync();
+            Assert.Null(RoomRecoverySnapshotStore.TryRead(future.RoomId));
+            await RoomRecoverySnapshotStore.DeleteDeferred(legacy.RoomId);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task 恢复快照原子写入后可读取并删除()
     {
         var root = TestDirectory();

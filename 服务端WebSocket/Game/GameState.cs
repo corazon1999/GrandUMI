@@ -6,6 +6,17 @@ namespace GrandUMI.Game;
 public sealed record StartingDiceRound(int Player0, int Player1);
 
 /// <summary>
+/// 一次仍可撤回的玩家贴咚操作。操作序号由服务端单调分配，客户端只能回传当前快照中的序号，
+/// 防止延迟、重复或乱序的撤回请求误撤后来发生的贴咚。
+/// </summary>
+public sealed record AttachDonUndoEntry(
+    long OperationSequence,
+    int PlayerIndex,
+    string TargetId,
+    Guid TargetCardId,
+    IReadOnlyList<Guid> DonIds);
+
+/// <summary>
 /// 完整对局状态。引擎所有操作都在此对象上进行。
 /// </summary>
 public class GameState
@@ -151,6 +162,15 @@ public class GameState
 
     /// <summary>序号（每次状态变化 +1，便于客户端识别快照新旧）</summary>
     public int Tick { get; set; }
+
+    /// <summary>本局玩家贴咚操作的服务端单调序号；重放时按相同动作顺序确定性重建。</summary>
+    public long AttachDonOperationSequence { get; set; }
+
+    /// <summary>
+    /// 自最后一项非贴咚操作以来仍可逐次撤回的贴咚。只有栈顶能被撤回；
+    /// 任一后续成功的其他对局动作会原子清空整栈，拒绝动作不影响资格。
+    /// </summary>
+    public List<AttachDonUndoEntry> AttachDonUndoStack { get; } = new();
 
     /// <summary>
     /// PreKO 触发期间共享的"已拦截 KO"集合。
