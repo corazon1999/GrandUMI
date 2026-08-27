@@ -519,10 +519,10 @@ public class RankedStoreTests
             Directory.CreateDirectory(tempDir);
             var now = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc);
             var championStore = new LeaderChampionStore(championPath);
-            for (var i = 0; i < LeaderChampionStore.MinimumChampionGames; i++)
+            for (var i = 0; i < LeaderChampionStore.LowVolumeMinimumChampionGames; i++)
             {
                 Assert.True(championStore.RecordMatch(new LeaderMatchResult(
-                    $"champion-{i}", now, MatchKind.Ranked,
+                    $"champion-{i}", now.AddDays(-(i % LeaderChampionStore.MinimumActiveDays)), MatchKind.Ranked,
                     "alice", $"opponent-{i}", "OP16-001", "OP01-001", 0, 0, 8, "胜利")));
             }
 

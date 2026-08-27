@@ -183,14 +183,20 @@ function percent(value: number | null): string {
 function ChampionRulesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Modal open={open} onClose={onClose} title="“最强”称号规则" mobileSheet maxWidthClass="max-w-lg">
-      <div className="max-h-[min(68dvh,34rem)] space-y-4 overflow-y-auto pr-1 text-sm leading-6 text-gray-300">
+      <div className="space-y-4 text-sm leading-6 text-gray-300">
         <p>
           每个 Leader 都会单独评选一名全服最强使用者。评选固定采用<strong className="text-amber-200">近 30 日</strong>数据，
           不会随榜单当前选择的“近 7 天 / 近 30 天 / 全部”切换。
         </p>
         <ol className="list-decimal space-y-3 pl-5 marker:font-bold marker:text-orange-400">
           <li>
-            玩家使用该 Leader 完成至少 <strong className="text-white">20 场</strong>有效公开对局后，才会进入候选名单。
+            默认需使用该 Leader 完成至少 <strong className="text-white">50 场</strong>有效公开对局；若该 Leader 近 30 日全服总场次少于
+            <strong className="text-white"> 1000 局</strong>，候选门槛降为 <strong className="text-white">30 场</strong>。
+            全服总场次按对局计，同 Leader 镜像局只算一局；个人场次按玩家实际出场计。
+          </li>
+          <li>
+            候选人还需在至少 <strong className="text-white">5 个 UTC+8 自然日</strong>参赛，并遇到至少
+            <strong className="text-white"> 15 名不同对手</strong>；对手仅以服务器匿名标识去重。
           </li>
           <li>
             只统计排位、休闲匹配和普通公开匹配；好友房、房间码及机器人对局不计入。
@@ -199,8 +205,9 @@ function ChampionRulesModal({ open, onClose }: { open: boolean; onClose: () => v
             少于 8 回合、掉线结束、没有明确胜负或同账号之间的对局不计入。
           </li>
           <li>
-            候选人按 <strong className="text-white">90% Wilson 胜率下限</strong>排名。它会同时考虑胜率和样本量，
-            避免少量对局的高胜率轻易超过长期稳定战绩。
+            候选人按 <strong className="text-white">贝叶斯修正胜率</strong>排名。服务器先用该 Leader 近 30 日其他玩家战绩作为基准；
+            计算某位候选时会排除其本人对局，镜像局会整局排除，再以 <strong className="text-white">50 场、50% 胜率</strong>平滑基准。
+            候选战绩最后按 <strong className="text-white">20 场等效样本</strong>向该基准收缩，降低小样本连胜优势。
           </li>
           <li>
             得分相同时依次比较场次、胜场；仍相同时由服务器的稳定顺序选出唯一持有者。

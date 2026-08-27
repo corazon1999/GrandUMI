@@ -14,13 +14,20 @@ public sealed record LeaderChampion(
 
 /// <summary>
 /// Leader 专属称号的权威数据源。称号只从公开匹配的有效对局中产生，
-/// 使用 30 日窗口和 Wilson 下置信界，避免少量高胜率对局刷榜。
+/// 使用 30 日窗口、动态候选门槛和贝叶斯修正胜率，避免少量高胜率对局刷榜。
 /// </summary>
 public sealed class LeaderChampionStore
 {
-    public const int MinimumChampionGames = 20;
     public const int ChampionWindowDays = 30;
-    private const double WilsonZ = 1.645; // 90% lower confidence bound
+    public const int DefaultMinimumChampionGames = 50;
+    public const int LowVolumeMinimumChampionGames = 30;
+    public const int LowVolumeLeaderMatchThreshold = 1_000;
+    public const int MinimumActiveDays = 5;
+    public const int MinimumDistinctOpponents = 15;
+    public const int BayesianPriorEquivalentGames = 20;
+    public const int LeaderPriorBaselineEquivalentGames = 50;
+    public const int ChampionBusinessUtcOffsetHours = 8;
+    private const double NeutralWinRate = 0.5;
 
     private readonly object _lock = new();
     private readonly string _databasePath;
@@ -200,24 +207,104 @@ public sealed class LeaderChampionStore
 
             using var connection = OpenLeaderboardConnection();
             using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT player_key, leader_number, COUNT(*) AS games, SUM(won) AS wins
-                FROM (
-                    SELECT player0_key AS player_key, player0_leader AS leader_number,
+            var sourceMatchesSql = HasAuthoritativeMatchResults(connection)
+                ? $"""
+                    SELECT match_id, ended_at_utc, player0_key, player1_key,
+                           player0_leader, player1_leader, winner_index
+                    FROM match_results
+                    WHERE counted = 1
+                      AND match_kind IN ({LeaderStatsEligibilityPolicy.PublicMatchKindsSql})
+                      AND winner_index IN (0, 1)
+                      AND turn_count >= {LeaderStatsStore.MinimumCountedTurn}
+                      AND player0_key <> player1_key
+                      AND finish_reason NOT LIKE '%断线%'
+                      AND LOWER(finish_reason) NOT LIKE '%disconnect%'
+                      AND ended_at_utc >= $sinceUtc
+                      AND ended_at_utc <= $untilUtc
+                    """
+                : """
+                    SELECT match_id, ended_at_utc, player0_key, player1_key,
+                           player0_leader, player1_leader, winner_index
+                    FROM champion_match_results
+                    WHERE ended_at_utc >= $sinceUtc
+                      AND ended_at_utc <= $untilUtc
+                    """;
+            command.CommandText = $"""
+                WITH source_matches AS (
+                    {sourceMatchesSql}
+                ), appearances AS (
+                    SELECT match_id, ended_at_utc,
+                           player0_key AS player_key, player1_key AS opponent_key,
+                           player0_leader AS leader_number,
                            CASE WHEN winner_index = 0 THEN 1 ELSE 0 END AS won
-                    FROM champion_match_results
-                    WHERE ended_at_utc >= $sinceUtc
+                    FROM source_matches
                     UNION ALL
-                    SELECT player1_key AS player_key, player1_leader AS leader_number,
+                    SELECT match_id, ended_at_utc,
+                           player1_key AS player_key, player0_key AS opponent_key,
+                           player1_leader AS leader_number,
                            CASE WHEN winner_index = 1 THEN 1 ELSE 0 END AS won
-                    FROM champion_match_results
-                    WHERE ended_at_utc >= $sinceUtc
+                    FROM source_matches
+                ), leader_matches AS (
+                    -- 镜像局对同一 Leader 只算一局，避免动态门槛被重复抬高。
+                    SELECT match_id, player0_leader AS leader_number FROM source_matches
+                    UNION
+                    SELECT match_id, player1_leader AS leader_number FROM source_matches
+                ), leader_game_totals AS (
+                    SELECT leader_number, COUNT(*) AS unique_games
+                    FROM leader_matches
+                    GROUP BY leader_number
+                ), leader_appearance_totals AS (
+                    SELECT leader_number, COUNT(*) AS appearances, SUM(won) AS wins
+                    FROM appearances
+                    GROUP BY leader_number
+                ), candidate_totals AS (
+                    SELECT leader_number, player_key,
+                           COUNT(*) AS games, SUM(won) AS wins,
+                           COUNT(DISTINCT date(ended_at_utc, $businessDayOffset)) AS active_days,
+                           COUNT(DISTINCT opponent_key) AS distinct_opponents
+                    FROM appearances
+                    GROUP BY leader_number, player_key
+                ), mirror_opponent_occurrences AS (
+                    -- 计算候选人的先验时整局排除其镜像局，避免候选战绩通过对手侧再次影响自己。
+                    SELECT player0_leader AS leader_number, player0_key AS player_key,
+                           CASE WHEN winner_index = 1 THEN 1 ELSE 0 END AS opponent_won
+                    FROM source_matches
+                    WHERE player0_leader = player1_leader
+                    UNION ALL
+                    SELECT player1_leader AS leader_number, player1_key AS player_key,
+                           CASE WHEN winner_index = 0 THEN 1 ELSE 0 END AS opponent_won
+                    FROM source_matches
+                    WHERE player0_leader = player1_leader
+                ), mirror_opponent_totals AS (
+                    SELECT leader_number, player_key,
+                           COUNT(*) AS games, SUM(opponent_won) AS wins
+                    FROM mirror_opponent_occurrences
+                    GROUP BY leader_number, player_key
                 )
-                GROUP BY player_key, leader_number
-                HAVING COUNT(*) >= $minimumGames;
+                SELECT c.player_key, c.leader_number, c.games, c.wins,
+                       a.appearances, a.wins,
+                       COALESCE(m.games, 0) AS candidate_mirror_games,
+                       COALESCE(m.wins, 0) AS mirror_opponent_wins
+                FROM candidate_totals c
+                JOIN leader_game_totals g ON g.leader_number = c.leader_number
+                JOIN leader_appearance_totals a ON a.leader_number = c.leader_number
+                LEFT JOIN mirror_opponent_totals m
+                       ON m.leader_number = c.leader_number AND m.player_key = c.player_key
+                WHERE c.games >= CASE
+                          WHEN g.unique_games < $lowVolumeLeaderMatchThreshold THEN $lowVolumeMinimumGames
+                          ELSE $defaultMinimumGames
+                      END
+                  AND c.active_days >= $minimumActiveDays
+                  AND c.distinct_opponents >= $minimumDistinctOpponents;
                 """;
             command.Parameters.AddWithValue("$sinceUtc", ToDatabaseUtc(generatedAtUtc.AddDays(-ChampionWindowDays)));
-            command.Parameters.AddWithValue("$minimumGames", MinimumChampionGames);
+            command.Parameters.AddWithValue("$untilUtc", ToDatabaseUtc(generatedAtUtc));
+            command.Parameters.AddWithValue("$businessDayOffset", $"+{ChampionBusinessUtcOffsetHours} hours");
+            command.Parameters.AddWithValue("$lowVolumeLeaderMatchThreshold", LowVolumeLeaderMatchThreshold);
+            command.Parameters.AddWithValue("$lowVolumeMinimumGames", LowVolumeMinimumChampionGames);
+            command.Parameters.AddWithValue("$defaultMinimumGames", DefaultMinimumChampionGames);
+            command.Parameters.AddWithValue("$minimumActiveDays", MinimumActiveDays);
+            command.Parameters.AddWithValue("$minimumDistinctOpponents", MinimumDistinctOpponents);
 
             var candidates = new List<LeaderChampion>();
             using var reader = command.ExecuteReader();
@@ -225,24 +312,21 @@ public sealed class LeaderChampionStore
             {
                 var games = reader.GetInt32(2);
                 var wins = reader.GetInt32(3);
+                var otherGames = Math.Max(0, reader.GetInt32(4) - games - reader.GetInt32(6));
+                var otherWins = Math.Clamp(reader.GetInt32(5) - wins - reader.GetInt32(7), 0, otherGames);
                 candidates.Add(new LeaderChampion(
                     reader.GetString(1),
                     reader.GetString(0),
                     games,
                     wins,
-                    WilsonLowerBound(wins, games)));
+                    BayesianAdjustedWinRate(wins, games, otherWins, otherGames)));
             }
 
             var result = candidates
                 .GroupBy(x => x.LeaderNumber, StringComparer.Ordinal)
                 .ToDictionary(
                     group => group.Key,
-                    group => group
-                        .OrderByDescending(x => x.Score)
-                        .ThenByDescending(x => x.Games)
-                        .ThenByDescending(x => x.Wins)
-                        .ThenBy(x => x.PlayerKey, StringComparer.Ordinal)
-                        .First(),
+                    SelectChampion,
                     StringComparer.Ordinal);
 
             if (nowUtc is null)
@@ -269,12 +353,36 @@ public sealed class LeaderChampionStore
            && (finishReason.Contains("断线", StringComparison.Ordinal)
                || finishReason.Contains("disconnect", StringComparison.OrdinalIgnoreCase));
 
-    private static double WilsonLowerBound(int wins, int games)
+    internal static int MinimumGamesForLeader(int leaderTotalGames)
+        => leaderTotalGames < LowVolumeLeaderMatchThreshold
+            ? LowVolumeMinimumChampionGames
+            : DefaultMinimumChampionGames;
+
+    internal static double BayesianAdjustedWinRate(int wins, int games, int otherWins, int otherGames)
     {
-        var rate = wins / (double)games;
-        var z2 = WilsonZ * WilsonZ;
-        return (rate + z2 / (2 * games) - WilsonZ * Math.Sqrt((rate * (1 - rate) + z2 / (4 * games)) / games))
-            / (1 + z2 / games);
+        if (games <= 0) return 0;
+        var safeWins = Math.Clamp(wins, 0, games);
+        var safeOtherGames = Math.Max(0, otherGames);
+        var safeOtherWins = Math.Clamp(otherWins, 0, safeOtherGames);
+        var leaderPriorMean = (safeOtherWins + NeutralWinRate * LeaderPriorBaselineEquivalentGames)
+            / (safeOtherGames + (double)LeaderPriorBaselineEquivalentGames);
+        return (safeWins + leaderPriorMean * BayesianPriorEquivalentGames)
+            / (games + (double)BayesianPriorEquivalentGames);
+    }
+
+    internal static LeaderChampion SelectChampion(IEnumerable<LeaderChampion> candidates)
+        => candidates
+            .OrderByDescending(x => x.Score)
+            .ThenByDescending(x => x.Games)
+            .ThenByDescending(x => x.Wins)
+            .ThenBy(x => x.PlayerKey, StringComparer.Ordinal)
+            .First();
+
+    private static bool HasAuthoritativeMatchResults(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'match_results' LIMIT 1;";
+        return command.ExecuteScalar() is not null;
     }
 
     private SqliteConnection OpenWriteConnection()
