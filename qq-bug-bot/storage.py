@@ -21,7 +21,8 @@ AGENT_QUEUE_STATES = ("queued", "owner_answered")
 AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
 CHAT_QUEUE_STATES = ("queued", "claimed")
 CHAT_TERMINAL_STATES = ("completed", "failed")
-PERSONALITIES = ("hancock", "nami", "robin")
+GROUP_PERSONALITIES = ("hancock", "nami", "robin")
+PERSONALITIES = (*GROUP_PERSONALITIES, "jinbe")
 DEFAULT_PERSONALITY = "hancock"
 DEFAULT_ASSISTANT_ID = "primary"
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
@@ -1964,9 +1965,10 @@ def get_group_personality(group_id: str) -> str:
 def set_group_personality(
     group_id: str, personality: str, updated_by: str
 ) -> str:
-    selected = normalize_personality(personality)
-    if selected != str(personality or "").strip().lower():
+    requested = str(personality or "").strip().lower()
+    if requested not in GROUP_PERSONALITIES:
         raise ValueError(f"不支持的性格: {personality}")
+    selected = requested
     now_text = datetime.now().isoformat(timespec="seconds")
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(

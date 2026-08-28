@@ -37,6 +37,7 @@ CONFIG_PATH = os.environ.get(
 )
 ADMIN_AGENT_OWNER_QQ = "651846226"
 PRIMARY_ASSISTANT_ID = "primary"
+JINBE_ASSISTANT_ID = "s-shark"
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _ASSISTANT_ROLES = {"primary", "admin_only"}
 
@@ -390,16 +391,19 @@ _PERSONALITY_BUSY_REPLIES = {
     "hancock": "妾身现在没空，稍后再来觐见吧。",
     "nami": "我现在忙不过来，等会儿再问吧。",
     "robin": "我现在暂时抽不开身，稍后再聊吧。",
+    "jinbe": "老夫现在暂时抽不开身，稍后再来吧。",
 }
 _PERSONALITY_EMPTY_REPLIES = {
     "hancock": "嗯？妾身刚才没听清。",
     "nami": "嗯？刚才那句我没听清。",
     "robin": "刚才那句话我没有听清，可以再说一次吗？",
+    "jinbe": "老夫刚才没有听清，请再说一次。",
 }
 _PERSONALITY_FAILED_REPLIES = {
     "hancock": "妾身现在暂时无法回答。过一会儿再来觐见吧。",
     "nami": "我现在暂时回答不了，过一会儿再来吧。",
     "robin": "我现在暂时无法回答，稍后再聊吧。",
+    "jinbe": "老夫现在暂时无法回答，稍后再来吧。",
 }
 _ORDINARY_CHAT_DISABLED_REPLY = "我只跟释迦大人聊天"
 
@@ -1224,6 +1228,12 @@ async def handle_chat(
     sender = event.get("sender") or {}
     nickname = sender.get("card") or sender.get("nickname") or "玩家"
     personality = storage.get_group_personality(str(group_id))
+    if (
+        kind == "admin_agent"
+        and assistant_role(cfg) == "admin_only"
+        and assistant_id(cfg) == JINBE_ASSISTANT_ID
+    ):
+        personality = "jinbe"
 
     enabled_key = (
         "admin_agent_enabled" if kind == "admin_agent" else "chat_agent_enabled"

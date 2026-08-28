@@ -617,6 +617,81 @@ class ChatStorageAndBotTests(unittest.TestCase):
             storage.claim_chat_job("admin-worker", kinds=("admin_agent",))
         )
 
+    def test鲨管理员任务固定甚平且不改变蛇和鹰的群人格(self):
+        storage.set_group_personality("456", "nami", "651846226")
+        event = self.event("核对部署状态")
+        event["user_id"] = 651846226
+
+        expected = (
+            ("s-shark", "s-鲨", "admin_only", "jinbe"),
+            ("s-eagle", "s-鹰", "admin_only", "nami"),
+            ("primary", "s-蛇", "primary", "nami"),
+        )
+        for index, (assistant, name, role, personality) in enumerate(expected):
+            with self.subTest(assistant=assistant):
+                event["message_id"] = f"personality-{index}"
+                cfg = {
+                    "_assistant_id": assistant,
+                    "_assistant_name": name,
+                    "_assistant_role": role,
+                    "_expected_self_id": "999",
+                    "admin_agent_enabled": True,
+                    "admin_agent_owner_qq": 651846226,
+                }
+                asyncio.run(bot.on_event(FakeWebSocket(), cfg, event))
+                job = storage.claim_chat_job(
+                    "admin-worker", kinds=("admin_agent",)
+                )
+                self.assertEqual(assistant, job["assistant_id"])
+                self.assertEqual(personality, job["personality"])
+                storage.complete_chat_job(
+                    job["id"], job["claim_token"], "任务完成"
+                )
+                storage.mark_chat_result_sent(job["id"])
+
+        self.assertEqual("nami", storage.get_group_personality("456"))
+        with self.assertRaisesRegex(ValueError, "不支持的性格"):
+            storage.set_group_personality("456", "jinbe", "651846226")
+
+    def test鲨失败回执保持甚平人格并由原连接发送(self):
+        chat_id = storage.add_chat_message(
+            "651846226",
+            "赛博释迦",
+            "456",
+            "检查项目状态",
+            kind="admin_agent",
+            personality="jinbe",
+            assistant_id="s-shark",
+        )
+        job = storage.claim_chat_job("admin-worker", kinds=("admin_agent",))
+        storage.release_chat_job(
+            chat_id, job["claim_token"], "模拟失败", max_attempts=1
+        )
+
+        async def scenario():
+            client = FakeOneBotClient()
+            cfg = {
+                "_assistant_id": "s-shark",
+                "_assistant_name": "s-鲨",
+                "_assistant_role": "admin_only",
+                "admin_agent_enabled": True,
+                "agent_notification_interval_seconds": 1,
+            }
+            with mock.patch.object(media_pipeline, "cleanup_expired_media"):
+                task = asyncio.create_task(bot.notification_loop(client, cfg))
+                for _ in range(100):
+                    if client.actions:
+                        break
+                    await asyncio.sleep(0.01)
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            return client
+
+        client = asyncio.run(scenario())
+        payload = json.dumps(client.actions[0][1], ensure_ascii=False)
+        self.assertIn("老夫现在暂时无法回答", payload)
+        self.assertIsNotNone(storage.get_chat_message(chat_id)["reply_sent_at"])
+
     def test管理员任务历史与回执严格按来源助理隔离(self):
         eagle_id = storage.add_chat_message(
             "651846226",
@@ -824,6 +899,29 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
                 self.assertIn(brief, chat_protocol.build_bug_intake_prompt(job))
                 self.assertIn(brief, chat_protocol.build_admin_agent_prompt(job))
                 self.assertNotIn("以“妾身”自称", chat_protocol.build_chat_prompt(job))
+
+    def test甚平人格约束管理员回复且不牺牲技术和安全边界(self):
+        prompt = chat_protocol.build_admin_agent_prompt(
+            {
+                "kind": "admin_agent",
+                "assistant_id": "s-shark",
+                "personality": "jinbe",
+                "qq": "651846226",
+                "content": "核对服务状态",
+            }
+        )
+        for wording in (
+            "草帽一伙操舵手、海侠甚平",
+            "沉稳克制、重情重义、成熟可靠",
+            "以“老夫”自称",
+            "不要夸张模仿",
+            "技术准确性",
+            "权限、安全或保密边界",
+            "技术结果必须准确",
+        ):
+            with self.subTest(wording=wording):
+                self.assertIn(wording, prompt)
+        self.assertNotIn("以“妾身”自称", prompt)
 
     def test未知和旧任务人格回退女帝(self):
         self.assertIn("波雅·汉库克", chat_protocol.build_chat_prompt({}))
