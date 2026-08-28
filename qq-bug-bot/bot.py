@@ -38,6 +38,7 @@ CONFIG_PATH = os.environ.get(
 ADMIN_AGENT_OWNER_QQ = "651846226"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
+_NEW_MEMBER_WELCOME_ASSISTANT_IDS = {"s-eagle", "s-shark"}
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _ASSISTANT_ROLES = {"primary", "admin_only"}
 
@@ -157,6 +158,14 @@ def resolve_assistant_connections(cfg: dict) -> list[dict]:
                 "_expected_self_id": expected_self_id,
                 "ws_url": ws_url,
                 "access_token": access_token,
+                "new_member_welcome_enabled": item.get(
+                    "new_member_welcome_enabled",
+                    cfg.get("new_member_welcome_enabled", False),
+                ),
+                "new_member_welcome_groups": item.get(
+                    "new_member_welcome_groups",
+                    cfg.get("new_member_welcome_groups", []),
+                ),
             }
         )
         connections.append(connection)
@@ -456,6 +465,18 @@ def group_add_auto_approval_groups(cfg: dict) -> set[str]:
         return set()
     groups = set()
     for value in cfg.get("group_add_auto_approval_groups") or []:
+        text = str(value).strip()
+        if text.isdigit() and int(text) > 0:
+            groups.add(str(int(text)))
+    return groups
+
+
+def new_member_welcome_groups(cfg: dict) -> set[str]:
+    """欢迎功能缺省关闭，且空群列表不会被解释为全部群。"""
+    if not cfg.get("new_member_welcome_enabled", False):
+        return set()
+    groups = set()
+    for value in cfg.get("new_member_welcome_groups") or []:
         text = str(value).strip()
         if text.isdigit() and int(text) > 0:
             groups.add(str(int(text)))
@@ -841,6 +862,66 @@ async def send_group_msg_confirmed(client, group_id, message) -> dict:
         "send_group_msg",
         {"group_id": int(group_id), "message": message},
     )
+
+
+# 每个副助理独立去重；只有 OneBot 明确确认发送成功后才记录，以便失败后重试。
+_HANDLED_NEW_MEMBER_WELCOME_LIMIT = 2048
+_handled_new_member_welcomes: dict[str, None] = {}
+
+
+def _new_member_welcome_event_key(cfg: dict, event: dict) -> str:
+    event_identity = event.get("message_id")
+    if event_identity not in (None, ""):
+        event_identity = f"message:{event_identity}"
+    else:
+        event_identity = ":".join(
+            str(event.get(key) or "")
+            for key in ("time", "group_id", "user_id", "self_id")
+        )
+    return f"{assistant_id(cfg)}:{event_identity}"
+
+
+def _remember_new_member_welcome(key: str) -> None:
+    _handled_new_member_welcomes[key] = None
+    while len(_handled_new_member_welcomes) > _HANDLED_NEW_MEMBER_WELCOME_LIMIT:
+        _handled_new_member_welcomes.pop(next(iter(_handled_new_member_welcomes)))
+
+
+async def handle_new_member_welcome(client, cfg: dict, event: dict) -> bool:
+    """由鹰、鲨副助理在明确目标群中分别欢迎真实入群成员。"""
+    if (
+        event.get("post_type") != "notice"
+        or event.get("notice_type") != "group_increase"
+        or assistant_role(cfg) != "admin_only"
+        or assistant_id(cfg) not in _NEW_MEMBER_WELCOME_ASSISTANT_IDS
+    ):
+        return False
+    group_id = str(event.get("group_id") or "")
+    if group_id not in new_member_welcome_groups(cfg):
+        return False
+    newcomer = str(event.get("user_id") or "")
+    self_id = str(event.get("self_id") or "")
+    if not newcomer or newcomer == self_id:
+        return False
+
+    event_key = _new_member_welcome_event_key(cfg, event)
+    if event_key in _handled_new_member_welcomes:
+        return True
+    try:
+        await send_group_msg_confirmed(
+            client,
+            group_id,
+            at_message(newcomer, f"欢迎加入本群！我是 {assistant_name(cfg)}，请多关照。"),
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(
+            f"[新人欢迎] {assistant_name(cfg)} 欢迎群{group_id}成员{newcomer}失败：{exc}"
+        )
+        return True
+    _remember_new_member_welcome(event_key)
+    return True
 
 
 async def get_authoritative_group_members(client, group_id) -> set[str]:
@@ -1625,6 +1706,8 @@ async def on_event(ws, cfg, event) -> None:
         print(
             f"[安全] {assistant_name(cfg)} 忽略 self_id 与预期账号不一致的事件"
         )
+        return
+    if await handle_new_member_welcome(ws, cfg, event):
         return
     if assistant_role(cfg) == "admin_only":
         await handle_admin_only_event(ws, cfg, event)

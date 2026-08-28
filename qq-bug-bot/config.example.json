@@ -17,7 +17,9 @@
       "enabled": false,
       "ws_url": "ws://127.0.0.1:3002",
       "access_token": "",
-      "expected_self_id": "3430685803"
+      "expected_self_id": "3430685803",
+      "new_member_welcome_enabled": true,
+      "new_member_welcome_groups": [297542853]
     },
     {
       "id": "s-shark",
@@ -26,7 +28,9 @@
       "enabled": false,
       "ws_url": "ws://127.0.0.1:3003",
       "access_token": "",
-      "expected_self_id": "184689168"
+      "expected_self_id": "184689168",
+      "new_member_welcome_enabled": true,
+      "new_member_welcome_groups": [297542853]
     }
   ],
   "command_prefix": "#bug ",
@@ -51,6 +55,8 @@
   "forward_max_depth": 3,
   "chat_max_pending_per_user": 1,
   "chat_cooldown_seconds": 15,
+  "new_member_welcome_enabled": false,
+  "new_member_welcome_groups": [],
   "new_member_verification_enabled": false,
   "new_member_verification_groups": [],
   "new_member_verification_timeout_seconds": 1800,

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import re
+import ast
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,39 @@ BOT_DIR = Path(__file__).resolve().parents[1]
 
 
 class DeployFileTests(unittest.TestCase):
+    @staticmethod
+    def _load_shell_config_migration():
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+        heredoc = re.search(
+            r'python3 - "\$deploy_dir/config\.server\.json" "\$enable_agent" '
+            r"<<'PY'\n(?P<source>.*?)\nPY\n",
+            shell,
+            re.DOTALL,
+        )
+        if not heredoc:
+            raise AssertionError("未找到 config.server.json 的 Python 迁移脚本")
+        tree = ast.parse(heredoc.group("source"))
+        function = next(
+            (
+                node
+                for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "migrate_config"
+            ),
+            None,
+        )
+        if function is None:
+            raise AssertionError("未找到 migrate_config 配置迁移函数")
+        namespace = {}
+        exec(
+            compile(
+                ast.Module(body=[function], type_ignores=[]),
+                "deploy-bot-server.sh:migrate_config",
+                "exec",
+            ),
+            namespace,
+        )
+        return namespace["migrate_config"]
+
     def test_Dockerfile复制的文件均进入构建上下文(self):
         dockerfile = (BOT_DIR / "Dockerfile").read_text(encoding="utf-8")
         dockerignore = (BOT_DIR / ".dockerignore").read_text(encoding="utf-8")
@@ -134,6 +168,48 @@ class DeployFileTests(unittest.TestCase):
                 [item["expected_self_id"] for item in connections],
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
+
+    def test_部署迁移只为现有鹰鲨连接启用指定群欢迎(self):
+        migrate = self._load_shell_config_migration()
+        config = {
+            "assistant_connections": [
+                {
+                    "id": "primary",
+                    "access_token": "primary-secret",
+                    "new_member_welcome_enabled": True,
+                    "new_member_welcome_groups": [111],
+                },
+                {"id": "s-eagle", "access_token": "eagle-secret"},
+                {
+                    "id": "s-shark",
+                    "access_token": "shark-secret",
+                    "custom": "保留",
+                },
+                {"id": "future-assistant", "access_token": "future-secret"},
+                "无效连接记录",
+            ]
+        }
+
+        result = migrate(config)
+
+        self.assertIs(config, result)
+        connections = result["assistant_connections"]
+        self.assertIs(connections[0]["new_member_welcome_enabled"], False)
+        self.assertEqual([], connections[0]["new_member_welcome_groups"])
+        for connection in connections[1:3]:
+            self.assertIs(connection["new_member_welcome_enabled"], True)
+            self.assertEqual([297542853], connection["new_member_welcome_groups"])
+        self.assertEqual(
+            ["primary-secret", "eagle-secret", "shark-secret", "future-secret"],
+            [connection["access_token"] for connection in connections[:4]],
+        )
+        self.assertEqual("保留", connections[2]["custom"])
+        self.assertNotIn("new_member_welcome_enabled", connections[3])
+        self.assertEqual("无效连接记录", connections[4])
+
+        missing = {"assistant_connections": [{"id": "primary"}]}
+        migrate(missing)
+        self.assertEqual(["primary"], [item["id"] for item in missing["assistant_connections"]])
 
     def test_三助理上线清单覆盖身份核验重放恢复和回滚(self):
         checklist = (BOT_DIR / "三助理上线清单.md").read_text(encoding="utf-8")

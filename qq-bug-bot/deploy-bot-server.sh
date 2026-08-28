@@ -43,6 +43,24 @@ enable_agent = sys.argv[2].lower() == "true"
 stat = os.stat(path)
 with open(path, "r", encoding="utf-8") as file:
     data = json.load(file)
+
+def migrate_config(data):
+    connections = data.get("assistant_connections")
+    if not isinstance(connections, list):
+        return data
+    for connection in connections:
+        if not isinstance(connection, dict):
+            continue
+        connection_id = str(connection.get("id") or "").strip().lower()
+        if connection_id == "primary":
+            connection["new_member_welcome_enabled"] = False
+            connection["new_member_welcome_groups"] = []
+        elif connection_id in {"s-eagle", "s-shark"}:
+            connection["new_member_welcome_enabled"] = True
+            connection["new_member_welcome_groups"] = [297542853]
+    return data
+
+data = migrate_config(data)
 data["agent_enabled"] = enable_agent
 data["agent_owner_qq"] = 651846226
 data["agent_notification_interval_seconds"] = 3
