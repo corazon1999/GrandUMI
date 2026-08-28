@@ -395,7 +395,10 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         self.assertEqual([], client.sent)
         self.assertEqual(
             bot.at_message(
-                "10001", "加群审批结果尚未确认，请稍后再试或联系释迦大人。"
+                "10001",
+                "你的加群审批结果尚未确认，暂时不能登记。请稍后由本人真正 "
+                "@“释迦的助理”，并只发送“邀请人QQ：123456789”；"
+                "若一直无法登记，请联系释迦大人核对。",
             ),
             client.actions[-1][1]["message"],
         )
@@ -409,10 +412,36 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         self.assertEqual([], client.sent)
         self.assertEqual(
             bot.at_message(
-                "30003", "当前没有待登记的邀请人验证，请联系释迦大人核对。"
+                "30003",
+                "邀请人 QQ 只能由刚入群且处于待验证状态的新人本人登记，不能代填。"
+                "若你就是刚入群的新人，请真正 @“释迦的助理”，并只发送"
+                "“邀请人QQ：123456789”；若仍提示没有待登记验证，请联系释迦大人核对。",
             ),
             client.actions[-1][1]["message"],
         )
+
+        for message_id, text in (
+            (14, " 请问邀请人QQ要怎么登记？"),
+            (15, " 邀请人QQ"),
+            (16, " 我想登记邀请人QQ是20002"),
+        ):
+            with self.subTest(text=text):
+                inquiry = dict(attempt)
+                inquiry["user_id"] = 30003
+                inquiry["message_id"] = message_id
+                inquiry["message"] = [
+                    {"type": "at", "data": {"qq": "99999"}},
+                    {"type": "text", "data": {"text": text}},
+                ]
+                asyncio.run(bot.on_event(client, cfg, inquiry))
+                reply = client.actions[-1][1]["message"][1]["data"]["text"]
+                self.assertIn("只能由", reply)
+                self.assertIn("新人本人登记", reply)
+                self.assertIn("邀请人QQ：123456789", reply)
+                self.assertIn("联系释迦大人", reply)
+                self.assertIsNone(
+                    storage.get_active_member_verification("456", "30003")
+                )
 
     def test普通含QQ聊天和纯文本艾特不误命中登记专用提示(self):
         cfg = approval_cfg()
@@ -463,7 +492,7 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         self.assertEqual(sent_count, len(client.sent))
         self.assertIsNone(storage.get_active_member_verification("456", "30003"))
 
-    def test严格登记格式不接受附加聊天_多个QQ_其他消息段和非目标群(self):
+    def test登记格式错误会引导但其他消息段和非目标群不误消费(self):
         cfg = approval_cfg()
         cfg.update(
             {
@@ -488,7 +517,7 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         }
         self.assertEqual("20002", bot.extract_strict_inviter_registration_qq(base))
 
-        invalid_messages = (
+        malformed_registration_messages = (
             [
                 {"type": "at", "data": {"qq": "99999"}},
                 {
@@ -503,29 +532,40 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
                     "data": {"text": "邀请人QQ:20002 另一个是30003"},
                 },
             ],
-            [
-                {"type": "at", "data": {"qq": "99999"}},
-                {"type": "text", "data": {"text": "邀请人QQ:20002"}},
-                {"type": "image", "data": {"file": "not-downloaded.jpg"}},
-            ],
         )
-        for index, message in enumerate(invalid_messages, start=17):
+        for index, message in enumerate(malformed_registration_messages, start=17):
             with self.subTest(message=message):
                 event = dict(base)
                 event["message_id"] = index
                 event["message"] = message
                 self.assertIsNone(bot.extract_strict_inviter_registration_qq(event))
                 asyncio.run(bot.on_event(client, cfg, event))
-                self.assertEqual(
-                    bot.at_message("30003", "我只跟释迦大人聊天"),
-                    client.sent[-1]["params"]["message"],
-                )
+                reply = client.actions[-1][1]["message"][1]["data"]["text"]
+                self.assertIn("新人本人登记", reply)
+                self.assertIn("邀请人QQ：123456789", reply)
+
+        attachment = dict(base)
+        attachment["message_id"] = 19
+        attachment["message"] = [
+            {"type": "at", "data": {"qq": "99999"}},
+            {"type": "text", "data": {"text": "邀请人QQ:20002"}},
+            {"type": "image", "data": {"file": "not-downloaded.jpg"}},
+        ]
+        self.assertIsNone(bot.extract_strict_inviter_registration_qq(attachment))
+        action_count = len(client.actions)
+        asyncio.run(bot.on_event(client, cfg, attachment))
+        self.assertEqual(action_count, len(client.actions))
+        self.assertEqual(
+            bot.at_message("30003", "我只跟释迦大人聊天"),
+            client.sent[-1]["params"]["message"],
+        )
 
         other_group = dict(base)
         other_group["group_id"] = 789
         other_group["message_id"] = 20
+        action_count = len(client.actions)
         asyncio.run(bot.on_event(client, cfg, other_group))
-        self.assertEqual([], client.actions)
+        self.assertEqual(action_count, len(client.actions))
         self.assertEqual(
             bot.at_message("30003", "我只跟释迦大人聊天"),
             client.sent[-1]["params"]["message"],

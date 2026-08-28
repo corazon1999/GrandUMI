@@ -723,6 +723,14 @@ _INVITER_REGISTRATION_BODY_RE = re.compile(
     r"^\s*邀请人\s*(?:的\s*)?QQ(?:号|号码)?\s*[：:=]\s*([1-9]\d{4,11})\s*$",
     re.IGNORECASE,
 )
+_INVITER_REGISTRATION_LABEL_RE = re.compile(
+    r"邀请人\s*(?:的\s*)?QQ(?:号|号码)?",
+    re.IGNORECASE,
+)
+_INVITER_REGISTRATION_INTENT_RE = re.compile(
+    r"登记|填(?:写|报)?|怎么填|如何填|补充|记录|验证|提交|回答|回复|修改|改成",
+    re.IGNORECASE,
+)
 
 
 def extract_strict_inviter_registration_qq(event: dict):
@@ -745,6 +753,38 @@ def extract_strict_inviter_registration_qq(event: dict):
         return None
     match = _INVITER_REGISTRATION_BODY_RE.fullmatch("".join(text_parts))
     return match.group(1) if match else None
+
+
+def has_inviter_registration_intent(event: dict) -> bool:
+    """保守识别真实 @ 后的登记询问或格式错误，不扫描引用、转发等嵌套内容。"""
+    if not is_real_at_self(event):
+        return False
+    self_id = str(event.get("self_id") or "")
+    text_parts = []
+    for segment in event.get("message") or []:
+        if not isinstance(segment, dict):
+            return False
+        segment_type = segment.get("type")
+        data = segment.get("data") or {}
+        if segment_type == "text":
+            text_parts.append(str(data.get("text") or ""))
+            continue
+        if segment_type == "at" and str(data.get("qq") or "") == self_id:
+            continue
+        return False
+    text = "".join(text_parts).strip()
+    label = _INVITER_REGISTRATION_LABEL_RE.search(text)
+    if not label:
+        return False
+    if _INVITER_REGISTRATION_INTENT_RE.search(text):
+        return True
+    # “邀请人QQ”“邀请人QQ是123”等短消息明显是在尝试登记；其他带该词的
+    # 普通长句继续交给原聊天路由，避免仅凭出现 QQ 就误消费。
+    remainder = text[label.end() :].strip()
+    return bool(
+        not remainder
+        or re.match(r"^(?:[：:=]|是|为)?\s*(?:[1-9]\d{0,11}|[?？])", remainder)
+    )
 
 
 def member_verification_message_key(event: dict) -> str:
@@ -1102,14 +1142,19 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
     received_at = _event_received_at(event)
     active = storage.get_active_member_verification(group_id, newcomer)
     strict_registration_qq = extract_strict_inviter_registration_qq(event)
+    registration_intent = bool(
+        strict_registration_qq or has_inviter_registration_intent(event)
+    )
     if active and active["state"] == "approval_pending":
         # 申请虽然可信，但外部审批结果尚未确认；此状态不能仅凭正文升级权限。
-        if strict_registration_qq:
+        if registration_intent:
             await _try_send_verification_message(
                 client,
                 group_id,
                 newcomer,
-                "加群审批结果尚未确认，请稍后再试或联系释迦大人。",
+                "你的加群审批结果尚未确认，暂时不能登记。请稍后由本人真正 "
+                "@“释迦的助理”，并只发送“邀请人QQ：123456789”；"
+                "若一直无法登记，请联系释迦大人核对。",
             )
             return True
         return False
@@ -1128,15 +1173,27 @@ async def handle_member_verification_reply(client, cfg: dict, event: dict) -> bo
             member_verification_message_key(event),
         ):
             return True
-        if strict_registration_qq:
+        if registration_intent:
             await _try_send_verification_message(
                 client,
                 group_id,
                 newcomer,
-                "当前没有待登记的邀请人验证，请联系释迦大人核对。",
+                "邀请人 QQ 只能由刚入群且处于待验证状态的新人本人登记，不能代填。"
+                "若你就是刚入群的新人，请真正 @“释迦的助理”，并只发送"
+                "“邀请人QQ：123456789”；若仍提示没有待登记验证，请联系释迦大人核对。",
             )
             return True
         return False
+    if registration_intent and not strict_registration_qq:
+        await _try_send_verification_message(
+            client,
+            group_id,
+            newcomer,
+            "你本人有待登记的邀请人验证。请真正 @“释迦的助理”，并只发送"
+            "“邀请人QQ：123456789”（替换为实际邀请人 QQ）；"
+            "机器人会继续核验，请不要填写自己的 QQ。",
+        )
+        return True
     candidate, error = extract_inviter_qq(event)
     if error:
         await _try_send_verification_message(client, group_id, newcomer, error)

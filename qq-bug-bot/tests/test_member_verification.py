@@ -616,6 +616,48 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
             [name for name, _ in client.actions],
         )
 
+    def test待验证新人自然语言登记先收到严格格式指引再安全核验(self):
+        client = FakeOneBotClient({"10001", "20002", "99999"})
+        cfg = verification_cfg()
+        asyncio.run(bot.on_event(client, cfg, join_event()))
+        row = storage.get_active_member_verification("456", "10001")
+
+        inquiry = reply_event(message_id=89)
+        inquiry["message"] = [
+            {"type": "at", "data": {"qq": "99999"}},
+            {
+                "type": "text",
+                "data": {"text": " 我想登记邀请人QQ是20002，应该怎么填？"},
+            },
+        ]
+        asyncio.run(bot.on_event(client, cfg, inquiry))
+
+        unchanged = storage.get_member_verification(row["id"])
+        self.assertEqual("pending", unchanged["state"])
+        self.assertEqual([], storage.get_member_verification_responses(row["id"]))
+        self.assertEqual(
+            ["send_group_msg", "send_group_msg"],
+            [name for name, _ in client.actions],
+        )
+        guidance = client.actions[-1][1]["message"][1]["data"]["text"]
+        self.assertIn("你本人有待登记", guidance)
+        self.assertIn("只发送“邀请人QQ：123456789”", guidance)
+        self.assertIn("不要填写自己的 QQ", guidance)
+
+        strict = reply_event(message_id=90, when=1101)
+        strict["message"] = [
+            {"type": "at", "data": {"qq": "99999"}},
+            {"type": "text", "data": {"text": " 邀请人QQ：20002"}},
+        ]
+        asyncio.run(bot.on_event(client, cfg, strict))
+        completed = storage.get_member_verification(row["id"])
+        self.assertEqual("verified", completed["state"])
+        self.assertEqual("20002", completed["inviter_qq"])
+        self.assertEqual(
+            ["get_group_member_list", "send_group_msg"],
+            [name for name, _ in client.actions[-2:]],
+        )
+
     def test非目标群不创建会话_空目标列表绝不代表全部群(self):
         client = FakeOneBotClient()
         cfg = verification_cfg(groups=(123,))
