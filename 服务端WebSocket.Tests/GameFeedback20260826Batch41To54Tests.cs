@@ -193,30 +193,99 @@ public class GameFeedback20260826Batch41To54Tests
         Assert.Empty(me.Trash);
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, 1)]
+    public async Task G891_OP11_054_EachReturnedHandCardExplainsAndUsesItsFinalOrder(
+        int firstPlacement,
+        int secondPlacement)
+    {
+        var state = TestScene.New("OP06-001")
+            .MyDeckTop("OP15-003", "OP15-004", "OP15-005", "OP15-008", "OP15-009")
+            .Build();
+        var me = state.Players[0];
+        var first = Card("OP15-006");
+        var second = Card("OP15-007");
+        me.Hand.AddRange([first, second]);
+        var deckAfterDraw = me.Deck.Skip(3).ToList();
+        var source = Card("OP11-054");
+        me.Characters.Add(source);
+        var prompts = new MockPromptService()
+            .QueueChoose(first.Id.ToString())
+            .QueueChoose(second.Id.ToString())
+            .QueueOption(firstPlacement)
+            .QueueOption(secondPlacement);
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
+
+        var expectedDeck = (firstPlacement, secondPlacement) switch
+        {
+            (0, 0) => new[] { first, second }.Concat(deckAfterDraw),
+            (0, 1) => new[] { first }.Concat(deckAfterDraw).Append(second),
+            (1, 0) => new[] { second }.Concat(deckAfterDraw).Append(first),
+            _ => deckAfterDraw.Concat(new[] { first, second }),
+        };
+        Assert.Equal(expectedDeck, me.Deck);
+        Assert.Equal(3, me.Hand.Count);
+        Assert.Equal(2, prompts.ChooseHistory.Count);
+
+        Assert.Contains("第 1/2 张", prompts.ChooseHistory[0].text);
+        Assert.Contains("第 2/2 张", prompts.ChooseHistory[1].text);
+        Assert.Contains(first.Info.Number, prompts.ChooseHistory[1].text);
+        if (firstPlacement == 0)
+        {
+            Assert.Contains("已放牌顶", prompts.ChooseHistory[1].text);
+            Assert.Contains("本张会位于第 1 张下方", prompts.ChooseHistory[1].text);
+        }
+        else
+        {
+            Assert.Contains("已放牌底", prompts.ChooseHistory[1].text);
+            Assert.Contains("本张会位于第 1 张下方并成为最终最下方", prompts.ChooseHistory[1].text);
+        }
+
+        Assert.Equal(2, prompts.OptionHistory.Count);
+        Assert.Contains(first.Info.Number, prompts.OptionHistory[0].text);
+        Assert.Contains("本张最终最上", prompts.OptionHistory[0].options[0]);
+        Assert.Contains("第 2 张放牌顶时本张最终最下", prompts.OptionHistory[0].options[1]);
+        Assert.Contains("放牌底时第 2 张位于本张下方", prompts.OptionHistory[0].options[1]);
+        Assert.Contains(second.Info.Number, prompts.OptionHistory[1].text);
+        Assert.Contains(first.Info.Number, prompts.OptionHistory[1].text);
+        Assert.Contains(firstPlacement == 0 ? "已放牌顶" : "已放牌底", prompts.OptionHistory[1].text);
+        if (firstPlacement == 0)
+        {
+            Assert.Contains("本张在第 1 张下方", prompts.OptionHistory[1].options[0]);
+            Assert.Contains("本张成为卡组最下方", prompts.OptionHistory[1].options[1]);
+        }
+        else
+        {
+            Assert.Contains("本张成为卡组最上方", prompts.OptionHistory[1].options[0]);
+            Assert.Contains("本张在第 1 张下方", prompts.OptionHistory[1].options[1]);
+        }
+    }
+
     [Fact]
-    public async Task G891_OP11_054_EachReturnedHandCardCanChooseTopOrBottomIndependently()
+    public async Task G891_OP11_054_InvalidPlacementDoesNotMoveTheSelectedCard()
     {
         var state = TestScene.New("OP06-001")
             .MyDeckTop("OP15-003", "OP15-004", "OP15-005")
             .Build();
         var me = state.Players[0];
-        var toTop = Card("OP15-006");
-        var toBottom = Card("OP15-007");
-        me.Hand.AddRange([toTop, toBottom]);
+        var selected = Card("OP15-006");
+        me.Hand.Add(selected);
         var source = Card("OP11-054");
         me.Characters.Add(source);
         var prompts = new MockPromptService()
-            .QueueChoose(toTop.Id.ToString())
-            .QueueChoose(toBottom.Id.ToString())
-            .QueueOption(0)
-            .QueueOption(1);
+            .QueueChoose(selected.Id.ToString())
+            .QueueOption(-1);
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
 
-        Assert.Equal(toTop, me.Deck[0]);
-        Assert.Equal(toBottom, me.Deck[^1]);
-        Assert.Equal(3, me.Hand.Count);
-        Assert.Equal(2, prompts.ChooseHistory.Count);
+        Assert.Contains(selected, me.Hand);
+        Assert.DoesNotContain(selected, me.Deck);
+        Assert.Single(prompts.ChooseHistory);
+        Assert.Single(prompts.OptionHistory);
     }
 
     [Fact]
