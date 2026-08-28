@@ -32,6 +32,8 @@ class DeployFileTests(unittest.TestCase):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
         self.assertRegex(powershell, re.escape('".dockerignore"'))
         self.assertRegex(shell, r'files="[^"]*\.dockerignore(?: |")')
+        self.assertRegex(powershell, re.escape('".env.example"'))
+        self.assertRegex(shell, r'files="[^"]*\.env\.example(?: |")')
 
     def test_NapCat锁定设备身份和镜像并使用信号包装(self):
         compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
@@ -73,6 +75,74 @@ class DeployFileTests(unittest.TestCase):
         for content in (powershell, shell):
             self.assertIn("napcat-init.sh", content)
             self.assertNotIn("napcat-quick-password-md5.secret", content)
+
+    def test_三助理NapCat账号设备和持久化卷完全隔离(self):
+        compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        environment = (BOT_DIR / ".env.example").read_text(encoding="utf-8")
+        digest = (
+            "mlikiowa/napcat-docker@sha256:"
+            "31bc4657c4bb5a2a44d11c12df863dd6d5bd109e78163e34cf09d8149cf9b078"
+        )
+
+        self.assertEqual(3, compose.count(f"image: {digest}"))
+        for service, container, account, port in (
+            ("napcat-eagle", "grandumi-napcat-eagle", "NAPCAT_EAGLE_ACCOUNT", 6100),
+            ("napcat-shark", "grandumi-napcat-shark", "NAPCAT_SHARK_ACCOUNT", 6101),
+        ):
+            self.assertIn(f"  {service}:", compose)
+            self.assertIn(f"container_name: {container}", compose)
+            self.assertIn(f'ACCOUNT: "${{{account}:-}}"', compose)
+            self.assertIn(f'"127.0.0.1:{port}:6099"', compose)
+            self.assertIn(account + "=", environment)
+            self.assertIn(f"      - {service}", compose)
+
+        expected_volumes = (
+            "napcat_qq", "napcat_config", "napcat_plugins",
+            "napcat_eagle_qq", "napcat_eagle_config", "napcat_eagle_plugins",
+            "napcat_shark_qq", "napcat_shark_config", "napcat_shark_plugins",
+        )
+        for volume in expected_volumes:
+            self.assertIn(f"  {volume}:", compose)
+        self.assertIn("NAPCAT_EAGLE_MAC_ADDRESS=", environment)
+        self.assertIn("NAPCAT_SHARK_MAC_ADDRESS=", environment)
+
+    def test_多助理配置默认保留主助理并安全关闭未知账号(self):
+        for name, expected_urls in (
+            (
+                "config.example.json",
+                ("ws://127.0.0.1:3001", "ws://127.0.0.1:3002", "ws://127.0.0.1:3003"),
+            ),
+            (
+                "config.server.example.json",
+                ("ws://napcat:3001", "ws://napcat-eagle:3001", "ws://napcat-shark:3001"),
+            ),
+        ):
+            config = json.loads((BOT_DIR / name).read_text(encoding="utf-8"))
+            connections = config["assistant_connections"]
+            self.assertEqual(
+                ["primary", "s-eagle", "s-shark"],
+                [item["id"] for item in connections],
+            )
+            self.assertEqual(
+                ["primary", "admin_only", "admin_only"],
+                [item["role"] for item in connections],
+            )
+            self.assertEqual([True, False, False], [item["enabled"] for item in connections])
+            self.assertEqual(list(expected_urls), [item["ws_url"] for item in connections])
+            self.assertEqual(
+                ["3215228879", "3430685803", "184689168"],
+                [item["expected_self_id"] for item in connections],
+            )
+            self.assertEqual(651846226, config["admin_agent_owner_qq"])
+
+    def test_三助理上线清单覆盖身份核验重放恢复和回滚(self):
+        checklist = (BOT_DIR / "三助理上线清单.md").read_text(encoding="utf-8")
+        for required in (
+            "651846226", "expected_self_id", "get_login_info",
+            "message_id", "不得新增第二条任务", "s-蛇", "s-鹰", "s-鲨",
+            "enabled=false", "失败恢复与回滚", "reply_sent_at",
+        ):
+            self.assertIn(required, checklist)
 
     def test_配置切换和回滚均强制重建机器人(self):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")

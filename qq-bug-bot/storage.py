@@ -6,6 +6,7 @@
 
 import os
 import json
+import re
 import sqlite3
 import time
 from datetime import datetime
@@ -22,6 +23,8 @@ CHAT_QUEUE_STATES = ("queued", "claimed")
 CHAT_TERMINAL_STATES = ("completed", "failed")
 PERSONALITIES = ("hancock", "nami", "robin")
 DEFAULT_PERSONALITY = "hancock"
+DEFAULT_ASSISTANT_ID = "primary"
+_ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 MEMBER_VERIFICATION_ACTIVE_STATES = (
     "approval_pending",
     "awaiting_join",
@@ -91,7 +94,9 @@ def init_db() -> None:
                 feedback_id INTEGER,
                 continued_at TEXT,
                 media_json TEXT NOT NULL DEFAULT '[]',
-                personality TEXT NOT NULL DEFAULT 'hancock'
+                personality TEXT NOT NULL DEFAULT 'hancock',
+                assistant_id TEXT NOT NULL DEFAULT 'primary',
+                source_message_key TEXT
             )
             """
         )
@@ -293,6 +298,35 @@ def init_db() -> None:
                 "ALTER TABLE chat_messages "
                 "ADD COLUMN personality TEXT NOT NULL DEFAULT 'hancock'"
             )
+        if "assistant_id" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN assistant_id TEXT NOT NULL DEFAULT 'primary'"
+            )
+        if "source_message_key" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages ADD COLUMN source_message_key TEXT"
+            )
+        conn.execute(
+            """
+            UPDATE chat_messages
+               SET assistant_id = 'primary'
+             WHERE assistant_id IS NULL OR TRIM(assistant_id) = ''
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_delivery
+            ON chat_messages(assistant_id, state, reply_sent_at, updated_at, id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_messages_admin_source
+            ON chat_messages(assistant_id, source_message_key)
+            WHERE kind = 'admin_agent' AND source_message_key IS NOT NULL
+            """
+        )
         verification_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(member_verifications)")
         }
@@ -1959,24 +1993,51 @@ def add_chat_message(
     kind: str = "chat",
     media=None,
     personality: str = DEFAULT_PERSONALITY,
-) -> int:
-    """新增一条聊天或 Bug 描述检查请求并返回编号。"""
+    assistant_id: str = DEFAULT_ASSISTANT_ID,
+    source_message_key: str | None = None,
+):
+    """新增聊天请求并返回编号；管理员消息重放时返回 ``None``。"""
     if kind not in ("chat", "bug_intake", "admin_agent"):
         raise ValueError(f"不支持的消息类型: {kind}")
+    selected_assistant = str(assistant_id or "").strip().lower()
+    if not _ASSISTANT_ID_RE.fullmatch(selected_assistant):
+        raise ValueError(f"不支持的助理标识: {assistant_id}")
+    source_key = str(source_message_key or "").strip() or None
+    if source_key is not None:
+        if kind != "admin_agent":
+            raise ValueError("只有管理员 Agent 消息可以设置来源消息键")
+        if len(source_key) > 200:
+            raise ValueError("来源消息键过长")
     now_text = datetime.now().isoformat(timespec="seconds")
     media_json = json.dumps(media or [], ensure_ascii=False)
     selected_personality = normalize_personality(personality)
     with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if source_key is not None:
+            existing = conn.execute(
+                """
+                SELECT id FROM chat_messages
+                 WHERE kind = 'admin_agent'
+                   AND assistant_id = ?
+                   AND source_message_key = ?
+                """,
+                (selected_assistant, source_key),
+            ).fetchone()
+            if existing:
+                conn.commit()
+                return None
         cur = conn.execute(
             """
             INSERT INTO chat_messages
                 (kind, qq, nickname, group_id, content, media_json,
-                 personality, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 personality, assistant_id, source_message_key,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 kind, str(qq), nickname or "", str(group_id), content,
                 media_json, selected_personality,
+                selected_assistant, source_key,
                 now_text, now_text,
             ),
         )
@@ -2182,12 +2243,18 @@ def claim_chat_job(
               FROM chat_messages
              WHERE group_id = ?
                AND kind = ?
+               AND assistant_id = ?
                AND state = 'completed'
                AND id < ?
              ORDER BY id DESC
              LIMIT 6
             """,
-            (str(row["group_id"]), str(row["kind"]), row["id"]),
+            (
+                str(row["group_id"]),
+                str(row["kind"]),
+                str(row["assistant_id"] or DEFAULT_ASSISTANT_ID),
+                row["id"],
+            ),
         ).fetchall()
         conn.commit()
         result = dict(claimed)
@@ -2369,18 +2436,43 @@ def release_chat_job(
         return cur.rowcount == 1
 
 
-def get_chat_result_to_send():
+def get_chat_result_to_send(
+    assistant_id: str | None = None,
+    kinds: tuple[str, ...] | None = None,
+):
+    selected_assistant = None
+    if assistant_id is not None:
+        selected_assistant = str(assistant_id or "").strip().lower()
+        if not _ASSISTANT_ID_RE.fullmatch(selected_assistant):
+            raise ValueError(f"不支持的助理标识: {assistant_id}")
+    selected_kinds = None
+    if kinds is not None:
+        selected_kinds = tuple(
+            kind for kind in kinds
+            if kind in ("chat", "bug_intake", "admin_agent")
+        )
+        if not selected_kinds or len(selected_kinds) != len(kinds):
+            raise ValueError("聊天结果类型过滤器无效")
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            """
+        query = """
             SELECT * FROM chat_messages
              WHERE state IN ('completed', 'failed')
                AND reply_sent_at IS NULL
-             ORDER BY updated_at, id
-             LIMIT 1
-            """
-        ).fetchone()
+        """
+        params = ()
+        if selected_assistant is not None:
+            query += " AND assistant_id = ?"
+            params = (selected_assistant,)
+        if selected_kinds is not None:
+            placeholders = ",".join("?" for _ in selected_kinds)
+            query += f" AND kind IN ({placeholders})"
+            params += selected_kinds
+        query += """
+              ORDER BY updated_at, id
+              LIMIT 1
+        """
+        row = conn.execute(query, params).fetchone()
         return dict(row) if row else None
 
 

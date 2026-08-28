@@ -29,6 +29,58 @@ services:
       - napcat_plugins:/app/napcat/plugins
       - ./napcat-init.sh:/usr/local/bin/grandumi-napcat-init.sh:ro
 
+  napcat-eagle:
+    image: mlikiowa/napcat-docker@sha256:31bc4657c4bb5a2a44d11c12df863dd6d5bd109e78163e34cf09d8149cf9b078
+    container_name: grandumi-napcat-eagle
+    restart: unless-stopped
+    hostname: "${NAPCAT_EAGLE_HOSTNAME:-grandumi-napcat-eagle}"
+    mac_address: "${NAPCAT_EAGLE_MAC_ADDRESS:-d6:79:89:15:5e:ea}"
+    stop_grace_period: 30s
+    entrypoint:
+      - /bin/bash
+      - /usr/local/bin/grandumi-napcat-init.sh
+    environment:
+      NAPCAT_UID: "${NAPCAT_UID:-1000}"
+      NAPCAT_GID: "${NAPCAT_GID:-1000}"
+      TZ: "${TZ:-Asia/Shanghai}"
+      ACCOUNT: "${NAPCAT_EAGLE_ACCOUNT:-}"
+      GRANDUMI_NAPCAT_STOP_TIMEOUT_SECONDS: "${NAPCAT_STOP_TIMEOUT_SECONDS:-20}"
+    ports:
+      - "127.0.0.1:6100:6099"
+    expose:
+      - "3001"
+    volumes:
+      - napcat_eagle_qq:/app/.config/QQ
+      - napcat_eagle_config:/app/napcat/config
+      - napcat_eagle_plugins:/app/napcat/plugins
+      - ./napcat-init.sh:/usr/local/bin/grandumi-napcat-init.sh:ro
+
+  napcat-shark:
+    image: mlikiowa/napcat-docker@sha256:31bc4657c4bb5a2a44d11c12df863dd6d5bd109e78163e34cf09d8149cf9b078
+    container_name: grandumi-napcat-shark
+    restart: unless-stopped
+    hostname: "${NAPCAT_SHARK_HOSTNAME:-grandumi-napcat-shark}"
+    mac_address: "${NAPCAT_SHARK_MAC_ADDRESS:-d6:79:89:15:5e:eb}"
+    stop_grace_period: 30s
+    entrypoint:
+      - /bin/bash
+      - /usr/local/bin/grandumi-napcat-init.sh
+    environment:
+      NAPCAT_UID: "${NAPCAT_UID:-1000}"
+      NAPCAT_GID: "${NAPCAT_GID:-1000}"
+      TZ: "${TZ:-Asia/Shanghai}"
+      ACCOUNT: "${NAPCAT_SHARK_ACCOUNT:-}"
+      GRANDUMI_NAPCAT_STOP_TIMEOUT_SECONDS: "${NAPCAT_STOP_TIMEOUT_SECONDS:-20}"
+    ports:
+      - "127.0.0.1:6101:6099"
+    expose:
+      - "3001"
+    volumes:
+      - napcat_shark_qq:/app/.config/QQ
+      - napcat_shark_config:/app/napcat/config
+      - napcat_shark_plugins:/app/napcat/plugins
+      - ./napcat-init.sh:/usr/local/bin/grandumi-napcat-init.sh:ro
+
   bug-bot:
     build:
       context: .
@@ -37,6 +89,8 @@ services:
     stop_grace_period: 20s
     depends_on:
       - napcat
+      - napcat-eagle
+      - napcat-shark
     # 测试域名经 CDN 代理；固定直连游戏主机，仍由 TLS SNI/Host、来源 ACL、代理标记和 Bearer 共同鉴权。
     extra_hosts:
       - "test.grand-umi.com:103.146.230.37"
@@ -63,3 +117,9 @@ volumes:
   napcat_qq:
   napcat_config:
   napcat_plugins:
+  napcat_eagle_qq:
+  napcat_eagle_config:
+  napcat_eagle_plugins:
+  napcat_shark_qq:
+  napcat_shark_config:
+  napcat_shark_plugins:

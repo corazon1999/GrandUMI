@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -39,7 +40,46 @@ class _BlockingWebSocket:
             raise
 
 
+class _FiniteWebSocket:
+    def __init__(self, events):
+        self.events = [json.dumps(item, ensure_ascii=False) for item in events]
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self.events:
+            raise StopAsyncIteration
+        return self.events.pop(0)
+
+    async def send(self, _payload):
+        return None
+
+
 class BotShutdownTests(unittest.IsolatedAsyncioTestCase):
+    async def test_副助理账号核验前不会启动任何回执后台任务(self):
+        cfg = {
+            "_assistant_id": "s-eagle",
+            "_assistant_name": "s-鹰",
+            "_assistant_role": "admin_only",
+            "_expected_self_id": "88888888",
+            "admin_agent_enabled": True,
+        }
+        sync = SimpleNamespace(enabled=False)
+        wrong = _FiniteWebSocket(
+            [{"post_type": "meta_event", "self_id": 77777777}]
+        )
+        right = _FiniteWebSocket(
+            [{"post_type": "meta_event", "self_id": 88888888}]
+        )
+
+        with mock.patch.object(bot, "notification_loop", new=mock.AsyncMock()) as notify:
+            with self.assertRaisesRegex(RuntimeError, "expected_self_id"):
+                await bot._run_connected_session(wrong, cfg, set(), sync)
+            notify.assert_not_called()
+            await bot._run_connected_session(right, cfg, set(), sync)
+            notify.assert_called_once()
+
     async def test_停止事件会打断五秒重连等待(self):
         stop_event = asyncio.Event()
         attempted = asyncio.Event()

@@ -1,6 +1,34 @@
 {
   "ws_url": "ws://127.0.0.1:3001",
   "access_token": "",
+  "assistant_connections": [
+    {
+      "id": "primary",
+      "name": "s-蛇",
+      "role": "primary",
+      "enabled": true,
+      "ws_url": "ws://127.0.0.1:3001",
+      "expected_self_id": "3215228879"
+    },
+    {
+      "id": "s-eagle",
+      "name": "s-鹰",
+      "role": "admin_only",
+      "enabled": false,
+      "ws_url": "ws://127.0.0.1:3002",
+      "access_token": "",
+      "expected_self_id": "3430685803"
+    },
+    {
+      "id": "s-shark",
+      "name": "s-鲨",
+      "role": "admin_only",
+      "enabled": false,
+      "ws_url": "ws://127.0.0.1:3003",
+      "access_token": "",
+      "expected_self_id": "184689168"
+    }
+  ],
   "command_prefix": "#bug ",
   "allowed_groups": [],
   "create_issue": true,

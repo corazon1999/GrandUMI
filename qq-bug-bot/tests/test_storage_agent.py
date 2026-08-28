@@ -105,14 +105,57 @@ class AgentStorageTests(unittest.TestCase):
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kind TEXT NOT NULL DEFAULT 'chat',
+                    qq TEXT NOT NULL,
+                    nickname TEXT,
+                    group_id TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    state TEXT NOT NULL DEFAULT 'queued',
+                    reply TEXT,
+                    error TEXT,
+                    claim_token TEXT,
+                    worker_id TEXT,
+                    claimed_at TEXT,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    reply_sent_at TEXT,
+                    feedback_id INTEGER,
+                    continued_at TEXT,
+                    media_json TEXT NOT NULL DEFAULT '[]',
+                    personality TEXT NOT NULL DEFAULT 'hancock'
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO chat_messages
+                    (kind, qq, group_id, content, created_at, updated_at)
+                VALUES ('admin_agent', '651846226', '456', '旧任务', ?, ?)
+                """,
+                ("2026-08-28T00:00:00", "2026-08-28T00:00:00"),
+            )
         storage.DB_PATH = old_db
         storage.init_db()
         storage.init_db()
         with sqlite3.connect(old_db) as conn:
             cols = {row[1] for row in conn.execute("PRAGMA table_info(feedback)")}
+            chat_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(chat_messages)")
+            }
+            migrated_assistant = conn.execute(
+                "SELECT assistant_id FROM chat_messages WHERE id = 1"
+            ).fetchone()[0]
         self.assertIn("agent_state", cols)
         self.assertIn("agent_reply_sent_at", cols)
         self.assertIn("status", cols)
+        self.assertIn("assistant_id", chat_cols)
+        self.assertIn("source_message_key", chat_cols)
+        self.assertEqual("primary", migrated_assistant)
 
 
 if __name__ == "__main__":

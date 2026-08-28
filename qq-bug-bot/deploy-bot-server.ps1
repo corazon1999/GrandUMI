@@ -21,6 +21,7 @@ if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{12}$') {
 }
 $files = @(
     ".dockerignore",
+    ".env.example",
     "Dockerfile",
     "docker-compose.yml",
     "napcat-init.sh",

@@ -13,7 +13,7 @@ stamp=$(date +%Y%m%d%H%M%S)
 stage="/tmp/grandumi-bug-bot-stage-$stamp"
 backup="$deploy_dir/.deploy-backup-$stamp"
 script_path="/tmp/grandumi-deploy-bug-bot-${bundle##*-}"
-files=".dockerignore Dockerfile docker-compose.yml napcat-init.sh requirements.txt bot.py storage.py qq_whitelist_sync.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py config.server.example.json"
+files=".dockerignore .env.example Dockerfile docker-compose.yml napcat-init.sh requirements.txt bot.py storage.py qq_whitelist_sync.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py config.server.example.json"
 
 cleanup() {
   rm -rf "$stage"

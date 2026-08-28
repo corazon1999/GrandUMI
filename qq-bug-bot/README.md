@@ -6,7 +6,9 @@
 
 唯一管理员 QQ `651846226` 可在群里直接发送 `#切换娜美`、`#切换罗宾` 或 `#切换女帝`。人格按群持久保存，默认是女帝；切换会影响该群后续的 Bug 补充追问、记录成功后的夸赞和管理员 Agent 回复。已经排队的消息保留入队时的人格，不会因稍后的切换改变。普通群友发送切换命令不会生效。
 
-唯一管理员 QQ `651846226` 真实 @机器人时，请求进入独立的管理员 Agent 队列，并优先于消息中的 `bug` 关键字路由。管理员 Agent 在 `D:\Self\GrandUMI` 以当前 Windows 用户权限运行，可读取和修改项目、执行命令、联网检索、测试与部署。身份只取 OneBot 原始事件的 `user_id` 与真实 `at` 消息段，正文、截图、引用或转发中的 QQ 号不能冒充管理员。管理员不 @机器人时，包含 `bug` 的消息仍按普通 Bug 收集处理。
+QQ 助理分为一个主助理 `s-蛇` 与两个副助理 `s-鹰`、`s-鲨`。唯一管理员 QQ `651846226` 真实 @其中任一账号时，请求进入同一条独立管理员 Agent 队列，并优先于消息中的 `bug` 关键字路由。管理员 Agent 在 `D:\Self\GrandUMI` 以当前 Windows 用户权限运行，可读取和修改项目、执行命令、联网检索、测试与部署。身份只取 OneBot 原始事件的 `user_id` 与顶层结构化真实 `at` 消息段，正文、CQ 字符串、截图、引用或转发中的 QQ 号不能冒充管理员。
+
+`s-鹰`、`s-鲨` 是严格的 `admin_only` 副助理：不收集 Bug、不审批加群、不验证新人、不执行 QQ 白名单同步，也不响应人格切换；非管理员真实 @时只返回固定权限提示。管理员任务会持久化来源助理和 OneBot 消息号，同一事件重放不会重复调用本机 Agent，完成结果只能由原助理账号回群。副助理断线不会中断 `s-蛇`，结果会保留到原账号恢复。管理员不 @ `s-蛇` 时，包含 `bug` 的消息仍只由主助理按普通 Bug 收集处理。
 
 管理员 Agent、Bug 提交和 Bug 追问可以同时发送 PNG、JPEG、WebP 图片或合并转发消息。机器人会展开合并转发中的说话人、文字和图片，把最多 4 张受限下载的图片交给对应模型识别；普通群友的普通聊天图片不会下载。
 
@@ -54,6 +56,10 @@ copy config.example.json config.json
 |------|------|
 | `ws_url` | NapCat 正向 WS 地址,默认 `ws://127.0.0.1:3001` |
 | `access_token` | 与 NapCat 一致;没设留空字符串 |
+| `assistant_connections` | 助理连接数组；省略时兼容旧版单个 `s-蛇`。主助理必须固定为 `id=primary, role=primary`，`s-鹰`、`s-鲨` 使用不同 id 且为 `role=admin_only` |
+| `assistant_connections[].enabled` | 新副助理完成账号登录和核验前必须保持 `false`；每个连接独立重连，一个副助理故障不会拖停其他账号 |
+| `assistant_connections[].ws_url` / `access_token` | 对应账号自己的 NapCat 正向 WebSocket 与令牌；令牌省略时继承顶层 `access_token`，生产环境建议每个账号使用不同随机令牌 |
+| `assistant_connections[].expected_self_id` | 该连接预期登录的真实 QQ。启用 `admin_only` 副助理时必填；收到其他 `self_id` 时拒绝事件，也不会启动回执或群管理后台任务 |
 | `allowed_groups` | 群号白名单数组,如 `[123456, 789012]`;**留空 `[]` 表示所有群** |
 | `create_issue` | 是否自动建 GitHub Issue |
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |
@@ -235,8 +241,10 @@ py bot.py
 
 ## 四、Linux 服务器 Docker 部署
 
-推荐把 NapCat 和机器人放在同一个 Compose 项目中。NapCat 的 OneBot 端口只在
-Docker 内网开放,宿主机仅在 `127.0.0.1:6099` 提供 WebUI,避免管理端口暴露到公网。
+推荐把三套 NapCat 和机器人放在同一个 Compose 项目中。三个账号分别使用独立容器、
+主机名、MAC 和三组命名卷，严禁共享 QQ 登录目录。OneBot 端口只在 Docker 内网开放；
+宿主机 WebUI 仅绑定 `127.0.0.1`：`s-蛇` 为 `6099`、`s-鹰` 为 `6100`、`s-鲨` 为
+`6101`，避免管理端口暴露到公网。
 Compose 当前锁定已经过服务器重建演练的 NapCat `v4.15.19` amd64 内容摘要；不要把
 它改回 `latest`，也不要仅凭“密码登录成功”日志判断上线，必须同时验证 WebUI 在线和
 OneBot `get_login_info`。
@@ -258,8 +266,11 @@ chown -R 10001:10001 data
 
 - `GH_TOKEN` 使用只允许目标仓库创建 Issue 的细粒度 GitHub Token。
 - `TZ` 使用服务器业务时区。
-- `NAPCAT_ACCOUNT` 填机器人 QQ；`NAPCAT_HOSTNAME` 和 `NAPCAT_MAC_ADDRESS` 在首次
-  成功登录后必须固定，更改任一值都可能让 QQ 把容器识别为新设备。
+- `NAPCAT_ACCOUNT` 填 `s-蛇` QQ，`NAPCAT_EAGLE_ACCOUNT` 和
+  `NAPCAT_SHARK_ACCOUNT` 分别填两个新账号 QQ；账号未知时保持为空，绝不能拿
+  `s-蛇` 账号或卷代替。
+- 三套 `HOSTNAME` 和 `MAC_ADDRESS` 在首次成功登录后必须各自固定，更改任一值都可能
+  让 QQ 把容器识别为新设备。
 - 白名单同步启用前，用 `openssl rand -hex 32` 生成
   `GRANDUMI_QQ_WHITELIST_SYNC_SECRET`；不得提交、打印或放进 `config.server.json`。
 
@@ -279,6 +290,10 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
 
 - `ws_url` 保持 `ws://napcat:3001`。
 - `access_token` 设置随机长字符串,并在 NapCat 的正向 WebSocket 配置中填写相同值。
+- `assistant_connections` 中保留 `s-蛇` 的 `primary` 连接；`s-鹰`、`s-鲨` 分别连接
+  `ws://napcat-eagle:3001`、`ws://napcat-shark:3001`。三个预期账号固定为
+  `s-蛇 3215228879`、`s-鹰 3430685803`、`s-鲨 184689168`；两个副助理在扫码登录、
+  配置 OneBot 并核验前保持 `enabled=false`。
 - `allowed_groups` 填实际群号白名单,不要留空开放所有群。
 - 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
   两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
@@ -307,8 +322,10 @@ NapCat 首次启动后,从部署电脑建立 SSH 隧道：
 ssh -L 6099:127.0.0.1:6099 root@服务器地址
 ```
 
-然后在浏览器打开 `http://127.0.0.1:6099/webui` 完成 QQ 登录,新增监听
-`0.0.0.0:3001` 的正向 WebSocket 服务端,并配置与机器人一致的访问令牌。
+然后分别在浏览器打开 `http://127.0.0.1:6099/webui`、`6100/webui`、`6101/webui`
+完成对应 QQ 登录；每套 NapCat 都新增监听 `0.0.0.0:3001` 的正向 WebSocket 服务端，
+并配置与该助理连接一致的访问令牌。两个新账号的逐项启用、恢复和回滚步骤见
+[`三助理上线清单.md`](./三助理上线清单.md)。
 
 每次登录态、镜像或设备身份调整后，至少执行两轮 `stop`、删除容器并重建；每轮都要
 确认 NapCat 退出码为 `0`、WebUI 显示在线、OneBot `get_login_info` 返回正确账号。

@@ -35,6 +35,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get(
     "BUG_BOT_CONFIG_PATH", os.path.join(BASE_DIR, "config.json")
 )
+ADMIN_AGENT_OWNER_QQ = "651846226"
+PRIMARY_ASSISTANT_ID = "primary"
+_ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+_ASSISTANT_ROLES = {"primary", "admin_only"}
 
 
 def load_config() -> dict:
@@ -55,6 +59,112 @@ def build_ws_url(cfg: dict) -> str:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}access_token={token}"
     return url
+
+
+def assistant_id(cfg: dict) -> str:
+    return str(cfg.get("_assistant_id") or PRIMARY_ASSISTANT_ID)
+
+
+def assistant_name(cfg: dict) -> str:
+    return str(cfg.get("_assistant_name") or "s-蛇")
+
+
+def assistant_role(cfg: dict) -> str:
+    return str(cfg.get("_assistant_role") or "primary")
+
+
+def is_primary_assistant(cfg: dict) -> bool:
+    return assistant_role(cfg) == "primary"
+
+
+def _fixed_owner_config_is_valid(cfg: dict, key: str) -> bool:
+    value = cfg.get(key, ADMIN_AGENT_OWNER_QQ)
+    return str(value).strip() == ADMIN_AGENT_OWNER_QQ
+
+
+def resolve_assistant_connections(cfg: dict) -> list[dict]:
+    """把旧版单连接配置和新版多助理配置统一为独立连接配置。"""
+    for key in ("agent_owner_qq", "admin_agent_owner_qq"):
+        if not _fixed_owner_config_is_valid(cfg, key):
+            raise ValueError(
+                f"{key} 只能是唯一管理员 QQ {ADMIN_AGENT_OWNER_QQ}"
+            )
+
+    configured = cfg.get("assistant_connections")
+    if configured is None:
+        configured = [
+            {
+                "id": PRIMARY_ASSISTANT_ID,
+                "name": "s-蛇",
+                "role": "primary",
+                "enabled": True,
+                "ws_url": cfg.get("ws_url"),
+                "access_token": cfg.get("access_token", ""),
+            }
+        ]
+    if not isinstance(configured, list) or not configured:
+        raise ValueError("assistant_connections 必须是非空数组")
+
+    seen_ids = set()
+    connections = []
+    primary_count = 0
+    for index, item in enumerate(configured, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"第 {index} 个助理连接配置不是对象")
+        connection_id = str(item.get("id") or "").strip().lower()
+        if not _ASSISTANT_ID_RE.fullmatch(connection_id):
+            raise ValueError(f"第 {index} 个助理连接 id 无效")
+        if connection_id in seen_ids:
+            raise ValueError(f"助理连接 id 重复：{connection_id}")
+        seen_ids.add(connection_id)
+
+        role = str(item.get("role") or "").strip().lower()
+        if role not in _ASSISTANT_ROLES:
+            raise ValueError(f"助理 {connection_id} 的 role 无效")
+        if role == "primary" and connection_id != PRIMARY_ASSISTANT_ID:
+            raise ValueError("主助理的 id 必须固定为 primary，以兼容历史任务")
+
+        enabled = item.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise ValueError(f"助理 {connection_id} 的 enabled 必须是布尔值")
+        if not enabled:
+            continue
+
+        name = str(item.get("name") or "").strip()
+        if not name or len(name) > 32:
+            raise ValueError(f"助理 {connection_id} 的 name 无效")
+        ws_url = str(item.get("ws_url") or "").strip()
+        if not ws_url.startswith(("ws://", "wss://")):
+            raise ValueError(f"助理 {connection_id} 的 ws_url 无效")
+        access_token = item.get("access_token", cfg.get("access_token", ""))
+        if not isinstance(access_token, str):
+            raise ValueError(f"助理 {connection_id} 的 access_token 必须是字符串")
+        expected_self_id = str(item.get("expected_self_id") or "").strip()
+        if expected_self_id and not re.fullmatch(r"[1-9]\d{4,11}", expected_self_id):
+            raise ValueError(f"助理 {connection_id} 的 expected_self_id 无效")
+        if role == "admin_only" and not expected_self_id:
+            raise ValueError(
+                f"副助理 {connection_id} 启用前必须填写 expected_self_id"
+            )
+
+        connection = dict(cfg)
+        connection.update(
+            {
+                "_assistant_id": connection_id,
+                "_assistant_name": name,
+                "_assistant_role": role,
+                "_expected_self_id": expected_self_id,
+                "ws_url": ws_url,
+                "access_token": access_token,
+            }
+        )
+        connections.append(connection)
+        if role == "primary":
+            primary_count += 1
+
+    if primary_count != 1:
+        raise ValueError("必须且只能启用一个 id 为 primary 的主助理连接")
+    return connections
 
 
 class OneBotClient:
@@ -360,6 +470,12 @@ def is_real_at_self(event: dict) -> bool:
         and str((segment.get("data") or {}).get("qq") or "") == self_id
         for segment in message
     )
+
+
+def event_matches_assistant_identity(event: dict, cfg: dict) -> bool:
+    """配置了预期 QQ 时，拒绝来自错误登录账号的 OneBot 事件。"""
+    expected = str(cfg.get("_expected_self_id") or "").strip()
+    return not expected or str(event.get("self_id") or "") == expected
 
 
 _QQ_NUMBER_RE = re.compile(r"(?<!\d)([1-9]\d{4,11})(?!\d)")
@@ -1088,12 +1204,19 @@ async def handle_feedback(ws, cfg, event, content, media=None) -> None:
         kind="bug_intake",
         media=media,
         personality=personality,
+        assistant_id=assistant_id(cfg),
     )
     print(f"[Bug检查#{intake_id}] 群{group_id} {nickname}({qq}): {content}")
 
 
 async def handle_chat(
-    ws, cfg, event, content: str, media=None, kind: str = "chat"
+    ws,
+    cfg,
+    event,
+    content: str,
+    media=None,
+    kind: str = "chat",
+    source_message_key: str | None = None,
 ) -> None:
     """把群聊请求写入独立只读 Agent 队列。"""
     group_id = event.get("group_id")
@@ -1139,7 +1262,16 @@ async def handle_chat(
         kind=kind,
         media=media,
         personality=personality,
+        assistant_id=assistant_id(cfg),
+        source_message_key=source_message_key,
     )
+    if chat_id is None:
+        media_pipeline.cleanup_media(media or [])
+        print(
+            f"[管理员Agent] 忽略 {assistant_name(cfg)} 收到的 OneBot 重放消息："
+            f"{source_message_key}"
+        )
+        return
     label = "管理员Agent" if kind == "admin_agent" else "聊天"
     print(f"[{label}#{chat_id}] 群{group_id} {nickname}({qq}): {content}")
 
@@ -1181,16 +1313,31 @@ def is_admin_agent_request(event: dict, cfg: dict) -> bool:
     """只信任 OneBot 事件中的真实发送者 QQ 与真实 @ 消息段。"""
     if not cfg.get("admin_agent_enabled", False):
         return False
-    owner_qq = str(cfg.get("admin_agent_owner_qq", "651846226"))
-    return str(event.get("user_id", "")) == owner_qq and is_at_self(event)
+    if not _fixed_owner_config_is_valid(cfg, "admin_agent_owner_qq"):
+        return False
+    return (
+        str(event.get("user_id", "")) == ADMIN_AGENT_OWNER_QQ
+        and is_real_at_self(event)
+    )
+
+
+def admin_agent_source_message_key(event: dict) -> str | None:
+    """只用 OneBot 原始消息号生成持久化去重键；缺失时避免误判两条正常消息。"""
+    message_id = event.get("message_id")
+    if isinstance(message_id, bool) or not isinstance(message_id, (int, str)):
+        return None
+    message_id = str(message_id).strip()
+    if not re.fullmatch(r"[-A-Za-z0-9_:]{1,100}", message_id):
+        return None
+    self_id = str(event.get("self_id") or "").strip()
+    group_id = str(event.get("group_id") or "").strip()
+    if not self_id or not group_id:
+        return None
+    return f"onebot:{self_id}:{group_id}:{message_id}"
 
 
 async def handle_personality_switch(ws, cfg, event, personality: str) -> bool:
-    owner_qq = str(
-        cfg.get("admin_agent_owner_qq")
-        or cfg.get("agent_owner_qq")
-        or "651846226"
-    )
+    owner_qq = ADMIN_AGENT_OWNER_QQ
     qq = str(event.get("user_id", ""))
     group_id = str(event.get("group_id", ""))
     if qq != owner_qq:
@@ -1214,7 +1361,9 @@ _OWNER_REPLY_RE = re.compile(r"^\s*#回复(?:\s+|[:：])?(.*)$", re.DOTALL)
 
 async def handle_owner_reply(ws, cfg, event) -> bool:
     """只接受指定管理员在原群发送的“#回复 …”，无需真实 @。"""
-    owner_qq = str(cfg.get("agent_owner_qq", "651846226"))
+    if not _fixed_owner_config_is_valid(cfg, "agent_owner_qq"):
+        return False
+    owner_qq = ADMIN_AGENT_OWNER_QQ
     if str(event.get("user_id", "")) != owner_qq:
         return False
     match = _OWNER_REPLY_RE.match(extract_plain_text(event))
@@ -1273,7 +1422,9 @@ def result_text(row: dict) -> str:
 async def notification_loop(ws, cfg) -> None:
     """串行发送管理员问题与玩家最终结果。"""
     interval = max(1, int(cfg.get("agent_notification_interval_seconds", 3)))
-    owner_qq = str(cfg.get("agent_owner_qq", "651846226"))
+    owner_qq = ADMIN_AGENT_OWNER_QQ
+    route_assistant_id = assistant_id(cfg)
+    primary = is_primary_assistant(cfg)
     next_media_cleanup = 0.0
     while True:
         try:
@@ -1284,7 +1435,7 @@ async def notification_loop(ws, cfg) -> None:
                     int(cfg.get("vision_media_ttl_seconds", 86400)),
                 )
                 next_media_cleanup = now + 3600
-            if cfg.get("agent_enabled", False):
+            if primary and cfg.get("agent_enabled", False):
                 question = storage.get_owner_question_to_send()
                 if question:
                     content = str(question.get("content") or "")
@@ -1296,14 +1447,14 @@ async def notification_loop(ws, cfg) -> None:
                         f"玩家反馈：{content}\n\n{detail}\n\n"
                         "请发送：#回复 你的判断或补充说明（无需 @机器人）"
                     )
-                    await send_group_msg(
+                    await send_group_msg_confirmed(
                         ws, question["group_id"], at_message(owner_qq, text)
                     )
                     storage.mark_owner_question_sent(question["id"])
 
                 result = storage.get_agent_result_to_send()
                 if result:
-                    await send_group_msg(
+                    await send_group_msg_confirmed(
                         ws,
                         result["group_id"],
                         at_message(str(result["qq"]), result_text(result)),
@@ -1311,8 +1462,12 @@ async def notification_loop(ws, cfg) -> None:
                     storage.mark_agent_result_sent(result["id"])
 
             chat = (
-                storage.get_chat_result_to_send()
-                if cfg.get("chat_agent_enabled", False)
+                storage.get_chat_result_to_send(
+                    route_assistant_id,
+                    None if primary else ("admin_agent",),
+                )
+                if cfg.get("admin_agent_enabled", False)
+                or (primary and cfg.get("chat_agent_enabled", False))
                 else None
             )
             if chat:
@@ -1329,7 +1484,7 @@ async def notification_loop(ws, cfg) -> None:
                         chat.get("personality")
                     )
                     text = _PERSONALITY_FAILED_REPLIES[personality]
-                await send_group_msg(
+                await send_group_msg_confirmed(
                     ws,
                     chat["group_id"],
                     at_message(str(chat["qq"]), text),
@@ -1342,7 +1497,72 @@ async def notification_loop(ws, cfg) -> None:
         await asyncio.sleep(interval)
 
 
+async def enqueue_admin_agent_request(
+    ws, cfg: dict, event: dict, text: str, image_refs
+) -> None:
+    """下载已授权消息的媒体，并以来源助理和 OneBot 消息号幂等入队。"""
+    media = []
+    try:
+        media, failures = await download_media_refs(ws, image_refs, cfg)
+        admin_text = text.strip()
+        if failures:
+            admin_text += f"\n（有 {failures} 张图片读取失败）"
+        await handle_chat(
+            ws,
+            cfg,
+            event,
+            admin_text.strip(),
+            media,
+            kind="admin_agent",
+            source_message_key=admin_agent_source_message_key(event),
+        )
+    except Exception as exc:
+        media_pipeline.cleanup_media(media)
+        print(
+            f"[错误] 处理 {assistant_name(cfg)} 管理员 Agent 请求异常: {exc}"
+        )
+
+
+async def handle_admin_only_event(ws, cfg: dict, event: dict) -> None:
+    """副助理只响应固定管理员的真实 @，不消费 Bug 或群管理事件。"""
+    if event.get("post_type") != "message" or event.get("message_type") != "group":
+        return
+    allowed = cfg.get("allowed_groups") or []
+    if allowed and event.get("group_id") not in allowed:
+        return
+    if is_admin_agent_request(event, cfg):
+        try:
+            text, image_refs = await expand_event_content(ws, event, cfg)
+        except Exception as exc:
+            print(f"[错误] 展开 {assistant_name(cfg)} 管理员消息异常: {exc}")
+            text = extract_plain_text(event)
+            image_refs = []
+        await enqueue_admin_agent_request(ws, cfg, event, text, image_refs)
+        return
+    if is_real_at_self(event):
+        try:
+            await send_group_msg(
+                ws,
+                event.get("group_id"),
+                at_message(
+                    str(event.get("user_id", "")),
+                    _ORDINARY_CHAT_DISABLED_REPLY,
+                ),
+            )
+        except Exception as exc:
+            print(f"[错误] 发送 {assistant_name(cfg)} 权限提示异常: {exc}")
+
+
 async def on_event(ws, cfg, event) -> None:
+    if not event_matches_assistant_identity(event, cfg):
+        print(
+            f"[安全] {assistant_name(cfg)} 忽略 self_id 与预期账号不一致的事件"
+        )
+        return
+    if assistant_role(cfg) == "admin_only":
+        await handle_admin_only_event(ws, cfg, event)
+        return
+
     if await handle_group_add_auto_approval(ws, cfg, event):
         return
 
@@ -1373,23 +1593,7 @@ async def on_event(ws, cfg, event) -> None:
         await handle_personality_switch(ws, cfg, event, personality)
         return
     if is_admin_agent_request(event, cfg):
-        media = []
-        try:
-            media, failures = await download_media_refs(ws, image_refs, cfg)
-            admin_text = text.strip()
-            if failures:
-                admin_text += f"\n（有 {failures} 张图片读取失败）"
-            await handle_chat(
-                ws,
-                cfg,
-                event,
-                admin_text.strip(),
-                media,
-                kind="admin_agent",
-            )
-        except Exception as exc:
-            media_pipeline.cleanup_media(media)
-            print(f"[错误] 处理管理员 Agent 请求异常: {exc}")
+        await enqueue_admin_agent_request(ws, cfg, event, text, image_refs)
         return
     content = match_feedback(text)
     if content is not None:
@@ -1467,18 +1671,34 @@ async def _run_connected_session(
     whitelist_syncer = None
     event_tasks = set()
     event_lock = asyncio.Lock()
-    if cfg.get("agent_enabled", False) or cfg.get(
-        "chat_agent_enabled", False
-    ):
-        notifier = asyncio.create_task(notification_loop(client, cfg))
-    if verification_groups:
-        verifier = asyncio.create_task(
-            member_verification_loop(client, cfg, event_lock)
-        )
-    if whitelist_sync_config.enabled:
-        whitelist_syncer = asyncio.create_task(
-            qq_whitelist_sync.run_sync_loop(client, whitelist_sync_config)
-        )
+    background_started = False
+
+    def start_background_tasks() -> None:
+        """预期 QQ 已核验后才允许发送通知或执行群管理后台动作。"""
+        nonlocal notifier, verifier, whitelist_syncer, background_started
+        if background_started:
+            return
+        background_started = True
+        if (
+            (is_primary_assistant(cfg) and cfg.get("agent_enabled", False))
+            or (
+                is_primary_assistant(cfg)
+                and cfg.get("chat_agent_enabled", False)
+            )
+            or cfg.get("admin_agent_enabled", False)
+        ):
+            notifier = asyncio.create_task(notification_loop(client, cfg))
+        if is_primary_assistant(cfg) and verification_groups:
+            verifier = asyncio.create_task(
+                member_verification_loop(client, cfg, event_lock)
+            )
+        if is_primary_assistant(cfg) and whitelist_sync_config.enabled:
+            whitelist_syncer = asyncio.create_task(
+                qq_whitelist_sync.run_sync_loop(client, whitelist_sync_config)
+            )
+
+    if not str(cfg.get("_expected_self_id") or "").strip():
+        start_background_tasks()
     try:
         async for raw in ws:
             try:
@@ -1489,6 +1709,11 @@ async def _run_connected_session(
             if "post_type" not in event:
                 client.resolve_response(event)
                 continue
+            if not event_matches_assistant_identity(event, cfg):
+                raise RuntimeError(
+                    f"{assistant_name(cfg)} OneBot 登录账号与 expected_self_id 不一致"
+                )
+            start_background_tasks()
             # 本机接收时间用于验证时限边界，不能由群消息正文伪造。
             event["_grandumi_received_at"] = int(time.time())
             task = asyncio.create_task(
@@ -1542,8 +1767,52 @@ async def _wait_for_reconnect_or_stop(stop_event: asyncio.Event, delay: float) -
     return True
 
 
+async def _run_assistant_connection(
+    cfg: dict,
+    verification_groups: set[str],
+    whitelist_sync_config: qq_whitelist_sync.SyncConfig,
+    stop_event: asyncio.Event,
+) -> None:
+    """独立维持一个助理连接；副助理故障不会中断主助理。"""
+    url = build_ws_url(cfg)
+    label = f"{assistant_name(cfg)}[{assistant_id(cfg)}]"
+    print(f"[{label}] 正在连接 {cfg['ws_url']} …")
+    while not stop_event.is_set():
+        try:
+            async with ws_connect(
+                url,
+                max_size=None,
+                open_timeout=10,
+                close_timeout=5,
+            ) as ws:
+                print(f"[{label}] 已连接 NapCat，等待群消息…")
+                await _consume_until_stopped(
+                    ws,
+                    cfg,
+                    verification_groups,
+                    whitelist_sync_config,
+                    stop_event,
+                )
+        except asyncio.CancelledError:
+            raise
+        except (OSError, websockets.exceptions.WebSocketException) as exc:
+            if stop_event.is_set():
+                break
+            print(f"[{label}] 连接断开/失败: {exc};5 秒后重连…")
+            if await _wait_for_reconnect_or_stop(stop_event, 5):
+                break
+        except Exception as exc:
+            if stop_event.is_set():
+                break
+            print(f"[{label}] 连接会话异常: {exc};5 秒后重连…")
+            if await _wait_for_reconnect_or_stop(stop_event, 5):
+                break
+    print(f"[{label}] 已完成停止清理。")
+
+
 async def run(stop_event: asyncio.Event | None = None) -> None:
     cfg = load_config()
+    connections = resolve_assistant_connections(cfg)
     storage.init_db()
     if stop_event is None:
         stop_event = asyncio.Event()
@@ -1555,8 +1824,7 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     )
     if cancelled:
         print(f"[新人验证] 因目标群配置变化取消了 {cancelled} 条遗留会话")
-    url = build_ws_url(cfg)
-    print(f"GrandUMI bug 反馈机器人启动,连接 {cfg['ws_url']} …")
+    print(f"GrandUMI QQ 助理启动，已启用 {len(connections)} 个连接。")
     if cfg.get("new_member_verification_enabled", False) and not verification_groups:
         print(
             "[新人验证] 目标群列表为空或无效；为避免误踢，功能不会生效"
@@ -1574,30 +1842,23 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     else:
         print("[QQ 白名单同步] 安全关闭")
 
-    # 断线自动重连
-    while not stop_event.is_set():
-        try:
-            async with ws_connect(
-                url,
-                max_size=None,
-                open_timeout=10,
-                close_timeout=5,
-            ) as ws:
-                print("已连接 NapCat,等待群消息…")
-                await _consume_until_stopped(
-                    ws,
-                    cfg,
-                    verification_groups,
-                    whitelist_sync_config,
-                    stop_event,
-                )
-        except (OSError, websockets.exceptions.WebSocketException) as e:
-            if stop_event.is_set():
-                break
-            print(f"连接断开/失败: {e};5 秒后重连…")
-            if await _wait_for_reconnect_or_stop(stop_event, 5):
-                break
-    print("已完成停止清理。")
+    tasks = [
+        asyncio.create_task(
+            _run_assistant_connection(
+                connection,
+                verification_groups,
+                whitelist_sync_config,
+                stop_event,
+            )
+        )
+        for connection in connections
+    ]
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def main() -> None:
