@@ -38,7 +38,7 @@ CONFIG_PATH = os.environ.get(
 ADMIN_AGENT_OWNER_QQ = "651846226"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
-_NEW_MEMBER_WELCOME_ASSISTANT_IDS = {"s-eagle", "s-shark"}
+_NEW_MEMBER_WELCOME_ASSISTANT_IDS = {PRIMARY_ASSISTANT_ID, "s-shark"}
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _ASSISTANT_ROLES = {"primary", "admin_only"}
 
@@ -864,7 +864,7 @@ async def send_group_msg_confirmed(client, group_id, message) -> dict:
     )
 
 
-# 每个副助理独立去重；只有 OneBot 明确确认发送成功后才记录，以便失败后重试。
+# 每个助理独立去重；只有 OneBot 明确确认发送成功后才记录，以便失败后重试。
 _HANDLED_NEW_MEMBER_WELCOME_LIMIT = 2048
 _handled_new_member_welcomes: dict[str, None] = {}
 
@@ -888,11 +888,10 @@ def _remember_new_member_welcome(key: str) -> None:
 
 
 async def handle_new_member_welcome(client, cfg: dict, event: dict) -> bool:
-    """由鹰、鲨副助理在明确目标群中分别欢迎真实入群成员。"""
+    """由蛇、鲨助理在明确目标群中分别欢迎真实入群成员。"""
     if (
         event.get("post_type") != "notice"
         or event.get("notice_type") != "group_increase"
-        or assistant_role(cfg) != "admin_only"
         or assistant_id(cfg) not in _NEW_MEMBER_WELCOME_ASSISTANT_IDS
     ):
         return False
@@ -1707,7 +1706,8 @@ async def on_event(ws, cfg, event) -> None:
             f"[安全] {assistant_name(cfg)} 忽略 self_id 与预期账号不一致的事件"
         )
         return
-    if await handle_new_member_welcome(ws, cfg, event):
+    welcome_handled = await handle_new_member_welcome(ws, cfg, event)
+    if welcome_handled and assistant_role(cfg) == "admin_only":
         return
     if assistant_role(cfg) == "admin_only":
         await handle_admin_only_event(ws, cfg, event)

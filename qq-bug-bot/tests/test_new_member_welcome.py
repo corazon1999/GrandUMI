@@ -4,6 +4,7 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 BOT_DIR = Path(__file__).resolve().parents[1]
@@ -34,12 +35,12 @@ class NewMemberWelcomeTests(unittest.TestCase):
 
     @staticmethod
     def cfg(
-        assistant="s-eagle",
-        name="s-鹰",
-        self_id="3430685803",
+        assistant="primary",
+        name="s-蛇",
+        self_id="3215228879",
         enabled=True,
         groups=None,
-        role="admin_only",
+        role="primary",
     ):
         return {
             "_assistant_id": assistant,
@@ -52,7 +53,7 @@ class NewMemberWelcomeTests(unittest.TestCase):
 
     @staticmethod
     def event(
-        self_id="3430685803",
+        self_id="3215228879",
         group_id=297542853,
         user_id=123456789,
         event_time=1787971200,
@@ -71,18 +72,18 @@ class NewMemberWelcomeTests(unittest.TestCase):
             event["message_id"] = message_id
         return event
 
-    def test鹰和鲨各自发送结构化欢迎消息(self):
+    def test蛇和鲨各自发送结构化欢迎消息(self):
         cases = (
-            ("s-eagle", "s-鹰", "3430685803"),
-            ("s-shark", "s-鲨", "184689168"),
+            ("primary", "s-蛇", "3215228879", "primary"),
+            ("s-shark", "s-鲨", "184689168", "admin_only"),
         )
-        for assistant, name, self_id in cases:
+        for assistant, name, self_id, role in cases:
             with self.subTest(assistant=assistant):
                 client = FakeActionClient()
                 handled = asyncio.run(
                     bot.handle_new_member_welcome(
                         client,
-                        self.cfg(assistant, name, self_id),
+                        self.cfg(assistant, name, self_id, role=role),
                         self.event(self_id=self_id),
                     )
                 )
@@ -102,23 +103,32 @@ class NewMemberWelcomeTests(unittest.TestCase):
                     params["message"],
                 )
 
-    def test主助理不会发送欢迎消息(self):
+    def test主助理欢迎成功后仍继续新人验证(self):
         client = FakeActionClient()
-        asyncio.run(
-            bot.on_event(
-                client,
-                self.cfg("primary", "s-蛇", "3215228879", role="primary"),
-                self.event(self_id="3215228879"),
-            )
-        )
-        self.assertEqual([], client.actions)
+        verification = mock.AsyncMock(return_value=True)
+        with mock.patch.object(bot, "handle_member_verification_notice", verification):
+            asyncio.run(bot.on_event(client, self.cfg(), self.event()))
+        self.assertEqual(["send_group_msg"], [action for action, _ in client.actions])
+        verification.assert_awaited_once_with(client, self.cfg(), self.event())
+
+    def test主助理欢迎失败也继续新人验证(self):
+        client = FakeActionClient(failures=1)
+        verification = mock.AsyncMock(return_value=True)
+        with mock.patch.object(bot, "handle_member_verification_notice", verification):
+            asyncio.run(bot.on_event(client, self.cfg(), self.event()))
+        self.assertEqual(["send_group_msg"], [action for action, _ in client.actions])
+        verification.assert_awaited_once_with(client, self.cfg(), self.event())
 
     def test机器人自身入群非目标群和关闭配置均不发送(self):
         cases = (
-            (self.cfg(), self.event(user_id="3430685803")),
+            (self.cfg(), self.event(user_id="3215228879")),
             (self.cfg(), self.event(group_id=987654321)),
             (self.cfg(enabled=False), self.event()),
             (self.cfg(groups=[]), self.event()),
+            (
+                self.cfg("s-eagle", "s-鹰", "3430685803", role="admin_only"),
+                self.event(self_id="3430685803"),
+            ),
         )
         for cfg, event in cases:
             with self.subTest(cfg=cfg, event=event):
@@ -142,7 +152,13 @@ class NewMemberWelcomeTests(unittest.TestCase):
 
     def test管理员副助理事件分发先处理欢迎通知(self):
         client = FakeActionClient()
-        asyncio.run(bot.on_event(client, self.cfg(), self.event()))
+        asyncio.run(
+            bot.on_event(
+                client,
+                self.cfg("s-shark", "s-鲨", "184689168", role="admin_only"),
+                self.event(self_id="184689168"),
+            )
+        )
         self.assertEqual(["send_group_msg"], [action for action, _ in client.actions])
 
     def test连接配置支持逐助理覆盖和顶层缺省(self):
@@ -156,6 +172,8 @@ class NewMemberWelcomeTests(unittest.TestCase):
                     "name": "s-蛇",
                     "role": "primary",
                     "ws_url": "ws://napcat:3001",
+                    "new_member_welcome_enabled": True,
+                    "new_member_welcome_groups": [297542853],
                 },
                 {
                     "id": "s-eagle",
@@ -163,16 +181,27 @@ class NewMemberWelcomeTests(unittest.TestCase):
                     "role": "admin_only",
                     "ws_url": "ws://napcat-eagle:3001",
                     "expected_self_id": "3430685803",
+                    "new_member_welcome_enabled": False,
+                    "new_member_welcome_groups": [],
+                },
+                {
+                    "id": "s-shark",
+                    "name": "s-鲨",
+                    "role": "admin_only",
+                    "ws_url": "ws://napcat-shark:3001",
+                    "expected_self_id": "184689168",
                     "new_member_welcome_enabled": True,
                     "new_member_welcome_groups": [297542853],
                 },
             ],
         }
         resolved = bot.resolve_assistant_connections(raw)
-        self.assertFalse(resolved[0]["new_member_welcome_enabled"])
-        self.assertEqual([], resolved[0]["new_member_welcome_groups"])
-        self.assertTrue(resolved[1]["new_member_welcome_enabled"])
-        self.assertEqual([297542853], resolved[1]["new_member_welcome_groups"])
+        self.assertTrue(resolved[0]["new_member_welcome_enabled"])
+        self.assertEqual([297542853], resolved[0]["new_member_welcome_groups"])
+        self.assertFalse(resolved[1]["new_member_welcome_enabled"])
+        self.assertEqual([], resolved[1]["new_member_welcome_groups"])
+        self.assertTrue(resolved[2]["new_member_welcome_enabled"])
+        self.assertEqual([297542853], resolved[2]["new_member_welcome_groups"])
 
 
 if __name__ == "__main__":

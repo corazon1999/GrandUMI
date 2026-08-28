@@ -169,17 +169,22 @@ class DeployFileTests(unittest.TestCase):
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
 
-    def test_部署迁移只为现有鹰鲨连接启用指定群欢迎(self):
+    def test_部署迁移只为现有蛇鲨连接启用指定群欢迎(self):
         migrate = self._load_shell_config_migration()
         config = {
             "assistant_connections": [
                 {
                     "id": "primary",
                     "access_token": "primary-secret",
+                    "new_member_welcome_enabled": False,
+                    "new_member_welcome_groups": [111],
+                },
+                {
+                    "id": "s-eagle",
+                    "access_token": "eagle-secret",
                     "new_member_welcome_enabled": True,
                     "new_member_welcome_groups": [111],
                 },
-                {"id": "s-eagle", "access_token": "eagle-secret"},
                 {
                     "id": "s-shark",
                     "access_token": "shark-secret",
@@ -194,11 +199,11 @@ class DeployFileTests(unittest.TestCase):
 
         self.assertIs(config, result)
         connections = result["assistant_connections"]
-        self.assertIs(connections[0]["new_member_welcome_enabled"], False)
-        self.assertEqual([], connections[0]["new_member_welcome_groups"])
-        for connection in connections[1:3]:
+        for connection in (connections[0], connections[2]):
             self.assertIs(connection["new_member_welcome_enabled"], True)
             self.assertEqual([297542853], connection["new_member_welcome_groups"])
+        self.assertIs(connections[1]["new_member_welcome_enabled"], False)
+        self.assertEqual([], connections[1]["new_member_welcome_groups"])
         self.assertEqual(
             ["primary-secret", "eagle-secret", "shark-secret", "future-secret"],
             [connection["access_token"] for connection in connections[:4]],
@@ -207,9 +212,9 @@ class DeployFileTests(unittest.TestCase):
         self.assertNotIn("new_member_welcome_enabled", connections[3])
         self.assertEqual("无效连接记录", connections[4])
 
-        missing = {"assistant_connections": [{"id": "primary"}]}
+        missing = {"assistant_connections": [{"id": "s-eagle"}]}
         migrate(missing)
-        self.assertEqual(["primary"], [item["id"] for item in missing["assistant_connections"]])
+        self.assertEqual(["s-eagle"], [item["id"] for item in missing["assistant_connections"]])
 
     def test_三助理上线清单覆盖身份核验重放恢复和回滚(self):
         checklist = (BOT_DIR / "三助理上线清单.md").read_text(encoding="utf-8")
