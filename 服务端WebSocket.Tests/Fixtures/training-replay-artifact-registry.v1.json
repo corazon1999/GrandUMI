@@ -1,0 +1,22 @@
+{
+  "schema": "grandumi.replay_artifact_registry.v1",
+  "registryVersion": "fixture-2026-08-28.v1",
+  "registryHash": "sha256:bbdf888d6be212e9f9ce10c83e9bcb0edda62bb20a2d09bfae713d9561e1441b",
+  "artifacts": [
+    {
+      "matchLogSchema": "grandumi.matchlog.v1",
+      "eventAdapterVersion": "grandumi.matchlog.v1.accepted-pairing.v1",
+      "engineArtifactId": "fixture-server-20260828",
+      "engineCommit": "1111111111111111111111111111111111111111",
+      "binarySha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rulesVersion": "fixture-rules-v1",
+      "rulesetManifestHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "cardDbContentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "rngAlgorithmVersion": "dotnet-system-random-v1",
+      "deterministicIdVersion": "grandumi-deterministic-id-v1",
+      "openingProtocolVersion": "grandumi-opening-v2",
+      "replayConfigSchema": "grandumi.replay-config.v1",
+      "executable": "fixture://not-executable"
+    }
+  ]
+}
