@@ -98,6 +98,13 @@ class DeployFileTests(unittest.TestCase):
             config["qq_whitelist_sync_secret_env"],
         )
 
+    def test_白名单同步域名固定直连唯一服务器且不使用弃用正式域名(self):
+        compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        for host in ("test.grand-umi.com", "ygo.grand-umi.com"):
+            self.assertIn(f'- "{host}:103.146.230.37"', compose)
+        self.assertNotIn('- "grand-umi.com:', compose)
+        self.assertNotIn("host-gateway", compose)
+
     def test_白名单内部入口同时受固定来源本机代理和未提交密钥保护(self):
         repo = BOT_DIR.parent
         production_nginx = (

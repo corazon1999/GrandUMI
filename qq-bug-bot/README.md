@@ -145,6 +145,12 @@ copy config.example.json config.json
 保存在 `feedback.db` 中。`notifying` 状态下崩溃会在重启后标记为送达不确定并停止自动
 重发，这是在 OneBot 不提供消息幂等键时避免重复通知的安全边界。
 
+测试与正式站点可能经过 CDN，不能依赖公网 DNS 回源后的 CDN 地址通过固定来源 ACL。
+Compose 因此将 `test.grand-umi.com` 和唯一正式域名 `ygo.grand-umi.com` 固定解析到
+`103.146.230.37`；请求仍使用原 HTTPS URL、TLS SNI 和 Host，并继续同时校验 Nginx
+来源 ACL、固定代理标记和 Bearer 密钥。服务器 IP 迁移时必须把域名映射、来源 ACL 和
+代理标记作为同一次受控变更更新，不能临时放宽为 Docker 网段或任意公网来源。
+
 ## 可切换人格 Agent
 
 Bug 描述检查使用独立的只读队列和常驻工作器；普通群友的普通聊天不会进入该队列。女帝人格高傲、优雅且护短；娜美人格聪明干练、直率且刀子嘴豆腐心；罗宾人格冷静知性、温和并带有克制的幽默。玩家输入和图片只作为不可信数据，不会被当作工具指令。Bug 与管理员 Agent 图片先在服务器校验协议、公网地址、体积和文件头，再通过 SSH 拉到 `E:\GrandUMI-Temp\QQBotMedia`，校验 SHA-256 后使用 Codex `--image` 识别，任务结束立即清理。安装或更新本机工作器：
@@ -277,6 +283,9 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
 - 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
   两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
   并开启；不能只在机器人一侧单独打开。
+- 游戏服务器的 `/etc/grandumi/qq-whitelist-sync.env` 必须为 `root:root 0600`，并由目标
+  后端在启动时实际加载。正式维护开始前只允许机器人指向已经启用的测试入口；正式
+  后端尚未加载权限门时，不得提前改指向正式入口制造整点 404。
 
 ### 2. 启动和查看日志
 

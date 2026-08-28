@@ -37,6 +37,10 @@ services:
     stop_grace_period: 20s
     depends_on:
       - napcat
+    # 测试域名经 CDN 代理；固定直连游戏主机，仍由 TLS SNI/Host、来源 ACL、代理标记和 Bearer 共同鉴权。
+    extra_hosts:
+      - "test.grand-umi.com:103.146.230.37"
+      - "ygo.grand-umi.com:103.146.230.37"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       GH_TOKEN: "${GH_TOKEN:-}"
