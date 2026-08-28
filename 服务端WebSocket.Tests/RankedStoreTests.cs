@@ -20,6 +20,41 @@ public class RankedStoreTests
     }
 
     [Fact]
+    public void 匹配资料_同一快照包含隐藏分定级进度悬赏与阵营()
+    {
+        var tempRoot = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT");
+        if (string.IsNullOrWhiteSpace(tempRoot))
+            throw new InvalidOperationException(
+                "排位匹配资料测试必须先通过 ops/windows/GrandUmiTemp.ps1 设置 GRANDUMI_TEST_TEMP_ROOT。");
+        var path = Path.Combine(tempRoot, $"grandumi-ranked-matchmaking-{Guid.NewGuid():N}.db");
+        try
+        {
+            var store = new RankedStore(path);
+            var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            for (var i = 0; i < RankedStore.PlacementRequired; i++)
+            {
+                Assert.NotNull(store.RecordMatch($"matchmaking-profile-{i}", now.AddMinutes(i + 1),
+                    "alice", "爱丽丝", $"bob-{i}", $"对手{i}", winnerIndex: 0));
+            }
+            SetRankPoints(path, ("爱丽丝", RankedStore.NewWorldRankPoints));
+
+            var profile = store.GetMatchmakingProfile("alice", "爱丽丝", now.AddMinutes(10));
+
+            Assert.True(profile.Rating > 1500);
+            Assert.Equal(RankedStore.PlacementRequired, profile.PlacementGames);
+            Assert.Equal(RankedStore.NewWorldRankPoints, profile.RankPoints);
+            Assert.Equal(RankedStore.PirateFaction, profile.Faction);
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + "-wal");
+            TryDelete(path + "-shm");
+        }
+    }
+
+    [Fact]
     public void 排位结算_五局完成定级且同一对局只结算一次()
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");

@@ -1291,7 +1291,10 @@ public static class WebSocketBridge
             return;
         }
 
-        if (ranked && RankedStore.ForMode(rankedMode).GetSnapshot(s.Account!, s.PlayerName).Profile.Faction is null)
+        var rankedProfile = ranked
+            ? RankedStore.ForMode(rankedMode).GetMatchmakingProfile(s.Account!, s.PlayerName)
+            : null;
+        if (ranked && rankedProfile?.Faction is null)
         {
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择阵营，阵营选定后不可更改" });
             return;
@@ -1310,9 +1313,9 @@ public static class WebSocketBridge
             s.DeckName = Str(msg, "deckName");
             s.MatchQueueKind = queueKind;
             s.MatchEnqueuedAtUtc = DateTime.UtcNow;
-            s.MatchRating = ranked
-                ? RankedStore.ForMode(rankedMode).GetMatchRating(s.Account!, s.PlayerName)
-                : 1500;
+            s.MatchRating = rankedProfile?.Rating ?? 1500;
+            s.MatchPlacementGames = rankedProfile?.PlacementGames ?? 0;
+            s.MatchRankPoints = rankedProfile?.RankPoints ?? 0;
             s.IsMatching = true;
             queue.Enqueue(s);
         }
@@ -1566,7 +1569,7 @@ public static class WebSocketBridge
                         continue;
                     }
                     var gap = Math.Abs(first.MatchRating - second.MatchRating);
-                    if (ranked && gap > AllowedRankGap(first, second)) continue;
+                    if (ranked && !CanRankedPlayersMatch(first, second, DateTime.UtcNow)) continue;
                     if (!ranked) { bestIndex = secondIndex; break; }
                     if (gap < bestGap) { bestGap = gap; bestIndex = secondIndex; }
                 }
@@ -1592,13 +1595,29 @@ public static class WebSocketBridge
         return false;
     }
 
-    private static double AllowedRankGap(WsSession first, WsSession second)
+    internal static bool CanRankedPlayersMatch(WsSession first, WsSession second, DateTime nowUtc)
     {
-        var waited = Math.Max(
-            (DateTime.UtcNow - first.MatchEnqueuedAtUtc).TotalSeconds,
-            (DateTime.UtcNow - second.MatchEnqueuedAtUtc).TotalSeconds);
-        return waited switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => double.MaxValue };
+        var commonWaitSeconds = Math.Min(
+            Math.Max(0, (nowUtc - first.MatchEnqueuedAtUtc).TotalSeconds),
+            Math.Max(0, (nowUtc - second.MatchEnqueuedAtUtc).TotalSeconds));
+        var gap = Math.Abs(first.MatchRating - second.MatchRating);
+        if (!double.IsFinite(gap) || gap > AllowedRankGap(commonWaitSeconds)) return false;
+
+        var placementAgainstHighRankedPlayer =
+            IsPlacementPlayer(first) && IsMatureHighRankedPlayer(second)
+            || IsPlacementPlayer(second) && IsMatureHighRankedPlayer(first);
+        return !placementAgainstHighRankedPlayer || commonWaitSeconds >= 90;
     }
+
+    internal static double AllowedRankGap(double commonWaitSeconds)
+        => commonWaitSeconds switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => 500 };
+
+    private static bool IsPlacementPlayer(WsSession session)
+        => session.MatchPlacementGames < RankedStore.PlacementRequired;
+
+    private static bool IsMatureHighRankedPlayer(WsSession session)
+        => session.MatchPlacementGames >= RankedStore.PlacementRequired
+           && session.MatchRankPoints >= RankedStore.NewWorldRankPoints;
 
     private static bool TryTakeMatchingSession(out WsSession session)
         => TryTakeMatchingSession(MatchQueue, out session);

@@ -69,6 +69,12 @@ public sealed record RankSnapshot(
     long SnapshotVersion,
     DateTime GeneratedAtUtc);
 
+internal sealed record RankedMatchmakingProfile(
+    double Rating,
+    int PlacementGames,
+    int RankPoints,
+    string? Faction);
+
 public sealed class RankLeaderboardUnavailableException : Exception
 {
     public RankLeaderboardUnavailableException(string message) : base(message)
@@ -437,6 +443,12 @@ public sealed class RankedStore
     }
 
     public double GetMatchRating(string account, string? displayName = null, DateTime? nowUtc = null)
+        => GetMatchmakingProfile(account, displayName, nowUtc).Rating;
+
+    internal RankedMatchmakingProfile GetMatchmakingProfile(
+        string account,
+        string? displayName = null,
+        DateTime? nowUtc = null)
     {
         lock (_gate)
         {
@@ -445,8 +457,13 @@ public sealed class RankedStore
             using var connection = Open();
             using var transaction = connection.BeginTransaction();
             var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
+            var faction = ReadFaction(connection, transaction, profile.AccountKey);
             transaction.Commit();
-            return profile.Rating;
+            return new RankedMatchmakingProfile(
+                profile.Rating,
+                profile.PlacementGames,
+                profile.RankPoints,
+                faction);
         }
     }
 

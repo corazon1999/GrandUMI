@@ -37,6 +37,8 @@ public class WsSession
     public string    MatchQueueKind   { get; set; } = "casual";
     public DateTime  MatchEnqueuedAtUtc { get; set; }
     public double    MatchRating      { get; set; } = 1500;
+    public int       MatchPlacementGames { get; set; }
+    public int       MatchRankPoints  { get; set; }
     public string?   CurrentRoomCode  { get; set; }
 
     /// <summary>本连接的默认观战权限；建局时固化到对局。</summary>
