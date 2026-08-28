@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-28-production-dns-answer-gate-fix",
+    version: "2026.08.28.3",
+    date: "2026-08-28",
+    title: "正式发布 DNS 门禁修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复正式发布预构建在 DNS 响应同时带有附加区地址时被误阻止的问题；发布仍只接受直连域名在权威回答区唯一指向登记服务器，并继续执行 TLS 与健康检查。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-28-ranked-deck-bot-training-release",
     version: "2026.08.28.2",
     date: "2026-08-28",

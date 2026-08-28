@@ -591,6 +591,9 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.doesNotMatch(deploy, /checkout --detach/);
   assert.match(deploy, /尚未切流/);
   assert.match(deploy, /Resolve-DnsName -Type A direct\.grand-umi\.com/);
+  assert.match(deploy, /\$_\.Section -eq "Answer"/);
+  assert.match(deploy, /\(\[string\]\$_\.Name\)\.TrimEnd\(\[char\]'\.'\)/);
+  assert.match(deploy, /\[StringComparison\]::OrdinalIgnoreCase/);
   assert.match(deploy, /低延迟直连 TLS\/健康检查失败/);
 });
 
