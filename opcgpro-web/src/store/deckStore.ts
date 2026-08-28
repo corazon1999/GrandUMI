@@ -72,8 +72,22 @@ export const UNLIMITED_COPY_CARDS = new Set<string>([
   "OP16-042", // 因佩尔地狱的囚犯
 ]);
 
+const DECK_TYPE_ORDER: Record<string, number> = {
+  Character: 0,
+  Event: 1,
+  Stage: 2,
+};
+
+/** 卡组构成按角色、事件、场地分组；组内沿用牌池的确定性排序。 */
+export function compareDeckCards(a: CardData, b: CardData): number {
+  const typeOrderA = DECK_TYPE_ORDER[a.type] ?? 99;
+  const typeOrderB = DECK_TYPE_ORDER[b.type] ?? 99;
+  if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
+  return compareCards(a, b);
+}
+
 function sortEntries(entries: DeckEntry[]): DeckEntry[] {
-  return [...entries].sort((a, b) => compareCards(a.card, b.card));
+  return [...entries].sort((a, b) => compareDeckCards(a.card, b.card));
 }
 
 export interface DeckEntry {
