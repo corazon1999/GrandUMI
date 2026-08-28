@@ -67,7 +67,7 @@ if (args.Length > 0 && string.Equals(args[0], "--backfill-leader-stats", StringC
         return;
     }
 
-    var backfillStore = new LeaderStatsStore(args[2]);
+    using var backfillStore = new LeaderStatsStore(args[2]);
     backfillStore.Initialize();
     var report = LeaderStatsBackfill.ImportDirectory(args[1], backfillStore);
     var backfillChampionStore = new LeaderChampionStore(args[2]);
@@ -154,9 +154,16 @@ GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
 CardRulesetManager.InitializePackages(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "Rulesets"));
-LeaderStatsStore.Default.Initialize();
+var keepLeaderStatsWalAnchor = string.Equals(
+    LeaderStatsStore.Default.DatabasePath,
+    LeaderStatsStore.Default.LeaderboardDatabasePath,
+    OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+LeaderStatsStore.Default.Initialize(keepWalAnchor: keepLeaderStatsWalAnchor);
 Console.WriteLine($"[LeaderStats] 写入 SQLite: {LeaderStatsStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderStats] 榜单 SQLite: {LeaderStatsStore.Default.LeaderboardDatabasePath}");
+Console.WriteLine(LeaderStatsStore.Default.WalAnchorActive
+    ? "[LeaderStats] WAL 生命周期锚点已启用"
+    : "[LeaderStats] 本环境使用外部只读榜单源，不持有其 WAL 生命周期");
 LeaderChampionStore.Default.Initialize();
 Console.WriteLine($"[LeaderChampion] 写入 SQLite: {LeaderChampionStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderChampion] 榜单 SQLite: {LeaderChampionStore.Default.LeaderboardDatabasePath}");
@@ -322,6 +329,7 @@ finally
     MatchLogRecorder.Shutdown();
     RoomJournal.Shutdown();
     RoomRecoverySnapshotStore.Shutdown();
+    LeaderStatsStore.Default.Dispose();
     playerDataStore.Shutdown();
     Console.WriteLine("[服务器] 已停止");
 }

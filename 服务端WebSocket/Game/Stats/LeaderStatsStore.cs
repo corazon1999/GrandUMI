@@ -123,7 +123,7 @@ public sealed record DailyMatchCountPoint(string Date, int Count);
 /// <summary>
 /// Leader 排行榜的逐局事实存储。以 match_id 幂等写入，榜单按时间窗口即时聚合。
 /// </summary>
-public sealed class LeaderStatsStore
+public sealed class LeaderStatsStore : IDisposable
 {
     public const int MinimumRankedGames = 20;
     public const int MinimumCountedTurn = 8;
@@ -141,7 +141,9 @@ public sealed class LeaderStatsStore
     private readonly string _writeConnectionString;
     private readonly string _leaderboardConnectionString;
     private readonly Dictionary<string, CachedLeaderboard> _leaderboardCache = new(StringComparer.Ordinal);
+    private SqliteConnection? _walAnchorConnection;
     private bool _initialized;
+    private bool _disposed;
 
     public static LeaderStatsStore Default { get; } = new();
 
@@ -178,12 +180,24 @@ public sealed class LeaderStatsStore
 
     public string DatabasePath => _databasePath;
     public string LeaderboardDatabasePath => _leaderboardDatabasePath;
+    public bool WalAnchorActive
+    {
+        get
+        {
+            lock (_lock) return _walAnchorConnection is not null;
+        }
+    }
 
-    public void Initialize()
+    public void Initialize(bool keepWalAnchor = false)
     {
         lock (_lock)
         {
-            if (_initialized) return;
+            ThrowIfDisposed();
+            if (_initialized)
+            {
+                if (keepWalAnchor) EnsureWalAnchorLocked();
+                return;
+            }
 
             // 同一进程可能为同一路径构造多个 Store（测试服读写分离、回填与测试均会发生）。
             // SQLitePCL 在多个连接同时为一份空库协商 journal_mode 时并不可靠，先按绝对路径串行建库；
@@ -212,6 +226,12 @@ public sealed class LeaderStatsStore
                 transaction.Commit();
                 _initialized = true;
             }
+
+            // 测试服以只读 mount 直接读取正式 WAL 数据库。SQLite 即使使用只读连接，
+            // 在最后一个正式连接退出并删除 -wal/-shm 后仍需要重新创建侧车，因只读 mount
+            // 会得到 EROFS。正式单写者显式保留此连接，让侧车与进程寿命一致；初始化已经
+            // 成功时锚点失败仍向上抛出，调用方可重试同一 Store，但绝不能静默无锚运行。
+            if (keepWalAnchor) EnsureWalAnchorLocked();
         }
     }
 
@@ -671,6 +691,52 @@ public sealed class LeaderStatsStore
         var connection = new SqliteConnection(_leaderboardConnectionString);
         connection.Open();
         return connection;
+    }
+
+    private void EnsureWalAnchorLocked()
+    {
+        if (_walAnchorConnection is not null) return;
+
+        SqliteConnection? anchor = null;
+        try
+        {
+            anchor = OpenWriteConnection();
+            ConfigureConnection(anchor);
+            using (var command = anchor.CreateCommand())
+            {
+                // 实际读取一次 schema，确保 SQLite 已进入 WAL 读取路径并物化 -wal/-shm；
+                // 只打开句柄但从未访问页面，不能证明侧车已经存在。
+                command.CommandText = "SELECT 1 FROM sqlite_schema LIMIT 1;";
+                command.ExecuteScalar();
+            }
+            if (!File.Exists(_databasePath + "-wal") || !File.Exists(_databasePath + "-shm"))
+                throw new InvalidOperationException("Leader 统计 WAL 生命周期锚点未能建立侧车文件。");
+            _walAnchorConnection = anchor;
+            anchor = null;
+        }
+        finally
+        {
+            anchor?.Dispose();
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(LeaderStatsStore));
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            var anchor = _walAnchorConnection;
+            _walAnchorConnection = null;
+            _leaderboardCache.Clear();
+            anchor?.Dispose();
+        }
+        GC.SuppressFinalize(this);
     }
 
     private static void ConfigureConnection(SqliteConnection connection)

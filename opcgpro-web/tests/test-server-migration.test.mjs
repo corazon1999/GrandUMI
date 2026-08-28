@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [entry, deploy, backendService, frontendService, acmeNginx, tlsNginx, enableTls] = await Promise.all([
+const [entry, deploy, backendService, frontendService, acmeNginx, tlsNginx, enableTls, serverProgram] = await Promise.all([
   readFile(new URL("../../deploy-test.ps1", import.meta.url), "utf8"),
   readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8"),
   readFile(new URL("../../ops/server/grandumi-test-backend.service", import.meta.url), "utf8"),
@@ -10,6 +10,7 @@ const [entry, deploy, backendService, frontendService, acmeNginx, tlsNginx, enab
   readFile(new URL("../../ops/server/grandumi-test-acme.nginx", import.meta.url), "utf8"),
   readFile(new URL("../../ops/server/grandumi-test.nginx", import.meta.url), "utf8"),
   readFile(new URL("../../ops/server/enable-grandumi-test-tls.sh", import.meta.url), "utf8"),
+  readFile(new URL("../../服务端WebSocket/Program.cs", import.meta.url), "utf8"),
 ]);
 
 test("测试服部署入口默认指向香港新服务器并支持首次初始化", () => {
@@ -27,6 +28,8 @@ test("测试服数据、端口与进程权限均和正式服隔离", () => {
   assert.match(backendService, /GRANDUMI_ONLINE_PLAYER_HISTORY_READ_PATH=\/data\/grandumi\/online-player-history\.db/);
   assert.match(backendService, /GRANDUMI_LEADER_STATS_READ_PATH=\/data\/grandumi\/leader-stats\.db/);
   assert.match(backendService, /ReadOnlyPaths=\/data\/grandumi/);
+  assert.match(serverProgram, /Initialize\(keepWalAnchor: keepLeaderStatsWalAnchor\)/);
+  assert.match(serverProgram, /LeaderStatsStore\.Default\.Dispose\(\)/);
   assert.match(backendService, /GrandUMIServer\.dll 8081/);
   assert.doesNotMatch(backendService, /GRANDUMI_DATA_DIR=\/data\/grandumi(?:\s|$)/m);
   assert.doesNotMatch(backendService, /GRANDUMI_PLAYER_DB/);

@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-28-leader-stats-wal-read-stability",
+    version: "2026.08.28.4",
+    date: "2026-08-28",
+    title: "跨环境统计读取稳定性修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复测试服管理面板在正式统计库空闲、进程重启或正式服切换后可能无法读取每日场次统计的问题，统计展示现在会随正式服务生命周期保持稳定可用。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-08-28-production-dns-answer-gate-fix",
     version: "2026.08.28.3",
     date: "2026-08-28",

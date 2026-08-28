@@ -186,6 +186,37 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
+    public void 正式WAL锚点保持侧车供外部只读源访问并可幂等释放()
+    {
+        Directory.CreateDirectory(_tempDir);
+        var productionPath = Path.Combine(_tempDir, "wal-anchor-production.db");
+        var testPath = Path.Combine(_tempDir, "wal-anchor-test.db");
+        var productionStore = new LeaderStatsStore(productionPath);
+        using var testStore = new LeaderStatsStore(testPath, productionPath);
+
+        productionStore.Initialize();
+        Assert.False(productionStore.WalAnchorActive);
+
+        // 已完成初始化的 Store 仍可在服务启动阶段显式升级为进程寿命锚点。
+        productionStore.Initialize(keepWalAnchor: true);
+        productionStore.RecordMatch(Match(
+            "anchor-visible", new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc),
+            MatchKind.Matchmaking, "L-ANCHOR-A", "L-ANCHOR-B", 0, 0, 8));
+
+        Assert.True(productionStore.WalAnchorActive);
+        Assert.True(File.Exists(productionPath + "-wal"));
+        Assert.True(File.Exists(productionPath + "-shm"));
+        Assert.Equal(1, testStore.GetLeaderboard("all").TotalMatches);
+
+        Parallel.For(0, 16, _ => productionStore.Dispose());
+        Assert.False(productionStore.WalAnchorActive);
+        Assert.Throws<ObjectDisposedException>(() => productionStore.Initialize(keepWalAnchor: true));
+        Assert.Throws<ObjectDisposedException>(() => productionStore.RecordMatch(Match(
+            "after-dispose", DateTime.UtcNow, MatchKind.Matchmaking,
+            "L-A", "L-B", 0, 0, 8)));
+    }
+
+    [Fact]
     public void 对战前十统计覆盖双方位置先后手镜像和排名边界()
     {
         var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
