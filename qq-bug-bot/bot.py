@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import sys
 import time
 from uuid import uuid4
@@ -1453,9 +1454,99 @@ def _finish_event_task(tasks: set, task) -> None:
         print(f"[错误] 群消息任务异常: {error}")
 
 
-async def run() -> None:
+async def _run_connected_session(
+    ws,
+    cfg: dict,
+    verification_groups: set[str],
+    whitelist_sync_config: qq_whitelist_sync.SyncConfig,
+) -> None:
+    """消费一条 OneBot 连接，并在取消时收束全部后台任务。"""
+    client = OneBotClient(ws)
+    notifier = None
+    verifier = None
+    whitelist_syncer = None
+    event_tasks = set()
+    event_lock = asyncio.Lock()
+    if cfg.get("agent_enabled", False) or cfg.get(
+        "chat_agent_enabled", False
+    ):
+        notifier = asyncio.create_task(notification_loop(client, cfg))
+    if verification_groups:
+        verifier = asyncio.create_task(
+            member_verification_loop(client, cfg, event_lock)
+        )
+    if whitelist_sync_config.enabled:
+        whitelist_syncer = asyncio.create_task(
+            qq_whitelist_sync.run_sync_loop(client, whitelist_sync_config)
+        )
+    try:
+        async for raw in ws:
+            try:
+                event = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            # API 动作响应交给等待中的事件任务，不能阻塞主接收循环。
+            if "post_type" not in event:
+                client.resolve_response(event)
+                continue
+            # 本机接收时间用于验证时限边界，不能由群消息正文伪造。
+            event["_grandumi_received_at"] = int(time.time())
+            task = asyncio.create_task(
+                _dispatch_event(event_lock, client, cfg, event)
+            )
+            event_tasks.add(task)
+            task.add_done_callback(
+                lambda done: _finish_event_task(event_tasks, done)
+            )
+    finally:
+        client.close()
+        for task in event_tasks:
+            task.cancel()
+        if event_tasks:
+            await asyncio.gather(*event_tasks, return_exceptions=True)
+        background_tasks = tuple(
+            task
+            for task in (notifier, verifier, whitelist_syncer)
+            if task is not None
+        )
+        for task in background_tasks:
+            task.cancel()
+        if background_tasks:
+            await asyncio.gather(*background_tasks, return_exceptions=True)
+
+
+async def _consume_until_stopped(ws, cfg, verification_groups, sync_config, stop_event):
+    """让连接消费和停止事件竞争，确保 SIGTERM 能打断等待消息。"""
+    consumer = asyncio.create_task(
+        _run_connected_session(ws, cfg, verification_groups, sync_config)
+    )
+    stopper = asyncio.create_task(stop_event.wait())
+    done, _ = await asyncio.wait(
+        (consumer, stopper), return_when=asyncio.FIRST_COMPLETED
+    )
+    if stopper in done:
+        consumer.cancel()
+        await asyncio.gather(consumer, return_exceptions=True)
+        return
+    stopper.cancel()
+    await asyncio.gather(stopper, return_exceptions=True)
+    await consumer
+
+
+async def _wait_for_reconnect_or_stop(stop_event: asyncio.Event, delay: float) -> bool:
+    """返回 True 表示停止优先于重连等待发生。"""
+    try:
+        await asyncio.wait_for(stop_event.wait(), timeout=delay)
+    except TimeoutError:
+        return False
+    return True
+
+
+async def run(stop_event: asyncio.Event | None = None) -> None:
     cfg = load_config()
     storage.init_db()
+    if stop_event is None:
+        stop_event = asyncio.Event()
     whitelist_sync_config = qq_whitelist_sync.SyncConfig.from_bot_config(cfg)
     verification_groups = member_verification_groups(cfg)
     auto_approval_groups = group_add_auto_approval_groups(cfg)
@@ -1484,74 +1575,57 @@ async def run() -> None:
         print("[QQ 白名单同步] 安全关闭")
 
     # 断线自动重连
-    while True:
+    while not stop_event.is_set():
         try:
-            async with ws_connect(url, max_size=None) as ws:
+            async with ws_connect(
+                url,
+                max_size=None,
+                open_timeout=10,
+                close_timeout=5,
+            ) as ws:
                 print("已连接 NapCat,等待群消息…")
-                client = OneBotClient(ws)
-                notifier = None
-                verifier = None
-                whitelist_syncer = None
-                event_tasks = set()
-                event_lock = asyncio.Lock()
-                if cfg.get("agent_enabled", False) or cfg.get(
-                    "chat_agent_enabled", False
-                ):
-                    notifier = asyncio.create_task(notification_loop(client, cfg))
-                if verification_groups:
-                    verifier = asyncio.create_task(
-                        member_verification_loop(client, cfg, event_lock)
-                    )
-                if whitelist_sync_config.enabled:
-                    whitelist_syncer = asyncio.create_task(
-                        qq_whitelist_sync.run_sync_loop(
-                            client, whitelist_sync_config
-                        )
-                    )
-                try:
-                    async for raw in ws:
-                        try:
-                            event = json.loads(raw)
-                        except json.JSONDecodeError:
-                            continue
-                        # API 动作响应交给等待中的事件任务，不能阻塞主接收循环。
-                        if "post_type" not in event:
-                            client.resolve_response(event)
-                            continue
-                        # 本机接收时间用于验证时限边界，不能由群消息正文伪造。
-                        event["_grandumi_received_at"] = int(time.time())
-                        task = asyncio.create_task(
-                            _dispatch_event(event_lock, client, cfg, event)
-                        )
-                        event_tasks.add(task)
-                        task.add_done_callback(
-                            lambda done: _finish_event_task(event_tasks, done)
-                        )
-                finally:
-                    client.close()
-                    for task in event_tasks:
-                        task.cancel()
-                    if event_tasks:
-                        await asyncio.gather(*event_tasks, return_exceptions=True)
-                    if notifier:
-                        notifier.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await notifier
-                    if verifier:
-                        verifier.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await verifier
-                    if whitelist_syncer:
-                        whitelist_syncer.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await whitelist_syncer
+                await _consume_until_stopped(
+                    ws,
+                    cfg,
+                    verification_groups,
+                    whitelist_sync_config,
+                    stop_event,
+                )
         except (OSError, websockets.exceptions.WebSocketException) as e:
+            if stop_event.is_set():
+                break
             print(f"连接断开/失败: {e};5 秒后重连…")
-            await asyncio.sleep(5)
+            if await _wait_for_reconnect_or_stop(stop_event, 5):
+                break
+    print("已完成停止清理。")
+
+
+async def main() -> None:
+    """注册容器停止信号，并等待主循环完成清理。"""
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    registered_signals = []
+
+    def request_stop(signame: str) -> None:
+        if not stop_event.is_set():
+            print(f"收到 {signame}，开始安全停止……")
+            stop_event.set()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, request_stop, sig.name)
+        except (NotImplementedError, RuntimeError):
+            continue
+        registered_signals.append(sig)
+    try:
+        await run(stop_event)
+    finally:
+        for sig in registered_signals:
+            loop.remove_signal_handler(sig)
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(run())
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("\n已退出。")

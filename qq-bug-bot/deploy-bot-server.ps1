@@ -23,6 +23,7 @@ $files = @(
     ".dockerignore",
     "Dockerfile",
     "docker-compose.yml",
+    "napcat-init.sh",
     "requirements.txt",
     "bot.py",
     "storage.py",

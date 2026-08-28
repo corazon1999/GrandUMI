@@ -231,6 +231,9 @@ py bot.py
 
 推荐把 NapCat 和机器人放在同一个 Compose 项目中。NapCat 的 OneBot 端口只在
 Docker 内网开放,宿主机仅在 `127.0.0.1:6099` 提供 WebUI,避免管理端口暴露到公网。
+Compose 当前锁定已经过服务器重建演练的 NapCat `v4.15.19` amd64 内容摘要；不要把
+它改回 `latest`，也不要仅凭“密码登录成功”日志判断上线，必须同时验证 WebUI 在线和
+OneBot `get_login_info`。
 
 ### 1. 创建服务器配置
 
@@ -249,8 +252,15 @@ chown -R 10001:10001 data
 
 - `GH_TOKEN` 使用只允许目标仓库创建 Issue 的细粒度 GitHub Token。
 - `TZ` 使用服务器业务时区。
+- `NAPCAT_ACCOUNT` 填机器人 QQ；`NAPCAT_HOSTNAME` 和 `NAPCAT_MAC_ADDRESS` 在首次
+  成功登录后必须固定，更改任一值都可能让 QQ 把容器识别为新设备。
 - 白名单同步启用前，用 `openssl rand -hex 32` 生成
   `GRANDUMI_QQ_WHITELIST_SYNC_SECRET`；不得提交、打印或放进 `config.server.json`。
+
+服务器还应保留权限为 `600` 的 `napcat-quick-password-md5.secret`。摘要只允许通过
+Docker secret 和 PID 1 包装器进入支持该能力的 NapCat，不得写进 `.env`、Compose
+环境或部署包。当前锁定的 `v4.15.19` 不读取该摘要；它仅用于后续受控升级的恢复，
+升级镜像前必须重新完成登录、重建和 Docker daemon 恢复演练。
 
 在 Windows 部署电脑上也可以运行以下脚本。脚本会隐藏输入、先验证目标仓库与
 Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token 放进命令行：
@@ -270,6 +280,11 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
 
 ### 2. 启动和查看日志
 
+从较新 NapCat 回退到 `v4.15.19` 时，应先在停止写入后备份三个命名卷。
+`webui.json` 只保留旧版支持的 `host`、`prefix`、`port`、`token` 和 `loginRate`
+字段，原 token 必须原样保留，旧文件应另存为权限 `600` 的时间戳备份；宿主机端口
+仍只能发布到 `127.0.0.1:6099`。不要把 WebUI 或 OneBot 配置混入 QQ 登录卷。
+
 ```bash
 docker compose config -q
 docker compose build
@@ -286,6 +301,11 @@ ssh -L 6099:127.0.0.1:6099 root@服务器地址
 然后在浏览器打开 `http://127.0.0.1:6099/webui` 完成 QQ 登录,新增监听
 `0.0.0.0:3001` 的正向 WebSocket 服务端,并配置与机器人一致的访问令牌。
 
+每次登录态、镜像或设备身份调整后，至少执行两轮 `stop`、删除容器并重建；每轮都要
+确认 NapCat 退出码为 `0`、WebUI 显示在线、OneBot `get_login_info` 返回正确账号。
+最后重启一次 Docker daemon，确认 NapCat 自动恢复而机器人不会意外重复启动。
+“快速登录开始”或密码接口返回成功都只是中间态，不能替代这些上线门禁。
+
 ### 3. 迁移和维护数据
 
 正式切换前先停止本机机器人,再把旧库复制为服务器的
@@ -299,13 +319,14 @@ docker compose exec bug-bot python export_by_date.py
 docker compose exec bug-bot python -c \
   "import sqlite3; print(sqlite3.connect('/data/feedback.db').execute('select count(*) from feedback').fetchone())"
 
-# 更新镜像并重启
-docker compose pull napcat
+# 使用当前锁定摘要重建；升级摘要前必须先在隔离卷完成登录兼容性验证
 docker compose up -d --build
 ```
 
 必须备份 `data/` 目录和 NapCat 的三个命名卷。不要提交 `.env`、
-`config.server.json`、`feedback.db` 或任何登录信息。
+`config.server.json`、`feedback.db`、密码摘要或任何登录信息。机器人停止后应确认
+容器退出码为 `0`，并对 `feedback.db` 执行 SQLite `quick_check`；干净停止后不应残留
+`feedback.db-wal` 或 `feedback.db-shm`。
 
 ## 五、查看反馈数据
 

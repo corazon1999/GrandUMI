@@ -33,6 +33,47 @@ class DeployFileTests(unittest.TestCase):
         self.assertRegex(powershell, re.escape('".dockerignore"'))
         self.assertRegex(shell, r'files="[^"]*\.dockerignore(?: |")')
 
+    def test_NapCat锁定设备身份和镜像并使用信号包装(self):
+        compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        environment = (BOT_DIR / ".env.example").read_text(encoding="utf-8")
+        wrapper = (BOT_DIR / "napcat-init.sh").read_text(encoding="utf-8")
+        powershell = (BOT_DIR / "deploy-bot-server.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+
+        self.assertNotIn("mlikiowa/napcat-docker:latest", compose)
+        self.assertIn(
+            "mlikiowa/napcat-docker@sha256:"
+            "31bc4657c4bb5a2a44d11c12df863dd6d5bd109e78163e34cf09d8149cf9b078",
+            compose,
+        )
+        self.assertRegex(
+            compose,
+            r"mlikiowa/napcat-docker@sha256:[0-9a-f]{64}",
+        )
+        self.assertIn('mac_address: "${NAPCAT_MAC_ADDRESS:', compose)
+        self.assertIn('hostname: "${NAPCAT_HOSTNAME:', compose)
+        self.assertIn("NAPCAT_MAC_ADDRESS=", environment)
+        self.assertIn("NAPCAT_HOSTNAME=", environment)
+        self.assertIn('ACCOUNT: "${NAPCAT_ACCOUNT:-}"', compose)
+        self.assertIn("NAPCAT_ACCOUNT=", environment)
+        self.assertIn("grandumi-napcat-init.sh", compose)
+        self.assertIn("setsid /bin/bash", wrapper)
+        self.assertIn('kill -TERM -- "-$child_pid"', wrapper)
+        self.assertIn('kill -KILL -- "-$child_pid"', wrapper)
+        self.assertIn("napcat_quick_password_md5", compose)
+        self.assertIn("/run/secrets/napcat_quick_password_md5", wrapper)
+        self.assertIn("^[a-fA-F0-9]{32}$", wrapper)
+        self.assertNotIn("NAPCAT_QUICK_PASSWORD_MD5:", compose)
+        self.assertIn(
+            "napcat-quick-password-md5.secret",
+            (BOT_DIR / ".gitignore").read_text(encoding="utf-8"),
+        )
+        for content in (powershell, shell):
+            self.assertIn("napcat-init.sh", content)
+            self.assertNotIn("napcat-quick-password-md5.secret", content)
+
     def test_配置切换和回滚均强制重建机器人(self):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
         self.assertGreaterEqual(shell.count("--force-recreate bug-bot"), 2)

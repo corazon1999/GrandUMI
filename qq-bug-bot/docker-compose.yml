@@ -2,13 +2,23 @@ name: grandumi-qq-bug-bot
 
 services:
   napcat:
-    image: mlikiowa/napcat-docker:latest
+    image: mlikiowa/napcat-docker@sha256:31bc4657c4bb5a2a44d11c12df863dd6d5bd109e78163e34cf09d8149cf9b078
     container_name: grandumi-napcat
     restart: unless-stopped
+    hostname: "${NAPCAT_HOSTNAME:-grandumi-napcat}"
+    mac_address: "${NAPCAT_MAC_ADDRESS:-d6:79:89:15:5e:e9}"
+    stop_grace_period: 30s
+    entrypoint:
+      - /bin/bash
+      - /usr/local/bin/grandumi-napcat-init.sh
+    secrets:
+      - napcat_quick_password_md5
     environment:
       NAPCAT_UID: "${NAPCAT_UID:-1000}"
       NAPCAT_GID: "${NAPCAT_GID:-1000}"
       TZ: "${TZ:-Asia/Shanghai}"
+      ACCOUNT: "${NAPCAT_ACCOUNT:-}"
+      GRANDUMI_NAPCAT_STOP_TIMEOUT_SECONDS: "${NAPCAT_STOP_TIMEOUT_SECONDS:-20}"
     ports:
       - "127.0.0.1:6099:6099"
     expose:
@@ -17,12 +27,14 @@ services:
       - napcat_qq:/app/.config/QQ
       - napcat_config:/app/napcat/config
       - napcat_plugins:/app/napcat/plugins
+      - ./napcat-init.sh:/usr/local/bin/grandumi-napcat-init.sh:ro
 
   bug-bot:
     build:
       context: .
     container_name: grandumi-qq-bug-bot
     restart: unless-stopped
+    stop_grace_period: 20s
     depends_on:
       - napcat
     environment:
@@ -38,6 +50,8 @@ services:
       - ./data:/data
 
 secrets:
+  napcat_quick_password_md5:
+    file: ./napcat-quick-password-md5.secret
   bot_config:
     file: ./config.server.json
 

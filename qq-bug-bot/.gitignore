@@ -1,3 +1,4 @@
 .env
 config.server.json
 data/
+napcat-quick-password-md5.secret
