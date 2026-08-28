@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$SshTarget = 'root@8.210.155.25',
+    [string]$SshTarget = 'root@103.146.230.37',
     [string]$RemoteDir = '/opt/qq-bug-bot',
     [Parameter(DontShow = $true)]
     [switch]$TransportSelfTest

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Server = "root@8.210.155.25",
+    [string]$Server = "root@103.146.230.37",
     [string]$RemoteDir = "/opt/qq-bug-bot",
     [string]$Repository = "corazon1999/GrandUMI"
 )

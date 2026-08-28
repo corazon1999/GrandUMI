@@ -82,17 +82,40 @@ class DeployFileTests(unittest.TestCase):
         for nginx in (production_nginx, test_nginx):
             self.assertIn("location = /internal/qq-whitelist/sync", nginx)
             self.assertIn("location = /internal/qq-whitelist/sync/failure", nginx)
-            self.assertIn("allow 8.210.155.25;", nginx)
+            self.assertIn("allow 103.146.230.37;", nginx)
+            self.assertNotIn("allow 8.210.155.25;", nginx)
             self.assertIn("deny all;", nginx)
-            self.assertIn("X-GrandUMI-Internal-Source", nginx)
+            self.assertIn(
+                'X-GrandUMI-Internal-Source "qq-bug-bot@103.146.230.37"',
+                nginx,
+            )
         self.assertIn('if ($host != "direct.grand-umi.com")', production_nginx)
         for service in services:
             self.assertIn(
                 "EnvironmentFile=-/etc/grandumi/qq-whitelist-sync.env", service
             )
         self.assertIn("GRANDUMI_QQ_WHITELIST_SYNC_ENABLED=0", environment_example)
+        self.assertIn(
+            "GRANDUMI_QQ_WHITELIST_SYNC_PROXY_ID=qq-bug-bot@103.146.230.37",
+            environment_example,
+        )
         self.assertIn("GRANDUMI_QQ_WHITELIST_SYNC_SECRET=REPLACE_ME", environment_example)
         self.assertNotRegex(environment_example, r"SECRET=[0-9a-fA-F]{64}")
+
+    def test_机器人运维入口默认使用新香港主机(self):
+        expected = "103.146.230.37"
+        legacy = "8.210.155.25"
+        files = [
+            BOT_DIR / "deploy-bot-server.ps1",
+            BOT_DIR / "configure-github-token.ps1",
+            BOT_DIR / "export-live-qq-whitelist.ps1",
+            BOT_DIR / "agent-worker.example.json",
+            BOT_DIR / "一键导出QQ白名单.md",
+        ]
+        for path in files:
+            content = path.read_text(encoding="utf-8-sig")
+            self.assertIn(expected, content, path.name)
+            self.assertNotIn(legacy, content, path.name)
 
     def test_Bug工作器隐藏常驻且停止旧实例(self):
         installer = (BOT_DIR / "install-agent-worker.ps1").read_text(

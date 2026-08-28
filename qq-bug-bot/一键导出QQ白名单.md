@@ -2,7 +2,7 @@
 
 需要手工导入最新白名单时，直接双击仓库根目录的 `一键导出QQ白名单.cmd`。入口固定读取 `GrandUMI测试群（297542853）`，不能通过命令行改成其他群；成功后会显示完整文件路径、群成员人数、实时拉取时间和 SHA-256，并在资源管理器中选中新生成的 `qq-whitelist-297542853-YYYYMMDD-HHmmss-fff-live.json`。窗口会保留，便于查看结果。
 
-脚本要求本机已有可用的 `ssh.exe`、`node.exe`、E 盘和到 `root@8.210.155.25` 的 SSH 密钥登录。它通过 SSH 标准输入在 `/opt/qq-bug-bot` 的现有 `bug-bot` 容器内执行只读采样，不向群发送消息，也不在远端创建临时文件。OneBot 连接设置只在容器内部从现有 Docker secret 使用，不回传或打印访问令牌；本机不需要密码、Token 或白名单同步密钥。
+脚本要求本机已有可用的 `ssh.exe`、`node.exe`、E 盘和到 `root@103.146.230.37` 的 SSH 密钥登录。它通过 SSH 标准输入在 `/opt/qq-bug-bot` 的现有 `bug-bot` 容器内执行只读采样，不向群发送消息，也不在远端创建临时文件。OneBot 连接设置只在容器内部从现有 Docker secret 使用，不回传或打印访问令牌；本机不需要密码、Token 或白名单同步密钥。
 
 每次尝试严格执行以下顺序，三个动作都使用 `no_cache=true`：
 
@@ -18,7 +18,7 @@
 
 ```powershell
 .\qq-bug-bot\export-live-qq-whitelist.ps1 `
-  -SshTarget root@8.210.155.25 `
+  -SshTarget root@103.146.230.37 `
   -RemoteDir /opt/qq-bug-bot
 ```
 

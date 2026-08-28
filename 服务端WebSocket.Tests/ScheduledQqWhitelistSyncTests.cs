@@ -392,7 +392,7 @@ public sealed class QqWhitelistSyncAuthorizationTests
         context.Request.Headers["X-GrandUMI-Internal-Source"] = "wrong-proxy";
         Assert.False(options.IsAuthorized(context));
         context.Request.Headers["X-GrandUMI-Internal-Source"] = "expected-proxy";
-        context.Connection.RemoteIpAddress = IPAddress.Parse("8.210.155.25");
+        context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.10");
         Assert.False(options.IsAuthorized(context));
     }
 }
