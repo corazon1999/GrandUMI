@@ -60,6 +60,8 @@ copy config.example.json config.json
 | `assistant_connections[].enabled` | 新副助理完成账号登录和核验前必须保持 `false`；每个连接独立重连，一个副助理故障不会拖停其他账号 |
 | `assistant_connections[].ws_url` / `access_token` | 对应账号自己的 NapCat 正向 WebSocket 与令牌；令牌省略时继承顶层 `access_token`，生产环境建议每个账号使用不同随机令牌 |
 | `assistant_connections[].expected_self_id` | 该连接预期登录的真实 QQ。启用 `admin_only` 副助理时必填；收到其他 `self_id` 时拒绝事件，也不会启动回执或群管理后台任务 |
+| `assistant_connections[].new_member_welcome_enabled` | 是否允许该连接发送新人欢迎；当前仅 `id=primary` 的 s-蛇可启用，s-鹰与 s-鲨保持关闭 |
+| `assistant_connections[].new_member_welcome_groups` | 该连接明确启用欢迎的群号数组；s-蛇固定只欢迎 `297542853`，空数组表示不欢迎任何群 |
 | `allowed_groups` | 群号白名单数组,如 `[123456, 789012]`;**留空 `[]` 表示所有群** |
 | `create_issue` | 是否自动建 GitHub Issue |
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |

@@ -31,8 +31,8 @@
       "ws_url": "ws://napcat-shark:3001",
       "access_token": "请替换为s-鲨随机访问令牌",
       "expected_self_id": "184689168",
-      "new_member_welcome_enabled": true,
-      "new_member_welcome_groups": [297542853]
+      "new_member_welcome_enabled": false,
+      "new_member_welcome_groups": []
     }
   ],
   "command_prefix": "#bug ",

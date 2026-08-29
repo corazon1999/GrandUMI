@@ -52,10 +52,10 @@ def migrate_config(data):
         if not isinstance(connection, dict):
             continue
         connection_id = str(connection.get("id") or "").strip().lower()
-        if connection_id in {"primary", "s-shark"}:
+        if connection_id == "primary":
             connection["new_member_welcome_enabled"] = True
             connection["new_member_welcome_groups"] = [297542853]
-        elif connection_id == "s-eagle":
+        elif connection_id in {"s-eagle", "s-shark"}:
             connection["new_member_welcome_enabled"] = False
             connection["new_member_welcome_groups"] = []
     return data

@@ -38,7 +38,7 @@ CONFIG_PATH = os.environ.get(
 ADMIN_AGENT_OWNER_QQ = "651846226"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
-_NEW_MEMBER_WELCOME_ASSISTANT_IDS = {PRIMARY_ASSISTANT_ID, "s-shark"}
+_NEW_MEMBER_WELCOME_ASSISTANT_IDS = {PRIMARY_ASSISTANT_ID}
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _ASSISTANT_ROLES = {"primary", "admin_only"}
 
@@ -888,7 +888,7 @@ def _remember_new_member_welcome(key: str) -> None:
 
 
 async def handle_new_member_welcome(client, cfg: dict, event: dict) -> bool:
-    """由蛇、鲨助理在明确目标群中分别欢迎真实入群成员。"""
+    """只由 s-蛇在明确目标群中欢迎真实入群成员。"""
     if (
         event.get("post_type") != "notice"
         or event.get("notice_type") != "group_increase"

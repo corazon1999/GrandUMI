@@ -31,8 +31,8 @@
       "ws_url": "ws://127.0.0.1:3003",
       "access_token": "",
       "expected_self_id": "184689168",
-      "new_member_welcome_enabled": true,
-      "new_member_welcome_groups": [297542853]
+      "new_member_welcome_enabled": false,
+      "new_member_welcome_groups": []
     }
   ],
   "command_prefix": "#bug ",
