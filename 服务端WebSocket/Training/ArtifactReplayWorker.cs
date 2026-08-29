@@ -683,7 +683,7 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
         if (!string.Equals(expected.StateDigest, actual.StateDigest, StringComparison.Ordinal))
             throw Mismatch(
                 ReplayQuarantineCodes.StateCheckpointMismatch,
-                "完整状态 checkpoint 分歧",
+                $"完整状态 checkpoint 分歧：position={ReplayCheckpointContractParser.PositionName(context.Position)}，actionIndex={context.ActionIndex}，expected={expected.StateDigest}，actual={actual.StateDigest}",
                 request.Header.MatchId,
                 expected.SourceSeq);
         if (!string.Equals(expected.PublicStateDigest, actual.PublicStateDigest, StringComparison.Ordinal))
@@ -728,30 +728,31 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
         GameEngine engine)
     {
         var expected = request.CheckpointContract.Terminal;
-        var state = engine.State;
-        if (state.WinnerIndex != expected.WinnerIndex
-            || state.IsDraw != expected.IsDraw
-            || !string.Equals(state.GameOverReason ?? string.Empty, expected.Reason, StringComparison.Ordinal)
-            || state.TurnCount != expected.TurnCount)
+        var actual = ReplayTerminalSemantics.Capture(engine.State);
+        var expectedReasonCategory = ReplayTerminalSemantics.ReasonCategory(
+            expected.Reason,
+            expected.IsDraw);
+        var actualReasonCategory = ReplayTerminalSemantics.ReasonCategory(
+            actual.Reason,
+            actual.IsDraw);
+        if (actual.WinnerIndex != expected.WinnerIndex
+            || actual.IsDraw != expected.IsDraw
+            || !string.Equals(actualReasonCategory, expectedReasonCategory, StringComparison.Ordinal)
+            || (string.Equals(actualReasonCategory, "unclassified", StringComparison.Ordinal)
+                && !string.Equals(actual.Reason, expected.Reason, StringComparison.Ordinal))
+            || actual.TurnCount != expected.TurnCount)
             throw Mismatch(
                 ReplayQuarantineCodes.TerminalMismatch,
-                "winner/draw/reason/turnCount 与 match_end 不一致",
+                "winner/draw/reasonCategory/turnCount 与 match_end 不一致",
                 request.Header.MatchId,
                 request.CheckpointContract.TerminalCheckpoint.SourceSeq);
 
-        var canonical = JsonSerializer.SerializeToElement(new
-        {
-            state.WinnerIndex,
-            state.IsDraw,
-            reason = state.GameOverReason ?? string.Empty,
-            state.TurnCount,
-        });
         return new VerifiedReplayTerminal(
-            state.WinnerIndex,
-            state.IsDraw,
-            state.GameOverReason ?? string.Empty,
-            state.TurnCount,
-            CanonicalJson.Hash(canonical));
+            actual.WinnerIndex,
+            actual.IsDraw,
+            actual.Reason,
+            actual.TurnCount,
+            actual.StableHash);
     }
 
     private VerifiedArtifactReplay BuildVerified(

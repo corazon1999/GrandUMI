@@ -53,23 +53,6 @@ public sealed record AcceptedActionTape(
 /// <summary>仅从 accepted 真人动作和已冻结系统事件构建确定性动作磁带。</summary>
 public static class AcceptedActionTapeBuilder
 {
-    private static readonly HashSet<string> StrategyActions = new(StringComparer.Ordinal)
-    {
-        "ChooseFirstPlayer",
-        "Mulligan",
-        "PlayCard",
-        "AttachDon",
-        "UndoAttachDon",
-        "Attack",
-        "DeclareBlocker",
-        "PassBlock",
-        "PlayCounter",
-        "PassCounter",
-        "EndTurn",
-        "PromptResponse",
-        "UseEffect",
-    };
-
     public static AcceptedActionTape Build(AdaptedMatchLog log, ReplayArtifactDescriptor artifact)
     {
         if (!IsSupportedAdapterVersion(artifact.EventAdapterVersion))
@@ -565,29 +548,24 @@ public static class AcceptedActionTapeBuilder
     {
         try
         {
-            var canonical = JsonSerializer.SerializeToElement(new
-            {
-                orderSeq,
-                sourceSeq,
-                resultSeq,
-                actorSeat = actor,
-                action,
-                data,
-                source = source.ToString().ToLowerInvariant(),
-                isTrainingLabelCandidate = source == ReplayActionSource.Player
-                    && StrategyActions.Contains(action),
-            });
-            var stableHash = CanonicalJson.Hash(canonical);
-            return new AcceptedActionTapeEntry(
+            var canonical = AcceptedActionCanonicalizer.Create(
                 orderSeq,
                 sourceSeq,
                 resultSeq,
                 actor,
                 action,
                 data,
-                source,
-                source == ReplayActionSource.Player && StrategyActions.Contains(action),
-                stableHash);
+                source);
+            return new AcceptedActionTapeEntry(
+                canonical.OrderSeq,
+                canonical.SourceSeq,
+                canonical.ResultSeq,
+                canonical.ActorSeat,
+                canonical.Action,
+                canonical.Data,
+                canonical.Source,
+                canonical.IsTrainingLabelCandidate,
+                canonical.StableHash);
         }
         catch (InvalidDataException ex)
         {

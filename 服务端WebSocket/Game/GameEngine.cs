@@ -13,6 +13,15 @@ using System.Text.Json;
 
 namespace GrandUMI.Game;
 
+internal sealed record AcceptedActionLogReceipt(
+    long OrderSeq,
+    string StableHash,
+    bool Queued);
+
+internal sealed record GameActionExecutionReceipt(
+    bool Accepted,
+    AcceptedActionLogReceipt? AcceptedLog);
+
 /// <summary>
 /// 单个房间的对战引擎（线程不安全；所有调用需在 GameRoomManager 中串行化）
 /// </summary>
@@ -25,6 +34,7 @@ public class GameEngine
     public Action<int, object>? OnSendToPlayer { get; set; }   // (playerIndex, payload)
     public Action<object>?      OnBroadcast    { get; set; }   // 双方都收到
     public Action<string, int?, object?>? OnMatchLog { get; set; }
+    public Func<string, int?, object?, MatchLogAppendReceipt>? OnMatchLogWithReceipt { get; set; }
     public Action<int, object, object?>? OnSendToSpectators { get; set; } // (主视角, 脱敏快照, 可选手牌快照)
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
@@ -229,8 +239,17 @@ public class GameEngine
         JsonElement data,
         string? requestId = null,
         GameActionSource source = GameActionSource.Player)
+        => HandleActionWithReceipt(playerIndex, action, data, requestId, source).Accepted;
+
+    /// <summary>线上 coordinator 专用入口；保留 accepted 日志的权威 seq/hash 绑定。</summary>
+    internal GameActionExecutionReceipt HandleActionWithReceipt(
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string? requestId = null,
+        GameActionSource source = GameActionSource.Player)
     {
-        if (State.IsGameOver) return false;
+        if (State.IsGameOver) return new GameActionExecutionReceipt(false, null);
 
         var correlationId = GameActionSourceWire.CorrelationId(requestId, source);
         try
@@ -252,7 +271,7 @@ public class GameEngine
                 reason = ex.Message,
                 requestId = correlationId,
             });
-            return false;
+            return new GameActionExecutionReceipt(false, null);
         }
 
         var dispatchStartedAt = LatencyDiagnostics.Start();
@@ -337,9 +356,10 @@ public class GameEngine
             State.AttachDonUndoStack.Clear();
             State.AttachDonUndoStack.AddRange(undoStackBeforeOtherAction);
         }
+        AcceptedActionLogReceipt? acceptedLog = null;
         if (accepted)
         {
-            RecordAcceptedAction(playerIndex, action, data, correlationId, source);
+            acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);
             OnPersistAction?.Invoke(playerIndex, action, data, correlationId); // 仅持久化被接受的动作
         }
 
@@ -349,7 +369,7 @@ public class GameEngine
         if (Volatile.Read(ref _trackedOperations) == 0)
             EndSnapshotBatch();
         LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
-        return accepted;
+        return new GameActionExecutionReceipt(accepted, acceptedLog);
     }
 
     // ── 开局骰点与先后手选择 ─────────────────────────────────────────────
@@ -1510,7 +1530,7 @@ public class GameEngine
     }
 
     /// <summary>accepted 的唯一写入形态；data 已规范化并且来源不会由调用者伪装成真人。</summary>
-    internal void RecordAcceptedAction(
+    internal AcceptedActionLogReceipt? RecordAcceptedAction(
         int playerIndex,
         string action,
         JsonElement data,
@@ -1518,30 +1538,50 @@ public class GameEngine
         GameActionSource source)
     {
         var normalized = CanonicalJson.NormalizeObject(data);
-        RecordMatchLog("player_action_accepted", playerIndex, new
+        var logReceipt = RecordMatchLog("player_action_accepted", playerIndex, new
         {
             requestId,
             action,
             data = normalized,
             source = GameActionSourceWire.Value(source),
         });
+        if (logReceipt is null) return null;
+
+        var replaySource = source == GameActionSource.Player
+            ? ReplayActionSource.Player
+            : ReplayActionSource.System;
+        var canonical = AcceptedActionCanonicalizer.Create(
+            logReceipt.Value.Seq,
+            logReceipt.Value.Seq,
+            logReceipt.Value.Seq,
+            playerIndex,
+            action,
+            normalized,
+            replaySource);
+        return new AcceptedActionLogReceipt(
+            canonical.OrderSeq,
+            canonical.StableHash,
+            logReceipt.Value.Queued);
     }
 
-    public void RecordMatchLog(string kind, int? actor, object? payload)
+    public MatchLogAppendReceipt? RecordMatchLog(string kind, int? actor, object? payload)
     {
+        if (OnMatchLogWithReceipt is not null)
+            return OnMatchLogWithReceipt.Invoke(kind, actor, payload);
         if (OnMatchLog is null)
         {
             _pendingMatchLogs.Add((kind, actor, payload));
-            return;
+            return null;
         }
         OnMatchLog.Invoke(kind, actor, payload);
+        return null;
     }
 
     public void FlushPendingMatchLogs()
     {
-        if (OnMatchLog is null || _pendingMatchLogs.Count == 0) return;
+        if ((OnMatchLog is null && OnMatchLogWithReceipt is null) || _pendingMatchLogs.Count == 0) return;
         foreach (var (kind, actor, payload) in _pendingMatchLogs)
-            OnMatchLog.Invoke(kind, actor, payload);
+            RecordMatchLog(kind, actor, payload);
         _pendingMatchLogs.Clear();
     }
 

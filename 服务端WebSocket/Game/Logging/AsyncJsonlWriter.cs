@@ -63,6 +63,10 @@ internal sealed class AsyncJsonlWriter
         return false;
     }
 
+    /// <summary>关键审计行不因队列容量暂满而丢弃；暂满时等待单写队列接收。</summary>
+    public void AppendRequired(string key, object entry)
+        => EnqueueRequired(new AppendCommand(key, entry));
+
     public void Close(string key)
         => CloseDeferred(key).GetAwaiter().GetResult();
 

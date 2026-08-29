@@ -146,6 +146,7 @@ public static class GameRoomManager
         internal long JournalSequence;
         internal long[] LastOperationSequences { get; } = [-1, -1];
         internal int AcceptedActionsSinceSnapshot;
+        internal ReplayCheckpointLogCoordinator? ReplayCheckpoints;
     }
 
     internal sealed record RoomWork(string Name, long EnqueuedAt, Func<Task> Execute, long ReceivedAt = 0);
@@ -221,6 +222,8 @@ public static class GameRoomManager
             MatchKind = matchKind,
             FriendlyRoomId = friendlyRoomId,
         };
+        if (ReplayCheckpointFeature.IsEnabled())
+            entry.ReplayCheckpoints = new ReplayCheckpointLogCoordinator(roomId);
         engine.State.MatchKind = matchKind;
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
         engine.State.OperationClockEnabled = UsesPublicMatchClock(matchKind);
@@ -256,7 +259,12 @@ public static class GameRoomManager
         engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
-        engine.OnMatchLog = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
+        engine.OnMatchLogWithReceipt = (kind, actor, payload) =>
+        {
+            var receipt = MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
+            entry.ReplayCheckpoints?.Observe(engine.State, kind, actor, payload, receipt);
+            return receipt;
+        };
 
         var replayIdentity = ReplayRuntimeIdentityProvider.For(
             engine.State.Ruleset ?? CardRulesetManager.GetRequired(engine.State.RulesetId));
@@ -303,6 +311,25 @@ public static class GameRoomManager
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
         CaptureRecoverySnapshot(entry);
+        if (broadcastInitialState)
+            engine.BeginOpeningSequence();
+        if (entry.ReplayCheckpoints is not null && broadcastInitialState
+            && !EnqueueWork(entry, new RoomWork("ReplayOpeningCheckpoint", LatencyDiagnostics.Start(), async () =>
+            {
+                try
+                {
+                    await engine.WaitSettledAsync();
+                    entry.ReplayCheckpoints.WriteOpening(engine);
+                }
+                catch (Exception ex)
+                {
+                    entry.ReplayCheckpoints.Disable(engine.State, "opening_stable_wait_failed");
+                    Console.Error.WriteLine($"[ReplayCheckpoint] {roomId} 开局稳定等待失败：{ex.Message}");
+                }
+            })))
+            entry.ReplayCheckpoints.Disable(engine.State, "opening_coordinator_enqueue_failed");
+        else if (entry.ReplayCheckpoints is not null && !broadcastInitialState)
+            entry.ReplayCheckpoints.Disable(engine.State, "opening_sequence_not_started");
         WebSocketBridge.OnGameChatParticipantJoined(p0Sid);
         WebSocketBridge.OnGameChatParticipantJoined(p1Sid);
         _sessionRoom[p0Sid] = roomId;
@@ -482,7 +509,7 @@ public static class GameRoomManager
                     FinishByInactivityTimeout(room, pause.ExpiredPlayer.Value);
                 else
                     FinishByOperationTimeout(room, pause.ExpiredPlayer.Value);
-                CleanupRoom(room.RoomId);
+                CleanupRoomFromCoordinator(room.RoomId);
                 return;
             }
             if (action is "PlayerActivity" or "RequestTurnExtension")
@@ -498,7 +525,13 @@ public static class GameRoomManager
                 data,
                 source = GameActionSourceWire.Value(source),
             });
-            var accepted = room.Engine.HandleAction(playerIndex, action, data, correlationId, source);
+            var execution = room.Engine.HandleActionWithReceipt(
+                playerIndex,
+                action,
+                data,
+                correlationId,
+                source);
+            var accepted = execution.Accepted;
             // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
             // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
             if (accepted)
@@ -514,6 +547,7 @@ public static class GameRoomManager
                 }
                 room.MarkActivity();
                 await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
+                room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
                 AppendClockState(room);
                 MaybeCaptureRecoverySnapshot(room);
             }
@@ -521,7 +555,7 @@ public static class GameRoomManager
             EnsureStartingPlayerChoiceTimeout(room);
             EnsureMulliganTimeout(room);
             if (room.Engine.State.IsGameOver)
-                CleanupRoom(room.RoomId);
+                CleanupRoomFromCoordinator(room.RoomId);
         }, receivedAt));
     }
 
@@ -943,7 +977,7 @@ public static class GameRoomManager
                             FinishByInactivityTimeout(activeRoom, expiration.ExpiredPlayer.Value);
                         else
                             FinishByOperationTimeout(activeRoom, expiration.ExpiredPlayer.Value);
-                        CleanupRoom(activeRoom.RoomId);
+                        CleanupRoomFromCoordinator(activeRoom.RoomId);
                     }
                     else if (shouldBroadcastWarning)
                     {
@@ -1144,15 +1178,16 @@ public static class GameRoomManager
         var data = JsonSerializer.SerializeToElement(new { goFirst = true });
         var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
         room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { requestId, goFirst = true });
-        var accepted = room.Engine.HandleAction(
+        var execution = room.Engine.HandleActionWithReceipt(
             chooser,
             "ChooseFirstPlayer",
             data,
             requestId,
             GameActionSource.System);
-        if (!accepted) return false;
+        if (!execution.Accepted) return false;
 
         await room.Engine.WaitSettledAsync();
+        room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
         return true;
     }
 
@@ -1269,23 +1304,38 @@ public static class GameRoomManager
     /// <summary>补做已过期的调度选择；供计时器、刷新取状态和账号重绑共同复用。</summary>
     private static async Task<IReadOnlyList<int>> ResolveExpiredMulliganAsync(RoomEntry room, DateTime utcNow)
     {
-        var autoKept = room.Engine.AutoKeepMulligans(utcNow);
-        if (autoKept.Count == 0) return autoKept;
+        var state = room.Engine.State;
+        if (state.MulliganDeadlineUtc is not { } deadline
+            || utcNow < deadline
+            || state.MulliganBothDone)
+            return Array.Empty<int>();
 
-        foreach (var playerIndex in autoKept)
+        var pendingPlayers = state.Players
+            .Select((player, index) => new { player, index })
+            .Where(entry => !entry.player.MulliganDone)
+            .Select(entry => entry.index)
+            .ToArray();
+        var autoKept = new List<int>(pendingPlayers.Length);
+        foreach (var playerIndex in pendingPlayers)
         {
             var data = JsonSerializer.SerializeToElement(new { redraw = false });
             var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
             room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { requestId, redraw = false });
-            room.Engine.RecordAcceptedAction(
+            var execution = room.Engine.HandleActionWithReceipt(
                 playerIndex,
                 "Mulligan",
                 data,
                 requestId,
                 GameActionSource.System);
-            room.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data, requestId);
+            if (!execution.Accepted)
+            {
+                room.ReplayCheckpoints?.Disable(state, "mulligan_timeout_action_rejected");
+                continue;
+            }
+            await room.Engine.WaitSettledAsync();
+            room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
+            autoKept.Add(playerIndex);
         }
-        await room.Engine.WaitSettledAsync();
         return autoKept;
     }
 
@@ -1477,7 +1527,7 @@ public static class GameRoomManager
                     r.Engine.State.GameOverReason = $"{r.PlayerDisplayNames[playerIndex]} 断线超时";
                     r.Engine.Broadcast("DisconnectTimeout", new { disconnected = playerIndex });
                 }
-                CleanupRoom(room.RoomId);
+                CleanupRoomFromCoordinator(room.RoomId);
                 return Task.CompletedTask;
             }));
         });
@@ -1527,7 +1577,7 @@ public static class GameRoomManager
                 room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[oppIdx]} 断线，对手确认结束对局";
                 room.Engine.Broadcast("DisconnectTimeout", new { disconnected = oppIdx });
             }
-            CleanupRoom(room.RoomId);
+            CleanupRoomFromCoordinator(room.RoomId);
             return Task.CompletedTask;
         }));
     }
@@ -1900,9 +1950,13 @@ public static class GameRoomManager
     }
 
     public static void CleanupRoom(string roomId)
-        => TryCleanupRoom(roomId);
+        => TryCleanupRoom(roomId, terminalStableInCoordinator: false);
 
-    private static bool TryCleanupRoom(string roomId)
+    /// <summary>仅供房间单读者任务在已完成结算的当前调用栈内收尾。</summary>
+    private static void CleanupRoomFromCoordinator(string roomId)
+        => TryCleanupRoom(roomId, terminalStableInCoordinator: true);
+
+    private static bool TryCleanupRoom(string roomId, bool terminalStableInCoordinator)
     {
         if (_rooms.TryRemove(roomId, out var r))
         {
@@ -1927,11 +1981,24 @@ public static class GameRoomManager
             r.ActionQueue.Writer.TryComplete();
             foreach (var sid in r.PlayerSessionIds) _sessionRoom.TryRemove(sid, out _);
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
+            if (r.ReplayCheckpoints is not null)
+            {
+                if (terminalStableInCoordinator && r.Engine.State.IsGameOver)
+                    r.ReplayCheckpoints.WriteTerminal(r.Engine);
+                else
+                    r.ReplayCheckpoints.Disable(
+                        r.Engine.State,
+                        r.Engine.State.IsGameOver
+                            ? "terminal_outside_single_reader_coordinator"
+                            : "room_closed_without_terminal_state");
+            }
+            var terminal = ReplayTerminalSemantics.Capture(r.Engine.State);
             r.Engine.RecordMatchLog("match_end", -1, new
             {
-                winnerIndex = r.Engine.State.WinnerIndex,
-                reason = r.Engine.State.GameOverReason,
-                turnCount = r.Engine.State.TurnCount,
+                winnerIndex = terminal.WinnerIndex,
+                isDraw = terminal.IsDraw,
+                reason = terminal.Reason,
+                turnCount = terminal.TurnCount,
                 finalTick = r.Engine.State.Tick,
                 matchKind = r.MatchKind.ToString(),
                 rulesetId = r.Engine.State.RulesetId,
@@ -1997,7 +2064,7 @@ public static class GameRoomManager
                 WebSocketBridge.Send(sessionId, new { proto = "MsgDuelOver", IsWin = false, Description = description });
         }
 
-        if (!TryCleanupRoom(roomId)) return false;
+        if (!TryCleanupRoom(roomId, terminalStableInCoordinator: false)) return false;
 
         var reason = terminalRoom
             ? "终局后残留"
@@ -2405,7 +2472,12 @@ public static class GameRoomManager
         engine.HasSpectatorsWithHandForPerspective = viewPlayerIndex =>
             entry.Spectators.Values.Any(value => value.ViewPlayerIndex == viewPlayerIndex && value.HandVisible);
         entry.MatchLogPath = MatchLogRecorder.OpenAppend(roomId);
-        engine.OnMatchLog      = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
+        engine.OnMatchLogWithReceipt = (kind, actor, payload) =>
+            MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
+        if (ReplayCheckpointFeature.IsEnabled())
+            new ReplayCheckpointLogCoordinator(roomId).Disable(
+                engine.State,
+                "process_recovery_random_trace_not_restored");
         engine.OnPersistAction = (pi, act, data, requestId) =>
             PersistAcceptedAction(entry, pi, act, data, requestId);
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）

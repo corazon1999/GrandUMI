@@ -7,6 +7,7 @@
 - 把完整 JSONL 对局转换为“精确工件身份 + seed + 两副原始牌组 + accepted／系统动作磁带”；
 - 通过可替换的 `IArtifactReplayWorker` 边界，把动作磁带接入精确登记工件对应的 `MatchReplay`；
 - 在开局、每条 accepted／系统动作后的稳定点和终局核对显式 checkpoint 契约；
+- 为当前工件冻结 full/public/random 三类状态投影，只把 SHA-256 digest、累计随机事件数和 accepted 动作绑定写入日志；
 - 任一异常、拒绝、超时或 full/public/random/terminal 分歧都只返回整局隔离记录，不返回部分 checkpoint 或样本。
 
 冻结边界：
@@ -20,13 +21,17 @@
 - 旧 `prompt_timeout` 没有完整 `chosen`，当前版本整局隔离。后续只有在对应历史工件与 adapter 能精确恢复其语义时才可登记。
 - 输出动作按日志应用序号确定性排序，动作、磁带、准备结果和隔离记录都使用规范 JSON 的 SHA-256。
 - checkpoint 事件使用 `grandumi.replay_checkpoint.v1`，必须完整覆盖 `opening + 每条磁带动作 + terminal`，动作 checkpoint 同时绑定 `actionOrderSeq` 与 `actionStableHash`。缺一条、重复、越过下一动作或终局字段不完整都会隔离。
-- checkpoint digest 算法属于对应 artifact，由 `IReplayCheckpointProvider` 注入。worker 只生成实际值并与日志期望比较，禁止在验证时反向生成期望值。当前仓库只用合成／当前版本 fixture provider 证明执行路径，尚未冻结生产 digest provider。
+- checkpoint digest 算法属于对应 artifact，由 `IReplayCheckpointProvider` 注入。worker 只生成实际值并与日志期望比较，禁止在验证时反向生成期望值。当前工件使用 `DeterministicReplayCheckpointProvider` 的 `grandumi.replay_full_state.v1`、`grandumi.replay_public_state.v1` 和 `grandumi.replay_random_trace.v1`；历史 artifact 仍必须随自身 worker 提供对应算法。
+- 在线 accepted 日志与离线磁带共用同一个规范描述器，checkpoint 同时绑定日志权威 `seq` 和完全相同的 `actionStableHash`；日志序号分配与入队保持同一有序临界区，checkpoint 不因队列容量饱和而丢弃。排队成功不等于磁盘写入成功，后台落盘缺失最终仍由不完整 checkpoint 契约 fail closed。
+- 在线开关 `GRANDUMI_REPLAY_CHECKPOINT_LOG` 默认关闭，目前仅测试服 service 配置为 `1`。新对局依次写 opening、每条 accepted／系统动作后的稳定点及 match_end 前 terminal；候选服和正式服配置未启用。
+- 进程恢复不会猜测未持久化的累计随机轨迹。恢复日志会追加 `grandumi.replay_checkpoint_status.v1` 停用标记，准备层对整局 fail closed；不得把恢复前后的部分 checkpoint 拼成可训练对局。
+- checkpoint 行禁止持久化原始 GameState、账号、显示名、session、完整卡组、隐藏区、Prompt 私有候选或 replayHands；full 投影只在受控进程内参与哈希，public 投影不含双方隐藏内容。终局摘要使用身份无关的原因类别，未知原因仍在 terminal verifier 中退回原文精确比较。
 - 整局 worker 有独立稳定等待超时、整局超时和取消信号；整局超时会取消在途进程内执行。成功结果保留 source/prepared/tape/contract/registry/artifact/worker/request/replay 的完整 hash lineage。
 
 仍然 No-Go：
 
 - 生产 registry 为空，旧日志也没有完整版本身份和显式 checkpoint contract，不能声称真实历史重放成功；
 - 尚未归档、验证并登记独立历史二进制／规则包／卡表，也未实现独立进程 executable 启动与二进制复核；
-- 当前在线日志尚未产生已冻结的 checkpoint contract；生产 checkpoint provider、动作前 observation、P0-B 合法动作集合、批量断点/manifest 和数据集导出仍未完成。
+- 测试服开关只用于生成最新版本 checkpoint 日志，不等于已有真实对局通过重放；动作前 observation、P0-B 合法动作集合、批量断点/manifest 和数据集导出仍未完成。
 
 这些门禁完成前，不得把本层 fixture 结果称为可训练数据集，也不得判定 Gate B 已通过。

@@ -57,6 +57,16 @@ internal static class ReplayCheckpointContractParser
         AdaptedMatchLog log,
         AcceptedActionTape tape)
     {
+        var disabled = log.Events.FirstOrDefault(entry =>
+            string.Equals(entry.Kind, "replay_checkpoint_status", StringComparison.Ordinal));
+        if (disabled is not null)
+            throw new ReplayQuarantineException(
+                ReplayQuarantineCodes.CheckpointContinuityDisabled,
+                "checkpoint_contract",
+                "日志明确标记 checkpoint 连续性已停用，整局禁止进入训练",
+                log.Header.MatchId,
+                disabled.Seq);
+
         var checkpointEvents = log.Events
             .Where(entry => string.Equals(entry.Kind, "replay_checkpoint", StringComparison.Ordinal))
             .ToArray();

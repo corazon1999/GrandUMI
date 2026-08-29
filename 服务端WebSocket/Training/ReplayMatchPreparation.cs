@@ -41,6 +41,7 @@ public static class ReplayQuarantineCodes
     public const string InvalidActor = "invalid_actor";
     public const string MalformedActionResult = "malformed_action_result";
     public const string InvalidCheckpointContract = "invalid_checkpoint_contract";
+    public const string CheckpointContinuityDisabled = "checkpoint_continuity_disabled";
     public const string MissingCheckpointContract = "missing_checkpoint_contract";
     public const string WorkerNotRegistered = "worker_not_registered";
     public const string WorkerArtifactMismatch = "worker_artifact_mismatch";
