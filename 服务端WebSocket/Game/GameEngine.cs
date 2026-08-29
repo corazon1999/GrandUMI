@@ -3,6 +3,7 @@ using GrandUMI.Diagnostics;
 using GrandUMI.Effects;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Game.Debug;
+using GrandUMI.Game.Actions;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
@@ -21,6 +22,14 @@ internal sealed record AcceptedActionLogReceipt(
 internal sealed record GameActionExecutionReceipt(
     bool Accepted,
     AcceptedActionLogReceipt? AcceptedLog);
+
+internal sealed record TrainingDecisionAudit(
+    string ObservationHash,
+    string LegalSetHash,
+    string ActionSpaceHash,
+    string ActionId,
+    bool TrainingLabelEligible,
+    string Source);
 
 /// <summary>
 /// 单个房间的对战引擎（线程不安全；所有调用需在 GameRoomManager 中串行化）
@@ -290,6 +299,41 @@ public class GameEngine
         _activeActionSource = source;
         _activeActionRejected = false;
 
+        var policyValidation = LegalActionSpace.IsPolicyAction(action)
+            ? LegalActionService.Validate(State, playerIndex, action, data)
+            : null;
+        TrainingDecisionAudit? trainingDecisionAudit = null;
+        if (policyValidation is { Ok: true }
+            && TrainingDecisionContextFeature.IsEnabled())
+        {
+            try
+            {
+                var purpose = source == GameActionSource.Player
+                    ? LegalActionPurpose.Training
+                    : LegalActionPurpose.System;
+                var legal = LegalActionService.Enumerate(State, playerIndex, purpose);
+                if (!LegalActionService.Contains(legal, action, data, out var actionId, out _))
+                {
+                    policyValidation = new ActionValidator.Result(false, "动作未命中当前权威合法动作集合");
+                }
+                else
+                {
+                    var observation = TrainingObservationBuilder.Build(State, playerIndex);
+                    trainingDecisionAudit = new TrainingDecisionAudit(
+                        observation.StableHash,
+                        legal.StableHash,
+                        legal.ActionSpaceHash,
+                        actionId!,
+                        source == GameActionSource.Player,
+                        GameActionSourceWire.Value(source));
+                }
+            }
+            catch (Exception ex)
+            {
+                policyValidation = new ActionValidator.Result(false, $"训练动作上下文构建失败：{ex.Message}");
+            }
+        }
+
         // 撤回资格必须在后续动作的任何即时快照之前失效，否则 Attack/PlayCard 等屏障快照会
         // 短暂把已经失效的按钮重新下发。先暂存并清空；若动作最终被拒绝，再原样恢复。
         var undoStackBeforeOtherAction = action is "AttachDon" or "UndoAttachDon"
@@ -299,7 +343,11 @@ public class GameEngine
             State.AttachDonUndoStack.Clear();
 
         // 平局申请期间冻结牌局，只允许对方回应或任一方直接投降。
-        if (State.PendingDrawRequester is not null
+        if (policyValidation is { Ok: false })
+        {
+            SendError(playerIndex, policyValidation.Reason ?? "动作不合法");
+        }
+        else if (State.PendingDrawRequester is not null
             && action is not "RespondDraw" and not "Surrender")
         {
             SendError(playerIndex, "请先等待或处理当前平局申请");
@@ -361,6 +409,21 @@ public class GameEngine
         {
             acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);
             OnPersistAction?.Invoke(playerIndex, action, data, correlationId); // 仅持久化被接受的动作
+            if (trainingDecisionAudit is { } audit)
+            {
+                RecordMatchLog("training_decision_context", playerIndex, new
+                {
+                    schema = "grandumi.training_decision_context.v1",
+                    requestId = correlationId,
+                    action,
+                    audit.ActionId,
+                    audit.ObservationHash,
+                    audit.LegalSetHash,
+                    audit.ActionSpaceHash,
+                    audit.TrainingLabelEligible,
+                    audit.Source,
+                });
+            }
         }
 
         _activeAction = null;
@@ -400,16 +463,6 @@ public class GameEngine
 
     private void HandleChooseFirstPlayer(int playerIndex, JsonElement data)
     {
-        if (State.StartingPlayerChosen)
-        {
-            SendError(playerIndex, "先后手已经确定");
-            return;
-        }
-        if (State.StartingPlayerChooser != playerIndex)
-        {
-            SendError(playerIndex, "本次骰点胜者才可选择先后手");
-            return;
-        }
         if (data.ValueKind != JsonValueKind.Object
             || !data.TryGetProperty("goFirst", out var goFirstElement)
             || goFirstElement.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
@@ -419,6 +472,8 @@ public class GameEngine
         }
 
         var goFirst = goFirstElement.GetBoolean();
+        var validation = ActionValidator.CanChooseFirstPlayer(State, playerIndex, goFirst);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
         State.OpeningStage = OpeningStage.Mulligan;
         State.StartingPlayerChoiceDeadlineUtc = null;
         State.FirstPlayer = goFirst ? playerIndex : 1 - playerIndex;
@@ -1194,9 +1249,8 @@ public class GameEngine
 
     private void HandlePassBlock(int playerIndex)
     {
-        if (State.CurrentBattle is null) { SendError(playerIndex, "无战斗"); return; }
-        if (State.Phase != Phase.BattleBlock) { SendError(playerIndex, "不在阻挡步骤"); return; }
-        if (State.CurrentBattle.DefenderPlayerIndex != playerIndex) { SendError(playerIndex, "不是防守方"); return; }
+        var validation = ActionValidator.CanPassBlock(State, playerIndex);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
         BattleEngine.PassBlock(State);
         Broadcast("PassBlock");
         _ = Track(AdvanceBattleAfterBlockAsync());
@@ -1204,13 +1258,14 @@ public class GameEngine
 
     private void HandlePlayCounter(int playerIndex, JsonElement data)
     {
-        if (State.CurrentBattle is null || State.Phase != Phase.BattleCounter)
-        { SendError(playerIndex, "不在反击步骤"); return; }
-        if (State.CurrentBattle.DefenderPlayerIndex != playerIndex)
-        { SendError(playerIndex, "不是防守方"); return; }
-
         var def = State.Players[playerIndex];
         bool useCounterIcon = data.TryGetProperty("useCounterIcon", out var uci) && uci.ValueKind == JsonValueKind.True;
+        if (!data.TryGetProperty("handIndex", out var validatedHandIndex)
+            || validatedHandIndex.ValueKind != JsonValueKind.Number
+            || !validatedHandIndex.TryGetInt32(out var parsedHandIndex))
+        { SendError(playerIndex, "缺少 handIndex"); return; }
+        var validation = ActionValidator.CanPlayCounter(State, playerIndex, parsedHandIndex, useCounterIcon);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
 
         if (useCounterIcon)
         {
@@ -1272,11 +1327,9 @@ public class GameEngine
 
     private void HandlePassCounter(int playerIndex)
     {
-        if (State.CurrentBattle is null || State.Phase != Phase.BattleCounter)
-        { SendError(playerIndex, "不在反击步骤"); return; }
-        if (State.CurrentBattle.DefenderPlayerIndex != playerIndex)
-        { SendError(playerIndex, "不是防守方"); return; }
-        int defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
+        var validation = ActionValidator.CanPassCounter(State, playerIndex);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
+        int defenderIdx = State.CurrentBattle!.DefenderPlayerIndex;
         BattleEngine.PassCounter(State);
         Broadcast("ResolveBattle");
         _ = Track(ResolveBattleDamageAsync(defenderIdx));
@@ -1613,16 +1666,12 @@ public class GameEngine
 
     private void HandleMulligan(int playerIndex, JsonElement data)
     {
-        var p = State.Players[playerIndex];
-        if (p.MulliganDone)
-        {
-            SendError(playerIndex, "已完成换牌");
-            return;
-        }
         bool redraw = false;
         if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("redraw", out var r))
             redraw = r.ValueKind == JsonValueKind.True;
 
+        var validation = ActionValidator.CanMulligan(State, playerIndex, redraw);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
         CompleteMulligan(playerIndex, redraw);
     }
 
@@ -1737,13 +1786,8 @@ public class GameEngine
                     chosen.Add(item.GetString()!);
 
         // 客户端响应只是输入，不能借由空选、超量、重复或伪造 ID 跳过必选成本/效果。
-        // 超时仍由 PromptSystem 自己处理；这里仅拒绝玩家主动提交的不合法答案，并保留原 prompt。
-        if (chosen.Count < pending.MinChoose || chosen.Count > pending.MaxChoose)
-        { SendError(playerIndex, "选择数量不符合要求"); return; }
-        if (chosen.Distinct(StringComparer.Ordinal).Count() != chosen.Count)
-        { SendError(playerIndex, "不能重复选择同一项"); return; }
-        if (chosen.Any(id => !pending.ValidChoices.Contains(id)))
-        { SendError(playerIndex, "包含不可选择的项目"); return; }
+        var validation = ActionValidator.CanRespondPrompt(State, playerIndex, promptId, chosen);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
 
         Prompts.Resolve(promptId, chosen);
     }
@@ -1752,16 +1796,8 @@ public class GameEngine
 
     private void HandleEndTurn(int playerIndex)
     {
-        if (State.CurrentTurnPlayer != playerIndex)
-        {
-            SendError(playerIndex, "不是你的回合");
-            return;
-        }
-        if (State.Phase != Phase.Main)
-        {
-            SendError(playerIndex, "只能在主要阶段结束回合");
-            return;
-        }
+        var validation = ActionValidator.CanEndTurn(State, playerIndex);
+        if (!validation.Ok) { SendError(playerIndex, validation.Reason!); return; }
         _ = Track(EndTurnAsync());
     }
 

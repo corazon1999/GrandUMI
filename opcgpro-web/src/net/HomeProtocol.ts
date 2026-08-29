@@ -1293,7 +1293,7 @@ export const HomeRequest = {
   },
 
   enterBotMatch(deck: string, goFirst: boolean = true, deckName?: string) {
-    // 单人测试：标记本局为机器人对战，对战页据此显示 GM 按钮
+    // AI 对战：标记本局为 Bot 房间，对战页据此显示测试辅助入口。
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "1");
     return NetManager.send({
       proto: "MsgEnterBotMatch",

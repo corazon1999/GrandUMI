@@ -5,6 +5,8 @@ namespace GrandUMI.Training;
 /// <summary>accepted 动作在线日志与离线磁带共用的冻结规范描述。</summary>
 internal static class AcceptedActionCanonicalizer
 {
+    // 该集合属于历史 accepted tape v1 的哈希语义；不可用新动作空间替换。
+    // 新训练数据集由 TrainingDatasetMatchCollector 另行使用 LegalActionSpace 门禁。
     private static readonly HashSet<string> StrategyActions = new(StringComparer.Ordinal)
     {
         "ChooseFirstPlayer",

@@ -1,75 +1,70 @@
-using System.Text.Json;
+using GrandUMI.Game.AI;
 
 namespace GrandUMI.Game;
 
 /// <summary>
-/// 单人测试模式的机器人对手（作为 P1 的"假会话"）。
-/// 不主动出牌/攻击，只做让对局推进所需的最小应答：
-///   重抽(不换) → 防守时放弃阻挡/反击 → 轮到它且主要阶段则结束回合 → 对它的 prompt 给默认应答。
+/// AI 对战模式的 synthetic 基线对手（作为 P1 的"假会话"）。
+/// 策略会出牌、分配咚、攻击并处理防守／Prompt；所有选择都必须从当前 LegalActionSet 产生。
 /// 由"发给机器人的每条状态广播"反应式驱动（见 GameRoomManager.CreateRoom 的 OnSendToPlayer）。
 /// </summary>
 public static class BotDriver
 {
     private const int BOT = 1;          // 机器人固定为 P1
     private const int ThinkDelayMs = 350;
+    private static readonly SyntheticBaselinePolicy PrimaryPolicy = SyntheticBaselinePolicy.LoadConfiguredOrBuiltIn();
+    private static readonly IAiPolicy FallbackPolicy = new DeterministicSafePolicy();
 
     /// <summary>机器人收到一条状态广播：调度一次思考（带去抖，避免重复排队）</summary>
     public static void OnBotMessage(GameRoomManager.RoomEntry room)
     {
-        if (room.BotScheduled) return;
-        room.BotScheduled = true;
+        if (Interlocked.CompareExchange(ref room.BotScheduleState, 1, 0) != 0) return;
         _ = Task.Run(async () =>
         {
             await Task.Delay(ThinkDelayMs);
-            room.BotScheduled = false;
-            try { Act(room); }
-            catch (Exception ex) { Console.Error.WriteLine($"[Bot] 异常: {ex.Message}"); }
+            if (!GameRoomManager.EnqueueBotDecision(room))
+                Volatile.Write(ref room.BotScheduleState, 0);
         });
     }
 
-    private static void Act(GameRoomManager.RoomEntry room)
+    /// <summary>只在房间单读者动作队列内调用，避免枚举期间与真人动作并发读取可变状态。</summary>
+    internal static async Task DecideAndQueueAsync(GameRoomManager.RoomEntry room)
     {
-        var engine = room.Engine;
-        var s = engine.State;
-        if (s.IsGameOver) return;
-
-        // 机器人也走房间动作队列，与真人操作保持同一有序入口。
-        if (s.PendingPrompt is { } p && p.PlayerIndex == BOT)
+        var retryAfterQueuePressure = false;
+        try
         {
-            string[] chosen;
-            if (p.Kind == "LifeTrigger")
-                chosen = new[] { "hand" };
-            else if (p.MinChoose > 0)
-                chosen = p.ValidChoices.Take(p.MinChoose).ToArray();
-            else
-                chosen = Array.Empty<string>();
-            GameRoomManager.EnqueueBotAction(room, BOT, "PromptResponse", El(new { promptId = p.PromptId, chosen }));
-            return;
+            if (room.Engine.State.IsGameOver) return;
+            var decision = await AiDecisionCoordinator.DecideAsync(
+                room.Engine.State,
+                BOT,
+                PrimaryPolicy,
+                FallbackPolicy,
+                TimeSpan.FromMilliseconds(200));
+            if (decision is null) return;
+            room.Engine.RecordMatchLog("ai_decision", BOT, new
+            {
+                policyId = decision.PolicyId,
+                modelHash = decision.ModelHash,
+                modelSource = PrimaryPolicy.ModelSource,
+                actionId = decision.ActionId,
+                usedFallback = decision.UsedFallback,
+                fallbackReason = decision.FallbackReason,
+            });
+            // 决策与实际动作是两个队列项；HandleAction 会在执行时再次校验当前状态，过期候选只会被拒绝。
+            retryAfterQueuePressure = !GameRoomManager.EnqueueBotAction(
+                room,
+                BOT,
+                decision.Action,
+                decision.Data);
         }
-
-        // 真人对局目前不会启用机器人；保留此分支以保证未来骰点机器人房间可自行推进。
-        if (!s.StartingPlayerChosen)
+        catch (Exception ex)
         {
-            if (s.StartingPlayerChooser == BOT)
-                GameRoomManager.EnqueueBotAction(room, BOT, "ChooseFirstPlayer", El(new { goFirst = true }));
-            return;
+            Console.Error.WriteLine($"[Bot] 决策异常，未发送猜测动作: {ex.Message}");
         }
-
-        if (!s.Players[BOT].MulliganDone)
+        finally
         {
-            GameRoomManager.EnqueueBotAction(room, BOT, "Mulligan", El(new { redraw = false }));
-            return;
+            Volatile.Write(ref room.BotScheduleState, 0);
         }
-
-        if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == BOT)
-        {
-            if (s.Phase == Phase.BattleBlock) { GameRoomManager.EnqueueBotAction(room, BOT, "PassBlock", El(new { })); return; }
-            if (s.Phase == Phase.BattleCounter) { GameRoomManager.EnqueueBotAction(room, BOT, "PassCounter", El(new { })); return; }
-        }
-
-        if (s.CurrentTurnPlayer == BOT && s.Phase == Phase.Main && s.CurrentBattle is null)
-            GameRoomManager.EnqueueBotAction(room, BOT, "EndTurn", El(new { }));
+        if (retryAfterQueuePressure && !room.Engine.State.IsGameOver)
+            OnBotMessage(room);
     }
-
-    private static JsonElement El(object o) => JsonSerializer.SerializeToElement(o);
 }

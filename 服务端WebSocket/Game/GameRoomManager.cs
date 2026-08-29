@@ -127,8 +127,8 @@ public static class GameRoomManager
         internal bool[] DisconnectedPlayers { get; } = new bool[2];
         internal long[] DisconnectGraceRemainingMs { get; } = [GracePeriodSeconds * 1000L, GracePeriodSeconds * 1000L];
         internal long[] DisconnectStartedAt { get; } = new long[2];
-        /// <summary>机器人思考是否已排队（去抖）</summary>
-        public bool BotScheduled { get; set; }
+        /// <summary>机器人思考是否已排队（0=空闲，1=延迟/队列/决策中）。</summary>
+        internal int BotScheduleState;
         /// <summary>关联的友谊战房间 ID(非友谊战为 null);对局结束时回调更新比分并退回房间</summary>
         public string? FriendlyRoomId { get; set; }
         internal Channel<RoomWork> ActionQueue { get; } = Channel.CreateBounded<RoomWork>(new BoundedChannelOptions(256)
@@ -467,13 +467,20 @@ public static class GameRoomManager
     }
 
 
-    internal static void EnqueueBotAction(RoomEntry room, int playerIndex, string action, JsonElement data)
+    internal static bool EnqueueBotAction(RoomEntry room, int playerIndex, string action, JsonElement data)
         => EnqueuePlayerAction(
             room,
             playerIndex,
             action,
             data.Clone(),
             source: GameActionSource.System);
+
+    /// <summary>把读取可变 GameState 的 AI 决策放回房间单读者队列。</summary>
+    internal static bool EnqueueBotDecision(RoomEntry room)
+        => EnqueueWork(room, new RoomWork(
+            "BotDecision",
+            LatencyDiagnostics.Start(),
+            () => BotDriver.DecideAndQueueAsync(room)));
 
     private static bool EnqueuePlayerAction(
         RoomEntry room,

@@ -1,4 +1,5 @@
 using GrandUMI.Cards;
+using GrandUMI.Effects;
 
 namespace GrandUMI.Game.Validation;
 
@@ -11,6 +12,39 @@ public static class ActionValidator
     public record Result(bool Ok, string? Reason);
     private static Result Fail(string reason) => new(false, reason);
     private static readonly Result OkResult = new(true, null);
+
+    public static Result CanChooseFirstPlayer(GameState s, int playerIdx, bool _)
+    {
+        if (s.StartingPlayerChosen) return Fail("先后手已经确定");
+        if (s.StartingPlayerChooser != playerIdx) return Fail("本次骰点胜者才可选择先后手");
+        return OkResult;
+    }
+
+    public static Result CanMulligan(GameState s, int playerIdx, bool redraw)
+    {
+        if (!s.StartingPlayerChosen) return Fail("请先完成先后手选择");
+        var player = s.Players[playerIdx];
+        if (player.MulliganDone) return Fail("已完成换牌");
+        if (redraw && !player.HasReDraw) return Fail("已经没有重抽机会");
+        return OkResult;
+    }
+
+    public static Result CanRespondPrompt(
+        GameState s,
+        int playerIdx,
+        string promptId,
+        IReadOnlyList<string> chosen)
+    {
+        var pending = s.PendingPrompt;
+        if (pending is null) return Fail("没有待响应的 prompt");
+        if (pending.PlayerIndex != playerIdx) return Fail("不是你的 prompt");
+        if (!string.Equals(promptId, pending.PromptId, StringComparison.Ordinal)) return Fail("promptId 不匹配");
+        if (chosen.Count < pending.MinChoose || chosen.Count > pending.MaxChoose) return Fail("选择数量不符合要求");
+        if (chosen.Distinct(StringComparer.Ordinal).Count() != chosen.Count) return Fail("不能重复选择同一项");
+        var valid = pending.ValidChoices.ToHashSet(StringComparer.Ordinal);
+        if (chosen.Any(id => !valid.Contains(id))) return Fail("包含不可选择的项目");
+        return OkResult;
+    }
 
     public static Result CanEndTurn(GameState s, int playerIdx)
     {
@@ -184,6 +218,8 @@ public static class ActionValidator
             : me.Characters.FirstOrDefault(c => c.Id == sourceId)
               ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
         if (source is null) return Fail("效果来源不在你场上");
+        if (Array.IndexOf(source.Info.EffectTags, "ActivatedMain") < 0)
+            return Fail("该卡没有【启动主要】效果");
 
         if (!HasMetCardSpecificActivationTiming(s, playerIdx, source))
             return Fail("该效果要到你的第2回合及以后才能发动");
@@ -194,6 +230,38 @@ public static class ActionValidator
                 || source.HasRestriction(RestrictionKind.CannotBeRested)
                 || s.HasContinuousRestriction(source, RestrictionKind.CannotBeRested)))
             return Fail("约翰船长当前无法转为休息状态，不能支付发动成本");
+        return OkResult;
+    }
+
+    public static Result CanPassBlock(GameState s, int playerIdx)
+    {
+        if (s.CurrentBattle is null) return Fail("无战斗");
+        if (s.Phase != Phase.BattleBlock) return Fail("不在阻挡步骤");
+        if (s.CurrentBattle.DefenderPlayerIndex != playerIdx) return Fail("不是防守方");
+        return OkResult;
+    }
+
+    public static Result CanPlayCounter(GameState s, int playerIdx, int handIndex, bool useCounterIcon)
+    {
+        if (s.CurrentBattle is null || s.Phase != Phase.BattleCounter) return Fail("不在反击步骤");
+        if (s.CurrentBattle.DefenderPlayerIndex != playerIdx) return Fail("不是防守方");
+        var defender = s.Players[playerIdx];
+        if (handIndex < 0 || handIndex >= defender.Hand.Count) return Fail("手牌索引非法");
+        var card = defender.Hand[handIndex];
+        if (useCounterIcon)
+            return HandStaticCounter.Value(s, playerIdx, card) > 0
+                ? OkResult
+                : Fail("该卡无反击值");
+        if (Array.IndexOf(card.Info.EffectTags, "EventCounter") < 0) return Fail("该卡没有反击效果");
+        int cost = s.HandPlayCost(playerIdx, card);
+        if (defender.ActiveDonCount < cost) return Fail("活跃咚不足，无法打出该反击事件");
+        return OkResult;
+    }
+
+    public static Result CanPassCounter(GameState s, int playerIdx)
+    {
+        if (s.CurrentBattle is null || s.Phase != Phase.BattleCounter) return Fail("不在反击步骤");
+        if (s.CurrentBattle.DefenderPlayerIndex != playerIdx) return Fail("不是防守方");
         return OkResult;
     }
 

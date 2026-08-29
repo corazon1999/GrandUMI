@@ -8,6 +8,7 @@
 - 每次测试服后端构建现在会把完整 publish、当时的 `/data/grandumi-test/Rulesets` 快照和标准 manifest 归档到 `/var/lib/grandumi-test-replay-artifacts/<engineArtifactId>/`。
 - 新版归档由归档内历史 `GrandUMIServer.dll` 作为一次性独立进程 worker 执行真实重放；当前服务进程只负责按完整 artifact 指纹路由，不会用当前 `main` 代跑历史对局。
 - 覆盖审计只有在历史 DLL 握手、完整动作重放、逐 checkpoint／终局核对和响应 lineage 复核全部通过后才写 `replay_verified`；准备成功或入口声明可用都不是重放成功证据。
+- 当前进程现已提供统一 `LegalActionSet`、动作前隐私 observation、全有或全无数据集收集器、可复现 synthetic 训练命令、mask 强制推理与可玩的 AI 对战入口；synthetic 产物始终明确标记为非真人、非生产。
 
 ## 测试服不可变归档格式
 
@@ -81,6 +82,57 @@ manifest 使用规范 JSON 自哈希（计算时排除顶层 `manifestHash`）�
 
 `verify` 先用当前验证器检查不可变文件集合，再启动归档内历史程序集执行 `verify-self`；v2 随后还会启动一次 worker 握手。规则 manifest 不是只在外层 JSON 中互相抄写，而是由历史代码、历史 DSL 和归档规则包重新计算并与归档身份核对。
 
+## 六阶段 AI 最小端到端
+
+1. **合法动作**：`LegalActionService` 是策略动作的统一无副作用枚举与校验入口。动作集合、候选、参数化 Prompt 约束和 mask 都有冻结 schema、自哈希与 `actionSpaceHash`；引擎执行时仍会在权威房间单读者队列中再次校验，过期候选只会被拒绝。
+2. **动作前 observation**：`TrainingObservationBuilder` 只输出白名单字段。己方手牌可见，对手只输出手牌数量；牌库只输出数量；生命只输出公开的正面牌；账号、显示名、session、完整牌库和隐藏生命牌不会进入 observation。构建后还会做字段及敏感值扫描。
+3. **数据集**：`TrainingDatasetMatchCollector` 必须在 accepted 动作应用前观察状态。系统动作只推进、不产标签；真人来源必须先有 `replay_verified`；任一 accepted 策略动作未命中当时的 `LegalActionSet`，会以稳定原因码隔离整局并清空该局样本。JSONL 按匿名组稳定切分、按动作前上下文去重，并由 manifest 绑定样本哈希、schema、动作空间和隔离计数。
+4. **训练**：`--training-synthetic` 以固定种子串行运行双 AI 自博弈，导出 JSONL／数据集 manifest，再在 CPU 上生成首个候选动作类型模型。模型 manifest 自哈希并冻结数据集、样本、特征 schema、动作空间、评估和 lineage；`humanTrainingEvidence=false`、`productionEligible=false` 是加载门禁，不是说明文字。
+5. **推理**：`AiDecisionCoordinator` 只把隐私 observation 与合法候选／mask 交给策略。超时、异常、越界、越 mask、Prompt 物化失败或执行前复核失败都会切到同样受 mask 约束的确定性安全策略；不会猜测动作 ID。
+6. **可玩入口**：大厅“AI 对战（实验）”继续复用隔离于排位统计的 Bot 房间。当前 synthetic 基线会出牌、分配咚、攻击并处理 Prompt／防守；UI 明确说明未使用真人对局训练。
+
+Windows 本地生成命令必须使用仓库 E 盘助手：
+
+```powershell
+. .\ops\windows\GrandUmiTemp.ps1
+$aiTrainingDirectory = Get-GrandUmiTempDirectory -Category 'ai-synthetic'
+dotnet run --project .\服务端WebSocket\GrandUMIServer.csproj -- `
+  --training-synthetic `
+  --output-dir $aiTrainingDirectory `
+  --compute-device cpu
+```
+
+### 计算设备与低内存默认值
+
+当前实现不包含 CUDA、Torch、ONNX Runtime、ML.NET 或其他 GPU 运行时。所谓“训练”是对规范
+JSONL 做确定性的动作类型计数、拉普拉斯平滑和对数权重计算；推理是对合法候选做字典权重打分。
+两条路径都只使用 CPU，不会由 GrandUMI 申请显存，也不存在梯度、batch、梯度累积或混合精度可调。
+`--compute-device` 目前只接受 `cpu`，传入 `cuda`、`gpu` 等值会直接失败，避免配置给出错误暗示。
+
+训练命令默认使用低内存配置：
+
+- 串行运行 4 局，每局最多 1000 次决策；不并行启动自博弈。
+- 样本预算为 4000；`matches × max-decisions` 的最坏值超过预算时，在加载规则前拒绝启动。
+- 托管堆软上限为 256 MiB；每 32 次决策、每局结束、数据集导出后和模型生成后检查。超限时允许一次阻塞 GC（以速度换内存），仍超限则安全停止。
+- 数据集逐行写入并增量计算 SHA-256；模型训练逐行严格校验 UTF-8 JSONL 并只保留计数，不再把整份文件及全部反序列化样本同时留在内存。
+
+可通过 `--matches`、`--max-decisions`、`--sample-budget` 和
+`--managed-memory-budget-mb` 显式调整；样本预算硬上限为 50000，托管堆软上限允许范围为
+128..2048 MiB。托管堆预算是应用层检查，不是操作系统硬隔离，也不包含本机其他进程的内存。
+命令成功时会输出 `computeDevice=cpu`、`gpuAcceleration=false`、资源预算和本次观测到的托管堆峰值。
+
+测试服 systemd unit 只启动常驻服务和 CPU 推理，不会自动执行 `--training-synthetic`。unit 的
+`CPUQuota=50%`、`MemoryMax=768M` 约束常驻服务；手工运行的离线训练进程必须自行使用上述预算参数，
+不能把 service 限额误认为离线训练隔离。
+
+仓库随服务发布 `Training/Models/first-synthetic-model.v1.json`。也可通过
+`GRANDUMI_AI_MODEL_MANIFEST` 指向另一个同 schema、同动作空间、非真人、非生产的 synthetic
+manifest；文件缺失或校验失败会记录错误并回退内置同动作空间基线。
+
+测试服 service 会启用 `GRANDUMI_TRAINING_DECISION_CONTEXT_LOG=1`，在 accepted 日志后写入与
+`requestId` 绑定的 observation／legal-set／action-space／actionId 哈希，不写原始隐藏状态。
+该开关不等于数据可训练；真人局仍必须经过不可变归档 worker 的完整重放验证，才能由离线收集器产标签。
+
 ## 独立进程协议与失败边界
 
 - controller 只使用已验证 manifest 的固定入口；日志、请求和 manifest 自由文本都不能参与可执行文件、参数或工作目录选择。`--dotnet` 仅是部署／测试操作者提供的受信 host 覆盖，且文件名必须为 `dotnet` 或 `dotnet.exe`。
@@ -127,6 +179,6 @@ JSON 使用 `grandumi.replay_coverage_report.v2`，没有时间戳；输入内�
 - 代码完成不等于服务器已产生归档或覆盖报告；只有本提交后续真实部署测试服并运行命令，服务器持久路径才会出现证据。没有新 checkpoint 日志时报告必须如实为 0。
 - 测试服运行中另行激活或新增规则热更新包不会自动创建新归档；这类新身份会在审计中成为 `artifact_not_archived`。下一阶段必须把规则激活与同样的不可变归档门禁绑定后，才可允许其进入 worker。
 - 当前归档仅在测试服本机持久路径可取回，尚未建立异机冗余、保留期／容量治理和灾备恢复演练。
-- 动作前 observation、P0-B 合法动作集合、批量断点／训练 manifest 和数据集导出仍未完成。
+- 统一动作集合、动作前 observation、数据集 manifest 和 synthetic 最小端到端已经本地实现；但测试服尚未部署本次代码，也尚无由新日志产生并通过 `replay_verified` 的真人样本。现有 synthetic 模型不能冒充真人行为克隆或 Gate B 质量证据。
 
 这些门禁完成前，不得把 fixture、`preparation_ready`、仅握手成功或测试候选 catalog 称为可训练数据集；只有具体对局的 `replay_verified` 才表示该局真实历史重放成功。

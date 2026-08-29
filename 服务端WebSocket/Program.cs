@@ -20,6 +20,12 @@ if (args.Length > 0 && string.Equals(args[0], "--replay-artifact", StringCompari
     return;
 }
 
+if (args.Length > 0 && string.Equals(args[0], "--training-synthetic", StringComparison.Ordinal))
+{
+    Environment.ExitCode = await SyntheticTrainingCommand.RunAsync(args[1..]);
+    return;
+}
+
 if (args.Length > 0 && string.Equals(args[0], "--migrate-shared-accounts", StringComparison.Ordinal))
 {
     if (args.Length is < 3 or > 4)

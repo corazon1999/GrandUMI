@@ -149,7 +149,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
     HomeRequest.cancelMatch();
   };
 
-  // 单人测试：与机器人对战，方便测试单卡效果（机器人轮到自己会自动结束回合）
+  // AI 对战：仍复用隔离于排位统计的 Bot 房间协议。
   const handleBotMatch = () => {
     if (!selectedDeck) return;
     const sent = HomeRequest.enterBotMatch(selectedDeck.cards, botGoFirst, selectedDeck.name);
@@ -263,7 +263,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             {([
               ["match", "匹配"],
               ["friend", "好友房"],
-              ["bot", "单人"],
+              ["bot", "AI"],
             ] as const).map(([mode, label]) => (
               <button
                 key={mode}
@@ -450,8 +450,12 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
             {playMode === "bot" && (
               <div className="flex flex-col gap-4">
                 <div>
-                  <h2 className="font-bold text-white">单人测试</h2>
-                  <p className="mt-1 text-sm leading-5 text-gray-500">与机器人对战，适合测试卡组与单卡效果。</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-bold text-white">AI 对战（实验）</h2>
+                    <span className="rounded-full border border-sky-700/70 bg-sky-950/50 px-2 py-0.5 text-[11px] font-bold text-sky-300">synthetic</span>
+                  </div>
+                  <p className="mt-1 text-sm leading-5 text-gray-400">AI 会出牌、分配咚并主动攻击，可用于体验卡组对战。</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-300/80">此模型未使用真人对局训练，只用于体验与工程验证。</p>
                 </div>
                 <div>
                   <p className="mb-2 text-sm text-gray-400">选择顺序</p>
@@ -461,7 +465,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   </div>
                 </div>
                 <button type="button" onClick={handleBotMatch} disabled={!canEnter} className="h-12 w-full rounded-xl bg-sky-600 text-base font-bold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600">
-                  开始单人测试
+                  创建 AI 对局
                 </button>
               </div>
             )}
