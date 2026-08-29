@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="GrandUMIServer.Tests" />
+    <InternalsVisibleTo Include="GrandUMI.ProcessWorkerFixture" />
   </ItemGroup>
 
   <ItemGroup>

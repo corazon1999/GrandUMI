@@ -351,7 +351,8 @@ public static class StateSnapshotBuilder
             lifeFaceUp = board.LifeFaceUp,
             leaderId = board.LeaderId,
             leaderNumber = board.LeaderNumber,
-            championLeaderNumber = LeaderChampionStore.Default.IsChampion(p.AccountName, board.LeaderNumber)
+            championLeaderNumber = !state.SuppressExternalProfileLookups
+                && LeaderChampionStore.Default.IsChampion(p.AccountName, board.LeaderNumber)
                 ? board.LeaderNumber
                 : null,
             leaderTapped = board.LeaderTapped,

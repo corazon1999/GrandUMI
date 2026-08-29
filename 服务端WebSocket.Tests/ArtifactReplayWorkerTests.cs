@@ -202,7 +202,7 @@ public class ArtifactReplayWorkerTests
                 {
                     "state" => digest with { State = Sha('0') },
                     "public" => digest with { Public = Sha('1') },
-                    "random" => digest with { Random = Sha('2'), RandomCount = 3 },
+                    "random" => digest with { Random = Sha('2') },
                     _ => digest,
                 }
                 : digest);
@@ -211,6 +211,21 @@ public class ArtifactReplayWorkerTests
 
         Assert.Null(result.Verified);
         Assert.Equal(expectedReason, result.Quarantine!.ReasonCode);
+    }
+
+    [Fact]
+    public async Task 累计随机事件数单调但与实际不符_整局隔离()
+    {
+        var prepared = BuildPreparedFixture(
+            "artifact-random-count-mismatch",
+            mutateDigest: (index, digest) => index >= 1
+                ? digest with { RandomCount = 3 }
+                : digest);
+
+        var result = await CreateDispatcher(prepared).ExecuteAsync(prepared);
+
+        Assert.Null(result.Verified);
+        Assert.Equal(ReplayQuarantineCodes.RandomTraceMismatch, result.Quarantine!.ReasonCode);
     }
 
     [Fact]
@@ -412,6 +427,9 @@ public class ArtifactReplayWorkerTests
             prepared.Artifact,
             new FixtureCheckpointProvider(),
             FixtureRuleset());
+
+    internal static PreparedReplayMatch BuildDefaultPreparedFixture(string matchId)
+        => BuildPreparedFixture(matchId);
 
     private static PreparedReplayMatch BuildPreparedFixture(
         string matchId,

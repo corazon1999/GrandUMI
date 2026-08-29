@@ -96,9 +96,18 @@ public sealed record VerifiedReplayArtifactArchive(
 public static class ReplayArtifactArchive
 {
     public const string Schema = "grandumi.replay_artifact_archive.v1";
-    public const string ArchiveVersion = "grandumi.test-replay-artifact-archive.2026-08-29.v1";
+    public const string LegacyArchiveVersion = "grandumi.test-replay-artifact-archive.2026-08-29.v1";
+    public const string ArchiveVersion = "grandumi.test-replay-artifact-archive.2026-08-29.v2";
     public const string ManifestFileName = "replay-artifact-manifest.v1.json";
     public const string ReplayWorkerProtocol = "grandumi.artifact-replay-worker.v1";
+    public const string ReplayWorkerExecutable = "/opt/dotnet/dotnet";
+
+    private static readonly string[] ReplayWorkerArguments =
+    [
+        "GrandUMIServer.dll",
+        "--replay-artifact",
+        "worker-host",
+    ];
 
     private const int MaximumManifestBytes = 16 * 1024 * 1024;
     private const int MaximumEntries = 200_000;
@@ -371,16 +380,16 @@ public static class ReplayArtifactArchive
                 Array.AsReadOnly(new[] { "GrandUMIServer.dll", "8081" }),
                 publishRoot),
             new ReplayArtifactWorkerEntrypoint(
-                Available: false,
+                Available: true,
                 ReplayWorkerProtocol,
-                Executable: null,
-                Arguments: Array.Empty<string>(),
-                WorkingDirectory: null,
-                Reason: "当前阶段只归档可取回运行工件并提供验证器，尚未实现独立进程 replay worker 入口。"),
+                ReplayWorkerExecutable,
+                Arguments: Array.AsReadOnly(ReplayWorkerArguments),
+                WorkingDirectory: publishRoot,
+                Reason: "历史 DLL 提供有界独立进程重放协议；当前仅有应用层进程隔离、环境清理、超时与输入输出上限，尚未提供 OS 级网络/文件系统沙箱。"),
             new ReplayArtifactCandidateStatus(
                 "test",
                 ProductionRegistryEligible: false,
-                Reason: "独立进程 worker、取回执行与真实重放尚未全部证明，禁止写入生产 registry。"),
+                Reason: "仅限测试服逐局验证；未完成 OS 级网络/文件系统沙箱及生产资格审查，禁止写入生产 registry。"),
             ManifestHash: string.Empty);
         var hash = CanonicalJson.Hash(
             JsonSerializer.SerializeToElement(withoutHash, JsonOptions),
@@ -449,7 +458,13 @@ public static class ReplayArtifactArchive
         var actualDirectories = snapshot.Directories.Order(StringComparer.Ordinal).ToArray();
         var expectedDirectories = manifest.Content.Directories.Order(StringComparer.Ordinal).ToArray();
         if (!actualDirectories.SequenceEqual(expectedDirectories, StringComparer.Ordinal))
-            throw new ReplayArtifactArchiveException("归档目录集合与 manifest 不一致，存在缺失或额外目录。");
+        {
+            var missing = expectedDirectories.Except(actualDirectories, StringComparer.Ordinal).Take(8);
+            var extra = actualDirectories.Except(expectedDirectories, StringComparer.Ordinal).Take(8);
+            throw new ReplayArtifactArchiveException(
+                "归档目录集合与 manifest 不一致，存在缺失或额外目录：" +
+                $"missing=[{string.Join(",", missing)}]，extra=[{string.Join(",", extra)}]");
+        }
 
         var actualFiles = snapshot.Files.ToDictionary(file => file.RelativePath, StringComparer.Ordinal);
         if (!actualFiles.Remove(ManifestFileName))
@@ -495,7 +510,8 @@ public static class ReplayArtifactArchive
     {
         if (!string.Equals(manifest.Schema, Schema, StringComparison.Ordinal))
             throw new ReplayArtifactArchiveException($"不支持的归档 schema：{manifest.Schema}");
-        if (!string.Equals(manifest.ArchiveVersion, ArchiveVersion, StringComparison.Ordinal))
+        if (!string.Equals(manifest.ArchiveVersion, ArchiveVersion, StringComparison.Ordinal)
+            && !string.Equals(manifest.ArchiveVersion, LegacyArchiveVersion, StringComparison.Ordinal))
             throw new ReplayArtifactArchiveException($"不支持的归档版本：{manifest.ArchiveVersion}");
         if (!ArtifactIdPattern.IsMatch(manifest.ArtifactId))
             throw new ReplayArtifactArchiveException($"artifactId 格式无效：{manifest.ArtifactId}");
@@ -533,12 +549,7 @@ public static class ReplayArtifactArchive
             || !string.Equals(manifest.ServiceEntrypoint.WorkingDirectory, manifest.Content.PublishRoot, StringComparison.Ordinal)
             || !manifest.ServiceEntrypoint.Arguments.SequenceEqual(new[] { "GrandUMIServer.dll", "8081" }, StringComparer.Ordinal))
             throw new ReplayArtifactArchiveException("服务启动入口与冻结约定不一致。");
-        if (manifest.ReplayWorkerEntrypoint.Available
-            || !string.Equals(manifest.ReplayWorkerEntrypoint.Protocol, ReplayWorkerProtocol, StringComparison.Ordinal)
-            || manifest.ReplayWorkerEntrypoint.Executable is not null
-            || manifest.ReplayWorkerEntrypoint.WorkingDirectory is not null
-            || manifest.ReplayWorkerEntrypoint.Arguments.Count != 0)
-            throw new ReplayArtifactArchiveException("当前归档不得虚假声明独立 replay worker 可用。");
+        ValidateReplayWorkerEntrypoint(manifest);
         if (!string.Equals(manifest.CandidateStatus.Environment, "test", StringComparison.Ordinal)
             || manifest.CandidateStatus.ProductionRegistryEligible)
             throw new ReplayArtifactArchiveException("当前归档只能是测试服候选且不得进入生产 registry。");
@@ -578,6 +589,63 @@ public static class ReplayArtifactArchive
             if (!Sha256Pattern.IsMatch(hash))
                 throw new ReplayArtifactArchiveException($"manifest 内容哈希格式无效：{hash}");
         }
+    }
+
+    private static void ValidateReplayWorkerEntrypoint(ReplayArtifactArchiveManifest manifest)
+    {
+        var entrypoint = manifest.ReplayWorkerEntrypoint
+            ?? throw new ReplayArtifactArchiveException("归档缺少 replay worker 入口。");
+        if (!string.Equals(entrypoint.Protocol, ReplayWorkerProtocol, StringComparison.Ordinal)
+            || entrypoint.Arguments is null)
+            throw new ReplayArtifactArchiveException("replay worker 协议或参数列表无效。");
+
+        if (string.Equals(manifest.ArchiveVersion, LegacyArchiveVersion, StringComparison.Ordinal))
+        {
+            if (entrypoint.Available
+                || entrypoint.Executable is not null
+                || entrypoint.WorkingDirectory is not null
+                || entrypoint.Arguments.Count != 0)
+                throw new ReplayArtifactArchiveException("旧版归档不得声明独立 replay worker 可用。");
+            return;
+        }
+
+        if (!entrypoint.Available
+            || !string.Equals(entrypoint.Executable, ReplayWorkerExecutable, StringComparison.Ordinal)
+            || !string.Equals(
+                entrypoint.WorkingDirectory,
+                manifest.Content.PublishRoot,
+                StringComparison.Ordinal)
+            || !entrypoint.Arguments.SequenceEqual(ReplayWorkerArguments, StringComparer.Ordinal))
+            throw new ReplayArtifactArchiveException(
+                "replay worker 入口必须使用固定 dotnet、归档 payload/publish 内历史 DLL 与固定参数。");
+
+        ValidateRelativePath(entrypoint.WorkingDirectory!, "replayWorkerEntrypoint.workingDirectory");
+        if (!string.Equals(
+                entrypoint.Arguments[0],
+                Path.GetFileName(manifest.Content.EntryAssemblyPath),
+                StringComparison.Ordinal))
+            throw new ReplayArtifactArchiveException("replay worker 入口没有指向归档历史 DLL。");
+    }
+
+    internal static ReplayArtifactDescriptor CreateTestDescriptor(
+        ReplayArtifactArchiveManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        var identity = manifest.RuntimeIdentity;
+        return new ReplayArtifactDescriptor(
+            identity.MatchLogSchema,
+            identity.EventAdapterVersion,
+            identity.EngineArtifactId,
+            identity.EngineCommit,
+            identity.BinarySha256,
+            identity.RulesVersion,
+            identity.RulesetManifestHash,
+            identity.CardDbContentHash,
+            identity.RngAlgorithmVersion,
+            identity.DeterministicIdVersion,
+            identity.OpeningProtocolVersion,
+            identity.ReplayConfigSchema,
+            $"test-archive://{identity.EngineArtifactId}/payload/publish/GrandUMIServer.dll");
     }
 
     private static void CopyStableTree(string source, string destination)

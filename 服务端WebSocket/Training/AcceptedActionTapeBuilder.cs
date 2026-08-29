@@ -577,7 +577,7 @@ public static class AcceptedActionTapeBuilder
         }
     }
 
-    private static string HashTape(IReadOnlyList<AcceptedActionTapeEntry> actions, string matchId)
+    internal static string HashTape(IReadOnlyList<AcceptedActionTapeEntry> actions, string matchId)
     {
         try
         {

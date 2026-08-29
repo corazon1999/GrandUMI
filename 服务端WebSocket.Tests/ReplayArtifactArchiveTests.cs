@@ -21,7 +21,10 @@ public sealed class ReplayArtifactArchiveTests
         Assert.Equal(fixture.Identity.BinarySha256, verified.Manifest.Content.EntryAssemblySha256);
         Assert.Equal(fixture.Identity.CardDbContentHash, verified.Manifest.Content.CardDatabaseContentHash);
         Assert.Equal(fixture.Identity.RulesetManifestHash, verified.Manifest.Content.RulesetManifestHash);
-        Assert.False(verified.Manifest.ReplayWorkerEntrypoint.Available);
+        Assert.True(verified.Manifest.ReplayWorkerEntrypoint.Available);
+        Assert.Equal(
+            new[] { "GrandUMIServer.dll", "--replay-artifact", "worker-host" },
+            verified.Manifest.ReplayWorkerEntrypoint.Arguments);
         Assert.False(verified.Manifest.CandidateStatus.ProductionRegistryEligible);
         Assert.Contains(
             verified.Manifest.Content.Files,
@@ -255,6 +258,53 @@ public sealed class ReplayArtifactArchiveTests
                 fixture.RulesRoot));
 
         Assert.Contains("规则包内容", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 旧V1归档_保持可读且Worker严格Unavailable()
+    {
+        using var fixture = new ReplayArtifactTestWorkspace();
+        var result = fixture.Capture();
+        fixture.RewriteManifest(root =>
+        {
+            root["archiveVersion"] = ReplayArtifactArchive.LegacyArchiveVersion;
+            var worker = root["replayWorkerEntrypoint"]!.AsObject();
+            worker["available"] = false;
+            worker["executable"] = null;
+            worker["arguments"] = new JsonArray();
+            worker["workingDirectory"] = null;
+            worker["reason"] = "历史归档未包含独立进程 worker。";
+        });
+
+        var verified = ReplayArtifactArchive.Verify(result.ManifestPath);
+        var catalog = ReplayArtifactArchiveCatalog.Load(fixture.ArchiveRoot);
+
+        Assert.Equal(ReplayArtifactArchive.LegacyArchiveVersion, verified.Manifest.ArchiveVersion);
+        Assert.False(verified.Manifest.ReplayWorkerEntrypoint.Available);
+        Assert.Single(catalog.Archives);
+    }
+
+    [Theory]
+    [InlineData("executable", "cmd.exe")]
+    [InlineData("workingDirectory", "payload/rules")]
+    [InlineData("argument", "../../outside.dll")]
+    public void Worker入口路径或命令注入_即使重算Manifest哈希仍拒绝(
+        string field,
+        string value)
+    {
+        using var fixture = new ReplayArtifactTestWorkspace();
+        var result = fixture.Capture();
+        fixture.RewriteManifest(root =>
+        {
+            var worker = root["replayWorkerEntrypoint"]!.AsObject();
+            if (field == "argument") worker["arguments"]![0] = value;
+            else worker[field] = value;
+        });
+
+        var error = Assert.Throws<ReplayArtifactArchiveException>(
+            () => ReplayArtifactArchive.Verify(result.ManifestPath));
+
+        Assert.Contains("固定", error.Message, StringComparison.Ordinal);
     }
 
     private static string RepoPath(params string[] parts)

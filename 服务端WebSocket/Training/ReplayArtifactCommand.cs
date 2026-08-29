@@ -76,6 +76,7 @@ public static class ReplayArtifactCommand
                 "capture" => Capture(ParseOptions(args[1..])),
                 "verify" => await VerifyAsync(ParseOptions(args[1..]), cancellationToken),
                 "verify-self" => VerifySelf(ParseOptions(args[1..])),
+                "worker-host" => await RunWorkerHostAsync(args[1..], cancellationToken),
                 "audit" => await AuditAsync(ParseOptions(args[1..]), cancellationToken),
                 _ => throw new ArgumentException($"未知重放工件命令：{args[0]}")
             };
@@ -93,6 +94,7 @@ public static class ReplayArtifactCommand
         }
         catch (Exception ex) when (ex is ReplayArtifactArchiveException
             or ReplayArtifactRegistryException
+            or ArtifactReplayProcessException
             or IOException
             or UnauthorizedAccessException
             or InvalidOperationException)
@@ -144,8 +146,14 @@ public static class ReplayArtifactCommand
             : "dotnet";
         var verified = ReplayArtifactArchive.Verify(archive);
         await VerifyWithArchivedRuntimeAsync(verified, dotnet, cancellationToken);
+        if (verified.Manifest.ReplayWorkerEntrypoint.Available)
+        {
+            var worker = new ProcessArtifactReplayWorker(verified, dotnet);
+            _ = await worker.ProbeAsync(cancellationToken);
+        }
         Console.WriteLine(
-            $"重放工件归档验证通过：{verified.Manifest.ArtifactId}（文件、身份与历史运行时探针一致）");
+            $"重放工件归档验证通过：{verified.Manifest.ArtifactId}（文件、身份、历史运行时" +
+            (verified.Manifest.ReplayWorkerEntrypoint.Available ? "与 worker 握手一致）" : "一致；旧归档 worker unavailable）"));
         return 0;
     }
 
@@ -154,6 +162,15 @@ public static class ReplayArtifactCommand
         EnsureOnlyOptions(options, "archive");
         var archive = Required(options, "archive");
         var verified = ReplayArtifactArchive.Verify(archive);
+        var identity = VerifyArchivedRuntimeInCurrentProcess(verified);
+        Console.WriteLine($"历史运行时自证通过：{identity.EngineArtifactId}");
+        return 0;
+    }
+
+    internal static ReplayRuntimeIdentity VerifyArchivedRuntimeInCurrentProcess(
+        VerifiedReplayArtifactArchive verified)
+    {
+        ArgumentNullException.ThrowIfNull(verified);
         var archivedPublishRoot = Path.GetFullPath(Path.Combine(
             verified.ArchiveDirectory,
             verified.Manifest.Content.PublishRoot.Replace('/', Path.DirectorySeparatorChar)));
@@ -181,8 +198,16 @@ public static class ReplayArtifactCommand
             identity,
             archivedPublishRoot,
             rulesRoot);
-        Console.WriteLine($"历史运行时自证通过：{identity.EngineArtifactId}");
-        return 0;
+        return identity;
+    }
+
+    private static Task<int> RunWorkerHostAsync(
+        string[] remainingArgs,
+        CancellationToken cancellationToken)
+    {
+        if (remainingArgs.Length != 0)
+            throw new ArgumentException("worker-host 不接受路径或其他命令行参数。");
+        return ArtifactReplayProcessHost.RunAsync(cancellationToken);
     }
 
     private static async Task<int> AuditAsync(
@@ -196,7 +221,11 @@ public static class ReplayArtifactCommand
             "json",
             "markdown",
             "candidate-catalog",
-            "dotnet");
+            "dotnet",
+            "max-concurrency",
+            "stable-timeout-ms",
+            "worker-timeout-ms",
+            "probe-timeout-ms");
         var logs = Required(options, "logs");
         var archiveRoot = Required(options, "archive-root");
         var json = Required(options, "json");
@@ -205,19 +234,32 @@ public static class ReplayArtifactCommand
         var dotnet = options.TryGetValue("dotnet", out var configuredDotnet)
             ? configuredDotnet
             : "dotnet";
+        var defaults = ReplayCoverageExecutionOptions.Default;
+        var executionOptions = new ReplayCoverageExecutionOptions(
+            ParsePositiveInt(options, "max-concurrency", defaults.MaximumConcurrency),
+            ParsePositiveInt(options, "stable-timeout-ms", defaults.StableTimeoutMilliseconds),
+            ParsePositiveInt(options, "worker-timeout-ms", defaults.WorkerTimeoutMilliseconds),
+            ParsePositiveInt(options, "probe-timeout-ms", defaults.ProbeTimeoutMilliseconds));
+        executionOptions.Validate();
 
         var archives = ReplayArtifactArchiveCatalog.Load(archiveRoot);
         foreach (var archive in archives.Archives)
             await VerifyWithArchivedRuntimeAsync(archive, dotnet, cancellationToken);
-        var report = ReplayCoverageAudit.Generate(logs, archives);
+        var report = await ReplayCoverageAudit.GenerateAndExecuteAsync(
+            logs,
+            archives,
+            dotnet,
+            executionOptions,
+            cancellationToken);
         ReplayCoverageAudit.WriteOutputs(report, archives, json, markdown, candidateCatalog);
         Console.WriteLine(
             $"重放覆盖审计完成：日志 {report.TotalFiles}，准备层 {report.Count(ReplayCoverageStatus.PreparationReady)}，" +
-            $"独立 worker {report.Count(ReplayCoverageStatus.ReplayWorkerReady)}");
+            $"真实重放 {report.Count(ReplayCoverageStatus.ReplayVerified)}，分歧 {report.Count(ReplayCoverageStatus.ReplayDiverged)}，" +
+            $"超时 {report.Count(ReplayCoverageStatus.ReplayTimeout)}，worker 失败 {report.Count(ReplayCoverageStatus.ReplayWorkerFailed)}");
         return 0;
     }
 
-    private static ReplayRuntimeIdentity InspectRuntime(
+    internal static ReplayRuntimeIdentity InspectRuntime(
         ReplayArtifactPayloadLayout layout,
         string engineCommit)
     {
@@ -259,8 +301,8 @@ public static class ReplayArtifactCommand
 
         using var process = Process.Start(startInfo)
             ?? throw new ReplayArtifactArchiveException("无法启动归档历史运行时探针。");
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(RuntimeProbeTimeoutSeconds));
         try
@@ -269,13 +311,13 @@ public static class ReplayArtifactCommand
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            try { process.Kill(entireProcessTree: true); } catch { }
+            await TerminateRuntimeProbeAsync(process);
             throw new ReplayArtifactArchiveException(
                 $"归档历史运行时探针超过 {RuntimeProbeTimeoutSeconds} 秒，已终止。");
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch { }
+            await TerminateRuntimeProbeAsync(process);
             throw;
         }
         var stdout = await stdoutTask;
@@ -288,6 +330,32 @@ public static class ReplayArtifactCommand
             if (detail.Length > 1200) detail = detail[..1200];
             throw new ReplayArtifactArchiveException(
                 $"归档历史运行时探针失败（exit={process.ExitCode}）：{detail}");
+        }
+    }
+
+    private static async Task TerminateRuntimeProbeAsync(Process process)
+    {
+        try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        catch (Exception ex) when (ex is InvalidOperationException
+            or System.ComponentModel.Win32Exception
+            or NotSupportedException)
+        {
+            // 仍执行有界等待；若进程已竞争退出，此处是正常路径。
+        }
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (InvalidOperationException)
+        {
+            // Start 失败时没有可等待的进程。
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new ReplayArtifactArchiveException(
+                "历史运行时探针收到终止信号后 10 秒仍未退出，拒绝无限等待。",
+                ex);
         }
     }
 
@@ -313,6 +381,16 @@ public static class ReplayArtifactCommand
             ? value
             : throw new ArgumentException($"缺少必填选项 --{name}。");
 
+    private static int ParsePositiveInt(
+        IReadOnlyDictionary<string, string> options,
+        string name,
+        int defaultValue)
+        => !options.TryGetValue(name, out var value)
+            ? defaultValue
+            : int.TryParse(value, out var parsed) && parsed > 0
+                ? parsed
+                : throw new ArgumentException($"--{name} 必须是正 Int32。");
+
     private static void EnsureOnlyOptions(
         IReadOnlyDictionary<string, string> options,
         params string[] allowed)
@@ -328,6 +406,7 @@ public static class ReplayArtifactCommand
         Console.Error.WriteLine(
             "用法：GrandUMIServer --replay-artifact capture --publish-root <目录> --rules-root <目录> --archive-root <目录> --engine-commit <40位提交>\n" +
             "      GrandUMIServer --replay-artifact verify --archive <归档目录或manifest> [--dotnet <dotnet路径>]\n" +
-            "      GrandUMIServer --replay-artifact audit --logs <日志目录> --archive-root <目录> --json <文件> --markdown <文件> --candidate-catalog <文件> [--dotnet <dotnet路径>]");
+            "      GrandUMIServer --replay-artifact audit --logs <日志目录> --archive-root <目录> --json <文件> --markdown <文件> --candidate-catalog <文件> [--dotnet <dotnet路径>] [--max-concurrency <1..8>] [--worker-timeout-ms <毫秒>]\n" +
+            "      worker-host 仅供归档 manifest 的固定历史 DLL 入口调用，不接受人工路径参数。");
     }
 }

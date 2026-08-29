@@ -15,5 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\服务端WebSocket\GrandUMIServer.csproj" />
+    <ProjectReference Include="..\服务端WebSocket.ProcessWorkerFixture\GrandUMI.ProcessWorkerFixture.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

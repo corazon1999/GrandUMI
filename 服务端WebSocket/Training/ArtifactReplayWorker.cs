@@ -146,8 +146,8 @@ public sealed class ArtifactReplayExecutionResult
 /// <summary>按完整 artifact 指纹路由；同 ID 但任一哈希不同都不会启动 worker。</summary>
 public sealed class ArtifactReplayWorkerDispatcher
 {
-    public const string RequestSchema = "grandumi.artifact_replay_request.v1";
-    public const string ResponseSchema = "grandumi.artifact_replay_response.v1";
+    public const string RequestSchema = "grandumi.artifact_replay_request.v2";
+    public const string ResponseSchema = "grandumi.artifact_replay_response.v2";
     private readonly IReadOnlyDictionary<string, IArtifactReplayWorker> _workersByArtifactId;
 
     public ArtifactReplayWorkerDispatcher(IEnumerable<IArtifactReplayWorker> workers)
@@ -211,8 +211,12 @@ public sealed class ArtifactReplayWorkerDispatcher
         workerCancellation.CancelAfter(workerTimeoutMilliseconds);
         try
         {
-            var response = await worker.ExecuteAsync(request, workerCancellation.Token)
-                .WaitAsync(workerCancellation.Token);
+            var execution = worker.ExecuteAsync(request, workerCancellation.Token);
+            // 独立进程代理必须亲自完成 Kill(entireProcessTree)+有界 WaitForExit 后才能返回；
+            // 对它再套 WaitAsync 会让 dispatcher 提前结束并把清理中的子进程遗留到批次之后。
+            var response = worker is ProcessArtifactReplayWorker
+                ? await execution
+                : await execution.WaitAsync(workerCancellation.Token);
             if (workerCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 return Isolate(
                     prepared,
@@ -271,6 +275,16 @@ public sealed class ArtifactReplayWorkerDispatcher
                 sourceSeq: null,
                 request.RequestHash);
         }
+        catch (ArtifactReplayProcessException ex)
+        {
+            return Isolate(
+                prepared,
+                ex.ReasonCode,
+                "artifact_process_worker",
+                ex.Message,
+                sourceSeq: null,
+                request.RequestHash);
+        }
         catch (Exception ex)
         {
             return Isolate(
@@ -283,7 +297,7 @@ public sealed class ArtifactReplayWorkerDispatcher
         }
     }
 
-    private static ArtifactReplayWorkerRequest BuildRequest(
+    internal static ArtifactReplayWorkerRequest BuildRequest(
         PreparedReplayMatch prepared,
         string artifactFingerprint,
         int stableTimeoutMilliseconds)
@@ -331,11 +345,13 @@ public sealed class ArtifactReplayWorkerDispatcher
         var canonical = JsonSerializer.SerializeToElement(new
         {
             request.Schema,
+            request.SourceId,
             request.SourceFileHash,
             request.PreparedHash,
             request.TapeHash,
             request.RegistryVersion,
             request.RegistryHash,
+            request.Artifact,
             request.ArtifactFingerprint,
             request.Header,
             actions = request.Actions.Select(action => new
@@ -350,13 +366,13 @@ public sealed class ArtifactReplayWorkerDispatcher
                 source = action.Source.ToString().ToLowerInvariant(),
                 action.StableHash,
             }),
-            checkpointContractHash = request.CheckpointContract.StableHash,
+            request.CheckpointContract,
             request.StableTimeoutMilliseconds,
         });
         return CanonicalJson.Hash(canonical);
     }
 
-    private static bool IsValidResponseEnvelope(
+    internal static bool IsValidResponseEnvelope(
         ArtifactReplayWorkerResponse response,
         ArtifactReplayWorkerRequest request,
         IArtifactReplayWorker worker)
@@ -398,7 +414,8 @@ public sealed class ArtifactReplayWorkerDispatcher
                     verified.ArtifactFingerprint,
                     request.ArtifactFingerprint,
                     StringComparison.Ordinal)
-                && string.Equals(verified.WorkerId, worker.WorkerId, StringComparison.Ordinal);
+                && string.Equals(verified.WorkerId, worker.WorkerId, StringComparison.Ordinal)
+                && ArtifactReplayMessageValidator.IsValidVerified(request, verified);
         }
 
         var failure = response.Failure!;
@@ -409,6 +426,7 @@ public sealed class ArtifactReplayWorkerDispatcher
             || failure.ActionIndex >= 0 && failure.ActionIndex < request.Actions.Count;
         return IsValidProtocolToken(failure.ReasonCode)
             && IsValidProtocolToken(failure.Stage)
+            && failure.Message is { Length: > 0 and <= 2048 }
             && sourceSeqInRange
             && actionIndexInRange;
     }
@@ -481,6 +499,326 @@ public sealed class ArtifactReplayWorkerDispatcher
     }
 }
 
+internal static class ArtifactReplayMessageValidator
+{
+    private const int MaximumActions = 200_000;
+
+    public static bool IsValidRequest(
+        ArtifactReplayWorkerRequest? request,
+        ReplayArtifactDescriptor expectedArtifact,
+        string expectedFingerprint,
+        out string message)
+    {
+        message = "worker 请求无效";
+        try
+        {
+            if (request is null
+                || request.Artifact is null
+                || request.Header is null
+                || request.Header.Player0 is null
+                || request.Header.Player1 is null
+                || request.Header.Configuration is null
+                || request.Header.VersionIdentity is null
+                || request.Actions is null
+                || request.CheckpointContract is null
+                || request.CheckpointContract.Checkpoints is null
+                || request.CheckpointContract.Terminal is null)
+                return false;
+            if (!string.Equals(request.Schema, ArtifactReplayWorkerDispatcher.RequestSchema, StringComparison.Ordinal)
+                || !string.Equals(request.RequestHash, ArtifactReplayWorkerDispatcher.HashRequest(request), StringComparison.Ordinal)
+                || !string.Equals(request.ArtifactFingerprint, expectedFingerprint, StringComparison.Ordinal)
+                || !string.Equals(ReplayArtifactIdentity.Fingerprint(request.Artifact), expectedFingerprint, StringComparison.Ordinal)
+                || request.Artifact != expectedArtifact)
+                return false;
+            if (!IsSha256(request.RequestHash)
+                || !IsSha256(request.SourceFileHash)
+                || !IsSha256(request.PreparedHash)
+                || !IsSha256(request.TapeHash)
+                || !IsSha256(request.RegistryHash)
+                || !IsSha256(request.ArtifactFingerprint)
+                || request.SourceId is not { Length: > 0 and <= 1024 }
+                || request.RegistryVersion is not { Length: > 0 and <= 512 }
+                || request.Header.MatchId is not { Length: > 0 and <= 512 }
+                || request.Header.FirstPlayer is not 0 and not 1
+                || request.Header.Player0.Seat != 0
+                || request.Header.Player1.Seat != 1
+                || request.StableTimeoutMilliseconds is <= 0 or > 120_000
+                || request.Actions.Count > MaximumActions
+                || !VersionMatches(request.Header.VersionIdentity, expectedArtifact))
+                return false;
+
+            var canonicalActions = new List<AcceptedActionTapeEntry>(request.Actions.Count);
+            long previousOrder = 0;
+            for (var index = 0; index < request.Actions.Count; index++)
+            {
+                var action = request.Actions[index];
+                if (action is null
+                    || action.ActionIndex != index
+                    || action.OrderSeq <= previousOrder
+                    || action.SourceSeq <= 0
+                    || (action.ResultSeq is null
+                        ? action.Source != ReplayActionSource.System
+                            || action.OrderSeq != action.SourceSeq
+                        : action.ResultSeq <= 0
+                            || action.OrderSeq != action.ResultSeq
+                            || action.SourceSeq > action.ResultSeq)
+                    || action.ActorSeat is not 0 and not 1
+                    || action.Action is not { Length: > 0 and <= 256 }
+                    || action.Data.ValueKind != JsonValueKind.Object
+                    || !Enum.IsDefined(action.Source))
+                    return false;
+                var canonical = AcceptedActionCanonicalizer.Create(
+                    action.OrderSeq,
+                    action.SourceSeq,
+                    action.ResultSeq,
+                    action.ActorSeat,
+                    action.Action,
+                    action.Data,
+                    action.Source);
+                if (!string.Equals(canonical.StableHash, action.StableHash, StringComparison.Ordinal)
+                    || !canonical.Data.GetRawText().Equals(action.Data.GetRawText(), StringComparison.Ordinal))
+                    return false;
+                canonicalActions.Add(new AcceptedActionTapeEntry(
+                    canonical.OrderSeq,
+                    canonical.SourceSeq,
+                    canonical.ResultSeq,
+                    canonical.ActorSeat,
+                    canonical.Action,
+                    canonical.Data,
+                    canonical.Source,
+                    canonical.IsTrainingLabelCandidate,
+                    canonical.StableHash));
+                previousOrder = action.OrderSeq;
+            }
+
+            var tapeHash = AcceptedActionTapeBuilder.HashTape(
+                canonicalActions.AsReadOnly(),
+                request.Header.MatchId);
+            if (!string.Equals(tapeHash, request.TapeHash, StringComparison.Ordinal)
+                || !IsValidCheckpointContract(request.CheckpointContract, request.Actions))
+                return false;
+            var preparedHash = ReplayMatchPreparation.HashPrepared(
+                request.SourceFileHash,
+                request.Header,
+                request.Artifact,
+                request.TapeHash,
+                request.CheckpointContract.StableHash,
+                request.RegistryHash);
+            if (!string.Equals(preparedHash, request.PreparedHash, StringComparison.Ordinal))
+                return false;
+            message = string.Empty;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidDataException
+            or InvalidOperationException
+            or ArgumentException
+            or JsonException)
+        {
+            message = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool IsValidVerified(
+        ArtifactReplayWorkerRequest request,
+        VerifiedArtifactReplay verified)
+    {
+        if (verified.Checkpoints.Count != request.Actions.Count + 2) return false;
+        for (var index = 0; index < verified.Checkpoints.Count; index++)
+        {
+            var actual = verified.Checkpoints[index];
+            var expected = request.CheckpointContract.Checkpoints[index];
+            var expectedActionIndex = index == 0
+                ? -1
+                : index == verified.Checkpoints.Count - 1
+                    ? request.Actions.Count
+                    : index - 1;
+            var action = index > 0 && index <= request.Actions.Count
+                ? request.Actions[index - 1]
+                : null;
+            if (actual.Position != expected.Position
+                || actual.ActionIndex != expectedActionIndex
+                || actual.ActionOrderSeq != action?.OrderSeq
+                || !string.Equals(actual.ActionStableHash, action?.StableHash, StringComparison.Ordinal)
+                || !string.Equals(actual.StateDigest, expected.StateDigest, StringComparison.Ordinal)
+                || !string.Equals(actual.PublicStateDigest, expected.PublicStateDigest, StringComparison.Ordinal)
+                || !string.Equals(actual.RandomTraceDigest, expected.RandomTraceDigest, StringComparison.Ordinal)
+                || actual.RandomEventCount != expected.RandomEventCount
+                || !string.Equals(actual.StableHash, HashVerifiedCheckpoint(actual), StringComparison.Ordinal))
+                return false;
+        }
+
+        var expectedTerminal = request.CheckpointContract.Terminal;
+        var expectedCategory = ReplayTerminalSemantics.ReasonCategory(
+            expectedTerminal.Reason,
+            expectedTerminal.IsDraw);
+        var actualCategory = ReplayTerminalSemantics.ReasonCategory(
+            verified.Terminal.Reason,
+            verified.Terminal.IsDraw);
+        if (verified.Terminal.WinnerIndex != expectedTerminal.WinnerIndex
+            || verified.Terminal.IsDraw != expectedTerminal.IsDraw
+            || verified.Terminal.TurnCount != expectedTerminal.TurnCount
+            || !string.Equals(actualCategory, expectedCategory, StringComparison.Ordinal)
+            || (string.Equals(actualCategory, "unclassified", StringComparison.Ordinal)
+                && !string.Equals(verified.Terminal.Reason, expectedTerminal.Reason, StringComparison.Ordinal))
+            || !string.Equals(
+                verified.Terminal.StableHash,
+                HashVerifiedTerminal(verified.Terminal),
+                StringComparison.Ordinal))
+            return false;
+
+        var replayDigest = HashReplayDigest(request, verified.Checkpoints, verified.Terminal);
+        return string.Equals(verified.ReplayDigest, replayDigest, StringComparison.Ordinal)
+            && string.Equals(
+                verified.StableHash,
+                HashVerifiedReplay(replayDigest, verified.WorkerId, request.CheckpointContract.StableHash),
+                StringComparison.Ordinal);
+    }
+
+    public static string HashVerifiedCheckpoint(VerifiedReplayCheckpoint checkpoint)
+        => CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            position = ReplayCheckpointContractParser.PositionName(checkpoint.Position),
+            checkpoint.ActionIndex,
+            checkpoint.ActionOrderSeq,
+            checkpoint.ActionStableHash,
+            checkpoint.StateDigest,
+            checkpoint.PublicStateDigest,
+            checkpoint.RandomTraceDigest,
+            checkpoint.RandomEventCount,
+        }));
+
+    public static string HashVerifiedTerminal(VerifiedReplayTerminal terminal)
+        => CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            terminal.WinnerIndex,
+            terminal.IsDraw,
+            reasonCategory = ReplayTerminalSemantics.ReasonCategory(
+                terminal.Reason,
+                terminal.IsDraw),
+            terminal.TurnCount,
+        }));
+
+    public static string HashReplayDigest(
+        ArtifactReplayWorkerRequest request,
+        IReadOnlyList<VerifiedReplayCheckpoint> checkpoints,
+        VerifiedReplayTerminal terminal)
+        => CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            request.SourceFileHash,
+            request.PreparedHash,
+            request.RegistryHash,
+            request.ArtifactFingerprint,
+            request.RequestHash,
+            checkpointHashes = checkpoints.Select(checkpoint => checkpoint.StableHash),
+            terminalHash = terminal.StableHash,
+        }));
+
+    public static string HashVerifiedReplay(
+        string replayDigest,
+        string workerId,
+        string checkpointContractHash)
+        => CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            replayDigest,
+            workerId,
+            checkpointContractHash,
+        }));
+
+    private static bool IsValidCheckpointContract(
+        ExpectedReplayCheckpointContract contract,
+        IReadOnlyList<ArtifactReplayAction> actions)
+    {
+        if (!string.Equals(contract.Schema, ReplayCheckpointContractParser.Schema, StringComparison.Ordinal)
+            || contract.Checkpoints.Count != actions.Count + 2
+            || contract.Checkpoints.Count < 2
+            || contract.Terminal.Reason is not { Length: <= 2048 }
+            || contract.Terminal.TurnCount < 0
+            || contract.Terminal.WinnerIndex is not null and not 0 and not 1
+            || contract.Terminal.IsDraw == contract.Terminal.WinnerIndex.HasValue
+            || !string.Equals(
+                contract.Terminal.StableHash,
+                ReplayCheckpointContractParser.HashTerminal(contract.Terminal),
+                StringComparison.Ordinal))
+            return false;
+        long previousSourceSeq = 0;
+        var previousRandomEventCount = 0;
+        for (var index = 0; index < contract.Checkpoints.Count; index++)
+        {
+            var checkpoint = contract.Checkpoints[index];
+            if (checkpoint is null
+                || checkpoint.SourceSeq <= previousSourceSeq
+                || checkpoint.RandomEventCount < 0
+                || checkpoint.RandomEventCount < previousRandomEventCount
+                || !IsSha256(checkpoint.StateDigest)
+                || !IsSha256(checkpoint.PublicStateDigest)
+                || !IsSha256(checkpoint.RandomTraceDigest)
+                || !string.Equals(
+                    checkpoint.StableHash,
+                    ReplayCheckpointContractParser.HashCheckpoint(
+                        checkpoint.Position,
+                        checkpoint.SourceSeq,
+                        checkpoint.ActionOrderSeq,
+                        checkpoint.ActionStableHash,
+                        checkpoint.StateDigest,
+                        checkpoint.PublicStateDigest,
+                        checkpoint.RandomTraceDigest,
+                        checkpoint.RandomEventCount),
+                    StringComparison.Ordinal))
+                return false;
+            if (index == 0
+                && (checkpoint.Position != ReplayCheckpointPosition.Opening
+                    || checkpoint.ActionOrderSeq is not null
+                    || checkpoint.ActionStableHash is not null
+                    || actions.Count > 0 && checkpoint.SourceSeq >= actions[0].SourceSeq))
+                return false;
+            if (index > 0 && index <= actions.Count)
+            {
+                var action = actions[index - 1];
+                if (checkpoint.Position != ReplayCheckpointPosition.AfterAction
+                    || checkpoint.ActionOrderSeq != action.OrderSeq
+                    || !string.Equals(checkpoint.ActionStableHash, action.StableHash, StringComparison.Ordinal)
+                    || checkpoint.SourceSeq <= action.OrderSeq
+                    || index < actions.Count
+                        && checkpoint.SourceSeq >= actions[index].SourceSeq)
+                    return false;
+            }
+            if (index == contract.Checkpoints.Count - 1
+                && (checkpoint.Position != ReplayCheckpointPosition.Terminal
+                    || checkpoint.ActionOrderSeq is not null
+                    || checkpoint.ActionStableHash is not null))
+                return false;
+            previousSourceSeq = checkpoint.SourceSeq;
+            previousRandomEventCount = checkpoint.RandomEventCount;
+        }
+        return string.Equals(
+            contract.StableHash,
+            ReplayCheckpointContractParser.HashContract(contract.Checkpoints, contract.Terminal),
+            StringComparison.Ordinal);
+    }
+
+    private static bool VersionMatches(
+        ReplayVersionIdentity identity,
+        ReplayArtifactDescriptor artifact)
+        => string.Equals(identity.MatchLogSchema, artifact.MatchLogSchema, StringComparison.Ordinal)
+            && string.Equals(identity.EventAdapterVersion, artifact.EventAdapterVersion, StringComparison.Ordinal)
+            && string.Equals(identity.EngineArtifactId, artifact.EngineArtifactId, StringComparison.Ordinal)
+            && string.Equals(identity.EngineCommit, artifact.EngineCommit, StringComparison.Ordinal)
+            && string.Equals(identity.BinarySha256, artifact.BinarySha256, StringComparison.Ordinal)
+            && string.Equals(identity.RulesVersion, artifact.RulesVersion, StringComparison.Ordinal)
+            && string.Equals(identity.RulesetManifestHash, artifact.RulesetManifestHash, StringComparison.Ordinal)
+            && string.Equals(identity.CardDbContentHash, artifact.CardDbContentHash, StringComparison.Ordinal)
+            && string.Equals(identity.RngAlgorithmVersion, artifact.RngAlgorithmVersion, StringComparison.Ordinal)
+            && string.Equals(identity.DeterministicIdVersion, artifact.DeterministicIdVersion, StringComparison.Ordinal)
+            && string.Equals(identity.OpeningProtocolVersion, artifact.OpeningProtocolVersion, StringComparison.Ordinal)
+            && string.Equals(identity.ReplayConfigSchema, artifact.ReplayConfigSchema, StringComparison.Ordinal);
+
+    private static bool IsSha256(string? value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.AsSpan(7).ToArray().All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+}
+
 /// <summary>当前进程内的可替换实现；生产是否可用仍完全由不可变 registry + 显式登记决定。</summary>
 public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
 {
@@ -527,19 +865,16 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
         ArtifactReplayWorkerRequest request,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(request.Schema, ArtifactReplayWorkerDispatcher.RequestSchema, StringComparison.Ordinal)
-            || !string.Equals(request.RequestHash, ArtifactReplayWorkerDispatcher.HashRequest(request), StringComparison.Ordinal)
-            || !string.Equals(request.ArtifactFingerprint, ArtifactFingerprint, StringComparison.Ordinal)
-            || !string.Equals(
-                ReplayArtifactIdentity.Fingerprint(request.Artifact),
+        if (!ArtifactReplayMessageValidator.IsValidRequest(
+                request,
+                _artifact,
                 ArtifactFingerprint,
-                StringComparison.Ordinal)
-            || !string.Equals(request.Artifact.EngineArtifactId, EngineArtifactId, StringComparison.Ordinal))
+                out var validationMessage))
             return Failure(
                 request,
                 ReplayQuarantineCodes.WorkerArtifactMismatch,
                 "artifact_worker",
-                "请求 schema/hash/工件指纹与本 worker 不一致",
+                $"请求 schema/hash/工件指纹或 lineage 与本 worker 不一致：{validationMessage}",
                 sourceSeq: null,
                 actionIndex: null);
 
@@ -561,6 +896,7 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
                 configuredEngine =>
                 {
                     configuredEngine.EnablePrivateSnapshotLog = false;
+                    configuredEngine.State.SuppressExternalProfileLookups = true;
                     configuredEngine.OnMatchLog = (kind, actor, payload) =>
                     {
                         if (!string.Equals(kind, "random_event", StringComparison.Ordinal)) return;
@@ -700,18 +1036,7 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
                 request.Header.MatchId,
                 expected.SourceSeq);
 
-        var canonical = JsonSerializer.SerializeToElement(new
-        {
-            position = ReplayCheckpointContractParser.PositionName(context.Position),
-            context.ActionIndex,
-            context.ActionOrderSeq,
-            context.ActionStableHash,
-            actual.StateDigest,
-            actual.PublicStateDigest,
-            actual.RandomTraceDigest,
-            actual.RandomEventCount,
-        });
-        return new VerifiedReplayCheckpoint(
+        var checkpoint = new VerifiedReplayCheckpoint(
             context.Position,
             context.ActionIndex,
             context.ActionOrderSeq,
@@ -720,7 +1045,11 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
             actual.PublicStateDigest,
             actual.RandomTraceDigest,
             actual.RandomEventCount,
-            CanonicalJson.Hash(canonical));
+            StableHash: string.Empty);
+        return checkpoint with
+        {
+            StableHash = ArtifactReplayMessageValidator.HashVerifiedCheckpoint(checkpoint),
+        };
     }
 
     private static VerifiedReplayTerminal VerifyTerminal(
@@ -760,23 +1089,10 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
         IReadOnlyList<VerifiedReplayCheckpoint> checkpoints,
         VerifiedReplayTerminal terminal)
     {
-        var replayCanonical = JsonSerializer.SerializeToElement(new
-        {
-            request.SourceFileHash,
-            request.PreparedHash,
-            request.RegistryHash,
-            request.ArtifactFingerprint,
-            request.RequestHash,
-            checkpointHashes = checkpoints.Select(checkpoint => checkpoint.StableHash),
-            terminalHash = terminal.StableHash,
-        });
-        var replayDigest = CanonicalJson.Hash(replayCanonical);
-        var stableCanonical = JsonSerializer.SerializeToElement(new
-        {
-            replayDigest,
-            WorkerId,
-            request.CheckpointContract.StableHash,
-        });
+        var replayDigest = ArtifactReplayMessageValidator.HashReplayDigest(
+            request,
+            checkpoints,
+            terminal);
         return new VerifiedArtifactReplay(
             request.SourceId,
             request.SourceFileHash,
@@ -793,7 +1109,10 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
             Array.AsReadOnly(checkpoints.ToArray()),
             terminal,
             replayDigest,
-            CanonicalJson.Hash(stableCanonical));
+            ArtifactReplayMessageValidator.HashVerifiedReplay(
+                replayDigest,
+                WorkerId,
+                request.CheckpointContract.StableHash));
     }
 
     private ArtifactReplayWorkerResponse Success(
@@ -827,7 +1146,7 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
         var failure = new ArtifactReplayWorkerFailure(
             reasonCode,
             stage,
-            message,
+            SanitizeFailureMessage(message),
             sourceSeq,
             actionIndex);
         return new ArtifactReplayWorkerResponse(
@@ -843,6 +1162,16 @@ public sealed class InProcessArtifactReplayWorker : IArtifactReplayWorker
                 WorkerId,
                 verified: null,
                 failure));
+    }
+
+    private static string SanitizeFailureMessage(string? message)
+    {
+        var value = (message ?? string.Empty)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+        if (value.Length == 0) return "worker 未提供失败详情";
+        return value.Length <= 2048 ? value : value[..2048];
     }
 
     private static ReplayQuarantineException Mismatch(

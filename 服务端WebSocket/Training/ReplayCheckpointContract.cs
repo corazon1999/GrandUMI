@@ -182,6 +182,15 @@ internal static class ReplayCheckpointContractParser
         AcceptedActionTape tape,
         AdaptedMatchLog log)
     {
+        for (var index = 1; index < checkpoints.Count; index++)
+        {
+            if (checkpoints[index].RandomEventCount < checkpoints[index - 1].RandomEventCount)
+                throw Quarantine(
+                    "checkpoint 的累计随机事件数不得回退",
+                    log.Header.MatchId,
+                    checkpoints[index].SourceSeq);
+        }
+
         if (checkpoints[0].Position != ReplayCheckpointPosition.Opening
             || checkpoints[0].ActionOrderSeq is not null
             || checkpoints[0].ActionStableHash is not null)
@@ -293,7 +302,7 @@ internal static class ReplayCheckpointContractParser
             CanonicalJson.Hash(canonical));
     }
 
-    private static string HashCheckpoint(
+    internal static string HashCheckpoint(
         ReplayCheckpointPosition position,
         long sourceSeq,
         long? actionOrderSeq,
@@ -318,7 +327,7 @@ internal static class ReplayCheckpointContractParser
         return CanonicalJson.Hash(canonical);
     }
 
-    private static string HashContract(
+    internal static string HashContract(
         IReadOnlyList<ExpectedReplayCheckpoint> checkpoints,
         ExpectedReplayTerminal terminal)
     {
@@ -357,6 +366,15 @@ internal static class ReplayCheckpointContractParser
             ReplayCheckpointPosition.Terminal => "terminal",
             _ => throw new ArgumentOutOfRangeException(nameof(position)),
         };
+
+    internal static string HashTerminal(ExpectedReplayTerminal terminal)
+        => CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            winnerIndex = terminal.WinnerIndex,
+            isDraw = terminal.IsDraw,
+            reason = terminal.Reason,
+            turnCount = terminal.TurnCount,
+        }));
 
     private static string RequiredSha256(
         JsonElement element,

@@ -33,7 +33,10 @@ public sealed class ReplayCoverageAuditTests
         Assert.Equal(1, first.Count(ReplayCoverageStatus.IdentityMismatch));
         Assert.Equal(1, first.Count(ReplayCoverageStatus.ArtifactNotArchived));
         Assert.Equal(1, first.Count(ReplayCoverageStatus.PreparationReady));
-        Assert.Equal(0, first.Count(ReplayCoverageStatus.ReplayWorkerReady));
+        Assert.Equal(0, first.Count(ReplayCoverageStatus.ReplayVerified));
+        Assert.Equal(0, first.Count(ReplayCoverageStatus.ReplayDiverged));
+        Assert.Equal(0, first.Count(ReplayCoverageStatus.ReplayTimeout));
+        Assert.Equal(0, first.Count(ReplayCoverageStatus.ReplayWorkerFailed));
         Assert.Equal(1, first.Count(ReplayCoverageStatus.InvalidLog));
         Assert.Equal(first.ReportHash, second.ReportHash);
         Assert.Equal(
@@ -75,10 +78,11 @@ public sealed class ReplayCoverageAuditTests
         Assert.Equal(firstMarkdown, File.ReadAllBytes(markdown));
         Assert.Equal(firstCandidates, File.ReadAllBytes(candidates));
         Assert.Equal(productionBefore, File.ReadAllBytes(productionRegistry));
-        Assert.Contains("| `replay_worker_ready` | 0 |", File.ReadAllText(markdown), StringComparison.Ordinal);
+        Assert.Contains("| `replay_verified` | 0 |", File.ReadAllText(markdown), StringComparison.Ordinal);
         var candidateRoot = JsonNode.Parse(File.ReadAllText(candidates))!.AsObject();
         Assert.Equal(ReplayCoverageAudit.CandidateCatalogSchema, candidateRoot["schema"]!.GetValue<string>());
         Assert.False(candidateRoot["productionRegistryModified"]!.GetValue<bool>());
+        Assert.True(candidateRoot["artifacts"]![0]!["replayWorkerDeclaredAvailable"]!.GetValue<bool>());
         Assert.False(candidateRoot["artifacts"]![0]!["replayWorkerAvailable"]!.GetValue<bool>());
         Assert.False(candidateRoot["artifacts"]![0]!["productionRegistryEligible"]!.GetValue<bool>());
     }
@@ -95,7 +99,7 @@ public sealed class ReplayCoverageAuditTests
         Assert.All(report.Summary, item => Assert.Equal(0, item.Count));
         Assert.Empty(report.Entries);
         Assert.Contains(
-            "| 可进入独立 replay worker | `replay_worker_ready` | 0 |",
+            "| 真实重放验证通过 | `replay_verified` | 0 |",
             ReplayCoverageAudit.BuildMarkdown(report),
             StringComparison.Ordinal);
     }

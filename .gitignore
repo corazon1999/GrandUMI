@@ -31,6 +31,8 @@ crashlytics-build.properties
 服务端WebSocket/Data/
 服务端WebSocket/MatchLogs/
 服务端WebSocket/releases/
+服务端WebSocket.ProcessWorkerFixture/bin/
+服务端WebSocket.ProcessWorkerFixture/obj/
 *.user
 *.suo
 

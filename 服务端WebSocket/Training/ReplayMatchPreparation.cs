@@ -45,7 +45,9 @@ public static class ReplayQuarantineCodes
     public const string MissingCheckpointContract = "missing_checkpoint_contract";
     public const string WorkerNotRegistered = "worker_not_registered";
     public const string WorkerArtifactMismatch = "worker_artifact_mismatch";
+    public const string WorkerInputTooLarge = "worker_input_too_large";
     public const string WorkerProtocolMismatch = "worker_protocol_mismatch";
+    public const string WorkerTerminationFailed = "worker_termination_failed";
     public const string WorkerTimeout = "worker_timeout";
     public const string WorkerCancelled = "worker_cancelled";
     public const string WorkerFailure = "worker_failure";
@@ -217,10 +219,25 @@ public static class ReplayMatchPreparation
         AcceptedActionTape tape,
         ExpectedReplayCheckpointContract? checkpointContract,
         string registryHash)
+        => HashPrepared(
+            log.SourceFileHash,
+            log.Header,
+            artifact,
+            tape.StableHash,
+            checkpointContract?.StableHash,
+            registryHash);
+
+    internal static string HashPrepared(
+        string sourceFileHash,
+        ReplayMatchHeader header,
+        ReplayArtifactDescriptor artifact,
+        string tapeHash,
+        string? checkpointContractHash,
+        string registryHash)
     {
         var canonical = JsonSerializer.SerializeToElement(new
         {
-            log.SourceFileHash,
+            SourceFileHash = sourceFileHash,
             registryHash,
             artifact.EngineArtifactId,
             artifact.EngineCommit,
@@ -232,17 +249,17 @@ public static class ReplayMatchPreparation
             artifact.DeterministicIdVersion,
             artifact.OpeningProtocolVersion,
             artifact.ReplayConfigSchema,
-            matchId = log.Header.MatchId,
-            log.Header.RngSeed,
-            log.Header.FirstPlayer,
-            player0DeckHash = CanonicalJson.Sha256Utf8(log.Header.Player0.DeckRaw),
-            player1DeckHash = CanonicalJson.Sha256Utf8(log.Header.Player1.DeckRaw),
-            log.Header.Player0.AlwaysPromptOnLifeReveal,
-            player1AlwaysPromptOnLifeReveal = log.Header.Player1.AlwaysPromptOnLifeReveal,
-            log.Header.Configuration.LeaderKeywordWildcard,
-            log.Header.Configuration.OpeningSetupAfterFirstPlayerChoice,
-            tape.StableHash,
-            checkpointContractHash = checkpointContract?.StableHash ?? string.Empty,
+            matchId = header.MatchId,
+            header.RngSeed,
+            header.FirstPlayer,
+            player0DeckHash = CanonicalJson.Sha256Utf8(header.Player0.DeckRaw),
+            player1DeckHash = CanonicalJson.Sha256Utf8(header.Player1.DeckRaw),
+            header.Player0.AlwaysPromptOnLifeReveal,
+            player1AlwaysPromptOnLifeReveal = header.Player1.AlwaysPromptOnLifeReveal,
+            header.Configuration.LeaderKeywordWildcard,
+            header.Configuration.OpeningSetupAfterFirstPlayerChoice,
+            StableHash = tapeHash,
+            checkpointContractHash = checkpointContractHash ?? string.Empty,
         });
         return CanonicalJson.Hash(canonical);
     }

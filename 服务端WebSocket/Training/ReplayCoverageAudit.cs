@@ -12,7 +12,10 @@ public static class ReplayCoverageStatus
     public const string IdentityMismatch = "identity_mismatch";
     public const string ArtifactNotArchived = "artifact_not_archived";
     public const string PreparationReady = "preparation_ready";
-    public const string ReplayWorkerReady = "replay_worker_ready";
+    public const string ReplayVerified = "replay_verified";
+    public const string ReplayDiverged = "replay_diverged";
+    public const string ReplayTimeout = "replay_timeout";
+    public const string ReplayWorkerFailed = "replay_worker_failed";
     public const string InvalidLog = "invalid_log";
 
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(new[]
@@ -23,7 +26,10 @@ public static class ReplayCoverageStatus
         IdentityMismatch,
         ArtifactNotArchived,
         PreparationReady,
-        ReplayWorkerReady,
+        ReplayVerified,
+        ReplayDiverged,
+        ReplayTimeout,
+        ReplayWorkerFailed,
         InvalidLog,
     });
 }
@@ -36,15 +42,24 @@ public sealed record ReplayCoverageEntry(
     string Status,
     string ReasonCode,
     string Stage,
+    string? ReplayDigest,
     string StableHash);
 
 public sealed record ReplayCoverageSummary(string Status, int Count);
+
+public sealed record ReplayCoverageWorkerArtifact(
+    string ArtifactId,
+    bool EntrypointAvailable,
+    bool HandshakeVerified,
+    string ReasonCode,
+    string StableHash);
 
 public sealed record ReplayCoverageReport(
     string Schema,
     string ArchiveCatalogHash,
     int TotalFiles,
     IReadOnlyList<ReplayCoverageSummary> Summary,
+    IReadOnlyList<ReplayCoverageWorkerArtifact> WorkerArtifacts,
     IReadOnlyList<ReplayCoverageEntry> Entries,
     string ReportHash)
 {
@@ -58,7 +73,9 @@ public sealed record ReplayTestCandidateArtifact(
     string ManifestHash,
     string ArchiveDirectoryName,
     ReplayRuntimeIdentity RuntimeIdentity,
+    bool ReplayWorkerDeclaredAvailable,
     bool ReplayWorkerAvailable,
+    string ReplayWorkerAvailabilityReason,
     bool ProductionRegistryEligible,
     string Reason);
 
@@ -70,6 +87,31 @@ public sealed record ReplayTestCandidateCatalog(
     string ArchiveCatalogHash,
     IReadOnlyList<ReplayTestCandidateArtifact> Artifacts,
     string CatalogHash);
+
+public sealed record ReplayCoverageExecutionOptions(
+    int MaximumConcurrency,
+    int StableTimeoutMilliseconds,
+    int WorkerTimeoutMilliseconds,
+    int ProbeTimeoutMilliseconds)
+{
+    public static ReplayCoverageExecutionOptions Default { get; } = new(
+        MaximumConcurrency: 2,
+        StableTimeoutMilliseconds: 15_000,
+        WorkerTimeoutMilliseconds: 120_000,
+        ProbeTimeoutMilliseconds: 45_000);
+
+    internal void Validate()
+    {
+        if (MaximumConcurrency is <= 0 or > 8)
+            throw new ArgumentOutOfRangeException(nameof(MaximumConcurrency), "批量并发必须在 1..8。 ");
+        if (StableTimeoutMilliseconds is <= 0 or > 120_000)
+            throw new ArgumentOutOfRangeException(nameof(StableTimeoutMilliseconds));
+        if (WorkerTimeoutMilliseconds is <= 0 or > 15 * 60_000)
+            throw new ArgumentOutOfRangeException(nameof(WorkerTimeoutMilliseconds));
+        if (ProbeTimeoutMilliseconds is <= 0 or > 5 * 60_000)
+            throw new ArgumentOutOfRangeException(nameof(ProbeTimeoutMilliseconds));
+    }
+}
 
 /// <summary>只接纳完整验证通过的最终目录；.staging 永远不参与取回或覆盖统计。</summary>
 public sealed class ReplayArtifactArchiveCatalog
@@ -175,22 +217,22 @@ public sealed class ReplayArtifactArchiveCatalog
             registryVersion = "test-archive-catalog-" + catalogHash["sha256:".Length..],
             artifacts = archives.Select(archive =>
             {
-                var identity = archive.Manifest.RuntimeIdentity;
+                var descriptor = ReplayArtifactArchive.CreateTestDescriptor(archive.Manifest);
                 return new
                 {
-                    matchLogSchema = identity.MatchLogSchema,
-                    eventAdapterVersion = identity.EventAdapterVersion,
-                    engineArtifactId = identity.EngineArtifactId,
-                    engineCommit = identity.EngineCommit,
-                    binarySha256 = identity.BinarySha256,
-                    rulesVersion = identity.RulesVersion,
-                    rulesetManifestHash = identity.RulesetManifestHash,
-                    cardDbContentHash = identity.CardDbContentHash,
-                    rngAlgorithmVersion = identity.RngAlgorithmVersion,
-                    deterministicIdVersion = identity.DeterministicIdVersion,
-                    openingProtocolVersion = identity.OpeningProtocolVersion,
-                    replayConfigSchema = identity.ReplayConfigSchema,
-                    executable = $"test-archive://{identity.EngineArtifactId}/payload/publish/GrandUMIServer.dll",
+                    matchLogSchema = descriptor.MatchLogSchema,
+                    eventAdapterVersion = descriptor.EventAdapterVersion,
+                    engineArtifactId = descriptor.EngineArtifactId,
+                    engineCommit = descriptor.EngineCommit,
+                    binarySha256 = descriptor.BinarySha256,
+                    rulesVersion = descriptor.RulesVersion,
+                    rulesetManifestHash = descriptor.RulesetManifestHash,
+                    cardDbContentHash = descriptor.CardDbContentHash,
+                    rngAlgorithmVersion = descriptor.RngAlgorithmVersion,
+                    deterministicIdVersion = descriptor.DeterministicIdVersion,
+                    openingProtocolVersion = descriptor.OpeningProtocolVersion,
+                    replayConfigSchema = descriptor.ReplayConfigSchema,
+                    executable = descriptor.Executable,
                 };
             }).ToArray(),
         })!.AsObject();
@@ -202,8 +244,8 @@ public sealed class ReplayArtifactArchiveCatalog
 /// <summary>稳定、无时间戳的 JSON/Markdown 对局覆盖审计。</summary>
 public static class ReplayCoverageAudit
 {
-    public const string ReportSchema = "grandumi.replay_coverage_report.v1";
-    public const string CandidateCatalogSchema = "grandumi.test_replay_artifact_candidates.v1";
+    public const string ReportSchema = "grandumi.replay_coverage_report.v2";
+    public const string CandidateCatalogSchema = "grandumi.test_replay_artifact_candidates.v2";
     private const long MaximumLogBytes = 64L * 1024 * 1024;
 
     public static ReplayCoverageReport Generate(
@@ -217,17 +259,242 @@ public static class ReplayCoverageAudit
             .Select(source => Classify(source.FullPath, source.SourceId, archives))
             .OrderBy(entry => entry.SourceId, StringComparer.Ordinal)
             .ToArray();
+        var workers = archives.Archives
+            .Select(archive => WorkerArtifact(
+                archive.Manifest.ArtifactId,
+                archive.Manifest.ReplayWorkerEntrypoint.Available,
+                handshakeVerified: false,
+                archive.Manifest.ReplayWorkerEntrypoint.Available
+                    ? "worker_not_probed"
+                    : ReplayQuarantineCodes.WorkerNotRegistered))
+            .OrderBy(worker => worker.ArtifactId, StringComparer.Ordinal)
+            .ToArray();
+        return BuildReport(archives.CatalogHash, entries, workers);
+    }
+
+    public static async Task<ReplayCoverageReport> GenerateAndExecuteAsync(
+        string matchLogPath,
+        ReplayArtifactArchiveCatalog archives,
+        string? trustedDotnetExecutable = null,
+        ReplayCoverageExecutionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(matchLogPath);
+        ArgumentNullException.ThrowIfNull(archives);
+        options ??= ReplayCoverageExecutionOptions.Default;
+        options.Validate();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var baseline = Generate(matchLogPath, archives);
+        var processWorkers = new Dictionary<string, ProcessArtifactReplayWorker>(StringComparer.Ordinal);
+        var workerArtifacts = new List<ReplayCoverageWorkerArtifact>(archives.Archives.Count);
+        foreach (var archive in archives.Archives.OrderBy(
+                     item => item.Manifest.ArtifactId,
+                     StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!archive.Manifest.ReplayWorkerEntrypoint.Available)
+            {
+                workerArtifacts.Add(WorkerArtifact(
+                    archive.Manifest.ArtifactId,
+                    entrypointAvailable: false,
+                    handshakeVerified: false,
+                    ReplayQuarantineCodes.WorkerNotRegistered));
+                continue;
+            }
+
+            try
+            {
+                var worker = new ProcessArtifactReplayWorker(
+                    archive,
+                    trustedDotnetExecutable,
+                    TimeSpan.FromMilliseconds(options.WorkerTimeoutMilliseconds));
+                _ = await worker.ProbeAsync(
+                    TimeSpan.FromMilliseconds(options.ProbeTimeoutMilliseconds),
+                    cancellationToken);
+                processWorkers.Add(archive.Manifest.ArtifactId, worker);
+                workerArtifacts.Add(WorkerArtifact(
+                    archive.Manifest.ArtifactId,
+                    entrypointAvailable: true,
+                    handshakeVerified: true,
+                    "worker_handshake_verified"));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is ArtifactReplayProcessException
+                or ReplayArtifactArchiveException
+                or IOException
+                or UnauthorizedAccessException)
+            {
+                throw new ReplayArtifactArchiveException(
+                    $"归档声明 worker 可用但历史 DLL 自检/握手失败：{archive.Manifest.ArtifactId}；{ex.Message}",
+                    ex);
+            }
+        }
+
+        if (baseline.Entries.All(entry =>
+                !string.Equals(entry.Status, ReplayCoverageStatus.PreparationReady, StringComparison.Ordinal)))
+            return BuildReport(archives.CatalogHash, baseline.Entries, workerArtifacts);
+
+        var refreshedSources = EnumerateLogSources(matchLogPath);
+        var baselineSourceIds = baseline.Entries
+            .Select(entry => entry.SourceId)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var refreshedSourceIds = refreshedSources
+            .Select(source => source.SourceId)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!baselineSourceIds.SequenceEqual(refreshedSourceIds, StringComparer.Ordinal))
+            throw new ReplayArtifactArchiveException(
+                "批量执行期间日志文件集合发生变化，拒绝生成跨两个目录快照的部分报告。");
+        var sources = refreshedSources.ToDictionary(source => source.SourceId, StringComparer.Ordinal);
+        var dispatcher = new ArtifactReplayWorkerDispatcher(processWorkers.Values);
+        using var semaphore = new SemaphoreSlim(options.MaximumConcurrency, options.MaximumConcurrency);
+        using var batchCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        async Task<ReplayCoverageEntry> RunEntryAsync(ReplayCoverageEntry entry)
+        {
+            try
+            {
+                return await ExecutePreparedEntryAsync(
+                    entry,
+                    sources,
+                    archives,
+                    processWorkers,
+                    dispatcher,
+                    semaphore,
+                    options,
+                    batchCancellation.Token);
+            }
+            catch
+            {
+                try { batchCancellation.Cancel(); } catch (ObjectDisposedException) { }
+                throw;
+            }
+        }
+
+        var entries = await Task.WhenAll(baseline.Entries.Select(RunEntryAsync));
+        cancellationToken.ThrowIfCancellationRequested();
+        return BuildReport(archives.CatalogHash, entries, workerArtifacts);
+    }
+
+    private static async Task<ReplayCoverageEntry> ExecutePreparedEntryAsync(
+        ReplayCoverageEntry entry,
+        IReadOnlyDictionary<string, LogSource> sources,
+        ReplayArtifactArchiveCatalog archives,
+        IReadOnlyDictionary<string, ProcessArtifactReplayWorker> processWorkers,
+        ArtifactReplayWorkerDispatcher dispatcher,
+        SemaphoreSlim semaphore,
+        ReplayCoverageExecutionOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(entry.Status, ReplayCoverageStatus.PreparationReady, StringComparison.Ordinal))
+            return entry;
+        if (entry.ArtifactId is null
+            || !archives.ByArtifactId.TryGetValue(entry.ArtifactId, out var archive))
+            throw new ReplayArtifactArchiveException("准备层条目丢失对应归档，拒绝生成部分报告。");
+        if (!archive.Manifest.ReplayWorkerEntrypoint.Available)
+            return entry;
+        if (!processWorkers.ContainsKey(entry.ArtifactId))
+            throw new ReplayArtifactArchiveException("已握手 worker 未进入受控 dispatcher。");
+        if (!sources.TryGetValue(entry.SourceId, out var source))
+            throw new ReplayArtifactArchiveException("批量执行期间日志源消失，拒绝生成部分报告。");
+
+        var bytes = await File.ReadAllBytesAsync(source.FullPath, cancellationToken);
+        if (!string.Equals(CanonicalJson.Sha256(bytes), entry.SourceFileHash, StringComparison.Ordinal))
+            throw new ReplayArtifactArchiveException("批量执行期间日志字节发生变化，拒绝混合两个快照。");
+        var preparation = ReplayMatchPreparation.Prepare(
+            bytes,
+            entry.SourceId,
+            archives.PreparationRegistry);
+        var prepared = preparation.Prepared
+            ?? throw new ReplayArtifactArchiveException(
+                "批量执行期间准备结果改变，拒绝生成部分报告。");
+
+        await semaphore.WaitAsync(cancellationToken);
+        ArtifactReplayExecutionResult result;
+        try
+        {
+            result = await dispatcher.ExecuteAsync(
+                prepared,
+                options.StableTimeoutMilliseconds,
+                options.WorkerTimeoutMilliseconds,
+                cancellationToken);
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (result.Verified is { } verified)
+            return Entry(
+                entry.SourceId,
+                entry.SourceFileHash,
+                entry.MatchId,
+                entry.ArtifactId,
+                ReplayCoverageStatus.ReplayVerified,
+                "dispatcher_replay_verified",
+                "artifact_replay_dispatch",
+                verified.ReplayDigest);
+
+        var quarantine = result.Quarantine
+            ?? throw new ReplayArtifactArchiveException("dispatcher 没有返回 verified 或 quarantine。");
+        if (IsSystemicProtocolFailure(quarantine.ReasonCode))
+            throw new ReplayArtifactArchiveException(
+                $"归档 worker 出现系统性协议错误：{entry.ArtifactId}；" +
+                $"{quarantine.ReasonCode}/{quarantine.Stage}；{quarantine.Message}");
+        var status = IsReplayDivergence(quarantine.ReasonCode)
+            ? ReplayCoverageStatus.ReplayDiverged
+            : string.Equals(quarantine.ReasonCode, ReplayQuarantineCodes.WorkerTimeout, StringComparison.Ordinal)
+                || string.Equals(quarantine.ReasonCode, ReplayQuarantineCodes.StableWaitTimeout, StringComparison.Ordinal)
+                ? ReplayCoverageStatus.ReplayTimeout
+                : ReplayCoverageStatus.ReplayWorkerFailed;
+        return Entry(
+            entry.SourceId,
+            entry.SourceFileHash,
+            entry.MatchId,
+            entry.ArtifactId,
+            status,
+            quarantine.ReasonCode,
+            quarantine.Stage);
+    }
+
+    private static bool IsSystemicProtocolFailure(string reasonCode)
+        => string.Equals(reasonCode, ReplayQuarantineCodes.WorkerProtocolMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.WorkerArtifactMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.WorkerTerminationFailed, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.WorkerNotRegistered, StringComparison.Ordinal);
+
+    private static bool IsReplayDivergence(string reasonCode)
+        => string.Equals(reasonCode, ReplayQuarantineCodes.StateCheckpointMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.PublicCheckpointMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.RandomTraceMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.TerminalMismatch, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.ReplayActionRejected, StringComparison.Ordinal)
+            || string.Equals(reasonCode, ReplayQuarantineCodes.TapeContinuesAfterGameOver, StringComparison.Ordinal);
+
+    private static ReplayCoverageReport BuildReport(
+        string archiveCatalogHash,
+        IReadOnlyList<ReplayCoverageEntry> entries,
+        IReadOnlyList<ReplayCoverageWorkerArtifact> workers)
+    {
+        var orderedEntries = entries.OrderBy(entry => entry.SourceId, StringComparer.Ordinal).ToArray();
         var summary = ReplayCoverageStatus.All
             .Select(status => new ReplayCoverageSummary(
                 status,
-                entries.Count(entry => string.Equals(entry.Status, status, StringComparison.Ordinal))))
+                orderedEntries.Count(entry => string.Equals(entry.Status, status, StringComparison.Ordinal))))
             .ToArray();
         var withoutHash = new ReplayCoverageReport(
             ReportSchema,
-            archives.CatalogHash,
-            entries.Length,
+            archiveCatalogHash,
+            orderedEntries.Length,
             Array.AsReadOnly(summary),
-            Array.AsReadOnly(entries),
+            Array.AsReadOnly(workers.OrderBy(worker => worker.ArtifactId, StringComparer.Ordinal).ToArray()),
+            Array.AsReadOnly(orderedEntries),
             ReportHash: string.Empty);
         var hash = CanonicalJson.Hash(
             JsonSerializer.SerializeToElement(withoutHash, new JsonSerializerOptions
@@ -254,7 +521,7 @@ public static class ReplayCoverageAudit
 
         var json = ReplayArtifactArchive.SerializeCanonical(report) + "\n";
         var markdown = BuildMarkdown(report);
-        var candidate = BuildCandidateCatalog(archives);
+        var candidate = BuildCandidateCatalog(archives, report.WorkerArtifacts);
         var candidateJson = ReplayArtifactArchive.SerializeCanonical(candidate) + "\n";
         WriteAtomic(jsonPath, Encoding.UTF8.GetBytes(json));
         WriteAtomic(markdownPath, Encoding.UTF8.GetBytes(markdown));
@@ -262,18 +529,27 @@ public static class ReplayCoverageAudit
     }
 
     public static ReplayTestCandidateCatalog BuildCandidateCatalog(
-        ReplayArtifactArchiveCatalog archives)
+        ReplayArtifactArchiveCatalog archives,
+        IReadOnlyList<ReplayCoverageWorkerArtifact>? workerArtifacts = null)
     {
+        var workerByArtifactId = (workerArtifacts ?? Array.Empty<ReplayCoverageWorkerArtifact>())
+            .ToDictionary(worker => worker.ArtifactId, StringComparer.Ordinal);
         var artifacts = archives.Archives
-            .Select(archive => new ReplayTestCandidateArtifact(
-                archive.Manifest.ArtifactId,
-                archive.Manifest.EngineCommit,
-                archive.Manifest.ManifestHash,
-                Path.GetFileName(archive.ArchiveDirectory),
-                archive.Manifest.RuntimeIdentity,
-                archive.Manifest.ReplayWorkerEntrypoint.Available,
-                archive.Manifest.CandidateStatus.ProductionRegistryEligible,
-                archive.Manifest.CandidateStatus.Reason))
+            .Select(archive =>
+            {
+                workerByArtifactId.TryGetValue(archive.Manifest.ArtifactId, out var worker);
+                return new ReplayTestCandidateArtifact(
+                    archive.Manifest.ArtifactId,
+                    archive.Manifest.EngineCommit,
+                    archive.Manifest.ManifestHash,
+                    Path.GetFileName(archive.ArchiveDirectory),
+                    archive.Manifest.RuntimeIdentity,
+                    archive.Manifest.ReplayWorkerEntrypoint.Available,
+                    worker?.HandshakeVerified == true,
+                    worker?.ReasonCode ?? "worker_not_probed",
+                    archive.Manifest.CandidateStatus.ProductionRegistryEligible,
+                    archive.Manifest.CandidateStatus.Reason);
+            })
             .OrderBy(artifact => artifact.ArtifactId, StringComparer.Ordinal)
             .ToArray();
         var withoutHash = new ReplayTestCandidateCatalog(
@@ -302,8 +578,11 @@ public static class ReplayCoverageAudit
             [ReplayCoverageStatus.MissingCheckpoint] = "缺 checkpoint 契约",
             [ReplayCoverageStatus.IdentityMismatch] = "身份与归档不匹配",
             [ReplayCoverageStatus.ArtifactNotArchived] = "artifact 未归档",
-            [ReplayCoverageStatus.PreparationReady] = "可进入准备层",
-            [ReplayCoverageStatus.ReplayWorkerReady] = "可进入独立 replay worker",
+            [ReplayCoverageStatus.PreparationReady] = "仅准备层就绪",
+            [ReplayCoverageStatus.ReplayVerified] = "真实重放验证通过",
+            [ReplayCoverageStatus.ReplayDiverged] = "重放 checkpoint/终局分歧",
+            [ReplayCoverageStatus.ReplayTimeout] = "重放超时",
+            [ReplayCoverageStatus.ReplayWorkerFailed] = "独立 worker 失败",
             [ReplayCoverageStatus.InvalidLog] = "其他无效日志",
         };
         var builder = new StringBuilder();
@@ -319,7 +598,23 @@ public static class ReplayCoverageAudit
             builder.AppendLine($"| {labels[item.Status]} | `{item.Status}` | {item.Count} |");
         builder.AppendLine();
         builder.AppendLine(
-            "> `replay_worker_ready` 只有在归档明确提供且验证通过独立进程 worker 时才计数；当前候选归档明确为 unavailable，因此不会把准备层结果冒充真实重放证据。");
+            "> 只有历史 DLL 握手成功、该局 dispatcher 完整执行并通过全部 checkpoint/终局及响应 lineage 复核，才计为 `replay_verified`。准备层、worker 可用性和真实重放证据互不替代。");
+        builder.AppendLine();
+        builder.AppendLine("## 归档 worker 可用性");
+        builder.AppendLine();
+        builder.AppendLine("| artifactId | 入口声明 | 历史 DLL 握手 | 原因 |");
+        builder.AppendLine("|---|---:|---:|---|");
+        if (report.WorkerArtifacts.Count == 0)
+        {
+            builder.AppendLine("| _无归档_ |  |  |  |");
+        }
+        else
+        {
+            foreach (var worker in report.WorkerArtifacts)
+                builder.AppendLine(
+                    $"| {EscapeMarkdown(worker.ArtifactId)} | {(worker.EntrypointAvailable ? "是" : "否")} | " +
+                    $"{(worker.HandshakeVerified ? "是" : "否")} | `{worker.ReasonCode}` |");
+        }
         builder.AppendLine();
         builder.AppendLine("## 明细");
         builder.AppendLine();
@@ -489,17 +784,16 @@ public static class ReplayCoverageAudit
                 ReplayQuarantineCodes.MissingCheckpointContract,
                 "checkpoint_contract");
 
-        var workerReady = archive.Manifest.ReplayWorkerEntrypoint.Available
-            && archive.Manifest.ReplayWorkerEntrypoint.Executable is not null
-            && archive.Manifest.ReplayWorkerEntrypoint.WorkingDirectory is not null;
         return Entry(
             sourceId,
             sourceHash,
             log.Header.MatchId,
             identity.EngineArtifactId,
-            workerReady ? ReplayCoverageStatus.ReplayWorkerReady : ReplayCoverageStatus.PreparationReady,
-            workerReady ? "worker_entrypoint_verified" : ReplayQuarantineCodes.WorkerNotRegistered,
-            workerReady ? "artifact_worker" : "artifact_archive");
+            ReplayCoverageStatus.PreparationReady,
+            archive.Manifest.ReplayWorkerEntrypoint.Available
+                ? "batch_replay_not_executed"
+                : ReplayQuarantineCodes.WorkerNotRegistered,
+            "artifact_archive");
     }
 
     private static bool IdentityMatches(
@@ -527,7 +821,8 @@ public static class ReplayCoverageAudit
         string? artifactId,
         string status,
         string reasonCode,
-        string stage)
+        string stage,
+        string? replayDigest = null)
     {
         var stable = CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
         {
@@ -538,6 +833,7 @@ public static class ReplayCoverageAudit
             status,
             reasonCode,
             stage,
+            replayDigest,
         }));
         return new ReplayCoverageEntry(
             sourceId,
@@ -547,6 +843,28 @@ public static class ReplayCoverageAudit
             status,
             reasonCode,
             stage,
+            replayDigest,
+            stable);
+    }
+
+    private static ReplayCoverageWorkerArtifact WorkerArtifact(
+        string artifactId,
+        bool entrypointAvailable,
+        bool handshakeVerified,
+        string reasonCode)
+    {
+        var stable = CanonicalJson.Hash(JsonSerializer.SerializeToElement(new
+        {
+            artifactId,
+            entrypointAvailable,
+            handshakeVerified,
+            reasonCode,
+        }));
+        return new ReplayCoverageWorkerArtifact(
+            artifactId,
+            entrypointAvailable,
+            handshakeVerified,
+            reasonCode,
             stable);
     }
 

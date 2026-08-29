@@ -21,6 +21,11 @@ public sealed record AttachDonUndoEntry(
 /// </summary>
 public class GameState
 {
+    /// <summary>
+    /// 历史 artifact 重放不得查询排行榜、称号或其他进程外画像数据。该开关只影响展示快照的
+    /// 外部装饰字段，不改变卡牌规则状态，也不进入确定性 checkpoint。
+    /// </summary>
+    public bool SuppressExternalProfileLookups { get; set; }
     public required string RoomId { get; init; }
 
     /// <summary>本局创建时锁定的卡效规则版本；整局以及重启重放期间都不得改变。</summary>
