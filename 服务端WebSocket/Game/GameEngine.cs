@@ -411,7 +411,32 @@ public class GameEngine
     /// 等待玩家响应的 PendingPrompt 上。供重放/恢复在喂下一个动作前调用，确保不会在效果
     /// 还没跑到稳定点时就塞入后续动作。timeoutMs 仅为防卡死的安全网，不参与对局逻辑。
     /// </summary>
-    public async Task WaitSettledAsync(int timeoutMs = 15000, string? resolvingPromptId = null)
+    public Task WaitSettledAsync(int timeoutMs = 15000, string? resolvingPromptId = null)
+        => WaitSettledCoreAsync(
+            timeoutMs,
+            resolvingPromptId,
+            CancellationToken.None,
+            propagateTrackedFailure: false);
+
+    /// <summary>
+    /// 训练工件重放专用的稳定等待：除超时外还响应外部取消，并传播已经结束的异步效果链异常。
+    /// 线上恢复继续使用 <see cref="WaitSettledAsync"/> 的兼容语义，避免改变既有房间执行路径。
+    /// </summary>
+    internal Task WaitSettledForReplayAsync(
+        int timeoutMs,
+        string? resolvingPromptId,
+        CancellationToken cancellationToken)
+        => WaitSettledCoreAsync(
+            timeoutMs,
+            resolvingPromptId,
+            cancellationToken,
+            propagateTrackedFailure: true);
+
+    private async Task WaitSettledCoreAsync(
+        int timeoutMs,
+        string? resolvingPromptId,
+        CancellationToken cancellationToken,
+        bool propagateTrackedFailure)
     {
         var deadline = Environment.TickCount64 + timeoutMs;
         // PromptResponse 入队后，先等待它所响应的旧 Prompt 被续延消费；若效果链创建了下一个
@@ -420,17 +445,23 @@ public class GameEngine
                && resolvingPromptId is not null
                && State.PendingPrompt?.PromptId == resolvingPromptId)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (Environment.TickCount64 > deadline)
                 throw new TimeoutException("WaitSettledAsync 超时：PromptResponse 未被效果链消费");
-            await Task.WhenAny(_settle, Task.Delay(5));
+            await Task.WhenAny(_settle, Task.Delay(5, cancellationToken));
         }
 
         while (State.PendingPrompt is null && !_settle.IsCompleted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (Environment.TickCount64 > deadline)
                 throw new TimeoutException("WaitSettledAsync 超时：效果链未在限定时间内进入稳定态");
-            await Task.WhenAny(_settle, Task.Delay(5));
+            await Task.WhenAny(_settle, Task.Delay(5, cancellationToken));
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (propagateTrackedFailure && _settle.IsCompleted)
+            await _settle.WaitAsync(cancellationToken);
     }
 
     // ── GM 调试：按编号加牌到手牌 ──────────────────────────────────────────

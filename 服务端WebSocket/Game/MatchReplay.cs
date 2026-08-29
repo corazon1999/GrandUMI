@@ -17,6 +17,27 @@ public static class MatchReplay
     /// <summary>一条可重放的动作（与 GameEngine.HandleAction 的入参一一对应）。</summary>
     public sealed record ActionEntry(int PlayerIndex, string Action, JsonElement Data);
 
+    /// <summary>严格工件重放到达的稳定点；ActionIndex=-1 表示开局稳定点。</summary>
+    internal sealed record SettledReplayPoint(
+        int ActionIndex,
+        ActionEntry? Action,
+        GameEngine Engine);
+
+    internal sealed class ReplayActionRejectedException(
+        int actionIndex,
+        ActionEntry action)
+        : Exception($"重放动作被引擎拒绝：index={actionIndex}，actor={action.PlayerIndex}，action={action.Action}")
+    {
+        public int ActionIndex { get; } = actionIndex;
+        public ActionEntry ActionEntry { get; } = action;
+    }
+
+    internal sealed class ReplayTapeAfterGameOverException(int actionIndex)
+        : Exception($"对局已终局，但动作磁带仍包含 index={actionIndex} 及其后续动作")
+    {
+        public int ActionIndex { get; } = actionIndex;
+    }
+
     /// <summary>构造一条无 payload 的动作（如 PassBlock/EndTurn）。</summary>
     public static ActionEntry Action(int playerIndex, string action)
         => new(playerIndex, action, EmptyObject());
@@ -74,6 +95,86 @@ public static class MatchReplay
             var replayData = PrepareReplayData(a);
             engine.HandleAction(a.PlayerIndex, a.Action, replayData);
             await engine.WaitSettledAsync();
+        }
+
+        return engine;
+    }
+
+    /// <summary>
+    /// artifact worker 的严格旁路入口。它不替换线上恢复入口，只额外保证：每条磁带动作必须被
+    /// HandleAction 接受、稳定等待可取消且传播效果链异常，并在开局和每条动作后逐点回调。
+    /// </summary>
+    internal static async Task<GameEngine> RebuildForArtifactWorkerAsync(
+        string roomId,
+        int seed,
+        int firstPlayer,
+        (string account, string deckRaw) p0,
+        (string account, string deckRaw) p1,
+        IReadOnlyList<ActionEntry> actions,
+        int stableTimeoutMilliseconds,
+        Action<GameEngine>? configureEngine,
+        Func<SettledReplayPoint, CancellationToken, ValueTask> onSettled,
+        CancellationToken cancellationToken,
+        bool leaderKeywordWildcard = false,
+        bool p0AlwaysPrompt = false,
+        bool p1AlwaysPrompt = false,
+        bool openingSetupAfterFirstPlayerChoice = false,
+        CardRuleset? ruleset = null)
+    {
+        ArgumentNullException.ThrowIfNull(actions);
+        ArgumentNullException.ThrowIfNull(onSettled);
+        if (stableTimeoutMilliseconds <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(stableTimeoutMilliseconds),
+                "稳定等待超时必须大于 0 毫秒");
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var engine = new GameEngine(
+            roomId,
+            ("artifact-replay-p0", p0.account, p0.deckRaw),
+            ("artifact-replay-p1", p1.account, p1.deckRaw),
+            firstPlayer: firstPlayer,
+            rngSeed: seed,
+            leaderKeywordWildcard: leaderKeywordWildcard,
+            deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
+            deferInitialSetupUntilStart: openingSetupAfterFirstPlayerChoice,
+            ruleset: ruleset);
+
+        configureEngine?.Invoke(engine);
+        engine.State.Players[0].AlwaysPromptOnLifeReveal = p0AlwaysPrompt;
+        engine.State.Players[1].AlwaysPromptOnLifeReveal = p1AlwaysPrompt;
+        engine.FlushPendingMatchLogs();
+
+        if (openingSetupAfterFirstPlayerChoice)
+            engine.BeginOpeningSequence();
+
+        await engine.WaitSettledForReplayAsync(
+            stableTimeoutMilliseconds,
+            resolvingPromptId: null,
+            cancellationToken);
+        await onSettled(new SettledReplayPoint(-1, null, engine), cancellationToken);
+
+        for (var actionIndex = 0; actionIndex < actions.Count; actionIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (engine.State.IsGameOver)
+                throw new ReplayTapeAfterGameOverException(actionIndex);
+
+            var action = actions[actionIndex];
+            var replayData = PrepareReplayData(action);
+            var resolvingPromptId = string.Equals(action.Action, "PromptResponse", StringComparison.Ordinal)
+                ? engine.State.PendingPrompt?.PromptId
+                : null;
+            if (!engine.HandleAction(action.PlayerIndex, action.Action, replayData))
+                throw new ReplayActionRejectedException(actionIndex, action);
+
+            await engine.WaitSettledForReplayAsync(
+                stableTimeoutMilliseconds,
+                resolvingPromptId,
+                cancellationToken);
+            await onSettled(
+                new SettledReplayPoint(actionIndex, action, engine),
+                cancellationToken);
         }
 
         return engine;

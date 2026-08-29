@@ -23,9 +23,35 @@ public sealed record ReplayArtifactDescriptor(
     string ReplayConfigSchema,
     string Executable);
 
+/// <summary>跨进程 worker 路由使用的完整工件身份指纹。</summary>
+public static class ReplayArtifactIdentity
+{
+    public static string Fingerprint(ReplayArtifactDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var canonical = JsonSerializer.SerializeToElement(new
+        {
+            descriptor.MatchLogSchema,
+            descriptor.EventAdapterVersion,
+            descriptor.EngineArtifactId,
+            descriptor.EngineCommit,
+            descriptor.BinarySha256,
+            descriptor.RulesVersion,
+            descriptor.RulesetManifestHash,
+            descriptor.CardDbContentHash,
+            descriptor.RngAlgorithmVersion,
+            descriptor.DeterministicIdVersion,
+            descriptor.OpeningProtocolVersion,
+            descriptor.ReplayConfigSchema,
+            descriptor.Executable,
+        });
+        return CanonicalJson.Hash(canonical);
+    }
+}
+
 /// <summary>
-/// P0-0 不可变工件注册表。这里只解析和解析身份，不启动 executable；后续 artifact worker
-/// 必须另行实施进程允许列表与哈希复核。
+/// P0-0 不可变工件注册表。这里只解析和解析身份，不直接启动 executable；artifact worker
+/// dispatcher 另行按完整 descriptor 指纹绑定允许的进程内或进程代理实现。
 /// </summary>
 public sealed class ReplayArtifactRegistry
 {

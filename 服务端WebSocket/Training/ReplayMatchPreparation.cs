@@ -38,6 +38,21 @@ public static class ReplayQuarantineCodes
     public const string NonCanonicalPayload = "non_canonical_payload";
     public const string InvalidActor = "invalid_actor";
     public const string MalformedActionResult = "malformed_action_result";
+    public const string InvalidCheckpointContract = "invalid_checkpoint_contract";
+    public const string MissingCheckpointContract = "missing_checkpoint_contract";
+    public const string WorkerNotRegistered = "worker_not_registered";
+    public const string WorkerArtifactMismatch = "worker_artifact_mismatch";
+    public const string WorkerProtocolMismatch = "worker_protocol_mismatch";
+    public const string WorkerTimeout = "worker_timeout";
+    public const string WorkerCancelled = "worker_cancelled";
+    public const string WorkerFailure = "worker_failure";
+    public const string StableWaitTimeout = "stable_wait_timeout";
+    public const string ReplayActionRejected = "replay_action_rejected";
+    public const string TapeContinuesAfterGameOver = "tape_continues_after_game_over";
+    public const string StateCheckpointMismatch = "state_checkpoint_mismatch";
+    public const string PublicCheckpointMismatch = "public_checkpoint_mismatch";
+    public const string RandomTraceMismatch = "random_trace_mismatch";
+    public const string TerminalMismatch = "terminal_mismatch";
 }
 
 public sealed class ReplayQuarantineException : Exception
@@ -80,6 +95,9 @@ public sealed class PreparedReplayMatch
         ReplayMatchHeader header,
         ReplayArtifactDescriptor artifact,
         AcceptedActionTape tape,
+        ExpectedReplayCheckpointContract? checkpointContract,
+        string registryVersion,
+        string registryHash,
         string stableHash)
     {
         SourceId = sourceId;
@@ -87,6 +105,9 @@ public sealed class PreparedReplayMatch
         Header = header;
         Artifact = artifact;
         Tape = tape;
+        CheckpointContract = checkpointContract;
+        RegistryVersion = registryVersion;
+        RegistryHash = registryHash;
         StableHash = stableHash;
     }
 
@@ -95,10 +116,14 @@ public sealed class PreparedReplayMatch
     public ReplayMatchHeader Header { get; }
     public ReplayArtifactDescriptor Artifact { get; }
     public AcceptedActionTape Tape { get; }
+    public ExpectedReplayCheckpointContract? CheckpointContract { get; }
+    public string RegistryVersion { get; }
+    public string RegistryHash { get; }
     public string StableHash { get; }
 
     /// <summary>
-    /// 为注册工件 worker 生成 MatchReplay 入参形态；这里只物化动作，不在当前进程执行旧版本。
+    /// 为注册工件 worker 生成 MatchReplay 入参形态；准备层只物化动作，是否进程内执行由
+    /// 精确指纹绑定的 dispatcher/worker 决定，绝不回退到当前 main。
     /// </summary>
     public IReadOnlyList<MatchReplay.ActionEntry> MaterializeActionEntries()
         => Tape.Actions
@@ -144,13 +169,22 @@ public static class ReplayMatchPreparation
             log = MatchLogEventAdapter.Adapt(sourceBytes, sourceId);
             var artifact = registry.Resolve(log.Header.VersionIdentity);
             var tape = AcceptedActionTapeBuilder.Build(log, artifact);
-            var stableHash = HashPrepared(log, artifact, tape, registry.RegistryHash);
+            var checkpointContract = ReplayCheckpointContractParser.Parse(log, tape);
+            var stableHash = HashPrepared(
+                log,
+                artifact,
+                tape,
+                checkpointContract,
+                registry.RegistryHash);
             return ReplayPreparationResult.Success(new PreparedReplayMatch(
                 log.SourceId,
                 log.SourceFileHash,
                 log.Header,
                 artifact,
                 tape,
+                checkpointContract,
+                registry.RegistryVersion,
+                registry.RegistryHash,
                 stableHash));
         }
         catch (ReplayQuarantineException ex)
@@ -178,6 +212,7 @@ public static class ReplayMatchPreparation
         AdaptedMatchLog log,
         ReplayArtifactDescriptor artifact,
         AcceptedActionTape tape,
+        ExpectedReplayCheckpointContract? checkpointContract,
         string registryHash)
     {
         var canonical = JsonSerializer.SerializeToElement(new
@@ -196,6 +231,7 @@ public static class ReplayMatchPreparation
             log.Header.Configuration.LeaderKeywordWildcard,
             log.Header.Configuration.OpeningSetupAfterFirstPlayerChoice,
             tape.StableHash,
+            checkpointContractHash = checkpointContract?.StableHash ?? string.Empty,
         });
         return CanonicalJson.Hash(canonical);
     }
