@@ -30,6 +30,7 @@ from websockets.legacy.client import connect as ws_connect
 import storage
 import media_pipeline
 import qq_whitelist_sync
+import abuse_moderation
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get(
@@ -38,9 +39,46 @@ CONFIG_PATH = os.environ.get(
 ADMIN_AGENT_OWNER_QQ = "651846226"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
+ABUSE_MODERATION_AUTHORITY_QQ = "3215228879"
+OFFICIAL_ASSISTANT_QQS = {
+    ABUSE_MODERATION_AUTHORITY_QQ,
+    "3430685803",
+    "184689168",
+}
 _NEW_MEMBER_WELCOME_ASSISTANT_IDS = {PRIMARY_ASSISTANT_ID}
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _ASSISTANT_ROLES = {"primary", "admin_only"}
+
+
+class OneBotActionRejected(RuntimeError):
+    """OneBot 已明确返回失败；与超时、断线等未知结果严格区分。"""
+
+
+def _strict_positive_id_list(cfg: dict, key: str) -> list[str]:
+    raw = cfg.get(key, [])
+    if not isinstance(raw, list):
+        raise ValueError(f"{key} 必须是数组")
+    values = []
+    seen = set()
+    for item in raw:
+        if isinstance(item, bool):
+            raise ValueError(f"{key} 包含无效编号")
+        text = str(item or "").strip()
+        if not re.fullmatch(r"[1-9]\d{4,11}", text):
+            raise ValueError(f"{key} 包含无效编号")
+        canonical = str(int(text))
+        if canonical not in seen:
+            seen.add(canonical)
+            values.append(canonical)
+    return values
+
+
+def _validate_abuse_moderation_config(cfg: dict) -> None:
+    enabled = cfg.get("abuse_moderation_enabled", False)
+    if not isinstance(enabled, bool):
+        raise ValueError("abuse_moderation_enabled 必须是布尔值")
+    _strict_positive_id_list(cfg, "abuse_moderation_groups")
+    _strict_positive_id_list(cfg, "abuse_moderation_exempt_qqs")
 
 
 def load_config() -> dict:
@@ -86,6 +124,7 @@ def _fixed_owner_config_is_valid(cfg: dict, key: str) -> bool:
 
 def resolve_assistant_connections(cfg: dict) -> list[dict]:
     """把旧版单连接配置和新版多助理配置统一为独立连接配置。"""
+    _validate_abuse_moderation_config(cfg)
     for key in ("agent_owner_qq", "admin_agent_owner_qq"):
         if not _fixed_owner_config_is_valid(cfg, key):
             raise ValueError(
@@ -102,6 +141,12 @@ def resolve_assistant_connections(cfg: dict) -> list[dict]:
                 "enabled": True,
                 "ws_url": cfg.get("ws_url"),
                 "access_token": cfg.get("access_token", ""),
+                "expected_self_id": cfg.get("expected_self_id")
+                or (
+                    ABUSE_MODERATION_AUTHORITY_QQ
+                    if cfg.get("abuse_moderation_enabled", False)
+                    else ""
+                ),
             }
         ]
     if not isinstance(configured, list) or not configured:
@@ -174,6 +219,24 @@ def resolve_assistant_connections(cfg: dict) -> list[dict]:
 
     if primary_count != 1:
         raise ValueError("必须且只能启用一个 id 为 primary 的主助理连接")
+    if cfg.get("abuse_moderation_enabled", False):
+        authority = next(
+            (
+                item
+                for item in connections
+                if item.get("_assistant_id") == PRIMARY_ASSISTANT_ID
+                and item.get("_assistant_role") == "primary"
+            ),
+            None,
+        )
+        if (
+            not authority
+            or authority.get("_expected_self_id")
+            != ABUSE_MODERATION_AUTHORITY_QQ
+        ):
+            raise ValueError(
+                "群辱骂治理只能由 expected_self_id=3215228879 的 s-蛇主助理执行"
+            )
     return connections
 
 
@@ -205,7 +268,7 @@ class OneBotClient:
             self.pending.pop(echo, None)
         if response.get("status") != "ok" or response.get("retcode", 0) != 0:
             detail = response.get("message") or response.get("wording") or action
-            raise RuntimeError(f"NapCat 动作失败：{detail}")
+            raise OneBotActionRejected(f"NapCat 动作失败：{detail}")
         return response
 
     def resolve_response(self, response: dict) -> bool:
@@ -469,6 +532,27 @@ def group_add_auto_approval_groups(cfg: dict) -> set[str]:
         if text.isdigit() and int(text) > 0:
             groups.add(str(int(text)))
     return groups
+
+
+def abuse_moderation_groups(cfg: dict) -> set[str]:
+    """辱骂治理只认显式开关与显式群号，空数组永远不表示全部群。"""
+    if cfg.get("abuse_moderation_enabled", False) is not True:
+        return set()
+    try:
+        return set(_strict_positive_id_list(cfg, "abuse_moderation_groups"))
+    except ValueError:
+        return set()
+
+
+def abuse_moderation_exempt_qqs(cfg: dict) -> set[str]:
+    """固定豁免唯一管理员和三个官方机器人，并允许追加显式安全名单。"""
+    values = {ADMIN_AGENT_OWNER_QQ, *OFFICIAL_ASSISTANT_QQS}
+    try:
+        values.update(_strict_positive_id_list(cfg, "abuse_moderation_exempt_qqs"))
+    except ValueError:
+        # 生产启动会拒绝无效配置；直接调用处理器时继续保留固定豁免并失败关闭。
+        pass
+    return values
 
 
 def new_member_welcome_groups(cfg: dict) -> set[str]:
@@ -941,6 +1025,211 @@ async def get_authoritative_group_members(client, group_id) -> set[str]:
             raise RuntimeError("OneBot 成员列表混入其他群的数据")
         members.add(str(item["user_id"]))
     return members
+
+
+def abuse_moderation_message_identity(event: dict):
+    """生成跨助理一致的消息幂等键；缺少可信消息号时拒绝自动处罚。"""
+    message_id = event.get("message_id")
+    if isinstance(message_id, bool) or not isinstance(message_id, (int, str)):
+        return None
+    message_id = str(message_id).strip()
+    if not re.fullmatch(r"[-A-Za-z0-9_:]{1,100}", message_id):
+        return None
+    group_id = str(event.get("group_id") or "").strip()
+    offender = str(event.get("user_id") or "").strip()
+    if (
+        not _QQ_NUMBER_RE.fullmatch(group_id)
+        or not _QQ_NUMBER_RE.fullmatch(offender)
+    ):
+        return None
+    return f"onebot-group:{group_id}:{offender}:{message_id}", message_id
+
+
+async def get_authoritative_group_member(client, group_id, user_id) -> dict:
+    """实时核验待处罚者仍是普通成员，并读取现有禁言截止时间。"""
+    response = await client.call_action(
+        "get_group_member_info",
+        {
+            "group_id": int(group_id),
+            "user_id": int(user_id),
+            "no_cache": True,
+        },
+    )
+    data = response.get("data")
+    if not isinstance(data, dict):
+        raise RuntimeError("OneBot 群成员响应格式异常")
+    if str(data.get("group_id") or "") != str(group_id):
+        raise RuntimeError("OneBot 群成员响应群号不一致")
+    if str(data.get("user_id") or "") != str(user_id):
+        raise RuntimeError("OneBot 群成员响应 QQ 不一致")
+    role = str(data.get("role") or "").strip().lower()
+    if role not in ("owner", "admin", "member"):
+        raise RuntimeError("OneBot 群成员响应角色无效")
+    raw_mute_until = data.get("shut_up_timestamp", 0)
+    if isinstance(raw_mute_until, bool):
+        raise RuntimeError("OneBot 群成员禁言时间无效")
+    try:
+        mute_until = int(raw_mute_until or 0)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("OneBot 群成员禁言时间无效") from exc
+    if mute_until < 0 or mute_until > 4102444800:
+        raise RuntimeError("OneBot 群成员禁言时间超出安全范围")
+    result = dict(data)
+    result["role"] = role
+    result["shut_up_timestamp"] = mute_until
+    return result
+
+
+async def handle_abuse_moderation(client, cfg: dict, event: dict) -> bool:
+    """由官方 s-蛇 对明确人身攻击执行持久化、至多一次的一天禁言。"""
+    group_id = str(event.get("group_id") or "").strip()
+    if group_id not in abuse_moderation_groups(cfg):
+        return False
+    if (
+        assistant_id(cfg) != PRIMARY_ASSISTANT_ID
+        or assistant_role(cfg) != "primary"
+        or str(cfg.get("_expected_self_id") or "")
+        != ABUSE_MODERATION_AUTHORITY_QQ
+        or str(event.get("self_id") or "") != ABUSE_MODERATION_AUTHORITY_QQ
+    ):
+        return False
+
+    decision = abuse_moderation.classify_group_message(event)
+    if decision is None:
+        return False
+    identity = abuse_moderation_message_identity(event)
+    offender = str(event.get("user_id") or "").strip()
+    if identity is None or not _QQ_NUMBER_RE.fullmatch(offender):
+        print(
+            f"[群辱骂治理] 群{group_id}检测到明确攻击，但消息号或发送者字段无效；"
+            "为保证幂等不自动处罚"
+        )
+        return True
+    event_key, source_message_id = identity
+
+    sender = event.get("sender") if isinstance(event.get("sender"), dict) else {}
+    event_role = str(sender.get("role") or "").strip().lower()
+    if offender in abuse_moderation_exempt_qqs(cfg) or event_role in (
+        "owner",
+        "admin",
+    ):
+        print(f"[群辱骂治理] 群{group_id}消息{source_message_id}发送者属于豁免身份")
+        return False
+
+    try:
+        existing = storage.get_abuse_moderation_action(event_key)
+    except Exception as exc:
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}读取幂等记录失败，"
+            f"不执行处罚：{exc}"
+        )
+        return True
+    if existing:
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}已有状态"
+            f"{existing.get('state')}，不重复调用 OneBot"
+        )
+        return True
+
+    try:
+        member = await get_authoritative_group_member(client, group_id, offender)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}实时成员核验失败，"
+            f"不执行处罚：{exc}"
+        )
+        return True
+    if member["role"] in ("owner", "admin"):
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}发送者实时身份为"
+            f"{member['role']}，予以豁免"
+        )
+        return False
+    if member["role"] != "member":
+        return True
+
+    try:
+        reservation = storage.reserve_abuse_moderation_action(
+            event_key=event_key,
+            group_id=group_id,
+            offender_qq=offender,
+            source_message_id=source_message_id,
+            rule_id=decision.rule_id,
+            content_sha256=decision.content_sha256,
+            member_role=member["role"],
+            observed_mute_until=member["shut_up_timestamp"],
+        )
+    except Exception as exc:
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}无法持久化动作屏障，"
+            f"不执行处罚：{exc}"
+        )
+        return True
+    if not reservation.get("acquired"):
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}未重复处罚："
+            f"{reservation.get('reason')}"
+        )
+        return True
+
+    action_token = str(reservation.get("action_token") or "")
+
+    def finish_safely(state: str, error: str = "") -> bool:
+        try:
+            return storage.finish_abuse_moderation_action(
+                event_key,
+                action_token,
+                state,
+                error=error,
+            )
+        except Exception as exc:
+            print(
+                f"[群辱骂治理] 群{group_id}消息{source_message_id}写入{state}状态失败；"
+                f"预占记录仍会阻止重试：{exc}"
+            )
+            return False
+
+    try:
+        await client.call_action(
+            "set_group_ban",
+            {
+                "group_id": int(group_id),
+                "user_id": int(offender),
+                "duration": storage.ABUSE_MODERATION_DURATION_SECONDS,
+            },
+        )
+    except asyncio.CancelledError:
+        finish_safely("unknown", "任务取消，OneBot 动作结果未知")
+        raise
+    except OneBotActionRejected as exc:
+        finish_safely("rejected", str(exc))
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}禁言动作被 OneBot "
+            f"明确拒绝：{exc}"
+        )
+        return True
+    except Exception as exc:
+        finish_safely("unknown", f"OneBot 响应未知：{exc}")
+        print(
+            f"[群辱骂治理] 群{group_id}消息{source_message_id}禁言结果未知；"
+            f"不会自动重试或延长：{exc}"
+        )
+        return True
+
+    confirmed = finish_safely("confirmed")
+    if confirmed:
+        print(
+            f"[群辱骂治理] 群{group_id}成员{offender}因规则{decision.rule_id}"
+            "已被 OneBot 确认禁言 86400 秒"
+        )
+    else:
+        print(
+            f"[群辱骂治理] 群{group_id}成员{offender}的禁言已获 OneBot 成功响应，"
+            "但审计状态未落稳；保留预占屏障且绝不重试"
+        )
+    return True
 
 
 def _member_verification_reminder_delay(cfg: dict) -> int:
@@ -1713,6 +2002,9 @@ async def on_event(ws, cfg, event) -> None:
         await handle_admin_only_event(ws, cfg, event)
         return
 
+    if await handle_abuse_moderation(ws, cfg, event):
+        return
+
     if await handle_group_add_auto_approval(ws, cfg, event):
         return
 
@@ -1969,6 +2261,7 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     whitelist_sync_config = qq_whitelist_sync.SyncConfig.from_bot_config(cfg)
     verification_groups = member_verification_groups(cfg)
     auto_approval_groups = group_add_auto_approval_groups(cfg)
+    moderation_groups = abuse_moderation_groups(cfg)
     cancelled = storage.cancel_member_verifications_outside_groups(
         verification_groups
     )
@@ -1983,6 +2276,13 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
         print("[加群审批] 已配置启用，但目标群列表为空或无效；为避免误审批，功能不会生效")
     elif auto_approval_groups:
         print(f"[加群审批] 已启用，目标群：{', '.join(sorted(auto_approval_groups))}")
+    if cfg.get("abuse_moderation_enabled", False) and not moderation_groups:
+        print("[群辱骂治理] 已配置启用，但目标群列表为空；安全关闭且不会监听全部群")
+    elif moderation_groups:
+        print(
+            "[群辱骂治理] 已启用：仅 s-蛇执行，目标群："
+            f"{', '.join(sorted(moderation_groups))}，固定禁言 86400 秒"
+        )
     if whitelist_sync_config.enabled:
         print(
             "[QQ 白名单同步] 已启用："

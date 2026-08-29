@@ -85,6 +85,9 @@ copy config.example.json config.json
 | `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与一次追问的后台轮询间隔，默认 300 秒（5 分钟），允许范围 1～3600 秒 |
 | `group_add_auto_approval_enabled` | 是否启用加群申请与群成员邀请好友自动审批；默认关闭 |
 | `group_add_auto_approval_groups` | **明确启用自动审批的群号数组**；空数组表示不审批任何群，绝不表示全部群 |
+| `abuse_moderation_enabled` | 是否启用群辱骂治理；只有 JSON 布尔值 `true` 才会启用 |
+| `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
+| `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
 | `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单自然整点同步；默认关闭 |
 | `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权目标群，当前为 `297542853` / `GrandUMI测试群` |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
@@ -93,6 +96,26 @@ copy config.example.json config.json
 | `qq_whitelist_sync_min_members` | 自动同步的绝对人数下限，默认 100 |
 | `qq_whitelist_sync_max_shrink_percent` | 相较上一成功快照允许的最大缩水比例，默认 25% |
 | `qq_whitelist_sync_max_delay_seconds` | 整点请求允许的最长延迟，默认 600 秒；过期小时不补发 |
+
+### 群辱骂治理安全边界
+
+本地样例默认关闭；服务器样例只为官方群 `297542853` 开启。实际上线由部署运维在私密配置中显式设置：
+
+```json
+{
+  "abuse_moderation_enabled": true,
+  "abuse_moderation_groups": [297542853],
+  "abuse_moderation_exempt_qqs": [651846226, 3215228879, 3430685803, 184689168]
+}
+```
+
+- 权威执行者固定为 `id=primary, role=primary, expected_self_id=3215228879` 的 s-蛇；配置身份不符时机器人拒绝启动该功能。s-鹰、s-鲨即使收到同一群消息也不会查询成员或调用禁言动作。
+- 只读取 `post_type=message`、`message_type=group` 的顶层结构化 `text` 与真实 `at` 段。不读取字符串 CQ 码、`raw_message`、引用、合并转发、图片或图片识别文字；缺少可信 OneBot `message_id` 时，为保证幂等只记录日志而不处罚。
+- 判定词表保持短而保守：只匹配明确的第二人称严重人身攻击、家属诅咒、死亡威胁，或真实 @他人后的严重辱骂。普通负面评价、自嘲、技术讨论、敏感词测试、角色台词、引语、劝阻辱骂和仅仅出现某个词都不会处罚。外部文字不会进入 Agent、正则或命令执行。
+- 命中后先调用不走缓存的 `get_group_member_info`。事件或实时结果显示为群主/群管理员、发送者是唯一管理员/官方机器人/显式豁免 QQ、成员响应字段矛盾、查询失败时，都不会调用禁言。
+- 每个处罚在调用外部动作前写入 SQLite，以“群号 + 发送者 QQ + OneBot 消息号”永久去重。并发事件、三助理同时收取、容器重启和消息重放只能有一个调用者；审计仅保存规则编号与正文 SHA-256，不保存辱骂原文。
+- OneBot 明确成功才记录 `confirmed`，明确拒绝记录 `rejected`。超时、断线、取消或进程在调用前后退出都属于可能已经生效的未知结果：预占记录保持一天重试屏障，既不宣称成功，也不会自动重试或延长处罚。同一成员在已有确认、未知或实时观察到的禁言窗口内出现后续排队消息时只记为抑制，不会反复把截止时间向后延长。
+- 部署后应从日志确认目标群与唯一权威账号，再用普通测试成员发送一条明确攻击测试语句，核对 OneBot 只出现一次 `set_group_ban duration=86400`，并查询 SQLite `abuse_moderation_actions` 的 `confirmed` 状态。不得用群主、群管理员或豁免账号作为处罚验收对象。
 
 ### 加群申请自动审批安全边界
 
@@ -221,9 +244,10 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 ```
 
 部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
-它会构建并检查新容器，失败时恢复原文件与配置。脚本读取并原样保留私密
-`config.server.json` 中的机器人安全功能字段，但不会猜测目标群；首次启用前需要在服务器
-私密配置中明确写入相应开关与目标群。加群自动审批使用
+它会构建并检查新容器，失败时恢复原文件与配置。对于本次辱骂治理，普通部署读取并原样保留私密
+`config.server.json` 中现有的 `abuse_moderation_*` 字段，不会自动开启、恢复或猜测目标群。本次上线
+由部署运维在远端私密配置中原子写入开关、目标群与豁免账号。其他功能首次启用前也需在
+服务器私密配置中明确写入相应开关与目标群。加群自动审批使用
 `group_add_auto_approval_enabled` / `group_add_auto_approval_groups`，入群后二次验证使用
 `new_member_verification_enabled` / `new_member_verification_groups`。
 
@@ -297,6 +321,9 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   `s-蛇 3215228879`、`s-鹰 3430685803`、`s-鲨 184689168`；两个副助理在扫码登录、
   配置 OneBot 并核验前保持 `enabled=false`。
 - `allowed_groups` 填实际群号白名单,不要留空开放所有群。
+- 本次上线由部署运维在私密 `config.server.json` 中显式设置
+  `abuse_moderation_enabled=true`、`abuse_moderation_groups=[297542853]`，并确认 s-蛇仍为
+  `expected_self_id=3215228879`；普通部署脚本只保留现有值，不会自动开启、恢复或猜成全部群。
 - 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
   两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
   并开启；不能只在机器人一侧单独打开。
@@ -369,6 +396,7 @@ py -c "import sqlite3; [print(r) for r in sqlite3.connect('feedback.db').execute
 | 文件 | 作用 |
 |------|------|
 | `bot.py` | 主程序:连 OneBot WS、识别指令、调存储/建 issue、回执 |
+| `abuse_moderation.py` | 只读取顶层结构化消息的保守辱骂判定器 |
 | `storage.py` | SQLite 存储封装 |
 | `github_issue.py` | 通过 gh CLI 建 GitHub Issue |
 | `agent_bridge.py` | 服务器侧队列领取、问题和结果回写桥 |

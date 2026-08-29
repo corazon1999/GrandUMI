@@ -259,6 +259,41 @@ class DeployFileTests(unittest.TestCase):
             config["qq_whitelist_sync_secret_env"],
         )
 
+    def test_辱骂治理模块进入镜像部署包且样例边界明确(self):
+        dockerfile = (BOT_DIR / "Dockerfile").read_text(encoding="utf-8")
+        dockerignore = (BOT_DIR / ".dockerignore").read_text(encoding="utf-8")
+        powershell = (BOT_DIR / "deploy-bot-server.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+        for content in (dockerfile, dockerignore, powershell, shell):
+            self.assertIn("abuse_moderation.py", content)
+
+        local = json.loads(
+            (BOT_DIR / "config.example.json").read_text(encoding="utf-8")
+        )
+        server = json.loads(
+            (BOT_DIR / "config.server.example.json").read_text(encoding="utf-8")
+        )
+        self.assertIs(local["abuse_moderation_enabled"], False)
+        self.assertEqual([], local["abuse_moderation_groups"])
+        self.assertIs(server["abuse_moderation_enabled"], True)
+        self.assertEqual([297542853], server["abuse_moderation_groups"])
+        expected_exemptions = [651846226, 3215228879, 3430685803, 184689168]
+        self.assertEqual(expected_exemptions, local["abuse_moderation_exempt_qqs"])
+        self.assertEqual(expected_exemptions, server["abuse_moderation_exempt_qqs"])
+
+        readme = (BOT_DIR / "README.md").read_text(encoding="utf-8")
+        for required in (
+            "set_group_ban",
+            "86400",
+            "abuse_moderation_actions",
+            "顶层结构化",
+            "不会自动重试或延长",
+            "普通部署脚本只保留现有值",
+        ):
+            self.assertIn(required, readme)
+
     def test_白名单同步域名固定直连唯一服务器且不使用弃用正式域名(self):
         compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
         for host in ("test.grand-umi.com", "ygo.grand-umi.com"):

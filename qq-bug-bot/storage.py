@@ -39,6 +39,15 @@ MEMBER_VERIFICATION_TERMINAL_STATES = ("verified", "kicked", "left", "cancelled"
 MEMBER_VERIFICATION_REMINDER_MAX_ATTEMPTS = 5
 MEMBER_VERIFICATION_REMINDER_RETRY_BASE_SECONDS = 5
 MEMBER_VERIFICATION_REMINDER_RETRY_MAX_SECONDS = 300
+ABUSE_MODERATION_DURATION_SECONDS = 86400
+ABUSE_MODERATION_BARRIER_STATES = (
+    "reserved",
+    "confirmed",
+    "unknown",
+    "already_muted",
+)
+_MODERATION_RULE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def init_db() -> None:
@@ -199,6 +208,29 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS abuse_moderation_actions (
+                event_key TEXT PRIMARY KEY,
+                group_id TEXT NOT NULL,
+                offender_qq TEXT NOT NULL,
+                source_message_id TEXT NOT NULL,
+                rule_id TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                duration_seconds INTEGER NOT NULL,
+                member_role TEXT NOT NULL,
+                state TEXT NOT NULL,
+                action_token TEXT,
+                related_event_key TEXT,
+                suppression_until INTEGER,
+                action_started_at INTEGER,
+                completed_at INTEGER,
+                last_error TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_chat_messages_queue
             ON chat_messages(state, created_at, id)
             """
@@ -246,6 +278,14 @@ def init_db() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_qq_whitelist_sync_recovery
             ON qq_whitelist_sync_runs(group_id, scheduled_hour, state)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_abuse_moderation_barrier
+            ON abuse_moderation_actions(
+                group_id, offender_qq, state, suppression_until
+            )
             """
         )
         # 幂等迁移:给老库补上新列(缺了才加)
@@ -353,6 +393,227 @@ def init_db() -> None:
                 "ADD COLUMN failure_reported_at INTEGER"
             )
         conn.commit()
+
+
+def _validate_abuse_moderation_identity(value, label: str) -> str:
+    text = str(value or "").strip()
+    if not re.fullmatch(r"[1-9]\d{4,11}", text):
+        raise ValueError(f"{label}无效")
+    return text
+
+
+def get_abuse_moderation_action(event_key: str):
+    """读取处罚审计记录；原始群消息正文不会写入此表。"""
+    key = str(event_key or "").strip()
+    if not key:
+        return None
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM abuse_moderation_actions WHERE event_key = ?",
+            (key,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def reserve_abuse_moderation_action(
+    event_key: str,
+    group_id: str,
+    offender_qq: str,
+    source_message_id: str,
+    rule_id: str,
+    content_sha256: str,
+    member_role: str,
+    observed_mute_until=0,
+    now=None,
+):
+    """原子预占一次处罚，并阻止重复消息或已有处罚窗口被再次延长。
+
+    ``reserved`` 在外部动作前持久化，本身就代表“不能安全重试”。即使进程
+    在下发动作前后崩溃，重放也只会读取该记录，不会再次调用 OneBot。
+    """
+    key = str(event_key or "").strip()
+    if not key or len(key) > 220:
+        raise ValueError("处罚事件键无效")
+    selected_group = _validate_abuse_moderation_identity(group_id, "群号")
+    selected_offender = _validate_abuse_moderation_identity(offender_qq, "成员 QQ")
+    message_id = str(source_message_id or "").strip()
+    if not message_id or len(message_id) > 100:
+        raise ValueError("OneBot 消息号无效")
+    selected_rule = str(rule_id or "").strip()
+    if not _MODERATION_RULE_ID_RE.fullmatch(selected_rule):
+        raise ValueError("辱骂判定规则无效")
+    selected_hash = str(content_sha256 or "").strip().lower()
+    if not _SHA256_RE.fullmatch(selected_hash):
+        raise ValueError("消息摘要无效")
+    role = str(member_role or "").strip().lower()
+    if role != "member":
+        raise ValueError("只有普通群成员可以进入处罚状态机")
+    now_value = int(time.time() if now is None else now)
+    mute_until = max(0, int(observed_mute_until or 0))
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
+            "SELECT * FROM abuse_moderation_actions WHERE event_key = ?",
+            (key,),
+        ).fetchone()
+        if existing:
+            conn.commit()
+            result = dict(existing)
+            result["acquired"] = False
+            result["reason"] = "duplicate_event"
+            return result
+
+        common_values = (
+            key,
+            selected_group,
+            selected_offender,
+            message_id,
+            selected_rule,
+            selected_hash,
+            ABUSE_MODERATION_DURATION_SECONDS,
+            role,
+        )
+        if mute_until > now_value:
+            conn.execute(
+                """
+                INSERT INTO abuse_moderation_actions (
+                    event_key, group_id, offender_qq, source_message_id,
+                    rule_id, content_sha256, duration_seconds, member_role,
+                    state, suppression_until, completed_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'already_muted', ?, ?, ?, ?)
+                """,
+                (*common_values, mute_until, now_value, now_value, now_value),
+            )
+            conn.commit()
+            result = get_abuse_moderation_action(key)
+            result["acquired"] = False
+            result["reason"] = "already_muted"
+            return result
+
+        placeholders = ", ".join("?" for _ in ABUSE_MODERATION_BARRIER_STATES)
+        active = conn.execute(
+            f"""
+            SELECT event_key, state, suppression_until
+              FROM abuse_moderation_actions
+             WHERE group_id = ? AND offender_qq = ?
+               AND state IN ({placeholders})
+               AND suppression_until > ?
+             ORDER BY suppression_until DESC, created_at DESC
+             LIMIT 1
+            """,
+            (
+                selected_group,
+                selected_offender,
+                *ABUSE_MODERATION_BARRIER_STATES,
+                now_value,
+            ),
+        ).fetchone()
+        if active:
+            conn.execute(
+                """
+                INSERT INTO abuse_moderation_actions (
+                    event_key, group_id, offender_qq, source_message_id,
+                    rule_id, content_sha256, duration_seconds, member_role,
+                    state, related_event_key, suppression_until,
+                    completed_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'suppressed', ?, ?, ?, ?, ?)
+                """,
+                (
+                    *common_values,
+                    active["event_key"],
+                    active["suppression_until"],
+                    now_value,
+                    now_value,
+                    now_value,
+                ),
+            )
+            conn.commit()
+            result = get_abuse_moderation_action(key)
+            result["acquired"] = False
+            result["reason"] = f"active_{active['state']}"
+            return result
+
+        token = uuid4().hex
+        suppression_until = now_value + ABUSE_MODERATION_DURATION_SECONDS
+        conn.execute(
+            """
+            INSERT INTO abuse_moderation_actions (
+                event_key, group_id, offender_qq, source_message_id,
+                rule_id, content_sha256, duration_seconds, member_role,
+                state, action_token, suppression_until, action_started_at,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?)
+            """,
+            (
+                *common_values,
+                token,
+                suppression_until,
+                now_value,
+                now_value,
+                now_value,
+            ),
+        )
+        conn.commit()
+        result = get_abuse_moderation_action(key)
+        result["acquired"] = True
+        result["reason"] = "reserved"
+        return result
+
+
+def finish_abuse_moderation_action(
+    event_key: str,
+    action_token: str,
+    state: str,
+    error: str = "",
+    now=None,
+) -> bool:
+    """用预占令牌一次性落稳 OneBot 结果，迟到或重复完成不会改写终态。"""
+    selected_state = str(state or "").strip().lower()
+    if selected_state not in ("confirmed", "unknown", "rejected"):
+        raise ValueError("处罚完成状态无效")
+    key = str(event_key or "").strip()
+    token = str(action_token or "").strip()
+    if not key or not token:
+        return False
+    now_value = int(time.time() if now is None else now)
+    detail = str(error or "").strip()[:1000] or None
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if selected_state == "confirmed":
+            suppression_sql = "suppression_until = ?"
+            suppression_params = (now_value + ABUSE_MODERATION_DURATION_SECONDS,)
+        elif selected_state == "rejected":
+            suppression_sql = "suppression_until = NULL"
+            suppression_params = ()
+        else:
+            suppression_sql = "suppression_until = suppression_until"
+            suppression_params = ()
+        cur = conn.execute(
+            f"""
+            UPDATE abuse_moderation_actions
+               SET state = ?,
+                   action_token = NULL,
+                   {suppression_sql},
+                   completed_at = ?,
+                   last_error = ?,
+                   updated_at = ?
+             WHERE event_key = ? AND action_token = ? AND state = 'reserved'
+            """,
+            (
+                selected_state,
+                *suppression_params,
+                now_value,
+                detail,
+                now_value,
+                key,
+                token,
+            ),
+        )
+        conn.commit()
+        return cur.rowcount == 1
 
 
 def get_or_create_qq_whitelist_sync_instance_id(now=None) -> str:

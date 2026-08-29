@@ -12,7 +12,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY bot.py storage.py qq_whitelist_sync.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py ./
+COPY bot.py storage.py abuse_moderation.py qq_whitelist_sync.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py ./
 
 RUN groupadd --gid 10001 bugbot \
     && useradd --create-home --uid 10001 --gid bugbot bugbot \
