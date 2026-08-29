@@ -26,6 +26,12 @@ if (args.Length > 0 && string.Equals(args[0], "--training-synthetic", StringComp
     return;
 }
 
+if (args.Length > 0 && string.Equals(args[0], "--training-human", StringComparison.Ordinal))
+{
+    Environment.ExitCode = await HumanTrainingCommand.RunAsync(args[1..]);
+    return;
+}
+
 if (args.Length > 0 && string.Equals(args[0], "--migrate-shared-accounts", StringComparison.Ordinal))
 {
     if (args.Length is < 3 or > 4)

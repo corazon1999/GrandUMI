@@ -102,6 +102,32 @@ dotnet run --project .\服务端WebSocket\GrandUMIServer.csproj -- `
   --compute-device cpu
 ```
 
+### 真人数据 No-Go 门禁
+
+`--training-human` 不是训练开关，而是历史真人数据发布前的 fail-closed 审计入口。它先对指定
+JSONL 日志运行不可变归档 worker 覆盖审计，再写出自哈希的
+`grandumi.human_training_gate_report.v1`。当前归档 replay v2 响应没有承载动作前脱敏
+observation、`LegalActionSet` 和实际动作三者的逐决策绑定，因此该命令当前只会返回 No-Go
+（退出码 `3`），不会生成空数据集、空模型或 shadow 候选，也不会修改生产 registry。
+
+Windows 输出仍必须通过 E 盘助手创建：
+
+```powershell
+. .\ops\windows\GrandUmiTemp.ps1
+$humanGateDirectory = Get-GrandUmiTempDirectory -Category 'ai-human-gate'
+dotnet run --project .\服务端WebSocket\GrandUMIServer.csproj -- `
+  --training-human `
+  --logs <测试服持久 MatchLogs 的只读副本> `
+  --archive-root <不可变 replay artifact 归档目录> `
+  --output (Join-Path $humanGateDirectory 'human-training-gate.v1.json')
+```
+
+报告只接受闭合的覆盖统计和与计数精确对应的原因码。`replay_verified=0` 时原因是
+`no_replay_verified_logs`；即使存在 `replay_verified`，在归档 worker 尚未提供
+`grandumi.verified_human_decision_evidence.v1` 前仍为
+`verified_decision_evidence_unavailable`。fixture、synthetic、Bot 局、握手成功、
+`preparation_ready`、controller 用当前 main 补算的结果均不能增加真人样本计数。
+
 ### 计算设备与低内存默认值
 
 当前实现不包含 CUDA、Torch、ONNX Runtime、ML.NET 或其他 GPU 运行时。所谓“训练”是对规范
@@ -180,5 +206,6 @@ JSON 使用 `grandumi.replay_coverage_report.v2`，没有时间戳；输入内�
 - 测试服运行中另行激活或新增规则热更新包不会自动创建新归档；这类新身份会在审计中成为 `artifact_not_archived`。下一阶段必须把规则激活与同样的不可变归档门禁绑定后，才可允许其进入 worker。
 - 当前归档仅在测试服本机持久路径可取回，尚未建立异机冗余、保留期／容量治理和灾备恢复演练。
 - 统一动作集合、动作前 observation、数据集 manifest 和 synthetic 最小端到端已经本地实现；但测试服尚未部署本次代码，也尚无由新日志产生并通过 `replay_verified` 的真人样本。现有 synthetic 模型不能冒充真人行为克隆或 Gate B 质量证据。
+- 真人发布审计入口当前固定 fail closed：0 条 `replay_verified` 时不发布；即使将来出现重放通过局，在历史 worker 没有逐决策证据协议前也不发布。报告中的真人局数、真人样本数、数据集／模型／shadow／生产资格和生产 registry 修改标记当前都必须保持为 0 或 false。
 
 这些门禁完成前，不得把 fixture、`preparation_ready`、仅握手成功或测试候选 catalog 称为可训练数据集；只有具体对局的 `replay_verified` 才表示该局真实历史重放成功。
