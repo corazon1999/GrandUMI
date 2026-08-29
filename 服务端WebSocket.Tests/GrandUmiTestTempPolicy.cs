@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using GrandUMI.Training;
 
 namespace GrandUMI.Tests;
 
@@ -9,6 +10,11 @@ internal static class GrandUmiTestTempPolicy
     [ModuleInitializer]
     internal static void Initialize()
     {
+        ReplayRuntimeIdentityProvider.Initialize(new ReplayRuntimeBuildIdentity(
+            "1111111111111111111111111111111111111111",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"));
+
         if (!OperatingSystem.IsWindows()) return;
 
         var driveRoot = Path.GetPathRoot(WindowsTempRoot);

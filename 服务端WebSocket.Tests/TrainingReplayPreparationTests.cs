@@ -16,6 +16,7 @@ public class TrainingReplayPreparationTests
             "服务端WebSocket.Tests",
             "Fixtures",
             "training-replay-artifact-registry.v1.json")));
+    private static readonly Lazy<ReplayArtifactRegistry> CurrentFixtureRegistry = new(CreateCurrentFixtureRegistry);
 
     public static IEnumerable<object?[]> GoldenCases()
     {
@@ -220,6 +221,22 @@ public class TrainingReplayPreparationTests
     }
 
     [Fact]
+    public void 日志Binary哈希与注册工件不同_禁止只凭Commit回退()
+    {
+        var start = Start("binary-mismatch");
+        start["payload"]!["binarySha256"] =
+            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(BuildLog(start, End("binary-mismatch", 2))),
+            "binary-mismatch",
+            FixtureRegistry.Value);
+
+        Assert.False(result.IsPrepared);
+        Assert.Equal(ReplayQuarantineCodes.ArtifactIdentityMismatch, result.Quarantine!.ReasonCode);
+    }
+
+    [Fact]
     public void 生产注册表初始为空_不会把当前Main当历史工件兜底()
     {
         var registry = ReplayArtifactRegistry.Load(RepoPath(
@@ -233,8 +250,10 @@ public class TrainingReplayPreparationTests
             FixtureRegistry.Value.Artifacts.Single() is var artifact
                 ? new ReplayVersionIdentity(
                     artifact.MatchLogSchema,
+                    artifact.EventAdapterVersion,
                     artifact.EngineArtifactId,
                     artifact.EngineCommit,
+                    artifact.BinarySha256,
                     artifact.RulesVersion,
                     artifact.RulesetManifestHash,
                     artifact.CardDbContentHash,
@@ -291,6 +310,185 @@ public class TrainingReplayPreparationTests
         Assert.Equal(ReplayQuarantineCodes.OrphanActionResult, result.Quarantine!.ReasonCode);
     }
 
+    [Fact]
+    public void 新Accepted自包含规范Data与RequestId_不依赖Requested取训练数据()
+    {
+        var text = BuildLog(
+            Start(
+                "self-contained-player",
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("self-contained-player", 2, "player_action_requested", 0, new
+            {
+                requestId = "req-player-1",
+                action = "AttachDon",
+                data = new { targetId = "leader", count = 2 },
+                source = "player",
+            }),
+            Event("self-contained-player", 3, "player_action_accepted", 0, new
+            {
+                requestId = "req-player-1",
+                action = "AttachDon",
+                data = new { count = 2, targetId = "leader" },
+                source = "player",
+            }),
+            End("self-contained-player", 4));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "self-contained-player", CurrentFixtureRegistry.Value);
+
+        var action = Assert.Single(result.Prepared!.Tape.Actions);
+        Assert.Equal(3, action.OrderSeq);
+        Assert.Equal(3, action.SourceSeq);
+        Assert.Equal(3, action.ResultSeq);
+        Assert.Equal(ReplayActionSource.Player, action.Source);
+        Assert.True(action.IsTrainingLabelCandidate);
+        Assert.Equal(2, action.Data.GetProperty("count").GetInt32());
+    }
+
+    [Fact]
+    public void 系统超时Accepted明确标记System_绝不成为真人训练标签()
+    {
+        var text = BuildLog(
+            Start(
+                "self-contained-system",
+                firstPlayer: -1,
+                deferredOpening: true,
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("self-contained-system", 2, "starting_player_choice_timeout_auto_select", 0, new
+            {
+                requestId = "system-timeout-1",
+                goFirst = true,
+            }),
+            Event("self-contained-system", 3, "player_action_accepted", 0, new
+            {
+                requestId = "system-timeout-1",
+                action = "ChooseFirstPlayer",
+                data = new { goFirst = true },
+                source = "system",
+            }),
+            End("self-contained-system", 4));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "self-contained-system", CurrentFixtureRegistry.Value);
+
+        var action = Assert.Single(result.Prepared!.Tape.Actions);
+        Assert.Equal(ReplayActionSource.System, action.Source);
+        Assert.False(action.IsTrainingLabelCandidate);
+        Assert.Equal(0, result.Prepared.Tape.HumanLabelCandidateCount);
+    }
+
+    [Fact]
+    public void AcceptedData与Requested不一致_整局隔离()
+    {
+        var text = BuildLog(
+            Start(
+                "self-contained-mismatch",
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("self-contained-mismatch", 2, "player_action_requested", 0, new
+            {
+                requestId = "req-mismatch",
+                action = "Mulligan",
+                data = new { redraw = false },
+                source = "player",
+            }),
+            Event("self-contained-mismatch", 3, "player_action_accepted", 0, new
+            {
+                requestId = "req-mismatch",
+                action = "Mulligan",
+                data = new { redraw = true },
+                source = "player",
+            }),
+            End("self-contained-mismatch", 4));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "self-contained-mismatch", CurrentFixtureRegistry.Value);
+
+        Assert.False(result.IsPrepared);
+        Assert.Equal(ReplayQuarantineCodes.AcceptedActionDataMismatch, result.Quarantine!.ReasonCode);
+    }
+
+    [Fact]
+    public void 同席位重复RequestId_即使动作分开完成也整局隔离()
+    {
+        var text = BuildLog(
+            Start(
+                "duplicate-request-id",
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("duplicate-request-id", 2, "player_action_requested", 0, new
+            {
+                requestId = "duplicate-id",
+                action = "Mulligan",
+                data = new { redraw = false },
+                source = "player",
+            }),
+            Event("duplicate-request-id", 3, "player_action_accepted", 0, new
+            {
+                requestId = "duplicate-id",
+                action = "Mulligan",
+                data = new { redraw = false },
+                source = "player",
+            }),
+            Event("duplicate-request-id", 4, "player_action_requested", 0, new
+            {
+                requestId = "duplicate-id",
+                action = "EndTurn",
+                data = new { },
+                source = "player",
+            }),
+            End("duplicate-request-id", 5));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "duplicate-request-id", CurrentFixtureRegistry.Value);
+
+        Assert.False(result.IsPrepared);
+        Assert.Equal(ReplayQuarantineCodes.DuplicateRequestCorrelation, result.Quarantine!.ReasonCode);
+    }
+
+    [Fact]
+    public void 当前Adapter缺少自包含Accepted字段_不得退回Legacy配对()
+    {
+        var text = BuildLog(
+            Start(
+                "current-old-accepted",
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("current-old-accepted", 2, "player_action_requested", 0, new
+            {
+                requestId = "req-current-1",
+                action = "Mulligan",
+                data = new { redraw = false },
+                source = "player",
+            }),
+            Event("current-old-accepted", 3, "player_action_accepted", 0, new { action = "Mulligan" }),
+            End("current-old-accepted", 4));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "current-old-accepted", CurrentFixtureRegistry.Value);
+
+        Assert.False(result.IsPrepared);
+        Assert.Equal(ReplayQuarantineCodes.MalformedActionResult, result.Quarantine!.ReasonCode);
+    }
+
+    [Fact]
+    public void 当前Adapter系统调度事件缺少Accepted_不得沿用Legacy隐式映射()
+    {
+        var text = BuildLog(
+            Start(
+                "current-system-missing-result",
+                adapterVersion: MatchLogEventAdapter.CurrentAdapterVersion),
+            Event("current-system-missing-result", 2, "mulligan_timeout_auto_keep", 1, new
+            {
+                requestId = "system-mulligan-1",
+                redraw = false,
+            }),
+            End("current-system-missing-result", 3));
+
+        var result = ReplayMatchPreparation.Prepare(
+            Encoding.UTF8.GetBytes(text), "current-system-missing-result", CurrentFixtureRegistry.Value);
+
+        Assert.False(result.IsPrepared);
+        Assert.Equal(ReplayQuarantineCodes.UnresolvedAction, result.Quarantine!.ReasonCode);
+    }
+
     private static object?[] Case(
         string name,
         string text,
@@ -302,7 +500,11 @@ public class TrainingReplayPreparationTests
     private static object?[] QuarantineCase(string name, string text, string reason)
         => [name, text, false, reason, 0, 0, null];
 
-    private static JsonObject Start(string matchId, int firstPlayer = 0, bool deferredOpening = false)
+    private static JsonObject Start(
+        string matchId,
+        int firstPlayer = 0,
+        bool deferredOpening = false,
+        string? adapterVersion = null)
         => JsonSerializer.SerializeToNode(new
         {
             schema = MatchLogEventAdapter.SupportedSchema,
@@ -320,8 +522,10 @@ public class TrainingReplayPreparationTests
                 firstPlayer,
                 rngSeed = 1001,
                 openingSetupAfterFirstPlayerChoice = deferredOpening,
+                eventAdapterVersion = adapterVersion ?? MatchLogEventAdapter.LegacyAdapterVersion,
                 engineArtifactId = "fixture-server-20260828",
                 engineCommit = "1111111111111111111111111111111111111111",
+                binarySha256 = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 rulesVersion = "fixture-rules-v1",
                 rulesetManifestHash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 cardDbContentHash = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -332,6 +536,37 @@ public class TrainingReplayPreparationTests
                 replayConfig = new { leaderKeywordWildcard = false },
             },
         })!.AsObject();
+
+    private static ReplayArtifactRegistry CreateCurrentFixtureRegistry()
+    {
+        var artifact = FixtureRegistry.Value.Artifacts.Single();
+        var root = JsonSerializer.SerializeToNode(new
+        {
+            schema = ReplayArtifactRegistry.Schema,
+            registryVersion = "fixture-current-v2",
+            artifacts = new[]
+            {
+                new
+                {
+                    matchLogSchema = artifact.MatchLogSchema,
+                    eventAdapterVersion = MatchLogEventAdapter.CurrentAdapterVersion,
+                    engineArtifactId = artifact.EngineArtifactId,
+                    engineCommit = artifact.EngineCommit,
+                    binarySha256 = artifact.BinarySha256,
+                    rulesVersion = artifact.RulesVersion,
+                    rulesetManifestHash = artifact.RulesetManifestHash,
+                    cardDbContentHash = artifact.CardDbContentHash,
+                    rngAlgorithmVersion = artifact.RngAlgorithmVersion,
+                    deterministicIdVersion = artifact.DeterministicIdVersion,
+                    openingProtocolVersion = artifact.OpeningProtocolVersion,
+                    replayConfigSchema = artifact.ReplayConfigSchema,
+                    executable = artifact.Executable,
+                },
+            },
+        })!.AsObject();
+        root["registryHash"] = CanonicalJson.Hash(JsonSerializer.SerializeToElement(root));
+        return ReplayArtifactRegistry.Parse(root.ToJsonString());
+    }
 
     private static JsonObject End(string matchId, long seq)
         => Event(matchId, seq, "match_end", -1, new

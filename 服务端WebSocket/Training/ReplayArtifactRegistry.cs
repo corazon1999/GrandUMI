@@ -149,7 +149,9 @@ public sealed class ReplayArtifactRegistry
 
         var mismatches = new List<string>();
         Compare("matchLogSchema", identity.MatchLogSchema, descriptor.MatchLogSchema, mismatches);
+        Compare("eventAdapterVersion", identity.EventAdapterVersion, descriptor.EventAdapterVersion, mismatches);
         Compare("engineCommit", identity.EngineCommit, descriptor.EngineCommit, mismatches);
+        Compare("binarySha256", identity.BinarySha256, descriptor.BinarySha256, mismatches);
         Compare("rulesVersion", identity.RulesVersion, descriptor.RulesVersion, mismatches);
         Compare("rulesetManifestHash", identity.RulesetManifestHash, descriptor.RulesetManifestHash, mismatches);
         Compare("cardDbContentHash", identity.CardDbContentHash, descriptor.CardDbContentHash, mismatches);

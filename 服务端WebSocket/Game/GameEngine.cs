@@ -7,6 +7,7 @@ using GrandUMI.Game.Logging;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
+using GrandUMI.Training;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -39,6 +40,8 @@ public class GameEngine
     public bool EnablePrivateSnapshotLog { get; set; } = true;
     private string? _activeAction;
     private int? _activeActor;
+    private string? _activeRequestId;
+    private GameActionSource _activeActionSource;
     private bool _activeActionRejected;
     private readonly object _snapshotBatchGate = new();
     private bool _snapshotBatchActive;
@@ -220,15 +223,43 @@ public class GameEngine
 
     // ── 引擎入口 ──────────────────────────────────────────────────────────
 
-    public bool HandleAction(int playerIndex, string action, JsonElement data, string? requestId = null)
+    public bool HandleAction(
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string? requestId = null,
+        GameActionSource source = GameActionSource.Player)
     {
         if (State.IsGameOver) return false;
+
+        var correlationId = GameActionSourceWire.CorrelationId(requestId, source);
+        try
+        {
+            data = CanonicalJson.NormalizeObject(data);
+        }
+        catch (InvalidDataException ex)
+        {
+            RecordMatchLog("player_action_rejected", playerIndex, new
+            {
+                requestId = correlationId,
+                action,
+                source = GameActionSourceWire.Value(source),
+                reason = ex.Message,
+            });
+            OnSendToPlayer?.Invoke(playerIndex, new
+            {
+                proto = "MsgActionRejected",
+                reason = ex.Message,
+                requestId = correlationId,
+            });
+            return false;
+        }
 
         var dispatchStartedAt = LatencyDiagnostics.Start();
         BeginSnapshotBatch();
         _latencyActionStartedAt = dispatchStartedAt;
         _latencyAction = action;
-        _latencyRequestId = requestId;
+        _latencyRequestId = correlationId;
 
         // 动作可能由新线程（重连/线程池）进入，重新挂上本局确定性 ID 工厂；
         // 由本动作启动的 async 续延会捕获该上下文并沿用同一计数器。
@@ -236,6 +267,8 @@ public class GameEngine
 
         _activeAction = action;
         _activeActor = playerIndex;
+        _activeRequestId = correlationId;
+        _activeActionSource = source;
         _activeActionRejected = false;
 
         // 撤回资格必须在后续动作的任何即时快照之前失效，否则 Attack/PlayCard 等屏障快照会
@@ -306,12 +339,13 @@ public class GameEngine
         }
         if (accepted)
         {
-            RecordMatchLog("player_action_accepted", playerIndex, new { action });
-            OnPersistAction?.Invoke(playerIndex, action, data, requestId); // 仅持久化被接受的动作
+            RecordAcceptedAction(playerIndex, action, data, correlationId, source);
+            OnPersistAction?.Invoke(playerIndex, action, data, correlationId); // 仅持久化被接受的动作
         }
 
         _activeAction = null;
         _activeActor = null;
+        _activeRequestId = null;
         if (Volatile.Read(ref _trackedOperations) == 0)
             EndSnapshotBatch();
         LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
@@ -1467,10 +1501,30 @@ public class GameEngine
         _activeActionRejected = true;
         RecordMatchLog("player_action_rejected", _activeActor ?? playerIndex, new
         {
+            requestId = _activeRequestId ?? GameActionSourceWire.CorrelationId(null, _activeActionSource),
             action = _activeAction ?? "",
+            source = GameActionSourceWire.Value(_activeActionSource),
             reason,
         });
         OnSendToPlayer?.Invoke(playerIndex, new { proto = "MsgActionRejected", reason, requestId = _latencyRequestId });
+    }
+
+    /// <summary>accepted 的唯一写入形态；data 已规范化并且来源不会由调用者伪装成真人。</summary>
+    internal void RecordAcceptedAction(
+        int playerIndex,
+        string action,
+        JsonElement data,
+        string requestId,
+        GameActionSource source)
+    {
+        var normalized = CanonicalJson.NormalizeObject(data);
+        RecordMatchLog("player_action_accepted", playerIndex, new
+        {
+            requestId,
+            action,
+            data = normalized,
+            source = GameActionSourceWire.Value(source),
+        });
     }
 
     public void RecordMatchLog(string kind, int? actor, object? payload)

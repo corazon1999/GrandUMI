@@ -9,6 +9,7 @@ using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Ranked;
+using GrandUMI.Training;
 
 namespace GrandUMI.Game;
 
@@ -257,22 +258,25 @@ public static class GameRoomManager
         entry.MatchLogPath = MatchLogRecorder.Open(roomId);
         engine.OnMatchLog = (kind, actor, payload) => MatchLogRecorder.Append(roomId, engine.State, kind, actor, payload);
 
-        engine.RecordMatchLog("match_start", -1, new
-        {
-            players = new[]
-            {
-                new { index = 0, accountName = p0Account, deckRaw = p0Deck },
-                new { index = 1, accountName = p1Account, deckRaw = p1Deck },
-            },
+        var replayIdentity = ReplayRuntimeIdentityProvider.For(
+            engine.State.Ruleset ?? CardRulesetManager.GetRequired(engine.State.RulesetId));
+        engine.RecordMatchLog("match_start", -1, ReplayRuntimeIdentityFactory.CreateMatchStartPayload(
+            replayIdentity,
+            [
+                new ReplayMatchStartPlayer(0, p0Account, p0Deck, p0AlwaysPrompt),
+                new ReplayMatchStartPlayer(1, p1Account, p1Deck, p1AlwaysPrompt),
+            ],
             firstPlayer,
-            startingPlayerChooser = engine.State.StartingPlayerChooser,
-            startingDiceRolls = engine.State.StartingDiceRounds,
-            rngSeed = engine.State.RngSeed,
+            engine.State.StartingPlayerChooser,
+            engine.State.StartingDiceRounds.Select(round => (object)new
+            {
+                player0 = round.Player0,
+                player1 = round.Player1,
+            }).ToArray(),
+            engine.State.RngSeed,
             openingSetupAfterFirstPlayerChoice,
-            matchKind = matchKind.ToString(),
-            rulesVersion = engine.State.RulesetId,
-            cardDbVersion = "local-card-json",
-        });
+            matchKind.ToString(),
+            leaderKeywordWildcard: vsBot));
         engine.FlushPendingMatchLogs();
 
         // 动作日志持久化（仅 PvP 真人对局；重启恢复用）
@@ -437,7 +441,12 @@ public static class GameRoomManager
 
 
     internal static void EnqueueBotAction(RoomEntry room, int playerIndex, string action, JsonElement data)
-        => EnqueuePlayerAction(room, playerIndex, action, data.Clone());
+        => EnqueuePlayerAction(
+            room,
+            playerIndex,
+            action,
+            data.Clone(),
+            source: GameActionSource.System);
 
     private static bool EnqueuePlayerAction(
         RoomEntry room,
@@ -445,11 +454,27 @@ public static class GameRoomManager
         string action,
         JsonElement data,
         string? requestId = null,
-        long receivedAt = 0)
+        long receivedAt = 0,
+        GameActionSource source = GameActionSource.Player)
     {
         var promptIdBefore = action == "PromptResponse" ? room.Engine.State.PendingPrompt?.PromptId : null;
         return EnqueueWork(room, new RoomWork(action, LatencyDiagnostics.Start(), async () =>
         {
+            try
+            {
+                data = CanonicalJson.NormalizeObject(data);
+            }
+            catch (InvalidDataException ex)
+            {
+                WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], new
+                {
+                    proto = "MsgActionRejected",
+                    reason = ex.Message,
+                    requestId,
+                });
+                return;
+            }
+            var correlationId = GameActionSourceWire.CorrelationId(requestId, source);
             var pause = PauseOperationClockForAction(room, playerIndex, action, receivedAt);
             if (pause.ExpiredPlayer is 0 or 1)
             {
@@ -466,8 +491,14 @@ public static class GameRoomManager
                 EnsureOperationClockRunning(room);
                 return;
             }
-            room.Engine.RecordMatchLog("player_action_requested", playerIndex, new { action, data });
-            var accepted = room.Engine.HandleAction(playerIndex, action, data, requestId);
+            room.Engine.RecordMatchLog("player_action_requested", playerIndex, new
+            {
+                requestId = correlationId,
+                action,
+                data,
+                source = GameActionSourceWire.Value(source),
+            });
+            var accepted = room.Engine.HandleAction(playerIndex, action, data, correlationId, source);
             // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
             // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
             if (accepted)
@@ -1111,8 +1142,14 @@ public static class GameRoomManager
 
         var chooser = state.StartingPlayerChooser;
         var data = JsonSerializer.SerializeToElement(new { goFirst = true });
-        room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { goFirst = true });
-        var accepted = room.Engine.HandleAction(chooser, "ChooseFirstPlayer", data);
+        var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
+        room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { requestId, goFirst = true });
+        var accepted = room.Engine.HandleAction(
+            chooser,
+            "ChooseFirstPlayer",
+            data,
+            requestId,
+            GameActionSource.System);
         if (!accepted) return false;
 
         await room.Engine.WaitSettledAsync();
@@ -1238,8 +1275,15 @@ public static class GameRoomManager
         foreach (var playerIndex in autoKept)
         {
             var data = JsonSerializer.SerializeToElement(new { redraw = false });
-            room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { redraw = false });
-            room.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data, null);
+            var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
+            room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { requestId, redraw = false });
+            room.Engine.RecordAcceptedAction(
+                playerIndex,
+                "Mulligan",
+                data,
+                requestId,
+                GameActionSource.System);
+            room.Engine.OnPersistAction?.Invoke(playerIndex, "Mulligan", data, requestId);
         }
         await room.Engine.WaitSettledAsync();
         return autoKept;

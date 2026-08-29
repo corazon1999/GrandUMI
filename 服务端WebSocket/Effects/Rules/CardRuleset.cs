@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using GrandUMI.Effects.Dsl;
 using GrandUMI.Game;
+using GrandUMI.Training;
 
 namespace GrandUMI.Effects.Rules;
 
@@ -23,7 +24,8 @@ public sealed class CardRuleset
         IReadOnlyDictionary<string, IScriptedEffect> scriptedEffects,
         IReadOnlyDictionary<string, JsonElement> dslDefinitions,
         IReadOnlyCollection<string> changedCards,
-        IReadOnlyCollection<AssemblyLoadContext>? loadContexts = null)
+        IReadOnlyCollection<AssemblyLoadContext>? loadContexts = null,
+        string? sourcePackageHash = null)
     {
         Id = id;
         BaseRulesetId = baseRulesetId;
@@ -32,12 +34,22 @@ public sealed class CardRuleset
         _dslDefinitions = dslDefinitions;
         ChangedCards = changedCards.Order(StringComparer.Ordinal).ToArray();
         LoadContexts = loadContexts?.ToArray() ?? [];
+        ManifestHash = ReplayRuntimeIdentityFactory.ComputeRulesetManifestHash(
+            id,
+            baseRulesetId,
+            description,
+            scriptedEffects,
+            dslDefinitions,
+            ChangedCards,
+            sourcePackageHash);
     }
 
     public string Id { get; }
     public string? BaseRulesetId { get; }
     public string Description { get; }
     public IReadOnlyList<string> ChangedCards { get; }
+    /// <summary>本局规则行为、内置/插件程序集和规则包内容的不可变清单哈希。</summary>
+    public string ManifestHash { get; }
 
     // 规则集存活期间保留插件加载上下文，避免程序集在仍有对局引用时被回收。
     internal IReadOnlyList<AssemblyLoadContext> LoadContexts { get; }
@@ -328,6 +340,7 @@ public static class CardRulesetManager
         var changedCards = new HashSet<string>(manifest.ChangedCards ?? [], StringComparer.OrdinalIgnoreCase);
         var overriddenCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var contexts = new List<AssemblyLoadContext>();
+        var sourcePackageHash = ReplayContentManifest.HashDirectory(directory);
 
         if (!string.IsNullOrWhiteSpace(manifest.DefinitionsDirectory))
         {
@@ -369,7 +382,8 @@ public static class CardRulesetManager
             scripted,
             definitions,
             changedCards,
-            contexts);
+            contexts,
+            sourcePackageHash);
     }
 
     private static RulesetManifest ReadManifest(string directory)

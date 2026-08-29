@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text;
+using GrandUMI.Training;
 
 namespace GrandUMI.Cards;
 
@@ -15,6 +16,8 @@ public static class CardDatabase
     private static bool _loaded;
 
     public static int Count => _byNumber.Count;
+    /// <summary>启动时一次性计算的“规范相对路径 + 原始文件字节”SHA-256。</summary>
+    public static string ContentHash { get; private set; } = string.Empty;
 
     /// <summary>
     /// 加载所有卡集。幂等且线程安全：首次加载后重复调用直接返回。
@@ -37,12 +40,15 @@ public static class CardDatabase
             throw new DirectoryNotFoundException($"卡牌数据目录不存在: {cardDataRoot}");
 
         var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var files = Directory.GetFiles(cardDataRoot, "*.json")
+            .Where(file => !Path.GetFileNameWithoutExtension(file).StartsWith("_", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        // 哈希只在启动加载阶段遍历磁盘；新建房间和逐动作路径只读取缓存字符串。
+        ContentHash = ReplayContentManifest.HashFiles(cardDataRoot, files);
 
-        foreach (var file in Directory.GetFiles(cardDataRoot, "*.json"))
+        foreach (var file in files)
         {
-            var fileName = Path.GetFileNameWithoutExtension(file);
-            if (fileName.StartsWith("_")) continue; // 跳过 _index.json
-
             try
             {
                 using var fs = File.OpenRead(file);

@@ -50,6 +50,40 @@ public class MatchLogTests
         Assert.Equal(4, players[1].GetProperty("life").GetArrayLength());
     }
 
+    [Fact]
+    public void Accepted事件_自包含规范Data关联Id与真实System来源()
+    {
+        TestScene.New();
+        var deck = BuildLegalDeck("OP15-001");
+        var events = new List<MatchLogEvent>();
+        var engine = new GameEngine(
+            "accepted-log-test",
+            ("s0", "alice", deck),
+            ("s1", "bob", deck),
+            firstPlayer: 0,
+            rngSeed: 98765);
+        engine.OnMatchLog = (kind, actor, payload) => events.Add(new(kind, actor, payload));
+        engine.FlushPendingMatchLogs();
+
+        var accepted = engine.HandleAction(
+            0,
+            "Mulligan",
+            JsonDocument.Parse("{\"redraw\":false}").RootElement.Clone(),
+            " system-request-1 ",
+            GameActionSource.System);
+
+        Assert.True(accepted);
+        var acceptedEvent = Assert.Single(events.Where(item => item.Kind == "player_action_accepted"));
+        using var document = ToJson(acceptedEvent.Payload);
+        var payload = document.RootElement;
+        Assert.Equal("system-request-1", payload.GetProperty("requestId").GetString());
+        Assert.Equal("Mulligan", payload.GetProperty("action").GetString());
+        Assert.False(payload.GetProperty("data").GetProperty("redraw").GetBoolean());
+        Assert.Equal("system", payload.GetProperty("source").GetString());
+        Assert.DoesNotContain("alice", payload.GetRawText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bob", payload.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string BuildLegalDeck(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;

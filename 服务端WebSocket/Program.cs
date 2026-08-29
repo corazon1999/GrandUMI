@@ -7,6 +7,7 @@ using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Persistence;
+using GrandUMI.Training;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -147,13 +148,17 @@ adminDeploymentCoordinator?.Initialize();
 if (adminDeploymentCoordinator is not null)
     Console.WriteLine("[管理员发布] 已连接受限发布队列");
 
-CardDatabase.LoadFrom(ResolveCardDataPath());
+var cardDataPath = ResolveCardDataPath();
+CardDatabase.LoadFrom(cardDataPath);
 GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
     ResolveDslDir(),
     $"builtin-{BuildInfo.Commit}");
 CardRulesetManager.InitializePackages(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "Rulesets"));
+// 提交、核心程序集和卡表只在启动阶段读取/哈希；新建房间只按钉住的规则集取缓存身份。
+ReplayRuntimeIdentityProvider.InitializeFromCurrentProcess(BuildInfo.Commit, CardDatabase.ContentHash);
+Console.WriteLine($"[训练重放身份] binary={ReplayRuntimeIdentityProvider.For(CardRulesetManager.Current).BinarySha256}，cardDb={CardDatabase.ContentHash}，rules={CardRulesetManager.Current.ManifestHash}");
 var keepLeaderStatsWalAnchor = string.Equals(
     LeaderStatsStore.Default.DatabasePath,
     LeaderStatsStore.Default.LeaderboardDatabasePath,

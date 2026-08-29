@@ -72,14 +72,15 @@ public static class AcceptedActionTapeBuilder
 
     public static AcceptedActionTape Build(AdaptedMatchLog log, ReplayArtifactDescriptor artifact)
     {
-        if (!string.Equals(
-                artifact.EventAdapterVersion,
-                MatchLogEventAdapter.SupportedAdapterVersion,
-                StringComparison.Ordinal))
+        if (!IsSupportedAdapterVersion(artifact.EventAdapterVersion))
             throw Quarantine(
                 ReplayQuarantineCodes.UnsupportedEventAdapter,
                 $"当前 worker 不支持事件适配器 {artifact.EventAdapterVersion}",
                 log.Header.MatchId);
+        var requiresSelfContainedActions = string.Equals(
+            artifact.EventAdapterVersion,
+            MatchLogEventAdapter.CurrentAdapterVersion,
+            StringComparison.Ordinal);
 
         var pendingPlayers = new List<PendingAction>();
         var pendingSystems = new List<PendingAction>();
@@ -87,6 +88,7 @@ public static class AcceptedActionTapeBuilder
             .Where(e => string.Equals(e.Kind, "prompt_response", StringComparison.Ordinal))
             .ToDictionary(e => e.Seq);
         var consumedPromptResponses = new HashSet<long>();
+        var seenRequestIds = new HashSet<string>(StringComparer.Ordinal);
         var actions = new List<AcceptedActionTapeEntry>();
 
         foreach (var entry in log.Events)
@@ -94,18 +96,42 @@ public static class AcceptedActionTapeBuilder
             switch (entry.Kind)
             {
                 case "player_action_requested":
-                    pendingPlayers.Add(ParsePlayerRequest(entry, log.Header.MatchId));
-                    break;
-                case "player_action_accepted":
-                    ResolveAction(
+                {
+                    var pending = ParseRequest(
                         entry,
-                        accepted: true,
-                        pendingPlayers,
-                        pendingSystems,
-                        promptResponses,
-                        consumedPromptResponses,
-                        actions,
-                        log.Header.MatchId);
+                        log.Header.MatchId,
+                        requiresSelfContainedActions);
+                    if (pending.RequestId is not null
+                        && !seenRequestIds.Add($"{pending.ActorSeat}\n{pending.RequestId}"))
+                        throw Quarantine(
+                            ReplayQuarantineCodes.DuplicateRequestCorrelation,
+                            $"同一席位重复使用 requestId：{pending.RequestId}",
+                            log.Header.MatchId,
+                            entry.Seq);
+                    (pending.Source == ReplayActionSource.Player ? pendingPlayers : pendingSystems).Add(pending);
+                    break;
+                }
+                case "player_action_accepted":
+                    if (requiresSelfContainedActions)
+                        ResolveSelfContainedAccepted(
+                            entry,
+                            pendingPlayers,
+                            pendingSystems,
+                            promptResponses,
+                            consumedPromptResponses,
+                            actions,
+                            log.Header.MatchId);
+                    else
+                        ResolveAction(
+                            entry,
+                            accepted: true,
+                            pendingPlayers,
+                            pendingSystems,
+                            promptResponses,
+                            consumedPromptResponses,
+                            actions,
+                            log.Header.MatchId,
+                            requireResultMetadata: false);
                     break;
                 case "player_action_rejected":
                     ResolveAction(
@@ -116,13 +142,20 @@ public static class AcceptedActionTapeBuilder
                         promptResponses,
                         consumedPromptResponses,
                         actions,
-                        log.Header.MatchId);
+                        log.Header.MatchId,
+                        requireResultMetadata: requiresSelfContainedActions);
                     break;
                 case "starting_player_choice_timeout_auto_select":
-                    pendingSystems.Add(ParseStartingPlayerTimeout(entry, log.Header.MatchId));
+                    pendingSystems.Add(ParseStartingPlayerTimeout(
+                        entry,
+                        log.Header.MatchId,
+                        requiresSelfContainedActions));
                     break;
                 case "mulligan_timeout_auto_keep":
-                    actions.Add(CreateDirectMulliganSystemAction(entry, log.Header.MatchId));
+                    pendingSystems.Add(ParseMulliganTimeout(
+                        entry,
+                        log.Header.MatchId,
+                        requiresSelfContainedActions));
                     break;
                 case "prompt_timeout":
                     throw Quarantine(
@@ -139,6 +172,23 @@ public static class AcceptedActionTapeBuilder
                             entry.Seq);
                     break;
             }
+        }
+
+        foreach (var pending in pendingSystems
+                     .Where(item => item.CanApplyWithoutResult)
+                     .OrderBy(item => item.SourceSeq)
+                     .ToArray())
+        {
+            actions.Add(CreateTapeEntry(
+                pending.SourceSeq,
+                pending.SourceSeq,
+                resultSeq: null,
+                pending.ActorSeat,
+                pending.Action,
+                pending.Data,
+                pending.Source,
+                log.Header.MatchId));
+            pendingSystems.Remove(pending);
         }
 
         if (pendingPlayers.Count > 0 || pendingSystems.Count > 0)
@@ -184,7 +234,10 @@ public static class AcceptedActionTapeBuilder
         return new AcceptedActionTape(Array.AsReadOnly(ordered), tapeHash);
     }
 
-    private static PendingAction ParsePlayerRequest(AdaptedMatchLogEvent entry, string matchId)
+    private static PendingAction ParseRequest(
+        AdaptedMatchLogEvent entry,
+        string matchId,
+        bool requireCorrelation)
     {
         var actor = RequireSeat(entry, matchId);
         var action = RequireAction(entry, matchId);
@@ -196,15 +249,27 @@ public static class AcceptedActionTapeBuilder
                 matchId,
                 entry.Seq);
         EnsureCanonicalPayload(data, matchId, entry.Seq);
+        var source = ReadSource(
+            entry.Payload,
+            defaultSource: requireCorrelation ? null : ReplayActionSource.Player,
+            matchId,
+            entry.Seq);
         return new PendingAction(
             actor,
             action,
             data.Clone(),
-            ReplayActionSource.Player,
-            entry.Seq);
+            source,
+            entry.Seq,
+            requireCorrelation
+                ? ReadRequiredRequestId(entry.Payload, matchId, entry.Seq)
+                : ReadOptionalRequestId(entry.Payload, matchId, entry.Seq),
+            CanApplyWithoutResult: false);
     }
 
-    private static PendingAction ParseStartingPlayerTimeout(AdaptedMatchLogEvent entry, string matchId)
+    private static PendingAction ParseStartingPlayerTimeout(
+        AdaptedMatchLogEvent entry,
+        string matchId,
+        bool requireCorrelation)
     {
         var actor = RequireSeat(entry, matchId);
         if (!entry.Payload.TryGetProperty("goFirst", out var goFirst)
@@ -220,12 +285,17 @@ public static class AcceptedActionTapeBuilder
             "ChooseFirstPlayer",
             data,
             ReplayActionSource.System,
-            entry.Seq);
+            entry.Seq,
+            requireCorrelation
+                ? ReadRequiredRequestId(entry.Payload, matchId, entry.Seq)
+                : ReadOptionalRequestId(entry.Payload, matchId, entry.Seq),
+            CanApplyWithoutResult: false);
     }
 
-    private static AcceptedActionTapeEntry CreateDirectMulliganSystemAction(
+    private static PendingAction ParseMulliganTimeout(
         AdaptedMatchLogEvent entry,
-        string matchId)
+        string matchId,
+        bool requireCorrelation)
     {
         var actor = RequireSeat(entry, matchId);
         if (!entry.Payload.TryGetProperty("redraw", out var redraw)
@@ -236,15 +306,96 @@ public static class AcceptedActionTapeBuilder
                 matchId,
                 entry.Seq);
         var data = JsonSerializer.SerializeToElement(new { redraw = false });
-        return CreateTapeEntry(
-            entry.Seq,
-            entry.Seq,
-            resultSeq: null,
+        return new PendingAction(
             actor,
             "Mulligan",
             data,
             ReplayActionSource.System,
-            matchId);
+            entry.Seq,
+            requireCorrelation
+                ? ReadRequiredRequestId(entry.Payload, matchId, entry.Seq)
+                : ReadOptionalRequestId(entry.Payload, matchId, entry.Seq),
+            CanApplyWithoutResult: !requireCorrelation);
+    }
+
+    private static bool IsSupportedAdapterVersion(string version)
+        => string.Equals(version, MatchLogEventAdapter.LegacyAdapterVersion, StringComparison.Ordinal)
+            || string.Equals(version, MatchLogEventAdapter.CurrentAdapterVersion, StringComparison.Ordinal);
+
+    private static void ResolveSelfContainedAccepted(
+        AdaptedMatchLogEvent accepted,
+        ICollection<PendingAction> pendingPlayers,
+        ICollection<PendingAction> pendingSystems,
+        IReadOnlyDictionary<long, AdaptedMatchLogEvent> promptResponses,
+        ISet<long> consumedPromptResponses,
+        ICollection<AcceptedActionTapeEntry> actions,
+        string matchId)
+    {
+        var actor = RequireSeat(accepted, matchId);
+        var action = RequireAction(accepted, matchId);
+        var requestId = ReadRequiredRequestId(accepted.Payload, matchId, accepted.Seq);
+        var source = ReadSource(accepted.Payload, defaultSource: null, matchId, accepted.Seq);
+        if (!accepted.Payload.TryGetProperty("data", out var data)
+            || data.ValueKind != JsonValueKind.Object)
+            throw Quarantine(
+                ReplayQuarantineCodes.MissingActionData,
+                "自包含 player_action_accepted 缺少对象 data",
+                matchId,
+                accepted.Seq);
+        EnsureCanonicalPayload(data, matchId, accepted.Seq);
+
+        var candidates = pendingPlayers.Concat(pendingSystems)
+            .Where(candidate => candidate.ActorSeat == actor
+                && candidate.Source == source
+                && string.Equals(candidate.Action, action, StringComparison.Ordinal)
+                && string.Equals(candidate.RequestId, requestId, StringComparison.Ordinal))
+            .ToArray();
+        if (candidates.Length > 1)
+            throw Quarantine(
+                ReplayQuarantineCodes.AmbiguousActionPairing,
+                $"自包含 accepted 可关联到 {candidates.Length} 个候选：{action}",
+                matchId,
+                accepted.Seq);
+        if (source == ReplayActionSource.Player && candidates.Length == 0)
+            throw Quarantine(
+                ReplayQuarantineCodes.OrphanActionResult,
+                $"真人 accepted 缺少相同 requestId 的 requested：{action}",
+                matchId,
+                accepted.Seq);
+
+        var pending = candidates.SingleOrDefault();
+        if (pending is not null)
+        {
+            if (!string.Equals(CanonicalJson.Hash(pending.Data), CanonicalJson.Hash(data), StringComparison.Ordinal))
+                throw Quarantine(
+                    ReplayQuarantineCodes.AcceptedActionDataMismatch,
+                    "accepted.data 与对应 requested.data 不一致",
+                    matchId,
+                    accepted.Seq);
+            if (pending.Source == ReplayActionSource.Player)
+                pendingPlayers.Remove(pending);
+            else
+                pendingSystems.Remove(pending);
+
+            if (string.Equals(action, "PromptResponse", StringComparison.Ordinal))
+                ValidatePromptResponse(
+                    pending,
+                    accepted,
+                    promptResponses,
+                    consumedPromptResponses,
+                    matchId);
+        }
+
+        // v2 磁带的权威数据只依赖 accepted 自身；requested 仅作为相关性与篡改审计。
+        actions.Add(CreateTapeEntry(
+            accepted.Seq,
+            accepted.Seq,
+            accepted.Seq,
+            actor,
+            action,
+            data,
+            source,
+            matchId));
     }
 
     private static void ResolveAction(
@@ -255,14 +406,29 @@ public static class AcceptedActionTapeBuilder
         IReadOnlyDictionary<long, AdaptedMatchLogEvent> promptResponses,
         ISet<long> consumedPromptResponses,
         ICollection<AcceptedActionTapeEntry> actions,
-        string matchId)
+        string matchId,
+        bool requireResultMetadata)
     {
         var actor = RequireSeat(result, matchId);
         var action = RequireAction(result, matchId);
+        var requestId = requireResultMetadata
+            ? ReadRequiredRequestId(result.Payload, matchId, result.Seq)
+            : ReadOptionalRequestId(result.Payload, matchId, result.Seq);
+        ReplayActionSource? resultSource = requireResultMetadata
+            ? ReadSource(result.Payload, defaultSource: null, matchId, result.Seq)
+            : result.Payload.TryGetProperty("source", out _)
+                ? ReadSource(result.Payload, defaultSource: null, matchId, result.Seq)
+                : null;
         var candidates = pendingPlayers
             .Concat(pendingSystems)
             .Where(candidate => candidate.ActorSeat == actor
-                && string.Equals(candidate.Action, action, StringComparison.Ordinal))
+                && string.Equals(candidate.Action, action, StringComparison.Ordinal)
+                && (!resultSource.HasValue || candidate.Source == resultSource.Value)
+                && (requireResultMetadata
+                    ? string.Equals(candidate.RequestId, requestId, StringComparison.Ordinal)
+                    : requestId is null
+                        || candidate.RequestId is null
+                        || string.Equals(candidate.RequestId, requestId, StringComparison.Ordinal)))
             .ToArray();
         if (candidates.Length == 0)
             throw Quarantine(
@@ -476,6 +642,61 @@ public static class AcceptedActionTapeBuilder
         }
     }
 
+    private static ReplayActionSource ReadSource(
+        JsonElement payload,
+        ReplayActionSource? defaultSource,
+        string matchId,
+        long sourceSeq)
+    {
+        if (!payload.TryGetProperty("source", out var sourceElement))
+        {
+            if (defaultSource.HasValue) return defaultSource.Value;
+            throw Quarantine(
+                ReplayQuarantineCodes.MalformedActionResult,
+                "自包含动作缺少 source",
+                matchId,
+                sourceSeq);
+        }
+        if (sourceElement.ValueKind != JsonValueKind.String)
+            throw Quarantine(
+                ReplayQuarantineCodes.MalformedActionResult,
+                "动作 source 必须是 player 或 system",
+                matchId,
+                sourceSeq);
+        return sourceElement.GetString() switch
+        {
+            "player" => ReplayActionSource.Player,
+            "system" => ReplayActionSource.System,
+            _ => throw Quarantine(
+                ReplayQuarantineCodes.MalformedActionResult,
+                "动作 source 必须是 player 或 system",
+                matchId,
+                sourceSeq),
+        };
+    }
+
+    private static string? ReadOptionalRequestId(JsonElement payload, string matchId, long sourceSeq)
+    {
+        if (!payload.TryGetProperty("requestId", out var requestIdElement)) return null;
+        if (requestIdElement.ValueKind != JsonValueKind.String
+            || requestIdElement.GetString() is not { Length: > 0 and <= 128 } requestId
+            || !string.Equals(requestId, requestId.Trim(), StringComparison.Ordinal))
+            throw Quarantine(
+                ReplayQuarantineCodes.MalformedActionResult,
+                "requestId 必须是无首尾空白且不超过 128 字符的非空字符串",
+                matchId,
+                sourceSeq);
+        return requestId;
+    }
+
+    private static string ReadRequiredRequestId(JsonElement payload, string matchId, long sourceSeq)
+        => ReadOptionalRequestId(payload, matchId, sourceSeq)
+            ?? throw Quarantine(
+                ReplayQuarantineCodes.MalformedActionResult,
+                "自包含 accepted 缺少 requestId",
+                matchId,
+                sourceSeq);
+
     private static int RequireSeat(AdaptedMatchLogEvent entry, string matchId)
     {
         if (entry.Actor is not (0 or 1))
@@ -516,5 +737,7 @@ public static class AcceptedActionTapeBuilder
         string Action,
         JsonElement Data,
         ReplayActionSource Source,
-        long SourceSeq);
+        long SourceSeq,
+        string? RequestId,
+        bool CanApplyWithoutResult);
 }

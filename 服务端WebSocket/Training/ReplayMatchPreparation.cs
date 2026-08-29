@@ -26,6 +26,8 @@ public static class ReplayQuarantineCodes
     public const string ArtifactIdentityMismatch = "artifact_identity_mismatch";
     public const string UnsupportedEventAdapter = "unsupported_event_adapter";
     public const string MissingActionData = "missing_action_data";
+    public const string AcceptedActionDataMismatch = "accepted_action_data_mismatch";
+    public const string DuplicateRequestCorrelation = "duplicate_request_correlation";
     public const string MalformedSystemEvent = "malformed_system_event";
     public const string UnsupportedSystemEvent = "unsupported_system_event";
     public const string OrphanActionResult = "orphan_action_result";
@@ -221,6 +223,14 @@ public static class ReplayMatchPreparation
             registryHash,
             artifact.EngineArtifactId,
             artifact.EngineCommit,
+            artifact.BinarySha256,
+            artifact.RulesVersion,
+            artifact.RulesetManifestHash,
+            artifact.CardDbContentHash,
+            artifact.RngAlgorithmVersion,
+            artifact.DeterministicIdVersion,
+            artifact.OpeningProtocolVersion,
+            artifact.ReplayConfigSchema,
             matchId = log.Header.MatchId,
             log.Header.RngSeed,
             log.Header.FirstPlayer,

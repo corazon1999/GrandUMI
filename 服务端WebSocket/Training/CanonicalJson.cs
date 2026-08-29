@@ -30,6 +30,15 @@ internal static class CanonicalJson
         return buffer.WrittenSpan.ToArray();
     }
 
+    /// <summary>把任意对象 data 固化为属性有序、数字规范且脱离输入文档生命周期的对象。</summary>
+    public static JsonElement NormalizeObject(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("动作 data 必须是 JSON 对象");
+        using var document = JsonDocument.Parse(Encode(element));
+        return document.RootElement.Clone();
+    }
+
     private static void WriteElement(
         Utf8JsonWriter writer,
         JsonElement element,

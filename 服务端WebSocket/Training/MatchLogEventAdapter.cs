@@ -5,8 +5,10 @@ namespace GrandUMI.Training;
 
 public sealed record ReplayVersionIdentity(
     string MatchLogSchema,
+    string EventAdapterVersion,
     string EngineArtifactId,
     string EngineCommit,
+    string BinarySha256,
     string RulesVersion,
     string RulesetManifestHash,
     string CardDbContentHash,
@@ -59,7 +61,9 @@ public sealed record AdaptedMatchLog(
 public static class MatchLogEventAdapter
 {
     public const string SupportedSchema = "grandumi.matchlog.v1";
-    public const string SupportedAdapterVersion = "grandumi.matchlog.v1.accepted-pairing.v1";
+    public const string LegacyAdapterVersion = "grandumi.matchlog.v1.accepted-pairing.v1";
+    public const string CurrentAdapterVersion = "grandumi.matchlog.v1.accepted-self-contained.v2";
+    public const string SupportedAdapterVersion = CurrentAdapterVersion;
     private static readonly UTF8Encoding StrictUtf8 = new(
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
@@ -240,8 +244,10 @@ public static class MatchLogEventAdapter
         var schema = SupportedSchema;
         var identity = new ReplayVersionIdentity(
             schema,
+            RequiredVersionString(payload, "eventAdapterVersion", matchId, matchStart.Seq),
             RequiredVersionString(payload, "engineArtifactId", matchId, matchStart.Seq),
             RequiredVersionString(payload, "engineCommit", matchId, matchStart.Seq),
+            RequiredVersionString(payload, "binarySha256", matchId, matchStart.Seq),
             RequiredVersionString(payload, "rulesVersion", matchId, matchStart.Seq),
             RequiredVersionString(payload, "rulesetManifestHash", matchId, matchStart.Seq),
             RequiredVersionString(payload, "cardDbContentHash", matchId, matchStart.Seq),
