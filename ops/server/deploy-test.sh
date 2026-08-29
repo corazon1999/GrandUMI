@@ -4,6 +4,8 @@ set -Eeuo pipefail
 repo=/opt/grandumi-test
 state_dir=/var/lib/grandumi-test-release
 account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
+replay_archive_root=/var/lib/grandumi-test-replay-artifacts
+replay_archive_env=/etc/grandumi/grandumi-test-replay-artifact.env
 target="$1"
 force="${2:-}"
 
@@ -75,6 +77,32 @@ if [[ "$need_back" == 1 ]]; then
   # 绝不读取或迁移正式 players.db，也绝不创建 active 激活标记。
   install -d -o grandumi -g grandumi -m 0750 /data/grandumi-test
   install -d -o grandumi -g grandumi -m 0750 /data/grandumi-shared
+  install -d -o grandumi -g grandumi -m 0750 /data/grandumi-test/Rulesets
+
+  # 归档根只服务测试服；完整 publish 与规则包先在同卷 .staging 中复制、逐字节校验，
+  # 再由归档命令用目录 rename 发布。任何同 artifactId 冲突都会在切换服务前失败。
+  install -d -o root -g grandumi -m 2750 "$replay_archive_root"
+  install -d -o root -g grandumi -m 2750 "$replay_archive_root/.staging"
+  capture_output="$({
+    /opt/dotnet/dotnet "$next_publish/GrandUMIServer.dll" --replay-artifact capture \
+      --publish-root "$next_publish" \
+      --rules-root /data/grandumi-test/Rulesets \
+      --archive-root "$replay_archive_root" \
+      --engine-commit "$target"
+  } | tee /dev/stderr)"
+  capture_line="$(tail -n 1 <<<"$capture_output")"
+  IFS=$'\t' read -r capture_marker replay_artifact_id replay_manifest replay_capture_disposition capture_extra \
+    <<<"$capture_line"
+  [[ "$capture_marker" == "REPLAY_ARTIFACT" ]] \
+    || die "重放工件归档没有返回受控结果。"
+  [[ "$replay_artifact_id" =~ ^grandumi-runtime-[0-9a-f]{64}$ ]] \
+    || die "重放工件 artifactId 格式无效。"
+  [[ "$replay_manifest" == "$replay_archive_root/$replay_artifact_id/replay-artifact-manifest.v1.json" ]] \
+    || die "重放工件 manifest 路径不在预期的测试服归档目录。"
+  [[ -z "${capture_extra:-}" ]] || die "重放工件归档结果包含额外字段。"
+  /opt/dotnet/dotnet "$next_publish/GrandUMIServer.dll" --replay-artifact verify \
+    --archive "$replay_manifest" \
+    --dotnet /opt/dotnet/dotnet
 
   install -m 0644 "$repo/ops/server/grandumi-test-backend.service" \
     /etc/systemd/system/grandumi-test-backend.service
@@ -83,20 +111,60 @@ if [[ "$need_back" == 1 ]]; then
     /etc/grandumi/qq-whitelist-sync.env.example
   systemctl daemon-reload
 
+  replay_env_backup="$state_dir/replay-artifact-env.previous.$$"
+  rm -f "$replay_env_backup"
+  replay_env_existed=0
+  if [[ -f "$replay_archive_env" ]]; then
+    cp -p "$replay_archive_env" "$replay_env_backup"
+    replay_env_existed=1
+  fi
+  replay_env_next="$replay_archive_env.next"
+  {
+    echo "GRANDUMI_REPLAY_ARTIFACT_MANIFEST=$replay_manifest"
+  } > "$replay_env_next"
+  chmod 0644 "$replay_env_next"
+
   rm -rf "$previous_publish"
-  [[ -d "$repo/服务端WebSocket/publish" ]] && mv "$repo/服务端WebSocket/publish" "$previous_publish"
-  mv "$next_publish" "$repo/服务端WebSocket/publish"
+  if [[ -d "$repo/服务端WebSocket/publish" ]] \
+      && ! mv "$repo/服务端WebSocket/publish" "$previous_publish"; then
+    rm -f "$replay_env_next" "$replay_env_backup"
+    die "无法保存上一版测试服后端发布目录，尚未切换服务。"
+  fi
+  if ! mv "$next_publish" "$repo/服务端WebSocket/publish"; then
+    [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    rm -f "$replay_env_next" "$replay_env_backup"
+    die "无法原子切换测试服后端发布目录，已尝试恢复上一版。"
+  fi
+  if ! mv "$replay_env_next" "$replay_archive_env"; then
+    rm -rf "$repo/服务端WebSocket/publish"
+    [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    rm -f "$replay_env_next" "$replay_env_backup"
+    die "无法切换测试服重放归档环境文件，已尝试恢复上一版后端。"
+  fi
   if ! systemctl enable grandumi-test-backend.service \
       || ! systemctl restart grandumi-test-backend.service \
       || ! systemctl is-active --quiet grandumi-test-backend.service \
       || ! backend_ready \
-      || ! backend_matches_target; then
+      || ! backend_matches_target \
+      || ! /opt/dotnet/dotnet "$repo/服务端WebSocket/publish/GrandUMIServer.dll" --replay-artifact audit \
+        --logs /data/grandumi-test/MatchLogs \
+        --archive-root "$replay_archive_root" \
+        --json "$state_dir/replay-coverage.v1.json" \
+        --markdown "$state_dir/replay-coverage.v1.md" \
+        --candidate-catalog "$state_dir/test-replay-artifact-candidates.v1.json" \
+        --dotnet /opt/dotnet/dotnet; then
     rm -rf "$repo/服务端WebSocket/publish"
     [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    if [[ "$replay_env_existed" == 1 ]]; then
+      mv "$replay_env_backup" "$replay_archive_env"
+    else
+      rm -f "$replay_archive_env" "$replay_env_backup"
+    fi
     systemctl restart grandumi-test-backend.service || true
     backend_ready || true
-    die "测试服后端启动或就绪检查失败，已尝试回滚。"
+    die "测试服后端启动、归档绑定或覆盖审计失败，已尝试回滚。"
   fi
+  rm -f "$replay_env_backup"
 fi
 
 if [[ "$need_front" == 1 ]]; then

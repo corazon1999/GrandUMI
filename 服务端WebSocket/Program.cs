@@ -14,6 +14,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
+if (args.Length > 0 && string.Equals(args[0], "--replay-artifact", StringComparison.Ordinal))
+{
+    Environment.ExitCode = await ReplayArtifactCommand.RunAsync(args[1..]);
+    return;
+}
+
 if (args.Length > 0 && string.Equals(args[0], "--migrate-shared-accounts", StringComparison.Ordinal))
 {
     if (args.Length is < 3 or > 4)
@@ -86,6 +92,26 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 var port = args.Length > 0 && int.TryParse(args[0], out var parsedPort) ? parsedPort : 8080;
 var playerDatabasePath = PlayerDataStore.ResolveDefaultPath();
+var rulesPackagePath = Path.Combine(
+    Path.GetDirectoryName(playerDatabasePath)!,
+    "Rulesets");
+// 测试服先验证归档与当前只读内容，再加载任何规则插件或初始化持久数据库。
+ReplayArtifactRuntimeBinding.VerifyFilesFromEnvironment(
+    AppContext.BaseDirectory,
+    rulesPackagePath);
+var cardDataPath = ResolveCardDataPath();
+CardDatabase.LoadFrom(cardDataPath);
+GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
+    ResolveDslDir(),
+    $"builtin-{BuildInfo.Commit}");
+CardRulesetManager.InitializePackages(rulesPackagePath);
+ReplayRuntimeIdentityProvider.InitializeFromCurrentProcess(BuildInfo.Commit, CardDatabase.ContentHash);
+var replayRuntimeIdentity = ReplayRuntimeIdentityProvider.For(CardRulesetManager.Current);
+ReplayArtifactRuntimeBinding.VerifyFromEnvironment(
+    replayRuntimeIdentity,
+    AppContext.BaseDirectory,
+    rulesPackagePath);
+Console.WriteLine($"[训练重放身份] binary={replayRuntimeIdentity.BinarySha256}，cardDb={CardDatabase.ContentHash}，rules={CardRulesetManager.Current.ManifestHash}");
 using var writerLease = SingleWriterLease.IsRequired
     ? SingleWriterLease.Acquire(Path.GetDirectoryName(playerDatabasePath)!, BuildInfo.NodeId)
     : null;
@@ -148,17 +174,6 @@ adminDeploymentCoordinator?.Initialize();
 if (adminDeploymentCoordinator is not null)
     Console.WriteLine("[管理员发布] 已连接受限发布队列");
 
-var cardDataPath = ResolveCardDataPath();
-CardDatabase.LoadFrom(cardDataPath);
-GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
-    ResolveDslDir(),
-    $"builtin-{BuildInfo.Commit}");
-CardRulesetManager.InitializePackages(Path.Combine(
-    Path.GetDirectoryName(playerDataStore.DatabasePath)!,
-    "Rulesets"));
-// 提交、核心程序集和卡表只在启动阶段读取/哈希；新建房间只按钉住的规则集取缓存身份。
-ReplayRuntimeIdentityProvider.InitializeFromCurrentProcess(BuildInfo.Commit, CardDatabase.ContentHash);
-Console.WriteLine($"[训练重放身份] binary={ReplayRuntimeIdentityProvider.For(CardRulesetManager.Current).BinarySha256}，cardDb={CardDatabase.ContentHash}，rules={CardRulesetManager.Current.ManifestHash}");
 var keepLeaderStatsWalAnchor = string.Equals(
     LeaderStatsStore.Default.DatabasePath,
     LeaderStatsStore.Default.LeaderboardDatabasePath,

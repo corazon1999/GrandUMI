@@ -1,37 +1,110 @@
-# 确定性训练重放与隔离 worker 基础层
+# 确定性训练重放、不可变工件归档与隔离 worker 基础层
 
-当前切片负责：
+## 当前已经完成的边界
 
-- 在进程启动阶段冻结完整运行身份：完整 Git 对象 ID、当前入口程序集 SHA-256、卡表内容清单、规则集清单、RNG／确定性 ID／开局协议和重放配置版本；
-- 新对局只通过唯一工厂写入带精确身份的 `match_start`，逐局和逐动作路径不再扫描卡表、规则包或二进制文件；
-- 把完整 JSONL 对局转换为“精确工件身份 + seed + 两副原始牌组 + accepted／系统动作磁带”；
-- 通过可替换的 `IArtifactReplayWorker` 边界，把动作磁带接入精确登记工件对应的 `MatchReplay`；
-- 在开局、每条 accepted／系统动作后的稳定点和终局核对显式 checkpoint 契约；
-- 为当前工件冻结 full/public/random 三类状态投影，只把 SHA-256 digest、累计随机事件数和 accepted 动作绑定写入日志；
-- 任一异常、拒绝、超时或 full/public/random/terminal 分歧都只返回整局隔离记录，不返回部分 checkpoint 或样本。
+- 进程启动阶段冻结完整 `ReplayRuntimeIdentity`：Git commit、入口程序集 SHA-256、卡表内容清单、规则 manifest、RNG／确定性 ID／开局协议和重放配置版本；新对局只复用冻结身份。
+- 完整 JSONL 对局可转换为“精确工件身份 + seed + 两副原始牌组 + accepted／系统动作磁带”；`IArtifactReplayWorker` dispatcher 按 descriptor 完整指纹路由，绝不回退到当前 `main`。
+- 测试服可写 `grandumi.replay_checkpoint.v1`：开局、每条 accepted／系统动作后的稳定点和终局均绑定 full/public/random digest；任一缺失、重复、乱序或分歧都会整局隔离。
+- 每次测试服后端构建现在会把完整 publish、当时的 `/data/grandumi-test/Rulesets` 快照和标准 manifest 归档到 `/var/lib/grandumi-test-replay-artifacts/<engineArtifactId>/`。
+- 可从本机或服务器运行归档验证与日志覆盖审计；报告稳定区分 legacy、缺身份、缺 checkpoint、身份不匹配、artifact 未归档、可进入准备层和可进入独立 worker。
 
-冻结边界：
+## 测试服不可变归档格式
 
-- `Artifacts/replay-artifact-registry.v1.json` 不登记任何生产工件。旧日志缺少精确引擎、规则包、卡表、RNG、实例 ID、开局协议和重放配置身份，因此必须隔离，绝不回退到当前 `main`。
-- dispatcher 按完整 descriptor 指纹绑定 worker；相同 `engineArtifactId` 但 binary/rules/cardDb/executable 等任一字段不同都会隔离。进程内实现只是可替换边界，未来独立进程代理使用同一可序列化 request/response contract。
-- dispatcher 会复算 response 规范哈希，逐项核对成功结果的 source、prepared、tape、contract、registry、artifact、worker、request lineage；失败结果的稳定 reason/stage 和 source/action 定位也必须落在请求范围内。失败消息不进入稳定哈希。
-- `grandumi.matchlog.v1.accepted-self-contained.v2` 强制每条 accepted 自包含规范 `data`、`requestId`和真实 `source`；requested 只用于相关性与篡改审计，不再作为训练动作数据的权威来源。
-- `grandumi.matchlog.v1.accepted-pairing.v1` 仍只接纳能唯一配对的旧 requested → accepted 动作；两个 adapter 严格分流，v2 不会退回旧配对语义。rejected 始终不进入磁带。
-- v2 的先后手和调度超时动作也必须由后续自包含 accepted 确认；只有 legacy adapter 保留旧 `mulligan_timeout_auto_keep` 的直接映射。`source=system` 只推进重放，绝不成为真人训练标签。
-- 旧 `prompt_timeout` 没有完整 `chosen`，当前版本整局隔离。后续只有在对应历史工件与 adapter 能精确恢复其语义时才可登记。
-- 输出动作按日志应用序号确定性排序，动作、磁带、准备结果和隔离记录都使用规范 JSON 的 SHA-256。
-- checkpoint 事件使用 `grandumi.replay_checkpoint.v1`，必须完整覆盖 `opening + 每条磁带动作 + terminal`，动作 checkpoint 同时绑定 `actionOrderSeq` 与 `actionStableHash`。缺一条、重复、越过下一动作或终局字段不完整都会隔离。
-- checkpoint digest 算法属于对应 artifact，由 `IReplayCheckpointProvider` 注入。worker 只生成实际值并与日志期望比较，禁止在验证时反向生成期望值。当前工件使用 `DeterministicReplayCheckpointProvider` 的 `grandumi.replay_full_state.v1`、`grandumi.replay_public_state.v1` 和 `grandumi.replay_random_trace.v1`；历史 artifact 仍必须随自身 worker 提供对应算法。
-- 在线 accepted 日志与离线磁带共用同一个规范描述器，checkpoint 同时绑定日志权威 `seq` 和完全相同的 `actionStableHash`；日志序号分配与入队保持同一有序临界区，checkpoint 不因队列容量饱和而丢弃。排队成功不等于磁盘写入成功，后台落盘缺失最终仍由不完整 checkpoint 契约 fail closed。
-- 在线开关 `GRANDUMI_REPLAY_CHECKPOINT_LOG` 默认关闭，目前仅测试服 service 配置为 `1`。新对局依次写 opening、每条 accepted／系统动作后的稳定点及 match_end 前 terminal；候选服和正式服配置未启用。
-- 进程恢复不会猜测未持久化的累计随机轨迹。恢复日志会追加 `grandumi.replay_checkpoint_status.v1` 停用标记，准备层对整局 fail closed；不得把恢复前后的部分 checkpoint 拼成可训练对局。
-- checkpoint 行禁止持久化原始 GameState、账号、显示名、session、完整卡组、隐藏区、Prompt 私有候选或 replayHands；full 投影只在受控进程内参与哈希，public 投影不含双方隐藏内容。终局摘要使用身份无关的原因类别，未知原因仍在 terminal verifier 中退回原文精确比较。
-- 整局 worker 有独立稳定等待超时、整局超时和取消信号；整局超时会取消在途进程内执行。成功结果保留 source/prepared/tape/contract/registry/artifact/worker/request/replay 的完整 hash lineage。
+最终目录只包含：
 
-仍然 No-Go：
+```text
+<engineArtifactId>/
+├── replay-artifact-manifest.v1.json
+└── payload/
+    ├── publish/        # 完整 dotnet publish 输出，包含卡表和 DSL
+    └── rules/          # 部署时测试服规则包与 active-ruleset 快照
+```
 
-- 生产 registry 为空，旧日志也没有完整版本身份和显式 checkpoint contract，不能声称真实历史重放成功；
-- 尚未归档、验证并登记独立历史二进制／规则包／卡表，也未实现独立进程 executable 启动与二进制复核；
-- 测试服开关只用于生成最新版本 checkpoint 日志，不等于已有真实对局通过重放；动作前 observation、P0-B 合法动作集合、批量断点/manifest 和数据集导出仍未完成。
+`grandumi.replay_artifact_archive.v1` manifest 冻结以下内容：
 
-这些门禁完成前，不得把本层 fixture 结果称为可训练数据集，也不得判定 Gate B 已通过。
+- 完整 `ReplayRuntimeIdentity` 与其 `manifestHash`；
+- 全部目录、全部文件的规范相对路径、字节数、SHA-256 和 executable 标记；
+- payload、publish、规则包三层聚合内容哈希；
+- `GrandUMIServer.dll` 与卡表内容哈希，并逐字段交叉核对运行身份；
+- 测试服实际服务入口：`/opt/dotnet/dotnet`、`GrandUMIServer.dll 8081`、工作目录 `payload/publish`；
+- 独立 replay worker 状态。当前明确为 `available=false`，没有伪造 executable 或成功证据；
+- `environment=test`、`productionRegistryEligible=false`，防止测试候选被误当作生产 registry。
+
+manifest 使用规范 JSON 自哈希（计算时排除顶层 `manifestHash`）。验证器会拒绝未知字段、重复字段、非规范路径、路径穿越、Unicode／大小写冲突、符号链接或重解析点、缺文件、多文件、大小或哈希不符以及聚合身份不一致。
+
+## 部署时序、不变量与失败恢复
+
+测试服 `ops/server/deploy-test.sh` 的后端路径遵循：
+
+1. 在 `publish.next` 构建完整输出；
+2. 在归档根同一文件系统的 `.staging/capture-<pid>-<nonce>` 中稳定复制 publish 与规则包，两次扫描确认复制期间源未变化；
+3. 生成 manifest，重新验证 manifest 自哈希、目录／文件集合、每文件与聚合哈希、入口程序集／卡表／规则身份；
+4. 用目录 rename 发布为 `<engineArtifactId>`；最终目录在 rename 前不可见，残留 staging 永远不参与 catalog 或覆盖审计；
+5. 同 artifactId 已存在时，只有目录集合、文件元数据和每个文件字节完全相同才幂等成功；无效或冲突归档一律失败且从不覆盖；并发发布由唯一 staging + 原子目录 rename 收敛为一个创建者和若干幂等读取者；
+6. 用归档内历史 `GrandUMIServer.dll --replay-artifact verify-self` 重新加载归档卡表、DSL 和规则包，自证真实 `ReplayRuntimeIdentity`；
+7. 原子切换 publish 与测试服专用环境文件后重启。服务启动会重新验证最终归档、当前 publish、当前规则目录和进程身份；缺 manifest 或任一不一致均 fail closed；
+8. 就绪和版本检查通过后运行覆盖审计。任一归档、启动绑定或审计失败都会恢复上一版 publish 和上一份环境文件并尝试重启旧服务。冲突归档本身保留用于排查，不会被静默删除或覆盖。
+
+测试服 service 仅以只读方式访问 `/var/lib/grandumi-test-replay-artifacts`。候选服与正式服 service／部署脚本没有接入该路径，也没有启用该要求。
+
+## 命令入口
+
+命令必须由对应 publish 中的 `GrandUMIServer.dll` 执行。测试服部署脚本会自动调用；本地验证仍须遵守仓库 E 盘临时目录规则。
+
+```bash
+/opt/dotnet/dotnet GrandUMIServer.dll --replay-artifact capture \
+  --publish-root /path/to/publish \
+  --rules-root /path/to/Rulesets \
+  --archive-root /var/lib/grandumi-test-replay-artifacts \
+  --engine-commit <40位小写提交号>
+
+/opt/dotnet/dotnet GrandUMIServer.dll --replay-artifact verify \
+  --archive /var/lib/grandumi-test-replay-artifacts/<artifactId> \
+  --dotnet /opt/dotnet/dotnet
+
+/opt/dotnet/dotnet GrandUMIServer.dll --replay-artifact audit \
+  --logs /data/grandumi-test/MatchLogs \
+  --archive-root /var/lib/grandumi-test-replay-artifacts \
+  --json /var/lib/grandumi-test-release/replay-coverage.v1.json \
+  --markdown /var/lib/grandumi-test-release/replay-coverage.v1.md \
+  --candidate-catalog /var/lib/grandumi-test-release/test-replay-artifact-candidates.v1.json \
+  --dotnet /opt/dotnet/dotnet
+```
+
+`verify` 先用当前验证器检查不可变文件集合，再启动归档内历史程序集执行 `verify-self`。因此规则 manifest 不是只在外层 JSON 中互相抄写，而是由历史代码、历史 DSL 和归档规则包重新计算并与归档身份核对。
+
+## 覆盖审计状态
+
+JSON 使用 `grandumi.replay_coverage_report.v1`，没有时间戳；输入内容与归档 catalog 不变时，条目顺序、条目哈希、报告哈希和 Markdown 字节均稳定。所有状态始终显式输出计数，包括 0。
+
+| 稳定代码 | 含义 |
+|---|---|
+| `legacy` | 使用 legacy accepted-pairing adapter；不冒充当前可训练日志 |
+| `missing_identity` | `match_start` 缺任一精确身份字段或 `replayRuntimeManifestHash` |
+| `missing_checkpoint` | 身份与归档匹配且动作准备成功，但没有完整 checkpoint contract |
+| `identity_mismatch` | artifactId 存在，但日志任一身份字段与归档不一致 |
+| `artifact_not_archived` | 日志身份完整，但没有对应的已验证最终归档 |
+| `preparation_ready` | 身份、artifact、动作磁带和 checkpoint contract 均通过，可进入准备层；当前仍没有独立 worker |
+| `replay_worker_ready` | 只有独立进程 worker 入口和协议真实可用且通过验证时才可计数；当前必为 0 |
+| `invalid_log` | 其他结构、序号、动作配对或 checkpoint 契约错误 |
+
+部署会另写 `grandumi.test_replay_artifact_candidates.v1`。它是测试服候选 catalog，不是 `ReplayArtifactRegistry`，并明确记录 `productionRegistryModified=false`、worker unavailable 和生产登记 No-Go。
+
+## 既有重放冻结规则
+
+- `grandumi.matchlog.v1.accepted-self-contained.v2` 强制每条 accepted 自包含规范 `data`、`requestId` 和真实 `source`；requested 只用于相关性与篡改审计。rejected 不进入磁带，`source=system` 只推进重放而不成为真人标签。
+- `grandumi.matchlog.v1.accepted-pairing.v1` 只接纳能唯一配对的历史 requested → accepted；v2 不回退旧语义。旧 `prompt_timeout` 缺完整 `chosen` 时整局隔离。
+- checkpoint digest 属于对应 artifact。worker 只能核对日志期望，不能反向生成期望；恢复日志会写连续性停用标记，禁止拼接恢复前后的部分 checkpoint。
+- checkpoint 行不持久化原始 GameState、账号、显示名、session、完整卡组、隐藏区、Prompt 私有候选或 replayHands。排队成功不等于落盘成功，缺行最终仍由完整契约 fail closed。
+- dispatcher 会复算 response 规范哈希，并核对 source、prepared、tape、contract、registry、artifact、worker、request 和 replay lineage；超时和取消都只返回整局隔离，不返回部分样本。
+
+## 仍然 No-Go
+
+- `Training/Artifacts/replay-artifact-registry.v1.json` 仍为空。本阶段没有把测试服候选写入生产 registry。
+- 本阶段建立的是可取回、可自校验的历史运行工件及验证器；独立进程 replay worker 协议入口尚未实现，也没有真实日志通过独立 worker 的证据。因此 `replay_worker_ready` 必须为 0，不能宣称 Gate B 已通过。
+- 代码完成不等于服务器已产生归档或覆盖报告；只有本提交后续真实部署测试服并运行命令，服务器持久路径才会出现证据。没有新 checkpoint 日志时报告必须如实为 0。
+- 测试服运行中另行激活或新增规则热更新包不会自动创建新归档；这类新身份会在审计中成为 `artifact_not_archived`。下一阶段必须把规则激活与同样的不可变归档门禁绑定后，才可允许其进入 worker。
+- 当前归档仅在测试服本机持久路径可取回，尚未建立异机冗余、保留期／容量治理和灾备恢复演练。
+- 动作前 observation、P0-B 合法动作集合、批量断点／训练 manifest 和数据集导出仍未完成。
+
+这些门禁完成前，不得把 fixture、`preparation_ready` 或测试候选 catalog 称为可训练数据集，也不得判定真实历史重放成功。

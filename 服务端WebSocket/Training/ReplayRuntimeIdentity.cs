@@ -92,21 +92,18 @@ public static class ReplayRuntimeIdentityFactory
 
         var runtime = runtimeVersion ?? Environment.Version;
         var rngAlgorithmVersion = $"dotnet-system-random-seeded-{runtime}.v1";
-        var manifest = JsonSerializer.SerializeToElement(new
-        {
-            matchLogSchema = MatchLogEventAdapter.SupportedSchema,
-            eventAdapterVersion = MatchLogEventAdapter.CurrentAdapterVersion,
+        var manifestHash = ComputeManifestHash(
+            MatchLogEventAdapter.SupportedSchema,
+            MatchLogEventAdapter.CurrentAdapterVersion,
             build.EngineCommit,
             build.BinarySha256,
-            rulesVersion = ruleset.Id,
-            rulesetManifestHash = ruleset.ManifestHash,
+            ruleset.Id,
+            ruleset.ManifestHash,
             build.CardDbContentHash,
             rngAlgorithmVersion,
-            deterministicIdVersion = DeterministicIdVersion,
-            openingProtocolVersion = OpeningProtocolVersion,
-            replayConfigSchema = ReplayConfigSchema,
-        });
-        var manifestHash = CanonicalJson.Hash(manifest);
+            DeterministicIdVersion,
+            OpeningProtocolVersion,
+            ReplayConfigSchema);
         var artifactId = "grandumi-runtime-" + manifestHash["sha256:".Length..];
         return new ReplayRuntimeIdentity(
             MatchLogEventAdapter.SupportedSchema,
@@ -122,6 +119,84 @@ public static class ReplayRuntimeIdentityFactory
             OpeningProtocolVersion,
             ReplayConfigSchema,
             manifestHash);
+    }
+
+    /// <summary>验证一份外部归档声明的运行身份仍满足当前冻结算法。</summary>
+    internal static void ValidateIdentity(ReplayRuntimeIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ValidateBuild(new ReplayRuntimeBuildIdentity(
+            identity.EngineCommit,
+            identity.BinarySha256,
+            identity.CardDbContentHash));
+        RequireSha256(identity.RulesetManifestHash, nameof(identity.RulesetManifestHash));
+        RequireSha256(identity.ManifestHash, nameof(identity.ManifestHash));
+
+        var fields = new[]
+        {
+            identity.MatchLogSchema,
+            identity.EventAdapterVersion,
+            identity.EngineArtifactId,
+            identity.RulesVersion,
+            identity.RngAlgorithmVersion,
+            identity.DeterministicIdVersion,
+            identity.OpeningProtocolVersion,
+            identity.ReplayConfigSchema,
+        };
+        if (fields.Any(string.IsNullOrWhiteSpace)
+            || fields.Any(value => !string.Equals(value, value.Trim(), StringComparison.Ordinal)))
+            throw new InvalidOperationException("运行身份包含空字符串或首尾空白。拒绝接受归档。");
+
+        var expectedManifestHash = ComputeManifestHash(
+            identity.MatchLogSchema,
+            identity.EventAdapterVersion,
+            identity.EngineCommit,
+            identity.BinarySha256,
+            identity.RulesVersion,
+            identity.RulesetManifestHash,
+            identity.CardDbContentHash,
+            identity.RngAlgorithmVersion,
+            identity.DeterministicIdVersion,
+            identity.OpeningProtocolVersion,
+            identity.ReplayConfigSchema);
+        if (!string.Equals(expectedManifestHash, identity.ManifestHash, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"运行身份 manifestHash 不一致：声明 {identity.ManifestHash}，计算 {expectedManifestHash}");
+
+        var expectedArtifactId = "grandumi-runtime-" + expectedManifestHash["sha256:".Length..];
+        if (!string.Equals(expectedArtifactId, identity.EngineArtifactId, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"运行身份 engineArtifactId 不一致：声明 {identity.EngineArtifactId}，计算 {expectedArtifactId}");
+    }
+
+    private static string ComputeManifestHash(
+        string matchLogSchema,
+        string eventAdapterVersion,
+        string engineCommit,
+        string binarySha256,
+        string rulesVersion,
+        string rulesetManifestHash,
+        string cardDbContentHash,
+        string rngAlgorithmVersion,
+        string deterministicIdVersion,
+        string openingProtocolVersion,
+        string replayConfigSchema)
+    {
+        var manifest = JsonSerializer.SerializeToElement(new
+        {
+            matchLogSchema,
+            eventAdapterVersion,
+            engineCommit,
+            binarySha256,
+            rulesVersion,
+            rulesetManifestHash,
+            cardDbContentHash,
+            rngAlgorithmVersion,
+            deterministicIdVersion,
+            openingProtocolVersion,
+            replayConfigSchema,
+        });
+        return CanonicalJson.Hash(manifest);
     }
 
     public static ReplayMatchStartPayload CreateMatchStartPayload(
