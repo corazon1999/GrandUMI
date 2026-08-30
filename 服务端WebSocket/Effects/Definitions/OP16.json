@@ -1851,6 +1851,13 @@
       { "op": "TrashToHand", "target": "$card" }
     ],
     "main": {
+      "cost": {
+        "handDiscard": {
+          "n": 1,
+          "hasTrigger": true,
+          "text": "选择丢弃1张拥有【触发】的手牌作为成本（可放弃）"
+        }
+      },
       "then": [
         {
           "op": "Choose",

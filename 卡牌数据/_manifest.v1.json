@@ -5,7 +5,7 @@
     "sha256": "1106cf53f2db82e09177d4774387461e5fdf6c80b872e1c29c998bb0540eb24b"
   },
   "totalCards": 2823,
-  "contentSha256": "b3b38b9fa44f4b12a47b28d47115e63f74f50b9eb9b31121a1f0986090367f0a",
+  "contentSha256": "055ac61781a6dc0748e1fe7e76792ddd4e98f4b5d5bb4d2d7d83eb26c951f6de",
   "files": [
     {
       "path": "EB01.json",
@@ -69,7 +69,7 @@
     },
     {
       "path": "OP08.json",
-      "sha256": "1e69ec4d58a55e5d9d373e3b200479be14125209c8faf33dbe7af6723588b547",
+      "sha256": "169065c8d65347a70b8322c7f2f73a9625bb9ca59f3bf740a62d0701d22911db",
       "cardCount": 119
     },
     {
@@ -114,7 +114,7 @@
     },
     {
       "path": "OP17.json",
-      "sha256": "8bae08475513fe0237b59df56f69b03231811b5c7830009244161e04a8c63731",
+      "sha256": "8f5e4b18b4d899610236e439c5c654fd8cc7102624e69eabff9e8f18526b7c82",
       "cardCount": 119
     },
     {
@@ -194,7 +194,7 @@
     },
     {
       "path": "ST12.json",
-      "sha256": "14602a1cea5bd51cb3ce4155557090dd8c55b0503c0205f88e162144dbe4ee4d",
+      "sha256": "c4df105b95edb97b4dd3702ef863526d3155aa72aa9f3b5796574e9d7c9c3c72",
       "cardCount": 17
     },
     {

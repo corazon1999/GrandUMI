@@ -448,7 +448,7 @@
     "color": "绿",
     "type": "角色",
     "property": "斩",
-    "power": "2000",
+    "power": "0",
     "cost": "1",
     "keyWords": "红发海盗团旗下",
     "counter": "反击+2000",

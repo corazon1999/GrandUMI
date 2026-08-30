@@ -15,7 +15,7 @@ public class QqFeedback20260816RegressionTests
         => new() { Info = CardDatabase.Get(number)! };
 
     [Fact]
-    public async Task ST29_015_CounterBoostsOwnCardAndReducesOpponentAtOneLifeOrLess()
+    public async Task ST29_015_CounterBoostsOwnCardAndReducesOpponentForTurnAtThreeLifeOrLess()
     {
         var state = TestScene.New().OppCharacter("OP15-050").Build();
         var ownLeader = state.Players[0].Leader;
@@ -27,7 +27,8 @@ public class QqFeedback20260816RegressionTests
         await EffectRuntime.Resolve(state, 0, Card("ST29-015"), EffectTrigger.EventCounter, prompts);
 
         Assert.Equal(2000, ownLeader.PowerModThisBattle);
-        Assert.Equal(-2000, opponent.PowerModThisBattle);
+        Assert.Equal(-2000, opponent.PowerModThisTurn);
+        Assert.Equal(0, opponent.PowerModThisBattle);
         Assert.Equal(2, prompts.ChooseHistory.Count);
     }
 
