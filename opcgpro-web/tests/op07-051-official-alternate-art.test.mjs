@@ -12,6 +12,9 @@ const webRoot = path.resolve(testsDir, "..");
 const manifest = JSON.parse(
   readFileSync(path.join(webRoot, "public", "data", "imageManifest.json"), "utf8"),
 );
+const physicalAssetTest = process.env.GRANDUMI_REPOSITORY_VERIFICATION === "1"
+  ? { skip: "仓库验证只校验异画清单；测试服部署负责实体卡图完整性" }
+  : {};
 
 const expectedSprites = [
   "/cards/op07/OP07-051.png",
@@ -46,7 +49,7 @@ test("OP07-051 清单包含简中官网公布的全部六张卡图", () => {
   assert.equal(new Set(manifest["OP07-051"]).size, 6);
 });
 
-test("OP07-051 两张补充包异画为完整且互不重复的官方 PNG", async () => {
+test("OP07-051 两张补充包异画为完整且互不重复的官方 PNG", physicalAssetTest, async () => {
   const hashes = [];
   for (const { sprite, sha256 } of officialAlternateArt) {
     const file = await readFile(path.join(webRoot, "public", sprite));
@@ -58,7 +61,7 @@ test("OP07-051 两张补充包异画为完整且互不重复的官方 PNG", asyn
   assert.equal(new Set(hashes).size, officialAlternateArt.length);
 });
 
-test("OP07-051 两张补充包异画已生成小图与高清 WebP", async () => {
+test("OP07-051 两张补充包异画已生成小图与高清 WebP", physicalAssetTest, async () => {
   for (const { sprite } of officialAlternateArt) {
     const relativeWebpPath = sprite
       .slice("/cards/".length)

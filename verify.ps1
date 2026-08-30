@@ -24,6 +24,12 @@ if ($runningOnWindows) {
 $runTemp = Join-Path $verificationTemp ("run-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $runTemp | Out-Null
 $env:GRANDUMI_TEST_TEMP_ROOT = $runTemp
+$frontend = Join-Path $repo "opcgpro-web"
+$cardBundle = Join-Path $frontend "public\data\allCards.json"
+$cardBundleBackup = Join-Path $runTemp "allCards.original.json"
+$cardBundleExisted = Test-Path -LiteralPath $cardBundle
+$cardBundleSnapshotTaken = $false
+$previousRepositoryVerification = $env:GRANDUMI_REPOSITORY_VERIFICATION
 
 $suiteResults = [Collections.Generic.List[object]]::new()
 $failed = $false
@@ -57,6 +63,15 @@ function Invoke-VerificationSuite {
   }
 }
 
+function Restore-CardBundleSnapshot {
+  if (-not $script:cardBundleSnapshotTaken) { return }
+  if ($script:cardBundleExisted) {
+    Copy-Item -LiteralPath $script:cardBundleBackup -Destination $script:cardBundle -Force
+  } elseif (Test-Path -LiteralPath $script:cardBundle) {
+    Remove-Item -LiteralPath $script:cardBundle -Force
+  }
+}
+
 try {
   Invoke-VerificationSuite "WebSocket 协议契约" "node tools/verify-protocol-contract.mjs" {
     & node "tools/verify-protocol-contract.mjs"
@@ -66,6 +81,19 @@ try {
   }
 
   if (-not $InfrastructureOnly) {
+    Write-Host "`n[准备] 从前端锁文件安装确定性依赖" -ForegroundColor Cyan
+    & npm ci --prefix "opcgpro-web" --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "前端依赖安装失败，退出码为 $LASTEXITCODE" }
+
+    if ($cardBundleExisted) {
+      Copy-Item -LiteralPath $cardBundle -Destination $cardBundleBackup -Force
+    }
+    $cardBundleSnapshotTaken = $true
+    Write-Host "[准备] 生成前端测试所需的派生卡牌单包" -ForegroundColor Cyan
+    & npm run build:cards --prefix "opcgpro-web"
+    if ($LASTEXITCODE -ne 0) { throw "派生卡牌单包生成失败，退出码为 $LASTEXITCODE" }
+    $env:GRANDUMI_REPOSITORY_VERIFICATION = "1"
+
     Invoke-VerificationSuite "卡牌内容结构与清单" "node tools/verify-card-content.mjs" {
       & node "tools/verify-card-content.mjs"
     }
@@ -86,9 +114,15 @@ try {
       }
     }
     Invoke-VerificationSuite "QQ Bot 完整测试" "python -m unittest discover -s qq-bug-bot/tests" {
-      $py = Get-Command py -ErrorAction SilentlyContinue
-      if ($py) { & $py.Source -3 -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
-      else { & python -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
+      $previousDontWriteBytecode = $env:PYTHONDONTWRITEBYTECODE
+      $env:PYTHONDONTWRITEBYTECODE = "1"
+      try {
+        $py = Get-Command py -ErrorAction SilentlyContinue
+        if ($py) { & $py.Source -3 -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
+        else { & python -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
+      } finally {
+        $env:PYTHONDONTWRITEBYTECODE = $previousDontWriteBytecode
+      }
     }
     Invoke-VerificationSuite "前端生产构建" "npm run build --prefix opcgpro-web" {
       & npm run build --prefix "opcgpro-web"
@@ -102,6 +136,9 @@ try {
     Write-Host "`n统一验证失败，不会生成部署证明。" -ForegroundColor Red
     exit 1
   }
+
+  # prebuild 会再次生成 allCards.json；在检查 Git tree 和生成证明前恢复调用者原始状态。
+  Restore-CardBundleSnapshot
 
   if ($ProofPath) {
     if (-not $ExpectedCommit) { throw "生成部署证明必须提供 -ExpectedCommit。" }
@@ -127,6 +164,8 @@ try {
 
   Write-Host "`n统一验证通过：$($suiteResults.Count) 个套件。" -ForegroundColor Green
 } finally {
+  Restore-CardBundleSnapshot
+  $env:GRANDUMI_REPOSITORY_VERIFICATION = $previousRepositoryVerification
   if (Test-Path -LiteralPath $runTemp) {
     $resolvedRunTemp = [IO.Path]::GetFullPath($runTemp)
     $resolvedRoot = [IO.Path]::GetFullPath($verificationTemp)

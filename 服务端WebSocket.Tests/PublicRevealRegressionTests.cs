@@ -119,7 +119,7 @@ public class PublicRevealRegressionTests
     public void EveryCardTextContainingPublicRevealHasAnImplementationRoute()
     {
         var root = FindRepositoryRoot();
-        var publicCards = LoadPublicTextCardNumbers(Path.Combine(root, "卡牌数据_含原文"));
+        var publicCards = LoadPublicRevealCardNumbers(Path.Combine(root, "卡牌数据"));
         var scriptedFiles = Directory.GetFiles(
                 Path.Combine(root, "服务端WebSocket", "Effects", "Scripted"), "*.cs")
             .Select(path => File.ReadAllText(path))
@@ -192,29 +192,28 @@ public class PublicRevealRegressionTests
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            if (Directory.Exists(Path.Combine(dir.FullName, "卡牌数据_含原文"))
+            if (File.Exists(Path.Combine(dir.FullName, "卡牌数据", "_effect-audit.v1.json"))
                 && Directory.Exists(Path.Combine(dir.FullName, "服务端WebSocket")))
                 return dir.FullName;
         }
         throw new DirectoryNotFoundException("找不到 GrandUMI 仓库根目录");
     }
 
-    private static HashSet<string> LoadPublicTextCardNumbers(string cardDataDirectory)
+    private static HashSet<string> LoadPublicRevealCardNumbers(string cardDataDirectory)
     {
-        var numbers = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var path in Directory.GetFiles(cardDataDirectory, "*.json"))
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            foreach (var card in document.RootElement.EnumerateArray())
-            {
-                bool containsPublic = new[] { "effectText", "effectEvent", "trigger" }.Any(property =>
-                    card.TryGetProperty(property, out var value)
-                    && value.ValueKind == JsonValueKind.String
-                    && value.GetString()!.Contains("公开", StringComparison.Ordinal));
-                if (containsPublic) numbers.Add(card.GetProperty("number").GetString()!);
-            }
-        }
-        return numbers;
+        using var audit = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(cardDataDirectory, "_effect-audit.v1.json")));
+        using var content = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(cardDataDirectory, "_manifest.v1.json")));
+        var root = audit.RootElement;
+        Assert.Equal("grandumi.card-effect-audit.v1", root.GetProperty("schemaVersion").GetString());
+        Assert.Equal(
+            content.RootElement.GetProperty("contentSha256").GetString(),
+            root.GetProperty("cardContentSha256").GetString());
+        return root.GetProperty("publicRevealCards")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static Dictionary<string, List<string>> LoadDefinitionNodes(string definitionDirectory)

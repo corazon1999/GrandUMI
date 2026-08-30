@@ -121,32 +121,14 @@ public sealed class ReplayArtifactArchiveTests
         Assert.Contains("文件集合", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public void 符号链接源_拒绝跟随到归档根外()
     {
         using var fixture = new ReplayArtifactTestWorkspace();
         var outside = Path.Combine(fixture.Root, "outside.txt");
         File.WriteAllText(outside, "secret");
         var link = Path.Combine(fixture.PublishRoot, "escape.link");
-        try
-        {
-            File.CreateSymbolicLink(link, outside);
-        }
-        catch (IOException) when (OperatingSystem.IsWindows())
-        {
-            // 受限 Windows token 不能创建新符号链接；仓库卡图 junction 是现成真实重解析点。
-            var junction = RepoPath("opcgpro-web", "public", "cards");
-            var junctionError = Assert.Throws<ReplayArtifactArchiveException>(() =>
-                ReplayArtifactArchive.Capture(
-                    new ReplayArtifactCaptureOptions(
-                        junction,
-                        fixture.RulesRoot,
-                        fixture.ArchiveRoot,
-                        fixture.Identity.EngineCommit),
-                    _ => fixture.Identity));
-            Assert.Contains("符号链接", junctionError.Message, StringComparison.Ordinal);
-            return;
-        }
+        File.CreateSymbolicLink(link, outside);
 
         var error = Assert.Throws<ReplayArtifactArchiveException>(() => fixture.Capture());
 

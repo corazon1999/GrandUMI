@@ -28,3 +28,19 @@ test("服务器在任何构建或服务切换前校验提交、tree、策略与�
   assert.match(source, /--checksum "\$verification_checksum"/);
   assert.match(source, /test-verified\.json/);
 });
+
+test("统一验证从锁文件安装依赖、先生成卡牌单包，并在证明前恢复派生文件", async () => {
+  const source = await readFile(path.join(root, "verify.ps1"), "utf8");
+  const installAt = source.indexOf('npm ci --prefix "opcgpro-web"');
+  const bundleAt = source.indexOf('npm run build:cards --prefix "opcgpro-web"');
+  const frontendTestsAt = source.indexOf('Invoke-VerificationSuite "前端完整单元测试"');
+  const restoreAt = source.indexOf("  Restore-CardBundleSnapshot", frontendTestsAt);
+  const proofAt = source.indexOf("  if ($ProofPath)", frontendTestsAt);
+
+  assert.ok(installAt >= 0 && bundleAt > installAt, "必须先按锁文件安装依赖，再生成派生卡牌单包。");
+  assert.ok(frontendTestsAt > bundleAt, "前端测试开始前必须完成依赖安装和卡牌单包生成。");
+  assert.ok(restoreAt > frontendTestsAt && proofAt > restoreAt, "生成部署证明前必须恢复派生卡牌单包。");
+  assert.match(source, /GRANDUMI_REPOSITORY_VERIFICATION = "1"/);
+  assert.match(source, /PYTHONDONTWRITEBYTECODE = "1"/);
+  assert.match(source, /finally \{[\s\S]*Restore-CardBundleSnapshot/);
+});

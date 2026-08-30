@@ -11,6 +11,9 @@ import {
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..", "..");
+const physicalAssetTest = process.env.GRANDUMI_REPOSITORY_VERIFICATION === "1"
+  ? { skip: "仓库验证只校验发布清单；测试服部署由 check-card-image-assets.mjs 校验实体卡图" }
+  : {};
 
 test("原始 PNG 和 JPEG 会映射到同目录的 WebP", () => {
   assert.equal(derivedRelativePath("st34/ST34-004.png"), "st34/ST34-004.webp");
@@ -39,7 +42,7 @@ test("卡图发布清单会展开为缩略图和高清图，并忽略缓存参�
   );
 });
 
-test("宣传卡数据中的每张主卡图都有缩略图和高清展示图", async () => {
+test("宣传卡数据中的每张主卡图都有缩略图和高清展示图", physicalAssetTest, async () => {
   const publicDir = path.join(repoRoot, "opcgpro-web", "public");
   const [cards, manifest] = await Promise.all([
     readFile(path.join(publicDir, "data", "P.json"), "utf8").then(JSON.parse),

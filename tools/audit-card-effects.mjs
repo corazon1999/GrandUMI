@@ -8,6 +8,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sha256, stable } from './card-content-lib.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const VERBOSE = process.argv.includes('--verbose')
@@ -76,8 +77,6 @@ const REQUIRED_TAGS = new Map([
   ['ST02-001', ['ActivatedMain']],
 ])
 
-const BASE_KEYWORDS = ['阻挡者', '速攻', '双重攻击', '可攻击活跃', '不可阻挡', '流放', '速攻：角色']
-
 async function loadCards(dir) {
   const map = new Map()
   for (const file of (await readdir(dir)).filter(name => name.endsWith('.json') && name !== 'allCards.json' && name !== 'imageManifest.json')) {
@@ -120,22 +119,6 @@ function hasImplementation(number, definitions, scripted) {
   return scripted.has(number) || (definitions.get(number) ?? []).some(isRealDefinition)
 }
 
-function isDeclaredBaseKeyword(text, keyword) {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const anyKeyword = BASE_KEYWORDS.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-  const annotation = `(?:（[^）]*）|\\([^)]*\\))`
-  const prefix = `(?:【(?:${anyKeyword})】(?:\\s*${annotation})?\\s*)*`
-  return new RegExp(`(^|[。\\r\\n])\\s*${prefix}【${escaped}】(?=\\s*(?:（|\\(|【|$))`).test(text)
-}
-
-function expectedBaseAbilities(text) {
-  const abilities = BASE_KEYWORDS.filter(keyword => isDeclaredBaseKeyword(text, keyword))
-  // 早期卡面使用完整句描述同一规则，后续官方关键字名为【速攻：角色】。
-  if (/^此角色可以在登场的回合中攻击角色/.test(text)) abilities.push('速攻：角色')
-  if (/(^|[。\r\n])此角色无法攻击。/.test(text)) abilities.push('此角色无法攻击')
-  return abilities
-}
-
 function sameSet(left, right) {
   const a = [...new Set(left)].sort()
   const b = [...new Set(right)].sort()
@@ -148,9 +131,47 @@ function printGroup(label, values) {
 }
 
 const cards = await loadCards(path.join(ROOT, '卡牌数据'))
-const originals = await loadCards(path.join(ROOT, '卡牌数据_含原文'))
+const cardContentManifest = JSON.parse(await readFile(path.join(ROOT, '卡牌数据', '_manifest.v1.json'), 'utf8'))
+const effectAuditManifest = JSON.parse(await readFile(path.join(ROOT, '卡牌数据', '_effect-audit.v1.json'), 'utf8'))
 const definitions = await loadDefinitions()
 const scripted = await loadScriptedIds()
+
+const auditManifestIssues = []
+const { auditManifestSha256, ...auditPayload } = effectAuditManifest
+if (effectAuditManifest.schemaVersion !== 'grandumi.card-effect-audit.v1')
+  auditManifestIssues.push('schemaVersion')
+if (effectAuditManifest.cardContentSha256 !== cardContentManifest.contentSha256)
+  auditManifestIssues.push('cardContentSha256')
+if (effectAuditManifest.cardCount !== cards.size)
+  auditManifestIssues.push('cardCount')
+if (auditManifestSha256 !== sha256(stable(auditPayload)))
+  auditManifestIssues.push('auditManifestSha256')
+if (!effectAuditManifest.baseAbilities || Array.isArray(effectAuditManifest.baseAbilities)
+    || typeof effectAuditManifest.baseAbilities !== 'object')
+  auditManifestIssues.push('baseAbilities')
+if (!Array.isArray(effectAuditManifest.publicRevealCards) || effectAuditManifest.publicRevealCards.length === 0)
+  auditManifestIssues.push('publicRevealCards')
+if (!Array.isArray(effectAuditManifest.cardsWithoutOriginalReference)
+    || new Set(effectAuditManifest.cardsWithoutOriginalReference).size
+      !== effectAuditManifest.cardsWithoutOriginalReference.length
+    || effectAuditManifest.cardsWithoutOriginalReference.some(number => !cards.has(number)))
+  auditManifestIssues.push('cardsWithoutOriginalReference')
+
+const expectedAbilities = new Map(Object.entries(effectAuditManifest.baseAbilities ?? {}))
+for (const [number, abilities] of expectedAbilities) {
+  if (!cards.has(number) || !Array.isArray(abilities) || abilities.length === 0
+      || abilities.some((ability) => typeof ability !== 'string')
+      || new Set(abilities).size !== abilities.length) {
+    auditManifestIssues.push(`baseAbilities:${number}`)
+  }
+}
+const revealCards = effectAuditManifest.publicRevealCards ?? []
+const sortedRevealCards = [...revealCards].sort((left, right) => left.localeCompare(right, 'en'))
+if (new Set(revealCards).size !== revealCards.length
+    || revealCards.some((number) => typeof number !== 'string' || !cards.has(number))
+    || revealCards.some((number, index) => number !== sortedRevealCards[index])) {
+  auditManifestIssues.push('publicRevealCards:内容')
+}
 
 const missingImplementations = [...KNOWN_CLEAR_GAPS]
   .filter(number => !hasImplementation(number, definitions, scripted))
@@ -178,23 +199,20 @@ for (const number of APPROXIMATE_EFFECTS) {
 }
 
 const abilityMismatches = []
-for (const [number, original] of originals) {
-  const current = cards.get(number)
-  if (!current) continue
-  const expected = expectedBaseAbilities(String(original.effectText ?? ''))
-  if (number === 'OP12-036') expected.push('无法通过效果登场')
-  if (number === 'OP04-001' || number === 'OP04-039') expected.push('此角色无法攻击')
+for (const [number, current] of cards) {
+  const expected = expectedAbilities.get(number) ?? []
   const actual = Array.isArray(current.abilities) ? current.abilities : []
   if (!sameSet(expected, actual)) abilityMismatches.push(number)
 }
 
 console.log(`卡牌总数: ${cards.size}`)
+printGroup('审计清单不一致', [...new Set(auditManifestIssues)].sort())
 printGroup('明确缺失实现', missingImplementations)
 printGroup('触发标签断连', disconnectedTags)
 printGroup('仍含明确省略标记', staleOmissionMarkers.sort())
 printGroup('仍含近似实现标记', staleApproximationMarkers.sort())
 printGroup('基础关键词不一致', abilityMismatches.sort())
 
-const issueCount = missingImplementations.length + disconnectedTags.length
+const issueCount = auditManifestIssues.length + missingImplementations.length + disconnectedTags.length
   + staleOmissionMarkers.length + staleApproximationMarkers.length + abilityMismatches.length
 if (STRICT && issueCount > 0) process.exitCode = 1

@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
-import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
+const requireFromFrontend = createRequire(path.join(frontend, "package.json"));
+const { chromium } = requireFromFrontend("playwright-core");
 const nextBin = path.join(frontend, "node_modules", "next", "dist", "bin", "next");
 
 function resolveBrowserExecutable() {

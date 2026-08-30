@@ -104,7 +104,7 @@ public sealed class ReplayCoverageAuditTests
             StringComparison.Ordinal);
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public void 日志扫描遇到符号链接_拒绝越过审计根目录()
     {
         using var fixture = new ReplayArtifactTestWorkspace();
@@ -114,20 +114,7 @@ public sealed class ReplayCoverageAuditTests
         Directory.CreateDirectory(logs);
         var outside = Path.Combine(fixture.Root, "outside.jsonl");
         WriteLog(outside, fixture.Identity, LogVariant.PreparationReady);
-        try
-        {
-            File.CreateSymbolicLink(Path.Combine(logs, "escape.jsonl"), outside);
-        }
-        catch (IOException) when (OperatingSystem.IsWindows())
-        {
-            // 受限 Windows token 不能创建新符号链接；用仓库现有 junction 验证根路径拒绝。
-            var junctionError = Assert.Throws<ReplayArtifactArchiveException>(() =>
-                ReplayCoverageAudit.Generate(
-                    RepoPath("opcgpro-web", "public", "cards"),
-                    catalog));
-            Assert.Contains("符号链接", junctionError.Message, StringComparison.Ordinal);
-            return;
-        }
+        File.CreateSymbolicLink(Path.Combine(logs, "escape.jsonl"), outside);
 
         var error = Assert.Throws<ReplayArtifactArchiveException>(
             () => ReplayCoverageAudit.Generate(logs, catalog));
