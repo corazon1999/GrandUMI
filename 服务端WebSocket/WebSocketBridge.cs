@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Buffers;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using GrandUMI.Cards;
@@ -38,6 +39,8 @@ public static class WebSocketBridge
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
         "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
+        "MsgOperationsCases", "MsgOperationsCaseDetail", "MsgOperationsCaseUpdate", "MsgOperationsCaseAppeal", "MsgOperationsPenalty",
+        "MsgPrivilegedAudit", "MsgConsistencyDoctor", "MsgAdminApproval",
         "MsgQqWhitelistStatus", "MsgQqWhitelistImport", "MsgQqAccessDenied", "MsgQqBindingChanged",
     };
     private static readonly HashSet<string> BestEffortOutboundProtocols = new(StringComparer.Ordinal)
@@ -102,6 +105,9 @@ public static class WebSocketBridge
     private static OnlinePlayerHistoryStore? _onlinePlayerHistoryReadStore;
     private static AdminOperationsMetricsCache? _adminOperationsMetricsCache;
     private static AdminDeploymentCoordinator? _adminDeploymentCoordinator;
+    private static CloudReplayStore? _cloudReplayStore;
+    private static OperationsCenterStore? _operationsCenterStore;
+    private static ConsistencyDoctor? _consistencyDoctor;
     private static bool _recordDailyActivePlayers;
     private static int _accepting;
     private static int _onlineBroadcastScheduled;
@@ -145,7 +151,10 @@ public static class WebSocketBridge
         OnlinePlayerHistoryStore? onlinePlayerHistoryReadStore = null,
         AdminOperationsMetricsCache? adminOperationsMetricsCache = null,
         AdminDeploymentCoordinator? adminDeploymentCoordinator = null,
-        bool recordDailyActivePlayers = false)
+        bool recordDailyActivePlayers = false,
+        CloudReplayStore? cloudReplayStore = null,
+        OperationsCenterStore? operationsCenterStore = null,
+        ConsistencyDoctor? consistencyDoctor = null)
     {
         _playerDataStore = playerDataStore ?? throw new ArgumentNullException(nameof(playerDataStore));
         _accountAuthenticationStore = accountAuthenticationStore
@@ -155,6 +164,9 @@ public static class WebSocketBridge
         _onlinePlayerHistoryReadStore = onlinePlayerHistoryReadStore ?? onlinePlayerHistoryStore;
         _adminOperationsMetricsCache = adminOperationsMetricsCache;
         _adminDeploymentCoordinator = adminDeploymentCoordinator;
+        _cloudReplayStore = cloudReplayStore;
+        _operationsCenterStore = operationsCenterStore;
+        _consistencyDoctor = consistencyDoctor;
         _recordDailyActivePlayers = recordDailyActivePlayers;
         _cts.Cancel();
         _cts.Dispose();
@@ -412,6 +424,14 @@ public static class WebSocketBridge
             case "MsgAdminDeploy": OnAdminDeploy(session, msg); break;
             case "MsgAdminPlayerSearch": OnAdminPlayerSearch(session, msg); break;
             case "MsgAdminPlayerUpdate": OnAdminPlayerUpdate(session, msg); break;
+            case "MsgOperationsCases": OnOperationsCases(session, msg); break;
+            case "MsgOperationsCaseDetail": OnOperationsCaseDetail(session, msg); break;
+            case "MsgOperationsCaseUpdate": OnOperationsCaseUpdate(session, msg); break;
+            case "MsgOperationsCaseAppeal": OnOperationsCaseAppeal(session, msg); break;
+            case "MsgOperationsPenalty": OnOperationsPenalty(session, msg); break;
+            case "MsgPrivilegedAudit": OnPrivilegedAudit(session, msg); break;
+            case "MsgConsistencyDoctor": OnConsistencyDoctor(session, msg); break;
+            case "MsgAdminApproval": OnAdminApproval(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
@@ -425,6 +445,11 @@ public static class WebSocketBridge
             case "MsgRespondSpectatorHand": OnRespondSpectatorHand(session, msg); break;
             case "MsgKickSpectator": OnKickSpectator(session, msg); break;
             case "MsgBugReport":   OnBugReport(session, msg);     break;
+            case "MsgCloudReplayList": OnCloudReplayList(session, msg); break;
+            case "MsgCloudReplayLoad": OnCloudReplayLoad(session, msg); break;
+            case "MsgCloudReplayBookmark": OnCloudReplayBookmark(session, msg); break;
+            case "MsgCloudReplayShare": OnCloudReplayShare(session, msg); break;
+            case "MsgCloudReplayDelete": OnCloudReplayDelete(session, msg); break;
             default: LogWarn($"未知协议: {proto}"); break;
         }
     }
@@ -946,20 +971,8 @@ public static class WebSocketBridge
                 s.Account!,
                 Str(msg, "displayName") ?? "",
                 Str(msg, "avatar") ?? "");
-            var directorySynchronized = true;
-            try { _accountAuthenticationStore.UpdateDirectorySearchName(snapshot.Account, snapshot.DisplayName); }
-            catch (Exception directoryError)
-            {
-                directorySynchronized = false;
-                LogErr($"共享账号检索昵称同步失败 {snapshot.Account}: {directoryError.Message}");
-            }
             s.PlayerName = snapshot.DisplayName;
-            SendPlayerData(
-                s,
-                snapshot,
-                directorySynchronized
-                    ? null
-                    : "昵称已在当前环境更新，但跨环境检索目录同步失败，请稍后重新保存。");
+            SendPlayerData(s, snapshot);
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "更新玩家资料失败"); }
     }
@@ -1025,12 +1038,27 @@ public static class WebSocketBridge
     private static void OnDeleteCardBack(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequirePlayer(s)) return;
+        var cardBackId = Str(msg, "cardBackId") ?? "";
+        var administrator = AdministratorPolicy.IsAuthorized(s.Account);
+        var auditCorrelation = "";
         try
         {
+            if (administrator)
+            {
+                auditCorrelation = RequirePrivilegedAuditIntent(
+                    s.Account!, "card_back_delete", cardBackId, Str(msg, "requestId"),
+                    new { cardBackId });
+            }
             var result = _playerDataStore.DeleteCardBack(
                 s.Account!,
-                Str(msg, "cardBackId") ?? "",
-                canManagePublishedCardBacks: AdministratorPolicy.IsAuthorized(s.Account));
+                cardBackId,
+                canManagePublishedCardBacks: administrator);
+            if (administrator)
+            {
+                CompletePrivilegedAudit(
+                    s.Account!, "card_back_delete", cardBackId, auditCorrelation, "success",
+                    new { result.DeletedCardBackId });
+            }
             s.CardBackId = result.Snapshot.CardBackId;
             SendPlayerData(s, result.Snapshot, "卡背已删除并从广场下架");
             SendCardBackGalleryPage(s, _playerDataStore.GetCardBackGalleryPage(s.Account!), requestCursor: null);
@@ -1054,7 +1082,16 @@ public static class WebSocketBridge
                 catch (Exception ex) { LogErr($"同步卡背删除结果 {session.Account}: {ex.Message}"); }
             }
         }
-        catch (Exception ex) { SendCardBackGalleryError(s, ex, "删除卡背失败"); }
+        catch (Exception ex)
+        {
+            if (administrator)
+            {
+                CompletePrivilegedAudit(
+                    s.Account!, "card_back_delete", cardBackId, auditCorrelation, "failed",
+                    new { error = ex.Message });
+            }
+            SendCardBackGalleryError(s, ex, "删除卡背失败");
+        }
     }
 
     private static void OnCardBackReviewQueue(WsSession s)
@@ -1091,20 +1128,34 @@ public static class WebSocketBridge
             return;
         }
 
+        var cardBackId = Str(msg, "cardBackId") ?? "";
+        var approved = Bool(msg, "approved");
+        var auditCorrelation = "";
         try
         {
-            var approved = Bool(msg, "approved");
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                s.Account!, "card_back_review", cardBackId, Str(msg, "requestId"),
+                new { approved });
             _playerDataStore.ReviewCardBack(
                 s.Account!,
-                Str(msg, "cardBackId") ?? "",
+                cardBackId,
                 approved,
                 Str(msg, "reason"));
+            CompletePrivilegedAudit(
+                s.Account!, "card_back_review", cardBackId, auditCorrelation, "success",
+                new { approved });
             SendCardBackReviewQueue(
                 s,
                 _playerDataStore.GetPendingCardBackReviews(),
                 approved ? "卡背已审核通过" : "卡背已标记为未通过");
         }
-        catch (Exception ex) { SendCardBackReviewError(s, ex, "审核卡背失败"); }
+        catch (Exception ex)
+        {
+            CompletePrivilegedAudit(
+                s.Account!, "card_back_review", cardBackId, auditCorrelation, "failed",
+                new { approved, error = ex.Message });
+            SendCardBackReviewError(s, ex, "审核卡背失败");
+        }
     }
 
     private static void OnImportDecks(WsSession s, Dictionary<string, JsonElement> msg)
@@ -1244,6 +1295,34 @@ public static class WebSocketBridge
         // 仅兼容未调用 Initialize 的纯匹配算法单元测试。生产 WebSocket 在完成
         // Initialize（其中 QqAccessStore 为必填项）前不会进入可接收状态。
         if (_qqAccessStore is null) return true;
+
+        if (_operationsCenterStore is not null)
+        {
+            try
+            {
+                var restrictions = _operationsCenterStore.GetRestrictions(session.Account!);
+                if (restrictions.MatchBanned)
+                {
+                    if (session.IsMatching) RebuildMatchQueue(session);
+                    if (sendFailure)
+                        Send(session.SessionId, new
+                        {
+                            proto = responseProto,
+                            result = false,
+                            logStr = "当前账号处于限时比赛禁赛期，请在处罚到期或申诉处理后重试。",
+                            restrictionExpiresAt = restrictions.EarliestExpiry,
+                        });
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogErr($"比赛处罚状态读取失败 {session.Account}: {ex.Message}");
+                if (sendFailure)
+                    Send(session.SessionId, new { proto = responseProto, result = false, logStr = "处罚状态暂时无法确认，请稍后重试。" });
+                return false;
+            }
+        }
 
         QqLoginAccessResult access;
         try { access = _qqAccessStore.CheckNewGameAccess(session.Account!); }
@@ -2135,6 +2214,7 @@ public static class WebSocketBridge
             var action = (Str(msg, "action") ?? "list").Trim().ToLowerInvariant();
             var targetAccount = ResolvePlayerSafetyTarget(s, msg);
             string? logStr = null;
+            string? caseId = null;
             switch (action)
             {
                 case "list":
@@ -2153,20 +2233,61 @@ public static class WebSocketBridge
                     if (!s.TryConsumeRateLimit("player-report", capacity: 3, refillPerSecond: 1.0 / 120))
                         throw new PlayerDataValidationException("举报提交过于频繁，请稍后再试。");
                     var description = Str(msg, "description") ?? "";
+                    var category = Str(msg, "category") ?? "harassment";
                     var context = BuildPlayerReportContext(s, targetAccount);
-                    _playerDataStore.CreatePlayerReport(
+                    if (_operationsCenterStore is null)
+                        throw new InvalidOperationException("统一 Case 服务尚未初始化。");
+                    var room = GameRoomManager.GetRoomBySession(s.SessionId);
+                    var roomId = room?.RoomId;
+                    var chatEvidence = room is not null
+                        ? SnapshotGameChatEvidence(room.RoomId)
+                        : TryGetRecentOpponentContext(s.SessionId, out var recent)
+                            ? recent.RecentGameChat
+                            : [];
+                    if (roomId is null && TryGetRecentOpponentContext(s.SessionId, out var recentRoom))
+                        roomId = recentRoom.RoomId;
+                    var evidence = new List<OperationsCaseEvidenceInput>
+                    {
+                        new("report_context", context),
+                    };
+                    if (chatEvidence.Length > 0)
+                        evidence.Add(new OperationsCaseEvidenceInput(
+                            "game_chat",
+                            JsonSerializer.Serialize(chatEvidence)));
+                    caseId = _operationsCenterStore.CreateCase(new OperationsCaseCreate(
+                        OperationsCaseSources.PlayerReport,
+                        category,
+                        $"玩家举报：{category}",
+                        description,
                         s.Account,
                         targetAccount,
-                        Str(msg, "category") ?? "harassment",
-                        description,
-                        context);
+                        targetAccount,
+                        roomId,
+                        roomId,
+                        null,
+                        Str(msg, "requestId"),
+                        evidence,
+                        "high"));
+                    try
+                    {
+                        _playerDataStore.CreatePlayerReport(
+                            s.Account,
+                            targetAccount,
+                            category,
+                            description,
+                            context);
+                    }
+                    catch (Exception legacyError)
+                    {
+                        LogErr($"旧版玩家举报兼容记录失败，统一 Case 已保留 {caseId}: {legacyError.Message}");
+                    }
                     logStr = "举报已提交，感谢你协助维护社区环境";
                     break;
                 default:
                     throw new PlayerDataValidationException("不支持的安全操作。");
             }
 
-            SendPlayerSafetyState(s, logStr);
+            SendPlayerSafetyState(s, logStr, caseId);
         }
         catch (Exception ex)
         {
@@ -2270,7 +2391,7 @@ public static class WebSocketBridge
             ? queue.ToArray()
             : [];
 
-    private static void SendPlayerSafetyState(WsSession session, string? logStr = null)
+    private static void SendPlayerSafetyState(WsSession session, string? logStr = null, string? caseId = null)
     {
         var blockedPlayers = _playerDataStore.GetBlockedPlayers(session.Account!)
             .Select(player => new
@@ -2285,6 +2406,7 @@ public static class WebSocketBridge
             proto = "MsgPlayerSafety",
             result = true,
             logStr,
+            caseId,
             blockedPlayers,
         });
     }
@@ -3413,8 +3535,15 @@ public static class WebSocketBridge
             ? null
             : Game.Snapshot.PrivateStateSnapshotBuilder.Build(room.Engine.State);
 
+        var reportRequestId = Str(msg, "requestId")?.Trim();
+        var feedbackId = string.IsNullOrWhiteSpace(reportRequestId)
+            ? $"feedback-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"
+            : $"feedback-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(reportRequestId))).ToLowerInvariant()[..24]}";
+        var requestedReplayId = Str(msg, "replayId")?.Trim();
+        var replayId = !string.IsNullOrWhiteSpace(requestedReplayId) ? requestedReplayId : room?.RoomId;
         var report = new
         {
+            feedbackId,
             savedAt     = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             account     = s.Account ?? "",
             sessionId   = s.SessionId,
@@ -3422,16 +3551,43 @@ public static class WebSocketBridge
             playerIndex,
             category,
             description,
+            replayId,
             clientInfo,
             serverSnapshot,
         };
 
         try
         {
-            var path = BugReportStore.Save(report, s.Account ?? "anon", room?.RoomId, category);
+            if (_operationsCenterStore is null)
+                throw new InvalidOperationException("统一 Case 服务尚未初始化。");
+            var caseId = _operationsCenterStore.CreateCase(new OperationsCaseCreate(
+                OperationsCaseSources.BugReport,
+                category,
+                category == "suggestion" ? "玩家优化建议" : "玩家 Bug 反馈",
+                description,
+                s.Account,
+                null,
+                null,
+                room?.RoomId,
+                replayId,
+                feedbackId,
+                reportRequestId,
+                [new OperationsCaseEvidenceInput(
+                    "bug_report_context",
+                    JsonSerializer.Serialize(new { clientInfo, playerIndex, serverSnapshot }))],
+                category == "bug" ? "high" : "normal"));
+            string? legacyPath = null;
+            try { legacyPath = BugReportStore.Save(report, s.Account ?? "anon", room?.RoomId, category); }
+            catch (Exception legacyError)
+            {
+                LogErr($"旧版 Bug 反馈文件保存失败，统一 Case 已保留 {caseId}: {legacyError.Message}");
+            }
+            var replayLinked = s.Account is not null
+                && replayId is not null
+                && _cloudReplayStore?.AssociateFeedback(s.Account, replayId, feedbackId) == true;
             var categoryName = category == "suggestion" ? "优化建议" : "Bug";
-            Log($"{categoryName} 反馈已保存: {path}");
-            Send(s.SessionId, new { proto = "MsgBugReport", result = true, path });
+            Log($"{categoryName} 反馈已进入统一 Case: {caseId}；兼容文件={legacyPath ?? "未写入"}");
+            Send(s.SessionId, new { proto = "MsgBugReport", result = true, feedbackId, caseId, replayId, replayLinked });
         }
         catch (Exception ex)
         {
@@ -3439,6 +3595,186 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = ex.Message });
         }
     }
+
+    private static bool TryRequireCloudReplay(WsSession session, string proto, out CloudReplayStore store)
+    {
+        if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new { proto, result = false, errorCode = "login_required", logStr = "请先登录。" });
+            store = null!;
+            return false;
+        }
+        if (_cloudReplayStore is null)
+        {
+            Send(session.SessionId, new { proto, result = false, errorCode = "unavailable", logStr = "云回放服务暂不可用。" });
+            store = null!;
+            return false;
+        }
+        store = _cloudReplayStore;
+        return true;
+    }
+
+    private static void OnCloudReplayList(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgCloudReplayList";
+        if (!TryRequireCloudReplay(s, proto, out var store)) return;
+        if (!s.TryConsumeRateLimit("cloud-replay-list", capacity: 6, refillPerSecond: 0.5))
+        {
+            SendCloudReplayError(s, proto, "rate_limited", "读取过于频繁，请稍后重试。", Str(msg, "requestId"));
+            return;
+        }
+        try
+        {
+            var opponent = Str(msg, "opponent")?.Trim();
+            if (opponent?.Length > 80) throw new CloudReplayException("invalid_request", "对手筛选文字过长。");
+            var fromMs = Long(msg, "from", -1);
+            var toMs = Long(msg, "to", -1);
+            var page = store.List(s.Account!, new CloudReplayListQuery(
+                opponent,
+                Str(msg, "outcome"),
+                Str(msg, "matchKind"),
+                Bool(msg, "bookmarkedOnly"),
+                fromMs >= 0 ? DateTimeOffset.FromUnixTimeMilliseconds(fromMs).UtcDateTime : null,
+                toMs >= 0 ? DateTimeOffset.FromUnixTimeMilliseconds(toMs).UtcDateTime : null,
+                Int(msg, "offset"),
+                Int(msg, "limit", 30)));
+            Send(s.SessionId, new
+            {
+                proto = "MsgCloudReplayList",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                items = page.Items.Select(item => new
+                {
+                    replayId = item.ReplayId,
+                    startedAt = item.StartedAt,
+                    completedAt = item.CompletedAt,
+                    myName = item.MyName,
+                    opponentName = item.OpponentName,
+                    myLeader = item.MyLeader,
+                    opponentLeader = item.OpponentLeader,
+                    winnerIsMe = item.WinnerIsMe,
+                    isDraw = item.IsDraw,
+                    gameOverReason = item.GameOverReason,
+                    turnCount = item.TurnCount,
+                    matchKind = item.MatchKind,
+                    bookmarked = item.Bookmarked,
+                    shared = item.Shared,
+                    sharePolicy = item.SharePolicy,
+                    feedbackCount = item.FeedbackCount,
+                    sizeBytes = item.SizeBytes,
+                    runtimeArtifactId = item.RuntimeArtifactId,
+                }).ToArray(),
+                total = page.Total,
+                usedBytes = page.UsedBytes,
+                quotaBytes = page.QuotaBytes,
+                retentionDays = page.RetentionDays,
+                maximumReplays = page.MaximumReplays,
+            });
+        }
+        catch (Exception ex) { SendCloudReplayException(s, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnCloudReplayLoad(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgCloudReplayLoad";
+        if (!TryRequireCloudReplay(s, proto, out var store)) return;
+        if (!s.TryConsumeRateLimit("cloud-replay-load", capacity: 3, refillPerSecond: 0.1))
+        {
+            SendCloudReplayError(s, proto, "rate_limited", "读取回放过于频繁，请稍后重试。", Str(msg, "requestId"));
+            return;
+        }
+        try
+        {
+            var loaded = store.Load(s.Account!, Str(msg, "replayId") ?? "", Str(msg, "shareToken"));
+            Send(s.SessionId, new
+            {
+                proto = "MsgCloudReplayLoad",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                replayId = loaded.ReplayId,
+                sharedAccess = loaded.SharedAccess,
+                sharePolicy = loaded.SharePolicy,
+                document = loaded.Document,
+            });
+        }
+        catch (Exception ex) { SendCloudReplayException(s, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnCloudReplayBookmark(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgCloudReplayBookmark";
+        if (!TryRequireCloudReplay(s, proto, out var store)) return;
+        if (!s.TryConsumeRateLimit("cloud-replay-mutation", capacity: 10, refillPerSecond: 0.5))
+        {
+            SendCloudReplayError(s, proto, "rate_limited", "操作过于频繁，请稍后重试。", Str(msg, "requestId"));
+            return;
+        }
+        try
+        {
+            var bookmarked = store.SetBookmark(
+                s.Account!, Str(msg, "replayId") ?? "", Bool(msg, "bookmarked"), Str(msg, "requestId") ?? "");
+            Send(s.SessionId, new { proto = "MsgCloudReplayBookmark", result = true, requestId = Str(msg, "requestId"), replayId = Str(msg, "replayId"), bookmarked });
+        }
+        catch (Exception ex) { SendCloudReplayException(s, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnCloudReplayShare(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgCloudReplayShare";
+        if (!TryRequireCloudReplay(s, proto, out var store)) return;
+        if (!s.TryConsumeRateLimit("cloud-replay-mutation", capacity: 10, refillPerSecond: 0.5))
+        {
+            SendCloudReplayError(s, proto, "rate_limited", "操作过于频繁，请稍后重试。", Str(msg, "requestId"));
+            return;
+        }
+        try
+        {
+            var result = store.SetShare(
+                s.Account!, Str(msg, "replayId") ?? "", Bool(msg, "enabled"), Str(msg, "sharePolicy"), Str(msg, "requestId") ?? "");
+            Send(s.SessionId, new
+            {
+                proto = "MsgCloudReplayShare",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                replayId = result.ReplayId,
+                shared = result.Shared,
+                sharePolicy = result.SharePolicy,
+                shareToken = result.ShareToken,
+            });
+        }
+        catch (Exception ex) { SendCloudReplayException(s, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnCloudReplayDelete(WsSession s, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgCloudReplayDelete";
+        if (!TryRequireCloudReplay(s, proto, out var store)) return;
+        if (!s.TryConsumeRateLimit("cloud-replay-mutation", capacity: 10, refillPerSecond: 0.5))
+        {
+            SendCloudReplayError(s, proto, "rate_limited", "操作过于频繁，请稍后重试。", Str(msg, "requestId"));
+            return;
+        }
+        try
+        {
+            _ = store.Delete(s.Account!, Str(msg, "replayId") ?? "", Str(msg, "requestId") ?? "");
+            Send(s.SessionId, new { proto = "MsgCloudReplayDelete", result = true, requestId = Str(msg, "requestId"), replayId = Str(msg, "replayId") });
+        }
+        catch (Exception ex) { SendCloudReplayException(s, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void SendCloudReplayException(WsSession session, string proto, Exception exception, string? requestId)
+    {
+        if (exception is CloudReplayException known)
+        {
+            SendCloudReplayError(session, proto, known.Code, known.Message, requestId);
+            return;
+        }
+        LogErr($"{proto} 失败: {exception.Message}");
+        SendCloudReplayError(session, proto, "storage_error", "云回放服务暂时不可用，请稍后重试。", requestId);
+    }
+
+    private static void SendCloudReplayError(WsSession session, string proto, string errorCode, string message, string? requestId)
+        => Send(session.SessionId, new { proto, result = false, requestId, errorCode, logStr = message });
 
     /// <summary>
     /// MsgRequestState — 客户端重连后请求完整游戏状态快照（服务端权威）
@@ -3457,6 +3793,7 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "请先登录" });
             return;
         }
+        if (!TryRequireCommunicationAccess(s, "MsgSpectateRoom", forSpectating: true)) return;
         if (s.IsMatching)
         {
             Send(s.SessionId, new { proto = "MsgSpectateRoom", result = false, logStr = "请先取消匹配再观战" });
@@ -3622,9 +3959,41 @@ public static class WebSocketBridge
 
     // ── 聊天 ────────────────────────────────────────────────────────────────
 
+    private static bool TryRequireCommunicationAccess(
+        WsSession session,
+        string responseProto,
+        bool forSpectating = false)
+    {
+        if (_operationsCenterStore is null || string.IsNullOrWhiteSpace(session.Account)) return true;
+        try
+        {
+            var restrictions = _operationsCenterStore.GetRestrictions(session.Account);
+            var denied = restrictions.Muted || restrictions.SpectateOrChatBanned;
+            if (forSpectating) denied = restrictions.SpectateOrChatBanned;
+            if (!denied) return true;
+            Send(session.SessionId, new
+            {
+                proto = responseProto,
+                result = false,
+                logStr = forSpectating
+                    ? "当前账号处于限时观战/聊天限制期，暂时不能观战。"
+                    : "当前账号处于限时聊天限制期，暂时不能发送消息。",
+                restrictionExpiresAt = restrictions.EarliestExpiry,
+            });
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LogErr($"沟通处罚状态读取失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new { proto = responseProto, result = false, logStr = "处罚状态暂时无法确认，请稍后重试。" });
+            return false;
+        }
+    }
+
     private static void OnChatMsg(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!s.IsLoggedIn) return;
+        if (!TryRequireCommunicationAccess(s, "MsgChatMsg")) return;
         if (!s.TryConsumeRateLimit("lobby-chat", capacity: 3, refillPerSecond: 0.5))
         {
             Send(s.SessionId, new { proto = "MsgRateLimited", scope = "lobby-chat", retryAfterMs = 2_000 });
@@ -3669,14 +4038,32 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "公告内容不能为空" });
             return;
         }
-
-        BroadcastAll(new
+        var auditCorrelation = "";
+        try
         {
-            proto = "MsgGlobalAnnouncement",
-            content,
-            issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        });
-        Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = true, logStr = "全服公告已发送" });
+            var contentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                s.Account!, "global_announcement", "all_sessions", Str(msg, "requestId"),
+                new { contentLength = content.Length, contentHash });
+            BroadcastAll(new
+            {
+                proto = "MsgGlobalAnnouncement",
+                content,
+                issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            });
+            CompletePrivilegedAudit(
+                s.Account!, "global_announcement", "all_sessions", auditCorrelation, "success",
+                new { contentLength = content.Length, contentHash });
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = true, logStr = "全服公告已发送" });
+        }
+        catch (Exception ex)
+        {
+            CompletePrivilegedAudit(
+                s.Account!, "global_announcement", "all_sessions", auditCorrelation, "failed",
+                new { error = ex.Message });
+            LogErr($"全服公告发送失败：{ex.Message}");
+            Send(s.SessionId, new { proto = "MsgGlobalAnnouncement", result = false, logStr = "全服公告发送失败，未执行变更" });
+        }
     }
 
     private static void OnMaintenanceState(WsSession s)
@@ -3699,11 +4086,18 @@ public static class WebSocketBridge
         }
 
         var enabled = Bool(msg, "enabled");
+        var auditCorrelation = "";
         try
         {
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                s.Account!, "maintenance_set", enabled ? "enabled" : "disabled", Str(msg, "requestId"),
+                new { enabled });
             GameRoomManager.SetMaintenanceMode(enabled);
             if (enabled) CancelWaitingGameActivities();
             BroadcastMaintenanceState();
+            CompletePrivilegedAudit(
+                s.Account!, "maintenance_set", enabled ? "enabled" : "disabled", auditCorrelation, "success",
+                new { enabled });
             SendMaintenanceState(s, result: true, logStr: enabled
                 ? "维护模式已开启，新的对局已停止"
                 : "维护模式已关闭，玩家可以开始新对局");
@@ -3711,6 +4105,9 @@ public static class WebSocketBridge
         }
         catch (Exception ex)
         {
+            CompletePrivilegedAudit(
+                s.Account!, "maintenance_set", enabled ? "enabled" : "disabled", auditCorrelation, "failed",
+                new { enabled, error = ex.Message });
             LogErr($"维护状态持久化失败: {ex.Message}");
             SendMaintenanceState(s, result: false, logStr: "维护状态保存失败，未执行变更");
         }
@@ -3909,8 +4306,12 @@ public static class WebSocketBridge
             return;
         }
 
+        var auditCorrelation = "";
         try
         {
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                s.Account!, "ruleset_activate", rulesetId, Str(msg, "requestId"),
+                new { rulesetId });
             CardRulesetManager.RefreshPackages();
             var activated = CardRulesetManager.Activate(rulesetId);
             var oldRoomCount = GameRoomManager.RoomCountsByRuleset.TryGetValue(activated.PreviousRulesetId, out var count)
@@ -3921,10 +4322,16 @@ public static class WebSocketBridge
                 result: true,
                 logStr: $"已激活 {activated.CurrentRulesetId}；{oldRoomCount} 场进行中的旧版对局不受影响，新对局立即使用新版");
             BroadcastRulesetStateExcept(s.SessionId);
+            CompletePrivilegedAudit(
+                s.Account!, "ruleset_activate", activated.CurrentRulesetId, auditCorrelation, "success",
+                new { activated.PreviousRulesetId, activated.CurrentRulesetId, oldRoomCount });
             Log($"规则集 {activated.PreviousRulesetId} -> {activated.CurrentRulesetId}：{s.Account}");
         }
         catch (Exception ex)
         {
+            CompletePrivilegedAudit(
+                s.Account!, "ruleset_activate", rulesetId, auditCorrelation, "failed",
+                new { rulesetId, error = ex.Message });
             LogErr($"激活卡效规则失败: {ex.Message}");
             Send(s.SessionId, new { proto = "MsgRulesetState", result = false, logStr = $"激活规则失败：{ex.Message}" });
         }
@@ -4000,13 +4407,22 @@ public static class WebSocketBridge
             return;
         }
 
+        var rawJson = jsonElement.GetString() ?? "";
+        var auditCorrelation = "";
         try
         {
+            var payloadHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawJson))).ToLowerInvariant();
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                adminAccount, "qq_whitelist_import", "shared_qq_whitelist", Str(msg, "requestId"),
+                new { bootstrapOnly, payloadBytes = Encoding.UTF8.GetByteCount(rawJson), payloadHash });
             var result = _qqAccessStore.Import(
                 adminAccount,
-                jsonElement.GetString() ?? "",
+                rawJson,
                 initializationOnly: bootstrapOnly);
             EvictIneligibleWaitingActivities();
+            CompletePrivilegedAudit(
+                adminAccount, "qq_whitelist_import", "shared_qq_whitelist", auditCorrelation, "success",
+                new { result.Version, result.MemberCount, result.DuplicateCount, result.AddedCount, result.RemovedCount, result.RemovedBoundCount, bootstrapOnly });
             Send(session.SessionId, new
             {
                 proto = "MsgQqWhitelistImport",
@@ -4028,9 +4444,14 @@ public static class WebSocketBridge
                     SendQqWhitelistStatus(current);
             Log($"QQ 白名单导入完成：操作者={adminAccount}，版本={result.Version}，人数={result.MemberCount}，新增={result.AddedCount}，移除={result.RemovedCount}");
         }
-        catch (Exception ex) when (ex is QqAccessValidationException or SqliteException or InvalidOperationException)
+        catch (Exception ex) when (ex is QqAccessValidationException or SqliteException or InvalidOperationException or OperationsCenterException)
         {
-            var message = ex is QqAccessValidationException ? ex.Message : "QQ 白名单导入失败，请稍后重试。";
+            var message = ex is QqAccessValidationException or OperationsCenterException
+                ? ex.Message
+                : "QQ 白名单导入失败，请稍后重试。";
+            CompletePrivilegedAudit(
+                adminAccount, "qq_whitelist_import", "shared_qq_whitelist", auditCorrelation, "failed",
+                new { bootstrapOnly, error = ex.Message });
             try
             {
                 _qqAccessStore.RecordManualWhitelistFailure(adminAccount, message);
@@ -4123,6 +4544,429 @@ public static class WebSocketBridge
         });
     }
 
+    private static void OnOperationsCases(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgOperationsCases";
+        if (!TryRequireOperationsStore(session, proto, out var store)) return;
+        var canManage = AdministratorPolicy.IsAuthorized(session.Account);
+        try
+        {
+            var query = canManage
+                ? new OperationsCaseQuery(
+                    Str(msg, "status"),
+                    Str(msg, "source"),
+                    Str(msg, "assignee"),
+                    Str(msg, "account"),
+                    Int(msg, "offset"),
+                    Int(msg, "limit", 50))
+                : new OperationsCaseQuery(Account: session.Account, Offset: Int(msg, "offset"), Limit: Int(msg, "limit", 50));
+            var page = store.ListCases(query);
+            var metrics = canManage ? store.GetCaseMetrics() : null;
+            Send(session.SessionId, new
+            {
+                proto = "MsgOperationsCases",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                canManage,
+                items = page.Items.Select(ToOperationsCaseSummaryPayload).ToArray(),
+                total = page.Total,
+                metrics = metrics is null ? null : new
+                {
+                    total = metrics.Total,
+                    awaitingFirstAction = metrics.AwaitingFirstAction,
+                    firstActionP90Ms = metrics.FirstActionP90Milliseconds,
+                    byStatus = metrics.ByStatus,
+                },
+            });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnOperationsCaseDetail(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgOperationsCaseDetail";
+        if (!TryRequireOperationsStore(session, proto, out var store)) return;
+        try
+        {
+            var detail = store.GetCase(Str(msg, "caseId") ?? "");
+            var canManage = AdministratorPolicy.IsAuthorized(session.Account);
+            var involved = string.Equals(detail.Summary.ReporterAccount, session.Account, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(detail.Summary.SubjectAccount, session.Account, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(detail.Summary.RelatedAccount, session.Account, StringComparison.OrdinalIgnoreCase);
+            if (!canManage && !involved)
+                throw new OperationsCenterException("forbidden", "没有查看该 Case 的权限。");
+            Send(session.SessionId, new
+            {
+                proto = "MsgOperationsCaseDetail",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                canManage,
+                detail = ToOperationsCaseDetailPayload(detail),
+            });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnOperationsCaseUpdate(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgOperationsCaseUpdate";
+        if (!TryRequireOperationsAdmin(session, proto, out var store)) return;
+        var requestId = Str(msg, "requestId") ?? "";
+        try
+        {
+            var detail = store.TransitionCase(
+                session.Account!,
+                "web_admin",
+                Str(msg, "caseId") ?? "",
+                Str(msg, "toStatus") ?? "",
+                Str(msg, "assignee"),
+                Str(msg, "disposition"),
+                Str(msg, "note") ?? "",
+                requestId);
+            Send(session.SessionId, new { proto = "MsgOperationsCaseUpdate", result = true, requestId, detail = ToOperationsCaseDetailPayload(detail) });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, requestId); }
+    }
+
+    private static void OnOperationsCaseAppeal(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgOperationsCaseAppeal";
+        if (!TryRequireOperationsStore(session, proto, out var store)) return;
+        var requestId = Str(msg, "requestId") ?? "";
+        try
+        {
+            var detail = store.SubmitAppeal(
+                session.Account!,
+                Str(msg, "caseId") ?? "",
+                Str(msg, "appealText") ?? "",
+                requestId);
+            Send(session.SessionId, new { proto = "MsgOperationsCaseAppeal", result = true, requestId, detail = ToOperationsCaseDetailPayload(detail) });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, requestId); }
+    }
+
+    private static void OnOperationsPenalty(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgOperationsPenalty";
+        if (!TryRequireOperationsAdmin(session, proto, out var store)) return;
+        var requestId = Str(msg, "requestId") ?? "";
+        try
+        {
+            OperationsPenalty penalty;
+            var action = Str(msg, "action") ?? "apply";
+            if (string.Equals(action, "revoke", StringComparison.Ordinal))
+            {
+                penalty = store.RevokePenalty(
+                    session.Account!, "web_admin", Str(msg, "penaltyId") ?? "",
+                    Str(msg, "reason") ?? "", requestId);
+            }
+            else
+            {
+                var expiresAt = DateTimeOffset.FromUnixTimeMilliseconds(Long(msg, "expiresAt", -1)).UtcDateTime;
+                penalty = store.ApplyPenalty(
+                    session.Account!, "web_admin", Str(msg, "caseId") ?? "",
+                    Str(msg, "account") ?? "", Str(msg, "kind") ?? "", expiresAt,
+                    Str(msg, "reason") ?? "", requestId);
+            }
+            Send(session.SessionId, new { proto = "MsgOperationsPenalty", result = true, requestId, penalty = ToOperationsPenaltyPayload(penalty) });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, requestId); }
+    }
+
+    private static void OnPrivilegedAudit(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgPrivilegedAudit";
+        if (!TryRequireOperationsAdmin(session, proto, out var store)) return;
+        try
+        {
+            var entries = store.ListPrivilegedAudit(Int(msg, "offset"), Int(msg, "limit", 100));
+            Send(session.SessionId, new
+            {
+                proto = "MsgPrivilegedAudit",
+                result = true,
+                requestId = Str(msg, "requestId"),
+                chainValid = store.VerifyAuditChain(),
+                entries = entries.Select(item => new
+                {
+                    id = item.Id,
+                    actorAccount = item.ActorAccount,
+                    source = item.Source,
+                    operation = item.Operation,
+                    target = item.Target,
+                    requestId = item.RequestId,
+                    result = item.Result,
+                    detailJson = item.DetailJson,
+                    createdAt = item.CreatedAt,
+                    previousHash = item.PreviousHash,
+                    eventHash = item.EventHash,
+                }).ToArray(),
+            });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, Str(msg, "requestId")); }
+    }
+
+    private static void OnConsistencyDoctor(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgConsistencyDoctor";
+        if (!TryRequireOperationsAdmin(session, proto, out var store)) return;
+        if (_consistencyDoctor is null)
+        {
+            Send(session.SessionId, new { proto, result = false, errorCode = "unavailable", logStr = "一致性 Doctor 尚未初始化。" });
+            return;
+        }
+        var requestId = Str(msg, "requestId") ?? "";
+        try
+        {
+            var action = Str(msg, "action") ?? "snapshot";
+            if (string.Equals(action, "repair", StringComparison.Ordinal))
+            {
+                var findingId = Long(msg, "findingId", -1);
+                store.ConsumeHighRiskChallenge(
+                    session.Account!, "web_admin", "database_repair", findingId.ToString(),
+                    Str(msg, "challengeId") ?? "", Str(msg, "confirmationToken") ?? "");
+                _consistencyDoctor.QueueDisplayNameRepair(findingId, session.Account!, "web_admin", requestId);
+            }
+            var snapshot = _consistencyDoctor.RunOnce();
+            Send(session.SessionId, new
+            {
+                proto = "MsgConsistencyDoctor",
+                result = true,
+                requestId,
+                snapshot = new
+                {
+                    checkedAt = snapshot.CheckedAt,
+                    processed = snapshot.Processed,
+                    succeeded = snapshot.Succeeded,
+                    retried = snapshot.Retried,
+                    openFindings = snapshot.OpenFindings,
+                    outboxCounts = snapshot.OutboxCounts,
+                    schemas = snapshot.Schemas.Select(schema => new
+                    {
+                        name = schema.Name,
+                        path = schema.Path,
+                        exists = schema.Exists,
+                        healthy = schema.Healthy,
+                        integrity = schema.Integrity,
+                        userVersion = schema.UserVersion,
+                        migrationTables = schema.MigrationTables,
+                        sizeBytes = schema.SizeBytes,
+                        lastWriteAt = schema.LastWriteAt,
+                    }).ToArray(),
+                },
+                findings = store.ListConsistencyFindings().Select(item => new
+                {
+                    id = item.Id,
+                    scope = item.Scope,
+                    findingKey = item.FindingKey,
+                    status = item.Status,
+                    severity = item.Severity,
+                    authoritativeJson = item.AuthoritativeJson,
+                    observedJson = item.ObservedJson,
+                    repairAction = item.RepairAction,
+                    lastError = item.LastError,
+                    firstSeenAt = item.FirstSeenAt,
+                    lastSeenAt = item.LastSeenAt,
+                    resolvedAt = item.ResolvedAt,
+                }).ToArray(),
+            });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, requestId); }
+    }
+
+    private static void OnAdminApproval(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgAdminApproval";
+        if (!TryRequireOperationsAdmin(session, proto, out var store)) return;
+        var requestId = Str(msg, "requestId") ?? "";
+        try
+        {
+            var challenge = store.IssueHighRiskChallenge(
+                session.Account!, "web_admin", Str(msg, "operation") ?? "",
+                Str(msg, "target") ?? "", requestId);
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminApproval",
+                result = true,
+                requestId,
+                challengeId = challenge.ChallengeId,
+                confirmationToken = challenge.ConfirmationToken,
+                operation = challenge.Operation,
+                target = challenge.Target,
+                expiresAt = challenge.ExpiresAt,
+            });
+        }
+        catch (Exception ex) { SendOperationsError(session, proto, ex, requestId); }
+    }
+
+    private static bool TryRequireOperationsStore(
+        WsSession session,
+        string proto,
+        out OperationsCenterStore store)
+    {
+        if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new { proto, result = false, errorCode = "login_required", logStr = "请先登录。" });
+            store = null!;
+            return false;
+        }
+        if (_operationsCenterStore is null)
+        {
+            Send(session.SessionId, new { proto, result = false, errorCode = "unavailable", logStr = "运营中心暂不可用。" });
+            store = null!;
+            return false;
+        }
+        store = _operationsCenterStore;
+        return true;
+    }
+
+    private static bool TryRequireOperationsAdmin(
+        WsSession session,
+        string proto,
+        out OperationsCenterStore store)
+    {
+        if (!TryRequireOperationsStore(session, proto, out store)) return false;
+        if (AdministratorPolicy.IsAuthorized(session.Account)) return true;
+        Send(session.SessionId, new { proto, result = false, errorCode = "forbidden", logStr = "没有运营管理权限。" });
+        store = null!;
+        return false;
+    }
+
+    /// <summary>
+    /// 在任何旧式管理员写操作发生前先写入不可变审计意图。审计库不可用或写入失败时
+    /// 必须拒绝执行，避免出现“操作已经生效但完全没有审计痕迹”的窗口。
+    /// </summary>
+    private static string RequirePrivilegedAuditIntent(
+        string actorAccount,
+        string operation,
+        string? target,
+        string? clientRequestId,
+        object detail)
+    {
+        var store = _operationsCenterStore
+            ?? throw new OperationsCenterException("audit_unavailable", "特权审计不可用，已拒绝管理员操作。");
+        var correlationId = string.IsNullOrWhiteSpace(clientRequestId)
+            ? $"admin-{Guid.NewGuid():N}"
+            : clientRequestId.Trim();
+        store.AppendPrivilegedAudit(
+            actorAccount,
+            "web_admin",
+            $"{operation}_intent",
+            target,
+            $"audit-{Guid.NewGuid():N}",
+            "requested",
+            JsonSerializer.Serialize(new { correlationId, detail }));
+        return correlationId;
+    }
+
+    /// <summary>
+    /// 结果审计使用独立事件 ID，与意图事件形成相关联的两条追加记录。结果落库失败时
+    /// 保留已写入的意图事件并记录错误，避免诱导客户端重试已成功的非幂等操作。
+    /// </summary>
+    private static void CompletePrivilegedAudit(
+        string actorAccount,
+        string operation,
+        string? target,
+        string correlationId,
+        string result,
+        object detail)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId)) return;
+        try
+        {
+            _operationsCenterStore?.AppendPrivilegedAudit(
+                actorAccount,
+                "web_admin",
+                operation,
+                target,
+                $"audit-{Guid.NewGuid():N}",
+                result,
+                JsonSerializer.Serialize(new { correlationId, detail }));
+        }
+        catch (Exception auditError)
+        {
+            LogErr($"特权操作结果审计写入失败：operation={operation}，target={target}，correlation={correlationId}，原因={auditError.Message}");
+        }
+    }
+
+    private static void SendOperationsError(WsSession session, string proto, Exception error, string? requestId)
+    {
+        var errorCode = error is OperationsCenterException operationsError
+            ? operationsError.Code
+            : error is ArgumentOutOfRangeException ? "invalid_request" : "operation_failed";
+        var message = error is OperationsCenterException or PlayerDataValidationException or ArgumentOutOfRangeException
+            ? error.Message
+            : "运营操作失败，请稍后重试。";
+        LogErr($"运营协议 {proto} 失败 {session.Account}: {error.Message}");
+        Send(session.SessionId, new { proto, result = false, requestId, errorCode, logStr = message });
+    }
+
+    private static object ToOperationsCaseSummaryPayload(OperationsCaseSummary item) => new
+    {
+        caseId = item.CaseId,
+        source = item.Source,
+        category = item.Category,
+        title = item.Title,
+        status = item.Status,
+        priority = item.Priority,
+        reporterAccount = item.ReporterAccount,
+        subjectAccount = item.SubjectAccount,
+        relatedAccount = item.RelatedAccount,
+        roomId = item.RoomId,
+        replayId = item.ReplayId,
+        assignee = item.Assignee,
+        disposition = item.Disposition,
+        createdAt = item.CreatedAt,
+        firstActionAt = item.FirstActionAt,
+        updatedAt = item.UpdatedAt,
+        evidenceCount = item.EvidenceCount,
+        activePenaltyCount = item.ActivePenaltyCount,
+    };
+
+    private static object ToOperationsPenaltyPayload(OperationsPenalty item) => new
+    {
+        penaltyId = item.PenaltyId,
+        caseId = item.CaseId,
+        account = item.Account,
+        kind = item.Kind,
+        reason = item.Reason,
+        operatorAccount = item.OperatorAccount,
+        source = item.Source,
+        startsAt = item.StartsAt,
+        expiresAt = item.ExpiresAt,
+        revokedAt = item.RevokedAt,
+        revokedBy = item.RevokedBy,
+        revokeReason = item.RevokeReason,
+    };
+
+    private static object ToOperationsCaseDetailPayload(OperationsCaseDetail item) => new
+    {
+        summary = ToOperationsCaseSummaryPayload(item.Summary),
+        description = item.Description,
+        externalEventId = item.ExternalEventId,
+        appealText = item.AppealText,
+        evidence = item.Evidence.Select(evidence => new
+        {
+            id = evidence.Id,
+            type = evidence.Type,
+            payloadJson = evidence.PayloadJson,
+            createdAt = evidence.CreatedAt,
+            expiresAt = evidence.ExpiresAt,
+        }).ToArray(),
+        events = item.Events.Select(entry => new
+        {
+            id = entry.Id,
+            eventType = entry.EventType,
+            fromStatus = entry.FromStatus,
+            toStatus = entry.ToStatus,
+            actorAccount = entry.ActorAccount,
+            source = entry.Source,
+            requestId = entry.RequestId,
+            note = entry.Note,
+            createdAt = entry.CreatedAt,
+        }).ToArray(),
+        penalties = item.Penalties.Select(ToOperationsPenaltyPayload).ToArray(),
+    };
+
     private static void OnAdminOperations(WsSession session)
     {
         if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
@@ -4162,8 +5006,19 @@ public static class WebSocketBridge
         }
 
         var environment = Str(msg, "environment")?.Trim().ToLowerInvariant() ?? "";
+        var requestId = Str(msg, "requestId") ?? "";
+        var highRiskOperation = environment == "production" ? "deploy_production" : "deploy_test";
         try
         {
+            if (_operationsCenterStore is null)
+                throw new InvalidOperationException("运营中心尚未初始化，拒绝执行发布。");
+            _operationsCenterStore.ConsumeHighRiskChallenge(
+                session.Account!,
+                "web_admin",
+                highRiskOperation,
+                environment,
+                Str(msg, "challengeId") ?? "",
+                Str(msg, "confirmationToken") ?? "");
             if (environment == "production")
             {
                 var maintenance = GameRoomManager.GetMaintenanceSnapshot();
@@ -4177,13 +5032,24 @@ public static class WebSocketBridge
                 }
             }
             _adminDeploymentCoordinator.Queue(environment);
+            _operationsCenterStore.AppendPrivilegedAudit(
+                session.Account!, "web_admin", "deploy_queue", environment,
+                requestId, "success", JsonSerializer.Serialize(new { environment }));
             SendAdminOperations(session, result: true, logStr: environment == "production"
                 ? "正式服发布任务已排队；执行器仍会检查测试服版本、更新日志和进行中房间。"
                 : "测试服更新任务已排队，将部署远端 main 的最新提交。");
             Log($"管理员发布任务已排队：{environment}，操作者={session.Account}");
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception ex)
         {
+            try
+            {
+                _operationsCenterStore?.AppendPrivilegedAudit(
+                    session.Account!, "web_admin", "deploy_queue", environment,
+                    string.IsNullOrWhiteSpace(requestId) ? Guid.NewGuid().ToString("D") : requestId,
+                    "failed", JsonSerializer.Serialize(new { environment, error = ex.Message }));
+            }
+            catch (Exception auditError) { LogErr($"发布失败审计写入失败: {auditError.Message}"); }
             LogErr($"管理员发布任务排队失败：{ex.Message}");
             SendAdminOperations(session, result: false, logStr: ex.Message);
         }
@@ -4203,12 +5069,21 @@ public static class WebSocketBridge
             return;
         }
 
+        var searchBy = Str(msg, "searchBy") ?? "player";
+        var query = Str(msg, "query") ?? "";
+        var auditCorrelation = "";
         try
         {
-            var searchBy = Str(msg, "searchBy") ?? "player";
-            var players = _qqAccessStore.SearchAccountsForAdmin(Str(msg, "query") ?? "", searchBy)
+            var queryHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(query))).ToLowerInvariant();
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                session.Account!, "admin_player_search", searchBy, Str(msg, "requestId"),
+                new { searchBy, queryLength = query.Length, queryHash });
+            var players = _qqAccessStore.SearchAccountsForAdmin(query, searchBy)
                 .Select(ToAdminPlayerPayload)
                 .ToArray();
+            CompletePrivilegedAudit(
+                session.Account!, "admin_player_search", searchBy, auditCorrelation, "success",
+                new { searchBy, resultCount = players.Length });
             Send(session.SessionId, new
             {
                 proto = "MsgAdminPlayerSearch",
@@ -4219,7 +5094,10 @@ public static class WebSocketBridge
         }
         catch (Exception ex)
         {
-            var message = ex is PlayerDataValidationException or QqAccessValidationException
+            CompletePrivilegedAudit(
+                session.Account!, "admin_player_search", searchBy, auditCorrelation, "failed",
+                new { searchBy, error = ex.Message });
+            var message = ex is PlayerDataValidationException or QqAccessValidationException or OperationsCenterException
                 ? ex.Message
                 : "搜索玩家失败，请稍后再试。";
             LogErr($"管理员搜索玩家失败 {session.Account}: {ex.Message}");
@@ -4243,11 +5121,16 @@ public static class WebSocketBridge
 
         var action = Str(msg, "action")?.Trim();
         var targetAccount = Str(msg, "targetAccount")?.Trim() ?? "";
+        var requestId = Str(msg, "requestId") ?? Guid.NewGuid().ToString("D");
+        var auditOperation = $"admin_player_{action ?? "unknown"}";
+        var auditCorrelation = "";
         try
         {
+            auditCorrelation = RequirePrivilegedAuditIntent(
+                session.Account!, auditOperation, targetAccount, requestId,
+                new { action, targetAccount });
             string? temporaryPassword = null;
             var replayed = false;
-            var directorySynchronized = true;
             if (string.Equals(action, "rename", StringComparison.Ordinal))
             {
                 var snapshot = _playerDataStore.AdminRenamePlayer(
@@ -4260,18 +5143,16 @@ public static class WebSocketBridge
                     SendPlayerData(targetSession, snapshot, "管理员已更新你的昵称");
                     PushFriendPresenceToFriends(snapshot.Account);
                 }
-                try { _accountAuthenticationStore.UpdateDirectorySearchName(snapshot.Account, snapshot.DisplayName); }
-                catch (Exception directoryError)
-                {
-                    directorySynchronized = false;
-                    // 当前环境的玩法改名已经提交，不能伪装为整体回滚；检索目录可由后续改名重试修正。
-                    LogErr($"共享账号检索昵称同步失败 {snapshot.Account}: {directoryError.Message}");
-                }
                 targetAccount = snapshot.Account;
                 Log($"管理员玩家操作 rename：{session.Account} -> {targetAccount}");
             }
             else if (string.Equals(action, "resetPassword", StringComparison.Ordinal))
             {
+                if (_operationsCenterStore is null)
+                    throw new InvalidOperationException("运营中心尚未初始化，拒绝重置密码。");
+                _operationsCenterStore.ConsumeHighRiskChallenge(
+                    session.Account!, "web_admin", "reset_password", targetAccount,
+                    Str(msg, "challengeId") ?? "", Str(msg, "confirmationToken") ?? "");
                 var reset = _accountAuthenticationStore.AdminResetPassword(session.Account!, targetAccount);
                 targetAccount = reset.Account;
                 temporaryPassword = reset.TemporaryPassword;
@@ -4288,7 +5169,7 @@ public static class WebSocketBridge
                     action == "setQq" ? "set" : "unbind",
                     Str(msg, "qq"),
                     Long(msg, "expectedBindingRevision", -1),
-                    Str(msg, "requestId") ?? "");
+                    requestId);
                 targetAccount = mutation.Account;
                 replayed = mutation.Replayed;
                 if (!mutation.Replayed) ApplyQqBindingSecurityMutation(mutation.Account);
@@ -4298,6 +5179,10 @@ public static class WebSocketBridge
             {
                 throw new PlayerDataValidationException("不支持的玩家管理操作。");
             }
+
+            CompletePrivilegedAudit(
+                session.Account!, auditOperation, targetAccount, auditCorrelation,
+                replayed ? "replayed" : "success", new { action, targetAccount });
 
             var player = _qqAccessStore.SearchAccountsForAdmin(targetAccount, "player")
                 .FirstOrDefault(item => string.Equals(item.Account, targetAccount, StringComparison.OrdinalIgnoreCase));
@@ -4311,9 +5196,7 @@ public static class WebSocketBridge
                 replayed,
                 logStr = action switch
                 {
-                    "rename" => directorySynchronized
-                        ? "当前环境的玩法昵称已更新，跨环境检索目录已同步"
-                        : "当前环境的玩法昵称已更新，但跨环境检索目录同步失败，请稍后重试",
+                    "rename" => "当前环境的玩法昵称已更新，跨环境检索同步已进入可靠队列",
                     "resetPassword" => "密码已重置；临时密码只在本次结果中显示",
                     "setQq" => replayed ? "该改绑请求已经执行，已返回当前结果" : "玩家 QQ 绑定已原子更新",
                     "unbindQq" => replayed ? "该解绑请求已经执行，已返回当前结果" : "玩家 QQ 已解绑，旧登录令牌已失效",
@@ -4323,7 +5206,10 @@ public static class WebSocketBridge
         }
         catch (Exception ex)
         {
-            var message = ex is PlayerDataValidationException or QqAccessValidationException
+            CompletePrivilegedAudit(
+                session.Account!, auditOperation, targetAccount, auditCorrelation, "failed",
+                new { action, targetAccount, error = ex.Message });
+            var message = ex is PlayerDataValidationException or QqAccessValidationException or OperationsCenterException
                 ? ex.Message
                 : "玩家账号操作失败，请稍后再试。";
             LogErr($"管理员玩家操作失败 {session.Account} -> {targetAccount}: {ex.Message}");
@@ -4491,6 +5377,7 @@ public static class WebSocketBridge
     /// 限频(1.2s/条)+长度上限(100)防刷屏。瞬时消息,不进对局状态/快照。区别于大厅全局 OnChatMsg(BroadcastAll)。</summary>
     private static void OnGameChat(WsSession s, Dictionary<string, JsonElement> msg)
     {
+        if (!TryRequireCommunicationAccess(s, "MsgGameChat")) return;
         var room = GameRoomManager.GetRoomBySession(s.SessionId);
         string[] playerSessionIds;
         string[] recipients;
@@ -4560,6 +5447,7 @@ public static class WebSocketBridge
             Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "请先登录" });
             return;
         }
+        if (!TryRequireCommunicationAccess(s, "MsgFriendChat")) return;
         if (!s.TryConsumeRateLimit("friend-chat", capacity: 4, refillPerSecond: 0.75))
         {
             Send(s.SessionId, new { proto = "MsgFriendChat", result = false, logStr = "消息发送过于频繁，请稍后再试" });

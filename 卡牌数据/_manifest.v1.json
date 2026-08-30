@@ -1,0 +1,321 @@
+{
+  "schemaVersion": "grandumi.card-content-manifest.v1",
+  "schema": {
+    "path": "_schema.v1.json",
+    "sha256": "1106cf53f2db82e09177d4774387461e5fdf6c80b872e1c29c998bb0540eb24b"
+  },
+  "totalCards": 2823,
+  "contentSha256": "b3b38b9fa44f4b12a47b28d47115e63f74f50b9eb9b31121a1f0986090367f0a",
+  "files": [
+    {
+      "path": "EB01.json",
+      "sha256": "d0a9bd31f63d06f4db09a0699dd7dc82ff8fdad6f63c5e6e76d3461cdbf1169f",
+      "cardCount": 61
+    },
+    {
+      "path": "EB02.json",
+      "sha256": "e3aaef4554a81cc3d9a252f7bfe4db3f3e28124cf0b54ceb292d46ffc575b390",
+      "cardCount": 61
+    },
+    {
+      "path": "EB03.json",
+      "sha256": "adc03c1baa6c178ce87706587b3d26abb2cdd73df0092120763e16019113815e",
+      "cardCount": 62
+    },
+    {
+      "path": "EB04.json",
+      "sha256": "c96ba857667903e5459d0e9b4c05d0fd47e7653a29062842e5bbace399de8601",
+      "cardCount": 61
+    },
+    {
+      "path": "EB05.json",
+      "sha256": "56523f6b5105e7903a52788ac64b427525f9aaeb1f02889b84ebe7c13ce2656c",
+      "cardCount": 2
+    },
+    {
+      "path": "OP01.json",
+      "sha256": "56507403633704e9c46fa5ef1f1eb9071a7db7f0e27352b90cc81325614443c9",
+      "cardCount": 121
+    },
+    {
+      "path": "OP02.json",
+      "sha256": "9d80f8d63885eb0eb89d0a5609086acaeeeca6e7afe43c8f5b29635d59f1c7ea",
+      "cardCount": 121
+    },
+    {
+      "path": "OP03.json",
+      "sha256": "8480d17a05f94c6f94339564add3681206c479487a4432d7b4949d9165851a15",
+      "cardCount": 123
+    },
+    {
+      "path": "OP04.json",
+      "sha256": "fc141c0566a177b7e5d453f09f3497ce2ee1685722ffc46e0273967644eba921",
+      "cardCount": 119
+    },
+    {
+      "path": "OP05.json",
+      "sha256": "a9f30ed08f87239d92261d2451144abf6e4bb46069c14d29e547bc0efc6d6145",
+      "cardCount": 119
+    },
+    {
+      "path": "OP06.json",
+      "sha256": "6de55a7031a6fa3bd1ef1c556306c80b3a6f28ee0149e18c6546f1824a36d585",
+      "cardCount": 119
+    },
+    {
+      "path": "OP07.json",
+      "sha256": "d1537103640faf08a48705f6df2e3061d8532cfecce3a792b54946a5233b25f7",
+      "cardCount": 119
+    },
+    {
+      "path": "OP08.json",
+      "sha256": "1e69ec4d58a55e5d9d373e3b200479be14125209c8faf33dbe7af6723588b547",
+      "cardCount": 119
+    },
+    {
+      "path": "OP09.json",
+      "sha256": "463409e9f839c0dc73d9c362e4dcf09ed47bde0e17b0228802ea6809fc27af7d",
+      "cardCount": 119
+    },
+    {
+      "path": "OP10.json",
+      "sha256": "d0a4ac021248400b1df68f2bb3ea3f4897c8200ec0c2478d72eea02124df16ab",
+      "cardCount": 119
+    },
+    {
+      "path": "OP11.json",
+      "sha256": "cefa422a836902bea9e98f87a9e3cd6eb5d222a5820704d9a63b372dd20e0430",
+      "cardCount": 119
+    },
+    {
+      "path": "OP12.json",
+      "sha256": "ebdc56f79d3a117a429534917c352f81f06ca9d394a268a43f50c1d0cecbc796",
+      "cardCount": 119
+    },
+    {
+      "path": "OP13.json",
+      "sha256": "8c10de8dcddd0304ab5be4950a7582c05ba2edc6ea682170141c0561439b6f0e",
+      "cardCount": 120
+    },
+    {
+      "path": "OP14.json",
+      "sha256": "10780541a1bf3170836811fee9804e126167c80ee87b625382339daac53fec63",
+      "cardCount": 120
+    },
+    {
+      "path": "OP15.json",
+      "sha256": "8cf751dd19557d166d905e32c6f2cb9f1ae7891dc51a77c5ba18c7a79c9f96a6",
+      "cardCount": 119
+    },
+    {
+      "path": "OP16.json",
+      "sha256": "9d8a4ea289ef2e28b1c741dc1edf768c06afa35837aa59d56a390a595c4ac592",
+      "cardCount": 119
+    },
+    {
+      "path": "OP17.json",
+      "sha256": "8bae08475513fe0237b59df56f69b03231811b5c7830009244161e04a8c63731",
+      "cardCount": 119
+    },
+    {
+      "path": "OP18.json",
+      "sha256": "f5b5657b6d66fe193ad6c5648fd8c031c552b8ca61daf820aac2be2677cecaff",
+      "cardCount": 6
+    },
+    {
+      "path": "P.json",
+      "sha256": "7da80421924ac274e6e78ae984d5da420a56b52342fa2ce87c6ecc47b4846a0b",
+      "cardCount": 136
+    },
+    {
+      "path": "PRB01.json",
+      "sha256": "6f31fdb95c8184fbc3606e87540142c5acada1992f151c772e997d6b40965885",
+      "cardCount": 1
+    },
+    {
+      "path": "PRB02.json",
+      "sha256": "20ef0134867efb88581e6bf160d05998486eaa74f7daab2c7ca84cdc20cd33ed",
+      "cardCount": 18
+    },
+    {
+      "path": "ST01.json",
+      "sha256": "4ef97f51843938b56acb69c1de71b3779037874ac49d5711860b86d9138616ad",
+      "cardCount": 17
+    },
+    {
+      "path": "ST02.json",
+      "sha256": "1cf277940cdd13ab6c2e266ec3fee48cbccb0b914cd16914f2754020b046f9bf",
+      "cardCount": 17
+    },
+    {
+      "path": "ST03.json",
+      "sha256": "bc9001242c05ef165acd6aee25fa0d1db02287a3fc193a58e40795d8d2eda266",
+      "cardCount": 17
+    },
+    {
+      "path": "ST04.json",
+      "sha256": "6898e74f67a8afbb22f0bf1892fa89f32804bf38271289e02aab86ec2ebd1669",
+      "cardCount": 17
+    },
+    {
+      "path": "ST05.json",
+      "sha256": "e45b325d12d9c74f80cb794cf1a0195d014e743d7300d383b422c145838257b5",
+      "cardCount": 17
+    },
+    {
+      "path": "ST06.json",
+      "sha256": "5109e7bed2cadfb2413e2c3151a3140f82de385f3da8f0719660571c2f80e048",
+      "cardCount": 17
+    },
+    {
+      "path": "ST07.json",
+      "sha256": "eee5146c234f8cb4cb9b2165ca0a4b252af80294525c27ae1b61ebf2ef659a99",
+      "cardCount": 17
+    },
+    {
+      "path": "ST08.json",
+      "sha256": "95aaa606a5356b4be6afb53b3c2059b6bd55c4a71db67d2d1a0b3c2810d19238",
+      "cardCount": 15
+    },
+    {
+      "path": "ST09.json",
+      "sha256": "92d9d4e5fd7ace1869854572a001e2d689461737985ef5799f0f8335d672ffea",
+      "cardCount": 15
+    },
+    {
+      "path": "ST10.json",
+      "sha256": "4081c08091e9c08bf84e276dab514b9f6ae5b8b53e9b21a87de135d2c635a7a3",
+      "cardCount": 17
+    },
+    {
+      "path": "ST11.json",
+      "sha256": "320ddcd0a49239b5470ce8c3bf63ec7615533fbbe2d98c3759ee5733dcfb0aae",
+      "cardCount": 5
+    },
+    {
+      "path": "ST12.json",
+      "sha256": "14602a1cea5bd51cb3ce4155557090dd8c55b0503c0205f88e162144dbe4ee4d",
+      "cardCount": 17
+    },
+    {
+      "path": "ST13.json",
+      "sha256": "50528f84dd72082714476335acec01d41841a6706a72a8967a1712998ec19653",
+      "cardCount": 19
+    },
+    {
+      "path": "ST14.json",
+      "sha256": "66d487f4e333a38cb1d9df711cf12e1d60183afe296a88cc587fdd2848f04135",
+      "cardCount": 17
+    },
+    {
+      "path": "ST15.json",
+      "sha256": "599c5a96ce5d4add0a60822ea9e726c1711190499f61281245006a2b167544fe",
+      "cardCount": 5
+    },
+    {
+      "path": "ST16.json",
+      "sha256": "1c56d57ccdc2b06fc2305ffbe171424561cc37cbc30c85bfa77c14189a9a75f9",
+      "cardCount": 5
+    },
+    {
+      "path": "ST17.json",
+      "sha256": "86668d8e5456c98edc0f39457ebc7468257c82023ac65326373cc552a2cfe659",
+      "cardCount": 5
+    },
+    {
+      "path": "ST18.json",
+      "sha256": "fd7fe5c09947e021577446fe90a92a2b2bdfa01a095eb54fcf77e4e5569c095d",
+      "cardCount": 5
+    },
+    {
+      "path": "ST19.json",
+      "sha256": "c64330a651adb8d670f4f4ffc4db9fe9afba2596a7c3b8df3dff7ddfd1d54673",
+      "cardCount": 5
+    },
+    {
+      "path": "ST20.json",
+      "sha256": "18184a4c2bda6544ed892b480545c7f2b3943dc8881c52a4c072b4077825bbb1",
+      "cardCount": 5
+    },
+    {
+      "path": "ST21.json",
+      "sha256": "f462d7d51145f63bf6338cd90dc9d0458d88d3921622bed3f81e4ce617e61bf9",
+      "cardCount": 17
+    },
+    {
+      "path": "ST22.json",
+      "sha256": "a3abbf660dde31fa2ccc48d706e7463a575e4558631a28599d2fde713dfcbc8b",
+      "cardCount": 17
+    },
+    {
+      "path": "ST23.json",
+      "sha256": "845978199d3f50975a5ea8f0c5a11f088697733667c05ba19e19edf85fefc6a7",
+      "cardCount": 5
+    },
+    {
+      "path": "ST24.json",
+      "sha256": "1573243d61176f3157688ed942e72f64aad16b26994922f6496a0ecb61799e10",
+      "cardCount": 5
+    },
+    {
+      "path": "ST25.json",
+      "sha256": "0bafc6a2f2a61f6796bd789354f4144c9e8c850a7d369343b14ce378e8a072d0",
+      "cardCount": 5
+    },
+    {
+      "path": "ST26.json",
+      "sha256": "4a1987aa8b336c530ab8fac53e89e40c81810a6468ad06d54c7fd4ad632692cb",
+      "cardCount": 5
+    },
+    {
+      "path": "ST27.json",
+      "sha256": "689ea7f335f0e2d7d195f4ef8d85b91ca07780b80e4b6588ce76de3937b4d4d2",
+      "cardCount": 5
+    },
+    {
+      "path": "ST28.json",
+      "sha256": "edc196a19bbb983ecd61a2838bb45c0389792628e1d7a9fc26d7e49bc9646c8f",
+      "cardCount": 5
+    },
+    {
+      "path": "ST29.json",
+      "sha256": "20a275ec03677bdf196ed54c5b0e061d7a13f00007a4ede4e6c08d94086d3b0b",
+      "cardCount": 17
+    },
+    {
+      "path": "ST30.json",
+      "sha256": "7ae0d7aa20fc1295cac6851c1fc74b58e902ddede0e418f0a2f8e8170615cadc",
+      "cardCount": 17
+    },
+    {
+      "path": "ST31.json",
+      "sha256": "979254c2bde8ad12d0a24b65f9131b3f71f1e7dbc27ec2495ac29fbbbf90d34b",
+      "cardCount": 5
+    },
+    {
+      "path": "ST32.json",
+      "sha256": "88c2ee73e26f47c453288cb32d1afaea93e2b13e4763e035dbca7ad250836882",
+      "cardCount": 5
+    },
+    {
+      "path": "ST33.json",
+      "sha256": "fbc71029e7fda69b6b2313e52c38334ad2aae4383fdb5591882dc656fc03a592",
+      "cardCount": 5
+    },
+    {
+      "path": "ST34.json",
+      "sha256": "4c31b02d4db44e4b905d499459c9ba0b8087bd7eaf25d5701a4d31c26ed8dd59",
+      "cardCount": 5
+    },
+    {
+      "path": "ST35.json",
+      "sha256": "444f8049ec83150bf4674e22b960431b6a63867b007b5842eb6113849b9d95e2",
+      "cardCount": 5
+    },
+    {
+      "path": "ST36.json",
+      "sha256": "8d10918aa5aa8cd560d8132fe5c426a67e72754a914a9642fc2a587ce258e518",
+      "cardCount": 5
+    }
+  ]
+}

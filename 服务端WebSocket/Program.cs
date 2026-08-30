@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 if (args.Length > 0 && string.Equals(args[0], "--replay-artifact", StringComparison.Ordinal))
@@ -115,7 +116,8 @@ var cardDataPath = ResolveCardDataPath();
 CardDatabase.LoadFrom(cardDataPath);
 GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
     ResolveDslDir(),
-    $"builtin-{BuildInfo.Commit}");
+    $"builtin-{BuildInfo.Commit}",
+    failClosed: true);
 CardRulesetManager.InitializePackages(rulesPackagePath);
 ReplayRuntimeIdentityProvider.InitializeFromCurrentProcess(BuildInfo.Commit, CardDatabase.ContentHash);
 var replayRuntimeIdentity = ReplayRuntimeIdentityProvider.For(CardRulesetManager.Current);
@@ -145,8 +147,24 @@ var sharedAccountSummary = sharedAccountDatabase.Initialize(
     requirePreparedMigration: usesIndependentSharedAccountDatabase);
 var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore, sharedAccountDatabase);
 var qqAccessStore = new QqAccessStore(sharedAccountDatabase, AdministratorPolicy.GetAuthorizedAccounts());
+var operationsCenterStore = new OperationsCenterStore(Path.Combine(
+    Path.GetDirectoryName(playerDataStore.DatabasePath)!,
+    "operations-center.db"));
+operationsCenterStore.Initialize();
+var consistencyDoctor = new ConsistencyDoctor(
+    playerDataStore,
+    accountAuthenticationStore,
+    operationsCenterStore);
+var initialConsistencySnapshot = consistencyDoctor.RunOnce();
+var cloudReplayStore = new CloudReplayStore(
+    Path.Combine(Path.GetDirectoryName(playerDataStore.DatabasePath)!, "CloudReplays"),
+    CreateCloudReplayRuntimeAvailability(replayRuntimeIdentity.EngineArtifactId));
+cloudReplayStore.Initialize();
+GameRoomManager.ConfigureCloudReplays(cloudReplayStore);
 Console.WriteLine($"[玩家数据] SQLite: {playerDataStore.DatabasePath}");
 Console.WriteLine($"[共享账号] SQLite: {sharedAccountDatabase.DatabasePath}；账号 {sharedAccountSummary.AccountCount}，绑定 {sharedAccountSummary.BindingCount}");
+Console.WriteLine($"[运营中心] SQLite: {operationsCenterStore.DatabasePath}；待处理一致性差异 {initialConsistencySnapshot.OpenFindings}");
+Console.WriteLine($"[云回放] SQLite: {cloudReplayStore.DatabasePath}；只录制功能上线后新完成的对局");
 var qqWhitelistStatus = qqAccessStore.GetStatus();
 Console.WriteLine(qqWhitelistStatus.Initialized
     ? $"[QQ 准入] 白名单 v{qqWhitelistStatus.Version}，{qqWhitelistStatus.MemberCount} 人"
@@ -225,7 +243,10 @@ WebSocketBridge.Initialize(
     onlinePlayerHistoryReadStore,
     adminOperationsMetricsCache,
     adminDeploymentCoordinator,
-    recordDailyActivePlayers);
+    recordDailyActivePlayers,
+    cloudReplayStore,
+    operationsCenterStore,
+    consistencyDoctor);
 
 var builder = WebApplication.CreateSlimBuilder(Array.Empty<string>());
 builder.Logging.ClearProviders();
@@ -268,6 +289,15 @@ app.MapGet("/ready", () =>
             healthy = storage.Healthy,
             totalBytes = storage.TotalBytes,
             availableBytes = storage.AvailableBytes,
+        },
+        recovery = new
+        {
+            pausedRooms = GameRoomManager.RecoveryPausedRoomCount,
+            journalQueueDepth = RoomJournal.QueueDepth,
+            journalCommitFailures = RoomJournal.DurableCommitFailures,
+            snapshotQueueDepth = RoomRecoverySnapshotStore.QueueDepth,
+            snapshotWriteFailures = RoomRecoverySnapshotStore.WriteFailures,
+            quarantinedTotal = GameRoomManager.RecoveryQuarantinedTotal,
         },
         connections = WebSocketBridge.ConnectionCount,
         rooms = GameRoomManager.RoomCount,
@@ -331,6 +361,10 @@ using var roomExpirationCancellation = new CancellationTokenSource();
 var roomExpirationTask = GameRoomManager.RunExpirationMonitorAsync(roomExpirationCancellation.Token);
 app.Lifetime.ApplicationStopping.Register(roomExpirationCancellation.Cancel);
 using var rankedLeaderboardCancellation = new CancellationTokenSource();
+using var consistencyDoctorCancellation = new CancellationTokenSource();
+var consistencyDoctorTask = consistencyDoctor.RunLoopAsync(
+    TimeSpan.FromMinutes(1),
+    consistencyDoctorCancellation.Token);
 var standardRankedLeaderboardTask = RankedStore.Default.RunLeaderboardRefreshLoopAsync(
     RankedStore.LeaderboardRefreshInterval,
     RankedStore.LeaderboardRefreshInterval,
@@ -342,6 +376,7 @@ var wildRankedLeaderboardTask = RankedStore.Wild.RunLeaderboardRefreshLoopAsync(
     rankedLeaderboardCancellation.Token,
     error => Console.Error.WriteLine($"[狂野排位榜] 刷新失败，继续服务上一版：{error}"));
 app.Lifetime.ApplicationStopping.Register(rankedLeaderboardCancellation.Cancel);
+app.Lifetime.ApplicationStopping.Register(consistencyDoctorCancellation.Cancel);
 Console.WriteLine($"[网络] Kestrel 监听 http://127.0.0.1:{port}，WebSocket 路径 /ws");
 Console.WriteLine($"[构建] version={BuildInfo.Version}, commit={BuildInfo.Commit}, node={BuildInfo.NodeId}");
 
@@ -353,14 +388,17 @@ finally
 {
     roomExpirationCancellation.Cancel();
     rankedLeaderboardCancellation.Cancel();
+    consistencyDoctorCancellation.Cancel();
     await roomExpirationTask;
-    await Task.WhenAll(standardRankedLeaderboardTask, wildRankedLeaderboardTask);
+    await Task.WhenAll(standardRankedLeaderboardTask, wildRankedLeaderboardTask, consistencyDoctorTask);
     GameRoomManager.CaptureAllRecoverySnapshots();
     await RoomRecoverySnapshotStore.FlushAsync();
     WebSocketBridge.Stop();
     MatchLogRecorder.Shutdown();
     RoomJournal.Shutdown();
     RoomRecoverySnapshotStore.Shutdown();
+    cloudReplayStore.Dispose();
+    operationsCenterStore.Dispose();
     LeaderStatsStore.Default.Dispose();
     playerDataStore.Shutdown();
     Console.WriteLine("[服务器] 已停止");
@@ -388,4 +426,40 @@ static string ResolveDslDir()
         dir = dir.Parent;
     }
     return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Effects", "Definitions"));
+}
+
+static Func<string, bool> CreateCloudReplayRuntimeAvailability(string currentArtifactId)
+{
+    var cache = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
+    var explicitRoot = Environment.GetEnvironmentVariable("GRANDUMI_CLOUD_REPLAY_RUNTIME_ARCHIVE_ROOT")?.Trim();
+    var currentManifest = Environment.GetEnvironmentVariable(
+        ReplayArtifactRuntimeBinding.ManifestEnvironmentVariable)?.Trim();
+    var archiveRoot = !string.IsNullOrWhiteSpace(explicitRoot)
+        ? Path.GetFullPath(explicitRoot)
+        : !string.IsNullOrWhiteSpace(currentManifest)
+            ? Directory.GetParent(Path.GetDirectoryName(Path.GetFullPath(currentManifest))!)?.FullName
+            : null;
+
+    return artifactId =>
+    {
+        if (string.Equals(artifactId, currentArtifactId, StringComparison.Ordinal)) return true;
+        if (artifactId.Length != "grandumi-runtime-".Length + 64
+            || !artifactId.StartsWith("grandumi-runtime-", StringComparison.Ordinal)
+            || artifactId["grandumi-runtime-".Length..].Any(ch => !char.IsAsciiHexDigit(ch)))
+            return false;
+        if (string.IsNullOrWhiteSpace(archiveRoot)) return false;
+        return cache.GetOrAdd(artifactId, id =>
+        {
+            try
+            {
+                var candidate = Path.Combine(archiveRoot, id, ReplayArtifactArchive.ManifestFileName);
+                var verified = ReplayArtifactArchive.Verify(candidate);
+                return string.Equals(verified.Manifest.ArtifactId, id, StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        });
+    };
 }

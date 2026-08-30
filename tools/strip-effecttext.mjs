@@ -213,7 +213,8 @@ async function processDir(dir, originals) {
   try {
     files = (await readdir(dir)).filter(
       f => f.endsWith('.json')
-        && !['allCards.json', 'imageManifest.json', '_index.json'].includes(f)
+        && !f.startsWith('_')
+        && !['allCards.json', 'imageManifest.json'].includes(f)
         && (SET_FILTER.size === 0 || SET_FILTER.has(f)),
     )
   } catch {
@@ -264,7 +265,8 @@ async function syncRuleMetadata() {
   const publicDir = TARGET_DIRS[1]
   const files = (await readdir(primaryDir)).filter(
     f => f.endsWith('.json')
-      && !['allCards.json', 'imageManifest.json', '_index.json'].includes(f)
+      && !f.startsWith('_')
+      && !['allCards.json', 'imageManifest.json'].includes(f)
       && (SET_FILTER.size === 0 || SET_FILTER.has(f)),
   )
   let changedCards = 0

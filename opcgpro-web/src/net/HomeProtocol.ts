@@ -90,10 +90,28 @@ import type {
   MsgAdminDeploy,
   MsgAdminPlayerSearch,
   MsgAdminPlayerUpdate,
+  MsgOperationsCases,
+  MsgOperationsCaseDetail,
+  MsgOperationsCaseUpdate,
+  MsgOperationsCaseAppeal,
+  MsgOperationsPenalty,
+  MsgPrivilegedAudit,
+  MsgConsistencyDoctor,
+  MsgAdminApproval,
+  OperationsCaseStatus,
+  OperationsPenaltyKind,
   MsgQqWhitelistStatus,
   MsgQqWhitelistImport,
   MsgQqAccessDenied,
   MsgQqBindingChanged,
+  MsgRateLimited,
+  MsgCloudReplayList,
+  MsgCloudReplayLoad,
+  MsgCloudReplayBookmark,
+  MsgCloudReplayShare,
+  MsgCloudReplayDelete,
+  CloudReplaySharePolicy,
+  CloudReplayOutcome,
   AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
@@ -111,6 +129,11 @@ import {
 // ── 协议注册 ────────────────────────────────────────────────────────────
 
 let registered = false;
+let operationsRequestSequence = 0;
+function nextOperationsRequestId(prefix = "ops") {
+  operationsRequestSequence += 1;
+  return `${prefix}-${Date.now().toString(36)}-${operationsRequestSequence.toString(36)}`;
+}
 let spectateRequestTimer: ReturnType<typeof setTimeout> | null = null;
 let roomRequestTimer: ReturnType<typeof setTimeout> | null = null;
 const rankSnapshotRequestTimers: Partial<Record<RankedMode, {
@@ -209,6 +232,19 @@ export function registerHomeProtocols() {
 
   eventBus.on("message", (msg: MsgBase) => {
     switch (msg.proto) {
+      case "MsgRateLimited": {
+        const limited = msg as MsgRateLimited;
+        const seconds = Math.max(1, Math.ceil((limited.retryAfterMs || 0) / 1_000));
+        showMessage(`操作过于频繁，请在 ${seconds} 秒后重试。`, "error");
+        break;
+      }
+      // 云回放页面按 requestId 管理超时、乱序和导入事务；全局协议层只登记兼容边界。
+      case "MsgCloudReplayList":
+      case "MsgCloudReplayLoad":
+      case "MsgCloudReplayBookmark":
+      case "MsgCloudReplayShare":
+      case "MsgCloudReplayDelete":
+        break;
       case "MsgSecret":
         handleSecret(msg as MsgSecret);
         break;
@@ -289,6 +325,28 @@ export function registerHomeProtocols() {
         break;
       case "MsgAdminPlayerUpdate":
         handleAdminPlayerUpdate(msg as MsgAdminPlayerUpdate);
+        break;
+      case "MsgOperationsCases":
+        handleOperationsCases(msg as MsgOperationsCases);
+        break;
+      case "MsgOperationsCaseDetail":
+        handleOperationsCaseDetail(msg as MsgOperationsCaseDetail);
+        break;
+      case "MsgOperationsCaseUpdate":
+      case "MsgOperationsCaseAppeal":
+        handleOperationsCaseMutation(msg as MsgOperationsCaseUpdate | MsgOperationsCaseAppeal);
+        break;
+      case "MsgOperationsPenalty":
+        handleOperationsPenalty(msg as MsgOperationsPenalty);
+        break;
+      case "MsgPrivilegedAudit":
+        handlePrivilegedAudit(msg as MsgPrivilegedAudit);
+        break;
+      case "MsgConsistencyDoctor":
+        handleConsistencyDoctor(msg as MsgConsistencyDoctor);
+        break;
+      case "MsgAdminApproval":
+        handleAdminApproval(msg as MsgAdminApproval);
         break;
       case "MsgOnlineCount":
         handleOnlineCount(msg as MsgOnlineCount);
@@ -897,6 +955,84 @@ function handleAdminPlayerUpdate(msg: MsgAdminPlayerUpdate) {
   showMessage(msg.logStr ?? "玩家账号操作已完成", "info");
 }
 
+function handleOperationsCases(msg: MsgOperationsCases) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "读取 Case 列表失败", "error");
+    return;
+  }
+  useNetStore.getState().setOperationsCases(
+    Array.isArray(msg.items) ? msg.items : [],
+    Math.max(0, Number(msg.total) || 0),
+    msg.metrics ?? null,
+  );
+}
+
+function handleOperationsCaseDetail(msg: MsgOperationsCaseDetail) {
+  if (msg.result !== true || !msg.detail) {
+    showMessage(msg.logStr ?? "读取 Case 详情失败", "error");
+    return;
+  }
+  useNetStore.getState().setOperationsCaseDetail(msg.detail);
+}
+
+function handleOperationsCaseMutation(msg: MsgOperationsCaseUpdate | MsgOperationsCaseAppeal) {
+  if (msg.result !== true || !msg.detail) {
+    showMessage(msg.logStr ?? "Case 操作失败", "error");
+    return;
+  }
+  useNetStore.getState().setOperationsCaseDetail(msg.detail);
+  HomeRequest.requestOperationsCases();
+  showMessage(msg.logStr ?? "Case 已更新", "info");
+}
+
+function handleOperationsPenalty(msg: MsgOperationsPenalty) {
+  if (msg.result !== true || !msg.penalty) {
+    showMessage(msg.logStr ?? "处罚操作失败", "error");
+    return;
+  }
+  HomeRequest.requestOperationsCaseDetail(msg.penalty.caseId);
+  HomeRequest.requestOperationsCases();
+  showMessage(msg.logStr ?? "限时处罚已更新", "info");
+}
+
+function handlePrivilegedAudit(msg: MsgPrivilegedAudit) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "读取特权审计失败", "error");
+    return;
+  }
+  useNetStore.getState().setPrivilegedAudit(
+    Array.isArray(msg.entries) ? msg.entries : [],
+    msg.chainValid === true,
+  );
+}
+
+function handleConsistencyDoctor(msg: MsgConsistencyDoctor) {
+  if (msg.result !== true) {
+    showMessage(msg.logStr ?? "一致性巡检失败", "error");
+    return;
+  }
+  useNetStore.getState().setConsistencyDoctor(
+    msg.snapshot ?? null,
+    Array.isArray(msg.findings) ? msg.findings : [],
+  );
+}
+
+function handleAdminApproval(msg: MsgAdminApproval) {
+  if (msg.result !== true || !msg.operation || !msg.target || !msg.challengeId
+      || !msg.confirmationToken || typeof msg.expiresAt !== "number") {
+    showMessage(msg.logStr ?? "高风险操作确认失败", "error");
+    return;
+  }
+  useNetStore.getState().setAdminApproval({
+    operation: msg.operation,
+    target: msg.target,
+    challengeId: msg.challengeId,
+    confirmationToken: msg.confirmationToken,
+    expiresAt: msg.expiresAt,
+  });
+  showMessage("一次性确认凭证已生成，请核对目标后再次点击执行", "info");
+}
+
 /**
  * MsgOnlineCount — 在线人数广播
  * 服务器在有人登录/断开时推送，更新角落徽标
@@ -1408,8 +1544,131 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgAdminOperations" } as MsgAdminOperations);
   },
 
-  deployLatest(environment: AdminDeploymentEnvironment) {
-    return NetManager.send({ proto: "MsgAdminDeploy", environment } as MsgAdminDeploy);
+  deployLatest(
+    environment: AdminDeploymentEnvironment,
+    approval?: { challengeId: string; confirmationToken: string },
+  ) {
+    return NetManager.send({
+      proto: "MsgAdminDeploy",
+      environment,
+      requestId: nextOperationsRequestId("deploy"),
+      challengeId: approval?.challengeId,
+      confirmationToken: approval?.confirmationToken,
+    } as MsgAdminDeploy);
+  },
+
+  requestAdminApproval(
+    operation: NonNullable<MsgAdminApproval["operation"]>,
+    target: string,
+  ) {
+    useNetStore.getState().setAdminApproval(null);
+    return NetManager.send({
+      proto: "MsgAdminApproval",
+      operation,
+      target,
+      requestId: nextOperationsRequestId("approval"),
+    } as MsgAdminApproval);
+  },
+
+  requestOperationsCases(filters: Pick<MsgOperationsCases, "status" | "source" | "assignee" | "account"> = {}) {
+    return NetManager.send({
+      proto: "MsgOperationsCases",
+      ...filters,
+      requestId: nextOperationsRequestId("cases"),
+      offset: 0,
+      limit: 100,
+    } as MsgOperationsCases);
+  },
+
+  requestOperationsCaseDetail(caseId: string) {
+    return NetManager.send({
+      proto: "MsgOperationsCaseDetail",
+      caseId,
+      requestId: nextOperationsRequestId("case"),
+    } as MsgOperationsCaseDetail);
+  },
+
+  updateOperationsCase(
+    caseId: string,
+    toStatus: OperationsCaseStatus,
+    values: { assignee?: string; disposition?: string; note?: string } = {},
+  ) {
+    return NetManager.send({
+      proto: "MsgOperationsCaseUpdate",
+      caseId,
+      toStatus,
+      ...values,
+      requestId: nextOperationsRequestId("case-update"),
+    } as MsgOperationsCaseUpdate);
+  },
+
+  appealOperationsCase(caseId: string, appealText: string) {
+    return NetManager.send({
+      proto: "MsgOperationsCaseAppeal",
+      caseId,
+      appealText,
+      requestId: nextOperationsRequestId("appeal"),
+    } as MsgOperationsCaseAppeal);
+  },
+
+  applyOperationsPenalty(
+    caseId: string,
+    account: string,
+    kind: OperationsPenaltyKind,
+    expiresAt: number,
+    reason: string,
+  ) {
+    return NetManager.send({
+      proto: "MsgOperationsPenalty",
+      action: "apply",
+      caseId,
+      account,
+      kind,
+      expiresAt,
+      reason,
+      requestId: nextOperationsRequestId("penalty"),
+    } as MsgOperationsPenalty);
+  },
+
+  revokeOperationsPenalty(penaltyId: string, reason: string) {
+    return NetManager.send({
+      proto: "MsgOperationsPenalty",
+      action: "revoke",
+      penaltyId,
+      reason,
+      requestId: nextOperationsRequestId("penalty-revoke"),
+    } as MsgOperationsPenalty);
+  },
+
+  requestPrivilegedAudit() {
+    return NetManager.send({
+      proto: "MsgPrivilegedAudit",
+      requestId: nextOperationsRequestId("audit"),
+      offset: 0,
+      limit: 200,
+    } as MsgPrivilegedAudit);
+  },
+
+  requestConsistencyDoctor() {
+    return NetManager.send({
+      proto: "MsgConsistencyDoctor",
+      action: "snapshot",
+      requestId: nextOperationsRequestId("doctor"),
+    } as MsgConsistencyDoctor);
+  },
+
+  repairConsistencyFinding(
+    findingId: number,
+    approval: { challengeId: string; confirmationToken: string },
+  ) {
+    return NetManager.send({
+      proto: "MsgConsistencyDoctor",
+      action: "repair",
+      findingId,
+      challengeId: approval.challengeId,
+      confirmationToken: approval.confirmationToken,
+      requestId: nextOperationsRequestId("doctor-repair"),
+    } as MsgConsistencyDoctor);
   },
 
   searchAdminPlayers(query: string, searchBy: "player" | "qq" = "player") {
@@ -1427,12 +1686,18 @@ export const HomeRequest = {
     } as MsgAdminPlayerUpdate);
   },
 
-  resetAdminPlayerPassword(targetAccount: string) {
+  resetAdminPlayerPassword(
+    targetAccount: string,
+    approval?: { challengeId: string; confirmationToken: string },
+  ) {
     useNetStore.getState().setAdminTemporaryPassword(null);
     return NetManager.send({
       proto: "MsgAdminPlayerUpdate",
       action: "resetPassword",
       targetAccount,
+      requestId: nextOperationsRequestId("password-reset"),
+      challengeId: approval?.challengeId,
+      confirmationToken: approval?.confirmationToken,
     } as MsgAdminPlayerUpdate);
   },
 
@@ -1535,6 +1800,7 @@ export const HomeRequest = {
       currentOpponent,
       category,
       description,
+      requestId: nextOperationsRequestId("player-report"),
     } as MsgPlayerSafety);
   },
 
@@ -1566,6 +1832,61 @@ export const HomeRequest = {
   requestPlayerProfileStats(period: LeaderboardPeriod) {
     useNetStore.getState().setPlayerProfileStats(null);
     return NetManager.send({ proto: "MsgPlayerProfileStats", period } as MsgPlayerProfileStats);
+  },
+
+  requestCloudReplays(options: {
+    requestId: string;
+    opponent?: string;
+    outcome?: CloudReplayOutcome;
+    matchKind?: string;
+    bookmarkedOnly?: boolean;
+    from?: number;
+    to?: number;
+    offset?: number;
+    limit?: number;
+  }) {
+    return NetManager.send({ proto: "MsgCloudReplayList", ...options } as MsgCloudReplayList);
+  },
+
+  loadCloudReplay(requestId: string, replayId: string, shareToken?: string) {
+    return NetManager.send({
+      proto: "MsgCloudReplayLoad",
+      requestId,
+      replayId,
+      ...(shareToken ? { shareToken } : {}),
+    } as MsgCloudReplayLoad);
+  },
+
+  bookmarkCloudReplay(requestId: string, replayId: string, bookmarked: boolean) {
+    return NetManager.send({
+      proto: "MsgCloudReplayBookmark",
+      requestId,
+      replayId,
+      bookmarked,
+    } as MsgCloudReplayBookmark);
+  },
+
+  shareCloudReplay(
+    requestId: string,
+    replayId: string,
+    enabled: boolean,
+    sharePolicy: CloudReplaySharePolicy,
+  ) {
+    return NetManager.send({
+      proto: "MsgCloudReplayShare",
+      requestId,
+      replayId,
+      enabled,
+      sharePolicy,
+    } as MsgCloudReplayShare);
+  },
+
+  deleteCloudReplay(requestId: string, replayId: string) {
+    return NetManager.send({
+      proto: "MsgCloudReplayDelete",
+      requestId,
+      replayId,
+    } as MsgCloudReplayDelete);
   },
 
   invitePlayer(toAccount: string) {

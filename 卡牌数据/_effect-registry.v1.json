@@ -1,0 +1,9033 @@
+{
+  "schemaVersion": "grandumi.card-effect-registry.v1",
+  "cardContentSha256": "b3b38b9fa44f4b12a47b28d47115e63f74f50b9eb9b31121a1f0986090367f0a",
+  "implementationCardCount": 2506,
+  "scriptedSources": [
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ConfirmedMissingEffects.cs",
+      "cards": [
+        "EB03-008",
+        "EB04-016",
+        "OP11-028",
+        "OP11-084",
+        "OP12-021",
+        "OP12-036",
+        "OP12-072",
+        "OP12-081",
+        "OP15-012",
+        "OP15-037",
+        "OP15-038",
+        "OP15-041",
+        "OP15-056",
+        "OP15-057",
+        "OP15-084",
+        "OP15-115",
+        "OP16-057",
+        "OP16-068",
+        "ST36-001",
+        "ST36-002",
+        "ST36-004",
+        "ST36-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_001_KozukiOden.cs",
+      "cards": [
+        "EB01-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_002_Izo.cs",
+      "cards": [
+        "EB01-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_004_Kuzan.cs",
+      "cards": [
+        "EB01-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_008_LittleOarsJr.cs",
+      "cards": [
+        "EB01-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_011_MiniMerryII.cs",
+      "cards": [
+        "EB01-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_012_Cavendish.cs",
+      "cards": [
+        "EB01-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_014_Sanji.cs",
+      "cards": [
+        "EB01-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_020_ChaosSpace.cs",
+      "cards": [
+        "EB01-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_021_Hannyabal.cs",
+      "cards": [
+        "EB01-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_024_Hamlet.cs",
+      "cards": [
+        "EB01-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_025_Vertig021.cs",
+      "cards": [
+        "EB01-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_026_PrinceBellett.cs",
+      "cards": [
+        "EB01-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_028_GomuGomuChampionTwister.cs",
+      "cards": [
+        "EB01-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_029_SorryImDying.cs",
+      "cards": [
+        "EB01-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_030_LoguetownTown.cs",
+      "cards": [
+        "EB01-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_033_Blueno.cs",
+      "cards": [
+        "EB01-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_037_Mr9.cs",
+      "cards": [
+        "EB01-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_038_WayOfTheOkama.cs",
+      "cards": [
+        "EB01-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_040_Kyros.cs",
+      "cards": [
+        "EB01-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_043_Spandine.cs",
+      "cards": [
+        "EB01-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_045_Brook.cs",
+      "cards": [
+        "EB01-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_047_Lab.cs",
+      "cards": [
+        "EB01-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_052_Viola.cs",
+      "cards": [
+        "EB01-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_053_Wapister.cs",
+      "cards": [
+        "EB01-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_057_Shirahoshi.cs",
+      "cards": [
+        "EB01-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_058_Kricket.cs",
+      "cards": [
+        "EB01-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_059_Raigou.cs",
+      "cards": [
+        "EB01-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_060_IamGod.cs",
+      "cards": [
+        "EB01-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB01_061_Bentham.cs",
+      "cards": [
+        "EB01-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_005_FakeStrawHat.cs",
+      "cards": [
+        "EB02-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_006_Yamato.cs",
+      "cards": [
+        "EB02-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_007_SakuraFubuki.cs",
+      "cards": [
+        "EB02-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_009_ThousandSunny.cs",
+      "cards": [
+        "EB02-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_010_Luffy.cs",
+      "cards": [
+        "EB02-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_011_Arlong.cs",
+      "cards": [
+        "EB02-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_012_Gaimon.cs",
+      "cards": [
+        "EB02-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_013_Carrot.cs",
+      "cards": [
+        "EB02-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_015_JewelryBonney.cs",
+      "cards": [
+        "EB02-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_018_Buggy.cs",
+      "cards": [
+        "EB02-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_022_Usopp.cs",
+      "cards": [
+        "EB02-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_023_Crocodile.cs",
+      "cards": [
+        "EB02-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_025_Rosinante.cs",
+      "cards": [
+        "EB02-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_030_ComradesDream.cs",
+      "cards": [
+        "EB02-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_033_ShipSpirit.cs",
+      "cards": [
+        "EB02-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_035_SanjiAndBrulee.cs",
+      "cards": [
+        "EB02-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_036_NicoRobin.cs",
+      "cards": [
+        "EB02-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_037_Franky.cs",
+      "cards": [
+        "EB02-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_039_Germa66.cs",
+      "cards": [
+        "EB02-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_041_GoingMerry.cs",
+      "cards": [
+        "EB02-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_044_Sengoku.cs",
+      "cards": [
+        "EB02-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_045_Law.cs",
+      "cards": [
+        "EB02-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_051_BoxBaneZan.cs",
+      "cards": [
+        "EB02-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_052_Enel.cs",
+      "cards": [
+        "EB02-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_053_OrugaMischna.cs",
+      "cards": [
+        "EB02-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_055_Jinbe.cs",
+      "cards": [
+        "EB02-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_056_Vegapunk.cs",
+      "cards": [
+        "EB02-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_057_TreasureManiac.cs",
+      "cards": [
+        "EB02-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_059_PirateKing.cs",
+      "cards": [
+        "EB02-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_060_GoingMerry.cs",
+      "cards": [
+        "EB02-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB02_061_Luffy.cs",
+      "cards": [
+        "EB02-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_001_Vivi.cs",
+      "cards": [
+        "EB03-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_003_Uta.cs",
+      "cards": [
+        "EB03-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_004_Karina.cs",
+      "cards": [
+        "EB03-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_007_Bakkara.cs",
+      "cards": [
+        "EB03-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_009_Makino.cs",
+      "cards": [
+        "EB03-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_012_Otama.cs",
+      "cards": [
+        "EB03-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_013_Carrot.cs",
+      "cards": [
+        "EB03-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_015_Kemy.cs",
+      "cards": [
+        "EB03-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_018_Tashigi.cs",
+      "cards": [
+        "EB03-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_023_Jaya.cs",
+      "cards": [
+        "EB03-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_024_NefeltariVivi.cs",
+      "cards": [
+        "EB03-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_026_BoaHancock.cs",
+      "cards": [
+        "EB03-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_031_VinsmokeReiju.cs",
+      "cards": [
+        "EB03-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_033_CharlotteBrulee.cs",
+      "cards": [
+        "EB03-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_034_CharlotteLinlin.cs",
+      "cards": [
+        "EB03-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_035_CharlottePudding.cs",
+      "cards": [
+        "EB03-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_037_Lim.cs",
+      "cards": [
+        "EB03-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_038_ThanksForTheMeal.cs",
+      "cards": [
+        "EB03-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_039_Nutty.cs",
+      "cards": [
+        "EB03-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_041_Hancock.cs",
+      "cards": [
+        "EB03-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_042_Koala.cs",
+      "cards": [
+        "EB03-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_044_BlackMaria.cs",
+      "cards": [
+        "EB03-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_046_Sarah.cs",
+      "cards": [
+        "EB03-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_048_Rebecca.cs",
+      "cards": [
+        "EB03-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_049_WhatABigCommotion.cs",
+      "cards": [
+        "EB03-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_051_CharlotteSmoothie.cs",
+      "cards": [
+        "EB03-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_053_Nami.cs",
+      "cards": [
+        "EB03-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_055_Robin.cs",
+      "cards": [
+        "EB03-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_059_SSnakeWoman.cs",
+      "cards": [
+        "EB03-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB03_061_Uta.cs",
+      "cards": [
+        "EB03-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_003_Smoker_Tashigi.cs",
+      "cards": [
+        "EB04-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_004_Dorry.cs",
+      "cards": [
+        "EB04-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_005_TrafalgarLaw.cs",
+      "cards": [
+        "EB04-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_007_Zoro.cs",
+      "cards": [
+        "EB04-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_011_Scaler.cs",
+      "cards": [
+        "EB04-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_012_Kikunojo.cs",
+      "cards": [
+        "EB04-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_013_Carrot.cs",
+      "cards": [
+        "EB04-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_015_Jinbe.cs",
+      "cards": [
+        "EB04-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_018_Megalo.cs",
+      "cards": [
+        "EB04-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_022_Issho.cs",
+      "cards": [
+        "EB04-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_028_FrozenMoment.cs",
+      "cards": [
+        "EB04-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_029_SanjiCry.cs",
+      "cards": [
+        "EB04-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_030_Kaido.cs",
+      "cards": [
+        "EB04-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_031_Quewin.cs",
+      "cards": [
+        "EB04-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_033_BattleMonster.cs",
+      "cards": [
+        "EB04-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_035_Killer.cs",
+      "cards": [
+        "EB04-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_038_RosinanteAndLaw.cs",
+      "cards": [
+        "EB04-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_041_InvisibleBlack.cs",
+      "cards": [
+        "EB04-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_043_Kaku.cs",
+      "cards": [
+        "EB04-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_044_Koby.cs",
+      "cards": [
+        "EB04-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_045_Ginny.cs",
+      "cards": [
+        "EB04-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_046_Dol.cs",
+      "cards": [
+        "EB04-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_047_Hibari.cs",
+      "cards": [
+        "EB04-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_050_Adjust.cs",
+      "cards": [
+        "EB04-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_051_Emeth.cs",
+      "cards": [
+        "EB04-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_052_Sanji.cs",
+      "cards": [
+        "EB04-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_056_Pacifista.cs",
+      "cards": [
+        "EB04-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_057_Vegapunk.cs",
+      "cards": [
+        "EB04-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_059_BlackRopeTornado.cs",
+      "cards": [
+        "EB04-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_060_FalconGatling.cs",
+      "cards": [
+        "EB04-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/EB04_061_Luffy.cs",
+      "cards": [
+        "EB04-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OfficialConsistencyFixes.cs",
+      "cards": [
+        "ST07-016",
+        "ST09-015",
+        "ST13-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OfficialCoverageEffects.cs",
+      "cards": [
+        "OP01-060",
+        "P-057",
+        "P-058",
+        "P-059",
+        "P-060",
+        "P-120",
+        "P-121",
+        "P-122",
+        "P-126",
+        "P-128",
+        "P-129",
+        "P-130",
+        "P-132",
+        "P-133",
+        "P-134",
+        "P-155",
+        "ST19-003",
+        "ST19-004",
+        "ST19-005",
+        "ST20-004",
+        "ST20-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_001_Zoro.cs",
+      "cards": [
+        "OP01-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_002_Law.cs",
+      "cards": [
+        "OP01-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_004_Usopp.cs",
+      "cards": [
+        "OP01-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_005_Uta.cs",
+      "cards": [
+        "OP01-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_008_Cavendish.cs",
+      "cards": [
+        "OP01-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_009_Carrot.cs",
+      "cards": [
+        "OP01-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_014_Jinbe.cs",
+      "cards": [
+        "OP01-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_019_Bartolomeo.cs",
+      "cards": [
+        "OP01-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_021_Franky.cs",
+      "cards": [
+        "OP01-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_031_KozukiManor.cs",
+      "cards": [
+        "OP01-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_032_AshuraDoji.cs",
+      "cards": [
+        "OP01-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_037_Kawamatsu.cs",
+      "cards": [
+        "OP01-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_044_Shachi.cs",
+      "cards": [
+        "OP01-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_050_Penguin.cs",
+      "cards": [
+        "OP01-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_051_EustassKid.cs",
+      "cards": [
+        "OP01-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_061_Gedatsu.cs",
+      "cards": [
+        "OP01-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_062_Crocodile.cs",
+      "cards": [
+        "OP01-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_063_Arlong.cs",
+      "cards": [
+        "OP01-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_064_Abida.cs",
+      "cards": [
+        "OP01-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_067_Crocodile.cs",
+      "cards": [
+        "OP01-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_068_GekkoMoria.cs",
+      "cards": [
+        "OP01-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_069_Caesar.cs",
+      "cards": [
+        "OP01-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_070_Mihawk.cs",
+      "cards": [
+        "OP01-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_071_Jinbe.cs",
+      "cards": [
+        "OP01-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_072_Sumire.cs",
+      "cards": [
+        "OP01-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_073_Doflamingo.cs",
+      "cards": [
+        "OP01-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_077_Perona.cs",
+      "cards": [
+        "OP01-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_082_Monet.cs",
+      "cards": [
+        "OP01-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_083_Mr1.cs",
+      "cards": [
+        "OP01-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_086_OverHeatWhip.cs",
+      "cards": [
+        "OP01-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_088_DesertSpada.cs",
+      "cards": [
+        "OP01-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_089_CrescentDune.cs",
+      "cards": [
+        "OP01-089"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_091_Jin.cs",
+      "cards": [
+        "OP01-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_094_Kaido.cs",
+      "cards": [
+        "OP01-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_099_KurozumiSemimaru.cs",
+      "cards": [
+        "OP01-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_104_Speed.cs",
+      "cards": [
+        "OP01-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_105_Hoypoi.cs",
+      "cards": [
+        "OP01-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_109_FourzFour.cs",
+      "cards": [
+        "OP01-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_112_Page_One.cs",
+      "cards": [
+        "OP01-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_116_SMILE.cs",
+      "cards": [
+        "OP01-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP01_120_Shanks.cs",
+      "cards": [
+        "OP01-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_002_Garp.cs",
+      "cards": [
+        "OP02-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_004_Whitebeard.cs",
+      "cards": [
+        "OP02-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_008_Jozu.cs",
+      "cards": [
+        "OP02-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_014_Whitey.cs",
+      "cards": [
+        "OP02-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_015_Makino.cs",
+      "cards": [
+        "OP02-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_016_Magra.cs",
+      "cards": [
+        "OP02-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_018_Marco.cs",
+      "cards": [
+        "OP02-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_019_Rakuyo.cs",
+      "cards": [
+        "OP02-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_023_StupidSon.cs",
+      "cards": [
+        "OP02-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_024_MobyDick.cs",
+      "cards": [
+        "OP02-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_025_Kinemon.cs",
+      "cards": [
+        "OP02-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_026_Sanji.cs",
+      "cards": [
+        "OP02-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_027_Inuarashi.cs",
+      "cards": [
+        "OP02-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_031_Toki.cs",
+      "cards": [
+        "OP02-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_035_TrafalgarLaw.cs",
+      "cards": [
+        "OP02-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_045_SantoryuKikyaku.cs",
+      "cards": [
+        "OP02-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_046_AkumaFuukyaku.cs",
+      "cards": [
+        "OP02-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_050_Inazuma.cs",
+      "cards": [
+        "OP02-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_051_Ivankov.cs",
+      "cards": [
+        "OP02-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_052_Cabaji.cs",
+      "cards": [
+        "OP02-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_056_Doflamingo.cs",
+      "cards": [
+        "OP02-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_061_Moria.cs",
+      "cards": [
+        "OP02-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_062_MonkeyDLuffy.cs",
+      "cards": [
+        "OP02-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_063_MisterOne.cs",
+      "cards": [
+        "OP02-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_064_MisterTwo.cs",
+      "cards": [
+        "OP02-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_065_Mr3.cs",
+      "cards": [
+        "OP02-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_069_DeathWink.cs",
+      "cards": [
+        "OP02-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_071_Magellan.cs",
+      "cards": [
+        "OP02-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_072_Zephyr.cs",
+      "cards": [
+        "OP02-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_074_Hannyabal.cs",
+      "cards": [
+        "OP02-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_075_Sicilian.cs",
+      "cards": [
+        "OP02-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_085_Magellan.cs",
+      "cards": [
+        "OP02-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_093_Smoker.cs",
+      "cards": [
+        "OP02-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_094_Hina.cs",
+      "cards": [
+        "OP02-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_095_Onigumo.cs",
+      "cards": [
+        "OP02-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_100_Gantz.cs",
+      "cards": [
+        "OP02-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_101_Strawberry.cs",
+      "cards": [
+        "OP02-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_102_Smoker.cs",
+      "cards": [
+        "OP02-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_104_Sentomaru.cs",
+      "cards": [
+        "OP02-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_110_Hina.cs",
+      "cards": [
+        "OP02-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_111_Hewberdy.cs",
+      "cards": [
+        "OP02-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_113_Hilmeppo.cs",
+      "cards": [
+        "OP02-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_114_Borsalino.cs",
+      "cards": [
+        "OP02-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_118_YasakaniNoMagatama.cs",
+      "cards": [
+        "OP02-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_120_Uta.cs",
+      "cards": [
+        "OP02-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP02_121_Kuzan.cs",
+      "cards": [
+        "OP02-121"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_001_Ace.cs",
+      "cards": [
+        "OP03-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_002_Aidio.cs",
+      "cards": [
+        "OP03-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_004_Krieg.cs",
+      "cards": [
+        "OP03-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_005_Shakky.cs",
+      "cards": [
+        "OP03-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_008_Buggy.cs",
+      "cards": [
+        "OP03-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_012_Teach.cs",
+      "cards": [
+        "OP03-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_013_Marco.cs",
+      "cards": [
+        "OP03-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_015_Lim.cs",
+      "cards": [
+        "OP03-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_016_Enpou.cs",
+      "cards": [
+        "OP03-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_020_Striker.cs",
+      "cards": [
+        "OP03-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_021_Kuro.cs",
+      "cards": [
+        "OP03-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_022_Arlong.cs",
+      "cards": [
+        "OP03-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_025_Krieg.cs",
+      "cards": [
+        "OP03-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_027_SiamCat.cs",
+      "cards": [
+        "OP03-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_028_Jango.cs",
+      "cards": [
+        "OP03-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_030_Nami.cs",
+      "cards": [
+        "OP03-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_032_Buggy.cs",
+      "cards": [
+        "OP03-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_033_Hachi.cs",
+      "cards": [
+        "OP03-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_037_IronFist.cs",
+      "cards": [
+        "OP03-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_040_Nami.cs",
+      "cards": [
+        "OP03-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_041_Usopp.cs",
+      "cards": [
+        "OP03-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_043_Gaimon.cs",
+      "cards": [
+        "OP03-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_045_Gargon.cs",
+      "cards": [
+        "OP03-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_046_Kenzo.cs",
+      "cards": [
+        "OP03-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_047_Zoff.cs",
+      "cards": [
+        "OP03-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_051_Belmer.cs",
+      "cards": [
+        "OP03-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_053_YosakuJohnny.cs",
+      "cards": [
+        "OP03-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_057_SanZenSeKai.cs",
+      "cards": [
+        "OP03-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_058_Spandam.cs",
+      "cards": [
+        "OP03-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_059_Kaku.cs",
+      "cards": [
+        "OP03-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_060_Kalifa.cs",
+      "cards": [
+        "OP03-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_063_Zambai.cs",
+      "cards": [
+        "OP03-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_066_Bari.cs",
+      "cards": [
+        "OP03-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_070_Luffy.cs",
+      "cards": [
+        "OP03-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_075_GalleyLaCompany.cs",
+      "cards": [
+        "OP03-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_076_RobLucci.cs",
+      "cards": [
+        "OP03-076"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_077_CharlotteLinlin.cs",
+      "cards": [
+        "OP03-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_079_Vergo.cs",
+      "cards": [
+        "OP03-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_080_Kaku.cs",
+      "cards": [
+        "OP03-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_083_Gocchi.cs",
+      "cards": [
+        "OP03-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_086_Spandam.cs",
+      "cards": [
+        "OP03-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_088_Fukurou.cs",
+      "cards": [
+        "OP03-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_090_Blueno.cs",
+      "cards": [
+        "OP03-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_091_Hillmappoo.cs",
+      "cards": [
+        "OP03-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_092_RobLucci.cs",
+      "cards": [
+        "OP03-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_093_Wanze.cs",
+      "cards": [
+        "OP03-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_094_AirDoor.cs",
+      "cards": [
+        "OP03-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_095_SoapSheep.cs",
+      "cards": [
+        "OP03-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_098_EnniesLobby.cs",
+      "cards": [
+        "OP03-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_099_Katakuri.cs",
+      "cards": [
+        "OP03-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_100_RoyalPalm.cs",
+      "cards": [
+        "OP03-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_102_Sanji.cs",
+      "cards": [
+        "OP03-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_104_Shirley.cs",
+      "cards": [
+        "OP03-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_105_CharlotteOven.cs",
+      "cards": [
+        "OP03-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_108_Cracker.cs",
+      "cards": [
+        "OP03-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_110_Smoothie.cs",
+      "cards": [
+        "OP03-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_114_BigMom.cs",
+      "cards": [
+        "OP03-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_117_Napoleon.cs",
+      "cards": [
+        "OP03-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_119_SliceCutMochi.cs",
+      "cards": [
+        "OP03-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_120_AtamiHotSpring.cs",
+      "cards": [
+        "OP03-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP03_123_Katakuri.cs",
+      "cards": [
+        "OP03-123"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_004_Karoo.cs",
+      "cards": [
+        "OP04-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_005_KungFuDugong.cs",
+      "cards": [
+        "OP04-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_006_Kuzan.cs",
+      "cards": [
+        "OP04-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_009_SuperRunDuck.cs",
+      "cards": [
+        "OP04-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_011_Nami.cs",
+      "cards": [
+        "OP04-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_012_NefertariCobra.cs",
+      "cards": [
+        "OP04-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_013_Pell.cs",
+      "cards": [
+        "OP04-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_017_SweetStrike.cs",
+      "cards": [
+        "OP04-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_020_Issho.cs",
+      "cards": [
+        "OP04-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_021_Viola.cs",
+      "cards": [
+        "OP04-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_024_Sugar.cs",
+      "cards": [
+        "OP04-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_025_Jora.cs",
+      "cards": [
+        "OP04-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_026_SenorPink.cs",
+      "cards": [
+        "OP04-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_028_Diamante.cs",
+      "cards": [
+        "OP04-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_030_Trebol.cs",
+      "cards": [
+        "OP04-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_031_Doflamingo.cs",
+      "cards": [
+        "OP04-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_032_Baby5.cs",
+      "cards": [
+        "OP04-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_033_Machvise.cs",
+      "cards": [
+        "OP04-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_034_LaoG.cs",
+      "cards": [
+        "OP04-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_037_HanegekiSen.cs",
+      "cards": [
+        "OP04-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_040_Queen.cs",
+      "cards": [
+        "OP04-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_042_Ipponmatsu.cs",
+      "cards": [
+        "OP04-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_043_Junti.cs",
+      "cards": [
+        "OP04-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_047_IceOni.cs",
+      "cards": [
+        "OP04-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_048_Sasaki.cs",
+      "cards": [
+        "OP04-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_053_Pejiwan.cs",
+      "cards": [
+        "OP04-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_055_PlagueBomb.cs",
+      "cards": [
+        "OP04-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_058_Crocodile.cs",
+      "cards": [
+        "OP04-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_059_Asparagus.cs",
+      "cards": [
+        "OP04-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_060_Crocodile.cs",
+      "cards": [
+        "OP04-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_063_Franky.cs",
+      "cards": [
+        "OP04-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_064_MissAllSunday.cs",
+      "cards": [
+        "OP04-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_065_MissGoldenWeek.cs",
+      "cards": [
+        "OP04-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_067_MsMerryChristmas.cs",
+      "cards": [
+        "OP04-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_068_Yokozuna.cs",
+      "cards": [
+        "OP04-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_069_MrTwoBonClay.cs",
+      "cards": [
+        "OP04-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_070_Mr3.cs",
+      "cards": [
+        "OP04-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_071_MrFour.cs",
+      "cards": [
+        "OP04-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_072_Mr5.cs",
+      "cards": [
+        "OP04-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_073_Mr13AndMsFriday.cs",
+      "cards": [
+        "OP04-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_080_Gatz.cs",
+      "cards": [
+        "OP04-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_081_Cavendish.cs",
+      "cards": [
+        "OP04-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_083_Sabo.cs",
+      "cards": [
+        "OP04-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_084_Stussy.cs",
+      "cards": [
+        "OP04-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_086_Pepper.cs",
+      "cards": [
+        "OP04-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_088_Hajrudin.cs",
+      "cards": [
+        "OP04-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_090_Luffy.cs",
+      "cards": [
+        "OP04-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_093_GumGumKingKongGun.cs",
+      "cards": [
+        "OP04-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_094_RaijinHakaiken.cs",
+      "cards": [
+        "OP04-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_095_GuardShield.cs",
+      "cards": [
+        "OP04-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_096_CorridaColosseum.cs",
+      "cards": [
+        "OP04-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_098_Otoko.cs",
+      "cards": [
+        "OP04-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_099_OLin.cs",
+      "cards": [
+        "OP04-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_100_CaponBege.cs",
+      "cards": [
+        "OP04-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_102_Kinemon.cs",
+      "cards": [
+        "OP04-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_104_Sanji.cs",
+      "cards": [
+        "OP04-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_105_CharlotteAmande.cs",
+      "cards": [
+        "OP04-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_106_CharlotteBavarois.cs",
+      "cards": [
+        "OP04-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_108_CharlotteMoscato.cs",
+      "cards": [
+        "OP04-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_110_Pound.cs",
+      "cards": [
+        "OP04-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_111_Hera.cs",
+      "cards": [
+        "OP04-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_112_Yamato.cs",
+      "cards": [
+        "OP04-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_113_Rabian.cs",
+      "cards": [
+        "OP04-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_116_DiableJambeHohnikuShoot.cs",
+      "cards": [
+        "OP04-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_117_HeavensFire.cs",
+      "cards": [
+        "OP04-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_118_NefeltariVivi.cs",
+      "cards": [
+        "OP04-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP04_119_DonquixoteRosinante.cs",
+      "cards": [
+        "OP04-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_001_Sabo.cs",
+      "cards": [
+        "OP05-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_002_Belo_Betty.cs",
+      "cards": [
+        "OP05-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_003_Shanks.cs",
+      "cards": [
+        "OP05-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_007_Sabo.cs",
+      "cards": [
+        "OP05-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_009_Toto.cs",
+      "cards": [
+        "OP05-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_016_Morley.cs",
+      "cards": [
+        "OP05-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_026_Saatchis.cs",
+      "cards": [
+        "OP05-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_029_Doflamingo.cs",
+      "cards": [
+        "OP05-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_030_Rosinante.cs",
+      "cards": [
+        "OP05-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_031_Buffalo.cs",
+      "cards": [
+        "OP05-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_032_Pica.cs",
+      "cards": [
+        "OP05-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_038_DanceDanceDance.cs",
+      "cards": [
+        "OP05-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_040_BirdCage.cs",
+      "cards": [
+        "OP05-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_041_Sakazuki.cs",
+      "cards": [
+        "OP05-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_042_Issho.cs",
+      "cards": [
+        "OP05-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_043_Nami.cs",
+      "cards": [
+        "OP05-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_045_StainlessSteel.cs",
+      "cards": [
+        "OP05-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_048_Bastille.cs",
+      "cards": [
+        "OP05-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_049_Hatcha.cs",
+      "cards": [
+        "OP05-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_051_Borsalino.cs",
+      "cards": [
+        "OP05-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_053_Mozambia.cs",
+      "cards": [
+        "OP05-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_055_Drake.cs",
+      "cards": [
+        "OP05-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_056_XBaltz.cs",
+      "cards": [
+        "OP05-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_058_StopTramplingLife.cs",
+      "cards": [
+        "OP05-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_060_Luffy.cs",
+      "cards": [
+        "OP05-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_062_Anamu.cs",
+      "cards": [
+        "OP05-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_066_Jinbe.cs",
+      "cards": [
+        "OP05-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_067_Zorojuro.cs",
+      "cards": [
+        "OP05-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_069_TrafalgarLaw.cs",
+      "cards": [
+        "OP05-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_070_Franky.cs",
+      "cards": [
+        "OP05-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_071_Bepo.cs",
+      "cards": [
+        "OP05-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_074_EustassKid.cs",
+      "cards": [
+        "OP05-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_079_Viola.cs",
+      "cards": [
+        "OP05-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_080_IssabelloII.cs",
+      "cards": [
+        "OP05-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_082_Shirahoshi.cs",
+      "cards": [
+        "OP05-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_084_CharlosSaint.cs",
+      "cards": [
+        "OP05-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_086_NefeltariVivi.cs",
+      "cards": [
+        "OP05-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_087_Hakuba.cs",
+      "cards": [
+        "OP05-087"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_088_Mansherry.cs",
+      "cards": [
+        "OP05-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_089_Mjosgard.cs",
+      "cards": [
+        "OP05-089"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_092_RoswaldSaint.cs",
+      "cards": [
+        "OP05-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_094_HautCouture.cs",
+      "cards": [
+        "OP05-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_096_FiveHundredMillion.cs",
+      "cards": [
+        "OP05-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_097_MaryGeoise.cs",
+      "cards": [
+        "OP05-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_098_Enel.cs",
+      "cards": [
+        "OP05-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_099_Amazon.cs",
+      "cards": [
+        "OP05-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_100_Enel.cs",
+      "cards": [
+        "OP05-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_102_Enel.cs",
+      "cards": [
+        "OP05-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_103_Hotori.cs",
+      "cards": [
+        "OP05-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_105_Aisa.cs",
+      "cards": [
+        "OP05-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_107_LieutenantSpacey.cs",
+      "cards": [
+        "OP05-107"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_109_Pagaya.cs",
+      "cards": [
+        "OP05-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_111_Hotoji.cs",
+      "cards": [
+        "OP05-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_114_DivineJudgment.cs",
+      "cards": [
+        "OP05-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_115_NimillionVolts.cs",
+      "cards": [
+        "OP05-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_116_ThirtyMillionVolts.cs",
+      "cards": [
+        "OP05-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP05_119_MonkeyDLuffy.cs",
+      "cards": [
+        "OP05-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_001_Uta.cs",
+      "cards": [
+        "OP06-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_002_Flash.cs",
+      "cards": [
+        "OP06-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_003_Ivankov.cs",
+      "cards": [
+        "OP06-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_006_Saga.cs",
+      "cards": [
+        "OP06-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_009_Shura.cs",
+      "cards": [
+        "OP06-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_010_DouglasBullet.cs",
+      "cards": [
+        "OP06-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_011_Totemjika.cs",
+      "cards": [
+        "OP06-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_012_KingdomOfBears.cs",
+      "cards": [
+        "OP06-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_014_Ratchet.cs",
+      "cards": [
+        "OP06-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_015_LilyCarnation.cs",
+      "cards": [
+        "OP06-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_018_GomuGomuNoOzaruOGun.cs",
+      "cards": [
+        "OP06-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_020_HodyJones.cs",
+      "cards": [
+        "OP06-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_021_Perona.cs",
+      "cards": [
+        "OP06-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_023_Arlong.cs",
+      "cards": [
+        "OP06-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_026_Kozaburo.cs",
+      "cards": [
+        "OP06-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_030_Dosun.cs",
+      "cards": [
+        "OP06-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_035_Hody_Jones.cs",
+      "cards": [
+        "OP06-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_038_IshSenDaiSenSekai.cs",
+      "cards": [
+        "OP06-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_039_JustYou.cs",
+      "cards": [
+        "OP06-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_041_NoahArk.cs",
+      "cards": [
+        "OP06-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_042_Reiju.cs",
+      "cards": [
+        "OP06-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_043_Aramaki.cs",
+      "cards": [
+        "OP06-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_044_Gion.cs",
+      "cards": [
+        "OP06-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_046_Sakazuki.cs",
+      "cards": [
+        "OP06-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_047_CharlotteBrulee.cs",
+      "cards": [
+        "OP06-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_048_Jozu.cs",
+      "cards": [
+        "OP06-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_051_Tsuru.cs",
+      "cards": [
+        "OP06-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_052_Tokitoki.cs",
+      "cards": [
+        "OP06-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_054_Borsalino.cs",
+      "cards": [
+        "OP06-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_055_MonkeyDGarp.cs",
+      "cards": [
+        "OP06-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_057_NeverDoubtWomanTears.cs",
+      "cards": [
+        "OP06-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_060_Niji.cs",
+      "cards": [
+        "OP06-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_061_Niji.cs",
+      "cards": [
+        "OP06-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_062_VinsmokeNiji.cs",
+      "cards": [
+        "OP06-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_063_Sora.cs",
+      "cards": [
+        "OP06-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_064_Niji.cs",
+      "cards": [
+        "OP06-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_065_Niji.cs",
+      "cards": [
+        "OP06-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_066_Yonji.cs",
+      "cards": [
+        "OP06-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_067_VinsmokeYonji.cs",
+      "cards": [
+        "OP06-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_068_Reiju.cs",
+      "cards": [
+        "OP06-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_069_Reiju.cs",
+      "cards": [
+        "OP06-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_072_Cosette.cs",
+      "cards": [
+        "OP06-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_074_Zephyr.cs",
+      "cards": [
+        "OP06-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_076_Killer.cs",
+      "cards": [
+        "OP06-076"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_080_Moria.cs",
+      "cards": [
+        "OP06-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_083_Oars.cs",
+      "cards": [
+        "OP06-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_085_Komashi.cs",
+      "cards": [
+        "OP06-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_086_Moria.cs",
+      "cards": [
+        "OP06-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_088_Sai.cs",
+      "cards": [
+        "OP06-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_092_Brook.cs",
+      "cards": [
+        "OP06-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_093_Perona.cs",
+      "cards": [
+        "OP06-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_095_ShadowsGathering.cs",
+      "cards": [
+        "OP06-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_096_NothingHappened.cs",
+      "cards": [
+        "OP06-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_099_Aisa.cs",
+      "cards": [
+        "OP06-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_100_Inuarashi.cs",
+      "cards": [
+        "OP06-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_101_Aname.cs",
+      "cards": [
+        "OP06-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_102_Mantis.cs",
+      "cards": [
+        "OP06-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_103_Kawamatsu.cs",
+      "cards": [
+        "OP06-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_106_Hiyori.cs",
+      "cards": [
+        "OP06-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_109_Denjiro.cs",
+      "cards": [
+        "OP06-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_110_Nekomamushi.cs",
+      "cards": [
+        "OP06-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_111_Braham.cs",
+      "cards": [
+        "OP06-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_112_Raizo.cs",
+      "cards": [
+        "OP06-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_113_Raki.cs",
+      "cards": [
+        "OP06-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_116_Hammer.cs",
+      "cards": [
+        "OP06-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_117_ArkMaxim.cs",
+      "cards": [
+        "OP06-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_118_Zoro.cs",
+      "cards": [
+        "OP06-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP06_119_Sanji.cs",
+      "cards": [
+        "OP06-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_001_Dragon.cs",
+      "cards": [
+        "OP07-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_008_Tanaka.cs",
+      "cards": [
+        "OP07-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_009_Dogura_Magura.cs",
+      "cards": [
+        "OP07-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_010_Bacura.cs",
+      "cards": [
+        "OP07-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_013_Masked_Deuce.cs",
+      "cards": [
+        "OP07-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_017_DragonBreath.cs",
+      "cards": [
+        "OP07-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_018_KeepOut.cs",
+      "cards": [
+        "OP07-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_023_Caribou.cs",
+      "cards": [
+        "OP07-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_026_JewelryBonney.cs",
+      "cards": [
+        "OP07-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_029_Hawkins.cs",
+      "cards": [
+        "OP07-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_030_Pappag.cs",
+      "cards": [
+        "OP07-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_031_Bartolomeo.cs",
+      "cards": [
+        "OP07-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_032_FisherTiger.cs",
+      "cards": [
+        "OP07-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_033_Luffy.cs",
+      "cards": [
+        "OP07-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_036_AshuraMakyusen.cs",
+      "cards": [
+        "OP07-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_038_BoaHancock.cs",
+      "cards": [
+        "OP07-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_039_Edward_Weevil.cs",
+      "cards": [
+        "OP07-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_040_Crocodile.cs",
+      "cards": [
+        "OP07-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_042_Moria.cs",
+      "cards": [
+        "OP07-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_047_Trafalgar_Law.cs",
+      "cards": [
+        "OP07-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_048_Doflamingo.cs",
+      "cards": [
+        "OP07-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_050_Boa_Sandersonia.cs",
+      "cards": [
+        "OP07-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_051_BoaHancock.cs",
+      "cards": [
+        "OP07-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_052_BoaMarigold.cs",
+      "cards": [
+        "OP07-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_053_Ace.cs",
+      "cards": [
+        "OP07-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_059_Foxy.cs",
+      "cards": [
+        "OP07-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_060_Itomimizu.cs",
+      "cards": [
+        "OP07-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_062_VinsmokeReiju.cs",
+      "cards": [
+        "OP07-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_063_Capote.cs",
+      "cards": [
+        "OP07-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_065_Gina.cs",
+      "cards": [
+        "OP07-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_066_TonyTonyChopper.cs",
+      "cards": [
+        "OP07-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_068_Hamburg.cs",
+      "cards": [
+        "OP07-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_069_Tsukemono.cs",
+      "cards": [
+        "OP07-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_070_BigPan.cs",
+      "cards": [
+        "OP07-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_077_GoingToFindTheGreatTreasure.cs",
+      "cards": [
+        "OP07-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_078_MillionTonKyubiKaisoku.cs",
+      "cards": [
+        "OP07-078"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_079_AttackCostDown.cs",
+      "cards": [
+        "OP07-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_081_Jabra.cs",
+      "cards": [
+        "OP07-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_083_Moria.cs",
+      "cards": [
+        "OP07-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_085_Stussy.cs",
+      "cards": [
+        "OP07-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_087_Baskerville.cs",
+      "cards": [
+        "OP07-087"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_090_Morgans.cs",
+      "cards": [
+        "OP07-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_091_Luffy.cs",
+      "cards": [
+        "OP07-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_092_Josef.cs",
+      "cards": [
+        "OP07-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_093_RobLucci.cs",
+      "cards": [
+        "OP07-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_094_Soru.cs",
+      "cards": [
+        "OP07-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_095_Tekkai.cs",
+      "cards": [
+        "OP07-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_096_Rankyaku.cs",
+      "cards": [
+        "OP07-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_097_Vegapunk.cs",
+      "cards": [
+        "OP07-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_098_Atlas.cs",
+      "cards": [
+        "OP07-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_099_Usopp.cs",
+      "cards": [
+        "OP07-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_101_Shaka.cs",
+      "cards": [
+        "OP07-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_102_Jinbe.cs",
+      "cards": [
+        "OP07-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_103_Chopper.cs",
+      "cards": [
+        "OP07-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_115_HelpMe.cs",
+      "cards": [
+        "OP07-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_116_RetsuenZan.cs",
+      "cards": [
+        "OP07-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP07_119_Ace.cs",
+      "cards": [
+        "OP07-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_001_Chopper.cs",
+      "cards": [
+        "OP08-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_002_Marco.cs",
+      "cards": [
+        "OP08-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_004_KuroMorimo.cs",
+      "cards": [
+        "OP08-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_005_Komaru.cs",
+      "cards": [
+        "OP08-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_006_Chess_Marimo.cs",
+      "cards": [
+        "OP08-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_007_Chopper.cs",
+      "cards": [
+        "OP08-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_013_Robson.cs",
+      "cards": [
+        "OP08-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_014_Wapol.cs",
+      "cards": [
+        "OP08-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_018_HoofstampSakura.cs",
+      "cards": [
+        "OP08-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_020_DrumKingdom.cs",
+      "cards": [
+        "OP08-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_021_Carrot.cs",
+      "cards": [
+        "OP08-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_022_Inuarashi.cs",
+      "cards": [
+        "OP08-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_023_Carrot.cs",
+      "cards": [
+        "OP08-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_024_Conslot.cs",
+      "cards": [
+        "OP08-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_025_LionLeon.cs",
+      "cards": [
+        "OP08-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_026_Giovanni.cs",
+      "cards": [
+        "OP08-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_028_Nekomamushi.cs",
+      "cards": [
+        "OP08-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_029_Pomz.cs",
+      "cards": [
+        "OP08-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_030_Pedro.cs",
+      "cards": [
+        "OP08-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_033_Raizo.cs",
+      "cards": [
+        "OP08-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_036_RaijinNyon.cs",
+      "cards": [
+        "OP08-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_037_Carrot.cs",
+      "cards": [
+        "OP08-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_038_WeWillNotSellComrades.cs",
+      "cards": [
+        "OP08-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_041_Aphelandra.cs",
+      "cards": [
+        "OP08-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_043_EdwardNewgate.cs",
+      "cards": [
+        "OP08-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_045_Shachi.cs",
+      "cards": [
+        "OP08-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_046_Shakuyaku.cs",
+      "cards": [
+        "OP08-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_047_Jozu.cs",
+      "cards": [
+        "OP08-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_049_SpeedJiru.cs",
+      "cards": [
+        "OP08-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_050_Nairu.cs",
+      "cards": [
+        "OP08-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_051_Bakin.cs",
+      "cards": [
+        "OP08-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_052_PortgasDAce.cs",
+      "cards": [
+        "OP08-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_054_DontCatchTheKing.cs",
+      "cards": [
+        "OP08-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_055_PhoenixSeal.cs",
+      "cards": [
+        "OP08-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_056_MobyDick.cs",
+      "cards": [
+        "OP08-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_057_Kingdew.cs",
+      "cards": [
+        "OP08-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_058_CharlotteBrulee.cs",
+      "cards": [
+        "OP08-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_062_CharlotteKatakuri.cs",
+      "cards": [
+        "OP08-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_067_CharlotteBrulee.cs",
+      "cards": [
+        "OP08-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_069_Charlotte_Linlin.cs",
+      "cards": [
+        "OP08-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_071_CountNiwatori.cs",
+      "cards": [
+        "OP08-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_073_ViscountHiyoko.cs",
+      "cards": [
+        "OP08-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_074_BlackMaria.cs",
+      "cards": [
+        "OP08-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_077_Haikai.cs",
+      "cards": [
+        "OP08-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_079_Kaido.cs",
+      "cards": [
+        "OP08-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_081_Guernica.cs",
+      "cards": [
+        "OP08-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_083_SheepsHead.cs",
+      "cards": [
+        "OP08-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_085_Jinbe.cs",
+      "cards": [
+        "OP08-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_086_Kinlami.cs",
+      "cards": [
+        "OP08-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_093_XDrake.cs",
+      "cards": [
+        "OP08-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_094_EnnoukoumyOu.cs",
+      "cards": [
+        "OP08-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_096_HumansDreamsNeverEnd.cs",
+      "cards": [
+        "OP08-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_098_Kalgara.cs",
+      "cards": [
+        "OP08-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_100_SouthBird.cs",
+      "cards": [
+        "OP08-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_101_CharlotteAmande.cs",
+      "cards": [
+        "OP08-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_102_CharlotteOpera.cs",
+      "cards": [
+        "OP08-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_105_JewelryBonney.cs",
+      "cards": [
+        "OP08-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_109_Noland.cs",
+      "cards": [
+        "OP08-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_110_Wapol.cs",
+      "cards": [
+        "OP08-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_111_SShark.cs",
+      "cards": [
+        "OP08-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_112_SSnake.cs",
+      "cards": [
+        "OP08-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_114_SHawk.cs",
+      "cards": [
+        "OP08-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_115_TheEarthWontFail.cs",
+      "cards": [
+        "OP08-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_116_BurningCannon.cs",
+      "cards": [
+        "OP08-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_117_BurningSword.cs",
+      "cards": [
+        "OP08-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_118_Rayleigh.cs",
+      "cards": [
+        "OP08-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP08_119_KaidoAndBigMom.cs",
+      "cards": [
+        "OP08-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_001_Shanks.cs",
+      "cards": [
+        "OP09-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_004_Shanks.cs",
+      "cards": [
+        "OP09-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_005_Rayleigh.cs",
+      "cards": [
+        "OP09-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_007_Hawkins.cs",
+      "cards": [
+        "OP09-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_008_BuildingSnake.cs",
+      "cards": [
+        "OP09-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_012_Monster.cs",
+      "cards": [
+        "OP09-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_013_Usopp.cs",
+      "cards": [
+        "OP09-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_017_Wire.cs",
+      "cards": [
+        "OP09-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_018_Roll.cs",
+      "cards": [
+        "OP09-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_019_NeverForgive.cs",
+      "cards": [
+        "OP09-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_022_Lim.cs",
+      "cards": [
+        "OP09-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_023_Edeo.cs",
+      "cards": [
+        "OP09-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_025_Crocodile.cs",
+      "cards": [
+        "OP09-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_032_Rosinante.cs",
+      "cards": [
+        "OP09-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_033_NicoRobin.cs",
+      "cards": [
+        "OP09-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_036_Luffy.cs",
+      "cards": [
+        "OP09-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_041_FrankyRadarBoxingSword.cs",
+      "cards": [
+        "OP09-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_045_Kabaji.cs",
+      "cards": [
+        "OP09-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_051_Buggy.cs",
+      "cards": [
+        "OP09-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_052_Marco.cs",
+      "cards": [
+        "OP09-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_059_SteamMurder.cs",
+      "cards": [
+        "OP09-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_060_KaraiBari.cs",
+      "cards": [
+        "OP09-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_061_MonkeyDLuffy.cs",
+      "cards": [
+        "OP09-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_062_NicoRobin.cs",
+      "cards": [
+        "OP09-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_066_Jabra.cs",
+      "cards": [
+        "OP09-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_074_Bepo.cs",
+      "cards": [
+        "OP09-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_080_ThousandSunny.cs",
+      "cards": [
+        "OP09-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_081_Teach.cs",
+      "cards": [
+        "OP09-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_084_CatarinaDevon.cs",
+      "cards": [
+        "OP09-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_086_JesusBurgess.cs",
+      "cards": [
+        "OP09-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_088_Shiryu.cs",
+      "cards": [
+        "OP09-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_092_MarshallDTeach.cs",
+      "cards": [
+        "OP09-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_093_Teach.cs",
+      "cards": [
+        "OP09-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_104_Sabo.cs",
+      "cards": [
+        "OP09-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_105_Sanji.cs",
+      "cards": [
+        "OP09-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_108_BartholomewKuma.cs",
+      "cards": [
+        "OP09-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_109_JaguarDSaul.cs",
+      "cards": [
+        "OP09-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_111_Brook.cs",
+      "cards": [
+        "OP09-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_118_GolDRoger.cs",
+      "cards": [
+        "OP09-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_119_Luffy.cs",
+      "cards": [
+        "OP09-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_001_Smoker.cs",
+      "cards": [
+        "OP10-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_002_Caesar.cs",
+      "cards": [
+        "OP10-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_003_Sugar.cs",
+      "cards": [
+        "OP10-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_005_Sanji.cs",
+      "cards": [
+        "OP10-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_008_Scotch.cs",
+      "cards": [
+        "OP10-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_010_Chatleousse.cs",
+      "cards": [
+        "OP10-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_011_Chopper.cs",
+      "cards": [
+        "OP10-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_017_Rock.cs",
+      "cards": [
+        "OP10-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_022_Law.cs",
+      "cards": [
+        "OP10-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_026_Kinemon.cs",
+      "cards": [
+        "OP10-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_027_Kinemon.cs",
+      "cards": [
+        "OP10-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_029_Mihawk.cs",
+      "cards": [
+        "OP10-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_030_Smoker.cs",
+      "cards": [
+        "OP10-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_032_Tashigi.cs",
+      "cards": [
+        "OP10-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_033_Nami.cs",
+      "cards": [
+        "OP10-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_034_Franky.cs",
+      "cards": [
+        "OP10-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_036_Perona.cs",
+      "cards": [
+        "OP10-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_037_Lim.cs",
+      "cards": [
+        "OP10-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_038_Zoro.cs",
+      "cards": [
+        "OP10-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_042_Usopp.cs",
+      "cards": [
+        "OP10-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_043_Mozu.cs",
+      "cards": [
+        "OP10-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_046_Kyros.cs",
+      "cards": [
+        "OP10-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_047_Koala.cs",
+      "cards": [
+        "OP10-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_049_Sabo.cs",
+      "cards": [
+        "OP10-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_053_Bian.cs",
+      "cards": [
+        "OP10-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_058_Rebecca.cs",
+      "cards": [
+        "OP10-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_062_Viola.cs",
+      "cards": [
+        "OP10-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_066_Giolla.cs",
+      "cards": [
+        "OP10-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_069_Betty.cs",
+      "cards": [
+        "OP10-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_070_Trebol.cs",
+      "cards": [
+        "OP10-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_071_Doflamingo.cs",
+      "cards": [
+        "OP10-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_074_Pica.cs",
+      "cards": [
+        "OP10-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_075_Foxy.cs",
+      "cards": [
+        "OP10-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_080_BearToy.cs",
+      "cards": [
+        "OP10-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_083_Momonosuke.cs",
+      "cards": [
+        "OP10-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_085_JesusBurgess.cs",
+      "cards": [
+        "OP10-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_086_Shiryu.cs",
+      "cards": [
+        "OP10-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_092_Perona.cs",
+      "cards": [
+        "OP10-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_093_Homing.cs",
+      "cards": [
+        "OP10-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_094_Ryuma.cs",
+      "cards": [
+        "OP10-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_098_Liberation.cs",
+      "cards": [
+        "OP10-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_100_Lightning.cs",
+      "cards": [
+        "OP10-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_102_Ivankov.cs",
+      "cards": [
+        "OP10-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_103_CaponeBege.cs",
+      "cards": [
+        "OP10-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_104_Caribou.cs",
+      "cards": [
+        "OP10-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_107_Bonney.cs",
+      "cards": [
+        "OP10-107"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_108_DJGappa.cs",
+      "cards": [
+        "OP10-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_109_Hawkins.cs",
+      "cards": [
+        "OP10-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_110_HotoriKotori.cs",
+      "cards": [
+        "OP10-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_112_Kid.cs",
+      "cards": [
+        "OP10-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_113_Zoro.cs",
+      "cards": [
+        "OP10-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_114_XDrake.cs",
+      "cards": [
+        "OP10-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_115_SeeYouInTheNewWorld.cs",
+      "cards": [
+        "OP10-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_116_Railgun.cs",
+      "cards": [
+        "OP10-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_117_Room.cs",
+      "cards": [
+        "OP10-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_118_Luffy.cs",
+      "cards": [
+        "OP10-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_119_Law.cs",
+      "cards": [
+        "OP10-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_001_Koby.cs",
+      "cards": [
+        "OP11-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_002_Aokiji.cs",
+      "cards": [
+        "OP11-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_005_Smoker.cs",
+      "cards": [
+        "OP11-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_006_Zephyr.cs",
+      "cards": [
+        "OP11-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_009_Robin.cs",
+      "cards": [
+        "OP11-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_010_Tashigi.cs",
+      "cards": [
+        "OP11-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_012_Franky.cs",
+      "cards": [
+        "OP11-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_013_PrinceGrus.cs",
+      "cards": [
+        "OP11-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_014_Borsalino.cs",
+      "cards": [
+        "OP11-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_019_ClayCobweb.cs",
+      "cards": [
+        "OP11-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_022_Shirahoshi.cs",
+      "cards": [
+        "OP11-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_024_Aladine.cs",
+      "cards": [
+        "OP11-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_027_Bulldog.cs",
+      "cards": [
+        "OP11-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_031_Jinbe.cs",
+      "cards": [
+        "OP11-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_034_Hatchan.cs",
+      "cards": [
+        "OP11-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_035_FisherTiger.cs",
+      "cards": [
+        "OP11-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_041_Nami.cs",
+      "cards": [
+        "OP11-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_042_Vergo.cs",
+      "cards": [
+        "OP11-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_043_Ichiji.cs",
+      "cards": [
+        "OP11-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_046_VinsmokeYonji.cs",
+      "cards": [
+        "OP11-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_049_Carrot.cs",
+      "cards": [
+        "OP11-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_051_Sanji.cs",
+      "cards": [
+        "OP11-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_054_Nami.cs",
+      "cards": [
+        "OP11-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_057_Pedro.cs",
+      "cards": [
+        "OP11-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_058_MonkeyDLuffy.cs",
+      "cards": [
+        "OP11-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_059_GomuGomuNoKingCobra.cs",
+      "cards": [
+        "OP11-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_062_CharlotteKatakuri.cs",
+      "cards": [
+        "OP11-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_065_CharlotteAnana.cs",
+      "cards": [
+        "OP11-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_066_CharlotteOven.cs",
+      "cards": [
+        "OP11-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_071_CharlottePerospero.cs",
+      "cards": [
+        "OP11-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_072_CharlotteMont_dOr.cs",
+      "cards": [
+        "OP11-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_073_CharlotteLinlin.cs",
+      "cards": [
+        "OP11-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_074_PowderedCream.cs",
+      "cards": [
+        "OP11-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_077_Randolph.cs",
+      "cards": [
+        "OP11-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_079_OtokoNoShoubu.cs",
+      "cards": [
+        "OP11-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_081_KoteiKenHahajin.cs",
+      "cards": [
+        "OP11-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_082_Aramaki.cs",
+      "cards": [
+        "OP11-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_088_Shoun.cs",
+      "cards": [
+        "OP11-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_091_Verigood.cs",
+      "cards": [
+        "OP11-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_092_Hiruluk.cs",
+      "cards": [
+        "OP11-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_095_Garp.cs",
+      "cards": [
+        "OP11-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_096_Ripper.cs",
+      "cards": [
+        "OP11-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_097_TotallyRegressed.cs",
+      "cards": [
+        "OP11-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_099_FutureMarineGeneral.cs",
+      "cards": [
+        "OP11-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_100_Otohime.cs",
+      "cards": [
+        "OP11-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_101_CaponeBege.cs",
+      "cards": [
+        "OP11-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_102_Camie.cs",
+      "cards": [
+        "OP11-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_106_Zeus.cs",
+      "cards": [
+        "OP11-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_107_Chonmage.cs",
+      "cards": [
+        "OP11-107"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_109_Pappag.cs",
+      "cards": [
+        "OP11-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_110_Samezvezda.cs",
+      "cards": [
+        "OP11-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_112_Megalo.cs",
+      "cards": [
+        "OP11-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_114_GomuGomuNoFireFistGun.cs",
+      "cards": [
+        "OP11-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_115_NotMyType.cs",
+      "cards": [
+        "OP11-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_116_MermaidJiujitsuSuperOcean.cs",
+      "cards": [
+        "OP11-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_117_FishManIsland.cs",
+      "cards": [
+        "OP11-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_118_Luffy.cs",
+      "cards": [
+        "OP11-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP11_119_Koby.cs",
+      "cards": [
+        "OP11-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_001_Rayleigh.cs",
+      "cards": [
+        "OP12-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_003_Crocus.cs",
+      "cards": [
+        "OP12-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_004_Oden.cs",
+      "cards": [
+        "OP12-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_007_Jax.cs",
+      "cards": [
+        "OP12-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_008_Jax.cs",
+      "cards": [
+        "OP12-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_009_Jinbe.cs",
+      "cards": [
+        "OP12-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_012_Buggy.cs",
+      "cards": [
+        "OP12-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_013_Hachi.cs",
+      "cards": [
+        "OP12-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_015_Luffy.cs",
+      "cards": [
+        "OP12-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_016_Kakushin.cs",
+      "cards": [
+        "OP12-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_017_Kenbunshoku.cs",
+      "cards": [
+        "OP12-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_018_Haoshoku.cs",
+      "cards": [
+        "OP12-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_019_Busoshoku.cs",
+      "cards": [
+        "OP12-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_020_Zoro.cs",
+      "cards": [
+        "OP12-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_022_Inuarashi.cs",
+      "cards": [
+        "OP12-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_024_Ushimitsumaru.cs",
+      "cards": [
+        "OP12-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_026_Kuina.cs",
+      "cards": [
+        "OP12-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_027_Koshiro.cs",
+      "cards": [
+        "OP12-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_028_Hiyori.cs",
+      "cards": [
+        "OP12-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_029_Kozaburo.cs",
+      "cards": [
+        "OP12-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_030_Mihawk.cs",
+      "cards": [
+        "OP12-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_031_Tashigi.cs",
+      "cards": [
+        "OP12-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_037_Asura.cs",
+      "cards": [
+        "OP12-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_038_Rashomon.cs",
+      "cards": [
+        "OP12-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_040_Kuzan.cs",
+      "cards": [
+        "OP12-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_041_Sanji.cs",
+      "cards": [
+        "OP12-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_042_Abida.cs",
+      "cards": [
+        "OP12-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_043_Kuzan.cs",
+      "cards": [
+        "OP12-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_046_Zephyr.cs",
+      "cards": [
+        "OP12-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_047_Sengoku.cs",
+      "cards": [
+        "OP12-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_048_Rosinante.cs",
+      "cards": [
+        "OP12-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_053_Borsalino.cs",
+      "cards": [
+        "OP12-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_054_Teach.cs",
+      "cards": [
+        "OP12-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_056_Garp.cs",
+      "cards": [
+        "OP12-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_057_HieBlock.cs",
+      "cards": [
+        "OP12-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_058_Whitebeard.cs",
+      "cards": [
+        "OP12-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_059_Concasse.cs",
+      "cards": [
+        "OP12-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_060_BeefBomber.cs",
+      "cards": [
+        "OP12-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_061_Rosinante.cs",
+      "cards": [
+        "OP12-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_063_Reiju.cs",
+      "cards": [
+        "OP12-063"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_065_Ivankov.cs",
+      "cards": [
+        "OP12-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_066_Gargon.cs",
+      "cards": [
+        "OP12-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_069_Crocodile.cs",
+      "cards": [
+        "OP12-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_070_Sanji.cs",
+      "cards": [
+        "OP12-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_073_Law.cs",
+      "cards": [
+        "OP12-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_074_Pudding.cs",
+      "cards": [
+        "OP12-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_075_MissAllSunday.cs",
+      "cards": [
+        "OP12-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_077_KeshiruJutsu.cs",
+      "cards": [
+        "OP12-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_078_Kushiyaki.cs",
+      "cards": [
+        "OP12-078"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_080_Baratie.cs",
+      "cards": [
+        "OP12-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_085_Karasu.cs",
+      "cards": [
+        "OP12-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_087_Robin.cs",
+      "cards": [
+        "OP12-087"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_089_Haku.cs",
+      "cards": [
+        "OP12-089"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_090_BelloBetty.cs",
+      "cards": [
+        "OP12-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_091_Poker.cs",
+      "cards": [
+        "OP12-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_093_Mori.cs",
+      "cards": [
+        "OP12-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_094_Dragon.cs",
+      "cards": [
+        "OP12-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_095_Lindbergh.cs",
+      "cards": [
+        "OP12-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_096_BearPaw.cs",
+      "cards": [
+        "OP12-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_098_DreamPunch.cs",
+      "cards": [
+        "OP12-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_099_Kalgara.cs",
+      "cards": [
+        "OP12-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_100_Sabo.cs",
+      "cards": [
+        "OP12-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_101_Bonney.cs",
+      "cards": [
+        "OP12-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_102_Shirahoshi.cs",
+      "cards": [
+        "OP12-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_105_Lami.cs",
+      "cards": [
+        "OP12-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_108_Rosinante.cs",
+      "cards": [
+        "OP12-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_113_Zoro.cs",
+      "cards": [
+        "OP12-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_115_ILoveYou.cs",
+      "cards": [
+        "OP12-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_117_DestructionString.cs",
+      "cards": [
+        "OP12-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_118_JewelryBonney.cs",
+      "cards": [
+        "OP12-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP12_119_Kuma.cs",
+      "cards": [
+        "OP12-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_001_Luffy.cs",
+      "cards": [
+        "OP13-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_002_Ace.cs",
+      "cards": [
+        "OP13-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_003_GolDRoger.cs",
+      "cards": [
+        "OP13-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_004_Sabo.cs",
+      "cards": [
+        "OP13-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_006_Uppslap.cs",
+      "cards": [
+        "OP13-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_007_AceSaboLuffy.cs",
+      "cards": [
+        "OP13-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_008_Ivankov.cs",
+      "cards": [
+        "OP13-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_009_Dadan.cs",
+      "cards": [
+        "OP13-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_013_Kuma.cs",
+      "cards": [
+        "OP13-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_015_Makino.cs",
+      "cards": [
+        "OP13-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_016_Gomp.cs",
+      "cards": [
+        "OP13-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_017_MonkeyDDragon.cs",
+      "cards": [
+        "OP13-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_019_HonooDameda.cs",
+      "cards": [
+        "OP13-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_021_GomuGatling.cs",
+      "cards": [
+        "OP13-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_022_Windmill.cs",
+      "cards": [
+        "OP13-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_023_Uta.cs",
+      "cards": [
+        "OP13-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_024_Gordon.cs",
+      "cards": [
+        "OP13-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_025_Koby.cs",
+      "cards": [
+        "OP13-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_026_Sunny.cs",
+      "cards": [
+        "OP13-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_027_Sanji.cs",
+      "cards": [
+        "OP13-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_028_Jax.cs",
+      "cards": [
+        "OP13-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_030_Chopper.cs",
+      "cards": [
+        "OP13-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_031_Law.cs",
+      "cards": [
+        "OP13-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_033_Franky.cs",
+      "cards": [
+        "OP13-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_034_Brook.cs",
+      "cards": [
+        "OP13-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_035_Bepo.cs",
+      "cards": [
+        "OP13-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_037_Zoro.cs",
+      "cards": [
+        "OP13-037"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_038_GomuElephantGun.cs",
+      "cards": [
+        "OP13-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_039_GomuSnakeGun.cs",
+      "cards": [
+        "OP13-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_040_HonkiDayo.cs",
+      "cards": [
+        "OP13-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_042_Whitebeard.cs",
+      "cards": [
+        "OP13-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_044_Crierl.cs",
+      "cards": [
+        "OP13-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_045_Haruta.cs",
+      "cards": [
+        "OP13-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_046_Vista.cs",
+      "cards": [
+        "OP13-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_047_Vista.cs",
+      "cards": [
+        "OP13-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_050_Sandersonia.cs",
+      "cards": [
+        "OP13-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_051_Hancock.cs",
+      "cards": [
+        "OP13-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_052_Marigold.cs",
+      "cards": [
+        "OP13-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_053_Teach.cs",
+      "cards": [
+        "OP13-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_054_Yamato.cs",
+      "cards": [
+        "OP13-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_055_Rakuyo.cs",
+      "cards": [
+        "OP13-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_057_DignityOfMan.cs",
+      "cards": [
+        "OP13-057"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_058_PineappleGravel.cs",
+      "cards": [
+        "OP13-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_059_ShiningBurst.cs",
+      "cards": [
+        "OP13-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_060_Tentsukitokei.cs",
+      "cards": [
+        "OP13-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_061_Inuarashi.cs",
+      "cards": [
+        "OP13-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_062_Crocus.cs",
+      "cards": [
+        "OP13-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_064_GolDRoger.cs",
+      "cards": [
+        "OP13-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_066_Rayleigh.cs",
+      "cards": [
+        "OP13-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_068_Barrett.cs",
+      "cards": [
+        "OP13-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_069_Tom.cs",
+      "cards": [
+        "OP13-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_071_Nekomamushi.cs",
+      "cards": [
+        "OP13-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_074_Hera.cs",
+      "cards": [
+        "OP13-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_075_LetsFight.cs",
+      "cards": [
+        "OP13-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_076_Kamiyoke.cs",
+      "cards": [
+        "OP13-076"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_077_ToTheTop.cs",
+      "cards": [
+        "OP13-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_078_OroJackson.cs",
+      "cards": [
+        "OP13-078"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_079_Imu.cs",
+      "cards": [
+        "OP13-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_081_Koala.cs",
+      "cards": [
+        "OP13-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_082_FiveElders.cs",
+      "cards": [
+        "OP13-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_084_Peter.cs",
+      "cards": [
+        "OP13-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_089_Warcury.cs",
+      "cards": [
+        "OP13-089"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_091_MarsGod.cs",
+      "cards": [
+        "OP13-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_092_Mjosgard.cs",
+      "cards": [
+        "OP13-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_094_York.cs",
+      "cards": [
+        "OP13-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_095_Rozward.cs",
+      "cards": [
+        "OP13-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_097_WorldBalance.cs",
+      "cards": [
+        "OP13-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_098_Hajimekara.cs",
+      "cards": [
+        "OP13-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_099_EmptyThrone.cs",
+      "cards": [
+        "OP13-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_100_Bonney.cs",
+      "cards": [
+        "OP13-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_102_Edison.cs",
+      "cards": [
+        "OP13-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_104_Hiyori.cs",
+      "cards": [
+        "OP13-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_105_Momonosuke.cs",
+      "cards": [
+        "OP13-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_106_Coby.cs",
+      "cards": [
+        "OP13-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_108_JewelryBonney.cs",
+      "cards": [
+        "OP13-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_110_Stussy.cs",
+      "cards": [
+        "OP13-110"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_112_Vegapunk.cs",
+      "cards": [
+        "OP13-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_113_Lilith.cs",
+      "cards": [
+        "OP13-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_115_KamieZanei.cs",
+      "cards": [
+        "OP13-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP13_119_Ace.cs",
+      "cards": [
+        "OP13-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_001_Law.cs",
+      "cards": [
+        "OP14-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_003_CaponeBege.cs",
+      "cards": [
+        "OP14-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_004_Cavendish.cs",
+      "cards": [
+        "OP14-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_009_TrafalgarLaw.cs",
+      "cards": [
+        "OP14-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_011_Bartolomeo.cs",
+      "cards": [
+        "OP14-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_016_XDrake.cs",
+      "cards": [
+        "OP14-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_017_ChaosSpace.cs",
+      "cards": [
+        "OP14-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_020_Mihawk.cs",
+      "cards": [
+        "OP14-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_021_Issho.cs",
+      "cards": [
+        "OP14-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_026_KouzukiPalace.cs",
+      "cards": [
+        "OP14-026"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_027_Jacks.cs",
+      "cards": [
+        "OP14-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_028_Johnny.cs",
+      "cards": [
+        "OP14-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_029_Tashigi.cs",
+      "cards": [
+        "OP14-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_031_Nami.cs",
+      "cards": [
+        "OP14-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_032_PicaPicaPicador.cs",
+      "cards": [
+        "OP14-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_033_Perona.cs",
+      "cards": [
+        "OP14-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_034_Luffy.cs",
+      "cards": [
+        "OP14-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_035_Yosaku.cs",
+      "cards": [
+        "OP14-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_041_BoaHancock.cs",
+      "cards": [
+        "OP14-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_048_Shiryu.cs",
+      "cards": [
+        "OP14-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_053_Vista.cs",
+      "cards": [
+        "OP14-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_054_FisherTiger.cs",
+      "cards": [
+        "OP14-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_056_Watatsumi.cs",
+      "cards": [
+        "OP14-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_060_Doflamingo.cs",
+      "cards": [
+        "OP14-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_061_Vergo.cs",
+      "cards": [
+        "OP14-061"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_068_Trebol.cs",
+      "cards": [
+        "OP14-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_069_Doflamingo.cs",
+      "cards": [
+        "OP14-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_070_Buffalo.cs",
+      "cards": [
+        "OP14-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_078_BulletString.cs",
+      "cards": [
+        "OP14-078"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_079_Crocodile.cs",
+      "cards": [
+        "OP14-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_080_Moria.cs",
+      "cards": [
+        "OP14-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_082_Buhichuck.cs",
+      "cards": [
+        "OP14-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_086_MissDoublefinger.cs",
+      "cards": [
+        "OP14-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_092_Mr3.cs",
+      "cards": [
+        "OP14-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_098_CrescentDune.cs",
+      "cards": [
+        "OP14-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_103_Gloriosa.cs",
+      "cards": [
+        "OP14-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_104_Moria.cs",
+      "cards": [
+        "OP14-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_105_GorgonSisters.cs",
+      "cards": [
+        "OP14-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_106_Salome.cs",
+      "cards": [
+        "OP14-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_119_Mihawk.cs",
+      "cards": [
+        "OP14-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_120_Crocodile.cs",
+      "cards": [
+        "OP14-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_001_Krieg.cs",
+      "cards": [
+        "OP15-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_002_Lucci.cs",
+      "cards": [
+        "OP15-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_003_Apis.cs",
+      "cards": [
+        "OP15-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_006_Cavendish.cs",
+      "cards": [
+        "OP15-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_008_Krieg.cs",
+      "cards": [
+        "OP15-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_009_Koby.cs",
+      "cards": [
+        "OP15-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_010_Nezumi.cs",
+      "cards": [
+        "OP15-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_011_Pearl.cs",
+      "cards": [
+        "OP15-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_014_Bartolomeo.cs",
+      "cards": [
+        "OP15-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_015_Higuma.cs",
+      "cards": [
+        "OP15-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_017_Morgan.cs",
+      "cards": [
+        "OP15-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_020_FireFist.cs",
+      "cards": [
+        "OP15-020"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_022_Brook.cs",
+      "cards": [
+        "OP15-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_023_Arlong.cs",
+      "cards": [
+        "OP15-023"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_024_Usopp.cs",
+      "cards": [
+        "OP15-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_025_Kuro.cs",
+      "cards": [
+        "OP15-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_028_NyabanBrothers.cs",
+      "cards": [
+        "OP15-028"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_029_Kuma.cs",
+      "cards": [
+        "OP15-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_031_PuddingPudding.cs",
+      "cards": [
+        "OP15-031"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_035_Laboon.cs",
+      "cards": [
+        "OP15-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_039_Rebecca.cs",
+      "cards": [
+        "OP15-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_042_Kyros.cs",
+      "cards": [
+        "OP15-042"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_045_Sai.cs",
+      "cards": [
+        "OP15-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_046_Sabo.cs",
+      "cards": [
+        "OP15-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_050_BobbyFunk.cs",
+      "cards": [
+        "OP15-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_051_Luffy.cs",
+      "cards": [
+        "OP15-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_052_Leo.cs",
+      "cards": [
+        "OP15-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_053_Rebecca.cs",
+      "cards": [
+        "OP15-053"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_054_Lebecca.cs",
+      "cards": [
+        "OP15-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_055_ClimbOnPlease.cs",
+      "cards": [
+        "OP15-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_058_Enel.cs",
+      "cards": [
+        "OP15-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_059_Amazon.cs",
+      "cards": [
+        "OP15-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_064_Kotori.cs",
+      "cards": [
+        "OP15-064"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_065_Geuro.cs",
+      "cards": [
+        "OP15-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_066_Satori.cs",
+      "cards": [
+        "OP15-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_068_DivineSoldier.cs",
+      "cards": [
+        "OP15-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_069_Nora.cs",
+      "cards": [
+        "OP15-069"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_070_Fuza.cs",
+      "cards": [
+        "OP15-070"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_071_Pauly.cs",
+      "cards": [
+        "OP15-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_072_Kobe.cs",
+      "cards": [
+        "OP15-072"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_080_Oars.cs",
+      "cards": [
+        "OP15-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_087_NicoRobin.cs",
+      "cards": [
+        "OP15-087"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_088_CosmicDock.cs",
+      "cards": [
+        "OP15-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_090_Perona.cs",
+      "cards": [
+        "OP15-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_091_Margaret.cs",
+      "cards": [
+        "OP15-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_092_MonkeyDLuffy.cs",
+      "cards": [
+        "OP15-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_093_RisukiBrothers.cs",
+      "cards": [
+        "OP15-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_094_Zoro.cs",
+      "cards": [
+        "OP15-094"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_097_DontCallMeShameful.cs",
+      "cards": [
+        "OP15-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_098_Luffy.cs",
+      "cards": [
+        "OP15-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_099_Urouge.cs",
+      "cards": [
+        "OP15-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_101_Calgara.cs",
+      "cards": [
+        "OP15-101"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_102_GanFall.cs",
+      "cards": [
+        "OP15-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_104_Conis.cs",
+      "cards": [
+        "OP15-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_105_JewelryBonney.cs",
+      "cards": [
+        "OP15-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_109_Robin.cs",
+      "cards": [
+        "OP15-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_114_Wapol.cs",
+      "cards": [
+        "OP15-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_118_Enel.cs",
+      "cards": [
+        "OP15-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_119_Luffy.cs",
+      "cards": [
+        "OP15-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_001_Ace.cs",
+      "cards": [
+        "OP16-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_003_Newgate.cs",
+      "cards": [
+        "OP16-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_009_SpeedJiru.cs",
+      "cards": [
+        "OP16-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_012_BenBeckman.cs",
+      "cards": [
+        "OP16-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_014_Marco.cs",
+      "cards": [
+        "OP16-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_015_Luffy.cs",
+      "cards": [
+        "OP16-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_017_LittleOzJr.cs",
+      "cards": [
+        "OP16-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_018_Rockstar.cs",
+      "cards": [
+        "OP16-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_019_ShowYouOurPower.cs",
+      "cards": [
+        "OP16-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_021_MobyDick.cs",
+      "cards": [
+        "OP16-021"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_022_Luffy.cs",
+      "cards": [
+        "OP16-022"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_024_Kuzan.cs",
+      "cards": [
+        "OP16-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_025_Tsukofu.cs",
+      "cards": [
+        "OP16-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_027_Jinbe.cs",
+      "cards": [
+        "OP16-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_029_Karuko.cs",
+      "cards": [
+        "OP16-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_030_Law.cs",
+      "cards": [
+        "OP16-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_032_BoaHancock.cs",
+      "cards": [
+        "OP16-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_033_Mole.cs",
+      "cards": [
+        "OP16-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_034_Luffy.cs",
+      "cards": [
+        "OP16-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_035_Zoro.cs",
+      "cards": [
+        "OP16-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_036_Bentham.cs",
+      "cards": [
+        "OP16-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_038_AdvanceToMarineHQ.cs",
+      "cards": [
+        "OP16-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_039_GomuGomuNoJetGun.cs",
+      "cards": [
+        "OP16-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_040_GomuGomuNoHammerSpin.cs",
+      "cards": [
+        "OP16-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_041_Buggy.cs",
+      "cards": [
+        "OP16-041"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_043_Usopp.cs",
+      "cards": [
+        "OP16-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_045_Crocodile.cs",
+      "cards": [
+        "OP16-045"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_047_Doflamingo.cs",
+      "cards": [
+        "OP16-047"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_050_MissDoublefinger.cs",
+      "cards": [
+        "OP16-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_054_DazBones.cs",
+      "cards": [
+        "OP16-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_055_Bentham.cs",
+      "cards": [
+        "OP16-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_059_StrategicAdjustment.cs",
+      "cards": [
+        "OP16-059"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_060_Sengoku.cs",
+      "cards": [
+        "OP16-060"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_067_Otsuru.cs",
+      "cards": [
+        "OP16-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_071_BenevolentKing.cs",
+      "cards": [
+        "OP16-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_079_Yamato.cs",
+      "cards": [
+        "OP16-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_080_Teach.cs",
+      "cards": [
+        "OP16-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_082_Kinemon.cs",
+      "cards": [
+        "OP16-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_084_Momonosuke.cs",
+      "cards": [
+        "OP16-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_087_Onin.cs",
+      "cards": [
+        "OP16-087"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_092_Robin.cs",
+      "cards": [
+        "OP16-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_093_Kuma.cs",
+      "cards": [
+        "OP16-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_102_Pizarro.cs",
+      "cards": [
+        "OP16-102"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_104_CatarinaDevon.cs",
+      "cards": [
+        "OP16-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_105_Moria.cs",
+      "cards": [
+        "OP16-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_108_Shiryu.cs",
+      "cards": [
+        "OP16-108"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_111_BoaSandersonia.cs",
+      "cards": [
+        "OP16-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_113_BoaMarigold.cs",
+      "cards": [
+        "OP16-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP16_119_Teach.cs",
+      "cards": [
+        "OP16-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP17_All.cs",
+      "cards": [
+        "OP17-001",
+        "OP17-002",
+        "OP17-003",
+        "OP17-004",
+        "OP17-005",
+        "OP17-007",
+        "OP17-008",
+        "OP17-009",
+        "OP17-010",
+        "OP17-011",
+        "OP17-012",
+        "OP17-013",
+        "OP17-014",
+        "OP17-015",
+        "OP17-016",
+        "OP17-017",
+        "OP17-018",
+        "OP17-019",
+        "OP17-020",
+        "OP17-021",
+        "OP17-022",
+        "OP17-023",
+        "OP17-024",
+        "OP17-025",
+        "OP17-026",
+        "OP17-027",
+        "OP17-028",
+        "OP17-029",
+        "OP17-030",
+        "OP17-031",
+        "OP17-032",
+        "OP17-033",
+        "OP17-034",
+        "OP17-036",
+        "OP17-037",
+        "OP17-038",
+        "OP17-039",
+        "OP17-040",
+        "OP17-041",
+        "OP17-042",
+        "OP17-043",
+        "OP17-044",
+        "OP17-045",
+        "OP17-046",
+        "OP17-047",
+        "OP17-048",
+        "OP17-049",
+        "OP17-050",
+        "OP17-052",
+        "OP17-053",
+        "OP17-054",
+        "OP17-055",
+        "OP17-056",
+        "OP17-057",
+        "OP17-058",
+        "OP17-059",
+        "OP17-060",
+        "OP17-061",
+        "OP17-062",
+        "OP17-063",
+        "OP17-064",
+        "OP17-065",
+        "OP17-066",
+        "OP17-067",
+        "OP17-068",
+        "OP17-069",
+        "OP17-071",
+        "OP17-072",
+        "OP17-073",
+        "OP17-074",
+        "OP17-075",
+        "OP17-076",
+        "OP17-077",
+        "OP17-078",
+        "OP17-079",
+        "OP17-080",
+        "OP17-081",
+        "OP17-082",
+        "OP17-083",
+        "OP17-084",
+        "OP17-085",
+        "OP17-086",
+        "OP17-087",
+        "OP17-089",
+        "OP17-090",
+        "OP17-091",
+        "OP17-092",
+        "OP17-093",
+        "OP17-094",
+        "OP17-095",
+        "OP17-096",
+        "OP17-097",
+        "OP17-098",
+        "OP17-099",
+        "OP17-101",
+        "OP17-102",
+        "OP17-103",
+        "OP17-104",
+        "OP17-105",
+        "OP17-106",
+        "OP17-107",
+        "OP17-108",
+        "OP17-109",
+        "OP17-110",
+        "OP17-111",
+        "OP17-112",
+        "OP17-113",
+        "OP17-114",
+        "OP17-115",
+        "OP17-116",
+        "OP17-117",
+        "OP17-118",
+        "OP17-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP18_EB05_NewCards.cs",
+      "cards": [
+        "EB05-010",
+        "EB05-016",
+        "OP18-021",
+        "OP18-031",
+        "OP18-060",
+        "OP18-065",
+        "OP18-078",
+        "OP18-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_001_Luffy.cs",
+      "cards": [
+        "P-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_002_AdventureFeeling.cs",
+      "cards": [
+        "P-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_003_Kid.cs",
+      "cards": [
+        "P-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_004_Crocodile.cs",
+      "cards": [
+        "P-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_005_Kaido.cs",
+      "cards": [
+        "P-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_006_Luffy.cs",
+      "cards": [
+        "P-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_007_Luffy.cs",
+      "cards": [
+        "P-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_011_Uta.cs",
+      "cards": [
+        "P-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_013_Gordon.cs",
+      "cards": [
+        "P-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_014_Coby.cs",
+      "cards": [
+        "P-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_024_PirateKing.cs",
+      "cards": [
+        "P-024"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_025_Smoker.cs",
+      "cards": [
+        "P-025"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_027_FrankyGeneral.cs",
+      "cards": [
+        "P-027"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_029_Bartolomeo.cs",
+      "cards": [
+        "P-029"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_030_Jinbe.cs",
+      "cards": [
+        "P-030"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_032_Sengoku.cs",
+      "cards": [
+        "P-032"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_033_Luffy.cs",
+      "cards": [
+        "P-033"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_034_Sanji.cs",
+      "cards": [
+        "P-034"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_035_Luffy.cs",
+      "cards": [
+        "P-035"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_036_Luffy.cs",
+      "cards": [
+        "P-036"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_038_Law.cs",
+      "cards": [
+        "P-038"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_039_Bellamy.cs",
+      "cards": [
+        "P-039"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_040_Kaido.cs",
+      "cards": [
+        "P-040"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_043_Luffy.cs",
+      "cards": [
+        "P-043"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_044_Sabo.cs",
+      "cards": [
+        "P-044"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_046_Yamato.cs",
+      "cards": [
+        "P-046"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_048_Arlong.cs",
+      "cards": [
+        "P-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_049_Usopp.cs",
+      "cards": [
+        "P-049"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_050_Sanji.cs",
+      "cards": [
+        "P-050"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_051_Shanks.cs",
+      "cards": [
+        "P-051"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_052_Mihawk.cs",
+      "cards": [
+        "P-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_054_Garp.cs",
+      "cards": [
+        "P-054"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_055_Luffy.cs",
+      "cards": [
+        "P-055"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_056_Zoro.cs",
+      "cards": [
+        "P-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_065_Chopper.cs",
+      "cards": [
+        "P-065"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_066_BoaHancock.cs",
+      "cards": [
+        "P-066"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_067_EustassKid.cs",
+      "cards": [
+        "P-067"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_068_Sanji.cs",
+      "cards": [
+        "P-068"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_071_Marco.cs",
+      "cards": [
+        "P-071"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_073_Sabo.cs",
+      "cards": [
+        "P-073"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_074_Ace.cs",
+      "cards": [
+        "P-074"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_075_Luffy.cs",
+      "cards": [
+        "P-075"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_076_Sakazuki.cs",
+      "cards": [
+        "P-076"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_077_Nami.cs",
+      "cards": [
+        "P-077"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_078_Idio.cs",
+      "cards": [
+        "P-078"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_079_Lim.cs",
+      "cards": [
+        "P-079"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_081_Mihawk.cs",
+      "cards": [
+        "P-081"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_082_Crocodile.cs",
+      "cards": [
+        "P-082"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_083_Jacks.cs",
+      "cards": [
+        "P-083"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_084_Buggy.cs",
+      "cards": [
+        "P-084"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_085_JewelryBonney.cs",
+      "cards": [
+        "P-085"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_086_TrafalgarLaw.cs",
+      "cards": [
+        "P-086"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_088_TrafalgarLaw.cs",
+      "cards": [
+        "P-088"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_090_CharlotteSmoothie.cs",
+      "cards": [
+        "P-090"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_091_Shirahoshi.cs",
+      "cards": [
+        "P-091"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_092_Koby.cs",
+      "cards": [
+        "P-092"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_093_TrafalgarLaw.cs",
+      "cards": [
+        "P-093"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_095_Sanji.cs",
+      "cards": [
+        "P-095"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_096_Shoujo.cs",
+      "cards": [
+        "P-096"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_097_Shanks.cs",
+      "cards": [
+        "P-097"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_098_Buggy.cs",
+      "cards": [
+        "P-098"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_099_Luffy.cs",
+      "cards": [
+        "P-099"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_100_Teach.cs",
+      "cards": [
+        "P-100"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_103_Ace.cs",
+      "cards": [
+        "P-103"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_104_Jack.cs",
+      "cards": [
+        "P-104"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_105_Sabo.cs",
+      "cards": [
+        "P-105"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_106_Luffy.cs",
+      "cards": [
+        "P-106"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_107_Roger.cs",
+      "cards": [
+        "P-107"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_109_Ace.cs",
+      "cards": [
+        "P-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_111_NicoRobin.cs",
+      "cards": [
+        "P-111"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_113_Bonney.cs",
+      "cards": [
+        "P-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_114_Zoro.cs",
+      "cards": [
+        "P-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_115_BoaHancock.cs",
+      "cards": [
+        "P-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_117_Nami.cs",
+      "cards": [
+        "P-117"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/P_118_Lilith.cs",
+      "cards": [
+        "P-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PlayerFeedbackAugust2026.cs",
+      "cards": [
+        "EB01-009",
+        "ST30-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB01_001_Sanji.cs",
+      "cards": [
+        "PRB01-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_001_Koby.cs",
+      "cards": [
+        "PRB02-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_002_TrafalgarLaw.cs",
+      "cards": [
+        "PRB02-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_005_Luffy.cs",
+      "cards": [
+        "PRB02-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_006_Zoro.cs",
+      "cards": [
+        "PRB02-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_009_Mr3.cs",
+      "cards": [
+        "PRB02-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_015_Shiryu.cs",
+      "cards": [
+        "PRB02-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/PRB02_017_BoaHancock.cs",
+      "cards": [
+        "PRB02-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/QqFeedback20260825Effects.cs",
+      "cards": [
+        "OP14-058",
+        "OP14-117",
+        "OP16-048"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_BlockerDeny.cs",
+      "cards": [
+        "ST01-002",
+        "ST01-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_FromDeck.cs",
+      "cards": [
+        "ST03-007",
+        "ST12-010",
+        "ST12-013",
+        "ST12-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_FromLife.cs",
+      "cards": [
+        "ST13-007",
+        "ST13-010",
+        "ST13-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GroupC_Misc.cs",
+      "cards": [
+        "ST02-008",
+        "ST11-003",
+        "ST16-002",
+        "ST29-002",
+        "ST29-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GroupC_Misc2.cs",
+      "cards": [
+        "ST03-010",
+        "ST12-003",
+        "ST12-007",
+        "ST17-003",
+        "ST28-003",
+        "ST29-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GroupC_Misc3.cs",
+      "cards": [
+        "ST02-010",
+        "ST07-010",
+        "ST07-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GroupC_Misc4.cs",
+      "cards": [
+        "ST13-001",
+        "ST13-009",
+        "ST26-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GuardAlly.cs",
+      "cards": [
+        "ST25-003",
+        "ST30-009",
+        "ST30-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_GuardSelf.cs",
+      "cards": [
+        "ST09-010",
+        "ST20-002",
+        "ST29-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_HandToLife.cs",
+      "cards": [
+        "ST07-001",
+        "ST13-005",
+        "ST29-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_Leaders2.cs",
+      "cards": [
+        "ST04-001",
+        "ST08-001",
+        "ST10-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_LifeScry.cs",
+      "cards": [
+        "ST07-003",
+        "ST07-008",
+        "ST13-012",
+        "ST13-016",
+        "ST20-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_Misc5.cs",
+      "cards": [
+        "ST13-002",
+        "ST13-003",
+        "ST26-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST_Misc6.cs",
+      "cards": [
+        "ST08-013",
+        "ST15-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST01_004_Sanji.cs",
+      "cards": [
+        "ST01-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST01_013_Zoro.cs",
+      "cards": [
+        "ST01-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST02_003_Urouge.cs",
+      "cards": [
+        "ST02-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST02_014_Drake.cs",
+      "cards": [
+        "ST02-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST03_013_BoaHancock.cs",
+      "cards": [
+        "ST03-013"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST05_008_Shiki.cs",
+      "cards": [
+        "ST05-008"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST05_009_Scarlet.cs",
+      "cards": [
+        "ST05-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST05_010_Zephyr.cs",
+      "cards": [
+        "ST05-010"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST06_004_Smoker.cs",
+      "cards": [
+        "ST06-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST07_007_CharlotteBrulee.cs",
+      "cards": [
+        "ST07-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST08_002_Uta.cs",
+      "cards": [
+        "ST08-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST08_007_NefertariVivi.cs",
+      "cards": [
+        "ST08-007"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST08_extra.cs",
+      "cards": [
+        "ST08-005",
+        "ST08-009",
+        "ST10-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST09_001_Yamato.cs",
+      "cards": [
+        "ST09-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST09_004_Kaido.cs",
+      "cards": [
+        "ST09-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST09_005_Goten.cs",
+      "cards": [
+        "ST09-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST10_003_Kid.cs",
+      "cards": [
+        "ST10-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST10_016_GumGumKongGatling.cs",
+      "cards": [
+        "ST10-016"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST10_DonReturn.cs",
+      "cards": [
+        "ST10-006",
+        "ST10-007",
+        "ST10-011",
+        "ST10-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST12_001_AttackDon.cs",
+      "cards": [
+        "ST12-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST12_006_AttackDon.cs",
+      "cards": [
+        "ST12-006"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST12_014_Dival.cs",
+      "cards": [
+        "ST12-014"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST13_015_Luffy.cs",
+      "cards": [
+        "ST13-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST13_017_FlameDragonKing.cs",
+      "cards": [
+        "ST13-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST14_001_Luffy.cs",
+      "cards": [
+        "ST14-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST14_009_Franky.cs",
+      "cards": [
+        "ST14-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST14_012_Luffy.cs",
+      "cards": [
+        "ST14-012"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST14_017_SunnyGo.cs",
+      "cards": [
+        "ST14-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST15_005_Ace.cs",
+      "cards": [
+        "ST15-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST16_003_Katakuri.cs",
+      "cards": [
+        "ST16-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST16_005_Luffy.cs",
+      "cards": [
+        "ST16-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST17_001_Crocodile.cs",
+      "cards": [
+        "ST17-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST17_002_TrafalgarLaw.cs",
+      "cards": [
+        "ST17-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST17_004_BoaHancock.cs",
+      "cards": [
+        "ST17-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST17_005_Teach.cs",
+      "cards": [
+        "ST17-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST21_001_Luffy.cs",
+      "cards": [
+        "ST21-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST21_002_Usopp.cs",
+      "cards": [
+        "ST21-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST21_011_Franky.cs",
+      "cards": [
+        "ST21-011"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST21_015_Zoro.cs",
+      "cards": [
+        "ST21-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST22_001_Ace_Newgate.cs",
+      "cards": [
+        "ST22-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST22_005_KozukiOden.cs",
+      "cards": [
+        "ST22-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST22_015_WhitebeardEvent.cs",
+      "cards": [
+        "ST22-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST25_Passives.cs",
+      "cards": [
+        "ST25-001",
+        "ST25-002",
+        "ST25-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST26_002_Chopper.cs",
+      "cards": [
+        "ST26-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST27_004_SanjuanWolf.cs",
+      "cards": [
+        "ST27-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST28_Passives.cs",
+      "cards": [
+        "ST28-002",
+        "ST28-004",
+        "ST28-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST29_003_Kaku.cs",
+      "cards": [
+        "ST29-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST29_009_NicoRobin.cs",
+      "cards": [
+        "ST29-009"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST30_Passives.cs",
+      "cards": [
+        "ST30-001",
+        "ST30-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/ST31_ST35.cs",
+      "cards": [
+        "ST31-001",
+        "ST31-002",
+        "ST31-003",
+        "ST31-004",
+        "ST31-005",
+        "ST32-001",
+        "ST32-002",
+        "ST32-003",
+        "ST32-004",
+        "ST32-005",
+        "ST33-001",
+        "ST33-002",
+        "ST33-003",
+        "ST33-004",
+        "ST33-005",
+        "ST34-001",
+        "ST34-002",
+        "ST34-003",
+        "ST34-004",
+        "ST34-005",
+        "ST35-001",
+        "ST35-002",
+        "ST35-003",
+        "ST35-004",
+        "ST35-005"
+      ]
+    }
+  ],
+  "dslSources": [
+    {
+      "source": "服务端WebSocket/Effects/Definitions/_GAP_wf.json",
+      "cards": [
+        "OP09-001",
+        "OP11-040",
+        "P-008",
+        "P-009",
+        "P-010",
+        "P-017",
+        "P-019",
+        "P-020",
+        "P-026",
+        "P-031",
+        "P-037",
+        "P-042",
+        "P-047",
+        "P-053",
+        "P-062",
+        "P-063",
+        "P-069",
+        "P-072",
+        "P-094",
+        "P-096",
+        "P-101",
+        "P-102",
+        "P-108",
+        "P-112",
+        "P-116",
+        "P-135"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/EB01_wf.json",
+      "cards": [
+        "EB01-003",
+        "EB01-006",
+        "EB01-007",
+        "EB01-009",
+        "EB01-010",
+        "EB01-013",
+        "EB01-015",
+        "EB01-016",
+        "EB01-019",
+        "EB01-022",
+        "EB01-023",
+        "EB01-027",
+        "EB01-031",
+        "EB01-034",
+        "EB01-035",
+        "EB01-036",
+        "EB01-039",
+        "EB01-042",
+        "EB01-044",
+        "EB01-046",
+        "EB01-048",
+        "EB01-049",
+        "EB01-050",
+        "EB01-051",
+        "EB01-054",
+        "EB01-056"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/EB02_wf.json",
+      "cards": [
+        "EB02-002",
+        "EB02-003",
+        "EB02-008",
+        "EB02-013",
+        "EB02-014",
+        "EB02-016",
+        "EB02-017",
+        "EB02-019",
+        "EB02-020",
+        "EB02-021",
+        "EB02-024",
+        "EB02-026",
+        "EB02-027",
+        "EB02-028",
+        "EB02-030",
+        "EB02-031",
+        "EB02-032",
+        "EB02-038",
+        "EB02-040",
+        "EB02-046",
+        "EB02-047",
+        "EB02-048",
+        "EB02-049",
+        "EB02-050",
+        "EB02-054",
+        "EB02-055",
+        "EB02-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/EB03_wf.json",
+      "cards": [
+        "EB03-005",
+        "EB03-006",
+        "EB03-008",
+        "EB03-010",
+        "EB03-011",
+        "EB03-014",
+        "EB03-016",
+        "EB03-017",
+        "EB03-020",
+        "EB03-021",
+        "EB03-022",
+        "EB03-025",
+        "EB03-027",
+        "EB03-028",
+        "EB03-029",
+        "EB03-032",
+        "EB03-036",
+        "EB03-043",
+        "EB03-045",
+        "EB03-047",
+        "EB03-050",
+        "EB03-052",
+        "EB03-053",
+        "EB03-054",
+        "EB03-055",
+        "EB03-056",
+        "EB03-057",
+        "EB03-058",
+        "EB03-060",
+        "EB03-062"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/EB04_wf.json",
+      "cards": [
+        "EB04-001",
+        "EB04-002",
+        "EB04-006",
+        "EB04-008",
+        "EB04-009",
+        "EB04-010",
+        "EB04-014",
+        "EB04-016",
+        "EB04-017",
+        "EB04-019",
+        "EB04-020",
+        "EB04-021",
+        "EB04-023",
+        "EB04-024",
+        "EB04-025",
+        "EB04-026",
+        "EB04-027",
+        "EB04-032",
+        "EB04-034",
+        "EB04-036",
+        "EB04-037",
+        "EB04-039",
+        "EB04-040",
+        "EB04-042",
+        "EB04-048",
+        "EB04-049",
+        "EB04-051",
+        "EB04-053",
+        "EB04-054",
+        "EB04-055",
+        "EB04-058"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/LifeTriggerCompletion.json",
+      "cards": [
+        "EB01-026",
+        "EB01-028",
+        "EB01-029",
+        "EB01-038",
+        "EB01-053",
+        "EB01-060",
+        "EB02-018",
+        "EB02-056",
+        "EB03-059",
+        "EB04-028",
+        "EB04-041",
+        "EB04-059",
+        "EB04-060",
+        "OP02-069",
+        "OP03-119",
+        "OP04-037",
+        "OP05-094",
+        "OP05-115",
+        "OP06-023",
+        "OP06-038",
+        "OP06-057",
+        "OP06-101",
+        "OP06-116",
+        "OP07-036",
+        "OP07-078",
+        "OP07-116",
+        "OP08-115",
+        "OP09-059",
+        "OP09-104",
+        "OP10-080",
+        "OP10-109",
+        "OP10-116",
+        "OP11-019",
+        "OP11-079",
+        "OP11-081",
+        "OP12-113",
+        "OP14-082",
+        "P-106",
+        "PRB02-017",
+        "ST36-002",
+        "ST36-003"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP01_wf.json",
+      "cards": [
+        "OP01-003",
+        "OP01-006",
+        "OP01-007",
+        "OP01-011",
+        "OP01-013",
+        "OP01-015",
+        "OP01-016",
+        "OP01-017",
+        "OP01-020",
+        "OP01-022",
+        "OP01-024",
+        "OP01-026",
+        "OP01-027",
+        "OP01-028",
+        "OP01-029",
+        "OP01-030",
+        "OP01-033",
+        "OP01-034",
+        "OP01-035",
+        "OP01-038",
+        "OP01-039",
+        "OP01-040",
+        "OP01-041",
+        "OP01-042",
+        "OP01-046",
+        "OP01-047",
+        "OP01-048",
+        "OP01-049",
+        "OP01-052",
+        "OP01-054",
+        "OP01-055",
+        "OP01-056",
+        "OP01-057",
+        "OP01-058",
+        "OP01-059",
+        "OP01-074",
+        "OP01-078",
+        "OP01-079",
+        "OP01-080",
+        "OP01-084",
+        "OP01-085",
+        "OP01-087",
+        "OP01-090",
+        "OP01-093",
+        "OP01-095",
+        "OP01-096",
+        "OP01-097",
+        "OP01-098",
+        "OP01-101",
+        "OP01-102",
+        "OP01-106",
+        "OP01-108",
+        "OP01-111",
+        "OP01-113",
+        "OP01-114",
+        "OP01-115",
+        "OP01-117",
+        "OP01-118",
+        "OP01-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP02_wf.json",
+      "cards": [
+        "OP02-001",
+        "OP02-005",
+        "OP02-009",
+        "OP02-010",
+        "OP02-011",
+        "OP02-013",
+        "OP02-017",
+        "OP02-021",
+        "OP02-022",
+        "OP02-029",
+        "OP02-030",
+        "OP02-032",
+        "OP02-034",
+        "OP02-036",
+        "OP02-037",
+        "OP02-040",
+        "OP02-041",
+        "OP02-042",
+        "OP02-044",
+        "OP02-047",
+        "OP02-048",
+        "OP02-049",
+        "OP02-057",
+        "OP02-058",
+        "OP02-059",
+        "OP02-066",
+        "OP02-067",
+        "OP02-068",
+        "OP02-070",
+        "OP02-073",
+        "OP02-076",
+        "OP02-078",
+        "OP02-079",
+        "OP02-082",
+        "OP02-083",
+        "OP02-086",
+        "OP02-087",
+        "OP02-089",
+        "OP02-090",
+        "OP02-091",
+        "OP02-092",
+        "OP02-096",
+        "OP02-098",
+        "OP02-099",
+        "OP02-103",
+        "OP02-105",
+        "OP02-106",
+        "OP02-112",
+        "OP02-115",
+        "OP02-117",
+        "OP02-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP03_wf.json",
+      "cards": [
+        "OP03-003",
+        "OP03-009",
+        "OP03-011",
+        "OP03-014",
+        "OP03-017",
+        "OP03-018",
+        "OP03-019",
+        "OP03-024",
+        "OP03-026",
+        "OP03-029",
+        "OP03-033",
+        "OP03-034",
+        "OP03-036",
+        "OP03-038",
+        "OP03-039",
+        "OP03-042",
+        "OP03-044",
+        "OP03-048",
+        "OP03-049",
+        "OP03-050",
+        "OP03-054",
+        "OP03-055",
+        "OP03-056",
+        "OP03-062",
+        "OP03-064",
+        "OP03-067",
+        "OP03-068",
+        "OP03-069",
+        "OP03-071",
+        "OP03-072",
+        "OP03-073",
+        "OP03-074",
+        "OP03-078",
+        "OP03-081",
+        "OP03-089",
+        "OP03-090",
+        "OP03-096",
+        "OP03-097",
+        "OP03-108",
+        "OP03-109",
+        "OP03-110",
+        "OP03-112",
+        "OP03-113",
+        "OP03-115",
+        "OP03-116",
+        "OP03-118",
+        "OP03-121",
+        "OP03-122"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP04_wf.json",
+      "cards": [
+        "OP04-001",
+        "OP04-002",
+        "OP04-003",
+        "OP04-008",
+        "OP04-010",
+        "OP04-015",
+        "OP04-016",
+        "OP04-018",
+        "OP04-019",
+        "OP04-022",
+        "OP04-027",
+        "OP04-029",
+        "OP04-035",
+        "OP04-036",
+        "OP04-038",
+        "OP04-039",
+        "OP04-041",
+        "OP04-044",
+        "OP04-045",
+        "OP04-046",
+        "OP04-049",
+        "OP04-050",
+        "OP04-051",
+        "OP04-052",
+        "OP04-056",
+        "OP04-057",
+        "OP04-061",
+        "OP04-064",
+        "OP04-065",
+        "OP04-066",
+        "OP04-067",
+        "OP04-069",
+        "OP04-074",
+        "OP04-075",
+        "OP04-076",
+        "OP04-079",
+        "OP04-082",
+        "OP04-085",
+        "OP04-091",
+        "OP04-092",
+        "OP04-097",
+        "OP04-099",
+        "OP04-101",
+        "OP04-103",
+        "OP04-104",
+        "OP04-106",
+        "OP04-108",
+        "OP04-109",
+        "OP04-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP05_wf.json",
+      "cards": [
+        "OP05-004",
+        "OP05-005",
+        "OP05-006",
+        "OP05-008",
+        "OP05-010",
+        "OP05-011",
+        "OP05-012",
+        "OP05-014",
+        "OP05-015",
+        "OP05-016",
+        "OP05-017",
+        "OP05-018",
+        "OP05-019",
+        "OP05-020",
+        "OP05-021",
+        "OP05-022",
+        "OP05-023",
+        "OP05-025",
+        "OP05-027",
+        "OP05-028",
+        "OP05-033",
+        "OP05-034",
+        "OP05-036",
+        "OP05-037",
+        "OP05-039",
+        "OP05-046",
+        "OP05-047",
+        "OP05-050",
+        "OP05-054",
+        "OP05-057",
+        "OP05-059",
+        "OP05-061",
+        "OP05-063",
+        "OP05-064",
+        "OP05-068",
+        "OP05-072",
+        "OP05-073",
+        "OP05-075",
+        "OP05-076",
+        "OP05-077",
+        "OP05-078",
+        "OP05-081",
+        "OP05-085",
+        "OP05-090",
+        "OP05-091",
+        "OP05-093",
+        "OP05-095",
+        "OP05-101",
+        "OP05-104",
+        "OP05-105",
+        "OP05-106",
+        "OP05-112",
+        "OP05-117",
+        "OP05-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP06_wf.json",
+      "cards": [
+        "OP06-004",
+        "OP06-007",
+        "OP06-013",
+        "OP06-016",
+        "OP06-017",
+        "OP06-019",
+        "OP06-022",
+        "OP06-024",
+        "OP06-025",
+        "OP06-027",
+        "OP06-028",
+        "OP06-029",
+        "OP06-031",
+        "OP06-033",
+        "OP06-034",
+        "OP06-036",
+        "OP06-040",
+        "OP06-043",
+        "OP06-045",
+        "OP06-050",
+        "OP06-053",
+        "OP06-056",
+        "OP06-058",
+        "OP06-059",
+        "OP06-071",
+        "OP06-073",
+        "OP06-075",
+        "OP06-077",
+        "OP06-078",
+        "OP06-079",
+        "OP06-081",
+        "OP06-082",
+        "OP06-084",
+        "OP06-089",
+        "OP06-090",
+        "OP06-091",
+        "OP06-097",
+        "OP06-098",
+        "OP06-100",
+        "OP06-102",
+        "OP06-103",
+        "OP06-104",
+        "OP06-107",
+        "OP06-108",
+        "OP06-109",
+        "OP06-110",
+        "OP06-111",
+        "OP06-112",
+        "OP06-114",
+        "OP06-115"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP07_wf.json",
+      "cards": [
+        "OP07-002",
+        "OP07-003",
+        "OP07-004",
+        "OP07-005",
+        "OP07-006",
+        "OP07-011",
+        "OP07-012",
+        "OP07-014",
+        "OP07-015",
+        "OP07-016",
+        "OP07-019",
+        "OP07-020",
+        "OP07-021",
+        "OP07-022",
+        "OP07-024",
+        "OP07-025",
+        "OP07-034",
+        "OP07-035",
+        "OP07-037",
+        "OP07-041",
+        "OP07-043",
+        "OP07-044",
+        "OP07-045",
+        "OP07-046",
+        "OP07-049",
+        "OP07-054",
+        "OP07-055",
+        "OP07-056",
+        "OP07-057",
+        "OP07-058",
+        "OP07-061",
+        "OP07-071",
+        "OP07-072",
+        "OP07-073",
+        "OP07-074",
+        "OP07-075",
+        "OP07-076",
+        "OP07-079",
+        "OP07-080",
+        "OP07-082",
+        "OP07-086",
+        "OP07-088",
+        "OP07-098",
+        "OP07-100",
+        "OP07-101",
+        "OP07-104",
+        "OP07-105",
+        "OP07-106",
+        "OP07-107",
+        "OP07-109",
+        "OP07-110",
+        "OP07-111",
+        "OP07-112",
+        "OP07-113",
+        "OP07-114",
+        "OP07-117",
+        "OP07-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP08_wf.json",
+      "cards": [
+        "OP08-008",
+        "OP08-010",
+        "OP08-012",
+        "OP08-015",
+        "OP08-016",
+        "OP08-017",
+        "OP08-019",
+        "OP08-031",
+        "OP08-032",
+        "OP08-034",
+        "OP08-037",
+        "OP08-038",
+        "OP08-039",
+        "OP08-040",
+        "OP08-042",
+        "OP08-044",
+        "OP08-047",
+        "OP08-053",
+        "OP08-059",
+        "OP08-060",
+        "OP08-061",
+        "OP08-063",
+        "OP08-064",
+        "OP08-066",
+        "OP08-068",
+        "OP08-070",
+        "OP08-075",
+        "OP08-076",
+        "OP08-080",
+        "OP08-082",
+        "OP08-084",
+        "OP08-087",
+        "OP08-088",
+        "OP08-090",
+        "OP08-091",
+        "OP08-092",
+        "OP08-095",
+        "OP08-096",
+        "OP08-097",
+        "OP08-103",
+        "OP08-104",
+        "OP08-105",
+        "OP08-106",
+        "OP08-107",
+        "OP08-111",
+        "OP08-113",
+        "OP08-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP09_wf.json",
+      "cards": [
+        "OP09-028",
+        "OP09-029",
+        "OP09-039",
+        "OP09-040",
+        "OP09-042",
+        "OP09-044",
+        "OP09-047",
+        "OP09-050",
+        "OP09-053",
+        "OP09-056",
+        "OP09-058",
+        "OP09-064",
+        "OP09-065",
+        "OP09-068",
+        "OP09-070",
+        "OP09-072",
+        "OP09-073",
+        "OP09-075",
+        "OP09-076",
+        "OP09-078",
+        "OP09-098",
+        "OP09-100",
+        "OP09-102",
+        "OP09-103",
+        "OP09-106",
+        "OP09-107",
+        "OP09-108",
+        "OP09-109",
+        "OP09-112",
+        "OP09-115",
+        "OP09-117",
+        "OP09-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP09.json",
+      "cards": [
+        "OP09-002",
+        "OP09-003",
+        "OP09-009",
+        "OP09-010",
+        "OP09-011",
+        "OP09-014",
+        "OP09-015",
+        "OP09-020",
+        "OP09-021",
+        "OP09-024",
+        "OP09-026",
+        "OP09-027",
+        "OP09-030",
+        "OP09-031",
+        "OP09-034",
+        "OP09-035",
+        "OP09-037",
+        "OP09-043",
+        "OP09-046",
+        "OP09-048",
+        "OP09-057",
+        "OP09-069",
+        "OP09-077",
+        "OP09-079",
+        "OP09-083",
+        "OP09-085",
+        "OP09-087",
+        "OP09-089",
+        "OP09-090",
+        "OP09-095",
+        "OP09-096",
+        "OP09-097",
+        "OP09-099",
+        "OP09-101",
+        "OP09-110",
+        "OP09-114",
+        "OP09-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP10_wf.json",
+      "cards": [
+        "OP10-004",
+        "OP10-006",
+        "OP10-007",
+        "OP10-009",
+        "OP10-015",
+        "OP10-016",
+        "OP10-018",
+        "OP10-019",
+        "OP10-020",
+        "OP10-021",
+        "OP10-023",
+        "OP10-024",
+        "OP10-025",
+        "OP10-028",
+        "OP10-035",
+        "OP10-039",
+        "OP10-040",
+        "OP10-041",
+        "OP10-044",
+        "OP10-045",
+        "OP10-048",
+        "OP10-051",
+        "OP10-052",
+        "OP10-055",
+        "OP10-056",
+        "OP10-057",
+        "OP10-059",
+        "OP10-060",
+        "OP10-061",
+        "OP10-063",
+        "OP10-065",
+        "OP10-067",
+        "OP10-072",
+        "OP10-076",
+        "OP10-077",
+        "OP10-078",
+        "OP10-079",
+        "OP10-081",
+        "OP10-082",
+        "OP10-087",
+        "OP10-088",
+        "OP10-090",
+        "OP10-091",
+        "OP10-095",
+        "OP10-096",
+        "OP10-097",
+        "OP10-099",
+        "OP10-100",
+        "OP10-106",
+        "OP10-110",
+        "OP10-111",
+        "OP10-113"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP11_wf.json",
+      "cards": [
+        "OP11-004",
+        "OP11-007",
+        "OP11-008",
+        "OP11-016",
+        "OP11-018",
+        "OP11-020",
+        "OP11-021",
+        "OP11-023",
+        "OP11-025",
+        "OP11-028",
+        "OP11-029",
+        "OP11-030",
+        "OP11-036",
+        "OP11-037",
+        "OP11-038",
+        "OP11-039",
+        "OP11-044",
+        "OP11-047",
+        "OP11-048",
+        "OP11-050",
+        "OP11-056",
+        "OP11-060",
+        "OP11-061",
+        "OP11-063",
+        "OP11-067",
+        "OP11-069",
+        "OP11-070",
+        "OP11-075",
+        "OP11-076",
+        "OP11-080",
+        "OP11-083",
+        "OP11-084",
+        "OP11-085",
+        "OP11-086",
+        "OP11-098",
+        "OP11-103",
+        "OP11-104",
+        "OP11-106",
+        "OP11-108",
+        "OP11-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP12_gap.json",
+      "cards": [
+        "OP12-002",
+        "OP12-005",
+        "OP12-010",
+        "OP12-011",
+        "OP12-020",
+        "OP12-023",
+        "OP12-025",
+        "OP12-032",
+        "OP12-035",
+        "OP12-040",
+        "OP12-045",
+        "OP12-049",
+        "OP12-051",
+        "OP12-052",
+        "OP12-053",
+        "OP12-055",
+        "OP12-061",
+        "OP12-064",
+        "OP12-067",
+        "OP12-068",
+        "OP12-076",
+        "OP12-082",
+        "OP12-083",
+        "OP12-088",
+        "OP12-092",
+        "OP12-099",
+        "OP12-102",
+        "OP12-103",
+        "OP12-104",
+        "OP12-110",
+        "OP12-111",
+        "OP12-112",
+        "OP12-114"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP12_wf.json",
+      "cards": [
+        "OP12-109",
+        "OP12-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP12.json",
+      "cards": [
+        "OP12-006",
+        "OP12-014",
+        "OP12-033",
+        "OP12-034",
+        "OP12-039",
+        "OP12-044",
+        "OP12-050",
+        "OP12-051",
+        "OP12-062",
+        "OP12-071",
+        "OP12-079",
+        "OP12-084",
+        "OP12-085",
+        "OP12-086",
+        "OP12-097",
+        "OP12-101",
+        "OP12-104",
+        "OP12-106",
+        "OP12-107",
+        "OP12-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP13_wf.json",
+      "cards": [
+        "OP13-014",
+        "OP13-080",
+        "OP13-109"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP13.json",
+      "cards": [
+        "OP13-005",
+        "OP13-012",
+        "OP13-020",
+        "OP13-032",
+        "OP13-041",
+        "OP13-043",
+        "OP13-056",
+        "OP13-063",
+        "OP13-065",
+        "OP13-067",
+        "OP13-072",
+        "OP13-083",
+        "OP13-086",
+        "OP13-087",
+        "OP13-093",
+        "OP13-096",
+        "OP13-114",
+        "OP13-116",
+        "OP13-117",
+        "OP13-118",
+        "OP13-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP14_wf.json",
+      "cards": [
+        "OP14-002",
+        "OP14-036",
+        "OP14-040",
+        "OP14-045",
+        "OP14-049",
+        "OP14-059",
+        "OP14-063",
+        "OP14-096",
+        "OP14-102",
+        "OP14-109",
+        "OP14-112"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP14.json",
+      "cards": [
+        "OP14-005",
+        "OP14-006",
+        "OP14-010",
+        "OP14-012",
+        "OP14-013",
+        "OP14-014",
+        "OP14-015",
+        "OP14-016",
+        "OP14-018",
+        "OP14-019",
+        "OP14-022",
+        "OP14-023",
+        "OP14-024",
+        "OP14-025",
+        "OP14-031",
+        "OP14-037",
+        "OP14-038",
+        "OP14-039",
+        "OP14-042",
+        "OP14-043",
+        "OP14-044",
+        "OP14-046",
+        "OP14-047",
+        "OP14-048",
+        "OP14-050",
+        "OP14-051",
+        "OP14-052",
+        "OP14-054",
+        "OP14-057",
+        "OP14-058",
+        "OP14-062",
+        "OP14-064",
+        "OP14-065",
+        "OP14-067",
+        "OP14-071",
+        "OP14-072",
+        "OP14-074",
+        "OP14-075",
+        "OP14-076",
+        "OP14-077",
+        "OP14-078",
+        "OP14-081",
+        "OP14-083",
+        "OP14-084",
+        "OP14-085",
+        "OP14-087",
+        "OP14-088",
+        "OP14-089",
+        "OP14-090",
+        "OP14-091",
+        "OP14-093",
+        "OP14-094",
+        "OP14-097",
+        "OP14-099",
+        "OP14-100",
+        "OP14-105",
+        "OP14-107",
+        "OP14-108",
+        "OP14-110",
+        "OP14-111",
+        "OP14-113",
+        "OP14-114",
+        "OP14-115",
+        "OP14-116",
+        "OP14-117",
+        "OP14-118",
+        "OP14-119",
+        "OP14-120"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP15_wf.json",
+      "cards": [
+        "OP15-011",
+        "OP15-018",
+        "OP15-034",
+        "OP15-036",
+        "OP15-043",
+        "OP15-044",
+        "OP15-047",
+        "OP15-060",
+        "OP15-073",
+        "OP15-079",
+        "OP15-082",
+        "OP15-085",
+        "OP15-095",
+        "OP15-111",
+        "OP15-116"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP15.json",
+      "cards": [
+        "OP15-002",
+        "OP15-004",
+        "OP15-005",
+        "OP15-007",
+        "OP15-012",
+        "OP15-019",
+        "OP15-020",
+        "OP15-021",
+        "OP15-026",
+        "OP15-027",
+        "OP15-032",
+        "OP15-033",
+        "OP15-037",
+        "OP15-038",
+        "OP15-040",
+        "OP15-041",
+        "OP15-045",
+        "OP15-048",
+        "OP15-053",
+        "OP15-056",
+        "OP15-057",
+        "OP15-061",
+        "OP15-063",
+        "OP15-066",
+        "OP15-067",
+        "OP15-074",
+        "OP15-075",
+        "OP15-076",
+        "OP15-077",
+        "OP15-078",
+        "OP15-081",
+        "OP15-083",
+        "OP15-084",
+        "OP15-086",
+        "OP15-087",
+        "OP15-096",
+        "OP15-100",
+        "OP15-101",
+        "OP15-103",
+        "OP15-104",
+        "OP15-106",
+        "OP15-108",
+        "OP15-110",
+        "OP15-112",
+        "OP15-113",
+        "OP15-115",
+        "OP15-117",
+        "OP15-118"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/OP16.json",
+      "cards": [
+        "OP16-002",
+        "OP16-003",
+        "OP16-006",
+        "OP16-007",
+        "OP16-008",
+        "OP16-010",
+        "OP16-011",
+        "OP16-013",
+        "OP16-020",
+        "OP16-026",
+        "OP16-031",
+        "OP16-034",
+        "OP16-036",
+        "OP16-037",
+        "OP16-043",
+        "OP16-045",
+        "OP16-048",
+        "OP16-049",
+        "OP16-050",
+        "OP16-051",
+        "OP16-052",
+        "OP16-053",
+        "OP16-054",
+        "OP16-055",
+        "OP16-056",
+        "OP16-057",
+        "OP16-058",
+        "OP16-063",
+        "OP16-064",
+        "OP16-065",
+        "OP16-066",
+        "OP16-067",
+        "OP16-068",
+        "OP16-069",
+        "OP16-070",
+        "OP16-071",
+        "OP16-072",
+        "OP16-073",
+        "OP16-074",
+        "OP16-075",
+        "OP16-076",
+        "OP16-077",
+        "OP16-078",
+        "OP16-081",
+        "OP16-082",
+        "OP16-083",
+        "OP16-085",
+        "OP16-087",
+        "OP16-089",
+        "OP16-090",
+        "OP16-091",
+        "OP16-092",
+        "OP16-093",
+        "OP16-094",
+        "OP16-095",
+        "OP16-096",
+        "OP16-097",
+        "OP16-098",
+        "OP16-099",
+        "OP16-100",
+        "OP16-101",
+        "OP16-102",
+        "OP16-103",
+        "OP16-104",
+        "OP16-106",
+        "OP16-107",
+        "OP16-108",
+        "OP16-109",
+        "OP16-110",
+        "OP16-111",
+        "OP16-113",
+        "OP16-114",
+        "OP16-115",
+        "OP16-116",
+        "OP16-117",
+        "OP16-118",
+        "OP16-119"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/PRB01.json",
+      "cards": [
+        "PRB01-001"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/PRB02.json",
+      "cards": [
+        "PRB02-003",
+        "PRB02-004",
+        "PRB02-007",
+        "PRB02-008",
+        "PRB02-010",
+        "PRB02-011",
+        "PRB02-012",
+        "PRB02-013",
+        "PRB02-016",
+        "PRB02-018"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST01.json",
+      "cards": [
+        "ST01-001",
+        "ST01-005",
+        "ST01-007",
+        "ST01-011",
+        "ST01-014",
+        "ST01-015",
+        "ST01-016",
+        "ST01-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST02.json",
+      "cards": [
+        "ST02-001",
+        "ST02-005",
+        "ST02-007",
+        "ST02-009",
+        "ST02-013",
+        "ST02-015",
+        "ST02-016",
+        "ST02-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST03.json",
+      "cards": [
+        "ST03-001",
+        "ST03-003",
+        "ST03-004",
+        "ST03-005",
+        "ST03-009",
+        "ST03-014",
+        "ST03-015",
+        "ST03-016",
+        "ST03-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST04.json",
+      "cards": [
+        "ST04-002",
+        "ST04-003",
+        "ST04-004",
+        "ST04-005",
+        "ST04-006",
+        "ST04-008",
+        "ST04-010",
+        "ST04-014",
+        "ST04-015",
+        "ST04-016",
+        "ST04-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST05.json",
+      "cards": [
+        "ST05-001",
+        "ST05-002",
+        "ST05-004",
+        "ST05-005",
+        "ST05-006",
+        "ST05-011",
+        "ST05-014",
+        "ST05-016",
+        "ST05-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST06.json",
+      "cards": [
+        "ST06-001",
+        "ST06-002",
+        "ST06-005",
+        "ST06-006",
+        "ST06-008",
+        "ST06-010",
+        "ST06-012",
+        "ST06-014",
+        "ST06-015",
+        "ST06-016",
+        "ST06-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST07.json",
+      "cards": [
+        "ST07-004",
+        "ST07-005",
+        "ST07-009",
+        "ST07-011",
+        "ST07-013",
+        "ST07-016",
+        "ST07-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST08.json",
+      "cards": [
+        "ST08-002",
+        "ST08-004",
+        "ST08-006",
+        "ST08-008",
+        "ST08-014",
+        "ST08-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST09.json",
+      "cards": [
+        "ST09-002",
+        "ST09-005",
+        "ST09-007",
+        "ST09-008",
+        "ST09-009",
+        "ST09-012",
+        "ST09-014",
+        "ST09-015"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST10.json",
+      "cards": [
+        "ST10-001",
+        "ST10-003",
+        "ST10-005",
+        "ST10-008",
+        "ST10-009",
+        "ST10-010",
+        "ST10-012",
+        "ST10-013",
+        "ST10-015",
+        "ST10-016",
+        "ST10-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST11.json",
+      "cards": [
+        "ST11-001",
+        "ST11-002",
+        "ST11-004",
+        "ST11-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST12.json",
+      "cards": [
+        "ST12-002",
+        "ST12-008",
+        "ST12-011",
+        "ST12-012",
+        "ST12-016",
+        "ST12-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST13.json",
+      "cards": [
+        "ST13-004",
+        "ST13-006",
+        "ST13-008",
+        "ST13-011",
+        "ST13-013",
+        "ST13-015",
+        "ST13-017",
+        "ST13-018",
+        "ST13-019"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST14.json",
+      "cards": [
+        "ST14-002",
+        "ST14-003",
+        "ST14-004",
+        "ST14-006",
+        "ST14-007",
+        "ST14-008",
+        "ST14-011",
+        "ST14-014",
+        "ST14-015",
+        "ST14-016",
+        "ST14-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST15.json",
+      "cards": [
+        "ST15-002",
+        "ST15-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST16.json",
+      "cards": [
+        "ST16-001",
+        "ST16-004"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST17.json",
+      "cards": [
+        "ST17-002",
+        "ST17-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST18.json",
+      "cards": [
+        "ST18-001",
+        "ST18-002",
+        "ST18-003",
+        "ST18-004",
+        "ST18-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST19.json",
+      "cards": [
+        "ST19-001",
+        "ST19-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST20.json",
+      "cards": [
+        "ST20-001",
+        "ST20-002"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST21.json",
+      "cards": [
+        "ST21-001",
+        "ST21-003",
+        "ST21-004",
+        "ST21-009",
+        "ST21-010",
+        "ST21-012",
+        "ST21-014",
+        "ST21-015",
+        "ST21-016",
+        "ST21-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST22.json",
+      "cards": [
+        "ST22-002",
+        "ST22-003",
+        "ST22-006",
+        "ST22-007",
+        "ST22-011",
+        "ST22-012",
+        "ST22-015",
+        "ST22-016",
+        "ST22-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST23.json",
+      "cards": [
+        "ST23-002",
+        "ST23-003",
+        "ST23-004",
+        "ST23-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST24.json",
+      "cards": [
+        "ST24-001",
+        "ST24-002",
+        "ST24-003",
+        "ST24-004",
+        "ST24-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST25.json",
+      "cards": [
+        "ST25-001",
+        "ST25-003",
+        "ST25-004",
+        "ST25-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST26.json",
+      "cards": [
+        "ST26-002",
+        "ST26-003",
+        "ST26-004",
+        "ST26-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST27.json",
+      "cards": [
+        "ST27-001",
+        "ST27-002",
+        "ST27-003",
+        "ST27-004",
+        "ST27-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST28.json",
+      "cards": [
+        "ST28-001",
+        "ST28-002",
+        "ST28-003",
+        "ST28-004",
+        "ST28-005"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST29.json",
+      "cards": [
+        "ST29-001",
+        "ST29-003",
+        "ST29-004",
+        "ST29-005",
+        "ST29-007",
+        "ST29-008",
+        "ST29-009",
+        "ST29-012",
+        "ST29-014",
+        "ST29-015",
+        "ST29-016",
+        "ST29-017"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Definitions/ST30.json",
+      "cards": [
+        "ST30-002",
+        "ST30-004",
+        "ST30-006",
+        "ST30-007",
+        "ST30-008",
+        "ST30-010",
+        "ST30-012",
+        "ST30-014",
+        "ST30-015",
+        "ST30-016",
+        "ST30-017"
+      ]
+    }
+  ],
+  "builtinMetadataCards": [
+    "EB01-017",
+    "EB03-019",
+    "OP01-025",
+    "OP01-075",
+    "OP01-100",
+    "OP01-121",
+    "OP02-012",
+    "OP02-038",
+    "OP02-081",
+    "OP02-108",
+    "OP03-010",
+    "OP03-031",
+    "OP03-065",
+    "OP03-107",
+    "OP04-014",
+    "OP04-077",
+    "OP04-089",
+    "OP05-013",
+    "OP05-024",
+    "OP05-052",
+    "OP05-113",
+    "OP06-032",
+    "OP06-087",
+    "OP07-064",
+    "OP07-084",
+    "OP08-003",
+    "OP08-072",
+    "OP09-054",
+    "OP09-071",
+    "OP09-091",
+    "OP10-012",
+    "OP10-064",
+    "OP11-090",
+    "OP15-013",
+    "OP16-005",
+    "OP16-044",
+    "OP16-088",
+    "P-018",
+    "P-028",
+    "P-045",
+    "P-070",
+    "PRB02-014",
+    "ST01-006",
+    "ST02-004",
+    "ST03-008",
+    "ST04-011",
+    "ST05-003",
+    "ST06-007",
+    "ST15-003",
+    "ST21-007",
+    "ST22-009",
+    "ST23-001",
+    "ST29-011"
+  ],
+  "unresolvedTaggedCards": [],
+  "orphanImplementations": [],
+  "duplicateScripted": [],
+  "registrySha256": "b57619de5e9db02ef62e864016924bfd0679b7a9e4d06d03e0d0b83152679490"
+}

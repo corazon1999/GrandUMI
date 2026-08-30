@@ -21,7 +21,7 @@ function canonicalNumber(value) {
 async function loadLocalNumbers() {
   const numbers = new Set();
   const files = (await readdir(DATA_DIR)).filter(
-    (name) => name.endsWith(".json") && name !== "_index.json",
+    (name) => name.endsWith(".json") && !name.startsWith("_"),
   );
   for (const file of files) {
     const cards = JSON.parse(await readFile(path.join(DATA_DIR, file), "utf8"));

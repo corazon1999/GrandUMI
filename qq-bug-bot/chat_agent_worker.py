@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GrandUMI QQ 普通只读聊天与管理员全权限 Agent 常驻工作器。"""
+"""GrandUMI QQ 普通只读聊天与管理员安全任务入口常驻工作器。"""
 
 import argparse
 import hashlib
@@ -16,6 +16,7 @@ from pathlib import Path
 from pathlib import PurePosixPath
 
 import chat_protocol
+import admin_agent_security
 from agent_worker import (
     BRIDGE_PREFIX,
     WorkerError,
@@ -146,6 +147,10 @@ class ChatAgentWorker:
         image_paths=None,
         admin_mode: bool = False,
     ) -> dict:
+        if admin_mode:
+            raise WorkerError(
+                "QQ 管理消息禁止进入具备工具或 Shell 能力的 Codex 进程"
+            )
         schema = self.repo / "qq-bug-bot" / "schemas" / schema_name
         if not schema.is_file():
             raise WorkerError(f"找不到 Agent 输出 Schema: {schema}")
@@ -153,21 +158,13 @@ class ChatAgentWorker:
             self.resolve_current_codex_command(),
             "--ask-for-approval", "never",
         ]
-        if admin_mode:
-            args.extend([
-                "--search",
-                "exec",
-                "--dangerously-bypass-approvals-and-sandbox",
-            ])
-        else:
-            args.append("exec")
+        args.append("exec")
         model = str(self.cfg.get("chat_model") or self.cfg.get("model") or "").strip()
         if model:
             args.extend(["--model", model])
-        target_workdir = self.admin_workspace if admin_mode else self.workdir
+        target_workdir = self.workdir
         args.extend(["--ephemeral", "--json", "--skip-git-repo-check"])
-        if not admin_mode:
-            args.extend(["--sandbox", "read-only"])
+        args.extend(["--sandbox", "read-only"])
         args.extend([
             "--output-schema", str(schema),
             "-C", str(target_workdir),
@@ -303,18 +300,18 @@ class ChatAgentWorker:
         self.log(f"开始处理{kind} #{chat_id}")
         media_dir = None
         try:
-            media_dir, image_paths = self.prepare_images(job)
+            if kind == "admin_agent":
+                image_paths = []
+            else:
+                media_dir, image_paths = self.prepare_images(job)
             if kind == "admin_agent":
                 if self.mode != "admin":
                     raise WorkerError("普通聊天工作器拒绝管理员任务")
-                result = self.run_codex(
-                    chat_protocol.build_admin_agent_prompt(job),
-                    image_paths=image_paths,
-                    admin_mode=True,
+                reply = admin_agent_security.render_qq_admin_intake_reply(
+                    str(job.get("content") or "")
                 )
-                reply = str(result.get("reply") or "").strip()
                 if not reply or len(reply) > 500:
-                    raise WorkerError("管理员 Codex 返回的 reply 长度无效")
+                    raise WorkerError("管理员安全入口返回的 reply 长度无效")
                 self.bridge(
                     "chat-complete",
                     {
@@ -408,12 +405,16 @@ class ChatAgentWorker:
         for name in ("ssh",):
             if not shutil.which(name):
                 raise WorkerError(f"未找到命令: {name}")
-        self.resolve_current_codex_command()
         self.bridge("status")
-        admin_mode = self.mode == "admin"
+        if self.mode == "admin":
+            reply = admin_agent_security.render_qq_admin_intake_reply("安全自检")
+            if "不会运行命令" not in reply:
+                raise WorkerError("管理员安全入口自检返回意外结果")
+            self.log("自检通过")
+            return
+        self.resolve_current_codex_command()
         result = self.run_codex(
             "不要运行命令、读取或修改文件。仅按 Schema 输出 reply 字段，内容为‘聊天自检通过’。",
-            admin_mode=admin_mode,
         )
         reply = str(result.get("reply") or "")
         if "自检通过" not in reply:
@@ -423,7 +424,8 @@ class ChatAgentWorker:
     def run_once(self) -> bool:
         # 先确认本机依赖，再领取有次数上限的远端任务。CLI 更新或配置切换期间
         # 保持任务排队，避免同一故障在数秒内耗尽全部尝试次数。
-        self.resolve_current_codex_command()
+        if self.mode != "admin":
+            self.resolve_current_codex_command()
         command = "admin-claim" if self.mode == "admin" else "chat-claim"
         data = self.bridge(command)
         job = data.get("job")

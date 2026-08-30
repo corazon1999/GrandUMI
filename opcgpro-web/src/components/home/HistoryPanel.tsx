@@ -21,6 +21,7 @@ import {
 import { getCard } from "@/data/CardLoader";
 import { getMatchOpeningLabels } from "@/data/matchHistoryOpening";
 import { useLanguage } from "@/i18n/LanguageProvider";
+import CloudReplayPanel from "./CloudReplayPanel";
 
 function fmtTime(ts: number, locale: string): string {
   try {
@@ -49,6 +50,7 @@ export default function HistoryPanel() {
   const [importing, setImporting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [source, setSource] = useState<"local" | "cloud">("local");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -148,14 +150,20 @@ export default function HistoryPanel() {
     }
   };
 
+  if (source === "cloud") {
+    return <CloudReplayPanel onShowLocal={() => setSource("local")} />;
+  }
+
   return (
     <div className="flex h-full flex-col p-3 @[640px]:p-6">
       <div className="mb-3 flex flex-wrap items-start gap-3 @[640px]:mb-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold text-white">对局记录</h2>
-          <p className="mt-0.5 text-xs text-gray-500">
-            仅保存在本设备浏览器，最多保留最近 30 局
-          </p>
+          <div className="mt-2 inline-flex rounded-lg border border-gray-700 bg-gray-950 p-1" role="tablist" aria-label="记录来源">
+            <button type="button" role="tab" aria-selected="true" className="min-h-11 rounded-md bg-orange-500 px-4 text-sm font-bold text-white">本机</button>
+            <button type="button" role="tab" aria-selected="false" onClick={() => setSource("cloud")} className="min-h-11 rounded-md px-4 text-sm text-gray-400">云端</button>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">仅保存在本设备浏览器，最多保留最近 30 局</p>
         </div>
         <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-2">
           <input

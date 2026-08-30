@@ -1,0 +1,58 @@
+name: GrandUMI 完整验证
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: 检出待验证提交
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: 安装 Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            opcgpro-web/package-lock.json
+
+      - name: 安装 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: qq-bug-bot/requirements.txt
+
+      - name: 安装项目依赖
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix opcgpro-web --no-audit --no-fund
+          python -m pip install pytest -r qq-bug-bot/requirements.txt
+          npx playwright install --with-deps chromium
+
+      - name: 运行完整验证并生成提交绑定证明
+        shell: pwsh
+        run: ./verify.ps1 -ExpectedCommit "${{ github.sha }}" -ProofPath "${{ runner.temp }}/grandumi-${{ github.sha }}.verify.json"
+
+      - name: 上传验证证明
+        uses: actions/upload-artifact@v4
+        with:
+          name: grandumi-verification-${{ github.sha }}
+          path: ${{ runner.temp }}/grandumi-${{ github.sha }}.verify.json
+          if-no-files-found: error
+          retention-days: 30

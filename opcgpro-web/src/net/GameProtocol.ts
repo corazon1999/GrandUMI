@@ -13,6 +13,7 @@ import type {
   MsgPlayerReconnected,
   MsgDuelOver,
   MsgActionRejected,
+  MsgGameRecoveryPaused,
   MsgGameChat,
   MsgFriendChat,
   MsgSpectatorList,
@@ -67,6 +68,18 @@ export function registerGameProtocols() {
         eventBus.emit("actionRejected", { reason: (msg as MsgActionRejected).reason });
         console.warn("[GameProtocol] action rejected:", (msg as MsgActionRejected).reason);
         break;
+
+      case "MsgGameRecoveryPaused": {
+        const paused = msg as MsgGameRecoveryPaused;
+        useGameStore.getState().rollbackOptimistic();
+        useGameStore.getState().setPending(false);
+        showMessage(
+          paused.message || "恢复存储暂时不可用，对局已安全暂停，请稍后重新连接。",
+          "error",
+        );
+        console.error("[GameProtocol] recovery paused:", paused.roomId, paused.reason);
+        break;
+      }
 
       case "MsgPlayerDisconnected":
         eventBus.emit("opponentDisconnected", {

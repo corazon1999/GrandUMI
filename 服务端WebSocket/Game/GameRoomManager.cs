@@ -9,6 +9,7 @@ using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Ranked;
+using GrandUMI.Persistence;
 using GrandUMI.Training;
 
 namespace GrandUMI.Game;
@@ -40,6 +41,7 @@ public static class GameRoomManager
     private static readonly ConcurrentDictionary<string, RoomEntry> _rooms = new();
     private static readonly ConcurrentDictionary<string, string> _accountRoom = new(StringComparer.OrdinalIgnoreCase);
     private static GameMaintenanceState Maintenance = new();
+    private static CloudReplayStore? CloudReplays;
 
     public static int RoomCount => _rooms.Count;
     public static bool HasActivePlayerAccount(string account)
@@ -48,6 +50,9 @@ public static class GameRoomManager
            && _rooms.ContainsKey(roomId);
     public static int SpectatorCount => _rooms.Values.Sum(room => room.Spectators.Count);
     public static int TotalActionQueueDepth => _rooms.Values.Sum(room => Math.Max(0, Volatile.Read(ref room.ActionQueueDepth)));
+    public static int RecoveryPausedRoomCount => _rooms.Values.Count(room => room.RecoveryAvailability != RoomRecoveryAvailability.Healthy);
+    public static long RecoveryPausedTotal => RecoveryReliabilityHealth.PausedTotal;
+    public static long RecoveryQuarantinedTotal => RecoveryReliabilityHealth.QuarantinedTotal;
     public static IReadOnlyDictionary<string, int> RoomCountsByRuleset
         => _rooms.Values
             .GroupBy(room => room.Engine.State.RulesetId, StringComparer.OrdinalIgnoreCase)
@@ -61,6 +66,9 @@ public static class GameRoomManager
 
     public static void InitializeMaintenance(string persistencePath)
         => Maintenance = new GameMaintenanceState(persistencePath);
+
+    public static void ConfigureCloudReplays(CloudReplayStore? store)
+        => CloudReplays = store;
 
     /// <summary>sessionId → roomId</summary>
     private static readonly ConcurrentDictionary<string, string> _sessionRoom = new();
@@ -147,9 +155,56 @@ public static class GameRoomManager
         internal long[] LastOperationSequences { get; } = [-1, -1];
         internal int AcceptedActionsSinceSnapshot;
         internal ReplayCheckpointLogCoordinator? ReplayCheckpoints;
+        internal RoomOutboundCommitGate OutboundCommitGate { get; } = new();
+        internal RoomRecoveryAvailability RecoveryAvailability;
+        internal string? RecoveryFailureReason;
+        internal CloudReplayCapture? CloudReplay;
+        public bool IsRecoveryPaused => RecoveryAvailability != RoomRecoveryAvailability.Healthy;
+        public string? RecoveryPauseReason => RecoveryFailureReason;
     }
 
     internal sealed record RoomWork(string Name, long EnqueuedAt, Func<Task> Execute, long ReceivedAt = 0);
+
+    private static void DeliverPlayerPayload(RoomEntry room, int playerIndex, object payload)
+        => room.OutboundCommitGate.Deliver(() =>
+            WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], payload));
+
+    private static void DeliverSpectatorPayload(RoomEntry room, string sessionId, object payload)
+        => room.OutboundCommitGate.Deliver(() => WebSocketBridge.Send(sessionId, payload));
+
+    private static void PauseForRecoveryFailure(RoomEntry room, string reason, Exception exception)
+    {
+        if (room.RecoveryAvailability != RoomRecoveryAvailability.Healthy) return;
+        room.RecoveryAvailability = RoomRecoveryAvailability.Paused;
+        room.RecoveryFailureReason = reason;
+        room.OutboundCommitGate.AbortAndBlock();
+        lock (room.ClockGate)
+        {
+            StopOperationClockLocked(room);
+            room.Engine.State.OperationClockPaused = true;
+        }
+        CancelStartingPlayerChoiceTimeout(room.RoomId);
+        CancelMulliganTimeout(room.RoomId);
+        foreach (var sessionId in room.PlayerSessionIds)
+        {
+            if (!_grace.TryRemove(room.RoomId + ":" + sessionId, out var grace)) continue;
+            grace.Cancel();
+            grace.Dispose();
+        }
+        RecoveryReliabilityHealth.RecordPaused();
+        Console.Error.WriteLine($"[恢复可靠性] 房间 {room.RoomId} 已安全暂停：{reason}；{exception.Message}");
+        foreach (var sessionId in room.PlayerSessionIds)
+        {
+            if (sessionId.StartsWith("offline-", StringComparison.Ordinal)) continue;
+            WebSocketBridge.Send(sessionId, new
+            {
+                proto = "MsgGameRecoveryPaused",
+                roomId = room.RoomId,
+                reason,
+                message = "恢复存储暂时不可用，对局已安全暂停，未确认操作不会被继续执行。",
+            });
+        }
+    }
 
     /// <summary>双方匹配/房间码成功后创建房间</summary>
     public static RoomEntry CreateRoom(string p0Sid, string p0Account, string p0Deck,
@@ -240,8 +295,9 @@ public static class GameRoomManager
         // 配置回调：人类走 WS 下发；单人模式下 P1(机器人) 的消息驱动 BotDriver 思考
         engine.OnSendToPlayer = (idx, payload) =>
         {
+            entry.CloudReplay?.AppendSnapshot(idx, payload);
             if (idx == 1 && vsBot) { BotDriver.OnBotMessage(entry); return; }
-            WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
+            DeliverPlayerPayload(entry, idx, payload);
         };
 
         engine.OnSendToSpectators = (viewPlayerIndex, payload, handPayload) =>
@@ -249,7 +305,7 @@ public static class GameRoomManager
             foreach (var spectator in entry.Spectators)
             {
                 if (spectator.Value.ViewPlayerIndex == viewPlayerIndex)
-                    WebSocketBridge.Send(spectator.Key,
+                    DeliverSpectatorPayload(entry, spectator.Key,
                         spectator.Value.HandVisible && handPayload is not null ? handPayload : payload);
             }
         };
@@ -268,6 +324,22 @@ public static class GameRoomManager
 
         var replayIdentity = ReplayRuntimeIdentityProvider.For(
             engine.State.Ruleset ?? CardRulesetManager.GetRequired(engine.State.RulesetId));
+        try
+        {
+            entry.CloudReplay = CloudReplays?.BeginMatch(new CloudReplayMatchStart(
+                roomId,
+                entry.CreatedAt,
+                matchKind.ToString(),
+                replayIdentity,
+                new CloudReplayPlayer(p0Account, entry.PlayerDisplayNames[0], Record: true),
+                new CloudReplayPlayer(p1Account, entry.PlayerDisplayNames[1], Record: !vsBot)));
+        }
+        catch (Exception ex)
+        {
+            // 云回放属于赛后能力；存储不可用不得扩大为正在进行对局的失败。
+            entry.CloudReplay = null;
+            Console.Error.WriteLine($"[云回放] 房间 {roomId} 未开始录制：{ex.Message}");
+        }
         engine.RecordMatchLog("match_start", -1, ReplayRuntimeIdentityFactory.CreateMatchStartPayload(
             replayIdentity,
             [
@@ -308,9 +380,9 @@ public static class GameRoomManager
                 PersistAcceptedAction(entry, pi, act, data, requestId);
         }
 
+        CaptureRecoverySnapshot(entry);
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
-        CaptureRecoverySnapshot(entry);
         if (broadcastInitialState)
             engine.BeginOpeningSequence();
         if (entry.ReplayCheckpoints is not null && broadcastInitialState
@@ -438,6 +510,18 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "你不在任何对局中", requestId });
             return;
         }
+        if (room.IsRecoveryPaused)
+        {
+            WebSocketBridge.Send(sessionId, new
+            {
+                proto = "MsgGameRecoveryPaused",
+                roomId = room.RoomId,
+                reason = room.RecoveryPauseReason,
+                message = "恢复存储暂时不可用，对局已安全暂停，请勿重复操作。",
+                requestId,
+            });
+            return;
+        }
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         if (idx < 0)
         {
@@ -521,48 +605,71 @@ public static class GameRoomManager
             }
             if (action is "PlayerActivity" or "RequestTurnExtension")
             {
-                HandleClockControlAction(room, playerIndex, action, data, requestId, pause);
-                EnsureOperationClockRunning(room);
+                try
+                {
+                    HandleClockControlAction(room, playerIndex, action, data, requestId, pause);
+                    EnsureOperationClockRunning(room);
+                }
+                catch (Exception ex)
+                {
+                    PauseForRecoveryFailure(room, "recovery_clock_commit_failed", ex);
+                }
                 return;
             }
-            room.Engine.RecordMatchLog("player_action_requested", playerIndex, new
+            if (!room.OutboundCommitGate.Begin())
             {
-                requestId = correlationId,
-                action,
-                data,
-                source = GameActionSourceWire.Value(source),
-            });
-            var execution = room.Engine.HandleActionWithReceipt(
-                playerIndex,
-                action,
-                data,
-                correlationId,
-                source);
-            var accepted = execution.Accepted;
-            // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
-            // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
-            if (accepted)
-            {
-                lock (room.ClockGate)
-                {
-                    // 动作同步分派期间若创建了 Prompt，Prompt 快照的 BeforeSnapshot 会先行同步并
-                    // 重启棋钟。此处重新收拢到“动作处理中”状态，再提交本次有效活动；否则活动
-                    // 清零后 EnsureOperationClockRunning 会误以为棋钟已运行，留下无操作计时未启动
-                    // 的窗口。效果达到稳定点后由下方 Ensure 以权威决策者统一重新开钟。
-                    StopOperationClockLocked(room);
-                    CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
-                }
-                room.MarkActivity();
-                await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
-                room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
-                AppendClockState(room);
-                MaybeCaptureRecoverySnapshot(room);
+                if (room.IsRecoveryPaused)
+                    WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], new
+                    {
+                        proto = "MsgGameRecoveryPaused",
+                        roomId = room.RoomId,
+                        reason = room.RecoveryPauseReason,
+                    });
+                return;
             }
-            EnsureOperationClockRunning(room);
-            EnsureStartingPlayerChoiceTimeout(room);
-            EnsureMulliganTimeout(room);
-            if (room.Engine.State.IsGameOver)
-                CleanupRoomFromCoordinator(room.RoomId);
+
+            try
+            {
+                room.Engine.RecordMatchLog("player_action_requested", playerIndex, new
+                {
+                    requestId = correlationId,
+                    action,
+                    data,
+                    source = GameActionSourceWire.Value(source),
+                });
+                var execution = room.Engine.HandleActionWithReceipt(
+                    playerIndex,
+                    action,
+                    data,
+                    correlationId,
+                    source);
+                var accepted = execution.Accepted;
+                // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
+                // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
+                if (accepted)
+                {
+                    lock (room.ClockGate)
+                    {
+                        StopOperationClockLocked(room);
+                        CommitPlayerActivityLocked(room, playerIndex, pause.CutoffTimestamp);
+                    }
+                    room.MarkActivity();
+                    await room.Engine.WaitSettledAsync(resolvingPromptId: promptIdBefore);
+                    room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
+                    AppendClockState(room);
+                    MaybeCaptureRecoverySnapshot(room);
+                }
+                room.OutboundCommitGate.Commit();
+                EnsureOperationClockRunning(room);
+                EnsureStartingPlayerChoiceTimeout(room);
+                EnsureMulliganTimeout(room);
+                if (room.Engine.State.IsGameOver)
+                    CleanupRoomFromCoordinator(room.RoomId);
+            }
+            catch (Exception ex)
+            {
+                PauseForRecoveryFailure(room, "recovery_commit_failed", ex);
+            }
         }, receivedAt));
     }
 
@@ -684,15 +791,19 @@ public static class GameRoomManager
     }
 
     private static void AppendClockState(RoomEntry room)
-        => RoomJournal.AppendClock(
+    {
+        if (room.VsBot) return;
+        RoomJournal.AppendClock(
             room.RoomId,
             room.Engine.State.OperationClockRemainingMs,
             room.Engine.State.OperationTurnClockRemainingMs,
             room.Engine.State.OperationTurnClockTurnCount,
             room.Engine.State.OperationTurnExtensionUsed);
+    }
 
     private static void EnsureOperationClockRunning(RoomEntry room)
     {
+        if (room.IsRecoveryPaused) return;
         if (!room.Engine.State.OperationClockEnabled || room.Engine.State.IsGameOver) return;
         lock (room.ClockGate)
         {
@@ -1077,6 +1188,11 @@ public static class GameRoomManager
     /// <summary>根据服务端权威截止时间创建或清除先后手选择超时任务。</summary>
     private static void EnsureStartingPlayerChoiceTimeout(RoomEntry room, int retryAttempt = 0)
     {
+        if (room.IsRecoveryPaused)
+        {
+            CancelStartingPlayerChoiceTimeout(room.RoomId);
+            return;
+        }
         var deadline = room.Engine.State.StartingPlayerChoiceDeadlineUtc;
         if (deadline is null || room.Engine.State.StartingPlayerChosen)
         {
@@ -1184,18 +1300,34 @@ public static class GameRoomManager
         var chooser = state.StartingPlayerChooser;
         var data = JsonSerializer.SerializeToElement(new { goFirst = true });
         var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
-        room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { requestId, goFirst = true });
-        var execution = room.Engine.HandleActionWithReceipt(
-            chooser,
-            "ChooseFirstPlayer",
-            data,
-            requestId,
-            GameActionSource.System);
-        if (!execution.Accepted) return false;
+        if (!room.OutboundCommitGate.Begin()) return false;
+        try
+        {
+            room.Engine.RecordMatchLog("starting_player_choice_timeout_auto_select", chooser, new { requestId, goFirst = true });
+            var execution = room.Engine.HandleActionWithReceipt(
+                chooser,
+                "ChooseFirstPlayer",
+                data,
+                requestId,
+                GameActionSource.System);
+            if (!execution.Accepted)
+            {
+                room.OutboundCommitGate.Commit();
+                return false;
+            }
 
-        await room.Engine.WaitSettledAsync();
-        room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
-        return true;
+            await room.Engine.WaitSettledAsync();
+            room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
+            AppendClockState(room);
+            MaybeCaptureRecoverySnapshot(room);
+            room.OutboundCommitGate.Commit();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            PauseForRecoveryFailure(room, "recovery_timeout_commit_failed", ex);
+            return false;
+        }
     }
 
     private static void CancelStartingPlayerChoiceTimeout(string roomId)
@@ -1210,6 +1342,11 @@ public static class GameRoomManager
     /// <summary>根据服务端权威截止时间创建或清除调度超时任务；不会因客户端断线或后台而停止。</summary>
     private static void EnsureMulliganTimeout(RoomEntry room, int retryAttempt = 0)
     {
+        if (room.IsRecoveryPaused)
+        {
+            CancelMulliganTimeout(room.RoomId);
+            return;
+        }
         var deadline = room.Engine.State.MulliganDeadlineUtc;
         if (deadline is null || room.Engine.State.MulliganBothDone)
         {
@@ -1327,21 +1464,34 @@ public static class GameRoomManager
         {
             var data = JsonSerializer.SerializeToElement(new { redraw = false });
             var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
-            room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { requestId, redraw = false });
-            var execution = room.Engine.HandleActionWithReceipt(
-                playerIndex,
-                "Mulligan",
-                data,
-                requestId,
-                GameActionSource.System);
-            if (!execution.Accepted)
+            if (!room.OutboundCommitGate.Begin()) break;
+            try
             {
-                room.ReplayCheckpoints?.Disable(state, "mulligan_timeout_action_rejected");
-                continue;
+                room.Engine.RecordMatchLog("mulligan_timeout_auto_keep", playerIndex, new { requestId, redraw = false });
+                var execution = room.Engine.HandleActionWithReceipt(
+                    playerIndex,
+                    "Mulligan",
+                    data,
+                    requestId,
+                    GameActionSource.System);
+                if (!execution.Accepted)
+                {
+                    room.ReplayCheckpoints?.Disable(state, "mulligan_timeout_action_rejected");
+                    room.OutboundCommitGate.Commit();
+                    continue;
+                }
+                await room.Engine.WaitSettledAsync();
+                room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
+                AppendClockState(room);
+                MaybeCaptureRecoverySnapshot(room);
+                room.OutboundCommitGate.Commit();
+                autoKept.Add(playerIndex);
             }
-            await room.Engine.WaitSettledAsync();
-            room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
-            autoKept.Add(playerIndex);
+            catch (Exception ex)
+            {
+                PauseForRecoveryFailure(room, "recovery_timeout_commit_failed", ex);
+                break;
+            }
         }
         return autoKept;
     }
@@ -1429,6 +1579,17 @@ public static class GameRoomManager
             WebSocketBridge.Send(sessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "对局已结束，无法恢复" });
             return;
         }
+        if (room.IsRecoveryPaused)
+        {
+            WebSocketBridge.Send(sessionId, new
+            {
+                proto = "MsgGameRecoveryPaused",
+                roomId = room.RoomId,
+                reason = room.RecoveryPauseReason,
+                message = "恢复存储异常，对局仍处于安全暂停，无法下发未确认状态。",
+            });
+            return;
+        }
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
@@ -1463,6 +1624,7 @@ public static class GameRoomManager
     {
         var room = GetRoomBySession(sessionId);
         if (room is null) return;
+        if (room.IsRecoveryPaused) return;
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         if (idx < 0)
         {
@@ -1518,7 +1680,7 @@ public static class GameRoomManager
             catch (TaskCanceledException) { return; }
             // 超时 → 判负
             var r = GetRoom(room.RoomId);
-            if (r is null) return;
+            if (r is null || r.IsRecoveryPaused) return;
             // 终局任务不能像普通玩家操作一样在队列满时静默丢弃；否则房间最终会被清理，
             // 在线一方却收不到权威终局快照，只会一直停留在“正在结算”。
             EnqueueRecoveryWork(r, new RoomWork("DisconnectTimeout", LatencyDiagnostics.Start(), () =>
@@ -1549,6 +1711,16 @@ public static class GameRoomManager
     {
         var room = GetRoomBySession(sessionId);
         if (room is null) return;
+        if (room.IsRecoveryPaused)
+        {
+            WebSocketBridge.Send(sessionId, new
+            {
+                proto = "MsgGameRecoveryPaused",
+                roomId = room.RoomId,
+                reason = room.RecoveryPauseReason,
+            });
+            return;
+        }
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         if (idx < 0) return; // 观战者无权
 
@@ -1612,10 +1784,21 @@ public static class GameRoomManager
                     WebSocketBridge.OnGameSessionRebound(oldSid, newSessionId, r.PlayerSessionIds[1 - i]);
                     // 重新绑定引擎回调（PlayerIndex 编号未变，sid 已替换）
                     r.Engine.OnSendToPlayer = (idx, payload) =>
-                        WebSocketBridge.Send(r.PlayerSessionIds[idx], payload);
+                        DeliverPlayerPayload(r, idx, payload);
                     var playerIndex = i;
                     EnqueueRecoveryWork(r, new RoomWork("Reclaim", LatencyDiagnostics.Start(), async () =>
                     {
+                        if (r.IsRecoveryPaused)
+                        {
+                            WebSocketBridge.Send(newSessionId, new
+                            {
+                                proto = "MsgGameRecoveryPaused",
+                                roomId = r.RoomId,
+                                reason = r.RecoveryPauseReason,
+                                message = "恢复存储异常，对局仍处于安全暂停，未确认状态不会下发。",
+                            });
+                            return;
+                        }
                         await ResolveExpiredStartingPlayerChoiceAsync(r, DateTime.UtcNow);
                         EnsureStartingPlayerChoiceTimeout(r);
                         await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
@@ -2016,10 +2199,21 @@ public static class GameRoomManager
             TryRecordLeaderStats(r.RoomId, r.MatchKind, r.PlayerAccounts, r.Engine.State);
             // 文件命令在各自单写 Channel 内仍然严格保序，但不让数百个房间清理线程
             // 同步占住线程池等待磁盘关闭。正常关服的 Shutdown 仍会排空全部队列。
+            var cloudReplayCleanup = r.CloudReplay is null
+                ? Task.CompletedTask
+                : r.Engine.State.IsGameOver
+                    ? r.CloudReplay.CompleteAsync(new CloudReplayCompletion(
+                        DateTime.UtcNow,
+                        terminal.WinnerIndex,
+                        terminal.IsDraw,
+                        terminal.Reason,
+                        terminal.TurnCount))
+                    : r.CloudReplay.AbortAsync();
             var persistenceCleanup = Task.WhenAll(
                 MatchLogRecorder.CloseDeferred(roomId),
                 RoomJournal.DeleteDeferred(roomId),
-                RoomRecoverySnapshotStore.DeleteDeferred(roomId));
+                RoomRecoverySnapshotStore.DeleteDeferred(roomId),
+                cloudReplayCleanup);
             _ = persistenceCleanup.ContinueWith(task =>
             {
                 if (task.Exception is not null)
@@ -2197,10 +2391,20 @@ public static class GameRoomManager
         JsonElement data,
         string? requestId)
     {
-        var journalSequence = Interlocked.Increment(ref room.JournalSequence);
+        var journalSequence = Volatile.Read(ref room.JournalSequence) + 1;
+        try
+        {
+            RoomJournal.Append(room.RoomId, journalSequence, playerIndex, action, data, requestId, journalSequence);
+        }
+        catch (Exception ex)
+        {
+            throw new RecoveryPersistenceException(
+                $"动作 {journalSequence} 未能提交恢复日志",
+                ex);
+        }
+        Volatile.Write(ref room.JournalSequence, journalSequence);
         Volatile.Write(ref room.LastOperationSequences[playerIndex], journalSequence);
         Interlocked.Increment(ref room.AcceptedActionsSinceSnapshot);
-        RoomJournal.Append(room.RoomId, journalSequence, playerIndex, action, data, requestId, journalSequence);
     }
 
     private static void MaybeCaptureRecoverySnapshot(RoomEntry room)
@@ -2273,7 +2477,10 @@ public static class GameRoomManager
     /// <summary>恢复单个房间。成功放回 _rooms 返回 true；弃局（删文件）返回 false。</summary>
     private static async Task<bool> RestoreOne(string file)
     {
-        var lines = await File.ReadAllLinesAsync(file);
+        var committed = await RoomJournal.ReadCommittedLinesAsync(file);
+        var lines = committed.Lines.ToArray();
+        if (committed.HadIncompleteTail)
+            Console.WriteLine($"[Restore] {Path.GetFileName(file)} 已截断进程终止留下的未确认尾记录。");
         if (lines.Length == 0) { Quarantine(file, "日志为空"); return false; }
 
         // 首行 header
@@ -2360,12 +2567,17 @@ public static class GameRoomManager
             }
             if (kind != "action") continue;
             var pi   = e.GetProperty("playerIndex").GetInt32();
+            if (pi is not (0 or 1))
+                throw new InvalidDataException($"动作 {i} 的玩家编号非法");
             var act  = e.GetProperty("action").GetString()!;
             var data = e.GetProperty("data").Clone();
-            actions.Add(new MatchReplay.ActionEntry(pi, act, data));
-            journalSequence = e.TryGetProperty("journalSequence", out var sequenceElement)
-                ? Math.Max(journalSequence, sequenceElement.GetInt64())
+            var nextSequence = e.TryGetProperty("journalSequence", out var sequenceElement)
+                ? sequenceElement.GetInt64()
                 : journalSequence + 1;
+            if (nextSequence != journalSequence + 1)
+                throw new InvalidDataException($"恢复日志动作序号不连续：期望 {journalSequence + 1}，实际 {nextSequence}");
+            journalSequence = nextSequence;
+            actions.Add(new MatchReplay.ActionEntry(pi, act, data));
             lastOperationSequences[pi] = e.TryGetProperty("operationSequence", out var operationElement)
                 && operationElement.ValueKind == JsonValueKind.Number
                     ? Math.Max(lastOperationSequences[pi], operationElement.GetInt64())
@@ -2460,16 +2672,17 @@ public static class GameRoomManager
         entry.DisconnectStartedAt[1] = restoredDisconnectStartedAt;
         engine.State.OperationClockPaused = engine.State.OperationClockEnabled;
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
+        ValidateAndRefreshRecoverySnapshot(entry);
 
         // 重新挂回回调（按当前 sid 发；日志/动作日志均"续写"而非覆盖）
         engine.OnSendToPlayer = (idx, payload) =>
-            WebSocketBridge.Send(entry.PlayerSessionIds[idx], payload);
+            DeliverPlayerPayload(entry, idx, payload);
         engine.OnSendToSpectators = (viewPlayerIndex, payload, handPayload) =>
         {
             foreach (var spectator in entry.Spectators)
             {
                 if (spectator.Value.ViewPlayerIndex == viewPlayerIndex)
-                    WebSocketBridge.Send(spectator.Key,
+                    DeliverSpectatorPayload(entry, spectator.Key,
                         spectator.Value.HandVisible && handPayload is not null ? handPayload : payload);
             }
         };
@@ -2498,7 +2711,6 @@ public static class GameRoomManager
         StartDisconnectGraceTimer(entry, 1, entry.PlayerSessionIds[1], entry.DisconnectGraceRemainingMs[1]);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
-        ValidateAndRefreshRecoverySnapshot(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;
@@ -2512,10 +2724,13 @@ public static class GameRoomManager
 
     private static void ValidateAndRefreshRecoverySnapshot(RoomEntry room)
     {
-        var snapshot = RoomRecoverySnapshotStore.TryRead(room.RoomId);
+        var snapshot = RoomRecoverySnapshotStore.ReadRequiredIfExists(room.RoomId);
         if (snapshot is not null)
         {
             room.ProcessedPlayerRequests.Restore(snapshot.ProcessedRequests);
+            if (snapshot.JournalSequence > room.JournalSequence)
+                throw new InvalidDataException(
+                    $"恢复快照序号 {snapshot.JournalSequence} 超前于动作日志 {room.JournalSequence}");
             // 旧结构中的私有状态没有当前新增字段，哈希必然不同；但请求去重窗口仍然有效，
             // 必须先恢复它，再由下方 CaptureRecoverySnapshot 写出当前结构的完整检查点。
             if (snapshot.SchemaVersion == RoomRecoverySnapshotStore.SchemaVersion
@@ -2524,7 +2739,8 @@ public static class GameRoomManager
                 var current = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
                 var currentHash = RoomRecoverySnapshotStore.ComputeStateSha256(current);
                 if (!string.Equals(currentHash, snapshot.StateSha256, StringComparison.Ordinal))
-                    Console.Error.WriteLine($"[恢复快照] {room.RoomId} 重放校验不一致，已以动作日志重建结果为准。");
+                    throw new InvalidDataException(
+                        $"恢复快照哈希与动作重放结果不一致：{snapshot.StateSha256} != {currentHash}");
             }
         }
         CaptureRecoverySnapshot(room);
@@ -2550,6 +2766,7 @@ public static class GameRoomManager
                     $"{Path.GetFileNameWithoutExtension(file)}-{DateTime.UtcNow:yyyyMMddHHmmss}.snapshot.json");
                 File.Move(snapshot, snapshotTarget, overwrite: true);
             }
+            RecoveryReliabilityHealth.RecordQuarantined();
             Console.Error.WriteLine($"[Restore] 已隔离损坏日志 {target}：{reason}");
         }
         catch (Exception ex)

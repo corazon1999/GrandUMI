@@ -15,6 +15,7 @@ import type {
 } from "@/types/net";
 import RulesetControlPanel from "./RulesetControlPanel";
 import QqWhitelistImportPanel from "./QqWhitelistImportPanel";
+import OperationsWorkbench from "./OperationsWorkbench";
 
 type AdminPanelProps = {
   onOpenCardBackReview: () => void;
@@ -356,6 +357,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const maintenance = useNetStore((state) => state.maintenance);
   const reviewQueue = useNetStore((state) => state.cardBackReviewQueue);
   const adminOperations = useNetStore((state) => state.adminOperations);
+  const adminApproval = useNetStore((state) => state.operationsWorkbench.approval);
   const adminPlayerSearchResults = useNetStore((state) => state.adminPlayerSearchResults);
   const adminTemporaryPassword = useNetStore((state) => state.adminTemporaryPassword);
   const [announcement, setAnnouncement] = useState("");
@@ -443,11 +445,27 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
   const deployLatest = (environment: AdminDeploymentEnvironment) => {
     const production = environment === "production";
+    const operation = production ? "deploy_production" : "deploy_test";
+    const approvalReady = adminApproval?.operation === operation
+      && adminApproval.target === environment
+      && adminApproval.expiresAt > Date.now();
+    if (!approvalReady) {
+      const confirmed = window.confirm(production
+        ? "这是正式服高风险操作。确认申请一次性发布凭证？申请后必须再次核对目标并点击执行，现阶段不会发布。"
+        : "确认申请测试服部署的一次性凭证？申请后必须再次点击执行，现阶段不会重启服务。");
+      if (!confirmed) return;
+      if (!HomeRequest.requestAdminApproval(operation, environment)) showMessage("服务器未连接，无法申请发布凭证", "error");
+      return;
+    }
     const confirmed = window.confirm(production
-      ? "确认将远端 main 最新版本发布到正式服？系统会再次检查：该提交已部署测试服、待发布日志已归档、当前没有进行中房间。"
-      : "确认将远端 main 最新版本部署到测试服？发布期间测试服会短暂重启。");
+      ? "二次确认：立即将远端 main 最新版本发布到正式服？系统仍会检查测试服验证、日志归档与进行中房间。该凭证执行后失效。"
+      : "二次确认：立即将远端 main 最新版本部署到测试服？测试服会短暂重启，该凭证执行后失效。");
     if (!confirmed) return;
-    if (!HomeRequest.deployLatest(environment)) showMessage("服务器未连接，无法提交发布任务", "error");
+    if (!HomeRequest.deployLatest(environment, adminApproval)) {
+      showMessage("服务器未连接，无法提交发布任务", "error");
+      return;
+    }
+    useNetStore.getState().setAdminApproval(null);
   };
 
   const sendAnnouncement = () => {
@@ -546,8 +564,22 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
   const resetPlayerPassword = () => {
     if (!selectedPlayer) return;
-    if (!window.confirm(`确认重置账号“${selectedPlayer.account}”的密码？该玩家所有登录会话会立即失效。`)) return;
-    HomeRequest.resetAdminPlayerPassword(selectedPlayer.account);
+    const approvalReady = adminApproval?.operation === "reset_password"
+      && adminApproval.target === selectedPlayer.account
+      && adminApproval.expiresAt > Date.now();
+    if (!approvalReady) {
+      if (!window.confirm(`确认申请账号“${selectedPlayer.account}”密码重置的一次性凭证？此步骤不会修改密码，申请后仍需再次确认。`)) return;
+      if (!HomeRequest.requestAdminApproval("reset_password", selectedPlayer.account)) {
+        showMessage("服务器未连接，无法申请密码重置凭证", "error");
+      }
+      return;
+    }
+    if (!window.confirm(`二次确认：立即重置账号“${selectedPlayer.account}”的密码并注销其全部登录会话？该凭证执行后失效。`)) return;
+    if (!HomeRequest.resetAdminPlayerPassword(selectedPlayer.account, adminApproval)) {
+      showMessage("服务器未连接，密码重置没有提交", "error");
+      return;
+    }
+    useNetStore.getState().setAdminApproval(null);
   };
 
   const copyTemporaryPassword = async () => {
@@ -797,6 +829,10 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           <QqWhitelistImportPanel />
         </div>
 
+        <div className="mt-6">
+          <OperationsWorkbench />
+        </div>
+
         <div className="mt-6 grid gap-4 @[900px]:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1.35fr)]">
           <section aria-label="服务器磁盘空间" className="rounded-2xl border border-emerald-900/70 bg-emerald-950/15 p-4 @[640px]:p-5">
             <p className="text-xs font-bold tracking-[0.16em] text-emerald-400">STORAGE</p>
@@ -834,7 +870,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="玩家搜索方式">
               {(["player", "qq"] as const).map((mode) => (
-                <button
+                    <button
                   key={mode}
                   type="button"
                   onClick={() => {
@@ -938,9 +974,13 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                         type="button"
                         onClick={resetPlayerPassword}
                         disabled={selectedPlayer.account.toLocaleLowerCase() === account.toLocaleLowerCase()}
-                        className="min-h-11 w-full rounded-xl bg-red-500 px-4 text-sm font-black text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
-                      >
-                        {selectedPlayer.account.toLocaleLowerCase() === account.toLocaleLowerCase() ? "不能重置当前账号" : "重置密码并注销旧会话"}
+                      className="min-h-11 w-full rounded-xl bg-red-500 px-4 text-sm font-black text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+                    >
+                        {selectedPlayer.account.toLocaleLowerCase() === account.toLocaleLowerCase()
+                          ? "不能重置当前账号"
+                          : adminApproval?.operation === "reset_password" && adminApproval.target === selectedPlayer.account && adminApproval.expiresAt > Date.now()
+                            ? "二次确认并重置密码"
+                            : "申请密码重置凭证"}
                       </button>
                       <p className="mt-2 text-[11px] leading-5 text-gray-600">系统生成强随机临时密码，只在本次操作结果中展示；玩家登录后可在个人中心自行修改。</p>
                     </div>
@@ -994,7 +1034,13 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                     disabled={!connected || !adminOperations.deploymentAvailable || busy}
                     className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-black disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${production ? "bg-red-500 text-white hover:bg-red-400" : "bg-cyan-500 text-gray-950 hover:bg-cyan-400"}`}
                   >
-                    {busy ? "发布任务处理中" : production ? "一键发布正式服到最新" : "一键部署测试服到最新"}
+                    {busy
+                      ? "发布任务处理中"
+                      : adminApproval?.operation === (production ? "deploy_production" : "deploy_test")
+                        && adminApproval.target === status.environment
+                        && adminApproval.expiresAt > Date.now()
+                        ? production ? "二次确认并发布正式服" : "二次确认并部署测试服"
+                        : production ? "申请正式服发布凭证" : "申请测试服部署凭证"}
                   </button>
                 </article>
               );

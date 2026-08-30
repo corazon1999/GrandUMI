@@ -1,373 +1,1130 @@
 [
   {
     "set": "EB01",
-    "count": 116,
+    "count": 61,
     "file": "EB01.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "EB02",
-    "count": 97,
+    "count": 61,
     "file": "EB02.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "EB03",
-    "count": 90,
+    "count": 62,
     "file": "EB03.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAttackDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "EB04",
-    "count": 83,
+    "count": 61,
     "file": "EB04.json",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnGameStart",
+      "OnKO",
+      "OnOppAttackDeclare",
+      "OnSelfWillLeaveField",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "速攻",
+      "速攻：角色",
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "EB05",
+    "count": 2,
+    "file": "EB05.json",
+    "effectTags": [
+      "ActivatedMain",
+      "OnAnyCharKOd",
+      "OnEnterField"
+    ],
     "abilities": []
   },
   {
     "set": "OP01",
-    "count": 251,
+    "count": 121,
     "file": "OP01.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnEnterField",
+      "OnKO",
+      "OnOppEventPlayed",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "流放",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP02",
-    "count": 213,
+    "count": 121,
     "file": "OP02.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnBattleEnd",
+      "OnBlockDeclare",
+      "OnDonAttached",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP03",
-    "count": 243,
+    "count": 123,
     "file": "OP03.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnDamageToLeader",
+      "OnEnterField",
+      "OnKO",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "流放",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP04",
-    "count": 202,
+    "count": 119,
     "file": "OP04.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnBattleEnd",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnOppEventPlayed",
+      "PreKO"
+    ],
+    "abilities": [
+      "此角色无法攻击",
+      "流放",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP05",
-    "count": 268,
+    "count": 119,
     "file": "OP05.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnDrawCard",
+      "OnEnterField",
+      "OnKO",
+      "OnLifeLeaveField",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnTriggerActivated",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP06",
-    "count": 267,
+    "count": 119,
     "file": "OP06.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnOppAttackDeclare",
+      "OnOppBlocker",
+      "OnOppEventPlayed",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "此角色无法攻击",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP07",
-    "count": 214,
+    "count": 119,
     "file": "OP07.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnCharRested",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnTurnStart",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻",
+      "速攻：角色",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP08",
-    "count": 178,
+    "count": 119,
     "file": "OP08.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnLifeLeaveField",
+      "OnMyTurnEnd",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "OP09",
-    "count": 253,
+    "count": 119,
     "file": "OP09.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnOppBlocker",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "流放",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP10",
-    "count": 184,
+    "count": 119,
     "file": "OP10.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnCharLeaveField",
+      "OnCharRested",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnOppEventPlayed",
+      "PreKO"
+    ],
+    "abilities": [
+      "流放",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP11",
-    "count": 171,
+    "count": 119,
     "file": "OP11.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnLifeLeaveField",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "OnOppEventPlayed",
+      "OnTurnStart",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP12",
-    "count": 182,
+    "count": 119,
     "file": "OP12.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnCharLeaveField",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnHandDiscarded",
+      "OnKO",
+      "OnLifeLeaveField",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "无法通过效果登场",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP13",
-    "count": 188,
+    "count": 120,
     "file": "OP13.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDamageToLeader",
+      "OnEnterField",
+      "OnGameStart",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP14",
-    "count": 158,
+    "count": 120,
     "file": "OP14.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnCharRested",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnHandDiscarded",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "此角色无法攻击",
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "OP15",
-    "count": 242,
+    "count": 119,
     "file": "OP15.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO",
+      "OnOppAttackDeclare",
+      "OnOppBlocker",
+      "OnOppEventPlayed",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "OP16",
     "count": 119,
     "file": "OP16.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "不可阻挡",
+      "速攻：角色",
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "OP17",
+    "count": 119,
+    "file": "OP17.json",
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnLeaderBattle",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "流放",
+      "速攻",
+      "速攻：角色",
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "OP18",
+    "count": 6,
+    "file": "OP18.json",
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyCharEnter",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "P",
-    "count": 197,
+    "count": 136,
     "file": "P.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnDamageToLeader",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "此角色无法攻击",
+      "流放",
+      "阻挡者"
+    ]
   },
   {
     "set": "PRB01",
-    "count": 2,
+    "count": 1,
     "file": "PRB01.json",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
     "abilities": []
   },
   {
     "set": "PRB02",
-    "count": 38,
+    "count": 18,
     "file": "PRB02.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnCharRested",
+      "OnEnterField",
+      "OnKO",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST01",
-    "count": 63,
+    "count": 17,
     "file": "ST01.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST02",
-    "count": 31,
+    "count": 17,
     "file": "ST02.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField",
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST03",
-    "count": 46,
+    "count": 17,
     "file": "ST03.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST04",
-    "count": 40,
+    "count": 17,
     "file": "ST04.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST05",
-    "count": 20,
+    "count": 17,
     "file": "ST05.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnEnterField",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST06",
-    "count": 31,
+    "count": 17,
     "file": "ST06.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST07",
-    "count": 23,
+    "count": 17,
     "file": "ST07.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST08",
-    "count": 16,
+    "count": 15,
     "file": "ST08.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventMain",
+      "OnBattleEnd",
+      "OnEnterField",
+      "OnKO",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST09",
-    "count": 19,
+    "count": 15,
     "file": "ST09.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "EventCounter",
+      "OnAllyWillBeKOd",
+      "OnAttackDeclare",
+      "OnBlockDeclare",
+      "OnEnterField",
+      "OnKO",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST10",
-    "count": 34,
+    "count": 17,
     "file": "ST10.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnOppBlocker"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST11",
     "count": 5,
     "file": "ST11.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "EventMain",
+      "OnAttackDeclare",
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST12",
-    "count": 26,
+    "count": 17,
     "file": "ST12.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST13",
-    "count": 55,
+    "count": 19,
     "file": "ST13.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnEnterField",
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST14",
-    "count": 28,
+    "count": 17,
     "file": "ST14.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST15",
-    "count": 6,
+    "count": 5,
     "file": "ST15.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST16",
-    "count": 11,
+    "count": 5,
     "file": "ST16.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField",
+      "OnOppAttackDeclare"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST17",
-    "count": 12,
+    "count": 5,
     "file": "ST17.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST18",
-    "count": 13,
+    "count": 5,
     "file": "ST18.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST19",
     "count": 5,
     "file": "ST19.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST20",
-    "count": 4,
+    "count": 5,
     "file": "ST20.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyWillBeKOd",
+      "OnEnterField",
+      "PreKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST21",
-    "count": 45,
+    "count": 17,
     "file": "ST21.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventMain",
+      "OnAttackDeclare",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [
+      "速攻",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST22",
-    "count": 33,
+    "count": 17,
     "file": "ST22.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnOppAttackDeclare",
+      "PreKO"
+    ],
+    "abilities": [
+      "双重攻击",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST23",
     "count": 5,
     "file": "ST23.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST24",
     "count": 5,
     "file": "ST24.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "OnEnterField",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST25",
     "count": 5,
     "file": "ST25.json",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO"
+    ],
     "abilities": []
   },
   {
     "set": "ST26",
-    "count": 7,
+    "count": 5,
     "file": "ST26.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST27",
     "count": 5,
     "file": "ST27.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
   },
   {
     "set": "ST28",
     "count": 5,
     "file": "ST28.json",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
     "abilities": []
   },
   {
     "set": "ST29",
-    "count": 31,
+    "count": 17,
     "file": "ST29.json",
-    "effectTags": [],
-    "abilities": []
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAttackDeclare",
+      "OnEnterField",
+      "OnKO",
+      "PreKO"
+    ],
+    "abilities": [
+      "速攻：角色",
+      "阻挡者"
+    ]
   },
   {
     "set": "ST30",
-    "count": 34,
+    "count": 17,
     "file": "ST30.json",
-    "effectTags": [],
+    "effectTags": [
+      "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "ST31",
+    "count": 5,
+    "file": "ST31.json",
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "ST32",
+    "count": 5,
+    "file": "ST32.json",
+    "effectTags": [
+      "OnCharRested",
+      "OnEnterField"
+    ],
+    "abilities": []
+  },
+  {
+    "set": "ST33",
+    "count": 5,
+    "file": "ST33.json",
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "ST34",
+    "count": 5,
+    "file": "ST34.json",
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnDonReturnedToDeck",
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": []
+  },
+  {
+    "set": "ST35",
+    "count": 5,
+    "file": "ST35.json",
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ]
+  },
+  {
+    "set": "ST36",
+    "count": 5,
+    "file": "ST36.json",
+    "effectTags": [
+      "ActivatedMain",
+      "OnEnterField",
+      "OnKO",
+      "OnOppAttackDeclare"
+    ],
     "abilities": []
   }
 ]

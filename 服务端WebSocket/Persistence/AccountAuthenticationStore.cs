@@ -282,6 +282,17 @@ public sealed class AccountAuthenticationStore
         transaction.Commit();
     }
 
+    public IReadOnlyDictionary<string, string> GetDirectorySearchNames()
+    {
+        using var connection = _accounts.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT account,display_name FROM shared_accounts ORDER BY account_key;";
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) result[reader.GetString(0)] = reader.GetString(1);
+        return result;
+    }
+
     private void EnsureLocalPlayer(string account, string displayName)
     {
         // 共享账号是身份权威源；目录昵称只用于本环境首次物化。已经存在的玩法显示昵称不跨环境覆盖。

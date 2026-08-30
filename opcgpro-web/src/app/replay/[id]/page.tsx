@@ -10,6 +10,8 @@ import { getSnapshots } from "@/data/matchHistoryDB";
 import { revealReplayHands } from "@/lib/replayHands";
 import type { MsgGameState } from "@/types/net";
 import type { PlaybackSpeed } from "@/types/playback";
+import FeedbackOverlay from "@/components/game/FeedbackOverlay";
+import { readCloudReplayLink } from "@/data/cloudReplayLink";
 
 // 单帧基准时长（1x），按倍速缩放
 const STEP_MS = 900;
@@ -94,6 +96,7 @@ export default function ReplayPage() {
     return snapshots.reduce((m, s) => Math.max(m, s.turnCount ?? 0), 0);
   }, [snapshots]);
   const currentTurn = snapshots?.[Math.min(idx, lastIdx)]?.turnCount ?? 0;
+  const cloudReplayId = readCloudReplayLink(decodeURIComponent(id));
 
   const handlePlay = () => {
     if (isEnded) {
@@ -153,6 +156,7 @@ export default function ReplayPage() {
         onStepBackward={() => setIdx((i) => Math.max(0, i - 1))}
         onSpeedChange={setSpeed}
       />
+      <FeedbackOverlay context="game" showTrigger replayId={cloudReplayId} />
     </div>
   );
 }

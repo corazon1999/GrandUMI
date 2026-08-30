@@ -26,11 +26,21 @@ internal static class RoomRecoverySnapshotStore
         });
     private static readonly Task Worker = Task.Run(ProcessAsync);
     private static int _stopped;
+    private static int _queueDepth;
+    private static long _writeFailures;
+    private static long _lastFailureUtcTicks;
+
+    /// <summary>仅供故障演练测试注入；生产代码不得设置。</summary>
+    internal static Func<string, Exception?>? WriteFailureInjector { get; set; }
 
     internal static void Capture(RoomRecoverySnapshot snapshot)
     {
-        if (Volatile.Read(ref _stopped) != 0) return;
-        Queue.Writer.TryWrite(new SnapshotCommand(snapshot.RoomId, Serialize(snapshot), Delete: false));
+        if (Volatile.Read(ref _stopped) != 0)
+            throw new InvalidOperationException("恢复快照队列已停止");
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        EnqueueRequiredAsync(
+            new SnapshotCommand(snapshot.RoomId, Serialize(snapshot), Delete: false, completion),
+            completion).GetAwaiter().GetResult();
     }
 
     internal static Task DeleteDeferred(string roomId)
@@ -67,6 +77,31 @@ internal static class RoomRecoverySnapshotStore
         }
     }
 
+    /// <summary>恢复路径严格读取：文件存在却损坏或版本不兼容时必须隔离房间。</summary>
+    internal static RoomRecoverySnapshot? ReadRequiredIfExists(string roomId)
+    {
+        var path = PathOf(roomId);
+        if (!File.Exists(path)) return null;
+        try
+        {
+            var snapshot = JsonSerializer.Deserialize<RoomRecoverySnapshot>(File.ReadAllBytes(path))
+                ?? throw new InvalidDataException("恢复快照内容为空");
+            if (snapshot.SchemaVersion is < MinimumCompatibleSchemaVersion or > SchemaVersion)
+                throw new InvalidDataException($"恢复快照版本 {snapshot.SchemaVersion} 不兼容");
+            if (!string.Equals(snapshot.RoomId, roomId, StringComparison.Ordinal))
+                throw new InvalidDataException("恢复快照房间标识不一致");
+            return snapshot;
+        }
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidDataException($"恢复快照读取失败：{ex.Message}", ex);
+        }
+    }
+
     internal static string ComputeStateSha256(JsonElement state)
         => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(state))).ToLowerInvariant();
 
@@ -75,6 +110,17 @@ internal static class RoomRecoverySnapshotStore
         if (Interlocked.Exchange(ref _stopped, 1) != 0) return;
         Queue.Writer.TryComplete();
         Worker.GetAwaiter().GetResult();
+    }
+
+    internal static int QueueDepth => Math.Max(0, Volatile.Read(ref _queueDepth));
+    internal static long WriteFailures => Interlocked.Read(ref _writeFailures);
+    internal static DateTime? LastFailureUtc
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _lastFailureUtcTicks);
+            return ticks <= 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+        }
     }
 
     private static byte[] Serialize(RoomRecoverySnapshot snapshot)
@@ -87,13 +133,17 @@ internal static class RoomRecoverySnapshotStore
         SnapshotCommand command,
         TaskCompletionSource completion)
     {
+        var queued = false;
         try
         {
+            Interlocked.Increment(ref _queueDepth);
             await Queue.Writer.WriteAsync(command);
+            queued = true;
             await completion.Task;
         }
         catch (Exception ex)
         {
+            if (!queued) Interlocked.Decrement(ref _queueDepth);
             completion.TrySetException(ex);
             throw;
         }
@@ -103,8 +153,12 @@ internal static class RoomRecoverySnapshotStore
     {
         await foreach (var command in Queue.Reader.ReadAllAsync())
         {
+            Interlocked.Decrement(ref _queueDepth);
             try
             {
+                if (!string.IsNullOrEmpty(command.RoomId)
+                    && WriteFailureInjector?.Invoke(command.RoomId) is { } injected)
+                    throw injected;
                 if (command.Payload is null && !command.Delete)
                 {
                     command.Completion?.TrySetResult();
@@ -126,6 +180,8 @@ internal static class RoomRecoverySnapshotStore
             }
             catch (Exception ex)
             {
+                Interlocked.Increment(ref _writeFailures);
+                Interlocked.Exchange(ref _lastFailureUtcTicks, DateTime.UtcNow.Ticks);
                 command.Completion?.TrySetException(ex);
                 Console.Error.WriteLine($"[恢复快照] 写入 {command.RoomId} 失败：{ex.Message}");
             }

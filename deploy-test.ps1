@@ -6,10 +6,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
+$script:proof = $null
 Set-Location $repo
 . (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
 
 function Stop-WithError([string]$Message) {
+  if ($script:proof -and (Test-Path -LiteralPath $script:proof)) {
+    Remove-Item -LiteralPath $script:proof -Force -ErrorAction SilentlyContinue
+  }
   Write-Host $Message -ForegroundColor Red
   exit 1
 }
@@ -31,16 +35,27 @@ if ($dirty) {
 
 & $git pull --ff-only origin main
 if ($LASTEXITCODE -ne 0) { Stop-WithError "拉取 main 失败；必须先解决分支差异。" }
+$target = (& $git rev-parse HEAD).Trim()
+$short = $target.Substring(0, 12)
+$deployTempDirectory = Get-GrandUmiTempDirectory -Category "Deploy"
+$script:proof = Join-Path $deployTempDirectory "grandumi-test-$short.verify.json"
+$proof = $script:proof
+$remoteProof = "/tmp/grandumi-test-$short.verify.json"
+if (Test-Path -LiteralPath $proof) { Remove-Item -LiteralPath $proof -Force }
+
+# 验证必须先于推送和部署；证明同时绑定完整提交号、Git tree 与验证策略摘要。
+& (Join-Path $repo "verify.ps1") -ExpectedCommit $target -ProofPath $proof
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $proof)) {
+  Stop-WithError "完整验证未通过或未生成证明，拒绝推送及部署测试服。"
+}
+$proofChecksum = (Get-FileHash -LiteralPath $proof -Algorithm SHA256).Hash.ToLowerInvariant()
+
 & $git push origin main
 if ($LASTEXITCODE -ne 0) { Stop-WithError "推送 main 失败，未部署测试服。" }
-
-$target = (& $git rev-parse HEAD).Trim()
 
 $serverHead = (& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test rev-parse HEAD 2>/dev/null || true").Trim()
 $hasServerHead = $serverHead -match '^[0-9a-f]{40}$'
 
-$short = $target.Substring(0, 12)
-$deployTempDirectory = Get-GrandUmiTempDirectory -Category "Deploy"
 $bundle = Join-Path $deployTempDirectory "grandumi-test-$short.bundle"
 $remoteBundle = "/tmp/grandumi-test-$short.bundle"
 try {
@@ -61,15 +76,18 @@ try {
     & $ssh -o BatchMode=yes $Server "mkdir -p /opt/grandumi-test && git -C /opt/grandumi-test init && git -C /opt/grandumi-test fetch '$remoteBundle' '+refs/heads/main:refs/remotes/origin/main' && git -C /opt/grandumi-test checkout --detach '$target' && rm -f '$remoteBundle'"
   }
   if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服导入代码包失败。" }
+  & $scp -o BatchMode=yes $proof ($Server + ":" + $remoteProof)
+  if ($LASTEXITCODE -ne 0) { Stop-WithError "上传测试服验证证明失败。" }
 } finally {
   if (Test-Path -LiteralPath $bundle) { Remove-Item -LiteralPath $bundle -Force }
 }
 
 $forceArg = if ($All -or -not $hasServerHead) { "all" } else { "" }
 # 直接执行目标提交中的脚本，避免部署脚本自身更新时仍运行远端旧版本。
-& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test show '$target`:ops/server/deploy-test.sh' | bash -s -- '$target' '$forceArg'"
+& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test show '$target`:ops/server/deploy-test.sh' | bash -s -- '$target' '$forceArg' '$remoteProof' '$proofChecksum'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服部署失败，请检查服务器日志。" }
 
 $code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://test.grand-umi.com/"
 if ($code -ne "200") { Stop-WithError "测试服外网验证失败，HTTP $code。" }
+if (Test-Path -LiteralPath $proof) { Remove-Item -LiteralPath $proof -Force }
 Write-Host "测试服部署成功：$target" -ForegroundColor Green

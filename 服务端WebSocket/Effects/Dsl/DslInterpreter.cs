@@ -67,25 +67,28 @@ public static class DslInterpreter
     }
 
     /// <summary>批量加载某个目录下所有 *.json，注册为当前发布产物的内置规则。</summary>
-    public static void LoadDirectory(string dir, string rulesetId = "builtin-test")
+    public static void LoadDirectory(string dir, string rulesetId = "builtin-test", bool failClosed = false)
     {
         lock (BuiltInLoadGate)
         {
             if (_builtInLoaded) return;
-            var definitions = ReadDefinitionsDirectory(dir);
+            var definitions = ReadDefinitionsDirectory(dir, failClosed: failClosed);
             CardRulesetManager.InitializeBuiltIn(definitions, rulesetId);
             _builtInLoaded = true;
         }
     }
 
-    internal static IReadOnlyDictionary<string, JsonElement> ReadDefinitionsDirectory(string dir, bool strict = false)
+    internal static IReadOnlyDictionary<string, JsonElement> ReadDefinitionsDirectory(
+        string dir,
+        bool strict = false,
+        bool failClosed = false)
     {
         var files = GetDefinitionFiles(dir);
         var definitions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         int total = 0;
         foreach (var file in files)
         {
-            int n = LoadFile(file, definitions, strict);
+            int n = LoadFile(file, definitions, strict, failClosed);
             total += n;
         }
         if (definitions.Count == 0)
@@ -108,7 +111,8 @@ public static class DslInterpreter
     private static int LoadFile(
         string path,
         IDictionary<string, JsonElement> definitions,
-        bool strict = false)
+        bool strict = false,
+        bool failClosed = false)
     {
         if (!File.Exists(path)) return 0;
         try
@@ -133,7 +137,7 @@ public static class DslInterpreter
         }
         catch (Exception ex)
         {
-            if (strict)
+            if (strict || failClosed)
                 throw new InvalidOperationException($"DSL 加载失败：{path}：{ex.Message}", ex);
             Console.Error.WriteLine($"[DSL] 加载 {path} 失败: {ex.Message}");
             return 0;

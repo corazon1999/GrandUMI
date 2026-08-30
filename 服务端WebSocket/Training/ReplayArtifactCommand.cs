@@ -266,7 +266,8 @@ public static class ReplayArtifactCommand
         CardDatabase.LoadFrom(layout.CardDatabaseRoot);
         DslInterpreter.LoadDirectory(
             layout.DslDefinitionsRoot,
-            $"builtin-{engineCommit}");
+            $"builtin-{engineCommit}",
+            failClosed: true);
         CardRulesetManager.InitializePackages(layout.RulesRoot);
         var build = new ReplayRuntimeBuildIdentity(
             engineCommit,

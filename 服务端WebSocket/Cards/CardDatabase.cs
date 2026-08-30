@@ -39,41 +39,39 @@ public static class CardDatabase
         if (!Directory.Exists(cardDataRoot))
             throw new DirectoryNotFoundException($"卡牌数据目录不存在: {cardDataRoot}");
 
+        var manifest = CardContentManifest.Validate(cardDataRoot);
         var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var files = Directory.GetFiles(cardDataRoot, "*.json")
-            .Where(file => !Path.GetFileNameWithoutExtension(file).StartsWith("_", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+        var files = manifest.Files.Select(file => Path.Combine(cardDataRoot, file)).ToArray();
         // 哈希只在启动加载阶段遍历磁盘；新建房间和逐动作路径只读取缓存字符串。
-        ContentHash = ReplayContentManifest.HashFiles(cardDataRoot, files);
+        var contentHash = ReplayContentManifest.HashFiles(cardDataRoot, files);
+        var byNumber = new Dictionary<string, CardInfo>(StringComparer.OrdinalIgnoreCase);
+        var bySet = new Dictionary<string, List<CardInfo>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var file in files)
         {
-            try
-            {
-                using var fs = File.OpenRead(file);
-                var raw = JsonSerializer.Deserialize<List<RawCard>>(fs, jsonOpts);
-                if (raw is null) continue;
+            using var fs = File.OpenRead(file);
+            var raw = JsonSerializer.Deserialize<List<RawCard>>(fs, jsonOpts)
+                ?? throw new InvalidDataException($"卡牌数据文件为空：{Path.GetFileName(file)}");
 
-                foreach (var r in raw)
-                {
-                    var info = MapToCardInfo(r);
-                    if (info is null) continue;
-                    _byNumber[info.Number] = info;
-
-                    if (!_bySet.TryGetValue(info.SetCode, out var list))
-                    {
-                        list = new List<CardInfo>();
-                        _bySet[info.SetCode] = list;
-                    }
-                    list.Add(info);
-                }
-            }
-            catch (Exception ex)
+            for (var index = 0; index < raw.Count; index++)
             {
-                Console.Error.WriteLine($"[CardDB] 加载 {Path.GetFileName(file)} 失败: {ex.Message}");
+                var info = MapToCardInfo(raw[index])
+                    ?? throw new InvalidDataException($"卡牌必填字段无效：{Path.GetFileName(file)}[{index}]");
+                if (!byNumber.TryAdd(info.Number, info))
+                    throw new InvalidDataException($"卡牌番号重复：{info.Number}");
+                if (!bySet.TryGetValue(info.SetCode, out var list))
+                    bySet[info.SetCode] = list = new List<CardInfo>();
+                list.Add(info);
             }
         }
+
+        if (byNumber.Count != manifest.TotalCards)
+            throw new InvalidDataException($"卡牌唯一番号数 {byNumber.Count} 与清单总数 {manifest.TotalCards} 不一致");
+        _byNumber.Clear();
+        _bySet.Clear();
+        foreach (var (number, card) in byNumber) _byNumber.Add(number, card);
+        foreach (var (set, cards) in bySet) _bySet.Add(set, cards);
+        ContentHash = contentHash;
 
         Console.WriteLine($"[CardDB] 已加载 {_byNumber.Count} 张卡，{_bySet.Count} 个卡集");
     }
@@ -130,7 +128,7 @@ public static class CardDatabase
             "角色"           => CardKind.Character,
             "事件"           => CardKind.Event,
             "舞台"           => CardKind.Stage,
-            _                 => CardKind.Character,
+            _                 => throw new InvalidDataException($"未知卡牌类型：{r.number}={r.type}"),
         };
 
         return new CardInfo

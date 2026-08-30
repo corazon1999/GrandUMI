@@ -2,8 +2,8 @@
 """GrandUMI 本机 Bug 自动修复工作器。
 
 队列与 QQ 会话保存在服务器机器人数据库；本机只通过 SSH 领取/回写任务。
-模型仅在独立 Git worktree 与 workspace-write 沙箱中工作，提交和测试服部署由
-本文件中的固定门禁执行。
+模型仅在独立 Git worktree 与 workspace-write 沙箱中工作；普通工作器只能留下
+待审提交，不能合并、推送或部署。
 """
 
 import argparse
@@ -697,44 +697,6 @@ class AgentWorker:
         head = run_process(["git", "rev-parse", "HEAD"], cwd=worktree)
         return require_success(head, "读取修复提交").strip()
 
-    def publish(self, branch: str, expected_base: str) -> str:
-        current = require_success(
-            run_process(["git", "branch", "--show-current"], cwd=self.repo),
-            "读取运行副本分支",
-        ).strip()
-        if current != "main":
-            raise WorkerError(f"运行副本不在 main 分支: {current}")
-        status = require_success(
-            run_process(["git", "status", "--porcelain"], cwd=self.repo),
-            "检查运行副本状态",
-        )
-        if status.strip():
-            raise WorkerError("运行副本 main 存在未提交改动，拒绝部署")
-        ancestor = run_process(
-            ["git", "merge-base", "--is-ancestor", "HEAD", expected_base],
-            cwd=self.repo,
-        )
-        if ancestor.returncode != 0:
-            raise WorkerError("运行副本 main 与任务基线发生分叉，拒绝自动合并")
-        merge = run_process(["git", "merge", "--ff-only", branch], cwd=self.repo)
-        require_success(merge, "快进合并自动修复")
-        deploy = run_process(
-            [
-                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                "-File", str(self.repo / "deploy-test.ps1"),
-            ],
-            cwd=self.repo,
-            timeout=int(self.cfg.get("deploy_timeout_seconds", 3600)),
-            clear_proxy=True,
-            env_extra={
-                "HTTP_PROXY": str(self.cfg.get("git_proxy") or ""),
-                "HTTPS_PROXY": str(self.cfg.get("git_proxy") or ""),
-            },
-        )
-        require_success(deploy, "部署测试服")
-        head = run_process(["git", "rev-parse", "HEAD"], cwd=self.repo)
-        return require_success(head, "读取已部署提交").strip()
-
     def cleanup(self, worktree: Path, branch: str, merged: bool) -> None:
         result = run_process(
             ["git", "worktree", "remove", "--force", str(worktree)],
@@ -791,6 +753,7 @@ class AgentWorker:
         base = self.sync_origin()
         worktree, branch = self.create_worktree(job, base)
         merged = False
+        retained_for_review = False
         try:
             triage, _ = self.run_codex(
                 worktree,
@@ -859,7 +822,7 @@ class AgentWorker:
                 )
                 return
             files, tests = self.validate_review_and_test(worktree, job, triage)
-            self.commit_changes(worktree, files, feedback_id)
+            reviewed_commit = self.commit_changes(worktree, files, feedback_id)
 
             latest = self.sync_origin()
             if latest != base:
@@ -873,11 +836,25 @@ class AgentWorker:
                 self.prepare_test_environment(tests)
                 self.review(worktree, job, triage, tests, base_ref=latest)
                 self.run_required_tests(worktree, tests)
-            deployed = self.publish(branch, latest)
-            merged = True
+                reviewed_commit = require_success(
+                    run_process(["git", "rev-parse", "HEAD"], cwd=worktree),
+                    "读取变基后待审提交",
+                ).strip()
             summary = str(fix.get("summary") or "问题已修复")[:1800]
-            self.complete(job, "fixed", summary, deployed)
-            self.log(f"反馈 #{feedback_id} 已部署：{deployed}")
+            retained_for_review = True
+            self.complete(
+                job,
+                "manual",
+                (
+                    f"{summary}；已在隔离分支 {branch} 完成提交并通过门禁，"
+                    "普通 Bug 工作器不具备合并或部署能力，等待可信管理员复核发布。"
+                )[:1800],
+                reviewed_commit,
+            )
+            self.log(
+                f"反馈 #{feedback_id} 已完成待审提交：{reviewed_commit}，"
+                f"保留 {worktree}；未合并、未部署"
+            )
         except Exception as exc:
             detail = str(exc)
             transient = (
@@ -909,7 +886,10 @@ class AgentWorker:
             except Exception as bridge_exc:
                 self.log(f"反馈 #{feedback_id} 状态回写失败：{bridge_exc}")
         finally:
-            self.cleanup(worktree, branch, merged)
+            if retained_for_review:
+                self.log(f"待审工作区已保留：{worktree}（分支 {branch}）")
+            else:
+                self.cleanup(worktree, branch, merged)
 
     def self_check(self) -> None:
         for name in ("git", "ssh", "powershell"):

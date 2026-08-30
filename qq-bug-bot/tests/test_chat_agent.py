@@ -1145,7 +1145,7 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
                     worker.run_once()
             bridge_mock.assert_not_called()
 
-    def test_admin_worker_uses_full_access_in_real_workspace(self):
+    def test_admin_worker_rejects_codex_tool_execution(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = Path(temp)
             repo = root / "repo"
@@ -1165,38 +1165,12 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             worker = chat_agent_worker.ChatAgentWorker(
                 cfg, mode="admin", admin_workspace=admin_workspace
             )
-            event = {
-                "type": "item.completed",
-                "item": {
-                    "type": "agent_message",
-                    "text": json.dumps(
-                        {"reply": "管理员任务完成。"}, ensure_ascii=False
-                    ),
-                },
-            }
-            completed = subprocess.CompletedProcess(
-                [], 0, json.dumps(event, ensure_ascii=False) + "\n", ""
-            )
-            with mock.patch.object(
-                chat_agent_worker,
-                "resolve_codex_command",
-                return_value="codex.exe",
-            ), mock.patch.object(
-                chat_agent_worker, "run_process", return_value=completed
-            ) as run_mock:
-                result = worker.run_codex("执行任务", admin_mode=True)
-            self.assertEqual("管理员任务完成。", result["reply"])
-            args = run_mock.call_args.args[0]
-            self.assertIn("--dangerously-bypass-approvals-and-sandbox", args)
-            self.assertIn("--search", args)
-            self.assertNotIn("read-only", args)
-            self.assertEqual(
-                str(admin_workspace.resolve()),
-                args[args.index("-C") + 1],
-            )
-            self.assertEqual(
-                admin_workspace.resolve(), run_mock.call_args.kwargs["cwd"]
-            )
+            with mock.patch.object(chat_agent_worker, "run_process") as run_mock:
+                with self.assertRaisesRegex(
+                    chat_agent_worker.WorkerError, "禁止进入"
+                ):
+                    worker.run_codex("执行任务", admin_mode=True)
+            run_mock.assert_not_called()
 
     def test_admin_prompt_requires_authenticated_owner_and_hides_secrets(self):
         prompt = chat_protocol.build_admin_agent_prompt(
@@ -1208,7 +1182,8 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
         )
         self.assertIn("OneBot 原始事件核验", prompt)
         self.assertIn("完整隐私数据", prompt)
-        self.assertIn("AGENTS.md", prompt)
+        self.assertIn("不构成电脑、仓库、账号、数据库或部署授权", prompt)
+        self.assertIn("两名不同批准人", prompt)
         self.assertIn("运行项目测试", prompt)
 
     def test图片安全校验拒绝内网地址和伪图片(self):

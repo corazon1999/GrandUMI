@@ -22,6 +22,8 @@ interface Props {
   openRequest?: number;
   /** 对局页可将入口统一收进“更多”；大厅保持默认入口行为。 */
   showTrigger?: boolean;
+  /** 从云回放进入时，由服务端再次校验参与者身份后关联反馈。 */
+  replayId?: string | null;
 }
 
 type SubmitState =
@@ -46,7 +48,7 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
-export default function FeedbackOverlay({ context, openRequest, showTrigger = true }: Props) {
+export default function FeedbackOverlay({ context, openRequest, showTrigger = true, replayId }: Props) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [drafts, setDrafts] = useState<Record<FeedbackCategory, string>>({
@@ -173,6 +175,10 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
       category,
       description: trimmedDescription,
       clientInfo,
+      requestId: typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `feedback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+      ...(replayId ? { replayId } : {}),
     } as MsgBugReport);
 
     if (!sent) {

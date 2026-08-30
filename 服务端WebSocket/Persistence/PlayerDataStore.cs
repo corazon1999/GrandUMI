@@ -7,6 +7,16 @@ using Microsoft.Data.Sqlite;
 
 namespace GrandUMI.Persistence;
 
+public sealed record DisplayNameSyncOutboxItem(
+    long Id,
+    string Account,
+    string DisplayName,
+    long Revision,
+    string IdempotencyKey,
+    int Attempts);
+
+public sealed record PlayerDirectoryEntry(string Account, string DisplayName, long DisplayNameRevision);
+
 /// <summary>
 /// 玩家资料与卡组的 SQLite 持久化层。
 /// 每次操作使用独立短连接，SQLite 使用 WAL 保证读写并发。
@@ -273,6 +283,24 @@ public sealed class PlayerDataStore
             CREATE INDEX IF NOT EXISTS ix_deck_publication_likes_publication
                 ON deck_publication_likes(publication_id);
 
+            CREATE TABLE IF NOT EXISTS display_name_sync_outbox (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                account          TEXT NOT NULL COLLATE NOCASE,
+                display_name     TEXT NOT NULL,
+                revision         INTEGER NOT NULL,
+                idempotency_key  TEXT NOT NULL UNIQUE,
+                status           TEXT NOT NULL DEFAULT 'pending',
+                attempts         INTEGER NOT NULL DEFAULT 0,
+                next_attempt_at  INTEGER NOT NULL,
+                lease_until      INTEGER,
+                last_error       TEXT,
+                created_at       INTEGER NOT NULL,
+                updated_at       INTEGER NOT NULL,
+                CHECK(status IN ('pending','processing','retry','done','dead'))
+            );
+            CREATE INDEX IF NOT EXISTS ix_display_name_sync_due
+                ON display_name_sync_outbox(status,next_attempt_at,id);
+
             CREATE TABLE IF NOT EXISTS admin_player_audit (
                 id             INTEGER PRIMARY KEY AUTOINCREMENT,
                 admin_account  TEXT NOT NULL,
@@ -290,6 +318,7 @@ public sealed class PlayerDataStore
         command.ExecuteNonQuery();
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
         EnsureColumn(connection, "players", "display_name_change_used", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "players", "display_name_revision", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn(connection, "card_backs", "review_status", "TEXT NOT NULL DEFAULT 'approved'");
         EnsureColumn(connection, "card_backs", "review_reason", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "card_backs", "reviewed_by_account", "TEXT NULL");
@@ -299,7 +328,7 @@ public sealed class PlayerDataStore
         moderationIndex.CommandText = """
             CREATE INDEX IF NOT EXISTS ix_card_backs_review_status_created
                 ON card_backs(review_status, created_at DESC, id DESC);
-            PRAGMA user_version=6;
+            PRAGMA user_version=7;
             """;
         moderationIndex.ExecuteNonQuery();
     }
@@ -677,12 +706,17 @@ public sealed class PlayerDataStore
         if (string.Equals(previousName, name, StringComparison.Ordinal))
             throw new PlayerDataValidationException("新昵称与当前昵称相同。");
 
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         using (var update = connection.CreateCommand())
         {
             update.Transaction = transaction;
-            update.CommandText = "UPDATE players SET display_name=$name, updated_at=$now WHERE id=$id;";
+            update.CommandText = """
+                UPDATE players SET display_name=$name,
+                    display_name_revision=display_name_revision+1,
+                    updated_at=$now WHERE id=$id;
+                """;
             update.Parameters.AddWithValue("$name", name);
-            update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            update.Parameters.AddWithValue("$now", now);
             update.Parameters.AddWithValue("$id", playerId);
             update.ExecuteNonQuery();
         }
@@ -693,6 +727,7 @@ public sealed class PlayerDataStore
             canonicalAccount,
             "rename",
             JsonSerializer.Serialize(new { previousDisplayName = previousName, newDisplayName = name }));
+        EnqueueDisplayNameSync(connection, transaction, playerId, name, now);
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
         return snapshot;
@@ -1015,6 +1050,179 @@ public sealed class PlayerDataStore
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
         transaction.Commit();
+    }
+
+    /// <summary>
+    /// 以租约方式领取跨库昵称同步 outbox。领取与尝试次数更新位于同一个 IMMEDIATE 事务，
+    /// 进程崩溃后租约到期会重新进入 retry，不会静默丢失。
+    /// </summary>
+    public IReadOnlyList<DisplayNameSyncOutboxItem> ClaimDisplayNameSyncBatch(
+        int limit = 20,
+        DateTime? nowUtc = null,
+        TimeSpan? lease = null)
+    {
+        var now = new DateTimeOffset((nowUtc ?? DateTime.UtcNow).ToUniversalTime()).ToUnixTimeMilliseconds();
+        var leaseUntil = now + (long)(lease ?? TimeSpan.FromMinutes(2)).TotalMilliseconds;
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using (var recover = connection.CreateCommand())
+        {
+            recover.Transaction = transaction;
+            recover.CommandText = """
+                UPDATE display_name_sync_outbox
+                SET status='retry',lease_until=NULL,next_attempt_at=$now,updated_at=$now,
+                    last_error=COALESCE(last_error,'worker lease expired')
+                WHERE status='processing' AND lease_until IS NOT NULL AND lease_until<=$now;
+                """;
+            recover.Parameters.AddWithValue("$now", now);
+            recover.ExecuteNonQuery();
+        }
+        var ids = new List<long>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT id FROM display_name_sync_outbox
+                WHERE status IN ('pending','retry') AND next_attempt_at<=$now
+                ORDER BY id LIMIT $limit;
+                """;
+            select.Parameters.AddWithValue("$now", now);
+            select.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+            using var reader = select.ExecuteReader();
+            while (reader.Read()) ids.Add(reader.GetInt64(0));
+        }
+        foreach (var id in ids)
+        {
+            using var claim = connection.CreateCommand();
+            claim.Transaction = transaction;
+            claim.CommandText = """
+                UPDATE display_name_sync_outbox
+                SET status='processing',attempts=attempts+1,lease_until=$lease,updated_at=$now
+                WHERE id=$id AND status IN ('pending','retry');
+                """;
+            claim.Parameters.AddWithValue("$lease", leaseUntil);
+            claim.Parameters.AddWithValue("$now", now);
+            claim.Parameters.AddWithValue("$id", id);
+            claim.ExecuteNonQuery();
+        }
+        var result = new List<DisplayNameSyncOutboxItem>();
+        if (ids.Count > 0)
+        {
+            using var read = connection.CreateCommand();
+            read.Transaction = transaction;
+            read.CommandText = $"""
+                SELECT id,account,display_name,revision,idempotency_key,attempts
+                FROM display_name_sync_outbox
+                WHERE id IN ({string.Join(',', ids.Select((_, index) => $"$id{index}"))})
+                ORDER BY id;
+                """;
+            for (var index = 0; index < ids.Count; index++)
+                read.Parameters.AddWithValue($"$id{index}", ids[index]);
+            using var reader = read.ExecuteReader();
+            while (reader.Read()) result.Add(new DisplayNameSyncOutboxItem(
+                reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3), reader.GetString(4), reader.GetInt32(5)));
+        }
+        transaction.Commit();
+        return result;
+    }
+
+    public void CompleteDisplayNameSync(long id, DateTime? nowUtc = null)
+    {
+        var now = new DateTimeOffset((nowUtc ?? DateTime.UtcNow).ToUniversalTime()).ToUnixTimeMilliseconds();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE display_name_sync_outbox
+            SET status='done',lease_until=NULL,last_error=NULL,updated_at=$now
+            WHERE id=$id AND status IN ('processing','done');
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$now", now);
+        if (command.ExecuteNonQuery() == 0)
+            throw new PlayerDataValidationException("昵称同步 outbox 不存在或未被领取。");
+    }
+
+    public void RetryDisplayNameSync(long id, string error, DateTime? nowUtc = null)
+    {
+        var now = new DateTimeOffset((nowUtc ?? DateTime.UtcNow).ToUniversalTime()).ToUnixTimeMilliseconds();
+        error = (error ?? "unknown error").Trim();
+        if (error.Length > 1_000) error = error[..1_000];
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        int attempts;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT attempts FROM display_name_sync_outbox WHERE id=$id AND status='processing';";
+            read.Parameters.AddWithValue("$id", id);
+            if (read.ExecuteScalar() is not long value)
+                throw new PlayerDataValidationException("昵称同步 outbox 不存在或未被领取。");
+            attempts = checked((int)value);
+        }
+        var dead = attempts >= 10;
+        var delaySeconds = Math.Min(3_600, 5 * (1 << Math.Min(9, Math.Max(0, attempts - 1))));
+        using (var update = connection.CreateCommand())
+        {
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE display_name_sync_outbox
+                SET status=$status,lease_until=NULL,next_attempt_at=$next,last_error=$error,updated_at=$now
+                WHERE id=$id AND status='processing';
+                """;
+            update.Parameters.AddWithValue("$status", dead ? "dead" : "retry");
+            update.Parameters.AddWithValue("$next", now + delaySeconds * 1_000L);
+            update.Parameters.AddWithValue("$error", error);
+            update.Parameters.AddWithValue("$now", now);
+            update.Parameters.AddWithValue("$id", id);
+            update.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    public int QueueDisplayNameRepair(string account, string requestId)
+    {
+        var normalizedRequest = (requestId ?? "").Trim();
+        if (normalizedRequest.Length is < 8 or > 120 || normalizedRequest.Any(char.IsControl))
+            throw new PlayerDataValidationException("修复 requestId 无效。");
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var playerId = RequirePlayerId(connection, transaction, account);
+        string displayName;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT display_name FROM players WHERE id=$id;";
+            read.Parameters.AddWithValue("$id", playerId);
+            displayName = read.ExecuteScalar() as string
+                ?? throw new PlayerDataValidationException("玩家账号不存在。");
+        }
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var inserted = EnqueueDisplayNameSync(
+            connection, transaction, playerId, displayName, now, $"repair:{normalizedRequest}");
+        transaction.Commit();
+        return inserted;
+    }
+
+    public IReadOnlyList<PlayerDirectoryEntry> GetPlayerDirectoryEntries()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT account,display_name,display_name_revision FROM players ORDER BY account_key;";
+        var result = new List<PlayerDirectoryEntry>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) result.Add(new PlayerDirectoryEntry(reader.GetString(0), reader.GetString(1), reader.GetInt64(2)));
+        return result;
+    }
+
+    public IReadOnlyDictionary<string, int> GetDisplayNameSyncOutboxCounts()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status,COUNT(*) FROM display_name_sync_outbox GROUP BY status;";
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) result[reader.GetString(0)] = reader.GetInt32(1);
+        return result;
     }
 
     public PlayerDataSnapshot SaveDeck(string account, StoredDeck deck)
@@ -1377,12 +1585,23 @@ public sealed class PlayerDataStore
         if (DisplayNameInUse(connection, transaction, name, playerId))
             throw new PlayerDataValidationException("昵称已被其他玩家使用，请更换一个昵称。");
 
+        string previousDisplayName;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT display_name FROM players WHERE id=$id;";
+            read.Parameters.AddWithValue("$id", playerId);
+            previousDisplayName = read.ExecuteScalar() as string
+                ?? throw new PlayerDataValidationException("玩家账号不存在。");
+        }
+
         using var update = connection.CreateCommand();
         update.Transaction = transaction;
         update.CommandText = """
             UPDATE players
             SET display_name=$displayName,
                 display_name_change_used=CASE WHEN display_name <> $displayName THEN 1 ELSE display_name_change_used END,
+                display_name_revision=CASE WHEN display_name <> $displayName THEN display_name_revision+1 ELSE display_name_revision END,
                 avatar=$avatar,
                 updated_at=$now
             WHERE id=$id
@@ -1395,6 +1614,9 @@ public sealed class PlayerDataStore
         if (update.ExecuteNonQuery() == 0)
             throw new PlayerDataValidationException("昵称仅可修改一次，当前账号已使用改名机会。");
 
+        var now = Convert.ToInt64(update.Parameters["$now"].Value, CultureInfo.InvariantCulture);
+        if (!string.Equals(previousDisplayName, name, StringComparison.Ordinal))
+            EnqueueDisplayNameSync(connection, transaction, playerId, name, now);
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
         return snapshot;
@@ -2624,6 +2846,42 @@ public sealed class PlayerDataStore
         command.Parameters.AddWithValue("$spriteMapJson", JsonSerializer.Serialize(deck.SpriteMap));
         command.Parameters.AddWithValue("$clientUpdatedAt", deck.UpdatedAt);
         command.Parameters.AddWithValue("$updatedAt", serverUpdatedAt);
+    }
+
+    private static int EnqueueDisplayNameSync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playerId,
+        string displayName,
+        long now,
+        string? explicitIdempotencyKey = null)
+    {
+        string account;
+        long revision;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT account,display_name_revision FROM players WHERE id=$id;";
+            read.Parameters.AddWithValue("$id", playerId);
+            using var reader = read.ExecuteReader();
+            if (!reader.Read()) throw new PlayerDataValidationException("玩家账号不存在。");
+            account = reader.GetString(0);
+            revision = reader.GetInt64(1);
+        }
+        var key = explicitIdempotencyKey ?? $"display-name:{account.ToUpperInvariant()}:{revision}";
+        using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText = """
+            INSERT OR IGNORE INTO display_name_sync_outbox(
+                account,display_name,revision,idempotency_key,status,attempts,next_attempt_at,created_at,updated_at)
+            VALUES($account,$displayName,$revision,$key,'pending',0,$now,$now,$now);
+            """;
+        insert.Parameters.AddWithValue("$account", account);
+        insert.Parameters.AddWithValue("$displayName", displayName);
+        insert.Parameters.AddWithValue("$revision", revision);
+        insert.Parameters.AddWithValue("$key", key);
+        insert.Parameters.AddWithValue("$now", now);
+        return insert.ExecuteNonQuery();
     }
 
     private static void EnsureColumn(SqliteConnection connection, string table, string column, string definition)

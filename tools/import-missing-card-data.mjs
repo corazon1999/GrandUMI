@@ -84,7 +84,7 @@ async function fetchJson(url) {
 async function localNumbers() {
   const result = new Set();
   const dir = path.join(ROOT, "卡牌数据");
-  for (const file of (await readdir(dir)).filter((name) => name.endsWith(".json") && name !== "_index.json")) {
+  for (const file of (await readdir(dir)).filter((name) => name.endsWith(".json") && !name.startsWith("_"))) {
     const cards = JSON.parse(await readFile(path.join(dir, file), "utf8"));
     if (!Array.isArray(cards)) continue;
     for (const card of cards) {

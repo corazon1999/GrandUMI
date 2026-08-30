@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "grandumi.card-scenario-matrix.v1",
+  "scenarios": [
+    {
+      "id": "OP07-032.played-turn-target-boundary",
+      "cardNumber": "OP07-032",
+      "layer": "action-validation",
+      "given": ["本回合登场", "对方有休息角色"],
+      "when": "分别攻击角色与领袖",
+      "then": ["允许攻击角色", "拒绝攻击领袖"],
+      "automatedTest": "QqFeedback20260826RemainingRegressionTests.G628_OP07_032_CanAttackCharacterButNotLeaderOnItsPlayedTurn"
+    },
+    {
+      "id": "OP07-032.on-enter-eligible-target",
+      "cardNumber": "OP07-032",
+      "layer": "effect-resolution",
+      "given": ["我方领袖拥有鱼人族", "对方有费用6与费用7的活跃角色"],
+      "when": "确认发动登场时并选择费用6角色",
+      "then": ["费用6角色转为休息", "费用7角色不在候选中"],
+      "automatedTest": "CardContentPipelineTests.OP07_032_OnEnter_RestsOnlyEligibleCharacter"
+    },
+    {
+      "id": "OP07-032.on-enter-leader-condition",
+      "cardNumber": "OP07-032",
+      "layer": "effect-resolution",
+      "given": ["我方领袖不拥有鱼人族或人鱼族", "对方有费用6的活跃角色"],
+      "when": "结算登场时",
+      "then": ["不弹出选择", "对方角色保持活跃"],
+      "automatedTest": "CardContentPipelineTests.OP07_032_OnEnter_RequiresLeaderTrait"
+    }
+  ]
+}

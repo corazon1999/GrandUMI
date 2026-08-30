@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ygo.grand-umi.com/schemas/card-content.v1.json",
+  "title": "GrandUMI 卡牌内容",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "number",
+      "name",
+      "color",
+      "type",
+      "property",
+      "power",
+      "cost",
+      "keyWords",
+      "counter",
+      "effectTags",
+      "abilities",
+      "effectEvent",
+      "rarity",
+      "subscript",
+      "trigger",
+      "set",
+      "image",
+      "cartograph"
+    ],
+    "properties": {
+      "number": { "type": "string", "pattern": "^[A-Z0-9]+-[0-9]{3}$" },
+      "name": { "type": "string", "minLength": 1 },
+      "color": { "type": "string", "minLength": 1 },
+      "type": { "enum": ["领航", "领袖", "角色", "事件", "舞台"] },
+      "property": { "type": "string" },
+      "power": { "type": "string" },
+      "cost": { "type": "string" },
+      "keyWords": { "type": "string" },
+      "counter": { "type": "string" },
+      "effectTags": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "enum": [
+            "ActivatedMain",
+            "EventCounter",
+            "EventMain",
+            "OnAllyCharEnter",
+            "OnAllyWillBeKOd",
+            "OnAllyWillLeaveField",
+            "OnAnyCharKOd",
+            "OnAttackDeclare",
+            "OnBattleEnd",
+            "OnBlockDeclare",
+            "OnCharLeaveField",
+            "OnCharRested",
+            "OnDamageToLeader",
+            "OnDonAttached",
+            "OnDonReturnedToDeck",
+            "OnDrawCard",
+            "OnEnterField",
+            "OnGameStart",
+            "OnHandDiscarded",
+            "OnKO",
+            "OnLeaderBattle",
+            "OnLifeLeaveField",
+            "OnMyTurnEnd",
+            "OnOppAttackDeclare",
+            "OnOppBlocker",
+            "OnOppEventPlayed",
+            "OnSelfWillLeaveField",
+            "OnTriggerActivated",
+            "OnTurnStart",
+            "PreKO"
+          ]
+        }
+      },
+      "abilities": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "enum": [
+            "不可阻挡",
+            "此角色无法攻击",
+            "流放",
+            "双重攻击",
+            "速攻",
+            "速攻：角色",
+            "无法通过效果登场",
+            "阻挡者"
+          ]
+        }
+      },
+      "effectEvent": { "type": "string" },
+      "rarity": { "type": "string" },
+      "subscript": {
+        "oneOf": [
+          { "type": "integer", "minimum": 0 },
+          { "type": "string", "pattern": "^[0-9]*$" }
+        ]
+      },
+      "trigger": { "type": "string" },
+      "alsoNames": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": { "type": "string", "minLength": 1 }
+      },
+      "set": { "type": "string", "minLength": 1 },
+      "image": { "type": "string" },
+      "cartograph": { "type": "string" }
+    }
+  }
+}

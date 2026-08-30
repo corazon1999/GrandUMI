@@ -8,6 +8,8 @@ replay_archive_root=/var/lib/grandumi-test-replay-artifacts
 replay_archive_env=/etc/grandumi/grandumi-test-replay-artifact.env
 target="$1"
 force="${2:-}"
+verification_proof="${3:-}"
+verification_checksum="${4:-}"
 
 die() {
   echo "错误：$*" >&2
@@ -25,6 +27,16 @@ backend_matches_target() {
 
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供完整的 40 位提交号。"
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "测试服仓库中不存在提交 $target。"
+expected_proof="/tmp/grandumi-test-${target:0:12}.verify.json"
+[[ "$verification_proof" == "$expected_proof" ]] || die "验证证明路径与待部署提交不匹配。"
+[[ "$verification_checksum" =~ ^[0-9a-f]{64}$ ]] || die "验证证明 SHA-256 格式无效。"
+[[ -f "$verification_proof" ]] || die "缺少测试服验证证明。"
+verification_next=""
+cleanup_verification() {
+  rm -f "$verification_proof"
+  [[ -z "$verification_next" ]] || rm -f "$verification_next"
+}
+trap cleanup_verification EXIT
 
 mkdir -p "$state_dir"
 old="$(git -C "$repo" rev-parse HEAD)"
@@ -39,6 +51,15 @@ git -C "$repo" restore --worktree --staged -- "$generated" 2>/dev/null || true
 git -C "$repo" restore --worktree --staged -- '服务端WebSocket/publish' 2>/dev/null || true
 
 git -C "$repo" checkout --detach "$target"
+target_tree="$(git -C "$repo" rev-parse "$target^{tree}")"
+node "$repo/tools/verification-proof.mjs" verify \
+  --proof "$verification_proof" \
+  --commit "$target" \
+  --tree "$target_tree" \
+  --checksum "$verification_checksum" \
+  || die "测试服验证证明无效。"
+verification_next="$state_dir/test-verified.next.$$"
+install -m 0644 "$verification_proof" "$verification_next"
 install -d -m 0755 /var/lib/grandumi-admin-deploy/status
 install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
 install -m 0755 "$repo/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
@@ -249,5 +270,7 @@ fi
 backend_ready
 curl -fsS --retry 10 --retry-delay 1 --retry-connrefused -o /dev/null http://127.0.0.1:3001/
 echo "$target" > "$state_dir/test-deployed.next"
+mv "$verification_next" "$state_dir/test-verified.json"
+verification_next=""
 mv "$state_dir/test-deployed.next" "$state_dir/test-deployed"
 echo "测试服部署成功：$target"

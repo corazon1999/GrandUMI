@@ -79,12 +79,16 @@ test("日活玩家按正式服口径提供今日值和近一周一月趋势", ()
   assert.match(types, /playerTrafficUpdatedAt/);
 });
 
-test("管理员可提交测试服与正式服最新版本发布任务", () => {
-  assert.match(admin, /一键部署测试服到最新/);
-  assert.match(admin, /一键发布正式服到最新/);
-  assert.match(admin, /window\.confirm/);
-  assert.match(admin, /HomeRequest\.deployLatest\(environment\)/);
-  assert.match(protocol, /proto: "MsgAdminDeploy", environment/);
+test("管理员发布测试服与正式服前必须申请一次性凭证并二次确认", () => {
+  assert.match(admin, /申请测试服部署凭证/);
+  assert.match(admin, /申请正式服发布凭证/);
+  assert.match(admin, /二次确认并部署测试服/);
+  assert.match(admin, /二次确认并发布正式服/);
+  assert.match(admin, /HomeRequest\.requestAdminApproval\(operation, environment\)/);
+  assert.match(admin, /HomeRequest\.deployLatest\(environment, adminApproval\)/);
+  assert.doesNotMatch(admin, /HomeRequest\.deployLatest\(environment\)\)/);
+  assert.match(protocol, /proto: "MsgAdminDeploy",[\s\S]{0,80}environment,[\s\S]{0,160}challengeId: approval\?\.challengeId/);
+  assert.match(protocol, /proto: "MsgAdminApproval"/);
   assert.match(types, /AdminDeploymentEnvironment = "test" \| "production"/);
 });
 

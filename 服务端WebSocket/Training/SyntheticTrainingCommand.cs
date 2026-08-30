@@ -194,7 +194,8 @@ public static class SyntheticTrainingCommand
         CardDatabase.LoadFrom(Path.Combine(root, "卡牌数据"));
         DslInterpreter.LoadDirectory(
             Path.Combine(root, "服务端WebSocket", "Effects", "Definitions"),
-            "synthetic-training");
+            "synthetic-training",
+            failClosed: true);
     }
 
     private static string FindRepositoryRoot()

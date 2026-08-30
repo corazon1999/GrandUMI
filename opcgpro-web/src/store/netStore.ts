@@ -39,6 +39,12 @@ import type {
   AdminStorageSnapshot,
   AdminPlayerSummary,
   MsgQqWhitelistStatus,
+  OperationsCaseSummary,
+  OperationsCaseDetail,
+  OperationsCaseMetrics,
+  PrivilegedAuditEntry,
+  ConsistencyFinding,
+  ConsistencyDoctorSnapshot,
 } from "@/types/net";
 
 export function leaderMatchupKey(period: string, leaderNumber: string): string {
@@ -85,6 +91,24 @@ export type AdminOperationsState = {
   storage: AdminStorageSnapshot | null;
   test: AdminDeploymentStatus;
   production: AdminDeploymentStatus;
+};
+
+export type OperationsWorkbenchState = {
+  cases: OperationsCaseSummary[];
+  total: number;
+  metrics: OperationsCaseMetrics | null;
+  selectedCase: OperationsCaseDetail | null;
+  auditEntries: PrivilegedAuditEntry[];
+  auditChainValid: boolean | null;
+  findings: ConsistencyFinding[];
+  doctorSnapshot: ConsistencyDoctorSnapshot | null;
+  approval: {
+    operation: string;
+    target: string;
+    challengeId: string;
+    confirmationToken: string;
+    expiresAt: number;
+  } | null;
 };
 
 export interface ChatMessage {
@@ -145,6 +169,7 @@ interface NetStore {
   adminOperations: AdminOperationsState;
   adminPlayerSearchResults: AdminPlayerSummary[];
   adminTemporaryPassword: { account: string; password: string } | null;
+  operationsWorkbench: OperationsWorkbenchState;
   qqWhitelistStatus: MsgQqWhitelistStatus | null;
   // 在线玩家列表（点击在线人数时拉取）
   playerList: PlayerInfo[];
@@ -219,6 +244,11 @@ interface NetStore {
   setAdminOperations: (operations: AdminOperationsState) => void;
   setAdminPlayerSearchResults: (players: AdminPlayerSummary[]) => void;
   setAdminTemporaryPassword: (value: NetStore["adminTemporaryPassword"]) => void;
+  setOperationsCases: (items: OperationsCaseSummary[], total: number, metrics: OperationsCaseMetrics | null) => void;
+  setOperationsCaseDetail: (detail: OperationsCaseDetail | null) => void;
+  setPrivilegedAudit: (entries: PrivilegedAuditEntry[], chainValid: boolean) => void;
+  setConsistencyDoctor: (snapshot: ConsistencyDoctorSnapshot | null, findings: ConsistencyFinding[]) => void;
+  setAdminApproval: (approval: OperationsWorkbenchState["approval"]) => void;
   setQqWhitelistStatus: (status: MsgQqWhitelistStatus | null) => void;
   setPlayerList: (list: PlayerInfo[]) => void;
   setFriendData: (friends: FriendInfo[], incoming: FriendRequestInfo[], outgoing: FriendRequestInfo[]) => void;
@@ -302,6 +332,17 @@ const initialState = {
   } as AdminOperationsState,
   adminPlayerSearchResults: [] as AdminPlayerSummary[],
   adminTemporaryPassword: null as NetStore["adminTemporaryPassword"],
+  operationsWorkbench: {
+    cases: [],
+    total: 0,
+    metrics: null,
+    selectedCase: null,
+    auditEntries: [],
+    auditChainValid: null,
+    findings: [],
+    doctorSnapshot: null,
+    approval: null,
+  } as OperationsWorkbenchState,
   qqWhitelistStatus: null as MsgQqWhitelistStatus | null,
   playerList: [] as PlayerInfo[],
   friends: [] as FriendInfo[],
@@ -444,6 +485,21 @@ export const useNetStore = create<NetStore>((set) => ({
   setAdminOperations: (adminOperations) => set({ adminOperations }),
   setAdminPlayerSearchResults: (adminPlayerSearchResults) => set({ adminPlayerSearchResults }),
   setAdminTemporaryPassword: (adminTemporaryPassword) => set({ adminTemporaryPassword }),
+  setOperationsCases: (cases, total, metrics) => set((state) => ({
+    operationsWorkbench: { ...state.operationsWorkbench, cases, total, metrics },
+  })),
+  setOperationsCaseDetail: (selectedCase) => set((state) => ({
+    operationsWorkbench: { ...state.operationsWorkbench, selectedCase },
+  })),
+  setPrivilegedAudit: (auditEntries, auditChainValid) => set((state) => ({
+    operationsWorkbench: { ...state.operationsWorkbench, auditEntries, auditChainValid },
+  })),
+  setConsistencyDoctor: (doctorSnapshot, findings) => set((state) => ({
+    operationsWorkbench: { ...state.operationsWorkbench, doctorSnapshot, findings },
+  })),
+  setAdminApproval: (approval) => set((state) => ({
+    operationsWorkbench: { ...state.operationsWorkbench, approval },
+  })),
   setQqWhitelistStatus: (qqWhitelistStatus) => set({ qqWhitelistStatus }),
 
   setPlayerList: (list) => set({ playerList: list }),

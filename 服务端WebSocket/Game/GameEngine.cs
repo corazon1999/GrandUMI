@@ -407,8 +407,21 @@ public class GameEngine
         AcceptedActionLogReceipt? acceptedLog = null;
         if (accepted)
         {
-            acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);
-            OnPersistAction?.Invoke(playerIndex, action, data, correlationId); // 仅持久化被接受的动作
+            try
+            {
+                // 恢复事务先于普通 MatchLog：线上协调器会等待物理落盘，成功后客户端下行才会释放。
+                OnPersistAction?.Invoke(playerIndex, action, data, correlationId);
+                acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);
+            }
+            catch
+            {
+                _activeAction = null;
+                _activeActor = null;
+                _activeRequestId = null;
+                if (Volatile.Read(ref _trackedOperations) == 0)
+                    EndSnapshotBatch();
+                throw;
+            }
             if (trainingDecisionAudit is { } audit)
             {
                 RecordMatchLog("training_decision_context", playerIndex, new
@@ -1693,14 +1706,16 @@ public class GameEngine
             }
             p.HasReDraw = false;
         }
-        p.MulliganDone = true;
-
-        if (State.MulliganBothDone)
+        var completesMulligan = State.Players[1 - playerIndex].MulliganDone;
+        if (completesMulligan)
         {
             State.MulliganDeadlineUtc = null;
             CaptureStartingHands();
             TurnEngine.StartFirstTurn(State);
             State.OpeningStage = OpeningStage.Playing;
+            // 公开“双方已完成”前必须先把第一回合全部权威字段写好，避免并发读到
+            // MulliganBothDone=true 但 TurnCount 仍为 0 的中间状态。
+            p.MulliganDone = true;
             // 注册双方领袖的永续被动（如 OP16-080【对方回合中】我方角色费用+1）。
             // 注册为纯状态写入（无 prompt），同步完成后再广播，使快照立即包含该效果。
             RegisterLeaderPassives();
@@ -1708,6 +1723,7 @@ public class GameEngine
         }
         else
         {
+            p.MulliganDone = true;
             Broadcast("MulliganUpdate");
         }
     }

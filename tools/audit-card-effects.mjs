@@ -130,6 +130,8 @@ function isDeclaredBaseKeyword(text, keyword) {
 
 function expectedBaseAbilities(text) {
   const abilities = BASE_KEYWORDS.filter(keyword => isDeclaredBaseKeyword(text, keyword))
+  // 早期卡面使用完整句描述同一规则，后续官方关键字名为【速攻：角色】。
+  if (/^此角色可以在登场的回合中攻击角色/.test(text)) abilities.push('速攻：角色')
   if (/(^|[。\r\n])此角色无法攻击。/.test(text)) abilities.push('此角色无法攻击')
   return abilities
 }

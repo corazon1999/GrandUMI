@@ -719,6 +719,8 @@ export interface MsgPlayerSafety extends MsgBase {
   currentOpponent?: boolean;
   category?: PlayerReportCategory;
   description?: string;
+  requestId?: string;
+  caseId?: string;
   blockedPlayers?: BlockedPlayerInfo[];
   result?: boolean;
   logStr?: string;
@@ -1260,6 +1262,21 @@ export interface MsgActionRejected extends MsgBase {
   requestId?: string | null;
 }
 
+/** 服务端 → 客户端：恢复存储不可用时，对局进入只读安全暂停。 */
+export interface MsgGameRecoveryPaused extends MsgBase {
+  proto: "MsgGameRecoveryPaused";
+  roomId: string;
+  reason: string;
+  message: string;
+}
+
+/** 服务端 → 客户端：请求被限流；客户端不得自行重试有副作用的操作。 */
+export interface MsgRateLimited extends MsgBase {
+  proto: "MsgRateLimited";
+  scope: string;
+  retryAfterMs: number;
+}
+
 /** 客户端 → 服务器：游戏动作请求 */
 export interface MsgGameAction extends MsgBase {
   proto: "MsgGameAction";
@@ -1281,9 +1298,104 @@ export interface MsgBugReport extends MsgBase {
   category: FeedbackCategory; // bug 或优化建议
   description: string;   // 问题描述
   clientInfo: string;    // 客户端全量信息（JSON 字符串）
+  requestId?: string;
   result?: boolean;      // 服务端回执：是否保存成功
-  path?: string;         // 服务端回执：保存路径
+  replayId?: string;     // 可选：关联的云回放 ID
+  feedbackId?: string;   // 服务端生成的公开反馈 ID
+  caseId?: string;
+  replayLinked?: boolean;
   error?: string;        // 服务端回执：失败原因
+}
+
+export type CloudReplaySharePolicy = "masked" | "final_hands" | "full_timeline";
+export type CloudReplayOutcome = "win" | "loss" | "draw";
+
+export interface CloudReplayListItem {
+  replayId: string;
+  startedAt: number;
+  completedAt: number;
+  myName: string;
+  opponentName: string;
+  myLeader: string;
+  opponentLeader: string;
+  winnerIsMe: boolean;
+  isDraw: boolean;
+  gameOverReason: string;
+  turnCount: number;
+  matchKind: string;
+  bookmarked: boolean;
+  shared: boolean;
+  sharePolicy: CloudReplaySharePolicy;
+  feedbackCount: number;
+  sizeBytes: number;
+  runtimeArtifactId: string;
+}
+
+export interface MsgCloudReplayList extends MsgBase {
+  proto: "MsgCloudReplayList";
+  requestId: string;
+  opponent?: string;
+  outcome?: CloudReplayOutcome;
+  matchKind?: string;
+  bookmarkedOnly?: boolean;
+  from?: number;
+  to?: number;
+  offset?: number;
+  limit?: number;
+  result?: boolean;
+  items?: CloudReplayListItem[];
+  total?: number;
+  usedBytes?: number;
+  quotaBytes?: number;
+  retentionDays?: number;
+  maximumReplays?: number;
+  errorCode?: string;
+  logStr?: string;
+}
+
+export interface MsgCloudReplayLoad extends MsgBase {
+  proto: "MsgCloudReplayLoad";
+  requestId: string;
+  replayId: string;
+  shareToken?: string;
+  result?: boolean;
+  sharedAccess?: boolean;
+  sharePolicy?: CloudReplaySharePolicy;
+  document?: unknown;
+  errorCode?: string;
+  logStr?: string;
+}
+
+export interface MsgCloudReplayBookmark extends MsgBase {
+  proto: "MsgCloudReplayBookmark";
+  requestId: string;
+  replayId: string;
+  bookmarked: boolean;
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+}
+
+export interface MsgCloudReplayShare extends MsgBase {
+  proto: "MsgCloudReplayShare";
+  requestId: string;
+  replayId: string;
+  enabled: boolean;
+  sharePolicy: CloudReplaySharePolicy;
+  result?: boolean;
+  shared?: boolean;
+  shareToken?: string;
+  errorCode?: string;
+  logStr?: string;
+}
+
+export interface MsgCloudReplayDelete extends MsgBase {
+  proto: "MsgCloudReplayDelete";
+  requestId: string;
+  replayId: string;
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
 }
 
 /** 服务器 → 客户端：对手断线通知 */
@@ -1484,6 +1596,221 @@ export interface MsgAdminOperations extends MsgBase {
 export interface MsgAdminDeploy extends MsgBase {
   proto: "MsgAdminDeploy";
   environment: AdminDeploymentEnvironment;
+  requestId?: string;
+  challengeId?: string;
+  confirmationToken?: string;
+}
+
+export type OperationsCaseStatus =
+  | "new" | "triaged" | "investigating" | "actioned"
+  | "resolved" | "rejected" | "appealed" | "closed";
+export type OperationsPenaltyKind = "mute" | "match_ban" | "spectate_chat_ban";
+
+export interface OperationsCaseSummary {
+  caseId: string;
+  source: string;
+  category: string;
+  title: string;
+  status: OperationsCaseStatus;
+  priority: "low" | "normal" | "high" | "critical";
+  reporterAccount?: string | null;
+  subjectAccount?: string | null;
+  relatedAccount?: string | null;
+  roomId?: string | null;
+  replayId?: string | null;
+  assignee?: string | null;
+  disposition?: string | null;
+  createdAt: number;
+  firstActionAt?: number | null;
+  updatedAt: number;
+  evidenceCount: number;
+  activePenaltyCount: number;
+}
+
+export interface OperationsPenalty {
+  penaltyId: string;
+  caseId: string;
+  account: string;
+  kind: OperationsPenaltyKind;
+  reason: string;
+  operatorAccount: string;
+  source: string;
+  startsAt: number;
+  expiresAt: number;
+  revokedAt?: number | null;
+  revokedBy?: string | null;
+  revokeReason?: string | null;
+}
+
+export interface OperationsCaseDetail {
+  summary: OperationsCaseSummary;
+  description: string;
+  externalEventId?: string | null;
+  appealText?: string | null;
+  evidence: Array<{ id: number; type: string; payloadJson: string; createdAt: number; expiresAt?: number | null }>;
+  events: Array<{
+    id: number; eventType: string; fromStatus?: string | null; toStatus?: string | null;
+    actorAccount: string; source: string; requestId?: string | null; note: string; createdAt: number;
+  }>;
+  penalties: OperationsPenalty[];
+}
+
+export interface OperationsCaseMetrics {
+  total: number;
+  awaitingFirstAction: number;
+  firstActionP90Ms?: number | null;
+  byStatus: Record<string, number>;
+}
+
+export interface PrivilegedAuditEntry {
+  id: number;
+  actorAccount: string;
+  source: string;
+  operation: string;
+  target?: string | null;
+  requestId: string;
+  result: string;
+  detailJson: string;
+  createdAt: number;
+  previousHash: string;
+  eventHash: string;
+}
+
+export interface ConsistencyFinding {
+  id: number;
+  scope: string;
+  findingKey: string;
+  status: string;
+  severity: string;
+  authoritativeJson: string;
+  observedJson: string;
+  repairAction: string;
+  lastError?: string | null;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  resolvedAt?: number | null;
+}
+
+export interface ConsistencyDoctorSnapshot {
+  checkedAt: number;
+  processed: number;
+  succeeded: number;
+  retried: number;
+  openFindings: number;
+  outboxCounts: Record<string, number>;
+  schemas: Array<{
+    name: string; path: string; exists: boolean; healthy: boolean; integrity: string;
+    userVersion: number; migrationTables: string[]; sizeBytes: number; lastWriteAt?: number | null;
+  }>;
+}
+
+export interface MsgOperationsCases extends MsgBase {
+  proto: "MsgOperationsCases";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId?: string;
+  status?: string;
+  source?: string;
+  assignee?: string;
+  account?: string;
+  offset?: number;
+  limit?: number;
+  canManage?: boolean;
+  items?: OperationsCaseSummary[];
+  total?: number;
+  metrics?: OperationsCaseMetrics | null;
+}
+
+export interface MsgOperationsCaseDetail extends MsgBase {
+  proto: "MsgOperationsCaseDetail";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId?: string;
+  caseId?: string;
+  canManage?: boolean;
+  detail?: OperationsCaseDetail;
+}
+
+export interface MsgOperationsCaseUpdate extends MsgBase {
+  proto: "MsgOperationsCaseUpdate";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId: string;
+  caseId?: string;
+  toStatus?: OperationsCaseStatus;
+  assignee?: string;
+  disposition?: string;
+  note?: string;
+  detail?: OperationsCaseDetail;
+}
+
+export interface MsgOperationsCaseAppeal extends MsgBase {
+  proto: "MsgOperationsCaseAppeal";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId: string;
+  caseId?: string;
+  appealText?: string;
+  detail?: OperationsCaseDetail;
+}
+
+export interface MsgOperationsPenalty extends MsgBase {
+  proto: "MsgOperationsPenalty";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId: string;
+  action?: "apply" | "revoke";
+  caseId?: string;
+  account?: string;
+  kind?: OperationsPenaltyKind;
+  expiresAt?: number;
+  reason?: string;
+  penaltyId?: string;
+  penalty?: OperationsPenalty;
+}
+
+export interface MsgPrivilegedAudit extends MsgBase {
+  proto: "MsgPrivilegedAudit";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId?: string;
+  offset?: number;
+  limit?: number;
+  chainValid?: boolean;
+  entries?: PrivilegedAuditEntry[];
+}
+
+export interface MsgConsistencyDoctor extends MsgBase {
+  proto: "MsgConsistencyDoctor";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId: string;
+  action?: "snapshot" | "repair";
+  findingId?: number;
+  challengeId?: string;
+  confirmationToken?: string;
+  snapshot?: ConsistencyDoctorSnapshot;
+  findings?: ConsistencyFinding[];
+}
+
+export interface MsgAdminApproval extends MsgBase {
+  proto: "MsgAdminApproval";
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  requestId: string;
+  operation?: "deploy_test" | "deploy_production" | "reset_password" | "database_repair";
+  target?: string;
+  challengeId?: string;
+  confirmationToken?: string;
+  expiresAt?: number;
 }
 
 export interface MsgAdminPlayerSearch extends MsgBase {
@@ -1505,6 +1832,8 @@ export interface MsgAdminPlayerUpdate extends MsgBase {
   qq?: string;
   expectedBindingRevision?: number;
   requestId?: string;
+  challengeId?: string;
+  confirmationToken?: string;
   player?: AdminPlayerSummary | null;
   temporaryPassword?: string | null;
   replayed?: boolean;
@@ -1568,6 +1897,8 @@ export type AnyMsg =
   | MsgKickSpectator
   | MsgSpectatorKicked
   | MsgActionRejected
+  | MsgGameRecoveryPaused
+  | MsgRateLimited
   | MsgRequestState
   | MsgPlayerDisconnected
   | MsgPlayerReconnected
@@ -1577,7 +1908,20 @@ export type AnyMsg =
   | MsgAdminDeploy
   | MsgAdminPlayerSearch
   | MsgAdminPlayerUpdate
+  | MsgOperationsCases
+  | MsgOperationsCaseDetail
+  | MsgOperationsCaseUpdate
+  | MsgOperationsCaseAppeal
+  | MsgOperationsPenalty
+  | MsgPrivilegedAudit
+  | MsgConsistencyDoctor
+  | MsgAdminApproval
   | MsgBugReport
+  | MsgCloudReplayList
+  | MsgCloudReplayLoad
+  | MsgCloudReplayBookmark
+  | MsgCloudReplayShare
+  | MsgCloudReplayDelete
   | MsgChatMsg
   | MsgGlobalAnnouncement
   | MsgGameChat

@@ -37,6 +37,13 @@ public static class ServerMetrics
         Counter(output, "grandumi_websocket_dropped_messages_total", WebSocketBridge.DroppedOutboundCount);
         Gauge(output, "grandumi_room_journal_queue_depth", RoomJournal.QueueDepth);
         Counter(output, "grandumi_room_journal_dropped_total", RoomJournal.DroppedEntries);
+        Counter(output, "grandumi_room_journal_commit_failures_total", RoomJournal.DurableCommitFailures);
+        Counter(output, "grandumi_room_journal_unconfirmed_tail_truncations_total", RoomJournal.TailTruncations);
+        Gauge(output, "grandumi_room_recovery_snapshot_queue_depth", RoomRecoverySnapshotStore.QueueDepth);
+        Counter(output, "grandumi_room_recovery_snapshot_failures_total", RoomRecoverySnapshotStore.WriteFailures);
+        Gauge(output, "grandumi_room_recovery_paused", GameRoomManager.RecoveryPausedRoomCount);
+        Counter(output, "grandumi_room_recovery_paused_total", GameRoomManager.RecoveryPausedTotal);
+        Counter(output, "grandumi_room_recovery_quarantined_total", GameRoomManager.RecoveryQuarantinedTotal);
         Gauge(output, "grandumi_matchlog_queue_depth", MatchLogRecorder.QueueDepth);
         Counter(output, "grandumi_matchlog_dropped_total", MatchLogRecorder.DroppedEntries);
         var storage = StorageHealth.GetCurrent();
