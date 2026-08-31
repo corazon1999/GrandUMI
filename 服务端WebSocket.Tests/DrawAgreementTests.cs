@@ -260,7 +260,11 @@ public class DrawAgreementTests
                 room.PlayerSessionIds[responder],
                 "RespondDraw",
                 JsonSerializer.SerializeToElement(new { accept = false }));
-            await WaitUntilAsync(() => room.Engine.State.PendingDrawRequester is null);
+            // 清空申请和拒绝广播都早于房间队列最终恢复棋钟，广播还会短暂启动一次棋钟。
+            // 先等 Stop 之后写入的 accepted 提交标记，再在 ClockGate 下确认最终恢复，
+            // 避免把动作仍在提交中的中间状态当成完成状态。
+            await WaitUntilAsync(() => IsDrawResponseCommittedAndClockRunning(room));
+            Assert.Null(room.Engine.State.PendingDrawRequester);
             Assert.Equal(room.Engine.State.CurrentTurnPlayer, room.Engine.State.OperationClockActivePlayer);
         }
         finally
@@ -313,6 +317,22 @@ public class DrawAgreementTests
         for (var i = 0; i < 200 && !condition(); i++)
             await Task.Delay(5);
         Assert.True(condition(), "平局协商状态未在预期时间内更新");
+    }
+
+    private static bool IsDrawResponseCommittedAndClockRunning(GameRoomManager.RoomEntry room)
+    {
+        lock (room.FeedbackEvidenceGate)
+        {
+            if (!room.RecentFeedbackActions.Any(action =>
+                    action.Action == "RespondDraw" && action.Outcome == "accepted"))
+                return false;
+        }
+
+        lock (room.ClockGate)
+        {
+            return room.Engine.State.PendingDrawRequester is null
+                && room.Engine.State.OperationClockActivePlayer == room.Engine.State.CurrentTurnPlayer;
+        }
     }
 
     private static string BuildLegalDeck(string leaderNumber)
