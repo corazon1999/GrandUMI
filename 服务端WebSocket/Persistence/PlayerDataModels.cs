@@ -44,6 +44,7 @@ public sealed record PlayerDataSnapshot(
     string CardBackId,
     bool CanChangeDisplayName,
     string? SelectedDeckName,
+    string? EquippedChampionLeaderNumber,
     IReadOnlyList<StoredDeck> Decks);
 
 /// <summary>卡背广场中的玩家投稿（图片本体通过只读 HTTP 地址按需获取）。</summary>

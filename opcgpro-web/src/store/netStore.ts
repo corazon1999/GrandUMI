@@ -20,6 +20,7 @@ import type {
   MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
+  MsgLeaderChampionQuery,
   CardBackGalleryItem,
   CardBackGallerySortOrder,
   CardBackReviewItem,
@@ -146,6 +147,8 @@ interface NetStore {
   avatar: string;
   cardBackId: string;
   canChangeDisplayName: boolean;
+  championLeaderNumbers: string[];
+  equippedChampionLeaderNumber: string | null;
   // 错误提示
   error: string | null;
   // 匹配
@@ -187,6 +190,7 @@ interface NetStore {
   leaderMatchupMatrix: MsgLeaderMatchupMatrix | null;
   // 当前个人详情页的周期统计
   playerProfileStats: MsgPlayerProfileStats | null;
+  leaderChampionQuery: MsgLeaderChampionQuery | null;
   cardBackGallery: CardBackGalleryItem[] | null;
   cardBackGalleryOwned: CardBackGalleryItem[];
   cardBackGalleryTotal: number;
@@ -220,6 +224,7 @@ interface NetStore {
   setLoggedIn: (v: boolean, name?: string, account?: string) => void;
   setPlayerName: (name: string) => void;
   setProfile: (name: string, avatar: string, cardBackId?: string, canChangeDisplayName?: boolean) => void;
+  setChampionTitles: (leaderNumbers: string[], equippedLeaderNumber: string | null) => void;
   setError: (msg: string | null) => void;
   setMatchState: (s: MatchState) => void;
   setMatchQueueKind: (kind: MatchQueueKind) => void;
@@ -261,6 +266,7 @@ interface NetStore {
   clearLeaderMatchups: () => void;
   setLeaderMatchupMatrix: (data: MsgLeaderMatchupMatrix | null) => void;
   setPlayerProfileStats: (data: MsgPlayerProfileStats | null) => void;
+  setLeaderChampionQuery: (data: MsgLeaderChampionQuery | null) => void;
   setCardBackGallery: (items: CardBackGalleryItem[] | null) => void;
   setCardBackGalleryPage: (page: {
     items: CardBackGalleryItem[];
@@ -297,6 +303,8 @@ const initialState = {
   avatar: "",
   cardBackId: "classic",
   canChangeDisplayName: false,
+  championLeaderNumbers: [] as string[],
+  equippedChampionLeaderNumber: null as string | null,
   error: null as string | null,
   matchState: "idle" as MatchState,
   matchQueueKind: "casualStandard" as const,
@@ -357,6 +365,7 @@ const initialState = {
   leaderMatchups: {} as Record<string, MsgLeaderMatchups>,
   leaderMatchupMatrix: null as MsgLeaderMatchupMatrix | null,
   playerProfileStats: null as MsgPlayerProfileStats | null,
+  leaderChampionQuery: null as MsgLeaderChampionQuery | null,
   cardBackGallery: null as CardBackGalleryItem[] | null,
   cardBackGalleryOwned: [] as CardBackGalleryItem[],
   cardBackGalleryTotal: 0,
@@ -401,6 +410,11 @@ export const useNetStore = create<NetStore>((set) => ({
     cardBackId: cardBackId ?? state.cardBackId,
     canChangeDisplayName: canChangeDisplayName ?? state.canChangeDisplayName,
   })),
+
+  setChampionTitles: (championLeaderNumbers, equippedChampionLeaderNumber) => set({
+    championLeaderNumbers,
+    equippedChampionLeaderNumber,
+  }),
 
   setError: (msg) => set({ error: msg }),
 
@@ -538,6 +552,8 @@ export const useNetStore = create<NetStore>((set) => ({
   setLeaderMatchupMatrix: (leaderMatchupMatrix) => set({ leaderMatchupMatrix }),
 
   setPlayerProfileStats: (playerProfileStats) => set({ playerProfileStats }),
+
+  setLeaderChampionQuery: (leaderChampionQuery) => set({ leaderChampionQuery }),
 
   setCardBackGallery: (cardBackGallery) => set({
     cardBackGallery,

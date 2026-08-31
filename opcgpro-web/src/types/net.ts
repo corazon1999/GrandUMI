@@ -111,6 +111,8 @@ export interface MsgLogin extends MsgBase {
   cardBackId?: string;
   canChangeDisplayName?: boolean;
   selectedDeckName?: string | null;
+  championLeaderNumbers?: string[];
+  equippedChampionLeaderNumber?: string | null;
   decks?: SavedDeck[];
   result?: boolean;  // true = 成功（C# 中是 bool 不是 int）
   logStr?: string;   // 服务器提示文本
@@ -142,7 +144,14 @@ export interface MsgPlayerData extends MsgBase {
   cardBackId?: string;
   canChangeDisplayName?: boolean;
   selectedDeckName?: string | null;
+  championLeaderNumbers?: string[];
+  equippedChampionLeaderNumber?: string | null;
   decks?: SavedDeck[];
+}
+
+export interface MsgUpdateChampionTitle extends MsgBase {
+  proto: "MsgUpdateChampionTitle";
+  leaderNumber: string;
 }
 
 export interface MsgSaveDeck extends MsgBase {
@@ -736,6 +745,21 @@ export type LeaderboardPeriod = "7d" | "30d" | "all";
 
 export interface LeaderChampionInfo {
   displayName: string;
+}
+
+export interface LeaderChampionQueryStats {
+  games: number;
+  winRate: number;
+}
+
+/** 按 Leader 编号匿名查询当前“最强”称号的近 30 日总场次和原始胜率。 */
+export interface MsgLeaderChampionQuery extends MsgBase {
+  proto: "MsgLeaderChampionQuery";
+  leaderNumber: string;
+  result?: boolean;
+  error?: string;
+  generatedAtUtc?: string;
+  champion?: LeaderChampionQueryStats | null;
 }
 
 export interface LeaderLeaderboardItem {
@@ -1860,6 +1884,7 @@ export type AnyMsg =
   | MsgDeleteDeck
   | MsgSelectDeck
   | MsgUpdateProfile
+  | MsgUpdateChampionTitle
   | MsgUpdateCardBack
   | MsgCardBackGallery
   | MsgUploadCardBack
@@ -1933,6 +1958,7 @@ export type AnyMsg =
   | MsgFriendChat
   | MsgLeaveGameChat
   | MsgLeaderLeaderboard
+  | MsgLeaderChampionQuery
   | MsgLeaderMatchups
   | MsgLeaderMatchupMatrix
   | MsgPlayerProfileStats

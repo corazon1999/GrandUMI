@@ -6,7 +6,10 @@ namespace GrandUMI.Tests;
 
 public sealed class PlayerDataStoreTests : IDisposable
 {
-    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "grandumi-player-data-tests", Guid.NewGuid().ToString("N"));
+    private readonly string _tempDir = Path.Combine(
+        Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_DIR") ?? Path.GetTempPath(),
+        "grandumi-player-data-tests",
+        Guid.NewGuid().ToString("N"));
     private readonly string _databasePath;
 
     public PlayerDataStoreTests()
@@ -83,6 +86,62 @@ public sealed class PlayerDataStoreTests : IDisposable
         var deleted = store.DeleteDeck("玩家甲", "红色卡组");
         Assert.Empty(deleted.Decks);
         Assert.Null(deleted.SelectedDeckName);
+    }
+
+    [Fact]
+    public void 最强称号装备偏好会持久化且重复装备保持幂等()
+    {
+        var store = CreateStore();
+        var initial = store.Login("Alice");
+        Assert.Null(initial.EquippedChampionLeaderNumber);
+
+        var selected = store.UpdateEquippedChampionTitle("alice", " op16-001 ");
+        var repeated = store.UpdateEquippedChampionTitle("ALICE", "OP16-001");
+        var reloaded = CreateStore().Login("Alice");
+
+        Assert.Equal("OP16-001", selected.EquippedChampionLeaderNumber);
+        Assert.Equal("OP16-001", repeated.EquippedChampionLeaderNumber);
+        Assert.Equal("OP16-001", reloaded.EquippedChampionLeaderNumber);
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.UpdateEquippedChampionTitle("Alice", "../OP16-001"));
+    }
+
+    [Fact]
+    public void 旧版玩家库初始化时会无损补齐最强称号装备字段()
+    {
+        Directory.CreateDirectory(_tempDir);
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE players (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_key TEXT NOT NULL UNIQUE,
+                    account TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    display_name_change_used INTEGER NOT NULL DEFAULT 0,
+                    display_name_revision INTEGER NOT NULL DEFAULT 0,
+                    avatar TEXT NOT NULL DEFAULT '',
+                    card_back_id TEXT NOT NULL DEFAULT 'classic',
+                    selected_deck_name TEXT NULL,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    last_login_at INTEGER NOT NULL
+                );
+                INSERT INTO players(account_key, account, display_name, created_at, updated_at, last_login_at)
+                VALUES('ALICE', 'Alice', 'Alice', 1, 1, 1);
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var store = new PlayerDataStore(_databasePath);
+        store.Initialize();
+        var migrated = store.Login("alice");
+
+        Assert.Equal("Alice", migrated.DisplayName);
+        Assert.Null(migrated.EquippedChampionLeaderNumber);
+        Assert.Equal("OP01-001", store.UpdateEquippedChampionTitle("Alice", "OP01-001").EquippedChampionLeaderNumber);
     }
 
     [Fact]

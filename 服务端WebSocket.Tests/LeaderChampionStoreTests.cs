@@ -174,6 +174,28 @@ public sealed class LeaderChampionStoreTests : IDisposable
     }
 
     [Fact]
+    public void 装备称号不受当前使用Leader限制且资格失效时安全回退()
+    {
+        var now = UtcNow();
+        var store = CreateStore();
+        RecordCandidate(store, now, "alice", "OP16-001", 0, 30, 24);
+        RecordCandidate(store, now, "alice", "OP17-020", 100, 30, 23);
+
+        var owned = store.GetChampionLeaderNumbers("alice", now);
+        store.RememberEquippedChampionLeaderNumber("alice", "OP17-020");
+
+        Assert.Equal(2, owned.Count);
+        Assert.Equal("OP17-020", store.ResolveEquippedChampionLeaderNumber("alice", now));
+
+        store.RememberEquippedChampionLeaderNumber("alice", "OP99-999");
+        Assert.Equal(owned[0], store.ResolveEquippedChampionLeaderNumber("alice", now));
+
+        store.RememberEquippedChampionLeaderNumber("alice", null);
+        Assert.Equal(owned[0], store.ResolveEquippedChampionLeaderNumber("alice", now));
+        Assert.Null(store.ResolveEquippedChampionLeaderNumber("nobody", now));
+    }
+
+    [Fact]
     public void 测试服从独立排行榜数据库读取最强使用者()
     {
         var now = UtcNow();

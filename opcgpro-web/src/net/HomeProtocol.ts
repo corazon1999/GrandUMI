@@ -26,6 +26,7 @@ import type {
   MsgDeleteDeck,
   MsgSelectDeck,
   MsgUpdateProfile,
+  MsgUpdateChampionTitle,
   MsgUpdateCardBack,
   MsgCardBackGallery,
   MsgUploadCardBack,
@@ -68,6 +69,7 @@ import type {
   MsgFriendCancel,
   MsgPlayerSafety,
   MsgLeaderLeaderboard,
+  MsgLeaderChampionQuery,
   MsgLeaderMatchupMatrix,
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
@@ -379,6 +381,9 @@ export function registerHomeProtocols() {
       case "MsgLeaderLeaderboard":
         handleLeaderLeaderboard(msg as MsgLeaderLeaderboard);
         break;
+      case "MsgLeaderChampionQuery":
+        handleLeaderChampionQuery(msg as MsgLeaderChampionQuery);
+        break;
       case "MsgLeaderMatchups":
         handleLeaderMatchups(msg as MsgLeaderMatchups);
         break;
@@ -542,6 +547,8 @@ function handleLogin(msg: MsgLogin) {
       msg.cardBackId ?? "classic",
       msg.canChangeDisplayName ?? false,
       msg.selectedDeckName ?? null,
+      Array.isArray(msg.championLeaderNumbers) ? msg.championLeaderNumbers : [],
+      msg.equippedChampionLeaderNumber ?? null,
       msg.decks ?? [],
     );
     store.setLoggedIn(true, displayName, account);
@@ -615,6 +622,8 @@ function applyPlayerData(
   cardBackId: string,
   canChangeDisplayName: boolean,
   selectedDeckName: string | null,
+  championLeaderNumbers: string[],
+  equippedChampionLeaderNumber: string | null,
   decks: SavedDeck[],
 ) {
   setDeckStorageAccount(account);
@@ -623,6 +632,7 @@ function applyPlayerData(
 
   const store = useNetStore.getState();
   store.setProfile(displayName, avatar, cardBackId, canChangeDisplayName);
+  store.setChampionTitles(championLeaderNumbers, equippedChampionLeaderNumber);
   const selected = selectedDeckName
     ? decks.find((deck) => deck.name === selectedDeckName)
     : undefined;
@@ -659,6 +669,8 @@ function handlePlayerData(msg: MsgPlayerData) {
     msg.cardBackId ?? current.cardBackId,
     msg.canChangeDisplayName ?? current.canChangeDisplayName,
     msg.selectedDeckName ?? null,
+    Array.isArray(msg.championLeaderNumbers) ? msg.championLeaderNumbers : [],
+    msg.equippedChampionLeaderNumber ?? null,
     msg.decks,
   );
 
@@ -1103,6 +1115,10 @@ function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
   if (msg.result === false && msg.error) showMessage(msg.error, "error");
 }
 
+function handleLeaderChampionQuery(msg: MsgLeaderChampionQuery) {
+  useNetStore.getState().setLeaderChampionQuery(msg);
+}
+
 /** MsgLeaderMatchups — 指定 Leader 对阵当前周期榜前二十及起手留牌的统计。 */
 function handleLeaderMatchups(msg: MsgLeaderMatchups) {
   useNetStore.getState().setLeaderMatchups(msg);
@@ -1347,6 +1363,10 @@ export const HomeRequest = {
 
   updateProfile(displayName: string, avatar: string) {
     return NetManager.send({ proto: "MsgUpdateProfile", displayName, avatar } as MsgUpdateProfile);
+  },
+
+  updateChampionTitle(leaderNumber: string) {
+    return NetManager.send({ proto: "MsgUpdateChampionTitle", leaderNumber } as MsgUpdateChampionTitle);
   },
 
   updateCardBack(cardBackId: string) {
@@ -1821,6 +1841,22 @@ export const HomeRequest = {
     store.clearLeaderMatchups();
     store.setLeaderMatchupMatrix(null);
     return NetManager.send({ proto: "MsgLeaderLeaderboard", period } as MsgLeaderLeaderboard);
+  },
+
+  requestLeaderChampion(leaderNumber: string) {
+    const store = useNetStore.getState();
+    store.setLeaderChampionQuery({
+      proto: "MsgLeaderChampionQuery",
+      leaderNumber,
+    });
+    const sent = NetManager.send({ proto: "MsgLeaderChampionQuery", leaderNumber } as MsgLeaderChampionQuery);
+    if (!sent) store.setLeaderChampionQuery({
+      proto: "MsgLeaderChampionQuery",
+      leaderNumber,
+      result: false,
+      error: "网络未连接，请稍后再试。",
+    });
+    return sent;
   },
 
   requestLeaderMatchups(period: LeaderboardPeriod, leaderNumber: string) {

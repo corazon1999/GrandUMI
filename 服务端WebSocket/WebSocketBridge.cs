@@ -371,6 +371,7 @@ public static class WebSocketBridge
             case "MsgDeleteDeck":  OnDeleteDeck(session, msg);   break;
             case "MsgSelectDeck":  OnSelectDeck(session, msg);   break;
             case "MsgUpdateProfile": OnUpdateProfile(session, msg); break;
+            case "MsgUpdateChampionTitle": OnUpdateChampionTitle(session, msg); break;
             case "MsgUpdateCardBack": OnUpdateCardBack(session, msg); break;
             case "MsgCardBackGallery": OnCardBackGallery(session, msg); break;
             case "MsgUploadCardBack": OnUploadCardBack(session, msg); break;
@@ -401,6 +402,7 @@ public static class WebSocketBridge
             case "MsgFriendRemove": OnFriendRemove(session, msg); break;
             case "MsgPlayerSafety": OnPlayerSafety(session, msg); break;
             case "MsgLeaderLeaderboard": OnLeaderLeaderboard(session, msg); break;
+            case "MsgLeaderChampionQuery": OnLeaderChampionQuery(session, msg); break;
             case "MsgLeaderMatchups": OnLeaderMatchups(session, msg); break;
             case "MsgLeaderMatchupMatrix": OnLeaderMatchupMatrix(session, msg); break;
             case "MsgPlayerProfileStats": OnPlayerProfileStats(session, msg); break;
@@ -665,6 +667,8 @@ public static class WebSocketBridge
             // 后续登录回包和恢复只能由此刻仍为权威的连接执行。
             if (!IsCurrentAccountSession(s)) return;
 
+            var (championLeaderNumbers, equippedChampionLeaderNumber) = ResolveChampionTitleSnapshot(playerData);
+
             Send(s.SessionId, new
             {
                 proto = "MsgLogin",
@@ -674,6 +678,8 @@ public static class WebSocketBridge
                 cardBackId = playerData.CardBackId,
                 canChangeDisplayName = playerData.CanChangeDisplayName,
                 selectedDeckName = playerData.SelectedDeckName,
+                championLeaderNumbers,
+                equippedChampionLeaderNumber,
                 decks = playerData.Decks,
                 authToken = authentication.AuthToken,
                 qqMasked = qqAccess.MaskedQq,
@@ -975,6 +981,22 @@ public static class WebSocketBridge
             SendPlayerData(s, snapshot);
         }
         catch (Exception ex) { SendPlayerDataError(s, ex, "更新玩家资料失败"); }
+    }
+
+    private static void OnUpdateChampionTitle(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        if (!TryRequirePlayer(s)) return;
+        try
+        {
+            if (!s.TryConsumeRateLimit("champion-title-update", capacity: 6, refillPerSecond: 0.5))
+                throw new PlayerDataValidationException("称号操作过于频繁，请稍后再试。");
+            var leaderNumber = PlayerDataStore.NormalizeChampionLeaderNumber(Str(msg, "leaderNumber"));
+            if (!LeaderChampionStore.Default.IsChampion(s.Account, leaderNumber))
+                throw new PlayerDataValidationException("你当前未持有该 Leader 的“最强”称号。");
+            var snapshot = _playerDataStore.UpdateEquippedChampionTitle(s.Account!, leaderNumber);
+            SendPlayerData(s, snapshot, $"已装备“最强{leaderNumber}”称号");
+        }
+        catch (Exception ex) { SendPlayerDataError(s, ex, "装备最强称号失败"); }
     }
 
     private static void OnUpdateCardBack(WsSession s, Dictionary<string, JsonElement> msg)
@@ -2634,6 +2656,54 @@ public static class WebSocketBridge
         {
             LogErr($"读取 Leader 排行榜失败: {ex.Message}");
             Send(s.SessionId, new { proto = "MsgLeaderLeaderboard", result = false, error = "排行榜暂时不可用" });
+        }
+    }
+
+    private static void OnLeaderChampionQuery(WsSession s, Dictionary<string, JsonElement> msg)
+    {
+        var requestedLeader = (Str(msg, "leaderNumber") ?? "").Trim().ToUpperInvariant();
+        if (!TryRequirePlayer(s)) return;
+        if (!s.TryConsumeRateLimit("leader-champion-query", capacity: 10, refillPerSecond: 0.5))
+        {
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderChampionQuery",
+                result = false,
+                leaderNumber = requestedLeader,
+                error = "查询过于频繁，请稍后再试。",
+            });
+            return;
+        }
+
+        try
+        {
+            var leaderNumber = PlayerDataStore.NormalizeChampionLeaderNumber(requestedLeader);
+            var champion = LeaderChampionStore.Default.GetChampion(leaderNumber);
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderChampionQuery",
+                result = true,
+                leaderNumber,
+                generatedAtUtc = DateTime.UtcNow,
+                champion = champion is null ? null : new
+                {
+                    games = champion.Games,
+                    winRate = champion.Games == 0 ? 0 : champion.Wins / (double)champion.Games,
+                },
+            });
+        }
+        catch (Exception ex)
+        {
+            var message = ex is PlayerDataValidationException ? ex.Message : "最强称号查询暂时不可用。";
+            if (ex is not PlayerDataValidationException)
+                LogErr($"查询 Leader 最强称号失败: {ex.Message}");
+            Send(s.SessionId, new
+            {
+                proto = "MsgLeaderChampionQuery",
+                result = false,
+                leaderNumber = requestedLeader,
+                error = message,
+            });
         }
     }
 
@@ -5534,6 +5604,7 @@ public static class WebSocketBridge
 
     private static void SendPlayerData(WsSession session, PlayerDataSnapshot snapshot, string? logStr = null)
     {
+        var (championLeaderNumbers, equippedChampionLeaderNumber) = ResolveChampionTitleSnapshot(snapshot);
         Send(session.SessionId, new
         {
             proto = "MsgPlayerData",
@@ -5545,8 +5616,30 @@ public static class WebSocketBridge
             cardBackId = snapshot.CardBackId,
             canChangeDisplayName = snapshot.CanChangeDisplayName,
             selectedDeckName = snapshot.SelectedDeckName,
+            championLeaderNumbers,
+            equippedChampionLeaderNumber,
             decks = snapshot.Decks,
         });
+    }
+
+    private static (IReadOnlyList<string> Owned, string? Equipped) ResolveChampionTitleSnapshot(
+        PlayerDataSnapshot snapshot)
+    {
+        LeaderChampionStore.Default.RememberEquippedChampionLeaderNumber(
+            snapshot.Account,
+            snapshot.EquippedChampionLeaderNumber);
+        try
+        {
+            var owned = LeaderChampionStore.Default.GetChampionLeaderNumbers(snapshot.Account);
+            var equipped = LeaderChampionStore.Default.ResolveEquippedChampionLeaderNumber(snapshot.Account);
+            return (owned, equipped);
+        }
+        catch (Exception ex)
+        {
+            // 称号属于附加画像；数据源短暂不可用时只隐藏称号，不阻断登录、卡组或个人资料操作。
+            LogErr($"读取 {snapshot.Account} 的最强称号失败: {ex.Message}");
+            return (Array.Empty<string>(), null);
+        }
     }
 
     private static (bool Online, string Status) PresenceOf(string account)

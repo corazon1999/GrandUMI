@@ -143,6 +143,7 @@ public sealed class PlayerDataStore
                 avatar             TEXT NOT NULL DEFAULT '',
                 card_back_id       TEXT NOT NULL DEFAULT 'classic',
                 selected_deck_name TEXT NULL,
+                equipped_champion_leader_number TEXT NULL,
                 created_at         INTEGER NOT NULL,
                 updated_at         INTEGER NOT NULL,
                 last_login_at      INTEGER NOT NULL
@@ -321,6 +322,7 @@ public sealed class PlayerDataStore
         EnsureColumn(connection, "players", "card_back_id", "TEXT NOT NULL DEFAULT 'classic'");
         EnsureColumn(connection, "players", "display_name_change_used", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn(connection, "players", "display_name_revision", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "players", "equipped_champion_leader_number", "TEXT NULL");
         EnsureColumn(connection, "card_backs", "review_status", "TEXT NOT NULL DEFAULT 'approved'");
         EnsureColumn(connection, "card_backs", "review_reason", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "card_backs", "reviewed_by_account", "TEXT NULL");
@@ -330,7 +332,7 @@ public sealed class PlayerDataStore
         moderationIndex.CommandText = """
             CREATE INDEX IF NOT EXISTS ix_card_backs_review_status_created
                 ON card_backs(review_status, created_at DESC, id DESC);
-            PRAGMA user_version=7;
+            PRAGMA user_version=8;
             """;
         moderationIndex.ExecuteNonQuery();
     }
@@ -1622,6 +1624,41 @@ public sealed class PlayerDataStore
         var snapshot = LoadSnapshot(connection, transaction, playerId);
         transaction.Commit();
         return snapshot;
+    }
+
+    /// <summary>保存玩家主动选择的“最强”称号。称号资格由调用方实时校验，此处只持久化展示偏好。</summary>
+    public PlayerDataSnapshot UpdateEquippedChampionTitle(string account, string leaderNumber)
+    {
+        var normalizedLeaderNumber = NormalizeChampionLeaderNumber(leaderNumber);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var playerId = RequirePlayerId(connection, transaction, account);
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            UPDATE players
+            SET equipped_champion_leader_number=$leaderNumber, updated_at=$now
+            WHERE id=$id;
+            """;
+        update.Parameters.AddWithValue("$leaderNumber", normalizedLeaderNumber);
+        update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        update.Parameters.AddWithValue("$id", playerId);
+        update.ExecuteNonQuery();
+
+        var snapshot = LoadSnapshot(connection, transaction, playerId);
+        transaction.Commit();
+        return snapshot;
+    }
+
+    public static string NormalizeChampionLeaderNumber(string? leaderNumber)
+    {
+        var normalized = (leaderNumber ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length is < 5 or > 32
+            || !normalized.Contains('-', StringComparison.Ordinal)
+            || normalized.Any(character => character != '-' && !char.IsAsciiLetterOrDigit(character)))
+            throw new PlayerDataValidationException("请输入有效的 Leader 编号，例如 OP01-001。");
+        return normalized;
     }
 
     /// <summary>保存账号卡背；选用玩家投稿时会幂等地补上点赞。</summary>
@@ -3002,12 +3039,14 @@ public sealed class PlayerDataStore
         string cardBackId;
         bool canChangeDisplayName;
         string? selectedDeckName;
+        string? equippedChampionLeaderNumber;
 
         using (var player = connection.CreateCommand())
         {
             player.Transaction = transaction;
             player.CommandText = """
-                SELECT account, display_name, avatar, card_back_id, display_name_change_used, selected_deck_name
+                SELECT account, display_name, avatar, card_back_id, display_name_change_used,
+                       selected_deck_name, equipped_champion_leader_number
                 FROM players WHERE id=$id;
                 """;
             player.Parameters.AddWithValue("$id", playerId);
@@ -3019,6 +3058,7 @@ public sealed class PlayerDataStore
             cardBackId = reader.IsDBNull(3) ? DefaultCardBackId : reader.GetString(3);
             canChangeDisplayName = reader.GetInt64(4) == 0;
             selectedDeckName = reader.IsDBNull(5) ? null : reader.GetString(5);
+            equippedChampionLeaderNumber = reader.IsDBNull(6) ? null : reader.GetString(6);
         }
 
         var decks = new List<StoredDeck>();
@@ -3053,6 +3093,14 @@ public sealed class PlayerDataStore
             }
         }
 
-        return new PlayerDataSnapshot(account, displayName, avatar, cardBackId, canChangeDisplayName, selectedDeckName, decks);
+        return new PlayerDataSnapshot(
+            account,
+            displayName,
+            avatar,
+            cardBackId,
+            canChangeDisplayName,
+            selectedDeckName,
+            equippedChampionLeaderNumber,
+            decks);
     }
 }

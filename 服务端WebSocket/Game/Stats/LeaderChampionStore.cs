@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Collections.Concurrent;
 using Microsoft.Data.Sqlite;
 
 namespace GrandUMI.Game.Stats;
@@ -30,6 +31,7 @@ public sealed class LeaderChampionStore
     private const double NeutralWinRate = 0.5;
 
     private readonly object _lock = new();
+    private readonly ConcurrentDictionary<string, string> _equippedPreferences = new(StringComparer.Ordinal);
     private readonly string _databasePath;
     private readonly string _leaderboardDatabasePath;
     private readonly string _writeConnectionString;
@@ -143,6 +145,32 @@ public sealed class LeaderChampionStore
     {
         if (string.IsNullOrWhiteSpace(account)) return Array.Empty<string>();
         return GetChampionLeaderNumbersByPlayerKey(HashAccount(account), nowUtc);
+    }
+
+    /// <summary>
+    /// 记住玩家持久化的装备偏好。资格仍由近 30 日称号事实实时决定，偏好失效时自动回退到当前第一枚称号。
+    /// </summary>
+    public void RememberEquippedChampionLeaderNumber(string? account, string? leaderNumber)
+    {
+        if (string.IsNullOrWhiteSpace(account)) return;
+        var playerKey = HashAccount(account);
+        if (string.IsNullOrWhiteSpace(leaderNumber))
+            _equippedPreferences.TryRemove(playerKey, out _);
+        else
+            _equippedPreferences[playerKey] = leaderNumber.Trim().ToUpperInvariant();
+    }
+
+    /// <summary>解析当前实际展示的称号；旧玩家无偏好时沿用强度最高的一枚，失去全部资格时不展示。</summary>
+    public string? ResolveEquippedChampionLeaderNumber(string? account, DateTime? nowUtc = null)
+    {
+        if (string.IsNullOrWhiteSpace(account)) return null;
+        var playerKey = HashAccount(account);
+        var owned = GetChampionLeaderNumbersByPlayerKey(playerKey, nowUtc);
+        if (owned.Count == 0) return null;
+        return _equippedPreferences.TryGetValue(playerKey, out var preferred)
+            && owned.Contains(preferred, StringComparer.Ordinal)
+                ? preferred
+                : owned[0];
     }
 
     /// <summary>供已持有匿名玩家键的服务端模块查询称号，避免重新暴露原始账号。</summary>

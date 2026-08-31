@@ -3,6 +3,7 @@
 import NextImage from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import CardBack from "@/components/ui/CardBack";
+import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
 import { getCard, loadCardSet } from "@/data/CardLoader";
 import { CARD_BACK_OPTIONS, cardBackName, normalizeCardBackId, type CardBackId } from "@/lib/cardBacks";
 import { advanceImageFallback, thumbSrc } from "@/lib/sprite";
@@ -114,6 +115,9 @@ export default function ProfilePanel({
   const stats = useNetStore((state) => state.playerProfileStats);
   const rankProfile = useNetStore((state) => state.rankProfile);
   const onlineCount = useNetStore((state) => state.onlineCount);
+  const championLeaderNumbers = useNetStore((state) => state.championLeaderNumbers);
+  const equippedChampionLeaderNumber = useNetStore((state) => state.equippedChampionLeaderNumber);
+  const leaderChampionQuery = useNetStore((state) => state.leaderChampionQuery);
   const [period, setPeriod] = useState<LeaderboardPeriod>("30d");
   const [selectedLeaderNumber, setSelectedLeaderNumber] = useState("");
   const [selectedCardBackId, setSelectedCardBackId] = useState<CardBackId>(() => normalizeCardBackId(cloudCardBackId));
@@ -122,6 +126,8 @@ export default function ProfilePanel({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [savingChampionTitle, setSavingChampionTitle] = useState<string | null>(null);
+  const [championQueryInput, setChampionQueryInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [, setCardVersion] = useState(0);
 
@@ -160,7 +166,15 @@ export default function ProfilePanel({
   }, [cloudCardBackId]);
 
   useEffect(() => {
-    const onMessage = (message: { proto: string }) => {
+    setSavingChampionTitle(null);
+  }, [equippedChampionLeaderNumber, championLeaderNumbers]);
+
+  useEffect(() => {
+    const onMessage = (message: { proto: string; result?: boolean }) => {
+      if (message.proto === "MsgPlayerData" && message.result === false) {
+        setSavingChampionTitle(null);
+        return;
+      }
       if (message.proto !== "MsgUpdatePs") return;
       const result = message as MsgUpdatePs;
       setSavingPassword(false);
@@ -186,6 +200,19 @@ export default function ProfilePanel({
     if (selectedCardBackId === normalizeCardBackId(cloudCardBackId)) return;
     setSavingCardBack(true);
     if (!HomeRequest.updateCardBack(selectedCardBackId)) setSavingCardBack(false);
+  };
+
+  const equipChampionTitle = (leaderNumber: string) => {
+    if (leaderNumber === equippedChampionLeaderNumber) return;
+    setSavingChampionTitle(leaderNumber);
+    if (!HomeRequest.updateChampionTitle(leaderNumber)) setSavingChampionTitle(null);
+  };
+
+  const queryChampionTitle = () => {
+    const leaderNumber = championQueryInput.trim().toUpperCase();
+    if (!leaderNumber) return;
+    setChampionQueryInput(leaderNumber);
+    HomeRequest.requestLeaderChampion(leaderNumber);
   };
 
   const changePassword = () => {
@@ -312,6 +339,99 @@ export default function ProfilePanel({
             <p className="mt-3 text-xs text-gray-500">赛季结束：{dateLabel(rankProfile.seasonEndsAtUtc)}</p>
           </>
         )}
+      </article>
+
+      <article
+        data-testid="champion-title-management"
+        aria-labelledby="champion-title-heading"
+        className="mt-5 rounded-2xl border border-amber-700/50 bg-[radial-gradient(circle_at_100%_0%,rgba(245,158,11,0.16),transparent_42%),linear-gradient(135deg,rgba(69,26,3,0.38),rgba(17,24,39,0.96))] p-4 @[720px]:p-5"
+      >
+        <div>
+          <h2 id="champion-title-heading" className="text-lg font-bold text-white">最强称号管理</h2>
+          <p className="mt-1 text-xs leading-5 text-gray-400">装备后会在所有对局中展示，不再要求使用称号对应的 Leader。称号资格仍按近 30 日战绩滚动更新。</p>
+        </div>
+        <div className="mt-4 grid gap-4 @[760px]:grid-cols-2">
+          <section className="min-w-0 rounded-xl border border-amber-900/60 bg-black/20 p-3">
+            <h3 className="text-sm font-bold text-amber-100">我持有的称号</h3>
+            {championLeaderNumbers.length > 0 ? (
+              <div className="mt-3 grid gap-2">
+                {championLeaderNumbers.map((leaderNumber) => {
+                  const equipped = leaderNumber === equippedChampionLeaderNumber;
+                  const saving = savingChampionTitle === leaderNumber;
+                  return (
+                    <button
+                      key={leaderNumber}
+                      type="button"
+                      aria-pressed={equipped}
+                      onClick={() => equipChampionTitle(leaderNumber)}
+                      disabled={savingChampionTitle !== null}
+                      className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${equipped ? "border-amber-400 bg-amber-500/15" : "border-gray-700 bg-gray-950/45 hover:border-amber-600"} disabled:cursor-wait`}
+                    >
+                      <LeaderChampionBadge leaderNumber={leaderNumber} />
+                      <span className={`shrink-0 text-xs font-bold ${equipped ? "text-amber-200" : "text-gray-500"}`}>
+                        {saving ? "装备中…" : equipped ? "已装备" : "装备"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-dashed border-amber-900/60 px-3 py-6 text-center text-xs leading-5 text-gray-500">
+                当前还没有持有“最强”称号。达到动态场次、活跃日和对手数门槛后，系统会自动授予。
+              </div>
+            )}
+            <p className="mt-3 text-[11px] leading-5 text-gray-500">为延续现有展示行为，持有称号时不可卸下；所选称号失效后会自动展示仍持有的第一枚称号。</p>
+          </section>
+
+          <section className="min-w-0 rounded-xl border border-gray-800 bg-black/20 p-3">
+            <h3 className="text-sm font-bold text-white">称号战绩查询</h3>
+            <p className="mt-1 text-xs leading-5 text-gray-500">输入 Leader 编号，匿名查看当前称号持有者近 30 日的总场次和原始胜率。</p>
+            <form
+              className="mt-3 flex flex-col gap-2 @[480px]:flex-row"
+              onSubmit={(event) => { event.preventDefault(); queryChampionTitle(); }}
+            >
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Leader 编号</span>
+                <input
+                  value={championQueryInput}
+                  onChange={(event) => setChampionQueryInput(event.target.value.toUpperCase())}
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="例如 OP01-001"
+                  className="h-11 w-full rounded-xl border border-gray-700 bg-gray-950 px-3 font-mono text-sm uppercase text-white outline-none placeholder:font-sans placeholder:text-gray-700 focus:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/30"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={!championQueryInput.trim() || (leaderChampionQuery?.leaderNumber === championQueryInput.trim().toUpperCase() && leaderChampionQuery.result === undefined)}
+                className="min-h-11 shrink-0 rounded-xl bg-amber-500 px-5 text-sm font-black text-gray-950 transition-colors hover:bg-amber-400 disabled:cursor-wait disabled:bg-gray-700 disabled:text-gray-500"
+              >
+                查询
+              </button>
+            </form>
+            {leaderChampionQuery && (
+              <div className="mt-3 min-h-20 rounded-xl border border-gray-800 bg-gray-950/55 p-3" aria-live="polite">
+                {leaderChampionQuery.result === undefined ? (
+                  <p className="text-sm text-gray-500">正在查询 {leaderChampionQuery.leaderNumber}…</p>
+                ) : leaderChampionQuery.result === false ? (
+                  <p role="alert" className="text-sm text-red-300">{leaderChampionQuery.error ?? "查询失败，请稍后重试。"}</p>
+                ) : leaderChampionQuery.champion ? (
+                  <div>
+                    <p className="font-mono text-xs font-bold text-amber-200">{leaderChampionQuery.leaderNumber}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+                      <div className="rounded-lg bg-gray-900 p-2"><p className="text-lg font-black text-white">{leaderChampionQuery.champion.games}</p><p className="text-[10px] text-gray-600">近 30 日总场次</p></div>
+                      <div className="rounded-lg bg-gray-900 p-2"><p className="text-lg font-black text-amber-300">{percent(leaderChampionQuery.champion.winRate)}</p><p className="text-[10px] text-gray-600">原始胜率</p></div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm leading-6 text-gray-500">{leaderChampionQuery.leaderNumber} 当前暂无满足资格门槛的称号持有者。</p>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
       </article>
 
       <div className="mt-5 flex flex-col gap-3 @[640px]:flex-row @[640px]:items-end @[640px]:justify-between">
