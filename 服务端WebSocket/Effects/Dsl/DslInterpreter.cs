@@ -1647,6 +1647,20 @@ public static class DslInterpreter
                 {
                     // 将己方 N 张休息咚转为活跃状态
                     int n = GetInt(op, "n", 1);
+                    bool chooseCount = op.TryGetProperty("chooseCount", out var chooseCountNode)
+                        && chooseCountNode.ValueKind == JsonValueKind.True;
+                    if (chooseCount)
+                    {
+                        await AtomicOps.PromptChooseAndApplyDonCount(
+                            s,
+                            ctx.Prompts,
+                            ctx.OwnerIndex,
+                            n,
+                            $"选择要转为活跃状态的休息咚!!张数（最多 {n} 张）",
+                            don => don.State == DonState.Rest && don.AttachedToCardId is null,
+                            don => don.State = DonState.Active);
+                        break;
+                    }
                     int actCount = 0;
                     foreach (var d in me.CostArea)
                     {

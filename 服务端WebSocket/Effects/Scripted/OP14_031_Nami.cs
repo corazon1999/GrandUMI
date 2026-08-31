@@ -41,7 +41,8 @@ public sealed class OP14_031_Nami : IScriptedEffect
 
         ctx.State.EndOfTurnTasks.Add(new EndTurnTask
         {
-            Kind = "RefreshOwnDon",
+            // 使用独立任务种类，保留旧快照及其他固定数量 RefreshOwnDon 的原有语义。
+            Kind = "ChooseRefreshOwnDonUpTo",
             Owner = ctx.OwnerIndex,
             SourceCardId = ctx.Source.Id.ToString(),
             Count = 5,

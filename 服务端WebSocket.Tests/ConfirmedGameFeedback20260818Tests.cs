@@ -22,11 +22,14 @@ public sealed class ConfirmedGameFeedback20260818Tests
         var source = Card("OP14-031");
         me.Characters.Add(source);
 
-        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField,
-            new MockPromptService().QueueChoose(targets.Select(card => card.Id.ToString()).ToArray()));
+        var prompts = new MockPromptService()
+            .QueueChoose(targets.Select(card => card.Id.ToString()).ToArray())
+            .QueueOption(5);
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
 
         Assert.All(targets, target => Assert.True(target.IsTapped));
-        Assert.Contains(state.EndOfTurnTasks, task => task.Kind == "RefreshOwnDon" && task.Count == 5);
+        Assert.Contains(state.EndOfTurnTasks, task => task.Kind == "ChooseRefreshOwnDonUpTo" && task.Count == 5);
+        await TurnEngine.ResolvePromptedEndPhaseTasksAsync(state, prompts);
         TurnEngine.EnterEndPhase(state);
         Assert.Equal(5, me.ActiveDonCount);
         Assert.Equal(1, me.CostArea.Count(don => don.State == DonState.Rest));

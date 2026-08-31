@@ -456,6 +456,40 @@ public static class AtomicOps
     // ── 咚操作 ────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// 让玩家选择 0..max 张当前符合条件的咚，并在响应后重新校验数量后统一应用。
+    /// 这是“最多 N 张”效果专用入口；响应无效、取消或可用数量已不足所选值时均不应用，
+    /// 避免旧快照导致部分结算。强制处理固定数量的效果不得调用此方法。
+    /// </summary>
+    public static async Task<int> PromptChooseAndApplyDonCount(
+        GameState state,
+        IPromptService prompts,
+        int playerIdx,
+        int max,
+        string text,
+        Func<DonCard, bool> isEligible,
+        Action<DonCard> apply)
+    {
+        if (max <= 0 || playerIdx < 0 || playerIdx >= state.Players.Length) return 0;
+
+        var player = state.Players[playerIdx];
+        int limit = Math.Min(max, player.CostArea.Count(isEligible));
+        if (limit <= 0) return 0;
+
+        var options = Enumerable.Range(0, limit + 1)
+            .Select(count => $"{count} 张")
+            .ToList();
+        int chosenCount = await prompts.ChooseOption(playerIdx, text, options);
+        if (chosenCount <= 0 || chosenCount > limit) return 0;
+
+        // 提示期间牌局可能被取消、恢复或由测试注入状态变化；只以响应时的权威状态结算。
+        var currentEligible = player.CostArea.Where(isEligible).Take(chosenCount).ToList();
+        if (currentEligible.Count != chosenCount) return 0;
+
+        foreach (var don in currentEligible) apply(don);
+        return chosenCount;
+    }
+
+    /// <summary>
     /// 从费用区选 n 张指定状态(fromState)的咚附给 target，返回实际赋予数。
     /// 严格按 fromState 取咚，不做跨状态回退：
     ///   - 「赋予休息状态的咚!!」(fromState=Rest) 只取费用区中已是休息态的咚；无休息咚则不赋予

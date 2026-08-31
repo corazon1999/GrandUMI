@@ -64,6 +64,19 @@ public class GameFeedback20260826Batch41To54Tests
             })));
         await engine.WaitSettledAsync(resolvingPromptId: prompt.PromptId);
 
+        var quantityPrompt = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+        Assert.Equal("Option", quantityPrompt.Kind);
+        Assert.Equal(["0", "1", "2"], quantityPrompt.ValidChoices);
+        Assert.True(engine.HandleAction(
+            0,
+            "PromptResponse",
+            JsonSerializer.SerializeToElement(new
+            {
+                promptId = quantityPrompt.PromptId,
+                chosen = new[] { "2" },
+            })));
+        await engine.WaitSettledAsync(resolvingPromptId: quantityPrompt.PromptId);
+
         Assert.Null(state.PendingPrompt);
         Assert.False(activateSelfSource.IsTapped);
         Assert.All(me.CostArea, don => Assert.Equal(DonState.Active, don.State));

@@ -194,11 +194,25 @@ public static class TurnEngine
         var tasks = state.EndOfTurnTasks
             .Where(task => task.Kind is "ReturnCharacterToDeckBottom"
                 or "PreventOpponentDonCharacterReset"
-                or "ReturnExcessDonToOpponentCount")
+                or "ReturnExcessDonToOpponentCount"
+                or "ChooseRefreshOwnDonUpTo")
             .ToList();
         foreach (var task in tasks)
         {
             state.EndOfTurnTasks.Remove(task);
+
+            if (task.Kind == "ChooseRefreshOwnDonUpTo")
+            {
+                await AtomicOps.PromptChooseAndApplyDonCount(
+                    state,
+                    prompts,
+                    task.Owner,
+                    task.Count,
+                    $"奈美【回合结束时】：选择要转为活跃状态的休息咚!!张数（最多 {task.Count} 张）",
+                    don => don.State == DonState.Rest && don.AttachedToCardId is null,
+                    don => don.State = DonState.Active);
+                continue;
+            }
 
             if (task.Kind == "ReturnExcessDonToOpponentCount")
             {

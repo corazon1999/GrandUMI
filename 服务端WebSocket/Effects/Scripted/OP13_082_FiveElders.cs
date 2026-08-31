@@ -34,12 +34,7 @@ public class OP13_082_FiveElders : IScriptedEffect
             "五老星【启动主要】：横置 1 张咚!!并丢弃 1 张手牌，将我方所有角色弃置，再从废弃区登场最多 5 张力量5000且名称互不相同的《五老星》角色？");
         if (!use) return;
 
-        // 成本：将 1 张主动咚!!转为休息（ReturnDonToDeck 不符，改用横置：从 CostArea 找一张 Active 咚置为 Rest）
-        var activeDon = me.CostArea.FirstOrDefault(d => d.State == DonState.Active);
-        if (activeDon == null) return;
-        activeDon.State = DonState.Rest;
-
-        // 成本：丢弃 1 张手牌
+        // 先选择丢弃对象，不提前横置咚；取消或响应失效时不得留下部分成本。
         var handExtra = new Dictionary<string, object?>
         {
             ["choiceCards"] = me.Hand.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
@@ -47,18 +42,22 @@ public class OP13_082_FiveElders : IScriptedEffect
         var handPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
             "丢弃 1 张手牌",
             me.Hand.Select(c => c.Id.ToString()).ToList(), 1, 1, handExtra);
-        if (handPick.Count == 0)
-        {
-            activeDon.State = DonState.Active;
-            return;
-        }
-        var hc = me.Hand.First(c => c.Id.ToString() == handPick[0]);
+        if (handPick.Count == 0) return;
+
+        // 响应后原子复核两部分成本，再连续支付；旧响应或状态变化不抛异常、不部分支付。
+        var hc = me.Hand.FirstOrDefault(c => c.Id.ToString() == handPick[0]);
+        var activeDon = me.CostArea.FirstOrDefault(d =>
+            d.State == DonState.Active && d.AttachedToCardId is null);
+        if (hc is null || activeDon is null) return;
+        activeDon.State = DonState.Rest;
         AtomicOps.DiscardHand(me, hc);
 
         // 效果1：将我方所有角色放置到废弃区
-        foreach (var ch in me.Characters.ToList())
+        var allOwnCharacters = me.Characters.ToList();
+        foreach (var ch in allOwnCharacters)
         {
-            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, ch);
+            // 这是玩家自己效果的强制送墓；不得被仅防“对方效果离场”的粗粒度 LeaveGuard 误挡。
+            AtomicOps.TrashFieldCard(ctx.State, ctx.OwnerIndex, ch, ignoreEffectLeaveGuard: true);
         }
 
         // 效果2：从废弃区登场最多 5 张力量5000且名称不同的《五老星》角色

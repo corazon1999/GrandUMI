@@ -151,7 +151,7 @@ test("pointercancel、卡牌身份变化清理和组件卸载都会取消未完�
   assert.deepEqual(unmounted.opened, []);
 });
 
-test("CardItem 仅允许鼠标悬停，并在窗口捕获阶段拦截长按后的祖先点击", async () => {
+test("未选中 CardItem 也直接启动长按，并在窗口捕获阶段拦截祖先点击", async () => {
   const source = await readSource("../src/components/ui/CardItem.tsx");
 
   assert.match(source, /shouldShowDesktopCardHoverPreview/);
@@ -165,8 +165,23 @@ test("CardItem 仅允许鼠标悬停，并在窗口捕获阶段拦截长按后�
   assert.doesNotMatch(source, /onClick=\{onClick\}/);
   assert.match(source, /e\.preventDefault\(\);\s+e\.stopPropagation\(\);\s+e\.nativeEvent\.stopImmediatePropagation\(\);/);
   assert.match(source, /style=\{\{ WebkitTouchCallout: "none" \}\}/);
+  assert.match(source, /draggable=\{false\}/);
+  assert.match(source, /onContextMenuCapture=\{handleContextMenu\}/);
+  assert.match(source, /onDragStart=\{\(event\) => \{ event\.preventDefault\(\); \}\}/);
+  assert.match(source, /if \(!e\.isPrimary \|\| showFaceDown \|\| !cardIdentity\) return;[\s\S]*?longPressGesture\.start\(e, cardIdentity\);/);
+  assert.doesNotMatch(source, /if \([^\n]*isSelected[^\n]*\) return;[\s\S]{0,160}longPressGesture\.start/);
   assert.match(source, /zoomCardIdentity === cardIdentity[\s\S]*?!showFaceDown/);
   assert.match(source, /longPressGesture\.cancelActive\(\);\s+clearHoverPreview\(\);\s+setZoomCardIdentity\(null\);/);
+});
+
+test("HandArea 首次触控即提升未选中重叠手牌，释放或取消后恢复层级", async () => {
+  const source = await readSource("../src/components/game/HandArea.tsx");
+
+  assert.match(source, /setRaisedTouchHandId\(handId\);[\s\S]*?setPointerCapture\(event\.pointerId\);/);
+  assert.match(source, /raisedTouchHandId === handId \? "z-20" : ""/);
+  assert.match(source, /onPointerUp=[\s\S]*?setRaisedTouchHandId\(null\);/);
+  assert.match(source, /onPointerCancel=[\s\S]*?setRaisedTouchHandId\(null\);/);
+  assert.match(source, /onLostPointerCapture=\{\(\) => \{ setRaisedTouchHandId\(null\); \}\}/);
 });
 
 test("390×844 与 360×780 自动旋转后关闭按钮实际触控区域仍至少 44px", async () => {

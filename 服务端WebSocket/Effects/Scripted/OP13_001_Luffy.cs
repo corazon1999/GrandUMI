@@ -40,26 +40,15 @@ public class OP13_001_Luffy : IScriptedEffect
             "路飞：将任意张数活跃咚!!转为休息状态，每张使此领袖或 1 张《草帽一伙》角色本次战斗力量 +2000？");
         if (!use) return;
 
-        // 选择要转为休息的活跃咚张数（1..active）
-        var options = new List<string>();
-        for (int i = 1; i <= active; i++) options.Add($"转 {i} 张");
-        int pick = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
-            "选择要转为休息状态的活跃咚!!张数", options);
-        int restCount = pick < 0 ? 0 : pick + 1;
-        if (restCount <= 0) return;
-        restCount = Math.Min(restCount, active);
-
-        // 逐张把活跃咚改为休息
-        int rested = 0;
-        foreach (var d in me.CostArea)
-        {
-            if (rested >= restCount) break;
-            if (d.State == DonState.Active)
-            {
-                d.State = DonState.Rest;
-                rested++;
-            }
-        }
+        int rested = await AtomicOps.PromptChooseAndApplyDonCount(
+            ctx.State,
+            ctx.Prompts,
+            ctx.OwnerIndex,
+            active,
+            "选择要转为休息状态的活跃咚!!张数（可选 0 张）",
+            don => don.State == DonState.Active && don.AttachedToCardId is null,
+            don => don.State = DonState.Rest);
+        if (rested <= 0) return;
 
         // 每转 1 张，进行一次 +2000 目标选择：本领袖 或 1 张《草帽一伙》角色
         for (int i = 0; i < rested; i++)
@@ -70,7 +59,10 @@ public class OP13_001_Luffy : IScriptedEffect
                 $"第 {i + 1}/{rested} 个 +2000：选择此领袖或 1 张《草帽一伙》角色（本次战斗力量 +2000）",
                 targets.Select(c => c.Id.ToString()).ToList(), 0, 1);
             if (chosen.Count == 0) continue;
-            var tgt = targets.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
+            var tgt = me.Leader.Id.ToString() == chosen[0]
+                ? me.Leader
+                : me.Characters.FirstOrDefault(c =>
+                    c.Id.ToString() == chosen[0] && c.Info.HasKeyword("草帽一伙"));
             if (tgt is not null) AtomicOps.AddPowerThisBattle(tgt, 2000);
         }
     }

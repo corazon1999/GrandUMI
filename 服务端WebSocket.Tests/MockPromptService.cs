@@ -26,6 +26,8 @@ public class MockPromptService : IPromptService
     public List<(string kind, string text, IReadOnlyList<string> choices, int min, int max, Dictionary<string, object?>? extra)> ChooseHistory { get; } = new();
     public List<(int playerIdx, string text, IReadOnlyList<string> options)> OptionHistory { get; } = new();
     public List<string> ConfirmHistory { get; } = new();
+    public Action<string>? OnChooseResponse { get; set; }
+    public Action? OnOptionResponse { get; set; }
 
     public MockPromptService QueueChoose(params string[] ids)
     {
@@ -63,11 +65,14 @@ public class MockPromptService : IPromptService
             var ans = _chooseAnswers.Dequeue();
             // 校验答案在 validChoices 中
             var filtered = ans.Where(validChoices.Contains).ToList();
+            OnChooseResponse?.Invoke(kind);
             return Task.FromResult(filtered);
         }
         // 默认：max <= validChoices.Count 时返回前 max 个，否则全选
         int take = Math.Min(max, validChoices.Count);
-        return Task.FromResult(validChoices.Take(take).ToList());
+        var fallback = validChoices.Take(take).ToList();
+        OnChooseResponse?.Invoke(kind);
+        return Task.FromResult(fallback);
     }
 
     public Task<bool> ConfirmOptional(int playerIdx, string text)
@@ -79,7 +84,9 @@ public class MockPromptService : IPromptService
     public Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
     {
         OptionHistory.Add((playerIdx, text, options.ToList()));
-        return Task.FromResult(_optionAnswers.Count > 0 ? _optionAnswers.Dequeue() : 0);
+        int answer = _optionAnswers.Count > 0 ? _optionAnswers.Dequeue() : 0;
+        OnOptionResponse?.Invoke();
+        return Task.FromResult(answer);
     }
 
     public Task<bool> AskLifeTrigger(int playerIdx, CardInstance lifeCard, bool hasRealTrigger)

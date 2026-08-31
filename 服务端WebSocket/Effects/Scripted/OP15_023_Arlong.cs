@@ -73,7 +73,8 @@ public class OP15_023_Arlong : IScriptedEffect
             "成本：选择1张对方角色，赋予1张对方休息状态的咚!!",
             opp.Characters.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (costPick.Count < 1) return;
-        var costTarget = opp.Characters.First(c => c.Id.ToString() == costPick[0]);
+        var costTarget = opp.Characters.FirstOrDefault(c => c.Id.ToString() == costPick[0]);
+        if (costTarget is null) return;
         int paid = AtomicOps.AttachDonFromCost(opp, costTarget.Id, 1, DonState.Rest);
         if (paid < 1) return;
 
@@ -89,10 +90,37 @@ public class OP15_023_Arlong : IScriptedEffect
             "选择1张领袖或角色，赋予最多1张其持有者费用区中的咚!!",
             targets.Select(c => c.Id.ToString()).ToList(), 0, 1);
         if (pick2.Count < 1) return;
-        var target = targets.First(c => c.Id.ToString() == pick2[0]);
+        var selectedTargetId = pick2[0];
+        var selectedSnapshot = targets.FirstOrDefault(card => card.Id.ToString() == selectedTargetId);
+        if (selectedSnapshot is null) return;
+        bool expectedOwnHolder = ReferenceEquals(me.Leader, selectedSnapshot) || me.Characters.Contains(selectedSnapshot);
+        var holder = expectedOwnHolder ? me : opp;
+        var target = ReferenceEquals(holder.Leader, selectedSnapshot)
+            ? holder.Leader
+            : holder.Characters.FirstOrDefault(card => ReferenceEquals(card, selectedSnapshot));
+        if (target is null) return;
 
-        bool ownedByMe = me.Leader.Id == target.Id || me.Characters.Any(c => c.Id == target.Id);
-        var holder = ownedByMe ? me : opp;
-        AtomicOps.AttachDonFromCost(holder, target.Id, 1, DonState.Rest);
+        var activeDon = holder.CostArea
+            .Where(don => don.State == DonState.Active && don.AttachedToCardId is null)
+            .ToList();
+        if (activeDon.Count == 0) return;
+        var donPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "HolderActiveDon",
+            "选择目标持有者费用区中最多1张活跃咚!!赋予该目标",
+            activeDon.Select(don => don.Id.ToString()).ToList(), 0, 1,
+            new Dictionary<string, object?>
+            {
+                ["donChoices"] = activeDon.Select(don => new { id = don.Id.ToString(), state = "Active" }).ToList(),
+            });
+        if (donPick.Count < 1) return;
+
+        // 目标与咚都按响应时的实际实例、持有者、区域和状态重新校验。
+        bool targetStillHeld = ReferenceEquals(holder.Leader, target) || holder.Characters.Contains(target);
+        var selectedDon = holder.CostArea.FirstOrDefault(don =>
+            don.Id.ToString() == donPick[0]
+            && don.State == DonState.Active
+            && don.AttachedToCardId is null);
+        if (!targetStillHeld || selectedDon is null) return;
+        selectedDon.State = DonState.Attached;
+        selectedDon.AttachedToCardId = target.Id;
     }
 }

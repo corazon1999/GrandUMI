@@ -32,6 +32,8 @@ export default function HandArea({ side, hidden = false }: Props) {
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const [localOrder, setLocalOrder] = useState<string[]>([]);
   const [pendingCounterEvent, setPendingCounterEvent] = useState<PendingCounterEvent | null>(null);
+  // 触控按下即临时抬高未选中的重叠手牌，让首次长按不依赖“先短按选中”。
+  const [raisedTouchHandId, setRaisedTouchHandId] = useState<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
   const touchDragRef = useRef<{ id: string; startX: number; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
@@ -222,6 +224,7 @@ export default function HandArea({ side, hidden = false }: Props) {
               onPointerDown={(event) => {
                 if (!handId || event.pointerType === "mouse") return;
                 touchDragRef.current = { id: handId, startX: event.clientX, moved: false };
+                setRaisedTouchHandId(handId);
                 event.currentTarget.setPointerCapture(event.pointerId);
               }}
               onPointerMove={(event) => {
@@ -238,8 +241,13 @@ export default function HandArea({ side, hidden = false }: Props) {
               onPointerUp={(event) => {
                 if (touchDragRef.current?.moved) event.preventDefault();
                 touchDragRef.current = null;
+                setRaisedTouchHandId(null);
               }}
-              onPointerCancel={() => { touchDragRef.current = null; }}
+              onPointerCancel={() => {
+                touchDragRef.current = null;
+                setRaisedTouchHandId(null);
+              }}
+              onLostPointerCapture={() => { setRaisedTouchHandId(null); }}
               initial={{ x: xOf(i), y: side === "my" ? 36 : -24, opacity: 0 }}
               animate={{ x: xOf(i), y: 0, opacity: 1 }}
               exit={{ y: side === "my" ? -24 : 24, opacity: 0 }}
@@ -255,6 +263,7 @@ export default function HandArea({ side, hidden = false }: Props) {
               style={{ position: "absolute", left: 0, bottom: 0 }}
               className={[
                 "hover:z-20", // 悬停提升层级，盖过邻牌，便于看清被压住的卡（低于右栏操作区 z-30，避免盖住出牌/结束回合按钮）
+                raisedTouchHandId === handId ? "z-20" : "",
                 side === "my" && !hidden && handId ? "touch-none cursor-grab active:cursor-grabbing" : "",
                 counterPlayable ? "rounded-md ring-2 ring-amber-400 animate-pulse" : "",
               ].join(" ")}

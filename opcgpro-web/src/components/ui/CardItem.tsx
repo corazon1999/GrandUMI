@@ -275,8 +275,11 @@ export default function CardItem({
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       style={{ WebkitTouchCallout: "none" }}
       data-game-board-interactive={onClick ? "true" : undefined}
+      draggable={false}
       onClick={handleClick}
-      onContextMenu={handleContextMenu}
+      // 捕获阶段先于目标/图片默认行为拦截 HarmonyOS WebView 的原生保存/分享菜单。
+      onContextMenuCapture={handleContextMenu}
+      onDragStart={(event) => { event.preventDefault(); }}
       onPointerDown={handlePointerDown}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}

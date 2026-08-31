@@ -220,18 +220,20 @@ public class Feedback20260818RegressionTests
     }
 
     [Fact]
-    public async Task OP15_023_AttachesRestedDonToOwnLeaderAfterPayingOpponentDonCost()
+    public async Task OP15_023_SelectsActiveDonFromTargetHoldersCostArea()
     {
         var state = TestScene.New().MyCharacter("OP15-023").OppCharacter("OP15-003").Build();
         var me = state.Players[0];
         var opponent = state.Players[1];
-        me.CostArea.Add(new DonCard { State = DonState.Rest });
+        var ownActiveDon = new DonCard { State = DonState.Active };
+        me.CostArea.Add(ownActiveDon);
         opponent.CostArea.Add(new DonCard { State = DonState.Rest });
         var source = Assert.Single(me.Characters);
         var opponentCharacter = Assert.Single(opponent.Characters);
         var prompts = new MockPromptService()
             .QueueChoose(opponentCharacter.Id.ToString())
-            .QueueChoose(me.Leader.Id.ToString());
+            .QueueChoose(me.Leader.Id.ToString())
+            .QueueChoose(ownActiveDon.Id.ToString());
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.ActivatedMain, prompts);
 
