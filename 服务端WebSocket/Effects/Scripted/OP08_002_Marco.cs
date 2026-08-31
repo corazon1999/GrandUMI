@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -11,14 +12,19 @@ namespace GrandUMI.Effects.Scripted;
 /// 说明 / 简化点：
 ///   - "放回卡组最上方或最下方"用 ChooseOption 二选一：最上方用 me.Deck.Insert(0, card)，
 ///     最下方用 AtomicOps.ReturnHandToDeckBottom。
-///   - 【咚!!×1】为发动条件（场上至少 1 张被赋予的咚），引擎按惯例不在此处校验消耗，
-///     脚本仅实现收益。
+///   - 【咚!!×1】为发动条件（本领袖至少被赋予 1 张咚!!）；动作入口与脚本结算
+///     各自校验一次，避免按钮错误可用或绕过动作入口时发放收益。
 /// </summary>
-public class OP08_002_Marco : IScriptedEffect
+public class OP08_002_Marco : IScriptedEffect, IActivatedMainAvailability
 {
     public string CardNumber => "OP08-002";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+
+    public string? GetActivatedMainUnavailableReason(GameState state, int ownerIndex, CardInstance source)
+        => state.Players[ownerIndex].AttachedDonCount(source.Id) < 1
+            ? "马尔高需要被赋予至少 1 张咚!!才能发动该启动效果"
+            : null;
 
     public async Task Resolve(EffectContext ctx)
     {
@@ -28,6 +34,7 @@ public class OP08_002_Marco : IScriptedEffect
 
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
+        if (me.AttachedDonCount(self.Id) < 1) return;
 
         // 抽取 1 张
         AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);

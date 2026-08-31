@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -268,7 +269,58 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
                     client.actions[1][1],
                 )
 
-    def test自动审批成功后持久授权_入群登记必须与审核邀请人一致(self):
+    def test群成员直接邀请在可靠入群通知中自动记录双方映射(self):
+        cfg = approval_cfg()
+        cfg.update(
+            {
+                "new_member_verification_enabled": True,
+                "new_member_verification_groups": [456],
+            }
+        )
+        client = FakeOneBotClient({"20002", "99999"})
+        request = add_request(
+            applicant=20002,
+            comment="",
+            flag="member-direct-invite",
+        )
+        asyncio.run(bot.on_event(client, cfg, request))
+        self.assertEqual(
+            {"flag": "member-direct-invite", "sub_type": "add", "approve": True},
+            client.actions[-1][1],
+        )
+
+        client.members.add("10001")
+        notice = {
+            "post_type": "notice",
+            "notice_type": "group_increase",
+            "sub_type": "invite",
+            "group_id": 456,
+            "user_id": 10001,
+            "operator_id": 20002,
+            "self_id": 99999,
+            "time": 1010,
+            "_grandumi_received_at": 1010,
+        }
+        asyncio.run(bot.on_event(client, cfg, notice))
+
+        with sqlite3.connect(storage.DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            completed = conn.execute(
+                """
+                SELECT * FROM member_verifications
+                 WHERE group_id = '456' AND newcomer_qq = '10001'
+                 ORDER BY id DESC LIMIT 1
+                """
+            ).fetchone()
+        self.assertEqual("verified", completed["state"])
+        self.assertEqual("20002", completed["inviter_qq"])
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
+        self.assertNotIn(
+            "get_group_member_list",
+            [name for name, _ in client.actions[2:]],
+        )
+
+    def test自动审批成功后真实入群自动落账且重复通知幂等(self):
         cfg = approval_cfg()
         cfg.update(
             {
@@ -300,62 +352,58 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         self.assertTrue(
             asyncio.run(bot.handle_member_verification_notice(client, cfg, notice))
         )
-        active = storage.get_active_member_verification("456", "10001")
-        self.assertEqual("pending", active["state"])
-        self.assertEqual("20002", active["inviter_qq"])
-        prompt = client.actions[-1][1]["message"][1]["data"]["text"]
-        self.assertIn("已审核邀请人 QQ：20002", prompt)
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
+        completed = storage.get_member_verification(prejoin["id"])
+        self.assertEqual("verified", completed["state"])
+        self.assertEqual("20002", completed["inviter_qq"])
+        self.assertEqual(1010, completed["join_event_time"])
+        self.assertEqual([], storage.get_member_verification_responses(prejoin["id"]))
+        confirmation = client.actions[-1][1]["message"][1]["data"]["text"]
+        self.assertIn("根据加群申请自动记录邀请人 QQ：20002", confirmation)
+        self.assertIn("无需重复填写", confirmation)
         action_count = len(client.actions)
-        deadline_at = active["deadline_at"]
         asyncio.run(bot.on_event(client, cfg, notice))
         self.assertEqual(action_count, len(client.actions))
-        replayed = storage.get_active_member_verification("456", "10001")
-        self.assertEqual(active["id"], replayed["id"])
-        self.assertEqual(deadline_at, replayed["deadline_at"])
+        self.assertEqual({"456"}, bot.member_verification_groups(cfg))
 
-        mismatch = {
-            "post_type": "message",
-            "message_type": "group",
+    def test审批响应失败遗留预备记录可由真实入群前向恢复(self):
+        cfg = approval_cfg()
+        cfg.update(
+            {
+                "new_member_verification_enabled": True,
+                "new_member_verification_groups": [456],
+                "new_member_verification_timeout_seconds": 1800,
+            }
+        )
+        client = FakeOneBotClient({"20002", "99999"})
+        client.set_error_count = 1
+        request = add_request(flag="recovery-request")
+        request["time"] = 1000
+        request["_grandumi_received_at"] = 1000
+        asyncio.run(bot.on_event(client, cfg, request))
+        prepared = storage.get_active_member_verification("456", "10001")
+        self.assertEqual("approval_pending", prepared["state"])
+
+        client.members.add("10001")
+        notice = {
+            "post_type": "notice",
+            "notice_type": "group_increase",
+            "sub_type": "approve",
             "group_id": 456,
             "user_id": 10001,
             "self_id": 99999,
-            "time": 1020,
-            "message_id": 10,
-            "_grandumi_received_at": 1020,
-            "message": [
-                {"type": "at", "data": {"qq": "99999"}},
-                {"type": "text", "data": {"text": " 邀请人QQ:30003"}},
-            ],
+            "time": 1010,
+            "_grandumi_received_at": 1010,
         }
-        asyncio.run(bot.on_event(client, cfg, mismatch))
-        unchanged = storage.get_active_member_verification("456", "10001")
-        self.assertEqual("pending", unchanged["state"])
-        self.assertEqual("20002", unchanged["inviter_qq"])
-        self.assertEqual([], storage.get_member_verification_responses(active["id"]))
-        self.assertIn(
-            "不能通过群消息改写",
-            client.actions[-1][1]["message"][1]["data"]["text"],
-        )
+        asyncio.run(bot.on_event(client, cfg, notice))
 
-        correct = dict(mismatch)
-        correct["time"] = 1021
-        correct["message_id"] = 11
-        correct["_grandumi_received_at"] = 1021
-        correct["message"] = [
-            {"type": "at", "data": {"qq": "99999"}},
-            {"type": "text", "data": {"text": " 邀请人QQ:20002"}},
-        ]
-        asyncio.run(bot.on_event(client, cfg, correct))
-        completed = storage.get_member_verification(active["id"])
+        completed = storage.get_member_verification(prepared["id"])
         self.assertEqual("verified", completed["state"])
         self.assertEqual("20002", completed["inviter_qq"])
-        self.assertEqual({"456"}, bot.member_verification_groups(cfg))
-
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
         action_count = len(client.actions)
-        raw_sent = len(client.sent)
-        asyncio.run(bot.on_event(client, cfg, correct))
+        asyncio.run(bot.on_event(client, cfg, notice))
         self.assertEqual(action_count, len(client.actions))
-        self.assertEqual(raw_sent, len(client.sent))
 
     def test审批待确认和旧存量无会话的严格登记返回专用提示且不授权(self):
         cfg = approval_cfg()

@@ -35,6 +35,69 @@ public class OperationClockTests
     }
 
     [Fact]
+    public void 挂机超时终局在效果批次挂起时也会立即下发并停止全部计时()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            var sentPlayers = new List<int>();
+            room.Engine.OnSendToPlayer = (playerIndex, _) => sentPlayers.Add(playerIndex);
+            typeof(GameEngine).GetField("_snapshotBatchActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(room.Engine, true);
+            room.Engine.State.PendingPrompt = new PendingPrompt
+            {
+                PromptId = "stalled-prompt",
+                PlayerIndex = 0,
+                Kind = "Confirm",
+                ValidChoices = ["yes", "no"],
+                MinChoose = 1,
+                MaxChoose = 1,
+                PromptText = "等待玩家选择",
+            };
+
+            typeof(GameRoomManager).GetMethod(
+                    "FinishByInactivityTimeout",
+                    BindingFlags.Static | BindingFlags.NonPublic)!
+                .Invoke(null, [room, 0]);
+
+            Assert.True(room.Engine.State.IsGameOver);
+            Assert.Equal(1, room.Engine.State.WinnerIndex);
+            Assert.Equal(0, room.Engine.State.InactivityLossRemainingMs);
+            Assert.Equal(-1, room.Engine.State.OperationClockActivePlayer);
+            Assert.Equal([0, 1], sentPlayers);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
+    public void 新增终局原因即使未登记为交互屏障也必须立即下发()
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            var sentPlayers = new List<int>();
+            room.Engine.OnSendToPlayer = (playerIndex, _) => sentPlayers.Add(playerIndex);
+            typeof(GameEngine).GetField("_snapshotBatchActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(room.Engine, true);
+
+            room.Engine.State.WinnerIndex = 1;
+            room.Engine.State.GameOverReason = "未来新增的终局原因";
+            room.Engine.Broadcast("FutureTerminalAction");
+
+            Assert.Equal([0, 1], sentPlayers);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
+    [Fact]
     public async Task 选先后与调度不计时_进入第一回合后才启动棋钟()
     {
         TestScene.New();

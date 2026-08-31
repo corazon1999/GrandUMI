@@ -6,6 +6,7 @@ shared_db="$shared_dir/accounts.db"
 active_marker="$shared_dir/active"
 prepared_marker="$shared_dir/prepared"
 rollback_dir="$shared_dir/rollback"
+precommit_marker="$shared_dir/authority-precommit-snapshot"
 formal_players=/data/grandumi/players.db
 test_players=/data/grandumi-test/players.db
 test_backend=/opt/grandumi-test/服务端WebSocket/publish
@@ -33,6 +34,24 @@ validate_database() {
     || die "共享账号库缺少受控源数据迁移审计：$database"
 }
 
+validate_prepared_marker() {
+  [[ -f "$prepared_marker" ]] || die "共享账号库准备标记不存在"
+  [[ "$(wc -l < "$prepared_marker")" -eq 2 ]] \
+    && grep -Fxq 'schema=1' "$prepared_marker" \
+    && grep -Eq '^prepared_at_utc=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
+      "$prepared_marker" \
+    || die "共享账号库准备标记内容无效"
+}
+
+validate_active_marker() {
+  [[ -f "$active_marker" ]] || die "共享账号库激活标记不存在"
+  [[ "$(wc -l < "$active_marker")" -eq 2 ]] \
+    && grep -Fxq 'schema=1' "$active_marker" \
+    && grep -Eq '^activated_at_utc=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
+      "$active_marker" \
+    || die "共享账号库激活标记内容无效"
+}
+
 write_prepared_marker() {
   local next="$shared_dir/prepared.next"
   printf 'schema=1\nprepared_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$next"
@@ -50,8 +69,107 @@ write_active_marker() {
 }
 
 require_prepared_database() {
-  [[ -f "$prepared_marker" ]] || die "共享账号库准备标记不存在，拒绝启动或激活"
+  validate_prepared_marker
   validate_database "$shared_db"
+}
+
+write_precommit_snapshot() {
+  [[ ! -f "$active_marker" ]] || die "共享账号权威已经激活，拒绝覆盖提交前快照"
+  require_prepared_database
+  command -v sha256sum >/dev/null || die "缺少 sha256sum，无法校验共享账号提交前快照"
+
+  local timestamp snapshot snapshot_next available required accounts_hash prepared_hash marker_next
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  snapshot="$rollback_dir/pre-authority-$timestamp-$$"
+  snapshot_next="$snapshot.next"
+  [[ "$snapshot" =~ ^/data/grandumi-shared/rollback/pre-authority-[0-9]{8}T[0-9]{6}Z-[0-9]+$ ]] \
+    || die "共享账号提交前快照路径不安全：$snapshot"
+  [[ ! -e "$snapshot" && ! -e "$snapshot_next" ]] \
+    || die "共享账号提交前快照目录已存在：$snapshot"
+
+  available="$(df -PB1 "$rollback_dir" | awk 'NR==2 {print $4}')"
+  required=$(($(stat -c %s "$shared_db") + 64 * 1024 * 1024))
+  [[ "$available" =~ ^[0-9]+$ && "$available" -ge "$required" ]] \
+    || die "共享账号提交前快照空间不足"
+
+  # 快照先写入同文件系统的 .next 目录；只有数据库、prepared 和 active=absent
+  # 三项全部核对后才原子发布目录与指针，任何部分失败都不会留下可提交标记。
+  install -d -o grandumi -g grandumi -m 0700 "$snapshot_next"
+  cp -a -- "$shared_db" "$snapshot_next/accounts.db"
+  install -o grandumi -g grandumi -m 0600 "$prepared_marker" "$snapshot_next/prepared"
+  printf 'absent\n' > "$snapshot_next/active.state"
+  chown grandumi:grandumi "$snapshot_next/active.state"
+  chmod 0600 "$snapshot_next/active.state"
+  validate_database "$snapshot_next/accounts.db"
+
+  accounts_hash="$(sha256sum "$shared_db" | awk '{print $1}')"
+  prepared_hash="$(sha256sum "$prepared_marker" | awk '{print $1}')"
+  [[ "$(sha256sum "$snapshot_next/accounts.db" | awk '{print $1}')" == "$accounts_hash" ]] \
+    || die "共享账号提交前快照与当前 accounts.db 不一致"
+  [[ "$(sha256sum "$snapshot_next/prepared" | awk '{print $1}')" == "$prepared_hash" ]] \
+    || die "共享账号提交前快照与当前 prepared 标记不一致"
+  {
+    printf 'status=complete\n'
+    printf 'schema=1\n'
+    printf 'created_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'accounts_sha256=%s\n' "$accounts_hash"
+    printf 'prepared_sha256=%s\n' "$prepared_hash"
+    printf 'active_state=absent\n'
+  } > "$snapshot_next/manifest"
+  printf '%s\n' "$accounts_hash" > "$snapshot_next/.complete"
+  chown -R grandumi:grandumi "$snapshot_next"
+  chmod -R u=rwX,go= "$snapshot_next"
+  mv -- "$snapshot_next" "$snapshot"
+
+  marker_next="$precommit_marker.next"
+  {
+    printf 'snapshot_dir=%s\n' "$snapshot"
+    printf 'accounts_sha256=%s\n' "$accounts_hash"
+    printf 'prepared_sha256=%s\n' "$prepared_hash"
+    printf 'active_state=absent\n'
+  } > "$marker_next"
+  chown grandumi:grandumi "$marker_next"
+  chmod 0640 "$marker_next"
+  mv -f -- "$marker_next" "$precommit_marker"
+}
+
+require_precommit_snapshot() {
+  [[ -f "$precommit_marker" ]] || die "共享账号权威提交前快照标记不存在"
+  command -v sha256sum >/dev/null || die "缺少 sha256sum，无法复核共享账号提交前快照"
+  [[ "$(wc -l < "$precommit_marker")" -eq 4 ]] \
+    || die "共享账号权威提交前快照标记行数无效"
+
+  local snapshot expected_accounts expected_prepared active_state
+  snapshot="$(sed -n 's/^snapshot_dir=//p' "$precommit_marker")"
+  expected_accounts="$(sed -n 's/^accounts_sha256=//p' "$precommit_marker")"
+  expected_prepared="$(sed -n 's/^prepared_sha256=//p' "$precommit_marker")"
+  active_state="$(sed -n 's/^active_state=//p' "$precommit_marker")"
+  [[ "$snapshot" =~ ^/data/grandumi-shared/rollback/pre-authority-[0-9]{8}T[0-9]{6}Z-[0-9]+$ ]] \
+    || die "共享账号权威提交前快照路径无效"
+  [[ "$expected_accounts" =~ ^[0-9a-f]{64}$ \
+      && "$expected_prepared" =~ ^[0-9a-f]{64}$ \
+      && "$active_state" == absent ]] \
+    || die "共享账号权威提交前快照标记内容无效"
+  [[ -f "$snapshot/.complete" && -f "$snapshot/manifest" \
+      && -f "$snapshot/accounts.db" && -f "$snapshot/prepared" \
+      && "$(cat "$snapshot/active.state" 2>/dev/null)" == absent ]] \
+    || die "共享账号权威提交前快照不完整"
+  [[ ! -f "$active_marker" ]] || die "共享账号权威状态已改变，拒绝重复提交旧快照"
+  require_prepared_database
+  validate_database "$snapshot/accounts.db"
+  [[ "$(sha256sum "$shared_db" | awk '{print $1}')" == "$expected_accounts" \
+      && "$(sha256sum "$snapshot/accounts.db" | awk '{print $1}')" == "$expected_accounts" ]] \
+    || die "accounts.db 已偏离共享账号权威提交前快照"
+  [[ "$(sha256sum "$prepared_marker" | awk '{print $1}')" == "$expected_prepared" \
+      && "$(sha256sum "$snapshot/prepared" | awk '{print $1}')" == "$expected_prepared" ]] \
+    || die "prepared 标记已偏离共享账号权威提交前快照"
+  grep -Fxq "$expected_accounts" "$snapshot/.complete" \
+    || die "共享账号权威提交前快照完成标记无效"
+  grep -Fxq 'status=complete' "$snapshot/manifest" \
+    && grep -Fxq "accounts_sha256=$expected_accounts" "$snapshot/manifest" \
+    && grep -Fxq "prepared_sha256=$expected_prepared" "$snapshot/manifest" \
+    && grep -Fxq 'active_state=absent' "$snapshot/manifest" \
+    || die "共享账号权威提交前快照清单无效"
 }
 
 formal_backend_is_active() {
@@ -78,15 +196,18 @@ prepare_database() {
   flock -n 8 || die "另一个共享账号迁移任务正在执行"
 
   if [[ -f "$active_marker" ]]; then
+    validate_active_marker
     validate_database "$shared_db"
     [[ -f "$prepared_marker" ]] || write_prepared_marker
+    validate_prepared_marker
     return 0
   fi
   formal_backend_is_active \
     && die "首次共享账号迁移前必须停止所有正式后端写入"
   test_backend_is_active \
     && die "首次共享账号迁移前必须停止测试后端写入"
-  rm -f -- "$prepared_marker" "$shared_dir/prepared.next"
+  rm -f -- "$prepared_marker" "$shared_dir/prepared.next" \
+    "$precommit_marker" "$precommit_marker.next"
 
   local next="$shared_dir/accounts.db.next.$$"
   local timestamp archive formal_count shared_count
@@ -128,6 +249,7 @@ prepare_database() {
   mv -f -- "$next" "$shared_db"
   rm -f -- "$shared_db-wal" "$shared_db-shm"
   write_prepared_marker
+  write_precommit_snapshot
   trap - EXIT RETURN
   echo "共享账号库已准备（尚未激活测试服）：$shared_count 个账号"
 }
@@ -143,12 +265,14 @@ commit_authority() {
   require_prepared_database
 
   if [[ -f "$active_marker" ]]; then
+    validate_active_marker
     return 0
   fi
   formal_backend_is_active \
     && die "首次提交共享账号权威前必须停止所有正式后端写入"
   test_backend_is_active \
     && die "首次提交共享账号权威前必须停止测试后端写入"
+  require_precommit_snapshot
   write_active_marker
   echo "共享账号库已提交为不可回滚权威源；后续失败只能向前恢复新版服务" || true
 }
@@ -158,6 +282,7 @@ activate_test() {
   require_prepared_database
   [[ -f "$active_marker" ]] \
     || die "共享账号权威尚未提交，拒绝由测试服启动流程隐式激活"
+  validate_active_marker
   formal_backend_is_active || die "正式后端未运行，拒绝激活测试服共享账号"
   require_shared_marker "$test_backend"
   [[ -f /etc/systemd/system/grandumi-test-backend.service ]] \
@@ -194,6 +319,7 @@ case "$mode" in
   verify-target)
     [[ -n "$backend_dir" ]] || die "用法：grandumi-shared-account-migration verify-target <backend-dir>"
     if [[ -f "$active_marker" ]]; then
+      validate_active_marker
       require_shared_marker "$backend_dir"
       require_prepared_database
     fi
@@ -201,6 +327,7 @@ case "$mode" in
   verify-test)
     require_shared_marker "$test_backend"
     if [[ -f "$active_marker" ]]; then
+      validate_active_marker
       require_prepared_database
     fi
     [[ -f /etc/systemd/system/grandumi-test-backend.service ]] \

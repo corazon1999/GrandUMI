@@ -635,6 +635,26 @@ def extract_group_request_inviter_qq(event: dict):
     return None, "回答格式无效，请只填写一位邀请人的 QQ 号。"
 
 
+def extract_group_increase_inviter_qq(event: dict):
+    """只接受 OneBot 明确标记为邀请入群时的操作者，其他通知不猜测邀请人。"""
+    if (
+        event.get("post_type") != "notice"
+        or event.get("notice_type") != "group_increase"
+        or event.get("sub_type") != "invite"
+    ):
+        return None
+    inviter = str(event.get("operator_id") or "").strip()
+    newcomer = str(event.get("user_id") or "").strip()
+    bot_qq = str(event.get("self_id") or "").strip()
+    if (
+        not _QQ_NUMBER_RE.fullmatch(inviter)
+        or inviter == newcomer
+        or inviter == bot_qq
+    ):
+        return None
+    return inviter
+
+
 # 同一进程内只在 OneBot 明确确认动作成功后去重。动作失败或查询失败不会写入，
 # 让 NapCat 重投同一申请时仍可安全重试；上限用于避免长时间运行后无限增长。
 _HANDLED_GROUP_ADD_REQUEST_LIMIT = 2048
@@ -1489,15 +1509,31 @@ async def handle_member_verification_notice(client, cfg: dict, event: dict) -> b
     nickname = str(
         sender.get("card") or sender.get("nickname") or event.get("nickname") or ""
     )
+    notice_inviter = extract_group_increase_inviter_qq(event)
     verification = storage.start_member_verification(
         group_id,
         newcomer,
         nickname,
         _event_source_time(event),
         now=_event_received_at(event),
+        verified_inviter_qq=notice_inviter,
     )
     if verification.get("created"):
-        await process_member_verification_prompt(client, cfg, verification["id"])
+        if verification.get("state") == "verified":
+            inviter = str(verification.get("inviter_qq") or "")
+            if verification.get("reason") == "direct_invite_verified":
+                text = (
+                    f"欢迎加入本群，已根据本次群成员邀请自动记录邀请人 QQ：{inviter}，"
+                    "无需重复填写。"
+                )
+            else:
+                text = (
+                    f"欢迎加入本群，已根据加群申请自动记录邀请人 QQ：{inviter}，"
+                    "无需重复填写。"
+                )
+            await _try_send_verification_message(client, group_id, newcomer, text)
+        else:
+            await process_member_verification_prompt(client, cfg, verification["id"])
     return True
 
 

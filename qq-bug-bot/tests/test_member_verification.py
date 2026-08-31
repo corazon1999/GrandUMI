@@ -57,14 +57,21 @@ def verification_cfg(groups=(456,), reminder=1800, poll_interval=300):
     }
 
 
-def join_event(group_id=456, newcomer=10001, when=1000, self_id=99999):
+def join_event(
+    group_id=456,
+    newcomer=10001,
+    when=1000,
+    self_id=99999,
+    sub_type="approve",
+    operator=20002,
+):
     return {
         "post_type": "notice",
         "notice_type": "group_increase",
-        "sub_type": "invite",
+        "sub_type": sub_type,
         "group_id": group_id,
         "user_id": newcomer,
-        "operator_id": 20002,
+        "operator_id": operator,
         "self_id": self_id,
         "time": when,
         "_grandumi_received_at": when,
@@ -212,7 +219,7 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
             "cancelled", storage.get_member_verification(expired["id"])["state"]
         )
 
-    def test审批授权并发幂等且并发回答只能领取一次(self):
+    def test审批授权并发幂等且并发入群只完成一次(self):
         def prepare():
             return storage.prepare_member_verification_approval(
                 "456", "10001", "20002", 100, 600, now=100
@@ -227,15 +234,53 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
         self.assertTrue(
             storage.complete_member_verification_approval(row["id"], now=101)
         )
+
+        def join(_):
+            return storage.start_member_verification(
+                "456", "10001", "新人", 102, now=102
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            joined = list(pool.map(join, range(8)))
+        self.assertEqual(1, sum(bool(item["created"]) for item in joined))
+        self.assertEqual(1, len({item["id"] for item in joined}))
+        completed = storage.get_member_verification(row["id"])
+        self.assertEqual("verified", completed["state"])
+        self.assertEqual("20002", completed["inviter_qq"])
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
+        self.assertIsNone(storage.claim_member_verification_prompt(row["id"], now=103))
+        self.assertEqual([], storage.get_member_verification_responses(row["id"]))
+
+    def test审批响应状态未落稳时真实入群仍可前向恢复(self):
+        prepared = storage.prepare_member_verification_approval(
+            "456", "10001", "20002", 100, 600, now=100
+        )
+        self.assertTrue(
+            storage.record_member_verification_approval_failure(
+                prepared["id"], "审批响应中断", now=101
+            )
+        )
+
         joined = storage.start_member_verification(
             "456", "10001", "新人", 102, now=102
         )
-        prompt = storage.claim_member_verification_prompt(joined["id"], now=102)
-        self.assertTrue(
-            storage.complete_member_verification_prompt(
-                joined["id"], prompt["claim_token"], 600, sent_at=102
-            )
+        self.assertTrue(joined["created"])
+        self.assertEqual("approved_join_verified", joined["reason"])
+        self.assertEqual("verified", joined["state"])
+        self.assertEqual("20002", joined["inviter_qq"])
+        self.assertFalse(
+            storage.complete_member_verification_approval(prepared["id"], now=103)
         )
+
+        replay = storage.start_member_verification(
+            "456", "10001", "新人", 102, now=104
+        )
+        self.assertFalse(replay["created"])
+        self.assertEqual(prepared["id"], replay["id"])
+        self.assertEqual("verified", replay["state"])
+
+    def test并发回答仍只能领取一次(self):
+        row = self.create_prompted_session()
 
         def answer(index):
             return storage.begin_member_inviter_check(
@@ -254,15 +299,7 @@ class MemberVerificationStorageTests(MemberVerificationTestCase):
         self.assertTrue(
             all(result["status"] in ("claimed", "busy") for result in answers)
         )
-        self.assertEqual(
-            1, len(storage.get_member_verification_responses(joined["id"]))
-        )
-        token = claimed[0]["verification"]["claim_token"]
-        self.assertTrue(
-            storage.complete_member_inviter_check(
-                joined["id"], token, "20002", now=120
-            )
-        )
+        self.assertEqual(1, len(storage.get_member_verification_responses(row["id"])))
 
     def test重复通知不重置倒计时_离群重进创建新会话(self):
         first = storage.start_member_verification("456", "10001", "新人", 100, now=100)
@@ -599,6 +636,7 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
         asyncio.run(bot.on_event(client, cfg, join_event()))
         row = storage.get_active_member_verification("456", "10001")
         self.assertEqual("pending", row["state"])
+        self.assertIsNone(row["inviter_qq"])
         self.assertEqual("send_group_msg", client.actions[0][0])
         prompt = client.actions[0][1]["message"]
         self.assertEqual("at", prompt[0]["type"])
@@ -656,6 +694,72 @@ class MemberVerificationBotTests(MemberVerificationTestCase):
         self.assertEqual(
             ["get_group_member_list", "send_group_msg"],
             [name for name, _ in client.actions[-2:]],
+        )
+
+    def test明确邀请入群通知自动记录操作者且重复通知不重复确认(self):
+        client = FakeOneBotClient({"10001", "20002", "99999"})
+        cfg = verification_cfg()
+        event = join_event(sub_type="invite", operator=20002)
+
+        asyncio.run(bot.on_event(client, cfg, event))
+
+        self.assertIsNone(storage.get_active_member_verification("456", "10001"))
+        with sqlite3.connect(storage.DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            completed = conn.execute(
+                """
+                SELECT * FROM member_verifications
+                 WHERE group_id = '456' AND newcomer_qq = '10001'
+                 ORDER BY id DESC LIMIT 1
+                """
+            ).fetchone()
+        self.assertEqual("verified", completed["state"])
+        self.assertEqual("20002", completed["inviter_qq"])
+        self.assertEqual(["send_group_msg"], [name for name, _ in client.actions])
+        self.assertIn(
+            "本次群成员邀请自动记录邀请人 QQ：20002",
+            client.actions[0][1]["message"][1]["data"]["text"],
+        )
+
+        action_count = len(client.actions)
+        asyncio.run(bot.on_event(client, cfg, event))
+        self.assertEqual(action_count, len(client.actions))
+        with sqlite3.connect(storage.DB_PATH) as conn:
+            count = conn.execute(
+                """
+                SELECT COUNT(*) FROM member_verifications
+                 WHERE group_id = '456' AND newcomer_qq = '10001'
+                """
+            ).fetchone()[0]
+        self.assertEqual(1, count)
+
+    def test只有可靠invite操作者才自动记录_approve与无效字段沿用原流程(self):
+        base = join_event()
+        self.assertIsNone(bot.extract_group_increase_inviter_qq(base))
+        for sub_type, operator in (
+            ("invite", 0),
+            ("invite", 10001),
+            ("invite", 99999),
+            ("approve", 20002),
+        ):
+            with self.subTest(sub_type=sub_type, operator=operator):
+                event = join_event(sub_type=sub_type, operator=operator)
+                self.assertIsNone(bot.extract_group_increase_inviter_qq(event))
+
+        client = FakeOneBotClient({"10001", "20002", "99999"})
+        asyncio.run(
+            bot.on_event(
+                client,
+                verification_cfg(),
+                join_event(sub_type="invite", operator=0),
+            )
+        )
+        row = storage.get_active_member_verification("456", "10001")
+        self.assertEqual("pending", row["state"])
+        self.assertIsNone(row["inviter_qq"])
+        self.assertIn(
+            "请真正 @“释迦的助理”",
+            client.actions[0][1]["message"][1]["data"]["text"],
         )
 
     def test非目标群不创建会话_空目标列表绝不代表全部群(self):

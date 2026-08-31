@@ -111,6 +111,69 @@ test("首次正式切换在停写后迁移并先提交共享权威，再启动�
   assert.match(activate, /grandumi-account-authority-cutover\.lock/);
 });
 
+test("共享账号权威提交前原子快照绑定数据库、标记和未激活状态", () => {
+  assert.match(
+    migration,
+    /precommit_marker="\$shared_dir\/authority-precommit-snapshot"/,
+  );
+  assert.match(
+    migration,
+    /snapshot_next="\$snapshot\.next"[\s\S]*cp -a -- "\$shared_db" "\$snapshot_next\/accounts\.db"/,
+  );
+  assert.match(
+    migration,
+    /install [^\n]*"\$prepared_marker" "\$snapshot_next\/prepared"/,
+  );
+  assert.match(migration, /printf 'absent\\n' > "\$snapshot_next\/active\.state"/);
+  assert.match(
+    migration,
+    /sha256sum "\$snapshot_next\/accounts\.db"[\s\S]*== "\$accounts_hash"/,
+  );
+  assert.match(
+    migration,
+    /sha256sum "\$snapshot_next\/prepared"[\s\S]*== "\$prepared_hash"/,
+  );
+  assert.match(migration, /mv -- "\$snapshot_next" "\$snapshot"/);
+  assert.match(migration, /mv -f -- "\$marker_next" "\$precommit_marker"/);
+
+  const prepareFunction = migration.match(/prepare_database\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const prepared = prepareFunction.lastIndexOf("write_prepared_marker");
+  const snapshotted = prepareFunction.lastIndexOf("write_precommit_snapshot");
+  assert.ok(prepared >= 0 && snapshotted > prepared);
+
+  const commitFunction = migration.match(/commit_authority\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const stopFormal = commitFunction.indexOf("formal_backend_is_active");
+  const stopTest = commitFunction.indexOf("test_backend_is_active");
+  const verifySnapshot = commitFunction.indexOf("require_precommit_snapshot");
+  const activate = commitFunction.indexOf("write_active_marker");
+  assert.ok(
+    stopFormal >= 0 && stopTest > stopFormal
+      && verifySnapshot > stopTest && activate > verifySnapshot,
+  );
+  assert.match(commitFunction, /if \[\[ -f "\$active_marker" \]\]; then[\s\S]*validate_active_marker[\s\S]*return 0/);
+  assert.match(
+    commitFunction.slice(activate),
+    /^write_active_marker\s+echo "共享账号库已提交为不可回滚权威源；后续失败只能向前恢复新版服务" \|\| true\s*$/,
+  );
+});
+
+test("共享账号权威提交拒绝快照漂移和错误 active 状态", () => {
+  assert.match(migration, /\[\[ ! -f "\$active_marker" \]\] \|\| die "共享账号权威状态已改变/);
+  assert.match(
+    migration,
+    /sha256sum "\$shared_db"[\s\S]*== "\$expected_accounts"[\s\S]*sha256sum "\$snapshot\/accounts\.db"/,
+  );
+  assert.match(
+    migration,
+    /sha256sum "\$prepared_marker"[\s\S]*== "\$expected_prepared"[\s\S]*sha256sum "\$snapshot\/prepared"/,
+  );
+  assert.match(migration, /active_state="\$\(sed -n 's\/\^active_state=\/\/p'/);
+  assert.match(migration, /"\$active_state" == absent/);
+  assert.match(migration, /cat "\$snapshot\/active\.state" 2>\/dev\/null\)" == absent/);
+  assert.match(migration, /grep -Fxq 'active_state=absent' "\$snapshot\/manifest"/);
+  assert.doesNotMatch(migration, /rm -f -- "\$active_marker"/);
+});
+
 test("共享库激活后快照会包含账号库且旧槽位不得回滚", () => {
   assert.match(backendProject, /shared-account-v1\.marker/);
   assert.match(backendProject, /TargetPath="\.grandumi-shared-account-v1"/);

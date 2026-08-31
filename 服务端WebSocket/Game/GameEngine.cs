@@ -122,7 +122,7 @@ public class GameEngine
         "UndoAttachDon",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
         "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
-        "OperationTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
+        "OperationTimeout", "InactivityTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
 
@@ -1462,8 +1462,10 @@ public class GameEngine
             {
                 sendNow = true;
             }
-            else if (ImmediateSnapshotActions.Contains(lastAction))
+            else if (State.IsGameOver || ImmediateSnapshotActions.Contains(lastAction))
             {
+                // 任何终局都必须越过仍在等待 Prompt 的效果批次立即下发；否则服务端清房后，
+                // 客户端可能只看到棋钟归零而永远收不到判负快照。显式动作表仍用于非终局交互屏障。
                 // 当前完整快照已包含此前所有状态，旧的普通中间快照无需再发。
                 _pendingBroadcast = null;
                 sendNow = true;

@@ -1230,18 +1230,89 @@ def has_member_verification_response(
         return row is not None
 
 
+def _complete_member_verification_from_join(
+    conn,
+    active,
+    nickname: str,
+    join_event_time: int,
+    inviter_qq: str,
+    now_value: int,
+    reason: str,
+):
+    """在调用方持有写事务时，把真实入群与可信邀请人原子合并成终态。"""
+    response_key = str(active["response_message_key"] or "")
+    cur = conn.execute(
+        """
+        UPDATE member_verifications
+           SET state = 'verified',
+               nickname = ?,
+               join_event_time = ?,
+               inviter_qq = ?,
+               candidate_qq = ?,
+               deadline_at = NULL,
+               claim_token = NULL,
+               claim_kind = NULL,
+               claimed_at = NULL,
+               next_attempt_at = NULL,
+               last_error = NULL,
+               verified_at = ?,
+               ended_at = ?,
+               updated_at = ?
+         WHERE id = ?
+           AND state IN (
+               'approval_pending', 'awaiting_join',
+               'awaiting_prompt', 'pending', 'checking_inviter',
+               'reminding'
+           )
+        """,
+        (
+            str(nickname or ""),
+            int(join_event_time),
+            str(inviter_qq),
+            str(inviter_qq),
+            int(now_value),
+            int(now_value),
+            int(now_value),
+            active["id"],
+        ),
+    )
+    if cur.rowcount != 1:
+        return None
+    if response_key:
+        conn.execute(
+            """
+            UPDATE member_verification_responses
+               SET result = 'superseded',
+                   detail = '真实入群通知已提供可信邀请人记录',
+                   updated_at = ?
+             WHERE verification_id = ? AND message_key = ?
+               AND result IN ('checking', 'retrying')
+            """,
+            (int(now_value), active["id"], response_key),
+        )
+    completed = conn.execute(
+        "SELECT * FROM member_verifications WHERE id = ?", (active["id"],)
+    ).fetchone()
+    result = dict(completed)
+    result["created"] = True
+    result["reason"] = str(reason)
+    return result
+
+
 def start_member_verification(
     group_id: str,
     newcomer_qq: str,
     nickname: str,
     join_event_time: int,
     now=None,
+    verified_inviter_qq: str | None = None,
 ):
-    """幂等创建入群验证；重复通知不会重置当前验证窗口。"""
+    """幂等登记真实入群；已有可信邀请人时直接完成，否则创建回答会话。"""
     group_id = str(group_id)
     newcomer_qq = str(newcomer_qq)
     join_event_time = _verification_now(join_event_time)
     now_value = _verification_now(now)
+    notice_inviter = str(verified_inviter_qq or "").strip()
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
@@ -1310,6 +1381,30 @@ def start_member_verification(
                     result["created"] = False
                     result["reason"] = "replayed_notice"
                     return result
+                approved_inviter = str(active["inviter_qq"] or "")
+                final_inviter = approved_inviter or notice_inviter
+                if final_inviter:
+                    completed = _complete_member_verification_from_join(
+                        conn,
+                        active,
+                        nickname,
+                        join_event_time,
+                        final_inviter,
+                        now_value,
+                        (
+                            "approved_join_verified"
+                            if approved_inviter
+                            else "direct_invite_verified"
+                        ),
+                    )
+                    if not completed:
+                        conn.rollback()
+                        result = dict(active)
+                        result["created"] = False
+                        result["reason"] = "activation_conflict"
+                        return result
+                    conn.commit()
+                    return completed
                 cur = conn.execute(
                     """
                     UPDATE member_verifications
@@ -1371,6 +1466,30 @@ def start_member_verification(
                     else "joined_after_unconfirmed_approval"
                 )
                 return result
+            stored_inviter = str(active["inviter_qq"] or "")
+            final_inviter = stored_inviter or notice_inviter
+            if final_inviter:
+                completed = _complete_member_verification_from_join(
+                    conn,
+                    active,
+                    nickname,
+                    join_event_time,
+                    final_inviter,
+                    now_value,
+                    (
+                        "approved_join_verified"
+                        if stored_inviter
+                        else "direct_invite_verified"
+                    ),
+                )
+                if not completed:
+                    conn.rollback()
+                    result = dict(active)
+                    result["created"] = False
+                    result["reason"] = "activation_conflict"
+                    return result
+                conn.commit()
+                return completed
             conn.commit()
             result = dict(active)
             result["created"] = False
@@ -1393,29 +1512,54 @@ def start_member_verification(
             result["reason"] = "replayed_notice"
             return result
 
-        cur = conn.execute(
-            """
-            INSERT INTO member_verifications (
-                group_id, newcomer_qq, nickname, join_event_time, state,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'awaiting_prompt', ?, ?)
-            """,
-            (
-                group_id,
-                newcomer_qq,
-                str(nickname or ""),
-                join_event_time,
-                now_value,
-                now_value,
-            ),
-        )
+        if notice_inviter:
+            cur = conn.execute(
+                """
+                INSERT INTO member_verifications (
+                    group_id, newcomer_qq, nickname, join_event_time, state,
+                    inviter_qq, candidate_qq, verified_at, ended_at,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'verified', ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    group_id,
+                    newcomer_qq,
+                    str(nickname or ""),
+                    join_event_time,
+                    notice_inviter,
+                    notice_inviter,
+                    now_value,
+                    now_value,
+                    now_value,
+                    now_value,
+                ),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO member_verifications (
+                    group_id, newcomer_qq, nickname, join_event_time, state,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'awaiting_prompt', ?, ?)
+                """,
+                (
+                    group_id,
+                    newcomer_qq,
+                    str(nickname or ""),
+                    join_event_time,
+                    now_value,
+                    now_value,
+                ),
+            )
         row = conn.execute(
             "SELECT * FROM member_verifications WHERE id = ?", (cur.lastrowid,)
         ).fetchone()
         conn.commit()
         result = dict(row)
         result["created"] = True
-        result["reason"] = "created"
+        result["reason"] = (
+            "direct_invite_verified" if notice_inviter else "created"
+        )
         return result
 
 
