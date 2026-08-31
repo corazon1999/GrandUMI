@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 repo=/opt/grandumi-test
 state_dir=/var/lib/grandumi-test-release
+deploy_lock=/run/lock/grandumi-test-deploy.lock
 account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
 replay_archive_root=/var/lib/grandumi-test-replay-artifacts
 replay_archive_env=/etc/grandumi/grandumi-test-replay-artifact.env
@@ -39,7 +40,43 @@ cleanup_verification() {
 trap cleanup_verification EXIT
 
 mkdir -p "$state_dir"
-old="$(git -C "$repo" rev-parse HEAD)"
+exec 9>"$deploy_lock"
+flock -n 9 || die "另一个测试服部署正在进行，拒绝并发执行"
+repo_head="$(git -C "$repo" rev-parse HEAD)"
+
+# 仓库 HEAD 可能已被一次失败的门禁或构建提前移动，不能代表实际运行版本。
+# 只有最后一次原子写入的 test-deployed 才能作为增量部署基线；任何不可信状态都保守全量部署。
+deployment_state="$state_dir/test-deployed"
+deployment_base=""
+changed=""
+full_deploy=0
+full_deploy_reason=""
+require_full_deploy() {
+  full_deploy=1
+  full_deploy_reason="$1"
+  changed=""
+}
+
+if [[ "$force" == "all" ]]; then
+  require_full_deploy "发布入口要求全量部署"
+elif [[ ! -f "$deployment_state" ]]; then
+  require_full_deploy "缺少 test-deployed 成功状态"
+elif ! deployment_base="$(cat "$deployment_state" 2>/dev/null)"; then
+  require_full_deploy "无法读取 test-deployed 成功状态"
+else
+  deployment_base="${deployment_base%$'\r'}"
+  if [[ ! "$deployment_base" =~ ^[0-9a-f]{40}$ ]]; then
+    require_full_deploy "test-deployed 成功状态格式非法"
+  elif ! git -C "$repo" cat-file -e "$deployment_base^{commit}" 2>/dev/null; then
+    require_full_deploy "test-deployed 提交对象不可用"
+  elif ! git -C "$repo" merge-base --is-ancestor "$deployment_base" "$target" 2>/dev/null; then
+    require_full_deploy "test-deployed 不是待部署提交的祖先"
+  elif [[ "$deployment_base" == "$target" ]]; then
+    require_full_deploy "待部署提交已标记成功，执行确定性全量重建"
+  elif ! changed="$(git -C "$repo" -c core.quotepath=false diff --name-only "$deployment_base" "$target" 2>/dev/null)"; then
+    require_full_deploy "无法比较 test-deployed 与待部署提交"
+  fi
+fi
 
 # prebuild 会更新这个生成文件；除此以外的受控文件改动都必须人工处理。
 generated='opcgpro-web/src/data/dataVersion.ts'
@@ -67,19 +104,24 @@ install -m 0644 "$repo/ops/server/grandumi-admin-deploy.service" /etc/systemd/sy
 install -m 0644 "$repo/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path
 systemctl daemon-reload
 systemctl enable --now grandumi-admin-deploy.path
-changed="$(git -C "$repo" -c core.quotepath=false diff --name-only "$old" "$target" 2>/dev/null || true)"
 need_back=0
 need_front=0
 need_npm=0
-if [[ "$force" == "all" || "$old" == "$target" ]]; then
+if [[ "$full_deploy" == 1 ]]; then
   need_back=1
   need_front=1
+  need_npm=1
 fi
 grep -q '^服务端WebSocket/' <<<"$changed" && need_back=1 || true
 grep -q '^opcgpro-web/' <<<"$changed" && need_front=1 || true
 grep -Eq '^opcgpro-web/(package|package-lock)\.json$' <<<"$changed" && need_npm=1 || true
 
-echo "测试服代码：$(git -C "$repo" rev-parse --short=12 "$old") -> $(git -C "$repo" rev-parse --short=12 "$target")"
+echo "测试服仓库 HEAD：$(git -C "$repo" rev-parse --short=12 "$repo_head") -> $(git -C "$repo" rev-parse --short=12 "$target")"
+if [[ "$full_deploy" == 1 ]]; then
+  echo "测试服部署基线：$full_deploy_reason；执行前后端全量部署"
+else
+  echo "测试服部署基线：$(git -C "$repo" rev-parse --short=12 "$deployment_base") -> $(git -C "$repo" rev-parse --short=12 "$target")"
+fi
 
 if [[ "$need_back" == 1 ]]; then
   exec 8>"$account_cutover_lock"

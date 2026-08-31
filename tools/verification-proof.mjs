@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { promisify } from "node:util";
 
 const root = path.resolve(import.meta.dirname, "..");
 const policyFiles = [
@@ -21,6 +23,8 @@ const policyFiles = [
   "卡牌数据/_effect-registry.v1.json",
   "card-content/scenario-matrix.v1.json"
 ];
+const execFileAsync = promisify(execFile);
+const maxGitOutputBytes = 32 * 1024 * 1024;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -34,11 +38,40 @@ function stable(value) {
   return JSON.stringify(value);
 }
 
-async function policyDigest() {
+async function gitBytes(args, failureMessage) {
+  try {
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: root,
+      encoding: null,
+      maxBuffer: maxGitOutputBytes,
+      windowsHide: true,
+    });
+    return stdout;
+  } catch (error) {
+    const stderr = Buffer.isBuffer(error?.stderr)
+      ? error.stderr.toString("utf8").trim()
+      : String(error?.stderr ?? "").trim();
+    throw new Error(`${failureMessage}${stderr ? `：${stderr}` : "。"}`);
+  }
+}
+
+async function assertCommitTree(commit, expectedTree, label) {
+  const actualTree = (await gitBytes(
+    ["rev-parse", "--verify", `${commit}^{tree}`],
+    `无法解析${label}的 Git tree`,
+  )).toString("ascii").trim();
+  if (actualTree !== expectedTree) throw new Error(`${label}与声明的 Git tree 不对应。`);
+}
+
+async function policyDigest(tree) {
   const parts = [];
   for (const relativePath of policyFiles) {
-    const content = await readFile(path.join(root, relativePath));
-    parts.push(`${relativePath.replaceAll("\\", "/")}\0${content.length}\0`);
+    const canonicalPath = relativePath.replaceAll("\\", "/");
+    const content = await gitBytes(
+      ["cat-file", "blob", `${tree}:${canonicalPath}`],
+      `无法读取目标 Git tree 中的策略文件 ${canonicalPath}`,
+    );
+    parts.push(`${canonicalPath}\0${content.length}\0`);
     parts.push(content);
   }
   return sha256(Buffer.concat(parts.map((part) => Buffer.isBuffer(part) ? part : Buffer.from(part))));
@@ -67,6 +100,7 @@ async function createProof() {
   assertCommit(input.tree, "proof.tree");
   if (!Array.isArray(input.suites) || input.suites.length === 0) throw new Error("proof.suites 不能为空。");
   if (input.suites.some((suite) => suite.status !== "passed")) throw new Error("只有全部通过的验证才能生成证明。");
+  await assertCommitTree(input.commit, input.tree, "proof.commit");
 
   const payload = {
     schemaVersion: "grandumi.verification-proof.v1",
@@ -75,7 +109,7 @@ async function createProof() {
     generatedAtUtc: new Date().toISOString(),
     platform: input.platform ?? process.platform,
     suites: input.suites,
-    policyDigest: await policyDigest(),
+    policyDigest: await policyDigest(input.tree),
   };
   const proof = { ...payload, payloadSha256: sha256(stable(payload)) };
   await writeFile(output, `${JSON.stringify(proof, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
@@ -98,7 +132,8 @@ async function verifyProof() {
   const { payloadSha256, ...payload } = proof;
   if (proof.schemaVersion !== "grandumi.verification-proof.v1") throw new Error("验证证明版本不受支持。");
   if (proof.commit !== expectedCommit || proof.tree !== expectedTree) throw new Error("验证证明不属于待部署提交或其 Git tree。");
-  if (proof.policyDigest !== await policyDigest()) throw new Error("验证策略与待部署提交不一致。");
+  await assertCommitTree(expectedCommit, expectedTree, "待部署提交");
+  if (proof.policyDigest !== await policyDigest(expectedTree)) throw new Error("验证策略与待部署提交不一致。");
   if (!Array.isArray(proof.suites) || proof.suites.length === 0 || proof.suites.some((suite) => suite.status !== "passed")) {
     throw new Error("验证证明未记录全部通过的测试套件。");
   }
