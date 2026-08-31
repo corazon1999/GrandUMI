@@ -31,6 +31,7 @@ import type {
   MsgUploadCardBack,
   MsgLikeCardBack,
   MsgDeleteCardBack,
+  CardBackGallerySortOrder,
   MsgCardBackReviewQueue,
   MsgReviewCardBack,
   MsgImportDecks,
@@ -1119,14 +1120,21 @@ function handlePlayerProfileStats(msg: MsgPlayerProfileStats) {
 }
 
 function handleCardBackGallery(msg: MsgCardBackGallery) {
+  const store = useNetStore.getState();
+  const responseSortOrder = msg.sortOrder ?? "likesDesc";
+  if (responseSortOrder !== store.cardBackGallerySortOrder) {
+    if (msg.result !== false && !msg.cursor) {
+      HomeRequest.requestCardBackGallery(store.cardBackGallerySortOrder);
+    }
+    return;
+  }
   if (msg.result === false) {
-    const store = useNetStore.getState();
     if (store.cardBackGallery === null) store.setCardBackGallery([]);
     store.setCardBackGalleryLoadingMore(false);
     showMessage(msg.logStr ?? "卡背广场操作失败", "error");
     return;
   }
-  useNetStore.getState().setCardBackGalleryPage({
+  store.setCardBackGalleryPage({
     items: Array.isArray(msg.items) ? msg.items : [],
     ownedItems: Array.isArray(msg.ownedItems) ? msg.ownedItems : [],
     total: Math.max(0, msg.total ?? 0),
@@ -1345,29 +1353,32 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgUpdateCardBack", cardBackId } as MsgUpdateCardBack);
   },
 
-  requestCardBackGallery(cursor?: string | null) {
+  requestCardBackGallery(sortOrder: CardBackGallerySortOrder = "likesDesc", cursor?: string | null) {
     const store = useNetStore.getState();
+    if (cursor && sortOrder !== store.cardBackGallerySortOrder) return false;
+    store.setCardBackGallerySortOrder(sortOrder);
     if (cursor) store.setCardBackGalleryLoadingMore(true);
     else store.setCardBackGallery(null);
     const sent = NetManager.send({
       proto: "MsgCardBackGallery",
       cursor: cursor ?? null,
       pageSize: 40,
+      sortOrder,
     } as MsgCardBackGallery);
     if (!sent && cursor) store.setCardBackGalleryLoadingMore(false);
     return sent;
   },
 
-  uploadCardBack(name: string, mimeType: MsgUploadCardBack["mimeType"], imageBase64: string) {
-    return NetManager.send({ proto: "MsgUploadCardBack", name, mimeType, imageBase64 } as MsgUploadCardBack);
+  uploadCardBack(name: string, mimeType: MsgUploadCardBack["mimeType"], imageBase64: string, sortOrder: CardBackGallerySortOrder) {
+    return NetManager.send({ proto: "MsgUploadCardBack", name, mimeType, imageBase64, sortOrder } as MsgUploadCardBack);
   },
 
   toggleCardBackLike(cardBackId: string) {
     return NetManager.send({ proto: "MsgLikeCardBack", cardBackId } as MsgLikeCardBack);
   },
 
-  deleteCardBack(cardBackId: string) {
-    return NetManager.send({ proto: "MsgDeleteCardBack", cardBackId } as MsgDeleteCardBack);
+  deleteCardBack(cardBackId: string, sortOrder: CardBackGallerySortOrder) {
+    return NetManager.send({ proto: "MsgDeleteCardBack", cardBackId, sortOrder } as MsgDeleteCardBack);
   },
 
   requestCardBackReviewQueue() {

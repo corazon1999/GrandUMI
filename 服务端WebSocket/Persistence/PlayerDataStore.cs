@@ -45,6 +45,8 @@ public sealed class PlayerDataStore
     public const int MaxCardBackGalleryItems = 300;
     public const int DefaultCardBackGalleryPageSize = 40;
     public const int MaxCardBackGalleryPageSize = 50;
+    public const string CardBackGallerySortDescending = "likesDesc";
+    public const string CardBackGallerySortAscending = "likesAsc";
     public const int MaxCardBackReviewReasonLength = 300;
     public const int MaxPendingCardBackReviewItems = 300;
     public const string CardBackReviewPending = "pending";
@@ -1672,14 +1674,16 @@ public sealed class PlayerDataStore
         return gallery;
     }
 
-    /// <summary>按红心、发布时间和编号进行稳定的游标分页，允许玩家浏览全部已通过卡背。</summary>
+    /// <summary>按红心方向、发布时间和编号进行稳定的游标分页，允许玩家浏览全部已通过卡背。</summary>
     public CardBackGalleryPage GetCardBackGalleryPage(
         string account,
         string? cursor = null,
-        int pageSize = DefaultCardBackGalleryPageSize)
+        int pageSize = DefaultCardBackGalleryPageSize,
+        string? sortOrder = null)
     {
         var size = Math.Clamp(pageSize, 1, MaxCardBackGalleryPageSize);
-        var parsedCursor = ParseCardBackGalleryCursor(cursor);
+        var normalizedSortOrder = NormalizeCardBackGallerySortOrder(sortOrder);
+        var parsedCursor = ParseCardBackGalleryCursor(cursor, normalizedSortOrder);
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         var playerId = RequirePlayerId(connection, transaction, account);
@@ -1692,7 +1696,23 @@ public sealed class PlayerDataStore
 
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        var cursorPredicate = normalizedSortOrder == CardBackGallerySortAscending
+            ? """
+              $hasCursor=0
+              OR likes > $cursorLikes
+              OR (likes=$cursorLikes AND created_at < $cursorCreatedAt)
+              OR (likes=$cursorLikes AND created_at=$cursorCreatedAt AND id < $cursorId)
+              """
+            : """
+              $hasCursor=0
+              OR likes < $cursorLikes
+              OR (likes=$cursorLikes AND created_at < $cursorCreatedAt)
+              OR (likes=$cursorLikes AND created_at=$cursorCreatedAt AND id < $cursorId)
+              """;
+        var orderBy = normalizedSortOrder == CardBackGallerySortAscending
+            ? "likes ASC, created_at DESC, id DESC"
+            : "likes DESC, created_at DESC, id DESC";
+        command.CommandText = $"""
             WITH ranked AS (
                 SELECT cb.id, cb.name, p.display_name, cb.created_at, cb.owner_player_id,
                        COUNT(l.player_id) AS likes,
@@ -1706,11 +1726,8 @@ public sealed class PlayerDataStore
             SELECT id, name, display_name, created_at, likes, liked,
                    CASE WHEN owner_player_id=$playerId THEN 1 ELSE 0 END AS owned
             FROM ranked
-            WHERE $hasCursor=0
-               OR likes < $cursorLikes
-               OR (likes=$cursorLikes AND created_at < $cursorCreatedAt)
-               OR (likes=$cursorLikes AND created_at=$cursorCreatedAt AND id < $cursorId)
-            ORDER BY likes DESC, created_at DESC, id DESC
+            WHERE {cursorPredicate}
+            ORDER BY {orderBy}
             LIMIT $fetchLimit;
             """;
         command.Parameters.AddWithValue("$playerId", playerId);
@@ -1744,10 +1761,12 @@ public sealed class PlayerDataStore
 
         var hasMore = fetched.Count > size;
         if (hasMore) fetched.RemoveAt(fetched.Count - 1);
-        var nextCursor = hasMore && fetched.Count > 0 ? EncodeCardBackGalleryCursor(fetched[^1]) : null;
+        var nextCursor = hasMore && fetched.Count > 0
+            ? EncodeCardBackGalleryCursor(fetched[^1], normalizedSortOrder)
+            : null;
         var ownedItems = LoadOwnedCardBacks(connection, transaction, playerId);
         transaction.Commit();
-        return new CardBackGalleryPage(fetched, ownedItems, size, total, hasMore, nextCursor);
+        return new CardBackGalleryPage(fetched, ownedItems, size, total, hasMore, nextCursor, normalizedSortOrder);
     }
 
     public IReadOnlyList<CardBackGalleryItem> UploadCardBack(
@@ -2208,24 +2227,39 @@ public sealed class PlayerDataStore
             reader.GetString(8));
     }
 
-    private static string EncodeCardBackGalleryCursor(CardBackGalleryItem item)
+    public static string NormalizeCardBackGallerySortOrder(string? sortOrder)
+    {
+        var normalized = string.IsNullOrWhiteSpace(sortOrder)
+            ? CardBackGallerySortDescending
+            : sortOrder.Trim();
+        if (normalized is not CardBackGallerySortDescending and not CardBackGallerySortAscending)
+            throw new PlayerDataValidationException("卡背广场排序方式无效。");
+        return normalized;
+    }
+
+    private static string EncodeCardBackGalleryCursor(CardBackGalleryItem item, string sortOrder)
     {
         var id = long.Parse(item.Id[CustomCardBackPrefix.Length..], CultureInfo.InvariantCulture);
-        var value = $"{item.Likes}:{item.CreatedAt}:{id}";
+        var value = $"v2:{sortOrder}:{item.Likes}:{item.CreatedAt}:{id}";
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
     }
 
-    private static CardBackGalleryCursor? ParseCardBackGalleryCursor(string? cursor)
+    private static CardBackGalleryCursor? ParseCardBackGalleryCursor(string? cursor, string sortOrder)
     {
         if (string.IsNullOrWhiteSpace(cursor)) return null;
         try
         {
             var value = Encoding.UTF8.GetString(Convert.FromBase64String(cursor.Trim()));
             var parts = value.Split(':');
-            if (parts.Length != 3
-                || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var likes)
-                || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var createdAt)
-                || !long.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var id)
+            var legacyDescendingCursor = parts.Length == 3 && sortOrder == CardBackGallerySortDescending;
+            var versionedCursor = parts.Length == 5
+                && parts[0] == "v2"
+                && parts[1] == sortOrder;
+            var offset = versionedCursor ? 2 : 0;
+            if ((!legacyDescendingCursor && !versionedCursor)
+                || !int.TryParse(parts[offset], NumberStyles.None, CultureInfo.InvariantCulture, out var likes)
+                || !long.TryParse(parts[offset + 1], NumberStyles.None, CultureInfo.InvariantCulture, out var createdAt)
+                || !long.TryParse(parts[offset + 2], NumberStyles.None, CultureInfo.InvariantCulture, out var id)
                 || likes < 0 || createdAt <= 0 || id <= 0)
                 throw new FormatException();
             return new CardBackGalleryCursor(likes, createdAt, id);

@@ -67,7 +67,8 @@ public sealed record CardBackGalleryPage(
     int PageSize,
     int Total,
     bool HasMore,
-    string? NextCursor);
+    string? NextCursor,
+    string SortOrder);
 
 /// <summary>管理员卡背审核队列中的待处理投稿。</summary>
 public sealed record CardBackReviewItem(

@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [source, cardBack, protocol, store] = await Promise.all([
+const [source, cardBack, protocol, store, netTypes, i18n] = await Promise.all([
   readFile(new URL("../src/components/home/CardBackPlazaPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/ui/CardBack.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/net/HomeProtocol.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/store/netStore.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/types/net.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/i18n/core.mjs", import.meta.url), "utf8"),
 ]);
 
 test("卡背广场提供热门与我的投稿两个管理视图", () => {
@@ -23,12 +25,34 @@ test("卡背广场提供热门与我的投稿两个管理视图", () => {
 test("热门卡背使用游标自动续页并保留手动加载入口", () => {
   assert.match(source, /loadMoreSentinelRef/);
   assert.match(source, /rootMargin: "600px 0px"/);
-  assert.match(source, /HomeRequest\.requestCardBackGallery\(galleryNextCursor\)/);
+  assert.match(source, /HomeRequest\.requestCardBackGallery\(gallerySortOrder, galleryNextCursor\)/);
   assert.match(source, /正在加载更多…/);
   assert.match(protocol, /pageSize: 40/);
   assert.match(protocol, /append: Boolean\(msg\.cursor\)/);
   assert.match(store, /cardBackGalleryNextCursor/);
   assert.match(store, /seen = new Set<string>/);
+});
+
+test("欢迎度排序切换会丢弃旧分页链并由服务端按新方向重新读取", () => {
+  assert.match(netTypes, /type CardBackGallerySortOrder = "likesDesc" \| "likesAsc"/);
+  assert.match(source, /cardBackGallerySortOrder/);
+  assert.match(source, /setGallerySortOrder\(sortDescending \? "likesAsc" : "likesDesc"\)/);
+  assert.match(source, /HomeRequest\.requestCardBackGallery\(gallerySortOrder\)/);
+  assert.doesNotMatch(source, /approvedCardBacks\.reverse\(/);
+  assert.match(protocol, /requestCardBackGallery\(sortOrder: CardBackGallerySortOrder = "likesDesc", cursor\?: string \| null\)/);
+  assert.match(protocol, /sortOrder !== store\.cardBackGallerySortOrder/);
+  assert.match(protocol, /cursor: cursor \?\? null,[\s\S]*sortOrder/);
+  assert.match(store, /cardBackGallerySortOrder: "likesDesc"/);
+});
+
+test("排序按钮兼顾手机竖屏触控尺寸、状态说明与中英日翻译", () => {
+  assert.match(source, /data-testid="card-back-popularity-sort"/);
+  assert.match(source, /min-h-11 min-w-11/);
+  assert.match(source, /flex flex-wrap items-center justify-between gap-2/);
+  assert.match(source, /欢迎度当前从高到低，点击切换为从低到高/);
+  assert.match(source, /欢迎度：高 → 低/);
+  assert.match(i18n, /"欢迎度：高 → 低": "Popularity: high → low"/);
+  assert.match(i18n, /"欢迎度：高 → 低": "人気度：高い → 低い"/);
 });
 
 test("卡背图片只在接近可视区时加载", () => {
@@ -58,7 +82,7 @@ test("普通用户只能管理自己的投稿，管理员可在热门视图删�
   assert.match(source, /const canAdminDelete = galleryView === "popular" && canManage && approved && item\.publiclyListed/);
   assert.match(source, /\{\(canDeleteOwned \|\| canAdminDelete\) && \(/);
   assert.match(source, /管理员删除/);
-  assert.match(source, /HomeRequest\.deleteCardBack\(cardBackId\)/);
+  assert.match(source, /HomeRequest\.deleteCardBack\(cardBackId, gallerySortOrder\)/);
 });
 
 test("删除按钮需要不可恢复的二次确认", () => {

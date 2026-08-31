@@ -85,6 +85,8 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
   const galleryNextCursor = useNetStore((state) => state.cardBackGalleryNextCursor);
   const galleryHasMore = useNetStore((state) => state.cardBackGalleryHasMore);
   const galleryLoadingMore = useNetStore((state) => state.cardBackGalleryLoadingMore);
+  const gallerySortOrder = useNetStore((state) => state.cardBackGallerySortOrder);
+  const setGallerySortOrder = useNetStore((state) => state.setCardBackGallerySortOrder);
   const currentCardBackId = useNetStore((state) => state.cardBackId);
   const connState = useNetStore((state) => state.connState);
   const canManage = useNetStore((state) => state.maintenance.canManage);
@@ -102,13 +104,13 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
 
   const requestGallery = useCallback(() => {
     setGalleryTimedOut(false);
-    if (!HomeRequest.requestCardBackGallery()) setGalleryTimedOut(true);
-  }, []);
+    if (!HomeRequest.requestCardBackGallery(gallerySortOrder)) setGalleryTimedOut(true);
+  }, [gallerySortOrder]);
 
   const loadMore = useCallback(() => {
     if (!galleryNextCursor || galleryLoadingMore) return;
-    HomeRequest.requestCardBackGallery(galleryNextCursor);
-  }, [galleryLoadingMore, galleryNextCursor]);
+    HomeRequest.requestCardBackGallery(gallerySortOrder, galleryNextCursor);
+  }, [galleryLoadingMore, galleryNextCursor, gallerySortOrder]);
 
   useEffect(() => {
     if (connState === "connected") requestGallery();
@@ -160,7 +162,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
     if (!prepared) { setError("请先选择一张卡背图片"); return; }
     setSubmitting(true);
     setError("");
-    if (!HomeRequest.uploadCardBack(trimmedName, prepared.mimeType, prepared.imageBase64)) {
+    if (!HomeRequest.uploadCardBack(trimmedName, prepared.mimeType, prepared.imageBase64, gallerySortOrder)) {
       setSubmitting(false);
       setError("网络未连接，暂时无法上传");
       return;
@@ -178,7 +180,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
     if (!window.confirm(t(confirmation))) return;
     setDeletingId(cardBackId);
     setError("");
-    if (!HomeRequest.deleteCardBack(cardBackId)) {
+    if (!HomeRequest.deleteCardBack(cardBackId, gallerySortOrder)) {
       setDeletingId(null);
       setError("网络未连接，暂时无法删除");
     }
@@ -186,6 +188,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
 
   const approvedCardBacks = gallery?.filter((item) => item.reviewStatus === "approved" && item.publiclyListed) ?? [];
   const displayedCardBacks = galleryView === "mine" ? ownedCardBacks : approvedCardBacks;
+  const sortDescending = gallerySortOrder === "likesDesc";
 
   return (
     <section ref={sectionRef} className="h-full overflow-y-auto px-4 py-5 @[720px]:px-6 @[720px]:py-6" data-testid="card-back-plaza">
@@ -254,12 +257,33 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-600">
-            {galleryView === "popular" ? "全部已通过审核的卡背均可浏览；按红心数量排序，滚动到底会自动继续加载。" : "在这里查看审核状态，并管理你提交的卡背。"}
+            {galleryView === "popular"
+              ? sortDescending
+                ? "全部已通过审核的卡背均可浏览；欢迎度从高到低，同票时新发布的在前，滚动到底会自动继续加载。"
+                : "全部已通过审核的卡背均可浏览；欢迎度从低到高，同票时新发布的在前，滚动到底会自动继续加载。"
+              : "在这里查看审核状态，并管理你提交的卡背。"}
           </p>
         </div>
-        <span className="text-xs text-gray-600">
-          {galleryView === "popular" ? `已显示 ${approvedCardBacks.length} / 共 ${galleryTotal} 款` : `${ownedCardBacks.length} 款`}
-        </span>
+        <div className="flex flex-wrap items-center justify-between gap-2 @[560px]:justify-end">
+          {galleryView === "popular" && (
+            <button
+              type="button"
+              data-testid="card-back-popularity-sort"
+              aria-label={t(sortDescending
+                ? "欢迎度当前从高到低，点击切换为从低到高"
+                : "欢迎度当前从低到高，点击切换为从高到低")}
+              onClick={() => setGallerySortOrder(sortDescending ? "likesAsc" : "likesDesc")}
+              disabled={connState !== "connected"}
+              className="min-h-11 min-w-11 rounded-xl border border-gray-700 bg-gray-900 px-3 text-sm font-bold text-gray-300 transition-colors hover:border-rose-500 hover:text-white disabled:border-gray-800 disabled:text-gray-600"
+            >
+              <span aria-hidden="true" className="mr-1 text-rose-400">♥</span>
+              {sortDescending ? "欢迎度：高 → 低" : "欢迎度：低 → 高"}
+            </button>
+          )}
+          <span className="text-xs text-gray-600">
+            {galleryView === "popular" ? `已显示 ${approvedCardBacks.length} / 共 ${galleryTotal} 款` : `${ownedCardBacks.length} 款`}
+          </span>
+        </div>
       </div>
 
       {gallery === null ? galleryTimedOut ? (

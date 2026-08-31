@@ -310,10 +310,11 @@ public sealed class PlayerDataStoreTests : IDisposable
     }
 
     [Fact]
-    public void CardBackGallery_游标分页可读取全部公开卡背并单独返回本人投稿()
+    public void CardBackGallery_双向游标分页均可按欢迎度读取全部公开卡背并单独返回本人投稿()
     {
         var store = CreateStore();
         store.Login("Viewer");
+        var publishedIds = new List<string>();
         for (var ownerIndex = 0; ownerIndex < 16; ownerIndex++)
         {
             var account = $"Owner{ownerIndex:D2}";
@@ -329,29 +330,67 @@ public sealed class PlayerDataStoreTests : IDisposable
                 var pending = Assert.Single(uploaded, item =>
                     item.Owned && item.Name == name && item.ReviewStatus == PlayerDataStore.CardBackReviewPending);
                 store.ReviewCardBack("释迦", pending.Id, approved: true, rejectionReason: null);
+                publishedIds.Add(pending.Id);
             }
         }
 
-        var allItems = new List<CardBackGalleryItem>();
-        string? cursor = null;
-        do
-        {
-            var page = store.GetCardBackGalleryPage("Viewer", cursor, pageSize: 50);
-            Assert.Equal(320, page.Total);
-            Assert.InRange(page.Items.Count, 1, 50);
-            allItems.AddRange(page.Items);
-            cursor = page.NextCursor;
-            if (!page.HasMore) Assert.Null(cursor);
-        } while (cursor is not null);
+        store.Login("LikerOne");
+        store.Login("LikerTwo");
+        for (var index = 0; index < publishedIds.Count; index += 37)
+            store.ToggleCardBackLike("LikerOne", publishedIds[index]);
+        for (var index = 0; index < publishedIds.Count; index += 83)
+            store.ToggleCardBackLike("LikerTwo", publishedIds[index]);
 
-        Assert.Equal(320, allItems.Count);
-        Assert.Equal(320, allItems.Select(item => item.Id).Distinct().Count());
+        List<CardBackGalleryItem> ReadAll(string sortOrder)
+        {
+            var allItems = new List<CardBackGalleryItem>();
+            string? cursor = null;
+            do
+            {
+                var page = store.GetCardBackGalleryPage("Viewer", cursor, pageSize: 50, sortOrder: sortOrder);
+                Assert.Equal(sortOrder, page.SortOrder);
+                Assert.Equal(320, page.Total);
+                Assert.InRange(page.Items.Count, 1, 50);
+                allItems.AddRange(page.Items);
+                cursor = page.NextCursor;
+                if (!page.HasMore) Assert.Null(cursor);
+            } while (cursor is not null);
+            return allItems;
+        }
+
+        var descendingItems = ReadAll(PlayerDataStore.CardBackGallerySortDescending);
+        var ascendingItems = ReadAll(PlayerDataStore.CardBackGallerySortAscending);
+
+        Assert.Equal(320, descendingItems.Count);
+        Assert.Equal(320, descendingItems.Select(item => item.Id).Distinct().Count());
+        Assert.Equal(320, ascendingItems.Count);
+        Assert.Equal(320, ascendingItems.Select(item => item.Id).Distinct().Count());
+        Assert.Equal(
+            descendingItems.Select(item => item.Id).OrderBy(id => id),
+            ascendingItems.Select(item => item.Id).OrderBy(id => id));
+        AssertCardBackGalleryOrdered(descendingItems, PlayerDataStore.CardBackGallerySortDescending);
+        AssertCardBackGalleryOrdered(ascendingItems, PlayerDataStore.CardBackGallerySortAscending);
+        Assert.True(descendingItems[0].Likes > descendingItems[^1].Likes);
+        Assert.True(ascendingItems[0].Likes < ascendingItems[^1].Likes);
+
+        var defaultPage = store.GetCardBackGalleryPage("Viewer", pageSize: 50);
+        Assert.Equal(PlayerDataStore.CardBackGallerySortDescending, defaultPage.SortOrder);
+        Assert.Equal(descendingItems.Take(50).Select(item => item.Id), defaultPage.Items.Select(item => item.Id));
+        Assert.NotNull(defaultPage.NextCursor);
+        Assert.Throws<PlayerDataValidationException>(() => store.GetCardBackGalleryPage(
+            "Viewer",
+            defaultPage.NextCursor,
+            pageSize: 50,
+            sortOrder: PlayerDataStore.CardBackGallerySortAscending));
+
         var ownerView = store.GetCardBackGalleryPage("Owner00");
         Assert.Equal(PlayerDataStore.DefaultCardBackGalleryPageSize, ownerView.Items.Count);
         Assert.Equal(20, ownerView.OwnedItems.Count);
         Assert.All(ownerView.OwnedItems, item => Assert.True(item.Owned));
         Assert.Throws<PlayerDataValidationException>(() =>
             store.GetCardBackGalleryPage("Viewer", "不是有效游标"));
+        Assert.Throws<PlayerDataValidationException>(() =>
+            store.GetCardBackGalleryPage("Viewer", sortOrder: "likesSideways"));
     }
 
     [Fact]
@@ -611,6 +650,31 @@ public sealed class PlayerDataStoreTests : IDisposable
             SpriteMap = new Dictionary<string, string>(),
             UpdatedAt = 1_700_000_000_000,
         };
+
+    private static void AssertCardBackGalleryOrdered(
+        IReadOnlyList<CardBackGalleryItem> items,
+        string sortOrder)
+    {
+        for (var index = 1; index < items.Count; index++)
+        {
+            var previous = items[index - 1];
+            var current = items[index];
+            if (previous.Likes != current.Likes)
+            {
+                if (sortOrder == PlayerDataStore.CardBackGallerySortDescending)
+                    Assert.True(previous.Likes > current.Likes);
+                else
+                    Assert.True(previous.Likes < current.Likes);
+                continue;
+            }
+
+            var previousId = long.Parse(previous.Id["custom-".Length..]);
+            var currentId = long.Parse(current.Id["custom-".Length..]);
+            Assert.True(
+                previous.CreatedAt > current.CreatedAt
+                || (previous.CreatedAt == current.CreatedAt && previousId > currentId));
+        }
+    }
 
     public void Dispose()
     {

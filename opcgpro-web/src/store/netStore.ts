@@ -21,6 +21,7 @@ import type {
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   CardBackGalleryItem,
+  CardBackGallerySortOrder,
   CardBackReviewItem,
   DeckPlazaItem,
   FriendChatMessage,
@@ -192,6 +193,7 @@ interface NetStore {
   cardBackGalleryNextCursor: string | null;
   cardBackGalleryHasMore: boolean;
   cardBackGalleryLoadingMore: boolean;
+  cardBackGallerySortOrder: CardBackGallerySortOrder;
   cardBackReviewQueue: CardBackReviewItem[] | null;
   deckPlazaPage: { items: DeckPlazaItem[]; page: number; pageSize: number; total: number; hasMore: boolean } | null;
   deckPlazaRevision: number;
@@ -269,6 +271,7 @@ interface NetStore {
     append: boolean;
   }) => void;
   setCardBackGalleryLoadingMore: (loading: boolean) => void;
+  setCardBackGallerySortOrder: (sortOrder: CardBackGallerySortOrder) => void;
   updateCardBackGalleryItem: (item: CardBackGalleryItem) => void;
   setCardBackReviewQueue: (items: CardBackReviewItem[] | null) => void;
   setDeckPlazaPage: (page: NetStore["deckPlazaPage"]) => void;
@@ -360,6 +363,7 @@ const initialState = {
   cardBackGalleryNextCursor: null as string | null,
   cardBackGalleryHasMore: false,
   cardBackGalleryLoadingMore: false,
+  cardBackGallerySortOrder: "likesDesc" as CardBackGallerySortOrder,
   cardBackReviewQueue: null as CardBackReviewItem[] | null,
   deckPlazaPage: null as NetStore["deckPlazaPage"],
   deckPlazaRevision: 0,
@@ -562,6 +566,7 @@ export const useNetStore = create<NetStore>((set) => ({
     };
   }),
   setCardBackGalleryLoadingMore: (cardBackGalleryLoadingMore) => set({ cardBackGalleryLoadingMore }),
+  setCardBackGallerySortOrder: (cardBackGallerySortOrder) => set({ cardBackGallerySortOrder }),
   updateCardBackGalleryItem: (item) => set((state) => ({
     cardBackGallery: state.cardBackGallery?.map((current) => current.id === item.id ? item : current) ?? null,
     cardBackGalleryOwned: state.cardBackGalleryOwned.map((current) => current.id === item.id ? item : current),

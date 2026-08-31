@@ -185,6 +185,8 @@ export interface CardBackGalleryItem {
   reviewReason: string;
 }
 
+export type CardBackGallerySortOrder = "likesDesc" | "likesAsc";
+
 /** 卡背广场游标分页请求与响应；本人投稿单独返回，不占热门分页名额。 */
 export interface MsgCardBackGallery extends MsgBase {
   proto: "MsgCardBackGallery";
@@ -197,6 +199,7 @@ export interface MsgCardBackGallery extends MsgBase {
   total?: number;
   hasMore?: boolean;
   nextCursor?: string | null;
+  sortOrder?: CardBackGallerySortOrder;
 }
 
 export interface MsgUploadCardBack extends MsgBase {
@@ -204,6 +207,7 @@ export interface MsgUploadCardBack extends MsgBase {
   name: string;
   mimeType: "image/png" | "image/jpeg" | "image/webp";
   imageBase64: string;
+  sortOrder?: CardBackGallerySortOrder;
 }
 
 export interface MsgLikeCardBack extends MsgBase {
@@ -217,6 +221,7 @@ export interface MsgLikeCardBack extends MsgBase {
 export interface MsgDeleteCardBack extends MsgBase {
   proto: "MsgDeleteCardBack";
   cardBackId: string;
+  sortOrder?: CardBackGallerySortOrder;
 }
 
 export interface CardBackReviewItem {

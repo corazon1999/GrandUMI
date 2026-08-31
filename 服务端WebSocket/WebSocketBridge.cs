@@ -993,21 +993,27 @@ public static class WebSocketBridge
     private static void OnCardBackGallery(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequirePlayer(s)) return;
+        var cursor = Str(msg, "cursor");
+        var sortOrder = Str(msg, "sortOrder");
         try
         {
-            var cursor = Str(msg, "cursor");
             var page = _playerDataStore.GetCardBackGalleryPage(
                 s.Account!,
                 cursor,
-                Int(msg, "pageSize", PlayerDataStore.DefaultCardBackGalleryPageSize));
+                Int(msg, "pageSize", PlayerDataStore.DefaultCardBackGalleryPageSize),
+                sortOrder);
             SendCardBackGalleryPage(s, page, cursor);
         }
-        catch (Exception ex) { SendCardBackGalleryError(s, ex, "读取卡背广场失败"); }
+        catch (Exception ex)
+        {
+            SendCardBackGalleryError(s, ex, "读取卡背广场失败", cursor, sortOrder);
+        }
     }
 
     private static void OnUploadCardBack(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequirePlayer(s)) return;
+        var sortOrder = Str(msg, "sortOrder");
         try
         {
             _playerDataStore.UploadCardBack(
@@ -1017,11 +1023,11 @@ public static class WebSocketBridge
                 Str(msg, "imageBase64") ?? "");
             SendCardBackGalleryPage(
                 s,
-                _playerDataStore.GetCardBackGalleryPage(s.Account!),
+                _playerDataStore.GetCardBackGalleryPage(s.Account!, sortOrder: sortOrder),
                 requestCursor: null,
                 logStr: "卡背已提交审核，通过后将在广场展示");
         }
-        catch (Exception ex) { SendCardBackGalleryError(s, ex, "上传卡背失败"); }
+        catch (Exception ex) { SendCardBackGalleryError(s, ex, "上传卡背失败", sortOrder: sortOrder); }
     }
 
     private static void OnLikeCardBack(WsSession s, Dictionary<string, JsonElement> msg)
@@ -1039,6 +1045,7 @@ public static class WebSocketBridge
     {
         if (!TryRequirePlayer(s)) return;
         var cardBackId = Str(msg, "cardBackId") ?? "";
+        var sortOrder = Str(msg, "sortOrder");
         var administrator = AdministratorPolicy.IsAuthorized(s.Account);
         var auditCorrelation = "";
         try
@@ -1061,7 +1068,10 @@ public static class WebSocketBridge
             }
             s.CardBackId = result.Snapshot.CardBackId;
             SendPlayerData(s, result.Snapshot, "卡背已删除并从广场下架");
-            SendCardBackGalleryPage(s, _playerDataStore.GetCardBackGalleryPage(s.Account!), requestCursor: null);
+            SendCardBackGalleryPage(
+                s,
+                _playerDataStore.GetCardBackGalleryPage(s.Account!, sortOrder: sortOrder),
+                requestCursor: null);
 
             foreach (var session in Sessions.Values.Where(IsCurrentAccountSession))
             {
@@ -1090,7 +1100,7 @@ public static class WebSocketBridge
                     s.Account!, "card_back_delete", cardBackId, auditCorrelation, "failed",
                     new { error = ex.Message });
             }
-            SendCardBackGalleryError(s, ex, "删除卡背失败");
+            SendCardBackGalleryError(s, ex, "删除卡背失败", sortOrder: sortOrder);
         }
     }
 
@@ -5698,6 +5708,7 @@ public static class WebSocketBridge
             total = page.Total,
             hasMore = page.HasMore,
             nextCursor = page.NextCursor,
+            sortOrder = page.SortOrder,
         });
     }
 
@@ -5734,12 +5745,24 @@ public static class WebSocketBridge
         Send(session.SessionId, new { proto = "MsgLikeCardBack", result = false, logStr = message });
     }
 
-    private static void SendCardBackGalleryError(WsSession session, Exception exception, string fallback)
+    private static void SendCardBackGalleryError(
+        WsSession session,
+        Exception exception,
+        string fallback,
+        string? requestCursor = null,
+        string? sortOrder = null)
     {
         var message = exception is PlayerDataValidationException ? exception.Message : fallback;
         if (exception is not PlayerDataValidationException)
             LogErr($"{fallback} {session.Account}: {exception.Message}");
-        Send(session.SessionId, new { proto = "MsgCardBackGallery", result = false, logStr = message });
+        Send(session.SessionId, new
+        {
+            proto = "MsgCardBackGallery",
+            result = false,
+            logStr = message,
+            cursor = requestCursor,
+            sortOrder,
+        });
     }
 
     private static void SendCardBackReviewQueue(
