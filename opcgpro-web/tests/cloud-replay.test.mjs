@@ -81,7 +81,9 @@ test("云回放具备查询、书签、反馈关联、留存、硬配额和永�
   assert.match(store, /if \(row\.Bookmarked\) continue/);
   assert.match(store, /if \(used <= _quotaBytes\) break/);
   assert.match(store, /DELETE FROM cloud_replays WHERE replay_id = \$replayId AND owner_account = \$owner/);
-  assert.match(bridge, /AssociateFeedback\(s\.Account, replayId, feedbackId\)/);
+  assert.match(store, /TryNormalizeReplayId/);
+  assert.match(bridge, /TryNormalizeReplayId\(requestedReplayValue/);
+  assert.match(bridge, /AssociateFeedback\(submitterAccount, replayId, feedbackId\)/);
 });
 
 test("前端提供完整云回放入口并拒绝迟到或乱序响应", () => {

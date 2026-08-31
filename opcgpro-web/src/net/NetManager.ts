@@ -13,6 +13,7 @@ const DEFAULT_WS_URL = "ws://localhost:8080/ws";
 
 export interface NetworkDiagnostics {
   endpointHost: string;
+  connectionGeneration: number;
   handshakeMs: number | null;
   reconnectCount: number;
   endpointFailureCount: number;
@@ -101,6 +102,7 @@ class NetManagerClass {
     const health = this.getEndpointHealth(this.url);
     return {
       endpointHost: endpointHost(this.url),
+      connectionGeneration: this.socketGeneration,
       handshakeMs: this.handshakeMs,
       reconnectCount: this.reconnectCount,
       endpointFailureCount: health.totalFailures,

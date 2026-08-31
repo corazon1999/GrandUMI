@@ -237,6 +237,7 @@ if [[ "$need_front" == 1 ]]; then
   [[ -d .next ]] && mv .next .next.previous
   if NEXT_PUBLIC_WS_URL='wss://test.grand-umi.com/ws' \
       NEXT_PUBLIC_ASSET_ORIGIN='https://test.grand-umi.com' \
+      NEXT_PUBLIC_GRANDUMI_COMMIT="$target" \
       CARD_BACK_API_URL='http://127.0.0.1:8081' npm run build; then
     chown -R grandumi:grandumi .next
     install -m 0644 "$repo/ops/server/grandumi-test-frontend.service" \

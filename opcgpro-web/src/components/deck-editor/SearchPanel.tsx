@@ -5,6 +5,7 @@ import { useDeckStore } from "@/store/deckStore";
 import {
   COLOR_DISPLAY_NAMES,
   COLOR_STYLES,
+  parseCardColors,
 } from "@/lib/colorMap";
 import {
   CARD_COSTS as COSTS,
@@ -37,7 +38,7 @@ export default function SearchPanel({ onClose }: { onClose?: () => void }) {
   const hasFilter           = !!(searchQuery || filterColors.length > 0 || filterType || filterProperty || filterRarity || filterCost !== null || filterSets.length > 0 || filterShowSub1 || filterHasTrigger);
 
   // 已选领航且非领航模式时，颜色筛选收缩为领航拥有的颜色（双色剩 2、单色剩 1）；否则显示全部 6 色
-  const leaderDataColors    = leader && !isLeaderMode ? leader.color.split("/") : null;
+  const leaderDataColors    = leader && !isLeaderMode ? parseCardColors(leader.color) : null;
   const visibleColorNames   = leaderDataColors
     ? COLOR_DISPLAY_NAMES.filter((name) => leaderDataColors.includes(name))
     : COLOR_DISPLAY_NAMES;

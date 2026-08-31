@@ -29,6 +29,7 @@ rm -rf .next.candidate-previous
 [[ -d .next ]] && mv .next .next.candidate-previous
 if ! NEXT_PUBLIC_WS_URL="wss://$candidate_host/ws" \
     NEXT_PUBLIC_ASSET_ORIGIN="$candidate_asset_origin" \
+    NEXT_PUBLIC_GRANDUMI_COMMIT="$target" \
     CARD_BACK_API_URL=http://127.0.0.1:18080 npm run build; then
   rm -rf .next
   [[ -d .next.candidate-previous ]] && mv .next.candidate-previous .next

@@ -1,13 +1,16 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace GrandUMI;
 
 /// <summary>
-/// 游戏反馈落盘：根目录 BugReports/ → 按日期(yyyy-MM-dd)分子目录 → 每条反馈一个 JSON 文件。
-/// 文件内含反馈类型、描述、客户端全量信息和服务端权威全量快照。
+/// 游戏反馈兼容落盘：按反馈 ID 使用稳定路径，重复请求、进程重启和并发写入都只产生一个文件。
+/// 文件只含白名单化客户端诊断与服务端权威摘要，不得写入全量牌局快照。
 /// </summary>
 public static class BugReportStore
 {
+    internal const int MaxReportBytes = 64 * 1024;
     private static readonly JsonSerializerOptions WriteOpts = new()
     {
         WriteIndented = true,
@@ -18,29 +21,53 @@ public static class BugReportStore
     private static readonly object _lock = new();
     private static readonly object _writeLock = new();
 
-    /// <summary>保存一条反馈，返回写入文件的完整路径。</summary>
-    public static string Save(object report, string account, string? roomId, string category)
+    /// <summary>原子保存一条反馈；相同 feedbackId 幂等返回既有路径。</summary>
+    public static string Save(object report, string feedbackId, string category)
+        => SaveAtRoot(report, GetRoot(), feedbackId, category);
+
+    internal static string SaveAtRoot(object report, string root, string feedbackId, string category)
     {
-        var now = DateTime.Now;
-        var dateDir = Path.Combine(GetRoot(), now.ToString("yyyy-MM-dd"));
-        var safeAccount = Sanitize(string.IsNullOrEmpty(account) ? "anon" : account);
-        var safeRoom = string.IsNullOrEmpty(roomId) ? "noroom" : Sanitize(roomId);
-        var safeCategory = category == "suggestion" ? "suggestion" : "bug";
+        var serialized = JsonSerializer.Serialize(report, WriteOpts);
+        if (Encoding.UTF8.GetByteCount(serialized) > MaxReportBytes)
+            throw new InvalidDataException($"反馈证据超过 {MaxReportBytes} 字节上限");
+
+        var fullPath = BuildReportPath(root, feedbackId);
+        var directory = Path.GetDirectoryName(fullPath)
+            ?? throw new InvalidOperationException("反馈目录无效");
 
         lock (_writeLock)
         {
-            Directory.CreateDirectory(dateDir);
-            var filePrefix = $"{safeCategory}_{now:HH-mm-ss}_{safeAccount}_{safeRoom}";
-            var fullPath = Path.Combine(dateDir, $"{filePrefix}.json");
+            Directory.CreateDirectory(directory);
+            if (File.Exists(fullPath)) return fullPath;
 
-            // 同一秒多条反馈防覆盖；检查与写入放在同一把锁内，避免并发竞争。
-            int duplicate = 1;
-            while (File.Exists(fullPath))
-                fullPath = Path.Combine(dateDir, $"{filePrefix}_{duplicate++}.json");
-
-            File.WriteAllText(fullPath, JsonSerializer.Serialize(report, WriteOpts), System.Text.Encoding.UTF8);
+            var temporaryPath = fullPath + $".tmp-{Guid.NewGuid():N}";
+            try
+            {
+                using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+                {
+                    writer.Write(serialized);
+                    writer.Flush();
+                    stream.Flush(flushToDisk: true);
+                }
+                try { File.Move(temporaryPath, fullPath, overwrite: false); }
+                catch (IOException) when (File.Exists(fullPath)) { }
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
             return fullPath;
         }
+    }
+
+    internal static string BuildReportPath(string root, string feedbackId)
+    {
+        var normalizedFeedbackId = string.IsNullOrWhiteSpace(feedbackId) ? "invalid" : feedbackId.Trim();
+        var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"grandumi.bug-report.path.v1\0{normalizedFeedbackId}")))
+            .ToLowerInvariant();
+        return Path.Combine(Path.GetFullPath(root), "by-id", digest[..2], $"{digest}.json");
     }
 
     private static string GetRoot()
@@ -73,10 +100,4 @@ public static class BugReportStore
         return Path.Combine(Path.GetFullPath(fallbackRoot), "BugReports");
     }
 
-    private static string Sanitize(string s)
-    {
-        foreach (var c in Path.GetInvalidFileNameChars())
-            s = s.Replace(c, '_');
-        return s.Length > 40 ? s[..40] : s;
-    }
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { CardData } from "@/types/card";
 import { colorMatch, compareCards } from "@/lib/cardSearch";
+import { parseCardColors } from "@/lib/colorMap";
 
 export { colorMatch, compareCards } from "@/lib/cardSearch";
 
@@ -246,7 +247,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       );
       const entries = s.entries.filter(compatible);
       // 颜色筛选自动收缩为领航颜色：单色直接选中该色，双色置「全部」（两色都显示，可再按需多选）
-      const leaderColors = card.color.split("/");
+      const leaderColors = parseCardColors(card.color);
       const filterColors = leaderColors.length === 1 ? leaderColors : [];
       return {
         leader: card,

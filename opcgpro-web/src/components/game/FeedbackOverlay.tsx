@@ -3,8 +3,8 @@
 /**
  * FeedbackOverlay — 大厅与游戏内共用的反馈窗口
  *
- * 按 F 弹出/关闭。大厅只附带基础环境信息，游戏内额外附带
- * gameStore 镜像，发送给服务端落盘。
+ * 按 F 弹出/关闭。只附带白名单化的客户端网络与视口诊断；
+ * 对局规则状态由服务端在房间串行队列中权威采集。
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -12,8 +12,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
-import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
+import { buildClientFeedbackEvidence } from "@/lib/feedbackEvidence";
 import type { FeedbackCategory, MsgBase, MsgBugReport } from "@/types/net";
 
 interface Props {
@@ -142,31 +142,11 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
     if (!trimmedDescription || submit.kind === "sending") return;
 
     const netState = useNetStore.getState();
-    const gameState = context === "game" ? useGameStore.getState() : null;
-    const clientInfo = JSON.stringify({
-      meta: {
-        ts: new Date().toISOString(),
-        url: typeof window !== "undefined" ? window.location.href : "",
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        context,
-        account: netState.account,
-        playerName: netState.playerName,
-        connectionState: netState.connState,
-        networkDiagnostics: NetManager.getDiagnostics(),
-        ...(gameState
-          ? {
-              mode: gameState.mode,
-              phase: gameState.phase,
-              turnCount: gameState.turnCount,
-              currentTurn: gameState.currentTurn,
-              myName: gameState.myName,
-              opponentName: gameState.opponentName,
-            }
-          : {}),
-      },
-      // 大厅不附带上一局可能残留的对局数据。
-      ...(gameState ? { gameStore: gameState } : {}),
-    });
+    const clientEvidence = buildClientFeedbackEvidence(
+      context,
+      netState.connState,
+      NetManager.getDiagnostics(),
+    );
 
     setSubmit({ kind: "sending" });
     pendingCategoryRef.current = category;
@@ -174,7 +154,7 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
       proto: "MsgBugReport",
       category,
       description: trimmedDescription,
-      clientInfo,
+      clientEvidence,
       requestId: typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `feedback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,

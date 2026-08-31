@@ -99,7 +99,7 @@ if ($serverHead -ne $localHead) {
 }
 
 $arg = if ($All) { "all" } else { "" }
-$productionBuildEnvironment = "NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' CARD_BACK_API_URL='http://127.0.0.1:8080'"
+$productionBuildEnvironment = "NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' NEXT_PUBLIC_GRANDUMI_COMMIT='$localHead' CARD_BACK_API_URL='http://127.0.0.1:8080'"
 & $ssh -o BatchMode=yes $SRV "$productionBuildEnvironment bash /opt/grandumi/deploy.sh $arg"
 if ($LASTEXITCODE -ne 0) { Die "香港 deploy.sh 执行报错,请查香港日志。" }
 

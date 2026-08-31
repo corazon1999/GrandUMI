@@ -1,4 +1,5 @@
 import { ALL_SET_NAMES } from "@/data/cardSets";
+import { parseCardColors, sharesCardColor } from "@/lib/colorMap";
 import type { CardData } from "@/types/card";
 
 export const CARD_PROPERTIES = ["", "斩", "打", "射", "智", "特"];
@@ -83,8 +84,7 @@ export function cardSetOf(card: CardData): string {
 }
 
 export function colorMatch(leaderColor: string, cardColor: string): boolean {
-  const leaderColors = new Set(leaderColor.split("/"));
-  return cardColor.split("/").some((color) => leaderColors.has(color));
+  return sharesCardColor(leaderColor, cardColor);
 }
 
 const TYPE_ORDER: Record<string, number> = {
@@ -215,7 +215,7 @@ export function filterAndSortCards(
 
       if (
         selectedColors.size > 0 &&
-        !card.color.split("/").some((color) => selectedColors.has(color))
+        !parseCardColors(card.color).some((color) => selectedColors.has(color))
       ) {
         return false;
       }

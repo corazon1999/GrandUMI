@@ -6,6 +6,7 @@ namespace GrandUMI.Cards;
 /// </summary>
 public class CardInfo
 {
+    private static readonly char[] RuleColors = ['红', '绿', '蓝', '紫', '黑', '黄'];
     public required string Number    { get; init; }   // "OP15-001"
     public required string Name      { get; init; }
     public required string Color     { get; init; }   // "红" / "红/蓝" 等
@@ -37,8 +38,19 @@ public class CardInfo
     /// <summary>所属卡集，例如 "OP15" / "ST01"</summary>
     public string SetCode => Number.Split('-')[0];
 
-    /// <summary>颜色集合（多色卡按 / 拆分）</summary>
-    public string[] ColorList => Color.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    /// <summary>颜色集合；兼容历史导入中的不同分隔符，只认可六种规则色并保持原顺序。</summary>
+    public string[] ColorList => ParseColors(Color);
+
+    internal static string[] ParseColors(string? color)
+    {
+        if (string.IsNullOrWhiteSpace(color)) return Array.Empty<string>();
+        var normalized = color.Normalize(System.Text.NormalizationForm.FormKC);
+        return normalized
+            .Where(c => RuleColors.Contains(c))
+            .Distinct()
+            .Select(c => c.ToString())
+            .ToArray();
+    }
 
     /// <summary>判断与另一张卡（通常是领航）是否有颜色交集</summary>
     public bool SharesColorWith(CardInfo other)

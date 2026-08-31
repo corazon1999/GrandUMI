@@ -70,6 +70,7 @@ cat > public/network-endpoints.json <<'JSON'
 JSON
 if ! NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' \
     NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' \
+    NEXT_PUBLIC_GRANDUMI_COMMIT="$target" \
     CARD_BACK_API_URL=http://127.0.0.1:8080 npm run build; then
   die "新正式服前端构建失败"
 fi

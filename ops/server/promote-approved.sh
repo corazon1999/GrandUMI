@@ -126,6 +126,7 @@ if [[ "$need_front" == 1 ]]; then
   [[ -d .next ]] && mv .next .next.previous
   if ! NEXT_PUBLIC_WS_URL='wss://ygo.grand-umi.com/ws' \
       NEXT_PUBLIC_ASSET_ORIGIN='https://assets.grand-umi.com' \
+      NEXT_PUBLIC_GRANDUMI_COMMIT="$approved" \
       CARD_BACK_API_URL='http://127.0.0.1:8080' npm run build; then
     rm -rf .next
     [[ -d .next.previous ]] && mv .next.previous .next

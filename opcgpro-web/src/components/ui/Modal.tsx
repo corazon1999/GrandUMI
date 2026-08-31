@@ -13,6 +13,8 @@ interface Props {
   maxWidthClass?: string;
   /** 移动端使用底部抽屉，lg 及以上仍保持居中弹窗。 */
   mobileSheet?: boolean;
+  /** 覆盖遮罩层级；默认保持既有 z-50，仅特殊全局浮层按需提高。 */
+  layerClassName?: string;
 }
 
 export default function Modal({
@@ -22,6 +24,7 @@ export default function Modal({
   children,
   maxWidthClass = "max-w-2xl",
   mobileSheet = false,
+  layerClassName = "z-50",
 }: Props) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -104,7 +107,7 @@ export default function Modal({
     <AnimatePresence>
       {open && (
         <motion.div
-          className={`fixed inset-0 z-50 flex ${
+          className={`pointer-events-auto fixed inset-0 ${layerClassName} flex ${
             useMobileSheet
               ? `items-end px-0 pb-0 pt-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] ${largeSheetClasses}`
               : "items-center justify-center px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"

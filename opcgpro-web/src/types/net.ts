@@ -1320,13 +1320,62 @@ export interface MsgRequestState extends MsgBase {
 }
 
 export type FeedbackCategory = "bug" | "suggestion";
+export type FeedbackDisconnectCategory =
+  | "unknown"
+  | "normal"
+  | "going_away"
+  | "abnormal"
+  | "session_replaced"
+  | "timeout"
+  | "network"
+  | "maintenance"
+  | "access_revoked"
+  | "websocket_error"
+  | "other";
 
-/** 游戏内反馈（客户端 → 服务器；服务端回执带 result/path） */
+/** 客户端提供的非权威、白名单化排障证据；服务端会再次裁剪和校验。 */
+export interface ClientFeedbackEvidenceV1 {
+  schema: "grandumi.feedback.client.v1";
+  capturedAtUtc: string;
+  client: {
+    version: string;
+    commit: string;
+    context: "lobby" | "game";
+  };
+  connection: {
+    state: string;
+    endpointHost: string;
+    connectionGeneration: number;
+    reconnectCount: number;
+    endpointFailureCount: number;
+    handshakeMs: number | null;
+    rttMs: number | null;
+    rttP95Ms: number | null;
+    actionRoundTripMs: number | null;
+    actionRoundTripP95Ms: number | null;
+    disconnectCategory: FeedbackDisconnectCategory;
+    stateDeltaEnabled: boolean;
+    stateDeltaCount: number;
+    fullStateCount: number;
+    maxMessageQueueDepth: number;
+  };
+  viewport: {
+    width: number;
+    height: number;
+    orientation: "portrait" | "landscape";
+    devicePixelRatio: number;
+    standalone: boolean;
+    online: boolean;
+  };
+}
+
+/** 游戏内反馈；新客户端发送结构化证据，clientInfo 仅保留用于兼容旧客户端。 */
 export interface MsgBugReport extends MsgBase {
   proto: "MsgBugReport";
   category: FeedbackCategory; // bug 或优化建议
   description: string;   // 问题描述
-  clientInfo: string;    // 客户端全量信息（JSON 字符串）
+  clientEvidence?: ClientFeedbackEvidenceV1;
+  clientInfo?: string;
   requestId?: string;
   result?: boolean;      // 服务端回执：是否保存成功
   replayId?: string;     // 可选：关联的云回放 ID

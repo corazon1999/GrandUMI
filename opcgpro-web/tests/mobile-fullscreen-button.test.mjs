@@ -34,3 +34,19 @@ test("全屏按钮支持标准 API、WebKit API 和 iPhone 主屏幕降级说明
   assert.match(layout, /appleWebApp:[\s\S]*capable: true/);
   assert.match(manifest, /display: "fullscreen"/);
 });
+
+test("iPhone 降级提示在旋转画布门户中仍可强制关闭", async () => {
+  const [button, modal] = await Promise.all([
+    read("src/components/game/MobileFullscreenButton.tsx"),
+    read("src/components/ui/Modal.tsx"),
+  ]);
+
+  assert.match(modal, /layerClassName = "z-50"/);
+  assert.match(modal, /pointer-events-auto fixed inset-0 \$\{layerClassName\}/);
+  assert.match(button, /layerClassName="z-\[11000\]"/);
+  assert.match(button, /!helpOpen &&/);
+  assert.match(button, /onClose=\{closeHelp\}/);
+  assert.match(button, /onClick=\{closeHelp\}/);
+  assert.match(button, /min-h-12 w-full/);
+  assert.match(button, /我知道了/);
+});

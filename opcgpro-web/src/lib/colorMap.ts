@@ -4,6 +4,7 @@
 // UI 显示顺序
 export const COLOR_DISPLAY_NAMES = ["红", "绿", "蓝", "紫", "黑", "黄"] as const;
 export type ColorDisplayName = (typeof COLOR_DISPLAY_NAMES)[number];
+const COLOR_DISPLAY_NAME_SET = new Set<string>(COLOR_DISPLAY_NAMES);
 
 // 每种颜色对应的 Tailwind 样式
 export const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -20,7 +21,27 @@ export function toDisplayColor(dataColor: string): string {
   return dataColor;
 }
 
+/**
+ * 从卡牌颜色字段中提取规则色。
+ * 历史导入可能使用半角/全角斜杠、逗号或“紫色黑色”等排版；规则只认可六种标准色。
+ */
+export function parseCardColors(dataColor: string | null | undefined): ColorDisplayName[] {
+  if (!dataColor) return [];
+  const colors: ColorDisplayName[] = [];
+  for (const char of dataColor.normalize("NFKC")) {
+    if (!COLOR_DISPLAY_NAME_SET.has(char) || colors.includes(char as ColorDisplayName)) continue;
+    colors.push(char as ColorDisplayName);
+  }
+  return colors;
+}
+
+/** 两张卡只要共享任一规则色即为颜色兼容。 */
+export function sharesCardColor(left: string, right: string): boolean {
+  const leftColors = new Set(parseCardColors(left));
+  return parseCardColors(right).some((color) => leftColors.has(color));
+}
+
 /** 获取卡牌颜色的首个色名（用于取样式） */
 export function primaryDisplayColor(dataColor: string): string {
-  return dataColor.split("/")[0].trim();
+  return parseCardColors(dataColor)[0] ?? dataColor.trim();
 }

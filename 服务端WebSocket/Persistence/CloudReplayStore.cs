@@ -1077,11 +1077,18 @@ public sealed class CloudReplayStore : IDisposable
     private static bool IsSafeReplayId(string value)
         => value.Length is >= 8 and <= 64 && value.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_');
 
+    /// <summary>无副作用校验并规范化外部回放 ID，供任何持久化关联前复用。</summary>
+    internal static bool TryNormalizeReplayId(string? value, out string normalized)
+    {
+        normalized = value?.Trim() ?? "";
+        return IsSafeReplayId(normalized);
+    }
+
     private static string RequireReplayId(string value)
     {
-        value = value?.Trim() ?? "";
-        if (!IsSafeReplayId(value)) throw new CloudReplayException("invalid_request", "回放 ID 无效。");
-        return value;
+        if (!TryNormalizeReplayId(value, out var normalized))
+            throw new CloudReplayException("invalid_request", "回放 ID 无效。");
+        return normalized;
     }
 
     private static string RequireAccount(string value)

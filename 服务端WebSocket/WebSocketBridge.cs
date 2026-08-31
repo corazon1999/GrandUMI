@@ -3573,71 +3573,106 @@ public static class WebSocketBridge
     }
 
     /// <summary>
-    /// MsgBugReport — 游戏内反馈：类型 + 描述 + 客户端全量信息，服务端补充权威全量快照后落盘
+    /// MsgBugReport — 客户端只提供非权威白名单诊断；房间状态由服务端串行采集后落盘。
     /// </summary>
     private static void OnBugReport(WsSession s, Dictionary<string, JsonElement> msg)
+        => _ = OnBugReportAsync(s, msg);
+
+    private static async Task OnBugReportAsync(WsSession s, Dictionary<string, JsonElement> msg)
     {
-        var description = (Str(msg, "description") ?? "").Trim();
-        if (description.Length == 0)
-        {
-            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能为空" });
-            return;
-        }
-        if (description.Length > 4000)
-        {
-            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能超过 4000 字" });
-            return;
-        }
-
-        var categoryRaw = Str(msg, "category");
-        var category = categoryRaw switch
-        {
-            null or "" or "bug" => "bug",
-            "suggestion" => "suggestion",
-            _ => null,
-        };
-        if (category is null)
-        {
-            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈类型无效" });
-            return;
-        }
-
-        var clientInfoRaw = Str(msg, "clientInfo") ?? "";
-
-        // clientInfo 是 JSON 字符串，尝试解析为对象嵌入（失败则原样作为字符串保存）
-        object? clientInfo;
-        try { clientInfo = JsonSerializer.Deserialize<JsonElement>(clientInfoRaw); }
-        catch { clientInfo = clientInfoRaw; }
-
-        var room = GameRoomManager.GetRoomBySession(s.SessionId);
-        int playerIndex = room is null ? -1 : Array.IndexOf(room.PlayerSessionIds, s.SessionId);
-        object? serverSnapshot = room is null
-            ? null
-            : Game.Snapshot.PrivateStateSnapshotBuilder.Build(room.Engine.State);
-
-        var reportRequestId = Str(msg, "requestId")?.Trim();
-        var feedbackId = string.IsNullOrWhiteSpace(reportRequestId)
-            ? $"feedback-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"
-            : $"feedback-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(reportRequestId))).ToLowerInvariant()[..24]}";
-        var requestedReplayId = Str(msg, "replayId")?.Trim();
-        var replayId = !string.IsNullOrWhiteSpace(requestedReplayId) ? requestedReplayId : room?.RoomId;
-        var report = new
-        {
-            feedbackId,
-            savedAt     = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-            account     = s.Account ?? "",
-            sessionId   = s.SessionId,
-            roomId      = room?.RoomId,
-            playerIndex,
-            category,
-            description,
-            replayId,
-            clientInfo,
-            serverSnapshot,
-        };
-
         try
         {
+            if (!s.TryConsumeRateLimit("bug-report", capacity: 5, refillPerSecond: 1d / 30d))
+            {
+                Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "提交过于频繁，请稍后再试" });
+                return;
+            }
+
+            var description = (Str(msg, "description") ?? "").Trim();
+            if (description.Length == 0)
+            {
+                Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能为空" });
+                return;
+            }
+            if (description.Length > 4000)
+            {
+                Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈内容不能超过 4000 字" });
+                return;
+            }
+
+            var categoryRaw = Str(msg, "category");
+            var category = categoryRaw switch
+            {
+                null or "" or "bug" => "bug",
+                "suggestion" => "suggestion",
+                _ => null,
+            };
+            if (category is null)
+            {
+                Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈类型无效" });
+                return;
+            }
+
+            var reportRequestId = Str(msg, "requestId")?.Trim();
+            if (reportRequestId is { Length: > 128 })
+            {
+                Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈请求标识无效" });
+                return;
+            }
+            var submitterAccount = s.IsLoggedIn ? s.Account : null;
+            var requestIdentity = FeedbackRequestIdentityFactory.Create(
+                submitterAccount,
+                s.SessionId,
+                reportRequestId);
+            var feedbackId = requestIdentity.FeedbackId;
+
+            string? requestedReplayId = null;
+            var requestedReplayValue = Str(msg, "replayId");
+            if (!string.IsNullOrWhiteSpace(requestedReplayValue))
+            {
+                if (!CloudReplayStore.TryNormalizeReplayId(requestedReplayValue, out var normalizedReplayId))
+                {
+                    Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "回放 ID 无效" });
+                    return;
+                }
+                requestedReplayId = normalizedReplayId;
+            }
+
+            var room = GameRoomManager.GetRoomBySession(s.SessionId);
+            string? replayId = requestedReplayId;
+            if (replayId is null
+                && room is not null
+                && CloudReplayStore.TryNormalizeReplayId(room.RoomId, out var normalizedRoomReplayId))
+                replayId = normalizedRoomReplayId;
+
+            JsonElement? submittedClientEvidence = msg.TryGetValue("clientEvidence", out var evidenceElement)
+                ? evidenceElement
+                : null;
+            var clientEvidence = FeedbackEvidenceSanitizer.Sanitize(
+                submittedClientEvidence,
+                Str(msg, "clientInfo"));
+
+            var authorityEvidence = await GameRoomManager.CaptureFeedbackEvidenceAsync(s.SessionId);
+            var evidence = new
+            {
+                schema = "grandumi.feedback.evidence.v1",
+                authority = authorityEvidence,
+                client = clientEvidence,
+            };
+            var evidenceJson = JsonSerializer.Serialize(evidence);
+            if (Encoding.UTF8.GetByteCount(evidenceJson) > 48 * 1024)
+                throw new InvalidDataException("反馈证据超过持久化上限");
+            var report = new
+            {
+                schema = "grandumi.feedback.report.v1",
+                feedbackId,
+                savedAtUtc = DateTime.UtcNow.ToString("O"),
+                category,
+                description,
+                replayId,
+                evidence,
+            };
+
             if (_operationsCenterStore is null)
                 throw new InvalidOperationException("统一 Case 服务尚未初始化。");
             var caseId = _operationsCenterStore.CreateCase(new OperationsCaseCreate(
@@ -3645,26 +3680,34 @@ public static class WebSocketBridge
                 category,
                 category == "suggestion" ? "玩家优化建议" : "玩家 Bug 反馈",
                 description,
-                s.Account,
+                // 玩家反馈 Case 只关联房间/回放；提交者账号不进入持久化证据或 Case 元数据。
+                null,
                 null,
                 null,
                 room?.RoomId,
                 replayId,
                 feedbackId,
-                reportRequestId,
+                requestIdentity.SourceRequestId,
                 [new OperationsCaseEvidenceInput(
-                    "bug_report_context",
-                    JsonSerializer.Serialize(new { clientInfo, playerIndex, serverSnapshot }))],
+                    "bug_report_evidence_v1",
+                    evidenceJson)],
                 category == "bug" ? "high" : "normal"));
             string? legacyPath = null;
-            try { legacyPath = BugReportStore.Save(report, s.Account ?? "anon", room?.RoomId, category); }
+            try { legacyPath = BugReportStore.Save(report, feedbackId, category); }
             catch (Exception legacyError)
             {
                 LogErr($"旧版 Bug 反馈文件保存失败，统一 Case 已保留 {caseId}: {legacyError.Message}");
             }
-            var replayLinked = s.Account is not null
-                && replayId is not null
-                && _cloudReplayStore?.AssociateFeedback(s.Account, replayId, feedbackId) == true;
+            var replayLinked = false;
+            if (submitterAccount is not null && replayId is not null && _cloudReplayStore is not null)
+            {
+                try { replayLinked = _cloudReplayStore.AssociateFeedback(submitterAccount, replayId, feedbackId); }
+                catch (Exception replayError)
+                {
+                    // Case 与兼容文件已经持久化；回放关联失败不得把成功反馈伪装为整体失败。
+                    LogErr($"反馈 {feedbackId} 的云回放关联失败，Case {caseId} 已保留: {replayError.Message}");
+                }
+            }
             var categoryName = category == "suggestion" ? "优化建议" : "Bug";
             Log($"{categoryName} 反馈已进入统一 Case: {caseId}；兼容文件={legacyPath ?? "未写入"}");
             Send(s.SessionId, new { proto = "MsgBugReport", result = true, feedbackId, caseId, replayId, replayLinked });
@@ -3672,7 +3715,7 @@ public static class WebSocketBridge
         catch (Exception ex)
         {
             LogErr($"BugReport 保存失败: {ex.Message}");
-            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = ex.Message });
+            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈暂时无法保存，请稍后重试" });
         }
     }
 

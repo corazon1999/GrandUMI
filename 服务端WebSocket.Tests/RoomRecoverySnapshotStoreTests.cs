@@ -283,6 +283,77 @@ public sealed class RoomRecoverySnapshotStoreTests
         }
     }
 
+    [Fact]
+    public async Task 服务重启后反馈证据恢复最近已接受动作但不恢复动作数据()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        var roomId = $"restore-feedback-{Guid.NewGuid():N}"[..27];
+        var account0 = $"restore-feedback-a-{roomId}";
+        var account1 = $"restore-feedback-b-{roomId}";
+        try
+        {
+            var deck = BuildLegalDeck("OP15-001");
+            var now = DateTime.UtcNow;
+            var header = new
+            {
+                kind = "create",
+                roomId,
+                seed = 123456,
+                firstPlayer = 0,
+                openingSetupAfterFirstPlayerChoice = false,
+                p0 = new { account = account0, displayName = "恢复玩家A", deckRaw = deck },
+                p1 = new { account = account1, displayName = "恢复玩家B", deckRaw = deck },
+                vsBot = false,
+                matchKind = MatchKind.Ranked.ToString(),
+                createdAtUtc = now,
+            };
+            var acceptedAction = new
+            {
+                kind = "action",
+                journalSequence = 1,
+                playerIndex = 0,
+                action = "RequestDraw",
+                data = new { description = "不能进入反馈证据的私有动作数据 OP15-001" },
+                requestId = "restored-request-1",
+                operationSequence = 1,
+                tsUtc = now,
+            };
+            await File.WriteAllLinesAsync(
+                Path.Combine(root, $"{roomId}.jsonl"),
+                [JsonSerializer.Serialize(header), JsonSerializer.Serialize(acceptedAction)]);
+
+            await GameRoomManager.RestoreAll();
+            var room = Assert.IsType<GameRoomManager.RoomEntry>(GameRoomManager.GetRoom(roomId));
+            var reboundSession = $"restore-feedback-session-{Guid.NewGuid():N}";
+            Assert.True(GameRoomManager.TryReclaim(reboundSession, account0));
+
+            var authority = await GameRoomManager.CaptureFeedbackEvidenceAsync(reboundSession);
+            using var document = JsonDocument.Parse(authority.ToJsonString());
+            var evidence = document.RootElement;
+            var actions = evidence.GetProperty("recentActions").EnumerateArray().ToArray();
+
+            Assert.True(evidence.GetProperty("connection").GetProperty("restoredFromRecovery").GetBoolean());
+            Assert.Contains(actions, action => action.GetProperty("action").GetString() == "RequestDraw"
+                && action.GetProperty("outcome").GetString() == "accepted"
+                && action.GetProperty("requestId").GetString() == "restored-request-1");
+            Assert.DoesNotContain("不能进入反馈证据", evidence.GetRawText(), StringComparison.Ordinal);
+            Assert.DoesNotContain("OP15-001", evidence.GetRawText(), StringComparison.Ordinal);
+            Assert.DoesNotContain(account0, evidence.GetRawText(), StringComparison.Ordinal);
+            Assert.DoesNotContain(account1, evidence.GetRawText(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(30);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
     private static string TestDirectory()
     {
         if (OperatingSystem.IsWindows())

@@ -21,7 +21,8 @@ internal sealed record AcceptedActionLogReceipt(
 
 internal sealed record GameActionExecutionReceipt(
     bool Accepted,
-    AcceptedActionLogReceipt? AcceptedLog);
+    AcceptedActionLogReceipt? AcceptedLog,
+    string? RejectionReason);
 
 internal sealed record TrainingDecisionAudit(
     string ObservationHash,
@@ -62,6 +63,7 @@ public class GameEngine
     private string? _activeRequestId;
     private GameActionSource _activeActionSource;
     private bool _activeActionRejected;
+    private string? _activeActionRejectionReason;
     private readonly object _snapshotBatchGate = new();
     private bool _snapshotBatchActive;
     private int _trackedOperations;
@@ -258,7 +260,7 @@ public class GameEngine
         string? requestId = null,
         GameActionSource source = GameActionSource.Player)
     {
-        if (State.IsGameOver) return new GameActionExecutionReceipt(false, null);
+        if (State.IsGameOver) return new GameActionExecutionReceipt(false, null, "对局已经结束");
 
         var correlationId = GameActionSourceWire.CorrelationId(requestId, source);
         try
@@ -280,7 +282,7 @@ public class GameEngine
                 reason = ex.Message,
                 requestId = correlationId,
             });
-            return new GameActionExecutionReceipt(false, null);
+            return new GameActionExecutionReceipt(false, null, ex.Message);
         }
 
         var dispatchStartedAt = LatencyDiagnostics.Start();
@@ -298,6 +300,7 @@ public class GameEngine
         _activeRequestId = correlationId;
         _activeActionSource = source;
         _activeActionRejected = false;
+        _activeActionRejectionReason = null;
 
         var policyValidation = LegalActionSpace.IsPolicyAction(action)
             ? LegalActionService.Validate(State, playerIndex, action, data)
@@ -445,7 +448,7 @@ public class GameEngine
         if (Volatile.Read(ref _trackedOperations) == 0)
             EndSnapshotBatch();
         LatencyDiagnostics.Observe("动作同步分派", dispatchStartedAt, $"房间={State.RoomId}，动作={action}");
-        return new GameActionExecutionReceipt(accepted, acceptedLog);
+        return new GameActionExecutionReceipt(accepted, acceptedLog, _activeActionRejectionReason);
     }
 
     // ── 开局骰点与先后手选择 ─────────────────────────────────────────────
@@ -1585,6 +1588,7 @@ public class GameEngine
     public void SendError(int playerIndex, string reason)
     {
         _activeActionRejected = true;
+        _activeActionRejectionReason = reason;
         RecordMatchLog("player_action_rejected", _activeActor ?? playerIndex, new
         {
             requestId = _activeRequestId ?? GameActionSourceWire.CorrelationId(null, _activeActionSource),
