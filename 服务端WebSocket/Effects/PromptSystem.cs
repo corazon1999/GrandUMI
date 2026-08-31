@@ -86,7 +86,9 @@ public class PromptSystem : IPromptService
             }
         }
 
-        // “是否发动”确认后的第一个、尚未支付任何状态成本的选择步骤，可返回上一级重新决定。
+        // “是否发动”确认后的第一个、且牌局状态尚未改变的选择步骤，可返回上一级重新决定。
+        // 这既覆盖成本选择，也覆盖确认发动后才出现的目标选择；状态成本一旦支付，指纹变化会
+        // 关闭返回入口。没有可选发动上下文的强制选择仍只接受 min..max 范围内的正常答案。
         // 返回动作使用独立的内部合法选项，继续接受 GameEngine 对数量、重复项和伪造 ID 的统一校验。
         // 多选成本会生成 min 个不同的返回选项，确保返回动作同样满足 minChoose，且不会放宽必选规则。
         OptionalConfirmation? returnContext = null;
@@ -94,19 +96,22 @@ public class PromptSystem : IPromptService
         OptionalConfirmation? optional = null;
         var hasOptional = kind != "Option" && _optionalConfirmations.TryGetValue(playerIdx, out optional);
         if (hasOptional
-            && optional!.SourceId == EffectRuntime.CurrentSource?.Id.ToString()
-            && optional.StateFingerprint == BuildOptionalStateFingerprint(_engine.State)
-            && min > 0
-            && max >= min
-            && LooksLikeCostSelection(kind, text, optional.Text, extra))
+            && optional!.SourceId == EffectRuntime.CurrentSource?.Id.ToString())
         {
-            returnContext = optional;
+            // 同一可选效果遇到首个选择步骤后即消费上下文；即使该步本身可选零张或状态已改变，
+            // 也不能把旧确认框错误带到更后的强制步骤。
             _optionalConfirmations.TryRemove(playerIdx, out _);
-            returnChoiceIds.AddRange(Enumerable.Range(0, min)
-                .Select(i => $"{ReturnToEffectConfirmPrefix}:{i}"));
-            extra ??= new();
-            extra["canReturnToEffectConfirm"] = true;
-            extra["returnChoiceIds"] = returnChoiceIds.ToArray();
+            if (optional.StateFingerprint == BuildOptionalStateFingerprint(_engine.State)
+                && min > 0
+                && max >= min)
+            {
+                returnContext = optional;
+                returnChoiceIds.AddRange(Enumerable.Range(0, min)
+                    .Select(i => $"{ReturnToEffectConfirmPrefix}:{i}"));
+                extra ??= new();
+                extra["canReturnToEffectConfirm"] = true;
+                extra["returnChoiceIds"] = returnChoiceIds.ToArray();
+            }
         }
 
         while (true)
@@ -192,38 +197,6 @@ public class PromptSystem : IPromptService
             || kind.Contains("Reorder", StringComparison.OrdinalIgnoreCase))
             return (min, max);
         return (0, max);
-    }
-
-    private static bool LooksLikeCostSelection(string kind, string promptText, string confirmText,
-        Dictionary<string, object?>? extra)
-    {
-        if (EffectRuntime.PayingCost) return true;
-        if (extra?.TryGetValue("isCost", out var explicitCost) == true && explicitCost is true) return true;
-
-        bool BothContain(params string[] cues)
-            => cues.Any(cue => promptText.Contains(cue, StringComparison.Ordinal)
-                               && confirmText.Contains(cue, StringComparison.Ordinal));
-
-        if (promptText.Contains("成本", StringComparison.Ordinal)
-            || promptText.Contains("支付", StringComparison.Ordinal)
-            || promptText.Contains("代价", StringComparison.Ordinal)) return true;
-        if (BothContain("丢弃", "废弃", "弃置")) return true;
-        if (BothContain("放回手牌", "返回手牌", "退回手牌")) return true;
-        if (BothContain("放回卡组", "返回卡组", "卡组最下方", "卡组底")) return true;
-        if (BothContain("休息", "横置")) return true;
-        if (BothContain("公开")) return true;
-        if (kind.Contains("Discard", StringComparison.OrdinalIgnoreCase)
-            && (confirmText.Contains("丢弃", StringComparison.Ordinal)
-                || confirmText.Contains("废弃", StringComparison.Ordinal))) return true;
-        if (kind == "ReturnOwnDon"
-            && (confirmText.Contains("咚!!-", StringComparison.Ordinal)
-                || confirmText.Contains("咚-", StringComparison.Ordinal)
-                || confirmText.Contains("放回", StringComparison.Ordinal))) return true;
-        return promptText.Contains("生命", StringComparison.Ordinal)
-               && confirmText.Contains("生命", StringComparison.Ordinal)
-               && (promptText.Contains("翻", StringComparison.Ordinal)
-                   || promptText.Contains("置入", StringComparison.Ordinal)
-                   || promptText.Contains("加入手牌", StringComparison.Ordinal));
     }
 
     private static string BuildOptionalStateFingerprint(GameState state)

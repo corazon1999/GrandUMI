@@ -83,7 +83,7 @@ public class GameFeedback20260826P3ImplementationTests
     }
 
     [Fact]
-    public async Task G865_OP17_012_KoCanPutOneCostWhitebeardStageFaceUpOnLifeTop()
+    public async Task G865_OP17_012_KoCanPlayOneCostWhitebeardStageFromHand()
     {
         var state = TestScene.New().Build();
         var me = state.Players[0];
@@ -96,9 +96,9 @@ public class GameFeedback20260826P3ImplementationTests
         await EffectRuntime.Resolve(
             state, 0, Card("OP17-012"), EffectTrigger.OnKO, prompts);
 
-        Assert.Equal([stage, existingLife], me.LifeArea);
-        Assert.True(stage.IsLifeFaceUp);
+        Assert.Equal([existingLife], me.LifeArea);
+        Assert.False(stage.IsLifeFaceUp);
         Assert.DoesNotContain(stage, me.Hand);
-        Assert.Null(me.StageCard);
+        Assert.Same(stage, me.StageCard);
     }
 }

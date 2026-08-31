@@ -730,9 +730,13 @@ export default function PromptOverlay() {
                 </button>
               )}
               {prompt.minChoose === 0 && !allowDefaultOrder && (
-                <button onClick={handleSkip}
-                  className="min-h-12 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-500">
-                  跳过
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  aria-label="不选择任何目标并继续结算"
+                  className="min-h-12 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-500"
+                >
+                  不选择并继续
                 </button>
               )}
               <button onClick={handleConfirm} disabled={!canConfirm}

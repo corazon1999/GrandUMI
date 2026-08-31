@@ -57,7 +57,7 @@ class AudioEngine {
 
   public play(id: SoundId, options: PlaySoundOptions = {}): void {
     if (!this.unlocked || this.muted || this.volume <= 0) return;
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    if (!this.canPlayForCurrentVisibility(options)) return;
 
     const definition = AUDIO_MANIFEST[id];
     const requestedAt = performance.now();
@@ -74,7 +74,7 @@ class AudioEngine {
     void this.loadBuffer(id).then((buffer) => {
       if (!buffer || performance.now() - requestedAt > MAX_LATE_PLAYBACK_MS) return;
       if (!this.unlocked || this.muted || this.volume <= 0) return;
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      if (!this.canPlayForCurrentVisibility(options)) return;
       this.playBuffer(id, buffer, options);
     });
   }
@@ -141,6 +141,7 @@ class AudioEngine {
     const context = this.context;
     const outputGain = this.outputGain;
     if (!context || !outputGain) return;
+    if (!this.canPlayForCurrentVisibility(options)) return;
 
     if (context.state === "suspended") void context.resume();
 
@@ -170,6 +171,13 @@ class AudioEngine {
     this.activeVoices.add(voice);
     source.onended = () => this.disposeVoice(voice);
     source.start();
+  }
+
+  private canPlayForCurrentVisibility(options: PlaySoundOptions): boolean {
+    if (typeof document === "undefined" || document.visibilityState !== "hidden") return true;
+    // 后台提示音仍必须先由用户手势解锁。移动浏览器若已挂起 AudioContext，
+    // 不排队到回到前台后补播，避免过时的“匹配成功”提示误导玩家。
+    return options.allowWhenHidden === true && this.context?.state === "running";
   }
 
   private stopVoice(voice: ActiveVoice): void {

@@ -528,18 +528,23 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.OnKO) return;
         var candidates = Me(c).Hand
-            .Where(x => x.Info.Cost == 1 && x.Info.HasKeywordContaining("白胡子海盗团"))
+            .Where(x => x.Info.Cost == 1
+                && x.Info.HasKeywordContaining("白胡子海盗团")
+                && x.Info.Kind is CardKind.Character or CardKind.Stage)
             .ToList();
         var pick = await Pick(c, c.OwnerIndex, "OwnHand",
-            "将手牌中最多1张费用1且特征中包含《白胡子海盗团》的卡牌正面朝上加入生命区最上方",
+            "将手牌中最多1张费用为1且特征中包含《白胡子海盗团》的卡牌登场",
             candidates, 0, 1);
         if (pick.Count == 0) return;
 
-        // Prompt 等待后按实例与权威区域重新确认，避免恢复/重放后移动已不在手牌的同名卡。
+        // Prompt 等待后按实例、权威区域及卡面条件重新确认；陈旧响应或状态变化不得移动别处实例。
         var chosen = pick[0];
-        if (!Me(c).Hand.Remove(chosen)) return;
-        chosen.IsLifeFaceUp = true;
-        Me(c).LifeArea.Insert(0, chosen);
+        if (!Me(c).Hand.Contains(chosen)
+            || chosen.Info.Cost != 1
+            || !chosen.Info.HasKeywordContaining("白胡子海盗团")
+            || chosen.Info.Kind is not (CardKind.Character or CardKind.Stage)) return;
+
+        await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, chosen);
     }
 
     private static async Task C013(EffectContext c)

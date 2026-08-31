@@ -32,4 +32,6 @@ export interface SoundDefinition {
 
 export interface PlaySoundOptions {
   volume?: number;
+  /** 已由用户手势解锁音频后，是否允许在后台标签页尝试播放。 */
+  allowWhenHidden?: boolean;
 }

@@ -587,7 +587,6 @@ public sealed class LeaderStatsStore : IDisposable
                 .OrderByDescending(x => x.Games)
                 .ThenByDescending(x => x.WinRate)
                 .ThenBy(x => x.LeaderNumber, StringComparer.Ordinal)
-                .Take(3)
                 .ToArray();
 
             return new PlayerProfileStatsSnapshot(

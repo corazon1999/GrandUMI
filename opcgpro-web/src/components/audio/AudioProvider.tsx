@@ -50,6 +50,12 @@ export default function AudioProvider({ children }: { children: ReactNode }) {
     const onRejected = () => play("error");
     const onDisconnected = () => play("disconnect");
     const onReconnected = () => play("reconnect");
+    const onProtocolMessage = (message: { proto: string; queueKind?: string }) => {
+      // 人机开局也复用 MsgMatchFound，但没有匹配队列；只为真人公开匹配提示。
+      if (message.proto === "MsgMatchFound" && message.queueKind) {
+        play("matchStart", { allowWhenHidden: true });
+      }
+    };
     const onGameChat = (message: { fromAccount?: string }) => {
       const account = useNetStore.getState().account;
       if (message.fromAccount && message.fromAccount !== account) play("message");
@@ -58,11 +64,13 @@ export default function AudioProvider({ children }: { children: ReactNode }) {
     eventBus.on("actionRejected", onRejected);
     eventBus.on("opponentDisconnected", onDisconnected);
     eventBus.on("opponentReconnected", onReconnected);
+    eventBus.on("message", onProtocolMessage);
     eventBus.on("gameChat", onGameChat);
     return () => {
       eventBus.off("actionRejected", onRejected);
       eventBus.off("opponentDisconnected", onDisconnected);
       eventBus.off("opponentReconnected", onReconnected);
+      eventBus.off("message", onProtocolMessage);
       eventBus.off("gameChat", onGameChat);
     };
   }, [play]);

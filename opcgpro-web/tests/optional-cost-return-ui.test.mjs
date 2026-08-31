@@ -18,4 +18,7 @@ test("可选效果的必选成本提供返回是否发动按钮", async () => {
   assert.match(source, /padding-bottom:calc\(2rem\+var\(--layout-safe-bottom,0px\)\)/);
   assert.equal(source.match(/max-md:sticky max-md:bottom-\[calc\(0\.75rem\+var\(--layout-safe-bottom,0px\)\)\]/g)?.length, 2);
   assert.equal(source.match(/max-md:mb-12/g)?.length, 2);
+  assert.match(source, /prompt\.minChoose === 0 && !allowDefaultOrder/);
+  assert.match(source, /aria-label="不选择任何目标并继续结算"/);
+  assert.match(source, /不选择并继续/);
 });

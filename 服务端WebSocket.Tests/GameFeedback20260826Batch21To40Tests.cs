@@ -209,7 +209,7 @@ public class GameFeedback20260826Batch21To40Tests
     }
 
     [Fact]
-    public async Task G864_OP17_012_KoPlacesCostOneFormerWhitebeardCardFaceUpOnLifeTop()
+    public async Task G864_OP17_012_KoPlaysCostOneFormerWhitebeardCharacterFromHand()
     {
         var state = TestScene.New().Build();
         var me = state.Players[0];
@@ -226,10 +226,10 @@ public class GameFeedback20260826Batch21To40Tests
 
         await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnKO, prompts);
 
-        Assert.Equal([formerWhitebeard, existingLife], me.LifeArea);
-        Assert.True(formerWhitebeard.IsLifeFaceUp);
+        Assert.Equal([existingLife], me.LifeArea);
+        Assert.False(formerWhitebeard.IsLifeFaceUp);
         Assert.DoesNotContain(formerWhitebeard, me.Hand);
-        Assert.DoesNotContain(formerWhitebeard, me.Characters);
+        Assert.Contains(formerWhitebeard, me.Characters);
         var choice = Assert.Single(prompts.ChooseHistory);
         Assert.Equal("OwnHand", choice.kind);
     }

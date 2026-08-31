@@ -317,7 +317,9 @@ export default function ProfilePanel({
       <div className="mt-5 flex flex-col gap-3 @[640px]:flex-row @[640px]:items-end @[640px]:justify-between">
         <div>
           <h2 className="text-lg font-bold text-white">胜率概览</h2>
-          <p className="mt-1 text-xs text-gray-500">统计真人有效对局，规则与 Leader 胜率榜一致</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-gray-500">
+            仅统计正常决出胜负且满 8 回合的真人公开匹配；合并休闲/排位与标准/狂野，好友房、房间码、人机及断线结束不计入。
+          </p>
         </div>
         <div className="grid grid-cols-3 rounded-xl border border-gray-800 bg-gray-900 p-1">
           {PERIODS.map((item) => (
@@ -326,7 +328,7 @@ export default function ProfilePanel({
               type="button"
               aria-pressed={period === item.value}
               onClick={() => setPeriod(item.value)}
-              className={`min-h-9 rounded-lg px-3 text-xs font-bold transition-colors ${period === item.value ? "bg-orange-500 text-white" : "text-gray-500 hover:text-white"}`}
+              className={`min-h-11 rounded-lg px-3 text-xs font-bold transition-colors ${period === item.value ? "bg-orange-500 text-white" : "text-gray-500 hover:text-white"}`}
             >
               {item.label}
             </button>
@@ -379,8 +381,11 @@ export default function ProfilePanel({
             )}
           </article>
 
-          <article className="rounded-2xl border border-gray-800 bg-gray-900 p-4 @[720px]:p-5">
-            <div><h3 className="font-bold text-white">最爱玩的领航</h3><p className="mt-1 text-xs text-gray-500">按所选周期内使用场次自动排序</p></div>
+          <article
+            data-testid="player-leader-win-rates"
+            className="rounded-2xl border border-gray-800 bg-gray-900 p-4 @[720px]:p-5"
+          >
+            <div><h3 className="font-bold text-white">按领袖个人胜率</h3><p className="mt-1 text-xs text-gray-500">按所选周期内使用场次排序；点击领袖查看详细战绩</p></div>
             {selectedLeader ? (
               <>
                 <div className="mt-4 flex items-center gap-4 border-b border-gray-800 pb-4">
@@ -388,10 +393,12 @@ export default function ProfilePanel({
                   <div className="min-w-0 flex-1">
                     <h4 className="truncate font-bold text-white">{selectedLeaderName}</h4>
                     <p className="mt-1 text-xs text-gray-500">{selectedLeader.leaderNumber}</p>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-center @[560px]:grid-cols-5">
                       <div><p className="font-bold text-white">{selectedLeader.games}</p><p className="text-[10px] text-gray-600">场次</p></div>
+                      <div><p className="font-bold text-white">{selectedLeader.wins}胜/{selectedLeader.losses}负</p><p className="text-[10px] text-gray-600">战绩</p></div>
                       <div><p className="font-bold text-white">{percent(selectedLeader.usageRate)}</p><p className="text-[10px] text-gray-600">使用占比</p></div>
                       <div><p className="font-bold text-orange-300">{percent(selectedLeader.winRate)}</p><p className="text-[10px] text-gray-600">胜率</p></div>
+                      <div><p className="font-bold text-white">{percent(selectedLeader.firstWinRate)} / {percent(selectedLeader.secondWinRate)}</p><p className="text-[10px] text-gray-600">先攻 / 后攻</p></div>
                     </div>
                   </div>
                 </div>

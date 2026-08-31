@@ -77,19 +77,6 @@ public class OptionalCostPromptReturnTests
             TargetIsLeader = true,
         };
 
-        // 同一效果在成本前出现的非成本选择不能提前吃掉返回上下文。
-        var intermediateTask = prompts.ChooseCards(
-            0,
-            "OpponentCharacter",
-            "选择对方1张角色",
-            new[] { choices[0] },
-            min: 1,
-            max: 1);
-        var intermediatePrompt = await WaitForPrompt(engine, prompt => prompt.Kind == "OpponentCharacter");
-        Assert.False(intermediatePrompt.Extra.ContainsKey("canReturnToEffectConfirm"));
-        prompts.Resolve(intermediatePrompt.PromptId, new[] { choices[0] });
-        Assert.Equal(new[] { choices[0] }, await intermediateTask);
-
         var costTask = prompts.ChooseCards(
             0,
             "OwnHand",
@@ -121,6 +108,117 @@ public class OptionalCostPromptReturnTests
 
         Assert.Equal(choices, await costTask);
         Assert.Null(engine.State.PendingPrompt);
+    }
+
+    [Fact]
+    public async Task 可选发动后的首个目标选择可返回确认并放弃发动()
+    {
+        var engine = CreateEngine();
+        var prompts = engine.Prompts;
+        var choice = engine.State.Players[1].Characters.FirstOrDefault()?.Id.ToString()
+            ?? engine.State.Players[1].Leader.Id.ToString();
+        const string confirmText = "发动效果，选择对方1张角色使其力量-2000？";
+
+        var confirmTask = prompts.ConfirmOptional(0, confirmText);
+        var initialConfirm = await WaitForPrompt(engine, prompt => prompt.Kind == "Option");
+        prompts.Resolve(initialConfirm.PromptId, new[] { "0" });
+        Assert.True(await confirmTask);
+
+        var targetTask = prompts.ChooseCards(
+            0,
+            "OpponentCharacter",
+            "选择对方1张角色，本回合力量-2000",
+            new[] { choice },
+            min: 1,
+            max: 1);
+        var targetPrompt = await WaitForPrompt(engine, prompt => prompt.Kind == "OpponentCharacter");
+        Assert.True((bool)targetPrompt.Extra["canReturnToEffectConfirm"]!);
+        var returnChoices = Assert.IsType<string[]>(targetPrompt.Extra["returnChoiceIds"]);
+
+        prompts.Resolve(targetPrompt.PromptId, returnChoices);
+        var returnedConfirm = await WaitForPrompt(
+            engine,
+            prompt => prompt.Kind == "Option" && prompt.PromptId != initialConfirm.PromptId);
+        Assert.Equal(confirmText, returnedConfirm.PromptText);
+        prompts.Resolve(returnedConfirm.PromptId, new[] { "1" });
+
+        await Assert.ThrowsAsync<OptionalEffectDeclinedException>(() => targetTask);
+        Assert.Null(engine.State.PendingPrompt);
+    }
+
+    [Fact]
+    public async Task 非可选发动的强制选择仍由服务端拒绝空响应()
+    {
+        var engine = CreateEngine();
+        var choice = engine.State.Players[0].Hand[0].Id.ToString();
+        var chooseTask = engine.Prompts.ChooseCards(
+            0,
+            "OwnHand",
+            "选择必须丢弃的1张手牌",
+            new[] { choice },
+            min: 1,
+            max: 1);
+        var prompt = await WaitForPrompt(engine, pending => pending.Kind == "OwnHand");
+
+        Assert.False(prompt.Extra.ContainsKey("canReturnToEffectConfirm"));
+        Assert.False(engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        })));
+        Assert.Equal(prompt.PromptId, engine.State.PendingPrompt?.PromptId);
+
+        engine.Prompts.Resolve(prompt.PromptId, new[] { choice });
+        Assert.Equal(new[] { choice }, await chooseTask);
+    }
+
+    [Fact]
+    public async Task 最多N张选择可由服务端接受零张且不需要伪造返回项()
+    {
+        var engine = CreateEngine();
+        var choices = engine.State.Players[0].Hand.Take(2).Select(card => card.Id.ToString()).ToArray();
+        var chooseTask = engine.Prompts.ChooseCards(
+            0,
+            "OwnHand",
+            "选择手牌中最多2张卡牌",
+            choices,
+            min: 2,
+            max: 2);
+        var prompt = await WaitForPrompt(engine, pending => pending.Kind == "OwnHand");
+
+        Assert.Equal(0, prompt.MinChoose);
+        Assert.False(prompt.Extra.ContainsKey("canReturnToEffectConfirm"));
+        Assert.True(engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        })));
+        Assert.Empty(await chooseTask);
+    }
+
+    [Fact]
+    public async Task 可选发动中的最多N张步骤不会把旧返回上下文泄漏到后续强制选择()
+    {
+        var engine = CreateEngine();
+        var prompts = engine.Prompts;
+        var choices = engine.State.Players[0].Hand.Take(2).Select(card => card.Id.ToString()).ToArray();
+        var confirmTask = prompts.ConfirmOptional(0, "发动含有最多N张目标的效果？");
+        var confirm = await WaitForPrompt(engine, pending => pending.Kind == "Option");
+        prompts.Resolve(confirm.PromptId, new[] { "0" });
+        Assert.True(await confirmTask);
+
+        var optionalTask = prompts.ChooseCards(
+            0, "OwnHand", "选择手牌中最多1张卡牌", choices, min: 0, max: 1);
+        var optionalPrompt = await WaitForPrompt(engine, pending => pending.Kind == "OwnHand");
+        prompts.Resolve(optionalPrompt.PromptId, Array.Empty<string>());
+        Assert.Empty(await optionalTask);
+
+        var forcedTask = prompts.ChooseCards(
+            0, "OwnHandDiscard", "必须选择1张手牌", choices, min: 1, max: 1);
+        var forcedPrompt = await WaitForPrompt(engine, pending => pending.Kind == "OwnHandDiscard");
+        Assert.False(forcedPrompt.Extra.ContainsKey("canReturnToEffectConfirm"));
+        prompts.Resolve(forcedPrompt.PromptId, new[] { choices[0] });
+        Assert.Equal(new[] { choices[0] }, await forcedTask);
     }
 
     [Fact]

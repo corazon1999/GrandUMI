@@ -394,6 +394,42 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
+    public void 个人详情返回本人所用全部领航并合并公开匹配模式()
+    {
+        var now = new DateTime(2026, 8, 31, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        var publicKinds = new[]
+        {
+            MatchKind.CasualStandard,
+            MatchKind.CasualWild,
+            MatchKind.Ranked,
+            MatchKind.RankedWild,
+        };
+        for (var index = 0; index < publicKinds.Length; index++)
+        {
+            store.RecordMatch(Match(
+                $"profile-all-leaders-{index}",
+                now.AddMinutes(index),
+                publicKinds[index],
+                $"L-{index}",
+                "L-OPPONENT",
+                winner: index % 2,
+                firstPlayer: index % 2,
+                turnCount: 8));
+        }
+        store.RecordMatch(Match(
+            "profile-private-excluded", now, MatchKind.Friendly,
+            "L-PRIVATE", "L-OPPONENT", winner: 0, firstPlayer: 0, turnCount: 20));
+
+        var profile = store.GetPlayerProfile("Alice", "all", now.AddMinutes(10));
+
+        Assert.Equal(4, profile.Games);
+        Assert.Equal(["L-0", "L-1", "L-2", "L-3"],
+            profile.TopLeaders.Select(item => item.LeaderNumber).OrderBy(number => number));
+        Assert.DoesNotContain(profile.TopLeaders, item => item.LeaderNumber == "L-PRIVATE");
+    }
+
+    [Fact]
     public void 公开排位榜可按账号哈希读取最常使用的Leader()
     {
         var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
