@@ -1009,6 +1009,7 @@ export interface FieldCardSnapshot {
   turnPlayed: number;
   canAttack: boolean;        // 该角色当前是否可发起攻击（后端权威，对手/非我方回合恒 false）
   cannotAttack: boolean;     // 该角色是否存在明确的“无法攻击”状态（不含横置、新登场等普通条件）
+  canActivateEffect?: boolean; // 该角色当前是否可发动【启动主要】（后端权威；旧回放可缺失）
 }
 
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
@@ -1053,6 +1054,8 @@ export interface PlayerSnapshot {
   leaderCanAttack: boolean;   // 领袖当前是否可发起攻击（后端权威）
   leaderCannotAttack: boolean; // 领袖是否存在明确的“无法攻击”状态
   leaderEnterEffectNullified: boolean; // 【登场时】效果当前被无效
+  leaderCanActivateEffect?: boolean; // 领袖当前是否可发动【启动主要】（后端权威）
+  stageCanActivateEffect?: boolean;  // 舞台当前是否可发动【启动主要】（后端权威）
   leaderActivatedUsedThisTurn: boolean;  // 领袖【启动主要】【每回合1次】本回合是否已用
   stageActivatedUsedThisTurn: boolean;   // 舞台【启动主要】【每回合1次】本回合是否已用
   leaderOncePerTurnEffectAvailable: boolean; // 领袖的【每回合1次】效果本回合仍可发动

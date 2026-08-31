@@ -6,7 +6,6 @@ import { useBattleStore } from "@/store/battleStore";
 import { useIsDefender } from "@/hooks/useIsDefender";
 import { GameRequest } from "@/net/GameRequest";
 import { getCard } from "@/data/CardLoader";
-import { canPayActivatedMainCost } from "@/lib/activatedMainCost";
 import CounterEventConfirmModal, {
   type PendingCounterEvent,
 } from "@/components/game/CounterEventConfirmModal";
@@ -63,40 +62,20 @@ export default function GameActions() {
       ? my.fieldCards.find((card) => card.id === selectedFieldId)
       : undefined;
 
-  // 选中场上卡（领袖/领航、角色或舞台）含【启动主要】时，主要阶段可发动启动效果
-  const selectedNumber =
+  // 启动效果以服务端权威合法性为准。服务端统一考虑阶段、整卡无效、卡牌专属条件与成本，
+  // 客户端不再根据卡面标签推测，避免展示点击后只会静默失败的按钮。
+  const selectedCanActivateEffect =
     my && selectedFieldId !== null
       ? selectedFieldId === my.leaderId
-          ? my.leaderNumber
+          ? my.leaderCanActivateEffect
           : selectedFieldId === my.stageId
-            ? my.stageNumber
-          : (selectedFieldCard?.number ?? null)
-      : null;
-  const selectedHasActivated = selectedNumber
-    ? (getCard(selectedNumber)?.effectTags?.includes("ActivatedMain") ?? false)
-    : false;
-  // 该启动效果若为【每回合1次】且本回合已发动过，则后端权威下发已用标记 → 隐藏按钮
-  const selectedActivatedUsed =
-    my && selectedFieldId !== null
-      ? selectedFieldId === my.leaderId
-        ? my.leaderActivatedUsedThisTurn
-        : selectedFieldId === my.stageId
-          ? my.stageActivatedUsedThisTurn
-          : (selectedFieldCard?.activatedUsedThisTurn ?? false)
+            ? my.stageCanActivateEffect
+            : (selectedFieldCard?.canActivateEffect ?? false)
       : false;
   const canActivate =
-    currentTurn &&
-    phase === "Main" &&
-    !battle &&
     !isSelectingTarget &&
     selectedFieldId !== null &&
-    selectedHasActivated &&
-    !selectedActivatedUsed &&
-    canPayActivatedMainCost(
-      selectedNumber,
-      selectedFieldCard?.isTapped ?? false,
-      selectedFieldCard?.cannotBeRested ?? false,
-    );
+    selectedCanActivateEffect;
 
   // 贴咚采用“目标优先”操作：先选中领袖/角色，再直接选择要赋予的张数。
   // 领袖在协议中使用固定标识 "leader"；角色沿用场上实例 ID，舞台不可贴咚。

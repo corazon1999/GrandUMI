@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrandUMI.Cards;
+using GrandUMI.Effects;
 using GrandUMI.Game;
 using Xunit;
 
@@ -197,6 +198,56 @@ public class OverflowPlayOptimizationTests
         Assert.Equal("BattleEnd", actions[^1]);
         Assert.Equal(3, actions.Count);
         Assert.Null(state.CurrentBattle);
+    }
+
+    [Fact]
+    public async Task 只有非法阻挡者时自动进入反击_重复阻挡与错误方结束反击均不取消战斗()
+    {
+        TestScene.New();
+        var engine = CreateEngine();
+        var state = engine.State;
+        var attacker = state.Players[0];
+        var defender = state.Players[1];
+        state.CurrentTurnPlayer = 0;
+        state.TurnCount = 3;
+        state.Phase = Phase.Main;
+        attacker.Leader.IsTapped = false;
+        defender.Hand.Clear();
+        defender.Characters.Clear();
+
+        var blockerInfo = CardDatabase.GetBySet("OP15")
+            .First(card => card.Kind == CardKind.Character && card.Abilities.Contains("阻挡者"));
+        var blockedBlocker = new CardInstance { Info = blockerInfo };
+        AtomicOps.AddRestriction(blockedBlocker, RestrictionKind.CannotBeBlocker, KeywordDuration.ThisBattle);
+        defender.Characters.Add(blockedBlocker);
+        var actions = CaptureActions(engine);
+
+        engine.HandleAction(0, "Attack", JsonSerializer.SerializeToElement(new
+        {
+            attackerId = attacker.Leader.Id.ToString(),
+            targetIsLeader = true,
+        }));
+        await engine.WaitSettledAsync();
+
+        Assert.Equal(new[] { "Attack", "AwaitCounter" }, actions);
+        Assert.Equal(Phase.BattleCounter, state.Phase);
+        var battle = Assert.IsType<BattleContext>(state.CurrentBattle);
+
+        // 自动跳过阻挡后到达的重复/乱序 PassBlock 必须被拒绝，不能把战斗清掉。
+        engine.HandleAction(1, "PassBlock", JsonSerializer.SerializeToElement(new { }));
+        Assert.Same(battle, state.CurrentBattle);
+        Assert.Equal(Phase.BattleCounter, state.Phase);
+
+        // 反击阶段永远只允许防守方明确结束；攻击方不能代为跳过。
+        engine.HandleAction(0, "PassCounter", JsonSerializer.SerializeToElement(new { }));
+        Assert.Same(battle, state.CurrentBattle);
+        Assert.Equal(Phase.BattleCounter, state.Phase);
+
+        engine.HandleAction(1, "PassCounter", JsonSerializer.SerializeToElement(new { }));
+        await engine.WaitSettledAsync();
+
+        Assert.Null(state.CurrentBattle);
+        Assert.Equal(Phase.Main, state.Phase);
     }
 
     private static List<string> CaptureActions(GameEngine engine)

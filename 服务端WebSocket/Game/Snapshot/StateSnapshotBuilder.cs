@@ -265,6 +265,7 @@ public static class StateSnapshotBuilder
             turnPlayed = c.TurnPlayed,
             canAttack = CanInitiateAttack(state, idx, c.Id),
             cannotAttack = HasCannotAttackStatus(state, c),
+            canActivateEffect = Validation.ActionValidator.CanUseEffect(state, idx, c.Id).Ok,
             activatedUsedThisTurn = ActivatedUsedThisTurn(p, c),
             oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(state, p, c),
         }).ToArray();
@@ -277,6 +278,7 @@ public static class StateSnapshotBuilder
             p.StageCard?.Info.Number,
             p.StageCard?.Id.ToString(),
             p.StageCard?.IsTapped ?? false,
+            p.StageCard is not null && Validation.ActionValidator.CanUseEffect(state, idx, p.StageCard.Id).Ok,
             p.StageCard is not null && ActivatedUsedThisTurn(p, p.StageCard),
             p.StageCard is not null && OncePerTurnEffectAvailable(state, p, p.StageCard),
             p.Trash.Select(c => c.Info.Number).ToArray(),
@@ -296,6 +298,7 @@ public static class StateSnapshotBuilder
             CanInitiateAttack(state, idx, p.Leader.Id),
             HasCannotAttackStatus(state, p.Leader),
             state.IsTriggerNullified(p.Leader, Effects.EffectTrigger.OnEnterField),
+            Validation.ActionValidator.CanUseEffect(state, idx, p.Leader.Id).Ok,
             ActivatedUsedThisTurn(p, p.Leader),
             OncePerTurnEffectAvailable(state, p, p.Leader),
             p.ActiveDonCount,
@@ -342,6 +345,7 @@ public static class StateSnapshotBuilder
             stageNumber = board.StageNumber,
             stageId = board.StageId,
             stageTapped = board.StageTapped,
+            stageCanActivateEffect = board.StageCanActivateEffect,
             stageActivatedUsedThisTurn = board.StageActivatedUsedThisTurn,
             stageOncePerTurnEffectAvailable = board.StageOncePerTurnEffectAvailable,
             trashNumbers = board.TrashNumbers,
@@ -361,6 +365,7 @@ public static class StateSnapshotBuilder
             leaderCanAttack = board.LeaderCanAttack,
             leaderCannotAttack = board.LeaderCannotAttack,
             leaderEnterEffectNullified = board.LeaderEnterEffectNullified,
+            leaderCanActivateEffect = board.LeaderCanActivateEffect,
             leaderActivatedUsedThisTurn = board.LeaderActivatedUsedThisTurn,
             leaderOncePerTurnEffectAvailable = board.LeaderOncePerTurnEffectAvailable,
             costActive = board.CostActive,
@@ -380,6 +385,7 @@ public static class StateSnapshotBuilder
         string? StageNumber,
         string? StageId,
         bool StageTapped,
+        bool StageCanActivateEffect,
         bool StageActivatedUsedThisTurn,
         bool StageOncePerTurnEffectAvailable,
         string[] TrashNumbers,
@@ -395,6 +401,7 @@ public static class StateSnapshotBuilder
         bool LeaderCanAttack,
         bool LeaderCannotAttack,
         bool LeaderEnterEffectNullified,
+        bool LeaderCanActivateEffect,
         bool LeaderActivatedUsedThisTurn,
         bool LeaderOncePerTurnEffectAvailable,
         int CostActive,
@@ -437,10 +444,7 @@ public static class StateSnapshotBuilder
     /// 不把非当前回合、已休息、新登场等普通攻击条件误判为禁攻状态。
     /// </summary>
     private static bool HasCannotAttackStatus(GameState state, CardInstance card)
-        => card.HasRestriction(RestrictionKind.CannotAttack)
-           || (!card.IsEffectsNullified
-               && (state.HasContinuousRestriction(card, RestrictionKind.CannotAttack)
-                   || Array.IndexOf(card.Info.Abilities, "此角色无法攻击") >= 0));
+        => Validation.ActionValidator.HasCannotAttackStatus(state, card);
 
     private static readonly string[] GrantableKeywords =
         { "阻挡者", "速攻", "速攻：角色", "双重攻击", "不可阻挡", "流放", "可攻击活跃" };

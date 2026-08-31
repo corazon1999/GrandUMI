@@ -52,11 +52,15 @@ public class OP06_117_ArkMaxim : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
 
-        // 效果：将对方所有费用不高于 2 的角色 KO
+        // 效果：将对方所有费用不高于 2 的角色同时 KO。
+        // 必须走可交互的效果 KO 流程，让 OP17-095 等离场置换能够观察整批目标，
+        // 并确保一次支付可按卡文保护同一批次内的全部角色。
         var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
-        foreach (var t in targets)
-        {
-            AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, t);
-        }
+        await AtomicOps.KOCardsByEffectAsync(
+            ctx.State,
+            1 - ctx.OwnerIndex,
+            targets,
+            ctx.Prompts,
+            ctx.OwnerIndex);
     }
 }

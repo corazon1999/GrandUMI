@@ -1194,17 +1194,14 @@ public class GameEngine
                 return;
             }
 
-            // 若防守方无可用【阻挡者】（攻击者带【不可阻挡】也跳过 Block）
-            var def = State.Players[1 - attackerIdx];
-            var atk = State.Players[attackerIdx];
-            var attackerCard = atk.Leader.Id == State.CurrentBattle.AttackerCardId ? atk.Leader
-                : atk.Characters.FirstOrDefault(c => c.Id == State.CurrentBattle.AttackerCardId);
-            bool attackerUnblockable = attackerCard is not null && ActionValidator.HasKeyword(State, attackerCard, "不可阻挡");
-            bool hasBlocker = !attackerUnblockable && def.Characters.Any(c => !c.IsTapped && ActionValidator.HasKeyword(State, c, "阻挡者"));
+            // 阻挡阶段可以在“没有任何合法阻挡者”时自动跳过，但必须复用权威动作校验；
+            // 仅看关键词会把无法休息、被禁止阻挡等角色误判为可阻挡。
+            int defenderIdx = State.CurrentBattle.DefenderPlayerIndex;
+            bool hasBlocker = State.Players[defenderIdx].Characters.Any(card =>
+                ActionValidator.CanDeclareBlocker(State, defenderIdx, card.Id).Ok);
             if (!hasBlocker)
             {
                 BattleEngine.PassBlock(State);
-                Broadcast("AutoPassBlock");
                 await AdvanceBattleAfterBlockAsync();
             }
             else

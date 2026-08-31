@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -18,11 +19,16 @@ namespace GrandUMI.Effects.Scripted;
 ///     Predicate 以注册时回合数 baseTurn 限定有效期(s.TurnCount <= baseTurn + 1)，到期自动失效；
 ///     "无法攻击"用 AddRestriction(CannotAttack, UntilNextOpponentEndPhase)。
 /// </summary>
-public class OP09_093_Teach : IScriptedEffect
+public class OP09_093_Teach : IScriptedEffect, IActivatedMainAvailability
 {
     public string CardNumber => "OP09-093";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.ActivatedMain;
+
+    public string? GetActivatedMainUnavailableReason(GameState state, int ownerIndex, CardInstance source)
+        => ActionValidator.HasCannotAttackStatus(state, source)
+            ? "马歇尔·D·提奇处于无法攻击状态，不能发动该启动效果"
+            : null;
 
     public async Task Resolve(EffectContext ctx)
     {

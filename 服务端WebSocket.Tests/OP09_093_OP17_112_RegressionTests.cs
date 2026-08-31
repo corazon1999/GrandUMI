@@ -1,6 +1,9 @@
+using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.Snapshot;
+using GrandUMI.Game.Validation;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -54,5 +57,51 @@ public class OP09_093_OP17_112_RegressionTests
         state.CurrentTurnPlayer = 1;
         Assert.True(state.IsContinuouslyNullified(bigMom));
         Assert.Equal(4000, state.CurrentPowerOf(1, triggerCharacter));
+    }
+
+    [Fact]
+    public void OP09_093_整卡无效或明确禁攻时_动作校验与权威快照都禁止发动()
+    {
+        var state = TestScene.New().Build();
+        state.CurrentTurnPlayer = 0;
+        state.TurnCount = 3;
+        state.Phase = Phase.Main;
+        var teach = Card("OP09-093", state.TurnCount);
+        state.Players[0].Characters.Add(teach);
+
+        Assert.True(ActionValidator.CanUseEffect(state, 0, teach.Id).Ok);
+        Assert.True(FieldCanActivate(state, teach.Id));
+
+        teach.IsEffectsNullified = true;
+        Assert.False(ActionValidator.CanUseEffect(state, 0, teach.Id).Ok);
+        Assert.False(FieldCanActivate(state, teach.Id));
+
+        teach.IsEffectsNullified = false;
+        state.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = state.Players[1].Leader.Id.ToString(),
+            Scope = new ContinuousScope { Side = 1, IncludeCharacters = true },
+            NullifyEffect = true,
+            Predicate = (_, _, card) => card.Id == teach.Id,
+        });
+        Assert.True(state.IsContinuouslyNullified(teach));
+        Assert.False(ActionValidator.CanUseEffect(state, 0, teach.Id).Ok);
+        Assert.False(FieldCanActivate(state, teach.Id));
+
+        state.ContinuousEffects.Clear();
+        AtomicOps.AddRestriction(teach, RestrictionKind.CannotAttack, KeywordDuration.ThisTurn);
+        Assert.True(ActionValidator.HasCannotAttackStatus(state, teach));
+        Assert.False(ActionValidator.CanUseEffect(state, 0, teach.Id).Ok);
+        Assert.False(FieldCanActivate(state, teach.Id));
+    }
+
+    private static bool FieldCanActivate(GameState state, Guid cardId)
+    {
+        var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        return snapshot.GetProperty("my").GetProperty("fieldCards")
+            .EnumerateArray()
+            .Single(card => card.GetProperty("id").GetString() == cardId.ToString())
+            .GetProperty("canActivateEffect")
+            .GetBoolean();
     }
 }

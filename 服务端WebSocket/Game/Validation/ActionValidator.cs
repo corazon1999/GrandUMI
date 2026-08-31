@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
+using GrandUMI.Effects.Rules;
 
 namespace GrandUMI.Game.Validation;
 
@@ -130,13 +131,7 @@ public static class ActionValidator
         if (attacker.IsTapped) return Fail("攻击者已休息");
         if (attacker.HasRestriction(RestrictionKind.CannotBeRested))
             return Fail("此角色当前无法转为休息状态，不能攻击");
-        if (attacker.HasRestriction(RestrictionKind.CannotAttack)) return Fail("此角色本回合无法攻击");
-        // 条件性静态禁攻（持续效果，按当前场况实时判定；被效果无效化时本回合解除）
-        if (!attacker.IsEffectsNullified && s.HasContinuousRestriction(attacker, RestrictionKind.CannotAttack))
-            return Fail("此角色当前无法攻击");
-        // 永久"此角色无法攻击"被动（被效果无效化时本回合解除，如 OP06-083）
-        if (Array.IndexOf(attacker.Info.Abilities, "此角色无法攻击") >= 0 && !attacker.IsEffectsNullified)
-            return Fail("此角色无法攻击");
+        if (HasCannotAttackStatus(s, attacker)) return Fail("此角色当前无法攻击");
 
         // 新登场角色当回合不能攻击（除非有【速攻】；或"登场回合可攻击角色"且本次目标为角色——OP04-096）
         if (attacker != me.Leader && attacker.TurnPlayed == s.TurnCount
@@ -221,8 +216,17 @@ public static class ActionValidator
         if (Array.IndexOf(source.Info.EffectTags, "ActivatedMain") < 0)
             return Fail("该卡没有【启动主要】效果");
 
+        // 整卡效果无效时，效果根本不能发动；不能先接受请求、广播发动，再在运行时静默跳过。
+        if (source.IsEffectsNullified || s.IsContinuouslyNullified(source))
+            return Fail("该卡效果当前无效，不能发动启动效果");
+
         if (!HasMetCardSpecificActivationTiming(s, playerIdx, source))
             return Fail("该效果要到你的第2回合及以后才能发动");
+
+        var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(source.Info.Number);
+        if (scripted is IActivatedMainAvailability availability
+            && availability.GetActivatedMainUnavailableReason(s, playerIdx, source) is { } reason)
+            return Fail(reason);
 
         // OP17-044 的「将此角色转为休息状态」是发动成本；无法完成该状态变更时不能发动。
         if (source.Info.Number == "OP17-044"
@@ -232,6 +236,16 @@ public static class ActionValidator
             return Fail("约翰船长当前无法转为休息状态，不能支付发动成本");
         return OkResult;
     }
+
+    /// <summary>
+    /// 是否存在明确的“无法攻击”状态。只统计卡牌限制、持续限制和卡牌自带禁攻，
+    /// 不把非当前回合、已休息、新登场等普通攻击条件误判为禁攻状态。
+    /// </summary>
+    public static bool HasCannotAttackStatus(GameState s, CardInstance card)
+        => card.HasRestriction(RestrictionKind.CannotAttack)
+           || (!(card.IsEffectsNullified || s.IsContinuouslyNullified(card))
+               && (s.HasContinuousRestriction(card, RestrictionKind.CannotAttack)
+                   || Array.IndexOf(card.Info.Abilities, "此角色无法攻击") >= 0));
 
     public static Result CanPassBlock(GameState s, int playerIdx)
     {
@@ -285,9 +299,12 @@ public static class ActionValidator
         if (card is null)              return Fail("阻挡者不在你场上");
         if (card.IsTapped)             return Fail("阻挡者必须为活跃状态");
         if (!HasKeyword(s, card, "阻挡者")) return Fail("该角色没有【阻挡者】效果");
-        if (card.HasRestriction(RestrictionKind.CannotBeRested))
+        if (card.HasRestriction(RestrictionKind.CannotBeRested)
+            || s.HasContinuousRestriction(card, RestrictionKind.CannotBeRested))
             return Fail("此角色当前无法转为休息状态，不能发动【阻挡者】");
-        if (card.HasRestriction(RestrictionKind.CannotBeBlocker)) return Fail("该角色本回合不能发动【阻挡者】");
+        if (card.HasRestriction(RestrictionKind.CannotBeBlocker)
+            || s.HasContinuousRestriction(card, RestrictionKind.CannotBeBlocker))
+            return Fail("该角色本回合不能发动【阻挡者】");
 
         // 不可阻挡 keyword 检查
         var atk = s.Players[1 - playerIdx];

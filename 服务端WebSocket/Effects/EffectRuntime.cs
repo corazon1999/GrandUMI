@@ -524,6 +524,16 @@ public interface IScriptedEffect
 }
 
 /// <summary>
+/// 手写【启动主要】效果的额外发动条件。动作入口、合法动作列表与客户端权威快照
+/// 都通过同一接口判定，避免按钮可点但结算阶段静默失败。
+/// 返回 null 表示可以发动，否则返回拒绝原因。
+/// </summary>
+public interface IActivatedMainAvailability
+{
+    string? GetActivatedMainUnavailableReason(GameState state, int ownerIndex, CardInstance source);
+}
+
+/// <summary>
 /// 角色进入场上时需要注册、但规则上不属于【登场时】的静态效果。
 /// 该注册发生在选择性触发无效判定之前，注册后的持续效果仍会随整卡无效而停用。
 /// </summary>
