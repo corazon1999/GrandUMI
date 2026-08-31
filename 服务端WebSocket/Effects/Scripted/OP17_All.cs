@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Game;
 using GrandUMI.Game.PhaseFlow;
+using System.Text.Json;
 
 namespace GrandUMI.Effects.Scripted;
 
@@ -1117,14 +1118,52 @@ internal static class OP17Effects
             "将手牌中最多1张“烬”“昆因”或“杰克”登场");
     }
 
+    internal static bool IsC062TriggerAvailable(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+    {
+        if (trigger != EffectTrigger.OnDonReturnedToDeck
+            || state.CurrentTurnPlayer != ownerIndex
+            || state.Players[ownerIndex].TurnOnceUsed.Contains($"OP17-062-don:{source.Id}"))
+            return false;
+        if (payload is null || !payload.TryGetValue("owner", out var raw))
+            return true; // 兼容旧回放中未携带归属的 watcher
+        return TryReadPlayerIndex(raw, out var eventOwner) && eventOwner == ownerIndex;
+    }
+
+    private static bool TryReadPlayerIndex(object? raw, out int owner)
+    {
+        switch (raw)
+        {
+            case int value:
+                owner = value;
+                return value is 0 or 1;
+            case long value when value is 0 or 1:
+                owner = (int)value;
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.Number } element
+                when element.TryGetInt32(out var value) && value is 0 or 1:
+                owner = value;
+                return true;
+            default:
+                owner = -1;
+                return false;
+        }
+    }
+
     private static async Task C062(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.OnDonReturnedToDeck || c.State.CurrentTurnPlayer != c.OwnerIndex) return;
-        if (c.Vars.TryGetValue("owner", out var raw) && raw is int owner && owner != c.OwnerIndex) return;
+        if (!IsC062TriggerAvailable(c.State, c.OwnerIndex, c.Source, c.Trigger, c.Vars)) return;
         string key = $"OP17-062-don:{c.Source.Id}";
-        if (Me(c).TurnOnceUsed.Contains(key)) return;
-        AtomicOps.RefreshDonFromDeck(Me(c), 1, DonState.Active);
-        ActivateRestDon(Me(c), 1);
+        if (Me(c).DonDeck.Count > 0
+            && await c.Prompts.ConfirmOptional(c.OwnerIndex, "盖德：从咚!!卡组追加最多1张活跃咚!!？"))
+            AtomicOps.RefreshDonFromDeck(Me(c), 1, DonState.Active);
+        if (Me(c).CostArea.Any(don => don.State == DonState.Rest)
+            && await c.Prompts.ConfirmOptional(c.OwnerIndex, "盖德：将我方最多1张休息状态的咚!!转为活跃状态？"))
+            ActivateRestDon(Me(c), 1);
         Me(c).TurnOnceUsed.Add(key);
         await Task.CompletedTask;
     }
@@ -1839,7 +1878,17 @@ public sealed class OP17_058_Effect : OP17CardEffect { protected override string
 public sealed class OP17_059_Effect : OP17CardEffect { protected override string Number => "OP17-059"; }
 public sealed class OP17_060_Effect : OP17CardEffect { protected override string Number => "OP17-060"; }
 public sealed class OP17_061_Effect : OP17CardEffect { protected override string Number => "OP17-061"; }
-public sealed class OP17_062_Effect : OP17CardEffect { protected override string Number => "OP17-062"; }
+public sealed class OP17_062_Effect : OP17CardEffect, ITriggeredEffectAvailability
+{
+    protected override string Number => "OP17-062";
+    public bool IsTriggerAvailable(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+        => OP17Effects.IsC062TriggerAvailable(state, ownerIndex, source, trigger, payload);
+}
 public sealed class OP17_063_Effect : OP17CardEffect { protected override string Number => "OP17-063"; }
 public sealed class OP17_064_Effect : OP17CardEffect { protected override string Number => "OP17-064"; }
 public sealed class OP17_065_Effect : OP17CardEffect { protected override string Number => "OP17-065"; }

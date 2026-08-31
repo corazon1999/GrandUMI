@@ -208,6 +208,12 @@ public static class EffectRuntime
             if (source.IsEffectsNullified || s.IsContinuouslyNullified(source)
                 || (HasEffectForTrigger(source, trigger) && s.IsTriggerNullified(source, trigger))) return;
 
+            // 一些监听效果的卡面时机虽然匹配，但当前事件归属、回合或成本条件并不成立。
+            // 在效果排序和发动表现之前做同一份权威门禁，避免先向玩家显示“效果发动”，
+            // 随后脚本再静默 return；直接 Resolve 的测试/回放入口也必须遵守相同约束。
+            if (scripted is ITriggeredEffectAvailability triggerAvailability
+                && !triggerAvailability.IsTriggerAvailable(s, ownerIdx, source, trigger, payload)) return;
+
             // 出牌流程会统一调用 OnEnterField，即使卡牌没有该时点效果；只为确实声明了
             // 当前触发时机的卡记录表现，避免无效果卡登场时误播“效果发动”。
             // 提示型快照会立即带走事件，无交互效果则随本批次最终快照发送。
@@ -478,7 +484,8 @@ public static class EffectRuntime
             var attacker = atkP.Leader.Id == b.AttackerCardId
                 ? atkP.Leader
                 : atkP.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
-            if (attacker != null && HasEffectForTrigger(attacker, trigger))
+            if (attacker != null && HasEffectForTrigger(attacker, trigger)
+                && IsTriggeredEffectAvailable(s, ai2, attacker, trigger, payload))
                 list.Add(new(ai2, attacker));
             return list;
         }
@@ -488,17 +495,32 @@ public static class EffectRuntime
             if (skipIdx.HasValue && i == skipIdx.Value) continue;
             var p = s.Players[i];
             // 领袖
-            if (HasEffectForTrigger(p.Leader, trigger))
+            if (HasEffectForTrigger(p.Leader, trigger)
+                && IsTriggeredEffectAvailable(s, i, p.Leader, trigger, payload))
                 list.Add(new(i, p.Leader));
             // 角色
             foreach (var c in p.Characters)
-                if (HasEffectForTrigger(c, trigger))
+                if (HasEffectForTrigger(c, trigger)
+                    && IsTriggeredEffectAvailable(s, i, c, trigger, payload))
                     list.Add(new(i, c));
             // 舞台
-            if (p.StageCard is not null && HasEffectForTrigger(p.StageCard, trigger))
+            if (p.StageCard is not null && HasEffectForTrigger(p.StageCard, trigger)
+                && IsTriggeredEffectAvailable(s, i, p.StageCard, trigger, payload))
                 list.Add(new(i, p.StageCard));
         }
         return list;
+    }
+
+    private static bool IsTriggeredEffectAvailable(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        Dictionary<string, object?>? payload)
+    {
+        var scripted = CardRulesetManager.For(state).TryGetScriptedEffect(source.Info.Number);
+        return scripted is not ITriggeredEffectAvailability availability
+            || availability.IsTriggerAvailable(state, ownerIndex, source, trigger, payload);
     }
 
     /// <summary>
@@ -531,6 +553,20 @@ public interface IScriptedEffect
 public interface IActivatedMainAvailability
 {
     string? GetActivatedMainUnavailableReason(GameState state, int ownerIndex, CardInstance source);
+}
+
+/// <summary>
+/// 监听型效果的当前事件可用性。卡面 EffectTags 只表示“拥有该时机”，本接口进一步判断
+/// 此次事件的归属、回合、成本与目标是否满足；不满足时不得进入效果排序或发动表现。
+/// </summary>
+public interface ITriggeredEffectAvailability
+{
+    bool IsTriggerAvailable(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload);
 }
 
 /// <summary>
