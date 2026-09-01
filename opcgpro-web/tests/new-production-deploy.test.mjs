@@ -22,6 +22,7 @@ const candidateDeploy = await readFile(new URL("../../ops/server/deploy-grandumi
 const productionBootstrap = await readFile(new URL("../../ops/server/bootstrap-grandumi-production.sh", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../../deploy-new-hk-production.ps1", import.meta.url), "utf8");
 const emergencyDeploy = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
+const emergencyProduction = await readFile(new URL("../../ops/server/deploy-grandumi-production-emergency.sh", import.meta.url), "utf8");
 const directTls = await readFile(new URL("../../ops/server/enable-grandumi-production-direct-tls.sh", import.meta.url), "utf8");
 const directTlsRenewHook = await readFile(new URL("../../ops/server/renew-grandumi-direct-certificate.sh", import.meta.url), "utf8");
 const directTlsCompatChain = await readFile(new URL("../../ops/server/isrg-root-x2-cross-signed.pem", import.meta.url), "utf8");
@@ -366,7 +367,8 @@ test("新正式服预构建固定使用正式 HTTPS/WSS 域名", () => {
   assert.match(stage, /wss:\/\/ygo\.grand-umi\.com\/ws/);
   assert.doesNotMatch(stage, /wss:\/\/candidate\.grand-umi\.com\/ws/);
   assert.match(stage, /尚未切换服务/);
-  assert.match(emergencyDeploy, /NEXT_PUBLIC_WS_URL='wss:\/\/ygo\.grand-umi\.com\/ws'/);
+  assert.match(emergencyDeploy, /deploy-grandumi-production-emergency\.sh/);
+  assert.match(emergencyProduction, /stage-grandumi-production\.sh/);
   assert.match(promoteApproved, /NEXT_PUBLIC_WS_URL='wss:\/\/ygo\.grand-umi\.com\/ws'/);
   assert.doesNotMatch(
     `${stage}\n${emergencyDeploy}\n${promoteApproved}`,

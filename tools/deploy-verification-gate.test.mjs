@@ -32,6 +32,111 @@ test("Windows 发布入口在推送前完成验证，并把同提交证明交给
   assert.match(source, /'\$remoteProof' '\$proofChecksum'/);
 });
 
+test("正式服紧急入口只发布精确 main，并执行目标提交内的版本化 A/B 脚本", async () => {
+  const source = await readFile(path.join(root, "deploy-hk.ps1"), "utf8");
+  const pushAt = source.indexOf("& $git push origin main");
+  const remoteFetchAt = source.indexOf("git -C /opt/grandumi fetch --force --prune");
+  const deployAt = source.indexOf("deploy-grandumi-production-emergency.sh");
+
+  assert.match(source, /\[switch\]\$Emergency/);
+  assert.match(source, /if \(-not \$Emergency\)/);
+  assert.match(source, /root@103\.146\.230\.37/);
+  assert.match(source, /\$Server -ne "root@103\.146\.230\.37"/);
+  assert.match(source, /git merge --ff-only refs\/remotes\/origin\/main/);
+  assert.match(source, /\$originHead -ne \$localHead/);
+  assert.match(source, /ls-tree -r --name-only \$localHead -- changelog-cache\/pending/);
+  assert.ok(pushAt >= 0 && remoteFetchAt > pushAt && deployAt > remoteFetchAt,
+    "必须先精确推送，再只更新远端 Git ref，最后执行版本化发布脚本。");
+  assert.match(source, /git -C \/opt\/grandumi show '\$\{localHead\}:\$serverScriptPath'/);
+  assert.match(source, /bash "`\$script" --emergency '\$localHead'/);
+  assert.doesNotMatch(source, /git add -A/);
+  assert.doesNotMatch(source, /git pull --no-rebase/);
+  assert.doesNotMatch(source, /\/opt\/grandumi\/deploy\.sh/);
+  assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
+});
+
+test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、账号权威与失败恢复门禁", async () => {
+  const source = await readFile(
+    path.join(root, "ops", "server", "deploy-grandumi-production-emergency.sh"),
+    "utf8",
+  );
+  const activate = await readFile(
+    path.join(root, "ops", "server", "activate-grandumi-production.sh"),
+    "utf8",
+  );
+
+  assert.match(source, /--emergency\|--preflight/);
+  assert.match(source, /"\$mode" == --preflight/);
+  assert.match(source, /flock -n 8/);
+  assert.match(source, /flock -n 9/);
+  assert.match(source, /git ls-remote "\$git_url" refs\/heads\/main/);
+  assert.match(source, /"\$published_main" == "\$target"/);
+  assert.match(source, /"\$remote_main" == "\$target"/);
+  assert.match(source, /test-deployed/);
+  assert.match(source, /test-verified\.json/);
+  assert.match(source, /grandumi\.verification-proof\.v1/);
+  assert.match(source, /proof\.get\("commit"\) != target/);
+  assert.match(source, /proof\.get\("tree"\) != target_tree/);
+  assert.match(source, /item\.get\("status"\) != "passed"/);
+  assert.match(source, /ls-tree -r --name-only "\$target" -- changelog-cache\/pending/);
+  assert.match(source, /merge-base --is-ancestor "\$deployed" "\$target"/);
+  assert.match(source, /"\$current_commit" == "\$deployed"/);
+  assert.match(source, /shared_dir\/accounts\.db/);
+  assert.match(source, /shared_dir\/prepared/);
+  assert.match(source, /shared_dir\/active/);
+  assert.match(source, /grandumi-shared-account-migration verify-test/);
+  assert.match(source, /grandumi-shared-account-migration[\s\\]+\n\s+verify-target/);
+  assert.match(source, /systemctl is-active --quiet grandumi-test-backend\.service/);
+  assert.match(source, /GRANDUMI_ACCOUNT_DB=\/data\/grandumi-shared\/accounts\.db/);
+  assert.match(source, /find \/var\/lib\/grandumi-admin-deploy\/requests/);
+  assert.match(source, /journalQueueDepth/);
+  assert.match(source, /snapshotQueueDepth/);
+  assert.match(source, /worktree add --detach/);
+  assert.match(source, /worktree remove --force/);
+  assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
+  assert.doesNotMatch(source, /get\("rooms"\)|get\("maintenance"\)/);
+
+  const firstGateAt = source.indexOf("\nverify_release_candidate\n");
+  const bootstrapAt = source.indexOf("bootstrap-grandumi-production.sh", firstGateAt);
+  const stageAt = source.indexOf("stage-grandumi-production.sh", bootstrapAt);
+  const secondGateAt = source.indexOf("\nverify_release_candidate\n", firstGateAt + 1);
+  const activateAt = source.indexOf("activate-grandumi-production.sh", secondGateAt);
+  const postStateAt = source.indexOf("\nverify_production_state\n", activateAt);
+  assert.ok(firstGateAt >= 0, "构建前必须执行完整候选门禁。");
+  assert.ok(bootstrapAt > firstGateAt && stageAt > bootstrapAt, "必须先从目标 worktree 引导，再预构建发布包。");
+  assert.ok(secondGateAt > stageAt, "耗时构建后、切流前必须重新读取所有易变门禁。 ");
+  assert.ok(activateAt > secondGateAt && postStateAt > activateAt, "激活后必须再次核验权威版本和槽位。 ");
+
+  assert.match(activate, /grandumi-production-snapshot "\$target"/);
+  assert.match(activate, /\.complete/);
+  assert.match(activate, /grandumi-production-switch --release "\$target"/);
+  assert.match(activate, /切换脚本自动回滚/);
+});
+
+test("正式发布链修复已完整进入 2026.09.02.2 更新日志并保留归档记录", async () => {
+  const changelog = await readFile(path.join(root, "opcgpro-web", "src", "data", "changelog.ts"), "utf8");
+  const archived = await readFile(
+    path.join(
+      root,
+      "changelog-cache",
+      "published",
+      "2026.09.02.2",
+      "2026-09-02-production-emergency-ab-release.md",
+    ),
+    "utf8",
+  );
+  const currentAt = changelog.indexOf('version: "2026.09.02.2"');
+  const previousAt = changelog.indexOf('version: "2026.09.02.1"');
+
+  assert.ok(currentAt >= 0 && previousAt > currentAt, "新发布日志必须排在海克斯版本之前。 ");
+  assert.match(changelog, /id: "2026-09-02-production-emergency-ab-release"/);
+  assert.match(changelog, /修复正式服紧急更新入口失效的问题/);
+  assert.match(changelog, /可以不等待在线房间清空/);
+  assert.match(archived, /状态：已完成/);
+  assert.match(archived, /deploy-grandumi-production-emergency\.sh/);
+  assert.match(archived, /--preflight/);
+});
+
 test("服务器在任何构建或服务切换前校验提交、tree、策略与文件摘要", async () => {
   const source = await readFile(path.join(root, "ops", "server", "deploy-test.sh"), "utf8");
   const proofAt = source.indexOf('verification-proof.mjs" verify');

@@ -6,6 +6,8 @@ const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url),
 const deployTest = await readFile(new URL("../../ops/server/deploy-test.sh", import.meta.url), "utf8");
 const promote = await readFile(new URL("../../ops/server/promote-approved.sh", import.meta.url), "utf8");
 const deployHk = await readFile(new URL("../../deploy-hk.ps1", import.meta.url), "utf8");
+const emergencyProduction = await readFile(new URL("../../ops/server/deploy-grandumi-production-emergency.sh", import.meta.url), "utf8");
+const stageProduction = await readFile(new URL("../../ops/server/stage-grandumi-production.sh", import.meta.url), "utf8");
 const caddy = await readFile(new URL("../../ops/server/assets.grand-umi.com.caddy", import.meta.url), "utf8");
 const networkTuning = await readFile(new URL("../../ops/server/apply-grandumi-network.sh", import.meta.url), "utf8");
 const networkService = await readFile(new URL("../../ops/server/grandumi-network-tuning.service", import.meta.url), "utf8");
@@ -16,7 +18,9 @@ test("production build keeps critical Next assets same-origin and routes card as
   assert.doesNotMatch(nextConfig, /assetPrefix\s*:/);
   assert.match(nextConfig, /Next\.js JS\/CSS 始终使用当前站点同源地址/);
   assert.match(promote, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
-  assert.match(deployHk, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
+  assert.match(deployHk, /deploy-grandumi-production-emergency\.sh/);
+  assert.match(emergencyProduction, /stage-grandumi-production\.sh/);
+  assert.match(stageProduction, /NEXT_PUBLIC_ASSET_ORIGIN='https:\/\/assets\.grand-umi\.com'/);
 });
 
 test("home response is dynamic so releases cannot reuse stale HTML", async () => {

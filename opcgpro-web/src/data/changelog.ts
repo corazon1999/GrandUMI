@@ -20,6 +20,26 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-02-production-emergency-ab-release",
+    version: "2026.09.02.2",
+    date: "2026-09-02",
+    title: "正式服发布稳定性更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复正式服紧急更新入口失效的问题；紧急更新会使用可回滚的 A/B 槽位流程，并在发布前后完整核验版本与服务状态。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "明确授权紧急更新时可以不等待在线房间清空，但仍会保留测试验证、数据快照、共享账号和版本一致性保护。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-02-hex-mode-balance-and-rules",
     version: "2026.09.02.1",
     date: "2026-09-02",
