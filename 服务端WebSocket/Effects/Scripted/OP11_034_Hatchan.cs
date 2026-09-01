@@ -43,7 +43,7 @@ public class OP11_034_Hatchan : IScriptedEffect
         if (!use) return;
 
         // 支付成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 收益：选择对方最多 1 张费用≤3 的角色，使其无法转为休息状态
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

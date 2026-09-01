@@ -35,8 +35,7 @@ public class OP16_043_Usopp : IScriptedEffect
         var cost = new List<CardInstance>();
         if (!me.Leader.IsTapped && me.Leader.Info.HasKeyword("德莱斯罗兹"))
             cost.Add(me.Leader);
-        if (me.StageCard is not null && !me.StageCard.IsTapped && me.StageCard.Info.HasKeyword("德莱斯罗兹"))
-            cost.Add(me.StageCard);
+        cost.AddRange(me.StageCards.Where(stage => !stage.IsTapped && stage.Info.HasKeyword("德莱斯罗兹")));
         if (cost.Count == 0) return; // 付不起成本
 
         // "可以"=可选：先选成本（min 0 → 放弃则不发动）
@@ -44,7 +43,7 @@ public class OP16_043_Usopp : IScriptedEffect
             "可以将我方1张《德莱斯罗兹》领袖或舞台转为休息状态作为成本（放回对方1张费用不高于5的角色）",
             cost.Select(c => c.Id.ToString()).ToList(), 0, 1);
         if (cp.Count < 1) return;
-        AtomicOps.RestCard(cost.First(c => c.Id.ToString() == cp[0])); // 支付成本：横置
+        if (!AtomicOps.RestCard(cost.First(c => c.Id.ToString() == cp[0]))) return; // 支付成本：横置
 
         // 收益：对方最多 1 张费用≤5 角色放回其持有者手牌
         var tp = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterCostLe5",

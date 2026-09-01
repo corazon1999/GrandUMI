@@ -49,6 +49,6 @@ public class OP12_113_Zoro : IScriptedEffect
         if (target is null) return;
 
         await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, target);
-        target.IsTapped = true; // 以休息状态登场
+        AtomicOps.RestCard(target); // 以休息状态登场；霸王色霸气等无法休息规则仍须生效
     }
 }

@@ -223,7 +223,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         RegisterSelfKeyword(ctx, "速攻", (_, _, card) => card.Id == id && AssignedDon(me) >= 3);
         int strawHat = (me.Leader.Info.HasKeyword("草帽一伙") ? 1 : 0)
             + me.Characters.Count(c => c.Info.HasKeyword("草帽一伙"))
-            + (me.StageCard?.Info.HasKeyword("草帽一伙") == true ? 1 : 0);
+            + me.StageCards.Count(stage => stage.Info.HasKeyword("草帽一伙"));
         if (strawHat == 0) return;
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var target = await Choose(ctx, ctx.OwnerIndex, "OpponentCharacter",
@@ -245,7 +245,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         if (me.Leader.MatchesName("蒙奇·D·路飞")) targets.Add(me.Leader);
         targets.AddRange(me.Characters.Where(c => c.MatchesName("蒙奇·D·路飞")));
         if (targets.Count == 0) return;
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         var target = await Choose(ctx, ctx.OwnerIndex, "OwnLeaderOrCharacter", "赋予1张路飞最多1张休息咚!!", targets);
         if (target is not null) AtomicOps.AttachDonFromCost(me, target.Id, 1, DonState.Rest);
     }
@@ -265,7 +265,10 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrDon",
             "可以将斩属性领袖或1张咚!!转为休息状态：抽2张，丢弃1张手牌", ids, 0, 1, extra);
         if (selected.Count == 0) return;
-        if (selected[0] == me.Leader.Id.ToString()) me.Leader.IsTapped = true;
+        if (selected[0] == me.Leader.Id.ToString())
+        {
+            if (!AtomicOps.RestCard(me.Leader)) return;
+        }
         else
         {
             var don = me.CostArea.FirstOrDefault(d => d.Id.ToString() == selected[0] && d.State == DonState.Active);

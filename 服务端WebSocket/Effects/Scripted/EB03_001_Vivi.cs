@@ -63,7 +63,7 @@ public class EB03_001_Vivi : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.ActivatedMain)
         {
             // 成本：横置此领袖
-            AtomicOps.RestCard(self);
+            if (!AtomicOps.RestCard(self)) return;
 
             // 对方最多1张角色力量-2000
             if (opp.Characters.Count > 0)

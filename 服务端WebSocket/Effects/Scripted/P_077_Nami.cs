@@ -32,11 +32,24 @@ public class P_077_Nami : IScriptedEffect
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
 
         // 将我方最多 1 张紫色舞台转为活跃状态
-        if (me.StageCard is not null && me.StageCard.Info.ColorList.Contains("紫") && me.StageCard.IsTapped)
+        var stages = me.StageCards
+            .Where(stage => stage.Info.ColorList.Contains("紫") && stage.IsTapped)
+            .ToList();
+        if (stages.Count > 0)
         {
-            bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-                "将我方紫色舞台转为活跃状态？");
-            if (use) AtomicOps.ActivateCard(me.StageCard);
+            var chosen = await ctx.Prompts.ChooseCards(
+                ctx.OwnerIndex,
+                "OwnStage",
+                "选择我方最多1张紫色舞台转为活跃状态",
+                stages.Select(stage => stage.Id.ToString()).ToList(),
+                0,
+                1,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = stages.Select(stage => new { id = stage.Id.ToString(), number = stage.Info.Number }).ToList(),
+                });
+            if (chosen.Count > 0)
+                AtomicOps.ActivateCard(stages.First(stage => stage.Id.ToString() == chosen[0]));
         }
     }
 }

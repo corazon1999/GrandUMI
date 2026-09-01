@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { EffectActivationSnapshot, MsgGameState, PlayerRankIdentitySnapshot, PlayerSnapshot, RevealSnapshot } from "@/types/net";
+import type { EffectActivationSnapshot, HexModeSnapshot, MsgGameState, PlayerRankIdentitySnapshot, PlayerSnapshot, RevealSnapshot, StageSnapshot } from "@/types/net";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -50,6 +50,7 @@ export interface PlayerView {
   stageNumber: string | null;
   stageId: string | null;
   stageTapped: boolean;
+  stages: StageSnapshot[];
   trashNumbers: string[];
   deckCount: number;
   lifeCount: number;
@@ -82,6 +83,16 @@ export interface PlayerView {
 
 function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView | null {
   if (!player) return null;
+  const legacyStages = player.stageId && player.stageNumber
+    ? [{
+        id: player.stageId,
+        number: player.stageNumber,
+        tapped: player.stageTapped ?? false,
+        canActivateEffect: player.stageCanActivateEffect ?? false,
+        activatedUsedThisTurn: player.stageActivatedUsedThisTurn ?? false,
+        oncePerTurnEffectAvailable: player.stageOncePerTurnEffectAvailable ?? false,
+      }]
+    : [];
   return {
     ...player,
     spriteMap: { ...(player.spriteMap ?? {}) },
@@ -98,6 +109,7 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
       canActivateEffect: card.canActivateEffect ?? false,
       oncePerTurnEffectAvailable: card.oncePerTurnEffectAvailable ?? false,
     })),
+    stages: (player.stages?.length ? player.stages : legacyStages).map((stage) => ({ ...stage })),
     leaderGainedKeywords: [...(player.leaderGainedKeywords ?? [])],
     leaderCanActivateEffect: player.leaderCanActivateEffect ?? false,
     stageCanActivateEffect: player.stageCanActivateEffect ?? false,
@@ -106,6 +118,21 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
     trashNumbers: [...(player.trashNumbers ?? [])],
     lifeNumbers: [...(player.lifeNumbers ?? [])],
     lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),
+  };
+}
+
+function cloneHexModeSnapshot(hexState: HexModeSnapshot | null): HexModeSnapshot | null {
+  if (!hexState) return null;
+  return {
+    ...hexState,
+    myOwned: hexState.myOwned.map((hex) => ({ ...hex })),
+    opponentOwned: hexState.opponentOwned.map((hex) => ({ ...hex })),
+    activeDraft: hexState.activeDraft
+      ? {
+          ...hexState.activeDraft,
+          candidates: hexState.activeDraft.candidates?.map((hex) => ({ ...hex })) ?? null,
+        }
+      : null,
   };
 }
 
@@ -170,6 +197,7 @@ interface GameStore {
   operationClockSyncUtc: string | null;
   operationClockPaused: boolean;
   matchKind: MsgGameState["matchKind"];
+  hexState: HexModeSnapshot | null;
   phase: BattlePhase;
   viewerKind: "player" | "spectator";
   spectatorHandVisible: boolean;
@@ -293,6 +321,7 @@ export const useGameStore = create<GameStore>()(
     operationClockSyncUtc: null,
     operationClockPaused: false,
     matchKind: "UnknownHuman",
+    hexState: null,
     phase: "Main",
     viewerKind: "player",
     spectatorHandVisible: false,
@@ -375,6 +404,7 @@ export const useGameStore = create<GameStore>()(
         s.operationClockSyncUtc = msg.operationClockSyncUtc ?? null;
         s.operationClockPaused = msg.operationClockPaused ?? false;
         s.matchKind = msg.matchKind ?? "UnknownHuman";
+        s.hexState = cloneHexModeSnapshot(msg.hexState ?? null);
         s.isGameOver = msg.isGameOver ?? false;
         s.isDraw = msg.isDraw ?? false;
         s.winnerIsMe = msg.winnerIsMe ?? false;
@@ -570,6 +600,7 @@ export const useGameStore = create<GameStore>()(
       s.operationClockSyncUtc = null;
       s.operationClockPaused = false;
       s.matchKind = "UnknownHuman";
+      s.hexState = null;
       s.phase = "Main";
       s.my = null;
       s.opponent = null;

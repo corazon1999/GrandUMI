@@ -79,11 +79,8 @@ public class OP16_021_MobyDick : IScriptedEffect
         bool hasDon = me.CostArea.Any(d => d.State == DonState.Rest);
 
         // 成本：将本舞台移入废弃区
-        if (me.StageCard is not null && me.StageCard.Id == self.Id)
-        {
-            me.Trash.Add(me.StageCard);
-            me.StageCard = null;
-        }
+        if (!me.RemoveStageCard(self)) return;
+        me.Trash.Add(self);
 
         if (!hasDon) return; // 无咚可给，仅完成移入废弃区
 

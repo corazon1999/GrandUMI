@@ -38,7 +38,7 @@ public class EB02_009_ThousandSunny : IScriptedEffect
         if (!use) return;
 
         // 成本：将此舞台转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 选择 1 张草帽角色作为转移目标
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",

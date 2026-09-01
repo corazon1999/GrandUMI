@@ -615,7 +615,7 @@ public sealed class OP15_057_DressrosaKingdom : IScriptedEffect
         var discarded = await ConfirmedMissingHelpers.ChooseUpToOne(ctx, "OwnHandDiscard",
             "选择必须丢弃的 1 张事件或舞台卡牌", discardCosts);
         if (discarded is null) return;
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         AtomicOps.DiscardHand(me, discarded);
         var targets = new List<CardInstance> { me.Leader };
         targets.AddRange(me.Characters);

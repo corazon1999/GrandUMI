@@ -43,7 +43,7 @@ public class OP13_078_OroJackson : IScriptedEffect
                    ?? me.Deck.FirstOrDefault(c => c.Id.ToString() == cardId)
                    ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId)
                    ?? me.Characters.FirstOrDefault(c => c.Id.ToString() == cardId)
-                   ?? (me.StageCard is { } st && st.Id.ToString() == cardId ? st : null);
+                   ?? me.StageCards.FirstOrDefault(stage => stage.Id.ToString() == cardId);
         if (left is null || !left.Info.HasKeyword("罗杰海盗团")) return Task.CompletedTask;
 
         // 每回合1次

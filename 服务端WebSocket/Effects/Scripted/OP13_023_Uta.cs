@@ -68,7 +68,7 @@ public class OP13_023_Uta : IScriptedEffect
 
             await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
             // 以休息状态登场
-            if (me.Characters.Contains(picked)) picked.IsTapped = true;
+            if (me.Characters.Contains(picked)) AtomicOps.RestCard(picked);
         }
     }
 }

@@ -41,7 +41,7 @@ public class OP06_038_IshSenDaiSenSekai : IScriptedEffect
         int restedCount = 0;
         if (me.Leader is not null && me.Leader.IsTapped) restedCount++;
         restedCount += me.Characters.Count(c => c.IsTapped);
-        if (me.StageCard is not null && me.StageCard.IsTapped) restedCount++;
+        restedCount += me.StageCards.Count(stage => stage.IsTapped);
         restedCount += me.CostArea.Count(d => d.State == DonState.Rest);
 
         if (restedCount >= 8)

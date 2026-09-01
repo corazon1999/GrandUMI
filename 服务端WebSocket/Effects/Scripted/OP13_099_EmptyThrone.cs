@@ -67,7 +67,7 @@ public class OP13_099_EmptyThrone : IScriptedEffect
         if (!use) return;
 
         // 卡面冒号前为可选成本：确认发动后先支付，再结算冒号后的“最多1张”。
-        ctx.Source.IsTapped = true;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         for (int i = 0; i < 3; i++) activeDons[i].State = DonState.Rest;
 
         // 效果候选：手牌中《五老星》黑色（含〈暗〉）角色，费用 ≤ 我方场上咚!!总张数

@@ -28,7 +28,7 @@ public class OP04_088_Hajrudin : IScriptedEffect
             "海尔丁【启动主要】：将我方领袖转为休息状态，本回合对方最多 1 张角色费用-4？");
         if (!use) return;
 
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
 
         var cands = opp.Characters.ToList();
         if (cands.Count == 0) return;

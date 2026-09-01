@@ -29,7 +29,7 @@ public class OP08_033_Raizo : IScriptedEffect
         int restedCards = 0;
         if (opp.Leader != null && opp.Leader.IsTapped) restedCards++;
         restedCards += opp.Characters.Count(c => c.IsTapped);
-        if (opp.StageCard != null && opp.StageCard.IsTapped) restedCards++;
+        restedCards += opp.StageCards.Count(stage => stage.IsTapped);
         restedCards += opp.CostArea.Count(d => d.State == DonState.Rest);
         if (restedCards < 7) return;
 

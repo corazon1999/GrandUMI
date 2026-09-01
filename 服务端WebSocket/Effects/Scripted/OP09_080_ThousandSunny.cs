@@ -49,7 +49,7 @@ public class OP09_080_ThousandSunny : IScriptedEffect
         if (!use) return;
 
         // 支付成本：横置舞台
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 效果：从咚!!卡组追加最多 1 张休息状态的咚!!
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
@@ -63,7 +63,8 @@ public class OP09_080_ThousandSunny : IScriptedEffect
         foreach (var c in p.LifeArea) if (c.Id.ToString() == id) return c;
         // 离场卡可能被同一效果链后续操作再次登场回场上，须搜场上角色区/舞台
         foreach (var c in p.Characters) if (c.Id.ToString() == id) return c;
-        if (p.StageCard is not null && p.StageCard.Id.ToString() == id) return p.StageCard;
+        var stage = p.StageCards.FirstOrDefault(card => card.Id.ToString() == id);
+        if (stage is not null) return stage;
         return null;
     }
 }

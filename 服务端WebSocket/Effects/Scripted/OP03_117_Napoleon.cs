@@ -43,7 +43,7 @@ public class OP03_117_Napoleon : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 成本：转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var tgt = targets.First(c => c.Id.ToString() == chosen[0]);
         var tgtId = tgt.Id;

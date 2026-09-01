@@ -81,7 +81,8 @@ public class OP08_056_MobyDick : IScriptedEffect
         foreach (var c in p.LifeArea) if (c.Id.ToString() == id) return c;
         // 离场卡可能被同一效果链后续操作再次登场回场上，须搜场上角色区/舞台
         foreach (var c in p.Characters) if (c.Id.ToString() == id) return c;
-        if (p.StageCard is not null && p.StageCard.Id.ToString() == id) return p.StageCard;
+        var stage = p.StageCards.FirstOrDefault(card => card.Id.ToString() == id);
+        if (stage is not null) return stage;
         return null;
     }
 }

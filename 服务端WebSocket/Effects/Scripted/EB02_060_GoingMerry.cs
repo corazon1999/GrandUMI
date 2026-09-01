@@ -37,7 +37,7 @@ public class EB02_060_GoingMerry : IScriptedEffect
         if (!use) return;
 
         // 成本：横置此舞台 + 将生命顶 1 张翻至正面朝上（向发动者展示）
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, new List<string> { me.LifeArea[0].Info.Number });
 
         // 选 1 张《草帽一伙》角色

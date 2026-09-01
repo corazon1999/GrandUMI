@@ -19,18 +19,23 @@ public sealed class CasualFormatMatchmakingTests
         ?? throw new InvalidOperationException("未找到公开匹配棋钟判定方法");
 
     [Fact]
-    public void 标准休闲与狂野休闲_使用独立队列且不与排位混排()
+    public void 各公开模式_使用独立队列且海克斯不与普通匹配混排()
     {
         var standardCasual = QueueFor("casualStandard");
         var wildCasual = QueueFor("casual");
         var standardRanked = QueueFor("ranked");
         var wildRanked = QueueFor("rankedWild");
+        var hex = QueueFor("hex");
 
         Assert.NotSame(standardCasual, wildCasual);
         Assert.NotSame(standardCasual, standardRanked);
         Assert.NotSame(standardCasual, wildRanked);
         Assert.NotSame(wildCasual, standardRanked);
         Assert.NotSame(wildCasual, wildRanked);
+        Assert.NotSame(hex, standardCasual);
+        Assert.NotSame(hex, wildCasual);
+        Assert.NotSame(hex, standardRanked);
+        Assert.NotSame(hex, wildRanked);
     }
 
     [Theory]
@@ -38,6 +43,7 @@ public sealed class CasualFormatMatchmakingTests
     [InlineData("casual", DeckValidator.FormatPublicUnrestricted, MatchKind.CasualWild)]
     [InlineData("ranked", DeckValidator.FormatStandardRanked, MatchKind.Ranked)]
     [InlineData("rankedWild", DeckValidator.FormatPublicUnrestricted, MatchKind.RankedWild)]
+    [InlineData("hex", DeckValidator.FormatPublicUnrestricted, MatchKind.Hex)]
     public void 队列协议_同时决定牌组规则与房间来源(
         string queueKind,
         string expectedDeckFormat,
@@ -65,6 +71,7 @@ public sealed class CasualFormatMatchmakingTests
     [InlineData("casual")]
     [InlineData("ranked")]
     [InlineData("rankedWild")]
+    [InlineData("hex")]
     [InlineData("unknown-client-value")]
     public void 所有公开匹配队列_包括旧客户端回退_都拒绝官网禁卡(string queueKind)
     {
@@ -87,6 +94,7 @@ public sealed class CasualFormatMatchmakingTests
     [InlineData(MatchKind.Matchmaking, DeckValidator.FormatPublicUnrestricted)]
     [InlineData(MatchKind.Ranked, DeckValidator.FormatStandardRanked)]
     [InlineData(MatchKind.RankedWild, DeckValidator.FormatPublicUnrestricted)]
+    [InlineData(MatchKind.Hex, DeckValidator.FormatPublicUnrestricted)]
     [InlineData(MatchKind.Bot, DeckValidator.FormatPublicUnrestricted)]
     [InlineData(MatchKind.Friendly, DeckValidator.FormatUnrestricted)]
     [InlineData(MatchKind.RoomCode, DeckValidator.FormatUnrestricted)]
@@ -100,6 +108,7 @@ public sealed class CasualFormatMatchmakingTests
     [InlineData("casual")]
     [InlineData("ranked")]
     [InlineData("rankedWild")]
+    [InlineData("hex")]
     public void 所有公开匹配队列_继续允许合法卡组(string queueKind)
     {
         TestScene.New();
@@ -126,18 +135,21 @@ public sealed class CasualFormatMatchmakingTests
         var wildRanked = ValidateForQueue(deck, "rankedWild");
         var standardCasual = ValidateForQueue(deck, "casualStandard");
         var wildCasual = ValidateForQueue(deck, "casual");
+        var hex = ValidateForQueue(deck, "hex");
 
         Assert.False(standardRanked.Ok);
         Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
         Assert.True(wildRanked.Ok, wildRanked.Reason);
         Assert.True(standardCasual.Ok, standardCasual.Reason);
         Assert.True(wildCasual.Ok, wildCasual.Reason);
+        Assert.True(hex.Ok, hex.Reason);
     }
 
     [Theory]
     [InlineData(MatchKind.CasualStandard)]
     [InlineData(MatchKind.CasualWild)]
     [InlineData(MatchKind.Casual)]
+    [InlineData(MatchKind.Hex)]
     public void 新旧休闲房间_都启用公开匹配棋钟(MatchKind matchKind)
     {
         Assert.True((bool)UsesPublicMatchClockMethod.Invoke(null, [matchKind])!);

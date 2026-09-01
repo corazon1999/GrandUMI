@@ -35,7 +35,7 @@ public class OP15_059_Amazon : IScriptedEffect
         if (!use) return;
 
         // 成本：横置此角色
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 对方是否有活跃咚可供放回
         bool oppHasActiveDon = opp.CostArea.Any(d => d.State == DonState.Active);

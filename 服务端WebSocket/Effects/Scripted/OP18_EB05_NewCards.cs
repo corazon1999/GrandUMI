@@ -63,7 +63,8 @@ internal static class OP18EB05EffectHelpers
     {
         if (id is null) return null;
         if (player.Leader.Id.ToString() == id) return player.Leader;
-        if (player.StageCard?.Id.ToString() == id) return player.StageCard;
+        var stage = player.StageCards.FirstOrDefault(card => card.Id.ToString() == id);
+        if (stage is not null) return stage;
         return player.Characters
             .Concat(player.Hand)
             .Concat(player.Trash)
@@ -137,7 +138,7 @@ public sealed class OP18_031_NicoRobin : IScriptedEffect
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             $"妮古·罗宾：将此角色转为休息状态，使「{victim.Info.Name}」不离场？")) return;
 
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         ctx.State.MarkPreventEffectLeaveBatch(
             ctx.OwnerIndex,
             victim.Id,
@@ -150,7 +151,7 @@ public sealed class OP18_031_NicoRobin : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var ownCards = new[] { me.Leader }
             .Concat(me.Characters)
-            .Concat(me.StageCard is null ? [] : new[] { me.StageCard })
+            .Concat(me.StageCards)
             .Where(card => card.IsTapped && card.Info.HasKeyword("七水之城"));
         var picked = await OP18EB05EffectHelpers.Pick(
             ctx, "OwnRestCard", "将我方最多1张拥有《七水之城》特征的卡牌转为活跃状态", ownCards, 0, 1);
@@ -261,7 +262,7 @@ public sealed class OP18_078_MiniMerryII : IScriptedEffect
 
         if (ctx.Trigger != EffectTrigger.ActivatedMain
             || ctx.State.CurrentTurnPlayer != ctx.OwnerIndex
-            || !ReferenceEquals(me.StageCard, ctx.Source)
+            || !me.StageCards.Contains(ctx.Source)
             || ctx.Source.IsTapped
             || ctx.Source.HasRestriction(RestrictionKind.CannotBeRested)
             || ctx.State.HasContinuousRestriction(ctx.Source, RestrictionKind.CannotBeRested)) return;
@@ -277,7 +278,7 @@ public sealed class OP18_078_MiniMerryII : IScriptedEffect
             0,
             Math.Min(4, restedDons.Count));
 
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         foreach (var target in picked)
         {
             var don = me.CostArea.FirstOrDefault(item => item.State == DonState.Rest);

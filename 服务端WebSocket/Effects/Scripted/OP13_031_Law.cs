@@ -72,6 +72,6 @@ public class OP13_031_Law : IScriptedEffect
 
         var card = playable.First(c => c.Id.ToString() == chosen[0]);
         await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
-        card.IsTapped = true; // 以休息状态登场
+        AtomicOps.RestCard(card); // 以休息状态登场；霸王色霸气等无法休息规则仍须生效
     }
 }

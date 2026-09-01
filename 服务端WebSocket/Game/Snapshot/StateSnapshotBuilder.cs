@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrandUMI.Game.Stats;
+using GrandUMI.Game.Hex;
 
 namespace GrandUMI.Game.Snapshot;
 
@@ -102,6 +103,7 @@ public static class StateSnapshotBuilder
         var myAttachDonUndo = !isSpectator && latestAttachDonUndo?.PlayerIndex == myIdx
             ? latestAttachDonUndo
             : null;
+        var hexState = BuildHexSnapshot(state, viewerIndex, myIdx, isSpectator);
 
         var logLines = new List<string>();
         if (queuedLogEvents is not null)
@@ -167,6 +169,7 @@ public static class StateSnapshotBuilder
             operationClockSyncUtc = state.OperationClockSyncUtc,
             operationClockPaused = state.OperationClockPaused,
             matchKind = state.MatchKind.ToString(),
+            hexState,
             isGameOver = state.IsGameOver,
             isDraw = state.IsDraw,
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,
@@ -236,6 +239,46 @@ public static class StateSnapshotBuilder
                     defenderBonus = b.DefenderBattleBonus,
                 }
                 : null,
+        };
+    }
+
+    private static object? BuildHexSnapshot(GameState state, int viewerIndex, int myIdx, bool isSpectator)
+    {
+        if (!state.HexState.Enabled) return null;
+        var opponentIdx = 1 - myIdx;
+        var round = state.HexState.ActiveDraft;
+
+        object Hex(int id)
+        {
+            var definition = HexCatalog.Get(id);
+            return new
+            {
+                id = definition.Id,
+                name = definition.Name,
+                tier = definition.Tier.ToString(),
+                description = definition.Description,
+            };
+        }
+
+        return new
+        {
+            enabled = true,
+            draftResolving = state.HexState.DraftResolving || state.HexState.PendingSettlement is not null,
+            myOwned = state.HexState.Owned[myIdx].Select(Hex).ToArray(),
+            opponentOwned = state.HexState.Owned[opponentIdx].Select(Hex).ToArray(),
+            activeDraft = round is null ? null : new
+            {
+                roundId = round.RoundId,
+                tier = round.Tier.ToString(),
+                deadlineUtc = round.DeadlineUtc,
+                // 候选只属于对应玩家；观战者永远拿不到任何一方候选。
+                candidates = isSpectator ? null : round.Candidates[viewerIndex].Select(Hex).ToArray(),
+                myLocked = !isSpectator && round.Locked[viewerIndex],
+                mySelectedHexId = !isSpectator && round.Locked[viewerIndex]
+                    ? round.LockedChoices[viewerIndex]
+                    : null,
+                opponentLocked = !isSpectator && round.Locked[1 - viewerIndex],
+            },
         };
     }
 
@@ -348,6 +391,17 @@ public static class StateSnapshotBuilder
             stageCanActivateEffect = board.StageCanActivateEffect,
             stageActivatedUsedThisTurn = board.StageActivatedUsedThisTurn,
             stageOncePerTurnEffectAvailable = board.StageOncePerTurnEffectAvailable,
+            stages = new[] { p.StageCard, p.ExtraStageCard }
+                .OfType<CardInstance>()
+                .Select(stage => new
+                {
+                    id = stage.Id.ToString(),
+                    number = stage.Info.Number,
+                    tapped = stage.IsTapped,
+                    canActivateEffect = Validation.ActionValidator.CanUseEffect(state, idx, stage.Id).Ok,
+                    activatedUsedThisTurn = ActivatedUsedThisTurn(p, stage),
+                    oncePerTurnEffectAvailable = OncePerTurnEffectAvailable(state, p, stage),
+                }).ToArray(),
             trashNumbers = board.TrashNumbers,
             deckCount = board.DeckCount,
             lifeCount = board.LifeCount,

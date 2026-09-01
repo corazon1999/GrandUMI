@@ -17,5 +17,5 @@ test("领袖、角色和舞台均接入服务端权威可用状态", () => {
 
   assert.match(field, /oncePerTurnEffectAvailable=\{fc\.oncePerTurnEffectAvailable\}/);
   assert.match(leader, /oncePerTurnEffectAvailable=\{player\.leaderOncePerTurnEffectAvailable\}/);
-  assert.match(stage, /oncePerTurnEffectAvailable=\{player\?\.stageOncePerTurnEffectAvailable \?\? false\}/);
+  assert.match(stage, /oncePerTurnEffectAvailable=\{stage\.oncePerTurnEffectAvailable\}/);
 });

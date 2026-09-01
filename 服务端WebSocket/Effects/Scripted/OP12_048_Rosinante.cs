@@ -43,7 +43,7 @@ public class OP12_048_Rosinante : IScriptedEffect
         if (ch.Count < 1) return;
         var disc = me.Hand.First(c => c.Id.ToString() == ch[0]);
 
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         AtomicOps.DiscardHand(me, disc);
         ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
             card => card.Info.HasKeyword("海军") && card.Info.ColorList.Contains("蓝"));

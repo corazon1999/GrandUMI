@@ -265,6 +265,7 @@ public class PromptSystem : IPromptService
         {
             yield return player.Leader;
             if (player.StageCard is not null) yield return player.StageCard;
+            if (player.ExtraStageCard is not null) yield return player.ExtraStageCard;
             foreach (var card in player.Characters) yield return card;
             foreach (var card in player.Hand) yield return card;
             foreach (var card in player.Deck) yield return card;
@@ -285,6 +286,7 @@ public class PromptSystem : IPromptService
             var p = s.Players[owner];
             if (p.Leader.Id == gid) return new LocatedCard(p.Leader, owner, "leader", true);
             if (p.StageCard is not null && p.StageCard.Id == gid) return new LocatedCard(p.StageCard, owner, "stage", true);
+            if (p.ExtraStageCard is not null && p.ExtraStageCard.Id == gid) return new LocatedCard(p.ExtraStageCard, owner, "stage", true);
             foreach (var c in p.Characters) if (c.Id == gid) return new LocatedCard(c, owner, "character", true);
             foreach (var c in p.Hand) if (c.Id == gid) return new LocatedCard(c, owner, "hand", false);
             foreach (var c in p.Deck) if (c.Id == gid) return new LocatedCard(c, owner, "deck", false);

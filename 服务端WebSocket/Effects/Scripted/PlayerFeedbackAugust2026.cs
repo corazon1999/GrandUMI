@@ -69,8 +69,7 @@ public sealed class ST30_014_Mr3 : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Source.IsTapped) return;
-        AtomicOps.RestCard(ctx.Source);
-        if (!ctx.Source.IsTapped) return;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         var candidates = me.Characters.Where(card => card.Info.Power == 6000).ToList();
         if (candidates.Count == 0 || me.RestDonCount == 0) return;

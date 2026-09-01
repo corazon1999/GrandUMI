@@ -26,8 +26,7 @@ public class OP10_043_Mozu : IScriptedEffect
         // 成本候选：我方拥有《德莱斯罗兹》特征且可休置的领袖或舞台
         var costTargets = new List<CardInstance>();
         if (me.Leader.Info.HasKeyword("德莱斯罗兹") && !me.Leader.IsTapped) costTargets.Add(me.Leader);
-        if (me.StageCard is not null && me.StageCard.Info.HasKeyword("德莱斯罗兹") && !me.StageCard.IsTapped)
-            costTargets.Add(me.StageCard);
+        costTargets.AddRange(me.StageCards.Where(stage => stage.Info.HasKeyword("德莱斯罗兹") && !stage.IsTapped));
 
         // 收益候选：我方名为"蒙奇·D·路飞"的角色
         var luffyChars = me.Characters.Where(c => c.MatchesName("蒙奇·D·路飞")).ToList();
@@ -43,7 +42,7 @@ public class OP10_043_Mozu : IScriptedEffect
             costTargets.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (costPick.Count < 1) return;
         var costCard = costTargets.First(c => c.Id.ToString() == costPick[0]);
-        AtomicOps.RestCard(costCard);
+        if (!AtomicOps.RestCard(costCard)) return;
 
         // 收益：选择最多 1 张路飞获得本回合【流放】
         var benefit = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",

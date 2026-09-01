@@ -41,7 +41,7 @@ public class OP10_114_XDrake : IScriptedEffect
         if (!use) return;
 
         // 支付成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 收益：横置对方最多 1 张费用≤4 的角色
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

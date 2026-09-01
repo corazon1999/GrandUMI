@@ -28,6 +28,7 @@ import type { PlayerRankIdentitySnapshot, RankFaction } from "@/types/net";
 import { GameRequest } from "@/net/GameRequest";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import TurnExtensionIcon from "@/components/game/TurnExtensionIcon";
+import HexOwnedPanel from "@/components/game/HexOwnedPanel";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -245,6 +246,7 @@ function RightRail({
         <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
         <OperationClock side="my" allowExtension={!isObserver && !isPlayback} />
       </section>
+      <HexOwnedPanel />
       <div className="mt-auto flex flex-col gap-3">
         {!isObserver && !isPlayback && (
           <section
@@ -324,7 +326,8 @@ function OperationClock({
         : "border-white/10 bg-black/20 text-slate-400"
     }`}>
       <span className="text-[9px] font-bold tracking-wide">{
-        matchKind === "RankedWild" ? "狂野排位"
+        matchKind === "Hex" ? "海克斯"
+          : matchKind === "RankedWild" ? "狂野排位"
           : matchKind === "Ranked" ? "标准排位"
             : matchKind === "CasualWild" ? "狂野休闲"
               : matchKind === "CasualStandard" ? "标准休闲"

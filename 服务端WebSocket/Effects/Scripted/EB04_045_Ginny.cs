@@ -39,7 +39,7 @@ public class EB04_045_Ginny : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 收益：我方最多 1 张《革命军》领袖或角色 +1000（本回合）
         var targets = new List<CardInstance>();

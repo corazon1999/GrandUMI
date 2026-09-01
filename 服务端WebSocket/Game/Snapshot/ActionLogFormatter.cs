@@ -196,6 +196,7 @@ public static class ActionLogFormatter
             var c = p.Characters.FirstOrDefault(x => x.Id == id);
             if (c is not null) return new CardRef(idx, c);
             if (p.StageCard is { } st && st.Id == id) return new CardRef(idx, st);
+            if (p.ExtraStageCard is { } extraStage && extraStage.Id == id) return new CardRef(idx, extraStage);
         }
         return null;
     }

@@ -51,7 +51,7 @@ public class OP10_037_Lim : IScriptedEffect
             if (chosen.Count == 0) return;
 
             var costChar = cands.First(c => c.Id.ToString() == chosen[0]);
-            AtomicOps.RestCard(costChar);
+            if (!AtomicOps.RestCard(costChar)) return;
             ctx.State.MarkPreventKO(self.Id);
             me.TurnOnceUsed.Add(key);
             return;

@@ -45,7 +45,7 @@ public class OP11_014_Borsalino : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 支付成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var tgt = targets.First(c => c.Id.ToString() == chosen[0]);
         AtomicOps.GiveKeyword(tgt, "可攻击活跃", KeywordDuration.ThisTurn);

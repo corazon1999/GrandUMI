@@ -14,10 +14,18 @@ export interface ZonePlayerSnapshot {
   stageNumber: string | null;
   stageId: string | null;
   stageTapped?: boolean;
+  stages?: Array<{ id: string; number: string; tapped?: boolean }>;
   trashNumbers: string[];
   deckCount: number;
   lifeCount: number;
   lifeFaceUp?: { faceUp: boolean; number: string | null }[];
+}
+
+function stageCards(player: ZonePlayerSnapshot) {
+  if (player.stages?.length) return player.stages;
+  return player.stageId && player.stageNumber
+    ? [{ id: player.stageId, number: player.stageNumber, tapped: player.stageTapped }]
+    : [];
 }
 
 export interface ZoneTransitionContext {
@@ -140,7 +148,8 @@ function addedPublicCardId(
   const previousFieldIds = new Set(previous.fieldCards.map((card) => card.id));
   const field = current.fieldCards.find((card) => card.id === cardId && !previousFieldIds.has(card.id));
   if (field) return true;
-  return current.stageId === cardId && previous.stageId !== cardId;
+  const previousStageIds = new Set(stageCards(previous).map((stage) => stage.id));
+  return stageCards(current).some((stage) => stage.id === cardId && !previousStageIds.has(stage.id));
 }
 
 function forcedPlayForSide(
@@ -263,26 +272,28 @@ function buildFieldTokens(previous: ZonePlayerSnapshot, current: ZonePlayerSnaps
 }
 
 function buildStageTokens(previous: ZonePlayerSnapshot, current: ZonePlayerSnapshot) {
-  const outgoing: ZoneToken[] = [];
-  const incoming: ZoneToken[] = [];
-  if (previous.stageId && previous.stageId !== current.stageId) {
-    outgoing.push({
+  const previousStages = stageCards(previous);
+  const currentStages = stageCards(current);
+  const previousIds = new Set(previousStages.map((stage) => stage.id));
+  const currentIds = new Set(currentStages.map((stage) => stage.id));
+  const outgoing = previousStages
+    .filter((stage) => !currentIds.has(stage.id))
+    .map<ZoneToken>((stage) => ({
       zone: "stage",
-      number: previous.stageNumber ?? undefined,
-      cardId: previous.stageId,
+      number: stage.number,
+      cardId: stage.id,
       faceUp: true,
-      rotation: previous.stageTapped ? 90 : 0,
-    });
-  }
-  if (current.stageId && previous.stageId !== current.stageId) {
-    incoming.push({
+      rotation: stage.tapped ? 90 : 0,
+    }));
+  const incoming = currentStages
+    .filter((stage) => !previousIds.has(stage.id))
+    .map<ZoneToken>((stage) => ({
       zone: "stage",
-      number: current.stageNumber ?? undefined,
-      cardId: current.stageId,
+      number: stage.number,
+      cardId: stage.id,
       faceUp: true,
-      rotation: current.stageTapped ? 90 : 0,
-    });
-  }
+      rotation: stage.tapped ? 90 : 0,
+    }));
   return { outgoing, incoming };
 }
 

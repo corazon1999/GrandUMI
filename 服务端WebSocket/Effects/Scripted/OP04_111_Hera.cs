@@ -52,7 +52,7 @@ public class OP04_111_Hera : IScriptedEffect
         me.Trash.Add(sacrifice);
 
         // 成本 2：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 收益：将我方最多 1 张"夏洛特·玲玲"转为活跃
         var benefit = me.Characters.Where(c => c.MatchesName("夏洛特·玲玲")).ToList();

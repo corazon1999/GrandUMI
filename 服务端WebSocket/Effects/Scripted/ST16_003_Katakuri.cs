@@ -30,7 +30,7 @@ public class ST16_003_Katakuri : IScriptedEffect
                 if (!me.Leader.Info.HasKeyword("FILM")) return false;
                 int rested = me.Characters.Count(c => c.IsTapped)
                              + me.CostArea.Count(d => d.State == DonState.Rest)
-                             + (me.StageCard is not null && me.StageCard.IsTapped ? 1 : 0);
+                             + me.StageCards.Count(stage => stage.IsTapped);
                 return rested >= 6;
             },
         });

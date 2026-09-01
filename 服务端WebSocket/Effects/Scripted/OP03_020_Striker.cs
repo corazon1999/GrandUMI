@@ -29,7 +29,7 @@ public class OP03_020_Striker : IScriptedEffect
         if (!me.Leader.Info.NameContains("波特夹斯·D·艾斯")) return;
 
         // 成本前置：舞台须活跃，且有≥2张活跃咚!!
-        if (self.IsTapped) return;
+        if (self.IsTapped || !AtomicOps.CanRestCard(ctx.State, self)) return;
         var activeDons = me.CostArea
             .Where(d => d.State == DonState.Active && d.AttachedToCardId is null).ToList();
         if (activeDons.Count < 2) return;
@@ -38,11 +38,11 @@ public class OP03_020_Striker : IScriptedEffect
             "STRIKER【启动主要】：休息2张咚!!与此舞台，确认卡组顶5张并公开最多1张事件加入手牌？");
         if (!use) return;
 
+        // 先休置卡牌成本，失败时不得部分支付咚!!。
+        if (!AtomicOps.RestCard(self)) return;
         // 成本：休息2张活跃咚!!
         activeDons[0].State = DonState.Rest;
         activeDons[1].State = DonState.Rest;
-        // 成本：将此舞台转为休息状态
-        AtomicOps.RestCard(self);
 
         // 效果：确认卡组顶5张，公开最多1张事件加入手牌
         int k = Math.Min(5, me.Deck.Count);

@@ -24,7 +24,7 @@ public class OP13_015_Makino : IScriptedEffect
 
         // 成本：将此角色转为休息状态（已休息则无法支付）
         if (self.IsTapped) return;
-        self.IsTapped = true;
+        if (!AtomicOps.RestCard(self)) return;
 
         // 效果：我方最多 1 张"蒙奇·D·路飞"力量 +2000
         var candidates = me.Characters

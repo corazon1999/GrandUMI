@@ -42,7 +42,7 @@ public class OP06_011_Totemjika : IScriptedEffect
         if (chosen.Count == 0) return; // 未支付成本
 
         var costCard = utaList.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.RestCard(costCard);
+        if (!AtomicOps.RestCard(costCard)) return;
 
         me.TurnOnceUsed.Add(key);
 

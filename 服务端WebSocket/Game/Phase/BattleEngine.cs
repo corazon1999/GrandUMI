@@ -22,6 +22,8 @@ public static class BattleEngine
         var me = s.Players[atkPlayer];
         CardInstance attacker = (me.Leader.Id == attackerId) ? me.Leader
             : me.Characters.First(c => c.Id == attackerId);
+        if (!AtomicOps.CanRestCard(s, attacker, atkPlayer))
+            throw new InvalidOperationException("攻击者无法转为休息状态，不能宣言攻击");
         attacker.IsTapped = true;
 
         s.CurrentBattle = new BattleContext
@@ -41,6 +43,8 @@ public static class BattleEngine
         var me = s.Players[attackerIdx];
         CardInstance attacker = (me.Leader.Id == attackerId) ? me.Leader
             : me.Characters.First(c => c.Id == attackerId);
+        if (!AtomicOps.CanRestCard(s, attacker, attackerIdx))
+            throw new InvalidOperationException("攻击者无法转为休息状态，不能宣言攻击");
         attacker.IsTapped = true;
 
         s.CurrentBattle = new BattleContext
@@ -98,10 +102,12 @@ public static class BattleEngine
     public static void DeclareBlocker(GameState s, Guid blockerId)
     {
         var b = s.CurrentBattle!;
-        b.BlockerDeclared = true;
-        b.ReplacedByBlockerCardId = blockerId;
         var defender = s.Players[b.DefenderPlayerIndex];
         var blocker = defender.Characters.First(c => c.Id == blockerId);
+        if (!AtomicOps.CanRestCard(s, blocker, b.DefenderPlayerIndex))
+            throw new InvalidOperationException("阻挡者无法转为休息状态，不能宣言阻挡");
+        b.BlockerDeclared = true;
+        b.ReplacedByBlockerCardId = blockerId;
         blocker.IsTapped = true;
         b.TargetIsLeader = false;
         b.TargetCardId = blockerId;
@@ -185,7 +191,7 @@ public static class BattleEngine
         if (b.TargetIsLeader)
         {
             int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, def.Leader) + b.DefenderBattleBonus;
-            attackerWins = attackerPower >= defenderPower;
+            attackerWins = attackerPower + Hex.HexRules.AttackSuccessDeficit(s, b.AttackerPlayerIndex) >= defenderPower;
             if (attackerWins)
                 leaderDamage = Validation.ActionValidator.HasKeyword(s, attacker, "双重攻击") ? 2 : 1;
         }
@@ -194,7 +200,7 @@ public static class BattleEngine
             var target = def.Characters.FirstOrDefault(c => c.Id == b.TargetCardId);
             if (target is null) return 0;
             int defenderPower = s.CurrentPowerOf(b.DefenderPlayerIndex, target) + b.DefenderBattleBonus;
-            attackerWins = attackerPower >= defenderPower;
+            attackerWins = attackerPower + Hex.HexRules.AttackSuccessDeficit(s, b.AttackerPlayerIndex) >= defenderPower;
             if (attackerWins)
                 await KOCardAsync(s, b.DefenderPlayerIndex, target, prompts);
         }
@@ -322,6 +328,7 @@ public static class BattleEngine
         var guardians = new List<CardInstance> { guardSide.Leader };
         guardians.AddRange(guardSide.Characters);
         if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
+        if (guardSide.ExtraStageCard is not null) guardians.Add(guardSide.ExtraStageCard);
         foreach (var g in guardians.ToList())
         {
             if (g.Id == card.Id) continue;
@@ -453,6 +460,9 @@ public static class BattleEngine
                 ["owner"] = ownerIdx,
                 ["reason"] = reason,
                 ["attackerId"] = reason == "battle" ? s.CurrentBattle?.AttackerCardId.ToString() : null,
+                ["actingSide"] = reason == "battle"
+                    ? s.CurrentBattle?.AttackerPlayerIndex ?? 1 - ownerIdx
+                    : s.KOActingSide,
             });
     }
 
@@ -470,6 +480,7 @@ public static class BattleEngine
         }
         p.Characters.Remove(card);
         if (ReferenceEquals(p.StageCard, card)) p.StageCard = null; // 舞台卡被KO/送废弃（如 OP14-088 KO对方1费舞台）
+        if (ReferenceEquals(p.ExtraStageCard, card)) p.ExtraStageCard = null;
         p.Trash.Add(card);
         // 来源离场即时清理其注册的持续效果：此前仅靠 TurnEngine 结束阶段兜底，
         // 角色被KO后其持续光环会残留到回合末（反馈#245 OP15-092 领袖7000残留）。

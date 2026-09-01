@@ -27,14 +27,13 @@ public class OP10_083_Momonosuke : IScriptedEffect
         var self = ctx.Source;
 
         // 自身须处于活跃状态才能作为成本转休息
-        if (self.IsTapped) return;
+        if (self.IsTapped || !AtomicOps.CanRestCard(ctx.State, self)) return;
 
         // 收集可作为成本的《德莱斯罗兹》活跃领袖/舞台
         var costTargets = new List<CardInstance>();
         if (me.Leader != null && !me.Leader.IsTapped && me.Leader.Info.HasKeyword("德莱斯罗兹"))
             costTargets.Add(me.Leader);
-        if (me.StageCard != null && !me.StageCard.IsTapped && me.StageCard.Info.HasKeyword("德莱斯罗兹"))
-            costTargets.Add(me.StageCard);
+        costTargets.AddRange(me.StageCards.Where(stage => !stage.IsTapped && stage.Info.HasKeyword("德莱斯罗兹")));
         if (costTargets.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -49,8 +48,8 @@ public class OP10_083_Momonosuke : IScriptedEffect
         var costCard = costTargets.First(c => c.Id.ToString() == pick[0]);
 
         // 支付成本：横置自身与所选领袖/舞台
-        AtomicOps.RestCard(self);
-        AtomicOps.RestCard(costCard);
+        if (!AtomicOps.CanRestCard(ctx.State, costCard)) return;
+        if (!AtomicOps.RestCard(self) || !AtomicOps.RestCard(costCard)) return;
 
         // 收益：对方最多 1 张角色本回合费用 -2
         var cands = opp.Characters.ToList();

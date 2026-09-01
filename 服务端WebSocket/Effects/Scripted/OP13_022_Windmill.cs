@@ -36,7 +36,7 @@ public class OP13_022_Windmill : IScriptedEffect
         if (chosen.Count == 0) return;
 
         // 支付成本：将此舞台转为休息状态
-        ctx.Source.IsTapped = true;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
         AtomicOps.AddPowerThisTurn(target, 1000);

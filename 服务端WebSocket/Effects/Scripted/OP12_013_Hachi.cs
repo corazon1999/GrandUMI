@@ -52,7 +52,7 @@ public class OP12_013_Hachi : IScriptedEffect
             revealed.Select(id => events.First(c => c.Id.ToString() == id).Info.Number).ToList());
 
         // 支付成本：此角色转为休息状态
-        ctx.Source.IsTapped = true;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         // 效果：选定 1 张我方领袖或角色，赋予最多 2 张休息状态的咚!!
         var targets = new List<CardInstance> { me.Leader };

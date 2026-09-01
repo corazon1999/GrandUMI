@@ -250,7 +250,7 @@ internal static class OP17Effects
             d.AttachedToCardId = null;
         }
         me.Characters.Remove(c.Source);
-        if (ReferenceEquals(me.StageCard, c.Source)) me.StageCard = null;
+        me.RemoveStageCard(c.Source);
         c.State.ContinuousEffects.RemoveAll(x => x.SourceCardId == c.Source.Id.ToString());
         me.Trash.Add(c.Source);
     }
@@ -515,7 +515,9 @@ internal static class OP17Effects
             if (Me(c).ActiveDonCount < 2
                 || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，KO对方最多1张舞台？")) return;
             RestActiveDon(c, 2);
-            if (Opp(c).StageCard is { } stage) AtomicOps.KO(c.State, 1 - c.OwnerIndex, stage);
+            var stages = await Pick(c, c.OwnerIndex, "OpponentStage", "选择对方最多1张舞台KO",
+                Opp(c).StageCards, 0, 1);
+            if (stages.Count > 0) AtomicOps.KO(c.State, 1 - c.OwnerIndex, stages[0]);
             return;
         }
         if (c.Trigger != EffectTrigger.EventCounter
@@ -646,7 +648,7 @@ internal static class OP17Effects
 
         if (victim is null || !(victim.Info.HasKeyword("东海") || victim.Info.HasKeyword("草帽一伙"))) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将奈美转为休息状态，使该角色不被KO？")) return;
-        AtomicOps.RestCard(c.Source);
+        if (!AtomicOps.RestCard(c.Source)) return;
         c.State.MarkPreventEffectLeaveBatch(c.OwnerIndex, victim.Id,
             x => x.Info.HasKeyword("东海") || x.Info.HasKeyword("草帽一伙"), isKoReplacement: true);
     }
@@ -790,7 +792,7 @@ internal static class OP17Effects
             await SearchTop(c, 5, x => x.Info.HasKeywordContaining("红发海盗团"), "公开最多1张《红发海盗团》卡牌加入手牌");
             return;
         }
-        if (c.Trigger != EffectTrigger.EventCounter || AtomicOps.RestableCount(Me(c)) < 1) return;
+        if (c.Trigger != EffectTrigger.EventCounter || AtomicOps.RestableCount(c.State, Me(c)) < 1) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方1张卡牌转为休息状态，使我方1张领袖或角色力量+3000？")) return;
         if (!await AtomicOps.PromptRestOwnCards(c, 1, "选择我方1张卡牌转为休息状态", optional: true)) return;
         var pick = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择本次战斗力量+3000的卡牌", OwnLeaderAndCharacters(c), 0, 1);
@@ -801,7 +803,7 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.EventMain)
         {
-            if (AtomicOps.RestableCount(Me(c)) < 4
+            if (AtomicOps.RestableCount(c.State, Me(c)) < 4
                 || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方4张卡牌转为休息状态，使对方1张角色转为休息状态？")
                 || !await AtomicOps.PromptRestOwnCards(c, 4, "选择我方4张卡牌转为休息状态", optional: true)) return;
             foreach (var card in await ChooseOppChars(c, x => !x.IsTapped, 1, "选择对方1张角色转为休息状态")) AtomicOps.RestCard(card);
@@ -897,7 +899,7 @@ internal static class OP17Effects
             || c.Source.HasRestriction(RestrictionKind.CannotBeRested)
             || c.State.HasContinuousRestriction(c.Source, RestrictionKind.CannotBeRested)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将约翰船长转为休息状态，抽1张并丢弃1张手牌？")) return;
-        AtomicOps.RestCard(c.Source);
+        if (!AtomicOps.RestCard(c.Source)) return;
         AtomicOps.Draw(c.State, c.OwnerIndex, 1);
         if (Me(c).Hand.Count > 0) await DiscardOwn(c, 1, "选择丢弃1张手牌");
     }
@@ -1025,8 +1027,9 @@ internal static class OP17Effects
             || c.Source.HasRestriction(RestrictionKind.CannotBeRested)
             || c.State.HasContinuousRestriction(c.Source, RestrictionKind.CannotBeRested)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将3张咚!!和此角色转为休息状态，使对方1张角色无法攻击？")) return;
-        RestActiveDon(c, 3);
-        AtomicOps.RestCard(c.Source);
+        if (!AtomicOps.CanRestCard(c.State, c.Source)) return;
+        if (!AtomicOps.RestCard(c.Source)) return;
+        if (!RestActiveDon(c, 3)) return;
         var target = await ChooseOppChars(c, _ => true, 1, "选择无法攻击的角色");
         if (target.Count > 0) AtomicOps.AddRestriction(target[0], RestrictionKind.CannotAttack,
             KeywordDuration.UntilNextOpponentEndPhase, c.OwnerIndex);
@@ -1070,8 +1073,9 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.OnOppAttackDeclare || c.Source.IsTapped || Me(c).Hand.Count == 0) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将哈奇诺斯转为休息并丢弃1张手牌，使我方卡牌力量+1000？")
+            || !AtomicOps.CanRestCard(c.State, c.Source)
             || !await DiscardOwn(c, 1, "选择丢弃1张手牌")) return;
-        AtomicOps.RestCard(c.Source);
+        if (!AtomicOps.RestCard(c.Source)) return;
         var pick = await Pick(c, c.OwnerIndex, "OwnLeaderOrCharacter", "选择《洛克斯海盗团》领袖或角色，本次战斗力量+1000",
             OwnLeaderAndCharacters(c).Where(x => x.Info.HasKeyword("洛克斯海盗团")), 0, 1);
         if (pick.Count > 0) AtomicOps.AddPowerThisBattle(pick[0], 1000);
@@ -1758,11 +1762,12 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.EventMain)
         {
-            var stage = Opp(c).StageCard;
-            if (Me(c).ActiveDonCount < 2 || stage is null) return;
+            var stages = Opp(c).StageCards.ToList();
+            if (Me(c).ActiveDonCount < 2 || stages.Count == 0) return;
             if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将2张咚!!转为休息状态，KO对方舞台？")) return;
             RestActiveDon(c, 2);
-            AtomicOps.KO(c.State, 1 - c.OwnerIndex, stage);
+            var picked = await Pick(c, c.OwnerIndex, "OpponentStage", "选择对方1张舞台KO", stages, 1, 1);
+            if (picked.Count > 0) AtomicOps.KO(c.State, 1 - c.OwnerIndex, picked[0]);
             return;
         }
         if (c.Trigger != EffectTrigger.EventCounter || Me(c).Characters.Count(x => !string.IsNullOrEmpty(x.Info.Trigger)) < 2) return;

@@ -41,7 +41,7 @@ public class OP04_072_Mr5 : IScriptedEffect
         // 支付成本
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
         me.TurnOnceUsed.Add(key);
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         if (cands.Count == 0) return;
 

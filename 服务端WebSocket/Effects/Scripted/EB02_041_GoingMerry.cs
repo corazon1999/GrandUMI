@@ -44,7 +44,7 @@ public class EB02_041_GoingMerry : IScriptedEffect
         if (!use) return;
 
         // 成本：横置此舞台
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         // 条件：我方咚数 ≤ 对方咚数
         if (me.TotalDonInCostArea > opp.TotalDonInCostArea) return;

@@ -37,7 +37,7 @@ public class OP16_047_Doflamingo : IScriptedEffect
         if (!use) return;
 
         // 成本（冒号前）：将此角色转为休息状态 —— 无条件先付，按卡面顺序先于收益
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 效果条件（冒号后）：对方手牌 ≥8 才有后续收益；不足则成本已付、无后续
         if (opp.Hand.Count < 8) return;

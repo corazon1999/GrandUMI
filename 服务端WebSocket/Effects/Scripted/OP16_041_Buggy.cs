@@ -70,5 +70,5 @@ public class OP16_041_Buggy : IScriptedEffect
         ?? me.Deck.FirstOrDefault(c => c.Id.ToString() == cardId)
         ?? me.LifeArea.FirstOrDefault(c => c.Id.ToString() == cardId)
         ?? me.Characters.FirstOrDefault(c => c.Id.ToString() == cardId)
-        ?? (me.StageCard is { } st && st.Id.ToString() == cardId ? st : null);
+        ?? me.StageCards.FirstOrDefault(stage => stage.Id.ToString() == cardId);
 }

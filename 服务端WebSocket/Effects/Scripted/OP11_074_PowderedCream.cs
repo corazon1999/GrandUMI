@@ -38,7 +38,7 @@ public class OP11_074_PowderedCream : IScriptedEffect
 
         // 成本
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         me.TurnOnceUsed.Add(key);
 
         // 宣言任意费用

@@ -59,10 +59,9 @@ public class OP07_029_Hawkins : IScriptedEffect
         var key = self.Info.Number + "-guard" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        var candidates = opp.Characters.Where(c =>
-            !c.IsTapped &&
-            !c.HasRestriction(RestrictionKind.CannotBeRested) &&
-            !ctx.State.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)).ToList();
+        var candidates = opp.Characters
+            .Where(c => !c.IsTapped && AtomicOps.CanRestCard(ctx.State, c))
+            .ToList();
         if (candidates.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -75,7 +74,7 @@ public class OP07_029_Hawkins : IScriptedEffect
         if (pick.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == pick[0]);
-        AtomicOps.RestCard(target);
+        if (!AtomicOps.RestCard(target)) return;
 
         if (nonKoLeave) ctx.State.MarkPreventLeave(selfId);
         else ctx.State.MarkPreventKO(selfId);

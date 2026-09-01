@@ -44,6 +44,28 @@ public class GameState
     /// </summary>
     public Random Rng => _rng ??= new Random(RngSeed);
 
+    /// <summary>确定性随机事件记录器；运行时由 GameEngine 绑定，重放时仍消费同一 RNG 但不产生外部副作用。</summary>
+    internal Action<string, int, object>? OnDeterministicRandomEvent { get; set; }
+
+    /// <summary>消费本局 RNG 并写入单调随机序号。所有新增玩法随机都必须经过此入口。</summary>
+    public int NextRecordedRandom(int exclusiveMax, string type, int actor, object? context = null)
+    {
+        if (exclusiveMax <= 0) throw new ArgumentOutOfRangeException(nameof(exclusiveMax));
+        int value = Rng.Next(exclusiveMax);
+        int sequence = ++RandomSeq;
+        OnDeterministicRandomEvent?.Invoke(type, actor, new
+        {
+            randomSeq = sequence,
+            type,
+            actor,
+            value,
+            exclusiveMax,
+            context,
+            rngSeed = RngSeed,
+        });
+        return value;
+    }
+
     /// <summary>Monotonic random event sequence within this match.</summary>
     public int RandomSeq { get; set; }
 
@@ -164,6 +186,9 @@ public class GameState
     public DateTime? OperationClockSyncUtc { get; set; }
     public bool OperationClockPaused { get; set; }
     public MatchKind MatchKind { get; set; } = MatchKind.UnknownHuman;
+
+    /// <summary>海克斯模式的独立权威状态。普通对局保留禁用实例，避免把玩法状态伪装成卡牌 DSL。</summary>
+    public Hex.HexState HexState { get; } = new();
 
     /// <summary>序号（每次状态变化 +1，便于客户端识别快照新旧）</summary>
     public int Tick { get; set; }
@@ -322,7 +347,8 @@ public class GameState
         var leader = Players[playerIdx].Leader;
         return leader.Info.Number == "OP09-022"
             && !leader.IsEffectsNullified
-            && !IsContinuouslyNullified(leader);
+            && !IsContinuouslyNullified(leader)
+            && Effects.AtomicOps.CanRestCard(this, card, playerIdx);
     }
 
     /// <summary>评估指定卡当前从 ContinuousEffects 获得的总力量加成</summary>
@@ -378,7 +404,7 @@ public class GameState
         int basePower = card.CurrentPower(donCount, ownerTurn);
         int instanceOriginalPower = card.HighestInstanceOriginalPowerOverride ?? card.Info.Power;
         basePower += OriginalPowerOf(sideIdx, card) - instanceOriginalPower;
-        return basePower + ContinuousPowerBonus(sideIdx, card);
+        return basePower + ContinuousPowerBonus(sideIdx, card) + Hex.HexRules.PowerBonus(this, sideIdx, card);
     }
 
     /// <summary>
@@ -416,8 +442,9 @@ public class GameState
         int v = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
                 + ContinuousCostBonus(playerIdx, card)
                 + Effects.HandStaticCost.Delta(this, playerIdx, card)   // 手牌中静态减费（如 OP16-005）
-                - OneShotDiscountFor(playerIdx, card);                   // 一次性下次登场减费（OP02-025，预览不消费）
-        return v < 0 ? 0 : v;
+                - OneShotDiscountFor(playerIdx, card)                   // 一次性下次登场减费（OP02-025，预览不消费）
+                + Hex.HexRules.HandCostDelta(this, playerIdx, card);
+        return Hex.HexRules.AdjustFinalHandCost(this, playerIdx, card, v);
     }
 
     /// <summary>定位某卡当前所属的一方下标（场上：角色/领袖/舞台）；不在场返回 -1</summary>
@@ -426,7 +453,8 @@ public class GameState
         for (int s = 0; s < 2; s++)
         {
             var p = Players[s];
-            if (p.Characters.Contains(card) || ReferenceEquals(p.Leader, card) || ReferenceEquals(p.StageCard, card))
+            if (p.Characters.Contains(card) || ReferenceEquals(p.Leader, card)
+                || ReferenceEquals(p.StageCard, card) || ReferenceEquals(p.ExtraStageCard, card))
                 return s;
         }
         return -1;
@@ -578,7 +606,7 @@ public class GameState
         for (int side = 0; side < Players.Length; side++)
         {
             var player = Players[side];
-            if (player.Leader.Id == sourceId || player.StageCard?.Id == sourceId
+            if (player.Leader.Id == sourceId || player.StageCard?.Id == sourceId || player.ExtraStageCard?.Id == sourceId
                 || player.Characters.Any(card => card.Id == sourceId)
                 || player.Hand.Any(card => card.Id == sourceId)
                 || player.Deck.Any(card => card.Id == sourceId)
@@ -607,7 +635,9 @@ public class GameState
                 ? player.Leader
                 : player.StageCard?.Id == sourceId
                     ? player.StageCard
-                    : player.Characters.FirstOrDefault(card => card.Id == sourceId);
+                    : player.ExtraStageCard?.Id == sourceId
+                        ? player.ExtraStageCard
+                        : player.Characters.FirstOrDefault(card => card.Id == sourceId);
             if (source is null) continue;
             if (source.IsEffectsNullified) return false;
 
@@ -642,6 +672,10 @@ public class GameState
         return raw < 0 ? 0 : raw;
     }
 
+    /// <summary>指定玩家当前费用区上限；果实能力者把 10 提升为 12。</summary>
+    public int MaxDonInCostAreaFor(int playerIdx)
+        => Hex.HexRules.Has(this, playerIdx, 52) ? 12 : PhaseFlow.TurnEngine.MaxDonInCostArea;
+
     /// <summary>
     /// 计算当前费用，但排除指定来源的持续费用修正。用于持续效果以当前费用筛选自身作用对象，
     /// 防止该效果在判断条件时再次递归求值自身。
@@ -664,7 +698,8 @@ public class GameState
             var pl = Players[s];
             if (pl.Characters.Contains(card)
                 || ReferenceEquals(pl.Leader, card)
-                || ReferenceEquals(pl.StageCard, card))
+                || ReferenceEquals(pl.StageCard, card)
+                || ReferenceEquals(pl.ExtraStageCard, card))
                 return CurrentCostOf(s, card);
         }
         return card.CurrentCost();
@@ -689,6 +724,7 @@ public enum OpeningStage
     RollingDice,
     WaitingFirstPlayerChoice,
     Mulligan,
+    HexDraft,
     Playing,
 }
 

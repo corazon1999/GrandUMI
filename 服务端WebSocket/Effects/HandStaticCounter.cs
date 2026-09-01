@@ -18,7 +18,8 @@ public static class HandStaticCounter
             && !state.IsContinuouslyNullified(me.Leader))
             return 3000;
 
-        if (card.Info.Kind != CardKind.Character) return value;
+        if (card.Info.Kind != CardKind.Character)
+            return Math.Max(value, Game.Hex.HexRules.CounterBonus(state, playerIdx, card));
 
         // EB01-001 光月御殿：这是“规则上”的卡牌规则，不属于可被效果无效化的领袖效果。
         // 我方所有原本没有反击值的《和之国》角色卡牌均变为拥有反击+1000。
@@ -46,6 +47,6 @@ public static class HandStaticCounter
             && me.Characters.All(c => c.Info.Counter == 0))
             value = Math.Max(value, 2000);
 
-        return value;
+        return value + Game.Hex.HexRules.CounterBonus(state, playerIdx, card);
     }
 }

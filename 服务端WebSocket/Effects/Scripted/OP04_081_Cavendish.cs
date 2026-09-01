@@ -51,7 +51,7 @@ public class OP04_081_Cavendish : IScriptedEffect
             "凯文迪修【攻击时】：将我方领袖转为休息状态，KO 对方最多 1 张费用≤1 的角色，并将卡组顶 2 张废弃？");
         if (!use) return;
 
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
 
         var cands = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 1).ToList();
         if (cands.Count > 0)

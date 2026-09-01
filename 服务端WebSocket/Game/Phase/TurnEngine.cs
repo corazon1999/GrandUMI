@@ -1,4 +1,5 @@
 using GrandUMI.Effects;
+using GrandUMI.Cards;
 
 namespace GrandUMI.Game.PhaseFlow;
 
@@ -64,6 +65,11 @@ public static class TurnEngine
             if (stage.CannotActivateNextReset) stage.CannotActivateNextReset = false;
             else if (stage.IsTapped && !state.IsResetPrevented(stage)) stage.IsTapped = false;
         }
+        if (p.ExtraStageCard is { } extraStage)
+        {
+            if (extraStage.CannotActivateNextReset) extraStage.CannotActivateNextReset = false;
+            else if (extraStage.IsTapped && !state.IsResetPrevented(extraStage)) extraStage.IsTapped = false;
+        }
         foreach (var d in p.CostArea)
             if (d.State == DonState.Rest)
             {
@@ -97,7 +103,7 @@ public static class TurnEngine
             && !tp.Leader.IsEffectsNullified
             && !state.IsContinuouslyNullified(tp.Leader)
             && donBefore > 0
-            && donBefore < MaxDonInCostArea
+            && donBefore < state.MaxDonInCostAreaFor(state.CurrentTurnPlayer)
             && added > 0)
         {
             var don = tp.CostArea.FirstOrDefault(d => d.State == DonState.Active);
@@ -228,6 +234,7 @@ public static class TurnEngine
                     .Concat(returnOwner.Deck)
                     .Concat(returnOwner.LifeArea)
                     .Append(returnOwner.StageCard)
+                    .Append(returnOwner.ExtraStageCard)
                     .FirstOrDefault(card => card?.Id.ToString() == task.SourceCardId);
                 if (source is null) continue;
 
@@ -375,6 +382,7 @@ public static class TurnEngine
         {
             if (p.Leader.Id == gid) return true;
             if (p.StageCard?.Id == gid) return true;
+            if (p.ExtraStageCard?.Id == gid) return true;
             foreach (var c in p.Characters) if (c.Id == gid) return true;
         }
         return false;
@@ -394,6 +402,12 @@ public static class TurnEngine
     public static void AdvanceTurnToReset(GameState state)
     {
         EnterEndPhase(state);
+        StartNextTurnAtReset(state);
+    }
+
+    /// <summary>当前结束阶段已完成清理后，原子切换回合方并执行新回合准备阶段。</summary>
+    public static void StartNextTurnAtReset(GameState state)
+    {
         // 切换回合玩家（"追加获得我方回合"时跳过切换，同一玩家再来一回合）
         if (state.ExtraTurnPending) state.ExtraTurnPending = false;
         else state.CurrentTurnPlayer = 1 - state.CurrentTurnPlayer;
@@ -413,8 +427,8 @@ public static class TurnEngine
     public static int DrawCard(GameState state, int playerIdx, int n)
     {
         var p = state.Players[playerIdx];
-        int actual = 0;
-        for (int i = 0; i < n; i++)
+        int kept = 0;
+        while (kept < n)
         {
             if (p.Deck.Count == 0)
             {
@@ -423,13 +437,29 @@ public static class TurnEngine
             }
             var top = p.Deck[0];
             p.Deck.RemoveAt(0);
-            p.Hand.Add(top);
-            actual++;
+            var runtime = state.HexState.Runtime[playerIdx];
+            bool convertEvent = top.Info.Kind == CardKind.Event
+                && Hex.HexRules.Has(state, playerIdx, 38)
+                && !runtime.EventDrawConvertedThisTurn;
+            bool convertCharacter = top.Info.Kind == CardKind.Character
+                && Hex.HexRules.Has(state, playerIdx, 39)
+                && !runtime.CharacterDrawConvertedThisTurn;
+            if (convertEvent || convertCharacter)
+            {
+                if (convertEvent) runtime.EventDrawConvertedThisTurn = true;
+                if (convertCharacter) runtime.CharacterDrawConvertedThisTurn = true;
+                p.Trash.Add(top);
+            }
+            else
+            {
+                p.Hand.Add(top);
+                kept++;
+            }
             // 正式对局已启用规则时，抽走最后一张后立即判定；测试布场在未启用规则前不会被误判。
             state.EvaluateDeckOut();
             if (state.IsGameOver) break;
         }
-        return actual;
+        return kept;
     }
 
     /// <summary>从咚卡组取 n 张到费用区（活跃状态）</summary>
@@ -437,7 +467,7 @@ public static class TurnEngine
     {
         var p = state.Players[playerIdx];
         int actual = 0;
-        int budget = MaxDonInCostArea - p.CostArea.Count;
+        int budget = state.MaxDonInCostAreaFor(playerIdx) - p.CostArea.Count;
         n = Math.Min(n, budget);
         for (int i = 0; i < n; i++)
         {

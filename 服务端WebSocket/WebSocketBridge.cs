@@ -62,6 +62,7 @@ public static class WebSocketBridge
     private static readonly ConcurrentQueue<WsSession>              StandardCasualMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              RankedMatchQueue = new();
     private static readonly ConcurrentQueue<WsSession>              WildRankedMatchQueue = new();
+    private static readonly ConcurrentQueue<WsSession>              HexMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
     private static readonly ConcurrentDictionary<string, string>    MatchAccountReservations = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
@@ -1386,6 +1387,7 @@ public static class WebSocketBridge
 
         var queueKind = Str(msg, "queueKind") switch
         {
+            var value when string.Equals(value, "hex", StringComparison.OrdinalIgnoreCase) => "hex",
             var value when string.Equals(value, "casualStandard", StringComparison.OrdinalIgnoreCase) => "casualStandard",
             var value when string.Equals(value, "rankedWild", StringComparison.OrdinalIgnoreCase) => "rankedWild",
             var value when string.Equals(value, "ranked", StringComparison.OrdinalIgnoreCase) => "ranked",
@@ -1618,6 +1620,7 @@ public static class WebSocketBridge
 
     private static ConcurrentQueue<WsSession> QueueFor(string queueKind) => queueKind switch
     {
+        "hex" => HexMatchQueue,
         "casualStandard" => StandardCasualMatchQueue,
         "ranked" => RankedMatchQueue,
         "rankedWild" => WildRankedMatchQueue,
@@ -1626,6 +1629,7 @@ public static class WebSocketBridge
 
     private static MatchKind MatchKindForQueue(string queueKind) => queueKind switch
     {
+        "hex" => MatchKind.Hex,
         "casualStandard" => MatchKind.CasualStandard,
         "ranked" => MatchKind.Ranked,
         "rankedWild" => MatchKind.RankedWild,
@@ -1634,6 +1638,7 @@ public static class WebSocketBridge
 
     private static string QueueLabel(string queueKind) => queueKind switch
     {
+        "hex" => "海克斯",
         "casualStandard" => "标准休闲",
         "ranked" => "标准排位",
         "rankedWild" => "狂野排位",

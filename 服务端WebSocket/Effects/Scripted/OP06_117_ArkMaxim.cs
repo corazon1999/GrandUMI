@@ -32,7 +32,7 @@ public class OP06_117_ArkMaxim : IScriptedEffect
         // 成本前提：此舞台需为活跃，且存在 1 张活跃的"艾尼路"领袖或角色
         if (self.IsTapped) return;
         var enels = new[] { me.Leader }.Concat(me.Characters)
-            .Where(c => !c.IsTapped && c.MatchesName("艾尼路"))
+            .Where(c => !c.IsTapped && c.MatchesName("艾尼路") && AtomicOps.CanRestCard(ctx.State, c))
             .ToList();
         if (enels.Count == 0) return;
 
@@ -47,8 +47,8 @@ public class OP06_117_ArkMaxim : IScriptedEffect
         if (enelPick.Count < 1) return; // 未支付成本
 
         var enel = enels.First(c => c.Id.ToString() == enelPick[0]);
-        AtomicOps.RestCard(enel);
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.CanRestCard(ctx.State, enel) || !AtomicOps.CanRestCard(ctx.State, self)) return;
+        if (!AtomicOps.RestCard(enel) || !AtomicOps.RestCard(self)) return;
 
         me.TurnOnceUsed.Add(key);
 

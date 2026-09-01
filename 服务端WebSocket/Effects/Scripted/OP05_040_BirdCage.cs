@@ -59,9 +59,8 @@ public class OP05_040_BirdCage : IScriptedEffect
         }
 
         // 之后：将此舞台放置到废弃区
-        if (me.StageCard == self)
+        if (me.RemoveStageCard(self))
         {
-            me.StageCard = null;
             me.Trash.Add(self);
         }
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());

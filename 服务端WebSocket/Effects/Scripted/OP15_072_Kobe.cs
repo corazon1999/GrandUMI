@@ -37,7 +37,7 @@ public class OP15_072_Kobe : IScriptedEffect
 
         // 支付成本
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 条件：我方场上存在“小鸟”和“阿悟”
         bool hasKotori = me.Characters.Any(c => c.MatchesName("小鸟"));

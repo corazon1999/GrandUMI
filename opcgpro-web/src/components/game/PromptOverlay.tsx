@@ -211,11 +211,11 @@ export default function PromptOverlay() {
       return my?.leaderNumber ? getGameCard(my.leaderNumber, my.spriteMap) ?? null : null;
     if (id === opp?.leaderId)
       return opp?.leaderNumber ? getGameCard(opp.leaderNumber, opp.spriteMap) ?? null : null;
-    // 舞台不在 fieldCards 里（stageId/stageNumber 扁平字段），需单独识别，否则候选卡图加载不出
-    if (my && id === my.stageId)
-      return my.stageNumber ? getGameCard(my.stageNumber, my.spriteMap) ?? null : null;
-    if (opp && id === opp.stageId)
-      return opp.stageNumber ? getGameCard(opp.stageNumber, opp.spriteMap) ?? null : null;
+    // 舞台不在 fieldCards 里；海克斯模式下至多两张，按实例 ID 从数组反查。
+    const myStage = my?.stages.find((stage) => stage.id === id);
+    if (myStage) return getGameCard(myStage.number, my?.spriteMap) ?? null;
+    const opponentStage = opp?.stages.find((stage) => stage.id === id);
+    if (opponentStage) return getGameCard(opponentStage.number, opp?.spriteMap) ?? null;
     const myCard = my?.fieldCards.find((c) => c.id === id);
     if (myCard) return getGameCard(myCard.number, my?.spriteMap) ?? null;
     const opponentCard = opp?.fieldCards.find((c) => c.id === id);
@@ -229,7 +229,7 @@ export default function PromptOverlay() {
       my &&
       (id === "leader" ||
         id === my.leaderId ||
-        id === my.stageId ||
+        my.stages.some((stage) => stage.id === id) ||
         my.fieldCards.some((c) => c.id === id))
     ) {
       return "my";
@@ -237,7 +237,7 @@ export default function PromptOverlay() {
     if (
       opp &&
       (id === opp.leaderId ||
-        id === opp.stageId ||
+        opp.stages.some((stage) => stage.id === id) ||
         opp.fieldCards.some((c) => c.id === id))
     ) {
       return "opponent";
@@ -268,10 +268,10 @@ export default function PromptOverlay() {
       };
     }
     // 舞台：无贴咚、无力量修正，仅横置状态
-    if (my && id === my.stageId)
-      return { attachedDonCount: 0, powerBuff: 0, isTapped: my.stageTapped };
-    if (opp && id === opp.stageId)
-      return { attachedDonCount: 0, powerBuff: 0, isTapped: opp.stageTapped };
+    const myStage = my?.stages.find((stage) => stage.id === id);
+    if (myStage) return { attachedDonCount: 0, powerBuff: 0, isTapped: myStage.tapped };
+    const opponentStage = opp?.stages.find((stage) => stage.id === id);
+    if (opponentStage) return { attachedDonCount: 0, powerBuff: 0, isTapped: opponentStage.tapped };
     const fc = [...(my?.fieldCards ?? []), ...(opp?.fieldCards ?? [])].find((c) => c.id === id);
     if (!fc) return null;
     const base = getCard(fc.number)?.power ?? 0;

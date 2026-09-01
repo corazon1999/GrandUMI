@@ -28,9 +28,9 @@ public class OP15_039_Rebecca : IScriptedEffect
             dressrosaChars.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (picked.Count == 0) return;
         var bounceTgt = dressrosaChars.First(c => c.Id.ToString() == picked[0]);
+        if (!AtomicOps.CanRestCard(ctx.State, me.Leader)) return;
+        if (!AtomicOps.RestCard(me.Leader)) return;
         AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, bounceTgt);
-
-        me.Leader.IsTapped = true;
 
         // 从手牌找费用 3 的《德莱斯罗兹》角色登场
         var handCandidates = me.Hand

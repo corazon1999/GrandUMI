@@ -36,7 +36,7 @@ public class OP15_023_Arlong : IScriptedEffect
             var restedCards = new List<CardInstance>();
             if (opp.Leader.IsTapped) restedCards.Add(opp.Leader);
             restedCards.AddRange(opp.Characters.Where(c => c.IsTapped));
-            if (opp.StageCard is { IsTapped: true } stage) restedCards.Add(stage);
+            restedCards.AddRange(opp.StageCards.Where(stage => stage.IsTapped));
             var restedDons = opp.CostArea.Where(don => don.State == DonState.Rest).ToList();
             if (restedCards.Count + restedDons.Count == 0) return;
 

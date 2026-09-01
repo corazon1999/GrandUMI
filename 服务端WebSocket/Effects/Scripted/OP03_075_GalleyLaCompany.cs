@@ -32,7 +32,7 @@ public class OP03_075_GalleyLaCompany : IScriptedEffect
             "卡雷拉公司【启动主要】：横置此舞台，从咚!!卡组追加 1 张休息状态的咚!!？");
         if (!use) return;
 
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
     }
 }

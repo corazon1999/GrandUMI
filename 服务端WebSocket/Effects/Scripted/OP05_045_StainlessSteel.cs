@@ -47,7 +47,7 @@ public class OP05_045_StainlessSteel : IScriptedEffect
         AtomicOps.DiscardHand(me, dcard);
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 效果：选最多1张费用≤2角色放回其持有者卡组底
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "AnyCharacter",

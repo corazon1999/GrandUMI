@@ -36,13 +36,16 @@ public class EB02_025_Rosinante : IScriptedEffect
             "罗西南德【启动主要】：横置1张咚!!与此角色，确认卡组顶5张并以休息状态登场最多1张费用≤2角色？");
         if (!use) return;
 
+        // 先验证角色横置成本，避免 H19 拒绝时已部分支付咚!!。
+        if (!AtomicOps.CanRestCard(ctx.State, ctx.Source)) return;
+
         // 成本：将1张活跃咚!!转为休息状态
         var activeDon = me.CostArea.FirstOrDefault(d => d.State == DonState.Active);
         if (activeDon is null) return;
         activeDon.State = DonState.Rest;
 
         // 成本：将此角色转为休息状态
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         // 效果：确认卡组顶5张
         int peek = Math.Min(5, me.Deck.Count);

@@ -56,7 +56,7 @@ public class OP01_051_EustassKid : IScriptedEffect
         if (!use) return;
 
         // 成本：将此角色转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         me.TurnOnceUsed.Add(key);
 
         if (candidates.Count == 0) return;

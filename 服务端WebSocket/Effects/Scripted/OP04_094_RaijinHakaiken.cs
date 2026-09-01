@@ -47,7 +47,7 @@ public class OP04_094_RaijinHakaiken : IScriptedEffect
             "雷霆 破坏剑【触发】：将我方领袖转为休息状态，KO 对方最多 1 张费用≤5 的角色？");
         if (!use) return;
 
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
 
         var t5 = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 5).ToList();
         if (t5.Count == 0) return;

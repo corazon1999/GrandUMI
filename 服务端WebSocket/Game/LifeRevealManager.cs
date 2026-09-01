@@ -42,12 +42,16 @@ public static class LifeRevealManager
         // 判断本次攻击者是否带【流放】；并记录攻击者 id 供 OnDamageToLeader 派发
         bool exile = false;
         string? attackerIdForTrigger = null;
+        CardInstance? damageAttacker = null;
+        int attackerSide = 1 - targetPlayerIdx;
         if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == targetPlayerIdx)
         {
             attackerIdForTrigger = b.AttackerCardId.ToString();
+            attackerSide = b.AttackerPlayerIndex;
             var atk = s.Players[b.AttackerPlayerIndex];
             var attacker = atk.Leader.Id == b.AttackerCardId ? atk.Leader
                 : atk.Characters.FirstOrDefault(c => c.Id == b.AttackerCardId);
+            damageAttacker = attacker;
             if (attacker is not null && ActionValidator.HasKeyword(s, attacker, "流放"))
                 exile = true;
         }
@@ -65,6 +69,7 @@ public static class LifeRevealManager
             // “生命变为 0 张”在生命牌离开的一刻成立；不能等该生命牌的【触发】
             // 补回生命后才判断，否则 OP05-098 会漏掉与 OP06-115 等同时满足的时点。
             bool lifeBecameZero = p.LifeArea.Count == 0;
+            bool lifeReachedOne = p.LifeArea.Count == 1;
 
             if (exile)
             {
@@ -120,15 +125,24 @@ public static class LifeRevealManager
             await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, engine.Prompts,
                 new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = lifeBecameZero });
             if (s.IsGameOver) return;
+            if (lifeReachedOne)
+            {
+                await Hex.HexRules.OnEnemyLifeReachedOneAsync(engine, attackerSide);
+                if (s.IsGameOver) return;
+            }
             // 双重攻击在本次伤害中曾把生命降到 0 后，即使 OP05-098 等效果补回生命，
             // 其余伤害也不会继续揭开刚补回的生命牌。
             if (lifeBecameZero) break;
         }
 
         // 给对方生命区造成了伤害 → 派发 OnDamageToLeader（攻击者卡可据此发动，如 OP03-040/041/043）
-        if (dealt > 0 && attackerIdForTrigger is not null && !s.IsGameOver)
-            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, engine.Prompts,
-                new Dictionary<string, object?> { ["attackerId"] = attackerIdForTrigger, ["defenderOwner"] = targetPlayerIdx });
+        if (dealt > 0 && !s.IsGameOver)
+        {
+            await Hex.HexRules.OnLeaderDamagedAsync(engine, targetPlayerIdx, dealt, damageAttacker);
+            if (attackerIdForTrigger is not null && !s.IsGameOver)
+                await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, engine.Prompts,
+                    new Dictionary<string, object?> { ["attackerId"] = attackerIdForTrigger, ["defenderOwner"] = targetPlayerIdx });
+        }
     }
 
     /// <summary>是否为"纯【触发】此卡牌登场"(无成本「：」、无条件「场合」、无后续「之后」)。

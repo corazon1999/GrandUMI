@@ -51,6 +51,78 @@ public static class PrivateStateSnapshotBuilder
             operationClockSyncUtc = state.OperationClockSyncUtc,
             operationClockPaused = state.OperationClockPaused,
             matchKind = state.MatchKind.ToString(),
+            hexState = new
+            {
+                state.HexState.Enabled,
+                state.HexState.DraftSequence,
+                state.HexState.DraftResolving,
+                resumePoint = state.HexState.ResumePoint.ToString(),
+                owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+                completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+                runtime = state.HexState.Runtime.Select(runtime => new
+                {
+                    runtime.CardsPlayedThisTurn,
+                    runtime.SoulSiphonUsedThisTurn,
+                    runtime.FirstLeaderAttackSeenThisTurn,
+                    runtime.FirstCharacterAttackSeenThisTurn,
+                    runtime.FirstEnterEffectCopiedThisTurn,
+                    runtime.FirstKoEffectCopiedThisTurn,
+                    runtime.AttacksDeclaredThisTurn,
+                    runtime.RestingCharacterAttacksThisGame,
+                    runtime.SteelHeartUsedThisGame,
+                    runtime.UltimateRefreshUsedThisTurn,
+                    runtime.FinalFormUsedThisTurn,
+                    runtime.CriticalHealSucceededThisTurn,
+                    runtime.EventDrawConvertedThisTurn,
+                    runtime.CharacterDrawConvertedThisTurn,
+                    runtime.SlapUsedThisTurn,
+                    runtime.SoulConsumeUsedThisTurn,
+                    runtime.TankEngineUsedThisTurn,
+                    runtime.TankEngineOpponentTurnPower,
+                    runtime.NavyCarnivalUsedThisTurn,
+                    runtime.KingUsedThisGame,
+                    inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
+                }).ToArray(),
+                activeDraft = state.HexState.ActiveDraft is { } draft
+                    ? new
+                    {
+                        draft.RoundId,
+                        tier = draft.Tier.ToString(),
+                        draft.DeadlineUtc,
+                        candidates = draft.Candidates.Select(items => items.ToArray()).ToArray(),
+                        lockedChoices = draft.LockedChoices.ToArray(),
+                        locked = draft.Locked.ToArray(),
+                    }
+                    : null,
+                pendingSettlement = state.HexState.PendingSettlement is { } settlement
+                    ? new
+                    {
+                        settlement.RoundId,
+                        tier = settlement.Tier.ToString(),
+                        settlement.Player0Choice,
+                        settlement.Player1Choice,
+                        resumePoint = settlement.ResumePoint.ToString(),
+                        settlement.RootOwnershipCommitted,
+                        settlement.NextGrantIndex,
+                        grants = settlement.Grants.Select(grant => new
+                        {
+                            grant.GrantKey,
+                            grant.PlayerIndex,
+                            grant.HexId,
+                            grant.NextStep,
+                            grant.PlannedStepCount,
+                            grant.Completed,
+                        }).ToArray(),
+                    }
+                    : null,
+                resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+                {
+                    draft.RoundId,
+                    tier = draft.Tier.ToString(),
+                    draft.Player0Choice,
+                    draft.Player1Choice,
+                }).ToArray(),
+            },
             isGameOver = state.IsGameOver,
             isDraw = state.IsDraw,
             winnerIndex = state.WinnerIndex,
@@ -116,6 +188,7 @@ public static class PrivateStateSnapshotBuilder
             hand = player.Hand.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             characters = player.Characters.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             stage = player.StageCard is null ? null : SnapshotCard(state, playerIndex, player.StageCard),
+            extraStage = player.ExtraStageCard is null ? null : SnapshotCard(state, playerIndex, player.ExtraStageCard),
             trash = player.Trash.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             deck = player.Deck.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),
             life = player.LifeArea.Select(c => SnapshotCard(state, playerIndex, c)).ToArray(),

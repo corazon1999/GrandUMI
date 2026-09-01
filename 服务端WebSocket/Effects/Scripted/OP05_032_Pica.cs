@@ -40,7 +40,8 @@ public class OP05_032_Pica : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
 
         var candidates = me.Characters
-            .Where(c => c.Id != self.Id && !c.Info.Name.Contains("匹卡") && ctx.State.CurrentCostOf(c) >= 3)
+            .Where(c => c.Id != self.Id && !c.Info.Name.Contains("匹卡")
+                && ctx.State.CurrentCostOf(c) >= 3 && !c.IsTapped && AtomicOps.CanRestCard(ctx.State, c))
             .ToList();
         if (candidates.Count == 0) return;
 
@@ -54,7 +55,7 @@ public class OP05_032_Pica : IScriptedEffect
         if (chosen.Count == 0) return;
 
         var target = candidates.First(c => c.Id.ToString() == chosen[0]);
-        AtomicOps.RestCard(target);
+        if (!AtomicOps.RestCard(target)) return;
         me.TurnOnceUsed.Add(key);
         ctx.State.MarkPreventKO(self.Id);
     }

@@ -17,4 +17,6 @@ public enum MatchKind
     CasualStandard,
     /// <summary>放宽标准轮换限制的休闲公开匹配；仍执行官网禁卡表。新建对局使用此值，旧快照 Casual 仍可恢复。</summary>
     CasualWild,
+    /// <summary>航海王卡牌海克斯模式；使用独立权威选秀与海克斯规则，不计入排位或普通 Leader 统计。</summary>
+    Hex,
 }

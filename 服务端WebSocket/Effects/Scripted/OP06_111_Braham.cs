@@ -32,10 +32,12 @@ public class OP06_111_Braham : IScriptedEffect
 
         // 成本候选：双方场上费用为 1 的舞台。卡文没有限定“我方”，归属方随候选保留。
         var stages = new List<(CardInstance Stage, int OwnerIndex)>();
-        if (me.StageCard is { } myStage && ctx.State.CurrentCostOf(myStage) == 1)
-            stages.Add((myStage, ctx.OwnerIndex));
-        if (opp.StageCard is { } opponentStage && ctx.State.CurrentCostOf(opponentStage) == 1)
-            stages.Add((opponentStage, 1 - ctx.OwnerIndex));
+        stages.AddRange(me.StageCards
+            .Where(stage => ctx.State.CurrentCostOf(stage) == 1)
+            .Select(stage => (stage, ctx.OwnerIndex)));
+        stages.AddRange(opp.StageCards
+            .Where(stage => ctx.State.CurrentCostOf(stage) == 1)
+            .Select(stage => (stage, 1 - ctx.OwnerIndex)));
         if (stages.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -60,7 +62,7 @@ public class OP06_111_Braham : IScriptedEffect
         var picked = stages.FirstOrDefault(candidate => candidate.Stage.Id.ToString() == stagePick[0]);
         if (picked.Stage is null) return;
         var stageOwner = ctx.State.Players[picked.OwnerIndex];
-        if (!ReferenceEquals(stageOwner.StageCard, picked.Stage)
+        if (!stageOwner.StageCards.Contains(picked.Stage)
             || ctx.State.CurrentCostOf(picked.Stage) != 1)
             return;
         AtomicOps.ReturnFieldToDeckBottom(ctx.State, picked.OwnerIndex, picked.Stage);

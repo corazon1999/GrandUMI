@@ -1,8 +1,11 @@
 using System.Reflection;
+using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Effects.Scripted;
 using GrandUMI.Game;
+using GrandUMI.Game.Hex;
+using GrandUMI.Game.Snapshot;
 
 namespace GrandUMI.Effects;
 
@@ -23,6 +26,8 @@ public static class EffectRuntime
     /// </summary>
     public static async Task TriggerEvent(GameState s, EffectTrigger trigger, IPromptService prompts, Dictionary<string, object?>? payload = null)
     {
+        await HexRules.OnGameEventAsync(s, trigger, prompts, payload);
+        if (s.IsGameOver) return;
         var candidates = CollectListeners(s, trigger, payload);
         var effects = candidates
             .Select(candidate => new TriggeredCandidate(candidate.OwnerIdx, candidate.Source, trigger, payload))
@@ -97,7 +102,7 @@ public static class EffectRuntime
         var state = _ambient;
         if (state is null) return;
 
-        if (trigger == EffectTrigger.OnCharLeaveField)
+        if (trigger is EffectTrigger.OnCharLeaveField or EffectTrigger.OnAnyCharKOd or EffectTrigger.OnCharRested)
         {
             payload = payload is null
                 ? new Dictionary<string, object?>()
@@ -136,10 +141,19 @@ public static class EffectRuntime
     }
 
     /// <summary>对单个卡牌的指定触发时机解析效果</summary>
-    public static async Task Resolve(GameState s, int ownerIdx, CardInstance source, EffectTrigger trigger, IPromptService prompts, Dictionary<string, object?>? payload = null)
+    public static async Task Resolve(
+        GameState s,
+        int ownerIdx,
+        CardInstance source,
+        EffectTrigger trigger,
+        IPromptService prompts,
+        Dictionary<string, object?>? payload = null,
+        bool hexCopy = false)
     {
         var owner = s.Players[ownerIdx];
         int turnOnceCountBefore = owner.TurnOnceUsed.Count;
+        var turnOnceKeysBefore = owner.TurnOnceUsed.ToHashSet(StringComparer.Ordinal);
+        var cardOnceKeysBefore = source.OncePerTurnUsedKeys.ToHashSet(StringComparer.Ordinal);
         // 许多旧脚本直接操作 LifeArea，容易漏派发“生命牌离场”监听。
         // 仅最外层效果记录前后生命区的卡实例，统一补齐实际离开的生命牌事件；
         // 嵌套效果共用这一轮快照，避免同一张生命牌被重复通知。
@@ -176,13 +190,16 @@ public static class EffectRuntime
         _depth++;
         try
         {
+            var activationProbe = HexRules.CanCopyEffect(s, ownerIdx, trigger, hexCopy)
+                ? new TriggerActivationProbe(prompts)
+                : null;
             var ctx = new EffectContext
             {
                 State = s,
                 OwnerIndex = ownerIdx,
                 Source = source,
                 Trigger = trigger,
-                Prompts = prompts,
+                Prompts = activationProbe?.Prompts ?? prompts,
                 Engine = (prompts as PromptSystem)?.Engine,
             };
             if (payload is not null)
@@ -214,6 +231,10 @@ public static class EffectRuntime
             if (scripted is ITriggeredEffectAvailability triggerAvailability
                 && !triggerAvailability.IsTriggerAvailable(s, ownerIdx, source, trigger, payload)) return;
 
+            // H16/H17 等“再次发动”只绑定到实际进入解决的效果。脚本中的条件失败、成本失败、
+            // 空候选静默返回均不得抢占本回合第一次复制机会。
+            activationProbe?.Begin(s);
+
             // 出牌流程会统一调用 OnEnterField，即使卡牌没有该时点效果；只为确实声明了
             // 当前触发时机的卡记录表现，避免无效果卡登场时误播“效果发动”。
             // 提示型快照会立即带走事件，无交互效果则随本批次最终快照发送。
@@ -224,20 +245,34 @@ public static class EffectRuntime
             if (scripted is not null && scripted.HandlesTrigger(trigger))
             {
                 await scripted.Resolve(ctx);
+                bool actuallyActivated = activationProbe?.WasActivated(s, ctx) ?? true;
+                HexRules.ApplyInventorSecondUse(s, ownerIdx, source, turnOnceKeysBefore, cardOnceKeysBefore);
                 MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
+                await ResolveHexCopyAsync(
+                    s, ownerIdx, source, trigger, prompts, payload, hexCopy, actuallyActivated);
                 return;
             }
 
             // 2. 已确认省略项的前置补齐层：支付旧 DSL 无法表达的成本、注册持续效果，
             // 或在旧定义不精确时完整接管该触发。返回 false 表示本次已处理/取消，不再执行 DSL。
-            if (!await DeclaredOmissionEffects.BeforeDsl(ctx)) return;
+            if (!await DeclaredOmissionEffects.BeforeDsl(ctx))
+            {
+                bool actuallyActivated = activationProbe?.WasActivated(s, ctx) ?? true;
+                await ResolveHexCopyAsync(
+                    s, ownerIdx, source, trigger, prompts, payload, hexCopy, actuallyActivated);
+                return;
+            }
 
             // 3. 退回 DSL
-            await Dsl.DslInterpreter.TryResolve(ctx);
+            bool dslActivated = await Dsl.DslInterpreter.TryResolve(ctx);
 
             // 4. 后置补齐层：依赖 DSL 刚选中的同一目标，补结算条件加成、关键字或后续动作。
             await DeclaredOmissionEffects.AfterDsl(ctx);
+            bool dslActuallyActivated = dslActivated || (activationProbe?.WasActivated(s, ctx) ?? false);
+            HexRules.ApplyInventorSecondUse(s, ownerIdx, source, turnOnceKeysBefore, cardOnceKeysBefore);
             MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
+            await ResolveHexCopyAsync(
+                s, ownerIdx, source, trigger, prompts, payload, hexCopy, dslActuallyActivated);
         }
         catch (OptionalEffectDeclinedException)
         {
@@ -256,7 +291,7 @@ public static class EffectRuntime
             }
             _depth--;
             if (isRootResolve)
-                EnqueueLifeLeaveWatchers(s, lifeBefore0!, lifeBefore1!);
+                await HandleLifeZoneChangesAsync(s, prompts, lifeBefore0!, lifeBefore1!);
             _ambient = prevAmbient;
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
@@ -275,6 +310,93 @@ public static class EffectRuntime
     {
         if (owner.TurnOnceUsed.Count > turnOnceCountBefore && OncePerTurnEffectCatalog.Contains(source.Info.Number, s))
             owner.OncePerTurnEffectUsedCardIds.Add(source.Id);
+    }
+
+    private static async Task ResolveHexCopyAsync(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        IPromptService prompts,
+        Dictionary<string, object?>? payload,
+        bool alreadyCopied,
+        bool actuallyActivated)
+    {
+        if (!actuallyActivated
+            || !HasEffectForTrigger(source, trigger)
+            || !HexRules.ShouldCopyEffect(state, owner, trigger, alreadyCopied))
+            return;
+        var copyPayload = payload is null
+            ? new Dictionary<string, object?>()
+            : new Dictionary<string, object?>(payload);
+        copyPayload["hexCopied"] = true;
+        await Resolve(state, owner, source, trigger, prompts, copyPayload, hexCopy: true);
+    }
+
+    /// <summary>
+    /// 手写脚本仍沿用 Task 接口，无法直接返回“是否真正发动”。仅在玩家拥有复制类海克斯时，
+    /// 以权威状态变化、有效交互或公开动作作为实际发动证据，避免给所有历史脚本增加侵入式标记。
+    /// </summary>
+    private sealed class TriggerActivationProbe
+    {
+        private string? _before;
+        private bool _interactionAccepted;
+
+        public TriggerActivationProbe(IPromptService prompts)
+            => Prompts = new TrackingPromptService(prompts, () => _interactionAccepted = true);
+
+        public IPromptService Prompts { get; }
+
+        public void Begin(GameState state)
+        {
+            _interactionAccepted = false;
+            _before = Fingerprint(state);
+        }
+
+        public bool WasActivated(GameState state, EffectContext context)
+            => context.ExplicitActivationObserved
+               || _interactionAccepted
+               || (_before is not null && !string.Equals(_before, Fingerprint(state), StringComparison.Ordinal));
+
+        private static string Fingerprint(GameState state)
+            => JsonSerializer.Serialize(PrivateStateSnapshotBuilder.Build(state));
+    }
+
+    private sealed class TrackingPromptService(IPromptService inner, Action markAccepted) : IPromptService
+    {
+        public async Task<List<string>> ChooseCards(
+            int playerIdx,
+            string kind,
+            string text,
+            IReadOnlyList<string> validChoices,
+            int min,
+            int max,
+            Dictionary<string, object?>? extra = null)
+        {
+            var chosen = await inner.ChooseCards(playerIdx, kind, text, validChoices, min, max, extra);
+            if (chosen.Count > 0) markAccepted();
+            return chosen;
+        }
+
+        public async Task<bool> ConfirmOptional(int playerIdx, string text)
+        {
+            // 单独确认“愿意发动”不代表成本或效果已实际落地；后续权威状态变化才计入发动。
+            return await inner.ConfirmOptional(playerIdx, text);
+        }
+
+        public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
+        {
+            int selected = await inner.ChooseOption(playerIdx, text, options);
+            markAccepted();
+            return selected;
+        }
+
+        public async Task<bool> AskLifeTrigger(int playerIdx, CardInstance lifeCard, bool hasRealTrigger)
+        {
+            bool accepted = await inner.AskLifeTrigger(playerIdx, lifeCard, hasRealTrigger);
+            if (accepted) markAccepted();
+            return accepted;
+        }
     }
 
     /// <summary>
@@ -301,6 +423,24 @@ public static class EffectRuntime
                         ["toZero"] = s.Players[owner].LifeArea.Count == 0,
                     });
             }
+        }
+    }
+
+    private static async Task HandleLifeZoneChangesAsync(
+        GameState state,
+        IPromptService prompts,
+        HashSet<Guid> lifeBefore0,
+        HashSet<Guid> lifeBefore1)
+    {
+        EnqueueLifeLeaveWatchers(state, lifeBefore0, lifeBefore1);
+        if ((prompts as PromptSystem)?.Engine is not { } engine) return;
+
+        for (int owner = 0; owner < 2; owner++)
+        {
+            var before = owner == 0 ? lifeBefore0 : lifeBefore1;
+            int added = state.Players[owner].LifeArea.Count(card => !before.Contains(card.Id));
+            if (added > 0)
+                await HexRules.OnLifeAddedAsync(engine, owner, added);
         }
     }
 
@@ -386,6 +526,7 @@ public static class EffectRuntime
         var p = s.Players[ef.Owner];
         CardInstance? card = p.Characters.FirstOrDefault(c => c.Id == ef.CardId);
         if (card is null && p.StageCard is { } st && st.Id == ef.CardId) card = st;
+        if (card is null && p.ExtraStageCard is { } extraStage && extraStage.Id == ef.CardId) card = extraStage;
         if (card is null) return; // 已离场，跳过
         var enterPayload = new Dictionary<string, object?>
         {
@@ -507,6 +648,9 @@ public static class EffectRuntime
             if (p.StageCard is not null && HasEffectForTrigger(p.StageCard, trigger)
                 && IsTriggeredEffectAvailable(s, i, p.StageCard, trigger, payload))
                 list.Add(new(i, p.StageCard));
+            if (p.ExtraStageCard is not null && HasEffectForTrigger(p.ExtraStageCard, trigger)
+                && IsTriggeredEffectAvailable(s, i, p.ExtraStageCard, trigger, payload))
+                list.Add(new(i, p.ExtraStageCard));
         }
         return list;
     }

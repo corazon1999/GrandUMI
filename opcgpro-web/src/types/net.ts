@@ -347,7 +347,7 @@ export interface MsgCancelMatch extends MsgBase {
 export type RankFaction = "pirate" | "marine" | "government";
 export type RankedMode = "standard" | "wild";
 // casual 保留为旧客户端兼容值，语义等同狂野休闲；新客户端默认使用 casualStandard。
-export type MatchQueueKind = "ranked" | "rankedWild" | "casualStandard" | "casual";
+export type MatchQueueKind = "ranked" | "rankedWild" | "casualStandard" | "casual" | "hex";
 
 export interface MsgSelectRankFaction extends MsgBase {
   proto: "MsgSelectRankFaction";
@@ -973,6 +973,7 @@ export interface MsgFriendlyLeft extends MsgBase {
 export type GameActionType =
   | "ChooseFirstPlayer" // { goFirst: boolean }
   | "Mulligan"          // { redraw: boolean }
+  | "ChooseHex"         // { roundId: string, hexId: number }
   | "PlayCard"          // { handIndex: number, freeCost?: boolean }
   | "AttachDon"         // { targetId: "leader" | cardId, count: number }
   | "UndoAttachDon"     // { operationId: string }，只能撤回服务端快照确认的最近一次贴咚
@@ -1028,6 +1029,16 @@ export interface PlayerRankIdentitySnapshot {
   placementRequired: number;
 }
 
+/** 海克斯模式允许的舞台快照；普通模式通常只有一项，海克斯效果可扩展至两项。 */
+export interface StageSnapshot {
+  id: string;
+  number: string;
+  tapped: boolean;
+  canActivateEffect: boolean;
+  activatedUsedThisTurn: boolean;
+  oncePerTurnEffectAvailable: boolean;
+}
+
 export interface PlayerSnapshot {
   name: string;
   /** 仅排位对局携带；旧回放及其他对局类型缺失时不展示。 */
@@ -1045,6 +1056,8 @@ export interface PlayerSnapshot {
   stageNumber: string | null;
   stageId: string | null;
   stageTapped: boolean;
+  /** 新快照使用数组承载至多两个舞台；旧回放仍可只携带上方扁平字段。 */
+  stages?: StageSnapshot[];
   trashNumbers: string[];
   deckCount: number;
   lifeCount: number;
@@ -1107,6 +1120,34 @@ export interface ReplayHandFrameSnapshot {
   opponentLifeCardNumbers?: string[];
 }
 
+export type HexTierSnapshot = "Silver" | "Gold" | "Rainbow";
+
+export interface HexDefinitionSnapshot {
+  id: number;
+  name: string;
+  tier: HexTierSnapshot;
+  description: string;
+}
+
+export interface HexDraftSnapshot {
+  roundId: string;
+  tier: HexTierSnapshot;
+  deadlineUtc: string;
+  /** 仅参战玩家收到自己的候选；观战者永远为 null。 */
+  candidates: HexDefinitionSnapshot[] | null;
+  myLocked: boolean;
+  mySelectedHexId: number | null;
+  opponentLocked: boolean;
+}
+
+export interface HexModeSnapshot {
+  enabled: true;
+  draftResolving: boolean;
+  myOwned: HexDefinitionSnapshot[];
+  opponentOwned: HexDefinitionSnapshot[];
+  activeDraft: HexDraftSnapshot | null;
+}
+
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
@@ -1128,7 +1169,7 @@ export interface MsgGameState extends MsgBase {
   turnCount: number;
   firstPlayer: number;
   firstPlayerChosen: boolean;
-  openingStage?: "NotStarted" | "ResolvingOpeningEffects" | "WaitingOpeningPrompt" | "RollingDice" | "WaitingFirstPlayerChoice" | "Mulligan" | "Playing";
+  openingStage?: "NotStarted" | "ResolvingOpeningEffects" | "WaitingOpeningPrompt" | "RollingDice" | "WaitingFirstPlayerChoice" | "Mulligan" | "HexDraft" | "Playing";
   isFirstPlayer: boolean;
   canChooseFirstPlayer: boolean;
   diceWinnerIsMe: boolean;
@@ -1150,7 +1191,8 @@ export interface MsgGameState extends MsgBase {
   operationClockActive?: "my" | "opponent" | null;
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
-  matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "UnknownHuman";
+  matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "Hex" | "UnknownHuman";
+  hexState?: HexModeSnapshot | null;
   isGameOver: boolean;
   isDraw?: boolean;
   winnerIsMe: boolean;

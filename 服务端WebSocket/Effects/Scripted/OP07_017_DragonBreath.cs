@@ -39,21 +39,18 @@ public class OP07_017_DragonBreath : IScriptedEffect
         }
 
         // ── 对方最多 1 张费用≤1 的舞台 KO ──
-        var stage = opp.StageCard;
-        if (stage is not null && ctx.State.CurrentCostOf(stage) <= 1)
+        var stages = opp.StageCards.Where(stage => ctx.State.CurrentCostOf(stage) <= 1).ToList();
+        if (stages.Count > 0)
         {
             var extra = new Dictionary<string, object?>
             {
-                ["choiceCards"] = new[] { new { id = stage.Id.ToString(), number = stage.Info.Number } }.ToList(),
+                ["choiceCards"] = stages.Select(stage => new { id = stage.Id.ToString(), number = stage.Info.Number }).ToList(),
             };
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentStage",
                 "将对方最多 1 张费用≤1 的舞台 KO",
-                new List<string> { stage.Id.ToString() }, 0, 1, extra);
-            if (chosen.Count > 0 && opp.StageCard is not null && opp.StageCard.Id.ToString() == chosen[0])
-            {
-                opp.Trash.Add(opp.StageCard);
-                opp.StageCard = null;
-            }
+                stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1, extra);
+            var target = stages.FirstOrDefault(stage => chosen.Contains(stage.Id.ToString()));
+            if (target is not null) AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, target);
         }
     }
 }

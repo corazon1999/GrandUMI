@@ -34,7 +34,7 @@ public class EB02_033_ShipSpirit : IScriptedEffect
                 card.Id == selfId &&
                 sideIdx == ownerIndex &&
                 (
-                    (s.Players[ownerIndex].StageCard is { } st && st.Info.NameContains("前进·梅利号")) ||
+                    s.Players[ownerIndex].StageCards.Any(st => st.Info.NameContains("前进·梅利号")) ||
                     s.Players[ownerIndex].Characters.Any(c => c.Info.NameContains("前进·梅利号"))
                 ),
         });

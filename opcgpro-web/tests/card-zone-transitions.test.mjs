@@ -68,6 +68,41 @@ test("识别手牌和卡组到角色区", () => {
   assert.deepEqual(deckToField.map(route), ["deck->field"]);
 });
 
+test("海克斯双舞台分别识别登场与废弃移动", () => {
+  const addSecondStage = detect(
+    player({
+      handCardNumbers: ["STAGE-B"],
+      handCount: 1,
+      stages: [{ id: "stage-a", number: "STAGE-A" }],
+    }),
+    player({
+      stages: [
+        { id: "stage-a", number: "STAGE-A" },
+        { id: "stage-b", number: "STAGE-B" },
+      ],
+    }),
+    { lastAction: "PlayCard", actionPayload: { cardId: "stage-b", cardNumber: "STAGE-B" } },
+  );
+  assert.deepEqual(addSecondStage.map(route), ["hand->stage"]);
+  assert.equal(addSecondStage[0].targetCardId, "stage-b");
+
+  const removeOneStage = detect(
+    player({
+      stages: [
+        { id: "stage-a", number: "STAGE-A", tapped: true },
+        { id: "stage-b", number: "STAGE-B" },
+      ],
+    }),
+    player({
+      stages: [{ id: "stage-b", number: "STAGE-B" }],
+      trashNumbers: ["STAGE-A"],
+    }),
+  );
+  assert.deepEqual(removeOneStage.map(route), ["stage->trash"]);
+  assert.equal(removeOneStage[0].sourceCardId, "stage-a");
+  assert.equal(removeOneStage[0].fromRotation, 90);
+});
+
 test("识别场上到墓地和生命到手牌", () => {
   const fieldToTrash = detect(
     player({ fieldCards: [{ id: "field-a", number: "A", isTapped: true }] }),

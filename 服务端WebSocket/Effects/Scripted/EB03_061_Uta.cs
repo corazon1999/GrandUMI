@@ -64,7 +64,7 @@ public class EB03_061_Uta : IScriptedEffect
                 if (chosen.Count > 0)
                 {
                     var tgt = charCands.First(c => c.Id.ToString() == chosen[0]);
-                    tgt.IsTapped = true;
+                    AtomicOps.RestCard(tgt);
                 }
             }
             else if (choice == 1 && hasDon)

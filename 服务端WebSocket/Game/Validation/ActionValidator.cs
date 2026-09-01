@@ -85,6 +85,7 @@ public static class ActionValidator
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段赋予咚");
         if (s.CurrentBattle is not null)      return Fail("战斗中不能赋予咚");
+        if (Hex.HexRules.Has(s, playerIdx, 12)) return Fail("【回归基本功】使你无法手动赋予咚!!");
         if (count < 1)                        return Fail("赋予咚数量必须是正整数");
         var p = s.Players[playerIdx];
         if (p.ActiveDonCount < count)         return Fail($"活跃咚不足，需要 {count} 张");
@@ -112,6 +113,8 @@ public static class ActionValidator
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段宣言攻击");
         if (s.CurrentBattle is not null)      return Fail("已有战斗进行中");
+        if (!Hex.HexRules.CanDeclareAnotherAttack(s, playerIdx))
+            return Fail("【一板一眼】使你本回合只能宣言1次攻击");
         // TurnCount 记录的是整场对局中经过的玩家回合数：
         // 1 为先手的首回合，2 为后手的首回合。双方各自的首回合均不能攻击。
         if (s.TurnCount <= 2)                 return Fail("双方各自第 1 回合不能战斗");
@@ -129,8 +132,8 @@ public static class ActionValidator
             attacker = ch;
         }
         if (attacker.IsTapped) return Fail("攻击者已休息");
-        if (attacker.HasRestriction(RestrictionKind.CannotBeRested))
-            return Fail("此角色当前无法转为休息状态，不能攻击");
+        if (!AtomicOps.CanRestCard(s, attacker, playerIdx))
+            return Fail("【霸王色霸气】使当前力量5000或以下的角色无法转为休息，不能攻击");
         if (HasCannotAttackStatus(s, attacker)) return Fail("此角色当前无法攻击");
 
         // 新登场角色当回合不能攻击（除非有【速攻】；或"登场回合可攻击角色"且本次目标为角色——OP04-096）
@@ -155,6 +158,10 @@ public static class ActionValidator
         if (targetIsLeader)
         {
             if (johnTargetLock) return Fail("对方效果限制：只能攻击“约翰船长”角色");
+            if (ReferenceEquals(attacker, me.Leader) && !Hex.HexRules.LeaderMayAttackLeader(s, playerIdx))
+                return Fail("【亮出你的剑】使领袖不能攻击敌方领袖");
+            if (!Hex.HexRules.MayAttackProtectedZeroLifeLeader(s, 1 - playerIdx))
+                return Fail("【我是天龙人】保护了生命为0且仍有休息角色的领袖");
             // 领袖必然合法（除非有"无法被攻击"效果，暂不实现）
             return OkResult;
         }
@@ -178,6 +185,12 @@ public static class ActionValidator
 
     public static bool HasKeyword(GameState s, CardInstance c, string kw)
     {
+        if (kw == "不可阻挡")
+        {
+            int side = s.SideOf(c);
+            if (side is 0 or 1 && ReferenceEquals(s.Players[side].Leader, c) && Hex.HexRules.Has(s, side, 7))
+                return true;
+        }
         // “效果无效”会移除该角色自身印刷的永续关键词（如【速攻】），
         // 但不会抹掉由其他仍生效卡牌赋予它的关键词。
         if (c.IsEffectsNullified || s.IsContinuouslyNullified(c))
@@ -211,7 +224,8 @@ public static class ActionValidator
         var me = s.Players[playerIdx];
         var source = me.Leader.Id == sourceId ? me.Leader
             : me.Characters.FirstOrDefault(c => c.Id == sourceId)
-              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
+              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null)
+              ?? (me.ExtraStageCard?.Id == sourceId ? me.ExtraStageCard : null);
         if (source is null) return Fail("效果来源不在你场上");
         if (Array.IndexOf(source.Info.EffectTags, "ActivatedMain") < 0)
             return Fail("该卡没有【启动主要】效果");
@@ -299,9 +313,8 @@ public static class ActionValidator
         if (card is null)              return Fail("阻挡者不在你场上");
         if (card.IsTapped)             return Fail("阻挡者必须为活跃状态");
         if (!HasKeyword(s, card, "阻挡者")) return Fail("该角色没有【阻挡者】效果");
-        if (card.HasRestriction(RestrictionKind.CannotBeRested)
-            || s.HasContinuousRestriction(card, RestrictionKind.CannotBeRested))
-            return Fail("此角色当前无法转为休息状态，不能发动【阻挡者】");
+        if (!AtomicOps.CanRestCard(s, card, playerIdx))
+            return Fail("【霸王色霸气】使当前力量5000或以下的角色无法转为休息，不能发动【阻挡者】");
         if (card.HasRestriction(RestrictionKind.CannotBeBlocker)
             || s.HasContinuousRestriction(card, RestrictionKind.CannotBeBlocker))
             return Fail("该角色本回合不能发动【阻挡者】");

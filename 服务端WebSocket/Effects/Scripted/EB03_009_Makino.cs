@@ -29,7 +29,7 @@ public class EB03_009_Makino : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "选择最多1张原本没有效果的角色，本回合力量+2000",

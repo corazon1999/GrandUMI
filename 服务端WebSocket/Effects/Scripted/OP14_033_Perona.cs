@@ -57,7 +57,7 @@ public class OP14_033_Perona : IScriptedEffect
         ).ToList();
         if (playable.Count == 0) return;
 
-        if (AtomicOps.RestableCount(me) < 1) return; // 无法支付成本
+        if (AtomicOps.RestableCount(ctx.State, me) < 1) return; // 无法支付成本
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "佩罗娜【KO时】：将我方 1 张卡牌转为休息状态，登场 1 张费用≤5 的绿色角色？");

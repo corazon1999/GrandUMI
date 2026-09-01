@@ -31,7 +31,7 @@ public class EB03_015_Kemy : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 收益1：赋予我方1张《鱼人族》/《人鱼族》领袖或角色最多1张休息状态的咚!!
         var donTargets = new List<CardInstance>();

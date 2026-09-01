@@ -375,7 +375,7 @@ export default function CloudReplayPanel({ onShowLocal, previewItems }: Props) {
           <option value="">全部结果</option><option value="win">胜</option><option value="loss">负</option><option value="draw">平</option>
         </select>
         <select value={matchKind} onChange={(event) => setMatchKind(event.target.value)} className="min-h-11 rounded-lg border border-gray-700 bg-gray-950 px-3 text-sm text-white">
-          <option value="">全部模式</option><option value="Ranked">标准排位</option><option value="RankedWild">狂野排位</option><option value="CasualStandard">标准休闲</option><option value="Casual">狂野休闲</option><option value="Friendly">友谊战</option><option value="Bot">AI 对战</option>
+          <option value="">全部模式</option><option value="Ranked">标准排位</option><option value="RankedWild">狂野排位</option><option value="CasualStandard">标准休闲</option><option value="Casual">狂野休闲</option><option value="Hex">海克斯</option><option value="Friendly">友谊战</option><option value="Bot">AI 对战</option>
         </select>
         <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-700 px-3 text-sm text-gray-300"><input type="checkbox" checked={bookmarkedOnly} onChange={(event) => setBookmarkedOnly(event.target.checked)} />仅书签</label>
         <button type="button" onClick={refresh} className="min-h-11 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white hover:bg-orange-400">应用筛选</button>

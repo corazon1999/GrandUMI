@@ -39,7 +39,9 @@ public class PRB02_006_Zoro : IScriptedEffect
         if (restedId != self.Id.ToString()) return;
 
         // 需存在我方其他活跃角色作为代替对象
-        var others = me.Characters.Where(c => c != self && !c.IsTapped).ToList();
+        var others = me.Characters
+            .Where(c => c != self && !c.IsTapped && AtomicOps.CanRestCard(ctx.State, c))
+            .ToList();
         if (others.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -57,7 +59,7 @@ public class PRB02_006_Zoro : IScriptedEffect
         var target = others.First(c => c.Id.ToString() == chosen[0]);
 
         // 撤销自身休息 + 改为休息所选角色
+        if (!AtomicOps.RestCard(target)) return;
         AtomicOps.ActivateCard(self);
-        AtomicOps.RestCard(target);
     }
 }

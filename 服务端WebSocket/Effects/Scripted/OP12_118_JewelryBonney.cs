@@ -28,7 +28,7 @@ public class OP12_118_JewelryBonney : IScriptedEffect
         // 休息领袖 + 休息角色 + 休息舞台 + 休息咚!! + 被赋予中的咚!!（附着咚按官方规则以横置状态置于卡下，计入休息卡）
         int restedLeader = me.Leader.IsTapped ? 1 : 0;
         int restedChars = me.Characters.Count(c => c.IsTapped);
-        int restedStage = (me.StageCard is not null && me.StageCard.IsTapped) ? 1 : 0;
+        int restedStage = me.StageCards.Count(stage => stage.IsTapped);
         int restedDon = me.CostArea.Count(d => d.State == DonState.Rest || d.State == DonState.Attached);
         int restedTotal = restedLeader + restedChars + restedStage + restedDon;
 

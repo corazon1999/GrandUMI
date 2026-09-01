@@ -68,7 +68,10 @@ public static class RoomJournal
         string action,
         JsonElement data,
         string? requestId = null,
-        long? operationSequence = null)
+        long? operationSequence = null,
+        GameActionSource source = GameActionSource.Player,
+        string? hexDraftRoundId = null,
+        DateTime? hexDraftDeadlineUtc = null)
     {
         ExecuteDurable(roomId, "action", () =>
         {
@@ -81,6 +84,9 @@ public static class RoomJournal
                 data,
                 requestId,
                 operationSequence,
+                source = GameActionSourceWire.Value(source),
+                hexDraftRoundId,
+                hexDraftDeadlineUtc,
                 tsUtc = DateTime.UtcNow,
             });
         });

@@ -24,7 +24,7 @@ public class OP12_022_Inuarashi : IScriptedEffect
 
         // 代价：将此角色转为休息状态（自身须为活跃状态）
         if (ctx.Source.IsTapped) return;
-        ctx.Source.IsTapped = true;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         // 候选：对方处于休息状态且原本费用 ≤5 的角色
         var candidates = opp.Characters

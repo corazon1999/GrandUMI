@@ -49,7 +49,7 @@ public class OP14_021_Issho : IScriptedEffect
         // 之后：对方最多 1 张休息状态的角色或舞台，下个对方重置阶段不会转为活跃
         var cands = new List<CardInstance>();
         cands.AddRange(opp.Characters.Where(c => c.IsTapped));
-        if (opp.StageCard is { IsTapped: true } stage) cands.Add(stage);
+        cands.AddRange(opp.StageCards.Where(stage => stage.IsTapped));
         if (cands.Count == 0) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterOrStage",

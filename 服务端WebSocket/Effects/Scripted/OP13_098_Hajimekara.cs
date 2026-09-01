@@ -63,14 +63,15 @@ public class OP13_098_Hajimekara : IScriptedEffect
         if (!me.Leader.Info.NameIs("伊姆")) return;
 
         // 效果：将对方费用为 7 的舞台 KO（最多 1 张）
-        if (opp.StageCard is null || ctx.State.CurrentCostOf(opp.StageCard) != 7) return;
+        var stages = opp.StageCards.Where(stage => ctx.State.CurrentCostOf(stage) == 7).ToList();
+        if (stages.Count == 0) return;
 
-        var stage = opp.StageCard;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentStage",
             "将对方最多 1 张费用为 7 的舞台 KO",
-            new List<string> { stage.Id.ToString() }, 0, 1);
+            stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1);
         if (chosen.Count == 0) return;
 
+        var stage = stages.First(stage => stage.Id.ToString() == chosen[0]);
         AtomicOps.KO(s, oppIdx, stage);
     }
 }

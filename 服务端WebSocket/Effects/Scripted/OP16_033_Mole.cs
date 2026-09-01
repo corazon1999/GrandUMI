@@ -25,7 +25,7 @@ public class OP16_033_Mole : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
-        if (AtomicOps.RestableCount(me) < 2) return; // 活跃可休置项(领袖/角色/舞台/咚)不足2，无法支付
+        if (AtomicOps.RestableCount(ctx.State, me) < 2) return; // 活跃可休置项(领袖/角色/舞台/咚)不足2，无法支付
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "莫里：将我方 2 张卡牌转为休息状态，使此角色不会被KO？");

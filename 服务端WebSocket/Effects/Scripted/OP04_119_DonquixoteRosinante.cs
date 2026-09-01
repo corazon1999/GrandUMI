@@ -55,7 +55,7 @@ public class OP04_119_DonquixoteRosinante : IScriptedEffect
             "罗西南德【登场时】：将此角色转为休息状态，登场手牌中 1 张费用 5 的绿色角色？");
         if (!use) return;
 
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var extra = new Dictionary<string, object?>
         {

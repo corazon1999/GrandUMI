@@ -24,7 +24,7 @@ public class EB04_015_Jinbe : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        if (AtomicOps.RestableCount(me) < 1) return; // 无活跃可休置项(领袖/角色/舞台/咚)，无法支付
+        if (AtomicOps.RestableCount(ctx.State, me) < 1) return; // 无活跃可休置项(领袖/角色/舞台/咚)，无法支付
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "甚平【KO时】：将我方 1 张卡牌转为休息状态，若领袖含《鱼人族》或《人鱼族》则登场 1 张费用≤6 的绿色角色？");

@@ -35,7 +35,7 @@ public class OP08_037_Carrot : IScriptedEffect
             costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (costPick.Count < 1) return;
         var costCard = costCands.First(c => c.Id.ToString() == costPick[0]);
-        AtomicOps.RestCard(costCard);
+        if (!AtomicOps.RestCard(costCard)) return;
 
         // 收益：将对方最多1张角色转为休息状态
         var targets = opp.Characters.Where(c => !c.IsTapped).ToList();

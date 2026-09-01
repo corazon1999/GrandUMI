@@ -24,7 +24,7 @@ public sealed class OP11_110_Samezvezda : IScriptedEffect
             if (!me.Leader.IsTapped && me.Leader.Info.NameIs("白星")) costs.Add(me.Leader);
             costs.AddRange(me.Characters.Where(card =>
                 card.Id != ctx.Source.Id && !card.IsTapped && card.Info.HasKeyword("鱼人岛")));
-            if (me.StageCard is { IsTapped: false } stage && stage.Info.HasKeyword("鱼人岛")) costs.Add(stage);
+            costs.AddRange(me.StageCards.Where(stage => !stage.IsTapped && stage.Info.HasKeyword("鱼人岛")));
             if (costs.Count == 0) return;
 
             var chosen = await ctx.Prompts.ChooseCards(
@@ -40,7 +40,7 @@ public sealed class OP11_110_Samezvezda : IScriptedEffect
                 });
             if (chosen.Count == 0) return;
             var cost = costs.First(card => card.Id.ToString() == chosen[0]);
-            AtomicOps.RestCard(cost);
+            if (!AtomicOps.RestCard(cost)) return;
             if (cost.IsTapped) ctx.State.MarkPreventKO(ctx.Source.Id);
             return;
         }

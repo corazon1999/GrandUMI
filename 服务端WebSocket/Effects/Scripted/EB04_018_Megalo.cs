@@ -34,7 +34,7 @@ public class EB04_018_Megalo : IScriptedEffect
         if (!use) return;
 
         // 成本：将此角色转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多 1 张休息状态且力量≤8000 的角色KO",

@@ -38,7 +38,7 @@ public class P_029_Bartolomeo : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "将我方最多 1 张《FILM》角色转为活跃状态",

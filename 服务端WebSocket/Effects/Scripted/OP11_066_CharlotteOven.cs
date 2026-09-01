@@ -35,7 +35,7 @@ public class OP11_066_CharlotteOven : IScriptedEffect
         if (!use) return;
 
         // 成本：转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 宣言任意费用（0..10）
         var costOptions = Enumerable.Range(0, 11).Select(i => i.ToString()).ToList();

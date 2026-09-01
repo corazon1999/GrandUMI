@@ -35,7 +35,7 @@ public class OP05_099_Amazon : IScriptedEffect
             "亚马逊【对方的攻击时】：将此角色转为休息状态发动效果？");
         if (!use) return;
 
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 对方决策：是否将其生命区最上方 1 张卡牌放置到废弃区
         int oppChoice = 0;

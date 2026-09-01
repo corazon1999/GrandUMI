@@ -34,7 +34,7 @@ public class OP05_088_Mansherry : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 成本：选择废弃区 2 张，按选择顺序放回卡组最下方
         var trashExtra = new Dictionary<string, object?>

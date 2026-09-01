@@ -95,6 +95,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 : CanonicalJson.Sha256Utf8(state.PendingDrawRequestDescription),
             drawRequestRejectionCounts = state.DrawRequestRejectionCounts.ToArray(),
             matchKind = state.MatchKind.ToString(),
+            hexState = FullHexState(state),
             players = state.Players.Select((player, index) => FullPlayer(player, index)).ToArray(),
             preventKoCardIds = SortedIds(state.PreventKOCardIds),
             simultaneousKoVictimIds = SortedIds(state.SimultaneousKOVictimIds),
@@ -186,6 +187,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             state.PendingDrawRequester,
             drawRequestRejectionCounts = state.DrawRequestRejectionCounts.ToArray(),
             matchKind = state.MatchKind.ToString(),
+            hexState = PublicHexState(state),
             players = state.Players.Select((player, index) => PublicPlayer(player, index)).ToArray(),
             continuousEffects = state.ContinuousEffects.Select(ContinuousEffect).ToArray(),
             state.ExtraTurnPending,
@@ -223,6 +225,110 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             }).ToArray(),
         });
 
+    private static object FullHexState(GameState state)
+        => new
+        {
+            state.HexState.Enabled,
+            state.HexState.DraftSequence,
+            state.HexState.DraftResolving,
+            resumePoint = state.HexState.ResumePoint.ToString(),
+            owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+            completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+            runtime = state.HexState.Runtime.Select(runtime => new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+            }).ToArray(),
+            activeDraft = state.HexState.ActiveDraft is { } draft
+                ? new
+                {
+                    draft.RoundId,
+                    tier = draft.Tier.ToString(),
+                    candidates = draft.Candidates.Select(items => items.ToArray()).ToArray(),
+                    lockedChoices = draft.LockedChoices.ToArray(),
+                    locked = draft.Locked.ToArray(),
+                }
+                : null,
+            pendingSettlement = state.HexState.PendingSettlement is { } settlement
+                ? new
+                {
+                    settlement.RoundId,
+                    tier = settlement.Tier.ToString(),
+                    settlement.Player0Choice,
+                    settlement.Player1Choice,
+                    resumePoint = settlement.ResumePoint.ToString(),
+                    settlement.RootOwnershipCommitted,
+                    settlement.NextGrantIndex,
+                    grants = settlement.Grants.Select(grant => new
+                    {
+                        grant.GrantKey,
+                        grant.PlayerIndex,
+                        grant.HexId,
+                        grant.NextStep,
+                        grant.PlannedStepCount,
+                        grant.Completed,
+                    }).ToArray(),
+                }
+                : null,
+            resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+            {
+                draft.RoundId,
+                tier = draft.Tier.ToString(),
+                draft.Player0Choice,
+                draft.Player1Choice,
+            }).ToArray(),
+        };
+
+    private static object PublicHexState(GameState state)
+        => new
+        {
+            state.HexState.Enabled,
+            draftResolving = state.HexState.DraftResolving || state.HexState.PendingSettlement is not null,
+            owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+            completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+            activeDraft = state.HexState.ActiveDraft is { } draft
+                ? new
+                {
+                    draft.RoundId,
+                    tier = draft.Tier.ToString(),
+                    locked = draft.Locked.ToArray(),
+                }
+                : null,
+            settlingRound = state.HexState.PendingSettlement is { } settlement
+                ? new
+                {
+                    settlement.RoundId,
+                    tier = settlement.Tier.ToString(),
+                }
+                : null,
+            resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+            {
+                draft.RoundId,
+                tier = draft.Tier.ToString(),
+                draft.Player0Choice,
+                draft.Player1Choice,
+            }).ToArray(),
+        };
+
     private static object FullPlayer(PlayerState player, int playerIndex)
         => new
         {
@@ -231,6 +337,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             hand = player.Hand.Select(FullCard).ToArray(),
             characters = player.Characters.Select(FullCard).ToArray(),
             stage = player.StageCard is null ? null : FullCard(player.StageCard),
+            extraStage = player.ExtraStageCard is null ? null : FullCard(player.ExtraStageCard),
             trash = player.Trash.Select(FullCard).ToArray(),
             deck = player.Deck.Select(FullCard).ToArray(),
             life = player.LifeArea.Select(FullCard).ToArray(),
@@ -253,6 +360,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             handCount = player.Hand.Count,
             characters = player.Characters.Select(FullCard).ToArray(),
             stage = player.StageCard is null ? null : FullCard(player.StageCard),
+            extraStage = player.ExtraStageCard is null ? null : FullCard(player.ExtraStageCard),
             trash = player.Trash.Select(FullCard).ToArray(),
             deckCount = player.Deck.Count,
             life = player.LifeArea.Select(card => card.IsLifeFaceUp

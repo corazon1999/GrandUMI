@@ -51,7 +51,7 @@ public class OP03_028_Jango : IScriptedEffect
         else
         {
             // 横置自身
-            AtomicOps.RestCard(self);
+            if (!AtomicOps.RestCard(self)) return;
             // 对方最多1张角色横置
             var oppChars = opp.Characters.Where(c => !c.IsTapped).ToList();
             if (oppChars.Count == 0) return;

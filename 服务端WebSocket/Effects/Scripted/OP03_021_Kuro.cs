@@ -28,7 +28,8 @@ public class OP03_021_Kuro : IScriptedEffect
         var activeDons = me.CostArea
             .Where(d => d.State == DonState.Active && d.AttachedToCardId is null).ToList();
         if (activeDons.Count < 3) return;
-        var eastCands = me.Characters.Where(c => c.Info.HasKeyword("东海") && !c.IsTapped).ToList();
+        var eastCands = me.Characters.Where(c => c.Info.HasKeyword("东海")
+            && !c.IsTapped && AtomicOps.CanRestCard(ctx.State, c)).ToList();
         if (eastCands.Count < 2) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
@@ -41,10 +42,12 @@ public class OP03_021_Kuro : IScriptedEffect
             eastCands.Select(c => c.Id.ToString()).ToList(), 2, 2);
         if (costPick.Count < 2) return;
 
-        // 成本：休息3张活跃咚!!
+        var selectedCosts = costPick.Select(id => eastCands.First(c => c.Id.ToString() == id)).ToArray();
+        if (selectedCosts.Any(card => !AtomicOps.CanRestCard(ctx.State, card))) return;
+        foreach (var card in selectedCosts)
+            if (!AtomicOps.RestCard(card)) return;
+        // 卡牌成本全部成功后才支付咚!!，避免部分支付。
         for (int i = 0; i < 3; i++) activeDons[i].State = DonState.Rest;
-        foreach (var id in costPick)
-            AtomicOps.RestCard(eastCands.First(c => c.Id.ToString() == id));
 
         // 效果：将此领袖转为活跃状态
         AtomicOps.ActivateCard(me.Leader);

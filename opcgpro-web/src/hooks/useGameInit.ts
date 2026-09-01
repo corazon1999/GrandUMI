@@ -35,7 +35,8 @@ export function useGameInit() {
       ...my.fieldCards.map((c) => c.number),
       ...opp.fieldCards.map((c) => c.number),
       ...my.trashNumbers, ...opp.trashNumbers,
-      my.stageNumber, opp.stageNumber,
+      ...my.stages.map((stage) => stage.number),
+      ...opp.stages.map((stage) => stage.number),
     ].filter((n): n is string => !!n);
 
     const missing = new Set<string>();

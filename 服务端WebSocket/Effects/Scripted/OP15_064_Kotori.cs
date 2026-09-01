@@ -33,7 +33,7 @@ public class OP15_064_Kotori : IScriptedEffect
         if (!agu || !kobe) return;
 
         // 成本可支付性：自身需活跃；费用区需 ≥2 张可放回的咚（活跃/休息/附着皆可）
-        if (self.IsTapped) return;
+        if (self.IsTapped || !AtomicOps.CanRestCard(ctx.State, self)) return;
         if (me.CostArea.Count < 2) return;
 
         // 收益候选：对方力量≤5000 的角色
@@ -47,8 +47,9 @@ public class OP15_064_Kotori : IScriptedEffect
         if (!use) return;
 
         // 成本：咚!!-2 + 横置自身
+        // 已在进入交互前验证角色横置成本；房间串行队列保证支付咚!!期间该条件不发生竞态。
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacterPwLe5000",
             "选择对方最多 1 张力量≤5000 的角色转为休息状态",

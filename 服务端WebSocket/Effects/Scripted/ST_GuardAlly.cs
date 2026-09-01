@@ -121,7 +121,7 @@ public class ST30_011_Buggy : IScriptedEffect
         if (victim.Id == self.Id) return;
         if (self.IsTapped) return; // 已休息无法支付
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "巴奇：将自身转为休息状态，使该力量6000角色不离场？")) return;
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         if (ctx.Trigger == EffectTrigger.OnAllyWillLeaveField)
         {
             var simultaneousVictims = ctx.State.SimultaneousLeaveVictimIds;

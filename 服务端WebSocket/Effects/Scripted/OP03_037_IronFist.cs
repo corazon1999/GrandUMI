@@ -44,7 +44,7 @@ public class OP03_037_IronFist : IScriptedEffect
                 "将我方1张《东海》角色转为休息状态（成本）",
                 costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
             if (costPick.Count < 1) return;
-            AtomicOps.RestCard(costCands.First(c => c.Id.ToString() == costPick[0]));
+            if (!AtomicOps.RestCard(costCands.First(c => c.Id.ToString() == costPick[0]))) return;
 
             // 效果：KO 对方最多1张
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",

@@ -61,6 +61,10 @@ export default function GameActions() {
     my && selectedFieldId !== null
       ? my.fieldCards.find((card) => card.id === selectedFieldId)
       : undefined;
+  const selectedStage =
+    my && selectedFieldId !== null
+      ? my.stages.find((stage) => stage.id === selectedFieldId)
+      : undefined;
 
   // 启动效果以服务端权威合法性为准。服务端统一考虑阶段、整卡无效、卡牌专属条件与成本，
   // 客户端不再根据卡面标签推测，避免展示点击后只会静默失败的按钮。
@@ -68,8 +72,8 @@ export default function GameActions() {
     my && selectedFieldId !== null
       ? selectedFieldId === my.leaderId
           ? my.leaderCanActivateEffect
-          : selectedFieldId === my.stageId
-            ? my.stageCanActivateEffect
+          : selectedStage
+            ? selectedStage.canActivateEffect
             : (selectedFieldCard?.canActivateEffect ?? false)
       : false;
   const canActivate =

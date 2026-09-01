@@ -33,7 +33,7 @@ public class OP01_063_Arlong : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 选择对方 1 张手牌公开（对方手牌为非公开区，传卡面）
         var extra = new Dictionary<string, object?>

@@ -100,7 +100,10 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const deckIncomplete = mainCount > 0 && mainCount !== 50;
   const canEnter      = !!selectedDeck && !deckIncomplete && connState === "connected" && roomOperation === "idle" && !maintenance.enabled;
   const isRanked = matchQueueKind === "ranked" || matchQueueKind === "rankedWild";
-  const matchQueueLabel = matchQueueKind === "rankedWild"
+  const isHex = matchQueueKind === "hex";
+  const matchQueueLabel = matchQueueKind === "hex"
+    ? "海克斯"
+    : matchQueueKind === "rankedWild"
     ? "狂野排位"
     : matchQueueKind === "ranked"
       ? "标准排位"
@@ -287,9 +290,9 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <>
                     <div>
                       <h2 className="font-bold text-white">公开匹配</h2>
-                      <p className="mt-1 text-sm leading-5 text-gray-500">排位会改变悬赏金，休闲不影响排名。</p>
+                      <p className="mt-1 text-sm leading-5 text-gray-500">排位会改变悬赏金；海克斯模式会在对局中三次选择强化。</p>
                     </div>
-                    <div className="grid grid-cols-2 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
+                    <div className="grid grid-cols-3 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
                       <button
                         type="button"
                         onClick={() => useNetStore.getState().setMatchQueueKind(rankedMode === "wild" ? "rankedWild" : "ranked")}
@@ -301,14 +304,22 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       <button
                         type="button"
                         onClick={() => useNetStore.getState().setMatchQueueKind(rankedMode === "wild" ? "casual" : "casualStandard")}
-                        aria-pressed={!isRanked}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-black transition-colors ${!isRanked ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        aria-pressed={!isRanked && !isHex}
+                        className={`min-h-11 rounded-lg px-2 text-sm font-black transition-colors ${!isRanked && !isHex ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
                       >
                         休闲匹配
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => useNetStore.getState().setMatchQueueKind("hex")}
+                        aria-pressed={isHex}
+                        className={`min-h-11 rounded-lg px-2 text-sm font-black transition-colors ${isHex ? "bg-cyan-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                      >
+                        海克斯
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 rounded-xl border border-violet-900/70 bg-gray-950 p-1" aria-label={isRanked ? "排位模式" : "休闲模式"}>
+                    {!isHex && <div className="grid grid-cols-2 rounded-xl border border-violet-900/70 bg-gray-950 p-1" aria-label={isRanked ? "排位模式" : "休闲模式"}>
                         <button
                           type="button"
                           onClick={() => useNetStore.getState().setMatchQueueKind(isRanked ? "ranked" : "casualStandard")}
@@ -325,13 +336,15 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                         >
                           狂野
                         </button>
-                      </div>
-                    <p className="text-xs leading-5 text-gray-500">
-                      {rankedMode === "standard"
-                        ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
-                        : isRanked
-                          ? "狂野排位可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"
-                          : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
+                      </div>}
+                    <p className={`text-xs leading-5 ${isHex ? "text-cyan-200/80" : "text-gray-500"}`}>
+                      {isHex
+                        ? "海克斯使用狂野公开卡池与禁卡表；调度后、双方各完成第 2 与第 5 个自己的回合后，分别进行白银、黄金和彩虹三选一。候选仅本人可见。"
+                        : rankedMode === "standard"
+                          ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
+                          : isRanked
+                            ? "狂野排位可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"
+                            : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
                     </p>
 
                     {isRanked && rankProfile && (
@@ -422,7 +435,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       type="button"
                       onClick={handleMatch}
                       disabled={!canQueue}
-                      className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${isRanked ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
+                      className={`h-12 w-full rounded-xl text-base font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600 ${isHex ? "bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700" : isRanked ? "bg-violet-600 hover:bg-violet-500 active:bg-violet-700" : "bg-orange-500 hover:bg-orange-400 active:bg-orange-600"}`}
                     >
                       开始{matchQueueLabel}匹配
                     </button>

@@ -39,7 +39,7 @@ public class OP06_020_HodyJones : IScriptedEffect
         if (!use) return;
 
         // 成本：横置领袖自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         ctx.State.NoEffectLifeToHandThisTurn.Add(ctx.OwnerIndex);
 
         // 二选一

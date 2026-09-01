@@ -68,12 +68,17 @@ public class OP02_118_YasakaniNoMagatama : IScriptedEffect
         // 【触发】：将对方最多1张费用≤3的舞台KO
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            var stage = opp.StageCard;
-            if (stage is null || ctx.State.CurrentCostOf(stage) > 3) return;
-            bool ko = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-                "八尺琼勾玉【触发】：将对方费用≤3的舞台KO？");
-            if (!ko) return;
-            AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, stage);
+            var stages = opp.StageCards.Where(stage => ctx.State.CurrentCostOf(stage) <= 3).ToList();
+            if (stages.Count == 0) return;
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentStage",
+                "八尺琼勾玉【触发】：选择对方最多1张费用≤3的舞台KO",
+                stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = stages.Select(stage => new { id = stage.Id.ToString(), number = stage.Info.Number }).ToList(),
+                });
+            var target = stages.FirstOrDefault(stage => chosen.Contains(stage.Id.ToString()));
+            if (target is not null) AtomicOps.KO(ctx.State, 1 - ctx.OwnerIndex, target);
         }
     }
 }

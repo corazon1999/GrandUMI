@@ -66,7 +66,7 @@ public class OP15_054_Lebecca : IScriptedEffect
             // 双方舞台都可作为目标
             var stages = new List<(int owner, CardInstance card)>();
             for (int i = 0; i < 2; i++)
-                if (ctx.State.Players[i].StageCard is { } sc) stages.Add((i, sc));
+                stages.AddRange(ctx.State.Players[i].StageCards.Select(stage => (i, stage)));
             if (stages.Count == 0) return;
 
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "AnyStage",

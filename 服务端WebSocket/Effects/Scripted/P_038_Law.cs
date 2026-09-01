@@ -33,7 +33,7 @@ public class P_038_Law : IScriptedEffect
         if (!use) return;
 
         // 成本：横置我方领袖
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择 1 张费用≤1 的对方角色 KO",

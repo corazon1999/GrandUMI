@@ -77,6 +77,17 @@ public class PlayerState
     /// <summary>角色区（最多 5）</summary>
     public CharacterZone Characters { get; }
     public CardInstance? StageCard       { get; set; }
+    /// <summary>仅【三号船坞】存在时启用的第二舞台区。</summary>
+    public CardInstance? ExtraStageCard  { get; set; }
+    /// <summary>按固定槽位顺序枚举当前舞台；普通模式只会返回首槽。</summary>
+    public IEnumerable<CardInstance> StageCards
+    {
+        get
+        {
+            if (StageCard is not null) yield return StageCard;
+            if (ExtraStageCard is not null) yield return ExtraStageCard;
+        }
+    }
     public List<CardInstance> Trash      { get; } = new();
     public List<CardInstance> Deck       { get; } = new();
     public List<CardInstance> LifeArea   { get; } = new();
@@ -115,6 +126,22 @@ public class PlayerState
     public int TotalDonInCostArea => CostArea.Count;
     public int DeckCount => Deck.Count;
     public int LifeCount => LifeArea.Count;
+
+    /// <summary>从其实际舞台槽移除指定实例；重复或错误实例不会改变状态。</summary>
+    public bool RemoveStageCard(CardInstance card)
+    {
+        if (ReferenceEquals(StageCard, card))
+        {
+            StageCard = null;
+            return true;
+        }
+        if (ReferenceEquals(ExtraStageCard, card))
+        {
+            ExtraStageCard = null;
+            return true;
+        }
+        return false;
+    }
 
     private void RestAttachedDonForDepartingCharacter(CardInstance character)
     {

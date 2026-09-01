@@ -292,6 +292,7 @@ public static class LegalActionService
         var effectSources = new[] { me.Leader }
             .Concat(me.Characters)
             .Concat(me.StageCard is null ? Array.Empty<CardInstance>() : new[] { me.StageCard })
+            .Concat(me.ExtraStageCard is null ? Array.Empty<CardInstance>() : new[] { me.ExtraStageCard })
             .OrderBy(card => card.Id);
         foreach (var source in effectSources)
             AddConcrete(state, actor, purpose, "UseEffect", new { sourceId = source.Id.ToString() }, "main", pending);

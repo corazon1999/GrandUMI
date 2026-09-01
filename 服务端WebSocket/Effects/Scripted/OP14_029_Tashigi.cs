@@ -41,7 +41,7 @@ public class OP14_029_Tashigi : IScriptedEffect
             var victimOwner = ctx.Vars.TryGetValue("victimOwner", out var vo) && vo is int oi ? oi : -1;
             if (victimOwner != ctx.OwnerIndex || victimId != self.Id.ToString()) return;
 
-            if (AtomicOps.RestableCount(me) < 1) return;
+            if (AtomicOps.RestableCount(ctx.State, me) < 1) return;
 
             bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "达斯琪：是否将我方 1 张卡牌转为休息状态，使此角色不离场？");
@@ -58,7 +58,7 @@ public class OP14_029_Tashigi : IScriptedEffect
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
 
-        if (AtomicOps.RestableCount(me) < 2) return; // 不足 2 张活跃可休置项无法支付成本
+        if (AtomicOps.RestableCount(ctx.State, me) < 2) return; // 不足 2 张活跃可休置项无法支付成本
 
         bool act = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "达斯琪【启动主要】：将我方 2 张卡牌转为休息状态，使此角色力量 +2000？");

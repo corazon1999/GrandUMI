@@ -11,7 +11,7 @@ test("启动效果按钮只采用服务端权威可发动字段", async () => {
 
   assert.match(actions, /selectedCanActivateEffect/);
   assert.match(actions, /my\.leaderCanActivateEffect/);
-  assert.match(actions, /my\.stageCanActivateEffect/);
+  assert.match(actions, /selectedStage\.canActivateEffect/);
   assert.match(actions, /selectedFieldCard\?\.canActivateEffect/);
   assert.doesNotMatch(actions, /canPayActivatedMainCost/);
   assert.match(store, /canActivateEffect: card\.canActivateEffect \?\? false/);

@@ -38,7 +38,7 @@ public class EB03_012_Otama : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 二选一：角色 vs 咚!!（只有一类可选时直接走该类）
         int branch;

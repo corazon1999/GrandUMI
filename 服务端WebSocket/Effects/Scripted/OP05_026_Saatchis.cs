@@ -44,7 +44,7 @@ public class OP05_026_Saatchis : IScriptedEffect
             costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (paid.Count < 1) return;
         var costTarget = costCands.First(c => c.Id.ToString() == paid[0]);
-        AtomicOps.RestCard(costTarget);
+        if (!AtomicOps.RestCard(costTarget)) return;
 
         me.TurnOnceUsed.Add(key);
 

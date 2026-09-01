@@ -161,6 +161,7 @@ public static class DslInterpreter
     {
         var ruleset = CardRulesetManager.For(ctx.State);
         if (!ruleset.TryGetDslDefinition(ctx.Source.Info.Number, out var def)) return false;
+        bool activated = false;
 
         var triggerName = ctx.Trigger.ToString();
         // 1. triggers: 数组里找 on == 当前触发的项
@@ -189,6 +190,7 @@ public static class DslInterpreter
                     if (!await PayActivationCost(t, ctx)) continue;
                     await RunSteps(t.GetProperty("then"), ctx);
                     MarkTriggerOncePerTurnUsed(t, ctx, triggerName);
+                    activated = true;
                 }
             }
         }
@@ -197,7 +199,10 @@ public static class DslInterpreter
         if (ctx.Trigger == EffectTrigger.EventMain && def.TryGetProperty("main", out var main))
         {
             if (CheckCondition(main, ctx) && await PayActivationCost(main, ctx) && main.TryGetProperty("then", out var then))
+            {
                 await RunSteps(then, ctx);
+                activated = true;
+            }
         }
         // 4. trigger: 生命牌触发（数组=直接执行；对象=支持 cost/if 节，复用 PayActivationCost，同 counter）
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger && def.TryGetProperty("trigger", out var trig))
@@ -205,11 +210,15 @@ public static class DslInterpreter
             if (trig.ValueKind == JsonValueKind.Array)
             {
                 await RunSteps(trig, ctx);
+                activated = true;
             }
             else if (trig.ValueKind == JsonValueKind.Object)
             {
                 if (CheckCondition(trig, ctx) && await PayActivationCost(trig, ctx) && trig.TryGetProperty("then", out var tthen))
+                {
                     await RunSteps(tthen, ctx);
+                    activated = true;
+                }
             }
         }
         // 5. activated: 【启动主要】（由 HandleUseEffect 触发 ActivatedMain）
@@ -221,6 +230,7 @@ public static class DslInterpreter
                 {
                     await RunSteps(then, ctx);
                     MarkOncePerTurnUsed(act, ctx);
+                    activated = true;
                 }
             }
         }
@@ -230,14 +240,18 @@ public static class DslInterpreter
             if (co.ValueKind == JsonValueKind.Array)
             {
                 await RunSteps(co, ctx);
+                activated = true;
             }
             else if (co.ValueKind == JsonValueKind.Object)
             {
                 if (CheckCondition(co, ctx) && await PayActivationCost(co, ctx) && co.TryGetProperty("then", out var cthen))
+                {
                     await RunSteps(cthen, ctx);
+                    activated = true;
+                }
             }
         }
-        return true;
+        return activated;
     }
 
     /// <summary>检查"【每回合 1 次】"占位是否已用</summary>
@@ -330,8 +344,7 @@ public static class DslInterpreter
         // restSelf: 把自身转休息
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
         {
-            if (ctx.Source.IsTapped) return false;
-            ctx.Source.IsTapped = true;
+            if (ctx.Source.IsTapped || !AtomicOps.RestCard(ctx.Source)) return false;
         }
 
         // selfToTrash: 把自身放置到废弃区
@@ -542,12 +555,13 @@ public static class DslInterpreter
             var rcands = new List<CardInstance>();
             if (!me.Leader.IsTapped && (kw == "" || me.Leader.Info.HasKeyword(kw))) rcands.Add(me.Leader);
             if (me.StageCard is not null && !me.StageCard.IsTapped && (kw == "" || me.StageCard.Info.HasKeyword(kw))) rcands.Add(me.StageCard);
+            if (me.ExtraStageCard is not null && !me.ExtraStageCard.IsTapped && (kw == "" || me.ExtraStageCard.Info.HasKeyword(kw))) rcands.Add(me.ExtraStageCard);
             if (rcands.Count == 0) return false;
             var rchosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLeaderOrStageToRest",
                 kw == "" ? "将我方1张领袖或舞台转为休息状态（可放弃）" : $"将我方1张《{kw}》领袖或舞台转为休息状态（可放弃）",
                 rcands.Select(c => c.Id.ToString()).ToList(), 0, 1);
             if (rchosen.Count == 0) return false;
-            AtomicOps.RestCard(rcands.First(c => c.Id.ToString() == rchosen[0]));
+            if (!AtomicOps.RestCard(rcands.First(c => c.Id.ToString() == rchosen[0]))) return false;
         }
 
         // bounceOwnChar: 将我方 N 张角色放回手牌作为成本（数字=任意角色；对象 {n,...过滤} 带筛选，如 OP10-056 费≥4 德莱斯罗兹）。
@@ -605,18 +619,19 @@ public static class DslInterpreter
         // returnOwnStage: 将我方 1 张舞台放回卡组最下方作为成本（可带 originalCost 过滤；可放弃）。
         if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
         {
-            if (me.StageCard is null) return false;
-            bool sok = true;
-            if (ros.ValueKind == JsonValueKind.Object)
-            {
-                if (ros.TryGetProperty("originalCostLte", out var ocl) && me.StageCard.Info.Cost > ocl.GetInt32()) sok = false;
-                if (ros.TryGetProperty("originalCostGte", out var ocg) && me.StageCard.Info.Cost < ocg.GetInt32()) sok = false;
-            }
-            if (!sok) return false;
+            var stages = new[] { me.StageCard, me.ExtraStageCard }
+                .OfType<CardInstance>()
+                .Where(stage => ros.ValueKind != JsonValueKind.Object
+                    || (!ros.TryGetProperty("originalCostLte", out var ocl) || stage.Info.Cost <= ocl.GetInt32())
+                    && (!ros.TryGetProperty("originalCostGte", out var ocg) || stage.Info.Cost >= ocg.GetInt32()))
+                .ToList();
+            if (stages.Count == 0) return false;
             var schosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnStageToDeckBottom",
-                "将我方1张舞台放回卡组最下方（可放弃）", new List<string> { me.StageCard.Id.ToString() }, 0, 1);
+                "将我方1张舞台放回卡组最下方（可放弃）", stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1);
             if (schosen.Count == 0) return false;
-            AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, me.StageCard);
+            var selectedStage = stages.FirstOrDefault(stage => stage.Id.ToString() == schosen[0]);
+            if (selectedStage is null) return false;
+            AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, selectedStage);
         }
 
         // selfToDeckBottom: 将此角色放回持有者卡组最下方作为成本（OP06-016）。
@@ -697,7 +712,7 @@ public static class DslInterpreter
         if (cost.TryGetProperty("restCards", out var restCards))
         {
             int n = restCards.ValueKind == JsonValueKind.Number ? restCards.GetInt32() : GetInt(restCards, "n", 1);
-            if (AtomicOps.RestableCount(me) < n) return false;
+            if (AtomicOps.RestableCount(ctx.State, me) < n) return false;
         }
 
         if (cost.TryGetProperty("restCharacters", out var restCharacters))
@@ -753,7 +768,8 @@ public static class DslInterpreter
         {
             var kw = rok.TryGetProperty("keyword", out var kwv) ? kwv.GetString() ?? "" : "";
             bool any = (!me.Leader.IsTapped && (kw == "" || me.Leader.Info.HasKeyword(kw)))
-                       || (me.StageCard is not null && !me.StageCard.IsTapped && (kw == "" || me.StageCard.Info.HasKeyword(kw)));
+                       || (me.StageCard is not null && !me.StageCard.IsTapped && (kw == "" || me.StageCard.Info.HasKeyword(kw)))
+                       || (me.ExtraStageCard is not null && !me.ExtraStageCard.IsTapped && (kw == "" || me.ExtraStageCard.Info.HasKeyword(kw)));
             if (!any) return false;
         }
 
@@ -776,12 +792,12 @@ public static class DslInterpreter
 
         if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
         {
-            if (me.StageCard is null) return false;
-            if (ros.ValueKind == JsonValueKind.Object)
-            {
-                if (ros.TryGetProperty("originalCostLte", out var ocl) && me.StageCard.Info.Cost > ocl.GetInt32()) return false;
-                if (ros.TryGetProperty("originalCostGte", out var ocg) && me.StageCard.Info.Cost < ocg.GetInt32()) return false;
-            }
+            bool anyStage = new[] { me.StageCard, me.ExtraStageCard }
+                .OfType<CardInstance>()
+                .Any(stage => ros.ValueKind != JsonValueKind.Object
+                    || (!ros.TryGetProperty("originalCostLte", out var ocl) || stage.Info.Cost <= ocl.GetInt32())
+                    && (!ros.TryGetProperty("originalCostGte", out var ocg) || stage.Info.Cost >= ocg.GetInt32()));
+            if (!anyStage) return false;
         }
 
         if (cost.TryGetProperty("attachDonToNamed", out var adn) && adn.ValueKind == JsonValueKind.Object)
@@ -1027,7 +1043,8 @@ public static class DslInterpreter
                     // 我方场上处于休息状态的卡牌张数（休息角色 + 休息咚 + 休息舞台）≥ N
                     int rested = me.Characters.Count(c => c.IsTapped)
                                  + me.CostArea.Count(d => d.State == DonState.Rest)
-                                 + (me.StageCard is not null && me.StageCard.IsTapped ? 1 : 0);
+                                 + (me.StageCard is not null && me.StageCard.IsTapped ? 1 : 0)
+                                 + (me.ExtraStageCard is not null && me.ExtraStageCard.IsTapped ? 1 : 0);
                     if (rested < p.Value.GetInt32()) return false;
                     break;
                 }
@@ -2150,6 +2167,7 @@ public static class DslInterpreter
             if (p.Leader == c) return i;
             if (p.Characters.Contains(c)) return i;
             if (p.StageCard == c) return i;
+            if (p.ExtraStageCard == c) return i;
         }
         return -1;
     }
@@ -2192,9 +2210,9 @@ public static class DslInterpreter
             "OwnTrashCharacter"           => me.Trash.Where(c => c.Info.Kind == CardKind.Character).ToList(),
             "OwnTrashEvent"               => me.Trash.Where(c => c.Info.Kind == CardKind.Event).ToList(),
             "OwnTrash"                    => me.Trash.ToList(),
-            "OwnStage"                    => me.StageCard is { } sc ? new List<CardInstance> { sc } : new(),
-            "OpponentStage"               => opp.StageCard is { } osc ? new List<CardInstance> { osc } : new(),
-            "AnyStage"                    => new[] { me.StageCard, opp.StageCard }.Where(c => c is not null).Cast<CardInstance>().ToList(),
+            "OwnStage"                    => new[] { me.StageCard, me.ExtraStageCard }.OfType<CardInstance>().ToList(),
+            "OpponentStage"               => new[] { opp.StageCard, opp.ExtraStageCard }.OfType<CardInstance>().ToList(),
+            "AnyStage"                    => new[] { me.StageCard, me.ExtraStageCard, opp.StageCard, opp.ExtraStageCard }.OfType<CardInstance>().ToList(),
             "OpponentCharacterCostLe5"    => opp.Characters.Where(c => OpponentFieldCost(c) <= 5).ToList(),
             // C2 看对手私有区域：候选 ID 仍是卡 GUID，但仅向查看方暴露
             "OpponentHand"                => opp.Hand.ToList(),

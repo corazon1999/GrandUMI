@@ -29,7 +29,7 @@ public class OP12_026_Kuina : IScriptedEffect
 
         // 成本：自身转休息（已休息无法发动）
         if (ctx.Source.IsTapped) return;
-        ctx.Source.IsTapped = true;
+        if (!AtomicOps.RestCard(ctx.Source)) return;
 
         // 1. 将对方最多 1 张原本费用不高于 4 的角色转为休息状态
         var candidates = opp.Characters.Where(c => c.Info.Cost <= 4).ToList();

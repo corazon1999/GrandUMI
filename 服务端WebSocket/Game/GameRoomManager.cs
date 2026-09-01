@@ -103,6 +103,15 @@ public static class GameRoomManager
         CancellationToken Token,
         int RetryAttempt);
 
+    /// <summary>roomId → 海克斯私密选秀超时任务；只负责入队，选择与随机数均由权威引擎动作完成。</summary>
+    private static readonly ConcurrentDictionary<string, HexDraftTimeout> _hexDraftTimeouts = new();
+    private sealed record HexDraftTimeout(
+        string RoundId,
+        DateTime DeadlineUtc,
+        CancellationTokenSource Cancellation,
+        CancellationToken Token,
+        int RetryAttempt);
+
     public class RoomEntry
     {
         public required string RoomId { get; init; }
@@ -214,6 +223,7 @@ public static class GameRoomManager
         }
         CancelStartingPlayerChoiceTimeout(room.RoomId);
         CancelMulliganTimeout(room.RoomId);
+        CancelHexDraftTimeout(room.RoomId);
         foreach (var sessionId in room.PlayerSessionIds)
         {
             if (!_grace.TryRemove(room.RoomId + ":" + sessionId, out var grace)) continue;
@@ -281,7 +291,8 @@ public static class GameRoomManager
             firstPlayer: firstPlayer,
             leaderKeywordWildcard: vsBot,
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
-            deferInitialSetupUntilStart: true);
+            deferInitialSetupUntilStart: true,
+            matchKind: matchKind);
         engine.State.Players[0].DisplayName = p0DisplayName ?? p0Account;
         engine.State.Players[1].DisplayName = p1DisplayName ?? p1Account;
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
@@ -319,6 +330,7 @@ public static class GameRoomManager
         {
             EnsureStartingPlayerChoiceTimeout(entry);
             EnsureMulliganTimeout(entry);
+            EnsureHexDraftTimeout(entry);
         };
 
         // 配置回调：人类走 WS 下发；单人模式下 P1(机器人) 的消息驱动 BotDriver 思考
@@ -405,8 +417,8 @@ public static class GameRoomManager
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
             });
-            engine.OnPersistAction = (pi, act, data, requestId) =>
-                PersistAcceptedAction(entry, pi, act, data, requestId);
+            engine.OnPersistActionWithSource = (pi, act, data, requestId, source) =>
+                PersistAcceptedAction(entry, pi, act, data, requestId, source);
         }
 
         CaptureRecoverySnapshot(entry);
@@ -439,6 +451,7 @@ public static class GameRoomManager
         StartActionWorker(entry);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
+        EnsureHexDraftTimeout(entry);
         accountAdmission.Commit(roomId);
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
@@ -917,6 +930,7 @@ public static class GameRoomManager
                 EnsureOperationClockRunning(room);
                 EnsureStartingPlayerChoiceTimeout(room);
                 EnsureMulliganTimeout(room);
+                EnsureHexDraftTimeout(room);
                 if (room.Engine.State.IsGameOver)
                     CleanupRoomFromCoordinator(room.RoomId);
             }
@@ -1509,6 +1523,7 @@ public static class GameRoomManager
                         await ResolveExpiredStartingPlayerChoiceAsync(active, DateTime.UtcNow);
                     EnsureStartingPlayerChoiceTimeout(active);
                     EnsureMulliganTimeout(active);
+                    EnsureHexDraftTimeout(active);
                 }), timer.Token);
             }
             catch (OperationCanceledException) when (timer.Token.IsCancellationRequested)
@@ -1666,6 +1681,7 @@ public static class GameRoomManager
                     if (active.Engine.State.MulliganDeadlineUtc == timer.DeadlineUtc)
                         await ResolveExpiredMulliganAsync(active, DateTime.UtcNow);
                     EnsureMulliganTimeout(active);
+                    EnsureHexDraftTimeout(active);
                 }), timer.Token);
             }
             catch (OperationCanceledException) when (timer.Token.IsCancellationRequested)
@@ -1756,6 +1772,184 @@ public static class GameRoomManager
     private static void CancelMulliganTimeout(string roomId)
     {
         if (_mulliganTimeouts.TryRemove(roomId, out var timer))
+        {
+            timer.Cancellation.Cancel();
+            timer.Cancellation.Dispose();
+        }
+    }
+
+    /// <summary>根据当前权威选秀轮次创建或替换超时任务；重复调用不会产生重复结算。</summary>
+    private static void EnsureHexDraftTimeout(RoomEntry room, int retryAttempt = 0)
+    {
+        if (room.IsRecoveryPaused)
+        {
+            CancelHexDraftTimeout(room.RoomId);
+            return;
+        }
+
+        var round = room.Engine.State.HexState.ActiveDraft;
+        if (round is null || round.IsComplete || room.Engine.State.HexState.DraftResolving)
+        {
+            CancelHexDraftTimeout(room.RoomId);
+            return;
+        }
+
+        if (_hexDraftTimeouts.TryGetValue(room.RoomId, out var current)
+            && current.RoundId == round.RoundId
+            && current.DeadlineUtc == round.DeadlineUtc)
+            return;
+
+        var cancellation = new CancellationTokenSource();
+        var next = new HexDraftTimeout(
+            round.RoundId,
+            round.DeadlineUtc,
+            cancellation,
+            cancellation.Token,
+            retryAttempt);
+        while (true)
+        {
+            if (_hexDraftTimeouts.TryGetValue(room.RoomId, out current))
+            {
+                if (current.RoundId == round.RoundId && current.DeadlineUtc == round.DeadlineUtc)
+                {
+                    next.Cancellation.Dispose();
+                    return;
+                }
+                if (!_hexDraftTimeouts.TryUpdate(room.RoomId, next, current)) continue;
+                current.Cancellation.Cancel();
+                current.Cancellation.Dispose();
+            }
+            else if (!_hexDraftTimeouts.TryAdd(room.RoomId, next))
+            {
+                continue;
+            }
+
+            StartHexDraftTimeoutWait(room, next);
+            return;
+        }
+    }
+
+    private static void StartHexDraftTimeoutWait(RoomEntry room, HexDraftTimeout timer)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    var delay = timer.DeadlineUtc - DateTime.UtcNow;
+                    if (delay <= TimeSpan.Zero) break;
+                    await Task.Delay(delay, timer.Token);
+                }
+
+                if (timer.Token.IsCancellationRequested) return;
+                var active = GetRoom(room.RoomId);
+                if (active is null || !ReferenceEquals(active, room)) return;
+
+                await EnqueueCriticalWorkAsync(active, new RoomWork("HexDraftTimeout", LatencyDiagnostics.Start(), async () =>
+                {
+                    var activeRound = active.Engine.State.HexState.ActiveDraft;
+                    if (activeRound is not null
+                        && activeRound.RoundId == timer.RoundId
+                        && activeRound.DeadlineUtc == timer.DeadlineUtc)
+                        await ResolveExpiredHexDraftAsync(active, DateTime.UtcNow);
+                    EnsureHexDraftTimeout(active);
+                }), timer.Token);
+            }
+            catch (OperationCanceledException) when (timer.Token.IsCancellationRequested)
+            {
+                // 玩家已完成本轮、房间关闭或权威轮次已替换。
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[海克斯超时] 房间 {room.RoomId} 第 {timer.RetryAttempt + 1} 次计时任务异常: {ex.Message}");
+                if (!TryRemoveHexDraftTimeout(room.RoomId, timer)) return;
+
+                timer.Cancellation.Dispose();
+                var active = GetRoom(room.RoomId);
+                var activeRound = active?.Engine.State.HexState.ActiveDraft;
+                if (active is null
+                    || !ReferenceEquals(active, room)
+                    || activeRound is null
+                    || activeRound.RoundId != timer.RoundId
+                    || activeRound.DeadlineUtc != timer.DeadlineUtc
+                    || activeRound.IsComplete)
+                    return;
+
+                if (timer.RetryAttempt >= 2) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * (timer.RetryAttempt + 1)));
+                var retryRoom = GetRoom(room.RoomId);
+                var retryRound = retryRoom?.Engine.State.HexState.ActiveDraft;
+                if (retryRoom is not null
+                    && ReferenceEquals(retryRoom, room)
+                    && retryRound is not null
+                    && retryRound.RoundId == timer.RoundId
+                    && retryRound.DeadlineUtc == timer.DeadlineUtc
+                    && !retryRound.IsComplete)
+                    EnsureHexDraftTimeout(retryRoom, timer.RetryAttempt + 1);
+            }
+        });
+    }
+
+    private static bool TryRemoveHexDraftTimeout(string roomId, HexDraftTimeout expected)
+        => ((ICollection<KeyValuePair<string, HexDraftTimeout>>)_hexDraftTimeouts)
+            .Remove(new KeyValuePair<string, HexDraftTimeout>(roomId, expected));
+
+    /// <summary>把所有未锁定座次变成可重放的系统 ChooseHex 动作；固定座次保证 RNG 消耗顺序稳定。</summary>
+    private static async Task<IReadOnlyList<int>> ResolveExpiredHexDraftAsync(RoomEntry room, DateTime utcNow)
+    {
+        var round = room.Engine.State.HexState.ActiveDraft;
+        if (round is null || utcNow < round.DeadlineUtc || round.IsComplete)
+            return Array.Empty<int>();
+
+        var roundId = round.RoundId;
+        var pendingPlayers = Enumerable.Range(0, 2)
+            .Where(player => !round.Locked[player])
+            .ToArray();
+        var autoSelected = new List<int>(pendingPlayers.Length);
+        foreach (var playerIndex in pendingPlayers)
+        {
+            var current = room.Engine.State.HexState.ActiveDraft;
+            if (current is null || current.RoundId != roundId || current.Locked[playerIndex]) continue;
+
+            var data = JsonSerializer.SerializeToElement(new { roundId, auto = true });
+            var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
+            if (!room.OutboundCommitGate.Begin()) break;
+            try
+            {
+                room.Engine.RecordMatchLog("hex_draft_timeout_auto_select", playerIndex, new { requestId, roundId });
+                var execution = room.Engine.HandleActionWithReceipt(
+                    playerIndex,
+                    "ChooseHex",
+                    data,
+                    requestId,
+                    GameActionSource.System);
+                if (!execution.Accepted)
+                {
+                    room.ReplayCheckpoints?.Disable(room.Engine.State, "hex_timeout_action_rejected");
+                    room.OutboundCommitGate.Commit();
+                    continue;
+                }
+
+                await room.Engine.WaitSettledAsync();
+                room.ReplayCheckpoints?.WriteAfterAction(room.Engine, execution.AcceptedLog);
+                AppendClockState(room);
+                MaybeCaptureRecoverySnapshot(room);
+                room.OutboundCommitGate.Commit();
+                autoSelected.Add(playerIndex);
+            }
+            catch (Exception ex)
+            {
+                PauseForRecoveryFailure(room, "recovery_hex_timeout_commit_failed", ex);
+                break;
+            }
+        }
+        return autoSelected;
+    }
+
+    private static void CancelHexDraftTimeout(string roomId)
+    {
+        if (_hexDraftTimeouts.TryRemove(roomId, out var timer))
         {
             timer.Cancellation.Cancel();
             timer.Cancellation.Dispose();
@@ -1855,6 +2049,8 @@ public static class GameRoomManager
             EnsureStartingPlayerChoiceTimeout(room);
             await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
             EnsureMulliganTimeout(room);
+            await ResolveExpiredHexDraftAsync(room, DateTime.UtcNow);
+            EnsureHexDraftTimeout(room);
             if (idx < 0)
             {
                 var spectator = room.Spectators.TryGetValue(sessionId, out var storedSpectator)
@@ -2065,6 +2261,8 @@ public static class GameRoomManager
                         EnsureStartingPlayerChoiceTimeout(r);
                         await ResolveExpiredMulliganAsync(r, DateTime.UtcNow);
                         EnsureMulliganTimeout(r);
+                        await ResolveExpiredHexDraftAsync(r, DateTime.UtcNow);
+                        EnsureHexDraftTimeout(r);
                         if (wasDisconnected)
                         {
                             WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
@@ -2433,6 +2631,7 @@ public static class GameRoomManager
             RoomDirectory.Unregister(roomId);
             CancelStartingPlayerChoiceTimeout(roomId);
             CancelMulliganTimeout(roomId);
+            CancelHexDraftTimeout(roomId);
             foreach (var sid in r.PlayerSessionIds)
                 if (_grace.TryRemove(roomId + ":" + sid, out var grace)) { grace.Cancel(); grace.Dispose(); }
             r.ActionQueue.Writer.TryComplete();
@@ -2656,12 +2855,24 @@ public static class GameRoomManager
         int playerIndex,
         string action,
         JsonElement data,
-        string? requestId)
+        string? requestId,
+        GameActionSource source)
     {
         var journalSequence = Volatile.Read(ref room.JournalSequence) + 1;
         try
         {
-            RoomJournal.Append(room.RoomId, journalSequence, playerIndex, action, data, requestId, journalSequence);
+            var activeDraft = room.Engine.State.HexState.ActiveDraft;
+            RoomJournal.Append(
+                room.RoomId,
+                journalSequence,
+                playerIndex,
+                action,
+                data,
+                requestId,
+                journalSequence,
+                source,
+                activeDraft?.RoundId,
+                activeDraft?.DeadlineUtc);
         }
         catch (Exception ex)
         {
@@ -2813,6 +3024,9 @@ public static class GameRoomManager
         var restoredTurnClockMs = new long[] { OperationTurnTimeLimitMs, OperationTurnTimeLimitMs };
         var restoredTurnClockTurnCount = 0;
         var restoredTurnExtensionUsed = new bool[2];
+        var hexDraftStartedAt = new Dictionary<Hex.HexTier, DateTime>();
+        var hexMulliganDone = new bool[2];
+        var hexCompletedTurns = new int[2];
         DateTime lastActivity = h.TryGetProperty("createdAtUtc", out var ca)
             ? ca.GetDateTime() : DateTime.UtcNow;
         for (int i = 1; i < lines.Length; i++)
@@ -2845,13 +3059,48 @@ public static class GameRoomManager
             if (nextSequence != journalSequence + 1)
                 throw new InvalidDataException($"恢复日志动作序号不连续：期望 {journalSequence + 1}，实际 {nextSequence}");
             journalSequence = nextSequence;
-            actions.Add(new MatchReplay.ActionEntry(pi, act, data));
+            var source = e.TryGetProperty("source", out var sourceElement)
+                && string.Equals(sourceElement.GetString(), "system", StringComparison.OrdinalIgnoreCase)
+                    ? GameActionSource.System
+                    : GameActionSource.Player;
+            var hexDraftRoundId = e.TryGetProperty("hexDraftRoundId", out var hexRoundElement)
+                && hexRoundElement.ValueKind == JsonValueKind.String
+                    ? hexRoundElement.GetString()
+                    : null;
+            DateTime? hexDraftDeadlineUtc = e.TryGetProperty("hexDraftDeadlineUtc", out var hexDeadlineElement)
+                && hexDeadlineElement.ValueKind == JsonValueKind.String
+                    ? hexDeadlineElement.GetDateTime().ToUniversalTime()
+                    : null;
+            actions.Add(new MatchReplay.ActionEntry(
+                pi,
+                act,
+                data,
+                source,
+                hexDraftRoundId,
+                hexDraftDeadlineUtc));
             lastOperationSequences[pi] = e.TryGetProperty("operationSequence", out var operationElement)
                 && operationElement.ValueKind == JsonValueKind.Number
                     ? Math.Max(lastOperationSequences[pi], operationElement.GetInt64())
                     : journalSequence;
             var actionAtUtc = e.TryGetProperty("tsUtc", out var ts) ? ts.GetDateTime() : lastActivity;
             lastActivity = actionAtUtc;
+            if (matchKind == MatchKind.Hex)
+            {
+                if (string.Equals(act, "Mulligan", StringComparison.Ordinal))
+                {
+                    hexMulliganDone[pi] = true;
+                    if (hexMulliganDone[0] && hexMulliganDone[1])
+                        hexDraftStartedAt.TryAdd(Hex.HexTier.Silver, actionAtUtc.ToUniversalTime());
+                }
+                else if (string.Equals(act, "EndTurn", StringComparison.Ordinal))
+                {
+                    hexCompletedTurns[pi]++;
+                    if (hexCompletedTurns[0] >= 2 && hexCompletedTurns[1] >= 2)
+                        hexDraftStartedAt.TryAdd(Hex.HexTier.Gold, actionAtUtc.ToUniversalTime());
+                    if (hexCompletedTurns[0] >= 5 && hexCompletedTurns[1] >= 5)
+                        hexDraftStartedAt.TryAdd(Hex.HexTier.Rainbow, actionAtUtc.ToUniversalTime());
+                }
+            }
             string? restoredRequestId = null;
             if (e.TryGetProperty("requestId", out var requestElement)
                 && requestElement.ValueKind == JsonValueKind.String
@@ -2868,7 +3117,7 @@ public static class GameRoomManager
                 "accepted",
                 Clip(restoredRequestId, 128),
                 null,
-                GameActionSource.Player));
+                source));
             while (restoredRecentActions.Count > 16) restoredRecentActions.Dequeue();
         }
 
@@ -2889,7 +3138,15 @@ public static class GameRoomManager
             p0AlwaysPrompt: p0Always,
             p1AlwaysPrompt: p1Always,
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
-            ruleset: ruleset);
+            ruleset: ruleset,
+            matchKind: matchKind);
+        if (engine.State.HexState.ActiveDraft is { } restoredHexDraft
+            && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId)
+            && hexDraftStartedAt.TryGetValue(restoredHexDraft.Tier, out var restoredHexDraftStart))
+        {
+            restoredHexDraft.DeadlineUtc = restoredHexDraftStart
+                .AddSeconds(Hex.HexRules.DraftTimeoutSeconds);
+        }
         if (!engine.State.StartingPlayerChosen
             && engine.State.OpeningStage == OpeningStage.WaitingFirstPlayerChoice)
             engine.State.StartingPlayerChoiceDeadlineUtc = lastActivity.AddSeconds(GameEngine.StartingPlayerChoiceTimeoutSeconds);
@@ -2985,8 +3242,8 @@ public static class GameRoomManager
             new ReplayCheckpointLogCoordinator(roomId).Disable(
                 engine.State,
                 "process_recovery_random_trace_not_restored");
-        engine.OnPersistAction = (pi, act, data, requestId) =>
-            PersistAcceptedAction(entry, pi, act, data, requestId);
+        engine.OnPersistActionWithSource = (pi, act, data, requestId, source) =>
+            PersistAcceptedAction(entry, pi, act, data, requestId, source);
         RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）
 
         _rooms[roomId] = entry;
@@ -2998,6 +3255,7 @@ public static class GameRoomManager
         StartDisconnectGraceTimer(entry, 1, entry.PlayerSessionIds[1], entry.DisconnectGraceRemainingMs[1]);
         EnsureStartingPlayerChoiceTimeout(entry);
         EnsureMulliganTimeout(entry);
+        EnsureHexDraftTimeout(entry);
         // 不加 _sessionRoom（占位 sid 无意义）；不调 BroadcastInitialState（无人在线，静默重建）
         Console.WriteLine($"[Restore] 已恢复对局 {roomId}（{p0Account} vs {p1Account}，回放 {actions.Count} 个动作）。");
         return true;
@@ -3110,6 +3368,7 @@ public static class GameRoomManager
             or MatchKind.Casual
             or MatchKind.CasualStandard
             or MatchKind.CasualWild
+            or MatchKind.Hex
             or MatchKind.Matchmaking;
 
     private static void TryRecordLeaderStats(

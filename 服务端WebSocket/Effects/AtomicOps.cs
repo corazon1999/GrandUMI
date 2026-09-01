@@ -69,28 +69,55 @@ public static class AtomicOps
 
     // ── 状态切换 ──────────────────────────────────────────────────────────
 
-    public static void RestCard(CardInstance c)
+    /// <summary>
+    /// 统一判断卡牌当前能否转为休息状态。<paramref name="prospectiveOwner"/> 用于尚未进入场上的角色，
+    /// 使“以休息状态登场”也按其登场后的当前力量判定【霸王色霸气】。
+    /// </summary>
+    public static bool CanRestCard(GameState? state, CardInstance c, int? prospectiveOwner = null)
     {
-        if (c.HasRestriction(RestrictionKind.CannotBeRested)) return; // "无法转为休息状态"（瞬时来源）
+        if (c.HasRestriction(RestrictionKind.CannotBeRested)) return false; // "无法转为休息状态"（瞬时来源）
         // 持续来源（ContinuousEffect.GrantRestriction=CannotBeRested，如 OP11-046/GERMA 光环）同样拦截
-        var st = EffectRuntime.CurrentState;
-        if (st is not null && c.Info.Number == "OP15-024")
+        if (state is not null && c.Info.Number == "OP15-024")
         {
-            int owner = st.SideOf(c);
+            int owner = prospectiveOwner ?? state.SideOf(c);
             int acting = EffectRuntime.CurrentActingSide;
             var sourceKind = EffectRuntime.CurrentSource?.Info.Kind;
             if (owner >= 0
-                && st.CurrentTurnPlayer != owner
+                && state.CurrentTurnPlayer != owner
                 && acting == 1 - owner
                 && sourceKind is CardKind.Leader or CardKind.Character)
-                return;
+                return false;
         }
-        if (st is not null && st.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return;
+        if (state is not null && state.HasContinuousRestriction(c, RestrictionKind.CannotBeRested)) return false;
+        if (state is not null && !Game.Hex.HexRules.CanRest(state, c, prospectiveOwner)) return false;
+        return true;
+    }
+
+    public static bool RestCard(CardInstance c)
+    {
+        var st = EffectRuntime.CurrentState;
+        return RestCardCore(st, c);
+    }
+
+    /// <summary>无效果上下文的引擎/调试入口也必须显式携带权威状态，避免绕过全局休息限制。</summary>
+    public static bool RestCard(GameState state, CardInstance c, int? prospectiveOwner = null)
+        => RestCardCore(state, c, prospectiveOwner);
+
+    private static bool RestCardCore(GameState? state, CardInstance c, int? prospectiveOwner = null)
+    {
+        if (!CanRestCard(state, c, prospectiveOwner)) return false;
         bool was = c.IsTapped;
         c.IsTapped = true;
         if (!was) // 因效果转为休息状态 → 通知 watcher（reason=effect；攻击/阻挡横置由 BattleEngine 以 attack/block 派发）
             EffectRuntime.NotifyWatcher(EffectTrigger.OnCharRested,
-                new Dictionary<string, object?> { ["restedCardId"] = c.Id.ToString(), ["reason"] = "effect" });
+                new Dictionary<string, object?>
+                {
+                    ["restedCardId"] = c.Id.ToString(),
+                    ["owner"] = prospectiveOwner ?? state?.SideOf(c) ?? -1,
+                    ["actingSide"] = EffectRuntime.CurrentActingSide,
+                    ["reason"] = "effect",
+                });
+        return true;
     }
     public static void ActivateCard(CardInstance c) { c.IsTapped = false; }
 
@@ -100,12 +127,13 @@ public static class AtomicOps
 
     /// <summary>「将我方N张卡牌转为休息状态」成本的可休置项数：活跃的 领袖 + 角色 + 舞台 + 咚!!。
     /// 供发动前的可支付判定（不足 N 则不发动）。</summary>
-    public static int RestableCount(PlayerState p)
+    public static int RestableCount(GameState state, PlayerState p)
     {
         int n = 0;
-        if (!p.Leader.IsTapped) n++;
-        n += p.Characters.Count(c => !c.IsTapped);
-        if (p.StageCard is not null && !p.StageCard.IsTapped) n++;
+        if (!p.Leader.IsTapped && CanRestCard(state, p.Leader)) n++;
+        n += p.Characters.Count(c => !c.IsTapped && CanRestCard(state, c));
+        if (p.StageCard is not null && !p.StageCard.IsTapped && CanRestCard(state, p.StageCard)) n++;
+        if (p.ExtraStageCard is not null && !p.ExtraStageCard.IsTapped && CanRestCard(state, p.ExtraStageCard)) n++;
         n += p.CostArea.Count(d => d.State == DonState.Active);
         return n;
     }
@@ -114,10 +142,9 @@ public static class AtomicOps
     public static async Task<bool> PromptRestOwnCharacters(EffectContext ctx, int n, string text, bool optional = false)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var candidates = me.Characters.Where(card =>
-            !card.IsTapped
-            && !card.HasRestriction(RestrictionKind.CannotBeRested)
-            && !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested)).ToList();
+        var candidates = me.Characters
+            .Where(card => !card.IsTapped && CanRestCard(ctx.State, card))
+            .ToList();
         if (candidates.Count < n) return false;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnActiveCharacter", text,
@@ -127,11 +154,12 @@ public static class AtomicOps
                 ["choiceCards"] = candidates.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
             });
         if (chosen.Count < n) return false;
-        foreach (var id in chosen)
-        {
-            var card = candidates.FirstOrDefault(candidate => candidate.Id.ToString() == id);
-            if (card is not null) RestCard(card);
-        }
+        var selected = chosen
+            .Select(id => candidates.FirstOrDefault(candidate => candidate.Id.ToString() == id))
+            .ToArray();
+        if (selected.Any(card => card is null || card.IsTapped || !CanRestCard(ctx.State, card))) return false;
+        foreach (var card in selected)
+            if (!RestCard(card!)) return false;
         return true;
     }
 
@@ -142,14 +170,12 @@ public static class AtomicOps
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var cardCands = new List<CardInstance>();
-        bool CanRest(CardInstance card) =>
-            !card.IsTapped &&
-            !card.HasRestriction(RestrictionKind.CannotBeRested) &&
-            !ctx.State.HasContinuousRestriction(card, RestrictionKind.CannotBeRested);
+        bool CanRest(CardInstance card) => !card.IsTapped && CanRestCard(ctx.State, card);
 
         if (CanRest(me.Leader)) cardCands.Add(me.Leader);
         cardCands.AddRange(me.Characters.Where(CanRest));
         if (me.StageCard is not null && CanRest(me.StageCard)) cardCands.Add(me.StageCard);
+        if (me.ExtraStageCard is not null && CanRest(me.ExtraStageCard)) cardCands.Add(me.ExtraStageCard);
         var activeDon = me.CostArea.Where(d => d.State == DonState.Active).ToList();
         if (cardCands.Count + activeDon.Count < n) return false;
 
@@ -163,12 +189,24 @@ public static class AtomicOps
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOwnCardsOrDon", text,
             validChoices, optional ? 0 : n, n, extra);
         if (pick.Count < n) return false;
+        // 串行房间队列中正常不会发生竞态；仍先整体复核，保证多项成本不会部分支付。
+        foreach (var pid in pick)
+        {
+            var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
+            if (don is not null)
+            {
+                if (don.State != DonState.Active) return false;
+                continue;
+            }
+            var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
+            if (card is null || card.IsTapped || !CanRestCard(ctx.State, card)) return false;
+        }
         foreach (var pid in pick)
         {
             var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
             if (don is not null) { don.State = DonState.Rest; continue; }
             var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
-            if (card is not null) RestCard(card);
+            if (card is not null && !RestCard(card)) return false;
         }
         return true;
     }
@@ -179,9 +217,10 @@ public static class AtomicOps
     {
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var cardCands = new List<CardInstance>();
-        if (!opp.Leader.IsTapped) cardCands.Add(opp.Leader);
-        cardCands.AddRange(opp.Characters.Where(c => !c.IsTapped));
-        if (opp.StageCard is not null && !opp.StageCard.IsTapped) cardCands.Add(opp.StageCard);
+        if (!opp.Leader.IsTapped && CanRestCard(ctx.State, opp.Leader)) cardCands.Add(opp.Leader);
+        cardCands.AddRange(opp.Characters.Where(c => !c.IsTapped && CanRestCard(ctx.State, c)));
+        if (opp.StageCard is not null && !opp.StageCard.IsTapped && CanRestCard(ctx.State, opp.StageCard)) cardCands.Add(opp.StageCard);
+        if (opp.ExtraStageCard is not null && !opp.ExtraStageCard.IsTapped && CanRestCard(ctx.State, opp.ExtraStageCard)) cardCands.Add(opp.ExtraStageCard);
         var activeDon = opp.CostArea.Where(d => d.State == DonState.Active).ToList();
         if (cardCands.Count + activeDon.Count == 0) return;
 
@@ -221,7 +260,9 @@ public static class AtomicOps
         if (s.IsKoGuarded(card, "effect")) return;
         if (s.IsLeaveGuarded(card, "effect")) return; // 持续防离场光环（如 EB04-057）
         var owner = s.Players[ownerIdx];
-        if (!owner.Characters.Contains(card) && !ReferenceEquals(owner.StageCard, card)) return;
+        if (!owner.Characters.Contains(card)
+            && !ReferenceEquals(owner.StageCard, card)
+            && !ReferenceEquals(owner.ExtraStageCard, card)) return;
         BattleEngine.KOCard(s, ownerIdx, card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
             new Dictionary<string, object?>
@@ -268,6 +309,7 @@ public static class AtomicOps
             var guardians = new List<CardInstance> { guardSide.Leader };
             guardians.AddRange(guardSide.Characters);
             if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
+            if (guardSide.ExtraStageCard is not null) guardians.Add(guardSide.ExtraStageCard);
             foreach (var g in guardians.ToList())
             {
                 if (g.Id == card.Id) continue;
@@ -380,6 +422,7 @@ public static class AtomicOps
         var guardians = new List<CardInstance> { side.Leader };
         guardians.AddRange(side.Characters);
         if (side.StageCard is not null) guardians.Add(side.StageCard);
+        if (side.ExtraStageCard is not null) guardians.Add(side.ExtraStageCard);
         s.PreventLeaveCardIds.Remove(card.Id);
         // 不跳过受害卡本身：支持"此角色将要离场时改为…使其不离场"的自我置换
         foreach (var g in guardians.ToList())
@@ -520,7 +563,8 @@ public static class AtomicOps
     public static int AttachDonFromDeck(PlayerState p, Guid targetId, int n)
     {
         int attached = 0;
-        while (attached < n && p.DonDeck.Count > 0 && p.CostArea.Count < 10)
+        int capacity = Math.Max(10, p.DonDeck.Count + p.CostArea.Count);
+        while (attached < n && p.DonDeck.Count > 0 && p.CostArea.Count < capacity)
         {
             var d = p.DonDeck[0];
             p.DonDeck.RemoveAt(0);
@@ -820,6 +864,11 @@ public static class AtomicOps
             p.StageCard = null;
             removed = true;
         }
+        if (ReferenceEquals(p.ExtraStageCard, card))
+        {
+            p.ExtraStageCard = null;
+            removed = true;
+        }
         // 重复、乱序或错误持有者请求不得把同一实例再次加入手牌。
         if (!removed) return;
         // 归还附着咚
@@ -852,6 +901,11 @@ public static class AtomicOps
         if (ReferenceEquals(p.StageCard, card))
         {
             p.StageCard = null;
+            removed = true;
+        }
+        if (ReferenceEquals(p.ExtraStageCard, card))
+        {
+            p.ExtraStageCard = null;
             removed = true;
         }
         if (!removed) return;
@@ -895,6 +949,67 @@ public static class AtomicOps
         p.Trash.Add(victim);
     }
 
+    /// <summary>
+    /// 把舞台放入合法舞台槽。拥有“三号船坞”时保留两个槽；两个槽都占用时，
+    /// 在效果 Prompt 上下文中由玩家选择废弃哪张，恢复/无交互路径固定废弃主槽，保证重放确定性。
+    /// 调用方负责先从原区域移除新舞台，并在放置后登记登场效果。
+    /// </summary>
+    private static async Task PlaceStageAsync(GameState s, int playerIdx, CardInstance card)
+    {
+        var player = s.Players[playerIdx];
+        if (!Game.Hex.HexRules.Has(s, playerIdx, 30))
+        {
+            if (player.StageCard is not null) player.Trash.Add(player.StageCard);
+            player.StageCard = card;
+            return;
+        }
+
+        if (player.StageCard is null)
+        {
+            player.StageCard = card;
+            return;
+        }
+        if (player.ExtraStageCard is null)
+        {
+            player.ExtraStageCard = card;
+            return;
+        }
+
+        var stages = new[] { player.StageCard, player.ExtraStageCard };
+        var victim = player.StageCard;
+        var prompts = EffectRuntime.CurrentPrompts;
+        if (prompts is not null && ReferenceEquals(EffectRuntime.CurrentState, s))
+        {
+            try
+            {
+                var picked = await prompts.ChooseCards(
+                    playerIdx,
+                    "HexStageOverflowTrash",
+                    "三号船坞：选择1张现有舞台废弃，再登场新舞台",
+                    stages.Select(stage => stage.Id.ToString()).ToList(),
+                    1,
+                    1,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = stages.Select(stage => new
+                        {
+                            id = stage.Id.ToString(),
+                            number = stage.Info.Number,
+                        }).ToArray(),
+                    });
+                victim = stages.FirstOrDefault(stage => picked.Contains(stage.Id.ToString())) ?? victim;
+            }
+            catch
+            {
+                // Prompt 恢复失败时采用固定主槽，不引入未记录的随机分支。
+            }
+        }
+
+        if (ReferenceEquals(player.StageCard, victim)) player.StageCard = card;
+        else player.ExtraStageCard = card;
+        player.Trash.Add(victim);
+    }
+
     public static async Task PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
     {
         var p = s.Players[playerIdx];
@@ -913,8 +1028,7 @@ public static class AtomicOps
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
-            if (p.StageCard is not null) p.Trash.Add(p.StageCard);
-            p.StageCard = card;
+            await PlaceStageAsync(s, playerIdx, card);
             s.EnqueueEnterField(playerIdx, card, "hand");
         }
         // 事件类暂不在此入口处理
@@ -959,7 +1073,8 @@ public static class AtomicOps
     public static int RefreshDonFromDeck(PlayerState p, int n, DonState state = DonState.Active)
     {
         int added = 0;
-        for (int i = 0; i < n && p.DonDeck.Count > 0 && p.CostArea.Count < 10; i++)
+        int capacity = Math.Max(10, p.DonDeck.Count + p.CostArea.Count);
+        for (int i = 0; i < n && p.DonDeck.Count > 0 && p.CostArea.Count < capacity; i++)
         {
             var d = p.DonDeck[0]; p.DonDeck.RemoveAt(0);
             d.State = state;
@@ -985,6 +1100,7 @@ public static class AtomicOps
         }
         p.Characters.Remove(card);
         if (p.StageCard == card) p.StageCard = null;
+        if (p.ExtraStageCard == card) p.ExtraStageCard = null;
         ResetCardEphemeralState(card);
         p.Deck.Add(card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
@@ -1019,15 +1135,15 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
+            card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
+                && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "trash"); // 触发被登场角色的【登场时】
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
-            if (p.StageCard is not null) p.Trash.Add(p.StageCard);
             ResetCardEphemeralState(card);
-            p.StageCard = card;
+            await PlaceStageAsync(s, playerIdx, card);
             s.EnqueueEnterField(playerIdx, card, "trash");
         }
     }
@@ -1177,6 +1293,7 @@ public static class AtomicOps
         }
         p.Characters.Remove(card);
         if (p.StageCard == card) p.StageCard = null;
+        if (p.ExtraStageCard == card) p.ExtraStageCard = null;
         ResetCardEphemeralState(card);
         if (toTop) p.LifeArea.Insert(0, card);
         else       p.LifeArea.Add(card);
@@ -1196,15 +1313,15 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
+            card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
+                && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "deck"); // 触发被登场角色的【登场时】
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
-            if (p.StageCard is not null) p.Trash.Add(p.StageCard);
             ResetCardEphemeralState(card);
-            p.StageCard = card;
+            await PlaceStageAsync(s, playerIdx, card);
             s.EnqueueEnterField(playerIdx, card, "deck");
         }
     }
@@ -1221,7 +1338,8 @@ public static class AtomicOps
                 await SqueezeCharacterSlot(s, playerIdx);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = restState || s.ShouldCharacterEnterRested(playerIdx, card);
+            card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
+                && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "life"); // 触发被登场角色的【登场时】
         }

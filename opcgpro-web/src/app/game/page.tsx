@@ -9,6 +9,7 @@ import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner
 import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
 import LeaderClashOverlay from "@/components/game/LeaderClashOverlay";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
+import HexDraftOverlay from "@/components/game/HexDraftOverlay";
 import PromptOverlay from "@/components/game/PromptOverlay";
 import PromptSuccessFlash from "@/components/game/PromptSuccessFlash";
 import BattleDefenseOverlay from "@/components/game/BattleDefenseOverlay";
@@ -82,6 +83,7 @@ export default function GamePage() {
         </>
       )}
       {!isObserver && !isPlayback && leaderClashComplete && <MulliganOverlay />}
+      {!isObserver && !isPlayback && <HexDraftOverlay />}
       {!isObserver && !isPlayback && <PromptOverlay />}
       {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}

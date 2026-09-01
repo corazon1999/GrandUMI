@@ -42,7 +42,7 @@ public class OP11_072_CharlotteMont_dOr : IScriptedEffect
 
         // 支付成本
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
         me.TurnOnceUsed.Add(key);
 
         // 对方将其废弃区 2 张放回卡组最下方（由对方选择）

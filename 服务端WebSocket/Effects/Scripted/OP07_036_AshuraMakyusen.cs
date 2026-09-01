@@ -49,7 +49,7 @@ public class OP07_036_AshuraMakyusen : IScriptedEffect
             costCands.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (costChosen.Count == 0) return;
         var paid = costCands.First(c => c.Id.ToString() == costChosen[0]);
-        AtomicOps.RestCard(paid);
+        if (!AtomicOps.RestCard(paid)) return;
 
         // ── 结果：将对方最多 1 张费用≤5 的角色转为休息状态 ──
         var oppCands = opp.Characters.Where(c => !c.IsTapped && ctx.State.CurrentCostOf(c) <= 5).ToList();

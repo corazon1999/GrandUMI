@@ -64,7 +64,7 @@ public class P_091_Shirahoshi : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var extra2 = new Dictionary<string, object?>
         {

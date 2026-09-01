@@ -25,7 +25,7 @@ public class OP08_028_Nekomamushi : IScriptedEffect
 
         int restedCount = opp.Characters.Count(c => c.IsTapped);
         if (opp.Leader.IsTapped) restedCount++;
-        if (opp.StageCard is not null && opp.StageCard.IsTapped) restedCount++;
+        restedCount += opp.StageCards.Count(stage => stage.IsTapped);
 
         if (restedCount >= 7)
         {

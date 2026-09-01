@@ -171,11 +171,15 @@ export const GameRequest = {
   /** 重抽决策（双方初始 5 张后） */
   mulligan: (redraw: boolean) => send("Mulligan", { redraw }),
 
+  /** 海克斯私密轮抽：只提交当前轮次与自己的候选 ID，最终授予由服务端统一结算。 */
+  chooseHex: (roundId: string, hexId: number) => send("ChooseHex", { roundId, hexId }),
+
   /** 出牌：handIndex = 当前手牌列表下标 */
-  playCard: (handIndex: number, overflowTrashCardId?: string) =>
+  playCard: (handIndex: number, overflowTrashCardId?: string, overflowTrashStageId?: string) =>
     send("PlayCard", {
       handIndex,
       ...(overflowTrashCardId ? { overflowTrashCardId } : {}),
+      ...(overflowTrashStageId ? { overflowTrashStageId } : {}),
     }, () => useGameStore.getState().optimisticPlayCard(handIndex)),
 
   /** 请求赋予咚；可先本地确认，但确认后会立即提交到服务端。 */

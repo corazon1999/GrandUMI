@@ -40,7 +40,7 @@ public class OP03_098_EnniesLobby : IScriptedEffect
         if (!use) return;
 
         // 成本：将此舞台转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方 1 张角色，本回合费用-2",

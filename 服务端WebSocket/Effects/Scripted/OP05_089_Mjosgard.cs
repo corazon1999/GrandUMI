@@ -25,23 +25,24 @@ public class OP05_089_Mjosgard : IScriptedEffect
         var self = ctx.Source;
 
         // 成本目标：我方此角色以外的 1 张角色
-        var others = me.Characters.Where(c => c.Id != self.Id).ToList();
-        if (others.Count == 0) return;
+        var others = me.Characters.Where(c => c.Id != self.Id
+            && !c.IsTapped
+            && AtomicOps.CanRestCard(ctx.State, c)).ToList();
+        if (self.IsTapped || !AtomicOps.CanRestCard(ctx.State, self) || others.Count == 0) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "缪斯加鲁德圣【启动主要】：横置此角色与我方另 1 张角色，将废弃区最多 1 张费用1 的黑色角色加入手牌？");
         if (!use) return;
 
-        // 成本：横置自身
-        AtomicOps.RestCard(self);
-
-        // 成本：横置我方另 1 张角色
+        // 先选齐并再次验证两张成本牌，再开始改变状态，避免第二张失败时留下半支付成本。
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "选择我方另 1 张角色转为休息状态（成本）",
             others.Select(c => c.Id.ToString()).ToList(), 1, 1);
         if (pick.Count == 0) return; // 未支付成本
         var resting = others.First(c => c.Id.ToString() == pick[0]);
-        AtomicOps.RestCard(resting);
+        if (!AtomicOps.CanRestCard(ctx.State, self) || !AtomicOps.CanRestCard(ctx.State, resting)) return;
+        if (!AtomicOps.RestCard(self)) return;
+        if (!AtomicOps.RestCard(resting)) return;
 
         // 收益：废弃区中最多 1 张费用 1 的黑色角色加入手牌
         var cand = me.Trash.Where(c =>

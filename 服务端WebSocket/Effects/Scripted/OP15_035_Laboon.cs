@@ -21,7 +21,7 @@ public class OP15_035_Laboon : IScriptedEffect
         if (vOwner != ctx.OwnerIndex || vId is null) return;
         var victim = me.Characters.FirstOrDefault(c => c.Id.ToString() == vId);
         if (victim is null || victim.Info.Power > 7000) return;
-        if (AtomicOps.RestableCount(me) < 2) return;
+        if (AtomicOps.RestableCount(ctx.State, me) < 2) return;
 
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             $"拉布：将我方2张卡牌转为休息状态，使「{victim.Info.Name}」不离场？");

@@ -40,9 +40,9 @@ public class OP12_028_Hiyori : IScriptedEffect
         if (ctx.Source.IsTapped) return;
 
         // 支付代价
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         activeDon.State = DonState.Rest;
         activeDon.AttachedToCardId = null;
-        ctx.Source.IsTapped = true;
 
         // 效果：确认卡组顶 5 张
         int peek = Math.Min(5, me.Deck.Count);

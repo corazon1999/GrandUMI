@@ -32,7 +32,7 @@ public class OP04_004_Karoo : IScriptedEffect
         if (!use) return;
 
         // 成本：横置自身
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         // 效果：对每个《阿拉巴斯坦王国》角色赋予 1 张休息状态的咚!!
         var targets = me.Characters.Where(c => c.Info.HasKeyword("阿拉巴斯坦王国")).ToList();

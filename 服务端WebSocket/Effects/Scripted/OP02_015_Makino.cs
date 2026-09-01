@@ -27,7 +27,7 @@ public class OP02_015_Makino : IScriptedEffect
             "卷乃【启动主要】：将此角色转为休息状态，使我方最多1张费用为1的红色角色本回合力量+3000？");
         if (!use) return;
 
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
 
         var cands = me.Characters.Where(c =>
             ctx.State.CurrentCostOf(c) == 1 && c.Info.ColorList.Contains("红")).ToList();

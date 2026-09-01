@@ -15,7 +15,13 @@ namespace GrandUMI.Game;
 public static class MatchReplay
 {
     /// <summary>一条可重放的动作（与 GameEngine.HandleAction 的入参一一对应）。</summary>
-    public sealed record ActionEntry(int PlayerIndex, string Action, JsonElement Data);
+    public sealed record ActionEntry(
+        int PlayerIndex,
+        string Action,
+        JsonElement Data,
+        GameActionSource Source = GameActionSource.Player,
+        string? HexDraftRoundId = null,
+        DateTime? HexDraftDeadlineUtc = null);
 
     /// <summary>严格工件重放到达的稳定点；ActionIndex=-1 表示开局稳定点。</summary>
     internal sealed record SettledReplayPoint(
@@ -63,7 +69,8 @@ public static class MatchReplay
         bool p0AlwaysPrompt = false,
         bool p1AlwaysPrompt = false,
         bool openingSetupAfterFirstPlayerChoice = false,
-        CardRuleset? ruleset = null)
+        CardRuleset? ruleset = null,
+        MatchKind matchKind = MatchKind.UnknownHuman)
     {
         var engine = new GameEngine(
             roomId,
@@ -74,7 +81,8 @@ public static class MatchReplay
             leaderKeywordWildcard: leaderKeywordWildcard,
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
             deferInitialSetupUntilStart: openingSetupAfterFirstPlayerChoice,
-            ruleset: ruleset);
+            ruleset: ruleset,
+            matchKind: matchKind);
 
         // 必须在喂入动作之前恢复"防触发信息泄露"开关：它决定生命揭示是否暂停发 prompt，
         // 进而决定动作磁带里有没有对应的 PromptResponse —— 不还原会导致重放分歧。
@@ -93,8 +101,9 @@ public static class MatchReplay
             // 功能上线前 RequestDraw 没有 description。旧动作日志必须仍能重建，
             // 但实时请求继续由 GameEngine 严格拒绝空描述，避免兼容逻辑削弱新协议校验。
             var replayData = PrepareReplayData(a);
-            engine.HandleAction(a.PlayerIndex, a.Action, replayData);
+            engine.HandleAction(a.PlayerIndex, a.Action, replayData, source: a.Source);
             await engine.WaitSettledAsync();
+            RestoreHexDraftDeadline(engine, a);
         }
 
         return engine;
@@ -165,13 +174,14 @@ public static class MatchReplay
             var resolvingPromptId = string.Equals(action.Action, "PromptResponse", StringComparison.Ordinal)
                 ? engine.State.PendingPrompt?.PromptId
                 : null;
-            if (!engine.HandleAction(action.PlayerIndex, action.Action, replayData))
+            if (!engine.HandleAction(action.PlayerIndex, action.Action, replayData, source: action.Source))
                 throw new ReplayActionRejectedException(actionIndex, action);
 
             await engine.WaitSettledForReplayAsync(
                 stableTimeoutMilliseconds,
                 resolvingPromptId,
                 cancellationToken);
+            RestoreHexDraftDeadline(engine, action);
             await onSettled(
                 new SettledReplayPoint(actionIndex, action, engine),
                 cancellationToken);
@@ -195,5 +205,13 @@ public static class MatchReplay
         {
             description = GameState.LegacyDrawRequestDescription,
         });
+    }
+
+    private static void RestoreHexDraftDeadline(GameEngine engine, ActionEntry action)
+    {
+        if (action.HexDraftRoundId is null || action.HexDraftDeadlineUtc is null) return;
+        var draft = engine.State.HexState.ActiveDraft;
+        if (draft is not null && draft.RoundId == action.HexDraftRoundId)
+            draft.DeadlineUtc = action.HexDraftDeadlineUtc.Value.ToUniversalTime();
     }
 }

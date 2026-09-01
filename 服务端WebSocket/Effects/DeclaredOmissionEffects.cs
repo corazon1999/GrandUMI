@@ -721,7 +721,7 @@ public static class DeclaredOmissionEffects
         int opponentIndex = 1 - ctx.OwnerIndex;
         var opponent = ctx.State.Players[opponentIndex];
         var candidates = opponent.Characters.Where(card => ctx.State.CurrentCostOf(opponentIndex, card) == 0).ToList();
-        if (opponent.StageCard is { } stage && ctx.State.CurrentCostOf(opponentIndex, stage) <= 3) candidates.Add(stage);
+        candidates.AddRange(opponent.StageCards.Where(stage => ctx.State.CurrentCostOf(opponentIndex, stage) <= 3));
         var target = await ChooseUpToOne(ctx, "OpponentCharacterOrStage",
             "选择对方最多 1 张费用为 0 的角色或费用不高于 3 的舞台 KO", candidates);
         if (target is not null)
@@ -733,12 +733,12 @@ public static class DeclaredOmissionEffects
         var me = ctx.State.Players[ctx.OwnerIndex];
         var costs = new List<CardInstance>();
         if (!me.Leader.IsTapped) costs.Add(me.Leader);
-        if (me.StageCard is { IsTapped: false } stage && stage.MatchesName("斗牛竞技场")) costs.Add(stage);
+        costs.AddRange(me.StageCards.Where(stage => !stage.IsTapped && stage.MatchesName("斗牛竞技场")));
         if (costs.Count == 0 || !await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "居鲁士：将领袖或“斗牛竞技场”转为休息状态，代替此角色被 KO？")) return;
         var selected = await ChooseUpToOne(ctx, "OwnLeaderOrStage", "选择转为休息状态的卡牌", costs);
         if (selected is null) return;
-        AtomicOps.RestCard(selected);
+        if (!AtomicOps.RestCard(selected)) return;
         ctx.State.MarkPreventKO(ctx.Source.Id);
     }
 
@@ -747,7 +747,7 @@ public static class DeclaredOmissionEffects
         var me = ctx.State.Players[ctx.OwnerIndex];
         var fishmen = me.Hand.Where(card => card.Info.HasKeyword("鱼人族")).ToList();
         var noahs = me.Hand.Where(card => card.MatchesName("方舟诺亚")).ToList();
-        if (me.StageCard is { } stage && stage.MatchesName("方舟诺亚")) noahs.Add(stage);
+        noahs.AddRange(me.StageCards.Where(stage => stage.MatchesName("方舟诺亚")));
         if (fishmen.Count == 0 && noahs.Count == 0) return;
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "范德·戴肯九世：支付 1 张《鱼人族》手牌或“方舟诺亚”以发动？")) return;
         var allCosts = fishmen.Concat(noahs).DistinctBy(card => card.Id).ToList();
@@ -757,9 +757,8 @@ public static class DeclaredOmissionEffects
         try
         {
             if (me.Hand.Contains(cost)) AtomicOps.DiscardHand(me, cost);
-            else if (ReferenceEquals(me.StageCard, cost))
+            else if (me.RemoveStageCard(cost))
             {
-                me.StageCard = null;
                 me.Trash.Add(cost);
             }
         }
@@ -917,7 +916,7 @@ public static class DeclaredOmissionEffects
             : discardable.FirstOrDefault(card => card.Id.ToString() == chosen[0]);
         if (discard is null) return;
 
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         EffectRuntime.PayingCost = true;
         try { AtomicOps.DiscardHand(me, discard); }
         finally { EffectRuntime.PayingCost = false; }
@@ -948,7 +947,7 @@ public static class DeclaredOmissionEffects
                 "杓死：将我方 1 张《东海》角色转为休息状态，使最多 1 张“克洛”转为活跃状态？")) return;
         var cost = await ChooseUpToOne(ctx, "OwnCharacter", "选择转为休息状态的《东海》角色", restCosts);
         if (cost is null) return;
-        AtomicOps.RestCard(cost);
+        if (!AtomicOps.RestCard(cost)) return;
         var target = await ChooseUpToOne(ctx, "OwnCharacter", "选择最多 1 张“克洛”转为活跃状态", kuros);
         if (target is not null) AtomicOps.ActivateCard(target);
     }
@@ -1001,7 +1000,7 @@ public static class DeclaredOmissionEffects
         if (me.Leader.IsTapped
             || !await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
                 "雷欧：将我方领袖转为休息状态，将对方最多 1 张费用不高于 1 的角色 KO，之后废弃卡组顶 2 张？")) return;
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
         if (me.Leader.Info.HasKeyword("德莱斯罗兹"))
         {
             int opponent = 1 - ctx.OwnerIndex;
@@ -1158,7 +1157,7 @@ public static class DeclaredOmissionEffects
         int edge = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
             "将生命区 1 张卡牌加入手牌作为成本", new[] { "最上方", "最下方", "放弃" });
         if (edge is < 0 or > 1) return;
-        AtomicOps.RestCard(ctx.Source);
+        if (!AtomicOps.RestCard(ctx.Source)) return;
         int index = edge == 0 ? 0 : me.LifeArea.Count - 1;
         var life = me.LifeArea[index];
         me.LifeArea.RemoveAt(index);

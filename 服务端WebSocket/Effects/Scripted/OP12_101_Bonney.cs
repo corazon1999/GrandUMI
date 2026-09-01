@@ -40,7 +40,7 @@ public class OP12_101_Bonney : IScriptedEffect
         {
             // 代价：将此角色转为休息状态（需活跃）
             if (ctx.Source.IsTapped) return;
-            ctx.Source.IsTapped = true;
+            if (!AtomicOps.RestCard(ctx.Source)) return;
 
             // 效果：我方领袖拥有《超新星》特征时，领袖力量 +1000，持续到下个对方回合结束。
             if (me.Leader.Info.HasKeyword("超新星"))

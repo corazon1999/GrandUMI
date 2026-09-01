@@ -49,7 +49,8 @@ public class GameEngine
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Func<int, bool>? HasSpectatorsWithHandForPerspective { get; set; }
-    public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 被接受动作持久化（重启恢复用）
+    public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 兼容旧测试/调用方
+    public Action<int, string, JsonElement, string?, GameActionSource>? OnPersistActionWithSource { get; set; } // 被接受动作持久化（重启恢复用）
     public Action? OnOpeningSequenceReady { get; set; }
     /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
     public Action? BeforeSnapshot { get; set; }
@@ -121,6 +122,7 @@ public class GameEngine
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
         "UndoAttachDon",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
+        "HexDraftStarted", "HexChoiceLocked", "HexDraftResolved",
         "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
         "OperationTimeout", "InactivityWarning", "PlayerActivity", "InactivityTimeout",
         "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
@@ -141,7 +143,8 @@ public class GameEngine
                                        bool leaderKeywordWildcard = false,
                                        bool deferOpeningSetupUntilFirstPlayerChosen = false,
                                        bool deferInitialSetupUntilStart = false,
-                                       CardRuleset? ruleset = null)
+                                       CardRuleset? ruleset = null,
+                                       MatchKind matchKind = MatchKind.UnknownHuman)
     {
         var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
         var pinnedRuleset = ruleset ?? CardRulesetManager.Current;
@@ -158,7 +161,17 @@ public class GameEngine
             RngSeed = seed,
             RulesetId = pinnedRuleset.Id,
             Ruleset = pinnedRuleset,
+            MatchKind = matchKind,
         };
+        Hex.HexRules.Initialize(State);
+        State.OnDeterministicRandomEvent = (type, actor, payload) =>
+            RecordMatchLog("random_event", actor, new
+            {
+                randomSeq = State.RandomSeq,
+                type,
+                payload,
+                rngSeed = State.RngSeed,
+            });
 
         var p0Cards = ParseDeck(p0.deckRaw, out var p0Leader);
         var p1Cards = ParseDeck(p1.deckRaw, out var p1Leader);
@@ -364,6 +377,12 @@ public class GameEngine
         {
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
+        else if (State.HexState.BlocksOrdinaryActions
+            && action is not "ChooseHex" and not "PromptResponse"
+                and not "Surrender" and not "RequestDraw" and not "RespondDraw")
+        {
+            SendError(playerIndex, "当前正在进行海克斯选秀，暂时无法执行其他操作");
+        }
         else if (!State.StartingPlayerChosen
             && action is not "ChooseFirstPlayer" and not "PromptResponse"
                 and not "Surrender" and not "RequestDraw" and not "RespondDraw")
@@ -374,6 +393,7 @@ public class GameEngine
         {
             case "ChooseFirstPlayer": HandleChooseFirstPlayer(playerIndex, data); break;
             case "Mulligan":       HandleMulligan(playerIndex, data); break;
+            case "ChooseHex":      HandleChooseHex(playerIndex, data); break;
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
             case "AttachDon":      HandleAttachDon(playerIndex, data); break;
             case "UndoAttachDon":  HandleUndoAttachDon(playerIndex, data); break;
@@ -414,7 +434,10 @@ public class GameEngine
             try
             {
                 // 恢复事务先于普通 MatchLog：线上协调器会等待物理落盘，成功后客户端下行才会释放。
-                OnPersistAction?.Invoke(playerIndex, action, data, correlationId);
+                if (OnPersistActionWithSource is not null)
+                    OnPersistActionWithSource(playerIndex, action, data, correlationId, source);
+                else
+                    OnPersistAction?.Invoke(playerIndex, action, data, correlationId);
                 acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);
             }
             catch
@@ -779,7 +802,7 @@ public class GameEngine
         int count = 0;
         foreach (var c in p.Characters)
         {
-            if (!c.IsTapped) { c.IsTapped = true; count++; }
+            if (!c.IsTapped && AtomicOps.RestCard(State, c, targetIndex)) count++;
         }
         Broadcast("DebugRestAll", new { player = playerIndex, target = targetIndex, count });
     }
@@ -871,6 +894,38 @@ public class GameEngine
         var p = State.Players[playerIndex];
         var handCard = p.Hand[handIndex];
 
+        if (handCard.Info.Kind == CardKind.Stage
+            && Hex.HexRules.Has(State, playerIndex, 30)
+            && p.StageCard is not null
+            && p.ExtraStageCard is not null)
+        {
+            if (data.TryGetProperty("overflowTrashStageId", out var stageVictimElement))
+            {
+                if (stageVictimElement.ValueKind != JsonValueKind.String
+                    || !Guid.TryParse(stageVictimElement.GetString(), out var stageVictimId))
+                {
+                    SendError(playerIndex, "腾位舞台 ID 无效");
+                    return;
+                }
+                var victim = p.StageCard.Id == stageVictimId
+                    ? p.StageCard
+                    : p.ExtraStageCard.Id == stageVictimId ? p.ExtraStageCard : null;
+                if (victim is null)
+                {
+                    SendError(playerIndex, "所选腾位舞台已不在舞台区");
+                    return;
+                }
+                if (ReferenceEquals(p.StageCard, victim)) p.StageCard = null;
+                else p.ExtraStageCard = null;
+                p.Trash.Add(victim);
+            }
+            else
+            {
+                _ = Track(PlayStageWithOverflowAsync(playerIndex, handCard));
+                return;
+            }
+        }
+
         // 角色区满员（≥5）：先让玩家选择 1 张己方角色送去废弃区，再登场新角色
         if (handCard.Info.Kind == CardKind.Character && p.Characters.Count >= 5)
         {
@@ -936,6 +991,37 @@ public class GameEngine
         catch (Exception ex) { Console.Error.WriteLine($"[Play] 满员登场异常: {ex.Message}"); }
     }
 
+    private async Task PlayStageWithOverflowAsync(int playerIndex, CardInstance handCard)
+    {
+        try
+        {
+            var player = State.Players[playerIndex];
+            var stages = new[] { player.StageCard, player.ExtraStageCard }.OfType<CardInstance>().ToList();
+            var chosen = await Prompts.ChooseCards(
+                playerIndex,
+                "HexStageOverflowTrash",
+                "三号船坞：选择1张现有舞台废弃，再打出新舞台",
+                stages.Select(card => card.Id.ToString()).ToList(),
+                1,
+                1,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = stages.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToArray(),
+                });
+            var victim = stages.FirstOrDefault(card => chosen.Contains(card.Id.ToString()));
+            if (victim is null) { SendError(playerIndex, "未选择废弃舞台，取消打出"); return; }
+            if (ReferenceEquals(player.StageCard, victim)) player.StageCard = null;
+            else player.ExtraStageCard = null;
+            player.Trash.Add(victim);
+
+            int handIndex = player.Hand.IndexOf(handCard);
+            if (handIndex < 0) { SendError(playerIndex, "手牌状态已变化，取消打出"); return; }
+            var result = CardPlayer.Play(State, playerIndex, handIndex);
+            await ResolveEffectAndBroadcastPlayAsync(playerIndex, result, handCard.Info.Number);
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[Play] 双舞台腾位异常: {ex.Message}"); }
+    }
+
     private async Task ResolveEffectAndBroadcastPlayAsync(int playerIndex, PlayResult result, string cardNumber)
     {
         var playPayload = new
@@ -950,9 +1036,23 @@ public class GameEngine
         QueueActionLog("PlayCard", playPayload);
         try
         {
+            await Hex.HexRules.OnCardPlayedAsync(this, playerIndex, result);
+            if (State.IsGameOver) return;
             if (result.Kind == PlayKind.Character || result.Kind == PlayKind.Stage)
             {
                 await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.OnEnterField, Prompts);
+                if (!State.IsGameOver
+                    && result.Kind == PlayKind.Character
+                    && Hex.HexRules.ShouldTriggerAttackEffectOnEntry(State, playerIndex, result.Card))
+                {
+                    await EffectRuntime.Resolve(
+                        State,
+                        playerIndex,
+                        result.Card,
+                        EffectTrigger.OnAttackDeclare,
+                        Prompts,
+                        new Dictionary<string, object?> { ["hexVirtualAttack"] = true });
+                }
                 // 旁观者：当我方(其它)角色登场时
                 if (result.Kind == PlayKind.Character && !State.IsGameOver)
                     await EffectRuntime.TriggerEvent(State, EffectTrigger.OnAllyCharEnter, Prompts,
@@ -1187,6 +1287,8 @@ public class GameEngine
     {
         try
         {
+            await Hex.HexRules.OnAttackDeclaredAsync(this, attackerIdx);
+            if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
             await BattleEngine.TriggerAttackDeclareAsync(State, Prompts);
             if (State.IsGameOver || State.CurrentBattle is null) { CheckGameOver(); return; }
             if (!BattleEngine.AreBattleParticipantsOnField(State))
@@ -1323,6 +1425,8 @@ public class GameEngine
             var cardNumber = def.Hand[handIndex].Info.Number;
             var result = CardPlayer.Play(State, playerIndex, handIndex);   // 复用：按 HandPlayCost 扣活跃咚→休息，事件入废弃区
             Broadcast("PlayCard", new { player = playerIndex, cardNumber, kind = result.Kind.ToString(), cardId = result.Card.Id.ToString() });
+            await Hex.HexRules.OnCardPlayedAsync(this, playerIndex, result);
+            if (State.IsGameOver) { CheckGameOver(); return; }
             await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventCounter, Prompts);
             if (!State.IsGameOver)
                 await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppEventPlayed, Prompts,
@@ -1711,24 +1815,137 @@ public class GameEngine
             p.HasReDraw = false;
         }
         var completesMulligan = State.Players[1 - playerIndex].MulliganDone;
+        p.MulliganDone = true;
         if (completesMulligan)
         {
             State.MulliganDeadlineUtc = null;
             CaptureStartingHands();
-            TurnEngine.StartFirstTurn(State);
-            State.OpeningStage = OpeningStage.Playing;
-            // 公开“双方已完成”前必须先把第一回合全部权威字段写好，避免并发读到
-            // MulliganBothDone=true 但 TurnCount 仍为 0 的中间状态。
-            p.MulliganDone = true;
             // 注册双方领袖的永续被动（如 OP16-080【对方回合中】我方角色费用+1）。
             // 注册为纯状态写入（无 prompt），同步完成后再广播，使快照立即包含该效果。
             RegisterLeaderPassives();
-            Broadcast("MulliganComplete");
+            if (State.HexState.Enabled)
+            {
+                State.OpeningStage = OpeningStage.HexDraft;
+                var round = Hex.HexRules.StartDraft(
+                    State,
+                    Hex.HexTier.Silver,
+                    Hex.HexDraftResumePoint.StartFirstTurn);
+                Broadcast("HexDraftStarted", new
+                {
+                    roundId = round.RoundId,
+                    tier = round.Tier.ToString(),
+                    deadlineUtc = round.DeadlineUtc,
+                });
+            }
+            else
+            {
+                TurnEngine.StartFirstTurn(State);
+                State.OpeningStage = OpeningStage.Playing;
+                Broadcast("MulliganComplete");
+            }
         }
         else
         {
-            p.MulliganDone = true;
             Broadcast("MulliganUpdate");
+        }
+    }
+
+    // ── Hex draft ────────────────────────────────────────────────────────
+
+    private void HandleChooseHex(int playerIndex, JsonElement data)
+    {
+        if (data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("roundId", out var roundIdElement)
+            || roundIdElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(roundIdElement.GetString()))
+        {
+            SendError(playerIndex, "缺少有效的海克斯选秀轮次");
+            return;
+        }
+
+        var automatic = data.TryGetProperty("auto", out var autoElement)
+            && autoElement.ValueKind == JsonValueKind.True;
+        if (automatic && _activeActionSource == GameActionSource.Player)
+        {
+            SendError(playerIndex, "玩家不能伪造海克斯超时选择");
+            return;
+        }
+
+        int? requestedChoice = null;
+        if (data.TryGetProperty("hexId", out var choiceElement)
+            && choiceElement.ValueKind == JsonValueKind.Number
+            && choiceElement.TryGetInt32(out var parsedChoice))
+            requestedChoice = parsedChoice;
+
+        var roundId = roundIdElement.GetString()!;
+        var result = Hex.HexRules.LockChoice(
+            State,
+            playerIndex,
+            roundId,
+            requestedChoice,
+            automatic);
+        if (result.Status == Hex.HexChoiceStatus.Rejected)
+        {
+            SendError(playerIndex, result.Reason ?? "海克斯选择无效");
+            return;
+        }
+
+        Broadcast("HexChoiceLocked", new
+        {
+            player = playerIndex,
+            roundId,
+            automatic,
+            duplicate = result.Status == Hex.HexChoiceStatus.Duplicate,
+        });
+        if (result.Status == Hex.HexChoiceStatus.Ready)
+            _ = Track(CompleteHexDraftAsync());
+    }
+
+    internal async Task CompleteHexDraftAsync()
+    {
+        Hex.ResolvedHexDraft draft = null!;
+        Hex.HexDraftResumePoint resume = Hex.HexDraftResumePoint.None;
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                (draft, resume) = await Hex.HexRules.ResolveDraftAsync(this);
+                break;
+            }
+            catch (Exception ex) when (attempt < 2)
+            {
+                // 步骤游标已在每个完整授予步骤后前移；有限重试不会重复已完成效果。
+                RecordMatchLog("hex_draft_settlement_retry", -1, new
+                {
+                    roundId = State.HexState.PendingSettlement?.RoundId,
+                    attempt = attempt + 1,
+                    error = ex.GetType().Name,
+                });
+                await Task.Yield();
+            }
+        }
+        Broadcast("HexDraftResolved", new
+        {
+            roundId = draft.RoundId,
+            tier = draft.Tier.ToString(),
+            player0Choice = draft.Player0Choice,
+            player1Choice = draft.Player1Choice,
+        });
+        if (State.IsGameOver) { CheckGameOver(); return; }
+
+        switch (resume)
+        {
+            case Hex.HexDraftResumePoint.StartFirstTurn:
+                TurnEngine.StartFirstTurn(State);
+                State.OpeningStage = OpeningStage.Playing;
+                Hex.HexRules.OnTurnStarted(State, State.CurrentTurnPlayer);
+                Broadcast("MulliganComplete");
+                break;
+            case Hex.HexDraftResumePoint.AdvanceToNextTurn:
+                await ContinueEndTurnAfterHexDraftAsync();
+                break;
+            default:
+                throw new InvalidOperationException("海克斯选秀缺少有效的恢复点");
         }
     }
 
@@ -1768,7 +1985,8 @@ public class GameEngine
         var me = State.Players[playerIndex];
         CardInstance? source = me.Leader.Id == sourceId ? me.Leader
             : me.Characters.FirstOrDefault(c => c.Id == sourceId)
-              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null);
+              ?? (me.StageCard?.Id == sourceId ? me.StageCard : null)
+              ?? (me.ExtraStageCard?.Id == sourceId ? me.ExtraStageCard : null);
         if (source is null) { SendError(playerIndex, "效果来源不存在"); return; }
 
         _ = Track(ResolveActivatedAsync(playerIndex, source));
@@ -1839,7 +2057,37 @@ public class GameEngine
             if (State.IsGameOver) { CheckGameOver(); return; }
 
             await TurnEngine.ResolvePromptedEndPhaseTasksAsync(State, Prompts);
-            TurnEngine.AdvanceTurnToReset(State);
+            Hex.HexRules.OnTurnEnding(State, cur);
+            TurnEngine.EnterEndPhase(State);
+            if (Hex.HexRules.ShouldStartDraftAfterTurn(State, out var tier))
+            {
+                var round = Hex.HexRules.StartDraft(
+                    State,
+                    tier,
+                    Hex.HexDraftResumePoint.AdvanceToNextTurn);
+                Broadcast("HexDraftStarted", new
+                {
+                    roundId = round.RoundId,
+                    tier = round.Tier.ToString(),
+                    deadlineUtc = round.DeadlineUtc,
+                });
+                return;
+            }
+
+            await ContinueEndTurnAfterHexDraftAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[EndTurnAsync] {ex}");
+        }
+    }
+
+    private async Task ContinueEndTurnAfterHexDraftAsync()
+    {
+        try
+        {
+            TurnEngine.StartNextTurnAtReset(State);
+            Hex.HexRules.OnTurnStarted(State, State.CurrentTurnPlayer);
             // 【我方的回合开始时】(OP11-040 路飞等)：在准备阶段(Reset)之后、抽牌/加咚之前派发。
             // 此刻费用区咚数 = 进入本回合的咚总数（本回合 Don 尚未加咚），符合官方「回合开始时」判定时点。
             // 经 isMyTurn 过滤后仅当前回合方的卡触发；payload owner = 新回合方。
@@ -1853,7 +2101,7 @@ public class GameEngine
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[EndTurnAsync] {ex}");
+            Console.Error.WriteLine($"[ContinueEndTurnAfterHexDraftAsync] {ex}");
         }
     }
 

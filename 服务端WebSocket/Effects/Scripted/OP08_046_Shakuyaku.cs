@@ -54,6 +54,6 @@ public class OP08_046_Shakuyaku : IScriptedEffect
         }
 
         // 之后：将此角色转为休息状态
-        AtomicOps.RestCard(self);
+        if (!AtomicOps.RestCard(self)) return;
     }
 }

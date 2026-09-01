@@ -50,7 +50,7 @@ public class OP03_058_Spandam : IScriptedEffect
 
         // 支付成本：咚!!-1 + 横置领袖
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-        AtomicOps.RestCard(me.Leader);
+        if (!AtomicOps.RestCard(me.Leader)) return;
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
         await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked);
