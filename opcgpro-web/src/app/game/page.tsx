@@ -29,6 +29,7 @@ export default function GamePage() {
   const router = useRouter();
   const [leaderClashComplete, setLeaderClashComplete] = useState(false);
   const [feedbackOpenRequest, setFeedbackOpenRequest] = useState(0);
+  const [isSoloTest, setIsSoloTest] = useState(false);
   // 只订阅页面壳实际使用的字段，避免每份完整牌桌快照都让整个页面树重新渲染。
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
@@ -39,6 +40,10 @@ export default function GamePage() {
 
   const gameReady = useGameInit();
   const handleLeaderClashComplete = useCallback(() => setLeaderClashComplete(true), []);
+
+  useEffect(() => {
+    setIsSoloTest(sessionStorage.getItem("isBotMatch") === "1");
+  }, []);
 
   const playbackRecord = useMemo(() => {
     if (!isPlayback) return null;
@@ -87,7 +92,7 @@ export default function GamePage() {
       {!isObserver && !isPlayback && <PromptOverlay />}
       {!isObserver && !isPlayback && <PromptSuccessFlash />}
       {!isObserver && !isPlayback && <BattleDefenseOverlay />}
-      {!isObserver && !isPlayback && <GMPanel />}
+      {isSoloTest && !isObserver && !isPlayback && <GMPanel />}
       {!isPlayback && (
         <FeedbackOverlay
           context="game"

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameRequest } from "@/net/GameRequest";
 import { useGameStore } from "@/store/gameStore";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 interface OP17CoverageCardResult {
   number: string;
@@ -30,7 +31,7 @@ interface OP17CoverageReport {
   error?: string;
 }
 
-export default function GMPanel({ showButton = false }: { showButton?: boolean }) {
+export default function GMPanel() {
   const [open, setOpen] = useState(false);
   const [cardNumber, setCardNumber] = useState("");
   const [lifeNumber, setLifeNumber] = useState("");
@@ -44,6 +45,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
   const summonInputRef = useRef<HTMLInputElement>(null);
   const lastAction = useGameStore((s) => s.lastAction);
   const lastActionPayload = useGameStore((s) => s.lastActionPayloadObj);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -146,10 +148,15 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
   return (
     <>
       {/* 单人测试专用：左上角浮动 GM 按钮（移动端无 T 键时唤出面板） */}
-      {showButton && !open && (
+      {rotateQuarterTurn && !open && (
         <button
+          type="button"
           onClick={() => setOpen(true)}
-          className="fixed left-4 top-4 z-50 rounded-md border border-amber-400/50 bg-amber-500/90 px-3 py-1.5 text-xs font-black text-slate-950 shadow-lg transition-colors hover:bg-amber-400"
+          style={{
+            left: "calc(1rem + var(--layout-safe-left, env(safe-area-inset-left)))",
+            top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+          }}
+          className="fixed z-50 flex min-h-12 min-w-12 items-center justify-center rounded-md border border-amber-400/50 bg-amber-500/90 px-3 py-2 text-xs font-black text-slate-950 shadow-lg transition-colors hover:bg-amber-400 focus-visible:outline-2 focus-visible:outline-amber-200"
           aria-label="打开 GM 调试面板"
         >
           GM
@@ -159,7 +166,13 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed right-4 top-4 z-50 flex max-h-[calc(100dvh-2rem)] w-72 flex-col rounded-lg border border-amber-400/40 bg-slate-950/95 shadow-2xl shadow-black/50"
+          style={{
+            right: "calc(1rem + var(--layout-safe-right, env(safe-area-inset-right)))",
+            top: "calc(1rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+            width: "min(18rem, calc(100cqw - 2rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px)))",
+            maxHeight: "calc(100cqh - 2rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px))",
+          }}
+          className="fixed z-50 flex flex-col rounded-lg border border-amber-400/40 bg-slate-950/95 shadow-2xl shadow-black/50"
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 24 }}
@@ -167,8 +180,9 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
             <h2 className="text-sm font-black text-amber-300">GM 调试面板</h2>
             <button
+              type="button"
               onClick={() => setOpen(false)}
-              className="rounded px-2 py-0.5 text-xs text-slate-400 transition-colors hover:text-white"
+              className="flex min-h-12 min-w-12 items-center justify-center rounded px-2 py-1 text-xs text-slate-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-amber-200"
             >
               关闭 (T)
             </button>
@@ -180,7 +194,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <button
             onClick={runOP17Coverage}
             disabled={coverageRunning}
-            className={`mt-1.5 w-full rounded px-3 py-2 text-sm font-black transition-colors ${
+            className={`mt-1.5 min-h-12 w-full rounded px-3 py-2 text-sm font-black transition-colors ${
               coverageRunning
                 ? "cursor-wait bg-slate-800 text-slate-500"
                 : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
@@ -228,7 +242,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             />
             <button
               onClick={submit}
-              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+              className="min-h-12 shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
             >
               添加
             </button>
@@ -243,7 +257,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <div className="mt-1.5 flex gap-1 rounded border border-slate-600 bg-slate-900 p-0.5">
             <button
               onClick={() => setLifeTarget("self")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+              className={`min-h-12 flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
                 lifeTarget === "self" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
@@ -251,7 +265,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             </button>
             <button
               onClick={() => setLifeTarget("opponent")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+              className={`min-h-12 flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
                 lifeTarget === "opponent" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
@@ -270,7 +284,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             />
             <button
               onClick={submitLife}
-              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+              className="min-h-12 shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
             >
               放入
             </button>
@@ -295,14 +309,14 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             />
             <button
               onClick={submitDon}
-              className="flex-1 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+              className="min-h-12 flex-1 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
             >
               加咚
             </button>
           </div>
           <button
             onClick={refreshDon}
-            className="mt-1.5 w-full rounded bg-sky-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-sky-500"
+            className="mt-1.5 min-h-12 w-full rounded bg-sky-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-sky-500"
           >
             刷新咚（全部回费用区并竖直）
           </button>
@@ -313,7 +327,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <div className="mt-1.5 flex gap-1 rounded border border-slate-600 bg-slate-900 p-0.5">
             <button
               onClick={() => setSummonTarget("self")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+              className={`min-h-12 flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
                 summonTarget === "self"
                   ? "bg-amber-500 text-slate-950"
                   : "text-slate-400 hover:text-white"
@@ -323,7 +337,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             </button>
             <button
               onClick={() => setSummonTarget("opponent")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
+              className={`min-h-12 flex-1 rounded px-2 py-1 text-xs font-bold transition-colors ${
                 summonTarget === "opponent"
                   ? "bg-amber-500 text-slate-950"
                   : "text-slate-400 hover:text-white"
@@ -345,7 +359,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
             />
             <button
               onClick={submitSummon}
-              className="shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+              className="min-h-12 shrink-0 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
             >
               打出
             </button>
@@ -360,13 +374,13 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <div className="mt-1.5 flex gap-2">
             <button
               onClick={() => koAll("self")}
-              className="flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
+              className="min-h-12 flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
             >
               KO 我方全部
             </button>
             <button
               onClick={() => koAll("opponent")}
-              className="flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
+              className="min-h-12 flex-1 rounded bg-rose-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-rose-500"
             >
               KO 对方全部
             </button>
@@ -381,13 +395,13 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <div className="mt-1.5 flex gap-2">
             <button
               onClick={() => restAll("self")}
-              className="flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
+              className="min-h-12 flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
             >
               横置我方全部
             </button>
             <button
               onClick={() => restAll("opponent")}
-              className="flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
+              className="min-h-12 flex-1 rounded bg-orange-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-orange-500"
             >
               横置对方全部
             </button>
@@ -401,7 +415,7 @@ export default function GMPanel({ showButton = false }: { showButton?: boolean }
           <label className="block text-xs font-bold text-slate-300">对手领袖攻击</label>
           <button
             onClick={leaderAttack}
-            className="mt-1.5 w-full rounded bg-purple-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-purple-500"
+            className="mt-1.5 min-h-12 w-full rounded bg-purple-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-purple-500"
           >
             对手领袖攻击我方领袖
           </button>
