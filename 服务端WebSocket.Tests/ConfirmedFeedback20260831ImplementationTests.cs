@@ -123,7 +123,8 @@ public sealed class ConfirmedFeedback20260831ImplementationTests
         }
 
         public Task<bool> ConfirmOptional(int playerIdx, string text) => Task.FromResult(false);
-        public Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options) => Task.FromResult(-1);
+        public Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options,
+            Dictionary<string, object?>? extra = null) => Task.FromResult(-1);
         public Task<bool> AskLifeTrigger(int playerIdx, CardInstance lifeCard, bool hasRealTrigger) => Task.FromResult(false);
     }
 }

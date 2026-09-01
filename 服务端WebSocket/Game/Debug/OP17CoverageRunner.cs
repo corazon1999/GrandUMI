@@ -291,7 +291,8 @@ public static class OP17CoverageRunner
 
         public Task<bool> ConfirmOptional(int playerIdx, string text) => Task.FromResult(true);
 
-        public Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
+        public Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options,
+            Dictionary<string, object?>? extra = null)
             => Task.FromResult(0);
 
         public Task<bool> AskLifeTrigger(int playerIdx, CardInstance lifeCard, bool hasRealTrigger)

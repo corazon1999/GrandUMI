@@ -19,8 +19,10 @@ public interface IPromptService
     /// <summary>是否发动可选效果（"可以…：…"）</summary>
     Task<bool> ConfirmOptional(int playerIdx, string text);
 
-    /// <summary>从多个选项中选 1 个（"选择以下的 1 项"）</summary>
-    Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options);
+    /// <summary>从多个选项中选 1 个（"选择以下的 1 项"）。
+    /// extra 仅用于下发选项面板与控制日志视图，不参与选项合法性判定。</summary>
+    Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options,
+        Dictionary<string, object?>? extra = null);
 
     /// <summary>
     /// 生命牌反信息泄露 Prompt：让 playerIdx 决定"发动触发 / 加入手牌"

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Collections.Concurrent;
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
@@ -260,11 +261,15 @@ public class GameFeedback20260826Batch41To54Tests
 
         Assert.Equal(2, prompts.OptionHistory.Count);
         Assert.Contains(first.Info.Number, prompts.OptionHistory[0].text);
+        Assert.Equal("第 1/2 张：选择放回卡组后的最终位置。",
+            prompts.OptionHistory[0].extra?["logPublicText"]);
         Assert.Contains("本张最终最上", prompts.OptionHistory[0].options[0]);
         Assert.Contains("第 2 张放牌顶时本张最终最下", prompts.OptionHistory[0].options[1]);
         Assert.Contains("放牌底时第 2 张位于本张下方", prompts.OptionHistory[0].options[1]);
         Assert.Contains(second.Info.Number, prompts.OptionHistory[1].text);
         Assert.Contains(first.Info.Number, prompts.OptionHistory[1].text);
+        Assert.Equal("第 2/2 张：选择放回卡组后的最终位置。",
+            prompts.OptionHistory[1].extra?["logPublicText"]);
         Assert.Contains(firstPlacement == 0 ? "已放牌顶" : "已放牌底", prompts.OptionHistory[1].text);
         if (firstPlacement == 0)
         {
@@ -275,6 +280,88 @@ public class GameFeedback20260826Batch41To54Tests
         {
             Assert.Contains("本张成为卡组最上方", prompts.OptionHistory[1].options[0]);
             Assert.Contains("本张在第 1 张下方", prompts.OptionHistory[1].options[1]);
+        }
+    }
+
+    [Fact]
+    public async Task G891_OP11_054_OptionLogsKeepHandIdentityPrivateAndPreservePlacementResult()
+    {
+        const string deck = "OP06-001\nOP15-003\nOP15-004\nOP15-005\nOP15-008\nOP15-009";
+        var engine = new GameEngine(
+            "g891-op11-054-private-log",
+            ("s0", "p0", deck),
+            ("s1", "p1", deck),
+            firstPlayer: 0,
+            rngSeed: 891054);
+        var messages = new[] { new ConcurrentQueue<string>(), new ConcurrentQueue<string>() };
+        engine.OnSendToPlayer = (playerIndex, payload) =>
+            messages[playerIndex].Enqueue(JsonSerializer.Serialize(payload));
+
+        var me = engine.State.Players[0];
+        me.Hand.Clear();
+        me.Deck.Clear();
+        var first = Card("OP15-006");
+        var second = Card("OP15-007");
+        me.Hand.AddRange([first, second]);
+        me.Deck.AddRange([
+            Card("OP15-003"), Card("OP15-004"), Card("OP15-005"),
+            Card("OP15-008"), Card("OP15-009")]);
+        var deckAfterDraw = me.Deck.Skip(3).ToList();
+        var source = Card("OP11-054");
+        me.Characters.Add(source);
+
+        var resolution = EffectRuntime.Resolve(
+            engine.State, 0, source, EffectTrigger.OnEnterField, engine.Prompts);
+        var firstCardPrompt = await WaitForPrompt("OwnHand");
+        engine.Prompts.Resolve(firstCardPrompt.PromptId, [first.Id.ToString()]);
+        var firstPlacementPrompt = await WaitForPrompt("Option", firstCardPrompt.PromptId);
+        engine.Prompts.Resolve(firstPlacementPrompt.PromptId, ["0"]);
+        var secondCardPrompt = await WaitForPrompt("OwnHand", firstPlacementPrompt.PromptId);
+        engine.Prompts.Resolve(secondCardPrompt.PromptId, [second.Id.ToString()]);
+        var secondPlacementPrompt = await WaitForPrompt("Option", secondCardPrompt.PromptId);
+        engine.Prompts.Resolve(secondPlacementPrompt.PromptId, ["1"]);
+        await resolution;
+
+        Assert.Equal(new[] { first }.Concat(deckAfterDraw).Append(second), me.Deck);
+        var selfLogs = ReadLogLines(messages[0]);
+        var opponentLogs = ReadLogLines(messages[1]);
+        Assert.Contains(selfLogs, line => line.Contains(first.Info.Number, StringComparison.Ordinal));
+        Assert.Contains(selfLogs, line => line.Contains(second.Info.Number, StringComparison.Ordinal));
+        Assert.DoesNotContain(opponentLogs, line => line.Contains(first.Info.Number, StringComparison.Ordinal));
+        Assert.DoesNotContain(opponentLogs, line => line.Contains(second.Info.Number, StringComparison.Ordinal));
+        Assert.Contains(opponentLogs, line =>
+            line.Contains("第 1/2 张：选择放回卡组后的最终位置", StringComparison.Ordinal)
+            && line.Contains("放到牌顶", StringComparison.Ordinal));
+        Assert.Contains(opponentLogs, line =>
+            line.Contains("第 2/2 张：选择放回卡组后的最终位置", StringComparison.Ordinal)
+            && line.Contains("放到牌底", StringComparison.Ordinal));
+
+        async Task<PendingPrompt> WaitForPrompt(string kind, string? previousPromptId = null)
+        {
+            for (var i = 0; i < 300; i++)
+            {
+                if (engine.State.PendingPrompt is { } prompt
+                    && prompt.Kind == kind
+                    && prompt.PromptId != previousPromptId)
+                    return prompt;
+                await Task.Delay(10);
+            }
+
+            throw new TimeoutException($"等待 {kind} 提示超时");
+        }
+
+        static List<string> ReadLogLines(IEnumerable<string> snapshots)
+        {
+            var lines = new List<string>();
+            foreach (var snapshot in snapshots)
+            {
+                using var document = JsonDocument.Parse(snapshot);
+                if (!document.RootElement.TryGetProperty("logLines", out var values)) continue;
+                lines.AddRange(values.EnumerateArray()
+                    .Select(value => value.GetString())
+                    .OfType<string>());
+            }
+            return lines;
         }
     }
 

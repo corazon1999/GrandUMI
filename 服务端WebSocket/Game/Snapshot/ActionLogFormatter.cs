@@ -128,7 +128,15 @@ public static class ActionLogFormatter
                 string result = labels.Count == 0
                     ? "未选择"
                     : string.Join("、", labels.Select(x => $"【{x}】"));
-                string prompt = string.IsNullOrWhiteSpace(promptText) ? "" : $"：“{promptText}”";
+                string textVisibility = GetStr(payload, "textVisibility");
+                var textViewers = GetIntArray(payload, "textViewers");
+                bool maySeePromptText = textVisibility != "restricted"
+                    || viewerIndex == actor
+                    || textViewers.Contains(viewerIndex);
+                string visiblePromptText = maySeePromptText
+                    ? promptText
+                    : GetStr(payload, "publicText");
+                string prompt = string.IsNullOrWhiteSpace(visiblePromptText) ? "" : $"：“{visiblePromptText}”";
                 return $"[效果选择] {Side(actor)}处理 {source}{prompt} → {result}";
             }
 

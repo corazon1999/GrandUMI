@@ -54,10 +54,17 @@ public class OP11_054_Nami : IScriptedEffect
 
             var card = hand.First(c => c.Id.ToString() == pick[0]);
             var placementOptions = BuildPlacementOptions(i, count, firstPlacement);
+            var placementExtra = new Dictionary<string, object?>
+            {
+                // 选项面板只下发给操作者，可保留卡号、卡名与上一步顺序说明；
+                // 操作日志面向对手时换成不含手牌身份的公开正文。
+                ["logPublicText"] = BuildPublicPlacementPrompt(i, count),
+            };
 
             int where = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
                 BuildPlacementPrompt(i, count, card, firstPlacedCard, firstPlacement),
-                placementOptions);
+                placementOptions,
+                placementExtra);
             if (where is not 0 and not 1) break;
 
             me.Hand.Remove(card);
@@ -100,6 +107,9 @@ public class OP11_054_Nami : IScriptedEffect
         string firstPosition = firstPlacement == 0 ? "牌顶" : "牌底";
         return $"{prompt}第 1 张（{CardLabel(firstPlacedCard)}）已放{firstPosition}。";
     }
+
+    private static string BuildPublicPlacementPrompt(int index, int count)
+        => $"第 {index + 1}/{count} 张：选择放回卡组后的最终位置。";
 
     private static IReadOnlyList<string> BuildPlacementOptions(int index, int count, int? firstPlacement)
     {

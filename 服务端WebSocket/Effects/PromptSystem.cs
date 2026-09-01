@@ -303,6 +303,11 @@ public class PromptSystem : IPromptService
         var labels = new List<string>();
         bool hasHiddenCard = false;
         var detailViewers = new HashSet<int> { playerIdx };
+        string publicText = "";
+        if (extra is not null
+            && extra.TryGetValue("logPublicText", out var rawPublicText)
+            && rawPublicText is string configuredPublicText)
+            publicText = configuredPublicText;
         string[]? options = null;
         if (extra is not null
             && extra.TryGetValue("options", out var rawOptions)
@@ -349,6 +354,9 @@ public class PromptSystem : IPromptService
             labels = labels.ToArray(),
             detailVisibility = hasHiddenCard ? "restricted" : "public",
             detailViewers = detailViewers.ToArray(),
+            textVisibility = string.IsNullOrWhiteSpace(publicText) ? "public" : "restricted",
+            textViewers = new[] { playerIdx },
+            publicText,
         });
     }
 
@@ -369,12 +377,17 @@ public class PromptSystem : IPromptService
         return false;
     }
 
-    public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
+    public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options,
+        Dictionary<string, object?>? extra = null)
     {
+        var optionExtra = extra is null
+            ? new Dictionary<string, object?>()
+            : new Dictionary<string, object?>(extra);
+        optionExtra["options"] = options;
         var ans = await ChooseCards(playerIdx, "Option", text,
             Enumerable.Range(0, options.Count).Select(i => i.ToString()).ToList(),
             min: 1, max: 1,
-            extra: new Dictionary<string, object?> { ["options"] = options });
+            extra: optionExtra);
         if (ans.Count == 0) return -1;
         return int.TryParse(ans[0], out var v) ? v : -1;
     }

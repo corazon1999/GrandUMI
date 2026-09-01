@@ -384,9 +384,10 @@ public static class EffectRuntime
             return await inner.ConfirmOptional(playerIdx, text);
         }
 
-        public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options)
+        public async Task<int> ChooseOption(int playerIdx, string text, IReadOnlyList<string> options,
+            Dictionary<string, object?>? extra = null)
         {
-            int selected = await inner.ChooseOption(playerIdx, text, options);
+            int selected = await inner.ChooseOption(playerIdx, text, options, extra);
             markAccepted();
             return selected;
         }

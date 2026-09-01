@@ -84,6 +84,37 @@ public class ActionLogFormatterTests
     }
 
     [Fact]
+    public void 效果选择日志_选项结果可公开但隐藏区提示正文按视角脱敏()
+    {
+        var state = TestScene.New().Build();
+        var payload = JsonSerializer.SerializeToElement(new
+        {
+            player = 0,
+            sourceNumber = "OP11-054",
+            text = "第 2/2 张（OP15-007 波特卡斯·D·艾斯）：选择放回卡组后的最终位置。第 1 张（OP15-006 尤斯塔斯·基德）已放牌顶。",
+            publicText = "第 2/2 张：选择放回卡组后的最终位置。",
+            labels = new[] { "放到牌底：本张成为卡组最下方" },
+            detailVisibility = "public",
+            textVisibility = "restricted",
+            textViewers = new[] { 0 },
+        });
+
+        var self = ActionLogFormatter.Format(state, 0, "PromptResolved", payload);
+        var opponent = ActionLogFormatter.Format(state, 1, "PromptResolved", payload);
+        var spectator = ActionLogFormatter.Format(state, -1, "PromptResolved", payload);
+
+        Assert.Contains("OP15-007", self);
+        Assert.Contains("OP15-006", self);
+        Assert.Contains("放到牌底", self);
+        Assert.DoesNotContain("OP15-007", opponent);
+        Assert.DoesNotContain("OP15-006", opponent);
+        Assert.DoesNotContain("OP15-007", spectator);
+        Assert.DoesNotContain("OP15-006", spectator);
+        Assert.Contains("第 2/2 张：选择放回卡组后的最终位置", opponent);
+        Assert.Contains("放到牌底", opponent);
+    }
+
+    [Fact]
     public void 公开日志_列出全部公开卡牌()
     {
         var state = TestScene.New().Build();
