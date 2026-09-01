@@ -121,6 +121,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 entry.From,
                 effectSourceKind = entry.EffectSourceKind?.ToString(),
                 entry.EffectSourceNumber,
+                entry.LifeTriggerOrigin,
             }).ToArray(),
             state.ExtraTurnPending,
             noPlayCharacterThisTurn = state.NoPlayCharacterThisTurn.Order().ToArray(),

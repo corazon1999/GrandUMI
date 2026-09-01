@@ -1124,7 +1124,12 @@ public static class AtomicOps
     }
 
     /// <summary>从废弃区免费登场（restState=true 时以休息状态登场）</summary>
-    public static async Task PlayFromTrashFree(GameState s, int playerIdx, CardInstance card, bool restState = false)
+    public static async Task PlayFromTrashFree(
+        GameState s,
+        int playerIdx,
+        CardInstance card,
+        bool restState = false,
+        bool lifeTriggerOrigin = false)
     {
         var p = s.Players[playerIdx];
         if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
@@ -1138,13 +1143,13 @@ public static class AtomicOps
             card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
                 && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
-            s.EnqueueEnterField(playerIdx, card, "trash"); // 触发被登场角色的【登场时】
+            s.EnqueueEnterField(playerIdx, card, "trash", lifeTriggerOrigin); // 触发被登场角色的【登场时】
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
             ResetCardEphemeralState(card);
             await PlaceStageAsync(s, playerIdx, card);
-            s.EnqueueEnterField(playerIdx, card, "trash");
+            s.EnqueueEnterField(playerIdx, card, "trash", lifeTriggerOrigin);
         }
     }
 

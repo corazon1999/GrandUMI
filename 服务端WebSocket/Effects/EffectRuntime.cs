@@ -46,6 +46,7 @@ public static class EffectRuntime
     private static readonly AsyncLocal<CardInstance?> _currentSourceAL = new();
     private static readonly AsyncLocal<int?> _actingSideAL = new();
     private static readonly AsyncLocal<IPromptService?> _promptsAL = new();
+    private static readonly AsyncLocal<bool> _lifeTriggerOriginAL = new();
     private static readonly AsyncLocal<EffectLeaveReplacementProcess?> _leaveReplacementProcessAL = new();
     private static GameState? _ambient { get => _ambientAL.Value; set => _ambientAL.Value = value; }
     private static int _depth { get => _depthAL.Value; set => _depthAL.Value = value; }
@@ -67,6 +68,10 @@ public static class EffectRuntime
     /// 供 AtomicOps 内需要临时交互的场景（如 PlayFromHandFree 满场自选弃谁）使用，
     /// 免去给 136 处同步调用点改签名。</summary>
     public static IPromptService? CurrentPrompts => _promptsAL.Value;
+
+    /// <summary>当前效果链是否起源于生命【触发】。
+    /// 供效果登场入队时保留规则来源；卡牌在发动触发后已经进入废弃区，不能仅靠来源区域判断。</summary>
+    public static bool CurrentEffectOriginatesFromLifeTrigger => _lifeTriggerOriginAL.Value;
 
     /// <summary>
     /// 一张卡牌效果的一次完整结算中已经支付的离场置换。旧卡效可能把多目标离场拆成多个步骤，
@@ -148,7 +153,8 @@ public static class EffectRuntime
         EffectTrigger trigger,
         IPromptService prompts,
         Dictionary<string, object?>? payload = null,
-        bool hexCopy = false)
+        bool hexCopy = false,
+        bool lifeTriggerOrigin = false)
     {
         var owner = s.Players[ownerIdx];
         int turnOnceCountBefore = owner.TurnOnceUsed.Count;
@@ -175,6 +181,7 @@ public static class EffectRuntime
         var prevSource = _currentSourceAL.Value;
         var prevActing = _actingSideAL.Value;
         var prevPrompts = _promptsAL.Value;
+        bool prevLifeTriggerOrigin = _lifeTriggerOriginAL.Value;
         var prevLeaveReplacementProcess = _leaveReplacementProcessAL.Value;
         bool inheritLeaveReplacementProcess = prevLeaveReplacementProcess is not null
             && ReferenceEquals(prevLeaveReplacementProcess.State, s)
@@ -187,6 +194,7 @@ public static class EffectRuntime
         _currentSourceAL.Value = source;
         _actingSideAL.Value = ownerIdx;
         _promptsAL.Value = prompts;
+        _lifeTriggerOriginAL.Value = prevLifeTriggerOrigin || lifeTriggerOrigin;
         _depth++;
         try
         {
@@ -296,6 +304,7 @@ public static class EffectRuntime
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
             _promptsAL.Value = prevPrompts;
+            _lifeTriggerOriginAL.Value = prevLifeTriggerOrigin;
             _leaveReplacementProcessAL.Value = prevLeaveReplacementProcess;
             if (isRootResolve)
                 s.EvaluateDeckOut();
@@ -536,6 +545,7 @@ public static class EffectRuntime
             ["from"] = ef.From,
             ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
             ["effectSourceNumber"] = ef.EffectSourceNumber,
+            ["lifeTriggerOrigin"] = ef.LifeTriggerOrigin,
         };
 
         // 没有登场时效果的卡仍要经过 Resolve 注册静态场上能力，但不应作为排序候选展示。

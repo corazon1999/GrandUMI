@@ -327,7 +327,11 @@ public class GameState
 
     /// <summary>入队一张"被效果登场"的卡牌（由 AtomicOps.Play*Free 调用），稍后定向触发其【登场时】效果。
     /// from = 来源区("hand"/"trash"/"deck"/"life")，供 OnAllyCharEnter 监听卡区分（如 OP16-079 仅废弃区登场赋速攻）。</summary>
-    public void EnqueueEnterField(int owner, CardInstance card, string? from = null)
+    public void EnqueueEnterField(
+        int owner,
+        CardInstance card,
+        string? from = null,
+        bool lifeTriggerOrigin = false)
         => PendingEnterFields.Add(new PendingEnterField
         {
             Owner = owner,
@@ -335,6 +339,8 @@ public class GameState
             From = from,
             EffectSourceKind = Effects.EffectRuntime.CurrentSource?.Info.Kind,
             EffectSourceNumber = Effects.EffectRuntime.CurrentSource?.Info.Number,
+            LifeTriggerOrigin = lifeTriggerOrigin
+                || Effects.EffectRuntime.CurrentEffectOriginatesFromLifeTrigger,
         });
 
     /// <summary>
@@ -793,6 +799,8 @@ public class PendingEnterField
     public Cards.CardKind? EffectSourceKind { get; init; }
     /// <summary>使其登场的效果源卡号；普通从手牌打出时为空。</summary>
     public string? EffectSourceNumber { get; init; }
+    /// <summary>此次登场是否由生命【触发】效果产生；旧快照缺少该字段时默认为 false。</summary>
+    public bool LifeTriggerOrigin { get; init; }
 }
 
 /// <summary>检索/公开牌的瞬时信息：哪一方公开了哪些卡号</summary>

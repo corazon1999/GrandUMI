@@ -92,14 +92,15 @@ public static class LifeRevealManager
                         p.Trash.Add(top);
                         var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
                         await EffectRuntime.Resolve(s, targetPlayerIdx, top,
-                            revealTrigger, engine.Prompts);
+                            revealTrigger, engine.Prompts, lifeTriggerOrigin: true);
                         // 「此卡牌登场」通用兜底：纯自登场角色或舞台（无 DSL/脚本触发逻辑处理它）
                         // 在此自动从废弃区登场。带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op
                         // 处理；该卡届时已离开废弃区，因此不会再次命中此兜底。
                         if (!s.IsGameOver && top.Info.Kind is CardKind.Character or CardKind.Stage
                             && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                         {
-                            await AtomicOps.PlayFromTrashFree(s, targetPlayerIdx, top);
+                            await AtomicOps.PlayFromTrashFree(
+                                s, targetPlayerIdx, top, lifeTriggerOrigin: true);
                             // PlayFromTrashFree 只把【登场时】加入延迟队列；这条兜底位于 Resolve 之外，
                             // 必须显式排空一次。角色与舞台均由同一队列确保【登场时】恰好结算一次。
                             if (!s.IsGameOver)

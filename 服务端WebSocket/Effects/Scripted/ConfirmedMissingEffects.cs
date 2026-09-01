@@ -155,7 +155,11 @@ public sealed class OP12_081_Koala : IScriptedEffect
             || !Guid.TryParse(idValue?.ToString(), out var enteredId)) return;
         var entered = ctx.State.Players[enteredOwner].Characters.FirstOrDefault(card => card.Id == enteredId);
         if (entered is null) return;
-        // 从生命触发登场不是“将角色登场”或“通过角色效果登场”，不能触发克尔拉。
+        // 生命【触发】造成的登场不属于“通常登场”或“通过角色效果登场”，不能触发克尔拉。
+        // 触发卡发动前已从生命区移到废弃区，不能只依赖 from 区域判断。
+        if (ctx.Vars.TryGetValue("lifeTriggerOrigin", out var lifeTriggerOrigin)
+            && lifeTriggerOrigin is true) return;
+        // 兼容旧快照及旧调用方曾直接记录的 life 来源。
         if (ctx.Vars.TryGetValue("from", out var from)
             && string.Equals(from?.ToString(), "life", StringComparison.OrdinalIgnoreCase)) return;
         bool highCost = entered.Info.Cost >= 8;
