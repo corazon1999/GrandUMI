@@ -463,7 +463,6 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             card.BattledOpponentCharacterThisTurn,
             nameAliases = card.NameAliases.Order(StringComparer.Ordinal).ToArray(),
             gainedPropertiesThisTurn = card.GainedPropertiesThisTurn.Order(StringComparer.Ordinal).ToArray(),
-            fieldSnapshotSourceIds = SortedIds(card.FieldSnapshotSourceIds),
         };
 
     private static object Don(DonCard don)
