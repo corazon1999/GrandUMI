@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrandUMI.Cards;
+using GrandUMI.Game.Hex;
 
 namespace GrandUMI.Game.Snapshot;
 
@@ -153,6 +154,17 @@ public static class ActionLogFormatter
                 int newTurnPlayer = GetInt(payload, "newTurnPlayer");
                 int turnCount = GetInt(payload, "turnCount");
                 return $"—— 第 {turnCount} 回合 · {Side(newTurnPlayer)}回合 ——";
+            }
+
+            case "HexCandidateRefreshed":
+                return $"[海克斯] {Side(GetInt(payload, "player"))}刷新了一个私密候选";
+
+            case "HexDraftResolved":
+            {
+                int actor = GetInt(payload, "player");
+                int choice = GetInt(payload, "choice");
+                var hex = HexCatalog.Get(choice);
+                return $"[海克斯] {Side(actor)}获得【{hex.Name}】";
             }
 
             case "Surrender":

@@ -231,7 +231,7 @@ function RightRail({
   return (
     <aside
       data-game-right-rail
-      className="relative z-40 flex h-full min-h-0 w-44 shrink-0 flex-col gap-3"
+      className="relative z-40 flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 [padding-bottom:var(--layout-safe-bottom,0px)] [padding-right:var(--layout-safe-right,0px)] [padding-top:var(--layout-safe-top,0px)]"
     >
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <p className="text-xs font-black text-slate-300">对手</p>

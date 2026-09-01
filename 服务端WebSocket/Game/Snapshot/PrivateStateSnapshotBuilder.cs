@@ -55,6 +55,7 @@ public static class PrivateStateSnapshotBuilder
             {
                 state.HexState.Enabled,
                 state.HexState.DraftSequence,
+                draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
                 state.HexState.DraftResolving,
                 resumePoint = state.HexState.ResumePoint.ToString(),
                 owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
@@ -87,11 +88,17 @@ public static class PrivateStateSnapshotBuilder
                     ? new
                     {
                         draft.RoundId,
+                        draft.PlayerIndex,
+                        draft.OwnTurnNumber,
                         tier = draft.Tier.ToString(),
                         draft.DeadlineUtc,
-                        candidates = draft.Candidates.Select(items => items.ToArray()).ToArray(),
-                        lockedChoices = draft.LockedChoices.ToArray(),
-                        locked = draft.Locked.ToArray(),
+                        candidates = draft.Candidates.ToArray(),
+                        draft.LockedChoice,
+                        draft.Locked,
+                        draft.RefreshUsed,
+                        draft.RefreshedCandidateIndex,
+                        draft.ReplacedHexId,
+                        draft.ReplacementHexId,
                     }
                     : null,
                 pendingSettlement = state.HexState.PendingSettlement is { } settlement
@@ -99,8 +106,9 @@ public static class PrivateStateSnapshotBuilder
                     {
                         settlement.RoundId,
                         tier = settlement.Tier.ToString(),
-                        settlement.Player0Choice,
-                        settlement.Player1Choice,
+                        settlement.PlayerIndex,
+                        settlement.OwnTurnNumber,
+                        settlement.Choice,
                         resumePoint = settlement.ResumePoint.ToString(),
                         settlement.RootOwnershipCommitted,
                         settlement.NextGrantIndex,
@@ -119,8 +127,9 @@ public static class PrivateStateSnapshotBuilder
                 {
                     draft.RoundId,
                     tier = draft.Tier.ToString(),
-                    draft.Player0Choice,
-                    draft.Player1Choice,
+                    draft.PlayerIndex,
+                    draft.OwnTurnNumber,
+                    draft.Choice,
                 }).ToArray(),
             },
             isGameOver = state.IsGameOver,

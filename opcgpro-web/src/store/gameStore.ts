@@ -125,6 +125,8 @@ function cloneHexModeSnapshot(hexState: HexModeSnapshot | null): HexModeSnapshot
   if (!hexState) return null;
   return {
     ...hexState,
+    tierSequence: [...(hexState.tierSequence ?? [])],
+    draftOwnTurns: [...(hexState.draftOwnTurns ?? [1, 3, 6])],
     myOwned: hexState.myOwned.map((hex) => ({ ...hex })),
     opponentOwned: hexState.opponentOwned.map((hex) => ({ ...hex })),
     activeDraft: hexState.activeDraft

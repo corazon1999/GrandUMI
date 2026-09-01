@@ -978,6 +978,7 @@ export type GameActionType =
   | "ChooseFirstPlayer" // { goFirst: boolean }
   | "Mulligan"          // { redraw: boolean }
   | "ChooseHex"         // { roundId: string, hexId: number }
+  | "RefreshHex"        // { roundId: string, candidateIndex: number, expectedHexId: number }
   | "PlayCard"          // { handIndex: number, freeCost?: boolean }
   | "AttachDon"         // { targetId: "leader" | cardId, count: number }
   | "UndoAttachDon"     // { operationId: string }，只能撤回服务端快照确认的最近一次贴咚
@@ -1135,17 +1136,22 @@ export interface HexDefinitionSnapshot {
 
 export interface HexDraftSnapshot {
   roundId: string;
+  ownTurnNumber: 1 | 3 | 6;
   tier: HexTierSnapshot;
   deadlineUtc: string;
-  /** 仅参战玩家收到自己的候选；观战者永远为 null。 */
+  /** activeDraft 本身仅下发给拥有者；兼容旧快照时仍允许 null。 */
   candidates: HexDefinitionSnapshot[] | null;
   myLocked: boolean;
   mySelectedHexId: number | null;
-  opponentLocked: boolean;
+  refreshAvailable: boolean;
+  refreshedCandidateIndex: number | null;
 }
 
 export interface HexModeSnapshot {
   enabled: true;
+  /** 双方共享的第 1/3/6 回合品质序列，允许重复。 */
+  tierSequence: HexTierSnapshot[];
+  draftOwnTurns: number[];
   draftResolving: boolean;
   myOwned: HexDefinitionSnapshot[];
   opponentOwned: HexDefinitionSnapshot[];

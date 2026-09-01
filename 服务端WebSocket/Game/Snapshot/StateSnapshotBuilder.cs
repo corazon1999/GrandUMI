@@ -263,21 +263,24 @@ public static class StateSnapshotBuilder
         return new
         {
             enabled = true,
-            draftResolving = state.HexState.DraftResolving || state.HexState.PendingSettlement is not null,
+            tierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
+            draftOwnTurns = HexRules.DraftOwnTurns,
+            // 结算进度也属于私密交互；非拥有者和观战者不显示等待遮罩。
+            draftResolving = !isSpectator
+                && state.HexState.PendingSettlement?.PlayerIndex == viewerIndex,
             myOwned = state.HexState.Owned[myIdx].Select(Hex).ToArray(),
             opponentOwned = state.HexState.Owned[opponentIdx].Select(Hex).ToArray(),
-            activeDraft = round is null ? null : new
+            activeDraft = isSpectator || round?.PlayerIndex != viewerIndex ? null : new
             {
                 roundId = round.RoundId,
+                ownTurnNumber = round.OwnTurnNumber,
                 tier = round.Tier.ToString(),
                 deadlineUtc = round.DeadlineUtc,
-                // 候选只属于对应玩家；观战者永远拿不到任何一方候选。
-                candidates = isSpectator ? null : round.Candidates[viewerIndex].Select(Hex).ToArray(),
-                myLocked = !isSpectator && round.Locked[viewerIndex],
-                mySelectedHexId = !isSpectator && round.Locked[viewerIndex]
-                    ? round.LockedChoices[viewerIndex]
-                    : null,
-                opponentLocked = !isSpectator && round.Locked[1 - viewerIndex],
+                candidates = round.Candidates.Select(Hex).ToArray(),
+                myLocked = round.Locked,
+                mySelectedHexId = round.Locked ? round.LockedChoice : null,
+                refreshAvailable = !round.RefreshUsed && !round.Locked,
+                refreshedCandidateIndex = round.RefreshedCandidateIndex,
             },
         };
     }

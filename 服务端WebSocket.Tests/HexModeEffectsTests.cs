@@ -174,8 +174,12 @@ public sealed class HexModeEffectsTests
 
         OwnOnly(state, 0, 33);
         opponent.Characters.Add(Card("HEX-RANDOM", CardKind.Character));
+        var powerBeforeTurnStarted = opponent.Characters.ToDictionary(
+            card => card.Id,
+            card => card.PowerModThisTurn);
         HexRules.OnTurnStarted(state, 0);
-        Assert.Single(opponent.Characters.Where(card => card.PowerModThisTurn == -2000));
+        Assert.Single(opponent.Characters.Where(card =>
+            card.PowerModThisTurn == powerBeforeTurnStarted[card.Id] - 2000));
 
         OwnOnly(state, 0, 40);
         opponent.Characters[0].IsTapped = false;

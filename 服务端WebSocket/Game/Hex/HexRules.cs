@@ -14,6 +14,20 @@ public enum HexChoiceStatus
 
 public sealed record HexChoiceResult(HexChoiceStatus Status, int? Choice, string? Reason = null);
 
+public enum HexRefreshStatus
+{
+    Refreshed,
+    Duplicate,
+    Rejected,
+}
+
+public sealed record HexRefreshResult(
+    HexRefreshStatus Status,
+    int? CandidateIndex,
+    int? ReplacedHexId,
+    int? ReplacementHexId,
+    string? Reason = null);
+
 /// <summary>
 /// 海克斯玩法的唯一规则入口。选秀、获取时效果、全局修正和回合计数均在此聚合，
 /// 卡牌 DSL 不感知也不得修改海克斯状态。
@@ -21,9 +35,27 @@ public sealed record HexChoiceResult(HexChoiceStatus Status, int? Choice, string
 public static class HexRules
 {
     public const int DraftTimeoutSeconds = 60;
+    public static readonly int[] DraftOwnTurns = [1, 3, 6];
+    private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
 
     public static void Initialize(GameState state)
         => state.HexState.Enabled = state.MatchKind == MatchKind.Hex;
+
+    /// <summary>一次性生成双方共享的三段品质。使用本局 RNG，故重放和进程恢复会逐字重建。</summary>
+    public static void EnsureDraftTierSequence(GameState state)
+    {
+        if (!state.HexState.Enabled) return;
+        while (state.HexState.DraftTierSequence.Count < DraftOwnTurns.Length)
+        {
+            int slot = state.HexState.DraftTierSequence.Count;
+            int index = state.NextRecordedRandom(
+                AvailableTiers.Length,
+                "hex_draft_tier",
+                -1,
+                new { slot, ownTurn = DraftOwnTurns[slot] });
+            state.HexState.DraftTierSequence.Add(AvailableTiers[index]);
+        }
+    }
 
     public static bool Has(GameState state, int playerIndex, int hexId)
         => state.HexState.Enabled
@@ -32,34 +64,46 @@ public static class HexRules
 
     public static HexDraftRound StartDraft(
         GameState state,
-        HexTier tier,
+        int playerIndex,
+        int ownTurnNumber,
         HexDraftResumePoint resumePoint,
         DateTime? deadlineUtc = null)
     {
         if (!state.HexState.Enabled) throw new InvalidOperationException("当前不是海克斯模式");
+        if (playerIndex is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(playerIndex));
         if (state.HexState.ActiveDraft is not null
             || state.HexState.DraftResolving
             || state.HexState.PendingSettlement is not null)
             throw new InvalidOperationException("已有海克斯选秀正在进行");
 
+        EnsureDraftTierSequence(state);
+        int draftSlot = Array.IndexOf(DraftOwnTurns, ownTurnNumber);
+        if (draftSlot < 0) throw new InvalidOperationException($"玩家第 {ownTurnNumber} 回合不应触发海克斯选秀");
+        if (state.HexState.ResolvedDrafts.Any(item =>
+                item.PlayerIndex == playerIndex && item.OwnTurnNumber == ownTurnNumber))
+            throw new InvalidOperationException("该玩家本回合前的海克斯选秀已经完成");
+        var tier = state.HexState.DraftTierSequence[draftSlot];
+
         int sequence = ++state.HexState.DraftSequence;
         var round = new HexDraftRound
         {
-            RoundId = $"hex-{sequence}-{tier.ToString().ToLowerInvariant()}",
+            RoundId = $"hex-{sequence}-p{playerIndex}-t{ownTurnNumber}-{tier.ToString().ToLowerInvariant()}",
+            PlayerIndex = playerIndex,
+            OwnTurnNumber = ownTurnNumber,
             Tier = tier,
             DeadlineUtc = deadlineUtc ?? DateTime.UtcNow.AddSeconds(DraftTimeoutSeconds),
         };
-        for (int player = 0; player < 2; player++)
-            round.Candidates[player].AddRange(DrawCandidates(state, player, tier, 3));
+        round.Candidates.AddRange(DrawCandidates(state, playerIndex, tier, 3));
 
         state.HexState.ActiveDraft = round;
         state.HexState.ResumePoint = resumePoint;
         state.OnDeterministicRandomEvent?.Invoke("hex_draft_candidates", -1, new
         {
             roundId = round.RoundId,
+            playerIndex,
+            ownTurnNumber,
             tier = tier.ToString(),
-            player0 = round.Candidates[0].ToArray(),
-            player1 = round.Candidates[1].ToArray(),
+            candidates = round.Candidates.ToArray(),
             deadlineUtc = round.DeadlineUtc,
         });
         return round;
@@ -78,16 +122,20 @@ public static class HexRules
         var round = state.HexState.ActiveDraft;
         if (round is null || !string.Equals(round.RoundId, roundId, StringComparison.Ordinal))
         {
-            var resolved = state.HexState.ResolvedDrafts.LastOrDefault(item => item.RoundId == roundId);
-            int? previous = resolved is null ? null : playerIndex == 0 ? resolved.Player0Choice : resolved.Player1Choice;
+            var resolved = state.HexState.ResolvedDrafts.LastOrDefault(item =>
+                item.RoundId == roundId && item.PlayerIndex == playerIndex);
+            int? previous = resolved?.Choice;
             return previous.HasValue && requestedChoice == previous
                 ? new(HexChoiceStatus.Duplicate, previous)
                 : new(HexChoiceStatus.Rejected, null, "海克斯选秀轮次已过期");
         }
 
-        if (round.Locked[playerIndex])
+        if (round.PlayerIndex != playerIndex)
+            return new(HexChoiceStatus.Rejected, null, "这不是你的私密海克斯选秀");
+
+        if (round.Locked)
         {
-            int previous = round.LockedChoices[playerIndex]!.Value;
+            int previous = round.LockedChoice!.Value;
             return (!automatic && requestedChoice == previous)
                 ? new(HexChoiceStatus.Duplicate, previous)
                 : new(HexChoiceStatus.Rejected, null, "本轮海克斯已经锁定");
@@ -97,14 +145,14 @@ public static class HexRules
         if (automatic)
         {
             int candidateIndex = state.NextRecordedRandom(
-                round.Candidates[playerIndex].Count,
+                round.Candidates.Count,
                 "hex_timeout_auto_choice",
                 playerIndex,
                 new { roundId, tier = round.Tier.ToString() });
-            choice = round.Candidates[playerIndex][candidateIndex];
+            choice = round.Candidates[candidateIndex];
         }
         else if (requestedChoice is not int requested
-                 || !round.Candidates[playerIndex].Contains(requested))
+                 || !round.Candidates.Contains(requested))
         {
             return new(HexChoiceStatus.Rejected, null, "所选海克斯不在本轮私密候选中");
         }
@@ -113,12 +161,66 @@ public static class HexRules
             choice = requested;
         }
 
-        round.LockedChoices[playerIndex] = choice;
-        round.Locked[playerIndex] = true;
-        return new(round.IsComplete ? HexChoiceStatus.Ready : HexChoiceStatus.Locked, choice);
+        round.LockedChoice = choice;
+        round.Locked = true;
+        return new(HexChoiceStatus.Ready, choice);
     }
 
-    /// <summary>把双方已锁定结果同时转为已拥有，再按固定座次结算获取时效果。</summary>
+    public static HexRefreshResult RefreshCandidate(
+        GameState state,
+        int playerIndex,
+        string roundId,
+        int candidateIndex,
+        int expectedHexId)
+    {
+        if (!state.HexState.Enabled || playerIndex is < 0 or > 1)
+            return new(HexRefreshStatus.Rejected, null, null, null, "当前对局不支持海克斯刷新");
+
+        var round = state.HexState.ActiveDraft;
+        if (round is null || !string.Equals(round.RoundId, roundId, StringComparison.Ordinal))
+            return new(HexRefreshStatus.Rejected, null, null, null, "海克斯选秀轮次已过期");
+        if (round.PlayerIndex != playerIndex)
+            return new(HexRefreshStatus.Rejected, null, null, null, "这不是你的私密海克斯选秀");
+        if (round.Locked)
+            return new(HexRefreshStatus.Rejected, null, null, null, "本轮海克斯已经锁定");
+
+        if (round.RefreshUsed)
+        {
+            bool sameRequest = round.RefreshedCandidateIndex == candidateIndex
+                && round.ReplacedHexId == expectedHexId;
+            return sameRequest
+                ? new(HexRefreshStatus.Duplicate, candidateIndex, round.ReplacedHexId, round.ReplacementHexId)
+                : new(HexRefreshStatus.Rejected, null, null, null, "本轮唯一一次刷新机会已经使用");
+        }
+
+        if (candidateIndex < 0 || candidateIndex >= round.Candidates.Count)
+            return new(HexRefreshStatus.Rejected, null, null, null, "刷新候选位置无效");
+        if (round.Candidates[candidateIndex] != expectedHexId)
+            return new(HexRefreshStatus.Rejected, null, null, null, "待刷新候选已变化，请以最新快照为准");
+
+        var pool = HexCatalog.ForTier(round.Tier)
+            .Select(item => item.Id)
+            .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
+            .Where(id => !round.Candidates.Contains(id))
+            .ToList();
+        if (pool.Count == 0)
+            return new(HexRefreshStatus.Rejected, null, null, null, "当前品质没有可用的替换候选");
+
+        int replacementIndex = state.NextRecordedRandom(
+            pool.Count,
+            "hex_draft_refresh_candidate",
+            playerIndex,
+            new { roundId, candidateIndex, replacedHexId = expectedHexId });
+        int replacementHexId = pool[replacementIndex];
+        round.Candidates[candidateIndex] = replacementHexId;
+        round.RefreshUsed = true;
+        round.RefreshedCandidateIndex = candidateIndex;
+        round.ReplacedHexId = expectedHexId;
+        round.ReplacementHexId = replacementHexId;
+        return new(HexRefreshStatus.Refreshed, candidateIndex, expectedHexId, replacementHexId);
+    }
+
+    /// <summary>把当前玩家已锁定结果转为已拥有，并用持久化步骤游标结算获取时效果。</summary>
     public static async Task<(ResolvedHexDraft Draft, HexDraftResumePoint Resume)> ResolveDraftAsync(GameEngine engine)
     {
         var state = engine.State;
@@ -133,21 +235,16 @@ public static class HexRules
             {
                 RoundId = round.RoundId,
                 Tier = round.Tier,
-                Player0Choice = round.LockedChoices[0]!.Value,
-                Player1Choice = round.LockedChoices[1]!.Value,
+                PlayerIndex = round.PlayerIndex,
+                OwnTurnNumber = round.OwnTurnNumber,
+                Choice = round.LockedChoice!.Value,
                 ResumePoint = state.HexState.ResumePoint,
             };
             settlement.Grants.Add(new HexGrantProgress
             {
-                GrantKey = $"{round.RoundId}:root:0",
-                PlayerIndex = 0,
-                HexId = settlement.Player0Choice,
-            });
-            settlement.Grants.Add(new HexGrantProgress
-            {
-                GrantKey = $"{round.RoundId}:root:1",
-                PlayerIndex = 1,
-                HexId = settlement.Player1Choice,
+                GrantKey = $"{round.RoundId}:root:{round.PlayerIndex}",
+                PlayerIndex = round.PlayerIndex,
+                HexId = settlement.Choice,
             });
             state.HexState.PendingSettlement = settlement;
             state.HexState.ActiveDraft = null;
@@ -155,8 +252,9 @@ public static class HexRules
             var resolvedRecord = new ResolvedHexDraft(
                 settlement.RoundId,
                 settlement.Tier,
-                settlement.Player0Choice,
-                settlement.Player1Choice);
+                settlement.PlayerIndex,
+                settlement.OwnTurnNumber,
+                settlement.Choice);
             if (state.HexState.ResolvedDrafts.All(item => item.RoundId != settlement.RoundId))
                 state.HexState.ResolvedDrafts.Add(resolvedRecord);
         }
@@ -164,11 +262,9 @@ public static class HexRules
         state.HexState.DraftResolving = true;
         try
         {
-            // 根授予必须同时可见；任何一方的“获得时”效果都不能抢在另一方静态规则之前生效。
             if (!settlement.RootOwnershipCommitted)
             {
-                AddOwned(state, 0, settlement.Player0Choice);
-                AddOwned(state, 1, settlement.Player1Choice);
+                AddOwned(state, settlement.PlayerIndex, settlement.Choice);
                 settlement.RootOwnershipCommitted = true;
             }
 
@@ -184,8 +280,9 @@ public static class HexRules
             var resolved = new ResolvedHexDraft(
                 settlement.RoundId,
                 settlement.Tier,
-                settlement.Player0Choice,
-                settlement.Player1Choice);
+                settlement.PlayerIndex,
+                settlement.OwnTurnNumber,
+                settlement.Choice);
             var resume = settlement.ResumePoint;
             state.HexState.PendingSettlement = null;
             state.HexState.DraftResolving = false;
@@ -194,8 +291,9 @@ public static class HexRules
             {
                 roundId = resolved.RoundId,
                 tier = resolved.Tier.ToString(),
-                player0Choice = resolved.Player0Choice,
-                player1Choice = resolved.Player1Choice,
+                player = resolved.PlayerIndex,
+                ownTurnNumber = resolved.OwnTurnNumber,
+                choice = resolved.Choice,
             });
             return (resolved, resume);
         }
@@ -290,27 +388,30 @@ public static class HexRules
         state.HexState.CompletedOwnTurns[playerIndex]++;
     }
 
-    public static bool ShouldStartDraftAfterTurn(GameState state, out HexTier tier)
+    public static bool ShouldStartDraftBeforeTurn(
+        GameState state,
+        int playerIndex,
+        out int ownTurnNumber,
+        out HexTier tier)
     {
+        ownTurnNumber = 0;
         tier = default;
         if (!state.HexState.Enabled
+            || playerIndex is < 0 or > 1
             || state.HexState.ActiveDraft is not null
             || state.HexState.DraftResolving
             || state.HexState.PendingSettlement is not null)
             return false;
-        if (state.HexState.CompletedOwnTurns[0] >= 2 && state.HexState.CompletedOwnTurns[1] >= 2
-            && state.HexState.ResolvedDrafts.All(round => round.Tier != HexTier.Gold))
-        {
-            tier = HexTier.Gold;
-            return true;
-        }
-        if (state.HexState.CompletedOwnTurns[0] >= 5 && state.HexState.CompletedOwnTurns[1] >= 5
-            && state.HexState.ResolvedDrafts.All(round => round.Tier != HexTier.Rainbow))
-        {
-            tier = HexTier.Rainbow;
-            return true;
-        }
-        return false;
+        EnsureDraftTierSequence(state);
+        int nextOwnTurnNumber = state.HexState.CompletedOwnTurns[playerIndex] + 1;
+        ownTurnNumber = nextOwnTurnNumber;
+        int slot = Array.IndexOf(DraftOwnTurns, nextOwnTurnNumber);
+        if (slot < 0
+            || state.HexState.ResolvedDrafts.Any(round =>
+                round.PlayerIndex == playerIndex && round.OwnTurnNumber == nextOwnTurnNumber))
+            return false;
+        tier = state.HexState.DraftTierSequence[slot];
+        return true;
     }
 
     public static async Task OnAttackDeclaredAsync(GameEngine engine, int attackerSide)

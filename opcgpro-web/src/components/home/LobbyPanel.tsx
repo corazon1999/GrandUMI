@@ -339,7 +339,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                       </div>}
                     <p className={`text-xs leading-5 ${isHex ? "text-cyan-200/80" : "text-gray-500"}`}>
                       {isHex
-                        ? "海克斯使用狂野公开卡池与禁卡表；调度后、双方各完成第 2 与第 5 个自己的回合后，分别进行白银、黄金和彩虹三选一。候选仅本人可见。"
+                        ? "海克斯使用狂野公开卡池与禁卡表；每局随机生成 3 段可重复的银/金/彩品质序列，双方共享，并分别在自己的第 1、3、6 回合开始前私密三选一。每轮还可刷新其中 1 个候选，候选仅本人可见。"
                         : rankedMode === "standard"
                           ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
                           : isRanked

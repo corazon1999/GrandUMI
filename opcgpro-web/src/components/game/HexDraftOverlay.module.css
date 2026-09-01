@@ -1,0 +1,131 @@
+.candidate {
+  --hex-frame: #d7e0eb;
+  --hex-frame-deep: #536273;
+  --hex-glow: rgba(177, 204, 232, 0.28);
+  --hex-surface-a: #233142;
+  --hex-surface-b: #0b1420;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--hex-frame) 78%, transparent);
+  border-radius: 1.1rem 0.45rem 1.1rem 0.45rem;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--hex-frame) 16%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 12%, var(--hex-glow), transparent 34%),
+    linear-gradient(155deg, var(--hex-surface-a), var(--hex-surface-b) 72%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hex-frame-deep) 72%, transparent),
+    0 0 26px var(--hex-glow),
+    inset 0 0 28px rgba(0, 0, 0, 0.5);
+}
+
+.candidate::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 5px;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--hex-frame) 58%, transparent);
+  clip-path: polygon(8% 0, 92% 0, 100% 12%, 100% 88%, 92% 100%, 8% 100%, 0 88%, 0 12%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--hex-frame) 17%, transparent), transparent 26%),
+    linear-gradient(315deg, color-mix(in srgb, var(--hex-frame) 12%, transparent), transparent 30%);
+}
+
+.candidate::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -45% -70%;
+  pointer-events: none;
+  transform: rotate(18deg) translateX(-42%);
+  background: linear-gradient(90deg, transparent 40%, color-mix(in srgb, var(--hex-frame) 22%, transparent) 50%, transparent 60%);
+  animation: hex-sheen 6s ease-in-out infinite;
+}
+
+.silver {
+  --hex-frame: #e4edf5;
+  --hex-frame-deep: #59697b;
+  --hex-glow: rgba(157, 192, 224, 0.3);
+  --hex-surface-a: #344455;
+  --hex-surface-b: #0b1521;
+}
+
+.gold {
+  --hex-frame: #ffd978;
+  --hex-frame-deep: #76500b;
+  --hex-glow: rgba(255, 184, 51, 0.34);
+  --hex-surface-a: #5a3909;
+  --hex-surface-b: #160d04;
+}
+
+.rainbow {
+  --hex-frame: #f4d4ff;
+  --hex-frame-deep: #5941a8;
+  --hex-glow: rgba(122, 226, 255, 0.4);
+  --hex-surface-a: #312064;
+  --hex-surface-b: #071a32;
+  background:
+    linear-gradient(125deg, rgba(255, 100, 218, 0.22), transparent 30%, rgba(92, 227, 255, 0.22) 61%, transparent 82%),
+    conic-gradient(from 215deg at 75% 14%, rgba(255, 210, 91, 0.18), rgba(92, 229, 255, 0.2), rgba(197, 91, 255, 0.2), rgba(255, 210, 91, 0.18)),
+    radial-gradient(circle at 78% 12%, var(--hex-glow), transparent 35%),
+    linear-gradient(155deg, var(--hex-surface-a), var(--hex-surface-b) 72%);
+}
+
+.selected {
+  box-shadow:
+    0 0 0 3px rgba(103, 232, 249, 0.82),
+    0 0 34px var(--hex-glow),
+    inset 0 0 28px rgba(0, 0, 0, 0.42);
+}
+
+.choose {
+  display: block;
+  width: 100%;
+  min-height: 9.5rem;
+  padding: 1rem 1rem 3.5rem;
+  text-align: left;
+}
+
+.refresh {
+  position: absolute;
+  z-index: 2;
+  right: 0.75rem;
+  bottom: 0.65rem;
+  min-width: 6rem;
+  min-height: 3rem;
+  border: 1px solid color-mix(in srgb, var(--hex-frame) 64%, transparent);
+  border-radius: 0.65rem 0.25rem 0.65rem 0.25rem;
+  background: rgba(3, 10, 22, 0.82);
+  color: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 900;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.refresh:hover:not(:disabled) {
+  filter: brightness(1.35);
+  transform: translateY(-1px);
+}
+
+.refresh:focus-visible,
+.choose:focus-visible {
+  outline: 2px solid #a5f3fc;
+  outline-offset: -3px;
+}
+
+.refresh:disabled,
+.choose:disabled {
+  cursor: wait;
+}
+
+@keyframes hex-sheen {
+  0%, 35% { transform: rotate(18deg) translateX(-42%); opacity: 0; }
+  48% { opacity: 0.8; }
+  62%, 100% { transform: rotate(18deg) translateX(42%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .candidate::after { animation: none; }
+}

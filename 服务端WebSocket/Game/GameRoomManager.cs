@@ -1895,7 +1895,7 @@ public static class GameRoomManager
         => ((ICollection<KeyValuePair<string, HexDraftTimeout>>)_hexDraftTimeouts)
             .Remove(new KeyValuePair<string, HexDraftTimeout>(roomId, expected));
 
-    /// <summary>把所有未锁定座次变成可重放的系统 ChooseHex 动作；固定座次保证 RNG 消耗顺序稳定。</summary>
+    /// <summary>把当前私密选秀变成可重放的系统 ChooseHex 动作。</summary>
     private static async Task<IReadOnlyList<int>> ResolveExpiredHexDraftAsync(RoomEntry room, DateTime utcNow)
     {
         var round = room.Engine.State.HexState.ActiveDraft;
@@ -1903,18 +1903,15 @@ public static class GameRoomManager
             return Array.Empty<int>();
 
         var roundId = round.RoundId;
-        var pendingPlayers = Enumerable.Range(0, 2)
-            .Where(player => !round.Locked[player])
-            .ToArray();
-        var autoSelected = new List<int>(pendingPlayers.Length);
-        foreach (var playerIndex in pendingPlayers)
+        var playerIndex = round.PlayerIndex;
+        var autoSelected = new List<int>(1);
+        var current = room.Engine.State.HexState.ActiveDraft;
+        if (current is not null && current.RoundId == roundId && !current.Locked)
         {
-            var current = room.Engine.State.HexState.ActiveDraft;
-            if (current is null || current.RoundId != roundId || current.Locked[playerIndex]) continue;
 
             var data = JsonSerializer.SerializeToElement(new { roundId, auto = true });
             var requestId = GameActionSourceWire.CorrelationId(null, GameActionSource.System);
-            if (!room.OutboundCommitGate.Begin()) break;
+            if (!room.OutboundCommitGate.Begin()) return autoSelected;
             try
             {
                 room.Engine.RecordMatchLog("hex_draft_timeout_auto_select", playerIndex, new { requestId, roundId });
@@ -1928,7 +1925,7 @@ public static class GameRoomManager
                 {
                     room.ReplayCheckpoints?.Disable(room.Engine.State, "hex_timeout_action_rejected");
                     room.OutboundCommitGate.Commit();
-                    continue;
+                    return autoSelected;
                 }
 
                 await room.Engine.WaitSettledAsync();
@@ -1941,7 +1938,6 @@ public static class GameRoomManager
             catch (Exception ex)
             {
                 PauseForRecoveryFailure(room, "recovery_hex_timeout_commit_failed", ex);
-                break;
             }
         }
         return autoSelected;
@@ -3024,9 +3020,6 @@ public static class GameRoomManager
         var restoredTurnClockMs = new long[] { OperationTurnTimeLimitMs, OperationTurnTimeLimitMs };
         var restoredTurnClockTurnCount = 0;
         var restoredTurnExtensionUsed = new bool[2];
-        var hexDraftStartedAt = new Dictionary<Hex.HexTier, DateTime>();
-        var hexMulliganDone = new bool[2];
-        var hexCompletedTurns = new int[2];
         DateTime lastActivity = h.TryGetProperty("createdAtUtc", out var ca)
             ? ca.GetDateTime() : DateTime.UtcNow;
         for (int i = 1; i < lines.Length; i++)
@@ -3084,23 +3077,6 @@ public static class GameRoomManager
                     : journalSequence;
             var actionAtUtc = e.TryGetProperty("tsUtc", out var ts) ? ts.GetDateTime() : lastActivity;
             lastActivity = actionAtUtc;
-            if (matchKind == MatchKind.Hex)
-            {
-                if (string.Equals(act, "Mulligan", StringComparison.Ordinal))
-                {
-                    hexMulliganDone[pi] = true;
-                    if (hexMulliganDone[0] && hexMulliganDone[1])
-                        hexDraftStartedAt.TryAdd(Hex.HexTier.Silver, actionAtUtc.ToUniversalTime());
-                }
-                else if (string.Equals(act, "EndTurn", StringComparison.Ordinal))
-                {
-                    hexCompletedTurns[pi]++;
-                    if (hexCompletedTurns[0] >= 2 && hexCompletedTurns[1] >= 2)
-                        hexDraftStartedAt.TryAdd(Hex.HexTier.Gold, actionAtUtc.ToUniversalTime());
-                    if (hexCompletedTurns[0] >= 5 && hexCompletedTurns[1] >= 5)
-                        hexDraftStartedAt.TryAdd(Hex.HexTier.Rainbow, actionAtUtc.ToUniversalTime());
-                }
-            }
             string? restoredRequestId = null;
             if (e.TryGetProperty("requestId", out var requestElement)
                 && requestElement.ValueKind == JsonValueKind.String
@@ -3141,10 +3117,10 @@ public static class GameRoomManager
             ruleset: ruleset,
             matchKind: matchKind);
         if (engine.State.HexState.ActiveDraft is { } restoredHexDraft
-            && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId)
-            && hexDraftStartedAt.TryGetValue(restoredHexDraft.Tier, out var restoredHexDraftStart))
+            && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId))
         {
-            restoredHexDraft.DeadlineUtc = restoredHexDraftStart
+            // 没有任何后续动作携带本轮截止时间，说明本轮由最后一条已提交动作刚刚触发。
+            restoredHexDraft.DeadlineUtc = lastActivity.ToUniversalTime()
                 .AddSeconds(Hex.HexRules.DraftTimeoutSeconds);
         }
         if (!engine.State.StartingPlayerChosen

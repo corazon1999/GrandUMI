@@ -172,6 +172,7 @@ public class GameEngine
                 payload,
                 rngSeed = State.RngSeed,
             });
+        Hex.HexRules.EnsureDraftTierSequence(State);
 
         var p0Cards = ParseDeck(p0.deckRaw, out var p0Leader);
         var p1Cards = ParseDeck(p1.deckRaw, out var p1Leader);
@@ -377,8 +378,8 @@ public class GameEngine
         {
             SendError(playerIndex, "当前有效果等待玩家处理，暂时无法执行其他操作");
         }
-        else if (State.HexState.BlocksOrdinaryActions
-            && action is not "ChooseHex" and not "PromptResponse"
+        else if (State.HexState.BlocksOrdinaryActionsFor(playerIndex)
+            && action is not "ChooseHex" and not "RefreshHex" and not "PromptResponse"
                 and not "Surrender" and not "RequestDraw" and not "RespondDraw")
         {
             SendError(playerIndex, "当前正在进行海克斯选秀，暂时无法执行其他操作");
@@ -394,6 +395,7 @@ public class GameEngine
             case "ChooseFirstPlayer": HandleChooseFirstPlayer(playerIndex, data); break;
             case "Mulligan":       HandleMulligan(playerIndex, data); break;
             case "ChooseHex":      HandleChooseHex(playerIndex, data); break;
+            case "RefreshHex":     HandleRefreshHex(playerIndex, data); break;
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
             case "AttachDon":      HandleAttachDon(playerIndex, data); break;
             case "UndoAttachDon":  HandleUndoAttachDon(playerIndex, data); break;
@@ -1826,13 +1828,23 @@ public class GameEngine
             if (State.HexState.Enabled)
             {
                 State.OpeningStage = OpeningStage.HexDraft;
+                var draftPlayer = State.FirstPlayer;
+                if (!Hex.HexRules.ShouldStartDraftBeforeTurn(
+                        State,
+                        draftPlayer,
+                        out var ownTurnNumber,
+                        out _))
+                    throw new InvalidOperationException("海克斯首回合私密选秀未能启动");
                 var round = Hex.HexRules.StartDraft(
                     State,
-                    Hex.HexTier.Silver,
+                    draftPlayer,
+                    ownTurnNumber,
                     Hex.HexDraftResumePoint.StartFirstTurn);
                 Broadcast("HexDraftStarted", new
                 {
                     roundId = round.RoundId,
+                    player = round.PlayerIndex,
+                    ownTurnNumber = round.OwnTurnNumber,
                     tier = round.Tier.ToString(),
                     deadlineUtc = round.DeadlineUtc,
                 });
@@ -1901,6 +1913,55 @@ public class GameEngine
             _ = Track(CompleteHexDraftAsync());
     }
 
+    private void HandleRefreshHex(int playerIndex, JsonElement data)
+    {
+        if (data.ValueKind != JsonValueKind.Object
+            || !data.TryGetProperty("roundId", out var roundIdElement)
+            || roundIdElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(roundIdElement.GetString())
+            || !data.TryGetProperty("candidateIndex", out var indexElement)
+            || indexElement.ValueKind != JsonValueKind.Number
+            || !indexElement.TryGetInt32(out var candidateIndex)
+            || !data.TryGetProperty("expectedHexId", out var expectedElement)
+            || expectedElement.ValueKind != JsonValueKind.Number
+            || !expectedElement.TryGetInt32(out var expectedHexId))
+        {
+            SendError(playerIndex, "缺少有效的海克斯刷新参数");
+            return;
+        }
+
+        var roundId = roundIdElement.GetString()!;
+        var result = Hex.HexRules.RefreshCandidate(
+            State,
+            playerIndex,
+            roundId,
+            candidateIndex,
+            expectedHexId);
+        if (result.Status == Hex.HexRefreshStatus.Rejected)
+        {
+            SendError(playerIndex, result.Reason ?? "海克斯刷新无效");
+            return;
+        }
+
+        if (result.Status == Hex.HexRefreshStatus.Refreshed)
+        {
+            RecordMatchLog("hex_draft_candidate_refreshed", playerIndex, new
+            {
+                roundId,
+                candidateIndex = result.CandidateIndex,
+                replacedHexId = result.ReplacedHexId,
+                replacementHexId = result.ReplacementHexId,
+            });
+        }
+        Broadcast("HexCandidateRefreshed", new
+        {
+            player = playerIndex,
+            roundId,
+            candidateIndex = result.CandidateIndex,
+            duplicate = result.Status == Hex.HexRefreshStatus.Duplicate,
+        });
+    }
+
     internal async Task CompleteHexDraftAsync()
     {
         Hex.ResolvedHexDraft draft = null!;
@@ -1928,8 +1989,9 @@ public class GameEngine
         {
             roundId = draft.RoundId,
             tier = draft.Tier.ToString(),
-            player0Choice = draft.Player0Choice,
-            player1Choice = draft.Player1Choice,
+            player = draft.PlayerIndex,
+            ownTurnNumber = draft.OwnTurnNumber,
+            choice = draft.Choice,
         });
         if (State.IsGameOver) { CheckGameOver(); return; }
 
@@ -2059,15 +2121,23 @@ public class GameEngine
             await TurnEngine.ResolvePromptedEndPhaseTasksAsync(State, Prompts);
             Hex.HexRules.OnTurnEnding(State, cur);
             TurnEngine.EnterEndPhase(State);
-            if (Hex.HexRules.ShouldStartDraftAfterTurn(State, out var tier))
+            int nextTurnPlayer = State.ExtraTurnPending ? cur : 1 - cur;
+            if (Hex.HexRules.ShouldStartDraftBeforeTurn(
+                    State,
+                    nextTurnPlayer,
+                    out var ownTurnNumber,
+                    out _))
             {
                 var round = Hex.HexRules.StartDraft(
                     State,
-                    tier,
+                    nextTurnPlayer,
+                    ownTurnNumber,
                     Hex.HexDraftResumePoint.AdvanceToNextTurn);
                 Broadcast("HexDraftStarted", new
                 {
                     roundId = round.RoundId,
+                    player = round.PlayerIndex,
+                    ownTurnNumber = round.OwnTurnNumber,
                     tier = round.Tier.ToString(),
                     deadlineUtc = round.DeadlineUtc,
                 });

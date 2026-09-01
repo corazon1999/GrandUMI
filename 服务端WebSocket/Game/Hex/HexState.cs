@@ -10,15 +10,26 @@ public enum HexDraftResumePoint
 public sealed class HexDraftRound
 {
     public required string RoundId { get; init; }
+    public required int PlayerIndex { get; init; }
+    public required int OwnTurnNumber { get; init; }
     public required HexTier Tier { get; init; }
     public required DateTime DeadlineUtc { get; set; }
-    public List<int>[] Candidates { get; } = [new(), new()];
-    public int?[] LockedChoices { get; } = [null, null];
-    public bool[] Locked { get; } = [false, false];
-    public bool IsComplete => Locked[0] && Locked[1];
+    public List<int> Candidates { get; } = new();
+    public int? LockedChoice { get; set; }
+    public bool Locked { get; set; }
+    public bool RefreshUsed { get; set; }
+    public int? RefreshedCandidateIndex { get; set; }
+    public int? ReplacedHexId { get; set; }
+    public int? ReplacementHexId { get; set; }
+    public bool IsComplete => Locked;
 }
 
-public sealed record ResolvedHexDraft(string RoundId, HexTier Tier, int Player0Choice, int Player1Choice);
+public sealed record ResolvedHexDraft(
+    string RoundId,
+    HexTier Tier,
+    int PlayerIndex,
+    int OwnTurnNumber,
+    int Choice);
 
 /// <summary>一项海克斯授予的可重入进度；NextStep 只在该步骤的状态变更完整完成后前移。</summary>
 public sealed class HexGrantProgress
@@ -32,15 +43,16 @@ public sealed class HexGrantProgress
 }
 
 /// <summary>
-/// 一轮选秀从双方锁定到全部“获得时”效果完成的持久化前向结算记录。
-/// 根海克斯先同时写入 Owned，再按 Grants 顺序推进；H47 产生的子授予也追加到同一队列。
+/// 一轮私密选秀从本人锁定到全部“获得时”效果完成的持久化前向结算记录。
+/// 根海克斯先写入 Owned，再按 Grants 顺序推进；H47 产生的子授予也追加到同一队列。
 /// </summary>
 public sealed class HexDraftSettlement
 {
     public required string RoundId { get; init; }
     public required HexTier Tier { get; init; }
-    public required int Player0Choice { get; init; }
-    public required int Player1Choice { get; init; }
+    public required int PlayerIndex { get; init; }
+    public required int OwnTurnNumber { get; init; }
+    public required int Choice { get; init; }
     public required HexDraftResumePoint ResumePoint { get; init; }
     public bool RootOwnershipCommitted { get; set; }
     public int NextGrantIndex { get; set; }
@@ -107,6 +119,8 @@ public sealed class HexState
 {
     public bool Enabled { get; set; }
     public int DraftSequence { get; set; }
+    /// <summary>双方共享的第 1/3/6 个自己回合选秀品质；长度恒为 3，允许重复。</summary>
+    public List<HexTier> DraftTierSequence { get; } = new();
     public HexDraftRound? ActiveDraft { get; set; }
     public bool DraftResolving { get; set; }
     public HexDraftSettlement? PendingSettlement { get; set; }
@@ -119,6 +133,10 @@ public sealed class HexState
     /// <summary>仅测试使用的一次性故障注入点；不进入任何快照或重放投影。</summary>
     internal Action<HexGrantStepBoundary>? GrantStepFaultInjector { get; set; }
 
-    public bool BlocksOrdinaryActions => Enabled
-        && (ActiveDraft is not null || DraftResolving || PendingSettlement is not null);
+    /// <summary>私密选秀只冻结其拥有者；另一方仍由普通阶段/回合校验决定合法动作。</summary>
+    public bool BlocksOrdinaryActionsFor(int playerIndex)
+        => Enabled
+           && playerIndex is 0 or 1
+           && (ActiveDraft?.PlayerIndex == playerIndex
+               || PendingSettlement?.PlayerIndex == playerIndex);
 }
