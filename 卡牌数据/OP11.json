@@ -476,7 +476,9 @@
     "effectTags": [
       "ActivatedMain"
     ],
-    "abilities": [],
+    "abilities": [
+      "此角色无法攻击"
+    ],
     "effectEvent": "",
     "rarity": "L",
     "subscript": 3,

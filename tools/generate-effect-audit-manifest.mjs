@@ -56,7 +56,7 @@ function expectedBaseAbilities(card) {
   if (/^此角色可以在登场的回合中攻击角色/.test(text)) abilities.push("速攻：角色");
   if (/(^|[。\r\n])此角色无法攻击。/.test(text)) abilities.push("此角色无法攻击");
   if (card.number === "OP12-036") abilities.push("无法通过效果登场");
-  if (card.number === "OP04-001" || card.number === "OP04-039") abilities.push("此角色无法攻击");
+  if (["OP04-001", "OP04-039", "OP11-022"].includes(card.number)) abilities.push("此角色无法攻击");
   return [...new Set(abilities)].sort((left, right) => left.localeCompare(right, "zh-CN"));
 }
 

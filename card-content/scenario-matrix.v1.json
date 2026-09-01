@@ -27,6 +27,15 @@
       "when": "结算登场时",
       "then": ["不弹出选择", "对方角色保持活跃"],
       "automatedTest": "CardContentPipelineTests.OP07_032_OnEnter_RequiresLeaderTrait"
+    },
+    {
+      "id": "OP11-022.base-cannot-attack-snapshot",
+      "cardNumber": "OP11-022",
+      "layer": "action-validation",
+      "given": ["白星领袖效果未被无效", "已进入允许攻击的主要阶段"],
+      "when": "尝试用领袖攻击并构建重连快照",
+      "then": ["拒绝攻击", "快照标记领袖无法攻击"],
+      "automatedTest": "FeedbackTriage20260901RegressionTests.OP11_022_基础禁攻应同时进入动作校验与重连快照"
     }
   ]
 }
