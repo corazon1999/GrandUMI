@@ -28,23 +28,7 @@ export interface LeaderBreathingEffect {
  * 每张异画的人物位置与主色不同，因此使用显式配置控制焦点与色彩；
  * 后续扩展新 Leader 时只需在这里增加一项，不必继续修改渲染组件。
  */
-const LEADER_BREATHING_EFFECTS: Record<string, LeaderBreathingEffect> = {
-  "OP17-039": {
-    sprite: "/cards/op17/OP17-039.png",
-    focusX: "66%",
-    focusY: "28%",
-    duration: "3.6s",
-    scale: 1.07,
-    lift: "-3px",
-    subjectX: "66%",
-    subjectY: "38%",
-    subjectRadiusX: "53%",
-    subjectRadiusY: "57%",
-    energyDuration: "7.2s",
-    primaryRgb: "34 211 238",
-    secondaryRgb: "129 140 248",
-  },
-};
+const LEADER_BREATHING_EFFECTS: Record<string, LeaderBreathingEffect> = {};
 
 function normalizeSpritePath(sprite: string): string {
   // 兼容本地路径附带查询参数的情况，同时保留远程图片 URL 的 pathname。
