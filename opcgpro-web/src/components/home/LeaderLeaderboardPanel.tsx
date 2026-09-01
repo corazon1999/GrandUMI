@@ -18,7 +18,13 @@ import {
   type LeaderLeaderboardSortKey,
   type LeaderLeaderboardSortState,
 } from "@/lib/leaderLeaderboardSort";
-import type { FactionStanding, LeaderboardPeriod, LeaderLeaderboardItem, RankFaction, RankedMode, RankLeaderboardItem } from "@/types/net";
+import {
+  DEFAULT_LEADER_FILTER_TIER,
+  getLeaderFilterTierStorage,
+  readLeaderFilterTier,
+  writeLeaderFilterTier,
+} from "@/lib/leaderFilterTier";
+import type { FactionStanding, LeaderboardPeriod, LeaderFilterTier, LeaderLeaderboardItem, RankFaction, RankedMode, RankLeaderboardItem } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
 
@@ -26,6 +32,12 @@ const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "7d", label: "近 7 天" },
   { value: "30d", label: "近 30 天" },
   { value: "all", label: "全部" },
+];
+
+const FILTER_TIERS: Array<{ value: LeaderFilterTier; label: string; title: string }> = [
+  { value: "relaxed", label: "100 / 300 场", title: "近 7 天至少 100 场，近 30 天至少 300 场" },
+  { value: "standard", label: "500 / 3000 场", title: "近 7 天至少 500 场，近 30 天至少 3000 场" },
+  { value: "all", label: "全部", title: "不按场次隐藏 Leader" },
 ];
 
 const RANK_FACTION_NAMES: Record<RankFaction, string> = {
@@ -333,6 +345,8 @@ export default function LeaderLeaderboardPanel() {
   const leaderMatchups = useNetStore((s) => s.leaderMatchups);
   const leaderMatchupMatrix = useNetStore((s) => s.leaderMatchupMatrix);
   const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
+  const [filterTier, setFilterTier] = useState<LeaderFilterTier>(DEFAULT_LEADER_FILTER_TIER);
+  const [filterTierRestored, setFilterTierRestored] = useState(false);
   const [search, setSearch] = useState("");
   const [cardRevision, setCardRevision] = useState(0);
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
@@ -348,9 +362,9 @@ export default function LeaderLeaderboardPanel() {
   const rankSnapshotRequest = rankSnapshotRequests[rankedMode];
   const rankSnapshotStale = isRankSnapshotStale(rankSnapshotRequest.generatedAtUtc, rankSnapshotClock);
 
-  const request = (nextPeriod: LeaderboardPeriod) => {
+  const request = (nextPeriod: LeaderboardPeriod, nextFilterTier = filterTier) => {
     setSelectedLeader(null);
-    HomeRequest.requestLeaderLeaderboard(nextPeriod);
+    HomeRequest.requestLeaderLeaderboard(nextPeriod, nextFilterTier);
   };
 
   const toggleMatchups = (leaderNumber: string) => {
@@ -359,8 +373,19 @@ export default function LeaderLeaderboardPanel() {
       return;
     }
     setSelectedLeader(leaderNumber);
-    HomeRequest.requestLeaderMatchups(period, leaderNumber);
+    HomeRequest.requestLeaderMatchups(period, leaderNumber, filterTier);
   };
+
+  useEffect(() => {
+    const restored = readLeaderFilterTier(getLeaderFilterTierStorage());
+    setFilterTier(restored);
+    setFilterTierRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filterTierRestored) return;
+    writeLeaderFilterTier(getLeaderFilterTierStorage(), filterTier);
+  }, [filterTier, filterTierRestored]);
 
   useEffect(() => {
     let cancelled = false;
@@ -377,10 +402,10 @@ export default function LeaderLeaderboardPanel() {
   }, []);
 
   useEffect(() => {
-    if (rankingTab !== "leader") return;
+    if (rankingTab !== "leader" || !filterTierRestored) return;
     setSelectedLeader(null);
-    HomeRequest.requestLeaderLeaderboard(period);
-  }, [period, rankingTab]);
+    HomeRequest.requestLeaderLeaderboard(period, filterTier);
+  }, [filterTier, filterTierRestored, period, rankingTab]);
 
   useEffect(() => {
     if (rankingTab === "ranked" && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
@@ -397,28 +422,35 @@ export default function LeaderLeaderboardPanel() {
     if (
       viewMode === "matrix"
       && leaderboard?.period === period
+      && leaderboard.filterTier === filterTier
       && leaderboard.result !== false
-      && (leaderMatchupMatrix == null || leaderMatchupMatrix.period !== period)
+      && (leaderMatchupMatrix == null
+        || leaderMatchupMatrix.period !== period
+        || leaderMatchupMatrix.filterTier !== filterTier)
     ) {
-      HomeRequest.requestLeaderMatchupMatrix(period);
+      HomeRequest.requestLeaderMatchupMatrix(period, filterTier);
     }
-  }, [leaderboard, leaderMatchupMatrix, period, viewMode]);
+  }, [filterTier, leaderboard, leaderMatchupMatrix, period, viewMode]);
 
   const items = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("zh-CN");
-    const source = leaderboard?.period === period ? leaderboard.items ?? [] : [];
+    const source = leaderboard?.period === period && leaderboard.filterTier === filterTier
+      ? leaderboard.items ?? []
+      : [];
     const filtered = !keyword ? source : source.filter((item) => {
       const card = getCard(item.leaderNumber);
       return item.leaderNumber.toLocaleLowerCase("zh-CN").includes(keyword)
         || card?.name.toLocaleLowerCase("zh-CN").includes(keyword);
     });
     return sortLeaderLeaderboardItems(filtered, sort);
-  }, [cardRevision, leaderboard, period, search, sort]);
+  }, [cardRevision, filterTier, leaderboard, period, search, sort]);
 
-  const loading = leaderboard == null || leaderboard.period !== period;
+  const loading = leaderboard == null
+    || leaderboard.period !== period
+    || leaderboard.filterTier !== filterTier;
   const failed = !loading && leaderboard.result === false;
   const selectedMatchups = selectedLeader
-    ? leaderMatchups[leaderMatchupKey(period, selectedLeader)]
+    ? leaderMatchups[leaderMatchupKey(period, selectedLeader, filterTier)]
     : undefined;
 
   return (
@@ -474,31 +506,56 @@ export default function LeaderLeaderboardPanel() {
               </button>
             </div>
           )}
-          {rankingTab === "leader" && <div className="grid grid-cols-[1fr_auto] items-center gap-2 @[640px]:flex">
-          <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
-            {PERIODS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setPeriod(option.value)}
-                className={`min-h-11 rounded-md px-2 text-xs font-bold transition-colors @[640px]:min-h-0 @[640px]:px-3 @[640px]:py-1.5 ${
-                  period === option.value
-                    ? "bg-orange-500 text-white"
-                    : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
-                }`}
+          {rankingTab === "leader" && (
+            <div className="flex w-full flex-col gap-2 @[900px]:w-auto @[900px]:flex-row @[900px]:items-center">
+              <div
+                className="grid w-full grid-cols-[1fr_1fr_0.7fr] rounded-lg border border-gray-800 bg-gray-950 p-1 @[900px]:w-auto"
+                aria-label="Leader 榜场次筛选"
               >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => request(period)}
-            className="min-h-11 rounded-lg border border-gray-800 bg-gray-950 px-3 text-sm text-gray-400 transition-colors hover:border-orange-500 hover:text-white @[640px]:min-h-0 @[640px]:py-2 @[640px]:text-xs"
-          >
-            刷新
-          </button>
-          </div>}
+                {FILTER_TIERS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    title={option.title}
+                    aria-pressed={filterTier === option.value}
+                    onClick={() => setFilterTier(option.value)}
+                    className={`min-h-11 whitespace-nowrap rounded-md px-2 text-[11px] font-bold transition-colors @[900px]:px-3 ${
+                      filterTier === option.value
+                        ? "bg-amber-500/20 text-amber-200 ring-1 ring-inset ring-amber-400/60"
+                        : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
+                  {PERIODS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setPeriod(option.value)}
+                      className={`min-h-11 rounded-md px-2 text-xs font-bold transition-colors @[900px]:px-3 ${
+                        period === option.value
+                          ? "bg-orange-500 text-white"
+                          : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => request(period)}
+                  className="min-h-11 min-w-11 rounded-lg border border-gray-800 bg-gray-950 px-3 text-sm text-gray-400 transition-colors hover:border-orange-500 hover:text-white @[900px]:text-xs"
+                >
+                  刷新
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -624,9 +681,11 @@ export default function LeaderLeaderboardPanel() {
           </div>
         ) : viewMode === "matrix" ? (
           <LeaderMatchupMatrix
-            data={leaderMatchupMatrix?.period === period ? leaderMatchupMatrix : null}
+            data={leaderMatchupMatrix?.period === period && leaderMatchupMatrix.filterTier === filterTier
+              ? leaderMatchupMatrix
+              : null}
             leaderboardItems={leaderboard.items ?? []}
-            onRetry={() => HomeRequest.requestLeaderMatchupMatrix(period)}
+            onRetry={() => HomeRequest.requestLeaderMatchupMatrix(period, filterTier)}
           />
         ) : items.length === 0 ? (
           <p className="py-16 text-center text-sm text-gray-600">
@@ -695,7 +754,7 @@ export default function LeaderLeaderboardPanel() {
                     <div className="mt-3">
                       <LeaderMatchupBreakdown
                         data={selectedMatchups}
-                        onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber)}
+                        onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber, filterTier)}
                       />
                     </div>
                   )}
@@ -808,7 +867,7 @@ export default function LeaderLeaderboardPanel() {
                       <td colSpan={9} className="px-3 py-3">
                         <LeaderMatchupBreakdown
                           data={selectedMatchups}
-                          onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber)}
+                          onRetry={() => HomeRequest.requestLeaderMatchups(period, item.leaderNumber, filterTier)}
                         />
                       </td>
                     </tr>

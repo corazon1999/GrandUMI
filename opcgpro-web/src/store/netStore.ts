@@ -49,8 +49,8 @@ import type {
   ConsistencyDoctorSnapshot,
 } from "@/types/net";
 
-export function leaderMatchupKey(period: string, leaderNumber: string): string {
-  return `${period}:${leaderNumber}`;
+export function leaderMatchupKey(period: string, leaderNumber: string, filterTier = "standard"): string {
+  return `${period}:${filterTier}:${leaderNumber}`;
 }
 
 export type IncomingInvite = { inviteId: string; fromName: string };
@@ -543,7 +543,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setLeaderMatchups: (data) => set((state) => ({
     leaderMatchups: {
       ...state.leaderMatchups,
-      [leaderMatchupKey(data.period, data.leaderNumber)]: data,
+      [leaderMatchupKey(data.period, data.leaderNumber, data.filterTier)]: data,
     },
   })),
 

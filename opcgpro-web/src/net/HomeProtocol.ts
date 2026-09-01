@@ -74,6 +74,7 @@ import type {
   MsgLeaderMatchups,
   MsgPlayerProfileStats,
   LeaderboardPeriod,
+  LeaderFilterTier,
   MsgInvitePlayer,
   MsgInviteNotify,
   MsgInviteResponse,
@@ -128,6 +129,7 @@ import {
   setDeckStorageAccount,
   setSelectedDeckName,
 } from "@/data/DeckMapper";
+import { normalizeLeaderFilterTier } from "@/lib/leaderFilterTier";
 
 // ── 协议注册 ────────────────────────────────────────────────────────────
 
@@ -144,12 +146,25 @@ const rankSnapshotRequestTimers: Partial<Record<RankedMode, {
   timer: ReturnType<typeof setTimeout>;
 }>> = {};
 let rankSnapshotRequestSequence = 0;
+let leaderStatsRequestSequence = 0;
+let pendingLeaderLeaderboardRequestId: string | null = null;
+let pendingLeaderMatchupMatrixRequestId: string | null = null;
+const pendingLeaderMatchupRequestIds = new Map<string, string>();
 let pendingLegacyImport: { account: string; selectedDeckName: string | null } | null = null;
 const GAME_REFRESH_RESUME_KEY = "grandumi_resume_game_after_refresh";
 const HOME_REFRESH_RESUME_KEY = "grandumi_resume_home_after_refresh";
 const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
 const AUTH_TOKEN_KEY = "grandumi_auth_token";
 const RANK_SNAPSHOT_REQUEST_TIMEOUT_MS = 8_000;
+
+function nextLeaderStatsRequestId(kind: string): string {
+  leaderStatsRequestSequence += 1;
+  return `leader-${kind}-${Date.now().toString(36)}-${leaderStatsRequestSequence.toString(36)}`;
+}
+
+function leaderStatsResponseKey(period: LeaderboardPeriod, filterTier: LeaderFilterTier): string {
+  return `${period}:${filterTier}`;
+}
 
 interface MsgMaintenanceState extends MsgBase {
   proto: "MsgMaintenanceState";
@@ -1111,6 +1126,9 @@ function handlePlayerSafety(msg: MsgPlayerSafety) {
 
 /** MsgLeaderLeaderboard — 服务端 Leader 聚合榜单。 */
 function handleLeaderLeaderboard(msg: MsgLeaderLeaderboard) {
+  if (!msg.requestId || msg.requestId !== pendingLeaderLeaderboardRequestId) return;
+  msg.filterTier = normalizeLeaderFilterTier(msg.filterTier);
+  pendingLeaderLeaderboardRequestId = null;
   useNetStore.getState().setLeaderLeaderboard(msg);
   if (msg.result === false && msg.error) showMessage(msg.error, "error");
 }
@@ -1121,11 +1139,18 @@ function handleLeaderChampionQuery(msg: MsgLeaderChampionQuery) {
 
 /** MsgLeaderMatchups — 指定 Leader 对阵当前周期榜前二十及起手留牌的统计。 */
 function handleLeaderMatchups(msg: MsgLeaderMatchups) {
+  msg.filterTier = normalizeLeaderFilterTier(msg.filterTier);
+  const key = `${leaderStatsResponseKey(msg.period, msg.filterTier)}:${msg.leaderNumber}`;
+  if (!msg.requestId || pendingLeaderMatchupRequestIds.get(key) !== msg.requestId) return;
+  pendingLeaderMatchupRequestIds.delete(key);
   useNetStore.getState().setLeaderMatchups(msg);
 }
 
 /** MsgLeaderMatchupMatrix — 当前周期榜前十五的完整对阵矩阵。 */
 function handleLeaderMatchupMatrix(msg: MsgLeaderMatchupMatrix) {
+  if (!msg.requestId || msg.requestId !== pendingLeaderMatchupMatrixRequestId) return;
+  msg.filterTier = normalizeLeaderFilterTier(msg.filterTier);
+  pendingLeaderMatchupMatrixRequestId = null;
   useNetStore.getState().setLeaderMatchupMatrix(msg);
 }
 
@@ -1835,12 +1860,22 @@ export const HomeRequest = {
     } as MsgPlayerSafety);
   },
 
-  requestLeaderLeaderboard(period: LeaderboardPeriod) {
+  requestLeaderLeaderboard(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "standard") {
+    const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
+    const requestId = nextLeaderStatsRequestId("leaderboard");
+    pendingLeaderLeaderboardRequestId = requestId;
+    pendingLeaderMatchupMatrixRequestId = null;
+    pendingLeaderMatchupRequestIds.clear();
     const store = useNetStore.getState();
     store.setLeaderLeaderboard(null);
     store.clearLeaderMatchups();
     store.setLeaderMatchupMatrix(null);
-    return NetManager.send({ proto: "MsgLeaderLeaderboard", period } as MsgLeaderLeaderboard);
+    return NetManager.send({
+      proto: "MsgLeaderLeaderboard",
+      period,
+      filterTier: normalizedFilterTier,
+      requestId,
+    } as MsgLeaderLeaderboard);
   },
 
   requestLeaderChampion(leaderNumber: string) {
@@ -1859,21 +1894,47 @@ export const HomeRequest = {
     return sent;
   },
 
-  requestLeaderMatchups(period: LeaderboardPeriod, leaderNumber: string) {
+  requestLeaderMatchups(
+    period: LeaderboardPeriod,
+    leaderNumber: string,
+    filterTier: LeaderFilterTier = "standard",
+  ) {
+    const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
+    const requestId = nextLeaderStatsRequestId("matchups");
+    const key = `${leaderStatsResponseKey(period, normalizedFilterTier)}:${leaderNumber}`;
+    pendingLeaderMatchupRequestIds.set(key, requestId);
     useNetStore.getState().setLeaderMatchups({
       proto: "MsgLeaderMatchups",
       period,
+      filterTier: normalizedFilterTier,
+      requestId,
       leaderNumber,
     });
-    return NetManager.send({ proto: "MsgLeaderMatchups", period, leaderNumber } as MsgLeaderMatchups);
+    return NetManager.send({
+      proto: "MsgLeaderMatchups",
+      period,
+      filterTier: normalizedFilterTier,
+      requestId,
+      leaderNumber,
+    } as MsgLeaderMatchups);
   },
 
-  requestLeaderMatchupMatrix(period: LeaderboardPeriod) {
+  requestLeaderMatchupMatrix(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "standard") {
+    const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
+    const requestId = nextLeaderStatsRequestId("matrix");
+    pendingLeaderMatchupMatrixRequestId = requestId;
     useNetStore.getState().setLeaderMatchupMatrix({
       proto: "MsgLeaderMatchupMatrix",
       period,
+      filterTier: normalizedFilterTier,
+      requestId,
     });
-    return NetManager.send({ proto: "MsgLeaderMatchupMatrix", period } as MsgLeaderMatchupMatrix);
+    return NetManager.send({
+      proto: "MsgLeaderMatchupMatrix",
+      period,
+      filterTier: normalizedFilterTier,
+      requestId,
+    } as MsgLeaderMatchupMatrix);
   },
 
   requestPlayerProfileStats(period: LeaderboardPeriod) {

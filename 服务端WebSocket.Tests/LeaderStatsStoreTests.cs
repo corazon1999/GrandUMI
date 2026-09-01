@@ -123,28 +123,106 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Theory]
-    [InlineData(" 7D ", "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
-    [InlineData(" 30D ", "30d", LeaderStatsStore.MinimumThirtyDayLeaderboardGames)]
-    [InlineData(null, "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
-    [InlineData("unexpected", "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData(" 7D ", null, "7d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData(" 30D ", "standard", "30d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumThirtyDayLeaderboardGames)]
+    [InlineData("7d", " relaxed ", "7d", LeaderStatsStore.RelaxedFilterTier, LeaderStatsStore.RelaxedSevenDayLeaderboardGames)]
+    [InlineData("30d", "RELAXED", "30d", LeaderStatsStore.RelaxedFilterTier, LeaderStatsStore.RelaxedThirtyDayLeaderboardGames)]
+    [InlineData(null, "unexpected", "7d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData("unexpected", "all", "7d", LeaderStatsStore.AllFilterTier, 0)]
+    [InlineData("30d", "all", "30d", LeaderStatsStore.AllFilterTier, 0)]
     public void 周期榜隐藏低于最低场次的领航且保留恰好达到门槛的领航(
         string? requestedPeriod,
+        string? requestedFilterTier,
         string expectedPeriod,
+        string expectedFilterTier,
         int minimumGames)
     {
         var now = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
         store.Initialize();
-        SeedCountedMatches(store, "exact", "L-EXACT", "L-EXACT-OPPONENT", minimumGames, now);
-        SeedCountedMatches(store, "below", "L-BELOW", "L-BELOW-OPPONENT", minimumGames - 1, now);
+        var exactGames = Math.Max(1, minimumGames);
+        SeedCountedMatches(store, "exact", "L-EXACT", "L-EXACT-OPPONENT", exactGames, now);
+        if (minimumGames > 0)
+            SeedCountedMatches(store, "below", "L-BELOW", "L-BELOW-OPPONENT", minimumGames - 1, now);
 
-        var result = store.GetLeaderboard(requestedPeriod, now);
+        var result = store.GetLeaderboard(requestedPeriod, now, requestedFilterTier);
 
         Assert.Equal(expectedPeriod, result.Period);
-        Assert.Equal(minimumGames * 2 - 1, result.TotalMatches);
-        Assert.Equal(minimumGames, Assert.Single(result.Items, x => x.LeaderNumber == "L-EXACT").Games);
-        Assert.DoesNotContain(result.Items, x => x.LeaderNumber is "L-BELOW" or "L-BELOW-OPPONENT");
+        Assert.Equal(expectedFilterTier, result.FilterTier);
+        Assert.Equal(LeaderStatsStore.MinimumRankedGames, result.MinimumGames);
+        Assert.Equal(minimumGames > 0 ? minimumGames * 2 - 1 : 1, result.TotalMatches);
+        Assert.Equal(exactGames, Assert.Single(result.Items, x => x.LeaderNumber == "L-EXACT").Games);
+        if (minimumGames > 0)
+            Assert.DoesNotContain(result.Items, x => x.LeaderNumber is "L-BELOW" or "L-BELOW-OPPONENT");
         Assert.All(result.Items, x => Assert.True(x.Games >= minimumGames));
+    }
+
+    [Fact]
+    public void 全部周期不应用场次筛选但仍回显并保留所选档位()
+    {
+        var now = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        store.RecordMatch(Match("all-period", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
+
+        foreach (var filterTier in new[]
+                 {
+                     LeaderStatsStore.RelaxedFilterTier,
+                     LeaderStatsStore.StandardFilterTier,
+                     LeaderStatsStore.AllFilterTier,
+                 })
+        {
+            var result = store.GetLeaderboard("all", now, filterTier);
+            Assert.Equal(filterTier, result.FilterTier);
+            Assert.Equal(LeaderStatsStore.MinimumRankedGames, result.MinimumGames);
+            Assert.Equal(2, result.Items.Count);
+        }
+    }
+
+    [Fact]
+    public void 相同周期的筛选档位使用独立缓存且详情与矩阵沿用相同前二十来源()
+    {
+        var now = DateTime.UtcNow.AddMinutes(-1);
+        var store = CreateStore();
+        store.Initialize();
+        SeedCountedMatches(
+            store,
+            "cache-tier",
+            "L-RELAXED-A",
+            "L-RELAXED-B",
+            LeaderStatsStore.RelaxedSevenDayLeaderboardGames,
+            now);
+
+        var relaxed = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
+        var standard = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.StandardFilterTier);
+        var relaxedMatchups = store.GetMatchups(
+            "L-RELAXED-A",
+            "7d",
+            requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
+        var standardMatchups = store.GetMatchups(
+            "L-RELAXED-A",
+            "7d",
+            requestedFilterTier: LeaderStatsStore.StandardFilterTier);
+        var relaxedMatrix = store.GetMatchupMatrix(
+            "7d",
+            requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
+        var standardMatrix = store.GetMatchupMatrix(
+            "7d",
+            requestedFilterTier: LeaderStatsStore.StandardFilterTier);
+
+        Assert.Equal(2, relaxed.Items.Count);
+        Assert.Empty(standard.Items);
+        Assert.Equal(LeaderStatsStore.RelaxedFilterTier, relaxedMatchups.FilterTier);
+        Assert.Equal(2, relaxedMatchups.Items.Count);
+        Assert.Empty(standardMatchups.Items);
+        Assert.Equal(2, relaxedMatrix.Rows.Count);
+        Assert.Empty(standardMatrix.Rows);
+
+        var cacheField = typeof(LeaderStatsStore).GetField(
+            "_leaderboardCache",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var cache = Assert.IsAssignableFrom<System.Collections.IDictionary>(cacheField!.GetValue(store));
+        Assert.Contains("7d:relaxed", cache.Keys.Cast<string>());
+        Assert.Contains("7d:standard", cache.Keys.Cast<string>());
     }
 
     [Fact]

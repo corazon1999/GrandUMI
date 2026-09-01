@@ -37,6 +37,7 @@ public sealed record LeaderLeaderboardItem(
 
 public sealed record LeaderLeaderboardSnapshot(
     string Period,
+    string FilterTier,
     DateTime GeneratedAtUtc,
     DateTime? SinceUtc,
     int TotalMatches,
@@ -58,6 +59,7 @@ public sealed record LeaderMatchupItem(
 
 public sealed record LeaderMatchupSnapshot(
     string Period,
+    string FilterTier,
     DateTime GeneratedAtUtc,
     DateTime? SinceUtc,
     string LeaderNumber,
@@ -76,6 +78,7 @@ public sealed record LeaderMatchupMatrixRow(
 
 public sealed record LeaderMatchupMatrixSnapshot(
     string Period,
+    string FilterTier,
     DateTime GeneratedAtUtc,
     DateTime? SinceUtc,
     IReadOnlyList<LeaderMatchupMatrixRow> Rows);
@@ -126,8 +129,13 @@ public sealed record DailyMatchCountPoint(string Date, int Count);
 public sealed class LeaderStatsStore : IDisposable
 {
     public const int MinimumRankedGames = 20;
+    public const int RelaxedSevenDayLeaderboardGames = 100;
+    public const int RelaxedThirtyDayLeaderboardGames = 300;
     public const int MinimumSevenDayLeaderboardGames = 500;
     public const int MinimumThirtyDayLeaderboardGames = 3000;
+    public const string RelaxedFilterTier = "relaxed";
+    public const string StandardFilterTier = "standard";
+    public const string AllFilterTier = "all";
     public const int MinimumCountedTurn = 8;
     public const int MatchupLeaderboardLimit = 20;
     public const int MatchupMatrixLeaderLimit = 20;
@@ -336,9 +344,14 @@ public sealed class LeaderStatsStore : IDisposable
         }
     }
 
-    public LeaderLeaderboardSnapshot GetLeaderboard(string? requestedPeriod, DateTime? nowUtc = null)
+    public LeaderLeaderboardSnapshot GetLeaderboard(
+        string? requestedPeriod,
+        DateTime? nowUtc = null,
+        string? requestedFilterTier = null)
     {
         var period = NormalizePeriod(requestedPeriod);
+        var filterTier = NormalizeFilterTier(requestedFilterTier);
+        var cacheKey = $"{period}:{filterTier}";
         var generatedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
         DateTime? sinceUtc = period switch
         {
@@ -351,7 +364,7 @@ public sealed class LeaderStatsStore : IDisposable
         {
             Initialize();
             if (nowUtc is null
-                && _leaderboardCache.TryGetValue(period, out var cached)
+                && _leaderboardCache.TryGetValue(cacheKey, out var cached)
                 && generatedAtUtc - cached.CreatedAtUtc < TimeSpan.FromSeconds(15))
                 return cached.Snapshot;
             if (!File.Exists(_leaderboardDatabasePath))
@@ -360,10 +373,12 @@ public sealed class LeaderStatsStore : IDisposable
             using var connection = OpenLeaderboardConnection();
 
             var totalMatches = ReadTotalMatches(connection, sinceUtc);
-            var minimumLeaderboardGames = period switch
+            var minimumLeaderboardGames = (period, filterTier) switch
             {
-                "7d" => MinimumSevenDayLeaderboardGames,
-                "30d" => MinimumThirtyDayLeaderboardGames,
+                ("7d", RelaxedFilterTier) => RelaxedSevenDayLeaderboardGames,
+                ("30d", RelaxedFilterTier) => RelaxedThirtyDayLeaderboardGames,
+                ("7d", StandardFilterTier) => MinimumSevenDayLeaderboardGames,
+                ("30d", StandardFilterTier) => MinimumThirtyDayLeaderboardGames,
                 _ => 0,
             };
             var rows = ReadLeaderboardRows(connection, sinceUtc)
@@ -398,22 +413,27 @@ public sealed class LeaderStatsStore : IDisposable
 
             var snapshot = new LeaderLeaderboardSnapshot(
                 period,
+                filterTier,
                 generatedAtUtc,
                 sinceUtc,
                 totalMatches,
                 MinimumRankedGames,
                 items);
-            if (nowUtc is null) _leaderboardCache[period] = new CachedLeaderboard(generatedAtUtc, snapshot);
+            if (nowUtc is null) _leaderboardCache[cacheKey] = new CachedLeaderboard(generatedAtUtc, snapshot);
             return snapshot;
         }
     }
 
     /// <summary>统计指定 Leader 对阵当前周期排行榜前二十名的表现，以及起手留牌使用率。</summary>
-    public LeaderMatchupSnapshot GetMatchups(string leaderNumber, string? requestedPeriod, DateTime? nowUtc = null)
+    public LeaderMatchupSnapshot GetMatchups(
+        string leaderNumber,
+        string? requestedPeriod,
+        DateTime? nowUtc = null,
+        string? requestedFilterTier = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(leaderNumber);
         var normalizedLeader = leaderNumber.Trim();
-        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);
+        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc, requestedFilterTier);
         var topLeaders = leaderboard.Items
             .Where(x => x.Rank is not null)
             .Take(MatchupLeaderboardLimit)
@@ -467,6 +487,7 @@ public sealed class LeaderStatsStore : IDisposable
 
             return new LeaderMatchupSnapshot(
                 leaderboard.Period,
+                leaderboard.FilterTier,
                 leaderboard.GeneratedAtUtc,
                 leaderboard.SinceUtc,
                 normalizedLeader,
@@ -477,9 +498,12 @@ public sealed class LeaderStatsStore : IDisposable
     }
 
     /// <summary>按综合胜率降序统计榜前二十 Leader 的完整对阵矩阵。</summary>
-    public LeaderMatchupMatrixSnapshot GetMatchupMatrix(string? requestedPeriod, DateTime? nowUtc = null)
+    public LeaderMatchupMatrixSnapshot GetMatchupMatrix(
+        string? requestedPeriod,
+        DateTime? nowUtc = null,
+        string? requestedFilterTier = null)
     {
-        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc);
+        var leaderboard = GetLeaderboard(requestedPeriod, nowUtc, requestedFilterTier);
         var leaders = leaderboard.Items
             .Where(x => x.Rank is not null)
             .Take(MatchupMatrixLeaderLimit)
@@ -537,6 +561,7 @@ public sealed class LeaderStatsStore : IDisposable
 
             return new LeaderMatchupMatrixSnapshot(
                 leaderboard.Period,
+                leaderboard.FilterTier,
                 leaderboard.GeneratedAtUtc,
                 leaderboard.SinceUtc,
                 rows);
@@ -1290,6 +1315,15 @@ public sealed class LeaderStatsStore : IDisposable
             "30d" => "30d",
             "all" => "all",
             _ => "7d",
+        };
+
+    /// <summary>仅接受公开协议约定的三个筛选档位；旧客户端缺省或非法值均保持标准档行为。</summary>
+    public static string NormalizeFilterTier(string? filterTier)
+        => filterTier?.Trim().ToLowerInvariant() switch
+        {
+            RelaxedFilterTier => RelaxedFilterTier,
+            AllFilterTier => AllFilterTier,
+            _ => StandardFilterTier,
         };
 
     private static string HashAccount(string account)

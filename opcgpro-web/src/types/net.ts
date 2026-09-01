@@ -742,6 +742,7 @@ export interface MsgPlayerSafety extends MsgBase {
 
 // ── Leader 排行榜 ─────────────────────────────────────────────────────
 export type LeaderboardPeriod = "7d" | "30d" | "all";
+export type LeaderFilterTier = "relaxed" | "standard" | "all";
 
 export interface LeaderChampionInfo {
   displayName: string;
@@ -779,10 +780,12 @@ export interface LeaderLeaderboardItem {
   champion?: LeaderChampionInfo | null;
 }
 
-/** 客户端发送时只带 period；服务端回包附带聚合结果。 */
+/** 客户端发送周期与筛选档位；旧客户端缺少档位时服务端按 standard 处理。 */
 export interface MsgLeaderLeaderboard extends MsgBase {
   proto: "MsgLeaderLeaderboard";
   period: LeaderboardPeriod;
+  filterTier?: LeaderFilterTier;
+  requestId?: string;
   result?: boolean;
   error?: string;
   generatedAtUtc?: string;
@@ -816,6 +819,8 @@ export interface LeaderStartingHandItem {
 export interface MsgLeaderMatchups extends MsgBase {
   proto: "MsgLeaderMatchups";
   period: LeaderboardPeriod;
+  filterTier?: LeaderFilterTier;
+  requestId?: string;
   leaderNumber: string;
   result?: boolean;
   error?: string;
@@ -835,6 +840,8 @@ export interface LeaderMatchupMatrixRow {
 export interface MsgLeaderMatchupMatrix extends MsgBase {
   proto: "MsgLeaderMatchupMatrix";
   period: LeaderboardPeriod;
+  filterTier?: LeaderFilterTier;
+  requestId?: string;
   result?: boolean;
   error?: string;
   generatedAtUtc?: string;
