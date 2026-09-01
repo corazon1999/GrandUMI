@@ -24,7 +24,7 @@ test("海克斯私密选秀提交轮次令牌并支持一次单候选刷新", as
   assert.doesNotMatch(overlay, /Math\.random|crypto\.getRandomValues/);
 });
 
-test("海克斯选秀使用权威倒计时、超时恢复、容器布局和四向安全区", async () => {
+test("海克斯选秀使用权威倒计时、超时恢复、竖向三卡布局和四向安全区", async () => {
   const [overlay, frameCss] = await Promise.all([
     readSource("../src/components/game/HexDraftOverlay.tsx"),
     readSource("../src/components/game/HexDraftOverlay.module.css"),
@@ -32,20 +32,76 @@ test("海克斯选秀使用权威倒计时、超时恢复、容器布局和四�
 
   assert.match(overlay, /useServerCountdown/);
   assert.match(overlay, /GameRequest\.requestState\(\)/);
-  assert.match(overlay, /var\(--layout-safe-top/);
-  assert.match(overlay, /var\(--layout-safe-right/);
-  assert.match(overlay, /var\(--layout-safe-bottom/);
-  assert.match(overlay, /var\(--layout-safe-left/);
-  assert.match(overlay, /overflow-y-auto/);
-  assert.match(overlay, /className="@container fixed inset-0/);
-  assert.match(overlay, /grid-cols-1 gap-2\.5 @\[640px\]:grid-cols-3/);
-  assert.ok((overlay.match(/min-h-12/g)?.length ?? 0) >= 1);
+  assert.match(frameCss, /var\(--layout-safe-top/);
+  assert.match(frameCss, /var\(--layout-safe-right/);
+  assert.match(frameCss, /var\(--layout-safe-bottom/);
+  assert.match(frameCss, /var\(--layout-safe-left/);
+  assert.match(frameCss, /overflow: auto/);
+  assert.match(overlay, /className=\{`\$\{styles\.overlay\} \$\{rotateQuarterTurn \? styles\.quarterTurn : ""\} @container`\}/);
+  assert.match(frameCss, /width: min\(57rem, 100%\)/);
+  assert.match(frameCss, /\.candidates[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 16\.5rem\)\)/);
+  assert.match(frameCss, /\.candidate[\s\S]*aspect-ratio: 0\.65/);
   assert.match(frameCss, /\.candidate::before/);
   assert.match(frameCss, /\.candidate::after/);
   assert.match(frameCss, /\.silver/);
   assert.match(frameCss, /\.gold/);
   assert.match(frameCss, /\.rainbow/);
-  assert.match(frameCss, /min-height: 3rem/);
+  assert.ok((frameCss.match(/min-height: 3\.125rem/g)?.length ?? 0) >= 4);
+  assert.match(frameCss, /@container \(max-height: 31rem\)/);
+  assert.match(frameCss, /height: 14\.5rem/);
+  assert.match(frameCss, /grid-template-columns: repeat\(3, minmax\(0, 10rem\)\)/);
+  assert.match(frameCss, /@container \(max-width: 39rem\) and \(min-height: 39\.01rem\)/);
+  assert.match(frameCss, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test("海克斯选秀可隐藏查看牌桌并按轮次自动重开且不改变权威状态", async () => {
+  const [overlay, frameCss] = await Promise.all([
+    readSource("../src/components/game/HexDraftOverlay.tsx"),
+    readSource("../src/components/game/HexDraftOverlay.module.css"),
+  ]);
+
+  assert.match(overlay, /const \[isHidden, setIsHidden\] = useState\(false\)/);
+  assert.match(overlay, /previous\.roundId !== draft\.roundId/);
+  assert.match(overlay, /setIsHidden\(false\)/);
+  assert.match(overlay, /if \(!draft \|\| isGameOver\) \{[\s\S]*setIsHidden\(false\)/);
+  assert.match(overlay, /event\.key !== "Escape"/);
+  assert.match(overlay, /data-private-hex-draft-hidden/);
+  assert.match(overlay, /隐藏海克斯选择面板并查看场上局势/);
+  assert.match(overlay, /重新打开\$\{tierStyle\.label\}选择面板/);
+  assert.match(overlay, /useLayoutQuarterTurn\(\)/);
+  assert.match(overlay, /styles\.reopenQuarterTurn/);
+  assert.match(overlay, /styles\.quarterTurn/);
+  assert.doesNotMatch(overlay, /setInterval\([^)]*setIsHidden|clearHex|resetHex/);
+  assert.match(frameCss, /\.reopen[\s\S]*var\(--layout-safe-top/);
+  assert.match(frameCss, /\.reopen[\s\S]*var\(--layout-safe-right/);
+  assert.match(frameCss, /right: calc\(4\.5rem \+ var\(--layout-safe-right/);
+  assert.match(frameCss, /\.quarterTurn \.hide[\s\S]*left: 0/);
+  assert.match(frameCss, /\.reopenQuarterTurn[\s\S]*var\(--layout-safe-left/);
+  assert.match(frameCss, /\.reopen[\s\S]*min-height: 3\.25rem/);
+});
+
+test("海克斯选秀通过统一音频引擎播放原创出现、权威刷新与锁定反馈", async () => {
+  const [overlay, types, manifest, audioCheck] = await Promise.all([
+    readSource("../src/components/game/HexDraftOverlay.tsx"),
+    readSource("../src/audio/types.ts"),
+    readSource("../src/audio/audioManifest.ts"),
+    readSource("../scripts/check-audio-assets.mjs"),
+  ]);
+
+  assert.match(overlay, /const \{ play \} = useAudio\(\)/);
+  assert.match(overlay, /play\("hexDraftOpen"\)/);
+  assert.match(overlay, /previous\.refreshSignature !== refreshSignature[\s\S]*!isHidden[\s\S]*play\("hexDraftRefresh"\)/);
+  assert.match(overlay, /!previous\.locked && draft\.myLocked && !isHidden[\s\S]*play\("hexDraftConfirm"\)/);
+  assert.match(overlay, /previousDraftAudioRef\.current = \{[\s\S]*refreshSignature,[\s\S]*locked: draft\.myLocked/);
+  assert.match(types, /\| "hexDraftOpen"/);
+  assert.match(types, /\| "hexDraftRefresh"/);
+  assert.match(types, /\| "hexDraftConfirm"/);
+  assert.match(manifest, /hexDraftOpen:[\s\S]*hex-draft-open\.ogg/);
+  assert.match(manifest, /hexDraftRefresh:[\s\S]*hex-draft-refresh\.ogg/);
+  assert.match(manifest, /hexDraftConfirm:[\s\S]*hex-draft-confirm\.ogg/);
+  assert.match(audioCheck, /hex-draft-open\.ogg/);
+  assert.match(audioCheck, /hex-draft-refresh\.ogg/);
+  assert.match(audioCheck, /hex-draft-confirm\.ogg/);
 });
 
 test("海克斯选秀仅展示当前轮次品质，不展示本局共享品质序列", async () => {

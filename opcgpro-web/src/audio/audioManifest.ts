@@ -131,6 +131,27 @@ export const AUDIO_MANIFEST: Record<SoundId, SoundDefinition> = {
     maxVoices: 1,
     priority: 58,
   },
+  hexDraftOpen: {
+    src: `${AUDIO_ROOT}/hex-draft-open.ogg`,
+    volume: 0.68,
+    cooldownMs: 800,
+    maxVoices: 1,
+    priority: 64,
+  },
+  hexDraftRefresh: {
+    src: `${AUDIO_ROOT}/hex-draft-refresh.ogg`,
+    volume: 0.66,
+    cooldownMs: 250,
+    maxVoices: 1,
+    priority: 61,
+  },
+  hexDraftConfirm: {
+    src: `${AUDIO_ROOT}/hex-draft-confirm.ogg`,
+    volume: 0.74,
+    cooldownMs: 500,
+    maxVoices: 1,
+    priority: 68,
+  },
   error: {
     src: `${AUDIO_ROOT}/error.ogg`,
     volume: 0.62,
