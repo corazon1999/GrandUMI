@@ -101,6 +101,12 @@ public class CardInstance
     /// <summary>本回合临时获得的属性（例如 OP15-093 赋予“斩”）。</summary>
     public HashSet<string> GainedPropertiesThisTurn { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// 目标卡记录本次留在角色区期间，被哪些“建立时快照”持续效果选中；
+    /// 来源卡记录自身 ID，表示本次留场已经建立快照。双方离场时均由区域入口统一清理。
+    /// </summary>
+    public HashSet<Guid> FieldSnapshotSourceIds { get; } = new();
+
     public bool HasProperty(string property)
         => Info.Property.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains(property)
             || GainedPropertiesThisTurn.Contains(property);

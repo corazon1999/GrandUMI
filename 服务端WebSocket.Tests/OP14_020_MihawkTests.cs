@@ -73,4 +73,54 @@ public class OP14_020_MihawkTests
         Assert.False(protectedCharacter.IsTapped);
         Assert.True(validCharacter.IsTapped);
     }
+
+    [Fact]
+    public async Task ActivatedMain_OpponentCharacterRaisedToCurrentCostFiveSatisfiesCondition()
+    {
+        var state = TestScene.New(myLeaderNumber: "OP14-020")
+            .OppCharacter("OP15-050")
+            .Build();
+        var me = state.Players[0];
+        var opponentCharacter = state.Players[1].Characters[0];
+        opponentCharacter.CostModThisTurn = 2;
+        me.CostArea.AddRange([
+            new DonCard { State = DonState.Rest },
+            new DonCard { State = DonState.Rest },
+            new DonCard { State = DonState.Rest },
+        ]);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(me.Leader.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, me.Leader, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.Equal(5, state.CurrentCostOf(1, opponentCharacter));
+        Assert.All(me.CostArea, don => Assert.Equal(DonState.Active, don.State));
+    }
+
+    [Fact]
+    public async Task ActivatedMain_OriginalCostFiveReducedBelowFiveDoesNotSatisfyCondition()
+    {
+        var state = TestScene.New(myLeaderNumber: "OP14-020")
+            .OppCharacter("EB01-002")
+            .Build();
+        var me = state.Players[0];
+        var opponentCharacter = state.Players[1].Characters[0];
+        opponentCharacter.CostModThisTurn = -1;
+        me.CostArea.AddRange([
+            new DonCard { State = DonState.Rest },
+            new DonCard { State = DonState.Rest },
+            new DonCard { State = DonState.Rest },
+        ]);
+        var prompts = new MockPromptService()
+            .QueueConfirm(true)
+            .QueueChoose(me.Leader.Id.ToString());
+
+        await EffectRuntime.Resolve(
+            state, 0, me.Leader, EffectTrigger.ActivatedMain, prompts);
+
+        Assert.Equal(4, state.CurrentCostOf(1, opponentCharacter));
+        Assert.All(me.CostArea, don => Assert.Equal(DonState.Rest, don.State));
+    }
 }

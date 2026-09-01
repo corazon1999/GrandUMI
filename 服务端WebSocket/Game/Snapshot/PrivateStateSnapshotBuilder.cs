@@ -256,6 +256,10 @@ public static class PrivateStateSnapshotBuilder
             }).ToArray(),
             oncePerTurnUsedKeys = card.OncePerTurnUsedKeys.ToArray(),
             nameAliases = card.NameAliases.ToArray(),
+            fieldSnapshotSourceIds = card.FieldSnapshotSourceIds
+                .Select(id => id.ToString("D"))
+                .Order(StringComparer.Ordinal)
+                .ToArray(),
         };
     }
 

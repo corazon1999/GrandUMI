@@ -57,7 +57,7 @@ public class PlayerState
 {
     public PlayerState()
     {
-        Characters = new CharacterZone(RestAttachedDonForDepartingCharacter);
+        Characters = new CharacterZone(CleanupDepartingCharacter);
     }
 
     public required string SessionId   { get; set; }
@@ -76,9 +76,30 @@ public class PlayerState
     public List<CardInstance> Hand       { get; } = new();
     /// <summary>角色区（最多 5）</summary>
     public CharacterZone Characters { get; }
-    public CardInstance? StageCard       { get; set; }
+    private CardInstance? _stageCard;
+    private CardInstance? _extraStageCard;
+
+    public CardInstance? StageCard
+    {
+        get => _stageCard;
+        set
+        {
+            if (ReferenceEquals(_stageCard, value)) return;
+            ClearDepartingSnapshotSource(_stageCard);
+            _stageCard = value;
+        }
+    }
     /// <summary>仅【三号船坞】存在时启用的第二舞台区。</summary>
-    public CardInstance? ExtraStageCard  { get; set; }
+    public CardInstance? ExtraStageCard
+    {
+        get => _extraStageCard;
+        set
+        {
+            if (ReferenceEquals(_extraStageCard, value)) return;
+            ClearDepartingSnapshotSource(_extraStageCard);
+            _extraStageCard = value;
+        }
+    }
     /// <summary>按固定槽位顺序枚举当前舞台；普通模式只会返回首槽。</summary>
     public IEnumerable<CardInstance> StageCards
     {
@@ -143,13 +164,24 @@ public class PlayerState
         return false;
     }
 
-    private void RestAttachedDonForDepartingCharacter(CardInstance character)
+    private void CleanupDepartingCharacter(CardInstance character)
     {
+        // “建立时快照”只绑定当前这次留场；同一实例离场后再次登场也不得恢复旧快照资格。
+        character.FieldSnapshotSourceIds.Clear();
         foreach (var don in CostArea)
         {
             if (don.State != DonState.Attached || don.AttachedToCardId != character.Id) continue;
             don.State = DonState.Rest;
             don.AttachedToCardId = null;
         }
+    }
+
+    private void ClearDepartingSnapshotSource(CardInstance? source)
+    {
+        if (source is null) return;
+        // 舞台离场既结束它建立的快照，也结束它作为其它快照目标的本次留场资格。
+        source.FieldSnapshotSourceIds.Clear();
+        foreach (var character in Characters)
+            character.FieldSnapshotSourceIds.Remove(source.Id);
     }
 }

@@ -24,7 +24,7 @@ public sealed class RoomRecoverySnapshotStoreTests
             var state = JsonSerializer.SerializeToElement(new { tick = 16, phase = "主阶段" });
             var acceptedAtUtc = DateTime.UtcNow;
             var legacy = new RoomRecoverySnapshot(
-                RoomRecoverySnapshotStore.SchemaVersion - 1,
+                RoomRecoverySnapshotStore.MinimumCompatibleSchemaVersion,
                 "legacy-room-snapshot-test",
                 16,
                 acceptedAtUtc,
@@ -126,6 +126,22 @@ public sealed class RoomRecoverySnapshotStoreTests
                 Path.Combine(root, $"{roomId}.jsonl"),
                 JsonSerializer.Serialize(header) + Environment.NewLine);
 
+            // v2 的私有状态没有建立时快照来源字段。升级后必须保留其请求去重窗口、
+            // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前 v3。
+            var legacyPrivateState = JsonSerializer.SerializeToElement(new { schema = 2, legacy = true });
+            var legacyStateHash = RoomRecoverySnapshotStore.ComputeStateSha256(legacyPrivateState);
+            RoomRecoverySnapshotStore.Capture(new RoomRecoverySnapshot(
+                RoomRecoverySnapshotStore.SchemaVersion - 1,
+                roomId,
+                0,
+                DateTime.UtcNow,
+                [0, 0],
+                [600_000, 600_000],
+                [new RequestDedupeEntry(0, "legacy-v2-request", DateTime.UtcNow)],
+                legacyStateHash,
+                legacyPrivateState));
+            await RoomRecoverySnapshotStore.FlushAsync();
+
             await GameRoomManager.RestoreAll();
             var room = GameRoomManager.GetRoom(roomId);
 
@@ -135,6 +151,14 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.True(room.Engine.State.OperationClockPaused);
             Assert.All(room.Engine.State.OperationTurnExtensionUsed, Assert.False);
             Assert.Equal(240_000, room.Engine.State.InactivityLossRemainingMs);
+
+            var refreshed = Assert.IsType<RoomRecoverySnapshot>(
+                RoomRecoverySnapshotStore.TryRead(roomId));
+            Assert.Equal(RoomRecoverySnapshotStore.SchemaVersion, refreshed.SchemaVersion);
+            Assert.NotEqual(legacyStateHash, refreshed.StateSha256);
+            Assert.Contains(
+                refreshed.ProcessedRequests,
+                request => request.PlayerIndex == 0 && request.RequestId == "legacy-v2-request");
 
             var graceField = typeof(GameRoomManager).GetField(
                 "_grace", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
