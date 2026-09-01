@@ -19,7 +19,7 @@ const TIER_META: Record<HexTierSnapshot, { label: string; slot: string; text: st
     badge: "border-amber-200/35 bg-amber-300/10 text-amber-100",
   },
   Rainbow: {
-    label: "彩",
+    label: "棱彩",
     slot: "border-fuchsia-200/75 bg-gradient-to-br from-fuchsia-300/35 via-violet-400/20 to-cyan-300/35 text-white shadow-[inset_0_0_12px_rgba(103,232,249,0.25)]",
     text: "text-fuchsia-100",
     badge: "border-fuchsia-200/35 bg-gradient-to-r from-fuchsia-400/15 to-cyan-300/15 text-fuchsia-100",
@@ -51,6 +51,7 @@ export default function HexOwnedSlots({
   const activeIndex = pinnedIndex ?? focusedIndex ?? hoveredIndex;
   const activeHex = activeIndex === null ? null : owned[activeIndex] ?? null;
   const activeTier = activeHex ? TIER_META[activeHex.tier] : null;
+  const activeTierLabel = activeHex?.tierLabel ?? activeTier?.label ?? null;
 
   useEffect(() => {
     if (pinnedIndex === null) return;
@@ -87,6 +88,7 @@ export default function HexOwnedSlots({
         {Array.from({ length: MAX_OWNED_HEXES }, (_, index) => {
           const hex = owned[index];
           const tier = hex ? TIER_META[hex.tier] : null;
+          const tierLabel = hex?.tierLabel ?? tier?.label;
           const isActive = activeIndex === index && Boolean(hex);
           return (
             <li key={hex ? `${side}-${hex.id}-${index}` : `${side}-empty-${index}`}>
@@ -103,7 +105,7 @@ export default function HexOwnedSlots({
                     : "border-slate-500/20 bg-slate-950/35 text-slate-600 shadow-inner shadow-black/25"
                 }`}
                 aria-label={hex
-                  ? `${label}第 ${index + 1} 个海克斯，${tier?.label}品质“${hex.name}”，查看完整效果`
+                  ? `${label}第 ${index + 1} 个海克斯，${tierLabel}品质“${hex.name}”，查看完整效果`
                   : `${label}第 ${index + 1} 个海克斯空槽`}
                 aria-controls={hex ? popoverId : undefined}
                 aria-describedby={isActive ? popoverId : undefined}
@@ -129,7 +131,7 @@ export default function HexOwnedSlots({
                     tier ? "bg-black/25" : "bg-slate-700/15"
                   }`}
                 >
-                  {tier ? tier.label : "·"}
+                  {tierLabel ?? "·"}
                 </span>
                 {hex && <span className="sr-only">{hex.name}</span>}
               </button>
@@ -138,7 +140,7 @@ export default function HexOwnedSlots({
         })}
       </ol>
 
-      {activeHex && activeTier && (
+      {activeHex && activeTier && activeTierLabel && (
         <section
           id={popoverId}
           data-hex-owned-popover={side}
@@ -155,7 +157,7 @@ export default function HexOwnedSlots({
                 {activeHex.name}
               </h3>
               <span className={`mt-1 inline-flex rounded border px-1.5 py-0.5 text-[9px] font-black ${activeTier.badge}`}>
-                {activeTier.label}品质
+                {activeTierLabel}品质
               </span>
             </div>
             {pinnedIndex === activeIndex && (

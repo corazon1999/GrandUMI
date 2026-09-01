@@ -230,6 +230,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         => new
         {
             state.HexState.Enabled,
+            state.HexState.RulesRevision,
             state.HexState.DraftSequence,
             draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
             state.HexState.DraftResolving,
@@ -258,6 +259,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 runtime.TankEngineOpponentTurnPower,
                 runtime.NavyCarnivalUsedThisTurn,
                 runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
                 inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
             }).ToArray(),
             activeDraft = state.HexState.ActiveDraft is { } draft
@@ -294,6 +296,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                         grant.HexId,
                         grant.NextStep,
                         grant.PlannedStepCount,
+                        plannedChildHexIds = grant.PlannedChildHexIds.ToArray(),
                         grant.Completed,
                     }).ToArray(),
                 }
@@ -312,6 +315,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         => new
         {
             state.HexState.Enabled,
+            state.HexState.RulesRevision,
             draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
             draftResolving = state.HexState.DraftResolving || state.HexState.PendingSettlement is not null,
             owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),

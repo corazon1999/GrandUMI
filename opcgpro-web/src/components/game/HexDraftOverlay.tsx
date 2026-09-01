@@ -32,8 +32,8 @@ const TIER_STYLES: Record<HexTierSnapshot, {
     frame: styles.gold,
   },
   Rainbow: {
-    label: "彩色海克斯",
-    shortLabel: "彩色",
+    label: "棱彩海克斯",
+    shortLabel: "棱彩",
     accent: "text-fuchsia-200",
     frame: styles.rainbow,
   },
@@ -105,6 +105,7 @@ function HexCandidateCard({
   onRefresh: () => void;
 }) {
   const style = TIER_STYLES[hex.tier];
+  const tierLabel = hex.tierLabel ?? style.shortLabel;
   const refreshDisabled = disabled || !refreshAvailable;
   return (
     <div className={styles.candidateSlot} data-hex-candidate-slot={index + 1}>
@@ -119,12 +120,12 @@ function HexCandidateCard({
           onClick={onChoose}
           disabled={disabled}
           aria-pressed={selected}
-          aria-label={`选择${style.label}“${hex.name}”：${hex.description}`}
+          aria-label={`选择${tierLabel}海克斯“${hex.name}”：${hex.description}`}
           className={styles.choose}
         >
           <HexSigil hexId={hex.id} />
           <span className={styles.name}>{hex.name}</span>
-          <span className={styles.tierBadge}>{style.shortLabel}</span>
+          <span className={styles.tierBadge}>{tierLabel}</span>
           <span className={styles.divider} aria-hidden="true" />
           <span className={styles.description}>{hex.description}</span>
           <span className={styles.chooseHint}>{selected ? "选择已锁定" : "点击卡牌选择"}</span>
@@ -252,6 +253,8 @@ export default function HexDraftOverlay() {
 
   const tier = draft?.tier ?? "Silver";
   const tierStyle = TIER_STYLES[tier];
+  const tierLabel = draft?.tierLabel ?? tierStyle.shortLabel;
+  const tierHeading = `${tierLabel}海克斯`;
   const candidates = draft?.candidates ?? [];
   const locked = draft?.myLocked ?? false;
   const choose = (hexId: number) => {
@@ -273,7 +276,7 @@ export default function HexDraftOverlay() {
           onClick={() => setIsHidden(false)}
           data-private-hex-draft-hidden
           className={`${styles.reopen} ${rotateQuarterTurn ? styles.reopenQuarterTurn : ""} ${tierStyle.frame}`}
-          aria-label={`重新打开${tierStyle.label}选择面板，剩余 ${remainingSeconds} 秒`}
+          aria-label={`重新打开${tierHeading}选择面板，剩余 ${remainingSeconds} 秒`}
           initial={reduceMotion ? false : { opacity: 0, scale: 0.9, x: 10 }}
           animate={{ opacity: 1, scale: 1, x: 0 }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92, x: 10 }}
@@ -282,7 +285,7 @@ export default function HexDraftOverlay() {
           <EyeIcon />
           <span className={styles.reopenCopy}>
             <strong>打开海克斯选择</strong>
-            <small>{tierStyle.shortLabel} · {remainingSeconds} 秒</small>
+            <small>{tierLabel} · {remainingSeconds} 秒</small>
           </span>
         </motion.button>
       ) : (
@@ -320,7 +323,7 @@ export default function HexDraftOverlay() {
                   <kbd>Esc</kbd>
                 </button>
               )}
-              <p className={`${styles.eyebrow} ${tierStyle.accent}`}>{tierStyle.label}</p>
+              <p className={`${styles.eyebrow} ${tierStyle.accent}`}>{tierHeading}</p>
               <h1 id="hex-draft-title" className={styles.title}>
                 {draft ? `第 ${draft.ownTurnNumber} 回合海克斯选择` : "正在应用你的海克斯"}
               </h1>

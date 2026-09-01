@@ -34,12 +34,39 @@ public sealed record HexRefreshResult(
 /// </summary>
 public static class HexRules
 {
+    public const int LegacyRulesRevision = 1;
+    public const int CurrentRulesRevision = 2;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
+    private static readonly RandomGrantPlan[] ChaosGrantPlans =
+    [
+        new(null, "hex_chaos_grant", "chaos"),
+        new(null, "hex_chaos_grant", "chaos"),
+    ];
+    private static readonly RandomGrantPlan[] GoldenTierGrantPlans =
+    [
+        new(HexTier.Silver, "hex_golden_tier_grant", "golden-tier"),
+        new(HexTier.Gold, "hex_golden_tier_grant", "golden-tier"),
+    ];
+    private static readonly RandomGrantPlan[] PrismaticTierGrantPlans =
+    [
+        new(HexTier.Rainbow, "hex_prismatic_tier_grant", "prismatic-tier"),
+    ];
 
     public static void Initialize(GameState state)
-        => state.HexState.Enabled = state.MatchKind == MatchKind.Hex;
+    {
+        state.HexState.Enabled = state.MatchKind == MatchKind.Hex;
+        state.HexState.RulesRevision = CurrentRulesRevision;
+    }
+
+    /// <summary>仅恢复/重放入口可覆盖对局创建时锁定的规则版本。</summary>
+    internal static void SetRulesRevisionForReplay(GameState state, int rulesRevision)
+    {
+        if (rulesRevision is < LegacyRulesRevision or > CurrentRulesRevision)
+            throw new InvalidDataException($"不支持的海克斯规则版本：{rulesRevision}");
+        state.HexState.RulesRevision = rulesRevision;
+    }
 
     /// <summary>一次性生成双方共享的三段品质。使用本局 RNG，故重放和进程恢复会逐字重建。</summary>
     public static void EnsureDraftTierSequence(GameState state)
@@ -198,7 +225,7 @@ public static class HexRules
         if (round.Candidates[candidateIndex] != expectedHexId)
             return new(HexRefreshStatus.Rejected, null, null, null, "待刷新候选已变化，请以最新快照为准");
 
-        var pool = HexCatalog.ForTier(round.Tier)
+        var pool = HexCatalog.ForTier(round.Tier, state.HexState.RulesRevision)
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
             .Where(id => !round.Candidates.Contains(id))
@@ -322,6 +349,11 @@ public static class HexRules
             && player.Characters.Count(other => other.Info.Number == card.Info.Number) == 2)
             bonus += 3000;
         if (leader && Has(state, side, 20) && state.CurrentTurnPlayer == side) bonus += 2000;
+        if (leader
+            && state.HexState.RulesRevision >= CurrentRulesRevision
+            && Has(state, side, 22)
+            && state.CurrentTurnPlayer == side)
+            bonus += state.HexState.Runtime[side].TranscendentEvilOwnTurnPower;
         if (leader && Has(state, side, 34)) bonus += 2000;
         if (character && Has(state, side, 38)) bonus += 1000;
         if (leader && Has(state, side, 44) && state.CurrentTurnPlayer == 1 - side)
@@ -445,7 +477,12 @@ public static class HexRules
                     await AddLifeFromDeckAsync(engine, attackerSide, player.LifeArea.Count, "steel_heart");
                 }
             }
-            if (Has(state, attackerSide, 24) && attacker.Info.Kind == CardKind.Character && target.Info.Cost >= 8)
+            bool giantSlayerTargetEligible = state.HexState.RulesRevision >= CurrentRulesRevision
+                ? state.CurrentCostOf(1 - attackerSide, target) >= 8
+                : target.Info.Cost >= 8;
+            if (Has(state, attackerSide, 24)
+                && attacker.Info.Kind == CardKind.Character
+                && giantSlayerTargetEligible)
                 battle.AttackerBattleBonus += 3000;
             if (Has(state, attackerSide, 50)) target.PowerModThisTurn -= 1000;
         }
@@ -576,7 +613,12 @@ public static class HexRules
                 : state.Players[koSide].Characters.FirstOrDefault(card => card.Id == id);
             if (attacker is not null && ReferenceEquals(attacker, state.Players[koSide].Leader)
                 && Has(state, koSide, 22))
-                attacker.PowerModThisTurn += 500;
+            {
+                if (state.HexState.RulesRevision >= CurrentRulesRevision)
+                    state.HexState.Runtime[koSide].TranscendentEvilOwnTurnPower += 500;
+                else
+                    attacker.PowerModThisTurn += 500;
+            }
         }
 
         if (Has(state, victimOwner, 23))
@@ -800,11 +842,12 @@ public static class HexRules
 
     private static IReadOnlyList<int> DrawCandidates(GameState state, int player, HexTier tier, int count)
     {
-        var pool = HexCatalog.ForTier(tier)
+        var pool = HexCatalog.ForTier(tier, state.HexState.RulesRevision)
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[player].Contains(id))
             .ToList();
-        if (pool.Count < count) throw new InvalidOperationException($"{tier} 海克斯候选不足 {count} 个");
+        if (pool.Count < count)
+            throw new InvalidOperationException($"{HexCatalog.TierDisplayName(tier)}海克斯候选不足 {count} 个");
         var result = new List<int>(count);
         while (result.Count < count)
         {
@@ -888,32 +931,13 @@ public static class HexRules
                 }
                 break;
             case 47:
-                while (grant.NextStep < 2)
-                {
-                    int slot = grant.NextStep;
-                    var pool = HexCatalog.All.Select(item => item.Id)
-                        .Where(id => id != 47 && !state.HexState.Owned[grant.PlayerIndex].Contains(id))
-                        .ToList();
-                    if (pool.Count == 0)
-                    {
-                        grant.NextStep = 2;
-                        break;
-                    }
-                    int index = state.NextRecordedRandom(pool.Count, "hex_chaos_grant", grant.PlayerIndex, new { slot });
-                    int childHexId = pool[index];
-                    AddOwned(state, grant.PlayerIndex, childHexId);
-                    int insertAt = settlement.NextGrantIndex + 1
-                        + settlement.Grants.Skip(settlement.NextGrantIndex + 1)
-                            .TakeWhile(item => item.GrantKey.StartsWith(grant.GrantKey + ":chaos:", StringComparison.Ordinal))
-                            .Count();
-                    settlement.Grants.Insert(insertAt, new HexGrantProgress
-                    {
-                        GrantKey = $"{grant.GrantKey}:chaos:{slot}:{childHexId}",
-                        PlayerIndex = grant.PlayerIndex,
-                        HexId = childHexId,
-                    });
-                    CommitGrantStep(state, settlement, grant);
-                }
+                ApplyDraftRandomGrantPlan(state, settlement, grant, ChaosGrantPlans);
+                break;
+            case 55:
+                ApplyDraftRandomGrantPlan(state, settlement, grant, GoldenTierGrantPlans);
+                break;
+            case 56:
+                ApplyDraftRandomGrantPlan(state, settlement, grant, PrismaticTierGrantPlans);
                 break;
             case 49:
                 if (grant.NextStep == 0)
@@ -933,6 +957,66 @@ public static class HexRules
         }
 
         grant.Completed = true;
+    }
+
+    private static void ApplyDraftRandomGrantPlan(
+        GameState state,
+        HexDraftSettlement settlement,
+        HexGrantProgress grant,
+        IReadOnlyList<RandomGrantPlan> plans)
+    {
+        if (grant.PlannedStepCount < 0)
+            grant.PlannedStepCount = plans.Count;
+        else if (grant.PlannedStepCount != plans.Count)
+            throw new InvalidOperationException("海克斯随机授予计划步数与恢复状态不一致");
+
+        while (grant.NextStep < plans.Count)
+        {
+            int slot = grant.NextStep;
+            if (grant.PlannedChildHexIds.Count < slot)
+                throw new InvalidOperationException("海克斯随机授予计划缺少已完成步骤");
+
+            var plan = plans[slot];
+            if (grant.PlannedChildHexIds.Count == slot)
+            {
+                var pool = RandomGrantPool(state, grant.PlayerIndex, grant.HexId, plan.Tier);
+                int plannedHexId = 0;
+                if (pool.Count > 0)
+                {
+                    int index = state.NextRecordedRandom(
+                        pool.Count,
+                        plan.RandomEventType,
+                        grant.PlayerIndex,
+                        RandomGrantContext(slot, plan.Tier));
+                    plannedHexId = pool[index];
+                }
+                // 0 是明确的“该步骤池已耗尽”哨兵；仍提交步骤，避免恢复时反复尝试。
+                grant.PlannedChildHexIds.Add(plannedHexId);
+            }
+
+            int childHexId = grant.PlannedChildHexIds[slot];
+            if (childHexId > 0)
+            {
+                AddOwned(state, grant.PlayerIndex, childHexId);
+                string childGrantKey = $"{grant.GrantKey}:{plan.GrantKeyGroup}:{slot}:{childHexId}";
+                if (settlement.Grants.All(item =>
+                        !string.Equals(item.GrantKey, childGrantKey, StringComparison.Ordinal)))
+                {
+                    string childPrefix = $"{grant.GrantKey}:{plan.GrantKeyGroup}:";
+                    int insertAt = settlement.NextGrantIndex + 1
+                        + settlement.Grants.Skip(settlement.NextGrantIndex + 1)
+                            .TakeWhile(item => item.GrantKey.StartsWith(childPrefix, StringComparison.Ordinal))
+                            .Count();
+                    settlement.Grants.Insert(insertAt, new HexGrantProgress
+                    {
+                        GrantKey = childGrantKey,
+                        PlayerIndex = grant.PlayerIndex,
+                        HexId = childHexId,
+                    });
+                }
+            }
+            CommitGrantStep(state, settlement, grant);
+        }
     }
 
     private static void CommitGrantStep(
@@ -997,19 +1081,14 @@ public static class HexRules
                 }
                 break;
             case 47:
-            {
-                for (int i = 0; i < 2; i++)
-                {
-                    var pool = HexCatalog.All.Select(item => item.Id)
-                        .Where(id => id != 47 && !state.HexState.Owned[playerIndex].Contains(id))
-                        .ToList();
-                    if (pool.Count == 0) break;
-                    int index = state.NextRecordedRandom(pool.Count, "hex_chaos_grant", playerIndex, new { slot = i });
-                    await GrantAsync(engine, playerIndex, pool[index]);
-                    if (state.IsGameOver) break;
-                }
+                await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, ChaosGrantPlans);
                 break;
-            }
+            case 55:
+                await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, GoldenTierGrantPlans);
+                break;
+            case 56:
+                await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, PrismaticTierGrantPlans);
+                break;
             case 49:
                 TurnEngine.DrawCard(state, playerIndex, 3);
                 break;
@@ -1020,13 +1099,56 @@ public static class HexRules
         }
     }
 
+    private static async Task ApplyDirectRandomGrantPlanAsync(
+        GameEngine engine,
+        int playerIndex,
+        int sourceHexId,
+        IReadOnlyList<RandomGrantPlan> plans)
+    {
+        var state = engine.State;
+        for (int slot = 0; slot < plans.Count; slot++)
+        {
+            var plan = plans[slot];
+            var pool = RandomGrantPool(state, playerIndex, sourceHexId, plan.Tier);
+            if (pool.Count == 0) continue;
+            int index = state.NextRecordedRandom(
+                pool.Count,
+                plan.RandomEventType,
+                playerIndex,
+                RandomGrantContext(slot, plan.Tier));
+            await GrantAsync(engine, playerIndex, pool[index]);
+            if (state.IsGameOver) break;
+        }
+    }
+
+    private static List<int> RandomGrantPool(
+        GameState state,
+        int playerIndex,
+        int sourceHexId,
+        HexTier? tier)
+    {
+        var definitions = tier is { } requiredTier
+            ? HexCatalog.ForTier(requiredTier, state.HexState.RulesRevision)
+            : HexCatalog.RegularForRevision(state.HexState.RulesRevision);
+        return definitions
+            .Select(item => item.Id)
+            .Where(id => id != sourceHexId)
+            .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
+            .ToList();
+    }
+
+    private static object RandomGrantContext(int slot, HexTier? tier)
+        => tier is { } requiredTier
+            ? new { slot, tier = requiredTier.ToString() }
+            : new { slot };
+
     private static async Task TryTriggerKingAsync(GameEngine engine, int owner)
     {
         var state = engine.State;
         var runtime = state.HexState.Runtime[owner];
         if (!Has(state, owner, 48) || runtime.KingUsedThisGame) return;
         runtime.KingUsedThisGame = true;
-        var pool = HexCatalog.ForTier(HexTier.Rainbow).Select(item => item.Id)
+        var pool = HexCatalog.ForTier(HexTier.Rainbow, state.HexState.RulesRevision).Select(item => item.Id)
             .Where(id => !state.HexState.Owned[owner].Contains(id))
             .ToList();
         if (pool.Count > 0)
@@ -1068,4 +1190,9 @@ public static class HexRules
         }
         return added;
     }
+
+    private sealed record RandomGrantPlan(
+        HexTier? Tier,
+        string RandomEventType,
+        string GrantKeyGroup);
 }

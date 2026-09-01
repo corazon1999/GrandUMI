@@ -54,6 +54,7 @@ public static class PrivateStateSnapshotBuilder
             hexState = new
             {
                 state.HexState.Enabled,
+                state.HexState.RulesRevision,
                 state.HexState.DraftSequence,
                 draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
                 state.HexState.DraftResolving,
@@ -82,6 +83,7 @@ public static class PrivateStateSnapshotBuilder
                     runtime.TankEngineOpponentTurnPower,
                     runtime.NavyCarnivalUsedThisTurn,
                     runtime.KingUsedThisGame,
+                    runtime.TranscendentEvilOwnTurnPower,
                     inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
                 }).ToArray(),
                 activeDraft = state.HexState.ActiveDraft is { } draft
@@ -119,6 +121,7 @@ public static class PrivateStateSnapshotBuilder
                             grant.HexId,
                             grant.NextStep,
                             grant.PlannedStepCount,
+                            plannedChildHexIds = grant.PlannedChildHexIds.ToArray(),
                             grant.Completed,
                         }).ToArray(),
                     }

@@ -1126,11 +1126,14 @@ export interface ReplayHandFrameSnapshot {
 }
 
 export type HexTierSnapshot = "Silver" | "Gold" | "Rainbow";
+export type HexTierLabelSnapshot = "银色" | "金色" | "棱彩";
 
 export interface HexDefinitionSnapshot {
   id: number;
   name: string;
   tier: HexTierSnapshot;
+  /** 新服务端提供权威玩家文案；旧快照缺失时客户端按稳定 tier 值回退。 */
+  tierLabel?: HexTierLabelSnapshot;
   description: string;
 }
 
@@ -1138,6 +1141,7 @@ export interface HexDraftSnapshot {
   roundId: string;
   ownTurnNumber: 1 | 3 | 6;
   tier: HexTierSnapshot;
+  tierLabel?: HexTierLabelSnapshot;
   deadlineUtc: string;
   /** activeDraft 本身仅下发给拥有者；兼容旧快照时仍允许 null。 */
   candidates: HexDefinitionSnapshot[] | null;
@@ -1149,6 +1153,8 @@ export interface HexDraftSnapshot {
 
 export interface HexModeSnapshot {
   enabled: true;
+  /** 服务端在建局时锁定；旧快照可缺失，客户端无需据此计算规则。 */
+  rulesRevision?: number;
   /** 双方共享的第 1/3/6 回合品质序列，允许重复。 */
   tierSequence: HexTierSnapshot[];
   draftOwnTurns: number[];

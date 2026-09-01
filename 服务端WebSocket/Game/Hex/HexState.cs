@@ -39,12 +39,17 @@ public sealed class HexGrantProgress
     public required int HexId { get; init; }
     public int NextStep { get; set; }
     public int PlannedStepCount { get; set; } = -1;
+    /// <summary>
+    /// 随机子授予按步骤预先锁定的海克斯编号；0 表示该步骤池已耗尽。
+    /// 计划先于所有权和子队列写入，令同进程重试不会重新抽取或重复授予。
+    /// </summary>
+    public List<int> PlannedChildHexIds { get; } = new();
     public bool Completed { get; set; }
 }
 
 /// <summary>
 /// 一轮私密选秀从本人锁定到全部“获得时”效果完成的持久化前向结算记录。
-/// 根海克斯先写入 Owned，再按 Grants 顺序推进；H47 产生的子授予也追加到同一队列。
+/// 根海克斯先写入 Owned，再按 Grants 顺序推进；随机质变产生的子授予也追加到同一队列。
 /// </summary>
 public sealed class HexDraftSettlement
 {
@@ -91,6 +96,8 @@ public sealed class PlayerHexRuntime
     public int TankEngineOpponentTurnPower { get; set; }
     public bool NavyCarnivalUsedThisTurn { get; set; }
     public bool KingUsedThisGame { get; set; }
+    /// <summary>超凡邪恶累计层数对应的己方回合领袖力量；跨回合持久且不在 ResetTurn 清除。</summary>
+    public int TranscendentEvilOwnTurnPower { get; set; }
 
     public void ResetTurn()
     {
@@ -118,6 +125,11 @@ public sealed class PlayerHexRuntime
 public sealed class HexState
 {
     public bool Enabled { get; set; }
+    /// <summary>
+    /// 对局创建时锁定的海克斯规则版本。旧房间恢复时继续使用旧池与旧效果语义，
+    /// 避免部署后动作重放因候选变化或跨回合累计方式变化而分歧。
+    /// </summary>
+    public int RulesRevision { get; set; }
     public int DraftSequence { get; set; }
     /// <summary>双方共享的第 1/3/6 个自己回合选秀品质；长度恒为 3，允许重复。</summary>
     public List<HexTier> DraftTierSequence { get; } = new();

@@ -25,7 +25,7 @@ public class MulliganRecoveryTests
 
             // 取状态会重新核对权威截止时间并确保对应计时器存在。
             GameRoomManager.HandleRequestState(player0Session);
-            await WaitUntilAsync(() => room.Engine.State.MulliganBothDone);
+            await WaitUntilAsync(() => MulliganTransitionCompleted(room));
 
             Assert.All(room.Engine.State.Players, player => Assert.True(player.MulliganDone));
             Assert.Equal(1, room.Engine.State.TurnCount);
@@ -56,7 +56,7 @@ public class MulliganRecoveryTests
             var newSession = $"mulligan-reclaim-new-{suffix}";
 
             Assert.True(GameRoomManager.TryReclaim(newSession, player0Account));
-            await WaitUntilAsync(() => room.Engine.State.MulliganBothDone);
+            await WaitUntilAsync(() => MulliganTransitionCompleted(room));
 
             Assert.Same(room, GameRoomManager.GetRoomBySession(newSession));
             Assert.Equal(1, room.Engine.State.TurnCount);
@@ -89,7 +89,7 @@ public class MulliganRecoveryTests
 
             room.Engine.State.MulliganDeadlineUtc = DateTime.UtcNow.AddSeconds(-1);
             GameRoomManager.HandleRequestState(player0Session);
-            await WaitUntilAsync(() => room.Engine.State.MulliganBothDone);
+            await WaitUntilAsync(() => MulliganTransitionCompleted(room));
 
             Assert.True(room.Engine.State.Players[1].MulliganDone);
             Assert.True(room.Engine.State.Players[1].HasReDraw);
@@ -108,6 +108,16 @@ public class MulliganRecoveryTests
         for (var i = 0; i < 500 && !condition(); i++)
             await Task.Delay(4);
         Assert.True(condition(), "房间队列未在预期时间内完成调度恢复");
+    }
+
+    private static bool MulliganTransitionCompleted(GameRoomManager.RoomEntry room)
+    {
+        // 房间队列会先写入第二位玩家的完成标志，再在同一同步调用栈内初始化第一回合。
+        // 测试线程直接读取裸状态时必须等待完整后置条件，不能把队列内部中间态当作完成点。
+        var state = room.Engine.State;
+        return state.MulliganBothDone
+               && state.TurnCount == 1
+               && state.MulliganDeadlineUtc is null;
     }
 
     private static void Cleanup(GameRoomManager.RoomEntry room)

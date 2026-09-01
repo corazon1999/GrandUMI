@@ -251,11 +251,13 @@ public static class StateSnapshotBuilder
         object Hex(int id)
         {
             var definition = HexCatalog.Get(id);
+            var tier = HexCatalog.TierForRevision(id, state.HexState.RulesRevision);
             return new
             {
                 id = definition.Id,
                 name = definition.Name,
-                tier = definition.Tier.ToString(),
+                tier = tier.ToString(),
+                tierLabel = HexCatalog.TierDisplayName(tier),
                 description = definition.Description,
             };
         }
@@ -263,6 +265,7 @@ public static class StateSnapshotBuilder
         return new
         {
             enabled = true,
+            rulesRevision = state.HexState.RulesRevision,
             tierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
             draftOwnTurns = HexRules.DraftOwnTurns,
             // 结算进度也属于私密交互；非拥有者和观战者不显示等待遮罩。
@@ -275,6 +278,7 @@ public static class StateSnapshotBuilder
                 roundId = round.RoundId,
                 ownTurnNumber = round.OwnTurnNumber,
                 tier = round.Tier.ToString(),
+                tierLabel = HexCatalog.TierDisplayName(round.Tier),
                 deadlineUtc = round.DeadlineUtc,
                 candidates = round.Candidates.Select(Hex).ToArray(),
                 myLocked = round.Locked,

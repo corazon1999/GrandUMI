@@ -6,6 +6,7 @@ using GrandUMI.Game.Hex;
 using GrandUMI.Game.PhaseFlow;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Validation;
+using GrandUMI.Training;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -30,10 +31,11 @@ public sealed class HexModeEffectsTests
         [45] = "AttackLimit/BattleBonus", [46] = "HandCost/EffectRuntime.Copy", [47] = "OnAcquire",
         [48] = "EnemyLifeOne", [49] = "OnAcquire", [50] = "OnAttackDeclared", [51] = "CounterBonus",
         [52] = "OnAcquire/DonLimit", [53] = "AttackTarget", [54] = "OnCharacterKo",
+        [55] = "OnAcquire/TierGrant", [56] = "OnAcquire/PrismaticGrant",
     };
 
     public static IEnumerable<object[]> AllHexIds()
-        => Enumerable.Range(1, 54).Select(id => new object[] { id });
+        => HexCatalog.All.Select(item => new object[] { item.Id });
 
     [Theory]
     [MemberData(nameof(AllHexIds))]
@@ -190,6 +192,130 @@ public sealed class HexModeEffectsTests
     }
 
     [Fact]
+    public async Task 巨人杀手_以目标当前费用而非原本费用判定()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        var opponent = state.Players[1];
+        ClearZones(state);
+        OwnOnly(state, 0, 24);
+        var attacker = Card("HEX-GIANT-SLAYER", CardKind.Character, power: 5000, cost: 3);
+        me.Characters.Add(attacker);
+
+        async Task<int> DeclareAgainst(CardInstance target)
+        {
+            opponent.Characters.Clear();
+            opponent.Characters.Add(target);
+            state.CurrentBattle = new BattleContext
+            {
+                AttackerPlayerIndex = 0,
+                DefenderPlayerIndex = 1,
+                AttackerCardId = attacker.Id,
+                TargetCardId = target.Id,
+                TargetIsLeader = false,
+            };
+            await HexRules.OnAttackDeclaredAsync(engine, 0);
+            return state.CurrentBattle.AttackerBattleBonus;
+        }
+
+        var discountedEight = Card("HEX-COST8-DISCOUNTED", CardKind.Character, cost: 8);
+        discountedEight.CostModThisTurn = -1;
+        Assert.Equal(7, state.CurrentCostOf(1, discountedEight));
+        Assert.Equal(0, await DeclareAgainst(discountedEight));
+
+        var raisedSeven = Card("HEX-COST7-RAISED", CardKind.Character, cost: 7);
+        raisedSeven.CostModPersistent = 1;
+        Assert.Equal(8, state.CurrentCostOf(1, raisedSeven));
+        Assert.Equal(3000, await DeclareAgainst(raisedSeven));
+    }
+
+    [Fact]
+    public async Task 超凡邪恶_战斗KO累计跨回合持久且仅己方回合投影到所有快照()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 22);
+        state.CurrentTurnPlayer = 1;
+        int opponentTurnBaseline = state.CurrentPowerOf(0, me.Leader);
+        state.CurrentTurnPlayer = 0;
+        int ownTurnBaseline = state.CurrentPowerOf(0, me.Leader);
+
+        var characterAttacker = Card("HEX-NON-LEADER-KO", CardKind.Character);
+        me.Characters.Add(characterAttacker);
+        await HexRules.OnCharacterKoAsync(engine, 1, "battle", characterAttacker.Id, actingSide: 0);
+        await HexRules.OnCharacterKoAsync(engine, 1, "effect", me.Leader.Id, actingSide: 0);
+        Assert.Equal(0, state.HexState.Runtime[0].TranscendentEvilOwnTurnPower);
+
+        await HexRules.OnCharacterKoAsync(engine, 1, "battle", me.Leader.Id, actingSide: 0);
+        await HexRules.OnCharacterKoAsync(engine, 1, "battle", me.Leader.Id, actingSide: 0);
+
+        Assert.Equal(1000, state.HexState.Runtime[0].TranscendentEvilOwnTurnPower);
+        Assert.Equal(0, me.Leader.PowerModThisTurn);
+        Assert.Equal(ownTurnBaseline + 1000, state.CurrentPowerOf(0, me.Leader));
+
+        var ownerView = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        var opponentView = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 1));
+        Assert.Equal(ownTurnBaseline + 1000, ownerView.GetProperty("my").GetProperty("leaderPower").GetInt32());
+        Assert.Equal(ownTurnBaseline + 1000, opponentView.GetProperty("opponent").GetProperty("leaderPower").GetInt32());
+
+        var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        Assert.Equal(1000, privateState.GetProperty("hexState").GetProperty("runtime")[0]
+            .GetProperty("TranscendentEvilOwnTurnPower").GetInt32());
+        var replayCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
+        Assert.Equal(1000, replayCheckpoint.GetProperty("hexState").GetProperty("runtime")[0]
+            .GetProperty("TranscendentEvilOwnTurnPower").GetInt32());
+
+        state.CurrentTurnPlayer = 1;
+        HexRules.OnTurnStarted(state, 1);
+        Assert.Equal(1000, state.HexState.Runtime[0].TranscendentEvilOwnTurnPower);
+        Assert.Equal(opponentTurnBaseline, state.CurrentPowerOf(0, me.Leader));
+        var defenseView = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        Assert.Equal(opponentTurnBaseline, defenseView.GetProperty("my").GetProperty("leaderPower").GetInt32());
+
+        state.CurrentTurnPlayer = 0;
+        HexRules.OnTurnStarted(state, 0);
+        Assert.Equal(ownTurnBaseline + 1000, state.CurrentPowerOf(0, me.Leader));
+    }
+
+    [Fact]
+    public async Task 旧版房间恢复_超凡邪恶与巨人杀手继续沿用建局时语义()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        var opponent = state.Players[1];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.LegacyRulesRevision);
+        OwnOnly(state, 0, 22, 24);
+
+        await HexRules.OnCharacterKoAsync(engine, 1, "battle", me.Leader.Id, actingSide: 0);
+        Assert.Equal(500, me.Leader.PowerModThisTurn);
+        Assert.Equal(0, state.HexState.Runtime[0].TranscendentEvilOwnTurnPower);
+
+        var attacker = Card("HEX-LEGACY-GIANT-SLAYER", CardKind.Character, cost: 1);
+        var discountedEight = Card("HEX-LEGACY-COST8", CardKind.Character, cost: 8);
+        discountedEight.CostModThisTurn = -1;
+        me.Characters.Add(attacker);
+        opponent.Characters.Add(discountedEight);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = attacker.Id,
+            TargetCardId = discountedEight.Id,
+            TargetIsLeader = false,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(7, state.CurrentCostOf(1, discountedEight));
+        Assert.Equal(3000, state.CurrentBattle.AttackerBattleBonus);
+    }
+
+    [Fact]
     public async Task 生命伤害KO和敌方效果钩子_按实际事件且限次触发()
     {
         var engine = CreateEngine(seed: 7);
@@ -215,7 +341,8 @@ public sealed class HexModeEffectsTests
         var ally = Card("HEX-ALLY-KO", CardKind.Character, power: 5000);
         me.Characters.Add(ally);
         await HexRules.OnCharacterKoAsync(engine, 1, "battle", me.Leader.Id, actingSide: 0);
-        Assert.Equal(1500, me.Leader.PowerModThisTurn);
+        Assert.Equal(1000, me.Leader.PowerModThisTurn);
+        Assert.Equal(500, state.HexState.Runtime[0].TranscendentEvilOwnTurnPower);
         Assert.Equal(0, ally.PowerModThisTurn);
         Assert.Equal(1000, state.HexState.Runtime[0].TankEngineOpponentTurnPower);
         Assert.True(state.HexState.Runtime[0].NavyCarnivalUsedThisTurn);
@@ -570,13 +697,85 @@ public sealed class HexModeEffectsTests
         Assert.Equal(donBefore + 2, me.DonDeck.Count);
 
         state.HexState.Owned[0].Clear();
-        state.HexState.Owned[0].Add(47);
+        state.HexState.Owned[0].AddRange(HexCatalog.Regular
+            .Select(item => item.Id)
+            .Where(id => id is not 1 and not 2));
         int ownedBefore = state.HexState.Owned[0].Count;
         var chaosTask = HexRules.ApplyOnAcquireAsync(engine, 0, 47);
         await ResolvePromptsUntilComplete(engine, chaosTask);
         Assert.Equal(ownedBefore + 2, state.HexState.Owned[0].Count);
         Assert.Equal(state.HexState.Owned[0].Count, state.HexState.Owned[0].Distinct().Count());
         Assert.Equal(1, state.HexState.Owned[0].Count(id => id == 47));
+        Assert.DoesNotContain(state.HexState.Owned[0], HexCatalog.IsAlternative);
+    }
+
+    [Fact]
+    public async Task 两种质变_使用确定性随机按目标品质授予且排除自身备选与重复()
+    {
+        var first = CreateEngine(seed: 556056);
+        var second = CreateEngine(seed: 556056);
+
+        static void Prepare(GameState state)
+        {
+            state.HexState.Owned[0].Clear();
+            state.HexState.Owned[0].AddRange(HexCatalog.Regular
+                .Where(item => item.Tier == HexTier.Silver && item.Id is not 8 and not 23)
+                .Select(item => item.Id));
+            Own(state, 0, HexCatalog.Regular
+                .Where(item => item.Tier == HexTier.Gold && item.Id is not 1 and not 2)
+                .Select(item => item.Id)
+                .ToArray());
+            Own(state, 0, HexCatalog.Regular
+                .Where(item => item.Tier == HexTier.Rainbow && item.Id is not 5 and not 10)
+                .Select(item => item.Id)
+                .ToArray());
+            Own(state, 0, 55, 56);
+        }
+
+        Prepare(first.State);
+        Prepare(second.State);
+        int firstRandomBefore = first.State.RandomSeq;
+        int secondRandomBefore = second.State.RandomSeq;
+
+        await HexRules.ApplyOnAcquireAsync(first, 0, 55);
+        await HexRules.ApplyOnAcquireAsync(first, 0, 56);
+        await HexRules.ApplyOnAcquireAsync(second, 0, 55);
+        await HexRules.ApplyOnAcquireAsync(second, 0, 56);
+
+        static int[] NewlyGranted(GameState state)
+            => state.HexState.Owned[0]
+                .Where(id => id is 1 or 2 or 5 or 8 or 10 or 23)
+                .Order()
+                .ToArray();
+
+        Assert.Equal(NewlyGranted(first.State), NewlyGranted(second.State));
+        Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Silver));
+        Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Gold));
+        Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Rainbow));
+        Assert.Equal(firstRandomBefore + 3, first.State.RandomSeq);
+        Assert.Equal(secondRandomBefore + 3, second.State.RandomSeq);
+        Assert.Equal(first.State.HexState.Owned[0].Count, first.State.HexState.Owned[0].Distinct().Count());
+        Assert.Equal(1, first.State.HexState.Owned[0].Count(id => id == 55));
+        Assert.Equal(1, first.State.HexState.Owned[0].Count(id => id == 56));
+        Assert.DoesNotContain(first.State.HexState.Owned[0], HexCatalog.IsAlternative);
+    }
+
+    [Fact]
+    public async Task 两种质变_目标池耗尽时不抛错不消费随机也不重复授予()
+    {
+        var engine = CreateEngine(seed: 555656);
+        var state = engine.State;
+        state.HexState.Owned[0].Clear();
+        state.HexState.Owned[0].AddRange(HexCatalog.Regular.Select(item => item.Id));
+        int ownedBefore = state.HexState.Owned[0].Count;
+        int randomBefore = state.RandomSeq;
+
+        await HexRules.ApplyOnAcquireAsync(engine, 0, 55);
+        await HexRules.ApplyOnAcquireAsync(engine, 0, 56);
+
+        Assert.Equal(ownedBefore, state.HexState.Owned[0].Count);
+        Assert.Equal(randomBefore, state.RandomSeq);
+        Assert.Equal(state.HexState.Owned[0].Count, state.HexState.Owned[0].Distinct().Count());
     }
 
     [Fact]

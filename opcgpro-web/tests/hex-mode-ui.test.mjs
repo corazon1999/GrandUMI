@@ -20,6 +20,7 @@ test("海克斯私密选秀提交轮次令牌并支持一次单候选刷新", as
   assert.match(types, /\| "RefreshHex"/);
   assert.match(types, /refreshAvailable: boolean/);
   assert.match(types, /refreshedCandidateIndex: number \| null/);
+  assert.match(types, /tierLabel\?: HexTierLabelSnapshot/);
   assert.match(store, /cloneHexModeSnapshot/);
   assert.doesNotMatch(overlay, /Math\.random|crypto\.getRandomValues/);
 });
@@ -67,7 +68,7 @@ test("海克斯选秀可隐藏查看牌桌并按轮次自动重开且不改变�
   assert.match(overlay, /event\.key !== "Escape"/);
   assert.match(overlay, /data-private-hex-draft-hidden/);
   assert.match(overlay, /隐藏海克斯选择面板并查看场上局势/);
-  assert.match(overlay, /重新打开\$\{tierStyle\.label\}选择面板/);
+  assert.match(overlay, /重新打开\$\{tierHeading\}选择面板/);
   assert.match(overlay, /useLayoutQuarterTurn\(\)/);
   assert.match(overlay, /styles\.reopenQuarterTurn/);
   assert.match(overlay, /styles\.quarterTurn/);
@@ -111,7 +112,7 @@ test("海克斯选秀仅展示当前轮次品质，不展示本局共享品质�
   ]);
 
   assert.match(overlay, /const tier = draft\?\.tier \?\? "Silver"/);
-  assert.match(overlay, /\{tierStyle\.label\}/);
+  assert.match(overlay, /\{tierHeading\}/);
   assert.doesNotMatch(overlay, /tierSequence|本局共享品质序列/);
   assert.match(types, /tierSequence: HexTierSnapshot\[\]/);
 });
@@ -148,10 +149,12 @@ test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立�
   assert.match(owned, /hex\.name/);
   assert.match(owned, /TIER_META\[hex\.tier\]/);
   assert.match(owned, /activeHex\.description/);
-  assert.match(owned, /activeTier\.label/);
+  assert.match(owned, /activeTierLabel/);
   assert.match(owned, /Silver:/);
   assert.match(owned, /Gold:/);
   assert.match(owned, /Rainbow:/);
+  assert.match(owned, /label: "棱彩"/);
+  assert.match(owned, /hex\?\.tierLabel \?\? tier\?\.label/);
   assert.match(owned, /aria-label=\{`关闭\$\{activeHex\.name\}海克斯详情`\}/);
   assert.match(owned, /event\.key === "Escape"/);
   assert.match(owned, /document\.addEventListener\("pointerdown"/);
@@ -185,8 +188,39 @@ test("大厅、协议与对局页面完整挂接海克斯模式", async () => {
   assert.match(lobby, /候选仅本人可见/);
   assert.match(lobby, /第 1、3、6 回合开始前/);
   assert.match(lobby, /可重复/);
+  assert.match(lobby, /银\/金\/棱彩品质序列/);
   assert.match(types, /\| "ChooseHex"/);
   assert.match(types, /tierSequence: HexTierSnapshot\[\]/);
   assert.match(types, /\| "hex"/);
   assert.match(page, /<HexDraftOverlay \/>/);
+});
+
+test("玩家可见品质统一为棱彩且保留 Rainbow 协议兼容值", async () => {
+  const [overlay, owned, lobby, types, catalog, modeLog, arenaLog, slotsLog] = await Promise.all([
+    readSource("../src/components/game/HexDraftOverlay.tsx"),
+    readSource("../src/components/game/HexOwnedPanel.tsx"),
+    readSource("../src/components/home/LobbyPanel.tsx"),
+    readSource("../src/types/net.ts"),
+    readSource("../../服务端WebSocket/Game/Hex/HexCatalog.cs"),
+    readSource("../../changelog-cache/published/2026.09.02.1/2026-09-01-hex-mode.md"),
+    readSource("../../changelog-cache/published/2026.09.02.1/2026-09-02-hex-draft-arena-presentation.md"),
+    readSource("../../changelog-cache/published/2026.09.02.1/2026-09-02-hex-slots-in-player-cards.md"),
+  ]);
+
+  assert.match(types, /HexTierSnapshot = "Silver" \| "Gold" \| "Rainbow"/);
+  assert.match(types, /HexTierLabelSnapshot = "银色" \| "金色" \| "棱彩"/);
+  assert.match(overlay, /label: "棱彩海克斯"/);
+  assert.match(overlay, /shortLabel: "棱彩"/);
+  assert.match(overlay, /draft\?\.tierLabel \?\? tierStyle\.shortLabel/);
+  assert.match(owned, /label: "棱彩"/);
+  assert.match(catalog, /HexTier\.Rainbow => "棱彩"/);
+  assert.match(catalog, /协议继续使用 Rainbow/);
+  assert.match(lobby, /银\/金\/棱彩品质序列/);
+  assert.match(modeLog, /银色、金色或棱彩品质序列/);
+  assert.match(arenaLog, /银色、金色和棱彩品质/);
+  assert.match(slotsLog, /银、金、棱彩品质辨识/);
+  assert.doesNotMatch(
+    [overlay, owned, lobby, catalog, modeLog, arenaLog, slotsLog].join("\n"),
+    /彩色/,
+  );
 });

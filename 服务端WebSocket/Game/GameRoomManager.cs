@@ -410,6 +410,7 @@ public static class GameRoomManager
                 seed = engine.State.RngSeed,
                 firstPlayer,
                 rulesetId = engine.State.RulesetId,
+                hexRulesRevision = engine.State.HexState.RulesRevision,
                 openingSetupAfterFirstPlayerChoice,
                 p0 = new { account = p0Account, displayName = entry.PlayerDisplayNames[0], deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
                 p1 = new { account = p1Account, displayName = entry.PlayerDisplayNames[1], deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
@@ -2979,6 +2980,10 @@ public static class GameRoomManager
             && Enum.TryParse<MatchKind>(mk.GetString(), ignoreCase: true, out var parsedMatchKind))
             matchKind = parsedMatchKind;
         if (vsBot) matchKind = MatchKind.Bot;
+        // 海克斯规则版本字段在 v2 池调整前不存在；缺失即锁定旧版语义，确保旧房间可重放恢复。
+        var hexRulesRevision = h.TryGetProperty("hexRulesRevision", out var storedHexRulesRevision)
+            ? storedHexRulesRevision.GetInt32()
+            : Hex.HexRules.LegacyRulesRevision;
         var p0          = h.GetProperty("p0");
         var p1          = h.GetProperty("p1");
         var p0Account   = p0.GetProperty("account").GetString()!;
@@ -3115,7 +3120,8 @@ public static class GameRoomManager
             p1AlwaysPrompt: p1Always,
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset,
-            matchKind: matchKind);
+            matchKind: matchKind,
+            hexRulesRevision: hexRulesRevision);
         if (engine.State.HexState.ActiveDraft is { } restoredHexDraft
             && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId))
         {

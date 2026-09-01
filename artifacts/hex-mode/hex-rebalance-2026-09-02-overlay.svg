@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="941" height="1672" viewBox="0 0 941 1672">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000814" flood-opacity="0.95"/>
+    </filter>
+    <style>
+      .text { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #f4f8ff; filter: url(#shadow); }
+      .center { text-anchor: middle; }
+      .bold { font-weight: 800; }
+      .heavy { font-weight: 900; }
+      .body { font-size: 13px; font-weight: 650; fill: #e5eef8; }
+      .small { font-size: 11px; font-weight: 650; fill: #d7e7f6; }
+      .divider { stroke: rgba(255,255,255,.25); stroke-width: 1; }
+    </style>
+  </defs>
+
+  <g class="text">
+    <text x="470" y="136" class="center bold" font-size="14" fill="#8ddcff" letter-spacing="4">GRANDUMI · HEX MODE UPDATE</text>
+    <text x="470" y="180" class="center heavy" font-size="34" letter-spacing="2">海克斯模式平衡调整</text>
+    <text x="470" y="211" class="center bold" font-size="15" fill="#d7e7f6">54 个常规海克斯 · 银 / 金 / 棱彩各 18 个 · 2 个备选海克斯</text>
+
+    <text x="166" y="385" class="center heavy" font-size="23" fill="#e5f2ff" letter-spacing="3">银色</text>
+    <text x="58" y="426" class="heavy" font-size="17">质变：黄金阶</text>
+    <text x="267" y="426" class="bold" font-size="11" fill="#7fffd7" text-anchor="end">新增</text>
+    <text x="58" y="452" class="body">
+      <tspan x="58" dy="0">获得时确定性随机获得 1 个其他</tspan>
+      <tspan x="58" dy="21">银色海克斯和 1 个金色海克斯。</tspan>
+    </text>
+    <line x1="58" y1="505" x2="274" y2="505" class="divider"/>
+    <text x="58" y="535" class="heavy" font-size="17">超凡邪恶</text>
+    <text x="267" y="535" class="bold" font-size="11" fill="#7fffd7" text-anchor="end">重制</text>
+    <text x="58" y="561" class="body">
+      <tspan x="58" dy="0">己方领袖每通过战斗 KO 1 个敌方</tspan>
+      <tspan x="58" dy="21">角色，永久获得“在己方回合力量</tspan>
+      <tspan x="58" dy="21">+500”；可累计，仅己方回合生效。</tspan>
+    </text>
+    <line x1="58" y1="635" x2="274" y2="635" class="divider"/>
+    <text x="58" y="665" class="heavy" font-size="17">巨人杀手</text>
+    <text x="267" y="665" class="bold" font-size="11" fill="#7fffd7" text-anchor="end">调整</text>
+    <text x="58" y="691" class="body">
+      <tspan x="58" dy="0">己方角色攻击当前费用 8 以上角色</tspan>
+      <tspan x="58" dy="21">时，本次战斗力量 +3000。</tspan>
+    </text>
+
+    <text x="471" y="385" class="center heavy" font-size="23" fill="#ffd368" letter-spacing="3">金色</text>
+    <text x="367" y="426" class="heavy" font-size="17">海洋龙魂</text>
+    <text x="574" y="426" class="bold" font-size="11" fill="#ffd36b" text-anchor="end">降档</text>
+    <text x="367" y="452" class="body" fill="#fff0cc">对敌方领袖造成伤害后抽 1 张。</text>
+    <line x1="367" y1="487" x2="574" y2="487" class="divider"/>
+    <text x="367" y="517" class="heavy" font-size="17">虚幻武器</text>
+    <text x="574" y="517" class="bold" font-size="11" fill="#ffd36b" text-anchor="end">降档</text>
+    <text x="367" y="543" class="body" fill="#fff0cc">
+      <tspan x="367" dy="0">己方角色登场时触发该角色的</tspan>
+      <tspan x="367" dy="21">【攻击时】效果。</tspan>
+    </text>
+    <line x1="367" y1="596" x2="574" y2="596" class="divider"/>
+    <text x="367" y="626" class="heavy" font-size="17">质变：棱彩阶</text>
+    <text x="574" y="626" class="bold" font-size="11" fill="#7fffd7" text-anchor="end">新增</text>
+    <text x="367" y="652" class="body" fill="#fff0cc">
+      <tspan x="367" dy="0">获得时确定性随机获得 1 个</tspan>
+      <tspan x="367" dy="21">棱彩海克斯。</tspan>
+    </text>
+
+    <text x="781" y="385" class="center heavy" font-size="23" fill="#e1b8ff" letter-spacing="3">棱彩</text>
+    <text x="677" y="426" class="heavy" font-size="16">强化万用瞄准镜</text>
+    <text x="883" y="426" class="bold" font-size="11" fill="#f5a9ff" text-anchor="end">升档</text>
+    <text x="677" y="452" class="body" fill="#f3e8ff">
+      <tspan x="677" dy="0">己方攻击结算时，力量低 2000</tspan>
+      <tspan x="677" dy="21">也视为成功。</tspan>
+    </text>
+    <line x1="677" y1="505" x2="883" y2="505" class="divider"/>
+    <text x="677" y="535" class="heavy" font-size="17">最终形态</text>
+    <text x="883" y="535" class="bold" font-size="11" fill="#f5a9ff" text-anchor="end">升档</text>
+    <text x="677" y="561" class="body" fill="#f3e8ff">
+      <tspan x="677" dy="0">每回合 1 次，从手牌打出原本费用</tspan>
+      <tspan x="677" dy="21">10 的卡后，领袖 +2000 且角色</tspan>
+      <tspan x="677" dy="21">+1000 至下个对方回合结束。</tspan>
+    </text>
+
+    <text x="247" y="947" class="center heavy" font-size="22" fill="#9bdcff">常规抽取池</text>
+    <text x="247" y="980" class="center heavy" font-size="18">银色 18　·　金色 18　·　棱彩 18</text>
+    <text x="247" y="1008" class="center body">普通选秀、候选刷新与随机质变</text>
+    <text x="247" y="1029" class="center body">只会使用这 54 个海克斯。</text>
+
+    <text x="702" y="947" class="center heavy" font-size="22" fill="#ffd36b">备选池</text>
+    <text x="702" y="980" class="center heavy" font-size="18">三号船坞　·　尊我为王</text>
+    <text x="702" y="1008" class="center body">保留完整效果，但不进入普通选秀，</text>
+    <text x="702" y="1029" class="center body">也不会被随机质变抽到。</text>
+
+    <text x="72" y="1152" class="heavy" font-size="16" fill="#9bdcff" letter-spacing="2">随机授予规则</text>
+    <text x="534" y="1152" class="heavy" font-size="16" fill="#dcb5ff" letter-spacing="2">命名与兼容</text>
+
+    <text x="121" y="1232" class="center heavy" font-size="15">质变：混沌</text>
+    <text x="121" y="1262" class="center small">
+      <tspan x="121" dy="0">只从常规池获得</tspan><tspan x="121" dy="18">2 个其他、不重复</tspan><tspan x="121" dy="18">海克斯。</tspan>
+    </text>
+    <text x="250" y="1232" class="center heavy" font-size="15">排除自身</text>
+    <text x="250" y="1262" class="center small">
+      <tspan x="250" dy="0">新质变排除来源</tspan><tspan x="250" dy="18">与已经拥有的</tspan><tspan x="250" dy="18">海克斯。</tspan>
+    </text>
+    <text x="381" y="1232" class="center heavy" font-size="15">确定性随机</text>
+    <text x="381" y="1262" class="center small">
+      <tspan x="381" dy="0">断线、重试与恢复</tspan><tspan x="381" dy="18">不会重抽或</tspan><tspan x="381" dy="18">重复授予。</tspan>
+    </text>
+
+    <text x="591" y="1232" class="center heavy" font-size="15" fill="#f0c9ff">统一棱彩</text>
+    <text x="591" y="1262" class="center small">
+      <tspan x="591" dy="0">玩家可见的“彩色”</tspan><tspan x="591" dy="18">品质名称统一改为</tspan><tspan x="591" dy="18">“棱彩”。</tspan>
+    </text>
+    <text x="720" y="1232" class="center heavy" font-size="15" fill="#f0c9ff">协议兼容</text>
+    <text x="720" y="1262" class="center small">
+      <tspan x="720" dy="0">内部稳定枚举兼容</tspan><tspan x="720" dy="18">旧客户端、快照</tspan><tspan x="720" dy="18">与回放。</tspan>
+    </text>
+    <text x="849" y="1232" class="center heavy" font-size="15" fill="#f0c9ff">旧局锁定</text>
+    <text x="849" y="1262" class="center small">
+      <tspan x="849" dy="0">进行中的旧房间</tspan><tspan x="849" dy="18">保持旧池和</tspan><tspan x="849" dy="18">旧效果语义。</tspan>
+    </text>
+
+    <text x="470" y="1545" class="center heavy" font-size="20" fill="#ffd36b" letter-spacing="2">平衡更清晰，恢复更可靠</text>
+    <text x="470" y="1575" class="center body">品质、效果、候选、公开详情与卡面力量均由服务器权威同步；</text>
+    <text x="470" y="1598" class="center body">新规则已覆盖对局恢复与确定性回放。</text>
+    <text x="470" y="1628" class="center bold" font-size="12" fill="#88ddff" letter-spacing="1">GRANDUMI · 2026-09-02</text>
+  </g>
+</svg>
