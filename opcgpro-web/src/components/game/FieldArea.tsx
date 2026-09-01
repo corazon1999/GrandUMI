@@ -7,6 +7,7 @@ import CardItem from "@/components/ui/CardItem";
 import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
 import BattleTargetBadge from "@/components/game/BattleTargetBadge";
+import { getBattleCardPowerBonus } from "@/lib/battleCardPower";
 
 interface Props {
   side: "my" | "opponent";
@@ -71,6 +72,7 @@ export default function FieldArea({ side }: Props) {
         const isBlocker = !!battle && fc.id === battle.blockerCardId;
         const isBattleTarget =
           isBlocker || (!!battle && !battle.blockerCardId && !battle.targetIsLeader && fc.id === battle.targetCardId);
+        const battlePowerBonus = getBattleCardPowerBonus(battle, fc.id, "character");
         const isAttackTarget = isSelectingTarget
           && side === "opponent"
           && !isPending
@@ -124,7 +126,7 @@ export default function FieldArea({ side }: Props) {
                 isSelected={selectedFieldId === fc.id || isAttackTarget}
                 isTapped={fc.isTapped}
                 battleHighlight={isAttacker ? "attacker" : isBlocker ? "blocker" : isBattleTarget ? "target" : undefined}
-                powerBuff={fc.powerCurrent - (cardData?.power ?? 0) - attachedCount * 1000}
+                powerBuff={fc.powerCurrent + battlePowerBonus - (cardData?.power ?? 0) - attachedCount * 1000}
                 costBuff={fc.cost - (cardData?.cost ?? 0)}
                 attachedDonCount={attachedCount}
                 hideCounter

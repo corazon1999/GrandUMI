@@ -7,6 +7,7 @@ import CardItem from "@/components/ui/CardItem";
 import { getGameCard } from "@/data/CardLoader";
 import { GameRequest } from "@/net/GameRequest";
 import BattleTargetBadge from "@/components/game/BattleTargetBadge";
+import { getBattleCardPowerBonus } from "@/lib/battleCardPower";
 
 interface Props {
   side: "my" | "opponent";
@@ -59,6 +60,7 @@ export default function LeaderCard({ side }: Props) {
     !battle.blockerCardId &&
     battle.targetIsLeader &&
     attackerBelongsToOpposingPlayer;
+  const battlePowerBonus = getBattleCardPowerBonus(battle, player.leaderId, "leader");
 
   const isTargetable = isSelectingTarget && side === "opponent" && !isPending;
 
@@ -115,7 +117,7 @@ export default function LeaderCard({ side }: Props) {
         isTapped={player.leaderTapped}
         battleHighlight={isAttacker ? "attacker" : isBattleTarget ? "target" : undefined}
         attachedDonCount={player.leaderAttachedDon}
-        powerBuff={player.leaderPower - (leader.power ?? 0) - player.leaderAttachedDon * 1000}
+        powerBuff={player.leaderPower + battlePowerBonus - (leader.power ?? 0) - player.leaderAttachedDon * 1000}
         hideCost
         showKeywordFx
         gainedKeywords={player.leaderGainedKeywords}
