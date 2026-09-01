@@ -60,6 +60,8 @@ test("右侧海克斯详情公开双方完整效果并兼容移动安全区", as
   assert.match(owned, /hexState\.myOwned/);
   assert.match(owned, /hexState\.opponentOwned/);
   assert.match(owned, /<details/);
+  assert.match(owned, /hex\.name/);
+  assert.match(owned, /TIER_META\[hex\.tier\]/);
   assert.match(owned, /hex\.description/);
   assert.match(owned, /min-h-12/);
   assert.match(owned, /data-hex-details-panel/);

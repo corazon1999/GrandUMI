@@ -93,6 +93,91 @@ public sealed class HexModeStateMachineTests
     }
 
     [Fact]
+    public async Task 海克斯可见性_刷新与锁定全程私密且结算后仅选中定义立即向双方公开()
+    {
+        var engine = CreateEngine(seed: 20260901);
+        var delivered = new List<(int PlayerIndex, JsonElement Snapshot)>();
+        engine.OnSendToPlayer = (playerIndex, payload) =>
+            delivered.Add((playerIndex, JsonSerializer.SerializeToElement(payload)));
+
+        await MulliganBoth(engine);
+        var round = Assert.IsType<HexDraftRound>(engine.State.HexState.ActiveDraft);
+        var originalCandidates = round.Candidates.ToArray();
+        int replacedHexId = originalCandidates[0];
+
+        delivered.Clear();
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 0,
+            expectedHexId = replacedHexId,
+        })));
+        int replacementHexId = round.Candidates[0];
+        Assert.NotEqual(replacedHexId, replacementHexId);
+
+        var ownerRefresh = DeliveredSnapshot(delivered, 0, "HexCandidateRefreshed");
+        var opponentRefresh = DeliveredSnapshot(delivered, 1, "HexCandidateRefreshed");
+        Assert.Equal(
+            round.Candidates,
+            CandidateIds(ownerRefresh.GetProperty("hexState").GetProperty("activeDraft")));
+        Assert.Equal(
+            JsonValueKind.Null,
+            opponentRefresh.GetProperty("hexState").GetProperty("activeDraft").ValueKind);
+        var opponentRefreshPayload = JsonSerializer.Deserialize<JsonElement>(
+            opponentRefresh.GetProperty("actionPayload").GetString()!);
+        Assert.False(opponentRefreshPayload.TryGetProperty("replacedHexId", out _));
+        Assert.False(opponentRefreshPayload.TryGetProperty("replacementHexId", out _));
+
+        int choice = round.Candidates.First(id => id is not 20 and not 52);
+        var nonSelectedPrivateIds = originalCandidates
+            .Append(replacementHexId)
+            .Where(id => id != choice)
+            .Distinct()
+            .ToArray();
+
+        delivered.Clear();
+        Assert.True(engine.HandleAction(0, "ChooseHex", Json(new
+        {
+            roundId = round.RoundId,
+            hexId = choice,
+        })));
+        await engine.WaitSettledAsync();
+
+        // 锁定屏障先于异步授予结算下发：本人仍可见锁定结果，对手既看不到候选，也拿不到所选编号。
+        var ownerLocked = DeliveredSnapshot(delivered, 0, "HexChoiceLocked");
+        var opponentLocked = DeliveredSnapshot(delivered, 1, "HexChoiceLocked");
+        var ownerLockedHex = ownerLocked.GetProperty("hexState");
+        Assert.True(ownerLockedHex.GetProperty("activeDraft").GetProperty("myLocked").GetBoolean());
+        Assert.Equal(choice, ownerLockedHex.GetProperty("activeDraft").GetProperty("mySelectedHexId").GetInt32());
+        Assert.Equal(JsonValueKind.Null, opponentLocked.GetProperty("hexState").GetProperty("activeDraft").ValueKind);
+        Assert.Empty(opponentLocked.GetProperty("hexState").GetProperty("myOwned").EnumerateArray());
+        Assert.Empty(opponentLocked.GetProperty("hexState").GetProperty("opponentOwned").EnumerateArray());
+        var opponentLockedPayload = JsonSerializer.Deserialize<JsonElement>(
+            opponentLocked.GetProperty("actionPayload").GetString()!);
+        Assert.False(opponentLockedPayload.TryGetProperty("choice", out _));
+        Assert.False(opponentLockedPayload.TryGetProperty("hexId", out _));
+
+        // 结算完成的即时屏障向双方公开同一份权威目录定义；未选与被刷新候选不进入任何已拥有列表。
+        var ownerResolved = DeliveredSnapshot(delivered, 0, "HexDraftResolved");
+        var opponentResolved = DeliveredSnapshot(delivered, 1, "HexDraftResolved");
+        var ownerResolvedHex = ownerResolved.GetProperty("hexState");
+        var opponentResolvedHex = opponentResolved.GetProperty("hexState");
+        Assert.Equal(JsonValueKind.Null, ownerResolvedHex.GetProperty("activeDraft").ValueKind);
+        Assert.Equal(JsonValueKind.Null, opponentResolvedHex.GetProperty("activeDraft").ValueKind);
+
+        var definition = HexCatalog.Get(choice);
+        AssertSingleOwnedDefinition(ownerResolvedHex.GetProperty("myOwned"), definition);
+        Assert.Empty(ownerResolvedHex.GetProperty("opponentOwned").EnumerateArray());
+        Assert.Empty(opponentResolvedHex.GetProperty("myOwned").EnumerateArray());
+        AssertSingleOwnedDefinition(opponentResolvedHex.GetProperty("opponentOwned"), definition);
+        foreach (int privateId in nonSelectedPrivateIds)
+        {
+            Assert.DoesNotContain(privateId, OwnedHexIds(ownerResolvedHex));
+            Assert.DoesNotContain(privateId, OwnedHexIds(opponentResolvedHex));
+        }
+    }
+
+    [Fact]
     public async Task 单候选刷新_每轮恰好一次且校验越权重试过期与候选唯一性()
     {
         var engine = CreateEngine(seed: 20260901);
@@ -350,6 +435,29 @@ public sealed class HexModeStateMachineTests
     private static int[] CandidateIds(JsonElement draft)
         => draft.GetProperty("candidates")
             .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetInt32())
+            .ToArray();
+
+    private static JsonElement DeliveredSnapshot(
+        IEnumerable<(int PlayerIndex, JsonElement Snapshot)> delivered,
+        int playerIndex,
+        string lastAction)
+        => Assert.Single(delivered.Where(item =>
+            item.PlayerIndex == playerIndex
+            && item.Snapshot.GetProperty("lastAction").GetString() == lastAction)).Snapshot;
+
+    private static void AssertSingleOwnedDefinition(JsonElement owned, HexDefinition definition)
+    {
+        var actual = Assert.Single(owned.EnumerateArray());
+        Assert.Equal(definition.Id, actual.GetProperty("id").GetInt32());
+        Assert.Equal(definition.Name, actual.GetProperty("name").GetString());
+        Assert.Equal(definition.Tier.ToString(), actual.GetProperty("tier").GetString());
+        Assert.Equal(definition.Description, actual.GetProperty("description").GetString());
+    }
+
+    private static int[] OwnedHexIds(JsonElement hexState)
+        => hexState.GetProperty("myOwned").EnumerateArray()
+            .Concat(hexState.GetProperty("opponentOwned").EnumerateArray())
             .Select(item => item.GetProperty("id").GetInt32())
             .ToArray();
 
