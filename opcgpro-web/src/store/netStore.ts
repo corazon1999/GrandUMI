@@ -49,7 +49,7 @@ import type {
   ConsistencyDoctorSnapshot,
 } from "@/types/net";
 
-export function leaderMatchupKey(period: string, leaderNumber: string, filterTier = "standard"): string {
+export function leaderMatchupKey(period: string, leaderNumber: string, filterTier = "500"): string {
   return `${period}:${filterTier}:${leaderNumber}`;
 }
 

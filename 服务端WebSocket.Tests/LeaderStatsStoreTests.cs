@@ -123,11 +123,12 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Theory]
-    [InlineData(" 7D ", null, "7d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
-    [InlineData(" 30D ", "standard", "30d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumThirtyDayLeaderboardGames)]
-    [InlineData("7d", " relaxed ", "7d", LeaderStatsStore.RelaxedFilterTier, LeaderStatsStore.RelaxedSevenDayLeaderboardGames)]
-    [InlineData("30d", "RELAXED", "30d", LeaderStatsStore.RelaxedFilterTier, LeaderStatsStore.RelaxedThirtyDayLeaderboardGames)]
-    [InlineData(null, "unexpected", "7d", LeaderStatsStore.StandardFilterTier, LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData("7d", "100", "7d", LeaderStatsStore.HundredGameFilterTier, 100)]
+    [InlineData("30d", "300", "30d", LeaderStatsStore.ThreeHundredGameFilterTier, 300)]
+    [InlineData("all", "500", "all", LeaderStatsStore.FiveHundredGameFilterTier, 500)]
+    [InlineData("7d", "1000", "7d", LeaderStatsStore.ThousandGameFilterTier, 1000)]
+    [InlineData("30d", "3000", "30d", LeaderStatsStore.ThreeThousandGameFilterTier, 3000)]
+    [InlineData(null, "unexpected", "7d", LeaderStatsStore.FiveHundredGameFilterTier, 500)]
     [InlineData("unexpected", "all", "7d", LeaderStatsStore.AllFilterTier, 0)]
     [InlineData("30d", "all", "30d", LeaderStatsStore.AllFilterTier, 0)]
     public void 周期榜隐藏低于最低场次的领航且保留恰好达到门槛的领航(
@@ -157,25 +158,37 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.All(result.Items, x => Assert.True(x.Games >= minimumGames));
     }
 
-    [Fact]
-    public void 全部周期不应用场次筛选但仍回显并保留所选档位()
+    [Theory]
+    [InlineData(LeaderStatsStore.HundredGameFilterTier)]
+    [InlineData(LeaderStatsStore.ThreeHundredGameFilterTier)]
+    [InlineData(LeaderStatsStore.FiveHundredGameFilterTier)]
+    [InlineData(LeaderStatsStore.ThousandGameFilterTier)]
+    [InlineData(LeaderStatsStore.ThreeThousandGameFilterTier)]
+    [InlineData(LeaderStatsStore.AllFilterTier)]
+    public void 新版固定场次档位不随统计周期变化(string filterTier)
     {
-        var now = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
-        var store = CreateStore();
-        store.RecordMatch(Match("all-period", now, MatchKind.Matchmaking, "L-A", "L-B", 0, 0, 8));
+        Assert.Equal(filterTier, LeaderStatsStore.NormalizeFilterTier(filterTier, "7d"));
+        Assert.Equal(filterTier, LeaderStatsStore.NormalizeFilterTier(filterTier, "30d"));
+        Assert.Equal(filterTier, LeaderStatsStore.NormalizeFilterTier(filterTier, "all"));
+    }
 
-        foreach (var filterTier in new[]
-                 {
-                     LeaderStatsStore.RelaxedFilterTier,
-                     LeaderStatsStore.StandardFilterTier,
-                     LeaderStatsStore.AllFilterTier,
-                 })
-        {
-            var result = store.GetLeaderboard("all", now, filterTier);
-            Assert.Equal(filterTier, result.FilterTier);
-            Assert.Equal(LeaderStatsStore.MinimumRankedGames, result.MinimumGames);
-            Assert.Equal(2, result.Items.Count);
-        }
+    [Fact]
+    public void 旧版场次档位保留原周期语义且回包保留旧值()
+    {
+        Assert.Equal(LeaderStatsStore.HundredGameFilterTier,
+            LeaderStatsStore.NormalizeFilterTier(LeaderStatsStore.LegacyRelaxedFilterTier, "7d"));
+        Assert.Equal(LeaderStatsStore.ThreeHundredGameFilterTier,
+            LeaderStatsStore.NormalizeFilterTier(LeaderStatsStore.LegacyRelaxedFilterTier, "30d"));
+        Assert.Equal(LeaderStatsStore.FiveHundredGameFilterTier,
+            LeaderStatsStore.NormalizeFilterTier(LeaderStatsStore.LegacyStandardFilterTier, "7d"));
+        Assert.Equal(LeaderStatsStore.ThreeThousandGameFilterTier,
+            LeaderStatsStore.NormalizeFilterTier(LeaderStatsStore.LegacyStandardFilterTier, "30d"));
+        Assert.Equal(LeaderStatsStore.AllFilterTier,
+            LeaderStatsStore.NormalizeFilterTier(LeaderStatsStore.LegacyStandardFilterTier, "all"));
+        Assert.Equal(LeaderStatsStore.LegacyRelaxedFilterTier,
+            LeaderStatsStore.NormalizeFilterTierForResponse(LeaderStatsStore.LegacyRelaxedFilterTier, "30d"));
+        Assert.Equal(LeaderStatsStore.LegacyStandardFilterTier,
+            LeaderStatsStore.NormalizeFilterTierForResponse(LeaderStatsStore.LegacyStandardFilterTier, "30d"));
     }
 
     [Fact]
@@ -187,42 +200,42 @@ public sealed class LeaderStatsStoreTests : IDisposable
         SeedCountedMatches(
             store,
             "cache-tier",
-            "L-RELAXED-A",
-            "L-RELAXED-B",
-            LeaderStatsStore.RelaxedSevenDayLeaderboardGames,
+            "L-100-A",
+            "L-100-B",
+            100,
             now);
 
-        var relaxed = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
-        var standard = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.StandardFilterTier);
-        var relaxedMatchups = store.GetMatchups(
-            "L-RELAXED-A",
+        var hundred = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.HundredGameFilterTier);
+        var fiveHundred = store.GetLeaderboard("7d", requestedFilterTier: LeaderStatsStore.FiveHundredGameFilterTier);
+        var hundredMatchups = store.GetMatchups(
+            "L-100-A",
             "7d",
-            requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
-        var standardMatchups = store.GetMatchups(
-            "L-RELAXED-A",
+            requestedFilterTier: LeaderStatsStore.HundredGameFilterTier);
+        var fiveHundredMatchups = store.GetMatchups(
+            "L-100-A",
             "7d",
-            requestedFilterTier: LeaderStatsStore.StandardFilterTier);
-        var relaxedMatrix = store.GetMatchupMatrix(
+            requestedFilterTier: LeaderStatsStore.FiveHundredGameFilterTier);
+        var hundredMatrix = store.GetMatchupMatrix(
             "7d",
-            requestedFilterTier: LeaderStatsStore.RelaxedFilterTier);
-        var standardMatrix = store.GetMatchupMatrix(
+            requestedFilterTier: LeaderStatsStore.HundredGameFilterTier);
+        var fiveHundredMatrix = store.GetMatchupMatrix(
             "7d",
-            requestedFilterTier: LeaderStatsStore.StandardFilterTier);
+            requestedFilterTier: LeaderStatsStore.FiveHundredGameFilterTier);
 
-        Assert.Equal(2, relaxed.Items.Count);
-        Assert.Empty(standard.Items);
-        Assert.Equal(LeaderStatsStore.RelaxedFilterTier, relaxedMatchups.FilterTier);
-        Assert.Equal(2, relaxedMatchups.Items.Count);
-        Assert.Empty(standardMatchups.Items);
-        Assert.Equal(2, relaxedMatrix.Rows.Count);
-        Assert.Empty(standardMatrix.Rows);
+        Assert.Equal(2, hundred.Items.Count);
+        Assert.Empty(fiveHundred.Items);
+        Assert.Equal(LeaderStatsStore.HundredGameFilterTier, hundredMatchups.FilterTier);
+        Assert.Equal(2, hundredMatchups.Items.Count);
+        Assert.Empty(fiveHundredMatchups.Items);
+        Assert.Equal(2, hundredMatrix.Rows.Count);
+        Assert.Empty(fiveHundredMatrix.Rows);
 
         var cacheField = typeof(LeaderStatsStore).GetField(
             "_leaderboardCache",
             BindingFlags.Instance | BindingFlags.NonPublic);
         var cache = Assert.IsAssignableFrom<System.Collections.IDictionary>(cacheField!.GetValue(store));
-        Assert.Contains("7d:relaxed", cache.Keys.Cast<string>());
-        Assert.Contains("7d:standard", cache.Keys.Cast<string>());
+        Assert.Contains("7d:100", cache.Keys.Cast<string>());
+        Assert.Contains("7d:500", cache.Keys.Cast<string>());
     }
 
     [Fact]

@@ -133,13 +133,14 @@ public sealed record DailyMatchCountPoint(string Date, int Count);
 public sealed class LeaderStatsStore : IDisposable
 {
     public const int MinimumRankedGames = 20;
-    public const int RelaxedSevenDayLeaderboardGames = 100;
-    public const int RelaxedThirtyDayLeaderboardGames = 300;
-    public const int MinimumSevenDayLeaderboardGames = 500;
-    public const int MinimumThirtyDayLeaderboardGames = 3000;
-    public const string RelaxedFilterTier = "relaxed";
-    public const string StandardFilterTier = "standard";
+    public const string HundredGameFilterTier = "100";
+    public const string ThreeHundredGameFilterTier = "300";
+    public const string FiveHundredGameFilterTier = "500";
+    public const string ThousandGameFilterTier = "1000";
+    public const string ThreeThousandGameFilterTier = "3000";
     public const string AllFilterTier = "all";
+    public const string LegacyRelaxedFilterTier = "relaxed";
+    public const string LegacyStandardFilterTier = "standard";
     public const int MinimumCountedTurn = 8;
     public const int MatchupLeaderboardLimit = 20;
     public const int MatchupMatrixLeaderLimit = 20;
@@ -354,7 +355,7 @@ public sealed class LeaderStatsStore : IDisposable
         string? requestedFilterTier = null)
     {
         var period = NormalizePeriod(requestedPeriod);
-        var filterTier = NormalizeFilterTier(requestedFilterTier);
+        var filterTier = NormalizeFilterTier(requestedFilterTier, period);
         var cacheKey = $"{period}:{filterTier}";
         var generatedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
         DateTime? sinceUtc = period switch
@@ -377,12 +378,13 @@ public sealed class LeaderStatsStore : IDisposable
             using var connection = OpenLeaderboardConnection();
 
             var totalMatches = ReadTotalMatches(connection, sinceUtc);
-            var minimumLeaderboardGames = (period, filterTier) switch
+            var minimumLeaderboardGames = filterTier switch
             {
-                ("7d", RelaxedFilterTier) => RelaxedSevenDayLeaderboardGames,
-                ("30d", RelaxedFilterTier) => RelaxedThirtyDayLeaderboardGames,
-                ("7d", StandardFilterTier) => MinimumSevenDayLeaderboardGames,
-                ("30d", StandardFilterTier) => MinimumThirtyDayLeaderboardGames,
+                HundredGameFilterTier => 100,
+                ThreeHundredGameFilterTier => 300,
+                FiveHundredGameFilterTier => 500,
+                ThousandGameFilterTier => 1000,
+                ThreeThousandGameFilterTier => 3000,
                 _ => 0,
             };
             var rows = ReadLeaderboardRows(connection, sinceUtc)
@@ -1337,14 +1339,44 @@ public sealed class LeaderStatsStore : IDisposable
             _ => "7d",
         };
 
-    /// <summary>仅接受公开协议约定的三个筛选档位；旧客户端缺省或非法值均保持标准档行为。</summary>
-    public static string NormalizeFilterTier(string? filterTier)
-        => filterTier?.Trim().ToLowerInvariant() switch
+    /// <summary>
+    /// 将新客户端的固定场次档位规范化。旧版 relaxed / standard 与缺省值仍按旧周期口径映射，
+    /// 使旧客户端升级服务端后保持原有筛选结果；新版六档一旦选定便不再受周期影响。
+    /// </summary>
+    public static string NormalizeFilterTier(string? filterTier, string? requestedPeriod = null)
+    {
+        var period = NormalizePeriod(requestedPeriod);
+        return filterTier?.Trim().ToLowerInvariant() switch
         {
-            RelaxedFilterTier => RelaxedFilterTier,
+            HundredGameFilterTier => HundredGameFilterTier,
+            ThreeHundredGameFilterTier => ThreeHundredGameFilterTier,
+            FiveHundredGameFilterTier => FiveHundredGameFilterTier,
+            ThousandGameFilterTier => ThousandGameFilterTier,
+            ThreeThousandGameFilterTier => ThreeThousandGameFilterTier,
             AllFilterTier => AllFilterTier,
-            _ => StandardFilterTier,
+            LegacyRelaxedFilterTier => period switch
+            {
+                "30d" => ThreeHundredGameFilterTier,
+                "all" => AllFilterTier,
+                _ => HundredGameFilterTier,
+            },
+            _ => period switch
+            {
+                "30d" => ThreeThousandGameFilterTier,
+                "all" => AllFilterTier,
+                _ => FiveHundredGameFilterTier,
+            },
         };
+    }
+
+    /// <summary>旧客户端依赖回包原样携带 relaxed / standard 来关联请求，其余客户端回显规范化后的固定档位。</summary>
+    public static string NormalizeFilterTierForResponse(string? filterTier, string? requestedPeriod = null)
+    {
+        var legacyTier = filterTier?.Trim().ToLowerInvariant();
+        return legacyTier is LegacyRelaxedFilterTier or LegacyStandardFilterTier
+            ? legacyTier
+            : NormalizeFilterTier(filterTier, requestedPeriod);
+    }
 
     private static string HashAccount(string account)
     {

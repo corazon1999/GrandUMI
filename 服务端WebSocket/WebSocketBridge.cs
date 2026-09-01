@@ -2607,7 +2607,9 @@ public static class WebSocketBridge
     private static void OnLeaderLeaderboard(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var requestedPeriod = Str(msg, "period") ?? "7d";
-        var filterTier = LeaderStatsStore.NormalizeFilterTier(Str(msg, "filterTier"));
+        var requestedFilterTier = Str(msg, "filterTier");
+        var filterTier = LeaderStatsStore.NormalizeFilterTier(requestedFilterTier, requestedPeriod);
+        var responseFilterTier = LeaderStatsStore.NormalizeFilterTierForResponse(requestedFilterTier, requestedPeriod);
         var requestId = Str(msg, "requestId");
         if (!s.IsLoggedIn)
         {
@@ -2616,7 +2618,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderLeaderboard",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 error = "请先登录",
             });
@@ -2640,7 +2642,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderLeaderboard",
                 result = true,
                 period = snapshot.Period,
-                filterTier = snapshot.FilterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 generatedAtUtc = snapshot.GeneratedAtUtc,
                 sinceUtc = snapshot.SinceUtc,
@@ -2680,7 +2682,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderLeaderboard",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 error = "排行榜暂时不可用",
             });
@@ -2738,7 +2740,9 @@ public static class WebSocketBridge
     private static void OnLeaderMatchups(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var requestedPeriod = Str(msg, "period") ?? "7d";
-        var filterTier = LeaderStatsStore.NormalizeFilterTier(Str(msg, "filterTier"));
+        var requestedFilterTier = Str(msg, "filterTier");
+        var filterTier = LeaderStatsStore.NormalizeFilterTier(requestedFilterTier, requestedPeriod);
+        var responseFilterTier = LeaderStatsStore.NormalizeFilterTierForResponse(requestedFilterTier, requestedPeriod);
         var requestId = Str(msg, "requestId");
         var requestedLeader = (Str(msg, "leaderNumber") ?? "").Trim();
         if (!s.IsLoggedIn)
@@ -2748,7 +2752,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchups",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 leaderNumber = requestedLeader,
                 error = "请先登录",
@@ -2763,7 +2767,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchups",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 leaderNumber = requestedLeader,
                 error = "请选择有效的 Leader",
@@ -2782,7 +2786,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchups",
                 result = true,
                 period = snapshot.Period,
-                filterTier = snapshot.FilterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 generatedAtUtc = snapshot.GeneratedAtUtc,
                 sinceUtc = snapshot.SinceUtc,
@@ -2822,7 +2826,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchups",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 leaderNumber = requestedLeader,
                 error = "对战统计暂时不可用",
@@ -2833,7 +2837,9 @@ public static class WebSocketBridge
     private static void OnLeaderMatchupMatrix(WsSession s, Dictionary<string, JsonElement> msg)
     {
         var requestedPeriod = Str(msg, "period") ?? "7d";
-        var filterTier = LeaderStatsStore.NormalizeFilterTier(Str(msg, "filterTier"));
+        var requestedFilterTier = Str(msg, "filterTier");
+        var filterTier = LeaderStatsStore.NormalizeFilterTier(requestedFilterTier, requestedPeriod);
+        var responseFilterTier = LeaderStatsStore.NormalizeFilterTierForResponse(requestedFilterTier, requestedPeriod);
         var requestId = Str(msg, "requestId");
         if (!s.IsLoggedIn)
         {
@@ -2842,7 +2848,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchupMatrix",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 error = "请先登录",
             });
@@ -2859,7 +2865,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchupMatrix",
                 result = true,
                 period = snapshot.Period,
-                filterTier = snapshot.FilterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 generatedAtUtc = snapshot.GeneratedAtUtc,
                 sinceUtc = snapshot.SinceUtc,
@@ -2895,7 +2901,7 @@ public static class WebSocketBridge
                 proto = "MsgLeaderMatchupMatrix",
                 result = false,
                 period = requestedPeriod,
-                filterTier,
+                filterTier = responseFilterTier,
                 requestId,
                 error = "对阵矩阵暂时不可用",
             });

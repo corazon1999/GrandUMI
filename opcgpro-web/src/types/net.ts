@@ -742,7 +742,7 @@ export interface MsgPlayerSafety extends MsgBase {
 
 // ── Leader 排行榜 ─────────────────────────────────────────────────────
 export type LeaderboardPeriod = "7d" | "30d" | "all";
-export type LeaderFilterTier = "relaxed" | "standard" | "all";
+export type LeaderFilterTier = "100" | "300" | "500" | "1000" | "3000" | "all";
 
 export interface LeaderChampionInfo {
   displayName: string;
@@ -780,7 +780,7 @@ export interface LeaderLeaderboardItem {
   champion?: LeaderChampionInfo | null;
 }
 
-/** 客户端发送周期与筛选档位；旧客户端缺少档位时服务端按 standard 处理。 */
+/** 客户端分别发送统计周期与固定场次档位；服务端仍兼容旧客户端的 relaxed / standard 值。 */
 export interface MsgLeaderLeaderboard extends MsgBase {
   proto: "MsgLeaderLeaderboard";
   period: LeaderboardPeriod;

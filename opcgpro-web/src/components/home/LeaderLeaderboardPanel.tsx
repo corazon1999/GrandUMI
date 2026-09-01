@@ -40,8 +40,11 @@ const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
 ];
 
 const FILTER_TIERS: Array<{ value: LeaderFilterTier; label: string; title: string }> = [
-  { value: "relaxed", label: "100 / 300 场", title: "近 7 天至少 100 场，近 30 天至少 300 场" },
-  { value: "standard", label: "500 / 3000 场", title: "近 7 天至少 500 场，近 30 天至少 3000 场" },
+  { value: "100", label: "100 场", title: "所选周期内至少 100 场" },
+  { value: "300", label: "300 场", title: "所选周期内至少 300 场" },
+  { value: "500", label: "500 场", title: "所选周期内至少 500 场" },
+  { value: "1000", label: "1000 场", title: "所选周期内至少 1000 场" },
+  { value: "3000", label: "3000 场", title: "所选周期内至少 3000 场" },
   { value: "all", label: "全部", title: "不按场次隐藏 Leader" },
 ];
 
@@ -602,7 +605,7 @@ export default function LeaderLeaderboardPanel() {
           {rankingTab === "leader" && (
             <div className="flex w-full flex-col gap-2 @[900px]:w-auto @[900px]:flex-row @[900px]:items-center">
               <div
-                className="grid w-full grid-cols-[1fr_1fr_0.7fr] rounded-lg border border-gray-800 bg-gray-950 p-1 @[900px]:w-auto"
+                className="grid w-full grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1 @[900px]:w-auto @[900px]:grid-cols-6"
                 aria-label="Leader 榜场次筛选"
               >
                 {FILTER_TIERS.map((option) => (
@@ -612,7 +615,7 @@ export default function LeaderLeaderboardPanel() {
                     title={option.title}
                     aria-pressed={filterTier === option.value}
                     onClick={() => setFilterTier(option.value)}
-                    className={`min-h-11 whitespace-nowrap rounded-md px-2 text-[11px] font-bold transition-colors @[900px]:px-3 ${
+                    className={`min-h-11 whitespace-nowrap rounded-md px-2 text-[11px] font-bold transition-colors @[900px]:px-2.5 ${
                       filterTier === option.value
                         ? "bg-amber-500/20 text-amber-200 ring-1 ring-inset ring-amber-400/60"
                         : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"

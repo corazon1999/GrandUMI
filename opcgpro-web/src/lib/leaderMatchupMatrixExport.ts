@@ -27,8 +27,11 @@ const PERIOD_LABELS: Record<LeaderboardPeriod, string> = {
 };
 
 const FILTER_TIER_LABELS: Record<LeaderFilterTier, string> = {
-  relaxed: "100 / 300 场",
-  standard: "500 / 3000 场",
+  "100": "100 场",
+  "300": "300 场",
+  "500": "500 场",
+  "1000": "1000 场",
+  "3000": "3000 场",
   all: "全部 Leader",
 };
 

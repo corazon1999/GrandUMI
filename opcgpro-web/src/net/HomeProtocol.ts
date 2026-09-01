@@ -1860,7 +1860,7 @@ export const HomeRequest = {
     } as MsgPlayerSafety);
   },
 
-  requestLeaderLeaderboard(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "standard") {
+  requestLeaderLeaderboard(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "500") {
     const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
     const requestId = nextLeaderStatsRequestId("leaderboard");
     pendingLeaderLeaderboardRequestId = requestId;
@@ -1897,7 +1897,7 @@ export const HomeRequest = {
   requestLeaderMatchups(
     period: LeaderboardPeriod,
     leaderNumber: string,
-    filterTier: LeaderFilterTier = "standard",
+    filterTier: LeaderFilterTier = "500",
   ) {
     const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
     const requestId = nextLeaderStatsRequestId("matchups");
@@ -1919,7 +1919,7 @@ export const HomeRequest = {
     } as MsgLeaderMatchups);
   },
 
-  requestLeaderMatchupMatrix(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "standard") {
+  requestLeaderMatchupMatrix(period: LeaderboardPeriod, filterTier: LeaderFilterTier = "500") {
     const normalizedFilterTier = normalizeLeaderFilterTier(filterTier);
     const requestId = nextLeaderStatsRequestId("matrix");
     pendingLeaderMatchupMatrixRequestId = requestId;
