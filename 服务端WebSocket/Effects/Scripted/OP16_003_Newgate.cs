@@ -9,7 +9,8 @@ namespace GrandUMI.Effects.Scripted;
 /// 【登场时】可以公开我方手牌中 2 张力量为 8000 的角色卡牌：本回合中，对方最多 1 张角色力量 -6000。
 ///
 /// 实现说明：
-///   - 持续部分为静态效果，登场时注册 ContinuousEffect，离场时由 TurnEngine 自动清理。
+///   - 持续部分通过 IFieldStaticEffect 独立注册 ContinuousEffect，离场时由 TurnEngine 自动清理；
+///     选择性无效【登场时】不会阻止静态能力建立。
 ///     【双重攻击】用 GrantKeyword，力量 +2000 用 PowerDelta；谓词限定"我方领袖 + 我方回合"。
 ///     两条持续查询路径（ContinuousPowerBonus / HasContinuousKeyword）均只看 Predicate，
 ///     故 Scope 仅作语义标注，实际作用域完全由 Predicate 编码。
@@ -17,13 +18,13 @@ namespace GrandUMI.Effects.Scripted;
 ///     才会触发对方角色 -6000。整段在脚本内实现（不再委托 DSL），OP16.json 中该卡登场定义因
 ///     脚本覆盖而失效（保留作文档）。
 /// </summary>
-public class OP16_003_Newgate : IScriptedEffect
+public class OP16_003_Newgate : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP16-003";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;
@@ -55,6 +56,15 @@ public class OP16_003_Newgate : IScriptedEffect
             PowerDelta = 2000,
             Predicate = BuffsLeader,
         });
+
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        await RegisterFieldStatic(ctx);
+
+        int owner = ctx.OwnerIndex;
 
         // ── 【登场时】可以公开手牌 2 张力量 8000 的角色：本回合对方最多 1 张角色 -6000 ──
         var me = ctx.State.Players[owner];

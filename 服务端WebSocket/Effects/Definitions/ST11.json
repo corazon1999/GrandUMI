@@ -34,7 +34,7 @@
       "if": { "leaderNameEquals": "乌塔" },
       "then": [
         { "op": "LookTopReveal", "count": 3, "max": 1, "restTo": "bottom", "match": { "keyword": "FILM", "excludeName": "新纪元" } },
-        { "op": "ActiveOwnDon", "n": 1 }
+        { "op": "ActiveOwnDon", "n": 1, "chooseCount": true }
       ]
     }
   },

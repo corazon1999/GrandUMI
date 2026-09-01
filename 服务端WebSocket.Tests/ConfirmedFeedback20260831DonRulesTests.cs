@@ -97,7 +97,7 @@ public sealed class ConfirmedFeedback20260831DonRulesTests
     }
 
     [Fact]
-    public async Task OP13_027_And_OP14_022_PromptForQuantityWithoutChangingForcedDslEffects()
+    public async Task OP13_027_OP14_022_And_OP14_024_PromptForQuantity()
     {
         var sanjiState = TestScene.New().Build();
         var sanji = Card("OP13-027");
@@ -122,18 +122,18 @@ public sealed class ConfirmedFeedback20260831DonRulesTests
             new MockPromptService().QueueOption(1));
         Assert.Equal(1, optionalDslState.Players[0].ActiveDonCount);
 
-        var forcedDslState = TestScene.New().Build();
-        var forcedDslSource = Card("OP14-024");
-        forcedDslState.Players[0].Characters.Add(forcedDslSource);
-        forcedDslState.Players[0].CostArea.AddRange([
+        var op14024State = TestScene.New().Build();
+        var op14024Source = Card("OP14-024");
+        op14024State.Players[0].Characters.Add(op14024Source);
+        op14024State.Players[0].CostArea.AddRange([
             new DonCard { State = DonState.Rest },
             new DonCard { State = DonState.Rest },
             new DonCard { State = DonState.Rest },
         ]);
-        var forcedPrompts = new MockPromptService();
-        await EffectRuntime.Resolve(forcedDslState, 0, forcedDslSource, EffectTrigger.OnEnterField, forcedPrompts);
-        Assert.Equal(3, forcedDslState.Players[0].ActiveDonCount);
-        Assert.Empty(forcedPrompts.OptionHistory);
+        var op14024Prompts = new MockPromptService().QueueOption(1);
+        await EffectRuntime.Resolve(op14024State, 0, op14024Source, EffectTrigger.OnEnterField, op14024Prompts);
+        Assert.Equal(1, op14024State.Players[0].ActiveDonCount);
+        Assert.Single(op14024Prompts.OptionHistory);
     }
 
     [Fact]

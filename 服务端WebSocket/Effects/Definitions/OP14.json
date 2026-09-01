@@ -286,7 +286,8 @@
         "then": [
           {
             "op": "ActiveOwnDon",
-            "n": 3
+            "n": 3,
+            "chooseCount": true
           },
           {
             "op": "NoPlayCharacter"
@@ -437,7 +438,8 @@
         "then": [
           {
             "op": "ActiveOwnDon",
-            "n": 1
+            "n": 1,
+            "chooseCount": true
           }
         ]
       }

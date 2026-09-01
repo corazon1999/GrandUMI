@@ -93,7 +93,12 @@ public static class TurnEngine
 
         // OP13-003 高路·D·罗杰：进入咚阶段前场上已存在咚，且本次确实会放置咚时，
         // 才把其中 1 张改为赋予领袖。0 咚的首回合与已经 10 咚时都不会发动。
-        if (tp.Leader.Info.Number == "OP13-003" && donBefore > 0 && donBefore < MaxDonInCostArea && added > 0)
+        if (tp.Leader.Info.Number == "OP13-003"
+            && !tp.Leader.IsEffectsNullified
+            && !state.IsContinuouslyNullified(tp.Leader)
+            && donBefore > 0
+            && donBefore < MaxDonInCostArea
+            && added > 0)
         {
             var don = tp.CostArea.FirstOrDefault(d => d.State == DonState.Active);
             if (don is not null) { don.State = DonState.Attached; don.AttachedToCardId = tp.Leader.Id; }

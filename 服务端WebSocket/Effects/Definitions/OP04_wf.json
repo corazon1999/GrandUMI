@@ -277,7 +277,8 @@
         "then": [
           {
             "op": "ActiveOwnDon",
-            "n": 2
+            "n": 2,
+            "chooseCount": true
           }
         ]
       }
@@ -335,7 +336,8 @@
         "then": [
           {
             "op": "ActiveOwnDon",
-            "n": 1
+            "n": 1,
+            "chooseCount": true
           }
         ]
       }
@@ -470,7 +472,8 @@
     "trigger": [
       {
         "op": "ActiveOwnDon",
-        "n": 5
+        "n": 5,
+        "chooseCount": true
       }
     ]
   },

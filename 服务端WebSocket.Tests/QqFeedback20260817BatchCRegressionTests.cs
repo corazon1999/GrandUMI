@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game;
+using GrandUMI.Game.PhaseFlow;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -131,12 +132,17 @@ public class QqFeedback20260817BatchCRegressionTests
 
         await EffectRuntime.Resolve(state, 0, roger, EffectTrigger.OnEnterField, new MockPromptService());
 
-        state.TurnCount = 11;
-        Assert.Equal(2000, state.ContinuousPowerBonus(0, state.Players[0].Leader));
-        Assert.Equal(-2000, state.ContinuousPowerBonus(1, opponent));
+        Assert.Equal(2000, Assert.Single(state.Players[0].Leader.PowerModsUntilOppEnd).Delta);
+        Assert.Equal(-2000, Assert.Single(opponent.PowerModsUntilOppEnd).Delta);
 
-        state.TurnCount = 12;
-        Assert.Equal(0, state.ContinuousPowerBonus(0, state.Players[0].Leader));
-        Assert.Equal(0, state.ContinuousPowerBonus(1, opponent));
+        state.CurrentTurnPlayer = 0;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Single(state.Players[0].Leader.PowerModsUntilOppEnd);
+        Assert.Single(opponent.PowerModsUntilOppEnd);
+
+        state.CurrentTurnPlayer = 1;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Empty(state.Players[0].Leader.PowerModsUntilOppEnd);
+        Assert.Empty(opponent.PowerModsUntilOppEnd);
     }
 }

@@ -65,10 +65,10 @@
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+2000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 2000 },
-      { "op": "ActiveOwnDon", "n": 1 }
+      { "op": "ActiveOwnDon", "n": 1, "chooseCount": true }
     ],
     "trigger": [
-      { "op": "ActiveOwnDon", "n": 2 }
+      { "op": "ActiveOwnDon", "n": 2, "chooseCount": true }
     ]
   },
   "ST02-016": {
@@ -77,7 +77,7 @@
     "counter": [
       { "op": "Choose", "prompt": "OwnLeaderOrCharacter", "max": 1, "min": 0, "as": "$t", "text": "本次战斗我方最多1张领袖或角色力量+4000" },
       { "op": "AddPowerThisBattle", "target": "$t", "delta": 4000 },
-      { "op": "ActiveOwnDon", "n": 1 }
+      { "op": "ActiveOwnDon", "n": 1, "chooseCount": true }
     ]
   },
   "ST02-017": {

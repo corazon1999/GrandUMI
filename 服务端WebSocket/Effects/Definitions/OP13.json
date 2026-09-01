@@ -389,7 +389,8 @@
         "then": [
           {
             "op": "ActiveOwnDon",
-            "n": 4
+            "n": 4,
+            "chooseCount": true
           },
           {
             "op": "NoPlayCharacterOriginalCostGte",

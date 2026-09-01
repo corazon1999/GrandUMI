@@ -220,6 +220,62 @@ public class OP16EffectTests
     }
 
     [Fact]
+    public async Task OP16_003_KeepsStaticLeaderBuffWhenOwnOnEnterEffectIsNullified()
+    {
+        var state = TestScene.New("OP09-081").OppCharacter("OP15-050").Build();
+        var me = state.Players[0];
+        var newgate = Card("OP16-003");
+        me.Characters.Add(newgate);
+        me.Hand.AddRange([Card("OP16-004"), Card("OP16-005")]);
+        var target = Assert.Single(state.Players[1].Characters);
+
+        await EffectRuntime.Resolve(
+            state, 0, me.Leader, EffectTrigger.OnGameStart, new MockPromptService());
+        var prompts = new MockPromptService().QueueConfirm(true);
+        await EffectRuntime.Resolve(
+            state, 0, newgate, EffectTrigger.OnEnterField, prompts);
+
+        Assert.True(state.IsTriggerNullified(newgate, EffectTrigger.OnEnterField));
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Equal(0, target.PowerModThisTurn);
+        Assert.Equal(me.Leader.Info.Power + 2000, state.CurrentPowerOf(0, me.Leader));
+        Assert.True(ActionValidator.HasKeyword(state, me.Leader, "双重攻击"));
+    }
+
+    [Fact]
+    public async Task OP16_003_KeepsStaticLeaderBuffWhenOpponentTeachNullifiesOnEnterEffect()
+    {
+        var state = TestScene.New("OP09-081").Build();
+        var teach = state.Players[0];
+        var newgateOwner = state.Players[1];
+        var discard = Card("OP15-003");
+        var target = Card("OP15-050");
+        var newgate = Card("OP16-003");
+        teach.Hand.Add(discard);
+        teach.Characters.Add(target);
+        newgateOwner.Characters.Add(newgate);
+        newgateOwner.Hand.AddRange([Card("OP16-004"), Card("OP16-005")]);
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            teach.Leader,
+            EffectTrigger.ActivatedMain,
+            new MockPromptService().QueueConfirm(true).QueueChoose(discard.Id.ToString()));
+
+        state.CurrentTurnPlayer = 1;
+        var prompts = new MockPromptService().QueueConfirm(true);
+        await EffectRuntime.Resolve(
+            state, 1, newgate, EffectTrigger.OnEnterField, prompts);
+
+        Assert.True(state.IsTriggerNullified(newgate, EffectTrigger.OnEnterField));
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Equal(0, target.PowerModThisTurn);
+        Assert.Equal(newgateOwner.Leader.Info.Power + 2000, state.CurrentPowerOf(1, newgateOwner.Leader));
+        Assert.True(ActionValidator.HasKeyword(state, newgateOwner.Leader, "双重攻击"));
+    }
+
+    [Fact]
     public void OP16_118_Changes8000PowerCharactersInHandToCounter2000()
     {
         var state = TestScene.New("OP16-001").Build();

@@ -60,4 +60,38 @@ public class OP07_026_JewelryBonneyTests
         Assert.True(character.CannotActivateNextReset);
         Assert.False(restDon.CannotActivateNextReset);
     }
+
+    [Fact]
+    public async Task LockedDon_CanBeActivatedByMihawkAfterResetConsumesTheLock()
+    {
+        var state = TestScene.New(oppLeaderNumber: "OP14-020")
+            .OppCharacter("OP16-003")
+            .Build();
+        var opponent = state.Players[1];
+        var lockedDon = new DonCard { State = DonState.Rest };
+        opponent.CostArea.Add(lockedDon);
+
+        await EffectRuntime.Resolve(
+            state,
+            0,
+            new CardInstance { Info = CardDatabase.Get("OP07-026")! },
+            EffectTrigger.OnEnterField,
+            new MockPromptService().QueueChoose(lockedDon.Id.ToString()));
+
+        state.CurrentTurnPlayer = 1;
+        TurnEngine.EnterResetPhase(state);
+        Assert.Equal(DonState.Rest, lockedDon.State);
+        Assert.False(lockedDon.CannotActivateNextReset);
+
+        await EffectRuntime.Resolve(
+            state,
+            1,
+            opponent.Leader,
+            EffectTrigger.ActivatedMain,
+            new MockPromptService()
+                .QueueConfirm(true)
+                .QueueChoose(opponent.Leader.Id.ToString()));
+
+        Assert.Equal(DonState.Active, lockedDon.State);
+    }
 }

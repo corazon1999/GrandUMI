@@ -205,7 +205,7 @@ public class Feedback20260818RegressionTests
         for (int i = 0; i < 4; i++) me.CostArea.Add(new DonCard { State = DonState.Rest });
 
         await EffectRuntime.Resolve(state, 0, Card("OP13-118"), EffectTrigger.OnEnterField,
-            new MockPromptService());
+            new MockPromptService().QueueOption(4));
 
         Assert.Equal(4, me.ActiveDonCount);
         int highIndex = me.Hand.FindIndex(card => card.Info.Number == "OP13-118");

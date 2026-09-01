@@ -382,7 +382,8 @@
       "then": [
         {
           "op": "ActiveOwnDon",
-          "n": 1
+          "n": 1,
+          "chooseCount": true
         }
       ]
     }
@@ -423,7 +424,8 @@
       "then": [
         {
           "op": "ActiveOwnDon",
-          "n": 1
+          "n": 1,
+          "chooseCount": true
         }
       ]
     },

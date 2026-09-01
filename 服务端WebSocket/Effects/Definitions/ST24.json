@@ -27,7 +27,7 @@
         "on": "OnOppAttackDeclare",
         "cost": { "selfToTrash": true },
         "then": [
-          { "op": "ActiveOwnDon", "n": 1 }
+          { "op": "ActiveOwnDon", "n": 1, "chooseCount": true }
         ]
       }
     ]
@@ -38,7 +38,7 @@
     "triggers": [
       {
         "on": "OnMyTurnEnd",
-        "then": [ { "op": "ActiveOwnDon", "n": 1 } ]
+        "then": [ { "op": "ActiveOwnDon", "n": 1, "chooseCount": true } ]
       }
     ]
   },
