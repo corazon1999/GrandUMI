@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { getCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
+import { selectLeaderMatchupMatrixLeaders } from "@/lib/leaderMatchupMatrixExport";
 import type {
   LeaderLeaderboardItem,
   LeaderMatchupItem,
@@ -14,8 +15,6 @@ interface Props {
   leaderboardItems: LeaderLeaderboardItem[];
   onRetry: () => void;
 }
-
-const MATRIX_LEADER_LIMIT = 20;
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -37,10 +36,7 @@ function cellClasses(item?: LeaderMatchupItem): string {
 }
 
 export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }: Props) {
-  const leaders = [...leaderboardItems]
-    .filter((item) => item.rank != null)
-    .sort((left, right) => right.winRate - left.winRate || (left.rank ?? 0) - (right.rank ?? 0))
-    .slice(0, MATRIX_LEADER_LIMIT);
+  const leaders = selectLeaderMatchupMatrixLeaders(leaderboardItems);
   const rowMap = new Map(data?.rows?.map((row) => [row.leaderNumber, row]) ?? []);
   const loading = data == null || data.result == null;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { HomeRequest } from "@/net/HomeProtocol";
@@ -24,6 +24,11 @@ import {
   readLeaderFilterTier,
   writeLeaderFilterTier,
 } from "@/lib/leaderFilterTier";
+import {
+  downloadLeaderMatchupMatrixImage,
+  generateLeaderMatchupMatrixImage,
+  selectLeaderMatchupMatrixLeaders,
+} from "@/lib/leaderMatchupMatrixExport";
 import type { FactionStanding, LeaderboardPeriod, LeaderFilterTier, LeaderLeaderboardItem, RankFaction, RankedMode, RankLeaderboardItem } from "@/types/net";
 import LeaderMatchupBreakdown from "./LeaderMatchupBreakdown";
 import LeaderMatchupMatrix from "./LeaderMatchupMatrix";
@@ -353,6 +358,13 @@ export default function LeaderLeaderboardPanel() {
   const [rankingTab, setRankingTab] = useState<"leader" | "ranked">("ranked");
   const [rankedMode, setRankedMode] = useState<RankedMode>("standard");
   const [viewMode, setViewMode] = useState<"ranking" | "matrix">("ranking");
+  const [matrixExportState, setMatrixExportState] = useState<"idle" | "exporting" | "error" | "success">("idle");
+  const [matrixExportError, setMatrixExportError] = useState<string | null>(null);
+  const matrixExportSequence = useRef(0);
+  const matrixExportResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentMatrixSelection = `${period}:${filterTier}`;
+  const currentMatrixSelectionRef = useRef(currentMatrixSelection);
+  currentMatrixSelectionRef.current = currentMatrixSelection;
   const [sort, setSort] = useState<LeaderLeaderboardSortState | null>(null);
   const [championRulesOpen, setChampionRulesOpen] = useState(false);
   const [rankSnapshotClock, setRankSnapshotClock] = useState(() => Date.now());
@@ -365,6 +377,7 @@ export default function LeaderLeaderboardPanel() {
   const request = (nextPeriod: LeaderboardPeriod, nextFilterTier = filterTier) => {
     setSelectedLeader(null);
     HomeRequest.requestLeaderLeaderboard(nextPeriod, nextFilterTier);
+    HomeRequest.requestLeaderMatchupMatrix(nextPeriod, nextFilterTier);
   };
 
   const toggleMatchups = (leaderNumber: string) => {
@@ -408,6 +421,21 @@ export default function LeaderLeaderboardPanel() {
   }, [filterTier, filterTierRestored, period, rankingTab]);
 
   useEffect(() => {
+    matrixExportSequence.current += 1;
+    setMatrixExportState("idle");
+    setMatrixExportError(null);
+    if (matrixExportResetTimer.current) {
+      clearTimeout(matrixExportResetTimer.current);
+      matrixExportResetTimer.current = null;
+    }
+  }, [filterTier, period]);
+
+  useEffect(() => () => {
+    matrixExportSequence.current += 1;
+    if (matrixExportResetTimer.current) clearTimeout(matrixExportResetTimer.current);
+  }, []);
+
+  useEffect(() => {
     if (rankingTab === "ranked" && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
   }, [rankProfile, rankedMode, rankingTab]);
 
@@ -420,7 +448,7 @@ export default function LeaderLeaderboardPanel() {
 
   useEffect(() => {
     if (
-      viewMode === "matrix"
+      rankingTab === "leader"
       && leaderboard?.period === period
       && leaderboard.filterTier === filterTier
       && leaderboard.result !== false
@@ -430,7 +458,7 @@ export default function LeaderLeaderboardPanel() {
     ) {
       HomeRequest.requestLeaderMatchupMatrix(period, filterTier);
     }
-  }, [filterTier, leaderboard, leaderMatchupMatrix, period, viewMode]);
+  }, [filterTier, leaderboard, leaderMatchupMatrix, period, rankingTab]);
 
   const items = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("zh-CN");
@@ -449,9 +477,73 @@ export default function LeaderLeaderboardPanel() {
     || leaderboard.period !== period
     || leaderboard.filterTier !== filterTier;
   const failed = !loading && leaderboard.result === false;
+  const currentMatrix = leaderMatchupMatrix?.period === period
+    && leaderMatchupMatrix.filterTier === filterTier
+    ? leaderMatchupMatrix
+    : null;
+  const matrixExportLeaders = selectLeaderMatchupMatrixLeaders(leaderboard?.items ?? []);
+  const matrixExportReady = !loading
+    && !failed
+    && currentMatrix?.result === true
+    && matrixExportLeaders.length > 0;
+  const matrixExportRequestFailed = failed || currentMatrix?.result === false;
+  const matrixExportUnavailable = !loading
+    && !failed
+    && currentMatrix?.result === true
+    && matrixExportLeaders.length === 0;
+  const matrixExportDataLoading = !matrixExportReady
+    && !matrixExportRequestFailed
+    && !matrixExportUnavailable;
+  const matrixExportDisabled = matrixExportState === "exporting"
+    || matrixExportDataLoading
+    || matrixExportUnavailable;
   const selectedMatchups = selectedLeader
     ? leaderMatchups[leaderMatchupKey(period, selectedLeader, filterTier)]
     : undefined;
+
+  const handleMatrixExport = async () => {
+    if (matrixExportState === "exporting") return;
+    if (matrixExportUnavailable) return;
+    if (!matrixExportReady || !currentMatrix || !leaderboard?.items) {
+      setMatrixExportError(null);
+      setMatrixExportState("idle");
+      if (loading || failed) HomeRequest.requestLeaderLeaderboard(period, filterTier);
+      HomeRequest.requestLeaderMatchupMatrix(period, filterTier);
+      return;
+    }
+
+    const exportPeriod = period;
+    const exportFilterTier = filterTier;
+    const sequence = ++matrixExportSequence.current;
+    setMatrixExportState("exporting");
+    setMatrixExportError(null);
+    if (matrixExportResetTimer.current) clearTimeout(matrixExportResetTimer.current);
+    try {
+      const generated = await generateLeaderMatchupMatrixImage({
+        period: exportPeriod,
+        filterTier: exportFilterTier,
+        leaderboardItems: leaderboard.items,
+        matrix: currentMatrix,
+        totalMatches: leaderboard.totalMatches ?? 0,
+        minimumGames: leaderboard.minimumGames ?? 20,
+      });
+      if (sequence !== matrixExportSequence.current
+        || currentMatrixSelectionRef.current !== `${exportPeriod}:${exportFilterTier}`) {
+        return;
+      }
+      downloadLeaderMatchupMatrixImage(generated);
+      setMatrixExportState("success");
+      matrixExportResetTimer.current = setTimeout(() => {
+        setMatrixExportState("idle");
+        matrixExportResetTimer.current = null;
+      }, 2_500);
+    } catch (error) {
+      if (sequence !== matrixExportSequence.current) return;
+      console.error("导出 Leader 对阵一图流失败", error);
+      setMatrixExportState("error");
+      setMatrixExportError(error instanceof Error ? error.message : "PNG 导出失败，请稍后重试");
+    }
+  };
 
   return (
     <section
@@ -528,6 +620,32 @@ export default function LeaderLeaderboardPanel() {
                     {option.label}
                   </button>
                 ))}
+              </div>
+              <div className="w-full @[900px]:w-auto">
+                <button
+                  type="button"
+                  onClick={() => void handleMatrixExport()}
+                  disabled={matrixExportDisabled}
+                  aria-busy={matrixExportState === "exporting" || undefined}
+                  className="min-h-11 w-full whitespace-nowrap rounded-lg border border-orange-500/60 bg-orange-500/10 px-4 text-xs font-bold text-orange-200 transition-colors hover:bg-orange-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 disabled:cursor-wait disabled:border-gray-800 disabled:bg-gray-950 disabled:text-gray-600 @[900px]:w-auto"
+                >
+                  {matrixExportState === "exporting"
+                    ? "正在导出…"
+                    : matrixExportState === "success"
+                      ? "已下载 PNG"
+                      : matrixExportUnavailable
+                        ? "暂无可导出数据"
+                        : matrixExportRequestFailed || matrixExportState === "error"
+                        ? "重试导出"
+                        : matrixExportDataLoading
+                          ? "准备导出数据…"
+                          : "导出一图流"}
+                </button>
+                {(matrixExportError || matrixExportRequestFailed) && (
+                  <p role="alert" className="mt-1 max-w-56 text-[10px] leading-4 text-red-400 @[900px]:text-right">
+                    {matrixExportError ?? (failed ? leaderboard?.error : currentMatrix?.error) ?? "对阵矩阵暂时不可用，请重试"}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                 <div className="grid grid-cols-3 rounded-lg border border-gray-800 bg-gray-950 p-1">
@@ -681,9 +799,7 @@ export default function LeaderLeaderboardPanel() {
           </div>
         ) : viewMode === "matrix" ? (
           <LeaderMatchupMatrix
-            data={leaderMatchupMatrix?.period === period && leaderMatchupMatrix.filterTier === filterTier
-              ? leaderMatchupMatrix
-              : null}
+            data={currentMatrix}
             leaderboardItems={leaderboard.items ?? []}
             onRetry={() => HomeRequest.requestLeaderMatchupMatrix(period, filterTier)}
           />
