@@ -271,6 +271,10 @@ export const GameRequest = {
     NetManager.send({ proto: "MsgRequestState" } as MsgRequestState);
   },
 
+  /** 轻量重取当前权威快照；不干扰正在进行的卡牌动作与乐观状态。 */
+  refreshStateSnapshot: () =>
+    NetManager.send({ proto: "MsgRequestState" } as MsgRequestState),
+
   /** 对手断线宽限期内，主动请求即时结束对局（判对手负），不再干等后端计时器 */
   endByDisconnect: () => {
     NetManager.send({ proto: "MsgEndByDisconnect" } as MsgBase);

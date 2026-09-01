@@ -97,6 +97,40 @@ public class OperationClockTests
         }
     }
 
+    [Theory]
+    [InlineData("InactivityWarning")]
+    [InlineData("PlayerActivity")]
+    public void 挂机提醒与在线确认在效果批次挂起时仍立即下发(string action)
+    {
+        TestScene.New();
+        var room = CreateRankedRoom();
+        try
+        {
+            var sentPlayers = new List<int>();
+            room.Engine.OnSendToPlayer = (playerIndex, _) => sentPlayers.Add(playerIndex);
+            typeof(GameEngine).GetField("_snapshotBatchActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(room.Engine, true);
+            room.Engine.State.PendingPrompt = new PendingPrompt
+            {
+                PromptId = "inactivity-barrier-prompt",
+                PlayerIndex = 0,
+                Kind = "Confirm",
+                ValidChoices = ["yes", "no"],
+                MinChoose = 1,
+                MaxChoose = 1,
+                PromptText = "等待玩家选择",
+            };
+
+            room.Engine.Broadcast(action, new { player = 0 });
+
+            Assert.Equal([0, 1], sentPlayers);
+        }
+        finally
+        {
+            Cleanup(room);
+        }
+    }
+
     [Fact]
     public async Task 选先后与调度不计时_进入第一回合后才启动棋钟()
     {

@@ -61,7 +61,20 @@ test("挂机提醒使用服务端校准倒计时且只挂载给真实玩家", as
   assert.match(overlay, /本次无操作计时归零/);
   assert.match(overlay, /min-h-12 min-w-48/);
   assert.match(overlay, /--layout-safe-bottom/);
+  assert.match(overlay, /PRESENCE_CONFIRMATION_TIMEOUT_MS = 5_000/);
+  assert.match(overlay, /GameRequest\.refreshStateSnapshot\(\)/);
+  assert.match(overlay, /setSubmitting\(false\)/);
   assert.match(page, /!isObserver && !isPlayback && <InactivityWarningOverlay \/>/);
   assert.match(store, /inactivityLossRemainingMs: 240_000/);
   assert.match(types, /inactivityActive\?: "my" \| "opponent" \| null/);
+});
+
+test("挂机确认超时只重取权威快照，不回滚其他对局动作", async () => {
+  const request = await readSource("../src/net/GameRequest.ts");
+  const refreshStart = request.indexOf("refreshStateSnapshot:");
+  const refreshEnd = request.indexOf("/** 对手断线宽限期内", refreshStart);
+  const refreshBody = request.slice(refreshStart, refreshEnd);
+
+  assert.match(refreshBody, /MsgRequestState/);
+  assert.doesNotMatch(refreshBody, /rollbackOptimistic|setPending|clearPendingAttachDonState/);
 });

@@ -122,7 +122,8 @@ public class GameEngine
         "UndoAttachDon",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
         "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
-        "OperationTimeout", "InactivityTimeout", "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
+        "OperationTimeout", "InactivityWarning", "PlayerActivity", "InactivityTimeout",
+        "DisconnectTimeout", "PlayerDisconnected", "PlayerReconnected",
         "DebugOP17CoverageStarted", "DebugOP17CoverageResult",
     };
 

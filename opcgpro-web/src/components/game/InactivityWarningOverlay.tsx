@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GameRequest } from "@/net/GameRequest";
 import { useGameStore } from "@/store/gameStore";
 import { elapsedMillisecondsFromServerSync } from "@/lib/serverCountdown.mjs";
+
+const PRESENCE_CONFIRMATION_TIMEOUT_MS = 5_000;
 
 function monotonicNow(): number {
   return typeof performance === "undefined" ? 0 : performance.now();
@@ -27,9 +29,14 @@ export default function InactivityWarningOverlay() {
   const [anchor, setAnchor] = useState(() => ({ syncUtc, serverNowUtc, receivedAt: monotonicNow() }));
   const [now, setNow] = useState(() => monotonicNow());
   const [submitting, setSubmitting] = useState(false);
+  const confirmationTimer = useRef<number | null>(null);
   const visible = active === "my" && warning && !isGameOver;
 
   useEffect(() => {
+    if (confirmationTimer.current !== null) {
+      window.clearTimeout(confirmationTimer.current);
+      confirmationTimer.current = null;
+    }
     const receivedAt = monotonicNow();
     setAnchor({ syncUtc, serverNowUtc, receivedAt });
     setNow(receivedAt);
@@ -38,6 +45,10 @@ export default function InactivityWarningOverlay() {
 
   useEffect(() => {
     if (!visible) {
+      if (confirmationTimer.current !== null) {
+        window.clearTimeout(confirmationTimer.current);
+        confirmationTimer.current = null;
+      }
       setSubmitting(false);
       return;
     }
@@ -45,6 +56,10 @@ export default function InactivityWarningOverlay() {
     const timer = window.setInterval(() => setNow(monotonicNow()), 250);
     return () => window.clearInterval(timer);
   }, [visible]);
+
+  useEffect(() => () => {
+    if (confirmationTimer.current !== null) window.clearTimeout(confirmationTimer.current);
+  }, []);
 
   if (!visible) return null;
   const anchorMatchesSnapshot = anchor.syncUtc === syncUtc && anchor.serverNowUtc === serverNowUtc;
@@ -59,7 +74,15 @@ export default function InactivityWarningOverlay() {
 
   const confirmPresence = () => {
     setSubmitting(true);
-    if (!GameRequest.confirmInactivityPresence()) setSubmitting(false);
+    if (!GameRequest.confirmInactivityPresence()) {
+      setSubmitting(false);
+      return;
+    }
+    confirmationTimer.current = window.setTimeout(() => {
+      confirmationTimer.current = null;
+      GameRequest.refreshStateSnapshot();
+      setSubmitting(false);
+    }, PRESENCE_CONFIRMATION_TIMEOUT_MS);
   };
 
   return (
