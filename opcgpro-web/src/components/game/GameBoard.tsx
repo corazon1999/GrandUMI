@@ -28,7 +28,7 @@ import type { PlayerRankIdentitySnapshot, RankFaction } from "@/types/net";
 import { GameRequest } from "@/net/GameRequest";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import TurnExtensionIcon from "@/components/game/TurnExtensionIcon";
-import HexOwnedPanel from "@/components/game/HexOwnedPanel";
+import HexOwnedSlots from "@/components/game/HexOwnedPanel";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -228,25 +228,49 @@ function RightRail({
   isObserver: boolean;
   isPlayback: boolean;
 }) {
+  const matchKind = useGameStore((state) => state.matchKind);
+  const hexState = useGameStore((state) => state.hexState);
+  // 旧快照可能没有 matchKind；只要仍携带海克斯公开状态，就继续展示双方槽位。
+  const showHexSlots = matchKind === "Hex" || hexState?.enabled === true;
+
   return (
     <aside
       data-game-right-rail
-      className="relative z-40 flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 [padding-bottom:var(--layout-safe-bottom,0px)] [padding-right:var(--layout-safe-right,0px)] [padding-top:var(--layout-safe-top,0px)]"
+      className="relative z-40 flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 overflow-x-clip [padding-bottom:var(--layout-safe-bottom,0px)] [padding-right:var(--layout-safe-right,0px)] [padding-top:var(--layout-safe-top,0px)]"
     >
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
-        <p className="text-xs font-black text-slate-300">对手</p>
-        <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
-        <PlayerRankIdentity rank={opponentRankIdentity} />
+        <div
+          data-player-info-card="opponent"
+          className="relative grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-start gap-1"
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-black text-slate-300">对手</p>
+            <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+            <PlayerRankIdentity rank={opponentRankIdentity} />
+          </div>
+          {showHexSlots && (
+            <HexOwnedSlots side="opponent" label="对方" items={hexState?.opponentOwned ?? []} />
+          )}
+        </div>
         <LeaderChampionBadge leaderNumber={opponentChampionLeaderNumber} className="mt-1" />
         <OperationClock side="opponent" allowExtension={false} />
         <div className="my-3 h-px bg-white/10" />
-        <p className="text-xs font-black text-slate-300">我</p>
-        <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
-        <PlayerRankIdentity rank={myRankIdentity} />
+        <div
+          data-player-info-card="my"
+          className="relative grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-start gap-1"
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-black text-slate-300">我</p>
+            <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
+            <PlayerRankIdentity rank={myRankIdentity} />
+          </div>
+          {showHexSlots && (
+            <HexOwnedSlots side="my" label="我方" items={hexState?.myOwned ?? []} />
+          )}
+        </div>
         <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
         <OperationClock side="my" allowExtension={!isObserver && !isPlayback} />
       </section>
-      <HexOwnedPanel />
       <div className="mt-auto flex flex-col gap-3">
         {!isObserver && !isPlayback && (
           <section

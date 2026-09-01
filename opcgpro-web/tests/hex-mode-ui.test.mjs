@@ -60,7 +60,7 @@ test("海克斯选秀仅展示当前轮次品质，不展示本局共享品质�
   assert.match(types, /tierSequence: HexTierSnapshot\[\]/);
 });
 
-test("右侧海克斯详情公开双方完整效果并兼容移动安全区", async () => {
+test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立详情面板", async () => {
   const [owned, board, stage, actions, prompt] = await Promise.all([
     readSource("../src/components/game/HexOwnedPanel.tsx"),
     readSource("../src/components/game/GameBoard.tsx"),
@@ -69,15 +69,45 @@ test("右侧海克斯详情公开双方完整效果并兼容移动安全区", as
     readSource("../src/components/game/PromptOverlay.tsx"),
   ]);
 
-  assert.match(owned, /hexState\.myOwned/);
-  assert.match(owned, /hexState\.opponentOwned/);
-  assert.match(owned, /<details/);
+  assert.equal(board.match(/<HexOwnedSlots /g)?.length, 2);
+  assert.match(board, /data-player-info-card="opponent"/);
+  assert.match(board, /data-player-info-card="my"/);
+  assert.equal(board.match(/grid min-h-11 grid-cols-\[minmax\(0,1fr\)_auto\] items-start gap-1/g)?.length, 2);
+  assert.match(board, /items=\{hexState\?\.opponentOwned \?\? \[\]\}/);
+  assert.match(board, /items=\{hexState\?\.myOwned \?\? \[\]\}/);
+  assert.match(owned, /const MAX_OWNED_HEXES = 3/);
+  assert.match(owned, /Array\.from\(\{ length: MAX_OWNED_HEXES \}/);
+  assert.match(owned, /items\.slice\(0, MAX_OWNED_HEXES\)/);
+  assert.match(owned, /data-hex-slot-index=\{index \+ 1\}/);
+  assert.match(owned, /data-hex-slot-state=\{hex \? "owned" : "empty"\}/);
+  assert.doesNotMatch(board, /<HexOwnedPanel/);
+  assert.doesNotMatch(owned, /data-hex-details-panel|data-hex-owned-panel|tierSequence|candidates/);
+  assert.doesNotMatch(owned, /title=/);
+
+  assert.match(owned, /onPointerEnter=/);
+  assert.match(owned, /onFocus=/);
+  assert.match(owned, /onClick=/);
+  assert.match(owned, /role=\{pinnedIndex === activeIndex \? "dialog" : "tooltip"\}/);
+  assert.match(owned, /aria-describedby=\{isActive \? popoverId : undefined\}/);
   assert.match(owned, /hex\.name/);
   assert.match(owned, /TIER_META\[hex\.tier\]/);
-  assert.match(owned, /hex\.description/);
-  assert.match(owned, /min-h-12/);
-  assert.match(owned, /data-hex-details-panel/);
+  assert.match(owned, /activeHex\.description/);
+  assert.match(owned, /activeTier\.label/);
+  assert.match(owned, /Silver:/);
+  assert.match(owned, /Gold:/);
+  assert.match(owned, /Rainbow:/);
+  assert.match(owned, /aria-label=\{`关闭\$\{activeHex\.name\}海克斯详情`\}/);
+  assert.match(owned, /event\.key === "Escape"/);
+  assert.match(owned, /document\.addEventListener\("pointerdown"/);
+
+  assert.ok((owned.match(/h-11 min-h-11 w-11 min-w-11/g)?.length ?? 0) >= 2);
+  assert.match(owned, /absolute inset-x-0/);
+  assert.match(owned, /overflow-y-auto overscroll-contain/);
+  assert.match(owned, /100cqh/);
+  assert.match(owned, /var\(--layout-safe-top/);
+  assert.match(owned, /var\(--layout-safe-bottom/);
   assert.match(board, /data-game-right-rail/);
+  assert.match(board, /overflow-x-clip/);
   assert.match(board, /var\(--layout-safe-top/);
   assert.match(board, /var\(--layout-safe-right/);
   assert.match(board, /var\(--layout-safe-bottom/);
