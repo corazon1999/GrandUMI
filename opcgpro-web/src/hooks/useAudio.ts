@@ -6,7 +6,7 @@ import type { PlaySoundOptions, SoundId } from "@/audio/types";
 
 export function useAudio() {
   const play = useCallback((id: SoundId, options?: PlaySoundOptions) => {
-    audioEngine.play(id, options);
+    return audioEngine.play(id, options);
   }, []);
 
   const unlock = useCallback(async () => audioEngine.unlock(), []);

@@ -1,5 +1,5 @@
 import { AUDIO_MANIFEST, PRELOAD_SOUND_IDS } from "./audioManifest";
-import type { PlaySoundOptions, SoundId } from "./types";
+import type { PlaySoundOptions, SoundId, StopSound } from "./types";
 
 const GLOBAL_VOICE_LIMIT = 8;
 const MAX_LATE_PLAYBACK_MS = 1_200;
@@ -55,28 +55,38 @@ class AudioEngine {
     await Promise.allSettled(ids.map((id) => this.loadBuffer(id)));
   }
 
-  public play(id: SoundId, options: PlaySoundOptions = {}): void {
-    if (!this.unlocked || this.muted || this.volume <= 0) return;
-    if (!this.canPlayForCurrentVisibility(options)) return;
+  public play(id: SoundId, options: PlaySoundOptions = {}): StopSound {
+    let cancelled = false;
+    let voice: ActiveVoice | null = null;
+    const stop = () => {
+      cancelled = true;
+      if (voice && this.activeVoices.has(voice)) this.stopVoice(voice);
+      voice = null;
+    };
+
+    if (!this.unlocked || this.muted || this.volume <= 0) return stop;
+    if (!this.canPlayForCurrentVisibility(options)) return stop;
 
     const definition = AUDIO_MANIFEST[id];
     const requestedAt = performance.now();
     const previousAt = this.lastPlayedAt.get(id) ?? Number.NEGATIVE_INFINITY;
-    if (requestedAt - previousAt < definition.cooldownMs) return;
+    if (requestedAt - previousAt < definition.cooldownMs) return stop;
     this.lastPlayedAt.set(id, requestedAt);
 
     const cached = this.buffers.get(id);
     if (cached) {
-      this.playBuffer(id, cached, options);
-      return;
+      voice = this.playBuffer(id, cached, options);
+      return stop;
     }
 
     void this.loadBuffer(id).then((buffer) => {
+      if (cancelled) return;
       if (!buffer || performance.now() - requestedAt > MAX_LATE_PLAYBACK_MS) return;
       if (!this.unlocked || this.muted || this.volume <= 0) return;
       if (!this.canPlayForCurrentVisibility(options)) return;
-      this.playBuffer(id, buffer, options);
+      voice = this.playBuffer(id, buffer, options);
     });
+    return stop;
   }
 
   public stopAll(): void {
@@ -137,21 +147,21 @@ class AudioEngine {
     }
   }
 
-  private playBuffer(id: SoundId, buffer: AudioBuffer, options: PlaySoundOptions): void {
+  private playBuffer(id: SoundId, buffer: AudioBuffer, options: PlaySoundOptions): ActiveVoice | null {
     const context = this.context;
     const outputGain = this.outputGain;
-    if (!context || !outputGain) return;
-    if (!this.canPlayForCurrentVisibility(options)) return;
+    if (!context || !outputGain) return null;
+    if (!this.canPlayForCurrentVisibility(options)) return null;
 
     if (context.state === "suspended") void context.resume();
 
     const definition = AUDIO_MANIFEST[id];
     const sameSoundVoices = [...this.activeVoices].filter((voice) => voice.id === id);
-    if (sameSoundVoices.length >= definition.maxVoices) return;
+    if (sameSoundVoices.length >= definition.maxVoices) return null;
 
     if (this.activeVoices.size >= GLOBAL_VOICE_LIMIT) {
       const lowestPriorityVoice = [...this.activeVoices].sort((a, b) => a.priority - b.priority)[0];
-      if (!lowestPriorityVoice || lowestPriorityVoice.priority >= definition.priority) return;
+      if (!lowestPriorityVoice || lowestPriorityVoice.priority >= definition.priority) return null;
       this.stopVoice(lowestPriorityVoice);
     }
 
@@ -171,6 +181,7 @@ class AudioEngine {
     this.activeVoices.add(voice);
     source.onended = () => this.disposeVoice(voice);
     source.start();
+    return voice;
   }
 
   private canPlayForCurrentVisibility(options: PlaySoundOptions): boolean {

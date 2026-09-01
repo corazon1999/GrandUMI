@@ -7,11 +7,16 @@ import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
+import { useAudio } from "@/hooks/useAudio";
+import { useAudioStore } from "@/store/audioStore";
 import { useSettingsStore } from "@/store/settingsStore";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
 const IMPACT_SHARDS = [-78, -52, -29, -11, 14, 33, 57, 82, 108, 137, 164, 191];
+const IMPACT_SOUND_DELAY_MS = 1_020;
+const REDUCED_MOTION_IMPACT_SOUND_DELAY_MS = 120;
+const IMPACT_SOUND_GRACE_MS = 450;
 
 interface LeaderIntroQuoteData {
   fallback: string;
@@ -183,8 +188,12 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const turnCount = useGameStore((state) => state.turnCount);
   const reducedMotion = useReducedMotion() ?? false;
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const isAudioUnlocked = useAudioStore((state) => state.isUnlocked);
+  const { play } = useAudio();
   const [phase, setPhase] = useState<IntroPhase>("waiting");
   const completedRef = useRef(false);
+  const introStartedAtRef = useRef<number | null>(null);
+  const impactSoundPlayedRef = useRef(false);
 
   const myLeader = getGameCard(myLeaderNumber, mySpriteMap);
   const opponentLeader = getGameCard(opponentLeaderNumber, opponentSpriteMap);
@@ -243,6 +252,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
     const begin = () => {
       if (cancelled || started) return;
       started = true;
+      introStartedAtRef.current = performance.now();
       setPhase("playing");
     };
 
@@ -274,6 +284,31 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
     ready,
     turnCount,
   ]);
+
+  useEffect(() => {
+    if (phase !== "playing" || impactSoundPlayedRef.current || !isAudioUnlocked) return;
+
+    const introStartedAt = introStartedAtRef.current;
+    if (introStartedAt === null) return;
+
+    const impactDelay = reducedMotion
+      ? REDUCED_MOTION_IMPACT_SOUND_DELAY_MS
+      : IMPACT_SOUND_DELAY_MS;
+    const remainingDelay = introStartedAt + impactDelay - performance.now();
+    // 自动播放尚未解锁时只等待当前碰撞窗口，避免用户稍后操作时补播过时音效。
+    if (remainingDelay < -IMPACT_SOUND_GRACE_MS) return;
+
+    let stopSound = () => {};
+    const timer = window.setTimeout(() => {
+      impactSoundPlayedRef.current = true;
+      stopSound = play("damage", { volume: 0.68 });
+    }, Math.max(0, remainingDelay));
+
+    return () => {
+      window.clearTimeout(timer);
+      stopSound();
+    };
+  }, [isAudioUnlocked, phase, play, reducedMotion]);
 
   useEffect(() => {
     if (phase !== "playing") return;
