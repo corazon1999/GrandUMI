@@ -115,10 +115,36 @@ public sealed class LeaderStatsStoreTests : IDisposable
         var all = store.GetLeaderboard("all", now);
 
         Assert.Equal(20, sevenDays.TotalMatches);
-        Assert.Equal(1, Assert.Single(sevenDays.Items, x => x.LeaderNumber == "L-A").Rank);
-        Assert.Equal(2, Assert.Single(sevenDays.Items, x => x.LeaderNumber == "L-B").Rank);
+        Assert.Empty(sevenDays.Items);
         Assert.Equal(21, all.TotalMatches);
+        Assert.Equal(1, Assert.Single(all.Items, x => x.LeaderNumber == "L-A").Rank);
+        Assert.Equal(2, Assert.Single(all.Items, x => x.LeaderNumber == "L-B").Rank);
         Assert.True(Assert.Single(all.Items, x => x.LeaderNumber == "L-C").InsufficientSample);
+    }
+
+    [Theory]
+    [InlineData(" 7D ", "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData(" 30D ", "30d", LeaderStatsStore.MinimumThirtyDayLeaderboardGames)]
+    [InlineData(null, "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    [InlineData("unexpected", "7d", LeaderStatsStore.MinimumSevenDayLeaderboardGames)]
+    public void 周期榜隐藏低于最低场次的领航且保留恰好达到门槛的领航(
+        string? requestedPeriod,
+        string expectedPeriod,
+        int minimumGames)
+    {
+        var now = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+        store.Initialize();
+        SeedCountedMatches(store, "exact", "L-EXACT", "L-EXACT-OPPONENT", minimumGames, now);
+        SeedCountedMatches(store, "below", "L-BELOW", "L-BELOW-OPPONENT", minimumGames - 1, now);
+
+        var result = store.GetLeaderboard(requestedPeriod, now);
+
+        Assert.Equal(expectedPeriod, result.Period);
+        Assert.Equal(minimumGames * 2 - 1, result.TotalMatches);
+        Assert.Equal(minimumGames, Assert.Single(result.Items, x => x.LeaderNumber == "L-EXACT").Games);
+        Assert.DoesNotContain(result.Items, x => x.LeaderNumber is "L-BELOW" or "L-BELOW-OPPONENT");
+        Assert.All(result.Items, x => Assert.True(x.Games >= minimumGames));
     }
 
     [Fact]
@@ -836,6 +862,49 @@ public sealed class LeaderStatsStoreTests : IDisposable
     {
         Directory.CreateDirectory(_tempDir);
         return new LeaderStatsStore(Path.Combine(_tempDir, "leader-stats.db"));
+    }
+
+    private static void SeedCountedMatches(
+        LeaderStatsStore store,
+        string idPrefix,
+        string leader0,
+        string leader1,
+        int count,
+        DateTime endedAtUtc)
+    {
+        using var connection = new SqliteConnection($"Data Source={store.DatabasePath}");
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO match_results (
+                match_id, ended_at_utc, match_kind,
+                player0_key, player1_key, player0_leader, player1_leader,
+                winner_index, first_player_index, turn_count, finish_reason,
+                counted, exclude_reason, stats_version
+            ) VALUES (
+                $matchId, $endedAtUtc, 'Matchmaking',
+                $player0Key, $player1Key, $player0Leader, $player1Leader,
+                0, 0, 8, '测试结束',
+                1, NULL, $statsVersion
+            );
+            """;
+        var matchIdParameter = command.Parameters.Add("$matchId", SqliteType.Text);
+        command.Parameters.AddWithValue("$endedAtUtc", endedAtUtc.ToString("O"));
+        command.Parameters.AddWithValue("$player0Key", HashAccount("Alice"));
+        command.Parameters.AddWithValue("$player1Key", HashAccount("Bob"));
+        command.Parameters.AddWithValue("$player0Leader", leader0);
+        command.Parameters.AddWithValue("$player1Leader", leader1);
+        command.Parameters.AddWithValue("$statsVersion", LeaderStatsStore.StatsVersion);
+        command.Prepare();
+
+        for (var index = 0; index < count; index++)
+        {
+            matchIdParameter.Value = $"{idPrefix}-{index}";
+            command.ExecuteNonQuery();
+        }
+        transaction.Commit();
     }
 
     private static LeaderMatchResult Match(

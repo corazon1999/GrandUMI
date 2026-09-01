@@ -126,6 +126,8 @@ public sealed record DailyMatchCountPoint(string Date, int Count);
 public sealed class LeaderStatsStore : IDisposable
 {
     public const int MinimumRankedGames = 20;
+    public const int MinimumSevenDayLeaderboardGames = 500;
+    public const int MinimumThirtyDayLeaderboardGames = 3000;
     public const int MinimumCountedTurn = 8;
     public const int MatchupLeaderboardLimit = 20;
     public const int MatchupMatrixLeaderLimit = 20;
@@ -358,7 +360,14 @@ public sealed class LeaderStatsStore : IDisposable
             using var connection = OpenLeaderboardConnection();
 
             var totalMatches = ReadTotalMatches(connection, sinceUtc);
-            var rows = ReadLeaderboardRows(connection, sinceUtc);
+            var minimumLeaderboardGames = period switch
+            {
+                "7d" => MinimumSevenDayLeaderboardGames,
+                "30d" => MinimumThirtyDayLeaderboardGames,
+                _ => 0,
+            };
+            var rows = ReadLeaderboardRows(connection, sinceUtc)
+                .Where(x => x.Games >= minimumLeaderboardGames);
             var ordered = rows
                 .OrderBy(x => x.Games < MinimumRankedGames ? 1 : 0)
                 .ThenByDescending(x => x.Games >= MinimumRankedGames ? x.WinRate : -1)
@@ -1275,7 +1284,7 @@ public sealed class LeaderStatsStore : IDisposable
     }
 
     private static string NormalizePeriod(string? period)
-        => period?.ToLowerInvariant() switch
+        => period?.Trim().ToLowerInvariant() switch
         {
             "7d" => "7d",
             "30d" => "30d",
