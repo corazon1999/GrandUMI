@@ -27,12 +27,20 @@ test("反馈客户端只发送版本、连接和视口白名单，不再上传�
 });
 
 test("部署构建把目标提交号注入客户端诊断", async () => {
-  const scripts = await Promise.all([
+  const directBuildScripts = await Promise.all([
     read("../../ops/server/deploy-test.sh"),
     read("../../ops/server/deploy-grandumi-candidate.sh"),
     read("../../ops/server/stage-grandumi-production.sh"),
     read("../../ops/server/promote-approved.sh"),
-    read("../../deploy-hk.ps1"),
   ]);
-  for (const script of scripts) assert.match(script, /NEXT_PUBLIC_GRANDUMI_COMMIT=/);
+  for (const script of directBuildScripts) assert.match(script, /NEXT_PUBLIC_GRANDUMI_COMMIT=/);
+
+  const [windowsEmergencyEntry, emergencyProduction, stageProduction] = await Promise.all([
+    read("../../deploy-hk.ps1"),
+    read("../../ops/server/deploy-grandumi-production-emergency.sh"),
+    read("../../ops/server/stage-grandumi-production.sh"),
+  ]);
+  assert.match(windowsEmergencyEntry, /deploy-grandumi-production-emergency\.sh/);
+  assert.match(emergencyProduction, /stage-grandumi-production\.sh/);
+  assert.match(stageProduction, /NEXT_PUBLIC_GRANDUMI_COMMIT="\$target"/);
 });

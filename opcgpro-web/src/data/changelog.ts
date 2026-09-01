@@ -20,6 +20,26 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-02-emergency-build-env-contract",
+    version: "2026.09.02.3",
+    date: "2026-09-02",
+    title: "发布链验证稳定性更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复正式服紧急发布验证仍按旧入口检查的问题，确保 A/B 发布构建继续把准确的版本号写入客户端诊断。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "发布前自动检查现在会沿真实发布链验证版本注入，避免正确的新发布入口被旧契约误判为失败。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-02-production-emergency-ab-release",
     version: "2026.09.02.2",
     date: "2026-09-02",
