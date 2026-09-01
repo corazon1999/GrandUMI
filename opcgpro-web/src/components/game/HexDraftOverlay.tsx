@@ -13,25 +13,21 @@ const MAX_RECOVERY_ATTEMPTS = 3;
 
 const TIER_STYLES: Record<HexTierSnapshot, {
   label: string;
-  shortLabel: string;
   accent: string;
   frame: string;
 }> = {
   Silver: {
     label: "银色海克斯",
-    shortLabel: "银",
     accent: "text-slate-100",
     frame: styles.silver,
   },
   Gold: {
     label: "金色海克斯",
-    shortLabel: "金",
     accent: "text-amber-200",
     frame: styles.gold,
   },
   Rainbow: {
     label: "彩色海克斯",
-    shortLabel: "彩",
     accent: "text-fuchsia-200",
     frame: styles.rainbow,
   },
@@ -150,7 +146,6 @@ export default function HexDraftOverlay() {
   const tierStyle = TIER_STYLES[tier];
   const candidates = draft?.candidates ?? [];
   const locked = draft?.myLocked ?? false;
-  const tierSequence = (hexState.tierSequence ?? []).map((item) => TIER_STYLES[item].shortLabel);
   const choose = (hexId: number) => {
     if (!draft || locked || useGameStore.getState().isPending) return;
     GameRequest.chooseHex(draft.roundId, hexId);
@@ -179,11 +174,6 @@ export default function HexDraftOverlay() {
             <h1 id="hex-draft-title" className="mt-1 text-xl font-black text-white @[640px]:text-2xl">
               {draft ? `你的第 ${draft.ownTurnNumber} 回合开始前：三选一` : "正在应用你的海克斯"}
             </h1>
-            {tierSequence.length === 3 && (
-              <p className="mt-1 text-[11px] font-bold tracking-[0.14em] text-slate-300" aria-label={`本局共享品质序列：${tierSequence.join("、")}`}>
-                本局共享品质序列 · {tierSequence.join(" → ")}
-              </p>
-            )}
             {draft && (
               <p className={`mt-1 text-sm font-black tabular-nums ${remainingSeconds <= 10 ? "text-rose-300" : "text-cyan-200"}`}>
                 剩余 {remainingSeconds} 秒

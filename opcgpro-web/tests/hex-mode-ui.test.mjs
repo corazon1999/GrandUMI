@@ -48,6 +48,18 @@ test("海克斯选秀使用权威倒计时、超时恢复、容器布局和四�
   assert.match(frameCss, /min-height: 3rem/);
 });
 
+test("海克斯选秀仅展示当前轮次品质，不展示本局共享品质序列", async () => {
+  const [overlay, types] = await Promise.all([
+    readSource("../src/components/game/HexDraftOverlay.tsx"),
+    readSource("../src/types/net.ts"),
+  ]);
+
+  assert.match(overlay, /const tier = draft\?\.tier \?\? "Silver"/);
+  assert.match(overlay, /\{tierStyle\.label\}/);
+  assert.doesNotMatch(overlay, /tierSequence|本局共享品质序列/);
+  assert.match(types, /tierSequence: HexTierSnapshot\[\]/);
+});
+
 test("右侧海克斯详情公开双方完整效果并兼容移动安全区", async () => {
   const [owned, board, stage, actions, prompt] = await Promise.all([
     readSource("../src/components/game/HexOwnedPanel.tsx"),
