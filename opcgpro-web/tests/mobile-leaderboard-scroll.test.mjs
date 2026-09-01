@@ -7,15 +7,12 @@ const source = await readFile(
   "utf8",
 );
 
-test("手机窄屏下整个排行榜页面共用纵向滚动容器", () => {
+test("手机窄屏下非矩阵视图继续共用页面纵向滚动容器", () => {
   const leaderboardPanel = source.match(/export default function LeaderLeaderboardPanel\(\)[\s\S]*$/)?.[0];
 
   assert.ok(leaderboardPanel, "应能找到排行榜页面组件");
   assert.match(leaderboardPanel, /data-testid="leaderboard-page-scroll"/);
-  assert.match(
-    leaderboardPanel,
-    /h-full min-h-0 touch-pan-y overflow-y-auto overscroll-contain p-3 \[-webkit-overflow-scrolling:touch\]/,
-  );
+  assert.match(leaderboardPanel, /matrixViewActive \? "flex flex-col overflow-hidden" : "touch-pan-y overflow-y-auto overscroll-contain"/);
   assert.match(leaderboardPanel, /@\[640px\]:flex @\[640px\]:flex-col @\[640px\]:overflow-hidden/);
 
   const scrollStart = leaderboardPanel.indexOf('data-testid="leaderboard-page-scroll"');
@@ -50,4 +47,20 @@ test("Leader 榜只在宽屏使用内部列表滚动", () => {
     source,
     /overflow-clip @\[640px\]:touch-pan-y @\[640px\]:overflow-auto @\[640px\]:overscroll-contain/,
   );
+});
+
+test("Leader 对阵矩阵从手机窄屏起启用双轴触控滚动且不被裁切", () => {
+  const matrixScroll = source.match(
+    /data-testid=\{matrixViewActive \? "leader-matchup-matrix-scroll"[\s\S]*?className=\{`[\s\S]*?`\}/,
+  )?.[0];
+
+  assert.ok(matrixScroll, "应能找到对阵矩阵专用滚动容器");
+  assert.match(matrixScroll, /viewMode === "matrix" \? "touch-pan-x touch-pan-y overflow-auto overscroll-contain \[-webkit-overflow-scrolling:touch\]"/);
+  assert.match(matrixScroll, /aria-label=\{matrixViewActive \? "Leader 对阵矩阵，可横向和纵向滚动"/);
+
+  const matrixBranch = matrixScroll.match(
+    /viewMode === "matrix" \? "([^"]+)"/,
+  )?.[1] ?? "";
+  assert.match(matrixBranch, /overflow-auto/);
+  assert.doesNotMatch(matrixBranch, /overflow-clip|@\[640px\]:overflow-auto/);
 });

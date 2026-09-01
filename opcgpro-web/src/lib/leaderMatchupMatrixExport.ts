@@ -9,8 +9,8 @@ import type {
 } from "@/types/net";
 
 export const LEADER_MATCHUP_MATRIX_LIMIT = 20;
-export const LEADER_MATRIX_EXPORT_CELL_WIDTH = 104;
-export const LEADER_MATRIX_EXPORT_ROW_HEIGHT = 82;
+export const LEADER_MATRIX_EXPORT_CELL_WIDTH = 116;
+export const LEADER_MATRIX_EXPORT_ROW_HEIGHT = 104;
 export const LEADER_MATRIX_EXPORT_MIN_WIDTH = 1200;
 
 const CANVAS_PADDING = 42;
@@ -102,6 +102,15 @@ export function formatLeaderMatchupMatrixExportTimestamp(date: Date): {
 
 function percent(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
+function positionText(
+  label: "先" | "后",
+  games: number | undefined,
+  winRate: number | null | undefined,
+): string {
+  if (!games) return `${label} — · 0场`;
+  return `${label} ${percent(winRate)} · ${games}场`;
 }
 
 function roundedRect(
@@ -236,20 +245,37 @@ function drawMatrixCell(
   context.strokeRect(x + 0.5, y + 0.5, LEADER_MATRIX_EXPORT_CELL_WIDTH - 1, LEADER_MATRIX_EXPORT_ROW_HEIGHT - 1);
 
   context.fillStyle = colors.foreground;
-  context.font = `800 18px ${FONT_FAMILY}`;
+  context.font = `800 17px ${FONT_FAMILY}`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(item?.isMirror ? "—" : percent(item?.winRate), x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2, y + 31);
+  context.fillText(item?.isMirror ? "镜像" : percent(item?.winRate), x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2, y + 20);
 
   const lowSample = Boolean(item && !item.isMirror && item.games > 0 && item.games < 5);
   context.fillStyle = lowSample ? "#fbbf24" : "#94a3b8";
-  context.font = `600 11px ${FONT_FAMILY}`;
+  context.font = `600 10px ${FONT_FAMILY}`;
   const sampleText = item?.isMirror
     ? `${item.games} 场镜像`
     : item && item.games > 0
-      ? `${item.games} 场${lowSample ? " · 低样本" : ""}`
+      ? `总 ${item.games}场${lowSample ? " · 低样本" : ""}`
       : "暂无交手";
-  context.fillText(sampleText, x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2, y + 56);
+  context.fillText(sampleText, x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2, y + 42);
+
+  const firstLowSample = Boolean(item && item.firstGames > 0 && item.firstGames < 5);
+  context.fillStyle = firstLowSample ? "#fbbf24" : "#7dd3fc";
+  context.font = `700 10px ${FONT_FAMILY}`;
+  context.fillText(
+    positionText("先", item?.firstGames, item?.firstWinRate),
+    x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2,
+    y + 66,
+  );
+
+  const secondLowSample = Boolean(item && item.secondGames > 0 && item.secondGames < 5);
+  context.fillStyle = secondLowSample ? "#fbbf24" : "#c4b5fd";
+  context.fillText(
+    positionText("后", item?.secondGames, item?.secondWinRate),
+    x + LEADER_MATRIX_EXPORT_CELL_WIDTH / 2,
+    y + 87,
+  );
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -303,7 +329,11 @@ export async function renderLeaderMatchupMatrixImage(
   context.textBaseline = "alphabetic";
   context.fillStyle = "#ffffff";
   context.font = `800 38px ${FONT_FAMILY}`;
-  context.fillText(`Leader 对阵一图流 · 榜前 ${leaders.length}`, CANVAS_PADDING, CANVAS_PADDING + 50);
+  context.fillText(
+    `Leader 对阵一图流 · 榜前 ${LEADER_MATCHUP_MATRIX_LIMIT}${leaders.length < LEADER_MATCHUP_MATRIX_LIMIT ? `（当前 ${leaders.length}）` : ""}`,
+    CANVAS_PADDING,
+    CANVAS_PADDING + 50,
+  );
   context.fillStyle = "#cbd5e1";
   context.font = `600 18px ${FONT_FAMILY}`;
   context.fillText(
@@ -319,7 +349,7 @@ export async function renderLeaderMatchupMatrixImage(
     CANVAS_PADDING + 124,
   );
   context.fillStyle = "#64748b";
-  context.fillText("横轴为对手，纵轴为我方；少于 5 场标记低样本", CANVAS_PADDING, CANVAS_PADDING + 156);
+  context.fillText("横轴为对手，纵轴为我方；先/后均按纵轴我方视角，少于 5 场标记低样本", CANVAS_PADDING, CANVAS_PADDING + 156);
   context.textAlign = "right";
   context.fillStyle = "#fbbf24";
   context.font = `700 17px ${FONT_FAMILY}`;
@@ -406,7 +436,7 @@ export async function renderLeaderMatchupMatrixImage(
   context.fillStyle = "#64748b";
   context.font = `500 12px ${FONT_FAMILY}`;
   context.fillText(
-    "颜色仅表示当前行 Leader 对阵对应列 Leader 的胜率区间；镜像对局不计算胜率。",
+    "颜色仅表示当前行 Leader 对阵对应列 Leader 的综合胜率区间；镜像格仅展示先手与后手表现。",
     CANVAS_PADDING,
     canvas.height - CANVAS_PADDING - 10,
   );

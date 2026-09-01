@@ -321,7 +321,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
     }
 
     [Fact]
-    public void 对战前十统计覆盖双方位置先后手镜像和排名边界()
+    public void 对战前二十统计覆盖双方位置先后手镜像和排名边界()
     {
         var now = new DateTime(2026, 8, 8, 8, 0, 0, DateTimeKind.Utc);
         var store = CreateStore();
@@ -376,8 +376,12 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Equal(8, opponentRow.Losses);
         Assert.Equal(0.6, opponentRow.WinRate!.Value, precision: 8);
         Assert.Equal(10, opponentRow.FirstGames);
+        Assert.Equal(6, opponentRow.FirstWins);
+        Assert.Equal(4, opponentRow.FirstLosses);
         Assert.Equal(0.6, opponentRow.FirstWinRate!.Value, precision: 8);
         Assert.Equal(10, opponentRow.SecondGames);
+        Assert.Equal(6, opponentRow.SecondWins);
+        Assert.Equal(4, opponentRow.SecondLosses);
         Assert.Equal(0.6, opponentRow.SecondWinRate!.Value, precision: 8);
 
         var mirrorRow = Assert.Single(result.Items, x => x.LeaderNumber == target);
@@ -386,8 +390,84 @@ public sealed class LeaderStatsStoreTests : IDisposable
         Assert.Null(mirrorRow.WinRate);
         Assert.Null(mirrorRow.Wins);
         Assert.Null(mirrorRow.Losses);
+        Assert.Equal(20, mirrorRow.FirstGames);
+        Assert.Equal(12, mirrorRow.FirstWins);
+        Assert.Equal(8, mirrorRow.FirstLosses);
         Assert.Equal(0.6, mirrorRow.FirstWinRate!.Value, precision: 8);
+        Assert.Equal(20, mirrorRow.SecondGames);
+        Assert.Equal(8, mirrorRow.SecondWins);
+        Assert.Equal(12, mirrorRow.SecondLosses);
         Assert.Equal(0.4, mirrorRow.SecondWinRate!.Value, precision: 8);
+    }
+
+    [Fact]
+    public void 对阵矩阵先后手统计始终采用行玩家视角且无交手保持空样本()
+    {
+        var now = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
+        var store = CreateStore();
+
+        for (var gameIndex = 0; gameIndex < LeaderStatsStore.MinimumRankedGames; gameIndex++)
+        {
+            var firstPlayer = gameIndex < 8 ? 0 : 1;
+            var winner = gameIndex switch
+            {
+                < 6 => 0,
+                < 8 => 1,
+                < 11 => 0,
+                _ => 1,
+            };
+            store.RecordMatch(Match(
+                $"perspective-{gameIndex}",
+                now,
+                MatchKind.Matchmaking,
+                "L-A",
+                "L-B",
+                winner,
+                firstPlayer,
+                8));
+            store.RecordMatch(Match(
+                $"no-sample-{gameIndex}",
+                now,
+                MatchKind.Matchmaking,
+                "L-C",
+                "L-D",
+                gameIndex % 2,
+                gameIndex % 2,
+                8));
+        }
+
+        var result = store.GetMatchupMatrix("all", now);
+        var rowA = Assert.Single(result.Rows, row => row.LeaderNumber == "L-A");
+        var rowB = Assert.Single(result.Rows, row => row.LeaderNumber == "L-B");
+        var aAgainstB = Assert.Single(rowA.Items, item => item.LeaderNumber == "L-B");
+        var bAgainstA = Assert.Single(rowB.Items, item => item.LeaderNumber == "L-A");
+
+        Assert.Equal(8, aAgainstB.FirstGames);
+        Assert.Equal(6, aAgainstB.FirstWins);
+        Assert.Equal(2, aAgainstB.FirstLosses);
+        Assert.Equal(0.75, aAgainstB.FirstWinRate!.Value, precision: 8);
+        Assert.Equal(12, aAgainstB.SecondGames);
+        Assert.Equal(3, aAgainstB.SecondWins);
+        Assert.Equal(9, aAgainstB.SecondLosses);
+        Assert.Equal(0.25, aAgainstB.SecondWinRate!.Value, precision: 8);
+
+        Assert.Equal(aAgainstB.FirstGames, bAgainstA.SecondGames);
+        Assert.Equal(aAgainstB.FirstGames, aAgainstB.FirstWins + bAgainstA.SecondWins);
+        Assert.Equal(aAgainstB.SecondGames, bAgainstA.FirstGames);
+        Assert.Equal(aAgainstB.SecondGames, aAgainstB.SecondWins + bAgainstA.FirstWins);
+        Assert.Equal(0.75, bAgainstA.FirstWinRate!.Value, precision: 8);
+        Assert.Equal(0.25, bAgainstA.SecondWinRate!.Value, precision: 8);
+
+        var noSample = Assert.Single(rowA.Items, item => item.LeaderNumber == "L-C");
+        Assert.Equal(0, noSample.Games);
+        Assert.Equal(0, noSample.FirstGames);
+        Assert.Equal(0, noSample.FirstWins);
+        Assert.Equal(0, noSample.FirstLosses);
+        Assert.Null(noSample.FirstWinRate);
+        Assert.Equal(0, noSample.SecondGames);
+        Assert.Equal(0, noSample.SecondWins);
+        Assert.Equal(0, noSample.SecondLosses);
+        Assert.Null(noSample.SecondWinRate);
     }
 
     [Fact]
@@ -446,6 +526,7 @@ public sealed class LeaderStatsStoreTests : IDisposable
             .ToArray();
 
         Assert.Equal(LeaderStatsStore.MatchupMatrixLeaderLimit, result.Rows.Count);
+        Assert.True(result.Rows.Count > 12);
         Assert.Equal(expectedLeaders, result.Rows.Select(row => row.LeaderNumber));
         Assert.All(result.Rows, row => Assert.Equal(LeaderStatsStore.MatchupMatrixLeaderLimit, row.Items.Count));
 

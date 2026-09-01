@@ -52,8 +52,12 @@ public sealed record LeaderMatchupItem(
     int? Losses,
     double? WinRate,
     int FirstGames,
+    int FirstWins,
+    int FirstLosses,
     double? FirstWinRate,
     int SecondGames,
+    int SecondWins,
+    int SecondLosses,
     double? SecondWinRate,
     bool IsMirror);
 
@@ -462,8 +466,12 @@ public sealed class LeaderStatsStore : IDisposable
                         null,
                         null,
                         mirror.Games,
+                        mirror.FirstWins,
+                        mirror.Games - mirror.FirstWins,
                         mirror.Games == 0 ? null : mirror.FirstWins / (double)mirror.Games,
                         mirror.Games,
+                        mirror.SecondWins,
+                        mirror.Games - mirror.SecondWins,
                         mirror.Games == 0 ? null : mirror.SecondWins / (double)mirror.Games,
                         true);
                 }
@@ -479,8 +487,12 @@ public sealed class LeaderStatsStore : IDisposable
                     row.Games - row.Wins,
                     row.Games == 0 ? null : row.Wins / (double)row.Games,
                     row.FirstGames,
+                    row.FirstWins,
+                    row.FirstGames - row.FirstWins,
                     row.FirstGames == 0 ? null : row.FirstWins / (double)row.FirstGames,
                     row.SecondGames,
+                    row.SecondWins,
+                    row.SecondGames - row.SecondWins,
                     row.SecondGames == 0 ? null : row.SecondWins / (double)row.SecondGames,
                     false);
             }).ToArray();
@@ -533,8 +545,12 @@ public sealed class LeaderStatsStore : IDisposable
                             null,
                             null,
                             mirror.Games,
+                            mirror.FirstWins,
+                            mirror.Games - mirror.FirstWins,
                             mirror.Games == 0 ? null : mirror.FirstWins / (double)mirror.Games,
                             mirror.Games,
+                            mirror.SecondWins,
+                            mirror.Games - mirror.SecondWins,
                             mirror.Games == 0 ? null : mirror.SecondWins / (double)mirror.Games,
                             true);
                     }
@@ -550,8 +566,12 @@ public sealed class LeaderStatsStore : IDisposable
                         matchup.Games - matchup.Wins,
                         matchup.Games == 0 ? null : matchup.Wins / (double)matchup.Games,
                         matchup.FirstGames,
+                        matchup.FirstWins,
+                        matchup.FirstGames - matchup.FirstWins,
                         matchup.FirstGames == 0 ? null : matchup.FirstWins / (double)matchup.FirstGames,
                         matchup.SecondGames,
+                        matchup.SecondWins,
+                        matchup.SecondGames - matchup.SecondWins,
                         matchup.SecondGames == 0 ? null : matchup.SecondWins / (double)matchup.SecondGames,
                         false);
                 }).ToArray();

@@ -803,8 +803,12 @@ export interface LeaderMatchupItem {
   losses: number | null;
   winRate: number | null;
   firstGames: number;
+  firstWins: number;
+  firstLosses: number;
   firstWinRate: number | null;
   secondGames: number;
+  secondWins: number;
+  secondLosses: number;
   secondWinRate: number | null;
   isMirror: boolean;
 }
@@ -836,7 +840,7 @@ export interface LeaderMatchupMatrixRow {
   items: LeaderMatchupItem[];
 }
 
-/** 当前周期胜率榜前十五名的完整对阵矩阵。 */
+/** 当前筛选条件下胜率榜最多前二十名的完整对阵矩阵。 */
 export interface MsgLeaderMatchupMatrix extends MsgBase {
   proto: "MsgLeaderMatchupMatrix";
   period: LeaderboardPeriod;

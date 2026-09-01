@@ -3,7 +3,10 @@
 import Image from "next/image";
 import { getCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
-import { selectLeaderMatchupMatrixLeaders } from "@/lib/leaderMatchupMatrixExport";
+import {
+  LEADER_MATCHUP_MATRIX_LIMIT,
+  selectLeaderMatchupMatrixLeaders,
+} from "@/lib/leaderMatchupMatrixExport";
 import type {
   LeaderLeaderboardItem,
   LeaderMatchupItem,
@@ -33,6 +36,24 @@ function cellClasses(item?: LeaderMatchupItem): string {
   if (item.winRate === 0.5) return "bg-slate-500/10 text-slate-200";
   if (item.winRate >= 0.4) return "bg-rose-500/10 text-rose-300";
   return "bg-red-500/15 text-red-300";
+}
+
+function positionText(
+  label: "先" | "后",
+  games: number | undefined,
+  winRate: number | null | undefined,
+): string {
+  if (!games) return `${label} — · 0场`;
+  return `${label} ${percent(winRate ?? null)} · ${games}场`;
+}
+
+function positionDetailText(
+  label: "先" | "后",
+  games: number | undefined,
+  wins: number | undefined,
+  winRate: number | null | undefined,
+): string {
+  return `${label} ${percent(winRate ?? null)}（${wins ?? 0}胜/${games ?? 0}场）`;
 }
 
 export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }: Props) {
@@ -76,8 +97,11 @@ export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }:
     <section className="min-w-max">
       <header className="sticky left-0 z-20 flex w-[calc(100vw-2rem)] min-w-[760px] max-w-full flex-wrap items-center justify-between gap-2 border-b border-gray-800 bg-gray-950/95 px-4 py-3 backdrop-blur">
         <div>
-          <h3 className="text-sm font-bold text-white">榜前 {leaders.length} 对阵一图流</h3>
-          <p className="mt-0.5 text-[11px] text-gray-600">横轴为对手，纵轴为我方；两轴均按综合胜率由高到低排列</p>
+          <h3 className="text-sm font-bold text-white">
+            榜前 {LEADER_MATCHUP_MATRIX_LIMIT} 对阵一图流
+            {leaders.length < LEADER_MATCHUP_MATRIX_LIMIT ? `（当前 ${leaders.length}）` : ""}
+          </h3>
+          <p className="mt-0.5 text-[11px] text-gray-600">横轴为对手，纵轴为我方；先/后均按纵轴我方视角，当前筛选档位最多展示 20 名</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[10px] text-gray-500">
           <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-400/70" />优势</span>
@@ -101,7 +125,7 @@ export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }:
                 <th
                   key={leader.leaderNumber}
                   scope="col"
-                  className="sticky top-0 z-30 w-20 min-w-20 border-b border-r border-gray-800 bg-gray-900 px-1 py-2 align-bottom"
+                  className="sticky top-0 z-30 w-24 min-w-24 border-b border-r border-gray-800 bg-gray-900 px-1 py-2 align-bottom"
                 >
                   <div className="mx-auto">
                     <div className="relative mx-auto h-[62px] w-11 overflow-hidden rounded border border-gray-700 bg-gray-950">
@@ -160,21 +184,29 @@ export default function LeaderMatchupMatrix({ data, leaderboardItems, onRetry }:
                 {leaders.map((opponent) => {
                   const item = cellMap.get(opponent.leaderNumber);
                   const lowSample = Boolean(item && !item.isMirror && item.games > 0 && item.games < 5);
+                  const firstLowSample = Boolean(item && item.firstGames > 0 && item.firstGames < 5);
+                  const secondLowSample = Boolean(item && item.secondGames > 0 && item.secondGames < 5);
                   const rowName = card?.name ?? leader.leaderNumber;
                   const opponentName = getCard(opponent.leaderNumber)?.name ?? opponent.leaderNumber;
                   return (
                     <td
                       key={opponent.leaderNumber}
-                      className={`h-[61px] w-20 min-w-20 border-b border-r border-gray-800 p-1 ${cellClasses(item)}`}
-                      title={`${rowName} 对阵 ${opponentName}`}
+                      className={`h-[88px] w-24 min-w-24 border-b border-r border-gray-800 px-1 py-1.5 ${cellClasses(item)}`}
+                      title={`${rowName} 对阵 ${opponentName}；${item?.isMirror ? `${item.games}场镜像` : `综合 ${percent(item?.winRate ?? null)}（${item?.wins ?? 0}胜/${item?.games ?? 0}场）`}；${positionDetailText("先", item?.firstGames, item?.firstWins, item?.firstWinRate)}；${positionDetailText("后", item?.secondGames, item?.secondWins, item?.secondWinRate)}`}
                     >
-                      <p className="text-sm font-black tabular-nums">{item?.isMirror ? "—" : percent(item?.winRate ?? null)}</p>
-                      <p className={`mt-0.5 text-[9px] tabular-nums ${lowSample ? "text-amber-400" : "text-gray-600"}`}>
+                      <p className="text-sm font-black tabular-nums">{item?.isMirror ? "镜像" : percent(item?.winRate ?? null)}</p>
+                      <p className={`mt-0.5 text-[9px] tabular-nums ${lowSample ? "text-amber-400" : "text-gray-500"}`}>
                         {item?.isMirror
                           ? `${item.games} 场镜像`
                           : item && item.games > 0
-                            ? `${item.games} 场${lowSample ? " · 低样本" : ""}`
+                            ? `总 ${item.games}场${lowSample ? " · 低样本" : ""}`
                             : "暂无交手"}
+                      </p>
+                      <p className={`mt-1 text-[9px] font-semibold tabular-nums ${firstLowSample ? "text-amber-400" : "text-sky-300/90"}`}>
+                        {positionText("先", item?.firstGames, item?.firstWinRate)}
+                      </p>
+                      <p className={`mt-0.5 text-[9px] font-semibold tabular-nums ${secondLowSample ? "text-amber-400" : "text-violet-300/90"}`}>
+                        {positionText("后", item?.secondGames, item?.secondWinRate)}
                       </p>
                     </td>
                   );

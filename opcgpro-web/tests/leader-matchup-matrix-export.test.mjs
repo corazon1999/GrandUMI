@@ -39,6 +39,30 @@ test("完整矩阵画布只按 Leader 数量计算，不依赖滚动视口", asy
   assert.doesNotMatch(layoutBlock, /innerWidth|clientWidth|scrollWidth|viewport/);
   assert.match(exporter, /leaders\.forEach\(\(leader, rowIndex\)/);
   assert.match(exporter, /leaders\.forEach\(\(opponent, columnIndex\)/);
+  assert.match(exporter, /const LEADER_MATRIX_EXPORT_CELL_WIDTH = 116;/);
+  assert.match(exporter, /const LEADER_MATRIX_EXPORT_ROW_HEIGHT = 104;/);
+  assert.doesNotMatch(exporter, /\.slice\(0,\s*12\)/);
+});
+
+test("导出图片每格包含总计以及我方先手和后手统计", async () => {
+  const exporter = await readSource("../src/lib/leaderMatchupMatrixExport.ts");
+
+  assert.match(exporter, /总 \$\{item\.games\}场/);
+  assert.match(exporter, /positionText\("先", item\?\.firstGames, item\?\.firstWinRate\)/);
+  assert.match(exporter, /positionText\("后", item\?\.secondGames, item\?\.secondWinRate\)/);
+  assert.match(exporter, /先\/后均按纵轴我方视角/);
+  assert.match(exporter, /榜前 \$\{LEADER_MATCHUP_MATRIX_LIMIT\}/);
+
+  const visiblePositionText = exporter.slice(
+    exporter.indexOf("function positionText"),
+    exporter.indexOf("function roundedRect"),
+  );
+  const matrixCell = exporter.slice(
+    exporter.indexOf("function drawMatrixCell"),
+    exporter.indexOf("function canvasToBlob"),
+  );
+  assert.doesNotMatch(visiblePositionText, /胜\//, "PNG 先后手短文案不得拼接胜场");
+  assert.doesNotMatch(matrixCell, /firstWins|secondWins|item\.wins/, "PNG 格内不得重新引入长胜场文本");
 });
 
 test("导出按钮覆盖准备、连续点击锁定、成功和错误状态", async () => {

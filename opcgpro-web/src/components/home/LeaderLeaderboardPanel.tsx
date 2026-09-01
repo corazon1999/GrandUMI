@@ -494,6 +494,7 @@ export default function LeaderLeaderboardPanel() {
   const matrixExportDataLoading = !matrixExportReady
     && !matrixExportRequestFailed
     && !matrixExportUnavailable;
+  const matrixViewActive = rankingTab === "leader" && viewMode === "matrix";
   const matrixExportDisabled = matrixExportState === "exporting"
     || matrixExportDataLoading
     || matrixExportUnavailable;
@@ -548,7 +549,7 @@ export default function LeaderLeaderboardPanel() {
   return (
     <section
       data-testid="leaderboard-page-scroll"
-      className="h-full min-h-0 touch-pan-y overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] @[640px]:flex @[640px]:flex-col @[640px]:overflow-hidden @[640px]:p-6"
+      className={`h-full min-h-0 p-3 [-webkit-overflow-scrolling:touch] @[640px]:flex @[640px]:flex-col @[640px]:overflow-hidden @[640px]:p-6 ${matrixViewActive ? "flex flex-col overflow-hidden" : "touch-pan-y overflow-y-auto overscroll-contain"}`}
     >
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -767,7 +768,13 @@ export default function LeaderLeaderboardPanel() {
         </div>
       )}
 
-      <div className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-clip @[640px]:overflow-hidden" : "overflow-clip @[640px]:touch-pan-y @[640px]:overflow-auto @[640px]:overscroll-contain @[640px]:[-webkit-overflow-scrolling:touch]"}`}>
+      <div
+        data-testid={matrixViewActive ? "leader-matchup-matrix-scroll" : undefined}
+        role={matrixViewActive ? "region" : undefined}
+        aria-label={matrixViewActive ? "Leader 对阵矩阵，可横向和纵向滚动" : undefined}
+        tabIndex={matrixViewActive ? 0 : undefined}
+        className={`min-h-0 flex-1 rounded-xl border border-gray-800 bg-gray-950/60 ${rankingTab === "ranked" ? "overflow-clip @[640px]:overflow-hidden" : viewMode === "matrix" ? "touch-pan-x touch-pan-y overflow-auto overscroll-contain [-webkit-overflow-scrolling:touch]" : "overflow-clip @[640px]:touch-pan-y @[640px]:overflow-auto @[640px]:overscroll-contain @[640px]:[-webkit-overflow-scrolling:touch]"}`}
+      >
         {rankingTab === "ranked" ? rankProfile ? <RankedLeaderboard items={rankLeaderboard} standings={factionStandings} /> : rankSnapshotRequest.phase === "error" ? (
           <div className="px-4 py-16 text-center">
             <p className="text-sm font-bold text-red-400">{rankSnapshotRequest.error ?? "排位榜暂时不可用"}</p>
