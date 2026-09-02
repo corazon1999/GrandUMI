@@ -66,6 +66,18 @@ export default function FriendlyRoomPanel() {
         {room.origin === "roomCode" ? "房间码友谊战" : "友谊战房间"}
       </h1>
 
+      <div
+        data-friendly-room-gameplay={room.hexMode ? "hex" : "normal"}
+        className={`flex min-h-11 w-full max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-2.5 ${
+          room.hexMode
+            ? "border-cyan-700/70 bg-cyan-950/30 text-cyan-200"
+            : "border-gray-700 bg-gray-900 text-gray-300"
+        }`}
+      >
+        <span className="text-sm font-black">{room.hexMode ? "海克斯模式" : "普通模式"}</span>
+        <span className="text-xs opacity-75">房主已锁定</span>
+      </div>
+
       {room.roomCode && (
         <div className="flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-blue-800 bg-blue-950/30 px-4 py-3">
           <div className="min-w-0">

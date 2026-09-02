@@ -54,6 +54,30 @@ public sealed class HexModeStateMachineTests
     }
 
     [Fact]
+    public async Task 好友房海克斯_重放保留私房来源并由独立开关启用规则()
+    {
+        TestScene.New();
+        const int seed = 20260903;
+        var deck = BuildLegalDeck();
+
+        var rebuilt = await MatchReplay.RebuildAsync(
+            "friendly-hex-replay",
+            seed,
+            firstPlayer: 0,
+            ("alice", deck),
+            ("bob", deck),
+            Array.Empty<MatchReplay.ActionEntry>(),
+            matchKind: MatchKind.RoomCode,
+            hexMode: true);
+
+        Assert.Equal(MatchKind.RoomCode, rebuilt.State.MatchKind);
+        Assert.True(rebuilt.State.HexState.Enabled);
+        Assert.Equal(HexRules.CurrentRulesRevision, rebuilt.State.HexState.RulesRevision);
+        Assert.Equal(3, rebuilt.State.HexState.DraftTierSequence.Count);
+        Assert.Equal(HexCatalogConfiguration.BuiltIn.Digest, rebuilt.State.HexState.CatalogDigest);
+    }
+
+    [Fact]
     public void 动态品质目录锁定到房间且公开快照携带内容身份()
     {
         var engine = CreateEngine(seed: 20260902);

@@ -264,7 +264,8 @@ public static class GameRoomManager
                                           bool p0SpectatorHandsPublic = false,
                                           bool p1SpectatorHandsPublic = false,
                                           string? p0SpectateCode = null,
-                                          string? p1SpectateCode = null)
+                                          string? p1SpectateCode = null,
+                                          bool hexMode = false)
     {
         if (string.Equals(p0Sid, p1Sid, StringComparison.Ordinal))
             throw new InvalidOperationException("同一连接不能同时作为对局双方");
@@ -292,7 +293,8 @@ public static class GameRoomManager
             leaderKeywordWildcard: vsBot,
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
             deferInitialSetupUntilStart: true,
-            matchKind: matchKind);
+            matchKind: matchKind,
+            hexMode: hexMode);
         engine.State.Players[0].DisplayName = p0DisplayName ?? p0Account;
         engine.State.Players[1].DisplayName = p1DisplayName ?? p1Account;
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
@@ -410,6 +412,7 @@ public static class GameRoomManager
                 seed = engine.State.RngSeed,
                 firstPlayer,
                 rulesetId = engine.State.RulesetId,
+                hexMode = engine.State.HexState.Enabled,
                 hexRulesRevision = engine.State.HexState.RulesRevision,
                 hexCatalogRevision = engine.State.HexState.CatalogRevision,
                 hexCatalogDigest = engine.State.HexState.CatalogDigest,
@@ -2986,12 +2989,21 @@ public static class GameRoomManager
             && Enum.TryParse<MatchKind>(mk.GetString(), ignoreCase: true, out var parsedMatchKind))
             matchKind = parsedMatchKind;
         if (vsBot) matchKind = MatchKind.Bot;
+        // 新日志显式保存独立玩法开关；旧公开海克斯日志由 MatchKind 兼容推导，
+        // 旧好友房/房间码日志则保持升级前的普通玩法。
+        var hexMode = matchKind == MatchKind.Hex;
+        if (h.TryGetProperty("hexMode", out var storedHexMode))
+        {
+            if (storedHexMode.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new InvalidDataException("建房日志包含无效的海克斯玩法开关。");
+            hexMode = storedHexMode.GetBoolean() || matchKind == MatchKind.Hex;
+        }
         // 海克斯规则版本字段在 v2 池调整前不存在；缺失即锁定旧版语义，确保旧房间可重放恢复。
         var hexRulesRevision = h.TryGetProperty("hexRulesRevision", out var storedHexRulesRevision)
             ? storedHexRulesRevision.GetInt32()
             : Hex.HexRules.LegacyRulesRevision;
         Hex.HexCatalogConfiguration? hexCatalogConfiguration = null;
-        if (matchKind == MatchKind.Hex
+        if (hexMode
             && hexRulesRevision >= Hex.HexRules.CatalogConfigurationRulesRevision)
         {
             if (!h.TryGetProperty("hexCatalogRevision", out var catalogRevisionElement)
@@ -3154,6 +3166,7 @@ public static class GameRoomManager
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset,
             matchKind: matchKind,
+            hexMode: hexMode,
             hexRulesRevision: hexRulesRevision,
             hexCatalogConfiguration: hexCatalogConfiguration);
         if (engine.State.HexState.ActiveDraft is { } restoredHexDraft

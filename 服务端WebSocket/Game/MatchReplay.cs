@@ -71,6 +71,7 @@ public static class MatchReplay
         bool openingSetupAfterFirstPlayerChoice = false,
         CardRuleset? ruleset = null,
         MatchKind matchKind = MatchKind.UnknownHuman,
+        bool hexMode = false,
         int hexRulesRevision = Hex.HexRules.CurrentRulesRevision,
         Hex.HexCatalogConfiguration? hexCatalogConfiguration = null)
     {
@@ -84,7 +85,8 @@ public static class MatchReplay
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
             deferInitialSetupUntilStart: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset,
-            matchKind: matchKind);
+            matchKind: matchKind,
+            hexMode: hexMode);
         Hex.HexRules.SetRulesRevisionForReplay(engine.State, hexRulesRevision);
         if (hexCatalogConfiguration is not null)
             Hex.HexRules.SetCatalogForReplay(engine.State, hexCatalogConfiguration);

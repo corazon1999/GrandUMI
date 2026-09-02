@@ -66,9 +66,9 @@ public static class HexRules
         new(HexTier.Rainbow, "hex_prismatic_tier_grant", "prismatic-tier"),
     ];
 
-    public static void Initialize(GameState state)
+    public static void Initialize(GameState state, bool hexMode = false)
     {
-        state.HexState.Enabled = state.MatchKind == MatchKind.Hex;
+        state.HexState.Enabled = hexMode || state.MatchKind == MatchKind.Hex;
         state.HexState.RulesRevision = CurrentRulesRevision;
         if (state.HexState.Enabled)
             ApplyCatalogSnapshot(state.HexState, HexCatalogRuntime.SnapshotForNewRoom());

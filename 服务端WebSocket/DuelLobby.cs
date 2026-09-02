@@ -8,6 +8,8 @@ public sealed class DuelLobby
     public required string RoomId { get; init; }
     public required MatchKind MatchKind { get; init; }
     public string? JoinCode { get; init; }
+    /// <summary>房主建房时锁定的海克斯玩法；房间生命周期内不可变。</summary>
+    public bool HexMode { get; init; }
     public string?[] Accounts { get; } = new string?[2];
     public string?[] Names { get; } = new string?[2];
     public string?[] Decks { get; } = new string?[2];
@@ -69,7 +71,7 @@ public sealed class DuelLobby
 
             State = "starting";
             start = new DuelLobbyStartData(
-                Accounts[0]!, Accounts[1]!, Decks[0]!, Decks[1]!, DeckNames[0], DeckNames[1]);
+                Accounts[0]!, Accounts[1]!, Decks[0]!, Decks[1]!, DeckNames[0], DeckNames[1], HexMode);
             return true;
         }
     }
@@ -103,4 +105,5 @@ public sealed record DuelLobbyStartData(
     string HostDeck,
     string GuestDeck,
     string? HostDeckName,
-    string? GuestDeckName);
+    string? GuestDeckName,
+    bool HexMode);

@@ -72,6 +72,32 @@ public class DuelLobbyTests
     }
 
     [Fact]
+    public void 海克斯房间_并发开局只捕获一次锁定玩法且失败重试不改写()
+    {
+        var room = CreateWaitingRoom(hexMode: true);
+        Assert.True(room.TryAddGuest("guest", "访客", "guest-deck", "访客卡组", out _));
+        room.Ready[0] = true;
+        room.Ready[1] = true;
+        var starts = new System.Collections.Concurrent.ConcurrentBag<DuelLobbyStartData>();
+
+        Parallel.For(0, 20, _ =>
+        {
+            if (room.TryBeginStart(out var start) && start is not null)
+                starts.Add(start);
+        });
+
+        var captured = Assert.Single(starts);
+        Assert.True(captured.HexMode);
+        Assert.True(room.HexMode);
+
+        room.CompleteStart(success: false);
+        Assert.Equal("lobby", room.State);
+        Assert.True(room.HexMode);
+        Assert.False(room.Ready[0]);
+        Assert.False(room.Ready[1]);
+    }
+
+    [Fact]
     public void 房间码过期清理_不能关闭已经加入访客的房间()
     {
         var room = CreateWaitingRoom();
@@ -85,13 +111,14 @@ public class DuelLobbyTests
         Assert.False(room.TryAddGuest("late-guest", "迟到访客", "deck", "卡组", out _));
     }
 
-    private static DuelLobby CreateWaitingRoom()
+    private static DuelLobby CreateWaitingRoom(bool hexMode = false)
     {
         var room = new DuelLobby
         {
             RoomId = "room-code-test",
             MatchKind = MatchKind.RoomCode,
             JoinCode = "ABC234",
+            HexMode = hexMode,
         };
         room.Accounts[0] = "host";
         room.Names[0] = "房主";

@@ -1400,6 +1400,7 @@ function handleFriendlyRoom(msg: MsgFriendlyRoom) {
     roomId: msg.roomId,
     origin: msg.origin ?? "invite",
     roomCode: msg.roomCode ?? null,
+    hexMode: msg.hexMode === true,
     players: msg.players,
     scores: msg.scores,
     state: msg.state,
@@ -1725,12 +1726,13 @@ export const HomeRequest = {
     } as MsgSelectRankFaction);
   },
 
-  createRoom(deck: string, deckName: string) {
+  createRoom(deck: string, deckName: string, hexMode = false) {
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     const sent = NetManager.send({
       proto: "MsgCreateRoom",
       deck,
       deckName,
+      hexMode,
     } as MsgCreateRoom);
     if (sent) armRoomRequestTimer();
     return sent;

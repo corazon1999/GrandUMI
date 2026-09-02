@@ -59,6 +59,7 @@ export type FriendlyRoomState = {
   roomId: string;
   origin: "roomCode" | "invite";
   roomCode: string | null;
+  hexMode: boolean;
   players: FriendlyPlayer[];
   scores: number[];
   state: "lobby" | "starting" | "playing";

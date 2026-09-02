@@ -1,7 +1,9 @@
 using System.Text.Json;
 using GrandUMI.Cards;
 using GrandUMI.Game;
+using GrandUMI.Game.Hex;
 using GrandUMI.Game.Snapshot;
+using GrandUMI.Game.Stats;
 using Xunit;
 
 namespace GrandUMIServer.Tests;
@@ -12,6 +14,106 @@ public sealed class PersistenceDirectoryCollectionDefinition;
 [Collection("持久化目录隔离")]
 public sealed class RoomRecoverySnapshotStoreTests
 {
+    [Fact]
+    public async Task 好友房海克斯建局_日志快照保留玩法且仍隔离公开时钟与统计()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        GameRoomManager.RoomEntry? room = null;
+        try
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var deck = BuildLegalDeck("OP15-001");
+            room = GameRoomManager.CreateRoom(
+                $"friendly-hex-s0-{suffix}", $"friendly-hex-a-{suffix}", deck,
+                $"friendly-hex-s1-{suffix}", $"friendly-hex-b-{suffix}", deck,
+                p0First: true,
+                friendlyRoomId: $"friendly-lobby-{suffix}",
+                matchKind: MatchKind.RoomCode,
+                broadcastInitialState: false,
+                hexMode: true);
+
+            Assert.Equal(MatchKind.RoomCode, room.MatchKind);
+            Assert.Equal(MatchKind.RoomCode, room.Engine.State.MatchKind);
+            Assert.True(room.Engine.State.HexState.Enabled);
+            Assert.False(room.Engine.State.OperationClockEnabled);
+            Assert.False(LeaderStatsEligibilityPolicy.IsPublicMatch(room.MatchKind));
+
+            var publicState = JsonSerializer.SerializeToElement(
+                StateSnapshotBuilder.Build(room.Engine.State, viewerIndex: 0));
+            Assert.Equal("RoomCode", publicState.GetProperty("matchKind").GetString());
+            Assert.True(publicState.GetProperty("hexState").GetProperty("enabled").GetBoolean());
+
+            var journalPath = Path.Combine(root, $"{room.RoomId}.jsonl");
+            var committed = await RoomJournal.ReadCommittedLinesAsync(journalPath);
+            using var header = JsonDocument.Parse(committed.Lines[0]);
+            Assert.True(header.RootElement.GetProperty("hexMode").GetBoolean());
+            Assert.Equal("RoomCode", header.RootElement.GetProperty("matchKind").GetString());
+            Assert.Equal(HexCatalogConfiguration.BuiltIn.Digest,
+                header.RootElement.GetProperty("hexCatalogDigest").GetString());
+        }
+        finally
+        {
+            if (room is not null) GameRoomManager.CleanupRoom(room.RoomId);
+            await Task.Delay(30);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task 房间码日志重启恢复_显式海克斯与旧日志默认普通均兼容(
+        bool writeHexMode,
+        bool expectedEnabled)
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory();
+        Directory.CreateDirectory(root);
+        var old = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", root);
+        var roomId = $"restore-friend-hex-{Guid.NewGuid():N}"[..31];
+        try
+        {
+            await WriteRoomCodeRecoveryHeader(root, roomId, writeHexMode ? true : null);
+
+            await GameRoomManager.RestoreAll();
+            var room = Assert.IsType<GameRoomManager.RoomEntry>(GameRoomManager.GetRoom(roomId));
+
+            Assert.Equal(MatchKind.RoomCode, room.MatchKind);
+            Assert.Equal(MatchKind.RoomCode, room.Engine.State.MatchKind);
+            Assert.Equal(expectedEnabled, room.Engine.State.HexState.Enabled);
+            Assert.False(room.Engine.State.OperationClockEnabled);
+            Assert.False(LeaderStatsEligibilityPolicy.IsPublicMatch(room.MatchKind));
+
+            var publicState = JsonSerializer.SerializeToElement(
+                StateSnapshotBuilder.Build(room.Engine.State, viewerIndex: 0));
+            Assert.Equal("RoomCode", publicState.GetProperty("matchKind").GetString());
+            var publicHexState = publicState.GetProperty("hexState");
+            if (expectedEnabled)
+                Assert.True(publicHexState.GetProperty("enabled").GetBoolean());
+            else
+                Assert.Equal(JsonValueKind.Null, publicHexState.ValueKind);
+
+            await RoomRecoverySnapshotStore.FlushAsync();
+            var recoverySnapshot = Assert.IsType<RoomRecoverySnapshot>(
+                RoomRecoverySnapshotStore.TryRead(roomId));
+            Assert.Equal(expectedEnabled,
+                recoverySnapshot.PrivateState.GetProperty("hexState").GetProperty("Enabled").GetBoolean());
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(30);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", old);
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
     [Fact]
     public async Task 旧版恢复检查点仍可读取请求去重窗口并由重放路径刷新()
     {
@@ -383,6 +485,39 @@ public sealed class RoomRecoverySnapshotStoreTests
         if (OperatingSystem.IsWindows())
             return Path.Combine(@"E:\GrandUMI-Temp\Tests", $"room-snapshot-{Guid.NewGuid():N}");
         return Path.Combine(Path.GetTempPath(), $"grandumi-room-snapshot-{Guid.NewGuid():N}");
+    }
+
+    private static Task WriteRoomCodeRecoveryHeader(string root, string roomId, bool? hexMode)
+    {
+        var deck = BuildLegalDeck("OP15-001");
+        var suffix = Guid.NewGuid().ToString("N");
+        var header = new Dictionary<string, object?>
+        {
+            ["kind"] = "create",
+            ["roomId"] = roomId,
+            ["seed"] = 20260903,
+            ["firstPlayer"] = 0,
+            ["openingSetupAfterFirstPlayerChoice"] = false,
+            ["p0"] = new { account = $"restore-friend-a-{suffix}", displayName = "恢复玩家A", deckRaw = deck },
+            ["p1"] = new { account = $"restore-friend-b-{suffix}", displayName = "恢复玩家B", deckRaw = deck },
+            ["vsBot"] = false,
+            ["matchKind"] = MatchKind.RoomCode.ToString(),
+            ["createdAtUtc"] = DateTime.UtcNow,
+        };
+        if (hexMode.HasValue)
+        {
+            var catalog = HexCatalogConfiguration.BuiltIn;
+            header["hexMode"] = hexMode.Value;
+            header["hexRulesRevision"] = HexRules.CurrentRulesRevision;
+            header["hexCatalogRevision"] = catalog.Revision;
+            header["hexCatalogDigest"] = catalog.Digest;
+            header["hexCatalogTiers"] = catalog.Assignments
+                .Select(item => new { id = item.Id, tier = item.Tier.ToString() })
+                .ToArray();
+        }
+        return File.WriteAllTextAsync(
+            Path.Combine(root, $"{roomId}.jsonl"),
+            JsonSerializer.Serialize(header) + Environment.NewLine);
     }
 
     private static string BuildLegalDeck(string leaderNumber)

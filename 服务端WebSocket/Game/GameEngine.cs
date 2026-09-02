@@ -144,7 +144,8 @@ public class GameEngine
                                        bool deferOpeningSetupUntilFirstPlayerChosen = false,
                                        bool deferInitialSetupUntilStart = false,
                                        CardRuleset? ruleset = null,
-                                       MatchKind matchKind = MatchKind.UnknownHuman)
+                                       MatchKind matchKind = MatchKind.UnknownHuman,
+                                       bool hexMode = false)
     {
         var seed = rngSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue);
         var pinnedRuleset = ruleset ?? CardRulesetManager.Current;
@@ -163,7 +164,7 @@ public class GameEngine
             Ruleset = pinnedRuleset,
             MatchKind = matchKind,
         };
-        Hex.HexRules.Initialize(State);
+        Hex.HexRules.Initialize(State, hexMode);
         State.OnDeterministicRandomEvent = (type, actor, payload) =>
             RecordMatchLog("random_event", actor, new
             {

@@ -478,6 +478,7 @@ export interface MsgCreateRoom extends MsgBase {
   proto: "MsgCreateRoom";
   deck: string;
   deckName?: string;
+  hexMode?: boolean;
   roomCode?: string;  // 服务器返回的房间码
   result?: boolean;
   logStr?: string;
@@ -492,6 +493,7 @@ export interface MsgJoinRoom extends MsgBase {
   roomCode: string;
   deck: string;
   deckName?: string;
+  hexMode?: boolean;
   result?: boolean;
   logStr?: string;
   opponentName?: string;
@@ -941,6 +943,7 @@ export interface MsgFriendlyRoom extends MsgBase {
   roomId: string;
   origin?: "roomCode" | "invite";
   roomCode?: string | null;
+  hexMode?: boolean;
   players: FriendlyPlayer[];
   scores: number[];
   state: "lobby" | "starting" | "playing";

@@ -88,6 +88,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const [playMode, setPlayMode] = useState<"match" | "friend" | "bot">("match");
   const [joinInput, setJoinInput] = useState("");
   const [copied, setCopied] = useState(false);
+  const [friendHexMode, setFriendHexMode] = useState(false);
   const [botGoFirst, setBotGoFirst] = useState(true);
   const [pendingFaction, setPendingFaction] = useState<RankFaction | null>(null);
   const [factionEditorOpen, setFactionEditorOpen] = useState(false);
@@ -165,7 +166,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
     if (!selectedDeck) return;
     setRoomMode("create");
     useNetStore.getState().setRoomOperation("creating");
-    const sent = HomeRequest.createRoom(selectedDeck.cards, selectedDeck.name);
+    const sent = HomeRequest.createRoom(selectedDeck.cards, selectedDeck.name, friendHexMode);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
       useNetStore.getState().setRoomOperation("idle");
@@ -490,6 +491,32 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                     <div>
                       <h2 className="font-bold text-white">好友房</h2>
                       <p className="mt-1 text-sm leading-5 text-gray-500">创建房间码，或输入好友发来的房间码。</p>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-sm font-medium text-gray-300">创建房间玩法</p>
+                      <div className="grid grid-cols-2 rounded-xl border border-cyan-900/70 bg-gray-950 p-1" aria-label="好友房玩法">
+                        <button
+                          type="button"
+                          onClick={() => setFriendHexMode(false)}
+                          aria-pressed={!friendHexMode}
+                          className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${!friendHexMode ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        >
+                          普通模式
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFriendHexMode(true)}
+                          aria-pressed={friendHexMode}
+                          className={`min-h-11 rounded-lg px-3 text-sm font-bold transition-colors ${friendHexMode ? "bg-cyan-600 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-200"}`}
+                        >
+                          海克斯模式
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-gray-500">
+                        {friendHexMode
+                          ? "海克斯模式会在对局中进行三轮私密强化选择；房间创建后玩法锁定。"
+                          : "普通模式不启用海克斯强化。加入房间时沿用房主锁定的玩法。"}
+                      </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <button type="button" onClick={handleCreateRoom} disabled={!canEnter} className="min-h-12 rounded-xl bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600">创建房间</button>

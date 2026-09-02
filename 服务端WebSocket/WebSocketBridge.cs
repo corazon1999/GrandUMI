@@ -2078,7 +2078,13 @@ public static class WebSocketBridge
         var existingRoom = GetFriendlyRoomOf(s);
         if (existingRoom is not null && existingRoom.IsRoomCode && existingRoom.State == "lobby")
         {
-            Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = existingRoom.JoinCode, result = true });
+            Send(s.SessionId, new
+            {
+                proto = "MsgCreateRoom",
+                roomCode = existingRoom.JoinCode,
+                hexMode = existingRoom.HexMode,
+                result = true,
+            });
             PushFriendlyRoom(existingRoom);
             return;
         }
@@ -2103,6 +2109,7 @@ public static class WebSocketBridge
             RoomId = roomId,
             MatchKind = MatchKind.RoomCode,
             JoinCode = GenerateRoomCode(),
+            HexMode = Bool(msg, "hexMode"),
         };
         room.Accounts[0] = s.Account!;
         room.Names[0] = s.PlayerName ?? s.Account!;
@@ -2136,7 +2143,13 @@ public static class WebSocketBridge
             return;
         }
 
-        Send(s.SessionId, new { proto = "MsgCreateRoom", roomCode = room.JoinCode, result = true });
+        Send(s.SessionId, new
+        {
+            proto = "MsgCreateRoom",
+            roomCode = room.JoinCode,
+            hexMode = room.HexMode,
+            result = true,
+        });
         PushFriendlyRoom(room);
         ScheduleRoomCodeExpiry(room);
         Log($"创建房间码友谊战 {s.Account} → {room.JoinCode} ({roomId})");
@@ -2169,7 +2182,7 @@ public static class WebSocketBridge
         {
             if (existingRoom.IsRoomCode && string.Equals(existingRoom.JoinCode, code, StringComparison.OrdinalIgnoreCase))
             {
-                Send(s.SessionId, new { proto = "MsgJoinRoom", result = true });
+                Send(s.SessionId, new { proto = "MsgJoinRoom", hexMode = existingRoom.HexMode, result = true });
                 PushFriendlyRoom(existingRoom);
                 return;
             }
@@ -2241,7 +2254,7 @@ public static class WebSocketBridge
             return;
         }
 
-        Send(s.SessionId, new { proto = "MsgJoinRoom", result = true,
+        Send(s.SessionId, new { proto = "MsgJoinRoom", result = true, hexMode = room.HexMode,
             opponentName = host!.PlayerName ?? host.Account ?? "?" });
         PushFriendlyRoom(room);
         Log($"加入房间码友谊战: {host.Account} & {s.Account} code={code} ({room.RoomId})");
@@ -2263,6 +2276,7 @@ public static class WebSocketBridge
             RoomId = source.RoomId,
             MatchKind = source.MatchKind,
             JoinCode = roomCode,
+            HexMode = source.HexMode,
             State = source.State,
         };
         for (var i = 0; i < 2; i++)
@@ -3312,7 +3326,8 @@ public static class WebSocketBridge
         string guestDeck,
         string? guestDeckName,
         string friendlyRoomId,
-        MatchKind matchKind)
+        MatchKind matchKind,
+        bool hexMode)
     {
         try
         {
@@ -3337,7 +3352,8 @@ public static class WebSocketBridge
                 p0SpectatorHandsPublic: host.SpectatorHandsPublic,
                 p1SpectatorHandsPublic: guest.SpectatorHandsPublic,
                 p0SpectateCode: host.SpectateCode,
-                p1SpectateCode: guest.SpectateCode));
+                p1SpectateCode: guest.SpectateCode,
+                hexMode: hexMode));
             GameOpponent[host.SessionId]  = guest.SessionId;
             GameOpponent[guest.SessionId] = host.SessionId;
             Send(host.SessionId,  new { proto = "MsgGameStart" });
@@ -3409,6 +3425,7 @@ public static class WebSocketBridge
                 roomId = room.RoomId,
                 origin = room.IsRoomCode ? "roomCode" : "invite",
                 roomCode = room.IsRoomCode && !room.IsFull ? room.JoinCode : null,
+                hexMode = room.HexMode,
                 players = FriendlyPlayers(room),
                 scores = room.Scores.ToArray(),
                 state = room.State,
@@ -3533,7 +3550,7 @@ public static class WebSocketBridge
         var gameRoomId = StartDuel(
             host, start.HostDeck, start.HostDeckName,
             guest, start.GuestDeck, start.GuestDeckName,
-            room.RoomId, room.MatchKind);
+            room.RoomId, room.MatchKind, start.HexMode);
         room.CompleteStart(gameRoomId is not null);
         if (gameRoomId is null && GameRoomManager.GetMaintenanceSnapshot().Enabled)
         {
