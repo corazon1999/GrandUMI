@@ -418,9 +418,9 @@ const CHAT_DECORATION_FILTERS: Array<{
 }> = [
   { slot: "all", label: "全部" },
   { slot: "greeting", label: "问候" },
-  { slot: "praise", label: "赞美" },
+  { slot: "praise", label: "称赞" },
   { slot: "thanks", label: "感谢" },
-  { slot: "surprise", label: "惊讶" },
+  { slot: "surprise", label: "惊叹" },
   { slot: "mistake", label: "失误" },
   { slot: "threat", label: "威胁" },
 ];

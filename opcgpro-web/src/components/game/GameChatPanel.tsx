@@ -38,9 +38,9 @@ const DECORATION_SLOTS: Array<{
   icon: string;
 }> = [
   { slot: "greeting", label: "问候", icon: "👋" },
-  { slot: "praise", label: "赞美", icon: "✨" },
+  { slot: "praise", label: "称赞", icon: "✨" },
   { slot: "thanks", label: "感谢", icon: "🤝" },
-  { slot: "surprise", label: "惊讶", icon: "❗" },
+  { slot: "surprise", label: "惊叹", icon: "❗" },
   { slot: "mistake", label: "失误", icon: "🧭" },
   { slot: "threat", label: "威胁", icon: "⚔️" },
 ];
