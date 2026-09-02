@@ -60,6 +60,9 @@ public static class PrivateStateSnapshotBuilder
                 state.HexState.DraftResolving,
                 resumePoint = state.HexState.ResumePoint.ToString(),
                 owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+                grantedByTransmutation = state.HexState.GrantedByTransmutation
+                    .Select(items => items.Order().ToArray())
+                    .ToArray(),
                 appeared = state.HexState.Appeared
                     .Select(items => items.Order().ToArray())
                     .ToArray(),

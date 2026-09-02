@@ -1135,6 +1135,8 @@ export interface HexDefinitionSnapshot {
   /** 新服务端提供权威玩家文案；旧快照缺失时客户端按稳定 tier 值回退。 */
   tierLabel?: HexTierLabelSnapshot;
   description: string;
+  /** 新版权威快照标记该项由质变授予；名称已由服务端添加“质变-”前缀。 */
+  grantedByTransmutation?: boolean;
 }
 
 export interface HexDraftSnapshot {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { buildOwnedHexPresentation } from "../src/game/hexOwnedPresentation.mjs";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -130,7 +131,7 @@ test("海克斯选秀仅展示当前轮次品质，不展示本局共享品质�
   assert.match(types, /tierSequence: HexTierSnapshot\[\]/);
 });
 
-test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立详情面板", async () => {
+test("双方玩家信息卡保留三个海克斯槽位并为溢出项提供可访问的完整浮层", async () => {
   const [owned, board, stage, actions, prompt] = await Promise.all([
     readSource("../src/components/game/HexOwnedPanel.tsx"),
     readSource("../src/components/game/GameBoard.tsx"),
@@ -147,9 +148,9 @@ test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立�
   assert.match(board, /items=\{hexState\?\.myOwned \?\? \[\]\}/);
   assert.match(board, /<HexOwnedSlots side="opponent" label="对方" items=\{hexState\?\.opponentOwned \?\? \[\]\} \/>/);
   assert.match(board, /<HexOwnedSlots side="my" label="我方" items=\{hexState\?\.myOwned \?\? \[\]\} \/>/);
-  assert.match(owned, /const MAX_OWNED_HEXES = 3/);
-  assert.match(owned, /Array\.from\(\{ length: MAX_OWNED_HEXES \}/);
-  assert.match(owned, /items\.slice\(0, MAX_OWNED_HEXES\)/);
+  assert.match(owned, /const MAX_VISIBLE_OWNED_HEXES = 3/);
+  assert.match(owned, /Array\.from\(\{ length: MAX_VISIBLE_OWNED_HEXES \}/);
+  assert.match(owned, /buildOwnedHexPresentation\([\s\S]*items,[\s\S]*MAX_VISIBLE_OWNED_HEXES/);
   assert.match(owned, /data-hex-slot-index=\{index \+ 1\}/);
   assert.match(owned, /data-hex-slot-state=\{hex \? "owned" : "empty"\}/);
   assert.match(owned, /data-hex-slot-visible-label=\{hex \? "name" : "empty"\}/);
@@ -179,11 +180,28 @@ test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立�
   assert.match(owned, /document\.addEventListener\("pointerdown"/);
 
   assert.ok((owned.match(/h-11 min-h-11 w-11 min-w-11/g)?.length ?? 0) >= 2);
+  assert.match(owned, /data-hex-owned-overflow-trigger=\{side\}/);
+  assert.match(owned, /h-12 min-h-12 w-full min-w-12/);
+  assert.match(owned, /\+\{overflowCount\}/);
+  assert.match(owned, /查看全部/);
+  assert.match(owned, /aria-controls=\{allDialogId\}/);
+  assert.match(owned, /aria-expanded=\{allOpen\}/);
+  assert.match(owned, /<GameOverlayPortal>/);
+  assert.match(owned, /role="dialog"/);
+  assert.match(owned, /h-12 min-h-12 w-12 min-w-12/);
+  assert.match(owned, /aria-modal="true"/);
+  assert.match(owned, /items\.map\(\(hex, index\)/);
+  assert.match(owned, /requestAnimationFrame\(\(\) => allDialogRef\.current\?\.focus\(\)\)/);
+  assert.match(owned, /event\.key !== "Tab"/);
+  assert.match(owned, /restoreFocusTo\?\.focus\(\)/);
+  assert.match(owned, /touch-pan-y/);
   assert.match(owned, /absolute inset-x-0/);
   assert.match(owned, /overflow-y-auto overscroll-contain/);
   assert.match(owned, /100cqh/);
   assert.match(owned, /var\(--layout-safe-top/);
+  assert.match(owned, /var\(--layout-safe-right/);
   assert.match(owned, /var\(--layout-safe-bottom/);
+  assert.match(owned, /var\(--layout-safe-left/);
   assert.match(board, /data-game-right-rail/);
   assert.match(board, /overflow-x-clip/);
   assert.match(board, /var\(--layout-safe-top/);
@@ -194,6 +212,34 @@ test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立�
   assert.match(actions, /my\.stages\.find/);
   assert.match(prompt, /my\?\.stages\.find/);
   assert.match(prompt, /opp\?\.stages\.find/);
+});
+
+test("已拥有海克斯溢出计算支持4、8和54项且完整列表不被截断", () => {
+  for (const count of [4, 8, 54]) {
+    const items = Array.from({ length: count }, (_, index) => ({ id: index + 1 }));
+    const presentation = buildOwnedHexPresentation(items);
+    assert.deepEqual(presentation.visibleItems, items.slice(0, 3));
+    assert.equal(presentation.overflowCount, count - 3);
+    assert.equal(items.length, count, "完整权威数组不能因固定槽位展示而被修改");
+  }
+
+  const customLimit = buildOwnedHexPresentation([1, 2, 3, 4], 2.9);
+  assert.deepEqual(customLimit.visibleItems, [1, 2]);
+  assert.equal(customLimit.overflowCount, 2);
+});
+
+test("质变来源字段由协议透传，槽位与完整浮层直接展示服务端权威名称", async () => {
+  const [owned, types, store] = await Promise.all([
+    readSource("../src/components/game/HexOwnedPanel.tsx"),
+    readSource("../src/types/net.ts"),
+    readSource("../src/store/gameStore.ts"),
+  ]);
+
+  assert.match(types, /grantedByTransmutation\?: boolean/);
+  assert.match(store, /myOwned: hexState\.myOwned\.map\(\(hex\) => \(\{ \.\.\.hex \}\)\)/);
+  assert.match(store, /opponentOwned: hexState\.opponentOwned\.map\(\(hex\) => \(\{ \.\.\.hex \}\)\)/);
+  assert.ok((owned.match(/\{hex\.name\}/g)?.length ?? 0) >= 2);
+  assert.doesNotMatch(owned, /grantedByTransmutation\s*\?|`质变-/);
 });
 
 test("大厅、协议与对局页面完整挂接海克斯模式", async () => {

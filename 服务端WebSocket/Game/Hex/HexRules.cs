@@ -39,7 +39,9 @@ public static class HexRules
     public const int BalanceRulesRevision = 2;
     /// <summary>每槽一次刷新及按玩家整局候选去重所在的规则修订版。</summary>
     public const int PerSlotRefreshRulesRevision = 3;
-    public const int CurrentRulesRevision = PerSlotRefreshRulesRevision;
+    /// <summary>质变来源公开投影与黄金阶削弱所在的规则修订版。</summary>
+    public const int TransmutationPresentationRulesRevision = 4;
+    public const int CurrentRulesRevision = TransmutationPresentationRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -48,9 +50,13 @@ public static class HexRules
         new(null, "hex_chaos_grant", "chaos"),
         new(null, "hex_chaos_grant", "chaos"),
     ];
-    private static readonly RandomGrantPlan[] GoldenTierGrantPlans =
+    private static readonly RandomGrantPlan[] LegacyGoldenTierGrantPlans =
     [
         new(HexTier.Silver, "hex_golden_tier_grant", "golden-tier"),
+        new(HexTier.Gold, "hex_golden_tier_grant", "golden-tier"),
+    ];
+    private static readonly RandomGrantPlan[] GoldenTierGrantPlans =
+    [
         new(HexTier.Gold, "hex_golden_tier_grant", "golden-tier"),
     ];
     private static readonly RandomGrantPlan[] PrismaticTierGrantPlans =
@@ -92,6 +98,15 @@ public static class HexRules
         => state.HexState.Enabled
            && playerIndex is 0 or 1
            && state.HexState.Owned[playerIndex].Contains(hexId);
+
+    public static bool IsVisibleOwnedHex(GameState state, int hexId)
+        => state.HexState.RulesRevision < TransmutationPresentationRulesRevision
+           || !HexCatalog.IsTransmutation(hexId);
+
+    public static bool WasGrantedByTransmutation(GameState state, int playerIndex, int hexId)
+        => state.HexState.RulesRevision >= TransmutationPresentationRulesRevision
+           && playerIndex is 0 or 1
+           && state.HexState.GrantedByTransmutation[playerIndex].Contains(hexId);
 
     public static HexDraftRound StartDraft(
         GameState state,
@@ -929,10 +944,17 @@ public static class HexRules
         return result;
     }
 
-    private static void AddOwned(GameState state, int player, int hexId)
+    private static void AddOwned(
+        GameState state,
+        int player,
+        int hexId,
+        bool grantedByTransmutation = false)
     {
         _ = HexCatalog.Get(hexId);
         if (!state.HexState.Owned[player].Contains(hexId)) state.HexState.Owned[player].Add(hexId);
+        if (grantedByTransmutation
+            && state.HexState.RulesRevision >= TransmutationPresentationRulesRevision)
+            state.HexState.GrantedByTransmutation[player].Add(hexId);
     }
 
     private static async Task ApplyDraftGrantAsync(
@@ -1004,7 +1026,7 @@ public static class HexRules
                 ApplyDraftRandomGrantPlan(state, settlement, grant, ChaosGrantPlans);
                 break;
             case 55:
-                ApplyDraftRandomGrantPlan(state, settlement, grant, GoldenTierGrantPlans);
+                ApplyDraftRandomGrantPlan(state, settlement, grant, GoldenGrantPlans(state));
                 break;
             case 56:
                 ApplyDraftRandomGrantPlan(state, settlement, grant, PrismaticTierGrantPlans);
@@ -1067,7 +1089,7 @@ public static class HexRules
             int childHexId = grant.PlannedChildHexIds[slot];
             if (childHexId > 0)
             {
-                AddOwned(state, grant.PlayerIndex, childHexId);
+                AddOwned(state, grant.PlayerIndex, childHexId, grantedByTransmutation: true);
                 string childGrantKey = $"{grant.GrantKey}:{plan.GrantKeyGroup}:{slot}:{childHexId}";
                 if (settlement.Grants.All(item =>
                         !string.Equals(item.GrantKey, childGrantKey, StringComparison.Ordinal)))
@@ -1103,10 +1125,14 @@ public static class HexRules
             grant.NextStep));
     }
 
-    private static async Task GrantAsync(GameEngine engine, int player, int hexId)
+    private static async Task GrantAsync(
+        GameEngine engine,
+        int player,
+        int hexId,
+        bool grantedByTransmutation = false)
     {
         if (engine.State.HexState.Owned[player].Contains(hexId)) return;
-        AddOwned(engine.State, player, hexId);
+        AddOwned(engine.State, player, hexId, grantedByTransmutation);
         await ApplyOnAcquireAsync(engine, player, hexId);
     }
 
@@ -1154,7 +1180,7 @@ public static class HexRules
                 await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, ChaosGrantPlans);
                 break;
             case 55:
-                await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, GoldenTierGrantPlans);
+                await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, GoldenGrantPlans(state));
                 break;
             case 56:
                 await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, PrismaticTierGrantPlans);
@@ -1186,7 +1212,7 @@ public static class HexRules
                 plan.RandomEventType,
                 playerIndex,
                 RandomGrantContext(slot, plan.Tier));
-            await GrantAsync(engine, playerIndex, pool[index]);
+            await GrantAsync(engine, playerIndex, pool[index], grantedByTransmutation: true);
             if (state.IsGameOver) break;
         }
     }
@@ -1211,6 +1237,11 @@ public static class HexRules
         => tier is { } requiredTier
             ? new { slot, tier = requiredTier.ToString() }
             : new { slot };
+
+    private static IReadOnlyList<RandomGrantPlan> GoldenGrantPlans(GameState state)
+        => state.HexState.RulesRevision >= TransmutationPresentationRulesRevision
+            ? GoldenTierGrantPlans
+            : LegacyGoldenTierGrantPlans;
 
     private static async Task TryTriggerKingAsync(GameEngine engine, int owner)
     {

@@ -248,17 +248,20 @@ public static class StateSnapshotBuilder
         var opponentIdx = 1 - myIdx;
         var round = state.HexState.ActiveDraft;
 
-        object Hex(int id)
+        object Hex(int id, int? ownerIndex = null)
         {
             var definition = HexCatalog.Get(id);
             var tier = HexCatalog.TierForRevision(id, state.HexState.RulesRevision);
+            bool grantedByTransmutation = ownerIndex is int owner
+                && HexRules.WasGrantedByTransmutation(state, owner, id);
             return new
             {
                 id = definition.Id,
-                name = definition.Name,
+                name = grantedByTransmutation ? $"质变-{definition.Name}" : definition.Name,
                 tier = tier.ToString(),
                 tierLabel = HexCatalog.TierDisplayName(tier),
-                description = definition.Description,
+                description = HexCatalog.DescriptionForRevision(id, state.HexState.RulesRevision),
+                grantedByTransmutation,
             };
         }
 
@@ -271,8 +274,14 @@ public static class StateSnapshotBuilder
             // 结算进度也属于私密交互；非拥有者和观战者不显示等待遮罩。
             draftResolving = !isSpectator
                 && state.HexState.PendingSettlement?.PlayerIndex == viewerIndex,
-            myOwned = state.HexState.Owned[myIdx].Select(Hex).ToArray(),
-            opponentOwned = state.HexState.Owned[opponentIdx].Select(Hex).ToArray(),
+            myOwned = state.HexState.Owned[myIdx]
+                .Where(id => HexRules.IsVisibleOwnedHex(state, id))
+                .Select(id => Hex(id, myIdx))
+                .ToArray(),
+            opponentOwned = state.HexState.Owned[opponentIdx]
+                .Where(id => HexRules.IsVisibleOwnedHex(state, id))
+                .Select(id => Hex(id, opponentIdx))
+                .ToArray(),
             activeDraft = isSpectator || round?.PlayerIndex != viewerIndex ? null : new
             {
                 roundId = round.RoundId,
@@ -280,7 +289,7 @@ public static class StateSnapshotBuilder
                 tier = round.Tier.ToString(),
                 tierLabel = HexCatalog.TierDisplayName(round.Tier),
                 deadlineUtc = round.DeadlineUtc,
-                candidates = round.Candidates.Select(Hex).ToArray(),
+                candidates = round.Candidates.Select(id => Hex(id)).ToArray(),
                 myLocked = round.Locked,
                 mySelectedHexId = round.Locked ? round.LockedChoice : null,
                 // 旧字段保留给未刷新页面：修订版 3 仍只向旧客户端开放第一次刷新，避免同槽误操作。

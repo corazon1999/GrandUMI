@@ -71,11 +71,12 @@ public static class HexCatalog
         H(52, "果实能力者", HexTier.Silver, "获得时往咚!!卡组增加2张真实咚!!，费用区上限提高到12。"),
         H(53, "我是天龙人", HexTier.Rainbow, "己方生命为0且存在休息角色时，对方不能攻击己方领袖。"),
         H(54, "海军狂欢", HexTier.Silver, "每回合1次，己方KO敌方角色后，己方领袖和全部角色本回合力量+1000。"),
-        H(55, "质变：黄金阶", HexTier.Silver, "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。"),
+        H(55, "质变：黄金阶", HexTier.Silver, "获得时确定性随机获得1个金色海克斯。"),
         H(56, "质变：棱彩阶", HexTier.Gold, "获得时确定性随机获得1个棱彩海克斯。"),
     ];
 
     private static readonly HashSet<int> AlternativeIds = [30, 48];
+    private static readonly HashSet<int> TransmutationIds = [47, 55, 56];
     private static readonly HashSet<int> LegacyRainbowIds = [4, 5, 9, 10, 11, 12, 13, 14, 15, 19, 28, 35, 38, 39, 40, 46, 47, 53];
     private static readonly HashSet<int> LegacyGoldIds = [1, 2, 3, 6, 7, 16, 17, 18, 21, 26, 27, 29, 32, 36, 37, 48, 49, 51];
     private static readonly IReadOnlyDictionary<int, HexDefinition> ById = Definitions.ToDictionary(item => item.Id);
@@ -102,6 +103,14 @@ public static class HexCatalog
 
     public static bool IsAlternative(int id, int rulesRevision)
         => rulesRevision >= HexRules.BalanceRulesRevision && AlternativeIds.Contains(id);
+
+    public static bool IsTransmutation(int id) => TransmutationIds.Contains(id);
+
+    /// <summary>旧房间继续展示并执行建局时锁定的黄金阶文案与语义。</summary>
+    public static string DescriptionForRevision(int id, int rulesRevision)
+        => id == 55 && rulesRevision < HexRules.TransmutationPresentationRulesRevision
+            ? "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。"
+            : Get(id).Description;
 
     /// <summary>仅返回常规池中指定品质的定义。</summary>
     public static IReadOnlyList<HexDefinition> ForTier(HexTier tier)

@@ -150,6 +150,11 @@ public sealed class HexState
     public HexDraftResumePoint ResumePoint { get; set; }
     public List<int>[] Owned { get; } = [new(), new()];
     /// <summary>
+    /// 修订版 4 起记录由质变效果授予的真实海克斯。所有权仍由 Owned 唯一判定；
+    /// 此集合只保存获得来源，供公开名称投影、断线恢复和确定性重放使用。
+    /// </summary>
+    public HashSet<int>[] GrantedByTransmutation { get; } = [new(), new()];
+    /// <summary>
     /// 修订版 3 起按玩家独立记录整局曾向其展示过的全部候选；初始三张与刷新替换均立即写入。
     /// 不向客户端公开，只用于服务端确定性去重。
     /// </summary>

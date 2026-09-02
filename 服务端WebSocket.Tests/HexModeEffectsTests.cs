@@ -706,11 +706,12 @@ public sealed class HexModeEffectsTests
         Assert.Equal(ownedBefore + 2, state.HexState.Owned[0].Count);
         Assert.Equal(state.HexState.Owned[0].Count, state.HexState.Owned[0].Distinct().Count());
         Assert.Equal(1, state.HexState.Owned[0].Count(id => id == 47));
+        Assert.Equal(new[] { 1, 2 }, state.HexState.GrantedByTransmutation[0].Order());
         Assert.DoesNotContain(state.HexState.Owned[0], HexCatalog.IsAlternative);
     }
 
     [Fact]
-    public async Task 两种质变_使用确定性随机按目标品质授予且排除自身备选与重复()
+    public async Task 两种阶级质变_新版分别只授予金色与棱彩且确定性排除自身备选与重复()
     {
         var first = CreateEngine(seed: 556056);
         var second = CreateEngine(seed: 556056);
@@ -749,15 +750,43 @@ public sealed class HexModeEffectsTests
                 .ToArray();
 
         Assert.Equal(NewlyGranted(first.State), NewlyGranted(second.State));
-        Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Silver));
+        Assert.Empty(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Silver));
         Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Gold));
         Assert.Single(NewlyGranted(first.State).Where(id => HexCatalog.Get(id).Tier == HexTier.Rainbow));
-        Assert.Equal(firstRandomBefore + 3, first.State.RandomSeq);
-        Assert.Equal(secondRandomBefore + 3, second.State.RandomSeq);
+        Assert.Equal(firstRandomBefore + 2, first.State.RandomSeq);
+        Assert.Equal(secondRandomBefore + 2, second.State.RandomSeq);
+        Assert.Equal(NewlyGranted(first.State), first.State.HexState.GrantedByTransmutation[0].Order());
+        Assert.Equal(
+            first.State.HexState.GrantedByTransmutation[0].Order(),
+            second.State.HexState.GrantedByTransmutation[0].Order());
         Assert.Equal(first.State.HexState.Owned[0].Count, first.State.HexState.Owned[0].Distinct().Count());
         Assert.Equal(1, first.State.HexState.Owned[0].Count(id => id == 55));
         Assert.Equal(1, first.State.HexState.Owned[0].Count(id => id == 56));
         Assert.DoesNotContain(first.State.HexState.Owned[0], HexCatalog.IsAlternative);
+    }
+
+    [Fact]
+    public async Task 黄金阶质变_上一规则修订版继续确定性授予一个银色和一个金色()
+    {
+        var engine = CreateEngine(seed: 355055);
+        var state = engine.State;
+        HexRules.SetRulesRevisionForReplay(state, HexRules.PerSlotRefreshRulesRevision);
+        state.HexState.Owned[0].Clear();
+        state.HexState.Owned[0].AddRange(HexCatalog.Regular
+            .Where(item => item.Tier == HexTier.Silver && item.Id != 8)
+            .Select(item => item.Id));
+        Own(state, 0, HexCatalog.Regular
+            .Where(item => item.Tier == HexTier.Gold && item.Id != 1)
+            .Select(item => item.Id)
+            .ToArray());
+
+        int randomBefore = state.RandomSeq;
+        await HexRules.ApplyOnAcquireAsync(engine, 0, 55);
+
+        Assert.Contains(8, state.HexState.Owned[0]);
+        Assert.Contains(1, state.HexState.Owned[0]);
+        Assert.Equal(randomBefore + 2, state.RandomSeq);
+        Assert.Empty(state.HexState.GrantedByTransmutation[0]);
     }
 
     [Fact]

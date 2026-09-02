@@ -37,11 +37,111 @@ public sealed class HexModeStateMachineTests
         Assert.False(HexCatalog.IsAlternative(30, HexRules.LegacyRulesRevision));
         Assert.Equal(2, HexRules.BalanceRulesRevision);
         Assert.Equal(3, HexRules.PerSlotRefreshRulesRevision);
-        Assert.Equal(HexRules.PerSlotRefreshRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(4, HexRules.TransmutationPresentationRulesRevision);
+        Assert.Equal(HexRules.TransmutationPresentationRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal("获得时确定性随机获得1个金色海克斯。", HexCatalog.Get(55).Description);
+        Assert.Equal(
+            "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
+            HexCatalog.DescriptionForRevision(55, HexRules.PerSlotRefreshRulesRevision));
         Assert.Equal(
             HexCatalog.Regular.Select(item => item.Id),
             HexCatalog.RegularForRevision(HexRules.BalanceRulesRevision).Select(item => item.Id));
         Assert.True(HexCatalog.IsAlternative(30, HexRules.BalanceRulesRevision));
+    }
+
+    [Fact]
+    public void 质变公开投影_隐藏三个本体并保留派生来源于双方观战与回放状态()
+    {
+        var engine = CreateEngine(seed: 475556);
+        var state = engine.State;
+        state.HexState.Owned[0].AddRange([47, 1, 55, 2, 56, 5]);
+        state.HexState.GrantedByTransmutation[0].UnionWith([1, 2, 5]);
+        state.HexState.Owned[1].AddRange([55, 3]);
+        state.HexState.GrantedByTransmutation[1].Add(3);
+
+        Assert.All(new[] { 47, 55, 56 }, id => Assert.True(HexRules.Has(state, 0, id)));
+
+        static JsonElement HexStateFor(GameState gameState, int viewer, int spectatorPlayer = 0)
+            => JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(
+                gameState,
+                viewer,
+                spectatorPlayerIndex: spectatorPlayer)).GetProperty("hexState");
+
+        static void AssertPlayerZeroProjection(JsonElement hexState)
+        {
+            var owned = hexState.GetProperty("myOwned").EnumerateArray().ToArray();
+            Assert.Equal(new[] { 1, 2, 5 }, owned.Select(item => item.GetProperty("id").GetInt32()));
+            Assert.Equal(
+                new[] { "质变-大力", "质变-灵巧", "质变-尖端发明家" },
+                owned.Select(item => item.GetProperty("name").GetString()));
+            Assert.All(owned, item => Assert.True(item.GetProperty("grantedByTransmutation").GetBoolean()));
+            Assert.Equal("Gold", owned[0].GetProperty("tier").GetString());
+            Assert.Equal(HexCatalog.Get(1).Description, owned[0].GetProperty("description").GetString());
+            Assert.DoesNotContain(owned, item => HexCatalog.IsTransmutation(item.GetProperty("id").GetInt32()));
+        }
+
+        var owner = HexStateFor(state, 0);
+        AssertPlayerZeroProjection(owner);
+
+        var opponent = HexStateFor(state, 1);
+        Assert.Equal(
+            new[] { "质变-大力", "质变-灵巧", "质变-尖端发明家" },
+            opponent.GetProperty("opponentOwned").EnumerateArray()
+                .Select(item => item.GetProperty("name").GetString()));
+
+        AssertPlayerZeroProjection(HexStateFor(state, -1, spectatorPlayer: 0));
+        var playerOneSpectator = HexStateFor(state, -1, spectatorPlayer: 1);
+        Assert.Equal(
+            new[] { "质变-古式佳酿" },
+            playerOneSpectator.GetProperty("myOwned").EnumerateArray()
+                .Select(item => item.GetProperty("name").GetString()));
+
+        var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state))
+            .GetProperty("hexState");
+        Assert.Equal(new[] { 47, 1, 55, 2, 56, 5 }, privateState.GetProperty("owned")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
+        Assert.Equal(new[] { 1, 2, 5 }, privateState.GetProperty("grantedByTransmutation")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
+
+        var fullCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(state).GetProperty("hexState");
+        Assert.Equal(new[] { 1, 2, 5 }, fullCheckpoint.GetProperty("grantedByTransmutation")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
+        var publicCheckpoint = DeterministicReplayCheckpointProvider.BuildPublicState(state).GetProperty("hexState");
+        Assert.Equal(new[] { 1, 2, 5 }, publicCheckpoint.GetProperty("owned")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
+        Assert.Equal(new[] { 1, 2, 5 }, publicCheckpoint.GetProperty("grantedByTransmutation")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
+
+        state.HexState.DraftTierSequence.Clear();
+        state.HexState.DraftTierSequence.AddRange([HexTier.Rainbow, HexTier.Gold, HexTier.Silver]);
+        var draft = HexRules.StartDraft(state, 0, 1, HexDraftResumePoint.None);
+        Assert.DoesNotContain(47, draft.Candidates);
+    }
+
+    [Fact]
+    public void 上一规则修订版_保留质变本体旧文案且不改变旧检查点结构()
+    {
+        var engine = CreateEngine(seed: 355001);
+        var state = engine.State;
+        HexRules.SetRulesRevisionForReplay(state, HexRules.PerSlotRefreshRulesRevision);
+        state.HexState.Owned[0].AddRange([55, 8, 1]);
+        state.HexState.GrantedByTransmutation[0].UnionWith([8, 1]);
+
+        var visible = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0))
+            .GetProperty("hexState").GetProperty("myOwned").EnumerateArray().ToArray();
+        Assert.Equal(new[] { 55, 8, 1 }, visible.Select(item => item.GetProperty("id").GetInt32()));
+        Assert.Equal("质变：黄金阶", visible[0].GetProperty("name").GetString());
+        Assert.Equal(
+            "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
+            visible[0].GetProperty("description").GetString());
+        Assert.All(visible, item => Assert.False(item.GetProperty("grantedByTransmutation").GetBoolean()));
+
+        var fullCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(state).GetProperty("hexState");
+        var publicCheckpoint = DeterministicReplayCheckpointProvider.BuildPublicState(state).GetProperty("hexState");
+        Assert.False(fullCheckpoint.TryGetProperty("grantedByTransmutation", out _));
+        Assert.False(publicCheckpoint.TryGetProperty("grantedByTransmutation", out _));
+        Assert.Equal(new[] { 55, 8, 1 }, publicCheckpoint.GetProperty("owned")[0]
+            .EnumerateArray().Select(item => item.GetInt32()));
     }
 
     [Fact]
@@ -671,7 +771,7 @@ public sealed class HexModeStateMachineTests
         var state = engine.State;
         state.HexState.Owned[0].AddRange(HexCatalog.Regular
             .Select(item => item.Id)
-            .Where(id => id is not 55 and not 8 and not 1));
+            .Where(id => id is not 55 and not 1));
         int randomBefore = state.RandomSeq;
         var round = CreateLockedDraft(state, HexTier.Silver, playerIndex: 0, choice: 55);
         state.HexState.GrantStepFaultInjector = boundary =>
@@ -685,24 +785,24 @@ public sealed class HexModeStateMachineTests
         var pending = Assert.IsType<HexDraftSettlement>(state.HexState.PendingSettlement);
         var rootGrant = Assert.Single(pending.Grants.Where(item => item.HexId == 55));
         Assert.Equal(1, rootGrant.NextStep);
-        Assert.Equal(2, rootGrant.PlannedStepCount);
-        Assert.Equal([8], rootGrant.PlannedChildHexIds);
-        Assert.Contains(8, state.HexState.Owned[0]);
-        Assert.DoesNotContain(1, state.HexState.Owned[0]);
+        Assert.Equal(1, rootGrant.PlannedStepCount);
+        Assert.Equal([1], rootGrant.PlannedChildHexIds);
+        Assert.Contains(1, state.HexState.Owned[0]);
+        Assert.Contains(1, state.HexState.GrantedByTransmutation[0]);
         Assert.Equal(randomBefore + 1, state.RandomSeq);
 
         var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
         var persistedRoot = privateState.GetProperty("hexState")
             .GetProperty("pendingSettlement")
             .GetProperty("grants")[0];
-        Assert.Equal(8, persistedRoot.GetProperty("plannedChildHexIds")[0].GetInt32());
+        Assert.Equal(1, persistedRoot.GetProperty("plannedChildHexIds")[0].GetInt32());
 
         state.HexState.GrantStepFaultInjector = null;
         var (resolved, _) = await HexRules.ResolveDraftAsync(engine);
 
         Assert.Equal(round.RoundId, resolved.RoundId);
         Assert.Contains(1, state.HexState.Owned[0]);
-        Assert.Equal(randomBefore + 2, state.RandomSeq);
+        Assert.Equal(randomBefore + 1, state.RandomSeq);
         Assert.Equal(state.HexState.Owned[0].Count, state.HexState.Owned[0].Distinct().Count());
         Assert.DoesNotContain(state.HexState.Owned[0], HexCatalog.IsAlternative);
         Assert.Null(state.HexState.PendingSettlement);
