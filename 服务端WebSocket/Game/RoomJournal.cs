@@ -122,6 +122,37 @@ public static class RoomJournal
     }
 
     /// <summary>
+    /// 追加服务端裁定的终局意图。它与动作共用连续序号，并在修改内存胜负状态、广播和清房之前
+    /// 完成物理刷新；进程在任意后续步骤退出时，启动恢复都能重放同一个终局并继续幂等结算。
+    /// </summary>
+    public static void AppendTerminal(
+        string roomId,
+        long journalSequence,
+        int winnerIndex,
+        int expiredPlayer,
+        string terminalKind,
+        string reason,
+        DateTime completedAtUtc)
+    {
+        if (winnerIndex is not (0 or 1) || expiredPlayer is not (0 or 1))
+            throw new ArgumentOutOfRangeException(nameof(winnerIndex), "终局玩家编号非法");
+        ExecuteDurable(roomId, "terminal", () =>
+        {
+            Writer.AppendDurable(roomId, new
+            {
+                kind = "terminal",
+                journalSequence,
+                winnerIndex,
+                expiredPlayer,
+                terminalKind,
+                reason,
+                completedAtUtc = completedAtUtc.ToUniversalTime(),
+                tsUtc = completedAtUtc.ToUniversalTime(),
+            });
+        });
+    }
+
+    /// <summary>
     /// 读取已提交的换行边界。进程在写入中途被终止时，最后一个不完整行从未得到 fsync 确认，
     /// 可以安全截断；已换行但 JSON/序号损坏则由上层按数据损坏隔离，不能静默忽略。
     /// </summary>

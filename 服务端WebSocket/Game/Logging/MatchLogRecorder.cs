@@ -16,6 +16,9 @@ public static class MatchLogRecorder
     };
     private static readonly AsyncJsonlWriter Writer = new(JsonOptions);
 
+    /// <summary>仅供终局持久化故障演练测试注入；生产代码不得设置。</summary>
+    internal static Func<string, string, Exception?>? DurableFailureInjector { get; set; }
+
     public static int QueueDepth => Writer.QueueDepth;
     public static long DroppedEntries => Writer.DroppedEntries;
 
@@ -56,12 +59,7 @@ public static class MatchLogRecorder
     public static string OpenAppend(string matchId)
     {
         var root = GetLogDir();
-        string? existing = null;
-        if (Directory.Exists(root))
-        {
-            var hits = Directory.GetFiles(root, $"{matchId}.jsonl", SearchOption.AllDirectories);
-            if (hits.Length > 0) existing = hits[0];
-        }
+        var existing = FindExistingPath(root, matchId);
 
         var path = existing ?? Path.Combine(root, DateTime.UtcNow.ToString("yyyy-MM-dd"), $"{matchId}.jsonl");
         long startSeq = 0;
@@ -76,6 +74,42 @@ public static class MatchLogRecorder
             Sequences[matchId] = startSeq;
         }
         return path;
+    }
+
+    /// <summary>进程恢复时判断终局事实是否已经写入，避免崩溃点重放追加第二条 match_end。</summary>
+    internal static bool ContainsKind(string matchId, string kind)
+    {
+        var existing = FindExistingPath(GetLogDir(), matchId);
+        if (existing is null) return false;
+        using var stream = new FileStream(
+            existing,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        while (reader.ReadLine() is { } line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                if (document.RootElement.TryGetProperty("kind", out var storedKind)
+                    && string.Equals(storedKind.GetString(), kind, StringComparison.Ordinal))
+                    return true;
+            }
+            catch (JsonException)
+            {
+                // 普通对局日志不是恢复权威；损坏行由既有回放审计处理，这里只寻找已提交终局。
+            }
+        }
+        return false;
+    }
+
+    private static string? FindExistingPath(string root, string matchId)
+    {
+        if (!Directory.Exists(root)) return null;
+        var hits = Directory.GetFiles(root, $"{matchId}.jsonl", SearchOption.AllDirectories);
+        return hits.Length > 0 ? hits[0] : null;
     }
 
     public static MatchLogAppendReceipt Append(
@@ -141,6 +175,43 @@ public static class MatchLogRecorder
                 payload = payload ?? new { },
             };
             Writer.AppendRequired(matchId, entry);
+            Sequences[matchId] = seq;
+            return new MatchLogAppendReceipt(seq, true);
+        }
+    }
+
+    /// <summary>
+    /// 终局等权威行只有在物理刷新完成后才返回成功。序号仅在刷新成功后推进，注入或写盘失败
+    /// 均可安全重试；跨进程重试再由 ContainsKind 判断是否已经提交。
+    /// </summary>
+    internal static MatchLogAppendReceipt AppendDurableRequired(
+        string matchId,
+        GameState state,
+        string kind,
+        int? actor,
+        object? payload)
+    {
+        lock (LockObj)
+        {
+            if (!Sequences.TryGetValue(matchId, out var current))
+                return new MatchLogAppendReceipt(0, false);
+            var seq = current + 1;
+            var entry = new
+            {
+                schema = "grandumi.matchlog.v1",
+                matchId,
+                seq,
+                tick = state.Tick,
+                turn = state.TurnCount,
+                phase = PhaseLabels.Of(state.Phase),
+                timeUtc = DateTime.UtcNow,
+                kind,
+                actor,
+                payload = payload ?? new { },
+            };
+            if (DurableFailureInjector?.Invoke(matchId, kind) is { } injected)
+                throw injected;
+            Writer.AppendDurable(matchId, entry);
             Sequences[matchId] = seq;
             return new MatchLogAppendReceipt(seq, true);
         }

@@ -121,6 +121,66 @@ public sealed class CloudReplayStoreTests
         Assert.Equal("replay-retention-0002", items[0].ReplayId);
     }
 
+    [Fact]
+    public async Task 发布前故障_保留恢复磁带且重试只发布双方各一份()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-retry-0001"))!;
+        AppendCompleteTape(capture);
+        store.CompletionFailureInjector = (replayId, stage) =>
+            replayId == "replay-retry-0001" && stage == "after_payloads"
+                ? new IOException("故障演练：载荷写入后、数据库提交前退出")
+                : null;
+
+        await Assert.ThrowsAsync<IOException>(() => capture.CompleteAsync(Completion()));
+
+        var pending = Path.Combine(store.Root, "pending");
+        Assert.True(File.Exists(Path.Combine(pending, "replay-retry-0001.meta.json")));
+        Assert.True(File.Exists(Path.Combine(pending, "replay-retry-0001.p0.jsonl")));
+        Assert.True(File.Exists(Path.Combine(pending, "replay-retry-0001.p1.jsonl")));
+        Assert.Empty(store.List("alice", Query()).Items);
+        Assert.Empty(store.List("bob", Query()).Items);
+
+        store.CompletionFailureInjector = null;
+        await capture.CompleteAsync(Completion());
+        await capture.CompleteAsync(Completion());
+
+        Assert.Single(store.List("alice", Query()).Items);
+        Assert.Single(store.List("bob", Query()).Items);
+        Assert.Empty(Directory.GetFiles(pending, "replay-retry-0001.*"));
+    }
+
+    [Fact]
+    public async Task 进程重启_续写未完成磁带并且只发布一次()
+    {
+        using var workspace = new Workspace();
+        var firstStore = workspace.CreateStore(_ => true);
+        var firstCapture = firstStore.BeginMatch(Start("replay-resume-0001"))!;
+        firstCapture.AppendSnapshot(0, Snapshot(1, false, true, "P0-SECRET", ""));
+        firstCapture.AppendSnapshot(1, Snapshot(1, false, false, "P1-SECRET", ""));
+        firstStore.Dispose();
+
+        using var resumedStore = workspace.CreateStore(_ => true);
+        var resumedCapture = resumedStore.ResumeMatch("replay-resume-0001")!;
+        Assert.Equal(1, resumedCapture.GetRecoveryFrameState(0).FrameCount);
+        Assert.Equal(1, resumedCapture.GetRecoveryFrameState(1).FrameCount);
+        Assert.False(resumedCapture.GetRecoveryFrameState(0).HasTerminalFrame);
+        resumedCapture.AppendSnapshot(0, Snapshot(2, true, true, "P0-FINAL", "P1-FINAL"));
+        resumedCapture.AppendSnapshot(1, Snapshot(2, true, false, "P1-FINAL", "P0-FINAL"));
+        await resumedCapture.CompleteAsync(Completion());
+        await resumedCapture.CompleteAsync(Completion());
+
+        Assert.Single(resumedStore.List("alice", Query()).Items);
+        Assert.Single(resumedStore.List("bob", Query()).Items);
+        Assert.Equal(2,
+            resumedStore.Load("alice", "replay-resume-0001").Document
+                .GetProperty("snapshots").GetArrayLength());
+        Assert.Equal(2,
+            resumedStore.Load("bob", "replay-resume-0001").Document
+                .GetProperty("snapshots").GetArrayLength());
+    }
+
     private static CloudReplayMatchStart Start(string replayId, DateTime? startedAt = null)
         => new(
             replayId,

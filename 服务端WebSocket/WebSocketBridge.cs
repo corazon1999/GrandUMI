@@ -720,6 +720,10 @@ public static class WebSocketBridge
                 SupersedeSession(s, "原对局已经结束，请重新登录并完成 QQ 绑定。");
                 return;
             }
+            else if (isResume && GameRoomManager.TryDeliverRecentTerminal(s.SessionId, playerData.Account))
+            {
+                Log($"终局状态恢复成功 {playerData.Account}");
+            }
             else
                 TryRestoreFriendlyRoom(s, playerData.Account);
 

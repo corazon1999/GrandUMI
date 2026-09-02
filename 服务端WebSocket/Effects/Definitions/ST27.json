@@ -63,7 +63,7 @@
     "activated": {
       "cost": { "restSelf": true },
       "then": [
-        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "originalCostLte": 3 }, "text": "KO 最多1张费用≤3 的角色" },
+        { "op": "Choose", "prompt": "OpponentCharacter", "max": 1, "min": 0, "as": "$tgt", "filter": { "currentCostLte": 3 }, "text": "KO 最多1张费用≤3 的角色" },
         { "op": "KO", "target": "$tgt" }
       ]
     },

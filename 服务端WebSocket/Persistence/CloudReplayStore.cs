@@ -135,6 +135,9 @@ public sealed class CloudReplayStore : IDisposable
     private int _initialized;
     private int _disposed;
 
+    /// <summary>仅供故障演练测试注入；生产代码不得设置。</summary>
+    internal Func<string, string, Exception?>? CompletionFailureInjector { get; set; }
+
     public CloudReplayStore(
         string root,
         Func<string, bool> runtimeAvailable,
@@ -259,6 +262,9 @@ public sealed class CloudReplayStore : IDisposable
 
         var keys = new string?[2];
         var paths = new string?[2];
+        var metadataPath = PendingMetadataPath(start.ReplayId);
+        if (File.Exists(metadataPath))
+            throw new IOException($"云回放恢复元数据已存在：{start.ReplayId}");
         for (var index = 0; index < 2; index++)
         {
             var player = index == 0 ? start.Player0 : start.Player1;
@@ -269,11 +275,12 @@ public sealed class CloudReplayStore : IDisposable
                 throw new IOException($"云回放暂存文件已存在：{start.ReplayId}/P{index}");
         }
 
-        var capture = new CloudReplayCapture(this, start, keys, paths);
+        var capture = new CloudReplayCapture(this, start, keys, paths, metadataPath);
         if (!_active.TryAdd(start.ReplayId, capture))
             throw new InvalidOperationException($"云回放已经开始：{start.ReplayId}");
         try
         {
+            WriteMetadataAtomic(metadataPath, start);
             for (var index = 0; index < 2; index++)
                 if (keys[index] is not null && paths[index] is not null)
                     _writer.OpenRequired(keys[index]!, paths[index]!, append: false);
@@ -291,6 +298,72 @@ public sealed class CloudReplayStore : IDisposable
             }
             foreach (var path in paths)
                 if (path is not null) TryDeleteFile(path);
+            TryDeleteFile(metadataPath);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 进程恢复时重新打开尚未发布的玩家视角磁带。元数据与磁带都留在 pending 下，
+    /// 因而进行中对局可续录，已经写入终局 WAL 的对局也可继续同一次发布。
+    /// </summary>
+    internal CloudReplayCapture? ResumeMatch(string replayId)
+    {
+        EnsureInitialized();
+        if (!IsSafeReplayId(replayId)) return null;
+        if (_active.TryGetValue(replayId, out var active)) return active;
+        var metadataPath = PendingMetadataPath(replayId);
+        if (!File.Exists(metadataPath)) return null;
+
+        var start = JsonSerializer.Deserialize<CloudReplayMatchStart>(
+                        File.ReadAllBytes(metadataPath), JsonOptions)
+                    ?? throw new InvalidDataException($"云回放 {replayId} 恢复元数据为空");
+        if (!string.Equals(start.ReplayId, replayId, StringComparison.Ordinal))
+            throw new InvalidDataException($"云回放 {replayId} 恢复元数据 ID 不一致");
+        var keys = new string?[2];
+        var paths = new string?[2];
+        var initialFrameCounts = new int[2];
+        var initialLastTicks = new[] { -1, -1 };
+        var initialTerminalFrames = new bool[2];
+        for (var index = 0; index < 2; index++)
+        {
+            var player = index == 0 ? start.Player0 : start.Player1;
+            if (!player.Record) continue;
+            keys[index] = $"cloud:{replayId}:{index}";
+            paths[index] = ResolveInside(_pendingRoot, $"{replayId}.p{index}.jsonl");
+            if (!File.Exists(paths[index]))
+                throw new InvalidDataException($"云回放 {replayId}/P{index} 的恢复磁带缺失");
+            var pending = InspectPendingTape(paths[index]!);
+            initialFrameCounts[index] = pending.FrameCount;
+            initialLastTicks[index] = pending.LastTick;
+            initialTerminalFrames[index] = pending.HasTerminalFrame;
+        }
+
+        var capture = new CloudReplayCapture(
+            this,
+            start,
+            keys,
+            paths,
+            metadataPath,
+            initialFrameCounts,
+            initialLastTicks,
+            initialTerminalFrames);
+        if (!_active.TryAdd(replayId, capture)) return _active[replayId];
+        try
+        {
+            for (var index = 0; index < 2; index++)
+                if (keys[index] is not null && paths[index] is not null)
+                    _writer.OpenRequired(keys[index]!, paths[index]!, append: true);
+            return capture;
+        }
+        catch
+        {
+            _active.TryRemove(new KeyValuePair<string, CloudReplayCapture>(replayId, capture));
+            foreach (var key in keys)
+            {
+                if (key is null) continue;
+                try { _writer.Close(key); } catch { }
+            }
             throw;
         }
     }
@@ -582,7 +655,8 @@ public sealed class CloudReplayStore : IDisposable
             if (!snapshot.TryGetProperty("viewerKind", out var viewer)
                 || !string.Equals(viewer.GetString(), "player", StringComparison.Ordinal))
                 throw new InvalidDataException("云回放只允许写入玩家视角快照。");
-            if (capture.IncrementFrames(playerIndex) > MaximumSnapshots)
+            var tick = snapshot.GetProperty("tick").GetInt32();
+            if (capture.RegisterFrame(playerIndex, tick, TryBoolean(snapshot, "isGameOver")) > MaximumSnapshots)
                 throw new InvalidDataException($"云回放超过 {MaximumSnapshots} 帧上限。");
             _writer.AppendRequired(key, snapshot);
         }
@@ -595,13 +669,22 @@ public sealed class CloudReplayStore : IDisposable
 
     internal async Task CompleteAsync(CloudReplayCapture capture, CloudReplayCompletion completion)
     {
-        if (!_active.TryRemove(new KeyValuePair<string, CloudReplayCapture>(capture.Start.ReplayId, capture))) return;
+        if (!_active.TryGetValue(capture.Start.ReplayId, out var active)
+            || !ReferenceEquals(active, capture)) return;
         var finalPayloads = new List<string>();
+        var databaseCommitted = false;
         try
         {
             await CloseCaptureFiles(capture);
             if (capture.FailureReason is { } failure)
                 throw new InvalidDataException(failure);
+            if (IsCompletionPublished(capture.Start))
+            {
+                CompletePendingCleanup(capture);
+                return;
+            }
+            if (CompletionFailureInjector?.Invoke(capture.Start.ReplayId, "before_publish") is { } beforePublish)
+                throw beforePublish;
 
             var rows = new List<CompletedView>();
             for (var index = 0; index < 2; index++)
@@ -617,6 +700,8 @@ public sealed class CloudReplayStore : IDisposable
                 finalPayloads.Add(payloadPath);
                 rows.Add(BuildCompletedView(capture.Start, completion, index, snapshots, payloadPath));
             }
+            if (CompletionFailureInjector?.Invoke(capture.Start.ReplayId, "after_payloads") is { } afterPayloads)
+                throw afterPayloads;
 
             lock (_gate)
             {
@@ -626,19 +711,24 @@ public sealed class CloudReplayStore : IDisposable
                 foreach (var feedback in capture.FeedbackLinks)
                     InsertFeedback(connection, tx, capture.Start.ReplayId, feedback.Account, feedback.FeedbackId);
                 tx.Commit();
+                databaseCommitted = true;
                 foreach (var account in rows.Select(row => row.OwnerAccount).Distinct(StringComparer.OrdinalIgnoreCase))
                     EnforceRetentionAndQuota(connection, account);
             }
+            CompletePendingCleanup(capture);
         }
         catch (Exception ex)
         {
+            if (databaseCommitted)
+            {
+                // 数据库事务是发布提交点；其后的配额维护失败不能把已引用载荷删掉或要求重复发布。
+                Console.Error.WriteLine($"[云回放] {capture.Start.ReplayId} 已发布，后置维护失败：{ex.Message}");
+                CompletePendingCleanup(capture);
+                return;
+            }
             foreach (var path in finalPayloads) TryDeleteFile(path);
-            Console.Error.WriteLine($"[云回放] {capture.Start.ReplayId} 完成失败，未发布不完整回放：{ex.Message}");
-        }
-        finally
-        {
-            foreach (var path in capture.Paths)
-                if (path is not null) TryDeleteFile(path);
+            Console.Error.WriteLine($"[云回放] {capture.Start.ReplayId} 完成失败，保留恢复磁带等待重试：{ex.Message}");
+            throw;
         }
     }
 
@@ -649,6 +739,7 @@ public sealed class CloudReplayStore : IDisposable
         await CloseCaptureFiles(capture);
         foreach (var path in capture.Paths)
             if (path is not null) TryDeleteFile(path);
+        TryDeleteFile(capture.MetadataPath);
     }
 
     private async Task CloseCaptureFiles(CloudReplayCapture capture)
@@ -656,6 +747,36 @@ public sealed class CloudReplayStore : IDisposable
         var closes = capture.Keys.Where(key => key is not null)
             .Select(key => _writer.CloseDeferred(key!));
         await Task.WhenAll(closes);
+    }
+
+    private bool IsCompletionPublished(CloudReplayMatchStart start)
+    {
+        lock (_gate)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT owner_account FROM cloud_replays WHERE replay_id = $replayId;";
+            command.Parameters.AddWithValue("$replayId", start.ReplayId);
+            var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) existing.Add(reader.GetString(0));
+            var expected = new[] { start.Player0, start.Player1 }
+                .Where(player => player.Record)
+                .Select(player => player.Account)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (existing.Count == 0) return false;
+            if (!existing.SetEquals(expected))
+                throw new InvalidDataException($"云回放 {start.ReplayId} 已发布参与者集合不完整或冲突");
+            return true;
+        }
+    }
+
+    private void CompletePendingCleanup(CloudReplayCapture capture)
+    {
+        _active.TryRemove(new KeyValuePair<string, CloudReplayCapture>(capture.Start.ReplayId, capture));
+        foreach (var path in capture.Paths)
+            if (path is not null) TryDeleteFile(path);
+        TryDeleteFile(capture.MetadataPath);
     }
 
     private JsonElement BuildDocument(
@@ -777,6 +898,41 @@ public sealed class CloudReplayStore : IDisposable
         return snapshots.ToArray();
     }
 
+    /// <summary>
+    /// 恢复时先校验暂存磁带并取得最后一帧边界。允许零帧和非终局尾帧，因为进程可能在
+    /// 开局广播或终局广播的任意两次玩家下发之间退出；真正发布仍由 ReadSnapshots 做完整校验。
+    /// </summary>
+    private static PendingTapeState InspectPendingTape(string path)
+    {
+        var frameCount = 0;
+        var lastTick = -1;
+        var hasTerminalFrame = false;
+        long bytes = 0;
+        foreach (var line in File.ReadLines(path, Encoding.UTF8))
+        {
+            bytes += Encoding.UTF8.GetByteCount(line) + 1;
+            if (bytes > MaximumUncompressedBytes)
+                throw new InvalidDataException("云回放恢复磁带超过 64 MiB 上限。");
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            using var document = JsonDocument.Parse(line);
+            var snapshot = document.RootElement;
+            if (snapshot.GetProperty("proto").GetString() != "MsgGameState"
+                || snapshot.GetProperty("viewerKind").GetString() != "player")
+                throw new InvalidDataException("云回放恢复磁带包含非玩家状态快照。");
+            var tick = snapshot.GetProperty("tick").GetInt32();
+            if (tick <= lastTick)
+                throw new InvalidDataException("云回放恢复磁带 Tick 必须严格递增。");
+            if (hasTerminalFrame)
+                throw new InvalidDataException("云回放恢复磁带在终局帧之后仍有状态。");
+            lastTick = tick;
+            hasTerminalFrame = TryBoolean(snapshot, "isGameOver");
+            frameCount++;
+            if (frameCount > MaximumSnapshots)
+                throw new InvalidDataException($"云回放恢复磁带超过 {MaximumSnapshots} 帧上限。");
+        }
+        return new PendingTapeState(frameCount, lastTick, hasTerminalFrame);
+    }
+
     private static JsonElement ApplySharePolicy(JsonElement document, string policy)
     {
         var root = JsonNode.Parse(document.GetRawText())?.AsObject()
@@ -820,7 +976,9 @@ public sealed class CloudReplayStore : IDisposable
             using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.SequentialScan))
             using (var gzip = new GZipStream(file, CompressionLevel.SmallestSize, leaveOpen: true))
                 JsonSerializer.Serialize(gzip, document, JsonOptions);
-            File.Move(temp, path, overwrite: false);
+            // 同一终局在“数据库提交后进程退出”的极窄窗口内可能被恢复重试；
+            // 内容由同一终局 WAL 决定，允许原子替换同一路径而不生成第二份回放。
+            File.Move(temp, path, overwrite: true);
         }
         finally
         {
@@ -965,8 +1123,41 @@ public sealed class CloudReplayStore : IDisposable
 
     private void CleanupOrphans(SqliteConnection connection)
     {
+        var validPendingIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var metadataPath in Directory.EnumerateFiles(
+                     _pendingRoot, "*.meta.json", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                var start = JsonSerializer.Deserialize<CloudReplayMatchStart>(
+                                File.ReadAllBytes(metadataPath), JsonOptions)
+                            ?? throw new InvalidDataException("恢复元数据为空");
+                if (!IsSafeReplayId(start.ReplayId)
+                    || !string.Equals(metadataPath, PendingMetadataPath(start.ReplayId), PathComparison()))
+                    throw new InvalidDataException("恢复元数据路径与回放 ID 不一致");
+                var expectedPaths = new[] { start.Player0, start.Player1 }
+                    .Select((player, index) => player.Record
+                        ? ResolveInside(_pendingRoot, $"{start.ReplayId}.p{index}.jsonl")
+                        : null)
+                    .Where(path => path is not null)
+                    .ToArray();
+                if (expectedPaths.Length == 0 || expectedPaths.Any(path => !File.Exists(path)))
+                    throw new InvalidDataException("恢复磁带不完整");
+                validPendingIds.Add(start.ReplayId);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[云回放] 清理无效恢复元数据 {Path.GetFileName(metadataPath)}：{ex.Message}");
+                TryDeleteFile(metadataPath);
+            }
+        }
         foreach (var file in Directory.EnumerateFiles(_pendingRoot, "*.jsonl", SearchOption.TopDirectoryOnly))
-            TryDeleteFile(file);
+        {
+            var name = Path.GetFileName(file);
+            var marker = name.LastIndexOf(".p", StringComparison.Ordinal);
+            var replayId = marker > 0 ? name[..marker] : "";
+            if (!validPendingIds.Contains(replayId)) TryDeleteFile(file);
+        }
         var referenced = new HashSet<string>(PathComparer());
         using (var command = connection.CreateCommand())
         {
@@ -983,6 +1174,37 @@ public sealed class CloudReplayStore : IDisposable
         var ownerKey = Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes(account.Trim().ToLowerInvariant()))).ToLowerInvariant()[..24];
         return ResolveInside(_payloadRoot, ownerKey, $"{replayId}.json.gz");
+    }
+
+    private string PendingMetadataPath(string replayId)
+        => ResolveInside(_pendingRoot, $"{replayId}.meta.json");
+
+    private static void WriteMetadataAtomic(string path, CloudReplayMatchStart start)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporaryPath = Path.Combine(
+            Path.GetDirectoryName(path)!,
+            $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(start, JsonOptions);
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 16 * 1024,
+                       FileOptions.WriteThrough))
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temporaryPath, path, overwrite: false);
+        }
+        finally
+        {
+            TryDeleteFile(temporaryPath);
+        }
     }
 
     private void DeletePayload(string relativePath)
@@ -1160,32 +1382,56 @@ public sealed class CloudReplayStore : IDisposable
         string RuntimeManifestHash,
         string PayloadPath,
         long SizeBytes);
+
+    private readonly record struct PendingTapeState(
+        int FrameCount,
+        int LastTick,
+        bool HasTerminalFrame);
 }
 
 public sealed class CloudReplayCapture
 {
     private readonly CloudReplayStore _store;
     private readonly int[] _frameCounts = new int[2];
+    private readonly int[] _lastTicks = [-1, -1];
+    private readonly bool[] _terminalFrames = new bool[2];
+    private readonly object _frameGate = new();
     private readonly ConcurrentDictionary<(string Account, string FeedbackId), byte> _feedback = new();
+    private readonly SemaphoreSlim _finishGate = new(1, 1);
     private string? _failureReason;
-    private int _finished;
+    private int _completed;
     private int _aborted;
 
     internal CloudReplayCapture(
         CloudReplayStore store,
         CloudReplayMatchStart start,
         string?[] keys,
-        string?[] paths)
+        string?[] paths,
+        string metadataPath,
+        IReadOnlyList<int>? initialFrameCounts = null,
+        IReadOnlyList<int>? initialLastTicks = null,
+        IReadOnlyList<bool>? initialTerminalFrames = null)
     {
         _store = store;
         Start = start;
         Keys = keys;
         Paths = paths;
+        MetadataPath = metadataPath;
+        if (initialFrameCounts is not null)
+            for (var index = 0; index < Math.Min(2, initialFrameCounts.Count); index++)
+                _frameCounts[index] = Math.Max(0, initialFrameCounts[index]);
+        if (initialLastTicks is not null)
+            for (var index = 0; index < Math.Min(2, initialLastTicks.Count); index++)
+                _lastTicks[index] = initialLastTicks[index];
+        if (initialTerminalFrames is not null)
+            for (var index = 0; index < Math.Min(2, initialTerminalFrames.Count); index++)
+                _terminalFrames[index] = initialTerminalFrames[index];
     }
 
     internal CloudReplayMatchStart Start { get; }
     internal string?[] Keys { get; }
     internal string?[] Paths { get; }
+    internal string MetadataPath { get; }
     internal string? FailureReason => Volatile.Read(ref _failureReason);
     internal bool IsAborted => Volatile.Read(ref _aborted) != 0;
     internal IEnumerable<(string Account, string FeedbackId)> FeedbackLinks
@@ -1194,20 +1440,60 @@ public sealed class CloudReplayCapture
     public void AppendSnapshot(int playerIndex, object payload)
         => _store.Append(this, playerIndex, payload);
 
-    public Task CompleteAsync(CloudReplayCompletion completion)
+    public async Task CompleteAsync(CloudReplayCompletion completion)
     {
-        if (Interlocked.CompareExchange(ref _finished, 1, 0) != 0) return Task.CompletedTask;
-        return _store.CompleteAsync(this, completion);
+        await _finishGate.WaitAsync();
+        try
+        {
+            if (Volatile.Read(ref _completed) != 0 || IsAborted) return;
+            await _store.CompleteAsync(this, completion);
+            Volatile.Write(ref _completed, 1);
+        }
+        finally
+        {
+            _finishGate.Release();
+        }
     }
 
-    public Task AbortAsync()
+    public async Task AbortAsync()
     {
-        MarkAborted();
-        if (Interlocked.CompareExchange(ref _finished, 1, 0) != 0) return Task.CompletedTask;
-        return _store.AbortAsync(this);
+        await _finishGate.WaitAsync();
+        try
+        {
+            if (Volatile.Read(ref _completed) != 0 || IsAborted) return;
+            MarkAborted();
+            await _store.AbortAsync(this);
+            Volatile.Write(ref _completed, 1);
+        }
+        finally
+        {
+            _finishGate.Release();
+        }
     }
 
-    internal int IncrementFrames(int playerIndex) => Interlocked.Increment(ref _frameCounts[playerIndex]);
+    internal int RegisterFrame(int playerIndex, int tick, bool isTerminal)
+    {
+        lock (_frameGate)
+        {
+            if (_terminalFrames[playerIndex])
+                throw new InvalidDataException("云回放终局帧之后不得继续追加状态。");
+            if (tick <= _lastTicks[playerIndex])
+                throw new InvalidDataException("云回放 Tick 必须严格递增。");
+            _lastTicks[playerIndex] = tick;
+            _terminalFrames[playerIndex] = isTerminal;
+            return ++_frameCounts[playerIndex];
+        }
+    }
+
+    internal CloudReplayRecoveryFrameState GetRecoveryFrameState(int playerIndex)
+    {
+        lock (_frameGate)
+            return new CloudReplayRecoveryFrameState(
+                Keys[playerIndex] is not null,
+                _frameCounts[playerIndex],
+                _lastTicks[playerIndex],
+                _terminalFrames[playerIndex]);
+    }
     internal void MarkFailed(string reason) => Interlocked.CompareExchange(ref _failureReason, reason, null);
     internal void MarkAborted() => Volatile.Write(ref _aborted, 1);
 
@@ -1221,3 +1507,9 @@ public sealed class CloudReplayCapture
         return participant?.Record == true && _feedback.TryAdd((participant.Account, feedbackId), 0);
     }
 }
+
+internal readonly record struct CloudReplayRecoveryFrameState(
+    bool Recorded,
+    int FrameCount,
+    int LastTick,
+    bool HasTerminalFrame);

@@ -5,7 +5,7 @@ using GrandUMI.Effects.Rules;
 using GrandUMI.Effects.Scripted;
 using GrandUMI.Game;
 using GrandUMI.Game.Hex;
-using GrandUMI.Game.Snapshot;
+using GrandUMI.Training;
 
 namespace GrandUMI.Effects;
 
@@ -368,7 +368,12 @@ public static class EffectRuntime
                || (_before is not null && !string.Equals(_before, Fingerprint(state), StringComparison.Ordinal));
 
         private static string Fingerprint(GameState state)
-            => JsonSerializer.Serialize(PrivateStateSnapshotBuilder.Build(state));
+        {
+            // 复用确定性回放的完整规则状态投影：它覆盖限时力量/费用、区域、标记、触发队列与
+            // 海克斯运行态，却刻意不含 tick、棋钟、Prompt 截止时间等调度字段。这样真实 Prompt
+            // 跨动作返回“不发动”不会误消费首次复制，而 P-107 这类只写限时修正的实际效果仍可识别。
+            return DeterministicReplayCheckpointProvider.BuildFullState(state).GetRawText();
+        }
     }
 
     private sealed class TrackingPromptService(IPromptService inner, Action markAccepted) : IPromptService
@@ -708,6 +713,19 @@ public interface IScriptedEffect
 public interface IActivatedMainAvailability
 {
     string? GetActivatedMainUnavailableReason(GameState state, int ownerIndex, CardInstance source);
+}
+
+/// <summary>
+/// 手写【主要】事件在从手牌发动前必须满足的额外条件。传入的是已经计算持续减费后的实际出牌费用；
+/// 动作入口、合法动作集合与真正结算共用同一权威规则，避免事件先进入废弃区后才发现成本或目标不成立。
+/// </summary>
+public interface IEventMainAvailability
+{
+    string? GetEventMainUnavailableReason(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        int effectivePlayCost);
 }
 
 /// <summary>

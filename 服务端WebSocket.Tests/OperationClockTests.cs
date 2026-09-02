@@ -199,11 +199,13 @@ public class OperationClockTests
             room.Engine.HandleAction(0, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
             room.Engine.HandleAction(1, "Mulligan", JsonSerializer.SerializeToElement(new { redraw = false }));
             var active = room.Engine.State.CurrentTurnPlayer;
-            room.Engine.State.OperationTurnClockRemainingMs[active] = 30;
+            // 完整套件并行运行时，30ms 可能在紧接着的首个断言前已经到期；保留短时超时语义，
+            // 同时给调度器足够余量验证“先处于运行中、随后归零判负”两个阶段。
+            room.Engine.State.OperationTurnClockRemainingMs[active] = 1_000;
             room.Engine.Broadcast("TurnClockTest");
 
             Assert.Equal(active, room.Engine.State.OperationClockActivePlayer);
-            Assert.InRange(room.Engine.State.OperationTurnClockRemainingMs[active], 1, 30);
+            Assert.InRange(room.Engine.State.OperationTurnClockRemainingMs[active], 1, 1_000);
 
             await WaitUntilAsync(() => room.Engine.State.IsGameOver);
 
