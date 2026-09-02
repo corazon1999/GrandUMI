@@ -145,11 +145,17 @@ test("双方玩家信息卡内各有三个海克斯槽位且不再挂载独立�
   assert.equal(board.match(/grid min-h-11 grid-cols-\[minmax\(0,1fr\)_auto\] items-start gap-1/g)?.length, 2);
   assert.match(board, /items=\{hexState\?\.opponentOwned \?\? \[\]\}/);
   assert.match(board, /items=\{hexState\?\.myOwned \?\? \[\]\}/);
+  assert.match(board, /<HexOwnedSlots side="opponent" label="对方" items=\{hexState\?\.opponentOwned \?\? \[\]\} \/>/);
+  assert.match(board, /<HexOwnedSlots side="my" label="我方" items=\{hexState\?\.myOwned \?\? \[\]\} \/>/);
   assert.match(owned, /const MAX_OWNED_HEXES = 3/);
   assert.match(owned, /Array\.from\(\{ length: MAX_OWNED_HEXES \}/);
   assert.match(owned, /items\.slice\(0, MAX_OWNED_HEXES\)/);
   assert.match(owned, /data-hex-slot-index=\{index \+ 1\}/);
   assert.match(owned, /data-hex-slot-state=\{hex \? "owned" : "empty"\}/);
+  assert.match(owned, /data-hex-slot-visible-label=\{hex \? "name" : "empty"\}/);
+  assert.match(owned, /className="line-clamp-3 w-full break-all/);
+  assert.match(owned, /\{hex\.name\}/);
+  assert.doesNotMatch(owned, /\{tierLabel \?\? "·"\}/);
   assert.doesNotMatch(board, /<HexOwnedPanel/);
   assert.doesNotMatch(owned, /data-hex-details-panel|data-hex-owned-panel|tierSequence|candidates/);
   assert.doesNotMatch(owned, /title=/);

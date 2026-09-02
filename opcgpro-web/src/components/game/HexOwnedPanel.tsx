@@ -97,6 +97,7 @@ export default function HexOwnedSlots({
                 data-hex-owned-slot={side}
                 data-hex-slot-index={index + 1}
                 data-hex-slot-state={hex ? "owned" : "empty"}
+                data-hex-slot-visible-label={hex ? "name" : "empty"}
                 data-hex-tier={hex?.tier}
                 disabled={!hex}
                 className={`relative flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-md border text-[11px] font-black outline-none transition-colors enabled:cursor-pointer enabled:hover:z-10 enabled:hover:brightness-125 enabled:focus-visible:z-10 enabled:focus-visible:ring-2 enabled:focus-visible:ring-cyan-200 disabled:cursor-default ${
@@ -125,15 +126,21 @@ export default function HexOwnedSlots({
                   setPinnedIndex(index);
                 }}
               >
-                <span
-                  aria-hidden="true"
-                  className={`flex h-8 w-8 items-center justify-center [clip-path:polygon(25%_7%,75%_7%,100%_50%,75%_93%,25%_93%,0_50%)] ${
-                    tier ? "bg-black/25" : "bg-slate-700/15"
-                  }`}
-                >
-                  {tierLabel ?? "·"}
-                </span>
-                {hex && <span className="sr-only">{hex.name}</span>}
+                {hex ? (
+                  <span
+                    aria-hidden="true"
+                    className="line-clamp-3 w-full break-all px-0.5 text-center text-[10px] leading-[11px]"
+                  >
+                    {hex.name}
+                  </span>
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-8 w-8 items-center justify-center bg-slate-700/15 [clip-path:polygon(25%_7%,75%_7%,100%_50%,75%_93%,25%_93%,0_50%)]"
+                  >
+                    ·
+                  </span>
+                )}
               </button>
             </li>
           );
