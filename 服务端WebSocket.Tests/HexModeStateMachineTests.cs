@@ -40,6 +40,9 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(4, HexRules.TransmutationPresentationRulesRevision);
         Assert.Equal(5, HexRules.CatalogConfigurationRulesRevision);
         Assert.Equal(HexRules.CatalogConfigurationRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(
+            "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
+            HexCatalog.Get(42).Description);
         Assert.Equal("获得时确定性随机获得1个金色海克斯。", HexCatalog.Get(55).Description);
         Assert.Equal(
             "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
