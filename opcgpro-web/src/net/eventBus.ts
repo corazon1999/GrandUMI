@@ -1,5 +1,6 @@
 import mitt from "mitt";
 import type { MsgBase } from "@/types/net";
+import type { ChatDecorationSlot } from "@/store/netStore";
 
 export type ConnectionState =
   | "disconnected"
@@ -37,6 +38,14 @@ type Events = {
     fromAccount?: string;
     fromName: string;
     fromRole: "player" | "spectator";
+    displaySide?: "self" | "opponent" | null;
+    sentAt?: number;
+    decoration?: {
+      id: string;
+      slot: ChatDecorationSlot;
+      rarity: "common" | "rare" | "epic" | "legendary";
+      styleToken: string;
+    } | null;
   };
 };
 

@@ -32,6 +32,18 @@ import {
   completeRejectedActionLatency,
 } from "./GameRequest";
 import { showMessage } from "@/components/ui/MessageBox";
+import type { ChatDecorationSlot } from "@/store/netStore";
+
+type DecoratedGameChatWire = MsgGameChat & {
+  displaySide?: "self" | "opponent" | null;
+  sentAt?: number;
+  decoration?: {
+    id: string;
+    slot: ChatDecorationSlot;
+    rarity: "common" | "rare" | "epic" | "legendary";
+    styleToken: string;
+  } | null;
+};
 
 let registered = false;
 
@@ -114,7 +126,7 @@ export function registerGameProtocols() {
         break;
 
       case "MsgGameChat": {
-        const m = msg as MsgGameChat;
+        const m = msg as DecoratedGameChatWire;
         eventBus.emit("gameChat", {
           text: m.text ?? "",
           code: m.code ?? null,
@@ -122,6 +134,9 @@ export function registerGameProtocols() {
           fromAccount: m.fromAccount,
           fromName: m.fromName ?? "玩家",
           fromRole: m.fromRole ?? "spectator",
+          displaySide: m.displaySide ?? null,
+          sentAt: m.sentAt,
+          decoration: m.decoration ?? null,
         });
         break;
       }

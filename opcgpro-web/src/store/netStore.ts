@@ -65,6 +65,48 @@ export type FriendlyRoomState = {
 
 export type RoomOperation = "idle" | "creating" | "joining";
 
+export type ChatDecorationSlot =
+  | "greeting"
+  | "praise"
+  | "thanks"
+  | "surprise"
+  | "mistake"
+  | "threat";
+
+export type ChatDecorationExchangeAction = "snapshot" | "purchase" | "equip";
+
+export interface ChatDecorationItem {
+  id: string;
+  slot: ChatDecorationSlot;
+  name: string;
+  text: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+  styleToken: string;
+  priceRankPoints: number;
+  priceBerries: number;
+  owned: boolean;
+  equipped: boolean;
+}
+
+export interface ChatDecorationExchangeSnapshot {
+  walletMode: "standard";
+  walletRule: string;
+  seasonId: string;
+  balanceRankPoints: number;
+  balanceBerries: number;
+  items: ChatDecorationItem[];
+}
+
+export interface ChatDecorationExchangeState {
+  snapshot: ChatDecorationExchangeSnapshot | null;
+  pendingRequestId: string | null;
+  pendingAction: ChatDecorationExchangeAction | null;
+  lastRequestId: string | null;
+  lastOutcome: string | null;
+  lastReplayed: boolean;
+  error: string | null;
+}
+
 export type MaintenanceState = {
   enabled: boolean;
   activeRoomCount: number;
@@ -163,6 +205,7 @@ interface NetStore {
   factionStandingsByMode: Record<RankedMode, FactionStanding[]>;
   rankSnapshotRequests: Record<RankedMode, RankSnapshotRequestState>;
   lastRankResult: RankPlayerSettlement | null;
+  chatDecorationExchange: ChatDecorationExchangeState;
   // 房间码
   roomCode: string | null;
   roomOperation: RoomOperation;
@@ -243,6 +286,17 @@ interface NetStore {
     },
   ) => void;
   setLastRankResult: (result: RankPlayerSettlement | null) => void;
+  beginChatDecorationExchangeRequest: (
+    action: ChatDecorationExchangeAction,
+    requestId: string,
+  ) => void;
+  acceptChatDecorationExchangeSnapshot: (
+    requestId: string,
+    snapshot: ChatDecorationExchangeSnapshot,
+    outcome?: string | null,
+    replayed?: boolean,
+  ) => void;
+  failChatDecorationExchangeRequest: (requestId: string, error: string) => void;
   setRoomCode: (code: string | null) => void;
   setRoomOperation: (operation: RoomOperation) => void;
   setOnlineCount: (n: number) => void;
@@ -320,6 +374,15 @@ const initialState = {
     wild: { ...INITIAL_RANK_SNAPSHOT_REQUEST_STATE },
   } as Record<RankedMode, RankSnapshotRequestState>,
   lastRankResult: null as RankPlayerSettlement | null,
+  chatDecorationExchange: {
+    snapshot: null,
+    pendingRequestId: null,
+    pendingAction: null,
+    lastRequestId: null,
+    lastOutcome: null,
+    lastReplayed: false,
+    error: null,
+  } as ChatDecorationExchangeState,
   roomCode: null as string | null,
   roomOperation: "idle" as RoomOperation,
   onlineCount: 0,
@@ -492,6 +555,47 @@ export const useNetStore = create<NetStore>((set) => ({
     };
   }),
   setLastRankResult: (lastRankResult) => set({ lastRankResult }),
+  beginChatDecorationExchangeRequest: (pendingAction, pendingRequestId) => set((state) => ({
+    chatDecorationExchange: {
+      ...state.chatDecorationExchange,
+      pendingAction,
+      pendingRequestId,
+      lastRequestId: pendingRequestId,
+      lastOutcome: null,
+      lastReplayed: false,
+      error: null,
+    },
+  })),
+  acceptChatDecorationExchangeSnapshot: (
+    requestId,
+    snapshot,
+    lastOutcome = null,
+    lastReplayed = false,
+  ) => set((state) => {
+    if (state.chatDecorationExchange.lastRequestId !== requestId) return {};
+    return {
+      chatDecorationExchange: {
+        snapshot,
+        pendingRequestId: null,
+        pendingAction: null,
+        lastRequestId: requestId,
+        lastOutcome,
+        lastReplayed,
+        error: null,
+      },
+    };
+  }),
+  failChatDecorationExchangeRequest: (requestId, error) => set((state) => {
+    if (state.chatDecorationExchange.lastRequestId !== requestId) return {};
+    return {
+      chatDecorationExchange: {
+        ...state.chatDecorationExchange,
+        pendingRequestId: null,
+        pendingAction: null,
+        error,
+      },
+    };
+  }),
 
   setRoomCode: (code) => set({ roomCode: code }),
 

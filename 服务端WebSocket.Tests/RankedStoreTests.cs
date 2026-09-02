@@ -635,6 +635,287 @@ public class RankedStoreTests
         }
     }
 
+    [Fact]
+    public void 聊天装饰目录_六类槽位各有两个且价格与样式均有效()
+    {
+        Assert.Equal(12, ChatDecorationCatalog.All.Count);
+        Assert.Equal(
+            ChatDecorationCatalog.All.Count,
+            ChatDecorationCatalog.All.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(
+            ChatDecorationSlots.All.Count,
+            ChatDecorationSlots.All.Distinct(StringComparer.Ordinal).Count());
+
+        foreach (var slot in ChatDecorationSlots.All)
+            Assert.Equal(2, ChatDecorationCatalog.All.Count(item => item.Slot == slot));
+
+        Assert.All(ChatDecorationCatalog.All, item =>
+        {
+            Assert.NotEmpty(item.Name);
+            Assert.NotEmpty(item.Text);
+            Assert.NotEmpty(item.StyleToken);
+            Assert.True(item.PriceRankPoints > 0);
+            Assert.Equal(
+                (long)item.PriceRankPoints * ChatDecorationCatalog.BerriesPerRankPoint,
+                item.PriceBerries);
+        });
+    }
+
+    [Fact]
+    public void 聊天装饰交易_购买幂等装配持久且跨赛季仅重置钱包()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-persistence");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 50);
+
+            var initial = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
+            Assert.Equal(50, initial.BalanceRankPoints);
+
+            var purchased = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0001", now.AddSeconds(1));
+            Assert.True(purchased.Succeeded);
+            Assert.False(purchased.Replayed);
+            Assert.Equal("purchased", purchased.Outcome);
+            Assert.Equal(30, purchased.Snapshot.BalanceRankPoints);
+
+            var replayed = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0001", now.AddSeconds(2));
+            Assert.True(replayed.Succeeded);
+            Assert.True(replayed.Replayed);
+            Assert.Equal(30, replayed.Snapshot.BalanceRankPoints);
+
+            var duplicateItem = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0002", now.AddSeconds(3));
+            Assert.True(duplicateItem.Succeeded);
+            Assert.Equal("already_owned", duplicateItem.Outcome);
+            Assert.Equal(30, duplicateItem.Snapshot.BalanceRankPoints);
+
+            var insufficient = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-sea-breeze", "purchase-0003", now.AddSeconds(4));
+            Assert.False(insufficient.Succeeded);
+            Assert.Equal("insufficient_funds", insufficient.Outcome);
+            Assert.Equal(30, insufficient.Snapshot.BalanceRankPoints);
+
+            Assert.Throws<ChatDecorationValidationException>(() => store.EquipChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", ChatDecorationSlots.Greeting,
+                "purchase-0001", now.AddSeconds(5)));
+
+            var equipped = store.EquipChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", ChatDecorationSlots.Greeting,
+                "equip-000001", now.AddSeconds(6));
+            Assert.True(equipped.Succeeded);
+            Assert.Equal("equipped", equipped.Outcome);
+            Assert.Equal("greeting-straw-hat",
+                store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Greeting)?.Id);
+            Assert.Null(store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Praise));
+
+            var restarted = new RankedStore(path);
+            var afterRestart = restarted.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
+            Assert.Equal(30, afterRestart.BalanceRankPoints);
+            Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
+            Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Equipped);
+
+            var nextSeason = restarted.GetChatDecorationExchangeSnapshot(
+                "alice", "爱丽丝", new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc));
+            Assert.NotEqual(afterRestart.SeasonId, nextSeason.SeasonId);
+            Assert.Equal(0, nextSeason.BalanceRankPoints);
+            Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
+            Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Equipped);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰交易_提交前故障会整体回滚且同请求可安全重试()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-rollback");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 100);
+            Assert.Equal(100, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
+
+            store.BeforeChatDecorationMutationCommitForTesting = () =>
+                throw new InvalidOperationException("模拟进程在提交前失败");
+            Assert.Throws<InvalidOperationException>(() => store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-sea-breeze", "rollback-0001", now.AddSeconds(1)));
+            store.BeforeChatDecorationMutationCommitForTesting = null;
+
+            var afterFailure = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddSeconds(2));
+            Assert.Equal(100, afterFailure.BalanceRankPoints);
+            Assert.False(afterFailure.Items.Single(item => item.Definition.Id == "greeting-sea-breeze").Owned);
+
+            var retried = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-sea-breeze", "rollback-0001", now.AddSeconds(3));
+            Assert.True(retried.Succeeded);
+            Assert.False(retried.Replayed);
+            Assert.Equal(55, retried.Snapshot.BalanceRankPoints);
+            Assert.True(retried.Snapshot.Items.Single(item => item.Definition.Id == "greeting-sea-breeze").Owned);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task 聊天装饰交易_与另一实例的排位结算竞争时不会丢失余额更新()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-settlement-race");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        using var purchaseEntered = new ManualResetEventSlim(false);
+        using var allowPurchaseCommit = new ManualResetEventSlim(false);
+        using var settlementStarted = new ManualResetEventSlim(false);
+        try
+        {
+            var purchaseStore = new RankedStore(path);
+            var settlementStore = new RankedStore(path);
+            Assert.NotNull(purchaseStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            Assert.NotNull(purchaseStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 500, "鲍勃", 500);
+            Assert.Equal(500,
+                purchaseStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
+            settlementStore.Initialize();
+
+            purchaseStore.BeforeChatDecorationMutationCommitForTesting = () =>
+            {
+                purchaseEntered.Set();
+                if (!allowPurchaseCommit.Wait(TimeSpan.FromSeconds(10)))
+                    throw new TimeoutException("等待并发结算进入竞争窗口超时");
+            };
+
+            var purchaseTask = Task.Run(() => purchaseStore.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", "race-buy-0001", now.AddSeconds(1)));
+            Assert.True(purchaseEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            var settlementTask = Task.Run(() =>
+            {
+                settlementStarted.Set();
+                return settlementStore.RecordMatch(
+                    "chat-decoration-race-match", now.AddSeconds(2),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
+            });
+            Assert.True(settlementStarted.Wait(TimeSpan.FromSeconds(5)));
+            var completedDuringPurchase = await Task.WhenAny(
+                settlementTask,
+                Task.Delay(TimeSpan.FromMilliseconds(150)));
+            Assert.NotSame(settlementTask, completedDuringPurchase);
+
+            allowPurchaseCommit.Set();
+            var purchased = await purchaseTask;
+            var settlement = await settlementTask;
+            purchaseStore.BeforeChatDecorationMutationCommitForTesting = null;
+
+            Assert.True(purchased.Succeeded);
+            Assert.NotNull(settlement);
+            var expectedBalance = Math.Max(0, 500 - 20 + settlement!.Player0.RankPointDelta);
+            var final = new RankedStore(path)
+                .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
+            Assert.Equal(expectedBalance, final.BalanceRankPoints);
+            Assert.True(final.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
+        }
+        finally
+        {
+            allowPurchaseCommit.Set();
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task 聊天装饰交易_跨实例并发重复请求只扣一次且不会超额消费()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-concurrent-purchases");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var firstStore = new RankedStore(path);
+            var secondStore = new RankedStore(path);
+            Assert.NotNull(firstStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            Assert.NotNull(firstStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 50, "鲍勃", 50);
+            firstStore.Initialize();
+            secondStore.Initialize();
+
+            using (var startDuplicate = new ManualResetEventSlim(false))
+            {
+                var duplicateTasks = new[] { firstStore, secondStore }
+                    .Select(store => Task.Run(() =>
+                    {
+                        startDuplicate.Wait();
+                        return store.PurchaseChatDecoration(
+                            "alice", "爱丽丝", "greeting-straw-hat",
+                            "concurrent-duplicate-0001", now.AddSeconds(1));
+                    }))
+                    .ToArray();
+                startDuplicate.Set();
+                var results = await Task.WhenAll(duplicateTasks);
+
+                Assert.All(results, result => Assert.True(result.Succeeded));
+                Assert.Single(results, result => result.Replayed);
+                Assert.All(results, result => Assert.Equal(30, result.Snapshot.BalanceRankPoints));
+            }
+
+            using (var startOverspend = new ManualResetEventSlim(false))
+            {
+                var cheap = Task.Run(() =>
+                {
+                    startOverspend.Wait();
+                    return firstStore.PurchaseChatDecoration(
+                        "bob", "鲍勃", "greeting-straw-hat",
+                        "concurrent-cheap-0001", now.AddSeconds(2));
+                });
+                var expensive = Task.Run(() =>
+                {
+                    startOverspend.Wait();
+                    return secondStore.PurchaseChatDecoration(
+                        "bob", "鲍勃", "greeting-sea-breeze",
+                        "concurrent-expensive-0001", now.AddSeconds(2));
+                });
+                startOverspend.Set();
+                var results = await Task.WhenAll(cheap, expensive);
+
+                Assert.Single(results, result => result.Succeeded);
+                Assert.Single(results, result => !result.Succeeded && result.Outcome == "insufficient_funds");
+                var final = new RankedStore(path)
+                    .GetChatDecorationExchangeSnapshot("bob", "鲍勃", now.AddMinutes(1));
+                var owned = final.Items.Where(item => item.Owned).ToArray();
+                var purchased = Assert.Single(owned);
+                Assert.Equal(50 - purchased.Definition.PriceRankPoints, final.BalanceRankPoints);
+                Assert.True(final.BalanceRankPoints >= 0);
+            }
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰交易_狂野排位数据库明确拒绝使用()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wild-disabled");
+        try
+        {
+            var wildStore = new RankedStore(path, chatDecorationExchangeEnabled: false);
+            var error = Assert.Throws<ChatDecorationValidationException>(() =>
+                wildStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝"));
+            Assert.Contains("狂野排位不可用", error.Message);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
     private static void CompletePlacements(RankedStore store, DateTime now, string prefix)
     {
         // 最后一场由鲍勃获胜，保证随后爱丽丝胜、鲍勃负时都从一连开始。
@@ -655,6 +936,61 @@ public class RankedStoreTests
             command.Parameters.AddWithValue("$name", displayName);
             Assert.Equal(1, command.ExecuteNonQuery());
         }
+    }
+
+    private static string CreateRankedTestDatabasePath(string prefix)
+    {
+        var configuredRoot = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT");
+        if (string.IsNullOrWhiteSpace(configuredRoot))
+            throw new InvalidOperationException(
+                "聊天装饰交易测试必须先通过 ops/windows/GrandUmiTemp.ps1 设置 GRANDUMI_TEST_TEMP_ROOT。");
+
+        var root = Path.GetFullPath(configuredRoot);
+        var requiredRoot = Path.GetFullPath(@"E:\GrandUMI-Temp") + Path.DirectorySeparatorChar;
+        if (!root.StartsWith(requiredRoot, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("聊天装饰交易测试临时目录必须位于 E:\\GrandUMI-Temp\\ 下。");
+        Directory.CreateDirectory(root);
+        return Path.Combine(root, $"{prefix}-{Guid.NewGuid():N}.db");
+    }
+
+    private static void SeedRankPointsAndResetWallet(
+        string path,
+        params object[] displayNameAndRankPoints)
+    {
+        Assert.True(displayNameAndRankPoints.Length > 0 && displayNameAndRankPoints.Length % 2 == 0);
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        for (var index = 0; index < displayNameAndRankPoints.Length; index += 2)
+        {
+            var displayName = Assert.IsType<string>(displayNameAndRankPoints[index]);
+            var rankPoints = Assert.IsType<int>(displayNameAndRankPoints[index + 1]);
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE rank_profiles
+                SET placement_games=$placements, games=$placements,
+                    rank_points=$points, highest_rank_points=$points
+                WHERE display_name=$name;
+                """;
+            update.Parameters.AddWithValue("$placements", RankedStore.PlacementRequired);
+            update.Parameters.AddWithValue("$points", rankPoints);
+            update.Parameters.AddWithValue("$name", displayName);
+            Assert.Equal(1, update.ExecuteNonQuery());
+        }
+
+        using var reset = connection.CreateCommand();
+        reset.Transaction = transaction;
+        reset.CommandText = "DELETE FROM rank_exchange_wallets;";
+        reset.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private static void DeleteRankedTestDatabase(string path)
+    {
+        TryDelete(path);
+        TryDelete(path + "-wal");
+        TryDelete(path + "-shm");
     }
 
     private static void TryDelete(string path)

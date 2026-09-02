@@ -119,7 +119,13 @@ import type {
   AdminDeploymentEnvironment,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
-import { useNetStore } from "@/store/netStore";
+import {
+  useNetStore,
+  type ChatDecorationExchangeAction,
+  type ChatDecorationExchangeSnapshot,
+  type ChatDecorationItem,
+  type ChatDecorationSlot,
+} from "@/store/netStore";
 import { useGameStore } from "@/store/gameStore";
 import { showMessage } from "@/components/ui/MessageBox";
 import {
@@ -146,6 +152,11 @@ const rankSnapshotRequestTimers: Partial<Record<RankedMode, {
   timer: ReturnType<typeof setTimeout>;
 }>> = {};
 let rankSnapshotRequestSequence = 0;
+let chatDecorationExchangeRequestSequence = 0;
+let chatDecorationExchangeRequestTimer: {
+  requestId: string;
+  timer: ReturnType<typeof setTimeout>;
+} | null = null;
 let leaderStatsRequestSequence = 0;
 let pendingLeaderLeaderboardRequestId: string | null = null;
 let pendingLeaderMatchupMatrixRequestId: string | null = null;
@@ -156,6 +167,7 @@ const HOME_REFRESH_RESUME_KEY = "grandumi_resume_home_after_refresh";
 const AUTH_ACCOUNT_KEY = "grandumi_auth_account";
 const AUTH_TOKEN_KEY = "grandumi_auth_token";
 const RANK_SNAPSHOT_REQUEST_TIMEOUT_MS = 8_000;
+const CHAT_DECORATION_EXCHANGE_TIMEOUT_MS = 8_000;
 
 function nextLeaderStatsRequestId(kind: string): string {
   leaderStatsRequestSequence += 1;
@@ -179,6 +191,24 @@ interface MsgMaintenanceState extends MsgBase {
 interface MsgSetMaintenance extends MsgBase {
   proto: "MsgSetMaintenance";
   enabled: boolean;
+}
+
+interface MsgChatDecorationExchange extends MsgBase {
+  proto: "MsgChatDecorationExchange";
+  action?: ChatDecorationExchangeAction;
+  requestId?: string;
+  result?: boolean;
+  outcome?: string | null;
+  replayed?: boolean;
+  logStr?: string | null;
+  walletMode?: string;
+  walletRule?: string;
+  seasonId?: string;
+  balanceRankPoints?: number;
+  balanceBerries?: number;
+  items?: ChatDecorationItem[];
+  decorationId?: string;
+  slot?: ChatDecorationSlot;
 }
 
 function readAuthToken(account: string): string | undefined {
@@ -217,6 +247,20 @@ function clearRankSnapshotRequestTimer(mode: RankedMode, requestId?: string) {
   if (!pending || (requestId && pending.requestId !== requestId)) return;
   clearTimeout(pending.timer);
   delete rankSnapshotRequestTimers[mode];
+}
+
+function clearChatDecorationExchangeRequestTimer(requestId?: string) {
+  const pending = chatDecorationExchangeRequestTimer;
+  if (!pending || (requestId && pending.requestId !== requestId)) return;
+  clearTimeout(pending.timer);
+  chatDecorationExchangeRequestTimer = null;
+}
+
+function failPendingChatDecorationExchangeRequest(error: string) {
+  const requestId = useNetStore.getState().chatDecorationExchange.pendingRequestId;
+  if (!requestId) return;
+  clearChatDecorationExchangeRequestTimer(requestId);
+  useNetStore.getState().failChatDecorationExchangeRequest(requestId, error);
 }
 
 function failPendingRankSnapshotRequests(error: string) {
@@ -310,6 +354,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgRankResult":
         handleRankResult(msg as MsgRankResult);
+        break;
+      case "MsgChatDecorationExchange":
+        handleChatDecorationExchange(msg as MsgChatDecorationExchange);
         break;
       case "MsgCreateRoom":
         handleCreateRoom(msg as MsgCreateRoom);
@@ -484,6 +531,7 @@ export function registerHomeProtocols() {
     clearRoomRequestTimer();
     clearSpectateRequestTimer();
     for (const mode of ["standard", "wild"] as const) clearRankSnapshotRequestTimer(mode);
+    clearChatDecorationExchangeRequestTimer();
     pendingLegacyImport = null;
     useGameStore.getState().resetGame();
     const store = useNetStore.getState();
@@ -498,6 +546,7 @@ export function registerHomeProtocols() {
   eventBus.on("close", () => {
     const store = useNetStore.getState();
     failPendingRankSnapshotRequests("网络已断开，当前显示的榜单可能已过期，请重连后重试");
+    failPendingChatDecorationExchangeRequest("网络已断开，未确认的交易不会在客户端显示为成功，请重连后刷新交易所");
     const { spectateState, roomOperation } = store;
     if (roomOperation !== "idle") {
       clearRoomRequestTimer();
@@ -575,6 +624,8 @@ function handleLogin(msg: MsgLogin) {
       localStorage.setItem("grandumi_account", account);
     }
     saveAuthToken(account, msg.authToken);
+    // 对局页刷新恢复时可能不会再次收到玩家资料，登录成功后也必须重取持久装配。
+    HomeRequest.requestChatDecorationExchangeSnapshot();
     if (legacyDecks.length > 0) {
       pendingLegacyImport = { account, selectedDeckName: legacySelectedDeck };
       if (!HomeRequest.importDecks(legacyDecks)) pendingLegacyImport = null;
@@ -699,6 +750,7 @@ function handlePlayerData(msg: MsgPlayerData) {
   }
 
   if (msg.logStr) showMessage(msg.logStr, "info");
+  HomeRequest.requestChatDecorationExchangeSnapshot();
 }
 
 /**
@@ -823,6 +875,80 @@ function handleRankResult(msg: MsgRankResult) {
     showMessage(msg.leaderboardError, "error");
   }
   if (msg.result) store.setLastRankResult(msg.result);
+}
+
+function parseChatDecorationExchangeSnapshot(
+  msg: MsgChatDecorationExchange,
+): ChatDecorationExchangeSnapshot | null {
+  const validSlots = new Set<ChatDecorationSlot>([
+    "greeting",
+    "praise",
+    "thanks",
+    "surprise",
+    "mistake",
+    "threat",
+  ]);
+  const validRarities = new Set(["common", "rare", "epic", "legendary"]);
+  if (
+    msg.walletMode !== "standard"
+    || !msg.walletRule
+    || !msg.seasonId
+    || !Number.isSafeInteger(msg.balanceRankPoints)
+    || (msg.balanceRankPoints ?? -1) < 0
+    || !Number.isSafeInteger(msg.balanceBerries)
+    || (msg.balanceBerries ?? -1) < 0
+    || !Array.isArray(msg.items)
+  ) return null;
+
+  const items = msg.items.filter((item): item is ChatDecorationItem => Boolean(
+    item
+    && typeof item.id === "string"
+    && validSlots.has(item.slot)
+    && typeof item.name === "string"
+    && typeof item.text === "string"
+    && validRarities.has(item.rarity)
+    && typeof item.styleToken === "string"
+    && Number.isSafeInteger(item.priceRankPoints)
+    && item.priceRankPoints > 0
+    && Number.isSafeInteger(item.priceBerries)
+    && item.priceBerries > 0
+    && typeof item.owned === "boolean"
+    && typeof item.equipped === "boolean"
+  ));
+  if (items.length !== msg.items.length || items.length < 12) return null;
+  return {
+    walletMode: "standard",
+    walletRule: msg.walletRule,
+    seasonId: msg.seasonId,
+    balanceRankPoints: msg.balanceRankPoints!,
+    balanceBerries: msg.balanceBerries!,
+    items,
+  };
+}
+
+function handleChatDecorationExchange(msg: MsgChatDecorationExchange) {
+  const requestId = msg.requestId?.trim();
+  if (!requestId) return;
+  const store = useNetStore.getState();
+  if (store.chatDecorationExchange.lastRequestId !== requestId) return;
+
+  const snapshot = parseChatDecorationExchangeSnapshot(msg);
+  if (!snapshot) {
+    const error = msg.logStr || "交易所返回了无效数据，请刷新后重试";
+    clearChatDecorationExchangeRequestTimer(requestId);
+    store.failChatDecorationExchangeRequest(requestId, error);
+    showMessage(error, "error");
+    return;
+  }
+
+  clearChatDecorationExchangeRequestTimer(requestId);
+  store.acceptChatDecorationExchangeSnapshot(
+    requestId,
+    snapshot,
+    msg.outcome,
+    msg.replayed === true,
+  );
+  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
 }
 
 /**
@@ -1318,6 +1444,43 @@ function handleUpdateSpectateSettings(msg: MsgUpdateSpectateSettings) {
   }
 }
 
+function sendChatDecorationExchangeRequest(
+  action: ChatDecorationExchangeAction,
+  payload: Pick<MsgChatDecorationExchange, "decorationId" | "slot"> = {},
+) {
+  const store = useNetStore.getState();
+  if (store.chatDecorationExchange.pendingRequestId) return false;
+
+  clearChatDecorationExchangeRequestTimer();
+  chatDecorationExchangeRequestSequence += 1;
+  const requestId = `chat-exchange-${Date.now().toString(36)}-${chatDecorationExchangeRequestSequence.toString(36)}`;
+  store.beginChatDecorationExchangeRequest(action, requestId);
+  const sent = NetManager.send({
+    proto: "MsgChatDecorationExchange",
+    action,
+    requestId,
+    ...payload,
+  } as MsgChatDecorationExchange);
+  if (!sent) {
+    store.failChatDecorationExchangeRequest(
+      requestId,
+      "交易所请求发送失败，请确认网络已重连后重试",
+    );
+    return false;
+  }
+
+  const timer = setTimeout(() => {
+    if (chatDecorationExchangeRequestTimer?.requestId !== requestId) return;
+    chatDecorationExchangeRequestTimer = null;
+    useNetStore.getState().failChatDecorationExchangeRequest(
+      requestId,
+      "交易所响应超时，请刷新确认权威余额后再操作",
+    );
+  }, CHAT_DECORATION_EXCHANGE_TIMEOUT_MS);
+  chatDecorationExchangeRequestTimer = { requestId, timer };
+  return requestId;
+}
+
 // ── 请求发送 ────────────────────────────────────────────────────────────
 // 对应 C# HomeProtocol.cs 中的各 Request 静态方法
 
@@ -1523,6 +1686,18 @@ export const HomeRequest = {
     }, RANK_SNAPSHOT_REQUEST_TIMEOUT_MS);
     rankSnapshotRequestTimers[mode] = { requestId, timer };
     return true;
+  },
+
+  requestChatDecorationExchangeSnapshot() {
+    return sendChatDecorationExchangeRequest("snapshot");
+  },
+
+  purchaseChatDecoration(decorationId: string) {
+    return sendChatDecorationExchangeRequest("purchase", { decorationId });
+  },
+
+  equipChatDecoration(decorationId: string, slot: ChatDecorationSlot) {
+    return sendChatDecorationExchangeRequest("equip", { decorationId, slot });
   },
 
   selectRankFaction(faction: RankFaction, resetRankProgress = false, mode: RankedMode = "standard") {

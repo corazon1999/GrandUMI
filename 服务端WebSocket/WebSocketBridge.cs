@@ -36,7 +36,7 @@ public static class WebSocketBridge
     };
     private static readonly HashSet<string> CriticalOutboundProtocols = new(StringComparer.Ordinal)
     {
-        "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgActionRejected", "MsgDuelOver",
+        "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgChatDecorationExchange", "MsgChatDecorationSend", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
         "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
         "MsgOperationsCases", "MsgOperationsCaseDetail", "MsgOperationsCaseUpdate", "MsgOperationsCaseAppeal", "MsgOperationsPenalty",
@@ -50,7 +50,7 @@ public static class WebSocketBridge
     private static readonly HashSet<string> RevokedQqGameProtocols = new(StringComparer.Ordinal)
     {
         "MsgPing", "MsgNetworkDiagnostics", "MsgGameAction", "MsgPromptResponse", "MsgRequestState",
-        "MsgSurrender", "MsgEndByDisconnect", "MsgGameChat", "MsgBugReport", "MsgUpdateSettings",
+        "MsgSurrender", "MsgEndByDisconnect", "MsgGameChat", "MsgChatDecorationSend", "MsgBugReport", "MsgUpdateSettings",
     };
     // ── 会话注册表 ────────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, WsSession> Sessions    = new();
@@ -88,7 +88,9 @@ public static class WebSocketBridge
         string FromName,
         string FromRole,
         string Text,
-        string? Code);
+        string? Code,
+        string? DecorationId = null,
+        string? DecorationSlot = null);
     private sealed record RecentOpponentContext(
         string OpponentAccount,
         string RoomId,
@@ -389,6 +391,7 @@ public static class WebSocketBridge
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode")), Str(msg, "requestId")); break;
             case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
+            case "MsgChatDecorationExchange": OnChatDecorationExchange(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
             case "MsgCreateRoom":  OnCreateRoom(session, msg);   break;
@@ -416,6 +419,7 @@ public static class WebSocketBridge
             case "MsgSurrender":   OnSurrender(session);         break;
             case "MsgChatMsg":     OnChatMsg(session, msg);      break;
             case "MsgGameChat":    OnGameChat(session, msg);     break;
+            case "MsgChatDecorationSend": OnChatDecorationSend(session, msg); break;
             case "MsgFriendChat":  OnFriendChat(session, msg);   break;
             case "MsgLeaveGameChat": OnLeaveGameChat(session);   break;
             case "MsgGlobalAnnouncement": OnGlobalAnnouncement(session, msg); break;
@@ -1913,6 +1917,142 @@ public static class WebSocketBridge
             LogErr($"排位阵营选择失败 {session.Account}: {ex.Message}");
             Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "阵营选择暂时不可用，请稍后重试" });
         }
+    }
+
+    private static void OnChatDecorationExchange(
+        WsSession session,
+        IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        var action = (Str(msg, "action") ?? "snapshot").Trim().ToLowerInvariant();
+        var requestId = Str(msg, "requestId");
+        if (!session.IsLoggedIn || session.Account is null || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationExchange",
+                action,
+                requestId,
+                result = false,
+                logStr = "请先登录后再使用聊天装饰交易所。",
+            });
+            return;
+        }
+        if (!session.TryConsumeRateLimit("chat-decoration-exchange", capacity: 10, refillPerSecond: 2))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationExchange",
+                action,
+                requestId,
+                result = false,
+                logStr = "交易所操作过于频繁，请稍后重试。",
+            });
+            return;
+        }
+
+        try
+        {
+            ChatDecorationMutationResult? mutation = null;
+            ChatDecorationExchangeSnapshot snapshot;
+            switch (action)
+            {
+                case "snapshot":
+                    snapshot = RankedStore.Default.GetChatDecorationExchangeSnapshot(
+                        session.Account,
+                        session.PlayerName);
+                    break;
+                case "purchase":
+                    mutation = RankedStore.Default.PurchaseChatDecoration(
+                        session.Account,
+                        session.PlayerName,
+                        Str(msg, "decorationId") ?? string.Empty,
+                        requestId ?? string.Empty);
+                    snapshot = mutation.Snapshot;
+                    break;
+                case "equip":
+                    mutation = RankedStore.Default.EquipChatDecoration(
+                        session.Account,
+                        session.PlayerName,
+                        Str(msg, "decorationId") ?? string.Empty,
+                        Str(msg, "slot") ?? string.Empty,
+                        requestId ?? string.Empty);
+                    snapshot = mutation.Snapshot;
+                    break;
+                default:
+                    throw new ChatDecorationValidationException("不支持的交易所操作。");
+            }
+
+            SendChatDecorationExchangeSnapshot(session, action, requestId, snapshot, mutation);
+        }
+        catch (ChatDecorationValidationException ex)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationExchange",
+                action,
+                requestId,
+                result = false,
+                logStr = ex.Message,
+            });
+        }
+        catch (Exception ex)
+        {
+            LogErr($"聊天装饰交易失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationExchange",
+                action,
+                requestId,
+                result = false,
+                logStr = "聊天装饰交易暂时不可用，未确认的操作不会扣除赏金。",
+            });
+        }
+    }
+
+    private static void SendChatDecorationExchangeSnapshot(
+        WsSession session,
+        string action,
+        string? requestId,
+        ChatDecorationExchangeSnapshot snapshot,
+        ChatDecorationMutationResult? mutation)
+    {
+        var logStr = mutation?.Outcome switch
+        {
+            "purchased" => "购买成功，聊天装饰已永久拥有。",
+            "already_owned" => "你已拥有该聊天装饰，本次未扣除赏金。",
+            "insufficient_funds" => "可用标准排位悬赏金不足，本次未扣除赏金。",
+            "equipped" => "聊天装饰已装配到对应快捷槽位。",
+            "already_equipped" => "该聊天装饰已经装配。",
+            _ => null,
+        };
+        Send(session.SessionId, new
+        {
+            proto = "MsgChatDecorationExchange",
+            action,
+            requestId,
+            result = mutation?.Succeeded ?? true,
+            outcome = mutation?.Outcome,
+            replayed = mutation?.Replayed ?? false,
+            logStr,
+            walletMode = RankedStore.ChatDecorationWalletMode,
+            walletRule = "仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。",
+            seasonId = snapshot.SeasonId,
+            balanceRankPoints = snapshot.BalanceRankPoints,
+            balanceBerries = snapshot.BalanceBerries,
+            items = snapshot.Items.Select(item => new
+            {
+                id = item.Definition.Id,
+                slot = item.Definition.Slot,
+                name = item.Definition.Name,
+                text = item.Definition.Text,
+                rarity = item.Definition.Rarity,
+                styleToken = item.Definition.StyleToken,
+                priceRankPoints = item.Definition.PriceRankPoints,
+                priceBerries = item.Definition.PriceBerries,
+                owned = item.Owned,
+                equipped = item.Equipped,
+            }).ToArray(),
+        });
     }
 
     // ── 房间码对战 ────────────────────────────────────────────────────────
@@ -5559,6 +5699,140 @@ public static class WebSocketBridge
             bindingRevision = player.BindingRevision,
             matchKind = player.MatchKind,
         };
+    }
+
+    /// <summary>客户端只提交六类槽位；装配、文案和样式全部从标准排位库权威解析。</summary>
+    private static void OnChatDecorationSend(
+        WsSession session,
+        IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!session.IsLoggedIn || session.Account is null || !IsCurrentAccountSession(session))
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationSend",
+                result = false,
+                logStr = "请先登录后再发送聊天装饰。",
+            });
+            return;
+        }
+        if (!TryRequireCommunicationAccess(session, "MsgChatDecorationSend")) return;
+
+        var room = GameRoomManager.GetRoomBySession(session.SessionId);
+        if (room is null)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationSend",
+                result = false,
+                logStr = "聊天装饰只能由正在对局的玩家发送。",
+            });
+            return;
+        }
+        var seat = Array.IndexOf(room.PlayerSessionIds, session.SessionId);
+        if (seat < 0)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationSend",
+                result = false,
+                logStr = "观战者不能发送聊天装饰。",
+            });
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (GameChatAt.TryGetValue(session.SessionId, out var last)
+            && (now - last).TotalMilliseconds < 1200)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgRateLimited",
+                scope = "game-chat",
+                retryAfterMs = Math.Max(1, 1200 - (int)(now - last).TotalMilliseconds),
+            });
+            return;
+        }
+
+        ChatDecorationDefinition? decoration;
+        try
+        {
+            decoration = RankedStore.Default.ResolveEquippedChatDecoration(
+                session.Account,
+                Str(msg, "slot") ?? string.Empty);
+        }
+        catch (Exception ex)
+        {
+            LogErr($"聊天装饰装配读取失败 {session.Account}: {ex.Message}");
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationSend",
+                result = false,
+                logStr = "聊天装饰状态暂时无法确认，请稍后重试。",
+            });
+            return;
+        }
+        if (decoration is null)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgChatDecorationSend",
+                result = false,
+                logStr = "该快捷槽位尚未装配已拥有的聊天装饰。",
+            });
+            return;
+        }
+
+        GameChatAt[session.SessionId] = now;
+        var fromName = session.PlayerName ?? session.Account;
+        var evidence = GameChatEvidenceByRoom.GetOrAdd(room.RoomId, _ => new ConcurrentQueue<GameChatEvidence>());
+        evidence.Enqueue(new GameChatEvidence(
+            now,
+            session.Account,
+            fromName,
+            "player",
+            decoration.Text,
+            null,
+            decoration.Id,
+            decoration.Slot));
+        while (evidence.Count > 24) evidence.TryDequeue(out _);
+
+        var blockedAccounts = _playerDataStore.GetBlockedRelatedAccountKeys(session.Account);
+        var recipients = room.PlayerSessionIds.Concat(room.Spectators.Keys).Distinct(StringComparer.Ordinal);
+        foreach (var recipientId in recipients)
+        {
+            if (Sessions.TryGetValue(recipientId, out var recipientSession)
+                && recipientSession.Account is not null
+                && blockedAccounts.Contains(recipientSession.Account))
+                continue;
+
+            string? displaySide = null;
+            var recipientSeat = Array.IndexOf(room.PlayerSessionIds, recipientId);
+            if (recipientSeat >= 0)
+                displaySide = recipientSeat == seat ? "self" : "opponent";
+            else if (room.Spectators.TryGetValue(recipientId, out var spectator))
+                displaySide = spectator.ViewPlayerIndex == seat ? "self" : "opponent";
+
+            Send(recipientId, new
+            {
+                proto = "MsgGameChat",
+                text = decoration.Text,
+                code = (string?)null,
+                fromSeat = seat,
+                fromAccount = session.Account,
+                fromName,
+                fromRole = "player",
+                displaySide,
+                sentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                decoration = new
+                {
+                    id = decoration.Id,
+                    slot = decoration.Slot,
+                    rarity = decoration.Rarity,
+                    styleToken = decoration.StyleToken,
+                },
+            });
+        }
     }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。

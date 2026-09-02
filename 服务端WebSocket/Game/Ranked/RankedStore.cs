@@ -12,6 +12,659 @@ public enum RankedMode
     Wild,
 }
 
+public static class ChatDecorationSlots
+{
+    public const string Greeting = "greeting";
+    public const string Praise = "praise";
+    public const string Thanks = "thanks";
+    public const string Surprise = "surprise";
+    public const string Mistake = "mistake";
+    public const string Threat = "threat";
+
+    public static readonly IReadOnlyList<string> All =
+    [
+        Greeting,
+        Praise,
+        Thanks,
+        Surprise,
+        Mistake,
+        Threat,
+    ];
+
+    public static string? Normalize(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized is not null && All.Contains(normalized, StringComparer.Ordinal) ? normalized : null;
+    }
+}
+
+public sealed record ChatDecorationDefinition(
+    string Id,
+    string Slot,
+    string Name,
+    string Text,
+    string Rarity,
+    string StyleToken,
+    int PriceRankPoints)
+{
+    public long PriceBerries => checked((long)PriceRankPoints * ChatDecorationCatalog.BerriesPerRankPoint);
+}
+
+public static class ChatDecorationCatalog
+{
+    public const long BerriesPerRankPoint = 100_000;
+
+    public static readonly IReadOnlyList<ChatDecorationDefinition> All =
+    [
+        new("greeting-straw-hat", ChatDecorationSlots.Greeting, "草帽式问候", "嘿！来场痛快的对决吧！", "common", "sunset", 20),
+        new("greeting-sea-breeze", ChatDecorationSlots.Greeting, "海风招呼", "海风正好，愿我们旗鼓相当！", "rare", "tide", 45),
+        new("praise-fine-play", ChatDecorationSlots.Praise, "漂亮一手", "漂亮！这手真有船长风范！", "common", "gold", 25),
+        new("praise-worthy-rival", ChatDecorationSlots.Praise, "宿敌喝彩", "好牌！你值得我全力以赴！", "epic", "haki", 90),
+        new("thanks-crewmate", ChatDecorationSlots.Thanks, "伙伴谢意", "谢了，伙伴！这份情我记下了！", "common", "leaf", 20),
+        new("thanks-banquet", ChatDecorationSlots.Thanks, "宴会答谢", "多谢指教！打完一起开宴会吧！", "rare", "feast", 55),
+        new("surprise-seaquake", ChatDecorationSlots.Surprise, "海震惊叹", "什么？！连大海都被这一手震住了！", "rare", "shock", 50),
+        new("surprise-wanted", ChatDecorationSlots.Surprise, "悬赏震惊", "这操作……你的悬赏金要涨了！", "epic", "wanted", 110),
+        new("mistake-compass", ChatDecorationSlots.Mistake, "迷航道歉", "糟了，航向看错了！我的失误。", "common", "mist", 15),
+        new("mistake-captain", ChatDecorationSlots.Mistake, "船长失策", "船长也会失算，这回算我的！", "rare", "navy", 40),
+        new("threat-cannon", ChatDecorationSlots.Threat, "炮火宣言", "当心了，下一轮炮火可不会留情！", "rare", "ember", 60),
+        new("threat-emperor", ChatDecorationSlots.Threat, "皇者霸气", "准备好了吗？真正的风暴才刚开始！", "legendary", "emperor", 140),
+    ];
+
+    private static readonly IReadOnlyDictionary<string, ChatDecorationDefinition> ById =
+        All.ToDictionary(item => item.Id, StringComparer.Ordinal);
+
+    public static ChatDecorationDefinition? Find(string? id)
+        => id is not null && ById.TryGetValue(id.Trim(), out var item) ? item : null;
+}
+
+public sealed record ChatDecorationExchangeItem(
+    ChatDecorationDefinition Definition,
+    bool Owned,
+    bool Equipped);
+
+public sealed record ChatDecorationExchangeSnapshot(
+    string SeasonId,
+    int BalanceRankPoints,
+    long BalanceBerries,
+    IReadOnlyList<ChatDecorationExchangeItem> Items);
+
+public sealed record ChatDecorationMutationResult(
+    string Action,
+    string RequestId,
+    string Outcome,
+    bool Succeeded,
+    bool Replayed,
+    ChatDecorationExchangeSnapshot Snapshot);
+
+public sealed class ChatDecorationValidationException(string message) : Exception(message);
+
+public sealed partial class RankedStore
+{
+    public const string ChatDecorationWalletMode = RankedModeWire.Standard;
+    private const string PurchaseAction = "purchase";
+    private const string EquipAction = "equip";
+    private const string PurchasedOutcome = "purchased";
+    private const string AlreadyOwnedOutcome = "already_owned";
+    private const string InsufficientFundsOutcome = "insufficient_funds";
+    private const string EquippedOutcome = "equipped";
+    private const string AlreadyEquippedOutcome = "already_equipped";
+
+    internal Action? BeforeChatDecorationMutationCommitForTesting { get; set; }
+
+    private sealed record StoredChatDecorationOperation(
+        string Action,
+        string DecorationId,
+        string? Slot,
+        string Outcome);
+
+    private void InitializeChatDecorationExchangeSchema(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS rank_exchange_wallets (
+                season_id          TEXT NOT NULL,
+                account_key        TEXT NOT NULL,
+                balance_points     INTEGER NOT NULL CHECK(balance_points >= 0),
+                updated_at_utc     TEXT NOT NULL,
+                PRIMARY KEY(season_id, account_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_decoration_ownership (
+                account_key        TEXT NOT NULL,
+                decoration_id      TEXT NOT NULL,
+                acquired_at_utc    TEXT NOT NULL,
+                PRIMARY KEY(account_key, decoration_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_decoration_equipment (
+                account_key        TEXT NOT NULL,
+                slot               TEXT NOT NULL,
+                decoration_id      TEXT NOT NULL,
+                equipped_at_utc    TEXT NOT NULL,
+                PRIMARY KEY(account_key, slot)
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_decoration_operations (
+                account_key        TEXT NOT NULL,
+                request_id         TEXT NOT NULL,
+                action             TEXT NOT NULL,
+                decoration_id      TEXT NOT NULL,
+                slot               TEXT NULL,
+                outcome            TEXT NOT NULL,
+                price_points       INTEGER NOT NULL,
+                balance_after      INTEGER NOT NULL,
+                created_at_utc     TEXT NOT NULL,
+                PRIMARY KEY(account_key, request_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_chat_decoration_equipment_item
+                ON chat_decoration_equipment(account_key, decoration_id);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    public ChatDecorationExchangeSnapshot GetChatDecorationExchangeSnapshot(
+        string account,
+        string? displayName = null,
+        DateTime? nowUtc = null)
+    {
+        lock (_gate)
+        {
+            RequireChatDecorationExchangeEnabled();
+            Initialize();
+            var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+            var season = SeasonAt(observedAtUtc);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            var normalizedAccount = ValidateChatDecorationAccount(account);
+            var profile = LoadOrCreate(connection, transaction, season, normalizedAccount, displayName ?? normalizedAccount);
+            var balance = ReadOrCreateChatDecorationWallet(connection, transaction, profile, observedAtUtc);
+            var snapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
+            transaction.Commit();
+            return snapshot;
+        }
+    }
+
+    public ChatDecorationMutationResult PurchaseChatDecoration(
+        string account,
+        string? displayName,
+        string decorationId,
+        string requestId,
+        DateTime? nowUtc = null)
+    {
+        lock (_gate)
+        {
+            RequireChatDecorationExchangeEnabled();
+            Initialize();
+            var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+            var normalizedAccount = ValidateChatDecorationAccount(account);
+            var normalizedRequestId = ValidateChatDecorationRequestId(requestId);
+            var definition = ChatDecorationCatalog.Find(decorationId)
+                ?? throw new ChatDecorationValidationException("该聊天装饰不存在或已下架。");
+            var season = SeasonAt(observedAtUtc);
+
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            var profile = LoadOrCreate(connection, transaction, season, normalizedAccount, displayName ?? normalizedAccount);
+            var balance = ReadOrCreateChatDecorationWallet(connection, transaction, profile, observedAtUtc);
+            var stored = ReadChatDecorationOperation(connection, transaction, profile.AccountKey, normalizedRequestId);
+            if (stored is not null)
+            {
+                ValidateReplayedChatDecorationOperation(stored, PurchaseAction, definition.Id, null);
+                var replaySnapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
+                transaction.Commit();
+                return new ChatDecorationMutationResult(
+                    PurchaseAction,
+                    normalizedRequestId,
+                    stored.Outcome,
+                    stored.Outcome != InsufficientFundsOutcome,
+                    true,
+                    replaySnapshot);
+            }
+
+            string outcome;
+            if (OwnsChatDecoration(connection, transaction, profile.AccountKey, definition.Id))
+            {
+                outcome = AlreadyOwnedOutcome;
+            }
+            else if (balance < definition.PriceRankPoints)
+            {
+                outcome = InsufficientFundsOutcome;
+            }
+            else
+            {
+                using (var debit = connection.CreateCommand())
+                {
+                    debit.Transaction = transaction;
+                    debit.CommandText = """
+                        UPDATE rank_exchange_wallets
+                        SET balance_points=balance_points-$price, updated_at_utc=$updated
+                        WHERE season_id=$season AND account_key=$key AND balance_points >= $price;
+                        """;
+                    debit.Parameters.AddWithValue("$price", definition.PriceRankPoints);
+                    debit.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
+                    debit.Parameters.AddWithValue("$season", season.Id);
+                    debit.Parameters.AddWithValue("$key", profile.AccountKey);
+                    if (debit.ExecuteNonQuery() != 1)
+                        throw new InvalidOperationException("交易所钱包扣款竞争失败，事务已取消。");
+                }
+
+                balance -= definition.PriceRankPoints;
+                using var own = connection.CreateCommand();
+                own.Transaction = transaction;
+                own.CommandText = """
+                    INSERT INTO chat_decoration_ownership(account_key,decoration_id,acquired_at_utc)
+                    VALUES($key,$decoration,$created);
+                    """;
+                own.Parameters.AddWithValue("$key", profile.AccountKey);
+                own.Parameters.AddWithValue("$decoration", definition.Id);
+                own.Parameters.AddWithValue("$created", ChatDecorationUtcText(observedAtUtc));
+                own.ExecuteNonQuery();
+                outcome = PurchasedOutcome;
+            }
+
+            InsertChatDecorationOperation(
+                connection,
+                transaction,
+                profile.AccountKey,
+                normalizedRequestId,
+                PurchaseAction,
+                definition.Id,
+                null,
+                outcome,
+                definition.PriceRankPoints,
+                balance,
+                observedAtUtc);
+            var snapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
+            BeforeChatDecorationMutationCommitForTesting?.Invoke();
+            transaction.Commit();
+            return new ChatDecorationMutationResult(
+                PurchaseAction,
+                normalizedRequestId,
+                outcome,
+                outcome != InsufficientFundsOutcome,
+                false,
+                snapshot);
+        }
+    }
+
+    public ChatDecorationMutationResult EquipChatDecoration(
+        string account,
+        string? displayName,
+        string decorationId,
+        string slot,
+        string requestId,
+        DateTime? nowUtc = null)
+    {
+        lock (_gate)
+        {
+            RequireChatDecorationExchangeEnabled();
+            Initialize();
+            var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+            var normalizedAccount = ValidateChatDecorationAccount(account);
+            var normalizedRequestId = ValidateChatDecorationRequestId(requestId);
+            var normalizedSlot = ChatDecorationSlots.Normalize(slot)
+                ?? throw new ChatDecorationValidationException("请选择有效的聊天装饰槽位。");
+            var definition = ChatDecorationCatalog.Find(decorationId)
+                ?? throw new ChatDecorationValidationException("该聊天装饰不存在或已下架。");
+            if (!string.Equals(definition.Slot, normalizedSlot, StringComparison.Ordinal))
+                throw new ChatDecorationValidationException("该装饰不能装入所选槽位。");
+            var season = SeasonAt(observedAtUtc);
+
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            var profile = LoadOrCreate(connection, transaction, season, normalizedAccount, displayName ?? normalizedAccount);
+            var balance = ReadOrCreateChatDecorationWallet(connection, transaction, profile, observedAtUtc);
+            var stored = ReadChatDecorationOperation(connection, transaction, profile.AccountKey, normalizedRequestId);
+            if (stored is not null)
+            {
+                ValidateReplayedChatDecorationOperation(stored, EquipAction, definition.Id, normalizedSlot);
+                var replaySnapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
+                transaction.Commit();
+                return new ChatDecorationMutationResult(
+                    EquipAction,
+                    normalizedRequestId,
+                    stored.Outcome,
+                    true,
+                    true,
+                    replaySnapshot);
+            }
+
+            if (!OwnsChatDecoration(connection, transaction, profile.AccountKey, definition.Id))
+                throw new ChatDecorationValidationException("请先购买该聊天装饰，再进行装配。");
+
+            var current = ReadEquippedChatDecoration(connection, transaction, profile.AccountKey, normalizedSlot);
+            var outcome = string.Equals(current, definition.Id, StringComparison.Ordinal)
+                ? AlreadyEquippedOutcome
+                : EquippedOutcome;
+            if (outcome == EquippedOutcome)
+            {
+                using var equip = connection.CreateCommand();
+                equip.Transaction = transaction;
+                equip.CommandText = """
+                    INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+                    VALUES($key,$slot,$decoration,$equipped)
+                    ON CONFLICT(account_key,slot) DO UPDATE SET
+                        decoration_id=excluded.decoration_id,
+                        equipped_at_utc=excluded.equipped_at_utc;
+                    """;
+                equip.Parameters.AddWithValue("$key", profile.AccountKey);
+                equip.Parameters.AddWithValue("$slot", normalizedSlot);
+                equip.Parameters.AddWithValue("$decoration", definition.Id);
+                equip.Parameters.AddWithValue("$equipped", ChatDecorationUtcText(observedAtUtc));
+                equip.ExecuteNonQuery();
+            }
+
+            InsertChatDecorationOperation(
+                connection,
+                transaction,
+                profile.AccountKey,
+                normalizedRequestId,
+                EquipAction,
+                definition.Id,
+                normalizedSlot,
+                outcome,
+                0,
+                balance,
+                observedAtUtc);
+            var snapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
+            BeforeChatDecorationMutationCommitForTesting?.Invoke();
+            transaction.Commit();
+            return new ChatDecorationMutationResult(
+                EquipAction,
+                normalizedRequestId,
+                outcome,
+                true,
+                false,
+                snapshot);
+        }
+    }
+
+    public ChatDecorationDefinition? ResolveEquippedChatDecoration(string account, string slot)
+    {
+        lock (_gate)
+        {
+            RequireChatDecorationExchangeEnabled();
+            Initialize();
+            var normalizedSlot = ChatDecorationSlots.Normalize(slot);
+            if (normalizedSlot is null || string.IsNullOrWhiteSpace(account)) return null;
+            var accountKey = HashAccount(account);
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                SELECT equipment.decoration_id
+                FROM chat_decoration_equipment AS equipment
+                INNER JOIN chat_decoration_ownership AS owned
+                    ON owned.account_key=equipment.account_key
+                   AND owned.decoration_id=equipment.decoration_id
+                WHERE equipment.account_key=$key AND equipment.slot=$slot
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue("$key", accountKey);
+            command.Parameters.AddWithValue("$slot", normalizedSlot);
+            var decorationId = command.ExecuteScalar() as string;
+            transaction.Commit();
+            var definition = ChatDecorationCatalog.Find(decorationId);
+            return definition is not null && string.Equals(definition.Slot, normalizedSlot, StringComparison.Ordinal)
+                ? definition
+                : null;
+        }
+    }
+
+    private void ApplyChatDecorationWalletSettlementDelta(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Profile before,
+        Profile after,
+        DateTime observedAtUtc)
+    {
+        if (!_chatDecorationExchangeEnabled) return;
+        ReadOrCreateChatDecorationWallet(connection, transaction, before, observedAtUtc);
+        var delta = after.RankPoints - before.RankPoints;
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE rank_exchange_wallets
+            SET balance_points=MAX(0,balance_points+$delta), updated_at_utc=$updated
+            WHERE season_id=$season AND account_key=$key;
+            """;
+        command.Parameters.AddWithValue("$delta", delta);
+        command.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
+        command.Parameters.AddWithValue("$season", before.SeasonId);
+        command.Parameters.AddWithValue("$key", before.AccountKey);
+        if (command.ExecuteNonQuery() != 1)
+            throw new InvalidOperationException("标准排位结算未能同步交易所钱包，事务已取消。");
+    }
+
+    private void ResetChatDecorationWallet(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string seasonId,
+        string accountKey,
+        DateTime observedAtUtc)
+    {
+        if (!_chatDecorationExchangeEnabled) return;
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO rank_exchange_wallets(season_id,account_key,balance_points,updated_at_utc)
+            VALUES($season,$key,0,$updated)
+            ON CONFLICT(season_id,account_key) DO UPDATE SET
+                balance_points=0,
+                updated_at_utc=excluded.updated_at_utc;
+            """;
+        command.Parameters.AddWithValue("$season", seasonId);
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
+        command.ExecuteNonQuery();
+    }
+
+    private static int ReadOrCreateChatDecorationWallet(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Profile profile,
+        DateTime observedAtUtc)
+    {
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO rank_exchange_wallets(season_id,account_key,balance_points,updated_at_utc)
+                VALUES($season,$key,$balance,$updated)
+                ON CONFLICT(season_id,account_key) DO NOTHING;
+                """;
+            insert.Parameters.AddWithValue("$season", profile.SeasonId);
+            insert.Parameters.AddWithValue("$key", profile.AccountKey);
+            insert.Parameters.AddWithValue("$balance", Math.Max(0, profile.RankPoints));
+            insert.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
+            insert.ExecuteNonQuery();
+        }
+
+        using var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        read.CommandText = """
+            SELECT balance_points FROM rank_exchange_wallets
+            WHERE season_id=$season AND account_key=$key;
+            """;
+        read.Parameters.AddWithValue("$season", profile.SeasonId);
+        read.Parameters.AddWithValue("$key", profile.AccountKey);
+        return Convert.ToInt32(read.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private static ChatDecorationExchangeSnapshot BuildChatDecorationExchangeSnapshot(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Profile profile,
+        int balance)
+    {
+        var owned = new HashSet<string>(StringComparer.Ordinal);
+        using (var ownership = connection.CreateCommand())
+        {
+            ownership.Transaction = transaction;
+            ownership.CommandText = "SELECT decoration_id FROM chat_decoration_ownership WHERE account_key=$key;";
+            ownership.Parameters.AddWithValue("$key", profile.AccountKey);
+            using var reader = ownership.ExecuteReader();
+            while (reader.Read()) owned.Add(reader.GetString(0));
+        }
+
+        var equipped = new Dictionary<string, string>(StringComparer.Ordinal);
+        using (var equipment = connection.CreateCommand())
+        {
+            equipment.Transaction = transaction;
+            equipment.CommandText = "SELECT slot,decoration_id FROM chat_decoration_equipment WHERE account_key=$key;";
+            equipment.Parameters.AddWithValue("$key", profile.AccountKey);
+            using var reader = equipment.ExecuteReader();
+            while (reader.Read()) equipped[reader.GetString(0)] = reader.GetString(1);
+        }
+
+        var items = ChatDecorationCatalog.All
+            .Select(definition => new ChatDecorationExchangeItem(
+                definition,
+                owned.Contains(definition.Id),
+                equipped.TryGetValue(definition.Slot, out var equippedId)
+                    && string.Equals(equippedId, definition.Id, StringComparison.Ordinal)))
+            .ToArray();
+        return new ChatDecorationExchangeSnapshot(
+            profile.SeasonId,
+            balance,
+            checked((long)balance * ChatDecorationCatalog.BerriesPerRankPoint),
+            items);
+    }
+
+    private static bool OwnsChatDecoration(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string accountKey,
+        string decorationId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT 1 FROM chat_decoration_ownership
+            WHERE account_key=$key AND decoration_id=$decoration LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$decoration", decorationId);
+        return command.ExecuteScalar() is not null;
+    }
+
+    private static string? ReadEquippedChatDecoration(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string accountKey,
+        string slot)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT decoration_id FROM chat_decoration_equipment
+            WHERE account_key=$key AND slot=$slot LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$slot", slot);
+        return command.ExecuteScalar() as string;
+    }
+
+    private static StoredChatDecorationOperation? ReadChatDecorationOperation(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string accountKey,
+        string requestId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT action,decoration_id,slot,outcome
+            FROM chat_decoration_operations
+            WHERE account_key=$key AND request_id=$request LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$request", requestId);
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? new StoredChatDecorationOperation(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.GetString(3))
+            : null;
+    }
+
+    private static void InsertChatDecorationOperation(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string accountKey,
+        string requestId,
+        string action,
+        string decorationId,
+        string? slot,
+        string outcome,
+        int pricePoints,
+        int balanceAfter,
+        DateTime observedAtUtc)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO chat_decoration_operations(
+                account_key,request_id,action,decoration_id,slot,outcome,
+                price_points,balance_after,created_at_utc)
+            VALUES($key,$request,$action,$decoration,$slot,$outcome,$price,$balance,$created);
+            """;
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$request", requestId);
+        command.Parameters.AddWithValue("$action", action);
+        command.Parameters.AddWithValue("$decoration", decorationId);
+        command.Parameters.AddWithValue("$slot", (object?)slot ?? DBNull.Value);
+        command.Parameters.AddWithValue("$outcome", outcome);
+        command.Parameters.AddWithValue("$price", pricePoints);
+        command.Parameters.AddWithValue("$balance", balanceAfter);
+        command.Parameters.AddWithValue("$created", ChatDecorationUtcText(observedAtUtc));
+        command.ExecuteNonQuery();
+    }
+
+    private static void ValidateReplayedChatDecorationOperation(
+        StoredChatDecorationOperation operation,
+        string action,
+        string decorationId,
+        string? slot)
+    {
+        if (string.Equals(operation.Action, action, StringComparison.Ordinal)
+            && string.Equals(operation.DecorationId, decorationId, StringComparison.Ordinal)
+            && string.Equals(operation.Slot, slot, StringComparison.Ordinal))
+            return;
+        throw new ChatDecorationValidationException("请求编号已用于其他交易，请刷新交易所后重试。");
+    }
+
+    private void RequireChatDecorationExchangeEnabled()
+    {
+        if (!_chatDecorationExchangeEnabled)
+            throw new ChatDecorationValidationException("聊天装饰交易所只使用标准排位悬赏金，狂野排位不可用。");
+    }
+
+    private static string ValidateChatDecorationAccount(string account)
+    {
+        var normalized = account?.Trim() ?? string.Empty;
+        if (normalized.Length == 0)
+            throw new ChatDecorationValidationException("请先登录后再使用聊天装饰交易所。");
+        return normalized;
+    }
+
+    private static string ValidateChatDecorationRequestId(string requestId)
+    {
+        var normalized = requestId?.Trim() ?? string.Empty;
+        if (normalized.Length is < 8 or > 96 || normalized.Any(char.IsControl))
+            throw new ChatDecorationValidationException("交易请求编号无效，请刷新后重试。");
+        return normalized;
+    }
+
+    private static string ChatDecorationUtcText(DateTime value)
+        => value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+
+}
+
 public static class RankedModeWire
 {
     public const string Standard = "standard";
@@ -190,7 +843,7 @@ public static class RankWire
 /// 排位赛独立 SQLite。测试服和正式服可能共用玩家资料库，因此排位数据必须通过
 /// GRANDUMI_RANKED_DB 按环境隔离，不能写入 players.db。
 /// </summary>
-public sealed class RankedStore
+public sealed partial class RankedStore
 {
     public const string PirateFaction = "pirate";
     public const string MarineFaction = "marine";
@@ -220,6 +873,7 @@ public sealed class RankedStore
     private readonly string _connectionString;
     private readonly LeaderChampionStore _championStore;
     private readonly LeaderStatsStore _leaderStatsStore;
+    private readonly bool _chatDecorationExchangeEnabled;
     private readonly SemaphoreSlim _leaderboardRefreshGate = new(1, 1);
     private PublicLeaderboardSnapshot? _publicLeaderboardSnapshot;
     private string? _lastLeaderboardRefreshError;
@@ -228,18 +882,22 @@ public sealed class RankedStore
     internal Action? BeforeLeaderboardSnapshotBuildForTesting { get; set; }
 
     public static RankedStore Default { get; } = new();
-    public static RankedStore Wild { get; } = new(ResolveWildDefaultPath());
+    public static RankedStore Wild { get; } = new(
+        ResolveWildDefaultPath(),
+        chatDecorationExchangeEnabled: false);
 
     public static RankedStore ForMode(RankedMode mode) => mode == RankedMode.Wild ? Wild : Default;
 
     public RankedStore(
         string? databasePath = null,
         LeaderChampionStore? championStore = null,
-        LeaderStatsStore? leaderStatsStore = null)
+        LeaderStatsStore? leaderStatsStore = null,
+        bool chatDecorationExchangeEnabled = true)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
         _championStore = championStore ?? LeaderChampionStore.Default;
         _leaderStatsStore = leaderStatsStore ?? LeaderStatsStore.Default;
+        _chatDecorationExchangeEnabled = chatDecorationExchangeEnabled;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -344,6 +1002,8 @@ public sealed class RankedStore
                 );
                 """;
             command.ExecuteNonQuery();
+            if (_chatDecorationExchangeEnabled)
+                InitializeChatDecorationExchangeSchema(connection);
             _initialized = true;
         }
     }
@@ -403,7 +1063,7 @@ public sealed class RankedStore
         {
             Initialize();
             using var connection = Open();
-            using var transaction = connection.BeginTransaction();
+            using var transaction = connection.BeginTransaction(deferred: false);
             var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
             var selected = ReadFaction(connection, transaction, profile.AccountKey);
             if (selected is null)
@@ -424,6 +1084,12 @@ public sealed class RankedStore
                 {
                     profile = ResetRankProgress(profile, observedAtUtc);
                     Save(connection, transaction, profile);
+                    ResetChatDecorationWallet(
+                        connection,
+                        transaction,
+                        season.Id,
+                        profile.AccountKey,
+                        observedAtUtc);
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
                     update.CommandText = "UPDATE rank_factions SET faction=$faction, selected_at_utc=$selected WHERE account_key=$key;";
@@ -482,7 +1148,7 @@ public sealed class RankedStore
             Initialize();
             var season = SeasonAt(endedAtUtc);
             using var connection = Open();
-            using var transaction = connection.BeginTransaction();
+            using var transaction = connection.BeginTransaction(deferred: false);
             if (MatchExists(connection, transaction, matchId)) return null;
 
             var before0 = LoadOrCreate(connection, transaction, season, player0Account, player0Name);
@@ -510,6 +1176,18 @@ public sealed class RankedStore
 
             Save(connection, transaction, after0);
             Save(connection, transaction, after1);
+            ApplyChatDecorationWalletSettlementDelta(
+                connection,
+                transaction,
+                before0,
+                after0,
+                endedAtUtc);
+            ApplyChatDecorationWalletSettlementDelta(
+                connection,
+                transaction,
+                before1,
+                after1,
+                endedAtUtc);
             InsertMatch(connection, transaction, matchId, season.Id, endedAtUtc, before0.AccountKey,
                 before1.AccountKey, winnerIndex, after0.RankPoints - before0.RankPoints,
                 after1.RankPoints - before1.RankPoints);

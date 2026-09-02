@@ -52,3 +52,42 @@ test("两档手机竖屏旋转后聊天按钮仍保留至少44像素触控尺寸
     assert.ok(48 * scale >= 44, `${hostWidth}×${hostHeight} 的触控尺寸不足44px`);
   }
 });
+
+test("特殊聊天只发送槽位且由服务端回包决定文案样式与显示侧", async () => {
+  const [panel, request, protocol, events] = await Promise.all([
+    read("src/components/game/GameChatPanel.tsx"),
+    read("src/net/GameRequest.ts"),
+    read("src/net/GameProtocol.ts"),
+    read("src/net/eventBus.ts"),
+  ]);
+
+  const sendMethod = request.match(/sendChatDecoration:[\s\S]*?\),\n/)?.[0] ?? "";
+  assert.match(sendMethod, /proto: "MsgChatDecorationSend", slot/);
+  assert.doesNotMatch(sendMethod, /text|styleToken|decorationId/);
+  assert.match(protocol, /displaySide: m\.displaySide \?\? null/);
+  assert.match(protocol, /decoration: m\.decoration \?\? null/);
+  assert.match(events, /displaySide\?: "self" \| "opponent" \| null/);
+  assert.match(events, /styleToken: string/);
+  assert.match(panel, /chatDecorationBubbleClass\(bubble\.styleToken\)/);
+  assert.match(panel, /data-style-token=\{bubble\.styleToken\}/);
+});
+
+test("六槽快捷装饰与双方限时气泡兼容旋转安全区和44像素触控", async () => {
+  const panel = await read("src/components/game/GameChatPanel.tsx");
+
+  for (const slot of ["greeting", "praise", "thanks", "surprise", "mistake", "threat"]) {
+    assert.match(panel, new RegExp(`slot: "${slot}"`));
+  }
+  assert.match(panel, /DECORATION_BUBBLE_MS = 4200/);
+  assert.match(panel, /data-chat-decoration-bubble-layer/);
+  assert.match(panel, /data-display-side=\{side\}/);
+  assert.match(panel, /\["opponent", "self"\]/);
+  assert.match(panel, /var\(--layout-safe-right,0px\)/);
+  assert.match(panel, /var\(--layout-safe-bottom,0px\)/);
+  assert.match(panel, /var\(--layout-safe-top,0px\)/);
+  assert.match(panel, /data-chat-decoration-quickbar/);
+  assert.match(panel, /min-h-12 min-w-\[5\.25rem\]/);
+  assert.match(panel, /文案与样式由服务器确认/);
+  assert.match(panel, /mutedRef\.current && !isSelf/);
+  assert.match(panel, /else if \(!isSelf && !openRef\.current\)/);
+});

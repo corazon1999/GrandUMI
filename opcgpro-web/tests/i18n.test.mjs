@@ -84,3 +84,18 @@ test("translates new dynamic confirmations, counts, and notifications", () => {
   assert.equal(translateText("好友 · 3 条新申请", "ja"), "フレンド · 新着申請3件");
   assert.equal(translateText("· 5 条未读", "en"), "· 5 unread");
 });
+
+test("translates the chat decoration exchange catalog and authoritative phrases", () => {
+  assert.equal(translateText("聊天装饰交易所", "en"), "Chat decoration exchange");
+  assert.equal(translateText("聊天装饰交易所", "ja"), "チャット装飾取引所");
+  assert.equal(translateText("草帽式问候", "en"), "Straw Hat greeting");
+  assert.equal(translateText("皇者霸气", "ja"), "皇帝の覇気");
+  assert.equal(
+    translateText("准备好了吗？真正的风暴才刚开始！", "en"),
+    "Ready? The real storm is only beginning!",
+  );
+  assert.equal(
+    translateText("仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。", "ja"),
+    "今シーズンに利用できるスタンダードランク懸賞金のみを使用します。購入はランクに影響せず、ワイルド懸賞金は使用できません。",
+  );
+});
