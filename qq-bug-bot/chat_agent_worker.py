@@ -17,6 +17,7 @@ from pathlib import PurePosixPath
 
 import chat_protocol
 import admin_agent_security
+from repository_workspace_lock import RepositoryWorkspaceLock
 from agent_worker import (
     BRIDGE_PREFIX,
     WorkerError,
@@ -35,6 +36,7 @@ class ChatAgentWorker:
         media_root: Path | None = None,
         mode: str = "chat",
         admin_workspace: Path | None = None,
+        workspace_lock_root: Path | None = None,
         config_path: Path | None = None,
     ):
         self.cfg = cfg
@@ -58,6 +60,14 @@ class ChatAgentWorker:
             raise WorkerError(
                 f"管理员 Agent 工作区不存在: {self.admin_workspace}"
             )
+        configured_lock_root = str(
+            cfg.get("workspace_lock_root") or ""
+        ).strip()
+        self.workspace_lock_root = (
+            Path(workspace_lock_root or configured_lock_root).resolve()
+            if workspace_lock_root or configured_lock_root
+            else None
+        )
         self.logs_root = Path(cfg["logs_root"]).resolve()
         self.logs_root.mkdir(parents=True, exist_ok=True)
         self.workdir = self.logs_root / "chat-sandbox"
@@ -79,6 +89,12 @@ class ChatAgentWorker:
                 "GRANDUMI_QQ_MEDIA_ROOT", "E:/GrandUMI-Temp/QQBotMedia"
             )
         ).resolve()
+        self._loaded_source_fingerprint = self.source_fingerprint()
+
+    @staticmethod
+    def source_fingerprint() -> str:
+        """识别常驻进程启动后入口代码是否已经被更新。"""
+        return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
     def resolve_current_codex_command(self) -> str:
         """重新读取可热更新的 Codex 路径，但不切换任务所连接的远端队列。"""
@@ -426,13 +442,25 @@ class ChatAgentWorker:
         # 保持任务排队，避免同一故障在数秒内耗尽全部尝试次数。
         if self.mode != "admin":
             self.resolve_current_codex_command()
-        command = "admin-claim" if self.mode == "admin" else "chat-claim"
-        data = self.bridge(command)
-        job = data.get("job")
-        if not job:
-            return False
-        self.process_job(job)
-        return True
+            data = self.bridge("chat-claim")
+            job = data.get("job")
+            if not job:
+                return False
+            self.process_job(job)
+            return True
+
+        assert self.admin_workspace is not None
+        with RepositoryWorkspaceLock(
+            self.admin_workspace, self.workspace_lock_root
+        ) as repository_lock:
+            if not repository_lock.acquired:
+                return False
+            data = self.bridge("admin-claim")
+            job = data.get("job")
+            if not job:
+                return False
+            self.process_job(job)
+            return True
 
     def run_forever(self) -> None:
         poll_key = (
@@ -444,6 +472,9 @@ class ChatAgentWorker:
         self.cleanup_local_media()
         self.log(f"聊天工作器启动：{self.worker_id}")
         while True:
+            if self.source_fingerprint() != self._loaded_source_fingerprint:
+                self.log("工作器代码已更新，退出当前进程并等待计划任务重启")
+                return
             try:
                 if self.run_once():
                     continue
@@ -460,6 +491,7 @@ def main() -> int:
     parser.add_argument("--media-root", type=Path)
     parser.add_argument("--mode", choices=("chat", "admin"), default="chat")
     parser.add_argument("--admin-workspace", type=Path)
+    parser.add_argument("--workspace-lock-root", type=Path)
     args = parser.parse_args()
     try:
         config_path = args.config.resolve()
@@ -468,6 +500,7 @@ def main() -> int:
             args.media_root.resolve() if args.media_root else None,
             args.mode,
             args.admin_workspace.resolve() if args.admin_workspace else None,
+            args.workspace_lock_root.resolve() if args.workspace_lock_root else None,
             config_path,
         )
         if args.self_check:

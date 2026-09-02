@@ -5,6 +5,7 @@
   "admin_workspace_root": "D:\\Self\\GrandUMI",
   "jobs_root": "D:\\Self\\GrandUMI-agent-runtime\\jobs",
   "logs_root": "D:\\Self\\GrandUMI-agent-runtime\\logs",
+  "workspace_lock_root": "E:\\GrandUMI-Temp\\Locks",
   "worker_id": "grandumi-owner-pc",
   "codex_command": "codex",
   "codex_proxy": "http://127.0.0.1:7891",

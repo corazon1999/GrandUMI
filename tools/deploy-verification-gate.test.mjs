@@ -207,16 +207,23 @@ test("门禁失败只前移仓库 HEAD 时，重试仍按最后成功部署版�
 
 test("统一验证从锁文件安装依赖、先生成卡牌单包，并在证明前恢复派生文件", async () => {
   const source = await readFile(path.join(root, "verify.ps1"), "utf8");
+  const lockAt = source.indexOf("$repositoryLock = Enter-GrandUmiRepositoryLock");
   const installAt = source.indexOf('npm ci --prefix "opcgpro-web"');
   const bundleAt = source.indexOf('npm run build:cards --prefix "opcgpro-web"');
   const frontendTestsAt = source.indexOf('Invoke-VerificationSuite "前端完整单元测试"');
   const restoreAt = source.indexOf("  Restore-CardBundleSnapshot", frontendTestsAt);
   const proofAt = source.indexOf("  if ($ProofPath)", frontendTestsAt);
 
+  assert.ok(lockAt >= 0 && installAt > lockAt, "统一验证必须先持有仓库互斥锁再执行可能写盘的步骤。");
   assert.ok(installAt >= 0 && bundleAt > installAt, "必须先按锁文件安装依赖，再生成派生卡牌单包。");
   assert.ok(frontendTestsAt > bundleAt, "前端测试开始前必须完成依赖安装和卡牌单包生成。");
   assert.ok(restoreAt > frontendTestsAt && proofAt > restoreAt, "生成部署证明前必须恢复派生卡牌单包。");
   assert.match(source, /GRANDUMI_REPOSITORY_VERIFICATION = "1"/);
   assert.match(source, /PYTHONDONTWRITEBYTECODE = "1"/);
+  assert.match(source, /repositoryStateBeforeQqTests = Get-RepositoryStateFingerprint/);
+  assert.match(source, /repositoryStateAfterQqTests -ne \$repositoryStateBeforeQqTests/);
+  assert.match(source, /ls-files --others --exclude-standard -z/);
+  assert.match(source, /git hash-object --no-filters/);
+  assert.match(source, /finally \{[\s\S]*Exit-GrandUmiRepositoryLock/);
   assert.match(source, /finally \{[\s\S]*Restore-CardBundleSnapshot/);
 });

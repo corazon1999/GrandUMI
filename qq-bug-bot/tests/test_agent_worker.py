@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
 import json
 import os
 import subprocess
@@ -14,6 +15,7 @@ sys.path.insert(0, str(BOT_DIR))
 
 import agent_protocol
 import agent_worker
+import repository_workspace_lock
 
 
 def run(args, cwd):
@@ -24,9 +26,47 @@ def run(args, cwd):
         raise AssertionError(result.stderr)
 
 
+def repository_state(repo):
+    status = subprocess.run(
+        ["git", "-c", "core.quotepath=false", "status", "--porcelain=v1", "-z"],
+        cwd=repo,
+        capture_output=True,
+    )
+    diff = subprocess.run(
+        ["git", "diff", "--binary", "HEAD", "--"],
+        cwd=repo,
+        capture_output=True,
+    )
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=repo,
+        capture_output=True,
+    )
+    if status.returncode or diff.returncode or untracked.returncode:
+        errors = status.stderr + diff.stderr + untracked.stderr
+        raise AssertionError(errors.decode("utf-8", errors="replace"))
+
+    untracked_content = bytearray()
+    for raw_path in filter(None, untracked.stdout.split(b"\0")):
+        path = Path(repo) / os.fsdecode(raw_path)
+        untracked_content.extend(raw_path)
+        untracked_content.extend(b"\0")
+        untracked_content.extend(hashlib.sha256(path.read_bytes()).digest())
+    return status.stdout + b"\0" + diff.stdout + b"\0" + untracked_content
+
+
 class AgentWorkerGateTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        configured_root = os.environ.get("GRANDUMI_TEST_TEMP_ROOT")
+        if not configured_root:
+            self.fail("Bug 工作器测试必须设置 GRANDUMI_TEST_TEMP_ROOT")
+        self.test_temp_root = Path(configured_root).resolve()
+        if os.name == "nt":
+            self.assertEqual("E:", self.test_temp_root.drive.upper())
+        self.test_temp_root.mkdir(parents=True, exist_ok=True)
+        self.source_repo = BOT_DIR.parent
+        self.source_state_before = repository_state(self.source_repo)
+        self.temp = tempfile.TemporaryDirectory(dir=self.test_temp_root)
         self.repo = Path(self.temp.name) / "repo"
         self.repo.mkdir()
         run(["git", "init", "-b", "main"], self.repo)
@@ -50,7 +90,21 @@ class AgentWorkerGateTests(unittest.TestCase):
         self.worker = agent_worker.AgentWorker(cfg)
 
     def tearDown(self):
-        self.temp.cleanup()
+        try:
+            self.assertEqual(
+                self.source_state_before,
+                repository_state(self.source_repo),
+                "Bug 工作器回归修改了真实仓库工作区",
+            )
+        finally:
+            self.temp.cleanup()
+
+    def test工作区指纹识别同名未跟踪文件内容改写(self):
+        untracked = self.repo / "untracked.txt"
+        untracked.write_text("before", encoding="utf-8")
+        before = repository_state(self.repo)
+        untracked.write_text("after!", encoding="utf-8")
+        self.assertNotEqual(before, repository_state(self.repo))
 
     def test兼容PowerShell生成的带BOM配置(self):
         path = Path(self.temp.name) / "worker.json"
@@ -281,11 +335,79 @@ class AgentWorkerGateTests(unittest.TestCase):
                 self.repo, {"id": 263, "content": "新功能"}, {"resolution": "fix"}
             )
         self.assertEqual((files, tests), result)
+        self.assertTrue(self.repo.resolve().is_relative_to(self.test_temp_root))
         self.assertEqual(2, validate_mock.call_count)
         self.assertEqual(2, review_mock.call_count)
         self.assertIs(self.repo, codex_mock.call_args.args[0])
         self.assertIn("前端没有调用新接口", codex_mock.call_args.args[3])
         tests_mock.assert_called_once_with(self.repo, tests)
+
+    @unittest.skipUnless(os.name == "nt", "仅验证 Windows 跨进程仓库锁")
+    def test管理员工作器与PowerShell统一验证共享排他锁(self):
+        shared_repo = Path(self.temp.name) / "shared-repository"
+        shared_repo.mkdir()
+        lock_root = Path(self.temp.name) / "locks"
+        lock_path = repository_workspace_lock.repository_lock_path(
+            shared_repo, lock_root
+        )
+
+        def quote(value):
+            return "'" + str(value).replace("'", "''") + "'"
+
+        command = (
+            "$ErrorActionPreference = 'Stop'; "
+            f"$handle = [IO.FileStream]::new({quote(lock_path)}, "
+            "[IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, "
+            "[IO.FileShare]::None); exit 0"
+        )
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        lock = repository_workspace_lock.RepositoryWorkspaceLock(
+            shared_repo, lock_root
+        )
+        self.assertTrue(lock.try_acquire())
+        try:
+            blocked = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    command,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=creationflags,
+            )
+            self.assertNotEqual(0, blocked.returncode, blocked.stdout + blocked.stderr)
+        finally:
+            lock.release()
+
+        acquired = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=creationflags,
+        )
+        self.assertEqual(0, acquired.returncode, acquired.stdout + acquired.stderr)
+        recovered = repository_workspace_lock.RepositoryWorkspaceLock(
+            shared_repo, lock_root
+        )
+        self.assertTrue(recovered.try_acquire(), "持锁进程退出后锁未自动恢复")
+        recovered.release()
 
     def test复核修订达上限后停止(self):
         review = {

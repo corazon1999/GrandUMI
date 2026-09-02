@@ -13,9 +13,11 @@ if ($ProofPath -and $InfrastructureOnly) {
 }
 
 $runningOnWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+$repositoryLock = $null
 if ($runningOnWindows) {
   . (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
   $verificationTemp = Get-GrandUmiTempDirectory -Category "Verify"
+  $lockRoot = Get-GrandUmiTempDirectory -Category "Locks"
 } else {
   $ciTempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { "/tmp" }
   $verificationTemp = Join-Path $ciTempRoot "grandumi-verify"
@@ -72,7 +74,88 @@ function Restore-CardBundleSnapshot {
   }
 }
 
+function Get-GrandUmiRepositoryLockPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)][string]$LockRoot
+  )
+
+  $resolvedRepository = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/').ToLowerInvariant()
+  $resolvedLockRoot = [IO.Path]::GetFullPath($LockRoot)
+  if (-not $resolvedLockRoot.StartsWith('E:\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Windows 仓库互斥锁必须位于 E 盘，实际为：$resolvedLockRoot"
+  }
+  [IO.Directory]::CreateDirectory($resolvedLockRoot) | Out-Null
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $digestBytes = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($resolvedRepository))
+  } finally {
+    $sha256.Dispose()
+  }
+  $digest = ([BitConverter]::ToString($digestBytes)).Replace('-', '').ToLowerInvariant()
+  return Join-Path $resolvedLockRoot "repository-$digest.lock"
+}
+
+function Enter-GrandUmiRepositoryLock {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)][string]$LockRoot
+  )
+
+  $path = Get-GrandUmiRepositoryLockPath -RepositoryRoot $RepositoryRoot -LockRoot $LockRoot
+  try {
+    return [IO.FileStream]::new(
+      $path,
+      [IO.FileMode]::OpenOrCreate,
+      [IO.FileAccess]::ReadWrite,
+      [IO.FileShare]::None
+    )
+  } catch [IO.IOException] {
+    throw [InvalidOperationException]::new(
+      "仓库正在被管理员工作器或另一统一验证占用，拒绝并发修改：$RepositoryRoot",
+      $_.Exception
+    )
+  }
+}
+
+function Exit-GrandUmiRepositoryLock {
+  param([IO.FileStream]$LockHandle)
+
+  if ($null -ne $LockHandle) {
+    $LockHandle.Dispose()
+  }
+}
+
+function Get-RepositoryStateFingerprint {
+  $status = ((& git -c core.quotepath=false status --porcelain=v1 --untracked-files=all) -join "`n")
+  if ($LASTEXITCODE -ne 0) { throw "读取仓库状态失败。" }
+  $diff = ((& git diff --binary HEAD --) -join "`n")
+  if ($LASTEXITCODE -ne 0) { throw "读取仓库差异失败。" }
+  $untrackedPaths = ((& git -c core.quotepath=false ls-files --others --exclude-standard -z) -join "`n")
+  if ($LASTEXITCODE -ne 0) { throw "读取未跟踪文件列表失败。" }
+  $untrackedState = [Text.StringBuilder]::new()
+  foreach ($relativePath in $untrackedPaths.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)) {
+    $contentHash = ((& git hash-object --no-filters -- $relativePath) -join "")
+    if ($LASTEXITCODE -ne 0) { throw "读取未跟踪文件内容失败：$relativePath" }
+    [void]$untrackedState.Append($relativePath).Append([char]0).Append($contentHash).Append([char]0)
+  }
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [Text.Encoding]::UTF8.GetBytes(
+      $status + "`0" + $diff + "`0" + $untrackedState.ToString()
+    )
+    return ([BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
 try {
+  if ($runningOnWindows) {
+    $repositoryLock = Enter-GrandUmiRepositoryLock `
+      -RepositoryRoot $repo `
+      -LockRoot $lockRoot
+  }
   Invoke-VerificationSuite "WebSocket 协议契约" "node tools/verify-protocol-contract.mjs" {
     & node "tools/verify-protocol-contract.mjs"
   }
@@ -116,12 +199,21 @@ try {
     Invoke-VerificationSuite "QQ Bot 完整测试" "python -m unittest discover -s qq-bug-bot/tests" {
       $previousDontWriteBytecode = $env:PYTHONDONTWRITEBYTECODE
       $env:PYTHONDONTWRITEBYTECODE = "1"
+      $repositoryStateBeforeQqTests = Get-RepositoryStateFingerprint
       try {
         $py = Get-Command py -ErrorAction SilentlyContinue
         if ($py) { & $py.Source -3 -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
         else { & python -m unittest discover -s "qq-bug-bot/tests" -p "test_*.py" }
+        $qqTestExitCode = $LASTEXITCODE
       } finally {
         $env:PYTHONDONTWRITEBYTECODE = $previousDontWriteBytecode
+      }
+      $repositoryStateAfterQqTests = Get-RepositoryStateFingerprint
+      if ($repositoryStateAfterQqTests -ne $repositoryStateBeforeQqTests) {
+        throw "QQ Bot 测试修改了调用者仓库，已保留现场并拒绝继续。"
+      }
+      if ($qqTestExitCode -ne 0) {
+        throw "QQ Bot 测试退出码为 $qqTestExitCode"
       }
     }
     Invoke-VerificationSuite "前端生产构建" "npm run build --prefix opcgpro-web" {
@@ -172,5 +264,8 @@ try {
     if ($resolvedRunTemp.StartsWith($resolvedRoot, [StringComparison]::OrdinalIgnoreCase)) {
       Remove-Item -LiteralPath $resolvedRunTemp -Recurse -Force
     }
+  }
+  if ($runningOnWindows -and $null -ne $repositoryLock) {
+    Exit-GrandUmiRepositoryLock -LockHandle $repositoryLock
   }
 }

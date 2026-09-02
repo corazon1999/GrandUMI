@@ -17,6 +17,7 @@ import bot
 import chat_agent_worker
 import chat_protocol
 import media_pipeline
+import repository_workspace_lock
 import storage
 
 
@@ -1171,6 +1172,75 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
                 ):
                     worker.run_codex("执行任务", admin_mode=True)
             run_mock.assert_not_called()
+
+    def test管理员工作区被统一验证占用时不领取任务(self):
+        temp_root = os.environ.get("GRANDUMI_TEST_TEMP_ROOT")
+        if not temp_root:
+            self.fail("管理员工作器互斥测试必须设置 GRANDUMI_TEST_TEMP_ROOT")
+        with tempfile.TemporaryDirectory(
+            dir=temp_root, ignore_cleanup_errors=True
+        ) as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            admin_workspace = root / "GrandUMI"
+            repo.mkdir()
+            admin_workspace.mkdir()
+            cfg = {
+                "server": "root@example.com",
+                "remote_bot_dir": "/opt/qq-bug-bot",
+                "repository_root": str(repo),
+                "jobs_root": str(root / "jobs"),
+                "logs_root": str(root / "logs"),
+                "workspace_lock_root": str(root / "locks"),
+            }
+            worker = chat_agent_worker.ChatAgentWorker(
+                cfg, mode="admin", admin_workspace=admin_workspace
+            )
+            verification_lock = repository_workspace_lock.RepositoryWorkspaceLock(
+                admin_workspace, root / "locks"
+            )
+            self.assertTrue(verification_lock.try_acquire())
+            try:
+                with mock.patch.object(worker, "bridge") as bridge_mock:
+                    self.assertFalse(worker.run_once())
+                bridge_mock.assert_not_called()
+            finally:
+                verification_lock.release()
+
+            with mock.patch.object(
+                worker, "bridge", return_value={"job": None}
+            ) as bridge_mock:
+                self.assertFalse(worker.run_once())
+            bridge_mock.assert_called_once_with("admin-claim")
+
+    def test常驻工作器检测到入口代码更新后退出等待重启(self):
+        temp_root = os.environ.get("GRANDUMI_TEST_TEMP_ROOT")
+        if not temp_root:
+            self.fail("工作器重启测试必须设置 GRANDUMI_TEST_TEMP_ROOT")
+        with tempfile.TemporaryDirectory(
+            dir=temp_root, ignore_cleanup_errors=True
+        ) as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            repo.mkdir()
+            cfg = {
+                "server": "root@example.com",
+                "remote_bot_dir": "/opt/qq-bug-bot",
+                "repository_root": str(repo),
+                "jobs_root": str(root / "jobs"),
+                "logs_root": str(root / "logs"),
+            }
+            worker = chat_agent_worker.ChatAgentWorker(cfg)
+            worker._loaded_source_fingerprint = "旧版本"
+            with mock.patch.object(
+                worker, "source_fingerprint", return_value="新版本"
+            ), mock.patch.object(
+                worker, "cleanup_local_media"
+            ), mock.patch.object(
+                worker, "run_once"
+            ) as run_once_mock, mock.patch.object(worker, "log"):
+                worker.run_forever()
+            run_once_mock.assert_not_called()
 
     def test_admin_prompt_requires_authenticated_owner_and_hides_secrets(self):
         prompt = chat_protocol.build_admin_agent_prompt(

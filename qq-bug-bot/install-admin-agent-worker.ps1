@@ -15,6 +15,7 @@ $config = Join-Path $runtime "agent-worker.json"
 $logs = Join-Path $runtime "logs"
 . (Join-Path $repo "ops\windows\GrandUmiTemp.ps1")
 $mediaRoot = Get-GrandUmiTempDirectory -Category "QQBotMedia"
+$workspaceLockRoot = Get-GrandUmiTempDirectory -Category "Locks"
 
 if (-not (Test-Path -LiteralPath $worker)) { throw "找不到管理员工作器：$worker" }
 if (-not (Test-Path -LiteralPath $config)) { throw "找不到 Agent 配置：$config" }
@@ -43,13 +44,15 @@ Write-Host "正在执行 QQ 管理员 Agent 自检……" -ForegroundColor Cyan
     --media-root $mediaRoot `
     --mode admin `
     --admin-workspace $adminRoot `
+    --workspace-lock-root $workspaceLockRoot `
     --self-check
 if ($LASTEXITCODE -ne 0) { throw "管理员 Agent 自检失败，未注册计划任务。" }
 
 $arguments = (
     '"' + $worker + '" --config "' + $config +
     '" --media-root "' + $mediaRoot +
-    '" --mode admin --admin-workspace "' + $adminRoot + '"'
+    '" --mode admin --admin-workspace "' + $adminRoot +
+    '" --workspace-lock-root "' + $workspaceLockRoot + '"'
 )
 $action = New-ScheduledTaskAction `
     -Execute $pythonw `

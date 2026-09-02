@@ -391,6 +391,8 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("GrandUMI-Admin-Agent", installer)
         self.assertIn("--mode admin", installer)
         self.assertIn("--admin-workspace", installer)
+        self.assertIn("--workspace-lock-root", installer)
+        self.assertIn('Get-GrandUmiTempDirectory -Category "Locks"', installer)
         self.assertIn("D:\\Self\\GrandUMI", installer)
         self.assertIn("RestartCount 100", installer)
         self.assertIn("RepetitionInterval (New-TimeSpan -Minutes 5)", installer)
