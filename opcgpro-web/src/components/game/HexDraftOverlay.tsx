@@ -45,6 +45,8 @@ type DraftAudioSnapshot = {
   locked: boolean;
 };
 
+type HexRefreshState = "available" | "refreshed" | "locked";
+
 function EyeIcon({ open = true }: { open?: boolean }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={styles.actionIcon}>
@@ -90,8 +92,7 @@ function HexCandidateCard({
   index,
   selected,
   disabled,
-  refreshAvailable,
-  refreshed,
+  refreshState,
   onChoose,
   onRefresh,
 }: {
@@ -99,13 +100,14 @@ function HexCandidateCard({
   index: number;
   selected: boolean;
   disabled: boolean;
-  refreshAvailable: boolean;
-  refreshed: boolean;
+  refreshState: HexRefreshState;
   onChoose: () => void;
   onRefresh: () => void;
 }) {
   const style = TIER_STYLES[hex.tier];
   const tierLabel = hex.tierLabel ?? style.shortLabel;
+  const refreshAvailable = refreshState === "available";
+  const refreshed = refreshState === "refreshed";
   const refreshDisabled = disabled || !refreshAvailable;
   return (
     <div className={styles.candidateSlot} data-hex-candidate-slot={index + 1}>
@@ -139,13 +141,15 @@ function HexCandidateCard({
         onClick={onRefresh}
         disabled={refreshDisabled}
         className={styles.refresh}
-        data-hex-refresh-state={refreshAvailable ? "available" : "used"}
-        aria-label={refreshAvailable
+        data-hex-refresh-state={refreshState}
+        aria-label={refreshState === "available"
           ? `刷新候选 ${index + 1}：${hex.name}`
-          : `本轮刷新机会已使用，候选 ${index + 1} 不可刷新`}
+          : refreshState === "refreshed"
+            ? `候选 ${index + 1} 已经刷新过，不可再次刷新`
+            : `候选 ${index + 1} 当前已锁定，不可刷新`}
       >
         <RefreshIcon />
-        <span>{refreshAvailable ? "刷新此项" : "刷新已使用"}</span>
+        <span>{refreshState === "available" ? "刷新此项" : refreshed ? "此项已刷新" : "刷新已锁定"}</span>
       </button>
     </div>
   );
@@ -172,8 +176,12 @@ export default function HexDraftOverlay() {
     Boolean(draft && !isGameOver),
   );
   const timedOut = Boolean(draft && remainingSeconds === 0);
+  const refreshedCandidateIndices = draft
+    ? draft.refreshedCandidateIndices
+      ?? (typeof draft.refreshedCandidateIndex === "number" ? [draft.refreshedCandidateIndex] : [])
+    : [];
   const refreshSignature = draft
-    ? `${draft.refreshedCandidateIndex ?? "none"}:${(draft.candidates ?? []).map((candidate) => candidate.id).join(",")}`
+    ? `${refreshedCandidateIndices.join(",") || "none"}:${(draft.candidates ?? []).map((candidate) => candidate.id).join(",")}`
     : "";
 
   useEffect(() => {
@@ -189,7 +197,7 @@ export default function HexDraftOverlay() {
       play("hexDraftOpen");
     } else {
       if (previous.refreshSignature !== refreshSignature
-        && draft.refreshedCandidateIndex !== null
+        && refreshedCandidateIndices.length > 0
         && !isHidden) {
         play("hexDraftRefresh");
       }
@@ -257,12 +265,22 @@ export default function HexDraftOverlay() {
   const tierHeading = `${tierLabel}海克斯`;
   const candidates = draft?.candidates ?? [];
   const locked = draft?.myLocked ?? false;
+  const refreshRemaining = draft?.refreshRemaining ?? (draft?.refreshAvailable ? 1 : 0);
+  const refreshedCandidateSet = new Set(refreshedCandidateIndices);
+  const refreshStateFor = (candidateIndex: number): HexRefreshState => {
+    if (refreshedCandidateSet.has(candidateIndex)) return "refreshed";
+    if (locked) return "locked";
+    const availability = draft?.refreshAvailableByCandidate?.[candidateIndex]
+      ?? Boolean(draft?.refreshAvailable);
+    return availability ? "available" : "locked";
+  };
   const choose = (hexId: number) => {
     if (!draft || locked || useGameStore.getState().isPending) return;
     GameRequest.chooseHex(draft.roundId, hexId);
   };
   const refresh = (candidateIndex: number, expectedHexId: number) => {
-    if (!draft?.refreshAvailable || locked || useGameStore.getState().isPending) return;
+    if (!draft || refreshStateFor(candidateIndex) !== "available"
+      || useGameStore.getState().isPending) return;
     GameRequest.refreshHex(draft.roundId, candidateIndex, expectedHexId);
   };
 
@@ -343,9 +361,9 @@ export default function HexDraftOverlay() {
                     ? "你的选择已锁定，正在进行权威结算。"
                     : timedOut
                       ? "时间到，服务器将从刷新后的当前候选中自动选择。"
-                      : draft.refreshAvailable
-                        ? "候选仅你可见；本轮可刷新其中一项，选择后将公开给双方。"
-                        : "候选仅你可见；本轮刷新已使用，请选择一项。"}
+                      : refreshRemaining > 0
+                        ? `候选仅你可见；每个候选可各刷新一次，本轮还可刷新 ${refreshRemaining} 项。`
+                        : "候选仅你可见；三个候选的刷新机会均已使用，请选择一项。"}
               </p>
             </header>
 
@@ -358,8 +376,7 @@ export default function HexDraftOverlay() {
                     index={index}
                     selected={draft.mySelectedHexId === hex.id}
                     disabled={locked || isPending}
-                    refreshAvailable={draft.refreshAvailable}
-                    refreshed={draft.refreshedCandidateIndex === index}
+                    refreshState={refreshStateFor(index)}
                     onChoose={() => choose(hex.id)}
                     onRefresh={() => refresh(index, hex.id)}
                   />

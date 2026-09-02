@@ -1147,8 +1147,14 @@ export interface HexDraftSnapshot {
   candidates: HexDefinitionSnapshot[] | null;
   myLocked: boolean;
   mySelectedHexId: number | null;
+  /** 旧快照兼容：仅表示旧版整轮一次刷新，或新版尚未使用第一次刷新。 */
   refreshAvailable: boolean;
+  /** 旧快照兼容：新版中表示最近一次刷新的槽位。 */
   refreshedCandidateIndex: number | null;
+  /** 修订版 3 起由服务端下发；旧房间/旧快照缺失时客户端回退到旧字段。 */
+  refreshRemaining?: number;
+  refreshAvailableByCandidate?: boolean[];
+  refreshedCandidateIndices?: number[];
 }
 
 export interface HexModeSnapshot {

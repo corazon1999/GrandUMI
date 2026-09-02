@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-02-hex-per-slot-refresh-and-unique-drafts",
+    version: "2026.09.02.4",
+    date: "2026-09-02",
+    title: "海克斯候选刷新与整局去重更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "海克斯三选一的三个候选现在各自拥有 1 次刷新机会，每轮最多可刷新 3 次；刷新某一项后，另外两项仍可继续刷新。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "同一玩家整局已经见过的海克斯不会再次出现在其候选中，包含初始候选、未选择项和被刷掉的候选；双方各自独立记录，不影响对方的候选池。",
+          "刷新按钮会分别显示“可刷新”“此项已刷新”或“刷新已锁定”，并显示本轮剩余刷新次数；断线重连后会继续保持权威状态。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-02-emergency-build-env-contract",
     version: "2026.09.02.3",
     date: "2026-09-02",

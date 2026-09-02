@@ -60,6 +60,9 @@ public static class PrivateStateSnapshotBuilder
                 state.HexState.DraftResolving,
                 resumePoint = state.HexState.ResumePoint.ToString(),
                 owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+                appeared = state.HexState.Appeared
+                    .Select(items => items.Order().ToArray())
+                    .ToArray(),
                 completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
                 runtime = state.HexState.Runtime.Select(runtime => new
                 {
@@ -101,6 +104,12 @@ public static class PrivateStateSnapshotBuilder
                         draft.RefreshedCandidateIndex,
                         draft.ReplacedHexId,
                         draft.ReplacementHexId,
+                        refreshes = draft.Refreshes.Select(refresh => new
+                        {
+                            refresh.CandidateIndex,
+                            refresh.ReplacedHexId,
+                            refresh.ReplacementHexId,
+                        }).ToArray(),
                     }
                     : null,
                 pendingSettlement = state.HexState.PendingSettlement is { } settlement

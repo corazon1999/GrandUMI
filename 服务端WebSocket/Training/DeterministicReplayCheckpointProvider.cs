@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using GrandUMI.Game;
+using GrandUMI.Game.Hex;
 
 namespace GrandUMI.Training;
 
@@ -227,6 +228,157 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         });
 
     private static object FullHexState(GameState state)
+    {
+        if (state.HexState.RulesRevision < HexRules.PerSlotRefreshRulesRevision)
+            return LegacyFullHexState(state);
+
+        return new
+        {
+            state.HexState.Enabled,
+            state.HexState.RulesRevision,
+            state.HexState.DraftSequence,
+            draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
+            state.HexState.DraftResolving,
+            resumePoint = state.HexState.ResumePoint.ToString(),
+            owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+            appeared = state.HexState.Appeared
+                .Select(items => items.Order().ToArray())
+                .ToArray(),
+            completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+            runtime = state.HexState.Runtime.Select(runtime => new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+            }).ToArray(),
+            activeDraft = state.HexState.ActiveDraft is { } draft
+                ? new
+                {
+                    draft.RoundId,
+                    draft.PlayerIndex,
+                    draft.OwnTurnNumber,
+                    tier = draft.Tier.ToString(),
+                    candidates = draft.Candidates.ToArray(),
+                    draft.LockedChoice,
+                    draft.Locked,
+                    draft.RefreshUsed,
+                    draft.RefreshedCandidateIndex,
+                    draft.ReplacedHexId,
+                    draft.ReplacementHexId,
+                    refreshes = draft.Refreshes.Select(refresh => new
+                    {
+                        refresh.CandidateIndex,
+                        refresh.ReplacedHexId,
+                        refresh.ReplacementHexId,
+                    }).ToArray(),
+                }
+                : null,
+            pendingSettlement = state.HexState.PendingSettlement is { } settlement
+                ? new
+                {
+                    settlement.RoundId,
+                    tier = settlement.Tier.ToString(),
+                    settlement.PlayerIndex,
+                    settlement.OwnTurnNumber,
+                    settlement.Choice,
+                    resumePoint = settlement.ResumePoint.ToString(),
+                    settlement.RootOwnershipCommitted,
+                    settlement.NextGrantIndex,
+                    grants = settlement.Grants.Select(grant => new
+                    {
+                        grant.GrantKey,
+                        grant.PlayerIndex,
+                        grant.HexId,
+                        grant.NextStep,
+                        grant.PlannedStepCount,
+                        plannedChildHexIds = grant.PlannedChildHexIds.ToArray(),
+                        grant.Completed,
+                    }).ToArray(),
+                }
+                : null,
+            resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+            {
+                draft.RoundId,
+                tier = draft.Tier.ToString(),
+                draft.PlayerIndex,
+                draft.OwnTurnNumber,
+                draft.Choice,
+            }).ToArray(),
+        };
+    }
+
+    private static object PublicHexState(GameState state)
+    {
+        if (state.HexState.RulesRevision < HexRules.PerSlotRefreshRulesRevision)
+            return LegacyPublicHexState(state);
+
+        return new
+        {
+            state.HexState.Enabled,
+            state.HexState.RulesRevision,
+            draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
+            draftResolving = state.HexState.DraftResolving || state.HexState.PendingSettlement is not null,
+            owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+            appearedCounts = state.HexState.Appeared.Select(items => items.Count).ToArray(),
+            completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+            activeDraft = state.HexState.ActiveDraft is { } draft
+                ? new
+                {
+                    draft.RoundId,
+                    draft.PlayerIndex,
+                    draft.OwnTurnNumber,
+                    tier = draft.Tier.ToString(),
+                    draft.Locked,
+                    draft.RefreshUsed,
+                    refreshedCandidateIndices = HexRules.RefreshedCandidateIndices(
+                        draft,
+                        state.HexState.RulesRevision),
+                    refreshRemaining = HexRules.RefreshRemaining(
+                        draft,
+                        state.HexState.RulesRevision),
+                }
+                : null,
+            settlingRound = state.HexState.PendingSettlement is { } settlement
+                ? new
+                {
+                    settlement.RoundId,
+                    settlement.PlayerIndex,
+                    settlement.OwnTurnNumber,
+                    tier = settlement.Tier.ToString(),
+                }
+                : null,
+            resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+            {
+                draft.RoundId,
+                tier = draft.Tier.ToString(),
+                draft.PlayerIndex,
+                draft.OwnTurnNumber,
+                draft.Choice,
+            }).ToArray(),
+        };
+    }
+
+    /// <summary>规则修订版 1/2 的冻结投影；保持升级前 checkpoint 摘要可重放验证。</summary>
+    private static object LegacyFullHexState(GameState state)
         => new
         {
             state.HexState.Enabled,
@@ -311,7 +463,8 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             }).ToArray(),
         };
 
-    private static object PublicHexState(GameState state)
+    /// <summary>规则修订版 1/2 的冻结公开投影；不新增字段以保持旧工件摘要稳定。</summary>
+    private static object LegacyPublicHexState(GameState state)
         => new
         {
             state.HexState.Enabled,

@@ -4,7 +4,7 @@ import test from "node:test";
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("海克斯私密选秀提交轮次令牌并支持一次单候选刷新", async () => {
+test("海克斯私密选秀提交轮次令牌并支持三个槽位各刷新一次", async () => {
   const [overlay, request, store, types] = await Promise.all([
     readSource("../src/components/game/HexDraftOverlay.tsx"),
     readSource("../src/net/GameRequest.ts"),
@@ -20,8 +20,21 @@ test("海克斯私密选秀提交轮次令牌并支持一次单候选刷新", as
   assert.match(types, /\| "RefreshHex"/);
   assert.match(types, /refreshAvailable: boolean/);
   assert.match(types, /refreshedCandidateIndex: number \| null/);
+  assert.match(types, /refreshRemaining\?: number/);
+  assert.match(types, /refreshAvailableByCandidate\?: boolean\[\]/);
+  assert.match(types, /refreshedCandidateIndices\?: number\[\]/);
   assert.match(types, /tierLabel\?: HexTierLabelSnapshot/);
   assert.match(store, /cloneHexModeSnapshot/);
+  assert.match(store, /refreshAvailableByCandidate:[\s\S]*\.\.\.hexState\.activeDraft\.refreshAvailableByCandidate/);
+  assert.match(store, /refreshedCandidateIndices:[\s\S]*\.\.\.hexState\.activeDraft\.refreshedCandidateIndices/);
+  assert.match(overlay, /type HexRefreshState = "available" \| "refreshed" \| "locked"/);
+  assert.match(overlay, /const refreshRemaining = draft\?\.refreshRemaining \?\?/);
+  assert.match(overlay, /new Set\(refreshedCandidateIndices\)/);
+  assert.match(overlay, /draft\?\.refreshAvailableByCandidate\?\.\[candidateIndex\]/);
+  assert.match(overlay, /refreshStateFor\(candidateIndex\) !== "available"/);
+  assert.match(overlay, /每个候选可各刷新一次，本轮还可刷新/);
+  assert.match(overlay, /refreshState=\{refreshStateFor\(index\)\}/);
+  assert.doesNotMatch(overlay, /if \(!draft\?\.refreshAvailable/);
   assert.doesNotMatch(overlay, /Math\.random|crypto\.getRandomValues/);
 });
 
@@ -91,7 +104,7 @@ test("海克斯选秀通过统一音频引擎播放原创出现、权威刷新�
 
   assert.match(overlay, /const \{ play \} = useAudio\(\)/);
   assert.match(overlay, /play\("hexDraftOpen"\)/);
-  assert.match(overlay, /previous\.refreshSignature !== refreshSignature[\s\S]*!isHidden[\s\S]*play\("hexDraftRefresh"\)/);
+  assert.match(overlay, /previous\.refreshSignature !== refreshSignature[\s\S]*refreshedCandidateIndices\.length > 0[\s\S]*!isHidden[\s\S]*play\("hexDraftRefresh"\)/);
   assert.match(overlay, /!previous\.locked && draft\.myLocked && !isHidden[\s\S]*play\("hexDraftConfirm"\)/);
   assert.match(overlay, /previousDraftAudioRef\.current = \{[\s\S]*refreshSignature,[\s\S]*locked: draft\.myLocked/);
   assert.match(types, /\| "hexDraftOpen"/);
@@ -185,7 +198,8 @@ test("大厅、协议与对局页面完整挂接海克斯模式", async () => {
   ]);
 
   assert.match(lobby, /setMatchQueueKind\("hex"\)/);
-  assert.match(lobby, /候选仅本人可见/);
+  assert.match(lobby, /三个候选各可刷新 1 次/);
+  assert.match(lobby, /展示过的海克斯整局不会再次出现/);
   assert.match(lobby, /第 1、3、6 回合开始前/);
   assert.match(lobby, /可重复/);
   assert.match(lobby, /银\/金\/棱彩品质序列/);

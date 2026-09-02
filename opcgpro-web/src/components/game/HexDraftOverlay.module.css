@@ -514,6 +514,17 @@
   cursor: not-allowed;
 }
 
+.refresh[data-hex-refresh-state="refreshed"]:disabled {
+  border-color: color-mix(in srgb, var(--hex-frame) 42%, transparent);
+  background: color-mix(in srgb, var(--hex-frame-deep) 28%, #07101b);
+  color: color-mix(in srgb, var(--hex-frame-bright) 62%, #718096);
+  opacity: 0.9;
+}
+
+.refresh[data-hex-refresh-state="locked"]:disabled {
+  filter: saturate(0.45);
+}
+
 .choose:focus-visible,
 .refresh:focus-visible,
 .hide:focus-visible,

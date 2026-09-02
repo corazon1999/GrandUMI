@@ -7,6 +7,12 @@ public enum HexDraftResumePoint
     AdvanceToNextTurn,
 }
 
+/// <summary>单个候选槽位已经完成的权威刷新记录，用于幂等重试、断线恢复与动作重放。</summary>
+public sealed record HexDraftRefresh(
+    int CandidateIndex,
+    int ReplacedHexId,
+    int ReplacementHexId);
+
 public sealed class HexDraftRound
 {
     public required string RoundId { get; init; }
@@ -21,6 +27,11 @@ public sealed class HexDraftRound
     public int? RefreshedCandidateIndex { get; set; }
     public int? ReplacedHexId { get; set; }
     public int? ReplacementHexId { get; set; }
+    /// <summary>
+    /// 修订版 3 起，每个候选槽位各自只能刷新一次；列表只在替换成功后追加，
+    /// 因而既是每槽消费凭据，也是相同业务请求的幂等回执。
+    /// </summary>
+    public List<HexDraftRefresh> Refreshes { get; } = new();
     public bool IsComplete => Locked;
 }
 
@@ -138,6 +149,11 @@ public sealed class HexState
     public HexDraftSettlement? PendingSettlement { get; set; }
     public HexDraftResumePoint ResumePoint { get; set; }
     public List<int>[] Owned { get; } = [new(), new()];
+    /// <summary>
+    /// 修订版 3 起按玩家独立记录整局曾向其展示过的全部候选；初始三张与刷新替换均立即写入。
+    /// 不向客户端公开，只用于服务端确定性去重。
+    /// </summary>
+    public HashSet<int>[] Appeared { get; } = [new(), new()];
     public int[] CompletedOwnTurns { get; } = [0, 0];
     public PlayerHexRuntime[] Runtime { get; } = [new(), new()];
     public List<ResolvedHexDraft> ResolvedDrafts { get; } = new();

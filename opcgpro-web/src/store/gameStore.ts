@@ -133,6 +133,12 @@ function cloneHexModeSnapshot(hexState: HexModeSnapshot | null): HexModeSnapshot
       ? {
           ...hexState.activeDraft,
           candidates: hexState.activeDraft.candidates?.map((hex) => ({ ...hex })) ?? null,
+          refreshAvailableByCandidate: hexState.activeDraft.refreshAvailableByCandidate
+            ? [...hexState.activeDraft.refreshAvailableByCandidate]
+            : undefined,
+          refreshedCandidateIndices: hexState.activeDraft.refreshedCandidateIndices
+            ? [...hexState.activeDraft.refreshedCandidateIndices]
+            : undefined,
         }
       : null,
   };

@@ -283,8 +283,19 @@ public static class StateSnapshotBuilder
                 candidates = round.Candidates.Select(Hex).ToArray(),
                 myLocked = round.Locked,
                 mySelectedHexId = round.Locked ? round.LockedChoice : null,
+                // 旧字段保留给未刷新页面：修订版 3 仍只向旧客户端开放第一次刷新，避免同槽误操作。
                 refreshAvailable = !round.RefreshUsed && !round.Locked,
                 refreshedCandidateIndex = round.RefreshedCandidateIndex,
+                refreshRemaining = HexRules.RefreshRemaining(round, state.HexState.RulesRevision),
+                refreshAvailableByCandidate = Enumerable.Range(0, round.Candidates.Count)
+                    .Select(index => HexRules.RefreshAvailableForCandidate(
+                        round,
+                        index,
+                        state.HexState.RulesRevision))
+                    .ToArray(),
+                refreshedCandidateIndices = HexRules.RefreshedCandidateIndices(
+                    round,
+                    state.HexState.RulesRevision),
             },
         };
     }

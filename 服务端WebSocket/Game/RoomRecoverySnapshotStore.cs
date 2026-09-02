@@ -10,13 +10,14 @@ namespace GrandUMI.Game;
 /// </summary>
 internal static class RoomRecoverySnapshotStore
 {
+    // v5：私有状态哈希纳入海克斯逐槽刷新记录及双方独立的整局候选出现历史。
     // v4：私有状态哈希纳入海克斯随机子授予计划及“超凡邪恶”跨回合累计力量。
     // v3：私有状态哈希纳入场上卡的“建立时快照”来源 ID。
     // v2：私有状态哈希纳入服务端权威贴咚撤回序号与栈。
-    // v1-v3 仍须读取其请求去重窗口；只跳过旧结构的状态哈希比对，并在重放后刷新为 v4。
+    // v1-v4 仍须读取其请求去重窗口；只跳过旧结构的状态哈希比对，并在重放后刷新为 v5。
     // 若整份忽略旧版，升级重启后的迟到重试可能再次执行已接受的贴咚等非幂等动作。
     internal const int MinimumCompatibleSchemaVersion = 1;
-    internal const int SchemaVersion = 4;
+    internal const int SchemaVersion = 5;
     internal const int CaptureEveryAcceptedActions = 16;
     private static readonly Channel<SnapshotCommand> Queue = Channel.CreateBounded<SnapshotCommand>(
         new BoundedChannelOptions(2_048)

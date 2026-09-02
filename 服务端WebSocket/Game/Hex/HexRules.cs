@@ -35,7 +35,11 @@ public sealed record HexRefreshResult(
 public static class HexRules
 {
     public const int LegacyRulesRevision = 1;
-    public const int CurrentRulesRevision = 2;
+    /// <summary>品质池、备选池与海克斯效果语义调整所在的规则修订版。</summary>
+    public const int BalanceRulesRevision = 2;
+    /// <summary>每槽一次刷新及按玩家整局候选去重所在的规则修订版。</summary>
+    public const int PerSlotRefreshRulesRevision = 3;
+    public const int CurrentRulesRevision = PerSlotRefreshRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -111,6 +115,9 @@ public static class HexRules
             throw new InvalidOperationException("该玩家本回合前的海克斯选秀已经完成");
         var tier = state.HexState.DraftTierSequence[draftSlot];
 
+        // 先完整生成候选再提交轮次编号与活动选秀，候选不足时不留下半成品轮次。
+        var candidates = DrawCandidates(state, playerIndex, tier, 3);
+
         int sequence = ++state.HexState.DraftSequence;
         var round = new HexDraftRound
         {
@@ -120,7 +127,7 @@ public static class HexRules
             Tier = tier,
             DeadlineUtc = deadlineUtc ?? DateTime.UtcNow.AddSeconds(DraftTimeoutSeconds),
         };
-        round.Candidates.AddRange(DrawCandidates(state, playerIndex, tier, 3));
+        round.Candidates.AddRange(candidates);
 
         state.HexState.ActiveDraft = round;
         state.HexState.ResumePoint = resumePoint;
@@ -208,16 +215,41 @@ public static class HexRules
             return new(HexRefreshStatus.Rejected, null, null, null, "海克斯选秀轮次已过期");
         if (round.PlayerIndex != playerIndex)
             return new(HexRefreshStatus.Rejected, null, null, null, "这不是你的私密海克斯选秀");
-        if (round.Locked)
-            return new(HexRefreshStatus.Rejected, null, null, null, "本轮海克斯已经锁定");
 
-        if (round.RefreshUsed)
+        bool perSlotRefresh = state.HexState.RulesRevision >= PerSlotRefreshRulesRevision;
+        if (perSlotRefresh)
         {
-            bool sameRequest = round.RefreshedCandidateIndex == candidateIndex
-                && round.ReplacedHexId == expectedHexId;
-            return sameRequest
-                ? new(HexRefreshStatus.Duplicate, candidateIndex, round.ReplacedHexId, round.ReplacementHexId)
-                : new(HexRefreshStatus.Rejected, null, null, null, "本轮唯一一次刷新机会已经使用");
+            if (candidateIndex < 0 || candidateIndex >= round.Candidates.Count)
+                return new(HexRefreshStatus.Rejected, null, null, null, "刷新候选位置无效");
+
+            var completed = round.Refreshes.FirstOrDefault(item => item.CandidateIndex == candidateIndex);
+            if (completed is not null)
+            {
+                return completed.ReplacedHexId == expectedHexId
+                    ? new(
+                        HexRefreshStatus.Duplicate,
+                        completed.CandidateIndex,
+                        completed.ReplacedHexId,
+                        completed.ReplacementHexId)
+                    : new(HexRefreshStatus.Rejected, null, null, null, "该候选槽位的刷新机会已经使用");
+            }
+
+            if (round.Locked)
+                return new(HexRefreshStatus.Rejected, null, null, null, "本轮海克斯已经锁定");
+        }
+        else
+        {
+            if (round.Locked)
+                return new(HexRefreshStatus.Rejected, null, null, null, "本轮海克斯已经锁定");
+
+            if (round.RefreshUsed)
+            {
+                bool sameRequest = round.RefreshedCandidateIndex == candidateIndex
+                    && round.ReplacedHexId == expectedHexId;
+                return sameRequest
+                    ? new(HexRefreshStatus.Duplicate, candidateIndex, round.ReplacedHexId, round.ReplacementHexId)
+                    : new(HexRefreshStatus.Rejected, null, null, null, "本轮唯一一次刷新机会已经使用");
+            }
         }
 
         if (candidateIndex < 0 || candidateIndex >= round.Candidates.Count)
@@ -229,9 +261,10 @@ public static class HexRules
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
             .Where(id => !round.Candidates.Contains(id))
+            .Where(id => !perSlotRefresh || !state.HexState.Appeared[playerIndex].Contains(id))
             .ToList();
         if (pool.Count == 0)
-            return new(HexRefreshStatus.Rejected, null, null, null, "当前品质没有可用的替换候选");
+            return new(HexRefreshStatus.Rejected, null, null, null, "当前品质没有未出现过的可用替换候选");
 
         int replacementIndex = state.NextRecordedRandom(
             pool.Count,
@@ -244,7 +277,36 @@ public static class HexRules
         round.RefreshedCandidateIndex = candidateIndex;
         round.ReplacedHexId = expectedHexId;
         round.ReplacementHexId = replacementHexId;
+        if (perSlotRefresh)
+        {
+            round.Refreshes.Add(new HexDraftRefresh(candidateIndex, expectedHexId, replacementHexId));
+            state.HexState.Appeared[playerIndex].Add(replacementHexId);
+        }
         return new(HexRefreshStatus.Refreshed, candidateIndex, expectedHexId, replacementHexId);
+    }
+
+    public static IReadOnlyList<int> RefreshedCandidateIndices(HexDraftRound round, int rulesRevision)
+        => rulesRevision >= PerSlotRefreshRulesRevision
+            ? round.Refreshes.Select(item => item.CandidateIndex).Order().ToArray()
+            : round.RefreshedCandidateIndex is int index ? [index] : [];
+
+    public static int RefreshRemaining(HexDraftRound round, int rulesRevision)
+    {
+        if (round.Locked) return 0;
+        return rulesRevision >= PerSlotRefreshRulesRevision
+            ? Math.Max(0, round.Candidates.Count - round.Refreshes.Count)
+            : round.RefreshUsed ? 0 : 1;
+    }
+
+    public static bool RefreshAvailableForCandidate(
+        HexDraftRound round,
+        int candidateIndex,
+        int rulesRevision)
+    {
+        if (round.Locked || candidateIndex < 0 || candidateIndex >= round.Candidates.Count) return false;
+        return rulesRevision >= PerSlotRefreshRulesRevision
+            ? round.Refreshes.All(item => item.CandidateIndex != candidateIndex)
+            : !round.RefreshUsed;
     }
 
     /// <summary>把当前玩家已锁定结果转为已拥有，并用持久化步骤游标结算获取时效果。</summary>
@@ -350,7 +412,7 @@ public static class HexRules
             bonus += 3000;
         if (leader && Has(state, side, 20) && state.CurrentTurnPlayer == side) bonus += 2000;
         if (leader
-            && state.HexState.RulesRevision >= CurrentRulesRevision
+            && state.HexState.RulesRevision >= BalanceRulesRevision
             && Has(state, side, 22)
             && state.CurrentTurnPlayer == side)
             bonus += state.HexState.Runtime[side].TranscendentEvilOwnTurnPower;
@@ -477,7 +539,7 @@ public static class HexRules
                     await AddLifeFromDeckAsync(engine, attackerSide, player.LifeArea.Count, "steel_heart");
                 }
             }
-            bool giantSlayerTargetEligible = state.HexState.RulesRevision >= CurrentRulesRevision
+            bool giantSlayerTargetEligible = state.HexState.RulesRevision >= BalanceRulesRevision
                 ? state.CurrentCostOf(1 - attackerSide, target) >= 8
                 : target.Info.Cost >= 8;
             if (Has(state, attackerSide, 24)
@@ -614,7 +676,7 @@ public static class HexRules
             if (attacker is not null && ReferenceEquals(attacker, state.Players[koSide].Leader)
                 && Has(state, koSide, 22))
             {
-                if (state.HexState.RulesRevision >= CurrentRulesRevision)
+                if (state.HexState.RulesRevision >= BalanceRulesRevision)
                     state.HexState.Runtime[koSide].TranscendentEvilOwnTurnPower += 500;
                 else
                     attacker.PowerModThisTurn += 500;
@@ -842,12 +904,15 @@ public static class HexRules
 
     private static IReadOnlyList<int> DrawCandidates(GameState state, int player, HexTier tier, int count)
     {
+        bool excludeAppeared = state.HexState.RulesRevision >= PerSlotRefreshRulesRevision;
         var pool = HexCatalog.ForTier(tier, state.HexState.RulesRevision)
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[player].Contains(id))
+            .Where(id => !excludeAppeared || !state.HexState.Appeared[player].Contains(id))
             .ToList();
         if (pool.Count < count)
-            throw new InvalidOperationException($"{HexCatalog.TierDisplayName(tier)}海克斯候选不足 {count} 个");
+            throw new InvalidOperationException(
+                $"{HexCatalog.TierDisplayName(tier)}海克斯未出现候选不足：需要 {count} 个，实际 {pool.Count} 个");
         var result = new List<int>(count);
         while (result.Count < count)
         {
@@ -855,6 +920,11 @@ public static class HexRules
                 new { tier = tier.ToString(), slot = result.Count });
             result.Add(pool[index]);
             pool.RemoveAt(index);
+        }
+        if (excludeAppeared)
+        {
+            foreach (int id in result)
+                state.HexState.Appeared[player].Add(id);
         }
         return result;
     }

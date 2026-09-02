@@ -35,6 +35,13 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(HexTier.Rainbow, HexCatalog.TierForRevision(4, HexRules.LegacyRulesRevision));
         Assert.Equal(HexTier.Gold, HexCatalog.TierForRevision(27, HexRules.LegacyRulesRevision));
         Assert.False(HexCatalog.IsAlternative(30, HexRules.LegacyRulesRevision));
+        Assert.Equal(2, HexRules.BalanceRulesRevision);
+        Assert.Equal(3, HexRules.PerSlotRefreshRulesRevision);
+        Assert.Equal(HexRules.PerSlotRefreshRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(
+            HexCatalog.Regular.Select(item => item.Id),
+            HexCatalog.RegularForRevision(HexRules.BalanceRulesRevision).Select(item => item.Id));
+        Assert.True(HexCatalog.IsAlternative(30, HexRules.BalanceRulesRevision));
     }
 
     [Fact]
@@ -134,6 +141,12 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(
             round.Candidates,
             CandidateIds(ownerRefresh.GetProperty("hexState").GetProperty("activeDraft")));
+        var ownerDraft = ownerRefresh.GetProperty("hexState").GetProperty("activeDraft");
+        Assert.Equal(2, ownerDraft.GetProperty("refreshRemaining").GetInt32());
+        Assert.Equal(new[] { false, true, true }, ownerDraft.GetProperty("refreshAvailableByCandidate")
+            .EnumerateArray().Select(item => item.GetBoolean()).ToArray());
+        Assert.Equal(new[] { 0 }, ownerDraft.GetProperty("refreshedCandidateIndices")
+            .EnumerateArray().Select(item => item.GetInt32()).ToArray());
         Assert.Equal(
             JsonValueKind.Null,
             opponentRefresh.GetProperty("hexState").GetProperty("activeDraft").ValueKind);
@@ -192,7 +205,7 @@ public sealed class HexModeStateMachineTests
     }
 
     [Fact]
-    public async Task 单候选刷新_每轮恰好一次且校验越权重试过期与候选唯一性()
+    public async Task 逐槽刷新_三个槽位可任意顺序各刷新一次且同槽重试幂等()
     {
         var engine = CreateEngine(seed: 20260901);
         var logs = new List<string>();
@@ -220,10 +233,15 @@ public sealed class HexModeStateMachineTests
             expectedHexId = before[0],
         })));
 
-        var refresh = new { roundId = round.RoundId, candidateIndex = 1, expectedHexId = before[1] };
-        Assert.True(engine.HandleAction(0, "RefreshHex", Json(refresh)));
+        var refreshSlot1 = new { roundId = round.RoundId, candidateIndex = 1, expectedHexId = before[1] };
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(refreshSlot1)));
         Assert.True(round.RefreshUsed);
         Assert.Equal(1, round.RefreshedCandidateIndex);
+        Assert.Single(round.Refreshes);
+        Assert.Equal(2, HexRules.RefreshRemaining(round, engine.State.HexState.RulesRevision));
+        Assert.False(HexRules.RefreshAvailableForCandidate(round, 1, engine.State.HexState.RulesRevision));
+        Assert.True(HexRules.RefreshAvailableForCandidate(round, 0, engine.State.HexState.RulesRevision));
+        Assert.True(HexRules.RefreshAvailableForCandidate(round, 2, engine.State.HexState.RulesRevision));
         Assert.NotEqual(before[1], round.Candidates[1]);
         Assert.DoesNotContain(round.Candidates[1], before);
         Assert.Equal(3, round.Candidates.Distinct().Count());
@@ -232,13 +250,49 @@ public sealed class HexModeStateMachineTests
 
         // 相同业务请求即使用新 requestId 重试也只返回幂等成功，不再消费 RNG。
         int randomSeqAfterRefresh = engine.State.RandomSeq;
-        Assert.True(engine.HandleAction(0, "RefreshHex", Json(refresh)));
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(refreshSlot1)));
         Assert.Equal(randomSeqAfterRefresh, engine.State.RandomSeq);
+        Assert.Single(round.Refreshes);
+        // 同槽用替换后的编号请求属于第二次刷新，而不是上一请求重试。
         Assert.False(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 1,
+            expectedHexId = round.Candidates[1],
+        })));
+
+        // 另外两个槽仍可用，并且可以按 2 → 0 的顺序分别消费自己的机会。
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 2,
+            expectedHexId = before[2],
+        })));
+        Assert.True(HexRules.RefreshAvailableForCandidate(round, 0, engine.State.HexState.RulesRevision));
+        Assert.False(HexRules.RefreshAvailableForCandidate(round, 2, engine.State.HexState.RulesRevision));
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(new
         {
             roundId = round.RoundId,
             candidateIndex = 0,
             expectedHexId = before[0],
+        })));
+        Assert.Equal(0, HexRules.RefreshRemaining(round, engine.State.HexState.RulesRevision));
+        Assert.Equal([0, 1, 2], HexRules.RefreshedCandidateIndices(
+            round,
+            engine.State.HexState.RulesRevision));
+        Assert.Equal(3, round.Refreshes.Count);
+        Assert.Equal(3, logs.Count(kind => kind == "hex_draft_candidate_refreshed"));
+        Assert.Equal(6, engine.State.HexState.Appeared[0].Count);
+        Assert.Empty(engine.State.HexState.Appeared[1]);
+        Assert.Equal(6, engine.State.HexState.Appeared[0].Intersect(
+            HexCatalog.ForTier(round.Tier).Select(item => item.Id)).Count());
+
+        // 把槽 1 的旧期望编号挪到槽 0 不构成幂等重试。
+        Assert.False(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 0,
+            expectedHexId = before[1],
         })));
 
         Assert.False(engine.HandleAction(0, "ChooseHex", Json(new
@@ -246,13 +300,13 @@ public sealed class HexModeStateMachineTests
             roundId = round.RoundId,
             hexId = before[1],
         })));
-        int choice = round.Candidates[1];
+        int choice = round.Candidates.First(id => id is not 6 and not 47 and not 55 and not 56);
         Assert.True(engine.HandleAction(0, "ChooseHex", Json(new { roundId = round.RoundId, hexId = choice })));
         await engine.WaitSettledAsync();
         Assert.Contains(choice, engine.State.HexState.Owned[0]);
 
-        Assert.False(engine.HandleAction(0, "RefreshHex", Json(refresh)));
-        Assert.False(engine.HandleAction(1, "RefreshHex", Json(refresh)));
+        Assert.False(engine.HandleAction(0, "RefreshHex", Json(refreshSlot1)));
+        Assert.False(engine.HandleAction(1, "RefreshHex", Json(refreshSlot1)));
         // 已结算轮次上同一个选择是幂等成功，不会重复授予。
         Assert.True(engine.HandleAction(0, "ChooseHex", Json(new { roundId = round.RoundId, hexId = choice })));
         Assert.Single(engine.State.HexState.ResolvedDrafts.Where(item => item.RoundId == round.RoundId));
@@ -294,6 +348,51 @@ public sealed class HexModeStateMachineTests
         int replacement = round.Candidates[0];
         Assert.NotEqual(removed, replacement);
 
+        for (int candidateIndex = 1; candidateIndex < 3; candidateIndex++)
+        {
+            int expected = round.Candidates[candidateIndex];
+            await Apply(0, "RefreshHex", new
+            {
+                roundId = round.RoundId,
+                candidateIndex,
+                expectedHexId = expected,
+            }, GameActionSource.Player);
+        }
+        Assert.Equal(3, round.Refreshes.Count);
+        Assert.Equal(6, live.State.HexState.Appeared[0].Count);
+
+        // 在尚未选择时模拟进程重启：逐槽按钮、出现历史与 RNG 必须完整恢复。
+        var activeRebuilt = await MatchReplay.RebuildAsync(
+            roomId,
+            seed,
+            firstPlayer: 0,
+            ("alice", BuildLegalDeck()),
+            ("bob", BuildLegalDeck()),
+            tape,
+            matchKind: MatchKind.Hex);
+        var rebuiltRound = Assert.IsType<HexDraftRound>(activeRebuilt.State.HexState.ActiveDraft);
+        Assert.Equal([0, 1, 2], HexRules.RefreshedCandidateIndices(
+            rebuiltRound,
+            activeRebuilt.State.HexState.RulesRevision));
+        Assert.Equal(0, HexRules.RefreshRemaining(
+            rebuiltRound,
+            activeRebuilt.State.HexState.RulesRevision));
+        Assert.Equal(live.State.HexState.Appeared[0].Order(), activeRebuilt.State.HexState.Appeared[0].Order());
+        Assert.Equal(
+            JsonSerializer.Serialize(PrivateStateSnapshotBuilder.Build(live.State)),
+            JsonSerializer.Serialize(PrivateStateSnapshotBuilder.Build(activeRebuilt.State)));
+        var persisted = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(live.State));
+        Assert.Equal(6, persisted.GetProperty("hexState").GetProperty("appeared")[0].GetArrayLength());
+        Assert.Equal(3, persisted.GetProperty("hexState").GetProperty("activeDraft")
+            .GetProperty("refreshes").GetArrayLength());
+        var fullCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(live.State);
+        Assert.Equal(6, fullCheckpoint.GetProperty("hexState").GetProperty("appeared")[0].GetArrayLength());
+        Assert.Equal(3, fullCheckpoint.GetProperty("hexState").GetProperty("activeDraft")
+            .GetProperty("refreshes").GetArrayLength());
+        var publicCheckpoint = DeterministicReplayCheckpointProvider.BuildPublicState(live.State);
+        Assert.Equal(6, publicCheckpoint.GetProperty("hexState").GetProperty("appearedCounts")[0].GetInt32());
+        Assert.False(publicCheckpoint.GetProperty("hexState").TryGetProperty("appeared", out _));
+
         Assert.False(live.HandleAction(0, "ChooseHex", Json(new { roundId = round.RoundId, auto = true })));
         await Apply(0, "ChooseHex", new { roundId = round.RoundId, auto = true }, GameActionSource.System);
         Assert.Contains(live.State.HexState.Owned[0].Single(), round.Candidates);
@@ -314,6 +413,159 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(
             live.State.HexState.ResolvedDrafts.Select(item => item.Choice),
             rebuilt.State.HexState.ResolvedDrafts.Select(item => item.Choice));
+    }
+
+    [Fact]
+    public async Task 整局出现历史_同玩家连续同品质全刷十八张无重复且双方历史独立()
+    {
+        var engine = CreateEngine(seed: 26090218);
+        var state = engine.State;
+        state.HexState.DraftTierSequence.Clear();
+        state.HexState.DraftTierSequence.AddRange([HexTier.Silver, HexTier.Silver, HexTier.Silver]);
+        var allShown = new HashSet<int>();
+
+        foreach (int ownTurn in HexRules.DraftOwnTurns)
+        {
+            var round = HexRules.StartDraft(
+                state,
+                playerIndex: 0,
+                ownTurn,
+                HexDraftResumePoint.None);
+            var shownThisRound = new HashSet<int>(round.Candidates);
+            Assert.Empty(allShown.Intersect(shownThisRound));
+
+            for (int candidateIndex = 0; candidateIndex < round.Candidates.Count; candidateIndex++)
+            {
+                int expected = round.Candidates[candidateIndex];
+                var refreshed = HexRules.RefreshCandidate(
+                    state,
+                    playerIndex: 0,
+                    round.RoundId,
+                    candidateIndex,
+                    expected);
+                Assert.Equal(HexRefreshStatus.Refreshed, refreshed.Status);
+                Assert.True(shownThisRound.Add(round.Candidates[candidateIndex]));
+            }
+
+            Assert.Equal(6, shownThisRound.Count);
+            Assert.Empty(allShown.Intersect(shownThisRound));
+            allShown.UnionWith(shownThisRound);
+
+            int choice = round.Candidates.First(id => id is not 6 and not 47 and not 55 and not 56);
+            Assert.Equal(
+                HexChoiceStatus.Ready,
+                HexRules.LockChoice(state, 0, round.RoundId, choice, automatic: false).Status);
+            await HexRules.ResolveDraftAsync(engine);
+        }
+
+        Assert.Equal(18, allShown.Count);
+        Assert.Equal(SilverIds, allShown.Order().ToArray());
+        Assert.Equal(allShown.Order(), state.HexState.Appeared[0].Order());
+        Assert.Empty(state.HexState.Appeared[1]);
+
+        // P0 已经看完整个银色池，P1 仍按自己的空历史正常获得三个候选。
+        var playerOneRound = HexRules.StartDraft(
+            state,
+            playerIndex: 1,
+            ownTurnNumber: 1,
+            HexDraftResumePoint.None);
+        Assert.Equal(3, playerOneRound.Candidates.Count);
+        Assert.All(playerOneRound.Candidates, id => Assert.Contains(id, state.HexState.Appeared[0]));
+        Assert.Equal(playerOneRound.Candidates.Order(), state.HexState.Appeared[1].Order());
+    }
+
+    [Fact]
+    public void 候选不足_启动选秀与刷新均明确拒绝且不消耗随机状态()
+    {
+        var startEngine = CreateEngine(seed: 26090202);
+        var startState = startEngine.State;
+        startState.HexState.DraftTierSequence.Clear();
+        startState.HexState.DraftTierSequence.AddRange([HexTier.Silver, HexTier.Silver, HexTier.Silver]);
+        startState.HexState.Appeared[0].UnionWith(SilverIds.Take(16));
+        int draftSequenceBefore = startState.HexState.DraftSequence;
+        int randomBefore = startState.RandomSeq;
+
+        var startError = Assert.Throws<InvalidOperationException>(() => HexRules.StartDraft(
+            startState,
+            playerIndex: 0,
+            ownTurnNumber: 1,
+            HexDraftResumePoint.None));
+        Assert.Contains("未出现候选不足", startError.Message);
+        Assert.Null(startState.HexState.ActiveDraft);
+        Assert.Equal(draftSequenceBefore, startState.HexState.DraftSequence);
+        Assert.Equal(randomBefore, startState.RandomSeq);
+        Assert.Equal(16, startState.HexState.Appeared[0].Count);
+
+        var refreshEngine = CreateEngine(seed: 26090203);
+        var refreshState = refreshEngine.State;
+        refreshState.HexState.DraftTierSequence.Clear();
+        refreshState.HexState.DraftTierSequence.AddRange([HexTier.Silver, HexTier.Silver, HexTier.Silver]);
+        refreshState.HexState.Appeared[0].UnionWith(SilverIds.Take(15));
+        var round = HexRules.StartDraft(
+            refreshState,
+            playerIndex: 0,
+            ownTurnNumber: 1,
+            HexDraftResumePoint.None);
+        Assert.Equal(18, refreshState.HexState.Appeared[0].Count);
+        var candidatesBefore = round.Candidates.ToArray();
+        randomBefore = refreshState.RandomSeq;
+
+        var refresh = HexRules.RefreshCandidate(
+            refreshState,
+            playerIndex: 0,
+            round.RoundId,
+            candidateIndex: 0,
+            expectedHexId: round.Candidates[0]);
+        Assert.Equal(HexRefreshStatus.Rejected, refresh.Status);
+        Assert.Contains("没有未出现过", refresh.Reason);
+        Assert.Equal(candidatesBefore, round.Candidates);
+        Assert.Empty(round.Refreshes);
+        Assert.Equal(randomBefore, refreshState.RandomSeq);
+    }
+
+    [Fact]
+    public async Task 上一规则修订版_继续沿用整轮一次刷新且不会写入新版出现历史()
+    {
+        const int previousRulesRevision = HexRules.BalanceRulesRevision;
+        var engine = CreateEngine(seed: 26090204);
+        HexRules.SetRulesRevisionForReplay(engine.State, previousRulesRevision);
+        await MulliganBoth(engine);
+        var round = Assert.IsType<HexDraftRound>(engine.State.HexState.ActiveDraft);
+        var before = round.Candidates.ToArray();
+
+        Assert.True(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 0,
+            expectedHexId = before[0],
+        })));
+        Assert.False(engine.HandleAction(0, "RefreshHex", Json(new
+        {
+            roundId = round.RoundId,
+            candidateIndex = 1,
+            expectedHexId = before[1],
+        })));
+        Assert.Empty(round.Refreshes);
+        Assert.Empty(engine.State.HexState.Appeared[0]);
+        Assert.Equal(0, HexRules.RefreshRemaining(round, previousRulesRevision));
+        Assert.False(HexRules.RefreshAvailableForCandidate(round, 1, previousRulesRevision));
+
+        var snapshot = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(engine.State, 0));
+        var draft = snapshot.GetProperty("hexState").GetProperty("activeDraft");
+        Assert.Equal(0, draft.GetProperty("refreshRemaining").GetInt32());
+        Assert.All(draft.GetProperty("refreshAvailableByCandidate").EnumerateArray(), item => Assert.False(item.GetBoolean()));
+        Assert.Equal(new[] { 0 }, draft.GetProperty("refreshedCandidateIndices")
+            .EnumerateArray().Select(item => item.GetInt32()).ToArray());
+
+        var legacyFullCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(engine.State)
+            .GetProperty("hexState");
+        Assert.False(legacyFullCheckpoint.TryGetProperty("appeared", out _));
+        Assert.False(legacyFullCheckpoint.GetProperty("activeDraft").TryGetProperty("refreshes", out _));
+        var legacyPublicCheckpoint = DeterministicReplayCheckpointProvider.BuildPublicState(engine.State)
+            .GetProperty("hexState");
+        Assert.False(legacyPublicCheckpoint.TryGetProperty("appearedCounts", out _));
+        Assert.False(legacyPublicCheckpoint.GetProperty("activeDraft")
+            .TryGetProperty("refreshedCandidateIndices", out _));
     }
 
     [Fact]

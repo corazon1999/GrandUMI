@@ -101,7 +101,7 @@ public static class HexCatalog
     public static bool IsAlternative(int id) => AlternativeIds.Contains(id);
 
     public static bool IsAlternative(int id, int rulesRevision)
-        => rulesRevision >= HexRules.CurrentRulesRevision && AlternativeIds.Contains(id);
+        => rulesRevision >= HexRules.BalanceRulesRevision && AlternativeIds.Contains(id);
 
     /// <summary>仅返回常规池中指定品质的定义。</summary>
     public static IReadOnlyList<HexDefinition> ForTier(HexTier tier)
@@ -114,14 +114,14 @@ public static class HexCatalog
             .ToArray();
 
     public static IReadOnlyList<HexDefinition> RegularForRevision(int rulesRevision)
-        => rulesRevision >= HexRules.CurrentRulesRevision
+        => rulesRevision >= HexRules.BalanceRulesRevision
             ? RegularDefinitions
             : LegacyRegularDefinitions;
 
     public static HexTier TierForRevision(int id, int rulesRevision)
     {
         _ = Get(id);
-        if (rulesRevision >= HexRules.CurrentRulesRevision) return Get(id).Tier;
+        if (rulesRevision >= HexRules.BalanceRulesRevision) return Get(id).Tier;
         if (id > 54) throw new InvalidOperationException($"旧版海克斯规则不存在编号 {id}");
         if (LegacyRainbowIds.Contains(id)) return HexTier.Rainbow;
         if (LegacyGoldIds.Contains(id)) return HexTier.Gold;
