@@ -5939,8 +5939,8 @@ public static class WebSocketBridge
             entries = HexCatalog.All.Select(definition => new
             {
                 id = definition.Id,
-                definition.Name,
-                definition.Description,
+                name = definition.Name,
+                description = definition.Description,
                 tier = assignments[definition.Id].Tier.ToString(),
                 activeTier = state.Active.TierOf(definition.Id).ToString(),
                 alternative = HexCatalog.IsAlternative(definition.Id),

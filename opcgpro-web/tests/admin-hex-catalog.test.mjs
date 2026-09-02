@@ -41,6 +41,13 @@ test("管理员面板接入独立海克斯品质配置协议和权威状态", ()
     contract.criticalMessages.serverToClient.MsgAdminHexCatalog,
     ["proto", "requestId", "result"],
   );
+  assert.match(bridge, /name = definition\.Name/);
+  assert.match(bridge, /description = definition\.Description/);
+  assert.doesNotMatch(bridge, /\n\s*definition\.Name,/);
+  assert.doesNotMatch(bridge, /\n\s*definition\.Description,/);
+  assert.match(types, /interface AdminHexCatalogEntry \{[\s\S]*name: string;[\s\S]*description: string;/);
+  assert.match(panel, /<h3[^>]*>\{entry\.name\}<\/h3>/);
+  assert.match(panel, /<p[^>]*>\{entry\.description\}<\/p>/);
 });
 
 test("品质编辑采用完整草稿、乐观版本和精确一次性发布目标", () => {
@@ -112,6 +119,14 @@ test("手机竖屏保持单列、44像素触控与安全区内操作", () => {
   assert.match(panel, /layout-safe-bottom/);
   assert.match(panel, /overflow-x-hidden/);
   assert.match(panel, /grid gap-2 @\[560px\]:grid-cols-3/);
+  assert.match(panel, /<h3 className="break-words/);
+  assert.match(panel, /<p className="mt-1 break-words/);
+  assert.match(layoutFixture, /name: `布局验证海克斯 \$\{id\}`/);
+  assert.match(layoutFixture, /description: `用于验证手机竖屏长文案/);
+  for (const [width, height] of [[390, 844], [360, 780]]) {
+    assert.ok(width < 560, `${width}×${height} 应保持单列操作区`);
+    assert.ok(width < 720, `${width}×${height} 应保持单列海克斯卡片`);
+  }
 });
 
 test("布局验证夹具使用假数据且默认在生产构建中返回404", () => {

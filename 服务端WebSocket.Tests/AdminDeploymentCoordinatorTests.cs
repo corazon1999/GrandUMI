@@ -1,5 +1,6 @@
 using GrandUMI;
 using GrandUMI.Game.Hex;
+using System.Reflection;
 using System.Text.Json;
 using Xunit;
 
@@ -93,6 +94,27 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal(HexTier.Silver, restored.TierOf(1));
         Assert.Equal(HexTier.Gold, restored.TierOf(8));
         Assert.Equal("publish-1", restored.SourceRequestId);
+    }
+
+    [Fact]
+    public void 管理员海克斯目录协议使用小写名称与效果字段()
+    {
+        var coordinator = CreateCoordinator();
+        var state = coordinator.GetHexCatalogState("test");
+        var method = typeof(WebSocketBridge).GetMethod(
+            "ToAdminHexCatalogPayload",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+        var payload = method!.Invoke(null, [state]);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var firstEntry = document.RootElement.GetProperty("entries")[0];
+        var definition = HexCatalog.All[0];
+
+        Assert.Equal(definition.Name, firstEntry.GetProperty("name").GetString());
+        Assert.Equal(definition.Description, firstEntry.GetProperty("description").GetString());
+        Assert.False(firstEntry.TryGetProperty("Name", out _));
+        Assert.False(firstEntry.TryGetProperty("Description", out _));
     }
 
     [Fact]
