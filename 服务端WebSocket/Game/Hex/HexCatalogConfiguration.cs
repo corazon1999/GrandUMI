@@ -70,6 +70,34 @@ public sealed class HexCatalogConfiguration
         string? publishedBy = null,
         long? sourceDraftRevision = null,
         string? sourceRequestId = null)
+        => CreateValidated(
+            revision,
+            assignments,
+            requireBalancedPools: true,
+            expectedDigest,
+            publishedAt,
+            publishedBy,
+            sourceDraftRevision,
+            sourceRequestId);
+
+    public static HexCatalogConfiguration CreateDraft(
+        IEnumerable<HexCatalogTierAssignment> assignments,
+        string? expectedDigest = null)
+        => CreateValidated(
+            revision: 0,
+            assignments,
+            requireBalancedPools: false,
+            expectedDigest);
+
+    private static HexCatalogConfiguration CreateValidated(
+        long revision,
+        IEnumerable<HexCatalogTierAssignment> assignments,
+        bool requireBalancedPools,
+        string? expectedDigest = null,
+        long? publishedAt = null,
+        string? publishedBy = null,
+        long? sourceDraftRevision = null,
+        string? sourceRequestId = null)
     {
         if (revision < 0) throw new InvalidDataException("海克斯配置版本不能小于 0。");
         ArgumentNullException.ThrowIfNull(assignments);
@@ -86,13 +114,16 @@ public sealed class HexCatalogConfiguration
         if (!values.Keys.Order().SequenceEqual(knownIds))
             throw new InvalidDataException("海克斯配置必须且只能包含完整的权威目录编号。");
 
-        var regularIds = HexCatalog.Regular.Select(item => item.Id).ToHashSet();
-        foreach (var tier in Enum.GetValues<HexTier>())
+        if (requireBalancedPools)
         {
-            var count = values.Count(item => regularIds.Contains(item.Key) && item.Value == tier);
-            if (count != RegularHexesPerTier)
-                throw new InvalidDataException(
-                    $"{HexCatalog.TierDisplayName(tier)}常规海克斯必须恰好为 {RegularHexesPerTier} 个，当前为 {count} 个。");
+            var regularIds = HexCatalog.Regular.Select(item => item.Id).ToHashSet();
+            foreach (var tier in Enum.GetValues<HexTier>())
+            {
+                var count = values.Count(item => regularIds.Contains(item.Key) && item.Value == tier);
+                if (count != RegularHexesPerTier)
+                    throw new InvalidDataException(
+                        $"{HexCatalog.TierDisplayName(tier)}常规海克斯必须恰好为 {RegularHexesPerTier} 个，当前为 {count} 个。");
+            }
         }
 
         var digest = ComputeDigest(values);

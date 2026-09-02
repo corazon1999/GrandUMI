@@ -57,7 +57,7 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(panel, /baseActiveRevision !== selected\.activeRevision/);
   assert.match(panel, /publish_hex_catalog/);
   assert.match(panel, /draft-\$\{selected\.draftRevision\}:\$\{selected\.draftDigest\}/);
-  assert.match(panel, /必须先保存无冲突草稿/);
+  assert.match(panel, /必须先保存无冲突且三池平衡的草稿/);
   assert.match(panel, /不会抓取 main、部署代码或重启服务/);
   assert.match(coordinator, /current\.DraftRevision != expectedDraftRevision/);
   assert.match(coordinator, /active\.Revision != expectedActiveRevision/);
@@ -66,13 +66,17 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(bridge, /ConsumeHighRiskChallenge\([\s\S]*"publish_hex_catalog"/);
 });
 
-test("常规品质必须以调换方式严格保持各十八个", () => {
+test("不平衡品质可保存草稿但只有各十八个时才能发布", () => {
   assert.match(panel, /const REGULAR_HEXES_PER_TIER = 18/);
-  assert.match(panel, /count\) => count !== REGULAR_HEXES_PER_TIER/);
+  assert.match(panel, /const unbalancedPool = Object\.values\(regularCounts\)\.some\(\(count\) => count !== REGULAR_HEXES_PER_TIER\)/);
   assert.match(panel, /\{regularCounts\[tier\]\} \/ \{REGULAR_HEXES_PER_TIER\}/);
-  assert.match(panel, /每个品质必须恰好保留 18 个常规海克斯/);
-  assert.match(panel, /请调换另一项以恢复三池平衡/);
-  assert.match(panel, /disabled=\{!connected \|\| !dirty \|\| invalidPool \|\| pending !== null\}/);
+  assert.match(panel, /当前调整可以保存为草稿/);
+  assert.match(panel, /发布前，每个品质必须恰好保留 18 个常规海克斯/);
+  assert.match(panel, /const saveDraft = \(\) => \{[\s\S]*if \(!selected \|\| !dirty\) return;/);
+  assert.match(panel, /disabled=\{!connected \|\| !dirty \|\| pending !== null\}/);
+  assert.match(panel, /const publishDisabled = [\s\S]*\|\| unbalancedPool/);
+  assert.match(coordinator, /HexCatalogConfiguration\.CreateDraft\(assignments\)/);
+  assert.match(coordinator, /HexCatalogConfiguration\.Create\(0, draft\.Assignments, draft\.Digest\)/);
   assert.equal(Object.values({ Silver: 19, Gold: 17, Rainbow: 18 }).some((count) => count !== 18), true);
   assert.match(runner, /if count != 18:/);
   assert.match(runner, /常规海克斯必须恰好为 18 个/);

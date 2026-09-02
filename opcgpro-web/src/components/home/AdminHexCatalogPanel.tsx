@@ -105,7 +105,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
     }
     return counts;
   }, [sortedEntries, tiers]);
-  const invalidPool = Object.values(regularCounts).some((count) => count !== REGULAR_HEXES_PER_TIER);
+  const unbalancedPool = Object.values(regularCounts).some((count) => count !== REGULAR_HEXES_PER_TIER);
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("zh-CN");
     return sortedEntries.filter((entry) => {
@@ -138,7 +138,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
   };
 
   const saveDraft = () => {
-    if (!selected || !dirty || invalidPool) return;
+    if (!selected || !dirty) return;
     if (previewOnly) return;
     const sent = HomeRequest.saveAdminHexCatalog(
       environment,
@@ -155,7 +155,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
   };
 
   const publish = () => {
-    if (!selected || dirty || invalidPool || baseChanged || draftMatchesActive || selected.draftRevision < 1) return;
+    if (!selected || dirty || unbalancedPool || baseChanged || draftMatchesActive || selected.draftRevision < 1) return;
     if (previewOnly) return;
     if (!hasApproval) {
       if (!HomeRequest.requestAdminApproval("publish_hex_catalog", approvalTarget)) {
@@ -188,7 +188,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
     || !catalog.deploymentAvailable
     || !selected
     || dirty
-    || invalidPool
+    || unbalancedPool
     || baseChanged
     || draftMatchesActive
     || selected.draftRevision < 1
@@ -206,7 +206,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
           <p className="text-xs font-bold tracking-[0.16em] text-fuchsia-400">HEX CATALOG</p>
           <h2 className="mt-1 text-lg font-black text-white">海克斯品质面板</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-gray-400">
-            编辑完整目录并先保存草稿，再通过一次性凭证发布到指定环境。三个常规品质池必须各保持 18 个，请成对调换品质。激活只影响发布后新建的房间；进行中房间与恢复重放继续使用各自锁定版本。
+            编辑完整目录并先保存草稿，再通过一次性凭证发布到指定环境。草稿允许暂时不平衡；发布前，三个常规品质池必须各保持 18 个。激活只影响发布后新建的房间；进行中房间与恢复重放继续使用各自锁定版本。
           </p>
         </div>
         <button
@@ -273,8 +273,8 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
               </div>
             ))}
           </div>
-          {invalidPool && (
-            <p className="mt-2 text-xs font-bold text-red-300" role="alert">每个品质必须恰好保留 18 个常规海克斯；请调换另一项以恢复三池平衡，当前草稿不能保存。</p>
+          {unbalancedPool && (
+            <p className="mt-2 text-xs font-bold leading-5 text-amber-300" role="status">当前调整可以保存为草稿；发布前，每个品质必须恰好保留 18 个常规海克斯。</p>
           )}
 
           <div className="mt-4 flex flex-col gap-2 @[620px]:flex-row">
@@ -370,7 +370,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
             <button
               type="button"
               onClick={saveDraft}
-              disabled={!connected || !dirty || invalidPool || pending !== null}
+              disabled={!connected || !dirty || pending !== null}
               className="min-h-11 rounded-xl bg-fuchsia-600 px-3 text-sm font-black text-white hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
             >
               {pending === "save" ? "正在保存草稿…" : "保存共享草稿"}
@@ -400,7 +400,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
                   : `申请${environment === "production" ? "正式服" : "测试服"}配置发布凭证`}
             </button>
             <p className="mt-2 text-[11px] leading-5 text-gray-500">
-              必须先保存无冲突草稿。此按钮不会抓取 main、部署代码或重启服务；下方“版本发布”是完全独立的整站发布流程。
+              必须先保存无冲突且三池平衡的草稿。此按钮不会抓取 main、部署代码或重启服务；下方“版本发布”是完全独立的整站发布流程。
             </p>
           </article>
         </>

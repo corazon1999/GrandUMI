@@ -158,6 +158,34 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public void 不平衡品质可以保存并恢复草稿但不能进入发布队列()
+    {
+        var coordinator = CreateCoordinator();
+        var assignments = ChangeTier(1, HexTier.Silver);
+
+        var saved = coordinator.SaveHexCatalogDraft(
+            "test", 0, 0, assignments, "Admin", "save-unbalanced");
+        var restored = coordinator.GetHexCatalogState("test").Draft;
+
+        Assert.Equal(1, saved.State.Draft.DraftRevision);
+        Assert.Equal(saved.State.Draft.Digest, restored.Digest);
+        Assert.Equal(19, restored.Assignments.Count(item =>
+            !HexCatalog.IsAlternative(item.Id) && item.Tier == HexTier.Silver));
+        Assert.Equal(17, restored.Assignments.Count(item =>
+            !HexCatalog.IsAlternative(item.Id) && item.Tier == HexTier.Gold));
+
+        var error = Assert.Throws<InvalidDataException>(() => coordinator.QueueHexCatalog(
+            "test",
+            saved.State.Draft.DraftRevision,
+            saved.State.Draft.Digest,
+            "Admin",
+            "publish-unbalanced"));
+
+        Assert.Contains("必须恰好为 18 个", error.Message);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_directory, "requests"), "*.request"));
+    }
+
+    [Fact]
     public async Task 相同草稿版本的并发保存只有一个成功()
     {
         var coordinatorA = CreateCoordinator();

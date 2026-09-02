@@ -142,7 +142,7 @@ public sealed class AdminDeploymentCoordinator
         actor = RequiredToken(actor, 64, "操作者");
         requestId = RequiredToken(requestId, 128, "请求编号");
         ArgumentNullException.ThrowIfNull(assignments);
-        var requested = HexCatalogConfiguration.Create(0, assignments);
+        var requested = HexCatalogConfiguration.CreateDraft(assignments);
 
         using var draftLock = AcquireLock(DraftLockPath(environment));
         var active = ReadActiveHexCatalog(environment);
@@ -204,6 +204,8 @@ public sealed class AdminDeploymentCoordinator
             throw new InvalidOperationException("目标环境的已发布配置已变化，请重新保存草稿后再发布。");
         if (string.Equals(draft.Digest, active.Digest, StringComparison.Ordinal))
             throw new InvalidOperationException("草稿与目标环境当前配置一致，无需重复发布。");
+
+        _ = HexCatalogConfiguration.Create(0, draft.Assignments, draft.Digest);
 
         using var queueLock = AcquireLock(Path.Combine(_requestDirectory, ".queue.lock"));
         EnsureQueueEmpty();
@@ -285,7 +287,7 @@ public sealed class AdminDeploymentCoordinator
             ?? throw new InvalidDataException("海克斯草稿文件为空。");
         if (document.Schema != DraftSchema || document.Environment != environment)
             throw new InvalidDataException("海克斯草稿文件 schema 或环境无效。");
-        var validated = HexCatalogConfiguration.Create(0, document.Tiers, document.Digest);
+        var validated = HexCatalogConfiguration.CreateDraft(document.Tiers, document.Digest);
         if (document.DraftRevision < 1 || document.BaseActiveRevision < 0)
             throw new InvalidDataException("海克斯草稿版本无效。");
         return new AdminHexCatalogDraft(
