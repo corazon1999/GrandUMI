@@ -91,6 +91,8 @@ public sealed class PlayerHexRuntime
     public bool SoulSiphonUsedThisTurn { get; set; }
     public bool FirstLeaderAttackSeenThisTurn { get; set; }
     public bool FirstCharacterAttackSeenThisTurn { get; set; }
+    /// <summary>规则修订版 7 起，本回合由该玩家实际发动的【登场时】效果数；复制结算不计入。</summary>
+    public int ActivatedEnterEffectsThisTurn { get; set; }
     public bool FirstEnterEffectCopiedThisTurn { get; set; }
     public bool FirstKoEffectCopiedThisTurn { get; set; }
     public int AttacksDeclaredThisTurn { get; set; }
@@ -117,6 +119,7 @@ public sealed class PlayerHexRuntime
         SoulSiphonUsedThisTurn = false;
         FirstLeaderAttackSeenThisTurn = false;
         FirstCharacterAttackSeenThisTurn = false;
+        ActivatedEnterEffectsThisTurn = 0;
         FirstEnterEffectCopiedThisTurn = false;
         FirstKoEffectCopiedThisTurn = false;
         AttacksDeclaredThisTurn = 0;

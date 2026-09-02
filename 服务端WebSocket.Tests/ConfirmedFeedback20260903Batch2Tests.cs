@@ -108,11 +108,12 @@ public sealed class ConfirmedFeedback20260903Batch2Tests
     }
 
     [Fact]
-    public async Task 海克斯H16_拒绝可选登场时不消耗复制_下一张P107只复制首次实际发动()
+    public async Task 海克斯H16_旧规则拒绝可选登场时不消耗复制_下一张P107只复制首次实际发动()
     {
         var state = TestScene.New().Build();
         state.MatchKind = MatchKind.Hex;
         HexRules.Initialize(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.AstralBodyRulesRevision);
         state.HexState.Owned[0].Clear();
         state.HexState.Owned[0].Add(16);
         state.OperationClockEnabled = true;

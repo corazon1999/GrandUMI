@@ -250,31 +250,9 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 .Select(items => items.Order().ToArray())
                 .ToArray(),
             completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
-            runtime = state.HexState.Runtime.Select(runtime => new
-            {
-                runtime.CardsPlayedThisTurn,
-                runtime.SoulSiphonUsedThisTurn,
-                runtime.FirstLeaderAttackSeenThisTurn,
-                runtime.FirstCharacterAttackSeenThisTurn,
-                runtime.FirstEnterEffectCopiedThisTurn,
-                runtime.FirstKoEffectCopiedThisTurn,
-                runtime.AttacksDeclaredThisTurn,
-                runtime.RestingCharacterAttacksThisGame,
-                runtime.SteelHeartUsedThisGame,
-                runtime.UltimateRefreshUsedThisTurn,
-                runtime.FinalFormUsedThisTurn,
-                runtime.CriticalHealSucceededThisTurn,
-                runtime.EventDrawConvertedThisTurn,
-                runtime.CharacterDrawConvertedThisTurn,
-                runtime.SlapUsedThisTurn,
-                runtime.SoulConsumeUsedThisTurn,
-                runtime.TankEngineUsedThisTurn,
-                runtime.TankEngineOpponentTurnPower,
-                runtime.NavyCarnivalUsedThisTurn,
-                runtime.KingUsedThisGame,
-                runtime.TranscendentEvilOwnTurnPower,
-                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
-            }).ToArray(),
+            runtime = state.HexState.Runtime
+                .Select(runtime => CurrentHexRuntime(runtime, state.HexState.RulesRevision))
+                .ToArray(),
             activeDraft = state.HexState.ActiveDraft is { } draft
                 ? new
                 {
@@ -328,6 +306,66 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 draft.OwnTurnNumber,
                 draft.Choice,
             }).ToArray(),
+        };
+    }
+
+    private static object CurrentHexRuntime(PlayerHexRuntime runtime, int rulesRevision)
+    {
+        if (rulesRevision >= HexRules.BoardingSalvoRulesRevision)
+        {
+            return new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+                runtime.ActivatedEnterEffectsThisTurn,
+            };
+        }
+
+        // 修订版 4～6 的 checkpoint 投影已冻结，不能因新增运行态字段改变旧录像摘要。
+        return new
+        {
+            runtime.CardsPlayedThisTurn,
+            runtime.SoulSiphonUsedThisTurn,
+            runtime.FirstLeaderAttackSeenThisTurn,
+            runtime.FirstCharacterAttackSeenThisTurn,
+            runtime.FirstEnterEffectCopiedThisTurn,
+            runtime.FirstKoEffectCopiedThisTurn,
+            runtime.AttacksDeclaredThisTurn,
+            runtime.RestingCharacterAttacksThisGame,
+            runtime.SteelHeartUsedThisGame,
+            runtime.UltimateRefreshUsedThisTurn,
+            runtime.FinalFormUsedThisTurn,
+            runtime.CriticalHealSucceededThisTurn,
+            runtime.EventDrawConvertedThisTurn,
+            runtime.CharacterDrawConvertedThisTurn,
+            runtime.SlapUsedThisTurn,
+            runtime.SoulConsumeUsedThisTurn,
+            runtime.TankEngineUsedThisTurn,
+            runtime.TankEngineOpponentTurnPower,
+            runtime.NavyCarnivalUsedThisTurn,
+            runtime.KingUsedThisGame,
+            runtime.TranscendentEvilOwnTurnPower,
+            inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
         };
     }
 

@@ -557,11 +557,14 @@ public sealed class HexModeEffectsTests
         OwnOnly(state, 0, 16);
         var enterSource = DbCard("EB03-047");
         me.Deck.Clear();
-        me.Deck.AddRange(Enumerable.Range(0, 9).Select(i => Card($"HEX-MILL-{i}", CardKind.Character)));
+        me.Deck.AddRange(Enumerable.Range(0, 12).Select(i => Card($"HEX-MILL-{i}", CardKind.Character)));
         await EffectRuntime.Resolve(state, 0, enterSource, EffectTrigger.OnEnterField, new MockPromptService());
-        Assert.Equal(6, me.Trash.Count);
+        Assert.Equal(3, me.Trash.Count);
         await EffectRuntime.Resolve(state, 0, enterSource, EffectTrigger.OnEnterField, new MockPromptService());
         Assert.Equal(9, me.Trash.Count);
+        await EffectRuntime.Resolve(state, 0, enterSource, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(12, me.Trash.Count);
+        Assert.Equal(2, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
 
         OwnOnly(state, 0, 17);
         var koSource = DbCard("OP15-012");
@@ -593,29 +596,121 @@ public sealed class HexModeEffectsTests
     }
 
     [Fact]
-    public async Task 复制登场时_空候选静默返回不消耗首次机会()
+    public async Task 登舰礼炮_无效果无效放弃与空候选均不计数_第二个实际发动才复制()
     {
         var state = HexState();
         var me = state.Players[0];
         OwnOnly(state, 0, 16);
+
+        // 无【登场时】的卡与已被无效的【登场时】都不属于“发动”。
+        await EffectRuntime.Resolve(
+            state, 0, Card("HEX-NO-ENTER", CardKind.Character),
+            EffectTrigger.OnEnterField, new MockPromptService());
+        var nullifiedSource = DbCard("EB03-047");
+        nullifiedSource.IsEffectsNullified = true;
+        await EffectRuntime.Resolve(
+            state, 0, nullifiedSource, EffectTrigger.OnEnterField, new MockPromptService());
+
+        // EB04-032 有合法成本但玩家放弃，不计为发动。
+        var optionalSource = DbCard("EB04-032");
+        me.Hand.Add(DbCard("ST04-002"));
+        await EffectRuntime.Resolve(
+            state, 0, optionalSource, EffectTrigger.OnEnterField,
+            new MockPromptService().QueueChooseEmpty());
 
         // OP01-005 没有合法废弃区目标时会在脚本内静默返回。
         var silentSource = DbCard("OP01-005");
         await EffectRuntime.Resolve(
             state, 0, silentSource, EffectTrigger.OnEnterField, new MockPromptService());
 
+        Assert.Equal(0, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
         Assert.False(state.HexState.Runtime[0].FirstEnterEffectCopiedThisTurn);
 
-        // 后续真正发动的登场时仍应取得本回合第一次复制。
+        // 第一个实际发动只推进计数，第二个才额外结算；复制本身不会作为第三次再次计数。
         var actualSource = DbCard("EB03-047");
         me.Deck.Clear();
-        me.Deck.AddRange(Enumerable.Range(0, 6)
+        me.Deck.AddRange(Enumerable.Range(0, 12)
             .Select(i => Card($"HEX-ENTER-ACTUAL-{i}", CardKind.Character)));
         await EffectRuntime.Resolve(
             state, 0, actualSource, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(1, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.Equal(3, me.Trash.Count);
 
-        Assert.True(state.HexState.Runtime[0].FirstEnterEffectCopiedThisTurn);
-        Assert.Equal(6, me.Trash.Count);
+        await EffectRuntime.Resolve(
+            state, 0, actualSource, EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(2, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.False(state.HexState.Runtime[0].FirstEnterEffectCopiedThisTurn);
+        Assert.Equal(9, me.Trash.Count);
+    }
+
+    [Fact]
+    public async Task 登舰礼炮_双方独立计数_回合开始共同重置_旧房间仍复制首个发动()
+    {
+        var state = HexState();
+        OwnOnly(state, 0, 16);
+        OwnOnly(state, 1, 16);
+        var source = DbCard("EB03-047");
+        state.Players[0].Deck.AddRange(Enumerable.Range(0, 15)
+            .Select(i => Card($"HEX-P0-ENTER-{i}", CardKind.Character)));
+        state.Players[1].Deck.AddRange(Enumerable.Range(0, 15)
+            .Select(i => Card($"HEX-P1-ENTER-{i}", CardKind.Character)));
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, new MockPromptService());
+        await EffectRuntime.Resolve(state, 1, source, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(3, state.Players[0].Trash.Count);
+        Assert.Equal(3, state.Players[1].Trash.Count);
+        Assert.Equal(1, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.Equal(1, state.HexState.Runtime[1].ActivatedEnterEffectsThisTurn);
+
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(9, state.Players[0].Trash.Count);
+        Assert.Equal(3, state.Players[1].Trash.Count);
+        Assert.Equal(2, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.Equal(1, state.HexState.Runtime[1].ActivatedEnterEffectsThisTurn);
+
+        HexRules.OnTurnStarted(state, 1);
+        Assert.All(state.HexState.Runtime, runtime => Assert.Equal(0, runtime.ActivatedEnterEffectsThisTurn));
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(12, state.Players[0].Trash.Count);
+        Assert.Equal(1, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+
+        var legacy = HexState();
+        HexRules.SetRulesRevisionForReplay(legacy, HexRules.AstralBodyRulesRevision);
+        OwnOnly(legacy, 0, 16);
+        legacy.Players[0].Deck.AddRange(Enumerable.Range(0, 9)
+            .Select(i => Card($"HEX-LEGACY-ENTER-{i}", CardKind.Character)));
+        await EffectRuntime.Resolve(
+            legacy, 0, DbCard("EB03-047"), EffectTrigger.OnEnterField, new MockPromptService());
+
+        Assert.Equal(6, legacy.Players[0].Trash.Count);
+        Assert.True(legacy.HexState.Runtime[0].FirstEnterEffectCopiedThisTurn);
+        Assert.Equal(0, legacy.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+    }
+
+    [Fact]
+    public async Task 登舰礼炮_效果登场队列中的嵌套登场时按实际发动顺序成为第二个()
+    {
+        var state = HexState();
+        var me = state.Players[0];
+        OwnOnly(state, 0, 16);
+        me.Deck.AddRange(Enumerable.Range(0, 9)
+            .Select(i => Card($"HEX-NESTED-ENTER-{i}", CardKind.Character)));
+
+        await EffectRuntime.Resolve(
+            state, 0, DbCard("EB03-047"), EffectTrigger.OnEnterField, new MockPromptService());
+        Assert.Equal(1, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.Equal(3, me.Trash.Count);
+
+        // 效果登场统一在当前效果链结束后由待处理队列排空；该卡的登场时应成为第2个并结算两次。
+        var nestedSource = DbCard("EB03-047");
+        me.Characters.Add(nestedSource);
+        state.EnqueueEnterField(0, nestedSource, "deck");
+        await EffectRuntime.DrainPendingEnterFields(state, new MockPromptService());
+
+        Assert.Empty(state.PendingEnterFields);
+        Assert.Equal(2, state.HexState.Runtime[0].ActivatedEnterEffectsThisTurn);
+        Assert.Equal(9, me.Trash.Count);
     }
 
     [Fact]

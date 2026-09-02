@@ -32,7 +32,7 @@ public static class HexCatalog
         H(13, "双刀流", HexTier.Rainbow, "己方【攻击时】效果额外结算1次。"),
         H(14, "秘术冲拳", HexTier.Rainbow, "己方角色或领袖每次攻击时，手中全部事件费用-1至回合结束。"),
         H(15, "虚幻武器", HexTier.Gold, "己方角色登场时触发该角色的【攻击时】效果。"),
-        H(16, "登舰礼炮", HexTier.Gold, "每回合第一个实际发动的【登场时】效果额外结算1次。"),
+        H(16, "登舰礼炮", HexTier.Gold, "每回合第二个发动的【登场时】效果额外结算1次。"),
         H(17, "亡者回声", HexTier.Gold, "每回合第一个实际发动的【KO时】效果额外结算1次。"),
         H(18, "双重麻烦", HexTier.Gold, "己方场上恰好只有2个编号一致的角色时，这些角色力量+3000。"),
         H(19, "霸王色霸气", HexTier.Rainbow, "全场当前力量5000或以下的角色无法转为休息。"),
@@ -111,6 +111,8 @@ public static class HexCatalog
         => (id, rulesRevision) switch
         {
             (6, < HexRules.AstralBodyRulesRevision) => "获得时选择2张手牌，按顺序放入生命区。",
+            (16, < HexRules.BoardingSalvoRulesRevision) =>
+                "每回合第一个实际发动的【登场时】效果额外结算1次。",
             (55, < HexRules.TransmutationPresentationRulesRevision) =>
                 "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             _ => Get(id).Description,

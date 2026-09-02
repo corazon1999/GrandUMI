@@ -40,13 +40,20 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(4, HexRules.TransmutationPresentationRulesRevision);
         Assert.Equal(5, HexRules.CatalogConfigurationRulesRevision);
         Assert.Equal(6, HexRules.AstralBodyRulesRevision);
-        Assert.Equal(HexRules.AstralBodyRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(7, HexRules.BoardingSalvoRulesRevision);
+        Assert.Equal(HexRules.BoardingSalvoRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal(
             "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
             HexCatalog.Get(6).Description);
         Assert.Equal(
             "获得时选择2张手牌，按顺序放入生命区。",
             HexCatalog.DescriptionForRevision(6, HexRules.CatalogConfigurationRulesRevision));
+        Assert.Equal(
+            "每回合第二个发动的【登场时】效果额外结算1次。",
+            HexCatalog.Get(16).Description);
+        Assert.Equal(
+            "每回合第一个实际发动的【登场时】效果额外结算1次。",
+            HexCatalog.DescriptionForRevision(16, HexRules.AstralBodyRulesRevision));
         Assert.Equal(
             "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
             HexCatalog.Get(42).Description);
@@ -58,6 +65,31 @@ public sealed class HexModeStateMachineTests
             HexCatalog.Regular.Select(item => item.Id),
             HexCatalog.RegularForRevision(HexRules.BalanceRulesRevision).Select(item => item.Id));
         Assert.True(HexCatalog.IsAlternative(30, HexRules.BalanceRulesRevision));
+    }
+
+    [Fact]
+    public void 登舰礼炮新版计数进入恢复快照与完整检查点_旧规则投影保持冻结()
+    {
+        var current = CreateEngine(seed: 716001).State;
+        current.HexState.Runtime[0].ActivatedEnterEffectsThisTurn = 1;
+
+        var currentPrivateRuntime = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(current))
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        var currentCheckpointRuntime = DeterministicReplayCheckpointProvider.BuildFullState(current)
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        Assert.Equal(1, currentPrivateRuntime.GetProperty("ActivatedEnterEffectsThisTurn").GetInt32());
+        Assert.Equal(1, currentCheckpointRuntime.GetProperty("ActivatedEnterEffectsThisTurn").GetInt32());
+
+        var previous = CreateEngine(seed: 616001).State;
+        HexRules.SetRulesRevisionForReplay(previous, HexRules.AstralBodyRulesRevision);
+        previous.HexState.Runtime[0].ActivatedEnterEffectsThisTurn = 1;
+
+        var previousPrivateRuntime = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(previous))
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        var previousCheckpointRuntime = DeterministicReplayCheckpointProvider.BuildFullState(previous)
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        Assert.False(previousPrivateRuntime.TryGetProperty("ActivatedEnterEffectsThisTurn", out _));
+        Assert.False(previousCheckpointRuntime.TryGetProperty("ActivatedEnterEffectsThisTurn", out _));
     }
 
     [Fact]

@@ -45,7 +45,9 @@ public static class HexRules
     public const int CatalogConfigurationRulesRevision = 5;
     /// <summary>星界躯体改为手牌补1张生命后，再从卡组顶补1张生命所在的规则修订版。</summary>
     public const int AstralBodyRulesRevision = 6;
-    public const int CurrentRulesRevision = AstralBodyRulesRevision;
+    /// <summary>登舰礼炮改为每回合第2个实际发动的登场时效果额外结算所在的规则修订版。</summary>
+    public const int BoardingSalvoRulesRevision = 7;
+    public const int CurrentRulesRevision = BoardingSalvoRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -827,7 +829,9 @@ public static class HexRules
         var runtime = state.HexState.Runtime[owner];
         if (trigger == EffectTrigger.OnAttackDeclare && Has(state, owner, 13)) return true;
         if (trigger == EffectTrigger.OnEnterField && Has(state, owner, 16))
-            return !runtime.FirstEnterEffectCopiedThisTurn;
+            return state.HexState.RulesRevision >= BoardingSalvoRulesRevision
+                ? runtime.ActivatedEnterEffectsThisTurn < 2
+                : !runtime.FirstEnterEffectCopiedThisTurn;
         if (trigger == EffectTrigger.OnKO && Has(state, owner, 17))
             return !runtime.FirstKoEffectCopiedThisTurn;
         if (trigger is EffectTrigger.EventMain or EffectTrigger.EventCounter && Has(state, owner, 46)) return true;
@@ -838,7 +842,12 @@ public static class HexRules
     {
         if (!CanCopyEffect(state, owner, trigger, alreadyCopied)) return false;
         var runtime = state.HexState.Runtime[owner];
-        if (trigger == EffectTrigger.OnEnterField) runtime.FirstEnterEffectCopiedThisTurn = true;
+        if (trigger == EffectTrigger.OnEnterField)
+        {
+            if (state.HexState.RulesRevision >= BoardingSalvoRulesRevision)
+                return ++runtime.ActivatedEnterEffectsThisTurn == 2;
+            runtime.FirstEnterEffectCopiedThisTurn = true;
+        }
         if (trigger == EffectTrigger.OnKO) runtime.FirstKoEffectCopiedThisTurn = true;
         return true;
     }

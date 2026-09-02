@@ -73,31 +73,9 @@ public static class PrivateStateSnapshotBuilder
                     .Select(items => items.Order().ToArray())
                     .ToArray(),
                 completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
-                runtime = state.HexState.Runtime.Select(runtime => new
-                {
-                    runtime.CardsPlayedThisTurn,
-                    runtime.SoulSiphonUsedThisTurn,
-                    runtime.FirstLeaderAttackSeenThisTurn,
-                    runtime.FirstCharacterAttackSeenThisTurn,
-                    runtime.FirstEnterEffectCopiedThisTurn,
-                    runtime.FirstKoEffectCopiedThisTurn,
-                    runtime.AttacksDeclaredThisTurn,
-                    runtime.RestingCharacterAttacksThisGame,
-                    runtime.SteelHeartUsedThisGame,
-                    runtime.UltimateRefreshUsedThisTurn,
-                    runtime.FinalFormUsedThisTurn,
-                    runtime.CriticalHealSucceededThisTurn,
-                    runtime.EventDrawConvertedThisTurn,
-                    runtime.CharacterDrawConvertedThisTurn,
-                    runtime.SlapUsedThisTurn,
-                    runtime.SoulConsumeUsedThisTurn,
-                    runtime.TankEngineUsedThisTurn,
-                    runtime.TankEngineOpponentTurnPower,
-                    runtime.NavyCarnivalUsedThisTurn,
-                    runtime.KingUsedThisGame,
-                    runtime.TranscendentEvilOwnTurnPower,
-                    inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
-                }).ToArray(),
+                runtime = state.HexState.Runtime
+                    .Select(runtime => SnapshotHexRuntime(runtime, state.HexState.RulesRevision))
+                    .ToArray(),
                 activeDraft = state.HexState.ActiveDraft is { } draft
                     ? new
                     {
@@ -232,6 +210,66 @@ public static class PrivateStateSnapshotBuilder
             alwaysPromptOnLifeReveal = player.AlwaysPromptOnLifeReveal,
             turnOnceUsed = player.TurnOnceUsed.ToArray(),
         };
+    }
+
+    private static object SnapshotHexRuntime(Hex.PlayerHexRuntime runtime, int rulesRevision)
+    {
+        object Snapshot(bool includeBoardingSalvoCount)
+            => includeBoardingSalvoCount
+                ? new
+                {
+                    runtime.CardsPlayedThisTurn,
+                    runtime.SoulSiphonUsedThisTurn,
+                    runtime.FirstLeaderAttackSeenThisTurn,
+                    runtime.FirstCharacterAttackSeenThisTurn,
+                    runtime.FirstEnterEffectCopiedThisTurn,
+                    runtime.FirstKoEffectCopiedThisTurn,
+                    runtime.AttacksDeclaredThisTurn,
+                    runtime.RestingCharacterAttacksThisGame,
+                    runtime.SteelHeartUsedThisGame,
+                    runtime.UltimateRefreshUsedThisTurn,
+                    runtime.FinalFormUsedThisTurn,
+                    runtime.CriticalHealSucceededThisTurn,
+                    runtime.EventDrawConvertedThisTurn,
+                    runtime.CharacterDrawConvertedThisTurn,
+                    runtime.SlapUsedThisTurn,
+                    runtime.SoulConsumeUsedThisTurn,
+                    runtime.TankEngineUsedThisTurn,
+                    runtime.TankEngineOpponentTurnPower,
+                    runtime.NavyCarnivalUsedThisTurn,
+                    runtime.KingUsedThisGame,
+                    runtime.TranscendentEvilOwnTurnPower,
+                    inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
+                    runtime.ActivatedEnterEffectsThisTurn,
+                }
+                : new
+                {
+                    runtime.CardsPlayedThisTurn,
+                    runtime.SoulSiphonUsedThisTurn,
+                    runtime.FirstLeaderAttackSeenThisTurn,
+                    runtime.FirstCharacterAttackSeenThisTurn,
+                    runtime.FirstEnterEffectCopiedThisTurn,
+                    runtime.FirstKoEffectCopiedThisTurn,
+                    runtime.AttacksDeclaredThisTurn,
+                    runtime.RestingCharacterAttacksThisGame,
+                    runtime.SteelHeartUsedThisGame,
+                    runtime.UltimateRefreshUsedThisTurn,
+                    runtime.FinalFormUsedThisTurn,
+                    runtime.CriticalHealSucceededThisTurn,
+                    runtime.EventDrawConvertedThisTurn,
+                    runtime.CharacterDrawConvertedThisTurn,
+                    runtime.SlapUsedThisTurn,
+                    runtime.SoulConsumeUsedThisTurn,
+                    runtime.TankEngineUsedThisTurn,
+                    runtime.TankEngineOpponentTurnPower,
+                    runtime.NavyCarnivalUsedThisTurn,
+                    runtime.KingUsedThisGame,
+                    runtime.TranscendentEvilOwnTurnPower,
+                    inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
+                };
+
+        // 旧规则房间保持历史私密快照逐字兼容；只有新版房间持久化第二次发动计数。
+        return Snapshot(rulesRevision >= Hex.HexRules.BoardingSalvoRulesRevision);
     }
 
     private static object SnapshotCard(GameState state, int ownerIndex, CardInstance card)
