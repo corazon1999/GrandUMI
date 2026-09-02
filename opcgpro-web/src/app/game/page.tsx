@@ -24,6 +24,7 @@ import { usePlayback } from "@/hooks/usePlayback";
 import { useGameInit } from "@/hooks/useGameInit";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { GameRequest } from "@/net/GameRequest";
+import { installAltTabAutoChat, isAltTabAutoChatEligible } from "@/lib/altTabAutoChat";
 
 export default function GamePage() {
   const router = useRouter();
@@ -66,6 +67,13 @@ export default function GamePage() {
   useEffect(() => () => {
     GameRequest.cancelPendingAttachDon();
   }, []);
+
+  useEffect(() => installAltTabAutoChat({
+    windowTarget: window,
+    documentTarget: document,
+    canSend: () => isAltTabAutoChatEligible(useGameStore.getState()),
+    send: (message) => GameRequest.sendGameChat(message),
+  }), []);
 
   const returnToHome = () => {
     GameRequest.leaveGameChat();
