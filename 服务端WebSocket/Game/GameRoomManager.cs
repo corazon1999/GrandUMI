@@ -411,6 +411,12 @@ public static class GameRoomManager
                 firstPlayer,
                 rulesetId = engine.State.RulesetId,
                 hexRulesRevision = engine.State.HexState.RulesRevision,
+                hexCatalogRevision = engine.State.HexState.CatalogRevision,
+                hexCatalogDigest = engine.State.HexState.CatalogDigest,
+                hexCatalogTiers = engine.State.HexState.CatalogTiers
+                    .OrderBy(item => item.Key)
+                    .Select(item => new { id = item.Key, tier = item.Value.ToString() })
+                    .ToArray(),
                 openingSetupAfterFirstPlayerChoice,
                 p0 = new { account = p0Account, displayName = entry.PlayerDisplayNames[0], deckRaw = p0Deck, alwaysPrompt = p0AlwaysPrompt, cardBackId = p0CardBackId, spriteMap = engine.State.Players[0].SpriteMap, spectateMode = entry.SpectateModes[0], spectatorHandsPublic = entry.SpectatorHandsPublic[0], spectateCode = entry.SpectateCodes[0] },
                 p1 = new { account = p1Account, displayName = entry.PlayerDisplayNames[1], deckRaw = p1Deck, alwaysPrompt = p1AlwaysPrompt, cardBackId = p1CardBackId, spriteMap = engine.State.Players[1].SpriteMap, spectateMode = entry.SpectateModes[1], spectatorHandsPublic = entry.SpectatorHandsPublic[1], spectateCode = entry.SpectateCodes[1] },
@@ -2984,6 +2990,33 @@ public static class GameRoomManager
         var hexRulesRevision = h.TryGetProperty("hexRulesRevision", out var storedHexRulesRevision)
             ? storedHexRulesRevision.GetInt32()
             : Hex.HexRules.LegacyRulesRevision;
+        Hex.HexCatalogConfiguration? hexCatalogConfiguration = null;
+        if (matchKind == MatchKind.Hex
+            && hexRulesRevision >= Hex.HexRules.CatalogConfigurationRulesRevision)
+        {
+            if (!h.TryGetProperty("hexCatalogRevision", out var catalogRevisionElement)
+                || !catalogRevisionElement.TryGetInt64(out var catalogRevision)
+                || !h.TryGetProperty("hexCatalogDigest", out var catalogDigestElement)
+                || catalogDigestElement.ValueKind != JsonValueKind.String
+                || !h.TryGetProperty("hexCatalogTiers", out var catalogTiersElement)
+                || catalogTiersElement.ValueKind != JsonValueKind.Array)
+                throw new InvalidDataException("新版海克斯房间日志缺少建局时锁定的目录配置。");
+            var catalogAssignments = new List<Hex.HexCatalogTierAssignment>();
+            foreach (var item in catalogTiersElement.EnumerateArray())
+            {
+                if (!item.TryGetProperty("id", out var idElement)
+                    || !idElement.TryGetInt32(out var id)
+                    || !item.TryGetProperty("tier", out var tierElement)
+                    || tierElement.ValueKind != JsonValueKind.String
+                    || !Enum.TryParse<Hex.HexTier>(tierElement.GetString(), ignoreCase: false, out var tier))
+                    throw new InvalidDataException("海克斯房间日志包含无效的目录品质项。");
+                catalogAssignments.Add(new Hex.HexCatalogTierAssignment(id, tier));
+            }
+            hexCatalogConfiguration = Hex.HexCatalogConfiguration.Create(
+                catalogRevision,
+                catalogAssignments,
+                catalogDigestElement.GetString());
+        }
         var p0          = h.GetProperty("p0");
         var p1          = h.GetProperty("p1");
         var p0Account   = p0.GetProperty("account").GetString()!;
@@ -3121,7 +3154,8 @@ public static class GameRoomManager
             openingSetupAfterFirstPlayerChoice: openingSetupAfterFirstPlayerChoice,
             ruleset: ruleset,
             matchKind: matchKind,
-            hexRulesRevision: hexRulesRevision);
+            hexRulesRevision: hexRulesRevision,
+            hexCatalogConfiguration: hexCatalogConfiguration);
         if (engine.State.HexState.ActiveDraft is { } restoredHexDraft
             && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId))
         {

@@ -157,6 +157,13 @@ public sealed class OperationsCenterStoreTests : IDisposable
             _operations.ConsumeHighRiskChallenge(
                 "Admin", "web_admin", "deploy_test", "test", challenge.ChallengeId, challenge.ConfirmationToken));
         Assert.Equal("confirmation_invalid", replay.Code);
+
+        var hexTarget = "production:draft-4:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var hexChallenge = _operations.IssueHighRiskChallenge(
+            "Admin", "web_admin", "publish_hex_catalog", hexTarget, RequestId());
+        _operations.ConsumeHighRiskChallenge(
+            "Admin", "web_admin", "publish_hex_catalog", hexTarget,
+            hexChallenge.ChallengeId, hexChallenge.ConfirmationToken);
         Assert.True(_operations.VerifyAuditChain());
 
         SqliteConnection.ClearAllPools();

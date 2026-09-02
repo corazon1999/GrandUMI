@@ -38,7 +38,8 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(2, HexRules.BalanceRulesRevision);
         Assert.Equal(3, HexRules.PerSlotRefreshRulesRevision);
         Assert.Equal(4, HexRules.TransmutationPresentationRulesRevision);
-        Assert.Equal(HexRules.TransmutationPresentationRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(5, HexRules.CatalogConfigurationRulesRevision);
+        Assert.Equal(HexRules.CatalogConfigurationRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal("获得时确定性随机获得1个金色海克斯。", HexCatalog.Get(55).Description);
         Assert.Equal(
             "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
@@ -47,6 +48,55 @@ public sealed class HexModeStateMachineTests
             HexCatalog.Regular.Select(item => item.Id),
             HexCatalog.RegularForRevision(HexRules.BalanceRulesRevision).Select(item => item.Id));
         Assert.True(HexCatalog.IsAlternative(30, HexRules.BalanceRulesRevision));
+    }
+
+    [Fact]
+    public void 动态品质目录锁定到房间且公开快照携带内容身份()
+    {
+        var engine = CreateEngine(seed: 20260902);
+        var assignments = HexCatalogConfiguration.BuiltIn.Assignments
+            .Select(item => item.Id == 1
+                ? item with { Tier = HexTier.Silver }
+                : item.Id == 8
+                    ? item with { Tier = HexTier.Gold }
+                    : item)
+            .ToArray();
+        var pinned = HexCatalogConfiguration.Create(
+            8,
+            assignments,
+            publishedAt: 1788278400000,
+            publishedBy: "Admin",
+            sourceDraftRevision: 4,
+            sourceRequestId: "publish-pinned");
+
+        HexRules.SetRulesRevisionForReplay(engine.State, HexRules.CurrentRulesRevision);
+        HexRules.SetCatalogForReplay(engine.State, pinned);
+
+        Assert.Equal(8, engine.State.HexState.CatalogRevision);
+        Assert.Equal(pinned.Digest, engine.State.HexState.CatalogDigest);
+        Assert.Equal(HexTier.Silver, HexCatalog.TierForState(1, engine.State.HexState));
+        Assert.Contains(HexCatalog.ForTier(HexTier.Silver, engine.State.HexState), item => item.Id == 1);
+        Assert.DoesNotContain(HexCatalog.ForTier(HexTier.Gold, engine.State.HexState), item => item.Id == 1);
+
+        // 外部 active 后续变化不会回读或改写本局复制的映射。
+        _ = HexCatalogConfiguration.Create(
+            9,
+            HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
+                item.Id == 2
+                    ? item with { Tier = HexTier.Rainbow }
+                    : item.Id == 5
+                        ? item with { Tier = HexTier.Gold }
+                        : item));
+        Assert.Equal(HexTier.Silver, HexCatalog.TierForState(1, engine.State.HexState));
+        Assert.Equal(8, engine.State.HexState.CatalogRevision);
+
+        var publicHex = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(engine.State, 0))
+            .GetProperty("hexState");
+        Assert.Equal(8, publicHex.GetProperty("catalogRevision").GetInt64());
+        Assert.Equal(pinned.Digest, publicHex.GetProperty("catalogDigest").GetString());
+        var privateHex = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(engine.State))
+            .GetProperty("hexState");
+        Assert.Equal(56, privateHex.GetProperty("catalogTiers").GetArrayLength());
     }
 
     [Fact]

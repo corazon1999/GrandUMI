@@ -45,6 +45,8 @@ install -d -o grandumi -g grandumi -m 0755 /opt/grandumi/releases /opt/grandumi/
 install -d -m 0755 /var/lib/grandumi-ha
 install -d -m 0755 /var/lib/grandumi-admin-deploy/status
 install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/drafts
+install -d -o root -g grandumi -m 0750 /data/grandumi/hex-catalog /data/grandumi-test/hex-catalog
 
 cat > /etc/grandumi/backend-a.env <<'EOF'
 GRANDUMI_BACKEND_PORT=8080

@@ -41,7 +41,9 @@ public static class HexRules
     public const int PerSlotRefreshRulesRevision = 3;
     /// <summary>质变来源公开投影与黄金阶削弱所在的规则修订版。</summary>
     public const int TransmutationPresentationRulesRevision = 4;
-    public const int CurrentRulesRevision = TransmutationPresentationRulesRevision;
+    /// <summary>对局锁定管理员发布的完整品质目录所在的规则修订版。</summary>
+    public const int CatalogConfigurationRulesRevision = 5;
+    public const int CurrentRulesRevision = CatalogConfigurationRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -68,6 +70,8 @@ public static class HexRules
     {
         state.HexState.Enabled = state.MatchKind == MatchKind.Hex;
         state.HexState.RulesRevision = CurrentRulesRevision;
+        if (state.HexState.Enabled)
+            ApplyCatalogSnapshot(state.HexState, HexCatalogRuntime.SnapshotForNewRoom());
     }
 
     /// <summary>仅恢复/重放入口可覆盖对局创建时锁定的规则版本。</summary>
@@ -76,6 +80,30 @@ public static class HexRules
         if (rulesRevision is < LegacyRulesRevision or > CurrentRulesRevision)
             throw new InvalidDataException($"不支持的海克斯规则版本：{rulesRevision}");
         state.HexState.RulesRevision = rulesRevision;
+        state.HexState.CatalogRevision = 0;
+        state.HexState.CatalogDigest = string.Empty;
+        state.HexState.CatalogTiers.Clear();
+        if (state.HexState.Enabled && rulesRevision >= CatalogConfigurationRulesRevision)
+            ApplyCatalogSnapshot(state.HexState, HexCatalogConfiguration.BuiltIn);
+    }
+
+    /// <summary>恢复入口在重放任何随机事件之前覆盖建局时锁定的完整目录。</summary>
+    internal static void SetCatalogForReplay(GameState state, HexCatalogConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        if (!state.HexState.Enabled) return;
+        if (state.HexState.RulesRevision < CatalogConfigurationRulesRevision)
+            throw new InvalidDataException("旧版海克斯房间不能附加动态目录配置。");
+        ApplyCatalogSnapshot(state.HexState, configuration);
+    }
+
+    private static void ApplyCatalogSnapshot(HexState state, HexCatalogConfiguration configuration)
+    {
+        state.CatalogRevision = configuration.Revision;
+        state.CatalogDigest = configuration.Digest;
+        state.CatalogTiers.Clear();
+        foreach (var assignment in configuration.Assignments)
+            state.CatalogTiers.Add(assignment.Id, assignment.Tier);
     }
 
     /// <summary>一次性生成双方共享的三段品质。使用本局 RNG，故重放和进程恢复会逐字重建。</summary>
@@ -272,7 +300,7 @@ public static class HexRules
         if (round.Candidates[candidateIndex] != expectedHexId)
             return new(HexRefreshStatus.Rejected, null, null, null, "待刷新候选已变化，请以最新快照为准");
 
-        var pool = HexCatalog.ForTier(round.Tier, state.HexState.RulesRevision)
+        var pool = HexCatalog.ForTier(round.Tier, state.HexState)
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
             .Where(id => !round.Candidates.Contains(id))
@@ -920,7 +948,7 @@ public static class HexRules
     private static IReadOnlyList<int> DrawCandidates(GameState state, int player, HexTier tier, int count)
     {
         bool excludeAppeared = state.HexState.RulesRevision >= PerSlotRefreshRulesRevision;
-        var pool = HexCatalog.ForTier(tier, state.HexState.RulesRevision)
+        var pool = HexCatalog.ForTier(tier, state.HexState)
             .Select(item => item.Id)
             .Where(id => !state.HexState.Owned[player].Contains(id))
             .Where(id => !excludeAppeared || !state.HexState.Appeared[player].Contains(id))
@@ -1224,8 +1252,8 @@ public static class HexRules
         HexTier? tier)
     {
         var definitions = tier is { } requiredTier
-            ? HexCatalog.ForTier(requiredTier, state.HexState.RulesRevision)
-            : HexCatalog.RegularForRevision(state.HexState.RulesRevision);
+            ? HexCatalog.ForTier(requiredTier, state.HexState)
+            : HexCatalog.RegularForState(state.HexState);
         return definitions
             .Select(item => item.Id)
             .Where(id => id != sourceHexId)
@@ -1249,7 +1277,7 @@ public static class HexRules
         var runtime = state.HexState.Runtime[owner];
         if (!Has(state, owner, 48) || runtime.KingUsedThisGame) return;
         runtime.KingUsedThisGame = true;
-        var pool = HexCatalog.ForTier(HexTier.Rainbow, state.HexState.RulesRevision).Select(item => item.Id)
+        var pool = HexCatalog.ForTier(HexTier.Rainbow, state.HexState).Select(item => item.Id)
             .Where(id => !state.HexState.Owned[owner].Contains(id))
             .ToList();
         if (pool.Count > 0)

@@ -122,6 +122,18 @@ public static class HexCatalog
             .Where(item => TierForRevision(item.Id, rulesRevision) == tier)
             .ToArray();
 
+    /// <summary>新规则房间优先使用建局时复制的完整配置；旧房间继续按历史规则修订版解析。</summary>
+    public static IReadOnlyList<HexDefinition> ForTier(HexTier tier, HexState state)
+        => RegularForState(state)
+            .Where(item => TierForState(item.Id, state) == tier)
+            .ToArray();
+
+    public static IReadOnlyList<HexDefinition> RegularForState(HexState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return RegularForRevision(state.RulesRevision);
+    }
+
     public static IReadOnlyList<HexDefinition> RegularForRevision(int rulesRevision)
         => rulesRevision >= HexRules.BalanceRulesRevision
             ? RegularDefinitions
@@ -135,6 +147,16 @@ public static class HexCatalog
         if (LegacyRainbowIds.Contains(id)) return HexTier.Rainbow;
         if (LegacyGoldIds.Contains(id)) return HexTier.Gold;
         return HexTier.Silver;
+    }
+
+    public static HexTier TierForState(int id, HexState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        _ = Get(id);
+        if (state.RulesRevision >= HexRules.CatalogConfigurationRulesRevision
+            && state.CatalogTiers.TryGetValue(id, out var tier))
+            return tier;
+        return TierForRevision(id, state.RulesRevision);
     }
 
     public static string TierDisplayName(HexTier tier) => tier switch

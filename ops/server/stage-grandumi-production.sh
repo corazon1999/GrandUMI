@@ -125,6 +125,8 @@ install -m 0755 "$build_root/ops/server/grandumi-matchlog-maintenance.sh" /usr/l
 install -m 0755 "$build_root/ops/server/verify-grandumi-ha.sh" /usr/local/sbin/verify-grandumi-ha
 install -d -m 0755 /var/lib/grandumi-admin-deploy/status
 install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/drafts
+install -d -o root -g grandumi -m 0750 /data/grandumi/hex-catalog /data/grandumi-test/hex-catalog
 install -m 0755 "$build_root/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
 install -m 0644 "$build_root/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
 install -m 0644 "$build_root/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path

@@ -39,6 +39,7 @@ PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
 ReadWritePaths=/data/grandumi /data/grandumi-shared /opt/grandumi/服务端WebSocket/publish
+ReadOnlyPaths=/data/grandumi/hex-catalog
 
 [Install]
 WantedBy=multi-user.target

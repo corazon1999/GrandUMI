@@ -8,6 +8,7 @@ using GrandUMI.Cards;
 using GrandUMI.Diagnostics;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Game;
+using GrandUMI.Game.Hex;
 using GrandUMI.Game.Ranked;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Validation;
@@ -38,7 +39,7 @@ public static class WebSocketBridge
     {
         "MsgLogin", "MsgSecret", "MsgSessionReplaced", "MsgPlayerData", "MsgRankSnapshot", "MsgRankResult", "MsgChatDecorationExchange", "MsgChatDecorationSend", "MsgActionRejected", "MsgDuelOver",
         "MsgPrompt", "MsgPromptResponse", "MsgReconnect", "MsgPlayerReconnected", "MsgMaintenanceState",
-        "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
+        "MsgRulesetState", "MsgRulesetUpdated", "MsgAdminOperations", "MsgAdminHexCatalog", "MsgAdminPlayerSearch", "MsgAdminPlayerUpdate",
         "MsgOperationsCases", "MsgOperationsCaseDetail", "MsgOperationsCaseUpdate", "MsgOperationsCaseAppeal", "MsgOperationsPenalty",
         "MsgPrivilegedAudit", "MsgConsistencyDoctor", "MsgAdminApproval",
         "MsgQqWhitelistStatus", "MsgQqWhitelistImport", "MsgQqAccessDenied", "MsgQqBindingChanged",
@@ -429,6 +430,7 @@ public static class WebSocketBridge
             case "MsgActivateRuleset": OnActivateRuleset(session, msg); break;
             case "MsgAdminOperations": OnAdminOperations(session); break;
             case "MsgAdminDeploy": OnAdminDeploy(session, msg); break;
+            case "MsgAdminHexCatalog": OnAdminHexCatalog(session, msg); break;
             case "MsgAdminPlayerSearch": OnAdminPlayerSearch(session, msg); break;
             case "MsgAdminPlayerUpdate": OnAdminPlayerUpdate(session, msg); break;
             case "MsgOperationsCases": OnOperationsCases(session, msg); break;
@@ -5129,17 +5131,18 @@ public static class WebSocketBridge
     private static bool TryRequireOperationsStore(
         WsSession session,
         string proto,
-        out OperationsCenterStore store)
+        out OperationsCenterStore store,
+        string? requestId = null)
     {
         if (!session.IsLoggedIn || !IsCurrentAccountSession(session))
         {
-            Send(session.SessionId, new { proto, result = false, errorCode = "login_required", logStr = "请先登录。" });
+            Send(session.SessionId, new { proto, requestId, result = false, errorCode = "login_required", logStr = "请先登录。" });
             store = null!;
             return false;
         }
         if (_operationsCenterStore is null)
         {
-            Send(session.SessionId, new { proto, result = false, errorCode = "unavailable", logStr = "运营中心暂不可用。" });
+            Send(session.SessionId, new { proto, requestId, result = false, errorCode = "unavailable", logStr = "运营中心暂不可用。" });
             store = null!;
             return false;
         }
@@ -5150,11 +5153,12 @@ public static class WebSocketBridge
     private static bool TryRequireOperationsAdmin(
         WsSession session,
         string proto,
-        out OperationsCenterStore store)
+        out OperationsCenterStore store,
+        string? requestId = null)
     {
-        if (!TryRequireOperationsStore(session, proto, out store)) return false;
+        if (!TryRequireOperationsStore(session, proto, out store, requestId)) return false;
         if (AdministratorPolicy.IsAuthorized(session.Account)) return true;
-        Send(session.SessionId, new { proto, result = false, errorCode = "forbidden", logStr = "没有运营管理权限。" });
+        Send(session.SessionId, new { proto, requestId, result = false, errorCode = "forbidden", logStr = "没有运营管理权限。" });
         store = null!;
         return false;
     }
@@ -5381,6 +5385,202 @@ public static class WebSocketBridge
             LogErr($"管理员发布任务排队失败：{ex.Message}");
             SendAdminOperations(session, result: false, logStr: ex.Message);
         }
+    }
+
+    private static void OnAdminHexCatalog(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        const string proto = "MsgAdminHexCatalog";
+        var action = (Str(msg, "action") ?? "get").Trim().ToLowerInvariant();
+        var environment = (Str(msg, "environment") ?? "test").Trim().ToLowerInvariant();
+        var requestId = Str(msg, "requestId")?.Trim() ?? $"hex-admin-{Guid.NewGuid():N}";
+        if (!TryRequireOperationsAdmin(session, proto, out var operationsStore, requestId)) return;
+        if (_adminDeploymentCoordinator is null)
+        {
+            Send(session.SessionId, new
+            {
+                proto,
+                action,
+                environment,
+                requestId,
+                result = false,
+                errorCode = "unavailable",
+                logStr = "当前服务器尚未配置海克斯发布执行器。",
+            });
+            return;
+        }
+
+        var auditCorrelation = "";
+        try
+        {
+            switch (action)
+            {
+                case "get":
+                    if (!session.TryConsumeRateLimit("admin-hex-get", capacity: 10, refillPerSecond: 2))
+                        throw new InvalidOperationException("海克斯配置刷新过于频繁，请稍后再试。");
+                    SendAdminHexCatalog(session, action, environment, requestId, result: true);
+                    return;
+
+                case "save":
+                {
+                    if (!session.TryConsumeRateLimit("admin-hex-save", capacity: 4, refillPerSecond: 0.2))
+                        throw new InvalidOperationException("海克斯草稿保存过于频繁，请稍后再试。");
+                    var assignments = ReadHexCatalogAssignments(msg);
+                    auditCorrelation = RequirePrivilegedAuditIntent(
+                        session.Account!,
+                        "hex_catalog_save",
+                        environment,
+                        requestId,
+                        new
+                        {
+                            environment,
+                            expectedDraftRevision = Long(msg, "expectedDraftRevision", -1),
+                            expectedActiveRevision = Long(msg, "expectedActiveRevision", -1),
+                            digest = HexCatalogConfiguration.ComputeDigest(assignments),
+                        });
+                    var saved = _adminDeploymentCoordinator.SaveHexCatalogDraft(
+                        environment,
+                        Long(msg, "expectedDraftRevision", -1),
+                        Long(msg, "expectedActiveRevision", -1),
+                        assignments,
+                        session.Account!,
+                        requestId);
+                    CompletePrivilegedAudit(
+                        session.Account!,
+                        "hex_catalog_save",
+                        environment,
+                        auditCorrelation,
+                        saved.Replayed ? "replayed" : "success",
+                        new
+                        {
+                            environment,
+                            saved.State.Draft.DraftRevision,
+                            saved.State.Draft.Digest,
+                        });
+                    SendAdminHexCatalog(
+                        session,
+                        action,
+                        environment,
+                        requestId,
+                        result: true,
+                        logStr: saved.Replayed ? "该海克斯草稿已保存，已返回相同结果。" : "海克斯草稿已保存，尚未发布到任何环境。",
+                        replayed: saved.Replayed);
+                    return;
+                }
+
+                case "publish":
+                {
+                    if (!session.TryConsumeRateLimit("admin-hex-publish", capacity: 1, refillPerSecond: 1d / 30d))
+                        throw new InvalidOperationException("海克斯配置发布请求过于频繁，请稍后再试。");
+                    var current = _adminDeploymentCoordinator.GetHexCatalogState(environment);
+                    var requestedDraftRevision = Long(msg, "draftRevision", -1);
+                    var requestedDigest = Str(msg, "draftDigest") ?? "";
+                    if (current.Draft.DraftRevision != requestedDraftRevision
+                        || !string.Equals(current.Draft.Digest, requestedDigest, StringComparison.Ordinal))
+                        throw new InvalidOperationException("海克斯草稿已变化，请刷新并重新申请确认凭证。");
+                    var approvalTarget = AdminDeploymentCoordinator.HexCatalogApprovalTarget(
+                        environment,
+                        current.Draft.DraftRevision,
+                        current.Draft.Digest);
+                    operationsStore.ConsumeHighRiskChallenge(
+                        session.Account!,
+                        "web_admin",
+                        "publish_hex_catalog",
+                        approvalTarget,
+                        Str(msg, "challengeId") ?? "",
+                        Str(msg, "confirmationToken") ?? "");
+                    var queued = _adminDeploymentCoordinator.QueueHexCatalog(
+                        environment,
+                        current.Draft.DraftRevision,
+                        current.Draft.Digest,
+                        session.Account!,
+                        requestId);
+                    operationsStore.AppendPrivilegedAudit(
+                        session.Account!,
+                        "web_admin",
+                        "hex_catalog_publish_queue",
+                        environment,
+                        requestId,
+                        "success",
+                        JsonSerializer.Serialize(new
+                        {
+                            environment,
+                            queued.Draft.DraftRevision,
+                            queued.Draft.Digest,
+                            queued.Active.Revision,
+                        }));
+                    SendAdminHexCatalog(
+                        session,
+                        action,
+                        environment,
+                        requestId,
+                        result: true,
+                        logStr: $"{(environment == "production" ? "正式服" : "测试服")}海克斯配置已进入安全队列；仅新建房间会使用新配置。");
+                    return;
+                }
+
+                default:
+                    throw new InvalidDataException("不支持的海克斯管理操作。");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (action == "save" && !string.IsNullOrEmpty(auditCorrelation))
+            {
+                CompletePrivilegedAudit(
+                    session.Account!,
+                    "hex_catalog_save",
+                    environment,
+                    auditCorrelation,
+                    "failed",
+                    new { environment, error = ex.Message });
+            }
+            else if (action == "publish")
+            {
+                try
+                {
+                    operationsStore.AppendPrivilegedAudit(
+                        session.Account!,
+                        "web_admin",
+                        "hex_catalog_publish_queue",
+                        environment,
+                        requestId,
+                        "failed",
+                        JsonSerializer.Serialize(new { environment, error = ex.Message }));
+                }
+                catch (Exception auditError) { LogErr($"海克斯发布失败审计写入失败: {auditError.Message}"); }
+            }
+            LogErr($"管理员海克斯操作失败：action={action}，environment={environment}，error={ex.Message}");
+            SendAdminHexCatalog(
+                session,
+                action,
+                environment,
+                requestId,
+                result: false,
+                logStr: ex.Message,
+                errorCode: ex is OperationsCenterException operationsError ? operationsError.Code : "hex_catalog_failed");
+        }
+    }
+
+    private static IReadOnlyList<HexCatalogTierAssignment> ReadHexCatalogAssignments(
+        IReadOnlyDictionary<string, JsonElement> msg)
+    {
+        if (!msg.TryGetValue("tiers", out var tiers) || tiers.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("海克斯草稿缺少完整品质列表。");
+        if (tiers.GetArrayLength() > HexCatalog.All.Count)
+            throw new InvalidDataException("海克斯草稿品质列表过长。");
+        var result = new List<HexCatalogTierAssignment>(tiers.GetArrayLength());
+        foreach (var item in tiers.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object
+                || !item.TryGetProperty("id", out var idElement)
+                || !idElement.TryGetInt32(out var id)
+                || !item.TryGetProperty("tier", out var tierElement)
+                || tierElement.ValueKind != JsonValueKind.String
+                || !Enum.TryParse<HexTier>(tierElement.GetString(), ignoreCase: false, out var tier))
+                throw new InvalidDataException("海克斯草稿包含无效品质项。");
+            result.Add(new HexCatalogTierAssignment(id, tier));
+        }
+        return result;
     }
 
     private static void OnAdminPlayerSearch(WsSession session, IReadOnlyDictionary<string, JsonElement> msg)
@@ -5659,6 +5859,102 @@ public static class WebSocketBridge
         message = status?.Message ?? "发布执行器未配置。",
         updatedAt = status?.UpdatedAt,
     };
+
+    private static void SendAdminHexCatalog(
+        WsSession session,
+        string action,
+        string environment,
+        string requestId,
+        bool result,
+        string? logStr = null,
+        string? errorCode = null,
+        bool replayed = false)
+    {
+        if (_adminDeploymentCoordinator is null)
+        {
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminHexCatalog",
+                action,
+                environment,
+                requestId,
+                result = false,
+                errorCode = "unavailable",
+                logStr = logStr ?? "海克斯发布执行器未配置。",
+            });
+            return;
+        }
+
+        try
+        {
+            var test = _adminDeploymentCoordinator.GetHexCatalogState("test");
+            var production = _adminDeploymentCoordinator.GetHexCatalogState("production");
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminHexCatalog",
+                action,
+                environment,
+                requestId,
+                result,
+                errorCode,
+                logStr,
+                replayed,
+                deploymentAvailable = true,
+                test = ToAdminHexCatalogPayload(test),
+                production = ToAdminHexCatalogPayload(production),
+            });
+        }
+        catch (Exception snapshotError)
+        {
+            LogErr($"读取海克斯管理员快照失败：{snapshotError.Message}");
+            Send(session.SessionId, new
+            {
+                proto = "MsgAdminHexCatalog",
+                action,
+                environment,
+                requestId,
+                result = false,
+                errorCode = "hex_catalog_snapshot_failed",
+                logStr = result ? "海克斯操作已受理，但刷新权威快照失败，请重新加载。" : logStr ?? snapshotError.Message,
+            });
+        }
+    }
+
+    private static object ToAdminHexCatalogPayload(AdminHexCatalogEnvironmentState state)
+    {
+        var assignments = state.Draft.Assignments.ToDictionary(item => item.Id);
+        return new
+        {
+            environment = state.Environment,
+            activeRevision = state.Active.Revision,
+            activeDigest = state.Active.Digest,
+            activePublishedAt = state.Active.PublishedAt,
+            activePublishedBy = state.Active.PublishedBy,
+            draftRevision = state.Draft.DraftRevision,
+            baseActiveRevision = state.Draft.BaseActiveRevision,
+            baseActiveDigest = state.Draft.BaseActiveDigest,
+            draftDigest = state.Draft.Digest,
+            draftSavedAt = state.Draft.SavedAt,
+            draftSavedBy = state.Draft.SavedBy,
+            entries = HexCatalog.All.Select(definition => new
+            {
+                id = definition.Id,
+                definition.Name,
+                definition.Description,
+                tier = assignments[definition.Id].Tier.ToString(),
+                activeTier = state.Active.TierOf(definition.Id).ToString(),
+                alternative = HexCatalog.IsAlternative(definition.Id),
+            }).ToArray(),
+            deployment = new
+            {
+                environment = state.Deployment.Environment,
+                state = state.Deployment.State,
+                targetDigest = state.Deployment.TargetDigest,
+                state.Deployment.Message,
+                state.Deployment.UpdatedAt,
+            },
+        };
+    }
 
     private static object ToAdminPlayerPayload(AdminPlayerSummary player)
     {

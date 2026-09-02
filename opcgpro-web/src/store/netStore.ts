@@ -35,6 +35,7 @@ import type {
   SpectateMode,
   CardRulesetSummary,
   AdminDeploymentStatus,
+  AdminHexCatalogEnvironmentState,
   OnlinePlayerPeakPoint,
   DailyMatchCountPoint,
   DailyActivePlayerPoint,
@@ -137,6 +138,12 @@ export type AdminOperationsState = {
   production: AdminDeploymentStatus;
 };
 
+export type AdminHexCatalogState = {
+  deploymentAvailable: boolean;
+  test: AdminHexCatalogEnvironmentState | null;
+  production: AdminHexCatalogEnvironmentState | null;
+};
+
 export type OperationsWorkbenchState = {
   cases: OperationsCaseSummary[];
   total: number;
@@ -214,6 +221,7 @@ interface NetStore {
   maintenance: MaintenanceState;
   rulesets: RulesetAdminState;
   adminOperations: AdminOperationsState;
+  adminHexCatalog: AdminHexCatalogState;
   adminPlayerSearchResults: AdminPlayerSummary[];
   adminTemporaryPassword: { account: string; password: string } | null;
   operationsWorkbench: OperationsWorkbenchState;
@@ -303,6 +311,7 @@ interface NetStore {
   setMaintenance: (maintenance: MaintenanceState) => void;
   setRulesets: (rulesets: RulesetAdminState) => void;
   setAdminOperations: (operations: AdminOperationsState) => void;
+  setAdminHexCatalog: (state: AdminHexCatalogState) => void;
   setAdminPlayerSearchResults: (players: AdminPlayerSummary[]) => void;
   setAdminTemporaryPassword: (value: NetStore["adminTemporaryPassword"]) => void;
   setOperationsCases: (items: OperationsCaseSummary[], total: number, metrics: OperationsCaseMetrics | null) => void;
@@ -404,6 +413,11 @@ const initialState = {
     test: { environment: "test", state: "unavailable", message: "等待服务器状态" },
     production: { environment: "production", state: "unavailable", message: "等待服务器状态" },
   } as AdminOperationsState,
+  adminHexCatalog: {
+    deploymentAvailable: false,
+    test: null,
+    production: null,
+  } as AdminHexCatalogState,
   adminPlayerSearchResults: [] as AdminPlayerSummary[],
   adminTemporaryPassword: null as NetStore["adminTemporaryPassword"],
   operationsWorkbench: {
@@ -605,6 +619,7 @@ export const useNetStore = create<NetStore>((set) => ({
   setMaintenance: (maintenance) => set({ maintenance }),
   setRulesets: (rulesets) => set({ rulesets }),
   setAdminOperations: (adminOperations) => set({ adminOperations }),
+  setAdminHexCatalog: (adminHexCatalog) => set({ adminHexCatalog }),
   setAdminPlayerSearchResults: (adminPlayerSearchResults) => set({ adminPlayerSearchResults }),
   setAdminTemporaryPassword: (adminTemporaryPassword) => set({ adminTemporaryPassword }),
   setOperationsCases: (cases, total, metrics) => set((state) => ({

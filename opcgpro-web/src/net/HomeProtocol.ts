@@ -92,6 +92,7 @@ import type {
   MsgActivateRuleset,
   MsgAdminOperations,
   MsgAdminDeploy,
+  MsgAdminHexCatalog,
   MsgAdminPlayerSearch,
   MsgAdminPlayerUpdate,
   MsgOperationsCases,
@@ -117,6 +118,7 @@ import type {
   CloudReplaySharePolicy,
   CloudReplayOutcome,
   AdminDeploymentEnvironment,
+  HexTierSnapshot,
 } from "@/types/net";
 import type { SavedDeck } from "@/types/deck";
 import {
@@ -384,6 +386,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgAdminOperations":
         handleAdminOperations(msg as MsgAdminOperations);
+        break;
+      case "MsgAdminHexCatalog":
+        handleAdminHexCatalog(msg as MsgAdminHexCatalog);
         break;
       case "MsgAdminPlayerSearch":
         handleAdminPlayerSearch(msg as MsgAdminPlayerSearch);
@@ -1082,6 +1087,17 @@ function handleAdminOperations(msg: MsgAdminOperations) {
   if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
 }
 
+function handleAdminHexCatalog(msg: MsgAdminHexCatalog) {
+  if (msg.test && msg.production) {
+    useNetStore.getState().setAdminHexCatalog({
+      deploymentAvailable: msg.deploymentAvailable === true,
+      test: msg.test,
+      production: msg.production,
+    });
+  }
+  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
+}
+
 function handleAdminPlayerSearch(msg: MsgAdminPlayerSearch) {
   if (msg.result !== true) {
     showMessage(msg.logStr ?? "搜索玩家失败", "error");
@@ -1773,6 +1789,50 @@ export const HomeRequest = {
 
   requestAdminOperations() {
     return NetManager.send({ proto: "MsgAdminOperations" } as MsgAdminOperations);
+  },
+
+  requestAdminHexCatalog() {
+    return NetManager.send({
+      proto: "MsgAdminHexCatalog",
+      action: "get",
+      environment: "test",
+      requestId: nextOperationsRequestId("hex-get"),
+    } as MsgAdminHexCatalog);
+  },
+
+  saveAdminHexCatalog(
+    environment: AdminDeploymentEnvironment,
+    expectedDraftRevision: number,
+    expectedActiveRevision: number,
+    tiers: Array<{ id: number; tier: HexTierSnapshot }>,
+  ) {
+    return NetManager.send({
+      proto: "MsgAdminHexCatalog",
+      action: "save",
+      environment,
+      requestId: nextOperationsRequestId("hex-save"),
+      expectedDraftRevision,
+      expectedActiveRevision,
+      tiers,
+    } as MsgAdminHexCatalog);
+  },
+
+  publishAdminHexCatalog(
+    environment: AdminDeploymentEnvironment,
+    draftRevision: number,
+    draftDigest: string,
+    approval: { challengeId: string; confirmationToken: string },
+  ) {
+    return NetManager.send({
+      proto: "MsgAdminHexCatalog",
+      action: "publish",
+      environment,
+      requestId: nextOperationsRequestId("hex-publish"),
+      draftRevision,
+      draftDigest,
+      challengeId: approval.challengeId,
+      confirmationToken: approval.confirmationToken,
+    } as MsgAdminHexCatalog);
   },
 
   deployLatest(

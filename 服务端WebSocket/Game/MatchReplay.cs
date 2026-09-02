@@ -71,7 +71,8 @@ public static class MatchReplay
         bool openingSetupAfterFirstPlayerChoice = false,
         CardRuleset? ruleset = null,
         MatchKind matchKind = MatchKind.UnknownHuman,
-        int hexRulesRevision = Hex.HexRules.CurrentRulesRevision)
+        int hexRulesRevision = Hex.HexRules.CurrentRulesRevision,
+        Hex.HexCatalogConfiguration? hexCatalogConfiguration = null)
     {
         var engine = new GameEngine(
             roomId,
@@ -85,6 +86,8 @@ public static class MatchReplay
             ruleset: ruleset,
             matchKind: matchKind);
         Hex.HexRules.SetRulesRevisionForReplay(engine.State, hexRulesRevision);
+        if (hexCatalogConfiguration is not null)
+            Hex.HexRules.SetCatalogForReplay(engine.State, hexCatalogConfiguration);
 
         // 必须在喂入动作之前恢复"防触发信息泄露"开关：它决定生命揭示是否暂停发 prompt，
         // 进而决定动作磁带里有没有对应的 PromptResponse —— 不还原会导致重放分歧。

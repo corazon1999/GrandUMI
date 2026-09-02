@@ -1,4 +1,6 @@
 using GrandUMI;
+using GrandUMI.Game.Hex;
+using System.Text.Json;
 using Xunit;
 
 namespace GrandUMIServer.Tests;
@@ -44,6 +46,183 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal("0123456789012345678901234567890123456789", status.TargetCommit);
         Assert.NotEmpty(status.Message);
         Assert.NotNull(status.UpdatedAt);
+    }
+
+    [Fact]
+    public void 海克斯配置严格校验完整目录摘要与每品质十八个常规项()
+    {
+        Assert.Equal(
+            "sha256:b466b6465456221da8edbb2eaee26df5771b5ed07b2002d77c5892a145b8b430",
+            HexCatalogConfiguration.BuiltIn.Digest);
+
+        Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
+            1,
+            HexCatalogConfiguration.BuiltIn.Assignments.Skip(1)));
+        Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
+            1,
+            HexCatalogConfiguration.BuiltIn.Assignments.Append(
+                HexCatalogConfiguration.BuiltIn.Assignments[0])));
+        Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
+            1,
+            HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
+                new HexCatalogTierAssignment(item.Id, HexTier.Gold))));
+        var seventeenNineteen = ChangeTier(1, HexTier.Silver);
+        Assert.Equal(17, seventeenNineteen.Count(item =>
+            !HexCatalog.IsAlternative(item.Id) && item.Tier == HexTier.Gold));
+        Assert.Equal(19, seventeenNineteen.Count(item =>
+            !HexCatalog.IsAlternative(item.Id) && item.Tier == HexTier.Silver));
+        var unbalanced = Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
+            1,
+            seventeenNineteen));
+        Assert.Contains("必须恰好为 18 个", unbalanced.Message);
+
+        var configured = HexCatalogConfiguration.Create(
+            7,
+            SwapTiers(1, 8),
+            publishedAt: 1788278400000,
+            publishedBy: "Admin",
+            sourceDraftRevision: 3,
+            sourceRequestId: "publish-1");
+        var path = Path.Combine(_directory, "active.json");
+        Directory.CreateDirectory(_directory);
+        File.WriteAllBytes(path, HexCatalogConfiguration.SerializeActive(configured));
+
+        var restored = HexCatalogConfiguration.ReadActiveFile(path);
+        Assert.Equal(7, restored.Revision);
+        Assert.Equal(configured.Digest, restored.Digest);
+        Assert.Equal(HexTier.Silver, restored.TierOf(1));
+        Assert.Equal(HexTier.Gold, restored.TierOf(8));
+        Assert.Equal("publish-1", restored.SourceRequestId);
+    }
+
+    [Fact]
+    public void 海克斯草稿保存幂等且发布请求绑定精确基线与完整内容()
+    {
+        var coordinator = CreateCoordinator();
+        var assignments = SwapTiers(1, 8);
+
+        var first = coordinator.SaveHexCatalogDraft("test", 0, 0, assignments, "Admin", "save-1");
+        var replay = coordinator.SaveHexCatalogDraft("test", 0, 0, assignments, "Admin", "save-1");
+
+        Assert.False(first.Replayed);
+        Assert.True(replay.Replayed);
+        Assert.Equal(1, first.State.Draft.DraftRevision);
+        Assert.Equal(first.State.Draft.Digest, replay.State.Draft.Digest);
+        var conflict = Assert.Throws<InvalidOperationException>(() => coordinator.SaveHexCatalogDraft(
+            "test", 0, 0, SwapTiers(2, 5), "Admin", "save-2"));
+        Assert.Contains("其他管理员更新", conflict.Message);
+
+        var queued = coordinator.QueueHexCatalog(
+            "test",
+            first.State.Draft.DraftRevision,
+            first.State.Draft.Digest,
+            "Admin",
+            "publish-1");
+        Assert.Equal("queued", queued.Deployment.State);
+        Assert.Equal(
+            $"test:draft-1:{first.State.Draft.Digest}",
+            AdminDeploymentCoordinator.HexCatalogApprovalTarget("test", 1, first.State.Draft.Digest));
+
+        var requestPath = Assert.Single(Directory.GetFiles(
+            Path.Combine(_directory, "requests"),
+            "hex-test-*.request"));
+        using var request = JsonDocument.Parse(File.ReadAllBytes(requestPath));
+        var root = request.RootElement;
+        Assert.Equal("grandumi.admin.hex-catalog-request.v1", root.GetProperty("schema").GetString());
+        Assert.Equal("hex-catalog", root.GetProperty("kind").GetString());
+        Assert.Equal(0, root.GetProperty("expectedActiveRevision").GetInt64());
+        Assert.Equal(first.State.Draft.Digest, root.GetProperty("digest").GetString());
+        Assert.Equal(56, root.GetProperty("tiers").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task 相同草稿版本的并发保存只有一个成功()
+    {
+        var coordinatorA = CreateCoordinator();
+        var coordinatorB = new AdminDeploymentCoordinator(
+            _directory,
+            Path.Combine(_directory, "environment-data"));
+        coordinatorB.Initialize();
+
+        async Task<string> Save(AdminDeploymentCoordinator coordinator, int firstId, int secondId, string requestId)
+            => await Task.Run(() =>
+            {
+                try
+                {
+                    coordinator.SaveHexCatalogDraft("production", 0, 0, SwapTiers(firstId, secondId), "Admin", requestId);
+                    return "success";
+                }
+                catch (InvalidOperationException)
+                {
+                    return "conflict";
+                }
+            });
+
+        var outcomes = await Task.WhenAll(
+            Save(coordinatorA, 1, 8, "save-a"),
+            Save(coordinatorB, 2, 5, "save-b"));
+
+        Assert.Single(outcomes, value => value == "success");
+        Assert.Single(outcomes, value => value == "conflict");
+        Assert.Equal(1, coordinatorA.GetHexCatalogState("production").Draft.DraftRevision);
+    }
+
+    [Fact]
+    public void 已发布基线变化后拒绝旧草稿入队()
+    {
+        var coordinator = CreateCoordinator();
+        var saved = coordinator.SaveHexCatalogDraft(
+            "production", 0, 0, SwapTiers(1, 8), "Admin", "save-before-active-change");
+        var active = HexCatalogConfiguration.Create(
+            1,
+            SwapTiers(2, 5),
+            publishedBy: "OtherAdmin",
+            sourceDraftRevision: 1,
+            sourceRequestId: "other-publish");
+        var activePath = Path.Combine(_directory, "environment-data", "production", "hex-catalog", "active.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(activePath)!);
+        File.WriteAllBytes(activePath, HexCatalogConfiguration.SerializeActive(active));
+
+        var error = Assert.Throws<InvalidOperationException>(() => coordinator.QueueHexCatalog(
+            "production",
+            saved.State.Draft.DraftRevision,
+            saved.State.Draft.Digest,
+            "Admin",
+            "stale-publish"));
+
+        Assert.Contains("已发布配置已变化", error.Message);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_directory, "requests"), "*.request"));
+    }
+
+    private AdminDeploymentCoordinator CreateCoordinator()
+    {
+        Directory.CreateDirectory(Path.Combine(_directory, "requests"));
+        Directory.CreateDirectory(Path.Combine(_directory, "status"));
+        var coordinator = new AdminDeploymentCoordinator(
+            _directory,
+            Path.Combine(_directory, "environment-data"));
+        coordinator.Initialize();
+        return coordinator;
+    }
+
+    private static HexCatalogTierAssignment[] ChangeTier(int id, HexTier tier)
+        => HexCatalogConfiguration.BuiltIn.Assignments
+            .Select(item => item.Id == id ? item with { Tier = tier } : item)
+            .ToArray();
+
+    private static HexCatalogTierAssignment[] SwapTiers(int firstId, int secondId)
+    {
+        var firstTier = HexCatalogConfiguration.BuiltIn.TierOf(firstId);
+        var secondTier = HexCatalogConfiguration.BuiltIn.TierOf(secondId);
+        if (firstTier == secondTier)
+            throw new ArgumentException("测试交换项必须来自不同品质。");
+        return HexCatalogConfiguration.BuiltIn.Assignments
+            .Select(item => item.Id == firstId
+                ? item with { Tier = secondTier }
+                : item.Id == secondId
+                    ? item with { Tier = firstTier }
+                    : item)
+            .ToArray();
     }
 
     public void Dispose()

@@ -105,6 +105,13 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 var port = args.Length > 0 && int.TryParse(args[0], out var parsedPort) ? parsedPort : 8080;
 var playerDatabasePath = PlayerDataStore.ResolveDefaultPath();
+var hexCatalogActivePath = Path.Combine(
+    Path.GetDirectoryName(playerDatabasePath)!,
+    "hex-catalog",
+    "active.json");
+GrandUMI.Game.Hex.HexCatalogRuntime.Configure(hexCatalogActivePath);
+var activeHexCatalog = GrandUMI.Game.Hex.HexCatalogRuntime.SnapshotForNewRoom();
+Console.WriteLine($"[海克斯目录] 发布版本 {activeHexCatalog.Revision}，摘要 {activeHexCatalog.Digest}");
 var rulesPackagePath = Path.Combine(
     Path.GetDirectoryName(playerDatabasePath)!,
     "Rulesets");

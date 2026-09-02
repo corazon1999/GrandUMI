@@ -40,7 +40,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/data/grandumi /data/grandumi-shared /var/lib/grandumi-admin-deploy/requests
+ReadWritePaths=/data/grandumi /data/grandumi-shared /var/lib/grandumi-admin-deploy/requests /var/lib/grandumi-admin-deploy/drafts
+ReadOnlyPaths=/data/grandumi/hex-catalog /data/grandumi-test/hex-catalog
 
 [Install]
 WantedBy=multi-user.target

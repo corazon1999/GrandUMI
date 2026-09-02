@@ -14,6 +14,7 @@ import type {
   OnlinePlayerPeakPoint,
 } from "@/types/net";
 import RulesetControlPanel from "./RulesetControlPanel";
+import AdminHexCatalogPanel from "./AdminHexCatalogPanel";
 import QqWhitelistImportPanel from "./QqWhitelistImportPanel";
 import OperationsWorkbench from "./OperationsWorkbench";
 
@@ -1004,6 +1005,10 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
         <div className="mt-6">
           <RulesetControlPanel />
+        </div>
+
+        <div className="mt-6">
+          <AdminHexCatalogPanel />
         </div>
 
         <section aria-label="版本发布" className="mt-6 rounded-2xl border border-sky-900/70 bg-sky-950/15 p-4 @[640px]:p-5">

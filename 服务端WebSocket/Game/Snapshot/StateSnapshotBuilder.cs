@@ -251,7 +251,7 @@ public static class StateSnapshotBuilder
         object Hex(int id, int? ownerIndex = null)
         {
             var definition = HexCatalog.Get(id);
-            var tier = HexCatalog.TierForRevision(id, state.HexState.RulesRevision);
+            var tier = HexCatalog.TierForState(id, state.HexState);
             bool grantedByTransmutation = ownerIndex is int owner
                 && HexRules.WasGrantedByTransmutation(state, owner, id);
             return new
@@ -269,6 +269,8 @@ public static class StateSnapshotBuilder
         {
             enabled = true,
             rulesRevision = state.HexState.RulesRevision,
+            catalogRevision = state.HexState.CatalogRevision,
+            catalogDigest = state.HexState.CatalogDigest,
             tierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
             draftOwnTurns = HexRules.DraftOwnTurns,
             // 结算进度也属于私密交互；非拥有者和观战者不显示等待遮罩。

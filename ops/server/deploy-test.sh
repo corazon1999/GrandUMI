@@ -99,6 +99,8 @@ verification_next="$state_dir/test-verified.next.$$"
 install -m 0644 "$verification_proof" "$verification_next"
 install -d -m 0755 /var/lib/grandumi-admin-deploy/status
 install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/requests
+install -d -o grandumi -g grandumi -m 0750 /var/lib/grandumi-admin-deploy/drafts
+install -d -o root -g grandumi -m 0750 /data/grandumi-test/hex-catalog
 install -m 0755 "$repo/ops/server/grandumi-admin-deploy.sh" /usr/local/sbin/grandumi-admin-deploy
 install -m 0644 "$repo/ops/server/grandumi-admin-deploy.service" /etc/systemd/system/grandumi-admin-deploy.service
 install -m 0644 "$repo/ops/server/grandumi-admin-deploy.path" /etc/systemd/system/grandumi-admin-deploy.path

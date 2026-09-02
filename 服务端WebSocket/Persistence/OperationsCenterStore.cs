@@ -206,7 +206,7 @@ public sealed class OperationsCenterStore : IDisposable
 
     private static readonly HashSet<string> HighRiskOperations = new(StringComparer.Ordinal)
     {
-        "deploy_test", "deploy_production", "reset_password", "database_repair",
+        "deploy_test", "deploy_production", "publish_hex_catalog", "reset_password", "database_repair",
     };
 
     private readonly object _gate = new();

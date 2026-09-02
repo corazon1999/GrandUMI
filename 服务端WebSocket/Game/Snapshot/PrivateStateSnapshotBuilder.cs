@@ -55,6 +55,12 @@ public static class PrivateStateSnapshotBuilder
             {
                 state.HexState.Enabled,
                 state.HexState.RulesRevision,
+                state.HexState.CatalogRevision,
+                state.HexState.CatalogDigest,
+                catalogTiers = state.HexState.CatalogTiers
+                    .OrderBy(item => item.Key)
+                    .Select(item => new { id = item.Key, tier = item.Value.ToString() })
+                    .ToArray(),
                 state.HexState.DraftSequence,
                 draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
                 state.HexState.DraftResolving,

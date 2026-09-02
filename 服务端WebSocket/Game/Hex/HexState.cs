@@ -141,6 +141,13 @@ public sealed class HexState
     /// 避免部署后动作重放因候选变化或跨回合累计方式变化而分歧。
     /// </summary>
     public int RulesRevision { get; set; }
+    /// <summary>
+    /// 对局创建时锁定的海克斯目录发布版本与内容摘要。完整品质映射一并保存在状态/建房日志中，
+    /// 因而管理员发布、进程重启或 active 文件变化都不会改变本局候选池。
+    /// </summary>
+    public long CatalogRevision { get; set; }
+    public string CatalogDigest { get; set; } = string.Empty;
+    public Dictionary<int, HexTier> CatalogTiers { get; } = new();
     public int DraftSequence { get; set; }
     /// <summary>双方共享的第 1/3/6 个自己回合选秀品质；长度恒为 3，允许重复。</summary>
     public List<HexTier> DraftTierSequence { get; } = new();

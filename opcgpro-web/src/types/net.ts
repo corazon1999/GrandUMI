@@ -1755,6 +1755,60 @@ export interface MsgAdminDeploy extends MsgBase {
   confirmationToken?: string;
 }
 
+export interface AdminHexCatalogEntry {
+  id: number;
+  name: string;
+  description: string;
+  tier: HexTierSnapshot;
+  activeTier: HexTierSnapshot;
+  alternative: boolean;
+}
+
+export interface AdminHexCatalogDeploymentStatus {
+  environment: AdminDeploymentEnvironment;
+  state: AdminDeploymentState;
+  targetDigest?: string | null;
+  message: string;
+  updatedAt?: number | null;
+}
+
+export interface AdminHexCatalogEnvironmentState {
+  environment: AdminDeploymentEnvironment;
+  activeRevision: number;
+  activeDigest: string;
+  activePublishedAt?: number | null;
+  activePublishedBy?: string | null;
+  draftRevision: number;
+  baseActiveRevision: number;
+  baseActiveDigest: string;
+  draftDigest: string;
+  draftSavedAt?: number | null;
+  draftSavedBy?: string | null;
+  entries: AdminHexCatalogEntry[];
+  deployment: AdminHexCatalogDeploymentStatus;
+}
+
+export interface MsgAdminHexCatalog extends MsgBase {
+  proto: "MsgAdminHexCatalog";
+  action?: "get" | "save" | "publish";
+  environment?: AdminDeploymentEnvironment;
+  requestId?: string;
+  expectedDraftRevision?: number;
+  expectedActiveRevision?: number;
+  draftRevision?: number;
+  draftDigest?: string;
+  tiers?: Array<{ id: number; tier: HexTierSnapshot }>;
+  challengeId?: string;
+  confirmationToken?: string;
+  result?: boolean;
+  errorCode?: string;
+  logStr?: string;
+  replayed?: boolean;
+  deploymentAvailable?: boolean;
+  test?: AdminHexCatalogEnvironmentState;
+  production?: AdminHexCatalogEnvironmentState;
+}
+
 export type OperationsCaseStatus =
   | "new" | "triaged" | "investigating" | "actioned"
   | "resolved" | "rejected" | "appealed" | "closed";
@@ -1960,7 +2014,7 @@ export interface MsgAdminApproval extends MsgBase {
   errorCode?: string;
   logStr?: string;
   requestId: string;
-  operation?: "deploy_test" | "deploy_production" | "reset_password" | "database_repair";
+  operation?: "deploy_test" | "deploy_production" | "publish_hex_catalog" | "reset_password" | "database_repair";
   target?: string;
   challengeId?: string;
   confirmationToken?: string;
@@ -2061,6 +2115,7 @@ export type AnyMsg =
   | MsgRulesetState
   | MsgAdminOperations
   | MsgAdminDeploy
+  | MsgAdminHexCatalog
   | MsgAdminPlayerSearch
   | MsgAdminPlayerUpdate
   | MsgOperationsCases
