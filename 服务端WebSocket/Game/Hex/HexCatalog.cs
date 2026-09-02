@@ -22,7 +22,7 @@ public static class HexCatalog
         H(3, "古式佳酿", HexTier.Gold, "每次打出事件牌，己方领袖力量+1000至回合结束。"),
         H(4, "海洋龙魂", HexTier.Gold, "对敌方领袖造成伤害后抽1张。"),
         H(5, "尖端发明家", HexTier.Rainbow, "己方【每回合1次】效果每回合可使用2次。"),
-        H(6, "星界躯体", HexTier.Gold, "获得时选择2张手牌，按顺序放入生命区。"),
+        H(6, "星界躯体", HexTier.Gold, "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。"),
         H(7, "穿针引线", HexTier.Gold, "己方领袖获得【不可阻挡】。"),
         H(8, "灵魂虹吸", HexTier.Silver, "每回合1次，力量12000或以上的己方卡对敌方领袖造成伤害后，从卡组顶放1张到生命区。"),
         H(9, "歌利亚巨人", HexTier.Rainbow, "获得时从卡组顶放1张到生命区，己方领袖永久+1000。"),
@@ -106,11 +106,15 @@ public static class HexCatalog
 
     public static bool IsTransmutation(int id) => TransmutationIds.Contains(id);
 
-    /// <summary>旧房间继续展示并执行建局时锁定的黄金阶文案与语义。</summary>
+    /// <summary>旧房间继续展示建局时锁定规则版本对应的历史文案。</summary>
     public static string DescriptionForRevision(int id, int rulesRevision)
-        => id == 55 && rulesRevision < HexRules.TransmutationPresentationRulesRevision
-            ? "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。"
-            : Get(id).Description;
+        => (id, rulesRevision) switch
+        {
+            (6, < HexRules.AstralBodyRulesRevision) => "获得时选择2张手牌，按顺序放入生命区。",
+            (55, < HexRules.TransmutationPresentationRulesRevision) =>
+                "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
+            _ => Get(id).Description,
+        };
 
     /// <summary>仅返回常规池中指定品质的定义。</summary>
     public static IReadOnlyList<HexDefinition> ForTier(HexTier tier)

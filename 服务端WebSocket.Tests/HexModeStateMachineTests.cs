@@ -39,7 +39,14 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(3, HexRules.PerSlotRefreshRulesRevision);
         Assert.Equal(4, HexRules.TransmutationPresentationRulesRevision);
         Assert.Equal(5, HexRules.CatalogConfigurationRulesRevision);
-        Assert.Equal(HexRules.CatalogConfigurationRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(6, HexRules.AstralBodyRulesRevision);
+        Assert.Equal(HexRules.AstralBodyRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(
+            "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
+            HexCatalog.Get(6).Description);
+        Assert.Equal(
+            "获得时选择2张手牌，按顺序放入生命区。",
+            HexCatalog.DescriptionForRevision(6, HexRules.CatalogConfigurationRulesRevision));
         Assert.Equal(
             "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
             HexCatalog.Get(42).Description);
@@ -842,6 +849,83 @@ public sealed class HexModeStateMachineTests
     }
 
     [Fact]
+    public async Task 星界躯体授予故障_恢复时不重复手牌入生命并继续卡组顶步骤()
+    {
+        var engine = CreateEngine(seed: 600006);
+        var player = engine.State.Players[0];
+        player.Hand.Clear();
+        player.Deck.Clear();
+        player.LifeArea.Clear();
+        var handCard = TestCard("HEX-ASTRAL-HAND");
+        var deckTop = TestCard("HEX-ASTRAL-DECK-TOP");
+        var deckBottom = TestCard("HEX-ASTRAL-DECK-BOTTOM");
+        player.Hand.Add(handCard);
+        player.Deck.AddRange([deckTop, deckBottom]);
+        var round = CreateLockedDraft(engine.State, HexTier.Gold, playerIndex: 0, choice: 6);
+        engine.State.HexState.GrantStepFaultInjector = boundary =>
+        {
+            if (boundary.HexId == 6 && boundary.CompletedStep == 1)
+                throw new InjectedDraftSettlementException();
+        };
+
+        var resolving = HexRules.ResolveDraftAsync(engine);
+        await RespondToPendingPrompt(engine);
+        await Assert.ThrowsAsync<InjectedDraftSettlementException>(() => resolving);
+
+        Assert.Empty(player.Hand);
+        Assert.Equal([handCard], player.LifeArea);
+        Assert.Equal([deckTop, deckBottom], player.Deck);
+        var pending = Assert.IsType<HexDraftSettlement>(engine.State.HexState.PendingSettlement);
+        var grant = Assert.Single(pending.Grants);
+        Assert.Equal(1, grant.NextStep);
+        Assert.Equal(2, grant.PlannedStepCount);
+
+        var persistedGrant = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(engine.State))
+            .GetProperty("hexState")
+            .GetProperty("pendingSettlement")
+            .GetProperty("grants")[0];
+        Assert.Equal(1, persistedGrant.GetProperty("NextStep").GetInt32());
+        Assert.Equal(2, persistedGrant.GetProperty("PlannedStepCount").GetInt32());
+
+        engine.State.HexState.GrantStepFaultInjector = null;
+        var (resolved, _) = await HexRules.ResolveDraftAsync(engine);
+
+        Assert.Equal(round.RoundId, resolved.RoundId);
+        Assert.Empty(player.Hand);
+        Assert.Equal([deckTop, handCard], player.LifeArea);
+        Assert.Equal([deckBottom], player.Deck);
+        Assert.Null(engine.State.HexState.PendingSettlement);
+    }
+
+    [Fact]
+    public async Task 旧版星界躯体选秀结算_保持两张手牌入生命且不取卡组顶()
+    {
+        var engine = CreateEngine(seed: 500006);
+        var state = engine.State;
+        HexRules.SetRulesRevisionForReplay(state, HexRules.CatalogConfigurationRulesRevision);
+        var player = state.Players[0];
+        player.Hand.Clear();
+        player.Deck.Clear();
+        player.LifeArea.Clear();
+        var firstHand = TestCard("HEX-LEGACY-DRAFT-H1");
+        var secondHand = TestCard("HEX-LEGACY-DRAFT-H2");
+        var deckTop = TestCard("HEX-LEGACY-DRAFT-D1");
+        player.Hand.AddRange([firstHand, secondHand]);
+        player.Deck.Add(deckTop);
+        CreateLockedDraft(state, HexTier.Gold, playerIndex: 0, choice: 6);
+
+        var resolving = HexRules.ResolveDraftAsync(engine);
+        await RespondToPendingPrompt(engine);
+        await RespondToPendingPrompt(engine);
+        await resolving;
+
+        Assert.Empty(player.Hand);
+        Assert.Equal([secondHand, firstHand], player.LifeArea);
+        Assert.Equal([deckTop], player.Deck);
+        Assert.Null(state.HexState.PendingSettlement);
+    }
+
+    [Fact]
     public async Task 黄金阶授予故障_随机计划持久化且重试不重抽不重复子授予()
     {
         var engine = CreateEngine(seed: 550056);
@@ -971,6 +1055,41 @@ public sealed class HexModeStateMachineTests
         state.HexState.ResumePoint = HexDraftResumePoint.None;
         return round;
     }
+
+    private static async Task RespondToPendingPrompt(GameEngine engine, int timeoutMs = 5000)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (engine.State.PendingPrompt is null && Environment.TickCount64 < deadline)
+            await Task.Delay(5);
+        var prompt = Assert.IsType<PendingPrompt>(engine.State.PendingPrompt);
+        Assert.Equal("HexAstralBody", prompt.Kind);
+        Assert.Equal(1, prompt.MinChoose);
+        Assert.Equal(1, prompt.MaxChoose);
+        Assert.False(engine.HandleAction(prompt.PlayerIndex, "PromptResponse", Json(new
+        {
+            promptId = prompt.PromptId,
+            chosen = Array.Empty<string>(),
+        })));
+        Assert.Same(prompt, engine.State.PendingPrompt);
+        Assert.True(engine.HandleAction(prompt.PlayerIndex, "PromptResponse", Json(new
+        {
+            promptId = prompt.PromptId,
+            chosen = prompt.ValidChoices.Take(Math.Max(prompt.MinChoose, 1)).ToArray(),
+        })));
+    }
+
+    private static CardInstance TestCard(string number)
+        => new()
+        {
+            Info = new CardInfo
+            {
+                Number = number,
+                Name = number,
+                Color = "红",
+                Kind = CardKind.Character,
+                Property = "打",
+            },
+        };
 
     private sealed class InjectedDraftSettlementException : Exception;
 

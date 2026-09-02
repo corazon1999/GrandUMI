@@ -43,7 +43,9 @@ public static class HexRules
     public const int TransmutationPresentationRulesRevision = 4;
     /// <summary>对局锁定管理员发布的完整品质目录所在的规则修订版。</summary>
     public const int CatalogConfigurationRulesRevision = 5;
-    public const int CurrentRulesRevision = CatalogConfigurationRulesRevision;
+    /// <summary>星界躯体改为手牌补1张生命后，再从卡组顶补1张生命所在的规则修订版。</summary>
+    public const int AstralBodyRulesRevision = 6;
+    public const int CurrentRulesRevision = AstralBodyRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -998,29 +1000,43 @@ public static class HexRules
         {
             case 6:
             {
-                if (grant.PlannedStepCount < 0)
-                    grant.PlannedStepCount = Math.Min(2, player.Hand.Count);
-                while (grant.NextStep < grant.PlannedStepCount)
+                if (state.HexState.RulesRevision < AstralBodyRulesRevision)
                 {
-                    var candidates = player.Hand.ToList();
-                    if (candidates.Count == 0)
+                    if (grant.PlannedStepCount < 0)
+                        grant.PlannedStepCount = Math.Min(2, player.Hand.Count);
+                    while (grant.NextStep < grant.PlannedStepCount)
                     {
-                        grant.PlannedStepCount = grant.NextStep;
-                        break;
-                    }
-                    int order = grant.NextStep;
-                    var chosen = await engine.Prompts.ChooseCards(grant.PlayerIndex, "HexAstralBody",
-                        $"星界躯体：选择第 {order + 1} 张放入生命区的手牌",
-                        candidates.Select(card => card.Id.ToString()).ToList(), 1, 1,
-                        new Dictionary<string, object?>
+                        if (!await AddChosenHandCardToLifeAsync(
+                                engine,
+                                grant.PlayerIndex,
+                                $"星界躯体：选择第 {grant.NextStep + 1} 张放入生命区的手牌",
+                                grant.NextStep + 1))
                         {
-                            ["choiceCards"] = candidates.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToArray(),
-                            ["order"] = order + 1,
-                        });
-                    var card = candidates.FirstOrDefault(item => chosen.Contains(item.Id.ToString())) ?? candidates[0];
-                    player.Hand.Remove(card);
-                    player.LifeArea.Insert(0, card);
-                    await OnLifeAddedAsync(engine, grant.PlayerIndex, 1);
+                            grant.PlannedStepCount = grant.NextStep;
+                            break;
+                        }
+                        CommitGrantStep(state, settlement, grant);
+                    }
+                    break;
+                }
+
+                if (grant.PlannedStepCount < 0)
+                    grant.PlannedStepCount = 2;
+                else if (grant.PlannedStepCount != 2)
+                    throw new InvalidOperationException("星界躯体授予计划步数与规则版本不一致");
+
+                if (grant.NextStep == 0)
+                {
+                    await AddChosenHandCardToLifeAsync(
+                        engine,
+                        grant.PlayerIndex,
+                        "星界躯体：选择1张手牌放入生命区",
+                        order: 1);
+                    CommitGrantStep(state, settlement, grant);
+                }
+                if (grant.NextStep == 1)
+                {
+                    await AddLifeFromDeckAsync(engine, grant.PlayerIndex, 1, "astral_body");
                     CommitGrantStep(state, settlement, grant);
                 }
                 break;
@@ -1172,23 +1188,24 @@ public static class HexRules
         {
             case 6:
             {
-                int count = Math.Min(2, player.Hand.Count);
-                for (int order = 0; order < count; order++)
+                if (state.HexState.RulesRevision < AstralBodyRulesRevision)
                 {
-                    var candidates = player.Hand.ToList();
-                    var chosen = await engine.Prompts.ChooseCards(playerIndex, "HexAstralBody",
-                        $"星界躯体：选择第 {order + 1} 张放入生命区的手牌",
-                        candidates.Select(card => card.Id.ToString()).ToList(), 1, 1,
-                        new Dictionary<string, object?>
-                        {
-                            ["choiceCards"] = candidates.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToArray(),
-                            ["order"] = order + 1,
-                        });
-                    var card = candidates.FirstOrDefault(item => chosen.Contains(item.Id.ToString())) ?? candidates[0];
-                    player.Hand.Remove(card);
-                    player.LifeArea.Insert(0, card);
-                    await OnLifeAddedAsync(engine, playerIndex, 1);
+                    int count = Math.Min(2, player.Hand.Count);
+                    for (int order = 0; order < count; order++)
+                        await AddChosenHandCardToLifeAsync(
+                            engine,
+                            playerIndex,
+                            $"星界躯体：选择第 {order + 1} 张放入生命区的手牌",
+                            order + 1);
+                    break;
                 }
+
+                await AddChosenHandCardToLifeAsync(
+                    engine,
+                    playerIndex,
+                    "星界躯体：选择1张手牌放入生命区",
+                    order: 1);
+                await AddLifeFromDeckAsync(engine, playerIndex, 1, "astral_body");
                 break;
             }
             case 9:
@@ -1318,6 +1335,39 @@ public static class HexRules
             await OnLifeAddedAsync(engine, owner, added, allowCriticalHeal);
         }
         return added;
+    }
+
+    private static async Task<bool> AddChosenHandCardToLifeAsync(
+        GameEngine engine,
+        int playerIndex,
+        string description,
+        int order)
+    {
+        var player = engine.State.Players[playerIndex];
+        var candidates = player.Hand.ToList();
+        if (candidates.Count == 0) return false;
+
+        var chosen = await engine.Prompts.ChooseCards(
+            playerIndex,
+            "HexAstralBody",
+            description,
+            candidates.Select(card => card.Id.ToString()).ToList(),
+            1,
+            1,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = candidates.Select(card => new
+                {
+                    id = card.Id.ToString(),
+                    number = card.Info.Number,
+                }).ToArray(),
+                ["order"] = order,
+            });
+        var card = candidates.FirstOrDefault(item => chosen.Contains(item.Id.ToString())) ?? candidates[0];
+        player.Hand.Remove(card);
+        player.LifeArea.Insert(0, card);
+        await OnLifeAddedAsync(engine, playerIndex, 1);
+        return true;
     }
 
     private sealed record RandomGrantPlan(

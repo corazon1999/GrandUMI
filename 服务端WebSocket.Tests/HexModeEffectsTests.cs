@@ -673,11 +673,19 @@ public sealed class HexModeEffectsTests
             Card("HEX-H1", CardKind.Character),
             Card("HEX-H2", CardKind.Character),
         ]);
+        me.Deck.AddRange([
+            Card("HEX-ASTRAL-D1", CardKind.Character),
+            Card("HEX-ASTRAL-D2", CardKind.Character),
+        ]);
+        OwnOnly(state, 0, 43);
 
         var astralTask = HexRules.ApplyOnAcquireAsync(engine, 0, 6);
         await ResolvePromptsUntilComplete(engine, astralTask);
-        Assert.Empty(me.Hand);
+        Assert.Equal(["HEX-H2"], me.Hand.Select(card => card.Info.Number));
         Assert.Equal(2, me.LifeArea.Count);
+        Assert.Equal(["HEX-ASTRAL-D1", "HEX-H1"], me.LifeArea.Select(card => card.Info.Number));
+        Assert.Equal(["HEX-ASTRAL-D2"], me.Deck.Select(card => card.Info.Number));
+        Assert.Equal(-2000, state.Players[1].Leader.PowerModThisTurn);
 
         me.Deck.AddRange(Enumerable.Range(0, 30).Select(i => Card($"HEX-ACQ-{i}", CardKind.Character)));
         int lifeBefore = me.LifeArea.Count;
@@ -685,8 +693,9 @@ public sealed class HexModeEffectsTests
         Assert.Equal(lifeBefore + 1, me.LifeArea.Count);
         Assert.Equal(1000, me.Leader.PowerModPersistent);
 
+        int handBeforeGlassCannon = me.Hand.Count;
         await HexRules.ApplyOnAcquireAsync(engine, 0, 20);
-        Assert.Single(me.Hand);
+        Assert.Equal(handBeforeGlassCannon + 1, me.Hand.Count);
         Assert.Equal(lifeBefore, me.LifeArea.Count);
 
         int handBefore = me.Hand.Count;
@@ -708,6 +717,54 @@ public sealed class HexModeEffectsTests
         Assert.Equal(1, state.HexState.Owned[0].Count(id => id == 47));
         Assert.Equal(new[] { 1, 2 }, state.HexState.GrantedByTransmutation[0].Order());
         Assert.DoesNotContain(state.HexState.Owned[0], HexCatalog.IsAlternative);
+    }
+
+    [Fact]
+    public async Task 星界躯体_新版无手牌仍补卡组顶且旧房间保持两手牌语义()
+    {
+        var currentEngine = CreateEngine(seed: 600006);
+        var current = currentEngine.State.Players[0];
+        ClearZones(currentEngine.State);
+        current.Deck.AddRange([
+            Card("HEX-CURRENT-D1", CardKind.Character),
+            Card("HEX-CURRENT-D2", CardKind.Character),
+        ]);
+
+        await HexRules.ApplyOnAcquireAsync(currentEngine, 0, 6);
+
+        Assert.Equal(["HEX-CURRENT-D1"], current.LifeArea.Select(card => card.Info.Number));
+        Assert.Equal(["HEX-CURRENT-D2"], current.Deck.Select(card => card.Info.Number));
+
+        var legacyEngine = CreateEngine(seed: 500005);
+        var legacyState = legacyEngine.State;
+        var legacy = legacyState.Players[0];
+        ClearZones(legacyState);
+        HexRules.SetRulesRevisionForReplay(legacyState, HexRules.CatalogConfigurationRulesRevision);
+        legacy.Hand.AddRange([
+            Card("HEX-LEGACY-H1", CardKind.Character),
+            Card("HEX-LEGACY-H2", CardKind.Character),
+        ]);
+        legacy.Deck.Add(Card("HEX-LEGACY-D1", CardKind.Character));
+
+        var legacyTask = HexRules.ApplyOnAcquireAsync(legacyEngine, 0, 6);
+        await ResolvePromptsUntilComplete(legacyEngine, legacyTask);
+
+        Assert.Empty(legacy.Hand);
+        Assert.Equal(["HEX-LEGACY-H2", "HEX-LEGACY-H1"], legacy.LifeArea.Select(card => card.Info.Number));
+        Assert.Equal(["HEX-LEGACY-D1"], legacy.Deck.Select(card => card.Info.Number));
+
+        var emptyDeckEngine = CreateEngine(seed: 600007);
+        var emptyDeckState = emptyDeckEngine.State;
+        var emptyDeckPlayer = emptyDeckState.Players[0];
+        ClearZones(emptyDeckState);
+        DeckOutRules.Arm(emptyDeckState);
+        emptyDeckPlayer.Hand.Add(Card("HEX-EMPTY-DECK-H1", CardKind.Character));
+
+        var emptyDeckTask = HexRules.ApplyOnAcquireAsync(emptyDeckEngine, 0, 6);
+        await ResolvePromptsUntilComplete(emptyDeckEngine, emptyDeckTask);
+
+        Assert.Equal(["HEX-EMPTY-DECK-H1"], emptyDeckPlayer.LifeArea.Select(card => card.Info.Number));
+        Assert.True(emptyDeckState.IsGameOver);
     }
 
     [Fact]
