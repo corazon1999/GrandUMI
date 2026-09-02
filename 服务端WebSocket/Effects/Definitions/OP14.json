@@ -638,6 +638,12 @@
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "handDiscard": {
+            "n": 3,
+            "text": "可以丢弃3张手牌作为成本（可放弃）"
+          }
+        },
         "then": [
           {
             "op": "Choose",
@@ -847,11 +853,11 @@
       },
       {
         "on": "OnKO",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动增加生命效果？",
         "then": [
-          {
-            "op": "ReturnDonToDeck",
-            "n": 1
-          },
           {
             "op": "AddLifeFromDeck",
             "n": 1

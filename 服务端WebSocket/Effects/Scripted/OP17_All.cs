@@ -1692,9 +1692,8 @@ internal static class OP17Effects
         await KOByEffect(c, await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 1, 2, "选择最多2张费用≤1的角色KO"));
     }
 
-    private static async Task C112(EffectContext c)
+    internal static Task RegisterC112Static(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.OnEnterField) return;
         int owner = c.OwnerIndex;
         var id = c.Source.Id;
         var source = c.Source;
@@ -1708,6 +1707,12 @@ internal static class OP17Effects
                 && s.Players[owner].Characters.Contains(card)
                 && card.Info.Power == 4000 && !string.IsNullOrEmpty(card.Info.Trigger),
         });
+        return Task.CompletedTask;
+    }
+
+    private static async Task C112(EffectContext c)
+    {
+        if (c.Trigger != EffectTrigger.OnEnterField) return;
         AtomicOps.Draw(c.State, c.OwnerIndex, 1);
         var options = new List<string>();
         if (Me(c).Deck.Count > 0) options.Add("将我方卡组顶1张加入生命顶");
@@ -1944,7 +1949,11 @@ public sealed class OP17_108_Effect : OP17CardEffect { protected override string
 public sealed class OP17_109_Effect : OP17CardEffect { protected override string Number => "OP17-109"; }
 public sealed class OP17_110_Effect : OP17CardEffect { protected override string Number => "OP17-110"; }
 public sealed class OP17_111_Effect : OP17CardEffect { protected override string Number => "OP17-111"; }
-public sealed class OP17_112_Effect : OP17CardEffect { protected override string Number => "OP17-112"; }
+public sealed class OP17_112_Effect : OP17CardEffect, IFieldStaticEffect
+{
+    protected override string Number => "OP17-112";
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC112Static(ctx);
+}
 public sealed class OP17_113_Effect : OP17CardEffect { protected override string Number => "OP17-113"; }
 public sealed class OP17_114_Effect : OP17CardEffect { protected override string Number => "OP17-114"; }
 public sealed class OP17_115_Effect : OP17CardEffect { protected override string Number => "OP17-115"; }

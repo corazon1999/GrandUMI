@@ -169,7 +169,7 @@ public class QqFeedback20260826RemainingRegressionTests
     [Fact]
     public void G654_G655_G656_OP08CounterValuesMatchPrintedCards()
     {
-        Assert.Equal(0, CardDatabase.Get("OP08-022")!.Counter);
+        Assert.Equal(1000, CardDatabase.Get("OP08-022")!.Counter);
         Assert.Equal(2000, CardDatabase.Get("OP08-032")!.Counter);
         Assert.Equal(1000, CardDatabase.Get("OP08-034")!.Counter);
     }

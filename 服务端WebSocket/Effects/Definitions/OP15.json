@@ -418,6 +418,10 @@
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": {
+          "donReturn": 1
+        },
+        "costPrompt": "咚!!-1：发动抽卡效果？",
         "then": [
           {
             "op": "Draw",

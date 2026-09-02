@@ -1,2 +1,2 @@
 // 此文件由 scripts/build-card-bundle.mjs 自动生成，请勿手动修改。
-export const DATA_VERSION = "b2b7e63fdb12";
+export const DATA_VERSION = "7a0576975ed4";

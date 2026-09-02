@@ -14,7 +14,7 @@ namespace GrandUMI.Effects.Scripted;
 ///     （引擎的重置阶段仅对"角色"尊重 CannotActivateNextReset 标记，领袖/舞台会无条件转活跃，
 ///      故此处目标限定为对方休息状态的角色，与实战绝大多数场景一致。）
 ///   - 【启动主要】成本"贴对方休息咚到对方角色"无 DSL cost 通道，脚本实现；收益赋予领袖/角色最多1张
-///     其持有者费用区中的（活跃）咚!!。
+///     其持有者费用区中的咚!!，卡文未限定活跃/休息状态。
 ///   - 成本需对方有休息咚且有角色，否则不发动；每回合1次。
 /// </summary>
 public class OP15_023_Arlong : IScriptedEffect
@@ -80,7 +80,7 @@ public class OP15_023_Arlong : IScriptedEffect
 
         me.TurnOnceUsed.Add(key);
 
-        // 收益：赋予1张领袖或角色最多1张其持有者费用区中的（活跃）咚!!
+        // 收益：赋予1张领袖或角色最多1张其持有者费用区中的咚!!（活跃或休息均可）
         var targets = new List<CardInstance> { me.Leader };
         targets.AddRange(me.Characters);
         targets.Add(opp.Leader);
@@ -100,16 +100,17 @@ public class OP15_023_Arlong : IScriptedEffect
             : holder.Characters.FirstOrDefault(card => ReferenceEquals(card, selectedSnapshot));
         if (target is null) return;
 
-        var activeDon = holder.CostArea
-            .Where(don => don.State == DonState.Active && don.AttachedToCardId is null)
+        var availableDon = holder.CostArea
+            .Where(don => (don.State is DonState.Active or DonState.Rest) && don.AttachedToCardId is null)
             .ToList();
-        if (activeDon.Count == 0) return;
+        if (availableDon.Count == 0) return;
+        // 保留既有 kind，避免改变客户端与回放所见的提示协议；候选状态由 donChoices 明确下发。
         var donPick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "HolderActiveDon",
-            "选择目标持有者费用区中最多1张活跃咚!!赋予该目标",
-            activeDon.Select(don => don.Id.ToString()).ToList(), 0, 1,
+            "选择目标持有者费用区中最多1张咚!!赋予该目标",
+            availableDon.Select(don => don.Id.ToString()).ToList(), 0, 1,
             new Dictionary<string, object?>
             {
-                ["donChoices"] = activeDon.Select(don => new { id = don.Id.ToString(), state = "Active" }).ToList(),
+                ["donChoices"] = availableDon.Select(don => new { id = don.Id.ToString(), state = don.State.ToString() }).ToList(),
             });
         if (donPick.Count < 1) return;
 
@@ -117,7 +118,7 @@ public class OP15_023_Arlong : IScriptedEffect
         bool targetStillHeld = ReferenceEquals(holder.Leader, target) || holder.Characters.Contains(target);
         var selectedDon = holder.CostArea.FirstOrDefault(don =>
             don.Id.ToString() == donPick[0]
-            && don.State == DonState.Active
+            && (don.State is DonState.Active or DonState.Rest)
             && don.AttachedToCardId is null);
         if (!targetStillHeld || selectedDon is null) return;
         selectedDon.State = DonState.Attached;

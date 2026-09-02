@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 简化点：
 ///   - 可选择我方或对方的领袖/角色作为目标；咚!! 从"该卡持有者"的费用区取出附着，
 ///     与"其持有者的休息状态的咚!!"语义一致（引擎将取出的咚置为 Attached）。
-///   - 取费用区中活跃咚附着（受该持有者费用区剩余咚限制）。
+///   - 仅从费用区中休息状态的咚附着；活跃咚不能被此效果消耗。
 /// </summary>
 public class OP15_010_Nezumi : IScriptedEffect
 {
@@ -44,7 +44,7 @@ public class OP15_010_Nezumi : IScriptedEffect
         var target = targets.First(c => c.Id.ToString() == chosen[0]);
         // 判定目标持有者：从其持有者的费用区取咚
         var ownerState = me.Characters.Contains(target) || me.Leader.Id == target.Id ? me : opp;
-        AtomicOps.AttachDonFromCost(ownerState, target.Id, 1, DonState.Active);
+        AtomicOps.AttachDonFromCost(ownerState, target.Id, 1, DonState.Rest);
 
         me.TurnOnceUsed.Add(key);
     }
