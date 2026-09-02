@@ -284,7 +284,9 @@ public static class PrivateStateSnapshotBuilder
             property = card.CurrentProperty,
             basePower = card.Info.Power,
             baseCost = card.Info.Cost,
-            currentCost = card.CurrentCost(),
+            currentCost = state.SideOf(card) == ownerIndex
+                ? state.CurrentCostOf(ownerIndex, card)
+                : card.CurrentCost(),
             counter = Effects.HandStaticCounter.Value(state, ownerIndex, card),
             keywords = card.Info.Keywords,
             isTapped = card.IsTapped,

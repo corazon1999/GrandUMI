@@ -21,6 +21,35 @@ namespace GrandUMI.Effects;
 public static class EffectRuntime
 {
     /// <summary>
+    /// 结算一张已经成功从手牌打出的事件。修订版 11 起，溢流的第二次效果必须等待第一次效果、
+    /// 其提示以及由其产生的延迟触发全部到达稳定点后才开始；两次仍属于同一个出牌动作，
+    /// 不会重复支付费用、推进出牌计数或派发“打出事件”监听。
+    /// </summary>
+    public static async Task ResolvePlayedEvent(
+        GameState state,
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        IPromptService prompts)
+    {
+        if (source.Info.Kind != CardKind.Event
+            || trigger is not (EffectTrigger.EventMain or EffectTrigger.EventCounter))
+            throw new ArgumentException("只有从手牌打出的事件【主要】或【反击】效果可走事件结算入口。", nameof(trigger));
+
+        await Resolve(state, ownerIndex, source, trigger, prompts);
+        if (state.IsGameOver || !HexRules.ShouldRepeatPlayedEventEffect(state, ownerIndex, trigger)) return;
+
+        await Resolve(
+            state,
+            ownerIndex,
+            source,
+            trigger,
+            prompts,
+            new Dictionary<string, object?> { ["hexCopied"] = true },
+            hexCopy: true);
+    }
+
+    /// <summary>
     /// 在指定触发时机，对所有可响应的效果按规则顺序解析。
     /// 调用方应在状态变更后（出牌/攻击/KO/抽牌等）调用此方法。
     /// </summary>

@@ -674,7 +674,8 @@ public class GameState
     public int CurrentCostOf(int sideIdx, CardInstance card)
     {
         int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
-                  + ContinuousCostBonus(sideIdx, card);
+                  + ContinuousCostBonus(sideIdx, card)
+                  + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;
     }
 
@@ -689,7 +690,8 @@ public class GameState
     public int CurrentCostOfExcludingSource(int sideIdx, CardInstance card, string sourceCardId)
     {
         int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
-                  + ContinuousCostBonus(sideIdx, card, sourceCardId);
+                  + ContinuousCostBonus(sideIdx, card, sourceCardId)
+                  + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;
     }
 

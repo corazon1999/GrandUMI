@@ -55,7 +55,10 @@ export default function GameActions() {
       : null;
   const selectedIsCounterOnlyEvent =
     selectedHandCard?.type === "Event" && !selectedHandCard.effectTags.includes("EventMain");
-  const canPlay = currentTurn && selectedHandIndex !== null && !selectedIsCounterOnlyEvent;
+  const selectedCanPlay = selectedHandIndex === null
+    ? false
+    : my?.handCardCanPlay?.[selectedHandIndex] ?? !selectedIsCounterOnlyEvent;
+  const canPlay = currentTurn && selectedHandIndex !== null && selectedCanPlay;
   const canPassCounter = isDefender && phase === "Counter";
   const selectedFieldCard =
     my && selectedFieldId !== null
@@ -113,8 +116,9 @@ export default function GameActions() {
     if (!currentTurn || phase !== "Main" || battle || isPending) setPendingMainEvent(null);
   }, [battle, currentTurn, isPending, phase]);
 
-  const btn =
-    "min-h-12 w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600";
+  // 手机竖屏会把 1280×720 牌桌旋转并缩放；旋转态需预留更高的画布内按钮高度，
+  // 才能保证映射回物理竖屏后的短边仍不小于 44px。
+  const btn = `${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600`;
 
   const hasAny = canUndoAttachDon || canAttack || isSelectingTarget || canPlay || canActivate || canPassCounter || currentTurn;
 

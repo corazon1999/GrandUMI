@@ -53,7 +53,9 @@ public static class HexRules
     public const int UltimateRefreshRulesRevision = 9;
     /// <summary>炼狱导管改为永久减费，面包类减费增加最终费用 1 下限所在的规则修订版。</summary>
     public const int PermanentCostFloorRulesRevision = 10;
-    public const int CurrentRulesRevision = PermanentCostFloorRulesRevision;
+    /// <summary>七项海克斯效果整体重做所在的规则修订版。</summary>
+    public const int SevenHexReworkRulesRevision = 11;
+    public const int CurrentRulesRevision = SevenHexReworkRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -470,7 +472,10 @@ public static class HexRules
             && state.CurrentTurnPlayer == side)
             bonus += state.HexState.Runtime[side].TranscendentEvilOwnTurnPower;
         if (leader && Has(state, side, 34)) bonus += 2000;
-        if (character && Has(state, side, 38)) bonus += 1000;
+        if (character
+            && state.HexState.RulesRevision < SevenHexReworkRulesRevision
+            && Has(state, side, 38))
+            bonus += 1000;
         if (leader && Has(state, side, 44) && state.CurrentTurnPlayer == 1 - side)
             bonus += state.HexState.Runtime[side].TankEngineOpponentTurnPower;
         return bonus;
@@ -480,30 +485,86 @@ public static class HexRules
     {
         if (!state.HexState.Enabled) return 0;
         int delta = 0;
-        if (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 36)) delta--;
-        if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 37)) delta--;
-        if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 39)) delta -= 2;
+        if (state.HexState.RulesRevision < SevenHexReworkRulesRevision)
+        {
+            if (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 36)) delta--;
+            if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 37)) delta--;
+            if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 39)) delta -= 2;
+            return delta;
+        }
+
+        // 面包按本全局回合内该玩家已经成功从手牌打出的张数预览；只有出牌完成后的
+        // OnCardPlayedAsync 才推进计数，因此拒绝、取消、效果登场和反击值弃牌均不会占序号。
+        int cardsAlreadyPlayed = state.HexState.Runtime[playerIndex].CardsPlayedThisTurn;
+        if (cardsAlreadyPlayed == 0 && Has(state, playerIndex, 36)) delta--;
+        if (cardsAlreadyPlayed == 1 && Has(state, playerIndex, 37)) delta -= 2;
+
+        if (card.Info.Kind == CardKind.Character)
+        {
+            if (Has(state, playerIndex, 38)) delta -= 2;
+            if (Has(state, playerIndex, 39)) delta += 1;
+        }
+        else if (card.Info.Kind == CardKind.Event)
+        {
+            if (Has(state, playerIndex, 38)) delta += 1;
+            if (Has(state, playerIndex, 39)) delta -= 2;
+        }
         return delta;
     }
 
     public static int AdjustFinalHandCost(GameState state, int playerIndex, CardInstance card, int cost)
     {
         int normalized = Math.Max(0, cost);
-        int adjusted = card.Info.Kind == CardKind.Event && Has(state, playerIndex, 46)
-            ? checked(normalized * 2)
-            : normalized;
-        bool breadFloorApplies = state.HexState.RulesRevision >= PermanentCostFloorRulesRevision
-            && (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 36)
-                || card.Info.Kind == CardKind.Event && Has(state, playerIndex, 37));
-        return breadFloorApplies ? Math.Max(1, adjusted) : adjusted;
+        int adjusted = normalized;
+        if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 46))
+        {
+            adjusted = state.HexState.RulesRevision >= SevenHexReworkRulesRevision
+                ? normalized >= 5 ? 10 : normalized * 2
+                : checked(normalized * 2);
+        }
+
+        bool floorOne = state.HexState.RulesRevision >= SevenHexReworkRulesRevision
+            ? card.Info.Kind is CardKind.Character or CardKind.Event
+              && (Has(state, playerIndex, 38) || Has(state, playerIndex, 39))
+            : state.HexState.RulesRevision >= PermanentCostFloorRulesRevision
+              && (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 36)
+                  || card.Info.Kind == CardKind.Event && Has(state, playerIndex, 37));
+        return floorOne ? Math.Max(1, adjusted) : adjusted;
     }
 
     public static int CounterBonus(GameState state, int playerIndex, CardInstance card)
     {
         if (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 12)) return 1000;
-        if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 51)) return 2000;
+        if (card.Info.Kind == CardKind.Event && Has(state, playerIndex, 51))
+            return state.HexState.RulesRevision >= SevenHexReworkRulesRevision ? 4000 : 2000;
         return 0;
     }
+
+    /// <summary>新版“我是天龙人”对场上角色的动态费用修正；双方同时拥有时自然抵消。</summary>
+    public static int FieldCostDelta(GameState state, int side, CardInstance card)
+    {
+        if (!state.HexState.Enabled
+            || state.HexState.RulesRevision < SevenHexReworkRulesRevision
+            || side is < 0 or > 1
+            || card.Info.Kind != CardKind.Character
+            || !state.Players[side].Characters.Contains(card))
+            return 0;
+        return (Has(state, side, 53) ? 2 : 0) - (Has(state, 1 - side, 53) ? 2 : 0);
+    }
+
+    /// <summary>神射法师新版禁止从手牌发动事件效果；反击值弃牌走独立入口。</summary>
+    public static bool CanActivateHandEventEffect(GameState state, int playerIndex)
+        => state.HexState.RulesRevision < SevenHexReworkRulesRevision || !Has(state, playerIndex, 51);
+
+    /// <summary>仅成功从手牌打出的事件由调用方请求新版溢流的第二次顺序结算。</summary>
+    public static bool ShouldRepeatPlayedEventEffect(
+        GameState state,
+        int playerIndex,
+        EffectTrigger trigger)
+        => state.HexState.Enabled
+           && state.HexState.RulesRevision >= SevenHexReworkRulesRevision
+           && trigger is EffectTrigger.EventMain or EffectTrigger.EventCounter
+           && Has(state, playerIndex, 46);
 
     public static bool CanRest(GameState state, CardInstance card, int? prospectiveOwner = null)
         => !Has(state, 0, 19) && !Has(state, 1, 19)
@@ -850,7 +911,8 @@ public static class HexRules
         => !Has(state, attackerSide, 34);
 
     public static bool MayAttackProtectedZeroLifeLeader(GameState state, int defenderSide)
-        => !(Has(state, defenderSide, 53)
+        => !(state.HexState.RulesRevision < SevenHexReworkRulesRevision
+             && Has(state, defenderSide, 53)
              && state.Players[defenderSide].LifeArea.Count == 0
              && state.Players[defenderSide].Characters.Any(card => card.IsTapped));
 
@@ -865,7 +927,10 @@ public static class HexRules
                 : !runtime.FirstEnterEffectCopiedThisTurn;
         if (trigger == EffectTrigger.OnKO && Has(state, owner, 17))
             return !runtime.FirstKoEffectCopiedThisTurn;
-        if (trigger is EffectTrigger.EventMain or EffectTrigger.EventCounter && Has(state, owner, 46)) return true;
+        if (state.HexState.RulesRevision < SevenHexReworkRulesRevision
+            && trigger is EffectTrigger.EventMain or EffectTrigger.EventCounter
+            && Has(state, owner, 46))
+            return true;
         return false;
     }
 

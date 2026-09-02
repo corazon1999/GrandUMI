@@ -45,6 +45,7 @@ export interface PlayerView {
   handCardNumbers: string[];   // 仅己方有内容；对手为空数组
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
+  handCardCanPlay: boolean[];  // 每张手牌当前是否可从主要阶段打出（后端权威）
   handCount: number;
   fieldCards: FieldCardView[];
   stageNumber: string | null;
@@ -96,12 +97,13 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
   return {
     ...player,
     spriteMap: { ...(player.spriteMap ?? {}) },
-    // IndexedDB 中的旧回放可能缺少后来新增的手牌费用、反击值等字段。
+    // IndexedDB 中的旧回放可能缺少后来新增的手牌费用、反击值与可出牌标记等字段。
     // 在同步入口统一补齐，避免旧快照中断回放或让手牌区域无法渲染。
     handCardIds: [...(player.handCardIds ?? [])],
     handCardNumbers: [...(player.handCardNumbers ?? [])],
     handCardCosts: [...(player.handCardCosts ?? [])],
     handCardCounters: [...(player.handCardCounters ?? [])],
+    handCardCanPlay: [...(player.handCardCanPlay ?? [])],
     fieldCards: (player.fieldCards ?? []).map((card) => ({
       ...card,
       gainedKeywords: [...(card.gainedKeywords ?? [])],
@@ -508,6 +510,7 @@ export const useGameStore = create<GameStore>()(
       s.my.handCardIds.splice(handIndex, 1);
       s.my.handCardCosts.splice(handIndex, 1);
       s.my.handCardCounters.splice(handIndex, 1);
+      s.my.handCardCanPlay.splice(handIndex, 1);
       s.my.handCount = Math.max(0, s.my.handCount - 1);
     }),
     optimisticAttachDon: (targetId, count) => set((s) => {

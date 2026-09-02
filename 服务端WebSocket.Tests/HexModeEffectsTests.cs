@@ -25,12 +25,12 @@ public sealed class HexModeEffectsTests
         [24] = "OnAttackDeclared", [25] = "OnAttackDeclared", [26] = "OnAttackDeclared",
         [27] = "Legacy.ResolveDamage", [28] = "OnCardPlayed", [29] = "OnCardPlayed", [30] = "StageSlots",
         [31] = "OnLifeAdded", [32] = "OnCardPlayed", [33] = "OnTurnStarted", [34] = "Power/AttackTarget",
-        [35] = "OnCardPlayed", [36] = "HandCost", [37] = "HandCost", [38] = "Draw/Power",
-        [39] = "Draw/HandCost", [40] = "OnTurnEnding", [41] = "OnEnemyAffected",
+        [35] = "OnCardPlayed", [36] = "PlayedCardOrder/HandCost", [37] = "PlayedCardOrder/HandCost", [38] = "HandCost",
+        [39] = "HandCost", [40] = "OnTurnEnding", [41] = "OnEnemyAffected",
         [42] = "OnEnemyAffected", [43] = "OnLifeAdded", [44] = "OnCharacterKo/OnLeaderDamaged",
         [45] = "AttackLimit/BattleBonus", [46] = "HandCost/EffectRuntime.Copy", [47] = "OnAcquire",
-        [48] = "EnemyLifeOne", [49] = "OnAcquire", [50] = "OnAttackDeclared", [51] = "CounterBonus",
-        [52] = "OnAcquire/DonLimit", [53] = "AttackTarget", [54] = "OnCharacterKo",
+        [48] = "EnemyLifeOne", [49] = "OnAcquire", [50] = "OnAttackDeclared", [51] = "CounterBonus/EventGate",
+        [52] = "OnAcquire/DonLimit", [53] = "FieldCost", [54] = "OnCharacterKo",
         [55] = "OnAcquire/TierGrant", [56] = "OnAcquire/PrismaticGrant",
     };
 
@@ -98,64 +98,67 @@ public sealed class HexModeEffectsTests
         OwnOnly(state, 0, 36);
         Assert.Equal(4, state.HandPlayCost(0, character));
         OwnOnly(state, 0, 37);
-        Assert.Equal(2, state.HandPlayCost(0, eventCard));
+        state.HexState.Runtime[0].CardsPlayedThisTurn = 1;
+        Assert.Equal(1, state.HandPlayCost(0, eventCard));
         OwnOnly(state, 0, 39);
         Assert.Equal(1, state.HandPlayCost(0, eventCard));
         OwnOnly(state, 0, 46);
         Assert.Equal(6, state.HandPlayCost(0, eventCard));
         OwnOnly(state, 0, 51);
-        Assert.Equal(2000, HexRules.CounterBonus(state, 0, eventCard));
+        Assert.Equal(4000, HexRules.CounterBonus(state, 0, eventCard));
         OwnOnly(state, 0, 52);
         Assert.Equal(12, state.MaxDonInCostAreaFor(0));
 
-        opponent.LifeArea.Clear();
-        var shield = Card("HEX-SHIELD", CardKind.Character, power: 1000, cost: 1);
-        shield.IsTapped = true;
-        opponent.Characters.Add(shield);
-        OwnOnly(state, 1, 53);
-        Assert.False(ActionValidator.CanAttack(state, 0, me.Leader.Id, true, null).Ok);
+        var ownDragon = Card("HEX-OWN-DRAGON", CardKind.Character, power: 1000, cost: 1);
+        var enemyDragon = Card("HEX-ENEMY-DRAGON", CardKind.Character, power: 1000, cost: 1);
+        me.Characters.Add(ownDragon);
+        opponent.Characters.Add(enemyDragon);
+        OwnOnly(state, 0, 53);
+        Assert.Equal(3, state.CurrentCostOf(0, ownDragon));
+        Assert.Equal(0, state.CurrentCostOf(1, enemyDragon));
     }
 
     [Fact]
-    public void 面包减费_新版在全部叠加与费用翻倍后保持最终费用至少一()
+    public void 七项重做费用_按出牌序号类型转换和溢流上限统一结算()
     {
         var state = HexState();
         var me = state.Players[0];
         var character = Card("HEX-BREAD-CHARACTER", CardKind.Character, cost: 5);
-        character.CostModThisTurn = -2;
-        character.CostModPersistent = -2;
+        character.CostModThisTurn = -1;
+        character.CostModPersistent = -1;
         state.OneShotPlayDiscounts.Add(new OneShotPlayDiscount
         {
             Owner = 0,
-            Amount = 5,
+            Amount = 1,
             MinCost = 0,
             Kind = "Character",
         });
-        var unrelatedEvent = Card("HEX-BREAD-UNRELATED-EVENT", CardKind.Event, cost: 0);
-        var zeroCostCharacter = Card("HEX-BREAD-ZERO", CardKind.Character, cost: 0);
-        var oneCostCharacter = Card("HEX-BREAD-ONE", CardKind.Character, cost: 1);
-
-        OwnOnly(state, 0, 36);
-
+        OwnOnly(state, 0, 36, 38, 39);
         Assert.Equal(1, state.HandPlayCost(0, character));
-        Assert.Equal(1, state.HandPlayCost(0, zeroCostCharacter));
-        Assert.Equal(1, state.HandPlayCost(0, oneCostCharacter));
-        Assert.Equal(0, state.HandPlayCost(0, unrelatedEvent));
 
-        var eventCard = Card("HEX-CHEESE-EVENT", CardKind.Event, cost: 1);
-        var zeroCostEvent = Card("HEX-CHEESE-ZERO", CardKind.Event, cost: 0);
-        var unrelatedCharacter = Card("HEX-CHEESE-UNRELATED-CHARACTER", CardKind.Character, cost: 0);
-        OwnOnly(state, 0, 37);
+        var eventCard = Card("HEX-CHEESE-EVENT", CardKind.Event, cost: 8);
+        eventCard.CostModThisTurn = -1;
+        eventCard.CostModPersistent = -1;
+        state.OneShotPlayDiscounts.Clear();
+        state.OneShotPlayDiscounts.Add(new OneShotPlayDiscount
+        {
+            Owner = 0,
+            Amount = 2,
+            MinCost = 0,
+            Kind = "Event",
+        });
+        OwnOnly(state, 0, 36, 38, 39, 46);
+        Assert.Equal(4, state.HandPlayCost(0, eventCard));
 
-        Assert.Equal(1, state.HandPlayCost(0, eventCard));
-        Assert.Equal(1, state.HandPlayCost(0, zeroCostEvent));
-        Assert.Equal(0, state.HandPlayCost(0, unrelatedCharacter));
+        eventCard.CostModThisTurn = 0;
+        eventCard.CostModPersistent = 0;
+        state.OneShotPlayDiscounts.Clear();
+        OwnOnly(state, 0, 38, 46);
+        Assert.Equal(10, state.HandPlayCost(0, eventCard));
 
-        eventCard.CostModThisTurn = -3;
-        eventCard.CostModPersistent = -4;
-        Own(state, 0, 39, 46);
-
-        Assert.Equal(1, state.HandPlayCost(0, eventCard));
+        var zeroEvent = Card("HEX-TRANSFORM-ZERO", CardKind.Event, cost: 0);
+        OwnOnly(state, 0, 39, 46);
+        Assert.Equal(1, state.HandPlayCost(0, zeroEvent));
     }
 
     [Fact]
@@ -932,7 +935,7 @@ public sealed class HexModeEffectsTests
         me.Deck.AddRange(Enumerable.Range(0, 4).Select(i => Card($"HEX-EVENT-DRAW-{i}", CardKind.Character)));
         handBefore = me.Hand.Count;
         int leaderBefore = me.Leader.PowerModThisTurn;
-        await EffectRuntime.Resolve(state, 0, eventSource, EffectTrigger.EventMain, new MockPromptService());
+        await EffectRuntime.ResolvePlayedEvent(state, 0, eventSource, EffectTrigger.EventMain, new MockPromptService());
         Assert.Equal(handBefore + 2, me.Hand.Count);
         Assert.Equal(leaderBefore + 2000, me.Leader.PowerModThisTurn);
 
@@ -1316,6 +1319,7 @@ public sealed class HexModeEffectsTests
     {
         var state = HexState();
         var me = state.Players[0];
+        HexRules.SetRulesRevisionForReplay(state, HexRules.PermanentCostFloorRulesRevision);
         Own(state, 0, 38, 39);
         me.Deck.AddRange([
             Card("HEX-E-FIRST", CardKind.Event),

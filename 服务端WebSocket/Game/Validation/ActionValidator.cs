@@ -67,6 +67,9 @@ public static class ActionValidator
         if (card.Kind == CardKind.Event
             && Array.IndexOf(card.EffectTags, "EventMain") < 0)
             return Fail("该事件没有【主要】效果，不能在主要阶段发动");
+        if (card.Kind == CardKind.Event
+            && !Hex.HexRules.CanActivateHandEventEffect(s, playerIdx))
+            return Fail("【神射法师】使手牌事件不能发动效果，只能作为+4000反击值使用");
         if (card.Kind == CardKind.Character && s.NoPlayCharacterThisTurn.Contains(playerIdx))
             return Fail("本回合无法登场角色卡牌");
         if (card.Kind == CardKind.Character
@@ -284,6 +287,9 @@ public static class ActionValidator
             return HandStaticCounter.Value(s, playerIdx, card) > 0
                 ? OkResult
                 : Fail("该卡无反击值");
+        if (card.Info.Kind == CardKind.Event
+            && !Hex.HexRules.CanActivateHandEventEffect(s, playerIdx))
+            return Fail("【神射法师】使手牌事件不能发动效果，只能作为+4000反击值使用");
         if (Array.IndexOf(card.Info.EffectTags, "EventCounter") < 0) return Fail("该卡没有反击效果");
         int cost = s.HandPlayCost(playerIdx, card);
         if (defender.ActiveDonCount < cost) return Fail("活跃咚不足，无法打出该反击事件");

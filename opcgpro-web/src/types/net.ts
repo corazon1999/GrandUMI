@@ -1059,6 +1059,7 @@ export interface PlayerSnapshot {
   handCardNumbers: string[];  // 仅自己有内容
   handCardCosts: number[];    // 每张手牌的有效费用（含静态减费），仅自己有内容；对手为空
   handCardCounters: number[]; // 每张手牌的有效反击值（含静态光环），仅自己有内容；对手为空
+  handCardCanPlay?: boolean[]; // 每张手牌当前是否可从主要阶段打出（后端权威；旧回放可缺失）
   handCount: number;
   fieldCards: FieldCardSnapshot[];
   stageNumber: string | null;

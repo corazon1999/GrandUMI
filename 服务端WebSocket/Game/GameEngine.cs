@@ -1063,7 +1063,12 @@ public class GameEngine
             }
             else if (result.Kind == PlayKind.Event)
             {
-                await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventMain, Prompts);
+                await EffectRuntime.ResolvePlayedEvent(
+                    State,
+                    playerIndex,
+                    result.Card,
+                    EffectTrigger.EventMain,
+                    Prompts);
 
                 // 旁观者：当对方发动事件时（监听卡为非出牌方，脚本内自行判定）
                 if (!State.IsGameOver)
@@ -1430,7 +1435,12 @@ public class GameEngine
             Broadcast("PlayCard", new { player = playerIndex, cardNumber, kind = result.Kind.ToString(), cardId = result.Card.Id.ToString() });
             await Hex.HexRules.OnCardPlayedAsync(this, playerIndex, result);
             if (State.IsGameOver) { CheckGameOver(); return; }
-            await EffectRuntime.Resolve(State, playerIndex, result.Card, EffectTrigger.EventCounter, Prompts);
+            await EffectRuntime.ResolvePlayedEvent(
+                State,
+                playerIndex,
+                result.Card,
+                EffectTrigger.EventCounter,
+                Prompts);
             if (!State.IsGameOver)
                 await EffectRuntime.TriggerEvent(State, EffectTrigger.OnOppEventPlayed, Prompts,
                     new Dictionary<string, object?> { ["owner"] = playerIndex });

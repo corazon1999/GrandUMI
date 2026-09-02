@@ -412,6 +412,9 @@ public static class StateSnapshotBuilder
                 : Array.Empty<string>(),
             handCardCosts = asSelf ? p.Hand.Select(c => state.HandPlayCost(idx, c)).ToArray() : Array.Empty<int>(),
             handCardCounters = asSelf ? p.Hand.Select(c => Effects.HandStaticCounter.Value(state, idx, c)).ToArray() : Array.Empty<int>(),
+            handCardCanPlay = asSelf
+                ? p.Hand.Select((_, handIndex) => Validation.ActionValidator.CanPlayCard(state, idx, handIndex).Ok).ToArray()
+                : Array.Empty<bool>(),
             handCount = board.HandCount,
             fieldCards = board.FieldCards,
             stageNumber = board.StageNumber,

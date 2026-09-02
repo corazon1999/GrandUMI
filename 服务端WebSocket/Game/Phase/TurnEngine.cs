@@ -438,10 +438,13 @@ public static class TurnEngine
             var top = p.Deck[0];
             p.Deck.RemoveAt(0);
             var runtime = state.HexState.Runtime[playerIdx];
-            bool convertEvent = top.Info.Kind == CardKind.Event
+            bool useLegacyHexConversion = state.HexState.RulesRevision < Hex.HexRules.SevenHexReworkRulesRevision;
+            bool convertEvent = useLegacyHexConversion
+                && top.Info.Kind == CardKind.Event
                 && Hex.HexRules.Has(state, playerIdx, 38)
                 && !runtime.EventDrawConvertedThisTurn;
-            bool convertCharacter = top.Info.Kind == CardKind.Character
+            bool convertCharacter = useLegacyHexConversion
+                && top.Info.Kind == CardKind.Character
                 && Hex.HexRules.Has(state, playerIdx, 39)
                 && !runtime.CharacterDrawConvertedThisTurn;
             if (convertEvent || convertCharacter)
