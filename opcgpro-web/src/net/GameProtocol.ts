@@ -45,6 +45,12 @@ type DecoratedGameChatWire = MsgGameChat & {
   } | null;
 };
 
+type ChatDecorationSendResultWire = MsgBase & {
+  proto: "MsgChatDecorationSend";
+  result?: boolean;
+  logStr?: string | null;
+};
+
 let registered = false;
 
 export function registerGameProtocols() {
@@ -124,6 +130,14 @@ export function registerGameProtocols() {
           description: (msg as MsgDuelOver).Description,
         });
         break;
+
+      case "MsgChatDecorationSend": {
+        const response = msg as ChatDecorationSendResultWire;
+        if (response.result === false) {
+          showMessage(response.logStr?.trim() || "聊天装饰发送失败，请稍后重试。", "error");
+        }
+        break;
+      }
 
       case "MsgGameChat": {
         const m = msg as DecoratedGameChatWire;

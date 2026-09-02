@@ -66,6 +66,9 @@ test("特殊聊天只发送槽位且由服务端回包决定文案样式与显�
   assert.doesNotMatch(sendMethod, /text|styleToken|decorationId/);
   assert.match(protocol, /displaySide: m\.displaySide \?\? null/);
   assert.match(protocol, /decoration: m\.decoration \?\? null/);
+  assert.match(protocol, /case "MsgChatDecorationSend"/);
+  assert.match(protocol, /response\.result === false/);
+  assert.match(protocol, /聊天装饰发送失败，请稍后重试/);
   assert.match(events, /displaySide\?: "self" \| "opponent" \| null/);
   assert.match(events, /styleToken: string/);
   assert.match(panel, /chatDecorationBubbleClass\(bubble\.styleToken\)/);
