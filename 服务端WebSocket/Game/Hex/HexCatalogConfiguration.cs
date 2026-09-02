@@ -14,7 +14,13 @@ public sealed record HexCatalogTierAssignment(int Id, HexTier Tier);
 public sealed class HexCatalogConfiguration
 {
     public const string Schema = "grandumi.hex-catalog.v1";
-    public const int RegularHexesPerTier = 18;
+    public static int RequiredRegularHexes(HexTier tier) => tier switch
+    {
+        HexTier.Silver => 18,
+        HexTier.Gold => 18,
+        HexTier.Rainbow => 17,
+        _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, "未知海克斯品质"),
+    };
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -89,6 +95,28 @@ public sealed class HexCatalogConfiguration
             requireBalancedPools: false,
             expectedDigest);
 
+    /// <summary>
+    /// 读取已经锁定到旧房间、录像或旧环境 active 文件中的完整目录。
+    /// 历史配置创建时已按当时池规模校验；升级后只校验编号与摘要，不用新池规模反向否定历史数据。
+    /// </summary>
+    public static HexCatalogConfiguration CreateHistoricalSnapshot(
+        long revision,
+        IEnumerable<HexCatalogTierAssignment> assignments,
+        string? expectedDigest = null,
+        long? publishedAt = null,
+        string? publishedBy = null,
+        long? sourceDraftRevision = null,
+        string? sourceRequestId = null)
+        => CreateValidated(
+            revision,
+            assignments,
+            requireBalancedPools: false,
+            expectedDigest,
+            publishedAt,
+            publishedBy,
+            sourceDraftRevision,
+            sourceRequestId);
+
     private static HexCatalogConfiguration CreateValidated(
         long revision,
         IEnumerable<HexCatalogTierAssignment> assignments,
@@ -120,9 +148,10 @@ public sealed class HexCatalogConfiguration
             foreach (var tier in Enum.GetValues<HexTier>())
             {
                 var count = values.Count(item => regularIds.Contains(item.Key) && item.Value == tier);
-                if (count != RegularHexesPerTier)
+                var required = RequiredRegularHexes(tier);
+                if (count != required)
                     throw new InvalidDataException(
-                        $"{HexCatalog.TierDisplayName(tier)}常规海克斯必须恰好为 {RegularHexesPerTier} 个，当前为 {count} 个。");
+                        $"{HexCatalog.TierDisplayName(tier)}常规海克斯必须恰好为 {required} 个，当前为 {count} 个。");
             }
         }
 
@@ -166,7 +195,7 @@ public sealed class HexCatalogConfiguration
             throw new InvalidDataException("海克斯激活配置缺少品质列表。");
 
         var assignments = tiersElement.EnumerateArray().Select(ReadAssignment).ToArray();
-        return Create(
+        return CreateHistoricalSnapshot(
             revision,
             assignments,
             digestElement.GetString(),

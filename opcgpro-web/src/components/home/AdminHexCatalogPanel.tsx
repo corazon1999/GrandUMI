@@ -32,7 +32,11 @@ const deploymentLabels: Record<AdminHexCatalogEnvironmentState["deployment"]["st
 };
 
 type TierFilter = "all" | HexTierSnapshot;
-const REGULAR_HEXES_PER_TIER = 18;
+const REQUIRED_REGULAR_HEXES: Record<HexTierSnapshot, number> = {
+  Silver: 18,
+  Gold: 18,
+  Rainbow: 17,
+};
 
 function shortDigest(digest: string): string {
   if (!digest) return "—";
@@ -105,7 +109,8 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
     }
     return counts;
   }, [sortedEntries, tiers]);
-  const unbalancedPool = Object.values(regularCounts).some((count) => count !== REGULAR_HEXES_PER_TIER);
+  const unbalancedPool = (Object.keys(REQUIRED_REGULAR_HEXES) as HexTierSnapshot[])
+    .some((tier) => regularCounts[tier] !== REQUIRED_REGULAR_HEXES[tier]);
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("zh-CN");
     return sortedEntries.filter((entry) => {
@@ -206,7 +211,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
           <p className="text-xs font-bold tracking-[0.16em] text-fuchsia-400">HEX CATALOG</p>
           <h2 className="mt-1 text-lg font-black text-white">海克斯品质面板</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-gray-400">
-            编辑完整目录并先保存草稿，再通过一次性凭证发布到指定环境。草稿允许暂时不平衡；发布前，三个常规品质池必须各保持 18 个。激活只影响发布后新建的房间；进行中房间与恢复重放继续使用各自锁定版本。
+            编辑当前目录并先保存草稿，再通过一次性凭证发布到指定环境。强化万用瞄准镜已退役，不再进入调配和新房间。草稿允许暂时不平衡；发布前，银色、金色、棱彩常规池须分别保持 18、18、17 个。激活只影响发布后新建的房间；进行中房间与恢复重放继续使用各自锁定版本。
           </p>
         </div>
         <button
@@ -269,12 +274,12 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
             {(["Silver", "Gold", "Rainbow"] as const).map((tier) => (
               <div key={tier} className={`rounded-xl border px-2 py-3 text-center ${tierStyles[tier]}`}>
                 <p className="text-[11px] font-bold">{tierLabels[tier]}常规池</p>
-                <p className="mt-1 text-lg font-black">{regularCounts[tier]} / {REGULAR_HEXES_PER_TIER}</p>
+                <p className="mt-1 text-lg font-black">{regularCounts[tier]} / {REQUIRED_REGULAR_HEXES[tier]}</p>
               </div>
             ))}
           </div>
           {unbalancedPool && (
-            <p className="mt-2 text-xs font-bold leading-5 text-amber-300" role="status">当前调整可以保存为草稿；发布前，每个品质必须恰好保留 18 个常规海克斯。</p>
+            <p className="mt-2 text-xs font-bold leading-5 text-amber-300" role="status">当前调整可以保存为草稿；发布前，银色、金色、棱彩必须分别保留 18、18、17 个常规海克斯。</p>
           )}
 
           <div className="mt-4 flex flex-col gap-2 @[620px]:flex-row">
@@ -400,7 +405,7 @@ export default function AdminHexCatalogPanel({ previewState }: { previewState?: 
                   : `申请${environment === "production" ? "正式服" : "测试服"}配置发布凭证`}
             </button>
             <p className="mt-2 text-[11px] leading-5 text-gray-500">
-              必须先保存无冲突且三池平衡的草稿。此按钮不会抓取 main、部署代码或重启服务；下方“版本发布”是完全独立的整站发布流程。
+              必须先保存无冲突且符合 18/18/17 池规模的草稿。此按钮不会抓取 main、部署代码或重启服务；下方“版本发布”是完全独立的整站发布流程。
             </p>
           </article>
         </>

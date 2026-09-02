@@ -3238,7 +3238,7 @@ public static class GameRoomManager
                     throw new InvalidDataException("海克斯房间日志包含无效的目录品质项。");
                 catalogAssignments.Add(new Hex.HexCatalogTierAssignment(id, tier));
             }
-            hexCatalogConfiguration = Hex.HexCatalogConfiguration.Create(
+            hexCatalogConfiguration = Hex.HexCatalogConfiguration.CreateHistoricalSnapshot(
                 catalogRevision,
                 catalogAssignments,
                 catalogDigestElement.GetString());

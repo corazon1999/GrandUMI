@@ -42,7 +42,7 @@ public static class HexCatalog
         H(23, "俯冲轰炸", HexTier.Silver, "己方角色被KO时，对方所有角色本回合力量-1000。"),
         H(24, "巨人杀手", HexTier.Silver, "己方角色攻击当前费用8以上角色时，本次战斗力量+3000。"),
         H(25, "钢化你心", HexTier.Silver, "每局1次，累计攻击敌方休息角色10次时，按己方当前生命数从卡组顶补充生命。"),
-        H(26, "万用瞄准镜", HexTier.Gold, "己方攻击结算时，力量低1000也视为成功。"),
+        H(26, "万用瞄准镜", HexTier.Gold, "己方所有角色获得【攻击时】：直到本次战斗结束，力量+1000。"),
         H(27, "强化万用瞄准镜", HexTier.Rainbow, "己方攻击结算时，力量低2000也视为成功。"),
         H(28, "终极刷新", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。"),
         H(29, "最终形态", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，领袖+2000且角色+1000至下个对方回合结束。"),
@@ -76,6 +76,8 @@ public static class HexCatalog
     ];
 
     private static readonly HashSet<int> AlternativeIds = [30, 48];
+    // 编号 27 仅为旧房间与录像保留定义和品质映射；新房间、随机质变及管理员调配入口均不再使用。
+    private static readonly HashSet<int> RetiredIds = [27];
     private static readonly HashSet<int> TransmutationIds = [47, 55, 56];
     private static readonly HashSet<int> LegacyRainbowIds = [4, 5, 9, 10, 11, 12, 13, 14, 15, 19, 28, 35, 38, 39, 40, 46, 47, 53];
     private static readonly HashSet<int> LegacyGoldIds = [1, 2, 3, 6, 7, 16, 17, 18, 21, 26, 27, 29, 32, 36, 37, 48, 49, 51];
@@ -83,8 +85,11 @@ public static class HexCatalog
     private static readonly HexDefinition[] LegacyRegularDefinitions = Definitions
         .Where(item => item.Id <= 54)
         .ToArray();
-    private static readonly HexDefinition[] RegularDefinitions = Definitions
+    private static readonly HexDefinition[] PreRetirementRegularDefinitions = Definitions
         .Where(item => !AlternativeIds.Contains(item.Id))
+        .ToArray();
+    private static readonly HexDefinition[] RegularDefinitions = PreRetirementRegularDefinitions
+        .Where(item => !RetiredIds.Contains(item.Id))
         .ToArray();
     private static readonly HexDefinition[] AlternativeDefinitions = Definitions
         .Where(item => AlternativeIds.Contains(item.Id))
@@ -92,14 +97,20 @@ public static class HexCatalog
 
     /// <summary>完整目录，包含常规池和备选池。</summary>
     public static IReadOnlyList<HexDefinition> All => Definitions;
-    /// <summary>普通选秀与随机质变唯一允许使用的 54 项常规池。</summary>
+    /// <summary>新房间普通选秀与随机质变允许使用的 53 项常规池。</summary>
     public static IReadOnlyList<HexDefinition> Regular => RegularDefinitions;
+    /// <summary>管理员可调配的当前目录；不包含仅供历史兼容的退役项。</summary>
+    public static IReadOnlyList<HexDefinition> Configurable => Definitions
+        .Where(item => !RetiredIds.Contains(item.Id))
+        .ToArray();
     /// <summary>保留实现但不进入普通选秀或随机质变的备选项。</summary>
     public static IReadOnlyList<HexDefinition> Alternatives => AlternativeDefinitions;
     public static HexDefinition Get(int id) => ById.TryGetValue(id, out var value)
         ? value
         : throw new KeyNotFoundException($"未知海克斯编号：{id}");
     public static bool IsAlternative(int id) => AlternativeIds.Contains(id);
+
+    public static bool IsRetired(int id) => RetiredIds.Contains(id);
 
     public static bool IsAlternative(int id, int rulesRevision)
         => rulesRevision >= HexRules.BalanceRulesRevision && AlternativeIds.Contains(id);
@@ -113,6 +124,8 @@ public static class HexCatalog
             (6, < HexRules.AstralBodyRulesRevision) => "获得时选择2张手牌，按顺序放入生命区。",
             (16, < HexRules.BoardingSalvoRulesRevision) =>
                 "每回合第一个实际发动的【登场时】效果额外结算1次。",
+            (26, < HexRules.ScopeReworkRulesRevision) =>
+                "己方攻击结算时，力量低1000也视为成功。",
             (55, < HexRules.TransmutationPresentationRulesRevision) =>
                 "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             _ => Get(id).Description,
@@ -141,9 +154,11 @@ public static class HexCatalog
     }
 
     public static IReadOnlyList<HexDefinition> RegularForRevision(int rulesRevision)
-        => rulesRevision >= HexRules.BalanceRulesRevision
+        => rulesRevision >= HexRules.ScopeReworkRulesRevision
             ? RegularDefinitions
-            : LegacyRegularDefinitions;
+            : rulesRevision >= HexRules.BalanceRulesRevision
+                ? PreRetirementRegularDefinitions
+                : LegacyRegularDefinitions;
 
     public static HexTier TierForRevision(int id, int rulesRevision)
     {

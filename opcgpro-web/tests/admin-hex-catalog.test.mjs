@@ -57,7 +57,7 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(panel, /baseActiveRevision !== selected\.activeRevision/);
   assert.match(panel, /publish_hex_catalog/);
   assert.match(panel, /draft-\$\{selected\.draftRevision\}:\$\{selected\.draftDigest\}/);
-  assert.match(panel, /必须先保存无冲突且三池平衡的草稿/);
+  assert.match(panel, /必须先保存无冲突且符合 18\/18\/17 池规模的草稿/);
   assert.match(panel, /不会抓取 main、部署代码或重启服务/);
   assert.match(coordinator, /current\.DraftRevision != expectedDraftRevision/);
   assert.match(coordinator, /active\.Revision != expectedActiveRevision/);
@@ -66,20 +66,25 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(bridge, /ConsumeHighRiskChallenge\([\s\S]*"publish_hex_catalog"/);
 });
 
-test("不平衡品质可保存草稿但只有各十八个时才能发布", () => {
-  assert.match(panel, /const REGULAR_HEXES_PER_TIER = 18/);
-  assert.match(panel, /const unbalancedPool = Object\.values\(regularCounts\)\.some\(\(count\) => count !== REGULAR_HEXES_PER_TIER\)/);
-  assert.match(panel, /\{regularCounts\[tier\]\} \/ \{REGULAR_HEXES_PER_TIER\}/);
+test("不平衡品质可保存草稿但只有符合当前十八十八十七时才能发布", () => {
+  assert.match(panel, /const REQUIRED_REGULAR_HEXES:[\s\S]*Silver: 18,[\s\S]*Gold: 18,[\s\S]*Rainbow: 17/);
+  assert.match(panel, /regularCounts\[tier\] !== REQUIRED_REGULAR_HEXES\[tier\]/);
+  assert.match(panel, /\{regularCounts\[tier\]\} \/ \{REQUIRED_REGULAR_HEXES\[tier\]\}/);
   assert.match(panel, /当前调整可以保存为草稿/);
-  assert.match(panel, /发布前，每个品质必须恰好保留 18 个常规海克斯/);
+  assert.match(panel, /分别保留 18、18、17 个常规海克斯/);
   assert.match(panel, /const saveDraft = \(\) => \{[\s\S]*if \(!selected \|\| !dirty\) return;/);
   assert.match(panel, /disabled=\{!connected \|\| !dirty \|\| pending !== null\}/);
   assert.match(panel, /const publishDisabled = [\s\S]*\|\| unbalancedPool/);
-  assert.match(coordinator, /HexCatalogConfiguration\.CreateDraft\(assignments\)/);
+  assert.match(coordinator, /HexCatalogConfiguration\.CreateDraft\([\s\S]*CompleteRetiredHexAssignments\(assignments, current\.Assignments\)/);
   assert.match(coordinator, /HexCatalogConfiguration\.Create\(0, draft\.Assignments, draft\.Digest\)/);
-  assert.equal(Object.values({ Silver: 19, Gold: 17, Rainbow: 18 }).some((count) => count !== 18), true);
-  assert.match(runner, /if count != 18:/);
-  assert.match(runner, /常规海克斯必须恰好为 18 个/);
+  const required = { Silver: 18, Gold: 18, Rainbow: 17 };
+  assert.equal(Object.entries({ Silver: 19, Gold: 17, Rainbow: 17 })
+    .some(([tier, count]) => count !== required[tier]), true);
+  assert.match(runner, /retired_ids = \{27\}/);
+  assert.match(runner, /required_regular_counts = \{"Silver": 18, "Gold": 18, "Rainbow": 17\}/);
+  assert.match(runner, /if count != required:/);
+  assert.match(runner, /常规海克斯必须恰好为 \{required\} 个/);
+  assert.match(runner, /require_current_balance=False/);
   assert.match(runner, /type\(hex_id\) is not int/);
   assert.match(runner, /type\(draft_revision\) is not int/);
   assert.match(runner, /type\(expected_revision\) is not int/);
@@ -137,7 +142,7 @@ test("布局验证夹具使用假数据且默认在生产构建中返回404", ()
   assert.match(layoutPage, /export const dynamic = "force-dynamic"/);
   assert.match(layoutPage, /process\.env\.GRANDUMI_LAYOUT_VERIFICATION !== "1"\) notFound\(\)/);
   assert.match(layoutFixture, /previewState=\{PREVIEW_STATE\}/);
-  assert.match(layoutFixture, /candidate !== 30 && candidate !== 48/);
+  assert.match(layoutFixture, /candidate !== 27 && candidate !== 30 && candidate !== 48/);
   assert.match(layoutFixture, /activeTier: id === 1 \? "Gold" : id === 19 \? "Silver" : tier/);
   assert.equal(panel.match(/if \(previewOnly\) return;/g)?.length, 2);
   assert.match(panel, /if \(!previewOnly\) HomeRequest\.requestAdminHexCatalog\(\)/);

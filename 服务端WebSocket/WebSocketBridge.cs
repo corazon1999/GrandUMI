@@ -5957,7 +5957,7 @@ public static class WebSocketBridge
             draftDigest = state.Draft.Digest,
             draftSavedAt = state.Draft.SavedAt,
             draftSavedBy = state.Draft.SavedBy,
-            entries = HexCatalog.All.Select(definition => new
+            entries = HexCatalog.Configurable.Select(definition => new
             {
                 id = definition.Id,
                 name = definition.Name,

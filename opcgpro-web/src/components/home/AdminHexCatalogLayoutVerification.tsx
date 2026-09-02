@@ -8,7 +8,7 @@ import LayoutPreviewFrame from "./LayoutPreviewFrame";
 const activeDigest = `sha256:${"a".repeat(64)}`;
 const draftDigest = `sha256:${"b".repeat(64)}`;
 const regularIds = Array.from({ length: 56 }, (_, index) => index + 1)
-  .filter((candidate) => candidate !== 30 && candidate !== 48);
+  .filter((candidate) => candidate !== 27 && candidate !== 30 && candidate !== 48);
 
 function tierFor(id: number): HexTierSnapshot {
   if (id === 30) return "Silver";
@@ -32,8 +32,7 @@ function environmentState(environment: AdminDeploymentEnvironment): AdminHexCata
     draftDigest,
     draftSavedAt: Date.UTC(2026, 8, 2, 8, 15),
     draftSavedBy: "layout_operator_with_long_name",
-    entries: Array.from({ length: 56 }, (_, index) => {
-      const id = index + 1;
+    entries: Array.from({ length: 56 }, (_, index) => index + 1).filter((id) => id !== 27).map((id) => {
       const tier = tierFor(id);
       return {
         id,

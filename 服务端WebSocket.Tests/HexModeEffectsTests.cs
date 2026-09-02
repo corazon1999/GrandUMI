@@ -22,8 +22,8 @@ public sealed class HexModeEffectsTests
         [15] = "OnEnter.VirtualAttack", [16] = "EffectRuntime.Copy", [17] = "EffectRuntime.Copy",
         [18] = "PowerBonus", [19] = "CanRest", [20] = "OnAcquire/PowerBonus",
         [21] = "OnEnemyAffected", [22] = "OnCharacterKo", [23] = "OnCharacterKo",
-        [24] = "OnAttackDeclared", [25] = "OnAttackDeclared", [26] = "ResolveDamage",
-        [27] = "ResolveDamage", [28] = "OnCardPlayed", [29] = "OnCardPlayed", [30] = "StageSlots",
+        [24] = "OnAttackDeclared", [25] = "OnAttackDeclared", [26] = "OnAttackDeclared",
+        [27] = "Legacy.ResolveDamage", [28] = "OnCardPlayed", [29] = "OnCardPlayed", [30] = "StageSlots",
         [31] = "OnLifeAdded", [32] = "OnCardPlayed", [33] = "OnTurnStarted", [34] = "Power/AttackTarget",
         [35] = "OnCardPlayed", [36] = "HandCost", [37] = "HandCost", [38] = "Draw/Power",
         [39] = "Draw/HandCost", [40] = "OnTurnEnding", [41] = "OnEnemyAffected",
@@ -228,6 +228,91 @@ public sealed class HexModeEffectsTests
         raisedSeven.CostModPersistent = 1;
         Assert.Equal(8, state.CurrentCostOf(1, raisedSeven));
         Assert.Equal(3000, await DeclareAgainst(raisedSeven));
+    }
+
+    [Fact]
+    public async Task 万用瞄准镜_仅角色攻击获得本次战斗力量并同步权威快照()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 13, 15, 26);
+        var attacker = Card("HEX-SCOPE-CHARACTER", CardKind.Character, power: 5000);
+        me.Characters.Add(attacker);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = attacker.Id,
+            TargetIsLeader = true,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(1000, attacker.PowerModThisBattle);
+        Assert.Equal(6000, state.CurrentPowerOf(0, attacker));
+        Assert.Equal(0, HexRules.AttackSuccessDeficit(state, 0));
+        var publicState = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        Assert.Equal(6000, publicState.GetProperty("my").GetProperty("fieldCards")[0]
+            .GetProperty("powerCurrent").GetInt32());
+        var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        Assert.Equal(1000, privateState.GetProperty("players")[0].GetProperty("characters")[0]
+            .GetProperty("powerModThisBattle").GetInt32());
+        var checkpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
+        Assert.Equal(1000, checkpoint.GetProperty("players")[0].GetProperty("characters")[0]
+            .GetProperty("PowerModThisBattle").GetInt32());
+        Assert.True(HexRules.ShouldCopyEffect(state, 0, EffectTrigger.OnAttackDeclare, alreadyCopied: false));
+        Assert.Equal(1000, attacker.PowerModThisBattle);
+
+        BattleEngine.EndBattle(state);
+        Assert.Equal(0, attacker.PowerModThisBattle);
+        Assert.Equal(5000, state.CurrentPowerOf(0, attacker));
+
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = me.Leader.Id,
+            TargetIsLeader = true,
+        };
+        int leaderBefore = state.CurrentPowerOf(0, me.Leader);
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+        Assert.Equal(0, me.Leader.PowerModThisBattle);
+        Assert.Equal(leaderBefore, state.CurrentPowerOf(0, me.Leader));
+
+        BattleEngine.EndBattle(state);
+        var virtualAttackCharacter = DbCard("EB01-004");
+        Assert.True(HexRules.ShouldTriggerAttackEffectOnEntry(state, 0, virtualAttackCharacter));
+        Assert.Null(state.CurrentBattle);
+        Assert.Equal(0, virtualAttackCharacter.PowerModThisBattle);
+    }
+
+    [Fact]
+    public async Task 万用瞄准镜旧规则_保留低力量成功且强化版优先的历史语义()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.BoardingSalvoRulesRevision);
+        var attacker = Card("HEX-LEGACY-SCOPE", CardKind.Character, power: 5000);
+        me.Characters.Add(attacker);
+        OwnOnly(state, 0, 26);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = attacker.Id,
+            TargetIsLeader = true,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(0, attacker.PowerModThisBattle);
+        Assert.Equal(1000, HexRules.AttackSuccessDeficit(state, 0));
+        Own(state, 0, 27);
+        Assert.Equal(2000, HexRules.AttackSuccessDeficit(state, 0));
     }
 
     [Fact]

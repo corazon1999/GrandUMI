@@ -47,7 +47,9 @@ public static class HexRules
     public const int AstralBodyRulesRevision = 6;
     /// <summary>登舰礼炮改为每回合第2个实际发动的登场时效果额外结算所在的规则修订版。</summary>
     public const int BoardingSalvoRulesRevision = 7;
-    public const int CurrentRulesRevision = BoardingSalvoRulesRevision;
+    /// <summary>万用瞄准镜改为角色攻击时获得本次战斗力量，强化版退出常规池所在的规则修订版。</summary>
+    public const int ScopeReworkRulesRevision = 8;
+    public const int CurrentRulesRevision = ScopeReworkRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -568,6 +570,11 @@ public static class HexRules
         var runtime = state.HexState.Runtime[attackerSide];
         runtime.AttacksDeclaredThisTurn++;
 
+        if (state.HexState.RulesRevision >= ScopeReworkRulesRevision
+            && Has(state, attackerSide, 26)
+            && attacker.Info.Kind == CardKind.Character)
+            attacker.PowerModThisBattle += 1000;
+
         if (Has(state, attackerSide, 14))
             foreach (var card in player.Hand.Where(card => card.Info.Kind == CardKind.Event))
                 card.CostModThisTurn--;
@@ -813,7 +820,9 @@ public static class HexRules
         => !Has(state, playerIndex, 45) || state.HexState.Runtime[playerIndex].AttacksDeclaredThisTurn == 0;
 
     public static int AttackSuccessDeficit(GameState state, int attackerSide)
-        => Has(state, attackerSide, 27) ? 2000 : Has(state, attackerSide, 26) ? 1000 : 0;
+        => state.HexState.RulesRevision < ScopeReworkRulesRevision
+            ? Has(state, attackerSide, 27) ? 2000 : Has(state, attackerSide, 26) ? 1000 : 0
+            : 0;
 
     public static bool LeaderMayAttackLeader(GameState state, int attackerSide)
         => !Has(state, attackerSide, 34);

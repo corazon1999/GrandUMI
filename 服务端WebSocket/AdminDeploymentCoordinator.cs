@@ -142,11 +142,12 @@ public sealed class AdminDeploymentCoordinator
         actor = RequiredToken(actor, 64, "操作者");
         requestId = RequiredToken(requestId, 128, "请求编号");
         ArgumentNullException.ThrowIfNull(assignments);
-        var requested = HexCatalogConfiguration.CreateDraft(assignments);
 
         using var draftLock = AcquireLock(DraftLockPath(environment));
         var active = ReadActiveHexCatalog(environment);
         var current = ReadDraft(environment) ?? DraftFromActive(environment, active);
+        var requested = HexCatalogConfiguration.CreateDraft(
+            CompleteRetiredHexAssignments(assignments, current.Assignments));
         if (string.Equals(current.LastRequestId, requestId, StringComparison.Ordinal))
         {
             if (!string.Equals(current.Digest, requested.Digest, StringComparison.Ordinal))
@@ -329,6 +330,34 @@ public sealed class AdminDeploymentCoordinator
             SavedAt: null,
             SavedBy: null,
             LastRequestId: null);
+
+    private static IReadOnlyList<HexCatalogTierAssignment> CompleteRetiredHexAssignments(
+        IReadOnlyList<HexCatalogTierAssignment> assignments,
+        IReadOnlyList<HexCatalogTierAssignment> baseline)
+    {
+        var knownIds = HexCatalog.All.Select(item => item.Id).ToHashSet();
+        var configurableIds = HexCatalog.Configurable.Select(item => item.Id).ToHashSet();
+        var supplied = new Dictionary<int, HexTier>();
+        foreach (var assignment in assignments)
+        {
+            if (!knownIds.Contains(assignment.Id))
+                throw new InvalidDataException($"海克斯草稿包含未知编号 {assignment.Id}。");
+            if (!supplied.TryAdd(assignment.Id, assignment.Tier))
+                throw new InvalidDataException($"海克斯草稿重复包含编号 {assignment.Id}。");
+        }
+        if (!configurableIds.SetEquals(supplied.Keys.Where(configurableIds.Contains)))
+            throw new InvalidDataException("海克斯草稿必须包含完整的可调配目录。");
+
+        var baselineById = baseline.ToDictionary(item => item.Id, item => item.Tier);
+        foreach (var retired in HexCatalog.All.Where(item => HexCatalog.IsRetired(item.Id)))
+        {
+            if (!supplied.ContainsKey(retired.Id))
+                supplied.Add(retired.Id, baselineById[retired.Id]);
+        }
+        return supplied.OrderBy(item => item.Key)
+            .Select(item => new HexCatalogTierAssignment(item.Key, item.Value))
+            .ToArray();
+    }
 
     private string DraftPath(string environment) => Path.Combine(_draftDirectory, $"hex-{environment}.json");
     private string DraftLockPath(string environment) => Path.Combine(_draftDirectory, $".hex-{environment}.lock");

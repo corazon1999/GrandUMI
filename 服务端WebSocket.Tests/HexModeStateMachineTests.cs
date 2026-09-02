@@ -10,7 +10,7 @@ namespace GrandUMI.Tests;
 
 public sealed class HexModeStateMachineTests
 {
-    private static readonly int[] RainbowIds = [5, 9, 10, 11, 12, 13, 14, 19, 27, 28, 29, 35, 38, 39, 40, 46, 47, 53];
+    private static readonly int[] RainbowIds = [5, 9, 10, 11, 12, 13, 14, 19, 28, 29, 35, 38, 39, 40, 46, 47, 53];
     private static readonly int[] GoldIds = [1, 2, 3, 4, 6, 7, 15, 16, 17, 18, 21, 26, 32, 36, 37, 49, 51, 56];
     private static readonly int[] SilverIds = [8, 20, 22, 23, 24, 25, 31, 33, 34, 41, 42, 43, 44, 45, 50, 52, 54, 55];
 
@@ -20,10 +20,15 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(RainbowIds, HexCatalog.ForTier(HexTier.Rainbow).Select(item => item.Id).Order().ToArray());
         Assert.Equal(GoldIds, HexCatalog.ForTier(HexTier.Gold).Select(item => item.Id).Order().ToArray());
         Assert.Equal(SilverIds, HexCatalog.ForTier(HexTier.Silver).Select(item => item.Id).Order().ToArray());
-        Assert.All(Enum.GetValues<HexTier>(), tier => Assert.Equal(18, HexCatalog.ForTier(tier).Count));
-        Assert.Equal(54, HexCatalog.Regular.Select(item => item.Id).Distinct().Count());
+        Assert.Equal(18, HexCatalog.ForTier(HexTier.Silver).Count);
+        Assert.Equal(18, HexCatalog.ForTier(HexTier.Gold).Count);
+        Assert.Equal(17, HexCatalog.ForTier(HexTier.Rainbow).Count);
+        Assert.Equal(53, HexCatalog.Regular.Select(item => item.Id).Distinct().Count());
         Assert.Equal(new[] { 30, 48 }, HexCatalog.Alternatives.Select(item => item.Id).Order().ToArray());
         Assert.Equal(56, HexCatalog.All.Select(item => item.Id).Distinct().Count());
+        Assert.Equal(55, HexCatalog.Configurable.Select(item => item.Id).Distinct().Count());
+        Assert.True(HexCatalog.IsRetired(27));
+        Assert.DoesNotContain(HexCatalog.Configurable, item => item.Id == 27);
         Assert.DoesNotContain(HexCatalog.Regular, item => HexCatalog.IsAlternative(item.Id));
         Assert.Equal("Rainbow", HexTier.Rainbow.ToString());
         Assert.Equal("棱彩", HexCatalog.TierDisplayName(HexTier.Rainbow));
@@ -41,7 +46,8 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(5, HexRules.CatalogConfigurationRulesRevision);
         Assert.Equal(6, HexRules.AstralBodyRulesRevision);
         Assert.Equal(7, HexRules.BoardingSalvoRulesRevision);
-        Assert.Equal(HexRules.BoardingSalvoRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(8, HexRules.ScopeReworkRulesRevision);
+        Assert.Equal(HexRules.ScopeReworkRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal(
             "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
             HexCatalog.Get(6).Description);
@@ -55,15 +61,20 @@ public sealed class HexModeStateMachineTests
             "每回合第一个实际发动的【登场时】效果额外结算1次。",
             HexCatalog.DescriptionForRevision(16, HexRules.AstralBodyRulesRevision));
         Assert.Equal(
+            "己方所有角色获得【攻击时】：直到本次战斗结束，力量+1000。",
+            HexCatalog.Get(26).Description);
+        Assert.Equal(
+            "己方攻击结算时，力量低1000也视为成功。",
+            HexCatalog.DescriptionForRevision(26, HexRules.BoardingSalvoRulesRevision));
+        Assert.Equal(
             "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
             HexCatalog.Get(42).Description);
         Assert.Equal("获得时确定性随机获得1个金色海克斯。", HexCatalog.Get(55).Description);
         Assert.Equal(
             "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             HexCatalog.DescriptionForRevision(55, HexRules.PerSlotRefreshRulesRevision));
-        Assert.Equal(
-            HexCatalog.Regular.Select(item => item.Id),
-            HexCatalog.RegularForRevision(HexRules.BalanceRulesRevision).Select(item => item.Id));
+        Assert.Contains(HexCatalog.RegularForRevision(HexRules.BoardingSalvoRulesRevision), item => item.Id == 27);
+        Assert.DoesNotContain(HexCatalog.RegularForRevision(HexRules.ScopeReworkRulesRevision), item => item.Id == 27);
         Assert.True(HexCatalog.IsAlternative(30, HexRules.BalanceRulesRevision));
     }
 
@@ -114,6 +125,39 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(HexRules.CurrentRulesRevision, rebuilt.State.HexState.RulesRevision);
         Assert.Equal(3, rebuilt.State.HexState.DraftTierSequence.Count);
         Assert.Equal(HexCatalogConfiguration.BuiltIn.Digest, rebuilt.State.HexState.CatalogDigest);
+    }
+
+    [Fact]
+    public async Task 旧规则录像_保留退役强化瞄准镜与建局时品质映射()
+    {
+        TestScene.New();
+        var deck = BuildLegalDeck();
+        var assignments = HexCatalogConfiguration.BuiltIn.Assignments
+            .Select(item => item.Id == 26
+                ? item with { Tier = HexTier.Rainbow }
+                : item.Id == 27
+                    ? item with { Tier = HexTier.Gold }
+                    : item)
+            .ToArray();
+        var historical = HexCatalogConfiguration.CreateHistoricalSnapshot(12, assignments);
+
+        var rebuilt = await MatchReplay.RebuildAsync(
+            "legacy-scope-replay",
+            seed: 270026,
+            firstPlayer: 0,
+            ("alice", deck),
+            ("bob", deck),
+            Array.Empty<MatchReplay.ActionEntry>(),
+            matchKind: MatchKind.Hex,
+            hexMode: true,
+            hexRulesRevision: HexRules.BoardingSalvoRulesRevision,
+            hexCatalogConfiguration: historical);
+
+        Assert.Equal(HexRules.BoardingSalvoRulesRevision, rebuilt.State.HexState.RulesRevision);
+        Assert.Equal(historical.Digest, rebuilt.State.HexState.CatalogDigest);
+        Assert.Equal(HexTier.Gold, HexCatalog.TierForState(27, rebuilt.State.HexState));
+        Assert.Contains(HexCatalog.RegularForState(rebuilt.State.HexState), item => item.Id == 27);
+        Assert.Equal("强化万用瞄准镜", HexCatalog.Get(27).Name);
     }
 
     [Fact]

@@ -107,6 +107,8 @@ active_path = {
 allowed_tiers = {"Silver", "Gold", "Rainbow"}
 known_ids = set(range(1, 57))
 alternative_ids = {30, 48}
+retired_ids = {27}
+required_regular_counts = {"Silver": 18, "Gold": 18, "Rainbow": 17}
 built_in_digest = "sha256:b466b6465456221da8edbb2eaee26df5771b5ed07b2002d77c5892a145b8b430"
 
 def fail(message):
@@ -116,7 +118,7 @@ def canonical_digest(tiers):
     canonical = "".join(f"{item['id']}:{item['tier']}\n" for item in sorted(tiers, key=lambda value: value["id"]))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-def validate_tiers(tiers, label):
+def validate_tiers(tiers, label, require_current_balance=True):
     if not isinstance(tiers, list) or len(tiers) != len(known_ids):
         fail(f"{label}必须包含完整目录")
     seen = set()
@@ -127,10 +129,14 @@ def validate_tiers(tiers, label):
         if type(hex_id) is not int or hex_id not in known_ids or hex_id in seen or tier not in allowed_tiers:
             fail(f"{label}包含未知、重复编号或无效品质")
         seen.add(hex_id)
-    for tier in allowed_tiers:
-        count = sum(1 for item in tiers if item["id"] not in alternative_ids and item["tier"] == tier)
-        if count != 18:
-            fail(f"{label}的 {tier} 常规海克斯必须恰好为 18 个，当前为 {count} 个，拒绝激活")
+    if require_current_balance:
+        for tier, required in required_regular_counts.items():
+            count = sum(1 for item in tiers
+                        if item["id"] not in alternative_ids
+                        and item["id"] not in retired_ids
+                        and item["tier"] == tier)
+            if count != required:
+                fail(f"{label}的 {tier} 常规海克斯必须恰好为 {required} 个，当前为 {count} 个，拒绝激活")
 
 with open(request_path, "r", encoding="utf-8") as source:
     request = json.load(source)
@@ -172,7 +178,8 @@ if os.path.exists(active_path):
         fail("目标环境 active 海克斯配置版本无效")
     if type(current_source_draft_revision) is not int or current_source_draft_revision < 1:
         fail("目标环境 active 海克斯配置草稿版本无效")
-    validate_tiers(current_tiers, "目标环境 active 海克斯配置")
+    # 旧 active 创建时仍把编号 27 计入 18/18/18；代码升级不能因此拒绝启动或阻断下一次调配。
+    validate_tiers(current_tiers, "目标环境 active 海克斯配置", require_current_balance=False)
     if not isinstance(current_digest, str) or current_digest != canonical_digest(current_tiers):
         fail("目标环境 active 海克斯配置摘要无效")
     if current.get("sourceRequestId") == request_id:
