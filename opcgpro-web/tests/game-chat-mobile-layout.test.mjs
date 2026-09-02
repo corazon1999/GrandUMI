@@ -75,12 +75,53 @@ test("特殊聊天只发送槽位且由服务端回包决定文案样式与显�
   assert.match(panel, /data-style-token=\{bubble\.styleToken\}/);
 });
 
-test("六槽快捷装饰与双方限时气泡兼容旋转安全区和44像素触控", async () => {
+test("六槽快捷装饰采用无滚动单行图标布局并保留可访问名称", async () => {
   const panel = await read("src/components/game/GameChatPanel.tsx");
 
   for (const slot of ["greeting", "praise", "thanks", "surprise", "mistake", "threat"]) {
     assert.match(panel, new RegExp(`slot: "${slot}"`));
   }
+  assert.match(panel, /data-chat-decoration-quickbar/);
+  assert.match(panel, /grid grid-cols-6 gap-0\.5 overflow-x-hidden/);
+  assert.doesNotMatch(panel, /flex touch-pan-x gap-1\.5 overflow-x-auto overscroll-x-contain/);
+  assert.match(panel, /data-chat-decoration-slot=\{slot\}/);
+  assert.match(panel, /className="flex min-h-12 min-w-12 items-center justify-center/);
+  assert.match(panel, /aria-label=\{accessibleLabel\}/);
+  assert.match(panel, /title=\{decoration[\s\S]*?accessibleLabel/);
+  assert.doesNotMatch(panel, /<span>\{label\}<\/span>/);
+  assert.doesNotMatch(panel, /max-w-16 truncate text-\[9px\]/);
+  assert.doesNotMatch(panel, /max-md:w-64/);
+});
+
+test("两档手机竖屏旋转后六个装饰按钮同排且实际触控尺寸至少44像素", () => {
+  const dialogWidth = 320;
+  const horizontalPadding = 16;
+  const gap = 2;
+  const buttonCount = 6;
+  const designButtonWidth = (dialogWidth - horizontalPadding - gap * (buttonCount - 1)) / buttonCount;
+
+  assert.ok(designButtonWidth >= 48, "320px 聊天面板无法同排容纳六个 48px 按钮");
+
+  for (const [hostWidth, hostHeight] of [[390, 844], [360, 780]]) {
+    const scale = calculateLayoutScale({
+      hostWidth,
+      hostHeight,
+      canvasWidth: 844,
+      canvasHeight: 390,
+      rotateQuarterTurn: true,
+      edgeToEdge: true,
+    });
+
+    assert.ok(
+      Math.min(48, designButtonWidth) * scale >= 44,
+      `${hostWidth}×${hostHeight} 的装饰按钮触控尺寸不足44px`,
+    );
+  }
+});
+
+test("双方限时装饰气泡兼容旋转安全区", async () => {
+  const panel = await read("src/components/game/GameChatPanel.tsx");
+
   assert.match(panel, /DECORATION_BUBBLE_MS = 4200/);
   assert.match(panel, /data-chat-decoration-bubble-layer/);
   assert.match(panel, /data-display-side=\{side\}/);
@@ -88,8 +129,6 @@ test("六槽快捷装饰与双方限时气泡兼容旋转安全区和44像素触
   assert.match(panel, /var\(--layout-safe-right,0px\)/);
   assert.match(panel, /var\(--layout-safe-bottom,0px\)/);
   assert.match(panel, /var\(--layout-safe-top,0px\)/);
-  assert.match(panel, /data-chat-decoration-quickbar/);
-  assert.match(panel, /min-h-12 min-w-\[5\.25rem\]/);
   assert.match(panel, /文案与样式由服务器确认/);
   assert.match(panel, /mutedRef\.current && !isSelf/);
   assert.match(panel, /else if \(!isSelf && !openRef\.current\)/);

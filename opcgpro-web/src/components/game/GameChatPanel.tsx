@@ -473,7 +473,7 @@ export default function GameChatPanel({
           <div
             data-game-chat-dialog
             className={`pointer-events-auto flex flex-col overflow-hidden rounded-xl bg-slate-900/95 shadow-2xl ring-1 ring-white/15 ${
-              rotateQuarterTurn ? "" : "w-80 max-md:w-64"
+              rotateQuarterTurn ? "" : "w-80"
             }`}
             style={
               rotateQuarterTurn
@@ -547,24 +547,26 @@ export default function GameChatPanel({
                   </span>
                   <span className="text-[10px] text-slate-500">文案与样式由服务器确认</span>
                 </div>
-                <div className="flex touch-pan-x gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
+                <div className="grid grid-cols-6 gap-0.5 overflow-x-hidden">
                   {DECORATION_SLOTS.map(({ slot, label, icon }) => {
                     const decoration = equippedDecorations.get(slot);
+                    const accessibleLabel = decoration
+                      ? `${label}：${t(decoration.name)}`
+                      : `${label}：未装配`;
                     return (
                       <button
                         key={slot}
                         type="button"
+                        data-chat-decoration-slot={slot}
                         onClick={() => sendDecoration(slot)}
                         disabled={coolingDown || !decoration}
-                        aria-label={decoration ? `${label}：${t(decoration.name)}` : `${label}：未装配`}
-                        title={decoration ? t(decoration.text) : "请先在交易所购买并装配"}
-                        className="flex min-h-12 min-w-[5.25rem] shrink-0 flex-col items-center justify-center rounded-xl border border-amber-300/20 bg-slate-800/90 px-2 text-[10px] font-bold text-amber-50 transition-colors hover:border-amber-300/45 hover:bg-slate-700 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-600 disabled:opacity-70"
+                        aria-label={accessibleLabel}
+                        title={decoration
+                          ? `${accessibleLabel} · ${t(decoration.text)}`
+                          : `${accessibleLabel} · 请先在交易所购买并装配`}
+                        className="flex min-h-12 min-w-12 items-center justify-center rounded-xl border border-amber-300/20 bg-slate-800/90 text-lg text-amber-50 transition-colors hover:border-amber-300/45 hover:bg-slate-700 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-600 disabled:opacity-70"
                       >
-                        <span aria-hidden="true" className="text-sm">{icon}</span>
-                        <span>{label}</span>
-                        <span className="max-w-16 truncate text-[9px] font-normal opacity-70">
-                          {decoration ? t(decoration.name) : "未装配"}
-                        </span>
+                        <span aria-hidden="true">{icon}</span>
                       </button>
                     );
                   })}
