@@ -51,7 +51,9 @@ public static class HexRules
     public const int ScopeReworkRulesRevision = 8;
     /// <summary>终极刷新改为打出原本费用 10 的卡后最多活跃 8 张休息咚所在的规则修订版。</summary>
     public const int UltimateRefreshRulesRevision = 9;
-    public const int CurrentRulesRevision = UltimateRefreshRulesRevision;
+    /// <summary>炼狱导管改为永久减费，面包类减费增加最终费用 1 下限所在的规则修订版。</summary>
+    public const int PermanentCostFloorRulesRevision = 10;
+    public const int CurrentRulesRevision = PermanentCostFloorRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -487,9 +489,13 @@ public static class HexRules
     public static int AdjustFinalHandCost(GameState state, int playerIndex, CardInstance card, int cost)
     {
         int normalized = Math.Max(0, cost);
-        return card.Info.Kind == CardKind.Event && Has(state, playerIndex, 46)
+        int adjusted = card.Info.Kind == CardKind.Event && Has(state, playerIndex, 46)
             ? checked(normalized * 2)
             : normalized;
+        bool breadFloorApplies = state.HexState.RulesRevision >= PermanentCostFloorRulesRevision
+            && (card.Info.Kind == CardKind.Character && Has(state, playerIndex, 36)
+                || card.Info.Kind == CardKind.Event && Has(state, playerIndex, 37));
+        return breadFloorApplies ? Math.Max(1, adjusted) : adjusted;
     }
 
     public static int CounterBonus(GameState state, int playerIndex, CardInstance card)
@@ -650,7 +656,12 @@ public static class HexRules
             if (Has(state, playerIndex, 3)) player.Leader.PowerModThisTurn += 1000;
             if (Has(state, playerIndex, 35))
                 foreach (var card in player.Hand.Where(card => card.Info.Kind == CardKind.Event))
-                    card.CostModThisTurn--;
+                {
+                    if (state.HexState.RulesRevision >= PermanentCostFloorRulesRevision)
+                        card.CostModPersistent--;
+                    else
+                        card.CostModThisTurn--;
+                }
         }
 
         if (result.Card.Info.Cost == 10)

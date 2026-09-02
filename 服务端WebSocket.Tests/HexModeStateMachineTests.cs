@@ -48,7 +48,8 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(7, HexRules.BoardingSalvoRulesRevision);
         Assert.Equal(8, HexRules.ScopeReworkRulesRevision);
         Assert.Equal(9, HexRules.UltimateRefreshRulesRevision);
-        Assert.Equal(HexRules.UltimateRefreshRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(10, HexRules.PermanentCostFloorRulesRevision);
+        Assert.Equal(HexRules.PermanentCostFloorRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal(
             "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
             HexCatalog.Get(6).Description);
@@ -73,6 +74,11 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(
             "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
             HexCatalog.DescriptionForRevision(28, HexRules.ScopeReworkRulesRevision));
+        Assert.Equal(
+            "每从手牌打出1张事件，使当前手牌中全部事件费用永久-1。",
+            HexCatalog.Get(35).Description);
+        Assert.Equal("手牌中角色实际支付费用-1，且最低为1。", HexCatalog.Get(36).Description);
+        Assert.Equal("手牌中事件实际支付费用-1，且最低为1。", HexCatalog.Get(37).Description);
         Assert.Equal(
             "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
             HexCatalog.Get(42).Description);

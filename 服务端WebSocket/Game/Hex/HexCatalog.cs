@@ -51,9 +51,9 @@ public static class HexCatalog
         H(32, "老练狙神", HexTier.Gold, "每回合1次，从手牌打出原本费用3以上事件后，按实际支付费用转活跃等量休息咚!!。"),
         H(33, "回力OK镖", HexTier.Silver, "每个己方回合开始时，随机令对方1个角色本回合力量-2000。"),
         H(34, "亮出你的剑", HexTier.Silver, "己方领袖力量+2000，但不能攻击敌方领袖。"),
-        H(35, "炼狱导管", HexTier.Rainbow, "每从手牌打出1张事件，使手中全部事件费用-1至回合结束。"),
-        H(36, "面包和果酱", HexTier.Gold, "手牌中角色实际支付费用-1。"),
-        H(37, "面包和奶酪", HexTier.Gold, "手牌中事件实际支付费用-1。"),
+        H(35, "炼狱导管", HexTier.Rainbow, "每从手牌打出1张事件，使当前手牌中全部事件费用永久-1。"),
+        H(36, "面包和果酱", HexTier.Gold, "手牌中角色实际支付费用-1，且最低为1。"),
+        H(37, "面包和奶酪", HexTier.Gold, "手牌中事件实际支付费用-1，且最低为1。"),
         H(38, "魔法转物理", HexTier.Rainbow, "每回合抽到第1张事件时自动丢弃并抽1张；己方角色力量+1000。"),
         H(39, "物理转魔法", HexTier.Rainbow, "每回合抽到第1张角色时自动丢弃并抽1张；己方事件费用-2。"),
         H(40, "慢炖", HexTier.Rainbow, "每个己方回合结束时，对方当前所有活跃角色永久力量-1000。"),
@@ -128,6 +128,10 @@ public static class HexCatalog
                 "己方攻击结算时，力量低1000也视为成功。",
             (28, < HexRules.UltimateRefreshRulesRevision) =>
                 "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
+            (35, < HexRules.PermanentCostFloorRulesRevision) =>
+                "每从手牌打出1张事件，使手中全部事件费用-1至回合结束。",
+            (36, < HexRules.PermanentCostFloorRulesRevision) => "手牌中角色实际支付费用-1。",
+            (37, < HexRules.PermanentCostFloorRulesRevision) => "手牌中事件实际支付费用-1。",
             (55, < HexRules.TransmutationPresentationRulesRevision) =>
                 "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             _ => Get(id).Description,

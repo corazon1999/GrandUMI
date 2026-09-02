@@ -117,6 +117,144 @@ public sealed class HexModeEffectsTests
     }
 
     [Fact]
+    public void 面包减费_新版在全部叠加与费用翻倍后保持最终费用至少一()
+    {
+        var state = HexState();
+        var me = state.Players[0];
+        var character = Card("HEX-BREAD-CHARACTER", CardKind.Character, cost: 5);
+        character.CostModThisTurn = -2;
+        character.CostModPersistent = -2;
+        state.OneShotPlayDiscounts.Add(new OneShotPlayDiscount
+        {
+            Owner = 0,
+            Amount = 5,
+            MinCost = 0,
+            Kind = "Character",
+        });
+        var unrelatedEvent = Card("HEX-BREAD-UNRELATED-EVENT", CardKind.Event, cost: 0);
+        var zeroCostCharacter = Card("HEX-BREAD-ZERO", CardKind.Character, cost: 0);
+        var oneCostCharacter = Card("HEX-BREAD-ONE", CardKind.Character, cost: 1);
+
+        OwnOnly(state, 0, 36);
+
+        Assert.Equal(1, state.HandPlayCost(0, character));
+        Assert.Equal(1, state.HandPlayCost(0, zeroCostCharacter));
+        Assert.Equal(1, state.HandPlayCost(0, oneCostCharacter));
+        Assert.Equal(0, state.HandPlayCost(0, unrelatedEvent));
+
+        var eventCard = Card("HEX-CHEESE-EVENT", CardKind.Event, cost: 1);
+        var zeroCostEvent = Card("HEX-CHEESE-ZERO", CardKind.Event, cost: 0);
+        var unrelatedCharacter = Card("HEX-CHEESE-UNRELATED-CHARACTER", CardKind.Character, cost: 0);
+        OwnOnly(state, 0, 37);
+
+        Assert.Equal(1, state.HandPlayCost(0, eventCard));
+        Assert.Equal(1, state.HandPlayCost(0, zeroCostEvent));
+        Assert.Equal(0, state.HandPlayCost(0, unrelatedCharacter));
+
+        eventCard.CostModThisTurn = -3;
+        eventCard.CostModPersistent = -4;
+        Own(state, 0, 39, 46);
+
+        Assert.Equal(1, state.HandPlayCost(0, eventCard));
+    }
+
+    [Fact]
+    public async Task 炼狱导管_只永久降低每次触发时已经在手牌中的事件()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 35);
+        var firstHeldEvent = Card("HEX-CONDUIT-FIRST", CardKind.Event, cost: 4);
+        var secondHeldEvent = Card("HEX-CONDUIT-SECOND", CardKind.Event, cost: 3);
+        var heldCharacter = Card("HEX-CONDUIT-CHARACTER", CardKind.Character, cost: 2);
+        var firstPlayedEvent = Card("HEX-CONDUIT-PLAYED-1", CardKind.Event);
+        me.Hand.AddRange([firstPlayedEvent, firstHeldEvent, secondHeldEvent, heldCharacter]);
+
+        await HexRules.OnCardPlayedAsync(engine, 0, CardPlayer.Play(state, 0, 0));
+
+        Assert.Equal(0, firstPlayedEvent.CostModPersistent);
+        Assert.Equal(-1, firstHeldEvent.CostModPersistent);
+        Assert.Equal(-1, secondHeldEvent.CostModPersistent);
+        Assert.Equal(0, firstHeldEvent.CostModThisTurn);
+        Assert.Equal(0, heldCharacter.CostModPersistent);
+
+        var laterDrawnEvent = Card("HEX-CONDUIT-LATER-DRAW", CardKind.Event, cost: 5);
+        me.Deck.Add(laterDrawnEvent);
+        Assert.Equal(1, TurnEngine.DrawCard(state, 0, 1));
+        Assert.Equal(0, laterDrawnEvent.CostModPersistent);
+
+        var secondPlayedEvent = Card("HEX-CONDUIT-PLAYED-2", CardKind.Event);
+        me.Hand.Add(secondPlayedEvent);
+        await HexRules.OnCardPlayedAsync(
+            engine,
+            0,
+            CardPlayer.Play(state, 0, me.Hand.IndexOf(secondPlayedEvent)));
+
+        Assert.Equal(0, secondPlayedEvent.CostModPersistent);
+        Assert.Equal(-2, firstHeldEvent.CostModPersistent);
+        Assert.Equal(-2, secondHeldEvent.CostModPersistent);
+        Assert.Equal(-1, laterDrawnEvent.CostModPersistent);
+
+        firstHeldEvent.CostModThisTurn = -3;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(0, firstHeldEvent.CostModThisTurn);
+        Assert.Equal(-2, firstHeldEvent.CostModPersistent);
+
+        var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        var privateCard = privateState.GetProperty("players")[0].GetProperty("hand")
+            .EnumerateArray()
+            .Single(card => card.GetProperty("number").GetString() == firstHeldEvent.Info.Number);
+        Assert.Equal(-2, privateCard.GetProperty("costModPersistent").GetInt32());
+        var checkpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
+        var replayCard = checkpoint.GetProperty("players")[0].GetProperty("hand")
+            .EnumerateArray()
+            .Single(card => card.GetProperty("number").GetString() == firstHeldEvent.Info.Number);
+        Assert.Equal(-2, replayCard.GetProperty("CostModPersistent").GetInt32());
+    }
+
+    [Fact]
+    public async Task 上一规则修订_炼狱导管与面包减费继续使用回合内和零费语义()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.UltimateRefreshRulesRevision);
+        OwnOnly(state, 0, 35, 36, 37);
+        var eventCard = Card("HEX-LEGACY-CONDUIT", CardKind.Event, cost: 1);
+        var character = Card("HEX-LEGACY-BREAD", CardKind.Character, cost: 1);
+        me.Hand.AddRange([eventCard, character]);
+
+        await HexRules.OnCardPlayedAsync(
+            engine,
+            0,
+            new PlayResult(PlayKind.Event, Card("HEX-LEGACY-PLAYED", CardKind.Event), 0));
+
+        Assert.Equal(-1, eventCard.CostModThisTurn);
+        Assert.Equal(0, eventCard.CostModPersistent);
+        Assert.Equal(0, state.HandPlayCost(0, eventCard));
+        Assert.Equal(0, state.HandPlayCost(0, character));
+        Assert.Equal(
+            "每从手牌打出1张事件，使手中全部事件费用-1至回合结束。",
+            HexCatalog.DescriptionForRevision(35, state.HexState.RulesRevision));
+        Assert.Equal(
+            "手牌中角色实际支付费用-1。",
+            HexCatalog.DescriptionForRevision(36, state.HexState.RulesRevision));
+        Assert.Equal(
+            "手牌中事件实际支付费用-1。",
+            HexCatalog.DescriptionForRevision(37, state.HexState.RulesRevision));
+
+        var snapshot = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        Assert.Equal(HexRules.UltimateRefreshRulesRevision,
+            snapshot.GetProperty("hexState").GetProperty("RulesRevision").GetInt32());
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(0, eventCard.CostModThisTurn);
+        Assert.Equal(0, eventCard.CostModPersistent);
+    }
+
+    [Fact]
     public async Task 出牌攻击和回合钩子_覆盖成长刷新狙击与累计条件()
     {
         var engine = CreateEngine();
@@ -127,15 +265,17 @@ public sealed class HexModeEffectsTests
 
         Own(state, 0, 2, 3, 28, 29, 32, 35);
         state.HexState.Runtime[0].CardsPlayedThisTurn = 2;
-        me.Deck.Add(Card("HEX-DRAW", CardKind.Character));
+        me.Deck.Add(Card("HEX-DRAW", CardKind.Event));
         var discounted = Card("HEX-E2", CardKind.Event, cost: 2);
         me.Hand.Add(discounted);
         me.CostArea.AddRange(Enumerable.Range(0, 4).Select(_ => new DonCard { State = DonState.Rest }));
         var eventCard = Card("HEX-E3", CardKind.Event, cost: 3);
         await HexRules.OnCardPlayedAsync(engine, 0, new PlayResult(PlayKind.Event, eventCard, 3));
-        Assert.Single(me.Hand.Where(card => card.Info.Number == "HEX-DRAW"));
+        var drawnDuringPlayHook = Assert.Single(me.Hand.Where(card => card.Info.Number == "HEX-DRAW"));
         Assert.Equal(1000, me.Leader.PowerModThisTurn);
-        Assert.Equal(-1, discounted.CostModThisTurn);
+        Assert.Equal(-1, discounted.CostModPersistent);
+        Assert.Equal(-1, drawnDuringPlayHook.CostModPersistent);
+        Assert.Equal(0, discounted.CostModThisTurn);
         Assert.Equal(3, me.CostArea.Count(don => don.State == DonState.Active));
 
         var tenCost = Card("HEX-C10", CardKind.Character, power: 10000, cost: 10);
