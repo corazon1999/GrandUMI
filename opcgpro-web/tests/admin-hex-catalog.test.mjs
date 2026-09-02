@@ -23,7 +23,7 @@ const [panel, admin, protocol, store, types, bridge, coordinator, rules, roomMan
 const contract = JSON.parse(contractText);
 
 test("管理员面板接入独立海克斯品质配置协议和权威状态", () => {
-  assert.match(admin, /<AdminHexCatalogPanel \/>/);
+  assert.match(admin, /<AdminHexCatalogPanel/);
   assert.match(types, /interface MsgAdminHexCatalog/);
   assert.match(types, /interface AdminHexCatalogEnvironmentState/);
   assert.match(store, /adminHexCatalog: AdminHexCatalogState/);

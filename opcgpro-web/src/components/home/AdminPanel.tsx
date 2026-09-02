@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { showMessage } from "@/components/ui/MessageBox";
 import { positionLineChartTooltip } from "@/lib/lineChartTooltip";
 import { normalizeQq } from "@/lib/qqWhitelist.mjs";
@@ -22,9 +22,19 @@ type AdminPanelProps = {
   onOpenCardBackReview: () => void;
   onOpenPlayers: () => void;
   onReturnToLobby: () => void;
+  layoutVerification?: boolean;
 };
 
 type ExpandedTrend = "peak" | "dailyActive" | "matches" | null;
+
+const ADMIN_TABS = [
+  { id: "overview", label: "概览" },
+  { id: "content", label: "内容管理" },
+  { id: "operations", label: "运营与安全" },
+  { id: "rules", label: "规则与发布" },
+] as const;
+
+type AdminTab = (typeof ADMIN_TABS)[number]["id"];
 
 function StatusCard({
   label,
@@ -351,17 +361,20 @@ function shortCommit(commit?: string | null) {
   return commit ? commit.slice(0, 12) : "—";
 }
 
-export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onReturnToLobby }: AdminPanelProps) {
+export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onReturnToLobby, layoutVerification = false }: AdminPanelProps) {
   const account = useNetStore((state) => state.account);
   const playerName = useNetStore((state) => state.playerName);
   const connState = useNetStore((state) => state.connState);
   const maintenance = useNetStore((state) => state.maintenance);
   const reviewQueue = useNetStore((state) => state.cardBackReviewQueue);
   const adminOperations = useNetStore((state) => state.adminOperations);
+  const adminHexCatalog = useNetStore((state) => state.adminHexCatalog);
+  const operationsWorkbench = useNetStore((state) => state.operationsWorkbench);
   const adminApproval = useNetStore((state) => state.operationsWorkbench.approval);
   const adminPlayerSearchResults = useNetStore((state) => state.adminPlayerSearchResults);
   const adminTemporaryPassword = useNetStore((state) => state.adminTemporaryPassword);
   const [announcement, setAnnouncement] = useState("");
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
   const [expandedTrend, setExpandedTrend] = useState<ExpandedTrend>(null);
   const [peakRange, setPeakRange] = useState<7 | 30>(7);
@@ -373,6 +386,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const [renameValue, setRenameValue] = useState("");
   const [qqBindingValue, setQqBindingValue] = useState("");
   const qqMutationRequestRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const connected = connState === "connected";
   const pendingReviews = reviewQueue?.length;
@@ -387,7 +401,20 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
   const selectedPlayer = adminPlayerSearchResults.find((player) => player.account === selectedPlayerAccount) ?? null;
 
   const toggleTrend = (trend: Exclude<ExpandedTrend, null>) => {
+    setActiveTab("overview");
     setExpandedTrend((current) => current === trend ? null : trend);
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % ADMIN_TABS.length;
+    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + ADMIN_TABS.length) % ADMIN_TABS.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = ADMIN_TABS.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    setActiveTab(ADMIN_TABS[nextIndex].id);
+    tabRefs.current[nextIndex]?.focus();
   };
 
   useEffect(() => {
@@ -595,7 +622,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
 
   return (
     <section className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.08),transparent_34%)]" data-testid="admin-panel">
-      <div className="mx-auto w-full max-w-6xl px-4 py-5 @[720px]:px-6 @[720px]:py-7">
+      <div className="mx-auto w-full max-w-6xl px-4 py-5 pb-[max(1.25rem,var(--layout-safe-bottom,env(safe-area-inset-bottom)))] @[720px]:px-6 @[720px]:py-7">
         <header className="flex flex-col gap-4 @[640px]:flex-row @[640px]:items-end @[640px]:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -676,6 +703,62 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             className="col-span-2 @[720px]:col-span-3 @[1040px]:col-span-2"
           />
         </div>
+
+        <nav
+          aria-label="管理员功能分类"
+          className="sticky top-[var(--layout-safe-top,env(safe-area-inset-top))] z-20 -mx-1 mt-5 overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-800 bg-gray-950/95 p-1 shadow-xl backdrop-blur"
+        >
+          <div role="tablist" aria-label="管理员功能分页" className="grid min-w-[32rem] grid-cols-4 gap-1">
+            {ADMIN_TABS.map((tab, index) => {
+              const selected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  ref={(element) => { tabRefs.current[index] = element; }}
+                  id={`admin-tab-${tab.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls={`admin-panel-${tab.id}`}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  className={`min-h-11 min-w-28 rounded-xl px-3 text-sm font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${selected ? "bg-amber-500 text-gray-950 shadow-lg shadow-amber-950/30" : "text-gray-400 hover:bg-gray-900 hover:text-white"}`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div
+          id="admin-panel-overview"
+          role="tabpanel"
+          aria-labelledby="admin-tab-overview"
+          hidden={activeTab !== "overview"}
+          className={activeTab === "overview" ? "" : "hidden"}
+        >
+          <section aria-label="管理概览" className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/60 p-4 @[640px]:p-5">
+            <p className="text-xs font-bold tracking-[0.16em] text-amber-400">OVERVIEW</p>
+            <h2 className="mt-1 text-lg font-black text-white">管理概览</h2>
+            <p className="mt-1 text-xs leading-5 text-gray-400">点击上方统计卡可展开趋势；其他管理能力已按内容、运营安全、规则发布三个方向归类。</p>
+            <div className="mt-4 grid gap-2 @[620px]:grid-cols-3">
+              {ADMIN_TABS.slice(1).map((tab, index) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    tabRefs.current[index + 1]?.focus();
+                  }}
+                  className="min-h-11 rounded-xl border border-gray-700 bg-gray-950 px-4 text-left text-sm font-bold text-gray-200 hover:border-amber-600 hover:bg-amber-950/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                >
+                  前往{tab.label}
+                </button>
+              ))}
+            </div>
+          </section>
 
         {expandedTrend === "peak" && (
           <section id="online-peak-panel" aria-label="峰值在线玩家" className="mt-4 rounded-2xl border border-cyan-900/70 bg-cyan-950/15 p-4 @[640px]:p-5">
@@ -761,6 +844,15 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             <p className="mt-2 text-[11px] text-gray-500">统计缓存更新于 {formatTimestamp(adminOperations.matchesUpdatedAt)}</p>
           </section>
         )}
+        </div>
+
+        <div
+          id="admin-panel-content"
+          role="tabpanel"
+          aria-labelledby="admin-tab-content"
+          hidden={activeTab !== "content"}
+          className={activeTab === "content" ? "" : "hidden"}
+        >
 
         <div className="mt-6 grid gap-4 @[860px]:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
           <section aria-label="全服公告" className="rounded-2xl border border-amber-800/70 bg-amber-950/20 p-4 @[640px]:p-5">
@@ -827,11 +919,20 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
         </div>
 
         <div className="mt-6">
-          <QqWhitelistImportPanel />
+          <QqWhitelistImportPanel previewOnly={layoutVerification} />
+        </div>
         </div>
 
+        <div
+          id="admin-panel-operations"
+          role="tabpanel"
+          aria-labelledby="admin-tab-operations"
+          hidden={activeTab !== "operations"}
+          className={activeTab === "operations" ? "" : "hidden"}
+        >
+
         <div className="mt-6">
-          <OperationsWorkbench />
+          <OperationsWorkbench previewState={layoutVerification ? operationsWorkbench : undefined} />
         </div>
 
         <div className="mt-6 grid gap-4 @[900px]:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1.35fr)]">
@@ -1002,13 +1103,22 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             </div>
           </section>
         </div>
+        </div>
+
+        <div
+          id="admin-panel-rules"
+          role="tabpanel"
+          aria-labelledby="admin-tab-rules"
+          hidden={activeTab !== "rules"}
+          className={activeTab === "rules" ? "" : "hidden"}
+        >
 
         <div className="mt-6">
           <RulesetControlPanel />
         </div>
 
         <div className="mt-6">
-          <AdminHexCatalogPanel />
+          <AdminHexCatalogPanel previewState={layoutVerification ? adminHexCatalog : undefined} />
         </div>
 
         <section aria-label="版本发布" className="mt-6 rounded-2xl border border-sky-900/70 bg-sky-950/15 p-4 @[640px]:p-5">
@@ -1053,6 +1163,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           </div>
           <p className="mt-3 text-xs leading-5 text-amber-200/70">正式发布会拒绝未在测试服验证、更新日志未归档或仍有进行中房间的版本，不会绕过现有发布门禁。</p>
         </section>
+        </div>
 
         <aside className="mt-4 rounded-xl border border-gray-800 bg-gray-950/70 px-4 py-3 text-xs leading-5 text-gray-500">
           权限与操作结果均由服务器再次校验。维护、版本切换与内容审核等操作不会仅依赖网页端判断。

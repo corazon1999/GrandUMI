@@ -32,9 +32,11 @@ const describeUpdate = (update: QqWhitelistUpdateEvent) => {
 export default function QqWhitelistImportPanel({
   bootstrap = false,
   onImported,
+  previewOnly = false,
 }: {
   bootstrap?: boolean;
   onImported?: (result: MsgQqWhitelistImport) => void;
+  previewOnly?: boolean;
 }) {
   const status = useNetStore((state) => state.qqWhitelistStatus);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +57,7 @@ export default function QqWhitelistImportPanel({
   }, [onImported]);
 
   useEffect(() => {
+    if (previewOnly) return;
     HomeRequest.requestQqWhitelistStatus();
     const statusTimer = window.setInterval(
       () => HomeRequest.requestQqWhitelistStatus(),
@@ -82,7 +85,7 @@ export default function QqWhitelistImportPanel({
       eventBus.off("message", onMessage);
       eventBus.off("close", onClose);
     };
-  }, []);
+  }, [previewOnly]);
 
   const chooseFile = async (file?: File) => {
     const readGeneration = ++fileReadGenerationRef.current;
@@ -113,7 +116,7 @@ export default function QqWhitelistImportPanel({
   };
 
   const submit = () => {
-    if (!preview || !rawJson || pending || !canImport) return;
+    if (previewOnly || !preview || !rawJson || pending || !canImport) return;
     const confirmed = window.confirm(
       `${bootstrap ? "确认初始化" : "确认全量替换"} QQ 群白名单为 ${preview.uniqueCount} 人？`
       + `\n重复项 ${preview.duplicateCount} 条将自动去重；服务端会再次全量校验。`,
@@ -213,7 +216,7 @@ export default function QqWhitelistImportPanel({
       <button
         type="button"
         onClick={submit}
-        disabled={!preview || pending || !canImport}
+        disabled={previewOnly || !preview || pending || !canImport}
         className="mt-4 min-h-11 w-full rounded-xl bg-cyan-500 px-4 text-sm font-black text-gray-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
       >
         {pending ? "正在由服务端校验并替换..." : bootstrap ? "确认并初始化白名单" : "确认全量替换白名单"}
