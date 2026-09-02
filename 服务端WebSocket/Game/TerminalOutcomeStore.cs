@@ -35,7 +35,8 @@ internal static class TerminalOutcomeStore
         MatchKind matchKind,
         IReadOnlyList<string> accounts,
         IReadOnlyList<string> sessionIds,
-        GameState state)
+        GameState state,
+        Func<int, object?>? cinematicProvider = null)
     {
         if (accounts.Count < 2 || sessionIds.Count < 2)
             throw new ArgumentException("终局快照缺少双方身份");
@@ -56,9 +57,17 @@ internal static class TerminalOutcomeStore
             [sessionIds[0], sessionIds[1]],
             [
                 JsonSerializer.SerializeToElement(
-                    StateSnapshotBuilder.Build(state, 0, "TerminalRecovery"), JsonOptions),
+                    StateSnapshotBuilder.Build(
+                        state,
+                        0,
+                        "TerminalRecovery",
+                        cinematic: cinematicProvider?.Invoke(0)), JsonOptions),
                 JsonSerializer.SerializeToElement(
-                    StateSnapshotBuilder.Build(state, 1, "TerminalRecovery"), JsonOptions),
+                    StateSnapshotBuilder.Build(
+                        state,
+                        1,
+                        "TerminalRecovery",
+                        cinematic: cinematicProvider?.Invoke(1)), JsonOptions),
             ]);
 
         lock (Gate)

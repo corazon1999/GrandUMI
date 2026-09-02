@@ -15,6 +15,10 @@ test("回合提示直接监听服务端权威回合状态", async () => {
   assert.match(layer, /lastShownTurnRef/);
   assert.match(layer, /lastShownTurnRef\.current === turnCount/);
   assert.match(layer, /side: currentTurn \? "my" : "opponent"/);
+  assert.match(layer, /const cinematicBlockingBanner = isGameOver/);
+  assert.match(layer, /cinematicBlockingBanner \|\| turnCount <= 0/);
+  assert.match(layer, /lastShownTurnRef\.current = turnCount/);
+  assert.match(layer, /setBanner\(null\)/);
   assert.doesNotMatch(animationHook, /case "MulliganComplete"/);
   assert.doesNotMatch(animationHook, /case "EndTurn"/);
 });

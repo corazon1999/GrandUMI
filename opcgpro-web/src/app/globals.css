@@ -663,6 +663,145 @@ body[data-modal-open-count] [data-layout-settings-trigger] {
   transform-origin: center;
 }
 
+/* ===== 权威开场 / 终局演出 ===== */
+
+@keyframes game-cinematic-board-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  10% { transform: translate3d(-3px, 1px, 0); }
+  19% { transform: translate3d(4px, -2px, 0); }
+  29% { transform: translate3d(-5px, 2px, 0); }
+  41% { transform: translate3d(4px, 1px, 0); }
+  54% { transform: translate3d(-3px, -1px, 0); }
+  68% { transform: translate3d(2px, 1px, 0); }
+  84% { transform: translate3d(-1px, 0, 0); }
+}
+
+@keyframes leader-defeat-flash {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  24% { opacity: 0.92; }
+  52%, 100% { opacity: 0; }
+}
+
+@keyframes leader-defeat-shockwave {
+  0%, 14% { opacity: 0; transform: scale(0.58); }
+  24% { opacity: 0.95; }
+  74% { opacity: 0; transform: scale(1.75); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
+@keyframes leader-defeat-fracture {
+  0%, 18% { opacity: 0; transform: rotate(var(--fracture-r)) scaleY(0); }
+  26% { opacity: 1; transform: rotate(var(--fracture-r)) scaleY(1); }
+  70% { opacity: 0.78; }
+  100% { opacity: 0; }
+}
+
+@keyframes leader-defeat-shard {
+  0%, 24% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.5); }
+  34% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate3d(var(--shard-x), var(--shard-y), 0) rotate(var(--shard-r)) scale(1); }
+}
+
+@keyframes game-cinematic-bubble-opening {
+  0% { opacity: 0; transform: translate3d(18px, -50%, 0) scale(0.92); }
+  72% { opacity: 1; transform: translate3d(-3px, -50%, 0) scale(1.015); }
+  100% { opacity: 1; transform: translate3d(0, -50%, 0) scale(1); }
+}
+
+@keyframes game-cinematic-bubble-victory {
+  0% { opacity: 0; transform: translate3d(22px, -50%, 0) scale(0.84); filter: brightness(1.8); }
+  68% { opacity: 1; transform: translate3d(-4px, -50%, 0) scale(1.035); filter: brightness(1.15); }
+  100% { opacity: 1; transform: translate3d(0, -50%, 0) scale(1); filter: brightness(1); }
+}
+
+.game-cinematic-board-impact {
+  animation: game-cinematic-board-shake 1080ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  will-change: transform;
+}
+
+.leader-defeat-impact {
+  isolation: isolate;
+  overflow: visible;
+}
+
+.leader-defeat-flash,
+.leader-defeat-shockwave,
+.leader-defeat-fracture,
+.leader-defeat-shard {
+  position: absolute;
+  pointer-events: none;
+}
+
+.leader-defeat-flash {
+  inset: 18%;
+  z-index: 4;
+  border-radius: 0.45rem;
+  background: white;
+  box-shadow: 0 0 20px 10px rgb(255 255 255 / 0.9), 0 0 45px 18px rgb(56 189 248 / 0.55);
+  mix-blend-mode: screen;
+  animation: leader-defeat-flash 1080ms ease-out both;
+}
+
+.leader-defeat-shockwave {
+  inset: 5%;
+  z-index: 1;
+  border: 3px solid rgb(255 255 255 / 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgb(56 189 248 / 0.72), inset 0 0 14px rgb(244 63 94 / 0.58);
+  animation: leader-defeat-shockwave 1080ms ease-out both;
+}
+
+.leader-defeat-fracture {
+  --fracture-r: 0deg;
+  z-index: 5;
+  left: 50%;
+  top: 14%;
+  width: 2px;
+  height: 72%;
+  transform-origin: 50% 34%;
+  background: linear-gradient(to bottom, transparent, white 16%, rgb(125 211 252) 54%, transparent);
+  filter: drop-shadow(0 0 3px white);
+  clip-path: polygon(35% 0, 100% 0, 62% 24%, 100% 34%, 45% 52%, 82% 68%, 0 100%, 28% 62%, 0 48%, 54% 30%);
+  animation: leader-defeat-fracture 1080ms ease-out both;
+}
+
+.leader-defeat-fracture--one { --fracture-r: 18deg; }
+.leader-defeat-fracture--two { --fracture-r: -34deg; animation-delay: 45ms; }
+.leader-defeat-fracture--three { --fracture-r: 63deg; animation-delay: 80ms; }
+
+.leader-defeat-shard {
+  z-index: 3;
+  left: 45%;
+  top: 42%;
+  width: 18px;
+  height: 24px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.95), rgb(56 189 248 / 0.48));
+  clip-path: polygon(50% 0, 100% 100%, 0 72%);
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.8));
+  animation: leader-defeat-shard 1080ms cubic-bezier(0.15, 0.7, 0.2, 1) both;
+}
+
+.leader-defeat-shard--one { --shard-x: -52px; --shard-y: -40px; --shard-r: -95deg; }
+.leader-defeat-shard--two { --shard-x: 58px; --shard-y: -28px; --shard-r: 130deg; animation-delay: 40ms; }
+.leader-defeat-shard--three { --shard-x: -44px; --shard-y: 54px; --shard-r: 75deg; animation-delay: 70ms; }
+.leader-defeat-shard--four { --shard-x: 54px; --shard-y: 62px; --shard-r: -145deg; animation-delay: 100ms; }
+
+.game-cinematic-bubble {
+  transform: translateY(-50%);
+  transform-origin: right center;
+  overflow-wrap: anywhere;
+  will-change: transform, opacity;
+}
+
+.game-cinematic-bubble--opening {
+  animation: game-cinematic-bubble-opening 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.game-cinematic-bubble--victory {
+  animation: game-cinematic-bubble-victory 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .global-announcement-marquee {
     display: block;
@@ -682,10 +821,23 @@ body[data-modal-open-count] [data-layout-settings-trigger] {
   .leader-breath-frame,
   .rank-tier-badge--supreme,
   .rank-tier-badge--elite .rank-tier-badge__aura::after,
-  .battle-attacker-lunge-up,
-  .battle-attacker-lunge-down,
-  .battle-target-impact {
-    animation: none;
+    .battle-attacker-lunge-up,
+    .battle-attacker-lunge-down,
+    .battle-target-impact,
+    .game-cinematic-board-impact,
+    .leader-defeat-flash,
+    .leader-defeat-shockwave,
+    .leader-defeat-fracture,
+    .leader-defeat-shard,
+    .game-cinematic-bubble--opening,
+    .game-cinematic-bubble--victory {
+      animation: none;
+    }
+
+  .game-cinematic-bubble {
+    opacity: 1;
+    filter: none;
+    transform: translateY(-50%);
   }
 
   .rank-tier-badge--supreme {

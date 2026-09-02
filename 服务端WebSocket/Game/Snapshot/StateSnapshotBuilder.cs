@@ -29,7 +29,7 @@ public static class StateSnapshotBuilder
     public static object Build(GameState state, int viewerIndex, string? lastAction = null, object? actionPayload = null,
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
         IReadOnlyList<EffectActivationEvent>? effectActivations = null, int spectatorPlayerIndex = 0,
-        bool revealSpectatorMainHand = false, DateTime? serverNowUtc = null)
+        bool revealSpectatorMainHand = false, DateTime? serverNowUtc = null, object? cinematic = null)
     {
         var snapshotServerNowUtc = serverNowUtc ?? DateTime.UtcNow;
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
@@ -44,7 +44,8 @@ public static class StateSnapshotBuilder
             effectActivations,
             spectatorPlayerIndex,
             snapshotServerNowUtc,
-            revealSpectatorMainHand: revealSpectatorMainHand);
+            revealSpectatorMainHand: revealSpectatorMainHand,
+            cinematic: cinematic);
     }
 
     /// <summary>
@@ -55,24 +56,25 @@ public static class StateSnapshotBuilder
         IReadOnlyList<ActionLogEvent>? queuedLogEvents = null, string? requestId = null,
         IReadOnlyList<EffectActivationEvent>? effectActivations = null, bool includePlayer1Spectator = false,
         bool includePlayer0SpectatorHand = false, bool includePlayer1SpectatorHand = false,
-        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null, DateTime? serverNowUtc = null)
+        IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null, DateTime? serverNowUtc = null,
+        Func<int, object?>? cinematicProvider = null)
     {
         var snapshotServerNowUtc = serverNowUtc ?? DateTime.UtcNow;
         var boards = new[] { ComputePlayerBoard(state, 0), ComputePlayerBoard(state, 1) };
         var payload = ComputePayload(actionPayload);
         return new SnapshotSet(
-            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline),
-            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline),
-            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline))
+            BuildForViewer(state, 0, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, cinematic: cinematicProvider?.Invoke(0)),
+            BuildForViewer(state, 1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, cinematic: cinematicProvider?.Invoke(1)),
+            BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, cinematic: cinematicProvider?.Invoke(0)))
         {
             SpectatorPlayer1 = includePlayer1Spectator
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline, cinematic: cinematicProvider?.Invoke(1))
                 : null,
             SpectatorPlayer0Hand = includePlayer0SpectatorHand
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, true)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 0, snapshotServerNowUtc, replayHandTimeline, true, cinematicProvider?.Invoke(0))
                 : null,
             SpectatorPlayer1Hand = includePlayer1SpectatorHand
-                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline, true)
+                ? BuildForViewer(state, -1, lastAction, payload, boards, queuedLogEvents, requestId, effectActivations, 1, snapshotServerNowUtc, replayHandTimeline, true, cinematicProvider?.Invoke(1))
                 : null,
         };
     }
@@ -82,7 +84,8 @@ public static class StateSnapshotBuilder
         string? requestId, IReadOnlyList<EffectActivationEvent>? effectActivations, int spectatorPlayerIndex,
         DateTime serverNowUtc,
         IReadOnlyList<ReplayHandFrame>? replayHandTimeline = null,
-        bool revealSpectatorMainHand = false)
+        bool revealSpectatorMainHand = false,
+        object? cinematic = null)
     {
         var isSpectator = viewerIndex < 0;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
@@ -170,6 +173,7 @@ public static class StateSnapshotBuilder
             operationClockPaused = state.OperationClockPaused,
             matchKind = state.MatchKind.ToString(),
             hexState,
+            cinematic,
             isGameOver = state.IsGameOver,
             isDraw = state.IsDraw,
             winnerIsMe = !isSpectator && state.WinnerIndex == myIdx,

@@ -636,18 +636,56 @@ public class RankedStoreTests
     }
 
     [Fact]
-    public void 聊天装饰目录_六类槽位各有两个且价格与样式均有效()
+    public void 聊天装饰目录_新增二十四条语录统一价格且仅接受开场与胜利槽()
     {
-        Assert.Equal(12, ChatDecorationCatalog.All.Count);
+        Assert.Equal(36, ChatDecorationCatalog.All.Count);
         Assert.Equal(
             ChatDecorationCatalog.All.Count,
             ChatDecorationCatalog.All.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(
             ChatDecorationSlots.All.Count,
             ChatDecorationSlots.All.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(["opening", "victory"], ChatDecorationSlots.All);
+        Assert.Null(ChatDecorationSlots.Normalize("greeting"));
+        Assert.Null(ChatDecorationSlots.Normalize("threat"));
+        Assert.Null(ChatDecorationSlots.Normalize("slot1"));
+        Assert.Equal(ChatDecorationSlots.Opening, ChatDecorationSlots.Normalize(" OPENING "));
+        Assert.Equal(ChatDecorationSlots.Victory, ChatDecorationSlots.Normalize(" victory "));
 
-        foreach (var slot in ChatDecorationSlots.All)
-            Assert.Equal(2, ChatDecorationCatalog.All.Count(item => item.Slot == slot));
+        var newQuotes = ChatDecorationCatalog.All
+            .Where(item => item.AvailableForPurchase)
+            .ToArray();
+        Assert.Equal(24, newQuotes.Length);
+        Assert.Equal(new[]
+        {
+            "我是要成为海贼王的男人!",
+            "哟嚯嚯嚯嚯嚯嚯嚯！",
+            "我们的相遇是命运的安排！",
+            "我是来结束这场战争的。",
+            "原来外面的世界里真的存在像你这样强大的男人。",
+            "超越我吧。",
+            "谢谢大家，直到最后都一直爱着我。",
+            "我想活下去！",
+            "SUPERRRRRRRRRR~。",
+            "你要成为什么王？",
+            "四皇的副手也值得一杀。",
+            "这是我最小的刀了。",
+            "福无双至，祸不单行。",
+            "原谅女人谎言的，才是男人。",
+            "人的梦想，是不会结束的。",
+            "要是向力量屈服，那还算什么男人。",
+            "想保护好的东西就好好保护到底。",
+            "失去了就是失去了，想想你现在还剩下些什么。",
+            "男人的决斗，不需要肤浅的掩护。",
+            "唯有胜者才是正义！",
+            "背后的伤口，是剑士的耻辱。",
+            "存在本身，从来不是罪。",
+            "D之一族终将再次掀起风暴",
+            "看来你已经看见了比我更加遥远的未来",
+        }, newQuotes.Select(item => item.Text));
+        Assert.All(newQuotes, item => Assert.Equal(45, item.PriceRankPoints));
+        var legacy = ChatDecorationCatalog.All.Where(item => !item.AvailableForPurchase).ToArray();
+        Assert.Equal(12, legacy.Length);
 
         Assert.All(ChatDecorationCatalog.All, item =>
         {
@@ -674,57 +712,244 @@ public class RankedStoreTests
 
             var initial = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
             Assert.Equal(50, initial.BalanceRankPoints);
+            Assert.Equal(24, initial.Items.Count);
+            Assert.All(initial.Items, item => Assert.True(item.AvailableForPurchase));
+            Assert.DoesNotContain(initial.Items, item => item.Definition.Id == "greeting-straw-hat");
+            var delisted = Assert.Throws<ChatDecorationValidationException>(() => store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "greeting-straw-hat", "legacy-buy-0001", now.AddMilliseconds(500)));
+            Assert.Contains("已下架", delisted.Message);
+            Assert.Equal(50, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
 
             var purchased = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0001", now.AddSeconds(1));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001", now.AddSeconds(1));
             Assert.True(purchased.Succeeded);
             Assert.False(purchased.Replayed);
             Assert.Equal("purchased", purchased.Outcome);
-            Assert.Equal(30, purchased.Snapshot.BalanceRankPoints);
+            Assert.Equal(5, purchased.Snapshot.BalanceRankPoints);
 
             var replayed = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0001", now.AddSeconds(2));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001", now.AddSeconds(2));
             Assert.True(replayed.Succeeded);
             Assert.True(replayed.Replayed);
-            Assert.Equal(30, replayed.Snapshot.BalanceRankPoints);
+            Assert.Equal(5, replayed.Snapshot.BalanceRankPoints);
 
             var duplicateItem = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", "purchase-0002", now.AddSeconds(3));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0002", now.AddSeconds(3));
             Assert.True(duplicateItem.Succeeded);
             Assert.Equal("already_owned", duplicateItem.Outcome);
-            Assert.Equal(30, duplicateItem.Snapshot.BalanceRankPoints);
+            Assert.Equal(5, duplicateItem.Snapshot.BalanceRankPoints);
 
             var insufficient = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-sea-breeze", "purchase-0003", now.AddSeconds(4));
+                "alice", "爱丽丝", "quote-binks-laugh", "purchase-0003", now.AddSeconds(4));
             Assert.False(insufficient.Succeeded);
             Assert.Equal("insufficient_funds", insufficient.Outcome);
-            Assert.Equal(30, insufficient.Snapshot.BalanceRankPoints);
+            Assert.Equal(5, insufficient.Snapshot.BalanceRankPoints);
 
             Assert.Throws<ChatDecorationValidationException>(() => store.EquipChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", ChatDecorationSlots.Greeting,
+                "alice", "爱丽丝", "quote-pirate-king-man", ChatDecorationSlots.Opening,
                 "purchase-0001", now.AddSeconds(5)));
 
             var equipped = store.EquipChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", ChatDecorationSlots.Greeting,
+                "alice", "爱丽丝", "quote-pirate-king-man", ChatDecorationSlots.Victory,
                 "equip-000001", now.AddSeconds(6));
             Assert.True(equipped.Succeeded);
             Assert.Equal("equipped", equipped.Outcome);
-            Assert.Equal("greeting-straw-hat",
-                store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Greeting)?.Id);
-            Assert.Null(store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Praise));
+            Assert.Equal("quote-pirate-king-man",
+                store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Victory)?.Id);
+            Assert.Null(store.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Opening));
+            Assert.Null(store.ResolveEquippedChatDecoration("alice", "greeting"));
+
+            var equippedAgain = store.EquipChatDecoration(
+                "alice", "爱丽丝", "quote-pirate-king-man", ChatDecorationSlots.Opening,
+                "equip-000002", now.AddSeconds(7));
+            Assert.Equal("equipped", equippedAgain.Outcome);
+            Assert.Equal(
+                [ChatDecorationSlots.Opening, ChatDecorationSlots.Victory],
+                equippedAgain.Snapshot.Items
+                    .Single(item => item.Definition.Id == "quote-pirate-king-man")
+                    .EquippedSlots);
+
+            var invalidLegacySlot = Assert.Throws<ChatDecorationValidationException>(() =>
+                store.EquipChatDecoration(
+                    "alice", "爱丽丝", "quote-pirate-king-man", "greeting",
+                    "equip-000003", now.AddSeconds(8)));
+            Assert.Contains("开场台词或胜利宣言", invalidLegacySlot.Message);
 
             var restarted = new RankedStore(path);
             var afterRestart = restarted.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
-            Assert.Equal(30, afterRestart.BalanceRankPoints);
-            Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
-            Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Equipped);
+            Assert.Equal(5, afterRestart.BalanceRankPoints);
+            Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
+            Assert.Equal(
+                [ChatDecorationSlots.Opening, ChatDecorationSlots.Victory],
+                afterRestart.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").EquippedSlots);
 
             var nextSeason = restarted.GetChatDecorationExchangeSnapshot(
                 "alice", "爱丽丝", new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc));
             Assert.NotEqual(afterRestart.SeasonId, nextSeason.SeasonId);
             Assert.Equal(0, nextSeason.BalanceRankPoints);
-            Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
-            Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Equipped);
+            Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
+            Assert.Equal(
+                [ChatDecorationSlots.Opening, ChatDecorationSlots.Victory],
+                nextSeason.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").EquippedSlots);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task 聊天装饰迁移_旧六槽与四编号槽原子收敛且不损失任何所有权()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-legacy-slots");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        var legacyEquipment = new[]
+        {
+            (Slot: "greeting", DecorationId: "greeting-straw-hat"),
+            (Slot: "praise", DecorationId: "praise-fine-play"),
+            (Slot: "thanks", DecorationId: "thanks-crewmate"),
+            (Slot: "surprise", DecorationId: "surprise-seaquake"),
+            (Slot: "mistake", DecorationId: "mistake-compass"),
+            (Slot: "threat", DecorationId: "threat-cannon"),
+        };
+        try
+        {
+            var oldStore = new RankedStore(path);
+            Assert.NotNull(oldStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                string accountKey;
+                using (var profile = connection.CreateCommand())
+                {
+                    profile.Transaction = transaction;
+                    profile.CommandText = "SELECT account_key FROM rank_profiles WHERE display_name='爱丽丝' LIMIT 1;";
+                    accountKey = Assert.IsType<string>(profile.ExecuteScalar());
+                }
+
+                foreach (var (slot, decorationId) in legacyEquipment)
+                {
+                    using var ownership = connection.CreateCommand();
+                    ownership.Transaction = transaction;
+                    ownership.CommandText = """
+                        INSERT INTO chat_decoration_ownership(account_key,decoration_id,acquired_at_utc)
+                        VALUES($key,$decoration,$at);
+                        """;
+                    ownership.Parameters.AddWithValue("$key", accountKey);
+                    ownership.Parameters.AddWithValue("$decoration", decorationId);
+                    ownership.Parameters.AddWithValue("$at", now.ToString("O"));
+                    Assert.Equal(1, ownership.ExecuteNonQuery());
+
+                    using var equipment = connection.CreateCommand();
+                    equipment.Transaction = transaction;
+                    equipment.CommandText = """
+                        INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+                        VALUES($key,$slot,$decoration,$at);
+                        """;
+                    equipment.Parameters.AddWithValue("$key", accountKey);
+                    equipment.Parameters.AddWithValue("$slot", slot);
+                    equipment.Parameters.AddWithValue("$decoration", decorationId);
+                    equipment.Parameters.AddWithValue("$at", now.ToString("O"));
+                    Assert.Equal(1, equipment.ExecuteNonQuery());
+                }
+
+                for (var index = 0; index < 4; index++)
+                {
+                    using var numbered = connection.CreateCommand();
+                    numbered.Transaction = transaction;
+                    numbered.CommandText = """
+                        INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+                        VALUES($key,$slot,$decoration,$at);
+                        """;
+                    numbered.Parameters.AddWithValue("$key", accountKey);
+                    numbered.Parameters.AddWithValue("$slot", $"slot{index + 1}");
+                    numbered.Parameters.AddWithValue("$decoration", legacyEquipment[index + 1].DecorationId);
+                    numbered.Parameters.AddWithValue("$at", now.AddSeconds(index + 1).ToString("O"));
+                    Assert.Equal(1, numbered.ExecuteNonQuery());
+                }
+
+                using (var unknownOwnership = connection.CreateCommand())
+                {
+                    unknownOwnership.Transaction = transaction;
+                    unknownOwnership.CommandText = """
+                        INSERT INTO chat_decoration_ownership(account_key,decoration_id,acquired_at_utc)
+                        VALUES($key,'retired-owned-phrase',$at);
+                        """;
+                    unknownOwnership.Parameters.AddWithValue("$key", accountKey);
+                    unknownOwnership.Parameters.AddWithValue("$at", now.ToString("O"));
+                    Assert.Equal(1, unknownOwnership.ExecuteNonQuery());
+                }
+                using (var unmappableEquipment = connection.CreateCommand())
+                {
+                    unmappableEquipment.Transaction = transaction;
+                    unmappableEquipment.CommandText = """
+                        INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+                        VALUES($key,'victory','retired-owned-phrase',$at);
+                        """;
+                    unmappableEquipment.Parameters.AddWithValue("$key", accountKey);
+                    unmappableEquipment.Parameters.AddWithValue("$at", now.ToString("O"));
+                    Assert.Equal(1, unmappableEquipment.ExecuteNonQuery());
+                }
+                transaction.Commit();
+            }
+
+            // 多进程/多实例同时启动时，SQLite IMMEDIATE 事务必须串行收敛到同一结果。
+            var concurrentMigrations = Enumerable.Range(0, 2)
+                .Select(_ => Task.Run(() => new RankedStore(path).Initialize()))
+                .ToArray();
+            await Task.WhenAll(concurrentMigrations);
+            var migratedStore = new RankedStore(path);
+            var migrated = migratedStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
+            Assert.Equal(30, migrated.Items.Count);
+            Assert.Equal(6, migrated.Items.Count(item => item.Owned));
+            Assert.All(
+                migrated.Items.Where(item => item.Definition.Id is "greeting-straw-hat" or "praise-fine-play"
+                    or "thanks-crewmate" or "surprise-seaquake" or "mistake-compass" or "threat-cannon"),
+                item =>
+                {
+                    Assert.True(item.Owned);
+                    Assert.False(item.AvailableForPurchase);
+                });
+            Assert.Equal("greeting-straw-hat",
+                migratedStore.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Opening)?.Id);
+            Assert.Equal("threat-cannon",
+                migratedStore.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Victory)?.Id);
+            Assert.Empty(migrated.Items.Single(item => item.Definition.Id == "praise-fine-play").EquippedSlots);
+            Assert.Empty(migrated.Items.Single(item => item.Definition.Id == "thanks-crewmate").EquippedSlots);
+            Assert.Empty(migrated.Items.Single(item => item.Definition.Id == "surprise-seaquake").EquippedSlots);
+            Assert.Empty(migrated.Items.Single(item => item.Definition.Id == "mistake-compass").EquippedSlots);
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var legacyCount = connection.CreateCommand();
+                legacyCount.CommandText = """
+                    SELECT COUNT(*) FROM chat_decoration_equipment
+                    WHERE slot IN ('greeting','praise','thanks','surprise','mistake','threat','slot1','slot2','slot3','slot4');
+                    """;
+                Assert.Equal(0L, (long)legacyCount.ExecuteScalar()!);
+                using var ownershipCount = connection.CreateCommand();
+                ownershipCount.CommandText = "SELECT COUNT(*) FROM chat_decoration_ownership;";
+                Assert.Equal(7L, (long)ownershipCount.ExecuteScalar()!);
+                using var equipmentCount = connection.CreateCommand();
+                equipmentCount.CommandText = "SELECT COUNT(*) FROM chat_decoration_equipment;";
+                Assert.Equal(2L, (long)equipmentCount.ExecuteScalar()!);
+            }
+
+            var changed = migratedStore.EquipChatDecoration(
+                "alice", "爱丽丝", "threat-cannon", ChatDecorationSlots.Opening,
+                "migrated-equip-0001", now.AddMinutes(2));
+            Assert.Equal("equipped", changed.Outcome);
+            var afterAnotherRestart = new RankedStore(path);
+            Assert.Equal("threat-cannon",
+                afterAnotherRestart.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Opening)?.Id);
+            Assert.Equal("threat-cannon",
+                afterAnotherRestart.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Victory)?.Id);
+            var lockedLoadout = afterAnotherRestart.ResolveEquippedChatDecorationLoadout("alice");
+            Assert.Equal("threat-cannon", lockedLoadout.Opening?.Id);
+            Assert.Equal("threat-cannon", lockedLoadout.Victory?.Id);
         }
         finally
         {
@@ -747,19 +972,19 @@ public class RankedStoreTests
             store.BeforeChatDecorationMutationCommitForTesting = () =>
                 throw new InvalidOperationException("模拟进程在提交前失败");
             Assert.Throws<InvalidOperationException>(() => store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-sea-breeze", "rollback-0001", now.AddSeconds(1)));
+                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001", now.AddSeconds(1)));
             store.BeforeChatDecorationMutationCommitForTesting = null;
 
             var afterFailure = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddSeconds(2));
             Assert.Equal(100, afterFailure.BalanceRankPoints);
-            Assert.False(afterFailure.Items.Single(item => item.Definition.Id == "greeting-sea-breeze").Owned);
+            Assert.False(afterFailure.Items.Single(item => item.Definition.Id == "quote-fated-meeting").Owned);
 
             var retried = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-sea-breeze", "rollback-0001", now.AddSeconds(3));
+                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001", now.AddSeconds(3));
             Assert.True(retried.Succeeded);
             Assert.False(retried.Replayed);
             Assert.Equal(55, retried.Snapshot.BalanceRankPoints);
-            Assert.True(retried.Snapshot.Items.Single(item => item.Definition.Id == "greeting-sea-breeze").Owned);
+            Assert.True(retried.Snapshot.Items.Single(item => item.Definition.Id == "quote-fated-meeting").Owned);
         }
         finally
         {
@@ -794,7 +1019,7 @@ public class RankedStoreTests
             };
 
             var purchaseTask = Task.Run(() => purchaseStore.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", "race-buy-0001", now.AddSeconds(1)));
+                "alice", "爱丽丝", "quote-pirate-king-man", "race-buy-0001", now.AddSeconds(1)));
             Assert.True(purchaseEntered.Wait(TimeSpan.FromSeconds(5)));
 
             var settlementTask = Task.Run(() =>
@@ -817,11 +1042,11 @@ public class RankedStoreTests
 
             Assert.True(purchased.Succeeded);
             Assert.NotNull(settlement);
-            var expectedBalance = Math.Max(0, 500 - 20 + settlement!.Player0.RankPointDelta);
+            var expectedBalance = Math.Max(0, 500 - 45 + settlement!.Player0.RankPointDelta);
             var final = new RankedStore(path)
                 .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
             Assert.Equal(expectedBalance, final.BalanceRankPoints);
-            Assert.True(final.Items.Single(item => item.Definition.Id == "greeting-straw-hat").Owned);
+            Assert.True(final.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
         }
         finally
         {
@@ -852,7 +1077,7 @@ public class RankedStoreTests
                     {
                         startDuplicate.Wait();
                         return store.PurchaseChatDecoration(
-                            "alice", "爱丽丝", "greeting-straw-hat",
+                            "alice", "爱丽丝", "quote-pirate-king-man",
                             "concurrent-duplicate-0001", now.AddSeconds(1));
                     }))
                     .ToArray();
@@ -861,7 +1086,7 @@ public class RankedStoreTests
 
                 Assert.All(results, result => Assert.True(result.Succeeded));
                 Assert.Single(results, result => result.Replayed);
-                Assert.All(results, result => Assert.Equal(30, result.Snapshot.BalanceRankPoints));
+                Assert.All(results, result => Assert.Equal(5, result.Snapshot.BalanceRankPoints));
             }
 
             using (var startOverspend = new ManualResetEventSlim(false))
@@ -870,14 +1095,14 @@ public class RankedStoreTests
                 {
                     startOverspend.Wait();
                     return firstStore.PurchaseChatDecoration(
-                        "bob", "鲍勃", "greeting-straw-hat",
+                        "bob", "鲍勃", "quote-pirate-king-man",
                         "concurrent-cheap-0001", now.AddSeconds(2));
                 });
                 var expensive = Task.Run(() =>
                 {
                     startOverspend.Wait();
                     return secondStore.PurchaseChatDecoration(
-                        "bob", "鲍勃", "greeting-sea-breeze",
+                        "bob", "鲍勃", "quote-binks-laugh",
                         "concurrent-expensive-0001", now.AddSeconds(2));
                 });
                 startOverspend.Set();

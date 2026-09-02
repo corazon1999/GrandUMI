@@ -886,12 +886,8 @@ function parseChatDecorationExchangeSnapshot(
   msg: MsgChatDecorationExchange,
 ): ChatDecorationExchangeSnapshot | null {
   const validSlots = new Set<ChatDecorationSlot>([
-    "greeting",
-    "praise",
-    "thanks",
-    "surprise",
-    "mistake",
-    "threat",
+    "opening",
+    "victory",
   ]);
   const validRarities = new Set(["common", "rare", "epic", "legendary"]);
   if (
@@ -908,7 +904,6 @@ function parseChatDecorationExchangeSnapshot(
   const items = msg.items.filter((item): item is ChatDecorationItem => Boolean(
     item
     && typeof item.id === "string"
-    && validSlots.has(item.slot)
     && typeof item.name === "string"
     && typeof item.text === "string"
     && validRarities.has(item.rarity)
@@ -918,9 +913,20 @@ function parseChatDecorationExchangeSnapshot(
     && Number.isSafeInteger(item.priceBerries)
     && item.priceBerries > 0
     && typeof item.owned === "boolean"
-    && typeof item.equipped === "boolean"
+    && typeof item.availableForPurchase === "boolean"
+    && Array.isArray(item.equippedSlots)
+    && item.equippedSlots.every((slot) => validSlots.has(slot))
+    && new Set(item.equippedSlots).size === item.equippedSlots.length
+    && (item.owned || item.equippedSlots.length === 0)
+    && (item.availableForPurchase || item.owned)
   ));
-  if (items.length !== msg.items.length || items.length < 12) return null;
+  const equippedSlotCount = items.reduce((count, item) => count + item.equippedSlots.length, 0);
+  const equippedSlots = new Set(items.flatMap((item) => item.equippedSlots));
+  if (
+    items.length !== msg.items.length
+    || items.length === 0
+    || equippedSlots.size !== equippedSlotCount
+  ) return null;
   return {
     walletMode: "standard",
     walletRule: msg.walletRule,

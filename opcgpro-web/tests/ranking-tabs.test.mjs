@@ -32,7 +32,7 @@ test("排行榜页面在同一位置切换 Leader 榜和排位榜", async () => 
   assert.match(sidebar, /SidebarButton label="排行榜" icon="leaderboard"/);
 });
 
-test("聊天装饰交易所使用标准排位权威余额并覆盖窄屏购买装配状态", async () => {
+test("聊天装饰交易所使用标准排位权威余额并提供两个独立自动触发位置", async () => {
   const [panel, protocol, store, rankedStore, bridge] = await Promise.all([
     readSource("../src/components/home/MainPanel.tsx"),
     readSource("../src/net/HomeProtocol.ts"),
@@ -43,18 +43,32 @@ test("聊天装饰交易所使用标准排位权威余额并覆盖窄屏购买�
 
   assert.match(panel, /data-chat-decoration-exchange/);
   assert.match(panel, /SidebarButton label="聊天装饰交易所" icon="exchange"/);
-  assert.match(panel, /min-h-14 min-w-\[4\.5rem\]/);
+  assert.match(panel, /data-chat-decoration-equip-actions/);
+  assert.match(panel, /data-chat-decoration-equip-slot=\{option\.slot\}/);
+  assert.match(panel, /min-h-14 w-full rounded-lg/);
+  assert.match(panel, /@\[520px\]:grid-cols-2/);
   assert.match(panel, /min-h-14 min-w-\[10rem\]/);
   assert.match(panel, /grid-cols-1 gap-3 @\[620px\]:grid-cols-2 @\[1080px\]:grid-cols-3/);
   assert.match(panel, /snapshot\.balanceRankPoints < selected\.priceRankPoints/);
-  assert.match(panel, /selected\.owned\) HomeRequest\.equipChatDecoration/);
+  assert.match(panel, /HomeRequest\.equipChatDecoration\(selected\.id, slot\)/);
   assert.match(panel, /HomeRequest\.purchaseChatDecoration/);
-  assert.match(panel, /永久所有权 · 每类槽位同时装配一个/);
+  assert.match(panel, /永久所有权 · 同一句语录可同时用于开场与胜利/);
+  assert.match(panel, /永久拥有后，可分别设为自动开场台词和胜利宣言/);
+  assert.match(panel, /priceRankPoints \* 1_000/);
+  assert.match(panel, /!selected\.availableForPurchase/);
+  assert.match(panel, /历史藏品 · 已下架/);
+  assert.doesNotMatch(panel, /item\.slot === filter/);
 
   assert.match(protocol, /proto: "MsgChatDecorationExchange"/);
   assert.match(protocol, /CHAT_DECORATION_EXCHANGE_TIMEOUT_MS = 8_000/);
   assert.match(protocol, /lastRequestId !== requestId/);
   assert.match(protocol, /walletMode !== "standard"/);
+  assert.match(protocol, /"opening"/);
+  assert.match(protocol, /"victory"/);
+  assert.doesNotMatch(protocol, /"slot1"/);
+  assert.match(protocol, /item\.equippedSlots\.every/);
+  assert.match(protocol, /typeof item\.availableForPurchase === "boolean"/);
+  assert.match(protocol, /equippedSlots\.size !== equippedSlotCount/);
   assert.ok(
     (protocol.match(/HomeRequest\.requestChatDecorationExchangeSnapshot\(\);/g)?.length ?? 0) >= 2,
     "登录恢复和玩家资料更新都必须重取权威装配快照",
@@ -66,8 +80,19 @@ test("聊天装饰交易所使用标准排位权威余额并覆盖窄屏购买�
   assert.match(rankedStore, /BeginTransaction\(deferred: false\)/);
   assert.match(rankedStore, /ApplyChatDecorationWalletSettlementDelta/);
   assert.match(rankedStore, /chat_decoration_operations/);
+  assert.match(rankedStore, /MigrateLegacyChatDecorationEquipment/);
+  assert.match(rankedStore, /ChatDecorationSlots\.Opening/);
+  assert.match(rankedStore, /ChatDecorationSlots\.Victory/);
+  assert.match(rankedStore, /quote-pirate-king-man/);
+  assert.match(rankedStore, /"我是要成为海贼王的男人!"/);
+  assert.match(rankedStore, /AvailableForPurchase = true/);
+  assert.match(rankedStore, /definition\.AvailableForPurchase \|\| owned\.Contains/);
+  assert.doesNotMatch(rankedStore, /definition\.Slot/);
   assert.match(bridge, /RankedStore\.Default\.PurchaseChatDecoration/);
   assert.match(bridge, /RankedStore\.Default\.EquipChatDecoration/);
+  assert.match(bridge, /equippedSlots = item\.EquippedSlots/);
+  assert.match(bridge, /availableForPurchase = item\.AvailableForPurchase/);
+  assert.match(bridge, /局内手动发送聊天语录已停用/);
 });
 
 test("两档手机竖屏的交易所主要控件缩放后仍至少为 44 像素", () => {

@@ -10,7 +10,6 @@ import { NetManager } from "./NetManager";
 import type { MsgBase, MsgFriendChat, MsgGameAction, MsgLeaveGameChat, MsgPromptResponse, MsgRequestState, GameActionType } from "@/types/net";
 import { useGameStore } from "@/store/gameStore";
 import { useSettingsStore } from "@/store/settingsStore";
-import type { ChatDecorationSlot } from "@/store/netStore";
 
 type PendingLatency = { requestId: string; action: string; startedAt: number };
 const pendingLatencies = new Map<string, PendingLatency>();
@@ -295,10 +294,6 @@ export const GameRequest = {
     if (!t) return;
     NetManager.send({ proto: "MsgGameChat", Text: t.slice(0, 100), Code: code ?? null } as unknown as MsgBase);
   },
-
-  /** 特殊聊天只提交槽位；具体装饰、固定文案与样式由服务端按永久所有权和当前装配权威解析。 */
-  sendChatDecoration: (slot: ChatDecorationSlot) =>
-    NetManager.send({ proto: "MsgChatDecorationSend", slot } as MsgBase),
 
   /** 好友实时私聊：服务端会校验双方仍为好友且接收方在线。 */
   sendFriendChat: (toAccount: string, text: string) => {

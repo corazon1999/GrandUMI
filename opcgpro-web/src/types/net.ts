@@ -1176,6 +1176,37 @@ export interface HexModeSnapshot {
   activeDraft: HexDraftSnapshot | null;
 }
 
+export type GameCinematicSide = "self" | "opponent";
+
+export interface GameCinematicPhraseEvent {
+  eventId: string;
+  sourceSeat: 0 | 1;
+  displaySide: GameCinematicSide;
+  displayName: string;
+  id: string;
+  name: string;
+  text: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+  styleToken: string;
+}
+
+export interface GameCinematicTerminalEvent {
+  eventId: string;
+  winnerSeat: 0 | 1 | null;
+  loserSeat: 0 | 1 | null;
+  winnerSide: GameCinematicSide | null;
+  loserSide: GameCinematicSide | null;
+  reason: string;
+  victory: GameCinematicPhraseEvent | null;
+}
+
+/** 服务端随权威状态重复携带；客户端必须按稳定 eventId 去重。 */
+export interface GameCinematicSnapshot {
+  matchId: string;
+  openingEvents: GameCinematicPhraseEvent[];
+  terminal: GameCinematicTerminalEvent | null;
+}
+
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
   proto: "MsgGameState";
@@ -1221,6 +1252,7 @@ export interface MsgGameState extends MsgBase {
   operationClockPaused?: boolean;
   matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "Hex" | "UnknownHuman";
   hexState?: HexModeSnapshot | null;
+  cinematic?: GameCinematicSnapshot | null;
   isGameOver: boolean;
   isDraw?: boolean;
   winnerIsMe: boolean;

@@ -49,6 +49,8 @@ public class GameEngine
     public Func<bool>? HasSpectators { get; set; }
     public Func<int, bool>? HasSpectatorsForPerspective { get; set; }
     public Func<int, bool>? HasSpectatorsWithHandForPerspective { get; set; }
+    /// <summary>按主视角构建开场/终局演出元数据；只携带公开展示信息。</summary>
+    public Func<int, object?>? CinematicSnapshotProvider { get; set; }
     public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 兼容旧测试/调用方
     public Action<int, string, JsonElement, string?, GameActionSource>? OnPersistActionWithSource { get; set; } // 被接受动作持久化（重启恢复用）
     public Action? OnOpeningSequenceReady { get; set; }
@@ -1522,7 +1524,8 @@ public class GameEngine
             includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
             includePlayer0SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(0) == true,
             includePlayer1SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(1) == true,
-            replayHandTimeline: _replayHandTimeline);
+            replayHandTimeline: _replayHandTimeline,
+            cinematicProvider: CinematicSnapshotProvider);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;
@@ -1652,7 +1655,8 @@ public class GameEngine
             includePlayer1Spectator: HasSpectatorsForPerspective?.Invoke(1) == true,
             includePlayer0SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(0) == true,
             includePlayer1SpectatorHand: HasSpectatorsWithHandForPerspective?.Invoke(1) == true,
-            replayHandTimeline: _replayHandTimeline);
+            replayHandTimeline: _replayHandTimeline,
+            cinematicProvider: CinematicSnapshotProvider);
         OnSendToPlayer?.Invoke(0, snapshots.Player0);
         OnSendToPlayer?.Invoke(1, snapshots.Player1);
         var publicSnapshot = snapshots.Spectator;

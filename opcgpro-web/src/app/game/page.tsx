@@ -18,6 +18,7 @@ import FeedbackOverlay from "@/components/game/FeedbackOverlay";
 import AttachDonConfirmDialog from "@/components/game/AttachDonConfirmDialog";
 import InactivityWarningOverlay from "@/components/game/InactivityWarningOverlay";
 import GameOverOverlay from "@/components/game/GameOverOverlay";
+import { GameCinematicController } from "@/components/game/GameCinematicLayer";
 import { useGameStore } from "@/store/gameStore";
 import { useNetStore } from "@/store/netStore";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -154,6 +155,7 @@ export default function GamePage() {
         </AnimatePresence>
       )}
 
+      <GameCinematicController />
       <GameOverOverlay isObserver={isObserver} onReturnToHome={returnToHome} />
 
       <GameBoard

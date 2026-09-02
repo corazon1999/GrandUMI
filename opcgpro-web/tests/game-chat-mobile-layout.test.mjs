@@ -53,7 +53,7 @@ test("两档手机竖屏旋转后聊天按钮仍保留至少44像素触控尺寸
   }
 });
 
-test("特殊聊天只发送槽位且由服务端回包决定文案样式与显示侧", async () => {
+test("局内手动装饰发送入口已移除且旧服务端拒绝回包仍可提示", async () => {
   const [panel, request, protocol, events] = await Promise.all([
     read("src/components/game/GameChatPanel.tsx"),
     read("src/net/GameRequest.ts"),
@@ -61,75 +61,41 @@ test("特殊聊天只发送槽位且由服务端回包决定文案样式与显�
     read("src/net/eventBus.ts"),
   ]);
 
-  const sendMethod = request.match(/sendChatDecoration:[\s\S]*?\),\n/)?.[0] ?? "";
-  assert.match(sendMethod, /proto: "MsgChatDecorationSend", slot/);
-  assert.doesNotMatch(sendMethod, /text|styleToken|decorationId/);
+  assert.doesNotMatch(request, /sendChatDecoration/);
+  assert.doesNotMatch(request, /proto: "MsgChatDecorationSend"/);
+  assert.doesNotMatch(panel, /data-chat-decoration-quickbar/);
+  assert.doesNotMatch(panel, /data-chat-decoration-slot/);
   assert.match(protocol, /displaySide: m\.displaySide \?\? null/);
-  assert.match(protocol, /decoration: m\.decoration \?\? null/);
   assert.match(protocol, /case "MsgChatDecorationSend"/);
   assert.match(protocol, /response\.result === false/);
   assert.match(protocol, /聊天装饰发送失败，请稍后重试/);
   assert.match(events, /displaySide\?: "self" \| "opponent" \| null/);
-  assert.match(events, /styleToken: string/);
-  assert.match(panel, /chatDecorationBubbleClass\(bubble\.styleToken\)/);
-  assert.match(panel, /data-style-token=\{bubble\.styleToken\}/);
+  assert.doesNotMatch(events, /styleToken: string/);
 });
 
-test("六槽快捷装饰采用无滚动单行图标布局并保留可访问名称", async () => {
+test("开场与胜利气泡锚定双方领袖并跟随旋转后的固定牌桌缩放", async () => {
+  const [board, cinematic, css] = await Promise.all([
+    read("src/components/game/GameBoard.tsx"),
+    read("src/components/game/GameCinematicLayer.tsx"),
+    read("src/app/globals.css"),
+  ]);
+
+  assert.match(board, /LeaderCinematicAnchor side=\{side === "my" \? "self" : "opponent"\}/);
+  assert.match(board, /data-game-cinematic-board/);
+  assert.match(cinematic, /data-game-cinematic-leader-anchor=\{side\}/);
+  assert.match(cinematic, /right-\[calc\(100%\+0\.875rem\)\]/);
+  assert.match(cinematic, /w-\[20rem\]/);
+  assert.match(cinematic, /line-clamp-4/);
+  assert.match(cinematic, /data-game-cinematic-bubble=\{victory \? "victory" : "opening"\}/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /game-cinematic-bubble--victory/);
+});
+
+test("装饰语录不再受聊天静音控制且普通聊天静音语义保持不变", async () => {
   const panel = await read("src/components/game/GameChatPanel.tsx");
 
-  for (const slot of ["greeting", "praise", "thanks", "surprise", "mistake", "threat"]) {
-    assert.match(panel, new RegExp(`slot: "${slot}"`));
-  }
-  assert.match(panel, /data-chat-decoration-quickbar/);
-  assert.match(panel, /grid grid-cols-6 gap-0\.5 overflow-x-hidden/);
-  assert.doesNotMatch(panel, /flex touch-pan-x gap-1\.5 overflow-x-auto overscroll-x-contain/);
-  assert.match(panel, /data-chat-decoration-slot=\{slot\}/);
-  assert.match(panel, /className="flex min-h-12 min-w-12 items-center justify-center/);
-  assert.match(panel, /aria-label=\{accessibleLabel\}/);
-  assert.match(panel, /title=\{decoration[\s\S]*?accessibleLabel/);
-  assert.doesNotMatch(panel, /<span>\{label\}<\/span>/);
-  assert.doesNotMatch(panel, /max-w-16 truncate text-\[9px\]/);
-  assert.doesNotMatch(panel, /max-md:w-64/);
-});
-
-test("两档手机竖屏旋转后六个装饰按钮同排且实际触控尺寸至少44像素", () => {
-  const dialogWidth = 320;
-  const horizontalPadding = 16;
-  const gap = 2;
-  const buttonCount = 6;
-  const designButtonWidth = (dialogWidth - horizontalPadding - gap * (buttonCount - 1)) / buttonCount;
-
-  assert.ok(designButtonWidth >= 48, "320px 聊天面板无法同排容纳六个 48px 按钮");
-
-  for (const [hostWidth, hostHeight] of [[390, 844], [360, 780]]) {
-    const scale = calculateLayoutScale({
-      hostWidth,
-      hostHeight,
-      canvasWidth: 844,
-      canvasHeight: 390,
-      rotateQuarterTurn: true,
-      edgeToEdge: true,
-    });
-
-    assert.ok(
-      Math.min(48, designButtonWidth) * scale >= 44,
-      `${hostWidth}×${hostHeight} 的装饰按钮触控尺寸不足44px`,
-    );
-  }
-});
-
-test("双方限时装饰气泡兼容旋转安全区", async () => {
-  const panel = await read("src/components/game/GameChatPanel.tsx");
-
-  assert.match(panel, /DECORATION_BUBBLE_MS = 4200/);
-  assert.match(panel, /data-chat-decoration-bubble-layer/);
-  assert.match(panel, /data-display-side=\{side\}/);
-  assert.match(panel, /\["opponent", "self"\]/);
-  assert.match(panel, /var\(--layout-safe-right,0px\)/);
-  assert.match(panel, /var\(--layout-safe-bottom,0px\)/);
-  assert.match(panel, /var\(--layout-safe-top,0px\)/);
-  assert.match(panel, /文案与样式由服务器确认/);
+  assert.doesNotMatch(panel, /decorationBubbles/);
+  assert.doesNotMatch(panel, /message\.decoration/);
   assert.match(panel, /mutedRef\.current && !isSelf/);
-  assert.match(panel, /else if \(!isSelf && !openRef\.current\)/);
+  assert.match(panel, /if \(!isSelf && !openRef\.current\)/);
 });

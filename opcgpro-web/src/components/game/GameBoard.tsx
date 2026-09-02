@@ -29,6 +29,7 @@ import { GameRequest } from "@/net/GameRequest";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import TurnExtensionIcon from "@/components/game/TurnExtensionIcon";
 import HexOwnedSlots from "@/components/game/HexOwnedPanel";
+import { LeaderCinematicAnchor } from "@/components/game/GameCinematicLayer";
 
 // 对战页固定设计画布尺寸：内容按此基准布局，整体等比缩放铺满视口
 const STAGE_W = 1280;
@@ -50,7 +51,10 @@ function PlayerMat({
   const isOpponent = side === "opponent";
   const leaderStage = (
     <div className="flex items-end justify-center gap-4 md:gap-5">
-      <LeaderCard side={side} />
+      <div className="relative">
+        <LeaderCard side={side} />
+        <LeaderCinematicAnchor side={side === "my" ? "self" : "opponent"} />
+      </div>
       <StageSlot side={side} />
     </div>
   );
@@ -409,6 +413,7 @@ export default function GameBoard({
   const opponentChampionLeaderNumber = useGameStore((s) => s.opponent?.championLeaderNumber);
   const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
   const setSelectedDon = useGameStore((s) => s.setSelectedDon);
+  const cinematicPhase = useGameStore((s) => s.cinematic.phase);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageScale = useStageScale(STAGE_W, STAGE_H, viewportRef);
@@ -451,46 +456,50 @@ export default function GameBoard({
               transformOrigin: "center",
             }}
           >
-            <BattleRelationLayer />
-            <EffectActivationLayer />
-            <CardZoneTransitionLayer />
-            <div className="absolute inset-3 flex gap-3">
-              <LeftRail />
+            <div
+              data-game-cinematic-board
+              className={`absolute inset-0 ${cinematicPhase === "impact" ? "game-cinematic-board-impact" : ""}`}
+            >
+              <BattleRelationLayer />
+              <EffectActivationLayer />
+              <CardZoneTransitionLayer />
+              <div className="absolute inset-3 flex gap-3">
+                <LeftRail />
 
-              <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
-                <PlayerMat
-                  side="opponent"
+                <main className="relative z-0 flex min-w-0 flex-1 flex-col gap-2">
+                  <PlayerMat
+                    side="opponent"
+                    isObserver={isObserver}
+                    isPlayback={isPlayback}
+                    revealHands={isGameOver}
+                  />
+
+                  <PhaseTrack
+                    currentTurn={currentTurn}
+                    phase={phase}
+                  />
+
+                  <PlayerMat
+                    side="my"
+                    isObserver={isObserver}
+                    isPlayback={isPlayback}
+                    revealHands={isGameOver}
+                    revealObserverHand={isObserver && spectatorHandVisible}
+                  />
+                </main>
+
+                <RightRail
+                  myName={myName}
+                  opponentName={opponentName}
+                  myRankIdentity={myRankIdentity}
+                  opponentRankIdentity={opponentRankIdentity}
+                  myChampionLeaderNumber={myChampionLeaderNumber}
+                  opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                   isObserver={isObserver}
                   isPlayback={isPlayback}
-                  revealHands={isGameOver}
                 />
-
-                <PhaseTrack
-                  currentTurn={currentTurn}
-                  phase={phase}
-                />
-
-                <PlayerMat
-                  side="my"
-                  isObserver={isObserver}
-                  isPlayback={isPlayback}
-                  revealHands={isGameOver}
-                  revealObserverHand={isObserver && spectatorHandVisible}
-                />
-              </main>
-
-              <RightRail
-                myName={myName}
-                opponentName={opponentName}
-                myRankIdentity={myRankIdentity}
-                opponentRankIdentity={opponentRankIdentity}
-                myChampionLeaderNumber={myChampionLeaderNumber}
-                opponentChampionLeaderNumber={opponentChampionLeaderNumber}
-                isObserver={isObserver}
-                isPlayback={isPlayback}
-              />
+              </div>
             </div>
-
           </div>
         </CardSizeOverride.Provider>
       </div>

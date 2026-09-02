@@ -412,17 +412,12 @@ function SidebarButton({
   );
 }
 
-const CHAT_DECORATION_FILTERS: Array<{
-  slot: "all" | ChatDecorationSlot;
+const CHAT_DECORATION_SLOTS: Array<{
+  slot: ChatDecorationSlot;
   label: string;
 }> = [
-  { slot: "all", label: "全部" },
-  { slot: "greeting", label: "问候" },
-  { slot: "praise", label: "称赞" },
-  { slot: "thanks", label: "感谢" },
-  { slot: "surprise", label: "惊叹" },
-  { slot: "mistake", label: "失误" },
-  { slot: "threat", label: "威胁" },
+  { slot: "opening", label: "开场台词" },
+  { slot: "victory", label: "胜利宣言" },
 ];
 
 const CHAT_DECORATION_RARITY_LABELS: Record<ChatDecorationItem["rarity"], string> = {
@@ -448,19 +443,19 @@ function chatDecorationPreviewClass(styleToken: string): string {
   return "border-slate-300/60 from-slate-700 via-slate-900 to-gray-950 text-slate-50";
 }
 
-function ChatDecorationExchangePanel() {
+export function ChatDecorationExchangePanel() {
   const { locale, t } = useLanguage();
   const connState = useNetStore((state) => state.connState);
   const exchange = useNetStore((state) => state.chatDecorationExchange);
-  const [filter, setFilter] = useState<"all" | ChatDecorationSlot>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const snapshot = exchange.snapshot;
-  const filteredItems = (snapshot?.items ?? []).filter(
-    (item) => filter === "all" || item.slot === filter,
-  );
-  const selected = filteredItems.find((item) => item.id === selectedId)
-    ?? filteredItems[0]
+  const items = snapshot?.items ?? [];
+  const selected = items.find((item) => item.id === selectedId)
+    ?? items[0]
     ?? null;
+  const equippedBySlot = new Map<ChatDecorationSlot, ChatDecorationItem>(
+    items.flatMap((item) => item.equippedSlots.map((slot) => [slot, item] as const)),
+  );
   const numberLocale = locale === "zh-CN" ? "zh-CN" : locale;
 
   useEffect(() => {
@@ -469,11 +464,16 @@ function ChatDecorationExchangePanel() {
 
   const runSelectedAction = () => {
     if (!selected || exchange.pendingRequestId) return;
-    if (selected.owned) HomeRequest.equipChatDecoration(selected.id, selected.slot);
-    else HomeRequest.purchaseChatDecoration(selected.id);
+    if (selected.owned || !selected.availableForPurchase) return;
+    HomeRequest.purchaseChatDecoration(selected.id);
   };
 
-  const selectedActionLabel = !selected
+  const equipSelected = (slot: ChatDecorationSlot) => {
+    if (!selected?.owned || exchange.pendingRequestId || selected.equippedSlots.includes(slot)) return;
+    HomeRequest.equipChatDecoration(selected.id, slot);
+  };
+
+  const selectedActionLabel = t(!selected
     ? "请选择装饰"
     : exchange.pendingAction === "purchase"
       ? "购买确认中…"
@@ -481,16 +481,17 @@ function ChatDecorationExchangePanel() {
         ? "装配确认中…"
         : exchange.pendingAction === "snapshot"
           ? "同步余额中…"
-          : selected.equipped
-            ? "已装配"
+          : !selected.availableForPurchase
+            ? "历史拥有 · 已下架"
             : selected.owned
-              ? "装配到快捷槽位"
+              ? "已永久拥有"
               : snapshot && snapshot.balanceRankPoints < selected.priceRankPoints
                 ? "赏金不足"
-                : "永久购买";
+                : "永久购买");
   const selectedActionDisabled = !selected
     || Boolean(exchange.pendingRequestId)
-    || selected.equipped
+    || !selected.availableForPurchase
+    || selected.owned
     || (!selected.owned && Boolean(snapshot && snapshot.balanceRankPoints < selected.priceRankPoints));
 
   return (
@@ -504,21 +505,21 @@ function ChatDecorationExchangePanel() {
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="text-2xl">☠️</span>
               <div>
-                <h1 className="text-xl font-black text-white">聊天装饰交易所</h1>
-                <p className="text-xs text-slate-400">用本赛季可用标准排位悬赏金，永久解锁海贼风格快捷气泡。</p>
+                <h1 className="text-xl font-black text-white">{t("聊天装饰交易所")}</h1>
+                <p className="text-xs text-slate-400">{t("永久拥有后，可分别设为自动开场台词和胜利宣言。")}</p>
               </div>
             </div>
             {snapshot && <p className="mt-2 max-w-2xl text-[11px] leading-relaxed text-slate-500">{t(snapshot.walletRule)}</p>}
           </div>
           <div className="flex min-w-[15rem] items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-950/25 px-4 py-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">可用标准排位悬赏金</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">{t("可用标准排位悬赏金")}</p>
               <p className="mt-1 text-2xl font-black tabular-nums text-amber-50">
                 {snapshot ? snapshot.balanceRankPoints.toLocaleString(numberLocale) : "—"}
                 <span className="ml-1 text-sm text-amber-300">RP</span>
               </p>
               <p className="text-[10px] tabular-nums text-amber-200/60">
-                {snapshot ? `${snapshot.balanceBerries.toLocaleString(numberLocale)} 贝里` : "正在读取权威余额…"}
+                {snapshot ? `${snapshot.balanceBerries.toLocaleString(numberLocale)} ${t("贝里")}` : t("正在读取权威余额…")}
               </p>
             </div>
             <button
@@ -527,7 +528,7 @@ function ChatDecorationExchangePanel() {
               disabled={Boolean(exchange.pendingRequestId) || connState !== "connected"}
               className="min-h-14 min-w-14 rounded-xl border border-amber-300/20 bg-slate-900 px-3 text-xs font-bold text-amber-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              刷新
+              {t("刷新")}
             </button>
           </div>
         </header>
@@ -541,34 +542,16 @@ function ChatDecorationExchangePanel() {
               disabled={Boolean(exchange.pendingRequestId) || connState !== "connected"}
               className="min-h-14 rounded-lg bg-red-800 px-4 text-xs font-bold text-white disabled:opacity-50"
             >
-              重新同步
+              {t("重新同步")}
             </button>
           </div>
         )}
-
-        <div className="flex touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="聊天装饰分类">
-          {CHAT_DECORATION_FILTERS.map((option) => (
-            <button
-              key={option.slot}
-              type="button"
-              onClick={() => setFilter(option.slot)}
-              aria-pressed={filter === option.slot}
-              className={`min-h-14 min-w-[4.5rem] shrink-0 rounded-xl border px-3 text-sm font-bold transition-colors ${
-                filter === option.slot
-                  ? "border-amber-300 bg-amber-400 text-slate-950"
-                  : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
 
         {!snapshot ? (
           <div className="grid min-h-72 place-items-center rounded-2xl border border-slate-800 bg-slate-950/60 p-8 text-center text-sm text-slate-500">
             <div>
               <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-300" />
-              <p>{exchange.error ? "等待重新同步交易所…" : "正在读取交易所目录与权威余额…"}</p>
+              <p>{t(exchange.error ? "等待重新同步交易所…" : "正在读取交易所目录与权威余额…")}</p>
             </div>
           </div>
         ) : selected ? (
@@ -576,21 +559,66 @@ function ChatDecorationExchangePanel() {
             <div className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 @[760px]:grid-cols-[minmax(0,1fr)_minmax(17rem,0.7fr)] @[760px]:items-center">
               <div>
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full bg-slate-800 px-2.5 py-1 font-bold text-slate-300">
-                    {CHAT_DECORATION_FILTERS.find((option) => option.slot === selected.slot)?.label}
-                  </span>
                   <span className="rounded-full bg-violet-950 px-2.5 py-1 font-bold text-violet-200">
-                    {CHAT_DECORATION_RARITY_LABELS[selected.rarity]}
+                    {t(CHAT_DECORATION_RARITY_LABELS[selected.rarity])}
                   </span>
-                  {selected.owned && <span className="rounded-full bg-emerald-950 px-2.5 py-1 font-bold text-emerald-200">已拥有</span>}
-                  {selected.equipped && <span className="rounded-full bg-amber-950 px-2.5 py-1 font-bold text-amber-200">已装配</span>}
+                  {selected.owned && <span className="rounded-full bg-emerald-950 px-2.5 py-1 font-bold text-emerald-200">{t("已拥有")}</span>}
+                  {!selected.availableForPurchase && <span className="rounded-full bg-slate-800 px-2.5 py-1 font-bold text-slate-300">{t("历史拥有 · 已下架")}</span>}
+                  {selected.equippedSlots.length > 0 && <span className="rounded-full bg-amber-950 px-2.5 py-1 font-bold text-amber-200">{t("已装配")}</span>}
                 </div>
                 <h2 className="text-2xl font-black text-white">{t(selected.name)}</h2>
-                <p className="mt-1 text-xs text-slate-500">永久所有权 · 每类槽位同时装配一个</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selected.availableForPurchase
+                    ? t("永久所有权 · 同一句语录可同时用于开场与胜利")
+                    : t("历史藏品仍可装配和演出，不再开放购买。")}
+                </p>
+                {selected.owned && (
+                  <fieldset data-chat-decoration-equip-actions className="mt-4">
+                    <legend className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                      {t("自动触发位置")}
+                    </legend>
+                    <div className="grid gap-2 @[520px]:grid-cols-2">
+                      {CHAT_DECORATION_SLOTS.map((option) => {
+                        const equipped = equippedBySlot.get(option.slot);
+                        const isSelectedEquipped = selected.equippedSlots.includes(option.slot);
+                        return (
+                          <div key={option.slot} className="rounded-xl border border-slate-700 bg-slate-900/85 p-2.5">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <span className="text-xs font-black text-slate-200">{t(option.label)}</span>
+                              <span className="max-w-[9rem] truncate text-[10px] text-slate-500">
+                                {equipped ? t(equipped.name) : t("未设置")}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              data-chat-decoration-equip-slot={option.slot}
+                              onClick={() => equipSelected(option.slot)}
+                              disabled={Boolean(exchange.pendingRequestId) || isSelectedEquipped}
+                              aria-pressed={isSelectedEquipped}
+                              className={`min-h-14 w-full rounded-lg px-3 text-xs font-black transition-colors ${
+                                isSelectedEquipped
+                                  ? "bg-emerald-900/70 text-emerald-200 ring-1 ring-emerald-400/30"
+                                  : "bg-amber-400 text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                              }`}
+                            >
+                              {t(isSelectedEquipped ? `已设为${option.label}` : `设为${option.label}`)}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <div>
-                    <p className="text-xl font-black tabular-nums text-amber-200">{selected.priceRankPoints.toLocaleString(numberLocale)} RP</p>
-                    <p className="text-[10px] tabular-nums text-slate-500">{selected.priceBerries.toLocaleString(numberLocale)} 贝里</p>
+                    {selected.availableForPurchase ? (
+                      <>
+                        <p className="text-xl font-black tabular-nums text-amber-200">{(selected.priceRankPoints * 1_000).toLocaleString(numberLocale)} {t("赏金")}</p>
+                        <p className="text-[10px] tabular-nums text-slate-500">{selected.priceBerries.toLocaleString(numberLocale)} {t("贝里")}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-black text-slate-400">{t("历史藏品 · 已下架")}</p>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -603,7 +631,7 @@ function ChatDecorationExchangePanel() {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">局内气泡预览</p>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{t("领袖语录气泡预览")}</p>
                 <div
                   data-chat-decoration-preview
                   data-style-token={selected.styleToken}
@@ -617,13 +645,15 @@ function ChatDecorationExchangePanel() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 @[620px]:grid-cols-2 @[1080px]:grid-cols-3">
-              {filteredItems.map((item) => {
+              {items.map((item) => {
                 const active = item.id === selected.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setSelectedId(item.id)}
+                    onClick={() => {
+                      setSelectedId(item.id);
+                    }}
                     aria-pressed={active}
                     className={`min-h-36 rounded-2xl border p-4 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
                       active
@@ -637,19 +667,25 @@ function ChatDecorationExchangePanel() {
                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">{t(item.text)}</p>
                       </div>
                       <span className="shrink-0 rounded-full bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300">
-                        {CHAT_DECORATION_RARITY_LABELS[item.rarity]}
+                        {t(CHAT_DECORATION_RARITY_LABELS[item.rarity])}
                       </span>
                     </div>
                     <div className="mt-4 flex items-end justify-between gap-2">
-                      <span className="text-sm font-black tabular-nums text-amber-200">{item.priceRankPoints} RP</span>
+                      <span className={`text-sm font-black tabular-nums ${item.availableForPurchase ? "text-amber-200" : "text-slate-500"}`}>
+                        {item.availableForPurchase
+                          ? `${(item.priceRankPoints * 1_000).toLocaleString(numberLocale)} ${t("赏金")}`
+                          : t("历史藏品 · 已下架")}
+                      </span>
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                        item.equipped
+                        item.equippedSlots.length > 0
                           ? "bg-amber-950 text-amber-200"
                           : item.owned
                             ? "bg-emerald-950 text-emerald-200"
                             : "bg-slate-800 text-slate-400"
                       }`}>
-                        {item.equipped ? "已装配" : item.owned ? "已拥有" : "未拥有"}
+                        {item.equippedSlots.length > 0
+                          ? item.equippedSlots.map((slot) => t(CHAT_DECORATION_SLOTS.find((option) => option.slot === slot)?.label ?? slot)).join(" / ")
+                          : t(item.owned ? "已拥有" : "未拥有")}
                       </span>
                     </div>
                   </button>
@@ -658,7 +694,7 @@ function ChatDecorationExchangePanel() {
             </div>
           </>
         ) : (
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-10 text-center text-sm text-slate-500">该分类暂无聊天装饰。</div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-10 text-center text-sm text-slate-500">{t("暂无聊天装饰。")}</div>
         )}
       </div>
     </section>

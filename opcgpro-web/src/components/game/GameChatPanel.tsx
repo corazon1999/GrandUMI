@@ -11,10 +11,6 @@ import SpectatorArena from "@/components/game/SpectatorArena";
 import GameMenu from "@/components/game/GameMenu";
 import MobileTurnExtensionButton from "@/components/game/MobileTurnExtensionButton";
 import { useLanguage } from "@/i18n/LanguageProvider";
-import type {
-  ChatDecorationItem,
-  ChatDecorationSlot,
-} from "@/store/netStore";
 
 /** 左下角局内聊天与独立好友中心入口。 */
 
@@ -30,20 +26,6 @@ const PRESETS = [
   "老板来了，等我一会",
 ];
 const COOLDOWN_MS = 1300;
-const DECORATION_BUBBLE_MS = 4200;
-
-const DECORATION_SLOTS: Array<{
-  slot: ChatDecorationSlot;
-  label: string;
-  icon: string;
-}> = [
-  { slot: "greeting", label: "问候", icon: "👋" },
-  { slot: "praise", label: "称赞", icon: "✨" },
-  { slot: "thanks", label: "感谢", icon: "🤝" },
-  { slot: "surprise", label: "惊叹", icon: "❗" },
-  { slot: "mistake", label: "失误", icon: "🧭" },
-  { slot: "threat", label: "威胁", icon: "⚔️" },
-];
 
 interface GameChatItem {
   id: number;
@@ -51,56 +33,12 @@ interface GameChatItem {
   fromName: string;
   isSelf: boolean;
   fromRole: "player" | "spectator";
-  decoration?: {
-    id: string;
-    styleToken: string;
-  } | null;
 }
 
 interface ChatToast {
   text: string;
   fromName: string;
   fromRole: "player" | "spectator";
-}
-
-interface DecorationBubble {
-  id: number;
-  text: string;
-  fromName: string;
-  side: "self" | "opponent";
-  styleToken: string;
-}
-
-/** 服务端只下发受控 token；客户端静态映射视觉，绝不执行服务端提供的 CSS。 */
-function chatDecorationBubbleClass(styleToken: string): string {
-  switch (styleToken) {
-    case "sunset":
-      return "border-orange-300/70 bg-gradient-to-br from-orange-950/95 via-rose-950/95 to-slate-950/95 text-orange-50 ring-1 ring-orange-300/25";
-    case "tide":
-      return "border-cyan-300/70 bg-gradient-to-br from-cyan-950/95 via-blue-950/95 to-slate-950/95 text-cyan-50 ring-1 ring-cyan-300/25";
-    case "gold":
-      return "border-yellow-300/75 bg-gradient-to-br from-yellow-950/95 via-amber-950/95 to-slate-950/95 text-yellow-50 ring-1 ring-yellow-300/25";
-    case "haki":
-      return "border-fuchsia-300/75 bg-gradient-to-br from-fuchsia-950/95 via-violet-950/95 to-slate-950/95 text-fuchsia-50 ring-1 ring-fuchsia-300/30";
-    case "leaf":
-      return "border-emerald-300/70 bg-gradient-to-br from-emerald-950/95 via-teal-950/95 to-slate-950/95 text-emerald-50 ring-1 ring-emerald-300/25";
-    case "feast":
-      return "border-lime-300/70 bg-gradient-to-br from-lime-950/95 via-orange-950/95 to-slate-950/95 text-lime-50 ring-1 ring-lime-300/25";
-    case "shock":
-      return "border-sky-200/75 bg-gradient-to-br from-sky-950/95 via-indigo-950/95 to-slate-950/95 text-sky-50 ring-1 ring-sky-200/30";
-    case "wanted":
-      return "border-amber-200/80 bg-gradient-to-br from-stone-800/95 via-amber-950/95 to-red-950/95 text-amber-50 ring-1 ring-amber-200/35";
-    case "mist":
-      return "border-slate-300/65 bg-gradient-to-br from-slate-700/95 via-slate-900/95 to-gray-950/95 text-slate-50 ring-1 ring-slate-200/20";
-    case "navy":
-      return "border-blue-300/70 bg-gradient-to-br from-blue-950/95 via-slate-950/95 to-gray-950/95 text-blue-50 ring-1 ring-blue-300/25";
-    case "ember":
-      return "border-red-300/75 bg-gradient-to-br from-red-950/95 via-orange-950/95 to-slate-950/95 text-red-50 ring-1 ring-red-300/30";
-    case "emperor":
-      return "border-purple-200/80 bg-gradient-to-br from-purple-950/95 via-red-950/95 to-black/95 text-purple-50 ring-2 ring-purple-300/35";
-    default:
-      return "border-slate-300/60 bg-slate-950/95 text-white ring-1 ring-white/15";
-  }
 }
 
 type ActiveControl = "chat" | "friends" | "spectators" | "more" | null;
@@ -123,9 +61,6 @@ export default function GameChatPanel({
   const incomingFriendCount = useNetStore(
     (s) => s.incomingFriendRequests.length,
   );
-  const chatDecorationSnapshot = useNetStore(
-    (s) => s.chatDecorationExchange.snapshot,
-  );
   const opponentName = useGameStore((s) => s.opponentName);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const spectatorDetails = useGameStore((s) => s.spectatorDetails);
@@ -147,9 +82,6 @@ export default function GameChatPanel({
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [kickConfirm, setKickConfirm] = useState("");
-  const [decorationBubbles, setDecorationBubbles] = useState<Partial<
-    Record<"self" | "opponent", DecorationBubble>
-  >>({});
 
   const open = activeControl === "chat";
   const friendsOpen = activeControl === "friends";
@@ -162,9 +94,6 @@ export default function GameChatPanel({
   const listRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const decorationBubbleTimers = useRef<Partial<
-    Record<"self" | "opponent", ReturnType<typeof setTimeout>>
-  >>({});
 
   const totalFriendUnread = Object.values(friendChatUnreadByAccount).reduce(
     (total, count) => total + count,
@@ -219,10 +148,6 @@ export default function GameChatPanel({
       fromName: string;
       fromRole: "player" | "spectator";
       displaySide?: "self" | "opponent" | null;
-      decoration?: {
-        id: string;
-        styleToken: string;
-      } | null;
     }) => {
       const isSelf =
         !!message.fromAccount && message.fromAccount === accountRef.current;
@@ -233,33 +158,9 @@ export default function GameChatPanel({
         fromName: message.fromName,
         isSelf,
         fromRole: message.fromRole,
-        decoration: message.decoration,
       };
       setGameMessages((previous) => [...previous.slice(-49), item]);
-      if (message.decoration) {
-        const side = message.displaySide === "self" || message.displaySide === "opponent"
-          ? message.displaySide
-          : isSelf ? "self" : "opponent";
-        const bubble: DecorationBubble = {
-          id: item.id,
-          text: item.text,
-          fromName: item.fromName,
-          side,
-          styleToken: message.decoration.styleToken,
-        };
-        setDecorationBubbles((previous) => ({ ...previous, [side]: bubble }));
-        const previousTimer = decorationBubbleTimers.current[side];
-        if (previousTimer) clearTimeout(previousTimer);
-        decorationBubbleTimers.current[side] = setTimeout(() => {
-          setDecorationBubbles((previous) => {
-            if (previous[side]?.id !== bubble.id) return previous;
-            const next = { ...previous };
-            delete next[side];
-            return next;
-          });
-          delete decorationBubbleTimers.current[side];
-        }, DECORATION_BUBBLE_MS);
-      } else if (!isSelf && !openRef.current) {
+      if (!isSelf && !openRef.current) {
         setGameUnread((count) => count + 1);
         showToast({
           text: item.text,
@@ -273,10 +174,6 @@ export default function GameChatPanel({
       eventBus.off("gameChat", handler);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
-      Object.values(decorationBubbleTimers.current).forEach((timer) => {
-        if (timer) clearTimeout(timer);
-      });
-      decorationBubbleTimers.current = {};
     };
   }, []);
 
@@ -315,17 +212,6 @@ export default function GameChatPanel({
     fireCooldown();
   };
 
-  const sendDecoration = (slot: ChatDecorationSlot) => {
-    if (coolingDown || isObserver) return;
-    if (GameRequest.sendChatDecoration(slot)) fireCooldown();
-  };
-
-  const equippedDecorations = new Map<ChatDecorationSlot, ChatDecorationItem>(
-    (chatDecorationSnapshot?.items ?? [])
-      .filter((item) => item.owned && item.equipped)
-      .map((item) => [item.slot, item]),
-  );
-
   const requestHand = () => {
     if (observerHandRequestStatus !== "idle") return;
     if (GameRequest.requestSpectatorHand()) {
@@ -353,39 +239,6 @@ export default function GameChatPanel({
 
   return (
     <>
-      <div
-        data-chat-decoration-bubble-layer
-        aria-live="polite"
-        className="pointer-events-none fixed inset-0 z-[45] overflow-hidden"
-      >
-        {(["opponent", "self"] as const).map((side) => {
-          const bubble = decorationBubbles[side];
-          if (!bubble) return null;
-          return (
-            <div
-              key={`${side}:${bubble.id}`}
-              data-chat-decoration-bubble
-              data-display-side={side}
-              data-style-token={bubble.styleToken}
-              role="status"
-              className={`absolute right-[calc(clamp(8rem,19cqw,14rem)+var(--layout-safe-right,0px))] w-[min(17rem,38cqw)] rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed shadow-2xl backdrop-blur ${
-                side === "self"
-                  ? "bottom-[calc(18%+var(--layout-safe-bottom,0px))]"
-                  : "top-[calc(18%+var(--layout-safe-top,0px))]"
-              } ${chatDecorationBubbleClass(bubble.styleToken)}`}
-            >
-              <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.18em] opacity-75">
-                {side === "self" ? "你的装饰" : bubble.fromName}
-              </span>
-              <span>{t(bubble.text)}</span>
-              <span
-                aria-hidden="true"
-                className="absolute -right-2 top-1/2 h-4 w-4 -translate-y-1/2 rotate-45 border-r border-t border-current bg-inherit opacity-80"
-              />
-            </div>
-          );
-        })}
-      </div>
       {showSpectatorIndicator && (
         <SpectatorArena
           spectatorNames={spectatorNames}
@@ -524,7 +377,7 @@ export default function GameChatPanel({
               {gameMessages.map((message) => (
                 <div
                   key={message.id}
-                  className={`mb-1 leading-snug ${message.decoration ? "rounded-md border border-amber-400/20 bg-amber-400/5 px-2 py-1" : ""}`}
+                  className="mb-1 leading-snug"
                 >
                   <span
                     className={`font-bold ${message.isSelf ? "text-sky-300" : message.fromRole === "spectator" ? "text-slate-400" : "text-amber-300"}`}
@@ -536,43 +389,6 @@ export default function GameChatPanel({
                 </div>
               ))}
             </div>
-            {!isObserver && (
-              <div
-                data-chat-decoration-quickbar
-                className="shrink-0 border-t border-amber-300/15 bg-amber-950/15 px-2 py-2"
-              >
-                <div className="mb-1 flex items-center justify-between gap-2 px-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-200">
-                    特殊聊天装饰
-                  </span>
-                  <span className="text-[10px] text-slate-500">文案与样式由服务器确认</span>
-                </div>
-                <div className="grid grid-cols-6 gap-0.5 overflow-x-hidden">
-                  {DECORATION_SLOTS.map(({ slot, label, icon }) => {
-                    const decoration = equippedDecorations.get(slot);
-                    const accessibleLabel = decoration
-                      ? `${label}：${t(decoration.name)}`
-                      : `${label}：未装配`;
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        data-chat-decoration-slot={slot}
-                        onClick={() => sendDecoration(slot)}
-                        disabled={coolingDown || !decoration}
-                        aria-label={accessibleLabel}
-                        title={decoration
-                          ? `${accessibleLabel} · ${t(decoration.text)}`
-                          : `${accessibleLabel} · 请先在交易所购买并装配`}
-                        className="flex min-h-12 min-w-12 items-center justify-center rounded-xl border border-amber-300/20 bg-slate-800/90 text-lg text-amber-50 transition-colors hover:border-amber-300/45 hover:bg-slate-700 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-600 disabled:opacity-70"
-                      >
-                        <span aria-hidden="true">{icon}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
             <div
               data-game-chat-presets
               className={`gap-1 border-t border-white/10 px-2 py-1.5 ${

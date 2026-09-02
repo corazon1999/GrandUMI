@@ -19,7 +19,7 @@ namespace GrandUMI.Game;
 /// <summary>
 /// 房间池：管理活跃的 GameEngine 实例 + 会话↔房间映射 + 断线宽限期
 /// </summary>
-public static class GameRoomManager
+public static partial class GameRoomManager
 {
     public static IRoomPlacementDirectory RoomDirectory { get; set; } = LocalRoomPlacementDirectory.Instance;
     private const int GracePeriodSeconds = 90;
@@ -196,6 +196,7 @@ public static class GameRoomManager
         internal bool CloudReplayCompleted;
         internal bool TerminalMatchLogCompleted;
         internal string? TerminalFinalizationFailure;
+        internal ChatDecorationCinematicRuntime ChatDecorationCinematics { get; } = new();
         public bool IsRecoveryPaused => RecoveryAvailability != RoomRecoveryAvailability.Healthy;
         public string? RecoveryPauseReason => RecoveryFailureReason;
     }
@@ -344,6 +345,7 @@ public static class GameRoomManager
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
         engine.State.OperationClockRemainingMs[1] = OperationTimeLimitMs;
         ResetOperationTurnClock(engine.State);
+        ConfigureChatDecorationCinematics(entry);
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
         engine.OnOpeningSequenceReady = () =>
         {
@@ -443,6 +445,7 @@ public static class GameRoomManager
                 vsBot,
                 matchKind = matchKind.ToString(),
                 createdAtUtc = DateTime.UtcNow,
+                chatDecorations = entry.ChatDecorationCinematics.ExportForJournal(),
             });
             engine.OnPersistActionWithSource = (pi, act, data, requestId, source) =>
                 PersistAcceptedAction(entry, pi, act, data, requestId, source);
@@ -819,7 +822,11 @@ public static class GameRoomManager
             {
                 RecordRecentFeedbackAction(room, idx, action, "duplicate", requestId, "重复 requestId，动作未再次执行");
                 WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
-                    room.Engine.State, idx, "DuplicateRequest", requestId: requestId));
+                    room.Engine.State,
+                    idx,
+                    "DuplicateRequest",
+                    requestId: requestId,
+                    cinematic: room.Engine.CinematicSnapshotProvider?.Invoke(idx)));
                 return Task.CompletedTask;
             }));
             LatencyDiagnostics.RecordMetric("对局动作去重", 1, "次");
@@ -2155,13 +2162,18 @@ public static class GameRoomManager
                     -1,
                     "Resync",
                     spectatorPlayerIndex: spectator?.ViewPlayerIndex ?? 0,
-                    revealSpectatorMainHand: spectator?.HandVisible == true));
+                    revealSpectatorMainHand: spectator?.HandVisible == true,
+                    cinematic: room.Engine.CinematicSnapshotProvider?.Invoke(spectator?.ViewPlayerIndex ?? 0)));
                 return;
             }
             var wasDisconnected = CompleteDisconnectGrace(room, idx, sessionId);
             if (wasDisconnected)
                 WebSocketBridge.Send(room.PlayerSessionIds[1 - idx], new { proto = "MsgPlayerReconnected" });
-            WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(room.Engine.State, idx, "Resync"));
+            WebSocketBridge.Send(sessionId, StateSnapshotBuilder.Build(
+                room.Engine.State,
+                idx,
+                "Resync",
+                cinematic: room.Engine.CinematicSnapshotProvider?.Invoke(idx)));
             WebSocketBridge.BroadcastSpectatorList(room);
         }));
     }
@@ -2348,7 +2360,11 @@ public static class GameRoomManager
                             // 直接交付当前权威终局，后台扫描继续幂等收尾。
                             WebSocketBridge.Send(
                                 newSessionId,
-                                StateSnapshotBuilder.Build(r.Engine.State, i, "TerminalRecovery"));
+                                StateSnapshotBuilder.Build(
+                                    r.Engine.State,
+                                    i,
+                                    "TerminalRecovery",
+                                    cinematic: r.Engine.CinematicSnapshotProvider?.Invoke(i)));
                             return true;
                         }
                         var oldSid = r.PlayerSessionIds[i];
@@ -2389,7 +2405,11 @@ public static class GameRoomManager
                             {
                                 WebSocketBridge.Send(
                                     newSessionId,
-                                    StateSnapshotBuilder.Build(r.Engine.State, playerIndex, "TerminalRecovery"));
+                                    StateSnapshotBuilder.Build(
+                                        r.Engine.State,
+                                        playerIndex,
+                                        "TerminalRecovery",
+                                        cinematic: r.Engine.CinematicSnapshotProvider?.Invoke(playerIndex)));
                                 return;
                             }
                             await ResolveExpiredStartingPlayerChoiceAsync(r, DateTime.UtcNow);
@@ -2402,7 +2422,11 @@ public static class GameRoomManager
                             {
                                 WebSocketBridge.Send(
                                     newSessionId,
-                                    StateSnapshotBuilder.Build(r.Engine.State, playerIndex, "TerminalRecovery"));
+                                    StateSnapshotBuilder.Build(
+                                        r.Engine.State,
+                                        playerIndex,
+                                        "TerminalRecovery",
+                                        cinematic: r.Engine.CinematicSnapshotProvider?.Invoke(playerIndex)));
                                 return;
                             }
                             if (wasDisconnected)
@@ -2410,7 +2434,11 @@ public static class GameRoomManager
                                 WebSocketBridge.Send(r.PlayerSessionIds[1 - playerIndex], new { proto = "MsgPlayerReconnected" });
                                 r.Engine.Broadcast("PlayerReconnected", new { player = playerIndex });
                             }
-                            WebSocketBridge.Send(newSessionId, StateSnapshotBuilder.Build(r.Engine.State, playerIndex, "Resync"));
+                            WebSocketBridge.Send(newSessionId, StateSnapshotBuilder.Build(
+                                r.Engine.State,
+                                playerIndex,
+                                "Resync",
+                                cinematic: r.Engine.CinematicSnapshotProvider?.Invoke(playerIndex)));
                             SendCurrentOpponentDisconnectState(r, playerIndex, newSessionId);
                             WebSocketBridge.BroadcastSpectatorList(r);
                         }));
@@ -2561,7 +2589,8 @@ public static class GameRoomManager
                     -1,
                     "SpectateJoin",
                     spectatorPlayerIndex: storedSpectator.ViewPlayerIndex,
-                    revealSpectatorMainHand: storedSpectator.HandVisible));
+                    revealSpectatorMainHand: storedSpectator.HandVisible,
+                    cinematic: r.Engine.CinematicSnapshotProvider?.Invoke(storedSpectator.ViewPlayerIndex)));
             return Task.CompletedTask;
         }));
     }
@@ -2677,7 +2706,8 @@ public static class GameRoomManager
                         -1,
                         "SpectatorHandApproved",
                         spectatorPlayerIndex: activeSpectator.ViewPlayerIndex,
-                        revealSpectatorMainHand: true));
+                        revealSpectatorMainHand: true,
+                        cinematic: room.Engine.CinematicSnapshotProvider?.Invoke(activeSpectator.ViewPlayerIndex)));
                 return Task.CompletedTask;
             }));
         }
@@ -2835,7 +2865,8 @@ public static class GameRoomManager
                     room.MatchKind,
                     room.PlayerAccounts,
                     room.PlayerSessionIds,
-                    room.Engine.State);
+                    room.Engine.State,
+                    room.Engine.CinematicSnapshotProvider);
                 room.TerminalOutcomePersisted = true;
             }
 
@@ -3271,6 +3302,7 @@ public static class GameRoomManager
         var openingSetupAfterFirstPlayerChoice =
             h.TryGetProperty("openingSetupAfterFirstPlayerChoice", out var deferredSetup)
             && deferredSetup.GetBoolean();
+        var restoredChatDecorationLoadout = ReadChatDecorationJournalLoadout(h);
 
         if (vsBot) { TryDelete(file); return false; } // 范围=仅 PvP
 
@@ -3490,6 +3522,7 @@ public static class GameRoomManager
             engine.State.OperationClockActivePlayer = -1;
             engine.State.OperationClockPaused = true;
         }
+        ConfigureChatDecorationCinematics(entry, restoredChatDecorationLoadout);
         entry.DisconnectedPlayers[0] = true;
         entry.DisconnectedPlayers[1] = true;
         var restoredDisconnectStartedAt = Stopwatch.GetTimestamp();
@@ -3627,7 +3660,12 @@ public static class GameRoomManager
 
             capture.AppendSnapshot(
                 playerIndex,
-                StateSnapshotBuilder.Build(room.Engine.State, playerIndex, action, payload));
+                StateSnapshotBuilder.Build(
+                    room.Engine.State,
+                    playerIndex,
+                    action,
+                    payload,
+                    cinematic: room.Engine.CinematicSnapshotProvider?.Invoke(playerIndex)));
             var repaired = capture.GetRecoveryFrameState(playerIndex);
             if (!repaired.HasTerminalFrame || repaired.LastTick != room.Engine.State.Tick)
                 throw new IOException($"云回放 {room.RoomId}/P{playerIndex} 终局帧补写失败");

@@ -13,7 +13,16 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { BattlePhase, GameMode } from "@/types/game";
-import type { EffectActivationSnapshot, HexModeSnapshot, MsgGameState, PlayerRankIdentitySnapshot, PlayerSnapshot, RevealSnapshot, StageSnapshot } from "@/types/net";
+import type { EffectActivationSnapshot, GameCinematicPhraseEvent, GameCinematicTerminalEvent, HexModeSnapshot, MsgGameState, PlayerRankIdentitySnapshot, PlayerSnapshot, RevealSnapshot, StageSnapshot } from "@/types/net";
+import {
+  advanceGameCinematic,
+  createInitialGameCinematicState,
+  finishGameCinematicFallback,
+  ingestGameCinematic,
+  needsGameCinematicFallback,
+  shouldIgnoreLiveGameStateSnapshot,
+  shouldPreserveTerminalGameState,
+} from "../lib/gameCinematic.mjs";
 
 // ── 服务器快照中的字段（部分公开） ────────────────────────────────────────
 
@@ -170,6 +179,17 @@ export interface QueuedEffectActivation extends EffectActivationSnapshot {
   id: string;
 }
 
+export interface GameCinematicPresentationState {
+  matchId: string | null;
+  seenOpeningEventIds: string[];
+  openingBubbles: Array<GameCinematicPhraseEvent & { expiresAt: number }>;
+  terminalEventId: string | null;
+  terminal: GameCinematicTerminalEvent | null;
+  phase: "idle" | "impact" | "victory" | "complete";
+  phaseStartedAt: number;
+  settlementReady: boolean;
+}
+
 interface GameStore {
   // 元信息
   mode: GameMode;
@@ -256,6 +276,7 @@ interface GameStore {
   drawRequestDescription: string | null;
   drawRequestRejectionCount: number;
   drawRequestRejectionLimit: number;
+  cinematic: GameCinematicPresentationState;
 
   // 选中（纯本地）
   selectedHandIndex: number | null;
@@ -291,6 +312,8 @@ interface GameStore {
   removeSpectatorHandRequest: (requestId: string) => void;
   setObserverHandRequestStatus: (status: GameStore["observerHandRequestStatus"], retryAt?: number) => void;
   setMode: (m: GameMode) => void;
+  advanceCinematic: (now: number, reducedMotion: boolean) => void;
+  finishFromDuelOver: (isWin: boolean, description: string) => void;
   resetGame: () => void;
 }
 
@@ -362,6 +385,7 @@ export const useGameStore = create<GameStore>()(
     drawRequestDescription: null,
     drawRequestRejectionCount: 0,
     drawRequestRejectionLimit: 3,
+    cinematic: createInitialGameCinematicState() as GameCinematicPresentationState,
     selectedHandIndex: null,
     selectedFieldId: null,
     selectedDonIndex: null,
@@ -375,6 +399,36 @@ export const useGameStore = create<GameStore>()(
       set((s) => {
         const previousTick = s.tick;
         const incomingTick = msg.tick ?? previousTick + 1;
+        // 回放主动倒退后要重建本地演出游标，才能在再次越过触发帧时重播；
+        // 在线模式绝不能走这条路径，否则迟到快照会造成重复演出。
+        if (s.mode === "Playback" && incomingTick < previousTick) {
+          s.cinematic = createInitialGameCinematicState() as GameCinematicPresentationState;
+        }
+        const previousMatchId = s.cinematic.matchId;
+        const incomingMatchId = msg.cinematic?.matchId ?? null;
+        if (shouldIgnoreLiveGameStateSnapshot({
+          mode: s.mode,
+          previousTick,
+          incomingTick,
+          previousMatchId,
+          incomingMatchId,
+        })) return;
+        const preserveTerminal = shouldPreserveTerminalGameState({
+          mode: s.mode,
+          previousIsGameOver: s.isGameOver,
+          incomingIsGameOver: msg.isGameOver ?? false,
+          previousTick,
+          incomingTick,
+          previousMatchId,
+          incomingMatchId,
+        });
+        const previousTerminal = preserveTerminal
+          ? {
+              isDraw: s.isDraw,
+              winnerIsMe: s.winnerIsMe,
+              gameOverReason: s.gameOverReason,
+            }
+          : null;
         const firstPlayer = msg.firstPlayer ?? -1;
         const my = clonePlayerView(msg.my ?? null);
         const opponent = clonePlayerView(msg.opponent ?? null);
@@ -415,15 +469,28 @@ export const useGameStore = create<GameStore>()(
         s.operationClockPaused = msg.operationClockPaused ?? false;
         s.matchKind = msg.matchKind ?? "UnknownHuman";
         s.hexState = cloneHexModeSnapshot(msg.hexState ?? null);
-        s.isGameOver = msg.isGameOver ?? false;
-        s.isDraw = msg.isDraw ?? false;
-        s.winnerIsMe = msg.winnerIsMe ?? false;
-        s.gameOverReason = msg.gameOverReason ?? "";
+        s.isGameOver = preserveTerminal || (msg.isGameOver ?? false);
+        s.isDraw = previousTerminal?.isDraw ?? msg.isDraw ?? false;
+        s.winnerIsMe = previousTerminal?.winnerIsMe ?? msg.winnerIsMe ?? false;
+        s.gameOverReason = previousTerminal?.gameOverReason ?? msg.gameOverReason ?? "";
         s.drawRequestPendingFromMe = msg.drawRequestPendingFromMe ?? false;
         s.drawRequestPendingFromOpponent = msg.drawRequestPendingFromOpponent ?? false;
         s.drawRequestDescription = msg.drawRequestDescription ?? null;
         s.drawRequestRejectionCount = msg.drawRequestRejectionCount ?? 0;
         s.drawRequestRejectionLimit = msg.drawRequestRejectionLimit ?? 3;
+        if (msg.cinematic) {
+          s.cinematic = ingestGameCinematic(
+            s.cinematic,
+            msg.cinematic,
+            Date.now(),
+          ) as GameCinematicPresentationState;
+        }
+        if (needsGameCinematicFallback(s.cinematic, s.isGameOver)) {
+          s.cinematic = finishGameCinematicFallback(
+            s.cinematic,
+            Date.now(),
+          ) as GameCinematicPresentationState;
+        }
         s.viewerKind = (msg.viewerKind as "player" | "spectator") ?? "player";
         s.spectatorHandVisible = msg.spectatorHandVisible ?? false;
         if (s.spectatorHandVisible) {
@@ -576,6 +643,24 @@ export const useGameStore = create<GameStore>()(
       s.observerHandRequestRetryAt = retryAt;
     }),
     setMode: (m) => set((s) => { s.mode = m; }),
+    advanceCinematic: (now, reducedMotion) => set((s) => {
+      s.cinematic = advanceGameCinematic(
+        s.cinematic,
+        now,
+        reducedMotion,
+      ) as GameCinematicPresentationState;
+    }),
+    finishFromDuelOver: (isWin, description) => set((s) => {
+      s.isPending = false;
+      s.isGameOver = true;
+      s.isDraw = false;
+      s.winnerIsMe = isWin;
+      s.gameOverReason = description;
+      s.cinematic = finishGameCinematicFallback(
+        s.cinematic,
+        Date.now(),
+      ) as GameCinematicPresentationState;
+    }),
     resetGame: () => set((s) => {
       s.isStart = false;
       s.tick = 0;
@@ -637,6 +722,7 @@ export const useGameStore = create<GameStore>()(
       s.drawRequestDescription = null;
       s.drawRequestRejectionCount = 0;
       s.drawRequestRejectionLimit = 3;
+      s.cinematic = createInitialGameCinematicState() as GameCinematicPresentationState;
       s.selectedHandIndex = null;
       s.selectedFieldId = null;
       s.selectedDonIndex = null;

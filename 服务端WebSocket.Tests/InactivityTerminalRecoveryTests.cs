@@ -91,6 +91,9 @@ public sealed class InactivityTerminalRecoveryTests
             Assert.True(TerminalOutcomeStore.TryGetBySession(oldSession, out var terminal));
             Assert.True(terminal.GetProperty("isGameOver").GetBoolean());
             Assert.False(terminal.GetProperty("winnerIsMe").GetBoolean());
+            Assert.Equal(
+                $"{room.RoomId}:terminal",
+                terminal.GetProperty("cinematic").GetProperty("terminal").GetProperty("eventId").GetString());
             Assert.Equal(1, CountMatchLogKind(root, room.RoomId, "match_end"));
         }
         finally
@@ -218,6 +221,10 @@ public sealed class InactivityTerminalRecoveryTests
                 cloud.Load(account0, roomId).Document.GetProperty("snapshots").GetArrayLength());
             Assert.Equal(2,
                 cloud.Load(account1, roomId).Document.GetProperty("snapshots").GetArrayLength());
+            var repairedTerminal = cloud.Load(account1, roomId).Document.GetProperty("snapshots")[1];
+            Assert.Equal(
+                $"{roomId}:terminal",
+                repairedTerminal.GetProperty("cinematic").GetProperty("terminal").GetProperty("eventId").GetString());
             Assert.Equal(1, CountMatchLogKind(root, roomId, "match_end"));
         }
         finally

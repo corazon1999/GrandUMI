@@ -32,17 +32,10 @@ import {
   completeRejectedActionLatency,
 } from "./GameRequest";
 import { showMessage } from "@/components/ui/MessageBox";
-import type { ChatDecorationSlot } from "@/store/netStore";
 
-type DecoratedGameChatWire = MsgGameChat & {
+type GameChatWire = MsgGameChat & {
   displaySide?: "self" | "opponent" | null;
   sentAt?: number;
-  decoration?: {
-    id: string;
-    slot: ChatDecorationSlot;
-    rarity: "common" | "rare" | "epic" | "legendary";
-    styleToken: string;
-  } | null;
 };
 
 type ChatDecorationSendResultWire = MsgBase & {
@@ -121,15 +114,20 @@ export function registerGameProtocols() {
         break;
       }
 
-      case "MsgDuelOver":
-        useGameStore.getState().setPending(false);
+      case "MsgDuelOver": {
+        const duelOver = msg as MsgDuelOver;
+        useGameStore.getState().finishFromDuelOver(
+          duelOver.IsWin,
+          duelOver.Description,
+        );
         useNetStore.getState().setMatchState("idle");
         useNetStore.getState().setOpponentName("");
         eventBus.emit("duelOver", {
-          isWin: (msg as MsgDuelOver).IsWin,
-          description: (msg as MsgDuelOver).Description,
+          isWin: duelOver.IsWin,
+          description: duelOver.Description,
         });
         break;
+      }
 
       case "MsgChatDecorationSend": {
         const response = msg as ChatDecorationSendResultWire;
@@ -140,7 +138,7 @@ export function registerGameProtocols() {
       }
 
       case "MsgGameChat": {
-        const m = msg as DecoratedGameChatWire;
+        const m = msg as GameChatWire;
         eventBus.emit("gameChat", {
           text: m.text ?? "",
           code: m.code ?? null,
@@ -150,7 +148,6 @@ export function registerGameProtocols() {
           fromRole: m.fromRole ?? "spectator",
           displaySide: m.displaySide ?? null,
           sentAt: m.sentAt,
-          decoration: m.decoration ?? null,
         });
         break;
       }

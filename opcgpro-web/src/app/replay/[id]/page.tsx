@@ -12,6 +12,7 @@ import type { MsgGameState } from "@/types/net";
 import type { PlaybackSpeed } from "@/types/playback";
 import FeedbackOverlay from "@/components/game/FeedbackOverlay";
 import { readCloudReplayLink } from "@/data/cloudReplayLink";
+import { GameCinematicController } from "@/components/game/GameCinematicLayer";
 
 // 单帧基准时长（1x），按倍速缩放
 const STEP_MS = 900;
@@ -141,6 +142,7 @@ export default function ReplayPage() {
       </div>
 
       <GameBoard isObserver={false} isPlayback />
+      <GameCinematicController />
 
       <PlaybackControls
         currentTurn={currentTurn}

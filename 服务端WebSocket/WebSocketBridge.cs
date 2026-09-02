@@ -2027,8 +2027,8 @@ public static class WebSocketBridge
             "purchased" => "购买成功，聊天装饰已永久拥有。",
             "already_owned" => "你已拥有该聊天装饰，本次未扣除赏金。",
             "insufficient_funds" => "可用标准排位悬赏金不足，本次未扣除赏金。",
-            "equipped" => "聊天装饰已装配到对应快捷槽位。",
-            "already_equipped" => "该聊天装饰已经装配。",
+            "equipped" => "聊天语录已设置到所选自动触发位置。",
+            "already_equipped" => "该聊天语录已在所选自动触发位置。",
             _ => null,
         };
         Send(session.SessionId, new
@@ -2048,7 +2048,6 @@ public static class WebSocketBridge
             items = snapshot.Items.Select(item => new
             {
                 id = item.Definition.Id,
-                slot = item.Definition.Slot,
                 name = item.Definition.Name,
                 text = item.Definition.Text,
                 rarity = item.Definition.Rarity,
@@ -2056,7 +2055,8 @@ public static class WebSocketBridge
                 priceRankPoints = item.Definition.PriceRankPoints,
                 priceBerries = item.Definition.PriceBerries,
                 owned = item.Owned,
-                equipped = item.Equipped,
+                availableForPurchase = item.AvailableForPurchase,
+                equippedSlots = item.EquippedSlots,
             }).ToArray(),
         });
     }
@@ -3766,14 +3766,10 @@ public static class WebSocketBridge
 
     private static void OnSurrender(WsSession s)
     {
-        var opp = GetOpponentSid(s.SessionId);
-        if (opp is not null)
-        {
-            Send(opp, new { proto = "MsgDuelOver", IsWin = true, Description = "对手投降" });
-            GameOpponent.TryRemove(opp, out _);
-        }
-        Send(s.SessionId, new { proto = "MsgDuelOver", IsWin = false, Description = "你已投降" });
-        GameOpponent.TryRemove(s.SessionId, out _);
+        GameRoomManager.HandleAction(
+            s.SessionId,
+            "Surrender",
+            JsonSerializer.SerializeToElement(new { }));
         Log($"{s.Account} 投降");
     }
 
@@ -6018,138 +6014,18 @@ public static class WebSocketBridge
         };
     }
 
-    /// <summary>客户端只提交六类槽位；装配、文案和样式全部从标准排位库权威解析。</summary>
+    /// <summary>旧客户端兼容入口：局内手动发送已永久停用，不读取槽位也不产生聊天事件。</summary>
     private static void OnChatDecorationSend(
         WsSession session,
         IReadOnlyDictionary<string, JsonElement> msg)
     {
-        if (!session.IsLoggedIn || session.Account is null || !IsCurrentAccountSession(session))
+        _ = msg;
+        Send(session.SessionId, new
         {
-            Send(session.SessionId, new
-            {
-                proto = "MsgChatDecorationSend",
-                result = false,
-                logStr = "请先登录后再发送聊天装饰。",
-            });
-            return;
-        }
-        if (!TryRequireCommunicationAccess(session, "MsgChatDecorationSend")) return;
-
-        var room = GameRoomManager.GetRoomBySession(session.SessionId);
-        if (room is null)
-        {
-            Send(session.SessionId, new
-            {
-                proto = "MsgChatDecorationSend",
-                result = false,
-                logStr = "聊天装饰只能由正在对局的玩家发送。",
-            });
-            return;
-        }
-        var seat = Array.IndexOf(room.PlayerSessionIds, session.SessionId);
-        if (seat < 0)
-        {
-            Send(session.SessionId, new
-            {
-                proto = "MsgChatDecorationSend",
-                result = false,
-                logStr = "观战者不能发送聊天装饰。",
-            });
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        if (GameChatAt.TryGetValue(session.SessionId, out var last)
-            && (now - last).TotalMilliseconds < 1200)
-        {
-            Send(session.SessionId, new
-            {
-                proto = "MsgRateLimited",
-                scope = "game-chat",
-                retryAfterMs = Math.Max(1, 1200 - (int)(now - last).TotalMilliseconds),
-            });
-            return;
-        }
-
-        ChatDecorationDefinition? decoration;
-        try
-        {
-            decoration = RankedStore.Default.ResolveEquippedChatDecoration(
-                session.Account,
-                Str(msg, "slot") ?? string.Empty);
-        }
-        catch (Exception ex)
-        {
-            LogErr($"聊天装饰装配读取失败 {session.Account}: {ex.Message}");
-            Send(session.SessionId, new
-            {
-                proto = "MsgChatDecorationSend",
-                result = false,
-                logStr = "聊天装饰状态暂时无法确认，请稍后重试。",
-            });
-            return;
-        }
-        if (decoration is null)
-        {
-            Send(session.SessionId, new
-            {
-                proto = "MsgChatDecorationSend",
-                result = false,
-                logStr = "该快捷槽位尚未装配已拥有的聊天装饰。",
-            });
-            return;
-        }
-
-        GameChatAt[session.SessionId] = now;
-        var fromName = session.PlayerName ?? session.Account;
-        var evidence = GameChatEvidenceByRoom.GetOrAdd(room.RoomId, _ => new ConcurrentQueue<GameChatEvidence>());
-        evidence.Enqueue(new GameChatEvidence(
-            now,
-            session.Account,
-            fromName,
-            "player",
-            decoration.Text,
-            null,
-            decoration.Id,
-            decoration.Slot));
-        while (evidence.Count > 24) evidence.TryDequeue(out _);
-
-        var blockedAccounts = _playerDataStore.GetBlockedRelatedAccountKeys(session.Account);
-        var recipients = room.PlayerSessionIds.Concat(room.Spectators.Keys).Distinct(StringComparer.Ordinal);
-        foreach (var recipientId in recipients)
-        {
-            if (Sessions.TryGetValue(recipientId, out var recipientSession)
-                && recipientSession.Account is not null
-                && blockedAccounts.Contains(recipientSession.Account))
-                continue;
-
-            string? displaySide = null;
-            var recipientSeat = Array.IndexOf(room.PlayerSessionIds, recipientId);
-            if (recipientSeat >= 0)
-                displaySide = recipientSeat == seat ? "self" : "opponent";
-            else if (room.Spectators.TryGetValue(recipientId, out var spectator))
-                displaySide = spectator.ViewPlayerIndex == seat ? "self" : "opponent";
-
-            Send(recipientId, new
-            {
-                proto = "MsgGameChat",
-                text = decoration.Text,
-                code = (string?)null,
-                fromSeat = seat,
-                fromAccount = session.Account,
-                fromName,
-                fromRole = "player",
-                displaySide,
-                sentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                decoration = new
-                {
-                    id = decoration.Id,
-                    slot = decoration.Slot,
-                    rarity = decoration.Rarity,
-                    styleToken = decoration.StyleToken,
-                },
-            });
-        }
+            proto = "MsgChatDecorationSend",
+            result = false,
+            logStr = "局内手动发送聊天语录已停用；开场台词与胜利宣言会由服务器自动触发。",
+        });
     }
 
     /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。

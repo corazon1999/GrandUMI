@@ -198,7 +198,7 @@
     "MsgUpdateSpectateSettings"
   ],
   "compatibility": {
-    "legacyClientMessages": ["MsgSurrender", "MsgTransmit"],
+    "legacyClientMessages": ["MsgSurrender", "MsgTransmit", "MsgChatDecorationSend"],
     "legacyServerMessages": ["MsgTransmit"],
     "structuralClientHandlers": ["MsgGameStateDelta", "MsgSessionReplaced"]
   },
@@ -220,7 +220,7 @@
       "MsgRequestState": ["proto"]
     },
     "serverToClient": {
-      "MsgGameState": ["proto", "tick", "viewerKind", "requestId"],
+      "MsgGameState": ["proto", "tick", "viewerKind", "requestId", "cinematic"],
       "MsgGameStateDelta": ["proto", "baseTick", "tick", "changes"],
       "MsgActionRejected": ["proto", "reason", "requestId"],
       "MsgCloudReplayList": ["proto", "requestId", "result"],

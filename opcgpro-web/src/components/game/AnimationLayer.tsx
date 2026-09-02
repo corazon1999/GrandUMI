@@ -38,7 +38,14 @@ export default function AnimationLayer() {
   const mode = useGameStore((state) => state.mode);
   const currentTurn = useGameStore((state) => state.currentTurn);
   const turnCount = useGameStore((state) => state.turnCount);
+  const isGameOver = useGameStore((state) => state.isGameOver);
+  const openingBubbleCount = useGameStore((state) => state.cinematic.openingBubbles.length);
+  const cinematicPhase = useGameStore((state) => state.cinematic.phase);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const cinematicBlockingBanner = isGameOver
+    || openingBubbleCount > 0
+    || cinematicPhase === "impact"
+    || cinematicPhase === "victory";
 
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -54,8 +61,10 @@ export default function AnimationLayer() {
   // 回合归属以服务端权威快照为准。机器人或网络抖动可能让多个 lastAction 在 React
   // 渲染前合并，但 turnCount 的最终变化不会丢失，因此每个可见回合至少提示一次。
   useEffect(() => {
-    if (turnCount <= 0 || mode === "Observer" || animationSpeed === "off") {
+    if (cinematicBlockingBanner || turnCount <= 0 || mode === "Observer" || animationSpeed === "off") {
       lastShownTurnRef.current = turnCount;
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
       setBanner((current) => current?.kind === "turn" ? null : current);
       return;
     }
@@ -76,9 +85,16 @@ export default function AnimationLayer() {
       setBanner((current) => current?.id === turnBanner.id ? null : current);
       bannerTimerRef.current = null;
     }, animationDuration(2200, animationSpeed));
-  }, [animationSpeed, currentTurn, mode, turnCount]);
+  }, [animationSpeed, cinematicBlockingBanner, currentTurn, mode, turnCount]);
 
   useEffect(() => {
+    if (cinematicBlockingBanner) {
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+      setBanner(null);
+      return;
+    }
+
     switch (anim.type) {
       case "damage":
         if (animationSpeed === "off") break;
@@ -110,7 +126,7 @@ export default function AnimationLayer() {
       default:
         break;
     }
-  }, [anim, animationSpeed]);
+  }, [anim, animationSpeed, cinematicBlockingBanner]);
 
   return (
     <>

@@ -68,18 +68,13 @@ export type FriendlyRoomState = {
 export type RoomOperation = "idle" | "creating" | "joining";
 
 export type ChatDecorationSlot =
-  | "greeting"
-  | "praise"
-  | "thanks"
-  | "surprise"
-  | "mistake"
-  | "threat";
+  | "opening"
+  | "victory";
 
 export type ChatDecorationExchangeAction = "snapshot" | "purchase" | "equip";
 
 export interface ChatDecorationItem {
   id: string;
-  slot: ChatDecorationSlot;
   name: string;
   text: string;
   rarity: "common" | "rare" | "epic" | "legendary";
@@ -87,7 +82,8 @@ export interface ChatDecorationItem {
   priceRankPoints: number;
   priceBerries: number;
   owned: boolean;
-  equipped: boolean;
+  availableForPurchase: boolean;
+  equippedSlots: ChatDecorationSlot[];
 }
 
 export interface ChatDecorationExchangeSnapshot {

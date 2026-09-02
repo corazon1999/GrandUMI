@@ -85,10 +85,16 @@ test("translates new dynamic confirmations, counts, and notifications", () => {
   assert.equal(translateText("· 5 条未读", "en"), "· 5 unread");
 });
 
-test("translates the chat decoration exchange catalog and authoritative phrases", () => {
+test("translates the opening and victory phrase catalog and two-position controls", () => {
   assert.equal(translateText("聊天装饰交易所", "en"), "Chat decoration exchange");
   assert.equal(translateText("聊天装饰交易所", "ja"), "チャット装飾取引所");
   assert.equal(translateText("草帽式问候", "en"), "Straw Hat greeting");
+  assert.equal(translateText("开场台词", "en"), "Opening line");
+  assert.equal(translateText("胜利宣言", "ja"), "勝利宣言");
+  assert.equal(
+    translateText("永久拥有后，可分别设为自动开场台词和胜利宣言。", "en"),
+    "Once owned, a phrase can be set separately as your automatic opening line and victory declaration.",
+  );
   assert.equal(translateText("皇者霸气", "ja"), "皇帝の覇気");
   assert.equal(
     translateText("准备好了吗？真正的风暴才刚开始！", "en"),
@@ -97,5 +103,12 @@ test("translates the chat decoration exchange catalog and authoritative phrases"
   assert.equal(
     translateText("仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。", "ja"),
     "今シーズンに利用できるスタンダードランク懸賞金のみを使用します。購入はランクに影響せず、ワイルド懸賞金は使用できません。",
+  );
+  assert.equal(translateText("海贼王宣言", "en"), "Pirate King declaration");
+  assert.equal(translateText("我是要成为海贼王的男人!", "ja"), "海賊王におれはなる！");
+  assert.equal(translateText("唯有胜者才是正义！", "en"), "Only the victor is justice!");
+  assert.equal(
+    translateText("看来你已经看见了比我更加遥远的未来", "ja"),
+    "お前はもう、おれより遥かな未来を見ているようだ。",
   );
 });

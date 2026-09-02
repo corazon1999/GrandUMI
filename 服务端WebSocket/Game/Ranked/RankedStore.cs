@@ -14,21 +14,13 @@ public enum RankedMode
 
 public static class ChatDecorationSlots
 {
-    public const string Greeting = "greeting";
-    public const string Praise = "praise";
-    public const string Thanks = "thanks";
-    public const string Surprise = "surprise";
-    public const string Mistake = "mistake";
-    public const string Threat = "threat";
+    public const string Opening = "opening";
+    public const string Victory = "victory";
 
     public static readonly IReadOnlyList<string> All =
     [
-        Greeting,
-        Praise,
-        Thanks,
-        Surprise,
-        Mistake,
-        Threat,
+        Opening,
+        Victory,
     ];
 
     public static string? Normalize(string? value)
@@ -40,12 +32,12 @@ public static class ChatDecorationSlots
 
 public sealed record ChatDecorationDefinition(
     string Id,
-    string Slot,
     string Name,
     string Text,
     string Rarity,
     string StyleToken,
-    int PriceRankPoints)
+    int PriceRankPoints,
+    bool AvailableForPurchase = true)
 {
     public long PriceBerries => checked((long)PriceRankPoints * ChatDecorationCatalog.BerriesPerRankPoint);
 }
@@ -56,18 +48,43 @@ public static class ChatDecorationCatalog
 
     public static readonly IReadOnlyList<ChatDecorationDefinition> All =
     [
-        new("greeting-straw-hat", ChatDecorationSlots.Greeting, "草帽式问候", "嘿！来场痛快的对决吧！", "common", "sunset", 20),
-        new("greeting-sea-breeze", ChatDecorationSlots.Greeting, "海风招呼", "海风正好，愿我们旗鼓相当！", "rare", "tide", 45),
-        new("praise-fine-play", ChatDecorationSlots.Praise, "漂亮一手", "漂亮！这手真有船长风范！", "common", "gold", 25),
-        new("praise-worthy-rival", ChatDecorationSlots.Praise, "宿敌喝彩", "好牌！你值得我全力以赴！", "epic", "haki", 90),
-        new("thanks-crewmate", ChatDecorationSlots.Thanks, "伙伴谢意", "谢了，伙伴！这份情我记下了！", "common", "leaf", 20),
-        new("thanks-banquet", ChatDecorationSlots.Thanks, "宴会答谢", "多谢指教！打完一起开宴会吧！", "rare", "feast", 55),
-        new("surprise-seaquake", ChatDecorationSlots.Surprise, "海震惊叹", "什么？！连大海都被这一手震住了！", "rare", "shock", 50),
-        new("surprise-wanted", ChatDecorationSlots.Surprise, "悬赏震惊", "这操作……你的悬赏金要涨了！", "epic", "wanted", 110),
-        new("mistake-compass", ChatDecorationSlots.Mistake, "迷航道歉", "糟了，航向看错了！我的失误。", "common", "mist", 15),
-        new("mistake-captain", ChatDecorationSlots.Mistake, "船长失策", "船长也会失算，这回算我的！", "rare", "navy", 40),
-        new("threat-cannon", ChatDecorationSlots.Threat, "炮火宣言", "当心了，下一轮炮火可不会留情！", "rare", "ember", 60),
-        new("threat-emperor", ChatDecorationSlots.Threat, "皇者霸气", "准备好了吗？真正的风暴才刚开始！", "legendary", "emperor", 140),
+        // 历史占位条目只用于保留已购所有权、迁移和演出解析，不再上架。
+        new("greeting-straw-hat", "草帽式问候", "嘿！来场痛快的对决吧！", "common", "sunset", 20, false),
+        new("greeting-sea-breeze", "海风招呼", "海风正好，愿我们旗鼓相当！", "rare", "tide", 45, false),
+        new("praise-fine-play", "漂亮一手", "漂亮！这手真有船长风范！", "common", "gold", 25, false),
+        new("praise-worthy-rival", "宿敌喝彩", "好牌！你值得我全力以赴！", "epic", "haki", 90, false),
+        new("thanks-crewmate", "伙伴谢意", "谢了，伙伴！这份情我记下了！", "common", "leaf", 20, false),
+        new("thanks-banquet", "宴会答谢", "多谢指教！打完一起开宴会吧！", "rare", "feast", 55, false),
+        new("surprise-seaquake", "海震惊叹", "什么？！连大海都被这一手震住了！", "rare", "shock", 50, false),
+        new("surprise-wanted", "悬赏震惊", "这操作……你的悬赏金要涨了！", "epic", "wanted", 110, false),
+        new("mistake-compass", "迷航道歉", "糟了，航向看错了！我的失误。", "common", "mist", 15, false),
+        new("mistake-captain", "船长失策", "船长也会失算，这回算我的！", "rare", "navy", 40, false),
+        new("threat-cannon", "炮火宣言", "当心了，下一轮炮火可不会留情！", "rare", "ember", 60, false),
+        new("threat-emperor", "皇者霸气", "准备好了吗？真正的风暴才刚开始！", "legendary", "emperor", 140, false),
+        new("quote-pirate-king-man", "海贼王宣言", "我是要成为海贼王的男人!", "legendary", "emperor", 45),
+        new("quote-binks-laugh", "骷髅之歌", "哟嚯嚯嚯嚯嚯嚯嚯！", "epic", "feast", 45),
+        new("quote-fated-meeting", "命运相遇", "我们的相遇是命运的安排！", "rare", "tide", 45),
+        new("quote-end-the-war", "终结战争", "我是来结束这场战争的。", "legendary", "haki", 45),
+        new("quote-strong-man", "强者相逢", "原来外面的世界里真的存在像你这样强大的男人。", "epic", "shock", 45),
+        new("quote-surpass-me", "超越之约", "超越我吧。", "legendary", "navy", 45),
+        new("quote-loved-until-end", "最后的爱", "谢谢大家，直到最后都一直爱着我。", "legendary", "ember", 45),
+        new("quote-want-to-live", "生之呐喊", "我想活下去！", "legendary", "sunset", 45),
+        new("quote-super", "超级改造", "SUPERRRRRRRRRR~。", "epic", "gold", 45),
+        new("quote-what-king", "王者之问", "你要成为什么王？", "rare", "wanted", 45),
+        new("quote-emperor-deputy", "四皇副手", "四皇的副手也值得一杀。", "epic", "haki", 45),
+        new("quote-smallest-knife", "最小之刀", "这是我最小的刀了。", "epic", "navy", 45),
+        new("quote-fortune-misfortune", "福祸相依", "福无双至，祸不单行。", "rare", "mist", 45),
+        new("quote-forgive-lies", "谎言宽恕", "原谅女人谎言的，才是男人。", "rare", "sunset", 45),
+        new("quote-dreams-never-end", "梦想不灭", "人的梦想，是不会结束的。", "legendary", "emperor", 45),
+        new("quote-never-yield", "不屈之男", "要是向力量屈服，那还算什么男人。", "epic", "haki", 45),
+        new("quote-protect-to-end", "守护到底", "想保护好的东西就好好保护到底。", "epic", "leaf", 45),
+        new("quote-what-remains", "余下之物", "失去了就是失去了，想想你现在还剩下些什么。", "legendary", "tide", 45),
+        new("quote-mans-duel", "男人决斗", "男人的决斗，不需要肤浅的掩护。", "rare", "ember", 45),
+        new("quote-winner-justice", "胜者正义", "唯有胜者才是正义！", "legendary", "wanted", 45),
+        new("quote-swordsman-shame", "剑士之耻", "背后的伤口，是剑士的耻辱。", "legendary", "shock", 45),
+        new("quote-existence-no-sin", "存在无罪", "存在本身，从来不是罪。", "epic", "gold", 45),
+        new("quote-will-of-d", "D族风暴", "D之一族终将再次掀起风暴", "legendary", "emperor", 45),
+        new("quote-distant-future", "遥远未来", "看来你已经看见了比我更加遥远的未来", "legendary", "mist", 45),
     ];
 
     private static readonly IReadOnlyDictionary<string, ChatDecorationDefinition> ById =
@@ -80,7 +97,8 @@ public static class ChatDecorationCatalog
 public sealed record ChatDecorationExchangeItem(
     ChatDecorationDefinition Definition,
     bool Owned,
-    bool Equipped);
+    bool AvailableForPurchase,
+    IReadOnlyList<string> EquippedSlots);
 
 public sealed record ChatDecorationExchangeSnapshot(
     string SeasonId,
@@ -161,6 +179,122 @@ public sealed partial class RankedStore
                 ON chat_decoration_equipment(account_key, decoration_id);
             """;
         command.ExecuteNonQuery();
+        MigrateLegacyChatDecorationEquipment(connection);
+    }
+
+    /// <summary>
+    /// 将旧六类槽与过渡期的四个编号槽收敛到开场、胜利两个语义槽。
+    /// 迁移只删除无法继续使用的装备关系，永久所有权和历史幂等请求永不改动。
+    /// </summary>
+    private static void MigrateLegacyChatDecorationEquipment(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction(deferred: false);
+        const string sourceSlotsSql = "'greeting','praise','thanks','surprise','mistake','threat','slot1','slot2','slot3','slot4'";
+        var equipment = new List<(string AccountKey, string Slot, string DecorationId, string EquippedAtUtc)>();
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = $"""
+                SELECT equipment.account_key,equipment.slot,equipment.decoration_id,equipment.equipped_at_utc
+                FROM chat_decoration_equipment AS equipment
+                INNER JOIN chat_decoration_ownership AS owned
+                    ON owned.account_key=equipment.account_key
+                   AND owned.decoration_id=equipment.decoration_id
+                WHERE equipment.slot IN ({sourceSlotsSql},'opening','victory')
+                ORDER BY equipment.account_key,
+                    CASE equipment.slot
+                        WHEN 'greeting' THEN 1
+                        WHEN 'threat' THEN 2
+                        WHEN 'praise' THEN 3
+                        WHEN 'thanks' THEN 4
+                        WHEN 'surprise' THEN 5
+                        WHEN 'mistake' THEN 6
+                        WHEN 'slot1' THEN 7
+                        WHEN 'slot2' THEN 8
+                        WHEN 'slot3' THEN 9
+                        WHEN 'slot4' THEN 10
+                        WHEN 'opening' THEN 11
+                        WHEN 'victory' THEN 12
+                        ELSE 99
+                    END,
+                    equipment.equipped_at_utc,
+                    equipment.decoration_id;
+                """;
+            using var reader = read.ExecuteReader();
+            while (reader.Read())
+            {
+                var decorationId = reader.GetString(2);
+                if (ChatDecorationCatalog.Find(decorationId) is null) continue;
+                equipment.Add((reader.GetString(0), reader.GetString(1), decorationId, reader.GetString(3)));
+            }
+        }
+
+        var migratedEquipment = new List<(
+            string AccountKey,
+            string Slot,
+            (string AccountKey, string Slot, string DecorationId, string EquippedAtUtc) Equipment)>();
+        foreach (var accountEquipment in equipment.GroupBy(item => item.AccountKey, StringComparer.Ordinal))
+        {
+            var orderedSources = accountEquipment
+                .Where(item => item.Slot is not (ChatDecorationSlots.Opening or ChatDecorationSlots.Victory))
+                .ToArray();
+            var opening = accountEquipment.FirstOrDefault(item => item.Slot == ChatDecorationSlots.Opening);
+            if (string.IsNullOrEmpty(opening.DecorationId))
+            {
+                opening = orderedSources.FirstOrDefault(item => item.Slot == "greeting");
+                if (string.IsNullOrEmpty(opening.DecorationId)) opening = orderedSources.FirstOrDefault();
+            }
+
+            var victory = accountEquipment.FirstOrDefault(item => item.Slot == ChatDecorationSlots.Victory);
+            if (string.IsNullOrEmpty(victory.DecorationId))
+            {
+                victory = orderedSources.FirstOrDefault(item => item.Slot == "threat");
+                if (string.IsNullOrEmpty(victory.DecorationId))
+                    victory = orderedSources.FirstOrDefault(item => item.DecorationId != opening.DecorationId);
+                if (string.IsNullOrEmpty(victory.DecorationId)) victory = opening;
+            }
+
+            migratedEquipment.Add((accountEquipment.Key, ChatDecorationSlots.Opening, opening));
+            migratedEquipment.Add((accountEquipment.Key, ChatDecorationSlots.Victory, victory));
+        }
+
+        using (var cleanup = connection.CreateCommand())
+        {
+            cleanup.Transaction = transaction;
+            cleanup.CommandText = $"""
+                DELETE FROM chat_decoration_equipment
+                WHERE slot IN ({sourceSlotsSql},'opening','victory');
+                """;
+            cleanup.ExecuteNonQuery();
+        }
+
+        foreach (var item in migratedEquipment)
+            UpsertMigratedEquipment(connection, transaction, item.AccountKey, item.Slot, item.Equipment);
+        transaction.Commit();
+    }
+
+    private static void UpsertMigratedEquipment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string accountKey,
+        string slot,
+        (string AccountKey, string Slot, string DecorationId, string EquippedAtUtc) equipment)
+    {
+        if (string.IsNullOrEmpty(equipment.DecorationId)) return;
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+            VALUES($key,$slot,$decoration,$equipped)
+            ON CONFLICT(account_key,slot) DO UPDATE SET
+                decoration_id=excluded.decoration_id,
+                equipped_at_utc=excluded.equipped_at_utc;
+            """;
+        command.Parameters.AddWithValue("$key", accountKey);
+        command.Parameters.AddWithValue("$slot", slot);
+        command.Parameters.AddWithValue("$decoration", equipment.DecorationId);
+        command.Parameters.AddWithValue("$equipped", equipment.EquippedAtUtc);
+        command.ExecuteNonQuery();
     }
 
     public ChatDecorationExchangeSnapshot GetChatDecorationExchangeSnapshot(
@@ -221,6 +355,10 @@ public sealed partial class RankedStore
                     true,
                     replaySnapshot);
             }
+
+            // 历史条目可继续被已拥有者装配和演出，但不能产生新的购买或扣款。
+            if (!definition.AvailableForPurchase)
+                throw new ChatDecorationValidationException("该聊天语录已下架，历史所有权不受影响。");
 
             string outcome;
             if (OwnsChatDecoration(connection, transaction, profile.AccountKey, definition.Id))
@@ -304,11 +442,9 @@ public sealed partial class RankedStore
             var normalizedAccount = ValidateChatDecorationAccount(account);
             var normalizedRequestId = ValidateChatDecorationRequestId(requestId);
             var normalizedSlot = ChatDecorationSlots.Normalize(slot)
-                ?? throw new ChatDecorationValidationException("请选择有效的聊天装饰槽位。");
+                ?? throw new ChatDecorationValidationException("请选择开场台词或胜利宣言装备位。");
             var definition = ChatDecorationCatalog.Find(decorationId)
                 ?? throw new ChatDecorationValidationException("该聊天装饰不存在或已下架。");
-            if (!string.Equals(definition.Slot, normalizedSlot, StringComparison.Ordinal))
-                throw new ChatDecorationValidationException("该装饰不能装入所选槽位。");
             var season = SeasonAt(observedAtUtc);
 
             using var connection = Open();
@@ -407,9 +543,46 @@ public sealed partial class RankedStore
             var decorationId = command.ExecuteScalar() as string;
             transaction.Commit();
             var definition = ChatDecorationCatalog.Find(decorationId);
-            return definition is not null && string.Equals(definition.Slot, normalizedSlot, StringComparison.Ordinal)
-                ? definition
-                : null;
+            return definition;
+        }
+    }
+
+    /// <summary>在同一只读事务中锁定某个账号的两个自动触发位置，避免开局读取到跨版本组合。</summary>
+    public (ChatDecorationDefinition? Opening, ChatDecorationDefinition? Victory)
+        ResolveEquippedChatDecorationLoadout(string account)
+    {
+        lock (_gate)
+        {
+            RequireChatDecorationExchangeEnabled();
+            Initialize();
+            if (string.IsNullOrWhiteSpace(account)) return (null, null);
+            var accountKey = HashAccount(account);
+            ChatDecorationDefinition? opening = null;
+            ChatDecorationDefinition? victory = null;
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction();
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                SELECT equipment.slot,equipment.decoration_id
+                FROM chat_decoration_equipment AS equipment
+                INNER JOIN chat_decoration_ownership AS owned
+                    ON owned.account_key=equipment.account_key
+                   AND owned.decoration_id=equipment.decoration_id
+                WHERE equipment.account_key=$key AND equipment.slot IN ('opening','victory');
+                """;
+            command.Parameters.AddWithValue("$key", accountKey);
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var definition = ChatDecorationCatalog.Find(reader.GetString(1));
+                    if (reader.GetString(0) == ChatDecorationSlots.Opening) opening = definition;
+                    else if (reader.GetString(0) == ChatDecorationSlots.Victory) victory = definition;
+                }
+            }
+            transaction.Commit();
+            return (opening, victory);
         }
     }
 
@@ -509,22 +682,41 @@ public sealed partial class RankedStore
             while (reader.Read()) owned.Add(reader.GetString(0));
         }
 
-        var equipped = new Dictionary<string, string>(StringComparer.Ordinal);
+        var equippedSlots = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         using (var equipment = connection.CreateCommand())
         {
             equipment.Transaction = transaction;
-            equipment.CommandText = "SELECT slot,decoration_id FROM chat_decoration_equipment WHERE account_key=$key;";
+            equipment.CommandText = """
+                SELECT slot,decoration_id
+                FROM chat_decoration_equipment
+                WHERE account_key=$key AND slot IN ('opening','victory')
+                ORDER BY slot;
+                """;
             equipment.Parameters.AddWithValue("$key", profile.AccountKey);
             using var reader = equipment.ExecuteReader();
-            while (reader.Read()) equipped[reader.GetString(0)] = reader.GetString(1);
+            while (reader.Read())
+            {
+                var slot = reader.GetString(0);
+                var decorationId = reader.GetString(1);
+                if (!owned.Contains(decorationId)) continue;
+                if (!equippedSlots.TryGetValue(decorationId, out var slots))
+                {
+                    slots = [];
+                    equippedSlots[decorationId] = slots;
+                }
+                slots.Add(slot);
+            }
         }
 
         var items = ChatDecorationCatalog.All
+            .Where(definition => definition.AvailableForPurchase || owned.Contains(definition.Id))
             .Select(definition => new ChatDecorationExchangeItem(
                 definition,
                 owned.Contains(definition.Id),
-                equipped.TryGetValue(definition.Slot, out var equippedId)
-                    && string.Equals(equippedId, definition.Id, StringComparison.Ordinal)))
+                definition.AvailableForPurchase,
+                equippedSlots.TryGetValue(definition.Id, out var slots)
+                    ? slots.ToArray()
+                    : []))
             .ToArray();
         return new ChatDecorationExchangeSnapshot(
             profile.SeasonId,

@@ -14,6 +14,7 @@ interface Props {
 export default function GameOverOverlay({ isObserver, onReturnToHome }: Props) {
   const [hidden, setHidden] = useState(false);
   const isGameOver = useGameStore((state) => state.isGameOver);
+  const settlementReady = useGameStore((state) => state.cinematic.settlementReady);
   const isDraw = useGameStore((state) => state.isDraw);
   const winnerIsMe = useGameStore((state) => state.winnerIsMe);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
@@ -24,7 +25,7 @@ export default function GameOverOverlay({ isObserver, onReturnToHome }: Props) {
     if (!isGameOver) setHidden(false);
   }, [isGameOver]);
 
-  if (!isGameOver) return null;
+  if (!isGameOver || !settlementReady) return null;
 
   return (
     <>
