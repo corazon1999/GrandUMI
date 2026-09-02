@@ -47,7 +47,8 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(6, HexRules.AstralBodyRulesRevision);
         Assert.Equal(7, HexRules.BoardingSalvoRulesRevision);
         Assert.Equal(8, HexRules.ScopeReworkRulesRevision);
-        Assert.Equal(HexRules.ScopeReworkRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(9, HexRules.UltimateRefreshRulesRevision);
+        Assert.Equal(HexRules.UltimateRefreshRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal(
             "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
             HexCatalog.Get(6).Description);
@@ -66,6 +67,12 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(
             "己方攻击结算时，力量低1000也视为成功。",
             HexCatalog.DescriptionForRevision(26, HexRules.BoardingSalvoRulesRevision));
+        Assert.Equal(
+            "每回合1次，从手牌打出原本费用10的卡后，将最多8张休息咚!!转为活跃。",
+            HexCatalog.Get(28).Description);
+        Assert.Equal(
+            "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
+            HexCatalog.DescriptionForRevision(28, HexRules.ScopeReworkRulesRevision));
         Assert.Equal(
             "每回合1次，己方效果使敌方角色离场，或使敌方角色由活跃转为休息时，己方领袖本回合力量+2000。",
             HexCatalog.Get(42).Description);
@@ -158,6 +165,9 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(HexTier.Gold, HexCatalog.TierForState(27, rebuilt.State.HexState));
         Assert.Contains(HexCatalog.RegularForState(rebuilt.State.HexState), item => item.Id == 27);
         Assert.Equal("强化万用瞄准镜", HexCatalog.Get(27).Name);
+        Assert.Equal(
+            "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
+            HexCatalog.DescriptionForRevision(28, rebuilt.State.HexState.RulesRevision));
     }
 
     [Fact]

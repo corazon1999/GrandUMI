@@ -44,7 +44,7 @@ public static class HexCatalog
         H(25, "钢化你心", HexTier.Silver, "每局1次，累计攻击敌方休息角色10次时，按己方当前生命数从卡组顶补充生命。"),
         H(26, "万用瞄准镜", HexTier.Gold, "己方所有角色获得【攻击时】：直到本次战斗结束，力量+1000。"),
         H(27, "强化万用瞄准镜", HexTier.Rainbow, "己方攻击结算时，力量低2000也视为成功。"),
-        H(28, "终极刷新", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。"),
+        H(28, "终极刷新", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，将最多8张休息咚!!转为活跃。"),
         H(29, "最终形态", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，领袖+2000且角色+1000至下个对方回合结束。"),
         H(30, "三号船坞", HexTier.Silver, "己方额外获得1个舞台区；打出第3张舞台时选择废弃现有1张。"),
         H(31, "会心治疗", HexTier.Silver, "生命区增加卡牌时有25%概率再从卡组顶补1张生命，每回合最多成功1次。"),
@@ -126,6 +126,8 @@ public static class HexCatalog
                 "每回合第一个实际发动的【登场时】效果额外结算1次。",
             (26, < HexRules.ScopeReworkRulesRevision) =>
                 "己方攻击结算时，力量低1000也视为成功。",
+            (28, < HexRules.UltimateRefreshRulesRevision) =>
+                "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
             (55, < HexRules.TransmutationPresentationRulesRevision) =>
                 "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             _ => Get(id).Description,

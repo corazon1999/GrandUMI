@@ -192,6 +192,133 @@ public sealed class HexModeEffectsTests
     }
 
     [Fact]
+    public async Task 终极刷新_实际打出原本费用十的卡后最多活跃八张且每个全局回合一次()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 28);
+        me.CostArea.AddRange(Enumerable.Range(0, 10)
+            .Select(_ => new DonCard { State = DonState.Rest }));
+        int donCountBefore = me.CostArea.Count;
+        int donDeckCountBefore = me.DonDeck.Count;
+
+        var first = Card("HEX-ULTIMATE-FIRST", CardKind.Character, cost: 10);
+        first.CostModThisTurn = -10;
+        me.Hand.Add(first);
+        var firstResult = CardPlayer.Play(state, 0, 0);
+        Assert.Equal(0, firstResult.PaidCost);
+        await HexRules.OnCardPlayedAsync(engine, 0, firstResult);
+
+        Assert.Equal(8, me.CostArea.Count(don => don.State == DonState.Active));
+        Assert.Equal(2, me.CostArea.Count(don => don.State == DonState.Rest));
+        Assert.Equal(donCountBefore, me.CostArea.Count);
+        Assert.Equal(donDeckCountBefore, me.DonDeck.Count);
+        Assert.True(state.HexState.Runtime[0].UltimateRefreshUsedThisTurn);
+
+        var second = Card("HEX-ULTIMATE-SECOND", CardKind.Character, cost: 10);
+        second.CostModThisTurn = -10;
+        me.Hand.Add(second);
+        await HexRules.OnCardPlayedAsync(engine, 0, CardPlayer.Play(state, 0, 0));
+        Assert.Equal(2, me.CostArea.Count(don => don.State == DonState.Rest));
+
+        state.CurrentTurnPlayer = 1;
+        HexRules.OnTurnStarted(state, 1);
+        Assert.False(state.HexState.Runtime[0].UltimateRefreshUsedThisTurn);
+        var nextTurn = Card("HEX-ULTIMATE-NEXT-TURN", CardKind.Event, cost: 10);
+        nextTurn.CostModThisTurn = -10;
+        me.Hand.Add(nextTurn);
+        await HexRules.OnCardPlayedAsync(engine, 0, CardPlayer.Play(state, 0, 0));
+        Assert.All(me.CostArea, don => Assert.Equal(DonState.Active, don.State));
+    }
+
+    [Fact]
+    public async Task 终极刷新_按原本费用恰为十判定且效果登场不触发()
+    {
+        var reducedEngine = CreateEngine();
+        var reducedState = reducedEngine.State;
+        var reduced = reducedState.Players[0];
+        ClearZones(reducedState);
+        OwnOnly(reducedState, 0, 28);
+        reduced.CostArea.AddRange(Enumerable.Range(0, 4)
+            .Select(_ => new DonCard { State = DonState.Rest }));
+        var attached = new DonCard
+        {
+            State = DonState.Attached,
+            AttachedToCardId = reduced.Leader.Id,
+        };
+        reduced.CostArea.Add(attached);
+        var originalTen = Card("HEX-ULTIMATE-REDUCED", CardKind.Character, cost: 10);
+        originalTen.CostModThisTurn = -10;
+        reduced.Hand.Add(originalTen);
+        await HexRules.OnCardPlayedAsync(reducedEngine, 0, CardPlayer.Play(reducedState, 0, 0));
+        Assert.Equal(4, reduced.CostArea.Count(don => don.State == DonState.Active));
+        Assert.Equal(DonState.Attached, attached.State);
+        Assert.Equal(reduced.Leader.Id, attached.AttachedToCardId);
+
+        var raisedEngine = CreateEngine();
+        var raisedState = raisedEngine.State;
+        var raised = raisedState.Players[0];
+        ClearZones(raisedState);
+        OwnOnly(raisedState, 0, 28);
+        raised.CostArea.AddRange(Enumerable.Range(0, 10)
+            .Select(_ => new DonCard { State = DonState.Active }));
+        var originalNine = Card("HEX-ULTIMATE-RAISED", CardKind.Character, cost: 9);
+        originalNine.CostModThisTurn = 1;
+        raised.Hand.Add(originalNine);
+        var raisedResult = CardPlayer.Play(raisedState, 0, 0);
+        Assert.Equal(10, raisedResult.PaidCost);
+        await HexRules.OnCardPlayedAsync(raisedEngine, 0, raisedResult);
+        Assert.All(raised.CostArea, don => Assert.Equal(DonState.Rest, don.State));
+        Assert.False(raisedState.HexState.Runtime[0].UltimateRefreshUsedThisTurn);
+
+        var effectEntryEngine = CreateEngine();
+        var effectEntryState = effectEntryEngine.State;
+        var effectEntryPlayer = effectEntryState.Players[0];
+        ClearZones(effectEntryState);
+        OwnOnly(effectEntryState, 0, 28);
+        effectEntryPlayer.CostArea.AddRange(Enumerable.Range(0, 3)
+            .Select(_ => new DonCard { State = DonState.Rest }));
+        var effectEntry = Card("HEX-ULTIMATE-EFFECT-ENTRY", CardKind.Character, cost: 10);
+        effectEntryPlayer.Hand.Add(effectEntry);
+        await AtomicOps.PlayFromHandFree(effectEntryState, 0, effectEntry);
+        Assert.All(effectEntryPlayer.CostArea, don => Assert.Equal(DonState.Rest, don.State));
+        Assert.False(effectEntryState.HexState.Runtime[0].UltimateRefreshUsedThisTurn);
+    }
+
+    [Fact]
+    public async Task 终极刷新_上一规则修订继续活跃全部休息咚并保留恢复快照字段()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.ScopeReworkRulesRevision);
+        OwnOnly(state, 0, 28);
+        state.CurrentTurnPlayer = 1;
+        me.CostArea.AddRange(Enumerable.Range(0, 10)
+            .Select(_ => new DonCard { State = DonState.Rest }));
+        var legacyPlay = Card("HEX-ULTIMATE-LEGACY", CardKind.Event, cost: 10);
+        legacyPlay.CostModThisTurn = -10;
+        me.Hand.Add(legacyPlay);
+
+        await HexRules.OnCardPlayedAsync(engine, 0, CardPlayer.Play(state, 0, 0));
+
+        Assert.All(me.CostArea, don => Assert.Equal(DonState.Active, don.State));
+        var snapshot = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        var hexState = snapshot.GetProperty("hexState");
+        Assert.Equal(HexRules.ScopeReworkRulesRevision, hexState.GetProperty("RulesRevision").GetInt32());
+        Assert.True(hexState.GetProperty("runtime")[0]
+            .GetProperty("UltimateRefreshUsedThisTurn").GetBoolean());
+        var publicState = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
+        var owned = Assert.Single(publicState.GetProperty("hexState").GetProperty("myOwned").EnumerateArray());
+        Assert.Equal(
+            "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
+            owned.GetProperty("description").GetString());
+    }
+
+    [Fact]
     public async Task 巨人杀手_以目标当前费用而非原本费用判定()
     {
         var engine = CreateEngine();

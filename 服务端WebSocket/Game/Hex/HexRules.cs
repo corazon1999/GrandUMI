@@ -49,7 +49,9 @@ public static class HexRules
     public const int BoardingSalvoRulesRevision = 7;
     /// <summary>万用瞄准镜改为角色攻击时获得本次战斗力量，强化版退出常规池所在的规则修订版。</summary>
     public const int ScopeReworkRulesRevision = 8;
-    public const int CurrentRulesRevision = ScopeReworkRulesRevision;
+    /// <summary>终极刷新改为打出原本费用 10 的卡后最多活跃 8 张休息咚所在的规则修订版。</summary>
+    public const int UltimateRefreshRulesRevision = 9;
+    public const int CurrentRulesRevision = UltimateRefreshRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -653,10 +655,19 @@ public static class HexRules
 
         if (result.Card.Info.Cost == 10)
         {
-            if (Has(state, playerIndex, 28) && !runtime.UltimateRefreshUsedThisTurn)
+            // OnCardPlayedAsync 只由 CardPlayer.Play 成功移除手牌后调用；效果登场不会进入此钩子。
+            // 终极刷新只看卡面原本费用，不看 PaidCost 或任何费用修正；每个全局回合统一重置次数。
+            if (Has(state, playerIndex, 28)
+                && !runtime.UltimateRefreshUsedThisTurn)
             {
                 runtime.UltimateRefreshUsedThisTurn = true;
-                foreach (var don in player.CostArea.Where(don => don.State == DonState.Rest && don.AttachedToCardId is null))
+                int refreshLimit = state.HexState.RulesRevision >= UltimateRefreshRulesRevision
+                    ? 8
+                    : int.MaxValue;
+                // Attached 是独立状态，不属于休息；AttachedToCardId 判空同时防止异常旧状态被转成非法活跃咚。
+                foreach (var don in player.CostArea
+                             .Where(don => don.State == DonState.Rest && don.AttachedToCardId is null)
+                             .Take(refreshLimit))
                     don.State = DonState.Active;
             }
             if (Has(state, playerIndex, 29) && !runtime.FinalFormUsedThisTurn)
