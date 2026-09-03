@@ -15,6 +15,25 @@ function git(args, cwd) {
   return result.stdout.trim();
 }
 
+function resolveBash() {
+  const direct = spawnSync("bash", ["--version"], { encoding: "utf8" });
+  if (direct.status === 0) return "bash";
+
+  const gitExecPath = spawnSync("git", ["--exec-path"], { encoding: "utf8" });
+  assert.equal(gitExecPath.status, 0, gitExecPath.stderr);
+  const candidates = process.platform === "win32"
+    ? [
+        path.resolve(gitExecPath.stdout.trim(), "../../../bin/bash.exe"),
+        path.resolve(gitExecPath.stdout.trim(), "../../../usr/bin/bash.exe"),
+      ]
+    : ["/bin/bash", "/usr/bin/bash"];
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ["--version"], { encoding: "utf8" });
+    if (probe.status === 0) return candidate;
+  }
+  assert.fail("部署锁行为门禁需要可用的 Bash。");
+}
+
 async function writeTrackedFile(repository, relativePath, content) {
   const destination = path.join(repository, relativePath);
   await mkdir(path.dirname(destination), { recursive: true });
@@ -148,6 +167,42 @@ test("服务器在任何构建或服务切换前校验提交、tree、策略与�
   assert.match(source, /--tree "\$target_tree"/);
   assert.match(source, /--checksum "\$verification_checksum"/);
   assert.match(source, /test-verified\.json/);
+});
+
+test("测试服后端编译关闭共享编译，并阻止编译子进程继承两把部署锁", async () => {
+  const source = await readFile(path.join(root, "ops", "server", "deploy-test.sh"), "utf8");
+  const publish = source.match(
+    /\/opt\/dotnet\/dotnet publish[\s\S]*?(?=\n  \[\[ -f "\$next_publish\/\.grandumi-shared-account-v1")/,
+  )?.[0];
+  assert.ok(publish, "无法定位测试服后端 publish 命令。");
+  assert.match(publish, /-p:UseSharedCompilation=false/);
+  assert.match(publish, /8>&- 9>&-\s*$/);
+
+  const bash = resolveBash();
+  const behavior = spawnSync(
+    bash,
+    [
+      "-c",
+      [
+        "set -Eeuo pipefail",
+        "exec 8>/dev/null",
+        "exec 9>/dev/null",
+        "test -e /proc/$$/fd/8",
+        "test -e /proc/$$/fd/9",
+        `"$1" -c 'test ! -e /proc/$$/fd/8 && test ! -e /proc/$$/fd/9' 8>&- 9>&-`,
+        "test -e /proc/$$/fd/8",
+        "test -e /proc/$$/fd/9",
+      ].join("\n"),
+      "grandumi-lock-fd-test",
+      bash,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    behavior.status,
+    0,
+    `锁 FD 隔离行为不符合预期：${behavior.stderr || behavior.stdout}`,
+  );
 });
 
 test("门禁失败只前移仓库 HEAD 时，重试仍按最后成功部署版本补齐前后端", async () => {

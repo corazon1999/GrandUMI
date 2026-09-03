@@ -133,8 +133,10 @@ if [[ "$need_back" == 1 ]]; then
   previous_publish="$repo/服务端WebSocket/publish.previous"
   rm -rf "$next_publish"
   /opt/dotnet/dotnet publish "$repo/服务端WebSocket/GrandUMIServer.csproj" -c Release -o "$next_publish" --nologo \
+    -p:UseSharedCompilation=false \
     -p:InformationalVersion="1.0.0+$target" \
-    -p:IncludeSourceRevisionInInformationalVersion=false
+    -p:IncludeSourceRevisionInInformationalVersion=false \
+    8>&- 9>&-
   [[ -f "$next_publish/.grandumi-shared-account-v1" ]] \
     || die "测试服后端发布包缺少共享账号兼容标记"
 
