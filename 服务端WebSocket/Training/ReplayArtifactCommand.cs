@@ -175,10 +175,7 @@ public static class ReplayArtifactCommand
             verified.ArchiveDirectory,
             verified.Manifest.Content.PublishRoot.Replace('/', Path.DirectorySeparatorChar)));
         var currentBase = Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory));
-        if (!string.Equals(
-            currentBase,
-            Path.TrimEndingDirectorySeparator(archivedPublishRoot),
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        if (!RuntimeBindingPathsEqual(currentBase, archivedPublishRoot))
             throw new ReplayArtifactArchiveException(
                 "verify-self 必须由归档 payload/publish 内的历史 GrandUMIServer.dll 执行。");
         if (!string.Equals(BuildInfo.Commit, verified.Manifest.EngineCommit, StringComparison.Ordinal))
@@ -199,6 +196,37 @@ public static class ReplayArtifactCommand
             archivedPublishRoot,
             rulesRoot);
         return identity;
+    }
+
+    internal static bool RuntimeBindingPathsEqual(string left, string right)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(left);
+        ArgumentException.ThrowIfNullOrWhiteSpace(right);
+        return string.Equals(
+            NormalizeRuntimeBindingPath(left),
+            NormalizeRuntimeBindingPath(right),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
+
+    internal static string NormalizeRuntimeBindingPath(string path)
+    {
+        var normalized = path;
+        if (OperatingSystem.IsWindows())
+        {
+            const string extendedUncPrefix = @"\\?\UNC\";
+            const string extendedPathPrefix = @"\\?\";
+            if (normalized.StartsWith(extendedUncPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = @"\\" + normalized[extendedUncPrefix.Length..];
+            }
+            else if (normalized.StartsWith(extendedPathPrefix, StringComparison.Ordinal))
+            {
+                var withoutPrefix = normalized[extendedPathPrefix.Length..];
+                if (Path.IsPathFullyQualified(withoutPrefix)) normalized = withoutPrefix;
+            }
+        }
+
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(normalized));
     }
 
     private static Task<int> RunWorkerHostAsync(

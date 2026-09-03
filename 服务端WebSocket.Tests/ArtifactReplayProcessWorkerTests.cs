@@ -21,6 +21,28 @@ public sealed class ArtifactReplayProcessWorkerTests
         "OP09-093\nOP09-093\nOP09-093";
 
     [Fact]
+    public void 历史运行时路径绑定_兼容Windows扩展路径前缀()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        const string drivePath = @"E:\GrandUMI-Temp\Verify\run-0123456789abcdef\payload\publish";
+        const string extendedDrivePath = @"\\?\E:\GrandUMI-Temp\Verify\run-0123456789abcdef\payload\publish\";
+        const string uncPath = @"\\server\share\GrandUMI\payload\publish";
+        const string extendedUncPath = @"\\?\UNC\server\share\GrandUMI\payload\publish\";
+
+        Assert.True(ReplayArtifactCommand.RuntimeBindingPathsEqual(drivePath, extendedDrivePath));
+        Assert.True(ReplayArtifactCommand.RuntimeBindingPathsEqual(extendedDrivePath, drivePath));
+        Assert.True(ReplayArtifactCommand.RuntimeBindingPathsEqual(uncPath, extendedUncPath));
+        Assert.Equal(
+            @"E:\GrandUMI-Temp\Verify\run-0123456789abcdef",
+            ArtifactReplayProcessHost.ResolveArchiveDirectoryFromRuntimeBase(extendedDrivePath),
+            ignoreCase: true);
+        Assert.False(ReplayArtifactCommand.RuntimeBindingPathsEqual(
+            drivePath,
+            @"\\?\E:\GrandUMI-Temp\Verify\run-0123456789abcdef\payload\publish-other"));
+    }
+
+    [Fact]
     public async Task Release归档历史Dll_独立进程真实重放并隔离Checkpoint分歧()
     {
         if (OperatingSystem.IsWindows())

@@ -49,13 +49,111 @@ public sealed class GrandUmiTestTempPolicyTests
     }
 
     [Fact]
-    public void Windows测试临时目录固定在E盘()
+    public void Windows测试临时目录固定在GrandUMI的E盘根下()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        var actual = Path.GetFullPath(Path.GetTempPath());
-        var expectedRoot = Path.GetFullPath(@"E:\GrandUMI-Temp\Tests");
+        var actual = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+        var expectedRoot = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(@"E:\GrandUMI-Temp")) + Path.DirectorySeparatorChar;
 
         Assert.StartsWith(expectedRoot, actual, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Windows测试进程复用部署门禁提供的唯一临时根()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var configured = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT");
+        Assert.False(string.IsNullOrWhiteSpace(configured));
+
+        var expected = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configured!));
+        var actualTemp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(
+            Environment.GetEnvironmentVariable("TEMP") ?? ""));
+        var actualTmp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(
+            Environment.GetEnvironmentVariable("TMP") ?? ""));
+        var actualFrameworkTemp = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(Path.GetTempPath()));
+
+        Assert.Equal(expected, actualTemp, ignoreCase: true);
+        Assert.Equal(expected, actualTmp, ignoreCase: true);
+        Assert.Equal(expected, actualFrameworkTemp, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Windows测试临时目录解析器原样复用门禁隔离根()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var configured = @"E:\GrandUMI-Temp\Verify\run-0123456789abcdef";
+
+        var actual = GrandUmiTestTempPolicy.ResolveWindowsTempRoot(
+            configured,
+            processId: 123,
+            fallbackToken: "unused");
+
+        Assert.Equal(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(configured)),
+            actual,
+            ignoreCase: true);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Temp\grandumi")]
+    [InlineData(@"E:\GrandUMI-Temp-Other\run")]
+    [InlineData(@"E:\GrandUMI-Temp")]
+    [InlineData("relative-temp")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Windows测试临时目录解析器拒绝越界或不明确的门禁根(string configured)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            GrandUmiTestTempPolicy.ResolveWindowsTempRoot(
+                configured,
+                processId: 123,
+                fallbackToken: "unused"));
+    }
+
+    [Fact]
+    public void Windows直接运行测试时为每个测试主机生成唯一E盘回退根()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var first = GrandUmiTestTempPolicy.ResolveWindowsTempRoot(
+            configuredRoot: null,
+            processId: 123,
+            fallbackToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        var second = GrandUmiTestTempPolicy.ResolveWindowsTempRoot(
+            configuredRoot: null,
+            processId: 123,
+            fallbackToken: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+
+        Assert.Equal(
+            Path.GetFullPath(
+                @"E:\GrandUMI-Temp\Tests\testhost-123-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            first,
+            ignoreCase: true);
+        Assert.False(string.Equals(first, second, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(0, "aaaaaaaa")]
+    [InlineData(-1, "aaaaaaaa")]
+    [InlineData(123, "")]
+    [InlineData(123, "../escape")]
+    public void Windows直接运行测试时拒绝无效的测试主机身份(
+        int processId,
+        string fallbackToken)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            GrandUmiTestTempPolicy.ResolveWindowsTempRoot(
+                configuredRoot: null,
+                processId,
+                fallbackToken));
     }
 }

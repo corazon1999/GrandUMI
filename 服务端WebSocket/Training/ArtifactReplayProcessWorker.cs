@@ -701,7 +701,7 @@ internal static class ArtifactReplayProcessHost
                     StringComparison.Ordinal))
                 throw new ReplayArtifactArchiveException("worker host 缺少受控进程环境标记。");
 
-            var archiveDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+            var archiveDirectory = ResolveArchiveDirectoryFromRuntimeBase(AppContext.BaseDirectory);
             var archive = ReplayArtifactArchive.Verify(archiveDirectory);
             var identity = ReplayArtifactCommand.VerifyArchivedRuntimeInCurrentProcess(archive);
             var descriptor = ReplayArtifactArchive.CreateTestDescriptor(archive.Manifest);
@@ -782,6 +782,12 @@ internal static class ArtifactReplayProcessHost
             try { protocolOutput.Close(); } catch { }
             return 1;
         }
+    }
+
+    internal static string ResolveArchiveDirectoryFromRuntimeBase(string runtimeBaseDirectory)
+    {
+        var publishRoot = ReplayArtifactCommand.NormalizeRuntimeBindingPath(runtimeBaseDirectory);
+        return Path.GetFullPath(Path.Combine(publishRoot, "..", ".."));
     }
 
     private static void VerifyArchiveRemainsImmutable(
