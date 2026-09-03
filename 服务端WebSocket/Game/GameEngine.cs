@@ -24,6 +24,12 @@ internal sealed record GameActionExecutionReceipt(
     AcceptedActionLogReceipt? AcceptedLog,
     string? RejectionReason);
 
+/// <summary>仅用于反馈取证的服务端权威动作上下文；不参与规则结算或动作合法性。</summary>
+public sealed record FeedbackActionContext(
+    string? CardNumber,
+    string? PromptId,
+    string? PromptKind);
+
 internal sealed record TrainingDecisionAudit(
     string ObservationHash,
     string LegalSetHash,
@@ -52,7 +58,7 @@ public class GameEngine
     /// <summary>按主视角构建开场/终局演出元数据；只携带公开展示信息。</summary>
     public Func<int, object?>? CinematicSnapshotProvider { get; set; }
     public Action<int, string, JsonElement, string?>? OnPersistAction { get; set; } // 兼容旧测试/调用方
-    public Action<int, string, JsonElement, string?, GameActionSource>? OnPersistActionWithSource { get; set; } // 被接受动作持久化（重启恢复用）
+    public Action<int, string, JsonElement, string?, GameActionSource, FeedbackActionContext?>? OnPersistActionWithSource { get; set; } // 被接受动作持久化（重启恢复用）
     public Action? OnOpeningSequenceReady { get; set; }
     /// <summary>每次构建权威快照前同步房间级操作棋钟。</summary>
     public Action? BeforeSnapshot { get; set; }
@@ -200,6 +206,7 @@ public class GameEngine
 
         State.Players[0] = player0;
         State.Players[1] = player1;
+        State.BindFieldDepartureLifecycle();
         // 预设先后手（如单人测试）以及旧日志恢复沿用构造时发牌；
         // 新骰点对局必须等胜者选定先后手后才生成生命区和起手牌。
         if (!_deferInitialSetupUntilStart
@@ -276,7 +283,8 @@ public class GameEngine
         string action,
         JsonElement data,
         string? requestId = null,
-        GameActionSource source = GameActionSource.Player)
+        GameActionSource source = GameActionSource.Player,
+        FeedbackActionContext? feedbackContext = null)
     {
         if (State.IsGameOver) return new GameActionExecutionReceipt(false, null, "对局已经结束");
 
@@ -441,7 +449,7 @@ public class GameEngine
             {
                 // 恢复事务先于普通 MatchLog：线上协调器会等待物理落盘，成功后客户端下行才会释放。
                 if (OnPersistActionWithSource is not null)
-                    OnPersistActionWithSource(playerIndex, action, data, correlationId, source);
+                    OnPersistActionWithSource(playerIndex, action, data, correlationId, source, feedbackContext);
                 else
                     OnPersistAction?.Invoke(playerIndex, action, data, correlationId);
                 acceptedLog = RecordAcceptedAction(playerIndex, action, data, correlationId, source);

@@ -10,7 +10,7 @@ namespace GrandUMI.Tests;
 public class ST14EffectTests
 {
     [Fact]
-    public async Task ST14_017_SunnyGo_OnlyBoostsOwnMatchingCharactersOnField()
+    public async Task ST14_017_SunnyGo_DynamicallyBoostsOwnMatchingCharactersOnField()
     {
         var state = TestScene.New(myLeaderNumber: "ST14-001")
             .MyCharacter("ST14-007")
@@ -32,34 +32,24 @@ public class ST14EffectTests
         state.Players[0].Characters.Add(laterCharacter);
 
         Assert.Equal(ownFieldCharacter.Info.Cost + 1, state.CurrentCostOf(0, ownFieldCharacter));
-        Assert.Equal(laterCharacter.Info.Cost, state.CurrentCostOf(0, laterCharacter));
+        Assert.Equal(laterCharacter.Info.Cost + 1, state.CurrentCostOf(0, laterCharacter));
         Assert.Equal(ownHandCharacter.Info.Cost, state.HandPlayCost(0, ownHandCharacter));
         Assert.Equal(opponentFieldCharacter.Info.Cost, state.CurrentCostOf(1, opponentFieldCharacter));
 
         var fullCheckpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
         var ownCharacters = fullCheckpoint.GetProperty("players")[0].GetProperty("characters");
-        Assert.Contains(
-            sunny.Id.ToString(),
-            ownCharacters[0].GetProperty("fieldSnapshotSourceIds")
-                .EnumerateArray().Select(value => value.GetString()));
+        Assert.Empty(ownCharacters[0].GetProperty("fieldSnapshotSourceIds").EnumerateArray());
         Assert.Empty(ownCharacters[1].GetProperty("fieldSnapshotSourceIds").EnumerateArray());
 
         var recoveryState = System.Text.Json.JsonSerializer.SerializeToElement(
             PrivateStateSnapshotBuilder.Build(state));
         var recoveryCharacters = recoveryState.GetProperty("players")[0].GetProperty("characters");
-        Assert.Contains(
-            sunny.Id.ToString(),
-            recoveryCharacters[0].GetProperty("fieldSnapshotSourceIds")
-                .EnumerateArray().Select(value => value.GetString()));
-        var capturedHash = RoomRecoverySnapshotStore.ComputeStateSha256(recoveryState);
-        ownFieldCharacter.FieldSnapshotSourceIds.Clear();
-        var missingMembershipHash = RoomRecoverySnapshotStore.ComputeStateSha256(
-            System.Text.Json.JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state)));
-        Assert.NotEqual(capturedHash, missingMembershipHash);
+        Assert.Empty(recoveryCharacters[0].GetProperty("fieldSnapshotSourceIds").EnumerateArray());
+        Assert.Empty(recoveryCharacters[1].GetProperty("fieldSnapshotSourceIds").EnumerateArray());
     }
 
     [Fact]
-    public async Task ST14_017_SunnyGo_SnapshotSurvivesNullificationButStopsAfterDepartures()
+    public async Task ST14_017_SunnyGo_DynamicAuraStopsOnNullificationOrStageDeparture()
     {
         var state = TestScene.New(myLeaderNumber: "ST14-001")
             .MyCharacter("ST14-007")
@@ -80,7 +70,7 @@ public class ST14EffectTests
 
         Assert.True(me.Characters.Remove(capturedCharacter));
         me.Characters.Add(capturedCharacter);
-        Assert.Equal(capturedCharacter.Info.Cost, state.CurrentCostOf(0, capturedCharacter));
+        Assert.Equal(capturedCharacter.Info.Cost + 1, state.CurrentCostOf(0, capturedCharacter));
 
         AtomicOps.BounceToHand(state, 0, sunny);
         Assert.Equal(capturedCharacter.Info.Cost, state.CurrentCostOf(0, capturedCharacter));
@@ -93,7 +83,7 @@ public class ST14EffectTests
     }
 
     [Fact]
-    public async Task ST14_017_SunnyGo_RepeatedRegistrationDoesNotExpandEstablishedSnapshot()
+    public async Task ST14_017_SunnyGo_RepeatedRegistrationIsIdempotentAndRemainsDynamic()
     {
         var state = TestScene.New(myLeaderNumber: "ST14-001")
             .MyCharacter("ST14-007")
@@ -110,14 +100,14 @@ public class ST14EffectTests
         await EffectRuntime.Resolve(
             state, 0, sunny, EffectTrigger.OnEnterField, new MockPromptService());
 
-        Assert.Equal(laterCharacter.Info.Cost, state.CurrentCostOf(0, laterCharacter));
+        Assert.Equal(laterCharacter.Info.Cost + 1, state.CurrentCostOf(0, laterCharacter));
         Assert.Single(
             state.ContinuousEffects,
             effect => effect.SourceCardId == sunny.Id.ToString() && effect.CostDelta == 1);
     }
 
     [Fact]
-    public async Task ST14_017_SunnyGo_TwoStagesTrackAndCleanSnapshotsIndependently()
+    public async Task ST14_017_SunnyGo_TwoStagesStackAndLeaveIndependently()
     {
         var state = TestScene.New(myLeaderNumber: "ST14-001")
             .MyCharacter("ST14-007")
@@ -136,14 +126,14 @@ public class ST14EffectTests
             state, 0, secondSunny, EffectTrigger.OnEnterField, new MockPromptService());
 
         Assert.Equal(capturedCharacter.Info.Cost + 2, state.CurrentCostOf(0, capturedCharacter));
-        Assert.Equal(
-            new[] { firstSunny.Id.ToString(), secondSunny.Id.ToString() }.Order(StringComparer.Ordinal),
-            capturedCharacter.FieldSnapshotSourceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+        Assert.Empty(capturedCharacter.FieldSnapshotSourceIds);
 
         me.StageCard = null;
         Assert.Equal(capturedCharacter.Info.Cost + 1, state.CurrentCostOf(0, capturedCharacter));
-        Assert.DoesNotContain(firstSunny.Id, capturedCharacter.FieldSnapshotSourceIds);
-        Assert.Contains(secondSunny.Id, capturedCharacter.FieldSnapshotSourceIds);
+        Assert.DoesNotContain(state.ContinuousEffects, effect =>
+            effect.SourceCardId.StartsWith(firstSunny.Id.ToString(), StringComparison.Ordinal));
+        Assert.Contains(state.ContinuousEffects, effect =>
+            effect.SourceCardId.StartsWith(secondSunny.Id.ToString(), StringComparison.Ordinal));
 
         me.ExtraStageCard = null;
         Assert.Equal(capturedCharacter.Info.Cost, state.CurrentCostOf(0, capturedCharacter));

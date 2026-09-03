@@ -188,6 +188,8 @@ public static class EffectRuntime
         bool lifeTriggerOrigin = false,
         string? effectExecutionId = null)
     {
+        // 测试构造器、历史规则包及其它非 GameEngine 入口也必须获得统一的离场提交清理。
+        s.BindFieldDepartureLifecycle();
         var owner = s.Players[ownerIdx];
         int turnOnceCountBefore = owner.TurnOnceUsed.Count;
         var turnOnceKeysBefore = owner.TurnOnceUsed.ToHashSet(StringComparer.Ordinal);

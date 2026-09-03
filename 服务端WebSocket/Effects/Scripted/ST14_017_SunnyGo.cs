@@ -6,8 +6,8 @@ namespace GrandUMI.Effects.Scripted;
 
 /// <summary>
 /// ST14-017 千里·阳光号（舞台）
-/// 此舞台登场并建立静态效果时，我方场上已有的黑色《草帽一伙》角色费用+1。（持续）
-/// 后续登场的角色不进入本次快照；已入选角色离场后，即使同一实例再次登场也不恢复加成。
+/// 此舞台在场期间，我方场上的黑色《草帽一伙》角色费用+1。（持续）
+/// 目标集合随当前场面动态计算，后续登场或重新登场的符合角色也会立即获得加成。
 /// 【登场时】我方领袖拥有《草帽一伙》特征的场合，抽取1张卡牌。（委托 DSL ST14.json）
 /// </summary>
 public class ST14_017_SunnyGo : IScriptedEffect, IFieldStaticEffect
@@ -20,18 +20,7 @@ public class ST14_017_SunnyGo : IScriptedEffect, IFieldStaticEffect
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
 
-        // 来源自身持有同一个 ID，表示本次留场已经建立过快照；重复结算只重建光环，不扩大目标集。
-        // 舞台离场时 PlayerState 会清除此标记及所有目标标记，重登后才按新场面重新建立。
-        if (!ctx.Source.FieldSnapshotSourceIds.Contains(selfId))
-        {
-            foreach (var character in ctx.State.Players.SelectMany(player => player.Characters))
-                character.FieldSnapshotSourceIds.Remove(selfId);
-
-            ctx.Source.FieldSnapshotSourceIds.Add(selfId);
-            foreach (var character in ctx.State.Players[owner].Characters.Where(IsEligibleCharacter))
-                character.FieldSnapshotSourceIds.Add(selfId);
-        }
-
+        // 同一来源重复注册只替换自身光环；目标资格始终按当前权威场面实时判定。
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
@@ -43,7 +32,6 @@ public class ST14_017_SunnyGo : IScriptedEffect, IFieldStaticEffect
                 sideIdx == owner &&
                 s.Players[owner].StageCards.Any(stage => stage.Id == selfId) &&
                 s.Players[owner].Characters.Any(character => character.Id == card.Id) &&
-                card.FieldSnapshotSourceIds.Contains(selfId) &&
                 IsEligibleCharacter(card),
         });
 

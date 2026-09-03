@@ -11,7 +11,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【触发】= 生命牌触发 OnLifeRevealTrigger。
 ///   - 「直到下个我方回合结束」用基于回合数的 Predicate 自动到期（参考 OP07-018）。生命触发在对方回合
 ///     发动，到期回合 = 之后第一个我方回合。
-///   - 持续力量挂在目标自身（SourceCardId = 目标 Id），目标离场时引擎清理。
+///   - 每次触发以 EffectExecutionId 区分激活；同一执行重放幂等替换，不同执行可独立叠加。
+///   - 持续力量挂在目标自身（SourceCardId 以目标 Id 开头），目标离场时引擎清理。
 ///   - 目标可为领袖或角色，故 Scope.IncludeLeader = true。
 /// </summary>
 public class OP07_099_Usopp : IScriptedEffect
@@ -42,10 +43,16 @@ public class OP07_099_Usopp : IScriptedEffect
             : ctx.State.TurnCount + 1;
 
         var targetId = target.Id;
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == targetId.ToString() && e.PowerDelta == 2000);
+        var executionSuffix = $":{CardNumber}:{ctx.ExecutionId}";
+        // 同一个已提交执行若因恢复再次进入，只替换该执行的结果；不能删除其它生命触发的独立加成。
+        ctx.State.ContinuousEffects.RemoveAll(effect =>
+            string.Equals(effect.SourceCardNumber, CardNumber, StringComparison.OrdinalIgnoreCase)
+            && effect.SourceCardId.EndsWith(executionSuffix, StringComparison.Ordinal));
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
-            SourceCardId = targetId.ToString(),
+            SourceCardId = $"{targetId:D}{executionSuffix}",
+            SourceCardNumber = CardNumber,
+            ExpiresAtEndOfTurnForSide = owner,
             Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = true },
             PowerDelta = 2000,
             Predicate = (s, sideIdx, card) => card.Id == targetId && s.TurnCount <= expireTurn,

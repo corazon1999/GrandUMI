@@ -219,7 +219,10 @@ public static partial class GameRoomManager
         string Outcome,
         string? RequestId,
         string? Reason,
-        GameActionSource Source);
+        GameActionSource Source,
+        string? CardNumber = null,
+        string? PromptId = null,
+        string? PromptKind = null);
 
     private static void DeliverPlayerPayload(RoomEntry room, int playerIndex, object payload)
         => room.OutboundCommitGate.Deliver(() =>
@@ -447,8 +450,8 @@ public static partial class GameRoomManager
                 createdAtUtc = DateTime.UtcNow,
                 chatDecorations = entry.ChatDecorationCinematics.ExportForJournal(),
             });
-            engine.OnPersistActionWithSource = (pi, act, data, requestId, source) =>
-                PersistAcceptedAction(entry, pi, act, data, requestId, source);
+            engine.OnPersistActionWithSource = (pi, act, data, requestId, source, feedbackContext) =>
+                PersistAcceptedAction(entry, pi, act, data, requestId, source, feedbackContext);
         }
 
         CaptureRecoverySnapshot(entry);
@@ -666,6 +669,9 @@ public static partial class GameRoomManager
                     ["outcome"] = action.Outcome,
                     ["requestId"] = action.ActorIndex == viewerIndex ? action.RequestId : null,
                     ["reason"] = action.ActorIndex == viewerIndex && action.Outcome == "rejected" ? action.Reason : null,
+                    ["cardNumber"] = action.ActorIndex == viewerIndex ? action.CardNumber : null,
+                    ["promptId"] = action.ActorIndex == viewerIndex ? action.PromptId : null,
+                    ["promptKind"] = action.ActorIndex == viewerIndex ? action.PromptKind : null,
                 });
             }
         }
@@ -741,7 +747,8 @@ public static partial class GameRoomManager
         string outcome,
         string? requestId,
         string? reason,
-        GameActionSource source = GameActionSource.Player)
+        GameActionSource source = GameActionSource.Player,
+        FeedbackActionContext? feedbackContext = null)
     {
         lock (room.FeedbackEvidenceGate)
         {
@@ -753,7 +760,10 @@ public static partial class GameRoomManager
                 outcome,
                 Clip(requestId, 128),
                 SanitizeActionReason(reason),
-                source));
+                source,
+                feedbackContext?.CardNumber,
+                feedbackContext?.PromptId,
+                feedbackContext?.PromptKind));
             while (room.RecentFeedbackActions.Count > 16) room.RecentFeedbackActions.Dequeue();
         }
     }
@@ -776,6 +786,37 @@ public static partial class GameRoomManager
     {
         var clipped = Clip(value, 80);
         return clipped is not null && FeedbackActionNamePattern.IsMatch(clipped) ? clipped : "unknown";
+    }
+
+    /// <summary>
+    /// 从动作提交前的权威 Prompt 提取可公开诊断字段。客户端 data 中即使伪造同名字段也不会采信。
+    /// </summary>
+    internal static FeedbackActionContext? CaptureFeedbackActionContext(
+        GameState state,
+        int actorIndex,
+        string action)
+    {
+        if (!string.Equals(action, "PromptResponse", StringComparison.Ordinal)) return null;
+        var prompt = state.PendingPrompt;
+        if (prompt is null || prompt.PlayerIndex != actorIndex) return null;
+
+        string? cardNumber = null;
+        if (prompt.Extra.TryGetValue("sourceNumber", out var sourceNumber))
+            cardNumber = SanitizeCardNumber(sourceNumber?.ToString());
+        return new FeedbackActionContext(
+            cardNumber,
+            Clip(prompt.PromptId, 64),
+            SanitizeActionName(prompt.Kind));
+    }
+
+    private static string? SanitizeCardNumber(string? value)
+    {
+        var normalized = Clip(value, 16)?.ToUpperInvariant();
+        if (normalized is null) return null;
+        var match = FeedbackCardNumberPattern.Match(normalized);
+        return match.Success && match.Index == 0 && match.Length == normalized.Length
+            ? normalized
+            : null;
     }
 
     /// <summary>客户端通过 MsgGameAction 派发的入口</summary>
@@ -868,13 +909,15 @@ public static partial class GameRoomManager
         var promptIdBefore = action == "PromptResponse" ? room.Engine.State.PendingPrompt?.PromptId : null;
         return EnqueueWork(room, new RoomWork(action, LatencyDiagnostics.Start(), async () =>
         {
+            var feedbackContext = CaptureFeedbackActionContext(room.Engine.State, playerIndex, action);
             try
             {
                 data = CanonicalJson.NormalizeObject(data);
             }
             catch (InvalidDataException ex)
             {
-                RecordRecentFeedbackAction(room, playerIndex, action, "rejected", requestId, ex.Message, source);
+                RecordRecentFeedbackAction(
+                    room, playerIndex, action, "rejected", requestId, ex.Message, source, feedbackContext);
                 WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], new
                 {
                     proto = "MsgActionRejected",
@@ -887,7 +930,8 @@ public static partial class GameRoomManager
             var pause = PauseOperationClockForAction(room, playerIndex, action, receivedAt);
             if (pause.ExpiredPlayer is 0 or 1)
             {
-                RecordRecentFeedbackAction(room, playerIndex, action, "rejected", requestId, "动作到达时权威计时已到期", source);
+                RecordRecentFeedbackAction(
+                    room, playerIndex, action, "rejected", requestId, "动作到达时权威计时已到期", source, feedbackContext);
                 var committed = pause.ExpirationKind == ClockExpirationKind.Inactivity
                     ? FinishByInactivityTimeout(room, pause.ExpiredPlayer.Value)
                     : FinishByOperationTimeout(room, pause.ExpiredPlayer.Value);
@@ -910,7 +954,8 @@ public static partial class GameRoomManager
             }
             if (!room.OutboundCommitGate.Begin())
             {
-                RecordRecentFeedbackAction(room, playerIndex, action, "rejected", requestId, "对局提交闸门不可用", source);
+                RecordRecentFeedbackAction(
+                    room, playerIndex, action, "rejected", requestId, "对局提交闸门不可用", source, feedbackContext);
                 if (room.IsRecoveryPaused)
                     WebSocketBridge.Send(room.PlayerSessionIds[playerIndex], new
                     {
@@ -935,7 +980,8 @@ public static partial class GameRoomManager
                     action,
                     data,
                     correlationId,
-                    source);
+                    source,
+                    feedbackContext);
                 var accepted = execution.Accepted;
                 // 被拒绝的 PromptResponse 不会消费旧 Prompt，不应等待效果链稳定；
                 // 否则单读者房间队列会被卡到等待超时，后续合法响应也无法进入。
@@ -960,7 +1006,8 @@ public static partial class GameRoomManager
                     accepted ? "accepted" : "rejected",
                     correlationId,
                     execution.RejectionReason,
-                    source);
+                    source,
+                    feedbackContext);
                 EnsureOperationClockRunning(room);
                 EnsureStartingPlayerChoiceTimeout(room);
                 EnsureMulliganTimeout(room);
@@ -970,7 +1017,8 @@ public static partial class GameRoomManager
             }
             catch (Exception ex)
             {
-                RecordRecentFeedbackAction(room, playerIndex, action, "rejected", requestId, "服务端提交失败", source);
+                RecordRecentFeedbackAction(
+                    room, playerIndex, action, "rejected", requestId, "服务端提交失败", source, feedbackContext);
                 PauseForRecoveryFailure(room, "recovery_commit_failed", ex);
             }
         }, receivedAt));
@@ -3107,7 +3155,8 @@ public static partial class GameRoomManager
         string action,
         JsonElement data,
         string? requestId,
-        GameActionSource source)
+        GameActionSource source,
+        FeedbackActionContext? feedbackContext)
     {
         var journalSequence = Volatile.Read(ref room.JournalSequence) + 1;
         try
@@ -3123,7 +3172,8 @@ public static partial class GameRoomManager
                 journalSequence,
                 source,
                 activeDraft?.RoundId,
-                activeDraft?.DeadlineUtc);
+                activeDraft?.DeadlineUtc,
+                feedbackContext);
         }
         catch (Exception ex)
         {
@@ -3423,7 +3473,19 @@ public static partial class GameRoomManager
                 "accepted",
                 Clip(restoredRequestId, 128),
                 null,
-                source));
+                source,
+                e.TryGetProperty("feedbackCardNumber", out var feedbackCardNumber)
+                    && feedbackCardNumber.ValueKind == JsonValueKind.String
+                        ? SanitizeCardNumber(feedbackCardNumber.GetString())
+                        : null,
+                e.TryGetProperty("feedbackPromptId", out var feedbackPromptId)
+                    && feedbackPromptId.ValueKind == JsonValueKind.String
+                        ? Clip(feedbackPromptId.GetString(), 64)
+                        : null,
+                e.TryGetProperty("feedbackPromptKind", out var feedbackPromptKind)
+                    && feedbackPromptKind.ValueKind == JsonValueKind.String
+                        ? SanitizeActionName(feedbackPromptKind.GetString())
+                        : null));
             while (restoredRecentActions.Count > 16) restoredRecentActions.Dequeue();
         }
 
@@ -3587,8 +3649,8 @@ public static partial class GameRoomManager
                 "process_recovery_random_trace_not_restored");
         if (!engine.State.IsGameOver)
         {
-            engine.OnPersistActionWithSource = (pi, act, data, requestId, source) =>
-                PersistAcceptedAction(entry, pi, act, data, requestId, source);
+            engine.OnPersistActionWithSource = (pi, act, data, requestId, source, feedbackContext) =>
+                PersistAcceptedAction(entry, pi, act, data, requestId, source, feedbackContext);
             RoomJournal.Reopen(roomId); // 续写新动作到同一文件（不重写 header）
         }
 

@@ -55,6 +55,8 @@ public sealed record PlayerRankIdentity(
 /// </summary>
 public class PlayerState
 {
+    private Action<CardInstance>? _onFieldCardDeparted;
+
     public PlayerState()
     {
         Characters = new CharacterZone(CleanupDepartingCharacter);
@@ -85,8 +87,9 @@ public class PlayerState
         set
         {
             if (ReferenceEquals(_stageCard, value)) return;
-            ClearDepartingSnapshotSource(_stageCard);
+            var departed = _stageCard;
             _stageCard = value;
+            CleanupDepartingStage(departed);
         }
     }
     /// <summary>仅【三号船坞】存在时启用的第二舞台区。</summary>
@@ -96,8 +99,9 @@ public class PlayerState
         set
         {
             if (ReferenceEquals(_extraStageCard, value)) return;
-            ClearDepartingSnapshotSource(_extraStageCard);
+            var departed = _extraStageCard;
             _extraStageCard = value;
+            CleanupDepartingStage(departed);
         }
     }
     /// <summary>按固定槽位顺序枚举当前舞台；普通模式只会返回首槽。</summary>
@@ -178,14 +182,24 @@ public class PlayerState
             don.State = DonState.Rest;
             don.AttachedToCardId = null;
         }
+        _onFieldCardDeparted?.Invoke(character);
     }
 
-    private void ClearDepartingSnapshotSource(CardInstance? source)
+    private void CleanupDepartingStage(CardInstance? source)
     {
         if (source is null) return;
         // 舞台离场既结束它建立的快照，也结束它作为其它快照目标的本次留场资格。
         source.FieldSnapshotSourceIds.Clear();
         foreach (var character in Characters)
             character.FieldSnapshotSourceIds.Remove(source.Id);
+        // 舞台槽已先完成替换，再通知 GameState 清理来源效果；失败或同实例赋值不会触发。
+        _onFieldCardDeparted?.Invoke(source);
     }
+
+    /// <summary>
+    /// 绑定所属牌局的离场提交回调。角色集合完成移除、舞台槽完成替换后才会调用，
+    /// 因而离场保护、替代效果与错误持有者等未提交路径不会提前清掉持续效果。
+    /// </summary>
+    internal void BindFieldDeparture(Action<CardInstance> onFieldCardDeparted)
+        => _onFieldCardDeparted = onFieldCardDeparted;
 }

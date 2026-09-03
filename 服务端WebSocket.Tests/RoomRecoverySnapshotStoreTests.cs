@@ -228,7 +228,7 @@ public sealed class RoomRecoverySnapshotStoreTests
                 Path.Combine(root, $"{roomId}.jsonl"),
                 JsonSerializer.Serialize(header) + Environment.NewLine);
 
-            // 上一版 v6 私有状态没有当前新增的海克斯扩展运行态与卡牌实例字段。
+            // 上一版 v7 仍可能保存 ST14 建立时快照或延迟到回合末才清理的来源效果。
             // 升级后必须保留其请求去重窗口、
             // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前版本。
             var legacyPrivateState = JsonSerializer.SerializeToElement(new { schema = 2, legacy = true });
@@ -240,7 +240,7 @@ public sealed class RoomRecoverySnapshotStoreTests
                 DateTime.UtcNow,
                 [0, 0],
                 [600_000, 600_000],
-                [new RequestDedupeEntry(0, "legacy-v6-request", DateTime.UtcNow)],
+                [new RequestDedupeEntry(0, "legacy-v7-request", DateTime.UtcNow)],
                 legacyStateHash,
                 legacyPrivateState));
             await RoomRecoverySnapshotStore.FlushAsync();
@@ -261,7 +261,7 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.NotEqual(legacyStateHash, refreshed.StateSha256);
             Assert.Contains(
                 refreshed.ProcessedRequests,
-                request => request.PlayerIndex == 0 && request.RequestId == "legacy-v6-request");
+                request => request.PlayerIndex == 0 && request.RequestId == "legacy-v7-request");
 
             var graceField = typeof(GameRoomManager).GetField(
                 "_grace", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
@@ -447,6 +447,9 @@ public sealed class RoomRecoverySnapshotStoreTests
                 data = new { description = "不能进入反馈证据的私有动作数据 OP15-001" },
                 requestId = "restored-request-1",
                 operationSequence = 1,
+                feedbackCardNumber = "OP15-075",
+                feedbackPromptId = "p50",
+                feedbackPromptKind = "OpponentCharacter",
                 tsUtc = now,
             };
             await File.WriteAllLinesAsync(
@@ -466,7 +469,10 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.True(evidence.GetProperty("connection").GetProperty("restoredFromRecovery").GetBoolean());
             Assert.Contains(actions, action => action.GetProperty("action").GetString() == "RequestDraw"
                 && action.GetProperty("outcome").GetString() == "accepted"
-                && action.GetProperty("requestId").GetString() == "restored-request-1");
+                && action.GetProperty("requestId").GetString() == "restored-request-1"
+                && action.GetProperty("cardNumber").GetString() == "OP15-075"
+                && action.GetProperty("promptId").GetString() == "p50"
+                && action.GetProperty("promptKind").GetString() == "OpponentCharacter");
             Assert.DoesNotContain("不能进入反馈证据", evidence.GetRawText(), StringComparison.Ordinal);
             Assert.DoesNotContain("OP15-001", evidence.GetRawText(), StringComparison.Ordinal);
             Assert.DoesNotContain(account0, evidence.GetRawText(), StringComparison.Ordinal);

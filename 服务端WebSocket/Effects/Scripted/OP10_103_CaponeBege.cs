@@ -26,13 +26,8 @@ public class OP10_103_CaponeBege : IScriptedEffect
 
         if (me.LifeArea.Count == 0) return;
 
-        // 收益目标：手牌中《超新星》角色
-        var supernovas = me.Hand.Where(c =>
-            c.Info.Kind == CardKind.Character && c.Info.HasKeyword("超新星")).ToList();
-        if (supernovas.Count == 0) return; // 无收益则不提示发动
-
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "卡彭·班吉：将生命区最上/最下方 1 张加入手牌，并将 1 张《超新星》角色加入生命区最上方？");
+            "卡彭·班吉：将生命区最上/最下方 1 张加入手牌，并将最多 1 张《超新星》角色加入生命区最上方？");
         if (!use) return;
 
         // 成本：选择生命区最上方或最下方
@@ -46,7 +41,12 @@ public class OP10_103_CaponeBege : IScriptedEffect
         me.LifeArea.Remove(lifeCard);
         me.Hand.Add(lifeCard);
 
-        // 收益：将手牌中最多 1 张《超新星》角色加入生命区最上方
+        // 成本提交后重新读取权威手牌；刚从生命区加入手牌的《超新星》也必须成为收益目标。
+        var supernovas = me.Hand.Where(c =>
+            c.Info.Kind == CardKind.Character && c.Info.HasKeyword("超新星")).ToList();
+        if (supernovas.Count == 0) return;
+
+        // 收益：将手牌中最多 1 张《超新星》角色加入生命区最上方。
         var extra = new Dictionary<string, object?>
         {
             ["choiceCards"] = supernovas.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
@@ -56,12 +56,10 @@ public class OP10_103_CaponeBege : IScriptedEffect
             supernovas.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
         if (chosen.Count == 0) return;
 
-        var target = supernovas.First(c => c.Id.ToString() == chosen[0]);
-        if (me.Hand.Contains(target))
-        {
-            me.Hand.Remove(target);
-            target.IsLifeFaceUp = true;
-            me.LifeArea.Insert(0, target);
-        }
+        // Prompt 恢复/重放后仍以当前手牌为最终提交依据，失效选择不得造成异常或重复移动。
+        var target = supernovas.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
+        if (target is null || !me.Hand.Remove(target)) return;
+        target.IsLifeFaceUp = true;
+        me.LifeArea.Insert(0, target);
     }
 }

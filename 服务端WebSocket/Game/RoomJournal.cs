@@ -71,7 +71,8 @@ public static class RoomJournal
         long? operationSequence = null,
         GameActionSource source = GameActionSource.Player,
         string? hexDraftRoundId = null,
-        DateTime? hexDraftDeadlineUtc = null)
+        DateTime? hexDraftDeadlineUtc = null,
+        FeedbackActionContext? feedbackContext = null)
     {
         ExecuteDurable(roomId, "action", () =>
         {
@@ -87,6 +88,9 @@ public static class RoomJournal
                 source = GameActionSourceWire.Value(source),
                 hexDraftRoundId,
                 hexDraftDeadlineUtc,
+                feedbackCardNumber = feedbackContext?.CardNumber,
+                feedbackPromptId = feedbackContext?.PromptId,
+                feedbackPromptKind = feedbackContext?.PromptKind,
                 tsUtc = DateTime.UtcNow,
             });
         });

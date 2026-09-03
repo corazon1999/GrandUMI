@@ -72,6 +72,25 @@ public class GameState
     /// <summary>双方玩家。约定 0 = 房主/匹配 P1，1 = 加入者/匹配 P2</summary>
     public PlayerState[] Players { get; } = new PlayerState[2];
 
+    /// <summary>
+    /// 将双方场区的实际离场提交绑定到本局持续效果生命周期。绑定可重复调用；
+    /// GameEngine 构造及 EffectRuntime 入口都会兜底，兼容测试场景和旧规则包重放。
+    /// </summary>
+    internal void BindFieldDepartureLifecycle()
+    {
+        foreach (var player in Players)
+            player?.BindFieldDeparture(CommitFieldDeparture);
+    }
+
+    private void CommitFieldDeparture(CardInstance departed)
+    {
+        var sourceId = departed.Id;
+        ContinuousEffects.RemoveAll(effect =>
+            effect.SourceCardId.Length >= 36
+            && Guid.TryParse(effect.SourceCardId[..36], out var effectSourceId)
+            && effectSourceId == sourceId);
+    }
+
     /// <summary>当前回合玩家索引（0 / 1）</summary>
     public int CurrentTurnPlayer { get; set; }
 
