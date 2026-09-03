@@ -87,6 +87,7 @@ export interface PlayerView {
   costActive: number;
   costRest: number;
   costAttached: number;
+  costNextResetInactive: number;
   donDeckCount: number;
   hasReDraw: boolean;
   mulliganDone: boolean;
@@ -128,6 +129,7 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
     stageCanActivateEffect: player.stageCanActivateEffect ?? false,
     leaderOncePerTurnEffectAvailable: player.leaderOncePerTurnEffectAvailable ?? false,
     stageOncePerTurnEffectAvailable: player.stageOncePerTurnEffectAvailable ?? false,
+    costNextResetInactive: player.costNextResetInactive ?? 0,
     trashNumbers: [...(player.trashNumbers ?? [])],
     lifeNumbers: [...(player.lifeNumbers ?? [])],
     lifeFaceUp: player.lifeFaceUp?.map((life) => ({ ...life })),

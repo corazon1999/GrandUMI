@@ -427,6 +427,7 @@ public static class PrivateStateSnapshotBuilder
             id = don.Id.ToString(),
             state = don.State.ToString(),
             attachedToCardId = don.AttachedToCardId?.ToString(),
+            cannotActivateNextReset = don.CannotActivateNextReset,
         };
     }
 }

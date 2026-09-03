@@ -110,6 +110,46 @@ try {
       `全屏按钮超出安全可视区：${JSON.stringify(buttonBox)}`,
     );
 
+    await page.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "networkidle" });
+    const hexCanvas = page.locator('[data-layout-preview="mobile-landscape"]');
+    await hexCanvas.waitFor({ state: "visible" });
+    assert.equal(await hexCanvas.getAttribute("data-layout-rotated"), "true");
+    const lockedDonBadge = page.locator('[data-next-reset-inactive-count="2"]');
+    await lockedDonBadge.waitFor({ state: "visible" });
+    const lockedDonLayout = await page.evaluate(() => {
+      const badge = document.querySelector('[data-next-reset-inactive-count="2"]');
+      const slot = badge?.closest("button");
+      const chatDock = document.querySelector("[data-game-control-dock]");
+      if (!(badge instanceof HTMLElement) || !(slot instanceof HTMLButtonElement)
+          || !(chatDock instanceof HTMLElement)) {
+        throw new Error("咚!!锁定提示布局验证节点缺失。");
+      }
+      const badgeBox = badge.getBoundingClientRect();
+      const slotBox = slot.getBoundingClientRect();
+      const chatBox = chatDock.getBoundingClientRect();
+      const overlapsChat = badgeBox.left < chatBox.right && badgeBox.right > chatBox.left
+        && badgeBox.top < chatBox.bottom && badgeBox.bottom > chatBox.top;
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        documentHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+        badge: { x: badgeBox.x, y: badgeBox.y, width: badgeBox.width, height: badgeBox.height },
+        slot: { x: slotBox.x, y: slotBox.y, width: slotBox.width, height: slotBox.height },
+        slotLayout: { width: slot.offsetWidth, height: slot.offsetHeight },
+        overlapsChat,
+      };
+    });
+    assert.ok(lockedDonLayout.documentWidth <= lockedDonLayout.clientWidth, `咚!!锁定提示页面横向溢出：${JSON.stringify(lockedDonLayout)}`);
+    assert.ok(lockedDonLayout.documentHeight <= lockedDonLayout.clientHeight, `咚!!锁定提示页面纵向溢出：${JSON.stringify(lockedDonLayout)}`);
+    assert.ok(lockedDonLayout.badge.x >= -1 && lockedDonLayout.badge.y >= -1
+      && lockedDonLayout.badge.x + lockedDonLayout.badge.width <= viewport.width + 1
+      && lockedDonLayout.badge.y + lockedDonLayout.badge.height <= viewport.height + 1,
+    `咚!!锁定提示超出安全可视区：${JSON.stringify(lockedDonLayout)}`);
+    assert.ok(lockedDonLayout.slotLayout.width >= 44 && lockedDonLayout.slotLayout.height >= 44,
+      `咚!!休息区布局尺寸不足 44px：${JSON.stringify(lockedDonLayout)}`);
+    assert.equal(lockedDonLayout.overlapsChat, false, `咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(lockedDonLayout)}`);
+
     await page.goto(`${baseUrl}/layout-verification/cloud-replay`, { waitUntil: "networkidle" });
     const cloudPanel = page.locator("[data-cloud-replay-panel]");
     await cloudPanel.waitFor({ state: "visible" });
@@ -220,7 +260,41 @@ try {
     assert.ok(doctorButtonBox.x >= -1 && doctorButtonBox.x + doctorButtonBox.width <= viewport.width + 1, `一致性修复按钮横向越界：${JSON.stringify(doctorButtonBox)}`);
     await context.close();
   }
-  console.log("真实浏览器移动端回归通过：390×844、360×780 的对局旋转、云回放与运营工作台均无溢出，主要控件可见可触控。");
+  const narrowViewport = { width: 344, height: 582 };
+  const narrowContext = await browser.newContext({ viewport: narrowViewport, isMobile: true, hasTouch: true });
+  const narrowPage = await narrowContext.newPage();
+  await narrowPage.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "networkidle" });
+  const narrowCanvas = narrowPage.locator('[data-layout-preview="mobile-landscape"]');
+  await narrowCanvas.waitFor({ state: "visible" });
+  assert.equal(await narrowCanvas.getAttribute("data-layout-rotated"), "true");
+  await narrowPage.locator('[data-next-reset-inactive-count="2"]').waitFor({ state: "visible" });
+  const narrowLayout = await narrowPage.evaluate(() => {
+    const badge = document.querySelector('[data-next-reset-inactive-count="2"]');
+    const chatDock = document.querySelector("[data-game-control-dock]");
+    if (!(badge instanceof HTMLElement) || !(chatDock instanceof HTMLElement)) {
+      throw new Error("344×582 咚!!锁定提示布局验证节点缺失。");
+    }
+    const badgeBox = badge.getBoundingClientRect();
+    const chatBox = chatDock.getBoundingClientRect();
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      documentHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+      badge: { x: badgeBox.x, y: badgeBox.y, width: badgeBox.width, height: badgeBox.height },
+      overlapsChat: badgeBox.left < chatBox.right && badgeBox.right > chatBox.left
+        && badgeBox.top < chatBox.bottom && badgeBox.bottom > chatBox.top,
+    };
+  });
+  assert.ok(narrowLayout.documentWidth <= narrowLayout.clientWidth && narrowLayout.documentHeight <= narrowLayout.clientHeight,
+    `344×582 咚!!锁定提示页面溢出：${JSON.stringify(narrowLayout)}`);
+  assert.ok(narrowLayout.badge.x >= -1 && narrowLayout.badge.y >= -1
+    && narrowLayout.badge.x + narrowLayout.badge.width <= narrowViewport.width + 1
+    && narrowLayout.badge.y + narrowLayout.badge.height <= narrowViewport.height + 1,
+  `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
+  assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
+  await narrowContext.close();
+  console.log("真实浏览器移动端回归通过：390×844、360×780 的既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

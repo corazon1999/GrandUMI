@@ -383,6 +383,7 @@ public static class StateSnapshotBuilder
             p.ActiveDonCount,
             p.RestDonCount,
             p.CostArea.Count(d => d.State == DonState.Attached),
+            p.CostArea.Count(d => d.CannotActivateNextReset),
             p.DonDeck.Count,
             p.HasReDraw,
             p.MulliganDone);
@@ -464,6 +465,7 @@ public static class StateSnapshotBuilder
             costActive = board.CostActive,
             costRest = board.CostRest,
             costAttached = board.CostAttached,
+            costNextResetInactive = board.CostNextResetInactive,
             donDeckCount = board.DonDeckCount,
             hasReDraw = board.HasReDraw,
             mulliganDone = board.MulliganDone,
@@ -500,6 +502,7 @@ public static class StateSnapshotBuilder
         int CostActive,
         int CostRest,
         int CostAttached,
+        int CostNextResetInactive,
         int DonDeckCount,
         bool HasReDraw,
         bool MulliganDone);

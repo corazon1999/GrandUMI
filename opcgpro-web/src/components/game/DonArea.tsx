@@ -26,6 +26,7 @@ function DonCountSlot({
   state,
   selected,
   stagedCount,
+  nextResetInactiveCount,
   canInteract,
   onClick,
 }: {
@@ -34,6 +35,7 @@ function DonCountSlot({
   state: "active" | "rest";
   selected?: boolean;
   stagedCount?: number;
+  nextResetInactiveCount?: number;
   canInteract?: boolean;
   onClick?: () => void;
 }) {
@@ -44,6 +46,8 @@ function DonCountSlot({
       type="button"
       onClick={count > 0 && canInteract ? onClick : undefined}
       disabled={count <= 0 || !canInteract}
+      aria-label={`${label}咚!! ${count} 张${nextResetInactiveCount ? `，其中 ${nextResetInactiveCount} 张下次重置不活跃` : ""}`}
+      title={nextResetInactiveCount ? `其中 ${nextResetInactiveCount} 张咚!!在下个重置阶段不会转为活跃` : undefined}
       className={`${state === "rest" ? restSlotSizes[cardSize] : slotSizes[cardSize]} relative shrink-0 rounded-md border border-sky-200/15 bg-black/15 text-left shadow-inner shadow-black/25 disabled:cursor-default`}
     >
       <span className={`absolute left-2 top-2 z-20 text-[11px] font-black drop-shadow ${state === "active" ? "text-yellow-200" : "text-zinc-200"}`}>
@@ -58,6 +62,14 @@ function DonCountSlot({
       {stagedCount && stagedCount > 0 ? (
         <span className="absolute right-1 top-1 z-30 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-black shadow ring-2 ring-amber-200">
           依附×{stagedCount}
+        </span>
+      ) : null}
+      {nextResetInactiveCount && nextResetInactiveCount > 0 ? (
+        <span
+          data-next-reset-inactive-count={nextResetInactiveCount}
+          className="absolute right-1 top-1 z-30 whitespace-nowrap rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow ring-1 ring-rose-200"
+        >
+          下次不活跃×{nextResetInactiveCount}
         </span>
       ) : null}
       <div className="absolute inset-x-0 bottom-1 z-30 flex justify-center">
@@ -99,6 +111,7 @@ export default function DonArea({ side }: Props) {
         label="休息"
         count={player.costRest}
         state="rest"
+        nextResetInactiveCount={player.costNextResetInactive}
       />
     </div>
   );

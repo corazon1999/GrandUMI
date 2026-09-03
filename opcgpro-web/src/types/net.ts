@@ -1094,6 +1094,8 @@ export interface PlayerSnapshot {
   costActive: number;
   costRest: number;
   costAttached: number;
+  /** 旧快照缺失时按 0；表示下个重置阶段仍不会活跃的咚!!数量。 */
+  costNextResetInactive?: number;
   donDeckCount: number;
   hasReDraw: boolean;
   mulliganDone: boolean;
