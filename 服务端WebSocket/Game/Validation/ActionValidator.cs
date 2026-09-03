@@ -121,6 +121,9 @@ public static class ActionValidator
         if (s.Phase != Phase.Main) return Fail("只能在主要阶段移除咚");
         if (s.CurrentBattle is not null) return Fail("战斗中不能移除咚");
         if (!Hex.HexRules.Has(s, playerIdx, 70)) return Fail("未持有【屠宰场】");
+        if (s.HexState.RulesRevision >= Hex.HexRules.QualityAndEffectRulesRevision
+            && s.HexState.Runtime[playerIdx].SlaughterhouseUsedThisTurn)
+            return Fail("【屠宰场】每回合只能发动1次");
         var player = s.Players[playerIdx];
         if (!player.Characters.Any(card => card.Id == characterId)) return Fail("目标不是己方场上角色");
         if (player.AttachedDonCount(characterId) <= 0) return Fail("目标角色没有附加咚");
@@ -132,8 +135,6 @@ public static class ActionValidator
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
         if (s.Phase != Phase.Main)            return Fail("只能在主要阶段宣言攻击");
         if (s.CurrentBattle is not null)      return Fail("已有战斗进行中");
-        if (!Hex.HexRules.CanDeclareAnotherAttack(s, playerIdx))
-            return Fail("【一板一眼】使你本回合只能宣言1次攻击");
         // TurnCount 记录的是整场对局中经过的玩家回合数：
         // 1 为先手的首回合，2 为后手的首回合。双方各自的首回合均不能攻击。
         if (s.TurnCount <= 2)                 return Fail("双方各自第 1 回合不能战斗");
@@ -150,6 +151,10 @@ public static class ActionValidator
             if (ch is null) return Fail("攻击者不在你场上");
             attacker = ch;
         }
+        if (!Hex.HexRules.CanDeclareAnotherAttack(s, playerIdx, attacker))
+            return Fail(s.HexState.RulesRevision >= Hex.HexRules.QualityAndEffectRulesRevision
+                ? "【一板一眼】使你本回合只能宣言1次角色攻击"
+                : "【一板一眼】使你本回合只能宣言1次攻击");
         if (attacker.IsTapped) return Fail("攻击者已休息");
         if (!AtomicOps.CanRestCard(s, attacker, playerIdx))
             return Fail("【霸王色霸气】使当前力量5000或以下的角色无法转为休息，不能攻击");

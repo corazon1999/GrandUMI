@@ -218,6 +218,43 @@ public static class PrivateStateSnapshotBuilder
 
     private static object SnapshotHexRuntime(Hex.PlayerHexRuntime runtime, int rulesRevision)
     {
+        if (rulesRevision >= Hex.HexRules.QualityAndEffectRulesRevision)
+        {
+            return new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.CharacterAttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
+                runtime.ActivatedEnterEffectsThisTurn,
+                runtime.IceFruitUsedThisTurn,
+                runtime.SitUpUsedThisTurn,
+                runtime.FishmanKarateUsedThisTurn,
+                runtime.SlaughterhouseUsedThisTurn,
+                runtime.HighCostCharacterEntriesThisTurn,
+                runtime.VoidRefillResolving,
+            };
+        }
+
         if (rulesRevision >= Hex.HexRules.ExpansionRulesRevision)
         {
             return new

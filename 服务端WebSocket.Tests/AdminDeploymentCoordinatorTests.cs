@@ -50,14 +50,14 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void 海克斯配置严格校验完整目录摘要与当前常规池规模()
+    public void 海克斯配置严格校验完整目录摘要且发布只要求各常规池非空()
     {
         Assert.Equal(
-            "sha256:f02ed93429f2b51e7c4e37abac4f996792f7716a66cddd09656295457242fcd8",
+            "sha256:12974ca22a78c690458a609bec40495f7fc10920cd12928c9dbce867823ba005",
             HexCatalogConfiguration.BuiltIn.Digest);
-        Assert.Equal(45, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Silver));
-        Assert.Equal(18, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Gold));
-        Assert.Equal(17, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Rainbow));
+        Assert.Equal(28, HexCatalog.ForTier(HexTier.Silver).Count);
+        Assert.Equal(30, HexCatalog.ForTier(HexTier.Gold).Count);
+        Assert.Equal(22, HexCatalog.ForTier(HexTier.Rainbow).Count);
 
         Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
             1,
@@ -70,23 +70,21 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
             1,
             HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
                 new HexCatalogTierAssignment(item.Id, HexTier.Gold))));
-        var unbalancedAssignments = ChangeTier(1, HexTier.Silver);
-        Assert.Equal(17, unbalancedAssignments.Count(item =>
+        var unbalancedAssignments = ChangeTier(2, HexTier.Silver);
+        Assert.Equal(29, unbalancedAssignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Gold));
-        Assert.Equal(46, unbalancedAssignments.Count(item =>
+        Assert.Equal(29, unbalancedAssignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Silver));
-        var unbalanced = Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
-            1,
-            unbalancedAssignments));
-        Assert.Contains("银色常规海克斯必须恰好为 45 个", unbalanced.Message);
+        var publishable = HexCatalogConfiguration.Create(1, unbalancedAssignments);
+        Assert.Equal(HexTier.Silver, publishable.TierOf(2));
         var draft = HexCatalogConfiguration.CreateDraft(unbalancedAssignments);
-        Assert.Equal(HexTier.Silver, draft.TierOf(1));
+        Assert.Equal(HexTier.Silver, draft.TierOf(2));
 
         var emptySilver = Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
             1,
             HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
                 item.Tier == HexTier.Silver ? item with { Tier = HexTier.Gold } : item)));
-        Assert.Contains("银色常规海克斯必须恰好为 45 个", emptySilver.Message);
+        Assert.Contains("银色常规海克斯池不能为空", emptySilver.Message);
 
         var configured = HexCatalogConfiguration.Create(
             7,
@@ -102,13 +100,13 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         var restored = HexCatalogConfiguration.ReadActiveFile(path);
         Assert.Equal(7, restored.Revision);
         Assert.Equal(configured.Digest, restored.Digest);
-        Assert.Equal(HexTier.Silver, restored.TierOf(1));
-        Assert.Equal(HexTier.Gold, restored.TierOf(8));
+        Assert.Equal(HexTier.Gold, restored.TierOf(1));
+        Assert.Equal(HexTier.Silver, restored.TierOf(8));
         Assert.Equal("publish-1", restored.SourceRequestId);
     }
 
     [Fact]
-    public void 旧版Active中退役项调过品质仍可读取但不能直接作为新版平衡配置创建()
+    public void 旧版Active中退役项调过品质仍可读取并按新默认补齐扩展编号()
     {
         var legacyAssignments = HexCatalogConfiguration
             .BuiltInForRulesRevision(HexRules.SevenHexReworkRulesRevision)
@@ -122,7 +120,6 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
                     ? item with { Tier = tier26 }
                     : item)
             .ToArray();
-        Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(9, legacyAssignments));
         var legacyDigest = HexCatalogConfiguration.ComputeDigest(legacyAssignments);
         var path = Path.Combine(_directory, "active.json");
         Directory.CreateDirectory(_directory);
@@ -145,7 +142,8 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal(HexCatalogConfiguration.ComputeDigest(restored.Assignments), restored.Digest);
         Assert.Equal(HexTier.Gold, restored.TierOf(27));
         Assert.Equal(HexTier.Rainbow, restored.TierOf(26));
-        Assert.Equal(HexCatalog.Get(57).Tier, restored.TierOf(57));
+        Assert.All(HexCatalog.All.Where(item => item.Id > 56),
+            definition => Assert.Equal(definition.Tier, restored.TierOf(definition.Id)));
         Assert.Equal("legacy-active", restored.SourceRequestId);
     }
 
@@ -214,10 +212,10 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void 不平衡品质可以保存并恢复草稿但不能进入发布队列()
+    public void 任意非空品质分配可以保存恢复并进入发布队列()
     {
         var coordinator = CreateCoordinator();
-        var assignments = ChangeTier(1, HexTier.Silver);
+        var assignments = ChangeTier(2, HexTier.Silver);
 
         var saved = coordinator.SaveHexCatalogDraft(
             "test", 0, 0, assignments, "Admin", "save-unbalanced");
@@ -225,20 +223,20 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
 
         Assert.Equal(1, saved.State.Draft.DraftRevision);
         Assert.Equal(saved.State.Draft.Digest, restored.Digest);
-        Assert.Equal(46, restored.Assignments.Count(item =>
+        Assert.Equal(29, restored.Assignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Silver));
-        Assert.Equal(17, restored.Assignments.Count(item =>
+        Assert.Equal(29, restored.Assignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Gold));
 
-        var error = Assert.Throws<InvalidDataException>(() => coordinator.QueueHexCatalog(
+        var queued = coordinator.QueueHexCatalog(
             "test",
             saved.State.Draft.DraftRevision,
             saved.State.Draft.Digest,
             "Admin",
-            "publish-unbalanced"));
+            "publish-unbalanced");
 
-        Assert.Contains("必须恰好为 45 个", error.Message);
-        Assert.Empty(Directory.GetFiles(Path.Combine(_directory, "requests"), "*.request"));
+        Assert.Equal("queued", queued.Deployment.State);
+        Assert.Single(Directory.GetFiles(Path.Combine(_directory, "requests"), "*.request"));
     }
 
     [Fact]
@@ -254,9 +252,14 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal(HexCatalogConfiguration.BuiltIn.TierOf(27),
             saved.State.Draft.Assignments.Single(item => item.Id == 27).Tier);
 
+        var oldClientAssignments = SwapTiers(2, 5)
+            .Select(item => item.Id == 27 ? item with { Tier = HexTier.Gold } : item)
+            .ToArray();
         var oldClient = coordinator.SaveHexCatalogDraft(
-            "production", 0, 0, SwapTiers(2, 5), "Admin", "save-old-client");
+            "production", 0, 0, oldClientAssignments, "Admin", "save-old-client");
         Assert.Equal(82, oldClient.State.Draft.Assignments.Count);
+        Assert.Equal(HexCatalogConfiguration.BuiltIn.TierOf(27),
+            oldClient.State.Draft.Assignments.Single(item => item.Id == 27).Tier);
     }
 
     [Fact]

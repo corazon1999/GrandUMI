@@ -97,7 +97,10 @@ public sealed class PlayerHexRuntime
     public int ActivatedEnterEffectsThisTurn { get; set; }
     public bool FirstEnterEffectCopiedThisTurn { get; set; }
     public bool FirstKoEffectCopiedThisTurn { get; set; }
+    /// <summary>全部已接受攻击宣言数；继续单独服务线线果实等“首攻”语义。</summary>
     public int AttacksDeclaredThisTurn { get; set; }
+    /// <summary>规则修订版 13 起，本回合已接受的角色攻击宣言数；领袖攻击不计入。</summary>
+    public int CharacterAttacksDeclaredThisTurn { get; set; }
     public int RestingCharacterAttacksThisGame { get; set; }
     public bool SteelHeartUsedThisGame { get; set; }
     public bool UltimateRefreshUsedThisTurn { get; set; }
@@ -114,6 +117,8 @@ public sealed class PlayerHexRuntime
     public bool IceFruitUsedThisTurn { get; set; }
     public bool SitUpUsedThisTurn { get; set; }
     public bool FishmanKarateUsedThisTurn { get; set; }
+    /// <summary>规则修订版 13 起，屠宰场本回合成功发动后的权威消费凭据。</summary>
+    public bool SlaughterhouseUsedThisTurn { get; set; }
     public int HighCostCharacterEntriesThisTurn { get; set; }
     /// <summary>无尽虚空选择挂起/结算期间的再入守卫；必须进入确定性快照。</summary>
     public bool VoidRefillResolving { get; set; }
@@ -131,6 +136,7 @@ public sealed class PlayerHexRuntime
         FirstEnterEffectCopiedThisTurn = false;
         FirstKoEffectCopiedThisTurn = false;
         AttacksDeclaredThisTurn = 0;
+        CharacterAttacksDeclaredThisTurn = 0;
         UltimateRefreshUsedThisTurn = false;
         FinalFormUsedThisTurn = false;
         CriticalHealSucceededThisTurn = false;
@@ -143,6 +149,7 @@ public sealed class PlayerHexRuntime
         IceFruitUsedThisTurn = false;
         SitUpUsedThisTurn = false;
         FishmanKarateUsedThisTurn = false;
+        SlaughterhouseUsedThisTurn = false;
         HighCostCharacterEntriesThisTurn = 0;
     }
 }

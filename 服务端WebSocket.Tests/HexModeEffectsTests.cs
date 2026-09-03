@@ -229,6 +229,162 @@ public sealed class HexModeEffectsTests
     }
 
     [Fact]
+    public async Task 秘术冲拳_每次攻击只永久降低触发时仍在手牌中的事件()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 14);
+        var leavesHand = Card("HEX-ARCANE-LEAVES", CardKind.Event, cost: 4);
+        var staysInHand = Card("HEX-ARCANE-STAYS", CardKind.Event, cost: 5);
+        var character = Card("HEX-ARCANE-CHARACTER", CardKind.Character, cost: 2);
+        me.Hand.AddRange([leavesHand, staysInHand, character]);
+
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = me.Leader.Id,
+            TargetIsLeader = true,
+        };
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(-1, leavesHand.CostModPersistent);
+        Assert.Equal(-1, staysInHand.CostModPersistent);
+        Assert.Equal(0, character.CostModPersistent);
+        me.Hand.Remove(leavesHand);
+        var entersLater = Card("HEX-ARCANE-LATER", CardKind.Event, cost: 6);
+        me.Hand.Add(entersLater);
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(-1, leavesHand.CostModPersistent);
+        Assert.Equal(-2, staysInHand.CostModPersistent);
+        Assert.Equal(-1, entersLater.CostModPersistent);
+        Assert.All([staysInHand, entersLater], card => Assert.Equal(0, card.CostModThisTurn));
+        state.CurrentBattle = null;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(-2, staysInHand.CostModPersistent);
+
+        var privateRuntime = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        var persisted = privateRuntime.GetProperty("players")[0].GetProperty("hand")
+            .EnumerateArray()
+            .Single(card => card.GetProperty("number").GetString() == staysInHand.Info.Number);
+        Assert.Equal(-2, persisted.GetProperty("costModPersistent").GetInt32());
+        var checkpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
+        var replayCard = checkpoint.GetProperty("players")[0].GetProperty("hand")
+            .EnumerateArray()
+            .Single(card => card.GetProperty("number").GetString() == staysInHand.Info.Number);
+        Assert.Equal(-2, replayCard.GetProperty("CostModPersistent").GetInt32());
+    }
+
+    [Fact]
+    public async Task 秘术冲拳_规则修订版十二继续使用回合内减费()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.ExpansionRulesRevision);
+        OwnOnly(state, 0, 14);
+        var eventCard = Card("HEX-ARCANE-LEGACY", CardKind.Event, cost: 4);
+        me.Hand.Add(eventCard);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = me.Leader.Id,
+            TargetIsLeader = true,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+
+        Assert.Equal(-1, eventCard.CostModThisTurn);
+        Assert.Equal(0, eventCard.CostModPersistent);
+        state.CurrentBattle = null;
+        TurnEngine.EnterEndPhase(state);
+        Assert.Equal(0, eventCard.CostModThisTurn);
+    }
+
+    [Fact]
+    public async Task 一板一眼_新修订只限制一次角色攻击且每次攻击都按角色数加力量()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        OwnOnly(state, 0, 45);
+        var firstCharacter = Card("HEX-RIGID-FIRST", CardKind.Character, power: 5000);
+        var secondCharacter = Card("HEX-RIGID-SECOND", CardKind.Character, power: 5000);
+        me.Characters.AddRange([firstCharacter, secondCharacter]);
+
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = me.Leader.Id,
+            TargetIsLeader = true,
+        };
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+        Assert.Equal(2000, state.CurrentBattle.AttackerBattleBonus);
+        Assert.Equal(1, state.HexState.Runtime[0].AttacksDeclaredThisTurn);
+        Assert.Equal(0, state.HexState.Runtime[0].CharacterAttacksDeclaredThisTurn);
+        BattleEngine.EndBattle(state);
+
+        Assert.True(ActionValidator.CanAttack(state, 0, firstCharacter.Id, true, null).Ok);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = firstCharacter.Id,
+            TargetIsLeader = true,
+        };
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+        Assert.Equal(2000, state.CurrentBattle.AttackerBattleBonus);
+        Assert.Equal(2, state.HexState.Runtime[0].AttacksDeclaredThisTurn);
+        Assert.Equal(1, state.HexState.Runtime[0].CharacterAttacksDeclaredThisTurn);
+        BattleEngine.EndBattle(state);
+
+        var rejected = ActionValidator.CanAttack(state, 0, secondCharacter.Id, true, null);
+        Assert.False(rejected.Ok);
+        Assert.Contains("只能宣言1次角色攻击", rejected.Reason);
+        Assert.True(ActionValidator.CanAttack(state, 0, me.Leader.Id, true, null).Ok);
+
+        HexRules.OnTurnStarted(state, 0);
+        Assert.Equal(0, state.HexState.Runtime[0].AttacksDeclaredThisTurn);
+        Assert.Equal(0, state.HexState.Runtime[0].CharacterAttacksDeclaredThisTurn);
+        Assert.True(ActionValidator.CanAttack(state, 0, secondCharacter.Id, true, null).Ok);
+    }
+
+    [Fact]
+    public async Task 一板一眼_规则修订版十二仍由任意第一次攻击占用全体次数()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        var me = state.Players[0];
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.ExpansionRulesRevision);
+        OwnOnly(state, 0, 45);
+        var character = Card("HEX-RIGID-LEGACY", CardKind.Character, power: 5000);
+        me.Characters.Add(character);
+        state.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            DefenderPlayerIndex = 1,
+            AttackerCardId = me.Leader.Id,
+            TargetIsLeader = true,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(engine, 0);
+        BattleEngine.EndBattle(state);
+
+        Assert.Equal(1, state.HexState.Runtime[0].AttacksDeclaredThisTurn);
+        Assert.Equal(0, state.HexState.Runtime[0].CharacterAttacksDeclaredThisTurn);
+        Assert.False(ActionValidator.CanAttack(state, 0, character.Id, true, null).Ok);
+    }
+
+    [Fact]
     public async Task 上一规则修订_炼狱导管与面包减费继续使用回合内和零费语义()
     {
         var engine = CreateEngine();
@@ -322,11 +478,12 @@ public sealed class HexModeEffectsTests
         };
         await HexRules.OnAttackDeclaredAsync(engine, 0);
         Assert.False(me.Leader.IsTapped);
-        Assert.Equal(-1, handEvent.CostModThisTurn);
+        Assert.Equal(-1, handEvent.CostModPersistent);
+        Assert.Equal(0, handEvent.CostModThisTurn);
         Assert.Equal(5000, state.CurrentBattle.AttackerBattleBonus);
         Assert.Equal(-1000, target.PowerModThisTurn);
         Assert.Equal(4, me.LifeArea.Count);
-        Assert.False(HexRules.CanDeclareAnotherAttack(state, 0));
+        Assert.False(HexRules.CanDeclareAnotherAttack(state, 0, attacker));
 
         OwnOnly(state, 0, 33);
         opponent.Characters.Add(Card("HEX-RANDOM", CardKind.Character));
@@ -1243,14 +1400,14 @@ public sealed class HexModeEffectsTests
         {
             state.HexState.Owned[0].Clear();
             state.HexState.Owned[0].AddRange(HexCatalog.Regular
-                .Where(item => item.Tier == HexTier.Silver && item.Id is not 8 and not 23)
+                .Where(item => item.Tier == HexTier.Silver && item.Id != 1)
                 .Select(item => item.Id));
             Own(state, 0, HexCatalog.Regular
-                .Where(item => item.Tier == HexTier.Gold && item.Id is not 1 and not 2)
+                .Where(item => item.Tier == HexTier.Gold && item.Id != 2)
                 .Select(item => item.Id)
                 .ToArray());
             Own(state, 0, HexCatalog.Regular
-                .Where(item => item.Tier == HexTier.Rainbow && item.Id is not 5 and not 10)
+                .Where(item => item.Tier == HexTier.Rainbow && item.Id != 5)
                 .Select(item => item.Id)
                 .ToArray());
             Own(state, 0, 55, 56);
@@ -1268,7 +1425,7 @@ public sealed class HexModeEffectsTests
 
         static int[] NewlyGranted(GameState state)
             => state.HexState.Owned[0]
-                .Where(id => id is 1 or 2 or 5 or 8 or 10 or 23)
+                .Where(id => id is 1 or 2 or 5)
                 .Order()
                 .ToArray();
 
@@ -1295,11 +1452,11 @@ public sealed class HexModeEffectsTests
         var state = engine.State;
         HexRules.SetRulesRevisionForReplay(state, HexRules.PerSlotRefreshRulesRevision);
         state.HexState.Owned[0].Clear();
-        state.HexState.Owned[0].AddRange(HexCatalog.Regular
-            .Where(item => item.Tier == HexTier.Silver && item.Id != 8)
+        state.HexState.Owned[0].AddRange(HexCatalog.ForTier(HexTier.Silver, state.HexState)
+            .Where(item => item.Id != 8)
             .Select(item => item.Id));
-        Own(state, 0, HexCatalog.Regular
-            .Where(item => item.Tier == HexTier.Gold && item.Id != 1)
+        Own(state, 0, HexCatalog.ForTier(HexTier.Gold, state.HexState)
+            .Where(item => item.Id != 1)
             .Select(item => item.Id)
             .ToArray());
 

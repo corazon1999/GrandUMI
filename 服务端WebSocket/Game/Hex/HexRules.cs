@@ -58,7 +58,9 @@ public static class HexRules
     public const int SevenHexReworkRulesRevision = 11;
     /// <summary>26项扩展、三号船坞新语义与扩充品质目录所在的规则修订版。</summary>
     public const int ExpansionRulesRevision = 12;
-    public const int CurrentRulesRevision = ExpansionRulesRevision;
+    /// <summary>默认品质重排及秘术冲拳、一板一眼、屠宰场、鱼人空手道调整所在的规则修订版。</summary>
+    public const int QualityAndEffectRulesRevision = 13;
+    public const int CurrentRulesRevision = QualityAndEffectRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -710,6 +712,9 @@ public static class HexRules
         if (attacker is null) return;
         var runtime = state.HexState.Runtime[attackerSide];
         runtime.AttacksDeclaredThisTurn++;
+        if (state.HexState.RulesRevision >= QualityAndEffectRulesRevision
+            && player.Characters.Contains(attacker))
+            runtime.CharacterAttacksDeclaredThisTurn++;
 
         if (state.HexState.RulesRevision >= ScopeReworkRulesRevision
             && Has(state, attackerSide, 26)
@@ -717,10 +722,12 @@ public static class HexRules
             attacker.PowerModThisBattle += 1000;
         if (attacker.Info.Kind == CardKind.Character
             && Has(state, attackerSide, 76)
-            && !runtime.FishmanKarateUsedThisTurn
+            && (state.HexState.RulesRevision >= QualityAndEffectRulesRevision
+                || !runtime.FishmanKarateUsedThisTurn)
             && player.AttachedDonCount(attacker.Id) > 0)
         {
-            runtime.FishmanKarateUsedThisTurn = true;
+            if (state.HexState.RulesRevision < QualityAndEffectRulesRevision)
+                runtime.FishmanKarateUsedThisTurn = true;
             await TurnEngine.DrawCardAsync(state, attackerSide, 1, engine.Prompts);
         }
         if (attacker.Info.Kind == CardKind.Character && Has(state, attackerSide, 81))
@@ -728,7 +735,12 @@ public static class HexRules
 
         if (Has(state, attackerSide, 14))
             foreach (var card in player.Hand.Where(card => card.Info.Kind == CardKind.Event))
-                card.CostModThisTurn--;
+            {
+                if (state.HexState.RulesRevision >= QualityAndEffectRulesRevision)
+                    card.CostModPersistent--;
+                else
+                    card.CostModThisTurn--;
+            }
 
         if (!battle.TargetIsLeader && battle.TargetCardId is { } targetId
             && opponent.Characters.FirstOrDefault(card => card.Id == targetId) is { } target)
@@ -1050,8 +1062,15 @@ public static class HexRules
         await OnLifeAddedAsync(engine, owner, 1);
     }
 
-    public static bool CanDeclareAnotherAttack(GameState state, int playerIndex)
-        => !Has(state, playerIndex, 45) || state.HexState.Runtime[playerIndex].AttacksDeclaredThisTurn == 0;
+    public static bool CanDeclareAnotherAttack(GameState state, int playerIndex, CardInstance attacker)
+    {
+        if (!Has(state, playerIndex, 45)) return true;
+        var runtime = state.HexState.Runtime[playerIndex];
+        if (state.HexState.RulesRevision < QualityAndEffectRulesRevision)
+            return runtime.AttacksDeclaredThisTurn == 0;
+        return ReferenceEquals(state.Players[playerIndex].Leader, attacker)
+               || runtime.CharacterAttacksDeclaredThisTurn == 0;
+    }
 
     public static int AttackSuccessDeficit(GameState state, int attackerSide)
         => state.HexState.RulesRevision < ScopeReworkRulesRevision
@@ -1080,6 +1099,8 @@ public static class HexRules
            && state.Phase == Phase.Main
            && state.CurrentBattle is null
            && Has(state, owner, 70)
+           && (state.HexState.RulesRevision < QualityAndEffectRulesRevision
+               || !state.HexState.Runtime[owner].SlaughterhouseUsedThisTurn)
            && state.Players[owner].Characters.Any(card => card.Id == characterId)
            && state.Players[owner].AttachedDonCount(characterId) > 0;
 
@@ -1097,6 +1118,9 @@ public static class HexRules
             don.AttachedToCardId = null;
             detached++;
         }
+        // 只有完成至少一张咚的实际解除后才提交每回合消费；校验失败和空操作均不消费。
+        if (detached > 0 && state.HexState.RulesRevision >= QualityAndEffectRulesRevision)
+            state.HexState.Runtime[owner].SlaughterhouseUsedThisTurn = true;
         return detached;
     }
 

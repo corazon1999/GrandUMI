@@ -7,15 +7,14 @@ import LayoutPreviewFrame from "./LayoutPreviewFrame";
 
 const activeDigest = `sha256:${"a".repeat(64)}`;
 const draftDigest = `sha256:${"b".repeat(64)}`;
-const regularIds = Array.from({ length: 82 }, (_, index) => index + 1)
-  .filter((candidate) => candidate !== 27 && candidate !== 48);
+const rainbowIds = new Set([5, 9, 11, 12, 13, 14, 17, 26, 28, 29, 34, 35, 40, 46, 47, 66, 69, 73, 76, 79, 80, 81]);
+const goldIds = new Set([2, 4, 8, 10, 15, 16, 20, 30, 32, 36, 37, 38, 39, 44, 49, 51, 52, 53, 56, 57, 58, 60, 62, 64, 65, 68, 71, 74, 78, 82]);
 
 function tierFor(id: number): HexTierSnapshot {
   if (id === 48) return "Gold";
-  const regularIndex = regularIds.indexOf(id);
-  if (regularIndex < 45) return "Silver";
-  if (regularIndex < 63) return "Gold";
-  return "Rainbow";
+  if (rainbowIds.has(id)) return "Rainbow";
+  if (goldIds.has(id)) return "Gold";
+  return "Silver";
 }
 
 function environmentState(environment: AdminDeploymentEnvironment): AdminHexCatalogEnvironmentState {

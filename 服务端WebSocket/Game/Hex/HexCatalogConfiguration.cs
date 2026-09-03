@@ -14,13 +14,6 @@ public sealed record HexCatalogTierAssignment(int Id, HexTier Tier);
 public sealed class HexCatalogConfiguration
 {
     public const string Schema = "grandumi.hex-catalog.v1";
-    public static int RequiredRegularHexes(HexTier tier) => tier switch
-    {
-        HexTier.Silver => 45,
-        HexTier.Gold => 18,
-        HexTier.Rainbow => 17,
-        _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, "未知海克斯品质"),
-    };
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -69,14 +62,18 @@ public sealed class HexCatalogConfiguration
         HexCatalog.All.Select(item => new HexCatalogTierAssignment(item.Id, item.Tier)));
 
     public static HexCatalogConfiguration BuiltInForRulesRevision(int rulesRevision)
-        => rulesRevision >= HexRules.ExpansionRulesRevision
+        => rulesRevision >= HexRules.QualityAndEffectRulesRevision
             ? BuiltIn
             : CreateForRulesRevision(
                 rulesRevision,
                 revision: 0,
                 HexCatalog.All
-                    .Where(item => item.Id <= 56)
-                    .Select(item => new HexCatalogTierAssignment(item.Id, item.Tier)));
+                    .Where(item => rulesRevision >= HexRules.ExpansionRulesRevision || item.Id <= 56)
+                    .Select(item => new HexCatalogTierAssignment(
+                        item.Id,
+                        rulesRevision < HexRules.BalanceRulesRevision && item.Id > 54
+                            ? item.Tier
+                            : HexCatalog.TierForRevision(item.Id, rulesRevision))));
 
     public static HexCatalogConfiguration Create(
         long revision,
@@ -89,7 +86,7 @@ public sealed class HexCatalogConfiguration
         => CreateValidated(
             revision,
             assignments,
-            requireBalancedPools: true,
+            requireNonEmptyPools: true,
             expectedDigest,
             publishedAt,
             publishedBy,
@@ -102,7 +99,7 @@ public sealed class HexCatalogConfiguration
         => CreateValidated(
             revision: 0,
             assignments,
-            requireBalancedPools: false,
+            requireNonEmptyPools: false,
             expectedDigest);
 
     /// <summary>
@@ -120,7 +117,7 @@ public sealed class HexCatalogConfiguration
         => CreateValidated(
             revision,
             assignments,
-            requireBalancedPools: false,
+            requireNonEmptyPools: false,
             expectedDigest,
             publishedAt,
             publishedBy,
@@ -130,7 +127,7 @@ public sealed class HexCatalogConfiguration
     private static HexCatalogConfiguration CreateValidated(
         long revision,
         IEnumerable<HexCatalogTierAssignment> assignments,
-        bool requireBalancedPools,
+        bool requireNonEmptyPools,
         string? expectedDigest = null,
         long? publishedAt = null,
         string? publishedBy = null,
@@ -164,18 +161,8 @@ public sealed class HexCatalogConfiguration
         if (!values.Keys.Order().SequenceEqual(currentIds))
             throw new InvalidDataException("海克斯配置必须且只能包含完整的权威目录编号。");
 
-        if (requireBalancedPools)
-        {
-            var regularIds = HexCatalog.Regular.Select(item => item.Id).ToHashSet();
-            foreach (var tier in Enum.GetValues<HexTier>())
-            {
-                var count = values.Count(item => regularIds.Contains(item.Key) && item.Value == tier);
-                var required = RequiredRegularHexes(tier);
-                if (count != required)
-                    throw new InvalidDataException(
-                        $"{HexCatalog.TierDisplayName(tier)}常规海克斯必须恰好为 {required} 个，当前为 {count} 个。");
-            }
-        }
+        if (requireNonEmptyPools)
+            ValidateNonEmptyRegularPools(values, HexRules.CurrentRulesRevision);
 
         var digest = ComputeDigest(values);
         if (expectedDigest is not null

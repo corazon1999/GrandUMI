@@ -57,7 +57,7 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(panel, /baseActiveRevision !== selected\.activeRevision/);
   assert.match(panel, /publish_hex_catalog/);
   assert.match(panel, /draft-\$\{selected\.draftRevision\}:\$\{selected\.draftDigest\}/);
-  assert.match(panel, /必须先保存无冲突且符合 45\/18\/17 池规模的草稿/);
+  assert.match(panel, /必须先保存无冲突且三个常规品质池均非空的草稿/);
   assert.match(panel, /不会抓取 main、部署代码或重启服务/);
   assert.match(coordinator, /current\.DraftRevision != expectedDraftRevision/);
   assert.match(coordinator, /active\.Revision != expectedActiveRevision/);
@@ -66,25 +66,23 @@ test("品质编辑采用完整草稿、乐观版本和精确一次性发布目�
   assert.match(bridge, /ConsumeHighRiskChallenge\([\s\S]*"publish_hex_catalog"/);
 });
 
-test("不平衡品质可保存草稿但只有符合当前四十五十八十七时才能发布", () => {
-  assert.match(panel, /const REQUIRED_REGULAR_HEXES:[\s\S]*Silver: 45,[\s\S]*Gold: 18,[\s\S]*Rainbow: 17/);
-  assert.match(panel, /regularCounts\[tier\] !== REQUIRED_REGULAR_HEXES\[tier\]/);
-  assert.match(panel, /\{regularCounts\[tier\]\} \/ \{REQUIRED_REGULAR_HEXES\[tier\]\}/);
+test("不平衡品质可保存且任意三个非空常规池都能发布", () => {
+  assert.doesNotMatch(panel, /REQUIRED_REGULAR_HEXES/);
+  assert.match(panel, /regularCounts\[tier\] === 0/);
+  assert.match(panel, />\{regularCounts\[tier\]\}<\/p>/);
   assert.match(panel, /当前调整可以保存为草稿/);
-  assert.match(panel, /分别保留 45、18、17 个常规海克斯/);
+  assert.match(panel, /常规池均须至少保留 1 个海克斯/);
   assert.match(panel, /const saveDraft = \(\) => \{[\s\S]*if \(!selected \|\| !dirty\) return;/);
   assert.match(panel, /disabled=\{!connected \|\| !dirty \|\| pending !== null\}/);
-  assert.match(panel, /const publishDisabled = [\s\S]*\|\| unbalancedPool/);
+  assert.match(panel, /const publishDisabled = [\s\S]*\|\| hasEmptyRegularPool/);
   assert.match(coordinator, /HexCatalogConfiguration\.CreateDraft\([\s\S]*CompleteRetiredHexAssignments\(assignments, current\.Assignments\)/);
   assert.match(coordinator, /HexCatalogConfiguration\.Create\(0, draft\.Assignments, draft\.Digest\)/);
-  const required = { Silver: 45, Gold: 18, Rainbow: 17 };
-  assert.equal(Object.entries({ Silver: 46, Gold: 17, Rainbow: 17 })
-    .some(([tier, count]) => count !== required[tier]), true);
+  assert.doesNotMatch(runner, /required_regular_counts/);
   assert.match(runner, /retired_ids = \{27\}/);
-  assert.match(runner, /required_regular_counts = \{"Silver": 45, "Gold": 18, "Rainbow": 17\}/);
-  assert.match(runner, /if count != required:/);
-  assert.match(runner, /常规海克斯必须恰好为 \{required\} 个/);
-  assert.match(runner, /require_current_balance=False/);
+  assert.match(runner, /if count == 0:/);
+  assert.match(runner, /常规海克斯池不能为空/);
+  assert.match(runner, /require_non_empty_regular_pools=False/);
+  assert.match(runner, /退役海克斯 \{hex_id\} 的品质不可调配/);
   assert.match(runner, /legacy_ids = set\(range\(1, 57\)\)/);
   assert.match(runner, /range\(57, 83\)/);
   assert.match(runner, /type\(hex_id\) is not int/);
@@ -92,6 +90,20 @@ test("不平衡品质可保存草稿但只有符合当前四十五十八十七�
   assert.match(runner, /type\(expected_revision\) is not int/);
   assert.match(runner, /type\(current_revision\) is not int/);
   assert.match(runner, /type\(current_source_draft_revision\) is not int/);
+
+  const defaultTierBlock = runner.match(/new_id_default_tiers = \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(defaultTierBlock, "受限执行器必须声明旧 1–56 active 的扩展编号默认品质");
+  const scriptDefaults = Object.fromEntries(
+    [...defaultTierBlock.matchAll(/(\d+): "(Silver|Gold|Rainbow)"/g)]
+      .map((match) => [Number(match[1]), match[2]]),
+  );
+  assert.deepEqual(scriptDefaults, {
+    57: "Gold", 58: "Gold", 59: "Silver", 60: "Gold", 61: "Silver", 62: "Gold",
+    63: "Silver", 64: "Gold", 65: "Gold", 66: "Rainbow", 67: "Silver", 68: "Gold",
+    69: "Rainbow", 70: "Silver", 71: "Gold", 72: "Silver", 73: "Rainbow", 74: "Gold",
+    75: "Silver", 76: "Rainbow", 77: "Silver", 78: "Gold", 79: "Rainbow", 80: "Rainbow",
+    81: "Rainbow", 82: "Gold",
+  });
 });
 
 test("新房间锁定完整品质配置且恢复日志拒绝缺失映射", () => {
@@ -106,7 +118,7 @@ test("新房间锁定完整品质配置且恢复日志拒绝缺失映射", () =>
 
 test("受限执行器串行校验基线并原子替换且支持崩溃后幂等重放", () => {
   assert.match(runner, /\^hex-\(test\|production\)-\(\[0-9a-f\]\{32\}\)/);
-  assert.match(runner, /built_in_digest = "sha256:f02ed934/);
+  assert.match(runner, /built_in_digest = "sha256:12974ca2/);
   assert.match(runner, /current\.get\("sourceRequestId"\) == request_id/);
   assert.match(runner, /current_revision != expected_revision or current_digest != expected_digest/);
   assert.match(runner, /os\.open\(temporary, os\.O_WRONLY \| os\.O_CREAT \| os\.O_EXCL/);
@@ -134,6 +146,8 @@ test("手机竖屏保持单列、44像素触控与安全区内操作", () => {
   assert.match(panel, /<p className="mt-1 break-words/);
   assert.match(layoutFixture, /name: `布局验证海克斯 \$\{id\}`/);
   assert.match(layoutFixture, /description: `用于验证手机竖屏长文案/);
+  assert.match(layoutFixture, /const rainbowIds = new Set\(\[5, 9, 11, 12, 13, 14, 17, 26, 28, 29, 34, 35, 40, 46, 47, 66, 69, 73, 76, 79, 80, 81\]\)/);
+  assert.match(layoutFixture, /const goldIds = new Set\(\[2, 4, 8, 10, 15, 16, 20, 30, 32, 36, 37, 38, 39, 44, 49, 51, 52, 53, 56, 57, 58, 60, 62, 64, 65, 68, 71, 74, 78, 82\]\)/);
   for (const [width, height] of [[390, 844], [360, 780]]) {
     assert.ok(width < 560, `${width}×${height} 应保持单列操作区`);
     assert.ok(width < 720, `${width}×${height} 应保持单列海克斯卡片`);
@@ -145,8 +159,9 @@ test("布局验证夹具使用假数据且默认在生产构建中返回404", ()
   assert.match(layoutPage, /process\.env\.GRANDUMI_LAYOUT_VERIFICATION !== "1"\) notFound\(\)/);
   assert.match(layoutFixture, /previewState=\{PREVIEW_STATE\}/);
   assert.match(layoutFixture, /length: 82/);
-  assert.match(layoutFixture, /candidate !== 27 && candidate !== 48/);
-  assert.doesNotMatch(layoutFixture, /candidate !== 30/);
+  assert.match(layoutFixture, /if \(id === 48\) return "Gold"/);
+  assert.match(layoutFixture, /if \(rainbowIds\.has\(id\)\) return "Rainbow"/);
+  assert.match(layoutFixture, /if \(goldIds\.has\(id\)\) return "Gold"/);
   assert.match(layoutFixture, /activeTier: id === 1 \? "Gold" : id === 19 \? "Silver" : tier/);
   assert.equal(panel.match(/if \(previewOnly\) return;/g)?.length, 2);
   assert.match(panel, /if \(!previewOnly\) HomeRequest\.requestAdminHexCatalog\(\)/);

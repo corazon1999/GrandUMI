@@ -10,14 +10,19 @@ namespace GrandUMI.Tests;
 
 public sealed class HexModeStateMachineTests
 {
-    private static readonly int[] RainbowIds = [5, 9, 10, 11, 12, 13, 14, 19, 28, 29, 35, 38, 39, 40, 46, 47, 53];
-    private static readonly int[] GoldIds = [1, 2, 3, 4, 6, 7, 15, 16, 17, 18, 21, 26, 32, 36, 37, 49, 51, 56];
+    private static readonly int[] RainbowIds =
+        [5, 9, 11, 12, 13, 14, 17, 26, 28, 29, 34, 35, 40, 46, 47, 66, 69, 73, 76, 79, 80, 81];
+    private static readonly int[] GoldIds =
+        [2, 4, 8, 10, 15, 16, 20, 30, 32, 36, 37, 38, 39, 44, 49, 51, 52, 53, 56, 57, 58, 60, 62, 64, 65, 68, 71, 74, 78, 82];
     private static readonly int[] SilverIds =
     [
-        8, 20, 22, 23, 24, 25, 30, 31, 33, 34, 41, 42, 43, 44, 45, 50, 52, 54, 55,
-        57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-        75, 76, 77, 78, 79, 80, 81, 82,
+        1, 3, 6, 7, 18, 19, 21, 22, 23, 24, 25, 31, 33, 41, 42, 43, 45, 50,
+        54, 55, 59, 61, 63, 67, 70, 72, 75, 77,
     ];
+    private static readonly int[] ExpansionRainbowIds =
+        [5, 9, 10, 11, 12, 13, 14, 19, 28, 29, 35, 38, 39, 40, 46, 47, 53];
+    private static readonly int[] ExpansionGoldIds =
+        [1, 2, 3, 4, 6, 7, 15, 16, 17, 18, 21, 26, 32, 36, 37, 49, 51, 56];
 
     [Fact]
     public void 海克斯目录_品质编号与策划清单完全一致()
@@ -25,9 +30,9 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(RainbowIds, HexCatalog.ForTier(HexTier.Rainbow).Select(item => item.Id).Order().ToArray());
         Assert.Equal(GoldIds, HexCatalog.ForTier(HexTier.Gold).Select(item => item.Id).Order().ToArray());
         Assert.Equal(SilverIds, HexCatalog.ForTier(HexTier.Silver).Select(item => item.Id).Order().ToArray());
-        Assert.Equal(45, HexCatalog.ForTier(HexTier.Silver).Count);
-        Assert.Equal(18, HexCatalog.ForTier(HexTier.Gold).Count);
-        Assert.Equal(17, HexCatalog.ForTier(HexTier.Rainbow).Count);
+        Assert.Equal(28, HexCatalog.ForTier(HexTier.Silver).Count);
+        Assert.Equal(30, HexCatalog.ForTier(HexTier.Gold).Count);
+        Assert.Equal(22, HexCatalog.ForTier(HexTier.Rainbow).Count);
         Assert.Equal(80, HexCatalog.Regular.Select(item => item.Id).Distinct().Count());
         Assert.Equal(new[] { 48 }, HexCatalog.Alternatives.Select(item => item.Id).Order().ToArray());
         Assert.Equal(82, HexCatalog.All.Select(item => item.Id).Distinct().Count());
@@ -56,7 +61,20 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(10, HexRules.PermanentCostFloorRulesRevision);
         Assert.Equal(11, HexRules.SevenHexReworkRulesRevision);
         Assert.Equal(12, HexRules.ExpansionRulesRevision);
-        Assert.Equal(HexRules.ExpansionRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(13, HexRules.QualityAndEffectRulesRevision);
+        Assert.Equal(HexRules.QualityAndEffectRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(
+            ExpansionRainbowIds,
+            HexCatalog.ForTier(HexTier.Rainbow, HexRules.ExpansionRulesRevision)
+                .Select(item => item.Id).Order().ToArray());
+        Assert.Equal(
+            ExpansionGoldIds,
+            HexCatalog.ForTier(HexTier.Gold, HexRules.ExpansionRulesRevision)
+                .Select(item => item.Id).Order().ToArray());
+        Assert.Equal(45, HexCatalog.ForTier(HexTier.Silver, HexRules.ExpansionRulesRevision).Count);
+        Assert.Equal(
+            "sha256:f02ed93429f2b51e7c4e37abac4f996792f7716a66cddd09656295457242fcd8",
+            HexCatalogConfiguration.BuiltInForRulesRevision(HexRules.ExpansionRulesRevision).Digest);
         Assert.Equal(
             "获得时选择1张手牌放入生命区，然后从卡组顶将1张卡牌加入生命区。",
             HexCatalog.Get(6).Description);
@@ -81,6 +99,21 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(
             "每回合1次，从手牌打出原本费用10的卡后，全部非赋予中的休息咚!!转活跃。",
             HexCatalog.DescriptionForRevision(28, HexRules.ScopeReworkRulesRevision));
+        Assert.Equal(
+            "己方角色或领袖每次攻击时，使当时手牌中全部事件费用永久-1。",
+            HexCatalog.Get(14).Description);
+        Assert.Equal(
+            "己方角色或领袖每次攻击时，手中全部事件费用-1至回合结束。",
+            HexCatalog.DescriptionForRevision(14, HexRules.ExpansionRulesRevision));
+        Assert.Contains("只能宣言1次角色攻击", HexCatalog.Get(45).Description);
+        Assert.Contains("全体只能宣言1次攻击",
+            HexCatalog.DescriptionForRevision(45, HexRules.ExpansionRulesRevision));
+        Assert.Contains("【每回合1次】", HexCatalog.Get(70).Description);
+        Assert.DoesNotContain("【每回合1次】",
+            HexCatalog.DescriptionForRevision(70, HexRules.ExpansionRulesRevision));
+        Assert.DoesNotContain("每回合1次", HexCatalog.Get(76).Description);
+        Assert.Contains("每回合1次",
+            HexCatalog.DescriptionForRevision(76, HexRules.ExpansionRulesRevision));
         Assert.Equal(
             "每从手牌打出1张事件，使当前手牌中全部事件费用永久-1。",
             HexCatalog.Get(35).Description);
@@ -207,9 +240,9 @@ public sealed class HexModeStateMachineTests
         var engine = CreateEngine(seed: 20260902);
         var assignments = HexCatalogConfiguration.BuiltIn.Assignments
             .Select(item => item.Id == 1
-                ? item with { Tier = HexTier.Silver }
+                ? item with { Tier = HexTier.Gold }
                 : item.Id == 8
-                    ? item with { Tier = HexTier.Gold }
+                    ? item with { Tier = HexTier.Silver }
                     : item)
             .ToArray();
         var pinned = HexCatalogConfiguration.Create(
@@ -225,9 +258,9 @@ public sealed class HexModeStateMachineTests
 
         Assert.Equal(8, engine.State.HexState.CatalogRevision);
         Assert.Equal(pinned.Digest, engine.State.HexState.CatalogDigest);
-        Assert.Equal(HexTier.Silver, HexCatalog.TierForState(1, engine.State.HexState));
-        Assert.Contains(HexCatalog.ForTier(HexTier.Silver, engine.State.HexState), item => item.Id == 1);
-        Assert.DoesNotContain(HexCatalog.ForTier(HexTier.Gold, engine.State.HexState), item => item.Id == 1);
+        Assert.Equal(HexTier.Gold, HexCatalog.TierForState(1, engine.State.HexState));
+        Assert.Contains(HexCatalog.ForTier(HexTier.Gold, engine.State.HexState), item => item.Id == 1);
+        Assert.DoesNotContain(HexCatalog.ForTier(HexTier.Silver, engine.State.HexState), item => item.Id == 1);
 
         // 外部 active 后续变化不会回读或改写本局复制的映射。
         _ = HexCatalogConfiguration.Create(
@@ -238,7 +271,7 @@ public sealed class HexModeStateMachineTests
                     : item.Id == 5
                         ? item with { Tier = HexTier.Gold }
                         : item));
-        Assert.Equal(HexTier.Silver, HexCatalog.TierForState(1, engine.State.HexState));
+        Assert.Equal(HexTier.Gold, HexCatalog.TierForState(1, engine.State.HexState));
         Assert.Equal(8, engine.State.HexState.CatalogRevision);
 
         var publicHex = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(engine.State, 0))
@@ -276,7 +309,7 @@ public sealed class HexModeStateMachineTests
                 new[] { "质变-大力", "质变-灵巧", "质变-尖端发明家" },
                 owned.Select(item => item.GetProperty("name").GetString()));
             Assert.All(owned, item => Assert.True(item.GetProperty("grantedByTransmutation").GetBoolean()));
-            Assert.Equal("Gold", owned[0].GetProperty("tier").GetString());
+            Assert.Equal("Silver", owned[0].GetProperty("tier").GetString());
             Assert.Equal(HexCatalog.Get(1).Description, owned[0].GetProperty("description").GetString());
             Assert.DoesNotContain(owned, item => HexCatalog.IsTransmutation(item.GetProperty("id").GetInt32()));
         }
@@ -781,7 +814,7 @@ public sealed class HexModeStateMachineTests
         var startState = startEngine.State;
         startState.HexState.DraftTierSequence.Clear();
         startState.HexState.DraftTierSequence.AddRange([HexTier.Silver, HexTier.Silver, HexTier.Silver]);
-        startState.HexState.Appeared[0].UnionWith(SilverIds.Take(43));
+        startState.HexState.Appeared[0].UnionWith(SilverIds.Take(SilverIds.Length - 2));
         int draftSequenceBefore = startState.HexState.DraftSequence;
         int randomBefore = startState.RandomSeq;
 
@@ -794,19 +827,19 @@ public sealed class HexModeStateMachineTests
         Assert.Null(startState.HexState.ActiveDraft);
         Assert.Equal(draftSequenceBefore, startState.HexState.DraftSequence);
         Assert.Equal(randomBefore, startState.RandomSeq);
-        Assert.Equal(43, startState.HexState.Appeared[0].Count);
+        Assert.Equal(SilverIds.Length - 2, startState.HexState.Appeared[0].Count);
 
         var refreshEngine = CreateEngine(seed: 26090203);
         var refreshState = refreshEngine.State;
         refreshState.HexState.DraftTierSequence.Clear();
         refreshState.HexState.DraftTierSequence.AddRange([HexTier.Silver, HexTier.Silver, HexTier.Silver]);
-        refreshState.HexState.Appeared[0].UnionWith(SilverIds.Take(42));
+        refreshState.HexState.Appeared[0].UnionWith(SilverIds.Take(SilverIds.Length - 3));
         var round = HexRules.StartDraft(
             refreshState,
             playerIndex: 0,
             ownTurnNumber: 1,
             HexDraftResumePoint.None);
-        Assert.Equal(45, refreshState.HexState.Appeared[0].Count);
+        Assert.Equal(SilverIds.Length, refreshState.HexState.Appeared[0].Count);
         var candidatesBefore = round.Candidates.ToArray();
         randomBefore = refreshState.RandomSeq;
 
@@ -1048,7 +1081,7 @@ public sealed class HexModeStateMachineTests
         var state = engine.State;
         state.HexState.Owned[0].AddRange(HexCatalog.Regular
             .Select(item => item.Id)
-            .Where(id => id is not 55 and not 1));
+            .Where(id => id is not 55 and not 2));
         int randomBefore = state.RandomSeq;
         var round = CreateLockedDraft(state, HexTier.Silver, playerIndex: 0, choice: 55);
         state.HexState.GrantStepFaultInjector = boundary =>
@@ -1063,22 +1096,22 @@ public sealed class HexModeStateMachineTests
         var rootGrant = Assert.Single(pending.Grants.Where(item => item.HexId == 55));
         Assert.Equal(1, rootGrant.NextStep);
         Assert.Equal(1, rootGrant.PlannedStepCount);
-        Assert.Equal([1], rootGrant.PlannedChildHexIds);
-        Assert.Contains(1, state.HexState.Owned[0]);
-        Assert.Contains(1, state.HexState.GrantedByTransmutation[0]);
+        Assert.Equal([2], rootGrant.PlannedChildHexIds);
+        Assert.Contains(2, state.HexState.Owned[0]);
+        Assert.Contains(2, state.HexState.GrantedByTransmutation[0]);
         Assert.Equal(randomBefore + 1, state.RandomSeq);
 
         var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
         var persistedRoot = privateState.GetProperty("hexState")
             .GetProperty("pendingSettlement")
             .GetProperty("grants")[0];
-        Assert.Equal(1, persistedRoot.GetProperty("plannedChildHexIds")[0].GetInt32());
+        Assert.Equal(2, persistedRoot.GetProperty("plannedChildHexIds")[0].GetInt32());
 
         state.HexState.GrantStepFaultInjector = null;
         var (resolved, _) = await HexRules.ResolveDraftAsync(engine);
 
         Assert.Equal(round.RoundId, resolved.RoundId);
-        Assert.Contains(1, state.HexState.Owned[0]);
+        Assert.Contains(2, state.HexState.Owned[0]);
         Assert.Equal(randomBefore + 1, state.RandomSeq);
         Assert.Equal(state.HexState.Owned[0].Count, state.HexState.Owned[0].Distinct().Count());
         Assert.DoesNotContain(state.HexState.Owned[0], HexCatalog.IsAlternative);

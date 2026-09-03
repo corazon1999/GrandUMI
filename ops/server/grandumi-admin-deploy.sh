@@ -109,8 +109,15 @@ known_ids = set(range(1, 83))
 legacy_ids = set(range(1, 57))
 alternative_ids = {48}
 retired_ids = {27}
-required_regular_counts = {"Silver": 45, "Gold": 18, "Rainbow": 17}
-built_in_digest = "sha256:f02ed93429f2b51e7c4e37abac4f996792f7716a66cddd09656295457242fcd8"
+new_id_default_tiers = {
+    57: "Gold", 58: "Gold", 59: "Silver", 60: "Gold", 61: "Silver", 62: "Gold",
+    63: "Silver", 64: "Gold", 65: "Gold", 66: "Rainbow", 67: "Silver", 68: "Gold",
+    69: "Rainbow", 70: "Silver", 71: "Gold", 72: "Silver", 73: "Rainbow", 74: "Gold",
+    75: "Silver", 76: "Rainbow", 77: "Silver", 78: "Gold", 79: "Rainbow", 80: "Rainbow",
+    81: "Rainbow", 82: "Gold",
+}
+retired_default_tiers = {27: "Rainbow"}
+built_in_digest = "sha256:12974ca22a78c690458a609bec40495f7fc10920cd12928c9dbce867823ba005"
 
 def fail(message):
     raise SystemExit(message)
@@ -119,7 +126,7 @@ def canonical_digest(tiers):
     canonical = "".join(f"{item['id']}:{item['tier']}\n" for item in sorted(tiers, key=lambda value: value["id"]))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-def validate_tiers(tiers, label, allow_legacy=False, require_current_balance=True):
+def validate_tiers(tiers, label, allow_legacy=False, require_non_empty_regular_pools=True):
     if not isinstance(tiers, list):
         fail(f"{label}必须包含完整目录")
     legacy_input = allow_legacy and len(tiers) == len(legacy_ids)
@@ -135,15 +142,17 @@ def validate_tiers(tiers, label, allow_legacy=False, require_current_balance=Tru
     if seen != allowed_ids:
         fail(f"{label}必须包含完整目录")
     if legacy_input:
-        return tiers + [{"id": hex_id, "tier": "Silver"} for hex_id in range(57, 83)]
-    if require_current_balance:
-        for tier, required in required_regular_counts.items():
+        return tiers + [{"id": hex_id, "tier": new_id_default_tiers[hex_id]}
+                        for hex_id in range(57, 83)]
+    if require_non_empty_regular_pools:
+        # 固定校验顺序，避免集合遍历顺序令同一非法请求返回不同首个错误。
+        for tier in ("Silver", "Gold", "Rainbow"):
             count = sum(1 for item in tiers
                         if item["id"] not in alternative_ids
                         and item["id"] not in retired_ids
                         and item["tier"] == tier)
-            if count != required:
-                fail(f"{label}的 {tier} 常规海克斯必须恰好为 {required} 个，当前为 {count} 个，拒绝激活")
+            if count == 0:
+                fail(f"{label}的 {tier} 常规海克斯池不能为空，拒绝激活")
     return tiers
 
 with open(request_path, "r", encoding="utf-8") as source:
@@ -173,6 +182,7 @@ if request.get("digest") != digest:
 
 current_revision = 0
 current_digest = built_in_digest
+baseline_retired_tiers = retired_default_tiers
 if os.path.exists(active_path):
     with open(active_path, "r", encoding="utf-8") as source:
         current = json.load(source)
@@ -186,12 +196,12 @@ if os.path.exists(active_path):
         fail("目标环境 active 海克斯配置版本无效")
     if type(current_source_draft_revision) is not int or current_source_draft_revision < 1:
         fail("目标环境 active 海克斯配置草稿版本无效")
-    # 旧 active 创建时仍把编号 27 计入 18/18/18；代码升级不能因此拒绝启动或阻断下一次调配。
+    # 旧 active 允许保留历史品质分配；代码升级不能因此拒绝启动或阻断下一次调配。
     current_tiers = validate_tiers(
         stored_current_tiers,
         "目标环境 active 海克斯配置",
         allow_legacy=True,
-        require_current_balance=False)
+        require_non_empty_regular_pools=False)
     if not isinstance(current_digest, str) or current_digest != canonical_digest(stored_current_tiers):
         fail("目标环境 active 海克斯配置摘要无效")
     current_digest = canonical_digest(current_tiers)
@@ -202,6 +212,13 @@ if os.path.exists(active_path):
             fail("重复请求编号对应了不同内容")
         print(digest)
         raise SystemExit(0)
+    baseline_retired_tiers = {
+        item["id"]: item["tier"] for item in current_tiers if item["id"] in retired_ids
+    }
+requested_tiers_by_id = {item["id"]: item["tier"] for item in tiers}
+for hex_id, baseline_tier in baseline_retired_tiers.items():
+    if requested_tiers_by_id.get(hex_id) != baseline_tier:
+        fail(f"退役海克斯 {hex_id} 的品质不可调配")
 if current_revision != expected_revision or current_digest != expected_digest:
     fail(f"目标环境海克斯配置版本冲突：当前 v{current_revision}，请求基于 v{expected_revision}")
 

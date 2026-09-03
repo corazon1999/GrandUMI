@@ -12,7 +12,7 @@ using Xunit;
 namespace GrandUMI.Tests;
 
 /// <summary>
-/// 规则修订版 6 的 26 个新增银色海克斯，以及 30 号海克斯重制的定向回归。
+/// 规则修订版 12 的 26 个扩展海克斯，以及 30 号海克斯重制的定向回归。
 /// 每个独立机制至少在本文件中有一个行为断言；涉及选择、随机与永久状态的机制另测原子性和重放投影。
 /// </summary>
 public sealed class HexExpansionEffectsTests
@@ -305,19 +305,26 @@ public sealed class HexExpansionEffectsTests
     }
 
     [Fact]
-    public async Task 屠宰场_动作协议一次移除全部附着咚并拒绝重复请求()
+    public async Task 屠宰场_失败不消费且成功后同回合权威拒绝并在下回合恢复()
     {
         var engine = CreateEngine();
         var state = engine.State;
         ClearZones(state);
         OwnOnly(state, 0, 70);
         var character = Card("HEX-SLAUGHTERHOUSE", CardKind.Character);
-        state.Players[0].Characters.Add(character);
+        var emptyCharacter = Card("HEX-SLAUGHTERHOUSE-EMPTY", CardKind.Character);
+        state.Players[0].Characters.AddRange([character, emptyCharacter]);
         state.Players[0].CostArea.AddRange([
             new DonCard { State = DonState.Attached, AttachedToCardId = character.Id },
             new DonCard { State = DonState.Attached, AttachedToCardId = character.Id },
             new DonCard { State = DonState.Rest },
         ]);
+
+        Assert.False(engine.HandleAction(0, "DetachAllDon", Json(new
+        {
+            characterId = emptyCharacter.Id.ToString(),
+        })));
+        Assert.False(state.HexState.Runtime[0].SlaughterhouseUsedThisTurn);
 
         var before = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, 0));
         Assert.True(before.GetProperty("my").GetProperty("fieldCards")[0]
@@ -330,23 +337,60 @@ public sealed class HexExpansionEffectsTests
 
         Assert.Equal(2, state.Players[0].CostArea.Count(don =>
             don.State == DonState.Active && don.AttachedToCardId is null));
+        Assert.True(state.HexState.Runtime[0].SlaughterhouseUsedThisTurn);
+
+        character.IsTapped = true;
+        var nextDon = new DonCard
+        {
+            State = DonState.Attached,
+            AttachedToCardId = character.Id,
+        };
+        state.Players[0].CostArea.Add(nextDon);
         Assert.False(engine.HandleAction(0, "DetachAllDon", Json(new
         {
             characterId = character.Id.ToString(),
         })));
-        Assert.Equal(3, state.Players[0].CostArea.Count);
+        Assert.Equal(DonState.Attached, nextDon.State);
+        Assert.Equal(character.Id, nextDon.AttachedToCardId);
 
-        character.IsTapped = true;
-        state.Players[0].CostArea.Add(new DonCard
-        {
-            State = DonState.Attached,
-            AttachedToCardId = character.Id,
-        });
+        var privateRuntime = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state))
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        var checkpointRuntime = DeterministicReplayCheckpointProvider.BuildFullState(state)
+            .GetProperty("hexState").GetProperty("runtime")[0];
+        Assert.True(privateRuntime.GetProperty("SlaughterhouseUsedThisTurn").GetBoolean());
+        Assert.True(checkpointRuntime.GetProperty("SlaughterhouseUsedThisTurn").GetBoolean());
+
+        HexRules.OnTurnStarted(state, 0);
+        Assert.False(state.HexState.Runtime[0].SlaughterhouseUsedThisTurn);
         Assert.True(engine.HandleAction(0, "DetachAllDon", Json(new
         {
             characterId = character.Id.ToString(),
         })));
         Assert.Equal(2, state.Players[0].CostArea.Count(don => don.State == DonState.Rest));
+    }
+
+    [Fact]
+    public void 屠宰场_规则修订版十二仍允许同回合多次成功发动()
+    {
+        var engine = CreateEngine();
+        var state = engine.State;
+        ClearZones(state);
+        HexRules.SetRulesRevisionForReplay(state, HexRules.ExpansionRulesRevision);
+        OwnOnly(state, 0, 70);
+        var character = Card("HEX-SLAUGHTERHOUSE-LEGACY", CardKind.Character);
+        state.Players[0].Characters.Add(character);
+
+        void Attach() => state.Players[0].CostArea.Add(new DonCard
+        {
+            State = DonState.Attached,
+            AttachedToCardId = character.Id,
+        });
+
+        Attach();
+        Assert.Equal(1, HexRules.DetachAllDon(state, 0, character.Id));
+        Attach();
+        Assert.Equal(1, HexRules.DetachAllDon(state, 0, character.Id));
+        Assert.False(state.HexState.Runtime[0].SlaughterhouseUsedThisTurn);
     }
 
     [Fact]
@@ -438,7 +482,7 @@ public sealed class HexExpansionEffectsTests
     }
 
     [Fact]
-    public async Task 鱼人空手道_有附着咚的角色攻击时每回合只抽一次()
+    public async Task 鱼人空手道_新修订每次合格角色攻击都抽牌且旧修订仍每回合一次()
     {
         var engine = CreateEngine();
         var state = engine.State;
@@ -466,8 +510,38 @@ public sealed class HexExpansionEffectsTests
         await HexRules.OnAttackDeclaredAsync(engine, 0);
         await HexRules.OnAttackDeclaredAsync(engine, 0);
 
-        Assert.Single(state.Players[0].Hand);
-        Assert.True(state.HexState.Runtime[0].FishmanKarateUsedThisTurn);
+        Assert.Equal(2, state.Players[0].Hand.Count);
+        Assert.False(state.HexState.Runtime[0].FishmanKarateUsedThisTurn);
+
+        var legacyEngine = CreateEngine();
+        var legacy = legacyEngine.State;
+        ClearZones(legacy);
+        HexRules.SetRulesRevisionForReplay(legacy, HexRules.ExpansionRulesRevision);
+        OwnOnly(legacy, 0, 76);
+        var legacyAttacker = Card("HEX-FISHMAN-LEGACY", CardKind.Character, power: 5000);
+        legacy.Players[0].Characters.Add(legacyAttacker);
+        legacy.Players[0].CostArea.Add(new DonCard
+        {
+            State = DonState.Attached,
+            AttachedToCardId = legacyAttacker.Id,
+        });
+        legacy.Players[0].Deck.AddRange([
+            Card("HEX-FISH-LEGACY-DRAW", CardKind.Character),
+            Card("HEX-FISH-LEGACY-GUARD", CardKind.Character),
+        ]);
+        legacy.CurrentBattle = new BattleContext
+        {
+            AttackerPlayerIndex = 0,
+            AttackerCardId = legacyAttacker.Id,
+            TargetIsLeader = true,
+            DefenderPlayerIndex = 1,
+        };
+
+        await HexRules.OnAttackDeclaredAsync(legacyEngine, 0);
+        await HexRules.OnAttackDeclaredAsync(legacyEngine, 0);
+
+        Assert.Single(legacy.Players[0].Hand);
+        Assert.True(legacy.HexState.Runtime[0].FishmanKarateUsedThisTurn);
     }
 
     [Fact]
@@ -666,7 +740,7 @@ public sealed class HexExpansionEffectsTests
     }
 
     [Fact]
-    public void 扩展运行态进入新修订Checkpoint且旧修订投影保持冻结()
+    public void 品质效果修订运行态进入快照且规则修订版十二投影保持冻结()
     {
         var state = HexState();
         var card = Card("HEX-CHECKPOINT", CardKind.Character, cost: 5);
@@ -679,19 +753,33 @@ public sealed class HexExpansionEffectsTests
         state.HexState.Runtime[0].IceFruitUsedThisTurn = true;
         state.HexState.Runtime[0].SitUpUsedThisTurn = true;
         state.HexState.Runtime[0].FishmanKarateUsedThisTurn = true;
+        state.HexState.Runtime[0].CharacterAttacksDeclaredThisTurn = 1;
+        state.HexState.Runtime[0].SlaughterhouseUsedThisTurn = true;
         state.HexState.Runtime[0].HighCostCharacterEntriesThisTurn = 3;
 
+        var currentPrivateText = JsonSerializer.Serialize(
+            PrivateStateSnapshotBuilder.Build(state));
         var current = DeterministicReplayCheckpointProvider.BuildFullState(state);
         var currentText = current.GetRawText();
         Assert.Contains("EntityCostModPersistent", currentText, StringComparison.Ordinal);
         Assert.Contains("HexEnteredFromTrash", currentText, StringComparison.Ordinal);
         Assert.Contains("IceFruitUsedThisTurn", currentText, StringComparison.Ordinal);
+        Assert.Contains("CharacterAttacksDeclaredThisTurn", currentText, StringComparison.Ordinal);
+        Assert.Contains("SlaughterhouseUsedThisTurn", currentText, StringComparison.Ordinal);
+        Assert.Contains("CharacterAttacksDeclaredThisTurn", currentPrivateText, StringComparison.Ordinal);
+        Assert.Contains("SlaughterhouseUsedThisTurn", currentPrivateText, StringComparison.Ordinal);
 
-        state.HexState.RulesRevision = HexRules.CatalogConfigurationRulesRevision;
+        state.HexState.RulesRevision = HexRules.ExpansionRulesRevision;
+        var legacyPrivateText = JsonSerializer.Serialize(
+            PrivateStateSnapshotBuilder.Build(state));
         var legacyText = DeterministicReplayCheckpointProvider.BuildFullState(state).GetRawText();
-        Assert.DoesNotContain("EntityCostModPersistent", legacyText, StringComparison.Ordinal);
-        Assert.DoesNotContain("HexEnteredFromTrash", legacyText, StringComparison.Ordinal);
-        Assert.DoesNotContain("IceFruitUsedThisTurn", legacyText, StringComparison.Ordinal);
+        Assert.Contains("EntityCostModPersistent", legacyText, StringComparison.Ordinal);
+        Assert.Contains("HexEnteredFromTrash", legacyText, StringComparison.Ordinal);
+        Assert.Contains("IceFruitUsedThisTurn", legacyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("CharacterAttacksDeclaredThisTurn", legacyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("SlaughterhouseUsedThisTurn", legacyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("CharacterAttacksDeclaredThisTurn", legacyPrivateText, StringComparison.Ordinal);
+        Assert.DoesNotContain("SlaughterhouseUsedThisTurn", legacyPrivateText, StringComparison.Ordinal);
     }
 
     private static async Task NotifyDiscard(GameEngine engine, int owner, CardKind kind)

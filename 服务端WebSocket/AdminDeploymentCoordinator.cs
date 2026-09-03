@@ -350,10 +350,8 @@ public sealed class AdminDeploymentCoordinator
 
         var baselineById = baseline.ToDictionary(item => item.Id, item => item.Tier);
         foreach (var retired in HexCatalog.All.Where(item => HexCatalog.IsRetired(item.Id)))
-        {
-            if (!supplied.ContainsKey(retired.Id))
-                supplied.Add(retired.Id, baselineById[retired.Id]);
-        }
+            // 新旧客户端即使提交了退役项，也只能沿用当前基线，不能借完整目录协议改写它。
+            supplied[retired.Id] = baselineById[retired.Id];
         return supplied.OrderBy(item => item.Key)
             .Select(item => new HexCatalogTierAssignment(item.Key, item.Value))
             .ToArray();

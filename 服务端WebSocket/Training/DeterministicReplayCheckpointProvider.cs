@@ -325,7 +325,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             }).ToArray(),
         };
 
-    /// <summary>规则修订版 12 起的完整投影，包含扩展银色海克斯的全部恢复状态。</summary>
+    /// <summary>规则修订版 12 起的完整投影，包含扩展海克斯的全部恢复状态。</summary>
     private static object ExpansionFullHexState(GameState state)
         => new
         {
@@ -343,37 +343,9 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 .Select(items => items.Order().ToArray())
                 .ToArray(),
             completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
-            runtime = state.HexState.Runtime.Select(runtime => new
-            {
-                runtime.CardsPlayedThisTurn,
-                runtime.SoulSiphonUsedThisTurn,
-                runtime.FirstLeaderAttackSeenThisTurn,
-                runtime.FirstCharacterAttackSeenThisTurn,
-                runtime.FirstEnterEffectCopiedThisTurn,
-                runtime.FirstKoEffectCopiedThisTurn,
-                runtime.AttacksDeclaredThisTurn,
-                runtime.RestingCharacterAttacksThisGame,
-                runtime.SteelHeartUsedThisGame,
-                runtime.UltimateRefreshUsedThisTurn,
-                runtime.FinalFormUsedThisTurn,
-                runtime.CriticalHealSucceededThisTurn,
-                runtime.EventDrawConvertedThisTurn,
-                runtime.CharacterDrawConvertedThisTurn,
-                runtime.SlapUsedThisTurn,
-                runtime.SoulConsumeUsedThisTurn,
-                runtime.TankEngineUsedThisTurn,
-                runtime.TankEngineOpponentTurnPower,
-                runtime.NavyCarnivalUsedThisTurn,
-                runtime.KingUsedThisGame,
-                runtime.TranscendentEvilOwnTurnPower,
-                runtime.ActivatedEnterEffectsThisTurn,
-                runtime.IceFruitUsedThisTurn,
-                runtime.SitUpUsedThisTurn,
-                runtime.FishmanKarateUsedThisTurn,
-                runtime.HighCostCharacterEntriesThisTurn,
-                runtime.VoidRefillResolving,
-                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
-            }).ToArray(),
+            runtime = state.HexState.Runtime
+                .Select(runtime => ExpansionHexRuntime(runtime, state.HexState.RulesRevision))
+                .ToArray(),
             activeDraft = state.HexState.ActiveDraft is { } draft
                 ? new
                 {
@@ -429,6 +401,79 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 draft.Choice,
             }).ToArray(),
         };
+
+    private static object ExpansionHexRuntime(PlayerHexRuntime runtime, int rulesRevision)
+    {
+        if (rulesRevision >= HexRules.QualityAndEffectRulesRevision)
+        {
+            return new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.CharacterAttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                runtime.ActivatedEnterEffectsThisTurn,
+                runtime.IceFruitUsedThisTurn,
+                runtime.SitUpUsedThisTurn,
+                runtime.FishmanKarateUsedThisTurn,
+                runtime.SlaughterhouseUsedThisTurn,
+                runtime.HighCostCharacterEntriesThisTurn,
+                runtime.VoidRefillResolving,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+            };
+        }
+
+        // 修订版 12 的 checkpoint 投影已冻结；新增运行态字段不得改变旧录像摘要。
+        return new
+        {
+            runtime.CardsPlayedThisTurn,
+            runtime.SoulSiphonUsedThisTurn,
+            runtime.FirstLeaderAttackSeenThisTurn,
+            runtime.FirstCharacterAttackSeenThisTurn,
+            runtime.FirstEnterEffectCopiedThisTurn,
+            runtime.FirstKoEffectCopiedThisTurn,
+            runtime.AttacksDeclaredThisTurn,
+            runtime.RestingCharacterAttacksThisGame,
+            runtime.SteelHeartUsedThisGame,
+            runtime.UltimateRefreshUsedThisTurn,
+            runtime.FinalFormUsedThisTurn,
+            runtime.CriticalHealSucceededThisTurn,
+            runtime.EventDrawConvertedThisTurn,
+            runtime.CharacterDrawConvertedThisTurn,
+            runtime.SlapUsedThisTurn,
+            runtime.SoulConsumeUsedThisTurn,
+            runtime.TankEngineUsedThisTurn,
+            runtime.TankEngineOpponentTurnPower,
+            runtime.NavyCarnivalUsedThisTurn,
+            runtime.KingUsedThisGame,
+            runtime.TranscendentEvilOwnTurnPower,
+            runtime.ActivatedEnterEffectsThisTurn,
+            runtime.IceFruitUsedThisTurn,
+            runtime.SitUpUsedThisTurn,
+            runtime.FishmanKarateUsedThisTurn,
+            runtime.HighCostCharacterEntriesThisTurn,
+            runtime.VoidRefillResolving,
+            inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+        };
+    }
 
     private static object CurrentHexRuntime(PlayerHexRuntime runtime, int rulesRevision)
     {
