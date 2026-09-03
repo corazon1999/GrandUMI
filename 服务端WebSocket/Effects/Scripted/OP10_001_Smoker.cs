@@ -20,7 +20,7 @@ public class OP10_001_Smoker : IScriptedEffect
     public string CardNumber => "OP10-001";
 
     public bool HandlesTrigger(EffectTrigger t)
-        => t == EffectTrigger.OnEnterField || t == EffectTrigger.ActivatedMain;
+        => t is EffectTrigger.OnGameStart or EffectTrigger.OnEnterField or EffectTrigger.ActivatedMain;
 
     public async Task Resolve(EffectContext ctx)
     {
@@ -28,7 +28,7 @@ public class OP10_001_Smoker : IScriptedEffect
         var self = ctx.Source;
         int owner = ctx.OwnerIndex;
 
-        if (ctx.Trigger == EffectTrigger.OnEnterField)
+        if (ctx.Trigger is EffectTrigger.OnGameStart or EffectTrigger.OnEnterField)
         {
             var selfId = self.Id;
             ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
