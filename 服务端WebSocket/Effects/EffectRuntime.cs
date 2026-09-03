@@ -734,7 +734,7 @@ public static class EffectRuntime
         return list;
     }
 
-    private static bool IsTriggeredEffectAvailable(
+    internal static bool IsTriggeredEffectAvailable(
         GameState state,
         int ownerIndex,
         CardInstance source,
@@ -744,6 +744,24 @@ public static class EffectRuntime
         var scripted = CardRulesetManager.For(state).TryGetScriptedEffect(source.Info.Number);
         return scripted is not ITriggeredEffectAvailability availability
             || availability.IsTriggerAvailable(state, ownerIndex, source, trigger, payload);
+    }
+
+    /// <summary>
+    /// KO 置换排序必须只展示当前规则集能够实际解决的效果。EffectTags 是从历史卡面文本迁移的
+    /// 候选索引，个别卡会同时带兼容标签，但脚本只实现其中一个引擎触发窗口。
+    /// </summary>
+    internal static bool HasResolvableKOReplacementEffect(
+        GameState state,
+        CardInstance source,
+        EffectTrigger trigger)
+    {
+        if (!HasEffectForTrigger(source, trigger)) return false;
+
+        var ruleset = CardRulesetManager.For(state);
+        var scripted = ruleset.TryGetScriptedEffect(source.Info.Number);
+        return scripted?.HandlesTrigger(trigger) == true
+            || DeclaredOmissionEffects.HandlesKOReplacementTrigger(source.Info.Number, trigger)
+            || Dsl.DslInterpreter.HasTriggerDefinition(ruleset, source.Info.Number, trigger);
     }
 
     /// <summary>
@@ -845,7 +863,7 @@ public static class OncePerTurnEffectCatalog
         "OP15-041", "OP15-058", "OP15-114", "OP16-001", "OP16-018", "OP16-022", "OP16-041", "OP16-080",
         "OP17-001", "OP17-010", "OP17-020", "OP17-025", "OP17-030", "OP17-034", "OP17-040", "OP17-048",
         "OP17-049", "OP17-053", "OP17-058", "OP17-062", "OP17-063", "OP17-064", "OP17-072", "OP17-101",
-        "P-011", "P-073", "P-076", "P-077", "P-086", "P-095", "P-096", "P-111", "P-122", "PRB01-001",
+        "P-011", "P-073", "P-076", "P-077", "P-086", "P-095", "P-096", "P-111", "P-122", "P-148", "PRB01-001",
         "PRB02-002", "ST02-010", "ST03-007", "ST04-001", "ST05-010", "ST09-010", "ST10-002", "ST10-006",
         "ST10-007", "ST10-011", "ST10-014", "ST12-001", "ST12-010", "ST13-001", "ST13-002", "ST13-003",
         "ST15-005", "ST19-003", "ST19-004", "ST19-005", "ST20-002", "ST22-001", "ST22-005", "ST25-003",

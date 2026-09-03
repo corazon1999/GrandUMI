@@ -9,6 +9,15 @@ namespace GrandUMI.Effects;
 /// </summary>
 public static class DeclaredOmissionEffects
 {
+    /// <summary>
+    /// 由本补齐层完整接管、且属于 KO 置换排序窗口的触发。
+    /// 该查询供排序入口剔除仅有历史 EffectTags、实际没有处理器的幽灵候选。
+    /// </summary>
+    internal static bool HandlesKOReplacementTrigger(string cardNumber, EffectTrigger trigger)
+        => (cardNumber, trigger) is
+            ("OP04-082", EffectTrigger.PreKO)
+            or ("OP13-109", EffectTrigger.OnAllyWillLeaveField);
+
     public static async Task<bool> BeforeDsl(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];

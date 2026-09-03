@@ -160,8 +160,9 @@ function computeEffectTags(text) {
 function isDeclaredBaseKeyword(text, keyword) {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const anyKeyword = ABILITY_KEYWORDS.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-  const prefix = `(?:【(?:${anyKeyword})】(?:\\s*（[^）]*）)?\\s*)*`
-  return new RegExp(`(^|[。\\r\\n])\\s*${prefix}【${escaped}】(?=\\s*(?:（|【|$))`).test(text)
+  const annotation = '(?:（[^）]*）|\\([^)]*\\))'
+  const prefix = `(?:【(?:${anyKeyword})】(?:\\s*${annotation})?\\s*)*`
+  return new RegExp(`(^|[。\\r\\n])\\s*${prefix}【${escaped}】(?=\\s*(?:（|\\(|【|$))`).test(text)
 }
 
 function computeAbilities(text, number) {

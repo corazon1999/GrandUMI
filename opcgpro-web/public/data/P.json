@@ -2963,6 +2963,369 @@
     "cartograph": "画师原创"
   },
   {
+    "number": "P-136",
+    "name": "撒谎布",
+    "color": "红",
+    "type": "角色",
+    "property": "射",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "草帽一伙",
+    "counter": "2000",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/b00c61e1a8894b628d4262ee8e30484d.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-137",
+    "name": "山智",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "7000",
+    "cost": "6",
+    "keyWords": "草帽一伙",
+    "counter": "1000",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [
+      "双重攻击"
+    ],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/039b3a0421ed4f44b12c39371b6d2834.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-138",
+    "name": "托尼托尼·乔巴",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "动物/草帽一伙",
+    "counter": "1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/9728626da35a48b7b9410182adc99d3b.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-139",
+    "name": "奈美",
+    "color": "红",
+    "type": "角色",
+    "property": "知",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField",
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/5936c1dde5bc4ba39580a7a316e1385e.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-140",
+    "name": "蒙奇·D·路飞",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "8000",
+    "cost": "7",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/e82fffec76aa4abbb22348bee4243147.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-141",
+    "name": "罗罗诺亚·佐罗",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "7",
+    "keyWords": "草帽一伙",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/29d1996ba5b84ba08727a4b9a3f79769.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-142",
+    "name": "前进·梅利号",
+    "color": "红",
+    "type": "舞台",
+    "property": "-",
+    "power": "",
+    "cost": "1",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "PreKO",
+      "OnAllyWillBeKOd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/dd305576c349402cbff4e361c265b198.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-143",
+    "name": "克洛克达尔",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "8000",
+    "cost": "6",
+    "keyWords": "巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/73433a922c414c4ca17f9c9efe246e48.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-144",
+    "name": "Miss.全周日",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/eb3483d8bab0444f952ff56d5b03669e.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-145",
+    "name": "Miss.星期三",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/c9c92ea6414f404a9aa09ba10caec417.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-146",
+    "name": "Miss.黄金周(玛丽安奴)",
+    "color": "黑",
+    "type": "角色",
+    "property": "知",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/78a5fc4437724fd793464091c5beda8d.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-147",
+    "name": "Miss.情人节(美琪塔)",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "3000",
+    "cost": "3",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/c953d023a40440c88738269ec9b0d259.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-148",
+    "name": "Mr.3(加尔迪诺)",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/f868b5d2fb9d4ddaba1f6027bddb8401.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-149",
+    "name": "Mr.5(杰姆)",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻：角色"
+    ],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/58b02b60239f455995b52f434ae110e4.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-150",
+    "name": "库赞",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "黑胡子海盗团/原海军",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "【触发】抽取1张卡牌，本回合中，对方最多1张费用不高于6的角色无法攻击。",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/f7cd006b53994526846ad60ceccc44e0.png",
+    "cartograph": "其他"
+  },
+  {
+    "number": "P-151",
+    "name": "斯摩格",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "海军",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/f75c0eca97d84a9283365a70b0b9addf.png",
+    "cartograph": "画师原创"
+  },
+  {
     "number": "P-155",
     "name": "特拉法尔加·罗",
     "color": "黄",
@@ -2982,6 +3345,28 @@
     "trigger": "【触发】对方生命卡牌不多于3张的场合，此卡牌登场。",
     "set": "宣传卡",
     "image": "https://source.windoent.com/OnePiecePc/Picture/1782872145827P-155.png",
+    "cartograph": "画师原创"
+  },
+  {
+    "number": "P-157",
+    "name": "蒙奇·D·路飞",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "7",
+    "keyWords": "埃鲁巴夫/四皇/草帽一伙",
+    "counter": "1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "P",
+    "subscript": 5,
+    "trigger": "",
+    "set": "宣传卡",
+    "image": "https://source.windoent.com/OnePiecePc/Picture/646a89e0e8a24ab3bcd15023f8a57686.png",
     "cartograph": "画师原创"
   }
 ]

@@ -257,6 +257,13 @@ if [[ "$need_front" == 1 ]]; then
   fi
   ln -sfn "$original_cards_target" "$public_cards_link"
 
+  # 正画原图不进入 Git，且测试服不能假设正式服已经拥有本提交新增的卡图。
+  # 只从已提交卡牌数据中的官方 URL 恢复缺失正画，并校验 imageManifest 的内容摘要；
+  # 输出严格指向测试服独立资源目录，不写入或修改正式服资源库。
+  node "$repo/tools/ensure-card-images-from-data.mjs" \
+    --output-root="$public_cards_link" \
+    --only-missing
+
   for asset_dir in cards-thumb cards-webp; do
     source_dir="$production_assets/$asset_dir"
     target_dir="$test_assets/$asset_dir"

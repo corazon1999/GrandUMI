@@ -303,50 +303,18 @@ public static class AtomicOps
         int actingSide,
         bool deferOnKO = false)
     {
-        // 设置 KO 来源（effect + 发起方 + 来源卡），供受害者/守护者判定
+        // 设置 KO 来源（effect + 发起方 + 来源卡），供受害者/守护者判定。
+        // 嵌套效果 KO 结束后恢复外层上下文，不能把外层批次误降级成无来源 KO。
+        var previousReason = s.KOReason;
+        var previousActingSide = s.KOActingSide;
+        var previousSource = s.KOSourceCardId;
         s.KOReason = "effect";
         s.KOActingSide = actingSide;
         s.KOSourceCardId = EffectRuntime.CurrentSource?.Id;
         try
         {
-            // PreKO：受害者自身"改为…使其不被KO"置换
-            s.PreventKOCardIds.Remove(card.Id);
-            if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.PreKO))
-                await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.PreKO, prompts);
-            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
-
-            // 守护者：他卡"代替被KO/使其不被KO"置换
-            var guardSide = s.Players[ownerIdx];
-            var guardians = new List<CardInstance> { guardSide.Leader };
-            guardians.AddRange(guardSide.Characters);
-            if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
-            if (guardSide.ExtraStageCard is not null) guardians.Add(guardSide.ExtraStageCard);
-            foreach (var g in guardians.ToList())
-            {
-                if (g.Id == card.Id) continue;
-                if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
-                await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
-                    new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
-                if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return false; }
-            }
-
-            // 离场守护：他卡"代替离场使其不离场"（KO 属离场的一种；仅"对方效果"触发）
-            if (actingSide != ownerIdx)
-            {
-                s.PreventLeaveCardIds.Remove(card.Id);
-                // 不跳过受害卡本身：支持"此角色将要离场时改为…使其不离场"的自我置换
-                foreach (var g in guardians.ToList())
-                {
-                    if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
-                    await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillLeaveField, prompts,
-                        new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx, ["kind"] = "ko" });
-                    if (s.PreventLeaveCardIds.Contains(card.Id)) { s.PreventLeaveCardIds.Remove(card.Id); return false; }
-                }
-            }
-
-            // 持续守护
-            if (s.IsKoGuarded(card, "effect")) return false;
-            if (s.IsLeaveGuarded(card, "effect")) return false;
+            // 战斗 KO、单张效果 KO 与同时效果 KO 共用唯一置换入口，保证顺序、取消与批次覆盖一致。
+            if (await BattleEngine.IsKOReplacedAsync(s, ownerIdx, card, prompts)) return false;
 
             // 实际 KO（复用同步移除逻辑）
             BattleEngine.KOCard(s, ownerIdx, card);
@@ -367,9 +335,9 @@ public static class AtomicOps
         }
         finally
         {
-            s.KOReason = null;
-            s.KOActingSide = -1;
-            s.KOSourceCardId = null;
+            s.KOReason = previousReason;
+            s.KOActingSide = previousActingSide;
+            s.KOSourceCardId = previousSource;
         }
     }
 

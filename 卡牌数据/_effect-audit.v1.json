@@ -1,7 +1,7 @@
 {
   "schemaVersion": "grandumi.card-effect-audit.v1",
-  "cardContentSha256": "187d9219cefd5f28327d745189ad4c997441a0dceba3e1dd45fccd051ced5809",
-  "cardCount": 2823,
+  "cardContentSha256": "1ae2095769c3f868c928ff154ffd331ced653852985a11f893141f25c4d26fe0",
+  "cardCount": 2840,
   "cardsWithoutOriginalReference": [
     "ST18-004",
     "ST31-001",
@@ -901,6 +901,21 @@
     "P-135": [
       "阻挡者"
     ],
+    "P-137": [
+      "双重攻击"
+    ],
+    "P-140": [
+      "阻挡者"
+    ],
+    "P-141": [
+      "速攻"
+    ],
+    "P-148": [
+      "阻挡者"
+    ],
+    "P-149": [
+      "速攻：角色"
+    ],
     "PRB02-003": [
       "阻挡者"
     ],
@@ -1295,6 +1310,7 @@
     "OP17-113",
     "P-130",
     "P-134",
+    "P-151",
     "PRB02-007",
     "PRB02-012",
     "ST02-007",
@@ -1327,5 +1343,5 @@
     "ST30-004",
     "ST30-017"
   ],
-  "auditManifestSha256": "fd4d6b27ab1fed982234bbe4221560dd9c638a99317267c68b0056d3772bfcd6"
+  "auditManifestSha256": "f61f85940feb1eaba03e78b41fcbe5f8cabd029ac272a9f962421816ad4107e7"
 }

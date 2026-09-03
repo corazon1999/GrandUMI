@@ -29,7 +29,7 @@ public sealed class CardContentPipelineTests : IDisposable
         var manifest = CardContentManifest.Validate(RepoPath("卡牌数据"));
 
         Assert.Equal(62, manifest.Files.Count);
-        Assert.Equal(2823, manifest.TotalCards);
+        Assert.Equal(2840, manifest.TotalCards);
         Assert.Matches("^[0-9a-f]{64}$", manifest.ContentSha256);
     }
 

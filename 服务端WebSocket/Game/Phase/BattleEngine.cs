@@ -301,7 +301,7 @@ public static class BattleEngine
         }
     }
 
-    private static async Task<bool> IsKOReplacedAsync(
+    internal static async Task<bool> IsKOReplacedAsync(
         GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
         if (s.KOReason == "effect" && EffectRuntime.IsEffectLeaveReplacementCovered(s, ownerIdx, card))
@@ -312,54 +312,98 @@ public static class BattleEngine
             && (s.PreventKOCardIds.Remove(card.Id) || s.PreventLeaveCardIds.Remove(card.Id)))
             return true;
 
-        // PreKO 触发：仅本卡的效果有机会拦截（缩小范围避免误触发其他卡）
+        // 清除非当前批次遗留的单卡标记。批次覆盖已在上方消费，不能让旧标记污染本次 KO。
         s.PreventKOCardIds.Remove(card.Id);
-        if (EffectRuntime.HasEffectForTrigger(card, EffectTrigger.PreKO))
-        {
-            await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.PreKO, prompts);
-        }
-        if (s.PreventKOCardIds.Contains(card.Id))
-        {
-            s.PreventKOCardIds.Remove(card.Id);
-            return true; // KO 被取消
-        }
-        // 守护者：他卡"将要被KO时改为…代替被KO/使其不被KO"置换效果
+        s.PreventLeaveCardIds.Remove(card.Id);
+
+        // 同一个“将要被 KO”处理点可能同时存在自身置换、守护者与因对方效果离场置换。
+        // 它们属于同一方同时待处理的效果，由受影响玩家决定结算顺序；放弃一个可继续选择其它效果。
         var guardSide = s.Players[ownerIdx];
+        bool VictimIsOnField()
+            => guardSide.Characters.Contains(card)
+                || ReferenceEquals(guardSide.StageCard, card)
+                || ReferenceEquals(guardSide.ExtraStageCard, card);
         var guardians = new List<CardInstance> { guardSide.Leader };
         guardians.AddRange(guardSide.Characters);
         if (guardSide.StageCard is not null) guardians.Add(guardSide.StageCard);
         if (guardSide.ExtraStageCard is not null) guardians.Add(guardSide.ExtraStageCard);
-        foreach (var g in guardians.ToList())
+
+        var candidates = new List<KOReplacementCandidate>();
+        if (EffectRuntime.HasResolvableKOReplacementEffect(s, card, EffectTrigger.PreKO))
+            candidates.Add(new KOReplacementCandidate(card, EffectTrigger.PreKO, null));
+
+        var koPayload = new Dictionary<string, object?>
+        {
+            ["victimId"] = card.Id.ToString(),
+            ["victimOwner"] = ownerIdx,
+        };
+        foreach (var g in guardians)
         {
             if (g.Id == card.Id) continue;
-            if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillBeKOd)) continue;
-            await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillBeKOd, prompts,
-                new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = ownerIdx });
-            if (!guardSide.Characters.Contains(card)) return true;
-            if (s.PreventKOCardIds.Contains(card.Id)) { s.PreventKOCardIds.Remove(card.Id); return true; }
+            if (!EffectRuntime.HasResolvableKOReplacementEffect(s, g, EffectTrigger.OnAllyWillBeKOd)) continue;
+            candidates.Add(new KOReplacementCandidate(g, EffectTrigger.OnAllyWillBeKOd, koPayload));
         }
 
         // 效果 KO 还需检查“因对方效果将要离场”类守护；战斗 KO 不进入该分支。
         if (s.KOReason == "effect" && s.KOActingSide >= 0 && s.KOActingSide != ownerIdx)
         {
-            s.PreventLeaveCardIds.Remove(card.Id);
-            foreach (var g in guardians.ToList())
+            var leavePayload = new Dictionary<string, object?>
             {
-                if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
-                await EffectRuntime.Resolve(s, ownerIdx, g, EffectTrigger.OnAllyWillLeaveField, prompts,
+                ["victimId"] = card.Id.ToString(),
+                ["victimOwner"] = ownerIdx,
+                ["kind"] = "ko",
+            };
+            foreach (var g in guardians)
+            {
+                if (!EffectRuntime.HasResolvableKOReplacementEffect(s, g, EffectTrigger.OnAllyWillLeaveField)) continue;
+                // 同一卡实例通常只是为兼容 KO/非 KO 两条引擎路径同时登记两个标签；
+                // KO 窗口只能发动一次，优先使用更精确的 OnAllyWillBeKOd 连线。
+                if (candidates.Any(candidate => candidate.Source.Id == g.Id)) continue;
+                candidates.Add(new KOReplacementCandidate(g, EffectTrigger.OnAllyWillLeaveField, leavePayload));
+            }
+        }
+
+        while (candidates.Count > 0 && !s.IsGameOver && VictimIsOnField())
+        {
+            candidates.RemoveAll(candidate =>
+                s.SideOf(candidate.Source) != ownerIdx
+                || !EffectRuntime.IsTriggeredEffectAvailable(
+                    s, ownerIdx, candidate.Source, candidate.Trigger, candidate.Payload));
+            if (candidates.Count == 0) break;
+
+            var selected = candidates[0];
+            if (candidates.Count > 1)
+            {
+                var tokens = candidates.Select(candidate => candidate.Token).ToList();
+                var chosen = await prompts.ChooseCards(ownerIdx, "EffectOrder",
+                    "多个 KO 代替或保护效果同时可用，请选择下一个要结算的效果",
+                    tokens, 1, 1,
                     new Dictionary<string, object?>
                     {
-                        ["victimId"] = card.Id.ToString(),
-                        ["victimOwner"] = ownerIdx,
-                        ["kind"] = "ko",
+                        ["choiceCards"] = candidates.Select(candidate => new
+                        {
+                            id = candidate.Token,
+                            number = candidate.Source.Info.Number,
+                            trigger = candidate.Trigger.ToString(),
+                        }).ToList(),
                     });
-                if (!guardSide.Characters.Contains(card)) return true;
-                if (s.PreventLeaveCardIds.Contains(card.Id))
-                {
-                    s.PreventLeaveCardIds.Remove(card.Id);
-                    return true;
-                }
+                if (chosen.Count != 1) break;
+                var authoritativeSelection = candidates.FirstOrDefault(candidate => candidate.Token == chosen[0]);
+                if (authoritativeSelection is null) break;
+                selected = authoritativeSelection;
             }
+
+            candidates.Remove(selected);
+            // Prompt 等待期间必须再次以权威场上状态和可用性校验，拒绝旧快照或乱序响应支付成本。
+            if (s.SideOf(selected.Source) != ownerIdx
+                || !VictimIsOnField()
+                || !EffectRuntime.IsTriggeredEffectAvailable(
+                    s, ownerIdx, selected.Source, selected.Trigger, selected.Payload)) continue;
+
+            await EffectRuntime.Resolve(
+                s, ownerIdx, selected.Source, selected.Trigger, prompts, selected.Payload);
+            if (!VictimIsOnField()) return true;
+            if (s.PreventKOCardIds.Remove(card.Id) || s.PreventLeaveCardIds.Remove(card.Id)) return true;
         }
 
         string reason = s.KOReason == "effect" ? "effect" : "battle";
@@ -368,6 +412,14 @@ public static class BattleEngine
         if (await TryDiscardHandToPreventKOAsync(s, ownerIdx, card, prompts, reason)) return true;
 
         return false;
+    }
+
+    private sealed record KOReplacementCandidate(
+        CardInstance Source,
+        EffectTrigger Trigger,
+        Dictionary<string, object?>? Payload)
+    {
+        public string Token => $"{Source.Id}:{Trigger}";
     }
 
     /// <summary>结算“可以丢弃我方 1 张手牌，使该角色不会被 KO”的限时置换效果。</summary>

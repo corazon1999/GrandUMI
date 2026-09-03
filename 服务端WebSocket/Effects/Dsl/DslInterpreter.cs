@@ -52,6 +52,33 @@ public static class DslInterpreter
         return false;
     }
 
+    /// <summary>
+    /// 判断当前对局固定的规则集中，指定卡牌是否真的定义了该触发时机。
+    /// 卡牌数据中的 EffectTags 只负责发现候选；它可能因历史文本迁移而保留兼容标签，
+    /// 不能据此把一个实际不存在的效果放入需要玩家排序的权威候选集合。
+    /// </summary>
+    internal static bool HasTriggerDefinition(CardRuleset ruleset, string cardNumber, EffectTrigger trigger)
+    {
+        if (!ruleset.TryGetDslDefinition(cardNumber, out var definition)) return false;
+
+        string triggerName = trigger.ToString();
+        if (definition.TryGetProperty("triggers", out var triggers)
+            && triggers.ValueKind == JsonValueKind.Array
+            && triggers.EnumerateArray().Any(item =>
+                item.TryGetProperty("on", out var on)
+                && string.Equals(on.GetString(), triggerName, StringComparison.Ordinal)))
+            return true;
+
+        return trigger switch
+        {
+            EffectTrigger.ActivatedMain => definition.TryGetProperty("activated", out _),
+            EffectTrigger.EventMain => definition.TryGetProperty("main", out _),
+            EffectTrigger.EventCounter => definition.TryGetProperty("counter", out _),
+            EffectTrigger.OnLifeRevealTrigger => definition.TryGetProperty("trigger", out _),
+            _ => false,
+        };
+    }
+
     public static void Load(string path, string rulesetId = "builtin-test")
     {
         lock (BuiltInLoadGate)

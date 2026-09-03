@@ -9,11 +9,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const API_BASE = "https://webadmin.windoent.com/op-public";
+const API_BASE = "https://webadmin.windoent.com/front/op-public";
 const WRITE = process.argv.includes("--write");
 const setsArg = process.argv.find((arg) => arg.startsWith("--sets="));
+const numbersArg = process.argv.find((arg) => arg.startsWith("--numbers="));
 const SETS = setsArg
   ? new Set(setsArg.slice("--sets=".length).split(",").map((value) => value.trim().toUpperCase()).filter(Boolean))
+  : null;
+// 显式卡号既是过滤器也是刷新授权：允许用官网权威数据替换本地同卡号记录。
+const NUMBERS = numbersArg
+  ? new Set(numbersArg.slice("--numbers=".length).split(",").map(canonicalNumber).filter(Boolean))
   : null;
 const TARGET_DIRS = [
   path.join(ROOT, "卡牌数据_含原文"),
@@ -34,7 +39,14 @@ function mapScalar(value) {
 }
 
 function mapList(value) {
-  const text = Array.isArray(value) ? value.join("/") : mapScalar(value);
+  let normalized = value;
+  if (typeof normalized === "string" && normalized.trim().startsWith("[")) {
+    try {
+      const parsed = JSON.parse(normalized);
+      if (Array.isArray(parsed)) normalized = parsed;
+    } catch { /* 官网旧记录也可能直接返回普通字符串，沿用原值。 */ }
+  }
+  const text = Array.isArray(normalized) ? normalized.join("/") : mapScalar(normalized);
   return text.replace(/[，,]/g, "/");
 }
 
@@ -49,7 +61,7 @@ function mapRarity(value) {
 }
 
 function toCard(info, number) {
-  return {
+  const card = {
     number,
     name: mapScalar(info.cardName),
     color: mapList(info.cardColor),
@@ -68,6 +80,9 @@ function toCard(info, number) {
     image: mapScalar(info.cardImg),
     cartograph: mapScalar(info.cardCartograph),
   };
+  // 官网 P-142 详情元数据误标为角色；官方卡图卡面明确标注为舞台。
+  if (number === "P-142") card.type = "舞台";
+  return card;
 }
 
 async function fetchJson(url) {
@@ -104,7 +119,10 @@ const local = await localNumbers();
 const rowsByNumber = new Map();
 for (const row of listPayload.page.list) {
   const number = canonicalNumber(row.cardNumber);
-  if (!number || local.has(number) || (SETS && !SETS.has(setOf(number)))) continue;
+  if (!number
+      || (NUMBERS && !NUMBERS.has(number))
+      || (!NUMBERS && local.has(number))
+      || (SETS && !SETS.has(setOf(number)))) continue;
   const file = path.join(ROOT, "卡牌数据", `${setOf(number)}.json`);
   try { await access(file); } catch { continue; }
   const rows = rowsByNumber.get(number) ?? [];
@@ -145,8 +163,14 @@ for (const dir of TARGET_DIRS) {
   for (const [set, additions] of bySet) {
     const file = path.join(dir, `${set}.json`);
     const cards = JSON.parse(await readFile(file, "utf8"));
-    const existing = new Set(cards.map((card) => card.number));
-    cards.push(...additions.filter((card) => !existing.has(card.number)));
+    const additionsByNumber = new Map(additions.map((card) => [card.number, card]));
+    for (let index = 0; index < cards.length; index++) {
+      const replacement = additionsByNumber.get(cards[index].number);
+      if (!replacement) continue;
+      cards[index] = replacement;
+      additionsByNumber.delete(replacement.number);
+    }
+    cards.push(...additionsByNumber.values());
     cards.sort((a, b) => a.number.localeCompare(b.number, "en", { numeric: true }));
     await writeFile(file, `${JSON.stringify(cards, null, 2)}\n`, "utf8");
   }
