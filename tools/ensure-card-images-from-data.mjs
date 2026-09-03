@@ -24,6 +24,8 @@ const numbersArg = process.argv.find(argument => argument.startsWith("--numbers=
 const REQUESTED_NUMBERS = numbersArg
   ? new Set(numbersArg.slice("--numbers=".length).split(",").map(value => value.trim().toUpperCase()).filter(Boolean))
   : null;
+if (numbersArg && REQUESTED_NUMBERS.size === 0)
+  throw new Error("--numbers 必须至少包含一个有效卡号");
 const MAX_RETRY = 3;
 
 function sha12(buffer) {
@@ -104,16 +106,24 @@ async function main() {
     loadCards(),
   ]);
   const tasks = [];
+  const matchedNumbers = new Set();
   for (const [number, sprites] of Object.entries(manifest)) {
     if (REQUESTED_NUMBERS && !REQUESTED_NUMBERS.has(number.toUpperCase())) continue;
     const sprite = Array.isArray(sprites) ? parseSprite(sprites[0]) : null;
     if (!sprite) continue;
     const card = cards.get(number.toUpperCase());
     if (!card?.image) continue;
+    matchedNumbers.add(number.toUpperCase());
     const destination = path.resolve(OUTPUT_ROOT, sprite.relativePath);
     assertInsideOutput(destination);
     if (await existingIsUsable(destination, sprite.expectedDigest)) continue;
     tasks.push({ number, image: card.image, destination, expectedDigest: sprite.expectedDigest });
+  }
+
+  if (REQUESTED_NUMBERS) {
+    const missing = [...REQUESTED_NUMBERS].filter(number => !matchedNumbers.has(number));
+    if (missing.length > 0)
+      throw new Error(`指定卡号缺少可恢复的卡图清单或官网来源：${missing.join(", ")}`);
   }
 
   let restored = 0;
@@ -134,7 +144,7 @@ async function main() {
     console.log(`  已恢复 ${task.number} -> ${path.relative(OUTPUT_ROOT, task.destination)}`);
   }
 
-  console.log(`卡图正画恢复完成：检查 ${Object.keys(manifest).length} 个清单项，新增或修复 ${restored} 张。`);
+  console.log(`卡图正画恢复完成：检查 ${matchedNumbers.size} 个目标清单项，新增或修复 ${restored} 张。`);
 }
 
 await main();

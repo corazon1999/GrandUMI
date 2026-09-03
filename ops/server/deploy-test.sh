@@ -258,11 +258,12 @@ if [[ "$need_front" == 1 ]]; then
   ln -sfn "$original_cards_target" "$public_cards_link"
 
   # 正画原图不进入 Git，且测试服不能假设正式服已经拥有本提交新增的卡图。
-  # 只从已提交卡牌数据中的官方 URL 恢复缺失正画，并校验 imageManifest 的内容摘要；
+  # 本步骤只负责本提交新增的 17 张宣传卡，不能尝试恢复或改写其它历史系列；
+  # 从已提交卡牌数据中的官方 URL 恢复缺失正画，并校验 imageManifest 的内容摘要。
   # 输出严格指向测试服独立资源目录，不写入或修改正式服资源库。
   node "$repo/tools/ensure-card-images-from-data.mjs" \
     --output-root="$public_cards_link" \
-    --only-missing
+    --numbers="P-136,P-137,P-138,P-139,P-140,P-141,P-142,P-143,P-144,P-145,P-146,P-147,P-148,P-149,P-150,P-151,P-157"
 
   for asset_dir in cards-thumb cards-webp; do
     source_dir="$production_assets/$asset_dir"

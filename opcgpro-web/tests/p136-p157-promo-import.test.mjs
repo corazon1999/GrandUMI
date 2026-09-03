@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -88,10 +89,28 @@ test("测试服会从提交数据恢复缺失正画且不写正式服资源目�
   ]);
   assert.match(deploy, /ensure-card-images-from-data\.mjs/);
   assert.match(deploy, /--output-root="\$public_cards_link"/);
-  assert.match(deploy, /--only-missing/);
+  assert.doesNotMatch(deploy, /--only-missing/,
+    "测试服必须校验白名单内已有卡图的摘要，不能只按文件存在跳过");
+  const deployedNumbers = deploy.match(/--numbers="([^"]+)"/)?.[1]?.split(",") ?? [];
+  assert.deepEqual(
+    deployedNumbers,
+    expected.map(([number]) => number),
+    "测试服部署只能恢复本次新增的17张宣传卡，不能处理其它历史系列",
+  );
+  assert.equal(deployedNumbers.some(number => number.startsWith("EB")), false);
   assert.match(recovery, /expectedDigest/);
   assert.match(recovery, /官网图片摘要/);
   assert.match(recovery, /path\.relative\(OUTPUT_ROOT/);
   assert.match(importer, /https:\/\/webadmin\.windoent\.com\/front\/op-public/);
   assert.match(importer, /--numbers=/);
+});
+
+test("卡图恢复白名单缺项时失败关闭", () => {
+  const recoveryPath = path.join(repoRoot, "tools", "ensure-card-images-from-data.mjs");
+  const result = spawnSync(process.execPath, [recoveryPath, "--numbers=NOT-A-CARD"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /指定卡号缺少可恢复的卡图清单或官网来源/);
 });
