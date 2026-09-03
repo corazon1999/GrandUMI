@@ -30,6 +30,17 @@ public static class TurnEngine
         state.Phase = Phase.Reset;
         var p = state.Turn;
 
+        // “直到下个我方回合开始”在准备阶段入口到期，早于转活跃、抽牌及 OnTurnStart。
+        // 扫描双方场上卡而不是只扫当前方，使期限始终以记录的 OwnerSide 为权威；
+        // AppliedTurnCount 则防止同一回合的重复准备阶段入口提前清除刚施加的修正。
+        foreach (var side in state.Players)
+        {
+            ClearUntilNextOwnTurnStart(side.Leader, state);
+            foreach (var card in side.Characters) ClearUntilNextOwnTurnStart(card, state);
+            if (side.StageCard is not null) ClearUntilNextOwnTurnStart(side.StageCard, state);
+            if (side.ExtraStageCard is not null) ClearUntilNextOwnTurnStart(side.ExtraStageCard, state);
+        }
+
         // 新的自己回合开始：仍在场的卡重新获得【每回合1次】可用标识。
         // 对方回合内使用过的防御型效果也会在其控制者下次回合开始恢复。
         p.OncePerTurnEffectUsedCardIds.Clear();
@@ -322,6 +333,11 @@ public static class TurnEngine
             r.Duration == KeywordDuration.ThisBattle);
         c.OncePerTurnUsedKeys.Clear();
     }
+
+    private static void ClearUntilNextOwnTurnStart(CardInstance card, GameState state)
+        => card.PowerModsUntilNextOwnTurnStart.RemoveAll(modifier =>
+            modifier.OwnerSide == state.CurrentTurnPlayer
+            && modifier.AppliedTurnCount < state.TurnCount);
 
     /// <summary>
     /// 清除"直到下个对方的结束阶段结束时为止"(UntilNextOpponentEndPhase) 的关键词 / 限制。

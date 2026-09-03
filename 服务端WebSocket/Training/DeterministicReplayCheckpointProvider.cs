@@ -914,7 +914,27 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         };
 
     private static object CardProjection(CardInstance card, bool expansion)
-        => expansion ? ExpansionFullCard(card) : FullCard(card);
+    {
+        var legacyProjection = expansion ? ExpansionFullCard(card) : FullCard(card);
+        if (card.PowerModsUntilNextOwnTurnStart.Count == 0) return legacyProjection;
+
+        // 历史工件的 v1 checkpoint 必须保持逐字稳定；旧对局没有这一期限状态时不新增空字段。
+        // 只有真实存在新期限时才扩展投影，使其身份与到期回合进入完整/公开确定性哈希。
+        var projection = JsonSerializer.SerializeToNode(legacyProjection)!.AsObject();
+        projection["powerModsUntilNextOwnTurnStart"] = JsonSerializer.SerializeToNode(
+            card.PowerModsUntilNextOwnTurnStart
+                .Select(modifier => new
+                {
+                    modifier.Delta,
+                    modifier.OwnerSide,
+                    modifier.AppliedTurnCount,
+                })
+                .OrderBy(modifier => modifier.Delta)
+                .ThenBy(modifier => modifier.OwnerSide)
+                .ThenBy(modifier => modifier.AppliedTurnCount)
+                .ToArray());
+        return projection;
+    }
 
     /// <summary>规则修订版 1-5 的冻结卡牌投影。</summary>
     private static object FullCard(CardInstance card)

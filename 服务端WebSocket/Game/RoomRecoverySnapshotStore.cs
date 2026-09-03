@@ -10,6 +10,7 @@ namespace GrandUMI.Game;
 /// </summary>
 internal static class RoomRecoverySnapshotStore
 {
+    // v10：私有状态哈希纳入“直到下个我方回合开始”的实例级力量期限。
     // v9：私有状态哈希纳入咚!!的“下个重置阶段不活跃”一次性标记。
     // v8：场上来源离场改为提交点即时清理，ST14-017 改为动态场面判定；跳过旧状态语义的哈希比对。
     // v7：私有状态哈希纳入海克斯扩展运行态、卡牌永久实体费用及登场来源标记。
@@ -18,10 +19,10 @@ internal static class RoomRecoverySnapshotStore
     // v4：私有状态哈希纳入海克斯随机子授予计划及“超凡邪恶”跨回合累计力量。
     // v3：私有状态哈希纳入场上卡的“建立时快照”来源 ID。
     // v2：私有状态哈希纳入服务端权威贴咚撤回序号与栈。
-    // v1-v8 仍须读取其请求去重窗口；只跳过旧结构/旧语义的状态哈希比对，并在重放后刷新为 v9。
+    // v1-v9 仍须读取其请求去重窗口；只跳过旧结构/旧语义的状态哈希比对，并在重放后刷新为 v10。
     // 若整份忽略旧版，升级重启后的迟到重试可能再次执行已接受的贴咚等非幂等动作。
     internal const int MinimumCompatibleSchemaVersion = 1;
-    internal const int SchemaVersion = 9;
+    internal const int SchemaVersion = 10;
     internal const int CaptureEveryAcceptedActions = 16;
     private static readonly Channel<SnapshotCommand> Queue = Channel.CreateBounded<SnapshotCommand>(
         new BoundedChannelOptions(2_048)

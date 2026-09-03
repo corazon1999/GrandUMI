@@ -372,6 +372,17 @@ public static class PrivateStateSnapshotBuilder
                 powerModThisTurn = card.PowerModThisTurn,
                 powerModThisBattle = card.PowerModThisBattle,
                 powerModPersistent = card.PowerModPersistent,
+                powerModsUntilNextOwnTurnStart = card.PowerModsUntilNextOwnTurnStart
+                    .Select(modifier => new
+                    {
+                        modifier.Delta,
+                        modifier.OwnerSide,
+                        modifier.AppliedTurnCount,
+                    })
+                    .OrderBy(modifier => modifier.Delta)
+                    .ThenBy(modifier => modifier.OwnerSide)
+                    .ThenBy(modifier => modifier.AppliedTurnCount)
+                    .ToArray(),
                 costModThisTurn = card.CostModThisTurn,
                 costModPersistent = card.CostModPersistent,
                 originalPowerOverride = card.OriginalPowerOverride,
@@ -422,6 +433,17 @@ public static class PrivateStateSnapshotBuilder
             powerModThisTurn = card.PowerModThisTurn,
             powerModThisBattle = card.PowerModThisBattle,
             powerModPersistent = card.PowerModPersistent,
+            powerModsUntilNextOwnTurnStart = card.PowerModsUntilNextOwnTurnStart
+                .Select(modifier => new
+                {
+                    modifier.Delta,
+                    modifier.OwnerSide,
+                    modifier.AppliedTurnCount,
+                })
+                .OrderBy(modifier => modifier.Delta)
+                .ThenBy(modifier => modifier.OwnerSide)
+                .ThenBy(modifier => modifier.AppliedTurnCount)
+                .ToArray(),
             costModThisTurn = card.CostModThisTurn,
             costModPersistent = card.CostModPersistent,
             entityCostModPersistent = card.EntityCostModPersistent,

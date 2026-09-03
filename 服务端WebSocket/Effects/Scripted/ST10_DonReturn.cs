@@ -71,7 +71,8 @@ public class ST10_011_Heat : IScriptedEffect
         if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
         var key = $"ST10-011-donreturn:{ctx.Source.Id}";
         if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
-        AtomicOps.AddPowerPersistent(ctx.Source, 2000);
+        AtomicOps.AddPowerUntilNextOwnTurnStart(
+            ctx.State, ctx.OwnerIndex, ctx.Source, 2000);
         me.TurnOnceUsed.Add(key);
         return Task.CompletedTask;
     }

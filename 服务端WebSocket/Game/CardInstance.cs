@@ -27,6 +27,12 @@ public class CardInstance
     /// PowerModThisTurn 在施加者本回合末就清(过早)、PowerModPersistent 永不清(过久)，故另设此通道。</summary>
     public List<CardPowerMod> PowerModsUntilOppEnd { get; } = new();
 
+    /// <summary>
+    /// “直到下个我方回合开始时为止”的力量修正。它与“直到对方结束阶段”不是同一期限：
+    /// 对方结束阶段完成后仍保留，进入记录方下一个回合的准备阶段时才精确清除。
+    /// </summary>
+    public List<PowerModUntilNextOwnTurnStart> PowerModsUntilNextOwnTurnStart { get; } = new();
+
     /// <summary>临时获得的关键字（带过期时点）</summary>
     public List<TemporaryKeyword> GainedKeywords { get; } = new();
 
@@ -152,8 +158,26 @@ public class CardInstance
         int donBonus = ownerTurn ? donAttachedCount * 1000 : 0;
         int untilOppEnd = 0;
         foreach (var m in PowerModsUntilOppEnd) untilOppEnd += m.Delta;
-        return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent + untilOppEnd;
+        int untilNextOwnTurn = 0;
+        foreach (var m in PowerModsUntilNextOwnTurnStart) untilNextOwnTurn += m.Delta;
+        return baseP + donBonus + PowerModThisTurn + PowerModThisBattle + PowerModPersistent
+            + untilOppEnd + untilNextOwnTurn;
     }
+}
+
+/// <summary>持续到记录方下个回合开始时的单次力量修正。</summary>
+public sealed class PowerModUntilNextOwnTurnStart
+{
+    public required int Delta { get; init; }
+
+    /// <summary>“我方”所指的玩家；期限只会在该玩家的回合开始时到期。</summary>
+    public required int OwnerSide { get; init; }
+
+    /// <summary>
+    /// 施加时的全局回合编号。准备阶段可能因重连/恢复被重复进入；只有回合编号严格推进后才可清除，
+    /// 避免同一回合的重复入口把刚建立的期限误判为到期。
+    /// </summary>
+    public required int AppliedTurnCount { get; init; }
 }
 
 /// <summary>持续到施加方下个对方结束阶段的原本力量覆盖。</summary>

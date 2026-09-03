@@ -84,6 +84,11 @@ public class GameState
 
     private void CommitFieldDeparture(CardInstance departed)
     {
+        // “直到下个我方回合开始时”为实例级场上效果；任何实际离场都会终止它。
+        // 统一放在场区离场生命周期清理，覆盖 KO、退手、回卡组等所有入口，
+        // 防止同一卡实例随后从废弃区/手牌重新登场时继承旧加成。
+        departed.PowerModsUntilNextOwnTurnStart.Clear();
+
         var sourceId = departed.Id;
         ContinuousEffects.RemoveAll(effect =>
             effect.SourceCardId.Length >= 36

@@ -228,7 +228,7 @@ public sealed class RoomRecoverySnapshotStoreTests
                 Path.Combine(root, $"{roomId}.jsonl"),
                 JsonSerializer.Serialize(header) + Environment.NewLine);
 
-            // 上一版 v8 尚未把咚!!的“下个重置阶段不活跃”标记纳入私有状态哈希。
+            // 上一版 v9 尚未把“直到下个我方回合开始”的力量期限纳入私有状态哈希。
             // 升级后必须保留其请求去重窗口、
             // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前版本。
             var legacyPrivateState = JsonSerializer.SerializeToElement(new { schema = 2, legacy = true });

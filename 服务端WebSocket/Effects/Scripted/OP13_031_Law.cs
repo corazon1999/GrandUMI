@@ -17,29 +17,38 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 之后从手牌中选最多 1 张费用 ≤5 的角色，以休息状态登场。
 ///   - 手牌候选经 extra.choiceCards 下发卡面给客户端。
 ///
-/// 持续光环（登场时注册 ContinuousEffect）：
-///   "我方生命≤1 时此角色获得【阻挡者】" 由 GrantKeyword="阻挡者" 的条件持续效果实现，按生命数动态评估。
+/// 静态能力：
+///   - “我方生命≤1 时此角色获得【阻挡者】”通过 IFieldStaticEffect 独立注册，按生命数动态评估。
+///   - 它不是【登场时】效果，因此即使【登场时】被选择性无效化仍会建立，来源实际离场后统一清理。
 /// </summary>
-public class OP13_031_Law : IScriptedEffect
+public class OP13_031_Law : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP13-031";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
+    public Task RegisterFieldStatic(EffectContext ctx)
+    {
+        int owner = ctx.OwnerIndex;
+        var selfId = ctx.Source.Id;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "阻挡者",
+            Predicate = (state, side, card) =>
+                side == owner
+                && card.Id == selfId
+                && state.Players[owner].LifeArea.Count <= 1,
+        });
+
+        return Task.CompletedTask;
+    }
+
     public async Task Resolve(EffectContext ctx)
     {
         int owner = ctx.OwnerIndex;
-
-        // ── 持续光环：我方生命≤1 → 此角色获得【阻挡者】（登场时无条件注册，按生命数动态评估）──
-        var selfId0 = ctx.Source.Id;
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId0.ToString());
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
-        {
-            SourceCardId = selfId0.ToString(),
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-            GrantKeyword = "阻挡者",
-            Predicate = (st, side, card) => card.Id == selfId0 && st.Players[owner].LifeArea.Count <= 1,
-        });
 
         var me = ctx.State.Players[owner];
 

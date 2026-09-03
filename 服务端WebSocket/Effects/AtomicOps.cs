@@ -70,6 +70,27 @@ public static class AtomicOps
     public static void AddPowerUntilOppEnd(CardInstance c, int delta, int appliedBy)
         => c.PowerModsUntilOppEnd.Add(new CardPowerMod { Delta = delta, AppliedBySide = appliedBy });
 
+    /// <summary>
+    /// 给卡牌增加“直到指定玩家的下个回合开始时为止”的力量修正。
+    /// 记录服务端权威回合编号，使同一准备阶段的重复入口不会提前清除。
+    /// </summary>
+    public static void AddPowerUntilNextOwnTurnStart(
+        GameState state,
+        int ownerSide,
+        CardInstance card,
+        int delta)
+    {
+        if (ownerSide is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(ownerSide));
+
+        card.PowerModsUntilNextOwnTurnStart.Add(new PowerModUntilNextOwnTurnStart
+        {
+            Delta = delta,
+            OwnerSide = ownerSide,
+            AppliedTurnCount = state.TurnCount,
+        });
+    }
+
     /// <summary>将原本力量覆盖为指定值，持续到施加方的下个对方结束阶段。</summary>
     public static void SetOriginalPowerUntilOppEnd(CardInstance c, int value, int appliedBy)
         => c.OriginalPowerOverridesUntilOppEnd.Add(new OriginalPowerOverrideUntilOppEnd
@@ -774,7 +795,11 @@ public static class AtomicOps
     /// “对方将其场上的咚!!放回咚!!卡组”这类强制效果。
     /// </summary>
     public static async Task<bool> PromptReturnDonToDeck(
-        EffectContext ctx, int playerIdx, int n, bool optional)
+        EffectContext ctx,
+        int playerIdx,
+        int n,
+        bool optional,
+        bool requireExplicitChoice = false)
     {
         if (n <= 0) return true;
         var player = ctx.State.Players[playerIdx];
@@ -786,8 +811,11 @@ public static class AtomicOps
 
         List<DonCard> chosen;
         // 「咚!!-N」成本均可选择是否发动：即使全为活跃咚，也必须给玩家取消机会。
-        // 强制返还时，只有存在休息/附着咚（具体放回哪张会影响局面）才需要选择。
-        bool needPrompt = optional || eligible.Any(d => d.State != DonState.Active);
+        // “由某玩家将其咚返回”需显式选择时，由调用方开启 requireExplicitChoice；
+        // 这也覆盖全为活跃咚但实例级标记不同、选择哪张仍会影响后续局面的情况。
+        bool needPrompt = optional
+            || requireExplicitChoice
+            || eligible.Any(d => d.State != DonState.Active);
         if (!needPrompt)
         {
             chosen = eligible.Take(n).ToList();
@@ -1199,6 +1227,7 @@ public static class AtomicOps
         c.PowerModThisBattle = 0;
         c.PowerModPersistent = 0;
         c.PowerModsUntilOppEnd.Clear();
+        c.PowerModsUntilNextOwnTurnStart.Clear();
         c.OriginalPowerOverridesUntilOppEnd.Clear();
         c.GainedKeywords.Clear();
         c.CannotActivateNextReset = false;
