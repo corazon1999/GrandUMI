@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using GrandUMI.Diagnostics;
 using GrandUMI.Training;
 
 namespace GrandUMI.Tests;
@@ -10,6 +11,11 @@ internal static class GrandUmiTestTempPolicy
     [ModuleInitializer]
     internal static void Initialize()
     {
+        ServerCapacity.SetMemoryPressureProviderForTesting(
+            static () => new ServerCapacity.MemoryPressureSnapshot(
+                MemoryLoadBytes: 0,
+                HighMemoryLoadThresholdBytes: 1));
+
         ReplayRuntimeIdentityProvider.Initialize(new ReplayRuntimeBuildIdentity(
             "1111111111111111111111111111111111111111",
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
