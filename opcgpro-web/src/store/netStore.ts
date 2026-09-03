@@ -9,6 +9,7 @@ import {
   type IncomingRankSnapshotMetadata,
   type RankSnapshotRequestState,
 } from "@/lib/rankSnapshotState";
+import { nextConnectionEpoch } from "@/lib/inactivityRecovery";
 import type {
   PlayerInfo,
   FriendInfo,
@@ -184,6 +185,8 @@ export type SpectateState = "idle" | "joining" | "watching";
 interface NetStore {
   // 连接状态（含重连状态）
   connState: "disconnected" | "connecting" | "handshaking" | "connected" | "reconnecting" | "recovering" | "failed";
+  // 每次已连接会话失效时递增；用于阻止旧对局快照在重连窗口恢复交互。
+  connectionEpoch: number;
   // 重连倒计时（秒），ReconnectOverlay 显示用
   reconnectCountdown: number;
   // 账户状态
@@ -356,6 +359,7 @@ interface NetStore {
 
 const initialState = {
   connState: "disconnected" as const,
+  connectionEpoch: 0,
   reconnectCountdown: 0,
   loggedIn: false,
   account: "",
@@ -466,7 +470,10 @@ const initialState = {
 export const useNetStore = create<NetStore>((set) => ({
   ...initialState,
 
-  setConnState: (s) => set({ connState: s }),
+  setConnState: (s) => set((state) => ({
+    connState: s,
+    connectionEpoch: nextConnectionEpoch(state.connectionEpoch, state.connState, s),
+  })),
   setReconnectCountdown: (n) => set({ reconnectCountdown: n }),
 
   setLoggedIn: (v, name, account) =>

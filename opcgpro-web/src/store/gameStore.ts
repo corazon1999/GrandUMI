@@ -201,6 +201,8 @@ interface GameStore {
   isStart: boolean;
   tick: number;
   serverNowUtc: string | null;
+  // 最近一份已接纳权威快照所属的连接世代。
+  snapshotConnectionEpoch: number;
   currentTurn: boolean;
   canUndoAttachDon: boolean;
   undoAttachDonOperationId: string | null;
@@ -294,7 +296,7 @@ interface GameStore {
   spectatorNames: string[];
 
   // ── 唯一写入路径 ─────────────────────────────────────────────────────
-  syncFromServer: (msg: MsgGameState) => void;
+  syncFromServer: (msg: MsgGameState, connectionEpoch?: number) => void;
   clearReveal: () => void;
   shiftEffectActivation: () => void;
   flashPromptSuccess: () => void;
@@ -328,6 +330,7 @@ export const useGameStore = create<GameStore>()(
     isStart: false,
     tick: 0,
     serverNowUtc: null,
+    snapshotConnectionEpoch: 0,
     currentTurn: false,
     canUndoAttachDon: false,
     undoAttachDonOperationId: null,
@@ -400,7 +403,7 @@ export const useGameStore = create<GameStore>()(
     spectatorDetails: [],
     spectatorHandRequests: [],
 
-    syncFromServer: (msg) =>
+    syncFromServer: (msg, connectionEpoch = 0) =>
       set((s) => {
         const previousTick = s.tick;
         const incomingTick = msg.tick ?? previousTick + 1;
@@ -439,6 +442,7 @@ export const useGameStore = create<GameStore>()(
         const opponent = clonePlayerView(msg.opponent ?? null);
         s.tick = incomingTick;
         s.serverNowUtc = msg.serverNowUtc ?? null;
+        s.snapshotConnectionEpoch = connectionEpoch;
         s.phase = (msg.phase as BattlePhase) ?? "Main";
         s.currentTurn = msg.currentTurn;
         s.canUndoAttachDon = msg.canUndoAttachDon ?? false;
@@ -670,6 +674,7 @@ export const useGameStore = create<GameStore>()(
       s.isStart = false;
       s.tick = 0;
       s.serverNowUtc = null;
+      s.snapshotConnectionEpoch = 0;
       s.currentTurn = false;
       s.canUndoAttachDon = false;
       s.undoAttachDonOperationId = null;

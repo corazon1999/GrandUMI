@@ -55,7 +55,7 @@ test("挂机提醒使用服务端校准倒计时且只挂载给真实玩家", as
   ]);
 
   assert.match(overlay, /elapsedMillisecondsFromServerSync/);
-  assert.match(overlay, /active === "my" && warning && !isGameOver/);
+  assert.match(overlay, /shouldShowInactivityWarning\(\{/);
   assert.match(overlay, /我还在，继续对局/);
   assert.match(overlay, /连续 4 分钟没有任何操作将自动判负/);
   assert.match(overlay, /本次无操作计时归零/);

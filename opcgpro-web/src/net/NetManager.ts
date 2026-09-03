@@ -150,15 +150,40 @@ class NetManagerClass {
    * 它随后触发的 close/error 不会再启动第二套重连计时器。
    */
   retryNow(url?: string | readonly string[]) {
-    if (this._state === "connected" || this._state === "recovering") return;
+    const socketUsable = this.ws?.readyState === WebSocket.OPEN;
+    if (socketUsable && (this._state === "connected" || this._state === "recovering")) return;
+    this.restartConnectionNow(url, "立即切换线路重连");
+  }
+
+  /**
+   * 操作发送失败说明连接状态与真实 WebSocket 已不一致，不能继续停留在“已连接”。
+   * 此入口强制废弃旧 generation，并只启动一套新的恢复流程。
+   */
+  recoverAfterSendFailure(url?: string | readonly string[]) {
+    if (["connecting", "handshaking", "reconnecting", "recovering"].includes(this._state)) return;
+    this.restartConnectionNow(url, "操作发送失败，立即切换线路重连");
+  }
+
+  private restartConnectionNow(
+    url: string | readonly string[] | undefined,
+    closeReason: string,
+  ) {
     if (url !== undefined) this.endpoints = this.rankEndpoints(normalizeEndpoints(url));
 
     this.clearTimers();
     const socket = this.ws;
     this.ws = null;
     this.socketGeneration++;
+    this.stateBaseline = null;
+    this.deltaResyncRequested = false;
+    this.pendingPings.clear();
+    this.lastDisconnectReason = closeReason;
+    if (this.wasConnectedBefore && !this.lossNotified) {
+      this.lossNotified = true;
+      eventBus.emit("close");
+    }
     try {
-      socket?.close(4002, "立即切换线路重连");
+      socket?.close(4002, closeReason);
     } catch {
       // 浏览器可能已经回收异常连接；继续建立新连接即可。
     }

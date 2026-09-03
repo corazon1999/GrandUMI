@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameRequest } from "@/net/GameRequest";
+import { NetManager } from "@/net/NetManager";
+import { getWebSocketEndpoints } from "@/net/wsEndpoint";
 import { useGameStore } from "@/store/gameStore";
+import { useNetStore } from "@/store/netStore";
 import { elapsedMillisecondsFromServerSync } from "@/lib/serverCountdown.mjs";
+import { shouldShowInactivityWarning } from "@/lib/inactivityRecovery";
 
 const PRESENCE_CONFIRMATION_TIMEOUT_MS = 5_000;
 
@@ -25,12 +29,29 @@ export default function InactivityWarningOverlay() {
   const lossBase = useGameStore((s) => s.inactivityLossRemainingMs);
   const syncUtc = useGameStore((s) => s.inactivitySyncUtc);
   const serverNowUtc = useGameStore((s) => s.serverNowUtc);
+  const snapshotConnectionEpoch = useGameStore((s) => s.snapshotConnectionEpoch);
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const connState = useNetStore((s) => s.connState);
+  const connectionEpoch = useNetStore((s) => s.connectionEpoch);
   const [anchor, setAnchor] = useState(() => ({ syncUtc, serverNowUtc, receivedAt: monotonicNow() }));
   const [now, setNow] = useState(() => monotonicNow());
   const [submitting, setSubmitting] = useState(false);
+  const [confirmationIssue, setConfirmationIssue] = useState<string | null>(null);
+  const submittingRef = useRef(false);
   const confirmationTimer = useRef<number | null>(null);
-  const visible = active === "my" && warning && !isGameOver;
+  const visible = shouldShowInactivityWarning({
+    active,
+    warning,
+    isGameOver,
+    connState,
+    connectionEpoch,
+    snapshotConnectionEpoch,
+  });
+
+  const finishSubmitting = useCallback(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
+  }, []);
 
   useEffect(() => {
     if (confirmationTimer.current !== null) {
@@ -40,8 +61,9 @@ export default function InactivityWarningOverlay() {
     const receivedAt = monotonicNow();
     setAnchor({ syncUtc, serverNowUtc, receivedAt });
     setNow(receivedAt);
-    setSubmitting(false);
-  }, [lossBase, serverNowUtc, syncUtc]);
+    finishSubmitting();
+    setConfirmationIssue(null);
+  }, [finishSubmitting, lossBase, serverNowUtc, syncUtc]);
 
   useEffect(() => {
     if (!visible) {
@@ -49,13 +71,14 @@ export default function InactivityWarningOverlay() {
         window.clearTimeout(confirmationTimer.current);
         confirmationTimer.current = null;
       }
-      setSubmitting(false);
+      finishSubmitting();
+      setConfirmationIssue(null);
       return;
     }
     setNow(monotonicNow());
     const timer = window.setInterval(() => setNow(monotonicNow()), 250);
     return () => window.clearInterval(timer);
-  }, [visible]);
+  }, [finishSubmitting, visible]);
 
   useEffect(() => () => {
     if (confirmationTimer.current !== null) window.clearTimeout(confirmationTimer.current);
@@ -73,16 +96,31 @@ export default function InactivityWarningOverlay() {
   const remaining = Math.max(0, lossBase - elapsed);
 
   const confirmPresence = () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     if (!GameRequest.confirmInactivityPresence()) {
-      setSubmitting(false);
+      finishSubmitting();
+      setConfirmationIssue("确认未送达，正在恢复连接…");
+      NetManager.recoverAfterSendFailure(getWebSocketEndpoints());
       return;
     }
     confirmationTimer.current = window.setTimeout(() => {
       confirmationTimer.current = null;
-      GameRequest.refreshStateSnapshot();
-      setSubmitting(false);
+      const snapshotRequested = GameRequest.refreshStateSnapshot();
+      finishSubmitting();
+      if (!snapshotRequested) {
+        setConfirmationIssue("确认未送达，正在恢复连接…");
+        NetManager.recoverAfterSendFailure(getWebSocketEndpoints());
+        return;
+      }
+      setConfirmationIssue("暂未收到服务器确认，可再次确认或立即换线重连。");
     }, PRESENCE_CONFIRMATION_TIMEOUT_MS);
+  };
+
+  const retryConnection = () => {
+    setConfirmationIssue("正在切换线路并恢复对局…");
+    NetManager.recoverAfterSendFailure(getWebSocketEndpoints());
   };
 
   return (
@@ -105,6 +143,11 @@ export default function InactivityWarningOverlay() {
           {formatCountdown(remaining)}
         </p>
         <p className="mt-1 text-xs font-bold text-slate-400">距离自动判负</p>
+        {confirmationIssue && (
+          <p className="mt-3 text-sm font-bold leading-5 text-amber-200" role="status">
+            {confirmationIssue}
+          </p>
+        )}
         <button
           type="button"
           onClick={confirmPresence}
@@ -113,6 +156,15 @@ export default function InactivityWarningOverlay() {
         >
           {submitting ? "正在确认…" : "我还在，继续对局"}
         </button>
+        {confirmationIssue && (
+          <button
+            type="button"
+            onClick={retryConnection}
+            className="mt-3 min-h-12 rounded-xl border border-orange-400/70 bg-orange-500/10 px-5 text-sm font-bold text-orange-200 transition-colors hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+          >
+            立即换线重连
+          </button>
+        )}
       </section>
     </div>
   );

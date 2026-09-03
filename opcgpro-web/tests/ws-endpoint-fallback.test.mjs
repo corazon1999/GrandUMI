@@ -52,7 +52,8 @@ test("重连等待可以由玩家或浏览器恢复联网事件立即打断", as
   ]);
 
   assert.match(manager, /retryNow\(url\?: string \| readonly string\[\]\)/);
-  assert.match(manager, /socket\?\.close\(4002, "立即切换线路重连"\)/);
+  assert.match(manager, /restartConnectionNow\(url, "立即切换线路重连"\)/);
+  assert.match(manager, /socket\?\.close\(4002, closeReason\)/);
   assert.match(hook, /window\.addEventListener\("online", onBrowserOnline\)/);
   assert.match(hook, /window\.removeEventListener\("online", onBrowserOnline\)/);
   assert.match(login, /立即换线重试/);

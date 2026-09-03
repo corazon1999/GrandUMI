@@ -35,7 +35,7 @@ export default function ReconnectOverlay() {
     <AnimatePresence>
       {visible && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[10100] flex flex-col items-center justify-center overflow-y-auto bg-black/80 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))] backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -52,7 +52,7 @@ export default function ReconnectOverlay() {
               <button
                 type="button"
                 onClick={() => NetManager.retryNow(getWebSocketEndpoints())}
-                className="mt-5 min-h-11 rounded-xl border border-orange-400/70 bg-orange-500/10 px-5 text-sm font-semibold text-orange-200 transition-colors hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-orange-400"
+                className="mt-5 min-h-12 rounded-xl border border-orange-400/70 bg-orange-500/10 px-5 text-sm font-semibold text-orange-200 transition-colors hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-orange-400"
               >
                 立即换线重试
               </button>
@@ -67,15 +67,16 @@ export default function ReconnectOverlay() {
 
       {connState === "failed" && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90"
+          className="fixed inset-0 z-[10100] flex flex-col items-center justify-center overflow-y-auto bg-black/90 px-[calc(1rem+var(--layout-safe-left,env(safe-area-inset-left)))] py-[calc(1rem+var(--layout-safe-top,env(safe-area-inset-top)))] [padding-bottom:calc(1rem+var(--layout-safe-bottom,env(safe-area-inset-bottom)))] [padding-right:calc(1rem+var(--layout-safe-right,env(safe-area-inset-right)))]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
           <p className="text-red-400 text-2xl font-bold mb-4">连接失败</p>
           <p className="text-gray-400 mb-6">无法重新连接到服务器，游戏已结束</p>
           <button
+            type="button"
             onClick={() => router.push("/home")}
-            className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-400 transition-colors"
+            className="min-h-12 rounded-lg bg-orange-500 px-6 py-2 text-white transition-colors hover:bg-orange-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-200"
           >
             返回大厅
           </button>

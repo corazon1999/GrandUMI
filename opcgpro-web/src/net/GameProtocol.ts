@@ -55,7 +55,10 @@ export function registerGameProtocols() {
       case "MsgGameState": {
         const gs = msg as MsgGameState;
         completePendingActionLatency(gs.requestId, gs.tick ?? 0);
-        useGameStore.getState().syncFromServer(gs);
+        useGameStore.getState().syncFromServer(
+          gs,
+          useNetStore.getState().connectionEpoch,
+        );
         // 本地录制对局快照流（仅玩家视角；观战不记）→ 供首页战绩/回放
         matchRecorder.onSnapshot(gs);
         // 重启恢复/刷新后：若收到己方对局快照（非观战、未结束）但当前不在 /game，
