@@ -83,6 +83,9 @@ export default function GameActions() {
     !isSelectingTarget &&
     selectedFieldId !== null &&
     selectedCanActivateEffect;
+  const canDetachAllDon =
+    !isSelectingTarget &&
+    (selectedFieldCard?.canDetachAllDon ?? false);
 
   // 贴咚采用“目标优先”操作：先选中领袖/角色，再直接选择要赋予的张数。
   // 领袖在协议中使用固定标识 "leader"；角色沿用场上实例 ID，舞台不可贴咚。
@@ -116,11 +119,11 @@ export default function GameActions() {
     if (!currentTurn || phase !== "Main" || battle || isPending) setPendingMainEvent(null);
   }, [battle, currentTurn, isPending, phase]);
 
-  // 手机竖屏会把 1280×720 牌桌旋转并缩放；旋转态需预留更高的画布内按钮高度，
-  // 才能保证映射回物理竖屏后的短边仍不小于 44px。
+  // 竖屏设备会把 1280×720 牌桌缩放后再旋转；92px 在 360×780 的最小组合缩放下仍有 46px，
+  // 保证本区所有整行主要操作（含屠宰场）保留至少 44px 的实际触控短边。
   const btn = `${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} w-full rounded-md px-3 py-2 text-sm font-bold text-white shadow transition-colors disabled:cursor-not-allowed disabled:bg-gray-600`;
 
-  const hasAny = canUndoAttachDon || canAttack || isSelectingTarget || canPlay || canActivate || canPassCounter || currentTurn;
+  const hasAny = canUndoAttachDon || canAttack || isSelectingTarget || canPlay || canActivate || canDetachAllDon || canPassCounter || currentTurn;
 
   const activateEffect = () => {
     if (!selectedFieldId) return;
@@ -152,6 +155,12 @@ export default function GameActions() {
   const attachDon = (count: number) => {
     if (!attachTargetId) return;
     GameRequest.attachDon(attachTargetId, count);
+    setSelectedField(null);
+  };
+
+  const detachAllDon = () => {
+    if (!selectedFieldCard) return;
+    GameRequest.detachAllDon(selectedFieldCard.id);
     setSelectedField(null);
   };
 
@@ -224,6 +233,17 @@ export default function GameActions() {
           className={`${btn} bg-purple-600 hover:bg-purple-500`}
         >
           启动效果
+        </button>
+      )}
+
+      {canDetachAllDon && (
+        <button
+          type="button"
+          onClick={detachAllDon}
+          disabled={isPending}
+          className={`${btn} border border-orange-300/50 bg-orange-700 hover:bg-orange-600`}
+        >
+          屠宰场：移除全部咚
         </button>
       )}
 

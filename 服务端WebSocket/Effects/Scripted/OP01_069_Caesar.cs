@@ -42,6 +42,7 @@ public class OP01_069_Caesar : IScriptedEffect
             picked.TurnPlayed = ctx.State.TurnCount;
             picked.IsTapped = false;
             me.Characters.Add(picked);
+            ctx.State.EnqueueEnterField(ctx.OwnerIndex, picked, "deck");
         }
 
         // 切洗卡组

@@ -45,7 +45,7 @@ public class OP10_112_Kid : IScriptedEffect
         {
             if (opp.LifeArea.Count > 2) return;
 
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
             if (me.Hand.Count > 0)
             {

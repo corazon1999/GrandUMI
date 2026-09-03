@@ -34,7 +34,7 @@ public class OP07_096_Rankyaku : IScriptedEffect
         var me = s.Players[ctx.OwnerIndex];
         var opp = s.Players[1 - ctx.OwnerIndex];
 
-        AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
 
         if (me.Trash.Count >= 10 && opp.Characters.Count > 0)
         {

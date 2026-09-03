@@ -43,7 +43,7 @@ public class OP01_062_Crocodile : IScriptedEffect
             "克洛克达尔（领航）：手牌≤4 且本回合未通过此领袖抽牌，抽取 1 张卡牌？");
         if (!use) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         me.TurnOnceUsed.Add(key);
     }
 }

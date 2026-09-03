@@ -44,6 +44,6 @@ public class OP09_088_Shiryu : IScriptedEffect
             if (card != null) AtomicOps.DiscardHand(me, card);
         }
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

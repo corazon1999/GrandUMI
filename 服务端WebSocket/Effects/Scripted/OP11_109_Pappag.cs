@@ -27,7 +27,7 @@ public class OP11_109_Pappag : IScriptedEffect
         if (!hasKami) return;
 
         // 抽 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 丢弃我方 2 张手牌
         int toDiscard = Math.Min(2, me.Hand.Count);

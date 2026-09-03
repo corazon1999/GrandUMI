@@ -39,7 +39,7 @@ public class OP16_050_MissDoublefinger : IScriptedEffect
         AtomicOps.BounceToHand(ctx.State, ctx.OwnerIndex, bounce);
 
         // 收益：抽2张，丢弃我方1张手牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         if (me.Hand.Count > 0)
         {
             var dch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",

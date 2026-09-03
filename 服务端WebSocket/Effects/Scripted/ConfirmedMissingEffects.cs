@@ -145,7 +145,7 @@ public sealed class OP12_081_Koala : IScriptedEffect
             var battle = ctx.State.CurrentBattle;
             if (battle?.AttackerCardId != ctx.Source.Id || !battle.TargetIsLeader) return;
             if (me.Characters.Count(card => ctx.State.CurrentCostOf(ctx.OwnerIndex, card) >= 8) >= 2)
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 
@@ -236,7 +236,7 @@ public sealed class ST36_004_Bartolomeo : IScriptedEffect
             "选择必须丢弃的 1 张《超新星》卡牌", costs);
         if (discarded is null) return;
         AtomicOps.DiscardHand(me, discarded);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }
 
@@ -448,7 +448,7 @@ public sealed class OP15_012_Buggy : IScriptedEffect
     {
         if (ctx.Trigger == EffectTrigger.OnKO)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 
@@ -479,7 +479,7 @@ public sealed class OP15_037_ResultsSpeak : IScriptedEffect
     {
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
         var me = ctx.State.Players[ctx.OwnerIndex];
@@ -559,7 +559,7 @@ public sealed class OP15_041_Orlumbus : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Trigger == EffectTrigger.OnKO)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
         string key = $"OP15-041-act:{ctx.Source.Id}";
@@ -583,16 +583,16 @@ public sealed class OP15_056_FlameFlameFruit : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger trigger)
         => trigger == EffectTrigger.EventMain || trigger == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         if (ctx.Trigger == EffectTrigger.EventMain && me.Leader.MatchesName("路西"))
         {
             AtomicOps.GiveKeyword(me.Leader, "双重攻击", KeywordDuration.ThisTurn, ctx.OwnerIndex);
             AtomicOps.AddPowerThisTurn(me.Leader, 3000);
         }
-        return Task.CompletedTask;
+        return;
     }
 }
 
@@ -608,7 +608,7 @@ public sealed class OP15_057_DressrosaKingdom : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            if (me.Leader.Info.HasKeyword("德莱斯罗兹")) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            if (me.Leader.Info.HasKeyword("德莱斯罗兹")) await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
         if (ctx.Source.IsTapped) return;
@@ -636,14 +636,14 @@ public sealed class OP15_084_DrHogback : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger trigger)
         => trigger == EffectTrigger.OnEnterField || trigger == EffectTrigger.OnKO;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Trigger == EffectTrigger.OnEnterField && me.Leader.Info.HasKeyword("恐怖之船海盗团"))
             AtomicOps.MillTop(me, 5);
         else if (ctx.Trigger == EffectTrigger.OnKO && me.Hand.Count <= 6)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }
 

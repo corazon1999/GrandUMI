@@ -427,9 +427,12 @@ public class GameState
     {
         int? instance = card.HighestInstanceOriginalPowerOverride;
         int? continuous = ContinuousOriginalPowerOverride(sideIdx, card);
-        if (instance.HasValue && continuous.HasValue)
-            return Math.Max(instance.Value, continuous.Value);
-        return instance ?? continuous ?? card.Info.Power;
+        int? hex = Hex.HexRules.OriginalPowerOverride(this, sideIdx, card);
+        var overrides = new[] { instance, continuous, hex }
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
+        return overrides.Length > 0 ? overrides.Max() : card.Info.Power;
     }
 
     /// <summary>统一计算某张卡当前力量：基础 + 咚 + 临时修正 + 永续修正</summary>
@@ -476,7 +479,7 @@ public class GameState
     /// <summary>手牌打出该卡的实际费用（含持续费用光环，如"从手牌登场X角色费用-1"），最低 0</summary>
     public int HandPlayCost(int playerIdx, CardInstance card)
     {
-        int v = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
+        int v = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent + card.EntityCostModPersistent
                 + ContinuousCostBonus(playerIdx, card)
                 + Effects.HandStaticCost.Delta(this, playerIdx, card)   // 手牌中静态减费（如 OP16-005）
                 - OneShotDiscountFor(playerIdx, card)                   // 一次性下次登场减费（OP02-025，预览不消费）
@@ -704,7 +707,7 @@ public class GameState
     /// <summary>统一计算某张卡当前费用：基础 + 一次性修正 + 永续修正 + 持续光环，最低 0</summary>
     public int CurrentCostOf(int sideIdx, CardInstance card)
     {
-        int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
+        int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent + card.EntityCostModPersistent
                   + ContinuousCostBonus(sideIdx, card)
                   + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;
@@ -712,7 +715,9 @@ public class GameState
 
     /// <summary>指定玩家当前费用区上限；果实能力者把 10 提升为 12。</summary>
     public int MaxDonInCostAreaFor(int playerIdx)
-        => Hex.HexRules.Has(this, playerIdx, 52) ? 12 : PhaseFlow.TurnEngine.MaxDonInCostArea;
+        => Hex.HexRules.Has(this, playerIdx, 79)
+            ? int.MaxValue
+            : Hex.HexRules.Has(this, playerIdx, 52) ? 12 : PhaseFlow.TurnEngine.MaxDonInCostArea;
 
     /// <summary>
     /// 计算当前费用，但排除指定来源的持续费用修正。用于持续效果以当前费用筛选自身作用对象，
@@ -720,7 +725,7 @@ public class GameState
     /// </summary>
     public int CurrentCostOfExcludingSource(int sideIdx, CardInstance card, string sourceCardId)
     {
-        int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent
+        int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent + card.EntityCostModPersistent
                   + ContinuousCostBonus(sideIdx, card, sourceCardId)
                   + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;

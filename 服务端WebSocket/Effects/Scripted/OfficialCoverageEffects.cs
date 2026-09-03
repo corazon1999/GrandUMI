@@ -483,7 +483,7 @@ public sealed class P_134_DineAndDash : IScriptedEffect
     {
         var picked = await OfficialCoverageHelpers.LookTopPickAndBottom(ctx, 3,
             card => Names.Any(card.MatchesName), "公开最多1张“萨波”“艾斯”或“路飞”并加入手牌");
-        if (picked is null) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        if (picked is null) await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }
 

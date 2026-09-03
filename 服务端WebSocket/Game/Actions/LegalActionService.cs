@@ -92,6 +92,7 @@ public static class LegalActionService
                 "PromptResponse" => ValidatePromptResponse(state, actorSeat, data),
                 "PlayCard" => ValidatePlayCard(state, actorSeat, data),
                 "AttachDon" => ValidateAttachDon(state, actorSeat, data),
+                "DetachAllDon" => ValidateDetachAllDon(state, actorSeat, data),
                 "Attack" => ValidateAttack(state, actorSeat, data),
                 "UseEffect" => ValidateUseEffect(state, actorSeat, data),
                 "DeclareBlocker" => ValidateDeclareBlocker(state, actorSeat, data),
@@ -153,6 +154,10 @@ public static class LegalActionService
                 {
                     targetId = RequireString(data, "targetId"),
                     count = OptionalInt32(data, "count", 1),
+                }),
+                "DetachAllDon" => JsonSerializer.SerializeToElement(new
+                {
+                    characterId = RequireString(data, "characterId"),
                 }),
                 "Attack" => CanonicalizeAttack(data),
                 "UseEffect" => JsonSerializer.SerializeToElement(new
@@ -271,6 +276,12 @@ public static class LegalActionService
                 for (var count = 1; count <= me.ActiveDonCount; count++)
                     AddConcrete(state, actor, purpose, "AttachDon", new { targetId = target, count }, "main", pending);
         }
+
+        foreach (var character in me.Characters.OrderBy(card => card.Id))
+            AddConcrete(state, actor, purpose, "DetachAllDon", new
+            {
+                characterId = character.Id.ToString(),
+            }, "main", pending);
 
         var attackers = new[] { me.Leader }.Concat(me.Characters).OrderBy(card => card.Id).ToArray();
         foreach (var attacker in attackers)
@@ -517,6 +528,13 @@ public static class LegalActionService
             actor,
             RequireString(data, "targetId"),
             OptionalInt32(data, "count", 1));
+
+    private static ActionValidator.Result ValidateDetachAllDon(GameState state, int actor, JsonElement data)
+    {
+        if (!Guid.TryParse(RequireString(data, "characterId"), out var characterId))
+            return new(false, "角色 ID 非法");
+        return ActionValidator.CanDetachAllDon(state, actor, characterId);
+    }
 
     private static ActionValidator.Result ValidateAttack(GameState state, int actor, JsonElement data)
     {

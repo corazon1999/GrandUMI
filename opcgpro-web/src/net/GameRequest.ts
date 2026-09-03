@@ -200,6 +200,9 @@ export const GameRequest = {
   /** 撤回服务端确认的最近一次贴咚；旧令牌由服务端拒绝，不在客户端自行改牌桌。 */
   undoAttachDon: (operationId: string) => send("UndoAttachDon", { operationId }),
 
+  /** 【屠宰场】移除一个己方角色身上的全部咚；咚的状态由服务端按角色状态结算。 */
+  detachAllDon: (characterId: string) => send("DetachAllDon", { characterId }),
+
   /** 攻击宣言 */
   attack: (attackerId: string, target: { isLeader: true } | { isLeader: false; cardId: string }) =>
     send("Attack",

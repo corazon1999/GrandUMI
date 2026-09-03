@@ -16,7 +16,7 @@ public sealed class HexCatalogConfiguration
     public const string Schema = "grandumi.hex-catalog.v1";
     public static int RequiredRegularHexes(HexTier tier) => tier switch
     {
-        HexTier.Silver => 18,
+        HexTier.Silver => 45,
         HexTier.Gold => 18,
         HexTier.Rainbow => 17,
         _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, "未知海克斯品质"),
@@ -67,6 +67,16 @@ public sealed class HexCatalogConfiguration
     public static HexCatalogConfiguration BuiltIn { get; } = Create(
         revision: 0,
         HexCatalog.All.Select(item => new HexCatalogTierAssignment(item.Id, item.Tier)));
+
+    public static HexCatalogConfiguration BuiltInForRulesRevision(int rulesRevision)
+        => rulesRevision >= HexRules.ExpansionRulesRevision
+            ? BuiltIn
+            : CreateForRulesRevision(
+                rulesRevision,
+                revision: 0,
+                HexCatalog.All
+                    .Where(item => item.Id <= 56)
+                    .Select(item => new HexCatalogTierAssignment(item.Id, item.Tier)));
 
     public static HexCatalogConfiguration Create(
         long revision,
@@ -138,8 +148,20 @@ public sealed class HexCatalogConfiguration
                 throw new InvalidDataException($"海克斯配置重复包含编号 {assignment.Id}。");
         }
 
-        var knownIds = HexCatalog.All.Select(item => item.Id).Order().ToArray();
-        if (!values.Keys.Order().SequenceEqual(knownIds))
+        var currentIds = HexCatalog.All.Select(item => item.Id).Order().ToArray();
+        var legacyIds = HexCatalog.All.Where(item => item.Id <= 56).Select(item => item.Id).Order().ToArray();
+        if (values.Keys.Order().SequenceEqual(legacyIds))
+        {
+            // 升级前发布的 active 文件只有 1..56。若文件携带旧摘要，先按旧内容验真，
+            // 再只在内存中补入本修订新增项；下一次正常发布会把完整新目录原子写回。
+            if (expectedDigest is not null
+                && !string.Equals(expectedDigest, ComputeDigest(values), StringComparison.Ordinal))
+                throw new InvalidDataException("海克斯配置摘要校验失败。");
+            foreach (var definition in HexCatalog.All.Where(item => item.Id > 56))
+                values.Add(definition.Id, definition.Tier);
+            expectedDigest = null;
+        }
+        if (!values.Keys.Order().SequenceEqual(currentIds))
             throw new InvalidDataException("海克斯配置必须且只能包含完整的权威目录编号。");
 
         if (requireBalancedPools)
@@ -168,6 +190,50 @@ public sealed class HexCatalogConfiguration
             string.IsNullOrWhiteSpace(publishedBy) ? null : publishedBy.Trim(),
             sourceDraftRevision,
             string.IsNullOrWhiteSpace(sourceRequestId) ? null : sourceRequestId.Trim());
+    }
+
+    /// <summary>
+    /// 恢复历史房间时按建局规则版本验证当时的完整目录，不把新增编号补进旧房间，
+    /// 也不重算其已经写入日志的摘要。
+    /// </summary>
+    public static HexCatalogConfiguration CreateForRulesRevision(
+        int rulesRevision,
+        long revision,
+        IEnumerable<HexCatalogTierAssignment> assignments,
+        string? expectedDigest = null)
+    {
+        if (rulesRevision is < HexRules.LegacyRulesRevision or > HexRules.CurrentRulesRevision)
+            throw new InvalidDataException($"不支持的海克斯规则版本：{rulesRevision}");
+        if (revision < 0) throw new InvalidDataException("海克斯配置版本不能小于 0。");
+        ArgumentNullException.ThrowIfNull(assignments);
+        var values = new Dictionary<int, HexTier>();
+        foreach (var assignment in assignments)
+        {
+            if (!Enum.IsDefined(assignment.Tier))
+                throw new InvalidDataException($"海克斯 {assignment.Id} 的品质无效。");
+            if (!values.TryAdd(assignment.Id, assignment.Tier))
+                throw new InvalidDataException($"海克斯配置重复包含编号 {assignment.Id}。");
+        }
+
+        var expectedIds = HexCatalog.All
+            .Where(item => rulesRevision >= HexRules.ExpansionRulesRevision || item.Id <= 56)
+            .Select(item => item.Id)
+            .Order()
+            .ToArray();
+        if (!values.Keys.Order().SequenceEqual(expectedIds))
+            throw new InvalidDataException("海克斯配置与建局规则版本的权威目录不一致。");
+        ValidateNonEmptyRegularPools(values, rulesRevision);
+        var digest = ComputeDigest(values);
+        if (expectedDigest is not null && !string.Equals(expectedDigest, digest, StringComparison.Ordinal))
+            throw new InvalidDataException("海克斯配置摘要校验失败。");
+        return new HexCatalogConfiguration(
+            revision,
+            digest,
+            new ReadOnlyDictionary<int, HexTier>(values),
+            null,
+            null,
+            null,
+            null);
     }
 
     public static HexCatalogConfiguration ReadActiveFile(string path)
@@ -234,6 +300,20 @@ public sealed class HexCatalogConfiguration
             .Select(item => $"{item.Key}:{item.Value}\n"));
         return "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)))
             .ToLowerInvariant();
+    }
+
+    private static void ValidateNonEmptyRegularPools(
+        IReadOnlyDictionary<int, HexTier> assignments,
+        int rulesRevision)
+    {
+        var regularIds = HexCatalog.RegularForRevision(rulesRevision)
+            .Select(item => item.Id)
+            .ToHashSet();
+        foreach (var tier in Enum.GetValues<HexTier>())
+        {
+            if (!assignments.Any(item => regularIds.Contains(item.Key) && item.Value == tier))
+                throw new InvalidDataException($"{HexCatalog.TierDisplayName(tier)}常规海克斯池不能为空。");
+        }
     }
 
     private static HexCatalogTierAssignment ReadAssignment(JsonElement element)

@@ -26,12 +26,12 @@ public class OP14_041_BoaHancock : IScriptedEffect
 
     public async Task Resolve(EffectContext ctx)
     {
-        if (ctx.Trigger == EffectTrigger.OnAllyCharEnter) { ResolveAbility1(ctx); return; }
+        if (ctx.Trigger == EffectTrigger.OnAllyCharEnter) { await ResolveAbility1(ctx); return; }
         if (ctx.Trigger == EffectTrigger.OnAnyCharKOd) { await ResolveAbility2(ctx); return; }
     }
 
     // 第一段【对方的回合中】我方角色登场时抽 1
-    private void ResolveAbility1(EffectContext ctx)
+    private async Task ResolveAbility1(EffectContext ctx)
     {
         int owner = ctx.OwnerIndex;
 
@@ -46,7 +46,7 @@ public class OP14_041_BoaHancock : IScriptedEffect
         var cardId = ctx.Vars.TryGetValue("cardId", out var cv) ? cv as string : null;
         if (cardId is not null && cardId == ctx.Source.Id.ToString()) return;
 
-        AtomicOps.Draw(ctx.State, owner, 1);
+        await AtomicOps.DrawAsync(ctx.State, owner, 1);
     }
 
     // 第二段【咚!!×1】【每回合1次】我方≥5000 且亚马逊·百合/九蛇海盗团角色被KO → 对方生命顶≤1 入对方手牌

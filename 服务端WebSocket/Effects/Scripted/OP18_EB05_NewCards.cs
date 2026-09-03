@@ -202,7 +202,7 @@ public sealed class OP18_060_Gunko : IScriptedEffect
             if (enteredOwner != ctx.OwnerIndex || from != "trash" || me.TurnOnceUsed.Contains(key)) return;
 
             me.TurnOnceUsed.Add(key);
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
             if (me.Hand.Count > 0)
                 await OP18EB05EffectHelpers.DiscardOne(ctx, "抽取2张卡牌后，丢弃1张手牌", isCost: false);
             return;
@@ -255,7 +255,7 @@ public sealed class OP18_078_MiniMerryII : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
             return;
         }

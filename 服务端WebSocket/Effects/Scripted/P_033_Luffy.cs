@@ -27,6 +27,6 @@ public class P_033_Luffy : IScriptedEffect
         AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, ctx.Source);
 
         // 收益：抽 1 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

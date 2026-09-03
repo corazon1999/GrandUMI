@@ -28,7 +28,7 @@ public class OP10_058_Rebecca : IScriptedEffect
         // 场上存在费用≥8 的角色 → 抽 1
         bool has8 = me.Characters.Concat(opp.Characters).Any(c => ctx.State.CurrentCostOf(c) >= 8);
         if (has8)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 公开最多 2 张"莉贝卡"以外、《德莱斯罗兹》、费用≤7 的角色
         var pool = me.Hand.Where(c =>

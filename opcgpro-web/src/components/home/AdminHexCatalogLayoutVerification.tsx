@@ -7,15 +7,14 @@ import LayoutPreviewFrame from "./LayoutPreviewFrame";
 
 const activeDigest = `sha256:${"a".repeat(64)}`;
 const draftDigest = `sha256:${"b".repeat(64)}`;
-const regularIds = Array.from({ length: 56 }, (_, index) => index + 1)
-  .filter((candidate) => candidate !== 27 && candidate !== 30 && candidate !== 48);
+const regularIds = Array.from({ length: 82 }, (_, index) => index + 1)
+  .filter((candidate) => candidate !== 27 && candidate !== 48);
 
 function tierFor(id: number): HexTierSnapshot {
-  if (id === 30) return "Silver";
   if (id === 48) return "Gold";
   const regularIndex = regularIds.indexOf(id);
-  if (regularIndex < 18) return "Silver";
-  if (regularIndex < 36) return "Gold";
+  if (regularIndex < 45) return "Silver";
+  if (regularIndex < 63) return "Gold";
   return "Rainbow";
 }
 
@@ -32,7 +31,7 @@ function environmentState(environment: AdminDeploymentEnvironment): AdminHexCata
     draftDigest,
     draftSavedAt: Date.UTC(2026, 8, 2, 8, 15),
     draftSavedBy: "layout_operator_with_long_name",
-    entries: Array.from({ length: 56 }, (_, index) => index + 1).filter((id) => id !== 27).map((id) => {
+    entries: Array.from({ length: 82 }, (_, index) => index + 1).filter((id) => id !== 27).map((id) => {
       const tier = tierFor(id);
       return {
         id,
@@ -40,7 +39,7 @@ function environmentState(environment: AdminDeploymentEnvironment): AdminHexCata
         description: `用于验证手机竖屏长文案、品质选择器和完整触控区域的海克斯效果说明 ${id}。`,
         tier,
         activeTier: id === 1 ? "Gold" : id === 19 ? "Silver" : tier,
-        alternative: id === 30 || id === 48,
+        alternative: id === 48,
       };
     }),
     deployment: {

@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -47,7 +47,7 @@ public class OP12_060_BeefBomber : IScriptedEffect
         {
             // ・我方手牌不多于 6 张的场合，抽取 2 张卡牌
             if (me.Hand.Count <= 6)
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         }
     }
 }

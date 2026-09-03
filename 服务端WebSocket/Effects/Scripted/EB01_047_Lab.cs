@@ -25,7 +25,7 @@ public class EB01_047_Lab : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         if (me.Hand.Count == 0) return;
         var extra = new Dictionary<string, object?>

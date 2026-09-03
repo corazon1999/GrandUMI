@@ -425,6 +425,8 @@ public static class BattleEngine
                 ["sourceNumber"] = replacement.SourceCardNumber,
                 ["actingSide"] = ownerIdx,
                 ["isCost"] = true,
+                ["cardId"] = discard.Id.ToString(),
+                ["cardKind"] = discard.Info.Kind.ToString(),
             });
         return true;
     }

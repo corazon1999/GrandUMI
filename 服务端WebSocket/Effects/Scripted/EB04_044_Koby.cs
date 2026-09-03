@@ -65,6 +65,6 @@ public class EB04_044_Koby : IScriptedEffect
         var dkey = ctx.Source.Info.Number + "-draw" + ":" + ctx.Source.Id;
         if (me.TurnOnceUsed.Contains(dkey)) return;
         me.TurnOnceUsed.Add(dkey);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

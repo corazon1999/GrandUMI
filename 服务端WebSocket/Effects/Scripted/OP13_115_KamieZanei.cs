@@ -31,7 +31,7 @@ public class OP13_115_KamieZanei : IScriptedEffect
         // ── 【触发】 ──
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

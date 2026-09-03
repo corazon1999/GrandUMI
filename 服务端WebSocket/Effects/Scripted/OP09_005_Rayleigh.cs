@@ -29,7 +29,7 @@ public class OP09_005_Rayleigh : IScriptedEffect
         if (big < 2) return;
 
         // 抽 2
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 丢弃我方 1 张手牌（必须丢，若无手牌则跳过）
         if (me.Hand.Count == 0) return;

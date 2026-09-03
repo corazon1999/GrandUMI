@@ -38,7 +38,7 @@ public class OP10_080_BearToy : IScriptedEffect
         // 之后：我方场上咚!! ≥ 7 且手牌 ≤ 5 → 抽 1
         if (me.TotalDonInCostArea >= 7 && me.Hand.Count <= 5)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
     }
 }

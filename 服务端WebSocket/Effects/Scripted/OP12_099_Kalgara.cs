@@ -22,23 +22,23 @@ public class OP12_099_Kalgara : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnLifeLeaveField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         // 仅我方的回合
-        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
+        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
         // 卡面未限定生命的持有者；我方或对方生命离场均可发动。
         int owner = ctx.Vars.TryGetValue("owner", out var ov) && ov is int oi ? oi : -1;
-        if (owner is < 0 or > 1) return Task.CompletedTask;
+        if (owner is < 0 or > 1) return;
 
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 本回合 1 次（近似"之后本回合无法通过自己的效果抽牌"）
         var key = ctx.Source.Info.Number + "-lifedraw" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

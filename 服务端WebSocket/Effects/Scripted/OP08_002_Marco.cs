@@ -37,7 +37,7 @@ public class OP08_002_Marco : IScriptedEffect, IActivatedMainAvailability
         if (me.AttachedDonCount(self.Id) < 1) return;
 
         // 抽取 1 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 将 1 张手牌放回卡组最上方或最下方
         if (me.Hand.Count > 0)

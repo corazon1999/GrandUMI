@@ -168,6 +168,10 @@ public class PlayerState
     {
         // “建立时快照”只绑定当前这次留场；同一实例离场后再次登场也不得恢复旧快照资格。
         character.FieldSnapshotSourceIds.Clear();
+        character.HexEnteredFromTrash = false;
+        character.HexEnteredFromHandByEffect = false;
+        character.HexThreeAdmiralsGranted = false;
+        character.HexHighCostEntryTurn = 0;
         foreach (var don in CostArea)
         {
             if (don.State != DonState.Attached || don.AttachedToCardId != character.Id) continue;

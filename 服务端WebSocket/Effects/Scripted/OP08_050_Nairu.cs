@@ -24,7 +24,7 @@ public class OP08_050_Nairu : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 抽 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 抽牌后手牌不足 2 张时，仍须将现有手牌全部放回；最多放回 2 张。
         int returnCount = Math.Min(2, me.Hand.Count);

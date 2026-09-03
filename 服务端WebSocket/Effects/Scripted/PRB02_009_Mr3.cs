@@ -40,6 +40,6 @@ public class PRB02_009_Mr3 : IScriptedEffect
 
         // 放置废弃区（不触发 KO 事件）+ 抽 2
         BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, ctx.Source);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

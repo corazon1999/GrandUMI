@@ -335,6 +335,7 @@ public static class StateSnapshotBuilder
             powerCurrent = state.CurrentPowerOf(idx, c),
             cost = state.CurrentCostOf(idx, c),
             attachedDon = p.AttachedDonCount(c.Id),
+            canDetachAllDon = HexRules.CanDetachAllDon(state, idx, c.Id),
             gainedKeywords = GrantedKeywords(state, c),
             effectsNullified = c.IsEffectsNullified || state.IsContinuouslyNullified(c),
             cannotActivateNextReset = c.CannotActivateNextReset,
@@ -551,8 +552,12 @@ public static class StateSnapshotBuilder
     }
 
     private static string[] GrantedKeywords(GameState state, CardInstance c)
-        => c.GainedKeywords.Select(k => k.Keyword == "登场回合可攻击角色" ? "速攻：角色" : k.Keyword)
+    {
+        int side = state.SideOf(c);
+        return c.GainedKeywords.Select(k => k.Keyword == "登场回合可攻击角色" ? "速攻：角色" : k.Keyword)
             .Concat(ContinuousGrantedKeywords(state, c))
+            .Concat(side is 0 or 1 ? HexRules.DynamicGrantedKeywords(state, side, c) : Array.Empty<string>())
             .Distinct()
             .ToArray();
+    }
 }

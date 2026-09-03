@@ -43,7 +43,7 @@ public class OP10_115_SeeYouInTheNewWorld : IScriptedEffect
 
             // 之后：我方生命为 0 张时抽 1
             if (me.LifeCount == 0)
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

@@ -53,7 +53,7 @@ public class OP04_060_Crocodile : IScriptedEffect
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         if (me.Hand.Count > 0)
         {

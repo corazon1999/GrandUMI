@@ -27,7 +27,7 @@ public class EB04_011_Scaler : IScriptedEffect
         int n = me.Characters.Count(c => c.Info.HasKeyword("海王类"));
         if (n <= 0) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, n);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, n);
 
         // 之后：丢弃相同张数手牌（手牌不足则全弃）
         int toDiscard = Math.Min(n, me.Hand.Count);

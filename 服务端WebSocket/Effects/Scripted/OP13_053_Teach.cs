@@ -45,7 +45,7 @@ public class OP13_053_Teach : IScriptedEffect
         AtomicOps.KO(s, ctx.OwnerIndex, sacrifice);
 
         // 效果：抽 1 张
-        AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
 
         // 本回合此角色（提奇自身）获得【流放】
         AtomicOps.GiveKeyword(ctx.Source, "流放", KeywordDuration.ThisTurn);

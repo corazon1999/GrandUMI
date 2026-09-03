@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -26,7 +26,7 @@ public class OP08_086_Kinlami : IScriptedEffect
         if (!opp.Characters.Any(c => ctx.State.CurrentCostOf(c) == 0)) return;
 
         // 抽取 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 丢弃我方 2 张手牌（不足则全部丢弃）
         int n = Math.Min(2, me.Hand.Count);

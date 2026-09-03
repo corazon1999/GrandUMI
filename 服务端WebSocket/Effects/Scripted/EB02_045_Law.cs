@@ -57,7 +57,7 @@ public class EB02_045_Law : IScriptedEffect
         }
         else
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
     }
 }

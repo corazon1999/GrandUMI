@@ -26,7 +26,7 @@ public class OP04_093_GumGumKingKongGun : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 3);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 3);
             int discardCount = Math.Min(2, me.Hand.Count);
             if (discardCount == 0) return;
             var discardedIds = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard",

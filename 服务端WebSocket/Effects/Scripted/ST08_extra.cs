@@ -42,11 +42,11 @@ public class ST08_009_Makino : IScriptedEffect
     public string CardNumber => "ST08-009";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         bool boardHasCost0 = ctx.State.Players[0].Characters.Concat(ctx.State.Players[1].Characters).Any(c => ctx.State.CurrentCostOf(c) == 0);
-        if (boardHasCost0) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        if (boardHasCost0) await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }
 

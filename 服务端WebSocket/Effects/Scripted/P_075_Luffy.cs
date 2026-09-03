@@ -39,7 +39,7 @@ public class P_075_Luffy : IScriptedEffect
         bool hasBig = me.Characters.Any(c => ctx.State.CurrentCostOf(c) >= 8);
         if (!hasBig) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         if (me.Hand.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
             "丢弃我方的 1 张手牌", me.Hand.Select(c => c.Id.ToString()).ToList(), 1, 1);

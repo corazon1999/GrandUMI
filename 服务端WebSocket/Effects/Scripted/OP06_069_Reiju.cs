@@ -17,16 +17,16 @@ public class OP06_069_Reiju : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         if (me.TotalDonInCostArea <= opp.TotalDonInCostArea && me.Hand.Count <= 5)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

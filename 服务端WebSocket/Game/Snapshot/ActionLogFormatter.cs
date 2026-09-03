@@ -64,6 +64,14 @@ public static class ActionLogFormatter
                 return $"[咚] {Side(player)}撤回了为【{targetName}】附加的 {count} 个咚";
             }
 
+            case "DetachAllDon":
+            {
+                int player = GetInt(payload, "player");
+                int count = GetInt(payload, "count");
+                string cardNumber = GetStr(payload, "cardNumber");
+                return $"[海克斯] {Side(player)}令【{Card(cardNumber)}】移除全部 {count} 个咚";
+            }
+
             case "Attack":
             {
                 string attackerId = GetStr(payload, "attacker");

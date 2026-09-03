@@ -45,6 +45,6 @@ public class OP04_040_Queen : IScriptedEffect
             }
         }
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

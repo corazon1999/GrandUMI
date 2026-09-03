@@ -59,7 +59,7 @@ public class ST12_010_Ivankov : IScriptedEffect
         {
             var key = $"ST12-010-atk:{ctx.Source.Id}";
             if (me.TurnOnceUsed.Contains(key)) return;
-            if (me.Hand.Count <= 6) { AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1); me.TurnOnceUsed.Add(key); }
+            if (me.Hand.Count <= 6) { await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1); me.TurnOnceUsed.Add(key); }
             return;
         }
         await RevealTopPlayCost2(ctx, me, rest: false);

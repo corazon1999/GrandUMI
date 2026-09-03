@@ -26,7 +26,7 @@ public class OP13_042_Whitebeard : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 抽取 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 丢弃我方 1 张手牌（强制，手牌非空时）
         if (me.Hand.Count > 0)

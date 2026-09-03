@@ -40,7 +40,7 @@ public class OP04_083_Sabo : IScriptedEffect
         });
 
         // 之后：抽 2 张，丢弃 2 张手牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         int toDiscard = Math.Min(2, me.Hand.Count);
         if (toDiscard <= 0) return;

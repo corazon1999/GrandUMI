@@ -28,7 +28,7 @@ public class OP12_078_Kushiyaki : IScriptedEffect
 
         // 我方咚数不多于对方咚数 → 抽 1 张
         if (me.TotalDonInCostArea <= opp.TotalDonInCostArea)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 之后：本回合中，对方最多 1 张角色力量 -3000
         var candidates = opp.Characters.ToList();

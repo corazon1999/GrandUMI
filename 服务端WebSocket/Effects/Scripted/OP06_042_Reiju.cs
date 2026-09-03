@@ -17,20 +17,20 @@ public class OP06_042_Reiju : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnDonReturnedToDeck;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         // 仅【我方的回合中】生效
-        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
+        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 【每回合1次】
         var key = ctx.Source.Info.Number + "-act" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 
         // 抽取1张卡牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

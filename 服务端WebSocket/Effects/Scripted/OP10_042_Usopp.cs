@@ -107,7 +107,7 @@ public class OP10_042_Usopp : IScriptedEffect
         if (!use) return;
 
         me.TurnOnceUsed.Add(key);
-        AtomicOps.Draw(ctx.State, owner, 1);
+        await AtomicOps.DrawAsync(ctx.State, owner, 1);
     }
 
     private static CardInstance? FindCard(PlayerState player, string cardId)

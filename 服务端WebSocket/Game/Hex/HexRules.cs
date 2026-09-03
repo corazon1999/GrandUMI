@@ -1,6 +1,7 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
 using GrandUMI.Game.PhaseFlow;
+using GrandUMI.Game.Validation;
 
 namespace GrandUMI.Game.Hex;
 
@@ -55,7 +56,9 @@ public static class HexRules
     public const int PermanentCostFloorRulesRevision = 10;
     /// <summary>七项海克斯效果整体重做所在的规则修订版。</summary>
     public const int SevenHexReworkRulesRevision = 11;
-    public const int CurrentRulesRevision = SevenHexReworkRulesRevision;
+    /// <summary>26项扩展、三号船坞新语义与扩充品质目录所在的规则修订版。</summary>
+    public const int ExpansionRulesRevision = 12;
+    public const int CurrentRulesRevision = ExpansionRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -96,7 +99,9 @@ public static class HexRules
         state.HexState.CatalogDigest = string.Empty;
         state.HexState.CatalogTiers.Clear();
         if (state.HexState.Enabled && rulesRevision >= CatalogConfigurationRulesRevision)
-            ApplyCatalogSnapshot(state.HexState, HexCatalogConfiguration.BuiltIn);
+            ApplyCatalogSnapshot(
+                state.HexState,
+                HexCatalogConfiguration.BuiltInForRulesRevision(rulesRevision));
     }
 
     /// <summary>恢复入口在重放任何随机事件之前覆盖建局时锁定的完整目录。</summary>
@@ -137,7 +142,12 @@ public static class HexRules
     public static bool Has(GameState state, int playerIndex, int hexId)
         => state.HexState.Enabled
            && playerIndex is 0 or 1
+           && (hexId <= 56 || state.HexState.RulesRevision >= ExpansionRulesRevision)
            && state.HexState.Owned[playerIndex].Contains(hexId);
+
+    /// <summary>修订版11及以前的三号船坞仍提供第二舞台槽；修订版12起编号30改为舞台效果复制。</summary>
+    public static bool HasLegacyDockSlots(GameState state, int playerIndex)
+        => state.HexState.RulesRevision < ExpansionRulesRevision && Has(state, playerIndex, 30);
 
     public static bool IsVisibleOwnedHex(GameState state, int hexId)
         => state.HexState.RulesRevision < TransmutationPresentationRulesRevision
@@ -478,7 +488,77 @@ public static class HexRules
             bonus += 1000;
         if (leader && Has(state, side, 44) && state.CurrentTurnPlayer == 1 - side)
             bonus += state.HexState.Runtime[side].TankEngineOpponentTurnPower;
+        if (character && Has(state, side, 58) && ActionValidator.HasKeyword(state, card, "阻挡者"))
+            bonus += 2000;
+        if (character && Has(state, side, 67) && HasCommonCharacterTrait(player.Characters))
+            bonus += 1000;
+        if (leader && Has(state, side, 71) && state.CurrentTurnPlayer == side)
+            bonus += 2000;
         return bonus;
+    }
+
+    /// <summary>场上角色的动态费用修正。新版“我是天龙人”与“假面与真实”可同时叠加。</summary>
+    public static int FieldCostDelta(GameState state, int side, CardInstance card)
+    {
+        if (!state.HexState.Enabled
+            || side is < 0 or > 1
+            || card.Info.Kind != CardKind.Character
+            || !state.Players[side].Characters.Contains(card))
+            return 0;
+
+        int delta = 0;
+        if (state.HexState.RulesRevision >= SevenHexReworkRulesRevision)
+            delta += (Has(state, side, 53) ? 2 : 0) - (Has(state, 1 - side, 53) ? 2 : 0);
+        if (Has(state, side, 78)) delta += 8;
+        return delta;
+    }
+
+    public static int? OriginalPowerOverride(GameState state, int side, CardInstance card)
+        => side is 0 or 1
+           && state.Players[side].Characters.Contains(card)
+           && Has(state, side, 82)
+            ? checked(card.Info.Cost * 1000 + 2000)
+            : null;
+
+    public static bool GrantsKeyword(GameState state, int side, CardInstance card, string keyword)
+    {
+        if (side is < 0 or > 1 || !state.Players[side].Characters.Contains(card)) return false;
+        return keyword switch
+        {
+            "速攻" => (Has(state, side, 62) && state.CurrentPowerOf(side, card) >= 12000)
+                      || (Has(state, side, 66) && card.HexEnteredFromHandByEffect),
+            "流放" => Has(state, side, 63) && card.HexEnteredFromTrash,
+            "阻挡者" => Has(state, side, 65) && card.HexThreeAdmiralsGranted,
+            "速攻：角色" or "登场回合可攻击角色" => Has(state, side, 65)
+                         && card.HexThreeAdmiralsGranted,
+            _ => false,
+        };
+    }
+
+    public static IEnumerable<string> DynamicGrantedKeywords(GameState state, int side, CardInstance card)
+    {
+        if (GrantsKeyword(state, side, card, "阻挡者")) yield return "阻挡者";
+        if (GrantsKeyword(state, side, card, "速攻")) yield return "速攻";
+        if (GrantsKeyword(state, side, card, "速攻：角色")) yield return "速攻：角色";
+        if (GrantsKeyword(state, side, card, "流放")) yield return "流放";
+    }
+
+    private static bool HasCommonCharacterTrait(IReadOnlyList<CardInstance> characters)
+    {
+        if (characters.Count == 0) return false;
+        HashSet<string>? common = null;
+        foreach (var card in characters)
+        {
+            var traits = card.Info.Keywords
+                .Select(KeywordNormalizer.Normalize)
+                .Where(value => value.Length > 0)
+                .ToHashSet(StringComparer.Ordinal);
+            if (traits.Count == 0) return false;
+            if (common is null) common = traits;
+            else common.IntersectWith(traits);
+            if (common.Count == 0) return false;
+        }
+        return common is { Count: > 0 };
     }
 
     public static int HandCostDelta(GameState state, int playerIndex, CardInstance card)
@@ -540,18 +620,6 @@ public static class HexRules
         return 0;
     }
 
-    /// <summary>新版“我是天龙人”对场上角色的动态费用修正；双方同时拥有时自然抵消。</summary>
-    public static int FieldCostDelta(GameState state, int side, CardInstance card)
-    {
-        if (!state.HexState.Enabled
-            || state.HexState.RulesRevision < SevenHexReworkRulesRevision
-            || side is < 0 or > 1
-            || card.Info.Kind != CardKind.Character
-            || !state.Players[side].Characters.Contains(card))
-            return 0;
-        return (Has(state, side, 53) ? 2 : 0) - (Has(state, 1 - side, 53) ? 2 : 0);
-    }
-
     /// <summary>神射法师新版禁止从手牌发动事件效果；反击值弃牌走独立入口。</summary>
     public static bool CanActivateHandEventEffect(GameState state, int playerIndex)
         => state.HexState.RulesRevision < SevenHexReworkRulesRevision || !Has(state, playerIndex, 51);
@@ -597,6 +665,10 @@ public static class HexRules
         if (Has(state, playerIndex, 40))
             foreach (var card in state.Players[1 - playerIndex].Characters.Where(card => !card.IsTapped))
                 card.PowerModPersistent -= 1000;
+        if (Has(state, playerIndex, 68))
+            foreach (var card in state.Players[playerIndex].Characters
+                         .Where(card => state.OriginalPowerOf(playerIndex, card) >= 8000))
+                card.IsTapped = false;
         state.HexState.CompletedOwnTurns[playerIndex]++;
     }
 
@@ -643,6 +715,16 @@ public static class HexRules
             && Has(state, attackerSide, 26)
             && attacker.Info.Kind == CardKind.Character)
             attacker.PowerModThisBattle += 1000;
+        if (attacker.Info.Kind == CardKind.Character
+            && Has(state, attackerSide, 76)
+            && !runtime.FishmanKarateUsedThisTurn
+            && player.AttachedDonCount(attacker.Id) > 0)
+        {
+            runtime.FishmanKarateUsedThisTurn = true;
+            await TurnEngine.DrawCardAsync(state, attackerSide, 1, engine.Prompts);
+        }
+        if (attacker.Info.Kind == CardKind.Character && Has(state, attackerSide, 81))
+            ApplyHybridCostReduction(state, attackerSide, CardKind.Event, "hex_hybrid_attack");
 
         if (Has(state, attackerSide, 14))
             foreach (var card in player.Hand.Where(card => card.Info.Kind == CardKind.Event))
@@ -710,7 +792,7 @@ public static class HexRules
         var player = state.Players[playerIndex];
         runtime.CardsPlayedThisTurn++;
         if (Has(state, playerIndex, 2) && runtime.CardsPlayedThisTurn == 3)
-            TurnEngine.DrawCard(state, playerIndex, 1);
+            await TurnEngine.DrawCardAsync(state, playerIndex, 1, engine.Prompts);
 
         if (result.Kind == PlayKind.Event)
         {
@@ -723,6 +805,8 @@ public static class HexRules
                     else
                         card.CostModThisTurn--;
                 }
+            if (Has(state, playerIndex, 81))
+                ApplyHybridCostReduction(state, playerIndex, CardKind.Character, "hex_hybrid_event");
         }
 
         if (result.Card.Info.Cost == 10)
@@ -775,7 +859,9 @@ public static class HexRules
         state.HexState.Runtime[defender].TankEngineOpponentTurnPower = 0;
 
         if (attacker is not null && Has(state, attackerSide, 4))
-            TurnEngine.DrawCard(state, attackerSide, 1);
+            await TurnEngine.DrawCardAsync(state, attackerSide, 1, engine.Prompts);
+        if (Has(state, attackerSide, 79))
+            state.Players[attackerSide].DonDeck.Add(new DonCard());
         if (attacker is not null && Has(state, attackerSide, 8)
             && !state.HexState.Runtime[attackerSide].SoulSiphonUsedThisTurn
             && state.CurrentPowerOf(attackerSide, attacker) >= 12000)
@@ -824,6 +910,9 @@ public static class HexRules
             foreach (var card in state.Players[1 - victimOwner].Characters)
                 card.PowerModThisTurn -= 1000;
 
+        if (state.CurrentTurnPlayer == victimOwner && Has(state, victimOwner, 74))
+            await TurnEngine.DrawCardAsync(state, victimOwner, 1, engine.Prompts);
+
         if (koSide is < 0 or > 1) return;
         var runtime = state.HexState.Runtime[koSide];
         if (Has(state, koSide, 44) && !runtime.TankEngineUsedThisTurn)
@@ -859,7 +948,7 @@ public static class HexRules
         {
             runtime.SlapUsedThisTurn = true;
             var player = state.Players[actingSide];
-            TurnEngine.DrawCard(state, actingSide, 1);
+            await TurnEngine.DrawCardAsync(state, actingSide, 1, engine.Prompts);
             if (player.Hand.Count > 0)
             {
                 var chosen = await engine.Prompts.ChooseCards(actingSide, "HexSlapDiscard",
@@ -868,10 +957,9 @@ public static class HexRules
                     new Dictionary<string, object?>
                     {
                         ["choiceCards"] = player.Hand.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToArray(),
-                    });
+                });
                 var discard = player.Hand.FirstOrDefault(card => chosen.Contains(card.Id.ToString())) ?? player.Hand[0];
-                player.Hand.Remove(discard);
-                player.Trash.Add(discard);
+                AtomicOps.DiscardHand(player, discard);
             }
         }
         if (Has(state, actingSide, 42) && !runtime.SoulConsumeUsedThisTurn)
@@ -888,6 +976,37 @@ public static class HexRules
         if (Has(state, owner, 43))
             state.Players[1 - owner].Leader.PowerModThisTurn -= 1000 * actualAdded;
 
+        if (Has(state, owner, 57))
+        {
+            int minimumCost = state.Players[owner].LifeArea.Count;
+            var targets = state.Players[1 - owner].Characters
+                .Where(card => state.CurrentCostOf(1 - owner, card) >= minimumCost)
+                .ToList();
+            if (targets.Count > 0)
+            {
+                var chosen = await engine.Prompts.ChooseCards(
+                    owner,
+                    "HexDeathOrLifeKO",
+                    $"death or live：选择1个当前费用不低于{minimumCost}的对方角色KO",
+                    targets.Select(card => card.Id.ToString()).ToList(),
+                    1,
+                    1,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = targets.Select(card => new
+                        {
+                            id = card.Id.ToString(),
+                            number = card.Info.Number,
+                        }).ToArray(),
+                    });
+                var target = targets.FirstOrDefault(card => chosen.Contains(card.Id.ToString()));
+                if (target is not null
+                    && state.Players[1 - owner].Characters.Contains(target)
+                    && state.CurrentCostOf(1 - owner, target) >= state.Players[owner].LifeArea.Count)
+                    await AtomicOps.KOByEffectAsync(state, 1 - owner, target, engine.Prompts, owner);
+            }
+        }
+
         var runtime = state.HexState.Runtime[owner];
         if (!allowCriticalHeal || !Has(state, owner, 31) || runtime.CriticalHealSucceededThisTurn) return;
         for (int i = 0; i < actualAdded && !runtime.CriticalHealSucceededThisTurn; i++)
@@ -899,6 +1018,38 @@ public static class HexRules
         }
     }
 
+    public static async Task OnLifeMovedToHandByEffectAsync(GameEngine engine, int owner)
+    {
+        var state = engine.State;
+        if (state.CurrentTurnPlayer != owner || !Has(state, owner, 69)) return;
+        var runtime = state.HexState.Runtime[owner];
+        if (runtime.SitUpUsedThisTurn) return;
+        var player = state.Players[owner];
+        if (player.Hand.Count == 0) return;
+        var candidates = player.Hand.ToList();
+        var chosen = await engine.Prompts.ChooseCards(
+            owner,
+            "HexSitUpLife",
+            "仰卧起坐：可以将1张手牌放到生命区最上方",
+            candidates.Select(card => card.Id.ToString()).ToList(),
+            0,
+            1,
+            new Dictionary<string, object?>
+            {
+                ["choiceCards"] = candidates.Select(card => new
+                {
+                    id = card.Id.ToString(),
+                    number = card.Info.Number,
+                }).ToArray(),
+            });
+        var selected = candidates.FirstOrDefault(card => chosen.Contains(card.Id.ToString()));
+        if (selected is null || !player.Hand.Contains(selected)) return;
+        runtime.SitUpUsedThisTurn = true;
+        player.Hand.Remove(selected);
+        player.LifeArea.Insert(0, selected);
+        await OnLifeAddedAsync(engine, owner, 1);
+    }
+
     public static bool CanDeclareAnotherAttack(GameState state, int playerIndex)
         => !Has(state, playerIndex, 45) || state.HexState.Runtime[playerIndex].AttacksDeclaredThisTurn == 0;
 
@@ -908,7 +1059,46 @@ public static class HexRules
             : 0;
 
     public static bool LeaderMayAttackLeader(GameState state, int attackerSide)
-        => !Has(state, attackerSide, 34);
+        => Has(state, attackerSide, 71) || !Has(state, attackerSide, 34);
+
+    public static bool LeaderIgnoresCannotAttack(GameState state, int side, CardInstance card)
+        => side is 0 or 1
+           && ReferenceEquals(state.Players[side].Leader, card)
+           && Has(state, side, 71);
+
+    public static bool OpposingLeaderMayAttackLeader(GameState state, int attackerSide)
+        => Has(state, attackerSide, 71) || !Has(state, 1 - attackerSide, 61);
+
+    public static bool FirstAttackMustTargetRestedCharacter(GameState state, int attackerSide)
+        => state.HexState.Runtime[attackerSide].AttacksDeclaredThisTurn == 0
+           && Has(state, 1 - attackerSide, 75)
+           && state.Players[1 - attackerSide].Characters.Any(card => card.IsTapped);
+
+    public static bool CanDetachAllDon(GameState state, int owner, Guid characterId)
+        => owner is 0 or 1
+           && state.CurrentTurnPlayer == owner
+           && state.Phase == Phase.Main
+           && state.CurrentBattle is null
+           && Has(state, owner, 70)
+           && state.Players[owner].Characters.Any(card => card.Id == characterId)
+           && state.Players[owner].AttachedDonCount(characterId) > 0;
+
+    public static int DetachAllDon(GameState state, int owner, Guid characterId)
+    {
+        if (!CanDetachAllDon(state, owner, characterId)) return 0;
+        var player = state.Players[owner];
+        var character = player.Characters.First(card => card.Id == characterId);
+        var nextState = character.IsTapped ? DonState.Rest : DonState.Active;
+        int detached = 0;
+        foreach (var don in player.CostArea.Where(don =>
+                     don.State == DonState.Attached && don.AttachedToCardId == characterId))
+        {
+            don.State = nextState;
+            don.AttachedToCardId = null;
+            detached++;
+        }
+        return detached;
+    }
 
     public static bool MayAttackProtectedZeroLifeLeader(GameState state, int defenderSide)
         => !(state.HexState.RulesRevision < SevenHexReworkRulesRevision
@@ -916,10 +1106,19 @@ public static class HexRules
              && state.Players[defenderSide].LifeArea.Count == 0
              && state.Players[defenderSide].Characters.Any(card => card.IsTapped));
 
-    public static bool CanCopyEffect(GameState state, int owner, EffectTrigger trigger, bool alreadyCopied)
+    public static bool CanCopyEffect(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        bool alreadyCopied)
     {
         if (alreadyCopied || !state.HexState.Enabled) return false;
         var runtime = state.HexState.Runtime[owner];
+        if (state.HexState.RulesRevision >= ExpansionRulesRevision
+            && source.Info.Kind == CardKind.Stage
+            && Has(state, owner, 30))
+            return true;
         if (trigger == EffectTrigger.OnAttackDeclare && Has(state, owner, 13)) return true;
         if (trigger == EffectTrigger.OnEnterField && Has(state, owner, 16))
             return state.HexState.RulesRevision >= BoardingSalvoRulesRevision
@@ -934,22 +1133,133 @@ public static class HexRules
         return false;
     }
 
-    public static bool ShouldCopyEffect(GameState state, int owner, EffectTrigger trigger, bool alreadyCopied)
+    public static bool ShouldCopyEffect(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        bool alreadyCopied)
     {
-        if (!CanCopyEffect(state, owner, trigger, alreadyCopied)) return false;
+        if (!CanCopyEffect(state, owner, source, trigger, alreadyCopied)) return false;
         var runtime = state.HexState.Runtime[owner];
+        bool stageCopy = state.HexState.RulesRevision >= ExpansionRulesRevision
+                         && source.Info.Kind == CardKind.Stage
+                         && Has(state, owner, 30);
         if (trigger == EffectTrigger.OnEnterField)
         {
-            if (state.HexState.RulesRevision >= BoardingSalvoRulesRevision)
-                return ++runtime.ActivatedEnterEffectsThisTurn == 2;
-            runtime.FirstEnterEffectCopiedThisTurn = true;
+            bool boardingSalvoCopy = false;
+            if (Has(state, owner, 16))
+            {
+                if (state.HexState.RulesRevision >= BoardingSalvoRulesRevision)
+                {
+                    if (runtime.ActivatedEnterEffectsThisTurn < 2)
+                        runtime.ActivatedEnterEffectsThisTurn++;
+                    boardingSalvoCopy = runtime.ActivatedEnterEffectsThisTurn == 2;
+                }
+                else
+                {
+                    runtime.FirstEnterEffectCopiedThisTurn = true;
+                    boardingSalvoCopy = true;
+                }
+            }
+            return stageCopy || boardingSalvoCopy;
         }
-        if (trigger == EffectTrigger.OnKO) runtime.FirstKoEffectCopiedThisTurn = true;
+        if (trigger == EffectTrigger.OnKO && Has(state, owner, 17))
+            runtime.FirstKoEffectCopiedThisTurn = true;
         return true;
+    }
+
+    public static bool NeedsActivationProbe(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        bool alreadyCopied)
+        => CanCopyEffect(state, owner, source, trigger, alreadyCopied)
+           || (!alreadyCopied
+               && ((trigger == EffectTrigger.ActivatedMain
+                    && source.Info.Kind == CardKind.Leader
+                    && Has(state, owner, 77))
+                   || (trigger == EffectTrigger.OnOppAttackDeclare
+                       && Has(state, owner, 64))));
+
+    public static async Task AfterEffectResolvedAsync(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        IPromptService prompts,
+        bool alreadyCopied,
+        bool actuallyActivated)
+    {
+        if (!actuallyActivated
+            || alreadyCopied
+            || trigger != EffectTrigger.ActivatedMain
+            || source.Info.Kind != CardKind.Leader
+            || !Has(state, owner, 77))
+            return;
+        var rested = state.Players[owner].CostArea
+            .Where(don => don.State == DonState.Rest && don.AttachedToCardId is null)
+            .ToList();
+        if (rested.Count == 0) return;
+        int max = Math.Min(2, rested.Count);
+        var chosen = await prompts.ChooseCards(
+            owner,
+            "HexSwordDonRefresh",
+            $"听说你用剑了：可以将最多{max}张休息状态的咚!!转为活跃",
+            rested.Select(don => don.Id.ToString()).ToList(),
+            0,
+            max,
+            new Dictionary<string, object?>
+            {
+                ["donChoices"] = rested.Select(don => new
+                {
+                    id = don.Id.ToString(),
+                    state = don.State.ToString(),
+                }).ToArray(),
+            });
+        foreach (var id in chosen.Distinct(StringComparer.Ordinal))
+        {
+            var don = rested.FirstOrDefault(item => item.Id.ToString() == id);
+            if (don is not null
+                && state.Players[owner].CostArea.Contains(don)
+                && don.State == DonState.Rest
+                && don.AttachedToCardId is null)
+                don.State = DonState.Active;
+        }
     }
 
     public static bool ShouldTriggerAttackEffectOnEntry(GameState state, int owner, CardInstance card)
         => Has(state, owner, 15) && EffectRuntime.HasEffectForTrigger(card, EffectTrigger.OnAttackDeclare);
+
+    /// <summary>统一记录角色登场来源与“三大将”阈值；正常打出和所有效果登场入口均调用。</summary>
+    public static void OnCharacterEntered(GameState state, int owner, CardInstance card, string? from, bool byEffect)
+    {
+        if (!state.HexState.Enabled || card.Info.Kind != CardKind.Character || owner is < 0 or > 1) return;
+        var runtime = state.HexState.Runtime[owner];
+        if (byEffect && string.Equals(from, "trash", StringComparison.OrdinalIgnoreCase))
+            card.HexEnteredFromTrash = true;
+        if (byEffect && string.Equals(from, "hand", StringComparison.OrdinalIgnoreCase))
+            card.HexEnteredFromHandByEffect = true;
+
+        card.HexHighCostEntryTurn = 0;
+        if (state.CurrentCostOf(owner, card) < 5) return;
+        card.HexHighCostEntryTurn = state.TurnCount;
+        runtime.HighCostCharacterEntriesThisTurn++;
+        if (runtime.HighCostCharacterEntriesThisTurn < 3) return;
+        foreach (var current in state.Players[owner].Characters)
+            if (current.HexHighCostEntryTurn == state.TurnCount)
+                current.HexThreeAdmiralsGranted = true;
+    }
+
+    public static void OnCharacterLeftField(GameState state, int owner, CardInstance card)
+    {
+        if (owner is < 0 or > 1) return;
+        card.HexEnteredFromTrash = false;
+        card.HexEnteredFromHandByEffect = false;
+        card.HexThreeAdmiralsGranted = false;
+        card.HexHighCostEntryTurn = 0;
+    }
 
     /// <summary>
     /// 尖端发明家：第一次成功消耗某个【每回合1次】内部键时移除该键，第二次才保留。
@@ -959,12 +1269,24 @@ public static class HexRules
         GameState state,
         int owner,
         CardInstance source,
+        EffectTrigger trigger,
+        bool actuallyActivated,
         IReadOnlySet<string> playerKeysBefore,
         IReadOnlySet<string> cardKeysBefore)
     {
+        var player = state.Players[owner];
+
+        if (actuallyActivated && trigger == EffectTrigger.OnOppAttackDeclare && Has(state, owner, 64))
+        {
+            foreach (var key in player.TurnOnceUsed.Except(playerKeysBefore).ToArray())
+                player.TurnOnceUsed.Remove(key);
+            foreach (var key in source.OncePerTurnUsedKeys.Except(cardKeysBefore).ToArray())
+                source.OncePerTurnUsedKeys.Remove(key);
+            player.OncePerTurnEffectUsedCardIds.Remove(source.Id);
+        }
+
         if (!Has(state, owner, 5)) return;
         var runtime = state.HexState.Runtime[owner];
-        var player = state.Players[owner];
 
         foreach (var key in player.TurnOnceUsed.Except(playerKeysBefore).ToArray())
         {
@@ -1000,6 +1322,45 @@ public static class HexRules
         static string? Text(Dictionary<string, object?> values, string key)
             => values.TryGetValue(key, out var value) ? value?.ToString() : null;
 
+        if (trigger == EffectTrigger.OnDonReturnedToDeck)
+        {
+            int owner = Int(payload, "owner");
+            if (owner is 0 or 1 && Has(state, owner, 59))
+            {
+                var targets = state.Players[1 - owner].Characters.ToList();
+                if (targets.Count > 0)
+                {
+                    var chosen = await prompts.ChooseCards(
+                        owner,
+                        "HexOnigashimaTarget",
+                        "鬼岛决战：选择对方1个角色，本回合中力量-1000",
+                        targets.Select(card => card.Id.ToString()).ToList(),
+                        1,
+                        1);
+                    var target = targets.FirstOrDefault(card => chosen.Contains(card.Id.ToString()));
+                    if (target is not null && state.Players[1 - owner].Characters.Contains(target))
+                        target.PowerModThisTurn -= 1000;
+                }
+            }
+        }
+
+        if (trigger == EffectTrigger.OnHandDiscarded)
+        {
+            int owner = Int(payload, "owner");
+            if (owner is 0 or 1)
+            {
+                var runtime = state.HexState.Runtime[owner];
+                if (Has(state, owner, 73)
+                    && string.Equals(Text(payload, "cardKind"), CardKind.Event.ToString(), StringComparison.Ordinal))
+                    state.Players[owner].Leader.PowerModThisTurn += 2000;
+                if (Has(state, owner, 60) && !runtime.IceFruitUsedThisTurn)
+                {
+                    runtime.IceFruitUsedThisTurn = true;
+                    await TurnEngine.DrawCardAsync(state, owner, 1, prompts);
+                }
+            }
+        }
+
         if (trigger == EffectTrigger.OnCharRested && Text(payload, "reason") == "effect")
         {
             var card = FindCardAnywhere(state, Text(payload, "restedCardId"));
@@ -1031,6 +1392,26 @@ public static class HexRules
             Guid? attackerId = Guid.TryParse(Text(payload, "attackerId"), out var parsed) ? parsed : null;
             await OnCharacterKoAsync(engine, victimOwner, reason, attackerId, acting);
         }
+    }
+
+    private static void ApplyHybridCostReduction(
+        GameState state,
+        int owner,
+        CardKind targetKind,
+        string randomEventType)
+    {
+        var candidates = state.Players[owner].Hand
+            .Where(card => card.Info.Kind == targetKind)
+            .ToList();
+        if (candidates.Count == 0) return;
+        int index = state.NextRecordedRandom(
+            candidates.Count,
+            randomEventType,
+            owner,
+            new { targetKind = targetKind.ToString(), turnCount = state.TurnCount });
+        var selected = candidates[index];
+        if (selected.Info.Cost + selected.CostModPersistent + selected.EntityCostModPersistent > 0)
+            selected.EntityCostModPersistent--;
     }
 
     private static CardInstance? FindCardAnywhere(GameState state, string? idText)
@@ -1159,15 +1540,22 @@ public static class HexRules
                 }
                 break;
             case 20:
+                if (grant.PlannedStepCount < 0)
+                    grant.PlannedStepCount = player.LifeArea.Count > 0 ? 2 : 1;
                 if (grant.NextStep == 0)
                 {
-                    if (player.LifeArea.Count > 0)
+                    if (grant.PlannedStepCount == 2)
                     {
                         var top = player.LifeArea[0];
                         player.LifeArea.RemoveAt(0);
                         player.Hand.Add(top);
                         state.LifeLeftThisTurn.Add(grant.PlayerIndex);
                     }
+                    CommitGrantStep(state, settlement, grant);
+                }
+                if (grant.NextStep == 1 && grant.PlannedStepCount == 2)
+                {
+                    await OnLifeMovedToHandByEffectAsync(engine, grant.PlayerIndex);
                     CommitGrantStep(state, settlement, grant);
                 }
                 break;
@@ -1180,10 +1568,13 @@ public static class HexRules
             case 56:
                 ApplyDraftRandomGrantPlan(state, settlement, grant, PrismaticTierGrantPlans);
                 break;
+            case 80:
+                ApplyPandoraDraftPlan(state, settlement, grant);
+                break;
             case 49:
                 if (grant.NextStep == 0)
                 {
-                    TurnEngine.DrawCard(state, grant.PlayerIndex, 3);
+                    await TurnEngine.DrawCardAsync(state, grant.PlayerIndex, 3, engine.Prompts);
                     CommitGrantStep(state, settlement, grant);
                 }
                 break;
@@ -1324,6 +1715,7 @@ public static class HexRules
                     player.LifeArea.RemoveAt(0);
                     player.Hand.Add(top);
                     state.LifeLeftThisTurn.Add(playerIndex);
+                    await OnLifeMovedToHandByEffectAsync(engine, playerIndex);
                 }
                 break;
             case 47:
@@ -1335,8 +1727,11 @@ public static class HexRules
             case 56:
                 await ApplyDirectRandomGrantPlanAsync(engine, playerIndex, hexId, PrismaticTierGrantPlans);
                 break;
+            case 80:
+                await ApplyPandoraDirectAsync(engine, playerIndex);
+                break;
             case 49:
-                TurnEngine.DrawCard(state, playerIndex, 3);
+                await TurnEngine.DrawCardAsync(state, playerIndex, 3, engine.Prompts);
                 break;
             case 52:
                 player.DonDeck.Add(new DonCard());
@@ -1379,9 +1774,104 @@ public static class HexRules
         return definitions
             .Select(item => item.Id)
             .Where(id => id != sourceHexId)
+            .Where(id => id != 80)
             .Where(id => !state.HexState.Owned[playerIndex].Contains(id))
             .ToList();
     }
+
+    private static void ApplyPandoraDraftPlan(
+        GameState state,
+        HexDraftSettlement settlement,
+        HexGrantProgress grant)
+    {
+        if (grant.PlannedStepCount < 0)
+        {
+            var removed = state.HexState.Owned[grant.PlayerIndex]
+                .Where(id => id != 80)
+                .Distinct()
+                .Order()
+                .ToArray();
+            grant.PlannedRemovedHexIds.AddRange(removed);
+            var pool = PandoraReplacementPool(state, grant.PlayerIndex, removed);
+            for (int slot = 0; slot < removed.Length; slot++)
+            {
+                if (pool.Count == 0)
+                    throw new InvalidOperationException("潘多拉的魔盒没有足够的不同棱彩替换项");
+                int index = state.NextRecordedRandom(
+                    pool.Count,
+                    "hex_pandora_replacement",
+                    grant.PlayerIndex,
+                    new { slot, replacedHexId = removed[slot] });
+                grant.PlannedChildHexIds.Add(pool[index]);
+                pool.RemoveAt(index);
+            }
+            grant.PlannedStepCount = 1;
+        }
+        if (grant.PlannedRemovedHexIds.Count != grant.PlannedChildHexIds.Count)
+            throw new InvalidOperationException("潘多拉的魔盒替换计划不完整");
+        if (grant.NextStep > 0) return;
+
+        state.HexState.Owned[grant.PlayerIndex].Clear();
+        state.HexState.GrantedByTransmutation[grant.PlayerIndex].Clear();
+        for (int slot = 0; slot < grant.PlannedChildHexIds.Count; slot++)
+        {
+            int childHexId = grant.PlannedChildHexIds[slot];
+            AddOwned(state, grant.PlayerIndex, childHexId);
+            string childGrantKey = $"{grant.GrantKey}:pandora:{slot}:{childHexId}";
+            if (settlement.Grants.All(item =>
+                    !string.Equals(item.GrantKey, childGrantKey, StringComparison.Ordinal)))
+            {
+                settlement.Grants.Insert(settlement.NextGrantIndex + 1 + slot, new HexGrantProgress
+                {
+                    GrantKey = childGrantKey,
+                    PlayerIndex = grant.PlayerIndex,
+                    HexId = childHexId,
+                });
+            }
+        }
+        CommitGrantStep(state, settlement, grant);
+    }
+
+    private static async Task ApplyPandoraDirectAsync(GameEngine engine, int playerIndex)
+    {
+        var state = engine.State;
+        var removed = state.HexState.Owned[playerIndex]
+            .Where(id => id != 80)
+            .Distinct()
+            .Order()
+            .ToArray();
+        var pool = PandoraReplacementPool(state, playerIndex, removed);
+        var planned = new List<int>(removed.Length);
+        for (int slot = 0; slot < removed.Length; slot++)
+        {
+            if (pool.Count == 0)
+                throw new InvalidOperationException("潘多拉的魔盒没有足够的不同棱彩替换项");
+            int index = state.NextRecordedRandom(
+                pool.Count,
+                "hex_pandora_replacement",
+                playerIndex,
+                new { slot, replacedHexId = removed[slot] });
+            planned.Add(pool[index]);
+            pool.RemoveAt(index);
+        }
+
+        state.HexState.Owned[playerIndex].Clear();
+        state.HexState.GrantedByTransmutation[playerIndex].Clear();
+        foreach (int childHexId in planned)
+            await GrantAsync(engine, playerIndex, childHexId);
+    }
+
+    private static List<int> PandoraReplacementPool(
+        GameState state,
+        int playerIndex,
+        IReadOnlyCollection<int> removedIds)
+        => HexCatalog.ForTier(HexTier.Rainbow, state.HexState)
+            .Select(item => item.Id)
+            .Where(id => !HexCatalog.IsTransmutation(id))
+            .Where(id => !HexCatalog.IsAlternative(id, state.HexState.RulesRevision))
+            .Where(id => !removedIds.Contains(id))
+            .Where(id => !state.HexState.Owned[playerIndex].Contains(id) || removedIds.Contains(id))
+            .ToList();
 
     private static object RandomGrantContext(int slot, HexTier? tier)
         => tier is { } requiredTier
@@ -1407,7 +1897,7 @@ public static class HexRules
             int index = state.NextRecordedRandom(pool.Count, "hex_king_rainbow_grant", owner);
             await GrantAsync(engine, owner, pool[index]);
         }
-        TurnEngine.DrawCard(state, owner, 2);
+        await TurnEngine.DrawCardAsync(state, owner, 2, engine.Prompts);
     }
 
     private static async Task<int> AddLifeFromDeckAsync(
@@ -1422,7 +1912,8 @@ public static class HexRules
         int added = 0;
         for (int i = 0; i < count; i++)
         {
-            if (player.Deck.Count == 0)
+            if (player.Deck.Count == 0
+                && !await ResolveEmptyDeckAsync(state, owner, engine.Prompts))
             {
                 state.EvaluateDeckOut();
                 break;
@@ -1431,6 +1922,8 @@ public static class HexRules
             player.Deck.RemoveAt(0);
             player.LifeArea.Insert(0, top);
             added++;
+            if (player.Deck.Count == 0)
+                await ResolveEmptyDeckAsync(state, owner, engine.Prompts);
             state.EvaluateDeckOut();
             if (state.IsGameOver) break;
         }
@@ -1473,6 +1966,75 @@ public static class HexRules
         player.LifeArea.Insert(0, card);
         await OnLifeAddedAsync(engine, playerIndex, 1);
         return true;
+    }
+
+    /// <summary>
+    /// 卡组耗尽替代的唯一交互入口。选择列表的顺序就是新卡组从上到下的顺序；
+    /// 所有候选在等待结束后整体复核，再无等待地一次提交，避免取消/重放造成部分移动。
+    /// </summary>
+    public static async Task<bool> ResolveEmptyDeckAsync(
+        GameState state,
+        int owner,
+        IPromptService prompts)
+    {
+        if (owner is < 0 or > 1) return false;
+        var player = state.Players[owner];
+        if (player.Deck.Count > 0) return true;
+
+        // 奈美等更具体的既有耗尽替代先按既有优先级判定。
+        state.EvaluateDeckOut();
+        if (state.IsGameOver || !Has(state, owner, 72)) return false;
+        if (player.Trash.Count == 0)
+        {
+            state.EvaluateDeckOut();
+            return false;
+        }
+
+        var runtime = state.HexState.Runtime[owner];
+        if (runtime.VoidRefillResolving)
+            throw new InvalidOperationException("无尽虚空结算发生了不可重入的卡组耗尽");
+
+        runtime.VoidRefillResolving = true;
+        try
+        {
+            var candidates = player.Trash.ToList();
+            int count = Math.Min(10, candidates.Count);
+            var chosen = await prompts.ChooseCards(
+                owner,
+                "HexEndlessVoidOrder",
+                count == candidates.Count
+                    ? $"无尽虚空：将废弃区全部{count}张卡按选择顺序放回卡组"
+                    : "无尽虚空：选择10张不同卡牌并按选择顺序放回卡组",
+                candidates.Select(card => card.Id.ToString()).ToList(),
+                count,
+                count,
+                new Dictionary<string, object?>
+                {
+                    ["ordered"] = true,
+                    ["choiceCards"] = candidates.Select(card => new
+                    {
+                        id = card.Id.ToString(),
+                        number = card.Info.Number,
+                    }).ToArray(),
+                });
+            if (chosen.Count != count
+                || chosen.Distinct(StringComparer.Ordinal).Count() != count)
+                throw new InvalidDataException("无尽虚空选择数量或唯一性无效");
+            var selected = chosen
+                .Select(id => candidates.FirstOrDefault(card => card.Id.ToString() == id))
+                .ToArray();
+            if (selected.Any(card => card is null || !player.Trash.Contains(card)))
+                throw new InvalidDataException("无尽虚空选择包含已不在废弃区的卡牌");
+
+            foreach (var card in selected.OfType<CardInstance>())
+                player.Trash.Remove(card);
+            player.Deck.AddRange(selected.OfType<CardInstance>());
+            return player.Deck.Count > 0;
+        }
+        finally
+        {
+            runtime.VoidRefillResolving = false;
+        }
     }
 
     private sealed record RandomGrantPlan(

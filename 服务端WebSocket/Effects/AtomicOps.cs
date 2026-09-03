@@ -22,12 +22,23 @@ public static class AtomicOps
         return drew;
     }
 
+    public static async Task<int> DrawAsync(GameState s, int playerIdx, int n)
+    {
+        var prompts = EffectRuntime.CurrentPrompts
+            ?? throw new InvalidOperationException("交互式抽牌必须在效果结算上下文中执行");
+        int drew = await TurnEngine.DrawCardAsync(s, playerIdx, n, prompts);
+        if (drew > 0)
+            EffectRuntime.NotifyWatcher(EffectTrigger.OnDrawCard,
+                new Dictionary<string, object?> { ["count"] = drew, ["player"] = playerIdx });
+        return drew;
+    }
+
     public static void DiscardHand(PlayerState p, CardInstance card)
     {
         p.Hand.Remove(card);
         p.Trash.Add(card);
         // 手牌因效果被丢弃 → 派发 watcher（OP14-056 绵津见）；仅效果上下文内有效
-        EffectRuntime.NotifyHandDiscarded(p);
+        EffectRuntime.NotifyHandDiscarded(p, card);
     }
 
     /// <summary>把卡组顶部 n 张放入废弃区</summary>
@@ -961,7 +972,7 @@ public static class AtomicOps
     private static async Task PlaceStageAsync(GameState s, int playerIdx, CardInstance card)
     {
         var player = s.Players[playerIdx];
-        if (!Game.Hex.HexRules.Has(s, playerIdx, 30))
+        if (!Game.Hex.HexRules.HasLegacyDockSlots(s, playerIdx))
         {
             if (player.StageCard is not null) player.Trash.Add(player.StageCard);
             player.StageCard = card;

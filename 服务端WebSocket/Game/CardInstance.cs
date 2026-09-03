@@ -50,6 +50,18 @@ public class CardInstance
     /// <summary>持续费用修正（直到效果失效）</summary>
     public int CostModPersistent { get; set; }
 
+    /// <summary>
+    /// 跟随卡牌实体跨区域保留的永久费用修正。当前仅由海克斯“物法皆修”写入，
+    /// 不属于离场应清除的场上持续修正，因此 ResetCardEphemeralState 不得重置。
+    /// </summary>
+    public int EntityCostModPersistent { get; set; }
+
+    /// <summary>以下标记只在本次留在角色区期间有效，由 CharacterZone 离场清理统一重置。</summary>
+    public bool HexEnteredFromTrash { get; set; }
+    public bool HexEnteredFromHandByEffect { get; set; }
+    public bool HexThreeAdmiralsGranted { get; set; }
+    public int HexHighCostEntryTurn { get; set; }
+
     /// <summary>“直到下个对方结束阶段结束时为止”的费用修正。
     /// 数值同时计入 CostModPersistent，此列表负责记录到期方与精确回收的增量。</summary>
     public List<CardCostMod> CostModsUntilOppEnd { get; } = new();
@@ -123,7 +135,7 @@ public class CardInstance
     /// <summary>当前费用（含修正，不低于 0）</summary>
     public int CurrentCost()
     {
-        int v = Info.Cost + CostModThisTurn + CostModPersistent;
+        int v = Info.Cost + CostModThisTurn + CostModPersistent + EntityCostModPersistent;
         return v < 0 ? 0 : v;
     }
 

@@ -42,7 +42,7 @@ public class OP11_092_Hiruluk : IScriptedEffect
         AtomicOps.DiscardHand(me, toDiscard);
 
         // 收益 1：抽 1 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 收益 2：从废弃区登场 1 张（非"希路麦波"、费用≤8、含《利刃》）的角色
         var cands = me.Trash.Where(c =>

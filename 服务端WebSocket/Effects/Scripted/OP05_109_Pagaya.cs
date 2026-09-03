@@ -22,7 +22,7 @@ public class OP05_109_Pagaya : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;                   // 每回合1次
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         int dn = Math.Min(2, me.Hand.Count);
         if (dn <= 0) return;
         var ch = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand", $"丢弃{dn}张手牌",

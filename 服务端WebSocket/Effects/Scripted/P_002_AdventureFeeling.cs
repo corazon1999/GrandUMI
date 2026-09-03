@@ -20,7 +20,7 @@ public class P_002_AdventureFeeling : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.EventMain || t == EffectTrigger.OnLifeRevealTrigger;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
@@ -38,8 +38,8 @@ public class P_002_AdventureFeeling : IScriptedEffect
 
         // 抽取与放回张数相同的卡牌
         if (n > 0)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, n);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, n);
 
-        return Task.CompletedTask;
+        return;
     }
 }

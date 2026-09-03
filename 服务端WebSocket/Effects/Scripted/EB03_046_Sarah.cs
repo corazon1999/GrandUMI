@@ -19,7 +19,7 @@ public class EB03_046_Sarah : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnEnterField || t == EffectTrigger.OnKO;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         int owner = ctx.OwnerIndex;
@@ -37,12 +37,12 @@ public class EB03_046_Sarah : IScriptedEffect
                 me.Characters.Any(c => Cond(owner, c)) ||
                 opp.Characters.Any(c => Cond(oppIdx, c));
             if (exists)
-                AtomicOps.Draw(ctx.State, owner, 1);
-            return Task.CompletedTask;
+                await AtomicOps.DrawAsync(ctx.State, owner, 1);
+            return;
         }
 
         // 【KO时】卡组顶 2 张放置到废弃区
         AtomicOps.MillTop(me, 2);
-        return Task.CompletedTask;
+        return;
     }
 }

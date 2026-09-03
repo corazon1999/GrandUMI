@@ -46,7 +46,7 @@ public static class HexCatalog
         H(27, "强化万用瞄准镜", HexTier.Rainbow, "己方攻击结算时，力量低2000也视为成功。"),
         H(28, "终极刷新", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，将最多8张休息咚!!转为活跃。"),
         H(29, "最终形态", HexTier.Rainbow, "每回合1次，从手牌打出原本费用10的卡后，领袖+2000且角色+1000至下个对方回合结束。"),
-        H(30, "三号船坞", HexTier.Silver, "己方额外获得1个舞台区；打出第3张舞台时选择废弃现有1张。"),
+        H(30, "三号船坞", HexTier.Silver, "己方舞台卡的效果每次实际发动时，该效果额外发动1次。"),
         H(31, "会心治疗", HexTier.Silver, "生命区增加卡牌时有25%概率再从卡组顶补1张生命，每回合最多成功1次。"),
         H(32, "老练狙神", HexTier.Gold, "每回合1次，从手牌打出原本费用3以上事件后，按实际支付费用转活跃等量休息咚!!。"),
         H(33, "回力OK镖", HexTier.Silver, "每个己方回合开始时，随机令对方1个角色本回合力量-2000。"),
@@ -73,12 +73,39 @@ public static class HexCatalog
         H(54, "海军狂欢", HexTier.Silver, "每回合1次，己方KO敌方角色后，己方领袖和全部角色本回合力量+1000。"),
         H(55, "质变：黄金阶", HexTier.Silver, "获得时确定性随机获得1个金色海克斯。"),
         H(56, "质变：棱彩阶", HexTier.Gold, "获得时确定性随机获得1个棱彩海克斯。"),
+        H(57, "death or live", HexTier.Silver, "己方生命区增加卡牌时，选择并KO对方1个当前费用不低于己方当前生命数的角色。"),
+        H(58, "埃鲁巴夫", HexTier.Silver, "己方拥有【阻挡者】的角色力量+2000。"),
+        H(59, "鬼岛决战", HexTier.Silver, "己方咚!!放回咚!!卡组时，选择对方1个角色，本回合中力量-1000。"),
+        H(60, "冰冻果实", HexTier.Silver, "每回合1次，己方手牌因效果被丢弃时，抽1张卡。"),
+        H(61, "给我一个面子", HexTier.Silver, "对方领袖不能攻击己方领袖。"),
+        H(62, "四皇", HexTier.Silver, "己方当前力量12000或以上的角色获得【速攻】。"),
+        H(63, "死者苏生", HexTier.Silver, "从废弃区登场的己方角色获得【流放】。"),
+        H(64, "绝对防御", HexTier.Silver, "己方【对方攻击时】效果无视【每回合1次】的使用次数限制。"),
+        H(65, "三大将", HexTier.Silver, "本回合已有3个或以上登场时当前费用为5或以上的己方角色时，这些角色获得【阻挡者】和【速攻：角色】。"),
+        H(66, "越狱行动", HexTier.Silver, "因卡牌效果从手牌登场的己方角色获得【速攻】。"),
+        H(67, "清一色", HexTier.Silver, "己方场上有角色且所有角色拥有至少1个相同特征时，己方所有角色力量+1000。"),
+        H(68, "进攻即防御", HexTier.Silver, "己方回合结束时，将己方所有原本力量8000或以上的角色转为活跃。"),
+        H(69, "仰卧起坐", HexTier.Silver, "己方回合中每回合1次，己方生命卡牌因效果加入手牌时，可以将1张手牌放到生命区最上方。"),
+        H(70, "屠宰场", HexTier.Silver, "【启动主要】选择己方1个角色，解除其全部被赋予的咚!!；该角色活跃则这些咚!!转为活跃，休息则转为休息。"),
+        H(71, "公主链接", HexTier.Silver, "己方领袖无视自身的无法攻击限制；己方回合中，该领袖力量+2000。"),
+        H(72, "无尽虚空", HexTier.Silver, "己方卡组变为0张时，改为从废弃区选择最多10张不同卡牌，按选择顺序放回卡组；不足10张时选择全部。"),
+        H(73, "火之意志", HexTier.Silver, "己方事件卡因效果从手牌丢弃时，己方领袖本回合力量+2000。"),
+        H(74, "沙沙果实", HexTier.Silver, "己方回合中，己方角色被KO时，抽1张卡。"),
+        H(75, "线线果实", HexTier.Silver, "对方每回合的第1次攻击必须以己方休息状态角色为目标（若存在）。"),
+        H(76, "鱼人空手道", HexTier.Silver, "每回合1次，被赋予咚!!的己方角色攻击时，抽1张卡。"),
+        H(77, "听说你用剑了", HexTier.Silver, "己方领袖的【启动主要】效果结算后，可以将己方最多2张休息状态的咚!!转为活跃。"),
+        H(78, "革命军", HexTier.Silver, "己方所有角色当前费用+8。"),
+        H(79, "牙仙子", HexTier.Silver, "己方费用区的咚!!没有数量上限；每次对敌方领袖造成伤害后，在己方咚!!卡组中生成1张咚!!。"),
+        H(80, "潘多拉的魔盒", HexTier.Silver, "获得时移除此海克斯，并将已拥有的每个其他海克斯分别替换为不同的随机棱彩海克斯。"),
+        H(81, "物法皆修", HexTier.Silver, "己方角色攻击时，随机使手牌中1张事件卡的费用永久-1；己方打出事件时，随机使手牌中1张角色卡的费用永久-1。"),
+        H(82, "无果实能力者", HexTier.Silver, "己方角色的原本力量变为该角色原本费用×1000+2000。"),
     ];
 
-    private static readonly HashSet<int> AlternativeIds = [30, 48];
+    private static readonly HashSet<int> LegacyAlternativeIds = [30, 48];
+    private static readonly HashSet<int> AlternativeIds = [48];
     // 编号 27 仅为旧房间与录像保留定义和品质映射；新房间、随机质变及管理员调配入口均不再使用。
     private static readonly HashSet<int> RetiredIds = [27];
-    private static readonly HashSet<int> TransmutationIds = [47, 55, 56];
+    private static readonly HashSet<int> TransmutationIds = [47, 55, 56, 80];
     private static readonly HashSet<int> LegacyRainbowIds = [4, 5, 9, 10, 11, 12, 13, 14, 15, 19, 28, 35, 38, 39, 40, 46, 47, 53];
     private static readonly HashSet<int> LegacyGoldIds = [1, 2, 3, 6, 7, 16, 17, 18, 21, 26, 27, 29, 32, 36, 37, 48, 49, 51];
     private static readonly IReadOnlyDictionary<int, HexDefinition> ById = Definitions.ToDictionary(item => item.Id);
@@ -86,10 +113,13 @@ public static class HexCatalog
         .Where(item => item.Id <= 54)
         .ToArray();
     private static readonly HexDefinition[] PreRetirementRegularDefinitions = Definitions
-        .Where(item => !AlternativeIds.Contains(item.Id))
+        .Where(item => item.Id <= 56 && !LegacyAlternativeIds.Contains(item.Id))
         .ToArray();
-    private static readonly HexDefinition[] RegularDefinitions = PreRetirementRegularDefinitions
+    private static readonly HexDefinition[] PreExpansionRegularDefinitions = PreRetirementRegularDefinitions
         .Where(item => !RetiredIds.Contains(item.Id))
+        .ToArray();
+    private static readonly HexDefinition[] RegularDefinitions = Definitions
+        .Where(item => !AlternativeIds.Contains(item.Id) && !RetiredIds.Contains(item.Id))
         .ToArray();
     private static readonly HexDefinition[] AlternativeDefinitions = Definitions
         .Where(item => AlternativeIds.Contains(item.Id))
@@ -97,7 +127,7 @@ public static class HexCatalog
 
     /// <summary>完整目录，包含常规池和备选池。</summary>
     public static IReadOnlyList<HexDefinition> All => Definitions;
-    /// <summary>新房间普通选秀与随机质变允许使用的 53 项常规池。</summary>
+    /// <summary>新房间普通选秀与随机质变允许使用的 80 项常规池。</summary>
     public static IReadOnlyList<HexDefinition> Regular => RegularDefinitions;
     /// <summary>管理员可调配的当前目录；不包含仅供历史兼容的退役项。</summary>
     public static IReadOnlyList<HexDefinition> Configurable => Definitions
@@ -113,7 +143,9 @@ public static class HexCatalog
     public static bool IsRetired(int id) => RetiredIds.Contains(id);
 
     public static bool IsAlternative(int id, int rulesRevision)
-        => rulesRevision >= HexRules.BalanceRulesRevision && AlternativeIds.Contains(id);
+        => rulesRevision >= HexRules.ExpansionRulesRevision
+            ? AlternativeIds.Contains(id)
+            : rulesRevision >= HexRules.BalanceRulesRevision && LegacyAlternativeIds.Contains(id);
 
     public static bool IsTransmutation(int id) => TransmutationIds.Contains(id);
 
@@ -143,6 +175,8 @@ public static class HexCatalog
             (51, < HexRules.SevenHexReworkRulesRevision) => "可将手牌事件当作+2000反击值使用。",
             (53, < HexRules.SevenHexReworkRulesRevision) =>
                 "己方生命为0且存在休息角色时，对方不能攻击己方领袖。",
+            (30, < HexRules.ExpansionRulesRevision) =>
+                "己方额外获得1个舞台区；打出第3张舞台时选择废弃现有1张。",
             (55, < HexRules.TransmutationPresentationRulesRevision) =>
                 "获得时确定性随机获得1个其他银色海克斯和1个金色海克斯。",
             _ => Get(id).Description,
@@ -171,15 +205,19 @@ public static class HexCatalog
     }
 
     public static IReadOnlyList<HexDefinition> RegularForRevision(int rulesRevision)
-        => rulesRevision >= HexRules.ScopeReworkRulesRevision
+        => rulesRevision >= HexRules.ExpansionRulesRevision
             ? RegularDefinitions
-            : rulesRevision >= HexRules.BalanceRulesRevision
-                ? PreRetirementRegularDefinitions
-                : LegacyRegularDefinitions;
+            : rulesRevision >= HexRules.ScopeReworkRulesRevision
+                ? PreExpansionRegularDefinitions
+                : rulesRevision >= HexRules.BalanceRulesRevision
+                    ? PreRetirementRegularDefinitions
+                    : LegacyRegularDefinitions;
 
     public static HexTier TierForRevision(int id, int rulesRevision)
     {
         _ = Get(id);
+        if (rulesRevision < HexRules.ExpansionRulesRevision && id > 56)
+            throw new InvalidOperationException($"规则修订版 {rulesRevision} 不存在海克斯编号 {id}");
         if (rulesRevision >= HexRules.BalanceRulesRevision) return Get(id).Tier;
         if (id > 54) throw new InvalidOperationException($"旧版海克斯规则不存在编号 {id}");
         if (LegacyRainbowIds.Contains(id)) return HexTier.Rainbow;

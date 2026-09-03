@@ -35,7 +35,7 @@ public class OP12_118_JewelryBonney : IScriptedEffect
         if (restedTotal < 8) return;
 
         // 抽取 2 张卡牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 丢弃我方 1 张手牌（强制；手牌为空则跳过）
         if (me.Hand.Count > 0)

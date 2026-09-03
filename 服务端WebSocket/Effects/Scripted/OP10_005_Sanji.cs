@@ -20,7 +20,7 @@ public class OP10_005_Sanji : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t)
         => t == EffectTrigger.OnEnterField || t == EffectTrigger.OnKO;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -38,11 +38,11 @@ public class OP10_005_Sanji : IScriptedEffect
                 Predicate = (s, sideIdx, card) =>
                     card.Id == selfId && s.CurrentTurnPlayer == owner,
             });
-            return Task.CompletedTask;
+            return;
         }
 
         // 【KO时】抽取 1 张卡牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

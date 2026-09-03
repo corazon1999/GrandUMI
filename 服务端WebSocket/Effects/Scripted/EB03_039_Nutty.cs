@@ -24,7 +24,7 @@ public class EB03_039_Nutty : IScriptedEffect
         if (!me.Leader.Info.HasKeyword("百兽海盗团")) return;
 
         // 抽 1
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 丢弃 1 张手牌
         if (me.Hand.Count > 0)

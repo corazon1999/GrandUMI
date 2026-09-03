@@ -54,6 +54,6 @@ public class P_083_Jacks : IScriptedEffect
         }
 
         // 之后：抽取 1 张卡牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

@@ -63,7 +63,7 @@ public class OP12_057_HieBlock : IScriptedEffect
         if (!use) return;
 
         bool discarded = await DiscardOne(ctx, me, "丢弃我方 1 张手牌");
-        if (discarded) AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+        if (discarded) await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
     }
 
     private static async Task<bool> DiscardOne(EffectContext ctx, PlayerState me, string prompt)

@@ -36,6 +36,6 @@ public class OP05_056_XBaltz : IScriptedEffect
 
         var picked = cands.First(c => c.Id.ToString() == chosen[0]);
         AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, picked);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

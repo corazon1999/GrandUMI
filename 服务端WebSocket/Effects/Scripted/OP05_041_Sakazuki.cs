@@ -41,7 +41,7 @@ public class OP05_041_Sakazuki : IScriptedEffect
             var card = me.Hand.First(c => c.Id.ToString() == disc[0]);
             AtomicOps.DiscardHand(me, card);
             me.TurnOnceUsed.Add(key);
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

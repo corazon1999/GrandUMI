@@ -40,7 +40,7 @@ public class OP04_095_GuardShield : IScriptedEffect
         }
 
         // 【触发】抽 2 张，弃 1 张手牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         if (me.Hand.Count == 0) return;
         var disc = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
             "丢弃我方的 1 张手牌",

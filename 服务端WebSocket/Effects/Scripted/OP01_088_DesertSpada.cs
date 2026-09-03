@@ -27,7 +27,7 @@ public class OP01_088_DesertSpada : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
             // 抽2张，丢弃1张手牌
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
             if (me.Hand.Count > 0)
             {
                 var discard = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",

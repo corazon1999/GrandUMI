@@ -15,7 +15,7 @@ public sealed class OP15_104_Conis : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnEnterField
             && me.LifeArea.Count >= ctx.State.Players[1 - ctx.OwnerIndex].LifeArea.Count) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         int discardCount = ctx.Trigger == EffectTrigger.OnLifeRevealTrigger ? 1 : 2;
         int required = Math.Min(discardCount, me.Hand.Count);
         if (required == 0) return;

@@ -416,6 +416,7 @@ public sealed class HexSevenReworkTests
     public void 修订十一计数和所有权进入私密快照与确定性检查点_修订十文案冻结()
     {
         var state = NewState();
+        HexRules.SetRulesRevisionForReplay(state, HexRules.SevenHexReworkRulesRevision);
         OwnOnly(state, 0, 36, 37, 38, 39, 46, 51, 53);
         state.HexState.Runtime[0].CardsPlayedThisTurn = 2;
         var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));

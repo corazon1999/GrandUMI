@@ -20,21 +20,21 @@ public class OP12_040_Kuzan : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnHandDiscarded;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         // 丢弃的须是我方手牌
         if (!ctx.Vars.TryGetValue("owner", out var ov) || ov is not int owner || owner != ctx.OwnerIndex)
-            return Task.CompletedTask;
+            return;
         // 丢弃来源须是我方控制的效果
         if (ctx.Vars.TryGetValue("actingSide", out var asd) && asd is int acting && acting != ctx.OwnerIndex)
-            return Task.CompletedTask;
+            return;
         // 来源卡须拥有《海军》特征
         var srcNum = ctx.Vars.TryGetValue("sourceNumber", out var sn) ? sn as string : null;
-        if (string.IsNullOrEmpty(srcNum)) return Task.CompletedTask;
+        if (string.IsNullOrEmpty(srcNum)) return;
         var srcInfo = CardDatabase.Get(srcNum);
-        if (srcInfo is null || !srcInfo.HasKeyword("海军")) return Task.CompletedTask;
+        if (srcInfo is null || !srcInfo.HasKeyword("海军")) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

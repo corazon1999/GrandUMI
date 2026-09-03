@@ -58,7 +58,7 @@ public class OP11_071_CharlottePerospero : IScriptedEffect
         if (revealed.Info.Cost != declared) return; // 未命中
 
         // 命中：抽 1 张 + 追加 1 张活跃咚
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
     }
 }

@@ -122,7 +122,7 @@ public class GameEngine
     {
         "Prompt", "PromptTimeout", "RevealCards",
         "Attack", "AwaitBlock", "AwaitCounter", "DeclareBlocker", "CounterIcon", "PlayCard",
-        "UndoAttachDon",
+        "UndoAttachDon", "DetachAllDon",
         "FirstPlayerChosen", "MulliganComplete", "MulliganUpdate",
         "HexDraftStarted", "HexChoiceLocked", "HexDraftResolved",
         "DuelOver", "Surrender", "DrawRequested", "DrawRequestRejected", "DrawAgreed",
@@ -402,6 +402,7 @@ public class GameEngine
             case "PlayCard":       HandlePlayCard(playerIndex, data); break;
             case "AttachDon":      HandleAttachDon(playerIndex, data); break;
             case "UndoAttachDon":  HandleUndoAttachDon(playerIndex, data); break;
+            case "DetachAllDon":   HandleDetachAllDon(playerIndex, data); break;
             case "Attack":         HandleAttack(playerIndex, data); break;
             case "DeclareBlocker": HandleDeclareBlocker(playerIndex, data); break;
             case "PassBlock":      HandlePassBlock(playerIndex); break;
@@ -725,6 +726,7 @@ public class GameEngine
                 card.TurnPlayed = State.TurnCount; // 沿用登场回合规则（当回合默认不能攻击）
                 card.IsTapped = State.ShouldCharacterEnterRested(targetIndex, card);
                 p.Characters.Add(card);
+                Hex.HexRules.OnCharacterEntered(State, targetIndex, card, from: "debug", byEffect: false);
                 break;
 
             case CardKind.Stage:
@@ -900,7 +902,7 @@ public class GameEngine
         var handCard = p.Hand[handIndex];
 
         if (handCard.Info.Kind == CardKind.Stage
-            && Hex.HexRules.Has(State, playerIndex, 30)
+            && Hex.HexRules.HasLegacyDockSlots(State, playerIndex)
             && p.StageCard is not null
             && p.ExtraStageCard is not null)
         {
@@ -1233,6 +1235,42 @@ public class GameEngine
             targetId = entry.TargetId,
             count = dons.Length,
             operationId = operationSequence.ToString(),
+        });
+    }
+
+    private void HandleDetachAllDon(int playerIndex, JsonElement data)
+    {
+        if (!data.TryGetProperty("characterId", out var characterElement)
+            || characterElement.ValueKind != JsonValueKind.String
+            || !Guid.TryParse(characterElement.GetString(), out var characterId))
+        {
+            SendError(playerIndex, "角色 ID 非法");
+            return;
+        }
+
+        var validation = ActionValidator.CanDetachAllDon(State, playerIndex, characterId);
+        if (!validation.Ok)
+        {
+            SendError(playerIndex, validation.Reason!);
+            return;
+        }
+
+        var character = State.Players[playerIndex].Characters.First(card => card.Id == characterId);
+        var targetState = character.IsTapped ? DonState.Rest : DonState.Active;
+        var count = Hex.HexRules.DetachAllDon(State, playerIndex, characterId);
+        if (count <= 0)
+        {
+            SendError(playerIndex, "目标角色没有可移除的附加咚");
+            return;
+        }
+
+        Broadcast("DetachAllDon", new
+        {
+            player = playerIndex,
+            characterId = characterId.ToString(),
+            cardNumber = character.Info.Number,
+            count,
+            state = targetState.ToString(),
         });
     }
 
@@ -2184,7 +2222,8 @@ public class GameEngine
             if (!State.IsGameOver)
                 await EffectRuntime.TriggerEvent(State, EffectTrigger.OnTurnStart, Prompts,
                     new Dictionary<string, object?> { ["owner"] = State.CurrentTurnPlayer });
-            TurnEngine.AdvanceTurnToMain(State);
+            await TurnEngine.AdvanceTurnToMainAsync(State, Prompts);
+            if (State.IsGameOver) { CheckGameOver(); return; }
             // 「下个对方主要阶段开始时」延迟任务（PRB02-005 路飞）：此刻已切到新回合方、咚已 reset 活跃
             RunNextOppMainPhaseTasks();
             Broadcast("EndTurn", new { newTurnPlayer = State.CurrentTurnPlayer, turnCount = State.TurnCount });

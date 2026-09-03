@@ -33,7 +33,7 @@ public class OP13_102_Edison : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
             // 【触发】抽 1，并将对方最多 1 张费用≤3 的角色转休息
-            AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
             await RestOpponentCostLe3(ctx, opp);
             return;
         }
@@ -49,7 +49,7 @@ public class OP13_102_Edison : IScriptedEffect
         // 条件：我方生命牌数 ≤ 对方生命牌数
         if (me.LifeCount > opp.LifeCount) return;
 
-        AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
         await RestOpponentCostLe3(ctx, opp);
     }
 

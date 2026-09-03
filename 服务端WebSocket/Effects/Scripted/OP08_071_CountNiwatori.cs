@@ -59,6 +59,7 @@ public class OP08_071_CountNiwatori : IScriptedEffect
                 await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
             picked.TurnPlayed = ctx.State.TurnCount;
             me.Characters.Add(picked);
+            ctx.State.EnqueueEnterField(ctx.OwnerIndex, picked, "deck");
         }
 
         // 之后切洗卡组

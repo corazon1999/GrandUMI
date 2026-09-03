@@ -156,7 +156,7 @@ public static class EffectRuntime
     /// <summary>手牌因效果被丢弃时入队 OnHandDiscarded（owner=该手牌所属方）；仅效果上下文内有效。
     /// payload 额外携带丢弃来源：sourceNumber=当前结算效果的来源卡番号、actingSide=效果控制方、
     /// isCost=是否成本支付，供只关心收益阶段或只关心成本阶段的监听按各自规则判定。</summary>
-    public static void NotifyHandDiscarded(PlayerState p)
+    public static void NotifyHandDiscarded(PlayerState p, CardInstance card)
     {
         var s = _ambient;
         if (s is null) return;
@@ -171,6 +171,8 @@ public static class EffectRuntime
             ["sourceNumber"] = CurrentSource?.Info.Number,
             ["actingSide"] = CurrentActingSide,
             ["isCost"] = PayingCost,
+            ["cardId"] = card.Id.ToString(),
+            ["cardKind"] = card.Info.Kind.ToString(),
         });
     }
 
@@ -228,7 +230,7 @@ public static class EffectRuntime
         _depth++;
         try
         {
-            var activationProbe = HexRules.CanCopyEffect(s, ownerIdx, trigger, hexCopy)
+            var activationProbe = HexRules.NeedsActivationProbe(s, ownerIdx, source, trigger, hexCopy)
                 ? new TriggerActivationProbe(prompts)
                 : null;
             var ctx = new EffectContext
@@ -290,8 +292,11 @@ public static class EffectRuntime
             {
                 await scripted.Resolve(ctx);
                 bool actuallyActivated = activationProbe?.WasActivated(s, ctx) ?? true;
-                HexRules.ApplyInventorSecondUse(s, ownerIdx, source, turnOnceKeysBefore, cardOnceKeysBefore);
+                HexRules.ApplyInventorSecondUse(
+                    s, ownerIdx, source, trigger, actuallyActivated, turnOnceKeysBefore, cardOnceKeysBefore);
                 MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
+                await HexRules.AfterEffectResolvedAsync(
+                    s, ownerIdx, source, trigger, prompts, hexCopy, actuallyActivated);
                 await ResolveHexCopyAsync(
                     s, ownerIdx, source, trigger, prompts, payload, hexCopy, actuallyActivated);
                 return;
@@ -302,6 +307,11 @@ public static class EffectRuntime
             if (!await DeclaredOmissionEffects.BeforeDsl(ctx))
             {
                 bool actuallyActivated = activationProbe?.WasActivated(s, ctx) ?? true;
+                HexRules.ApplyInventorSecondUse(
+                    s, ownerIdx, source, trigger, actuallyActivated, turnOnceKeysBefore, cardOnceKeysBefore);
+                MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
+                await HexRules.AfterEffectResolvedAsync(
+                    s, ownerIdx, source, trigger, prompts, hexCopy, actuallyActivated);
                 await ResolveHexCopyAsync(
                     s, ownerIdx, source, trigger, prompts, payload, hexCopy, actuallyActivated);
                 return;
@@ -313,8 +323,11 @@ public static class EffectRuntime
             // 4. 后置补齐层：依赖 DSL 刚选中的同一目标，补结算条件加成、关键字或后续动作。
             await DeclaredOmissionEffects.AfterDsl(ctx);
             bool dslActuallyActivated = dslActivated || (activationProbe?.WasActivated(s, ctx) ?? false);
-            HexRules.ApplyInventorSecondUse(s, ownerIdx, source, turnOnceKeysBefore, cardOnceKeysBefore);
+            HexRules.ApplyInventorSecondUse(
+                s, ownerIdx, source, trigger, dslActuallyActivated, turnOnceKeysBefore, cardOnceKeysBefore);
             MarkOncePerTurnCardUsedIfConsumed(s, owner, source, turnOnceCountBefore);
+            await HexRules.AfterEffectResolvedAsync(
+                s, ownerIdx, source, trigger, prompts, hexCopy, dslActuallyActivated);
             await ResolveHexCopyAsync(
                 s, ownerIdx, source, trigger, prompts, payload, hexCopy, dslActuallyActivated);
         }
@@ -335,7 +348,12 @@ public static class EffectRuntime
             }
             _depth--;
             if (isRootResolve)
+            {
                 await HandleLifeZoneChangesAsync(s, prompts, lifeBefore0!, lifeBefore1!);
+                for (int playerIndex = 0; playerIndex < s.Players.Length && !s.IsGameOver; playerIndex++)
+                    if (s.Players[playerIndex].Deck.Count == 0)
+                        await HexRules.ResolveEmptyDeckAsync(s, playerIndex, prompts);
+            }
             _ambient = prevAmbient;
             _currentSourceAL.Value = prevSource;
             _actingSideAL.Value = prevActing;
@@ -369,7 +387,7 @@ public static class EffectRuntime
     {
         if (!actuallyActivated
             || !HasEffectForTrigger(source, trigger)
-            || !HexRules.ShouldCopyEffect(state, owner, trigger, alreadyCopied))
+            || !HexRules.ShouldCopyEffect(state, owner, source, trigger, alreadyCopied))
             return;
         var copyPayload = payload is null
             ? new Dictionary<string, object?>()
@@ -486,13 +504,20 @@ public static class EffectRuntime
         EnqueueLifeLeaveWatchers(state, lifeBefore0, lifeBefore1);
         if ((prompts as PromptSystem)?.Engine is not { } engine) return;
 
+        var addedCounts = new int[2];
+        var movedToHand = new bool[2];
         for (int owner = 0; owner < 2; owner++)
         {
             var before = owner == 0 ? lifeBefore0 : lifeBefore1;
-            int added = state.Players[owner].LifeArea.Count(card => !before.Contains(card.Id));
-            if (added > 0)
-                await HexRules.OnLifeAddedAsync(engine, owner, added);
+            addedCounts[owner] = state.Players[owner].LifeArea.Count(card => !before.Contains(card.Id));
+            movedToHand[owner] = state.Players[owner].Hand.Any(card => before.Contains(card.Id));
         }
+        for (int owner = 0; owner < 2; owner++)
+            if (addedCounts[owner] > 0)
+                await HexRules.OnLifeAddedAsync(engine, owner, addedCounts[owner]);
+        for (int owner = 0; owner < 2; owner++)
+            if (movedToHand[owner])
+                await HexRules.OnLifeMovedToHandByEffectAsync(engine, owner);
     }
 
     /// <summary>排空旧同步 KO 的【KO时】、watcher 队列与被效果登场卡的【登场时】（带再入上限防死循环）。
@@ -588,6 +613,8 @@ public static class EffectRuntime
             ["effectSourceNumber"] = ef.EffectSourceNumber,
             ["lifeTriggerOrigin"] = ef.LifeTriggerOrigin,
         };
+        if (card.Info.Kind == CardKind.Character)
+            HexRules.OnCharacterEntered(s, ef.Owner, card, ef.From, byEffect: true);
 
         // 没有登场时效果的卡仍要经过 Resolve 注册静态场上能力，但不应作为排序候选展示。
         if (!HasEffectForTrigger(card, EffectTrigger.OnEnterField))

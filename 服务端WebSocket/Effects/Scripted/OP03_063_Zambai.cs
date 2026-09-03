@@ -33,6 +33,6 @@ public class OP03_063_Zambai : IScriptedEffect
         // 成本：咚!!-1
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
         // 效果：抽 1
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

@@ -28,7 +28,7 @@ public class OP09_019_NeverForgive : IScriptedEffect
         // 【触发】抽 1
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 
@@ -52,7 +52,7 @@ public class OP09_019_NeverForgive : IScriptedEffect
         // 之后：对方场上存在力量≥5000的角色则抽 1
         if (opp.Characters.Any(c => ctx.State.CurrentPowerOf(oppIdx, c) >= 5000))
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
     }
 }

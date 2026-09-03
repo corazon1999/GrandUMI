@@ -50,6 +50,6 @@ public class OP15_002_Lucci : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;
         if (!me.HasActivatedBaseCost3PlusEventThisTurn) return;
         me.TurnOnceUsed.Add(key);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

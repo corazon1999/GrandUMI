@@ -24,7 +24,7 @@ public class OP12_098_DreamPunch : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
             // 【触发】抽 1 张 + 卡组顶 1 张入废弃区
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             AtomicOps.MillTop(me, 1);
             return;
         }

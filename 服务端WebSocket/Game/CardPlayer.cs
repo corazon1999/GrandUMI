@@ -38,10 +38,11 @@ public static class CardPlayer
                 card.TurnPlayed = s.TurnCount;
                 card.IsTapped = s.ShouldCharacterEnterRested(playerIdx, card);
                 p.Characters.Add(card);
+                Hex.HexRules.OnCharacterEntered(s, playerIdx, card, from: "hand", byEffect: false);
                 return new PlayResult(PlayKind.Character, card, cost);
 
             case CardKind.Stage:
-                if (Hex.HexRules.Has(s, playerIdx, 30))
+                if (Hex.HexRules.HasLegacyDockSlots(s, playerIdx))
                 {
                     if (p.StageCard is null) p.StageCard = card;
                     else if (p.ExtraStageCard is null) p.ExtraStageCard = card;

@@ -24,7 +24,7 @@ public class EB03_003_Uta : IScriptedEffect
 
         if (!me.Leader.Info.NameContains("乌塔")) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 之后：手牌中最多1张力量≤6000且原本没有效果的角色登场
         var playable = me.Hand.Where(c =>

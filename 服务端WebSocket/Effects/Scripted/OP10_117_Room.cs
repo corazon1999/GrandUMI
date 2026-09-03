@@ -28,7 +28,7 @@ public class OP10_117_Room : IScriptedEffect
         // ── 【触发】抽 1 ──
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

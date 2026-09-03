@@ -54,7 +54,7 @@ public class OP14_120_Crocodile : IScriptedEffect
                 return currentCost == 0 || currentCost >= 8;
             });
             if (shouldDraw)
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
             return;
         }

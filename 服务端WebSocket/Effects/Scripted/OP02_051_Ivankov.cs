@@ -24,7 +24,7 @@ public class OP02_051_Ivankov : IScriptedEffect
         int owner = ctx.OwnerIndex;
 
         int need = 3 - me.Hand.Count;
-        if (need > 0) AtomicOps.Draw(ctx.State, owner, need);
+        if (need > 0) await AtomicOps.DrawAsync(ctx.State, owner, need);
 
         var playable = me.Hand.Where(c =>
             c.Info.Kind == CardKind.Character &&

@@ -16,7 +16,7 @@ public sealed class OP09_119_Luffy : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         if (!await AtomicOps.PromptReturnAtLeastOneDonToDeck(ctx)) return;
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         AtomicOps.GiveKeyword(ctx.Source, "速攻", KeywordDuration.ThisTurn, ctx.OwnerIndex);
     }
 }

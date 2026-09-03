@@ -28,7 +28,7 @@ public class OP06_095_ShadowsGathering : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
             // 【触发】抽取 2 张卡牌，丢弃我方 1 张手牌
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
             if (me.Hand.Count > 0)
             {
                 var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",

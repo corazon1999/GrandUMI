@@ -38,7 +38,7 @@ public class OP07_031_Bartolomeo : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 抽取1张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 丢弃我方的1张手牌
         if (me.Hand.Count == 0) return;

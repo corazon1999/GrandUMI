@@ -34,6 +34,6 @@ public class P_046_Yamato : IScriptedEffect
         foreach (var c in hand)
             AtomicOps.ReturnHandToDeckBottom(me, c);
 
-        AtomicOps.Draw(ctx.State, owner, n);
+        await AtomicOps.DrawAsync(ctx.State, owner, n);
     }
 }

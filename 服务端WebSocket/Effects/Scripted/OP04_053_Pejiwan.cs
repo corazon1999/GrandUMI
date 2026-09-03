@@ -27,7 +27,7 @@ public class OP04_053_Pejiwan : IScriptedEffect
         if (me.TurnOnceUsed.Contains(key)) return;                                      // 每回合1次
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         if (me.Hand.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",

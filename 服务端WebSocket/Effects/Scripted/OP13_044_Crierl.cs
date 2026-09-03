@@ -23,7 +23,7 @@ public class OP13_044_Crierl : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnKO)
         {
             // 【KO时】抽取 1 张
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

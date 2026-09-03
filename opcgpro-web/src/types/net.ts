@@ -984,6 +984,7 @@ export type GameActionType =
   | "RefreshHex"        // { roundId: string, candidateIndex: number, expectedHexId: number }
   | "PlayCard"          // { handIndex: number, freeCost?: boolean }
   | "AttachDon"         // { targetId: "leader" | cardId, count: number }
+  | "DetachAllDon"      // { characterId: cardId }，屠宰场：移除目标角色的全部附加咚
   | "UndoAttachDon"     // { operationId: string }，只能撤回服务端快照确认的最近一次贴咚
   | "Attack"            // { attackerId: cardId | "leader", targetIsLeader: boolean, targetId?: cardId }
   | "DeclareBlocker"    // { blockerId: cardId }
@@ -1016,6 +1017,7 @@ export interface FieldCardSnapshot {
   powerCurrent: number;
   cost: number;              // 当前费用（含持续光环，如 OP16-080 对方回合 +1）
   attachedDon: number;
+  canDetachAllDon?: boolean; // 屠宰场：当前是否可移除该角色的全部附加咚
   gainedKeywords: string[];
   effectsNullified: boolean; // 当前角色效果是否处于无效状态
   cannotActivateNextReset: boolean;

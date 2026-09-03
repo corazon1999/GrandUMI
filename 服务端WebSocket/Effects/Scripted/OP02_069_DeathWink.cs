@@ -38,6 +38,6 @@ public class OP02_069_DeathWink : IScriptedEffect
 
         // 之后：抽取卡牌直到我方手牌变为 2 张（动态张数）
         int need = 2 - me.Hand.Count;
-        if (need > 0) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, need);
+        if (need > 0) await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, need);
     }
 }

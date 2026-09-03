@@ -55,6 +55,8 @@ public sealed class HexGrantProgress
     /// 计划先于所有权和子队列写入，令同进程重试不会重新抽取或重复授予。
     /// </summary>
     public List<int> PlannedChildHexIds { get; } = new();
+    /// <summary>潘多拉的魔盒在任何所有权变更前冻结的待替换编号，供故障重试保持同一计划。</summary>
+    public List<int> PlannedRemovedHexIds { get; } = new();
     public bool Completed { get; set; }
 }
 
@@ -109,6 +111,12 @@ public sealed class PlayerHexRuntime
     public int TankEngineOpponentTurnPower { get; set; }
     public bool NavyCarnivalUsedThisTurn { get; set; }
     public bool KingUsedThisGame { get; set; }
+    public bool IceFruitUsedThisTurn { get; set; }
+    public bool SitUpUsedThisTurn { get; set; }
+    public bool FishmanKarateUsedThisTurn { get; set; }
+    public int HighCostCharacterEntriesThisTurn { get; set; }
+    /// <summary>无尽虚空选择挂起/结算期间的再入守卫；必须进入确定性快照。</summary>
+    public bool VoidRefillResolving { get; set; }
     /// <summary>超凡邪恶累计层数对应的己方回合领袖力量；跨回合持久且不在 ResetTurn 清除。</summary>
     public int TranscendentEvilOwnTurnPower { get; set; }
 
@@ -132,6 +140,10 @@ public sealed class PlayerHexRuntime
         SoulConsumeUsedThisTurn = false;
         TankEngineUsedThisTurn = false;
         NavyCarnivalUsedThisTurn = false;
+        IceFruitUsedThisTurn = false;
+        SitUpUsedThisTurn = false;
+        FishmanKarateUsedThisTurn = false;
+        HighCostCharacterEntriesThisTurn = 0;
     }
 }
 

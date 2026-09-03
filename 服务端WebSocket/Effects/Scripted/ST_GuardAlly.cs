@@ -66,7 +66,7 @@ public class ST30_009_LittleOarsJr : IScriptedEffect
         if (victim.Id == self.Id) return; // 替身须为他卡
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "小奥兹Jr.：将自身置入废弃区并抽1张，使该力量6000角色不离场？")) return;
         BattleEngine.KOCard(ctx.State, ctx.OwnerIndex, self);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         if (ctx.Trigger == EffectTrigger.OnAllyWillLeaveField)
         {
             var simultaneousVictims = ctx.State.SimultaneousLeaveVictimIds;

@@ -19,20 +19,20 @@ public class OP16_055_Bentham : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnEnterField || t == EffectTrigger.OnAttackDeclare;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-            return Task.CompletedTask;
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+            return;
         }
 
         // OnAttackDeclare：【咚!!×1】
-        if (me.AttachedDonCount(ctx.Source.Id) < 1) return Task.CompletedTask;
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
         int oppIdx = 1 - ctx.OwnerIndex;
         var oppLeader = ctx.State.Players[oppIdx].Leader;
         ctx.Source.OriginalPowerOverride = ctx.State.CurrentPowerOf(oppIdx, oppLeader);
-        return Task.CompletedTask;
+        return;
     }
 }

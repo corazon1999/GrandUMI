@@ -29,7 +29,7 @@ public class OP11_054_Nami : IScriptedEffect
         if (me.Leader.Info.ColorList.Length < 2) return;
 
         // 抽取 3 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 3);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 3);
 
         // 将 2 张手牌自选顺序放到卡组顶/底
         int count = Math.Min(2, me.Hand.Count);

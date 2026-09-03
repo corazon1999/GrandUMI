@@ -51,6 +51,6 @@ public class OP09_060_KaraiBari : IScriptedEffect
         if (!AtomicOps.RestCard(self)) return;
 
         // 收益：抽取 2 张卡牌
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

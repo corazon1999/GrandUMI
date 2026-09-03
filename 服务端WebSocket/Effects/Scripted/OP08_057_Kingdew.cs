@@ -46,7 +46,7 @@ public class OP08_057_Kingdew : IScriptedEffect
         if (opt == 0)
         {
             if (me.Hand.Count <= 5)
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
         else
         {

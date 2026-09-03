@@ -17,15 +17,15 @@ public class OP05_009_Toto : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         if (ctx.State.CurrentPowerOf(ctx.OwnerIndex, me.Leader) <= 0)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }

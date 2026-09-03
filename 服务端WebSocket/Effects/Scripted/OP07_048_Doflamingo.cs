@@ -67,6 +67,7 @@ public class OP07_048_Doflamingo : IScriptedEffect
                 top.TurnPlayed = ctx.State.TurnCount;
                 AtomicOps.RestCard(top); // 休息状态登场；霸王色霸气等无法休息规则仍须生效
                 me.Characters.Add(top);
+                ctx.State.EnqueueEnterField(ctx.OwnerIndex, top, "deck");
                 return; // 已登场，无剩余卡需放回
             }
         }

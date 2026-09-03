@@ -53,9 +53,9 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
     public void 海克斯配置严格校验完整目录摘要与当前常规池规模()
     {
         Assert.Equal(
-            "sha256:b466b6465456221da8edbb2eaee26df5771b5ed07b2002d77c5892a145b8b430",
+            "sha256:f02ed93429f2b51e7c4e37abac4f996792f7716a66cddd09656295457242fcd8",
             HexCatalogConfiguration.BuiltIn.Digest);
-        Assert.Equal(18, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Silver));
+        Assert.Equal(45, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Silver));
         Assert.Equal(18, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Gold));
         Assert.Equal(17, HexCatalogConfiguration.RequiredRegularHexes(HexTier.Rainbow));
 
@@ -70,15 +70,23 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
             1,
             HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
                 new HexCatalogTierAssignment(item.Id, HexTier.Gold))));
-        var seventeenNineteen = ChangeTier(1, HexTier.Silver);
-        Assert.Equal(17, seventeenNineteen.Count(item =>
+        var unbalancedAssignments = ChangeTier(1, HexTier.Silver);
+        Assert.Equal(17, unbalancedAssignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Gold));
-        Assert.Equal(19, seventeenNineteen.Count(item =>
+        Assert.Equal(46, unbalancedAssignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Silver));
         var unbalanced = Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
             1,
-            seventeenNineteen));
-        Assert.Contains("必须恰好为 18 个", unbalanced.Message);
+            unbalancedAssignments));
+        Assert.Contains("银色常规海克斯必须恰好为 45 个", unbalanced.Message);
+        var draft = HexCatalogConfiguration.CreateDraft(unbalancedAssignments);
+        Assert.Equal(HexTier.Silver, draft.TierOf(1));
+
+        var emptySilver = Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(
+            1,
+            HexCatalogConfiguration.BuiltIn.Assignments.Select(item =>
+                item.Tier == HexTier.Silver ? item with { Tier = HexTier.Gold } : item)));
+        Assert.Contains("银色常规海克斯必须恰好为 45 个", emptySilver.Message);
 
         var configured = HexCatalogConfiguration.Create(
             7,
@@ -102,23 +110,43 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
     [Fact]
     public void 旧版Active中退役项调过品质仍可读取但不能直接作为新版平衡配置创建()
     {
-        var legacyAssignments = SwapTiers(26, 27);
+        var legacyAssignments = HexCatalogConfiguration
+            .BuiltInForRulesRevision(HexRules.SevenHexReworkRulesRevision)
+            .Assignments;
+        var tier26 = legacyAssignments.Single(item => item.Id == 26).Tier;
+        var tier27 = legacyAssignments.Single(item => item.Id == 27).Tier;
+        legacyAssignments = legacyAssignments
+            .Select(item => item.Id == 26
+                ? item with { Tier = tier27 }
+                : item.Id == 27
+                    ? item with { Tier = tier26 }
+                    : item)
+            .ToArray();
         Assert.Throws<InvalidDataException>(() => HexCatalogConfiguration.Create(9, legacyAssignments));
-        var legacy = HexCatalogConfiguration.CreateHistoricalSnapshot(
-            9,
-            legacyAssignments,
-            publishedBy: "LegacyAdmin",
-            sourceDraftRevision: 4,
-            sourceRequestId: "legacy-active");
+        var legacyDigest = HexCatalogConfiguration.ComputeDigest(legacyAssignments);
         var path = Path.Combine(_directory, "active.json");
         Directory.CreateDirectory(_directory);
-        File.WriteAllBytes(path, HexCatalogConfiguration.SerializeActive(legacy));
+        File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            schema = HexCatalogConfiguration.Schema,
+            revision = 9,
+            digest = legacyDigest,
+            sourceDraftRevision = 4,
+            sourceRequestId = "legacy-active",
+            publishedAt = 1788278400000L,
+            publishedBy = "LegacyAdmin",
+            tiers = legacyAssignments.Select(item => new { id = item.Id, tier = item.Tier.ToString() }),
+        }));
 
         var restored = HexCatalogConfiguration.ReadActiveFile(path);
 
-        Assert.Equal(legacy.Digest, restored.Digest);
+        Assert.Equal(82, restored.Assignments.Count);
+        Assert.NotEqual(legacyDigest, restored.Digest);
+        Assert.Equal(HexCatalogConfiguration.ComputeDigest(restored.Assignments), restored.Digest);
         Assert.Equal(HexTier.Gold, restored.TierOf(27));
         Assert.Equal(HexTier.Rainbow, restored.TierOf(26));
+        Assert.Equal(HexCatalog.Get(57).Tier, restored.TierOf(57));
+        Assert.Equal("legacy-active", restored.SourceRequestId);
     }
 
     [Fact]
@@ -140,7 +168,7 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal(definition.Description, firstEntry.GetProperty("description").GetString());
         Assert.False(firstEntry.TryGetProperty("Name", out _));
         Assert.False(firstEntry.TryGetProperty("Description", out _));
-        Assert.Equal(55, document.RootElement.GetProperty("entries").GetArrayLength());
+        Assert.Equal(81, document.RootElement.GetProperty("entries").GetArrayLength());
         Assert.DoesNotContain(document.RootElement.GetProperty("entries").EnumerateArray(),
             entry => entry.GetProperty("id").GetInt32() == 27);
     }
@@ -182,7 +210,7 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         Assert.Equal("hex-catalog", root.GetProperty("kind").GetString());
         Assert.Equal(0, root.GetProperty("expectedActiveRevision").GetInt64());
         Assert.Equal(first.State.Draft.Digest, root.GetProperty("digest").GetString());
-        Assert.Equal(56, root.GetProperty("tiers").GetArrayLength());
+        Assert.Equal(82, root.GetProperty("tiers").GetArrayLength());
     }
 
     [Fact]
@@ -197,7 +225,7 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
 
         Assert.Equal(1, saved.State.Draft.DraftRevision);
         Assert.Equal(saved.State.Draft.Digest, restored.Digest);
-        Assert.Equal(19, restored.Assignments.Count(item =>
+        Assert.Equal(46, restored.Assignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Silver));
         Assert.Equal(17, restored.Assignments.Count(item =>
             !HexCatalog.IsAlternative(item.Id) && !HexCatalog.IsRetired(item.Id) && item.Tier == HexTier.Gold));
@@ -209,12 +237,12 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
             "Admin",
             "publish-unbalanced"));
 
-        Assert.Contains("必须恰好为 18 个", error.Message);
+        Assert.Contains("必须恰好为 45 个", error.Message);
         Assert.Empty(Directory.GetFiles(Path.Combine(_directory, "requests"), "*.request"));
     }
 
     [Fact]
-    public void 新面板提交五十五项时沿用当前退役映射且旧面板完整提交仍兼容()
+    public void 新面板提交八十一项时沿用当前退役映射且旧面板完整提交仍兼容()
     {
         var coordinator = CreateCoordinator();
         var currentEntries = SwapTiers(1, 8).Where(item => item.Id != 27).ToArray();
@@ -222,13 +250,13 @@ public sealed class AdminDeploymentCoordinatorTests : IDisposable
         var saved = coordinator.SaveHexCatalogDraft(
             "test", 0, 0, currentEntries, "Admin", "save-without-retired");
 
-        Assert.Equal(56, saved.State.Draft.Assignments.Count);
+        Assert.Equal(82, saved.State.Draft.Assignments.Count);
         Assert.Equal(HexCatalogConfiguration.BuiltIn.TierOf(27),
             saved.State.Draft.Assignments.Single(item => item.Id == 27).Tier);
 
         var oldClient = coordinator.SaveHexCatalogDraft(
             "production", 0, 0, SwapTiers(2, 5), "Admin", "save-old-client");
-        Assert.Equal(56, oldClient.State.Draft.Assignments.Count);
+        Assert.Equal(82, oldClient.State.Draft.Assignments.Count);
     }
 
     [Fact]

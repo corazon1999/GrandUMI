@@ -53,6 +53,6 @@ public sealed class OP15_045_Sai : IScriptedEffect
             EffectRuntime.PayingCost = previousPayingCost;
         }
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

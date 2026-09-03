@@ -32,6 +32,6 @@ test("两档手机竖屏旋转后启动按钮保持至少44像素触控高度", 
     });
     // 对局牌桌还会把 1280×720 固定舞台缩放到 844×390 旋转画布内。
     const stageScale = Math.min(844 / 1280, 390 / 720);
-    assert.ok(92 * outerScale * stageScale >= 44, `${hostWidth}×${hostHeight} 的按钮触控高度不足44px`);
+    assert.ok(92 * outerScale * stageScale >= 44, `${hostWidth}×${hostHeight} 的按钮触控短边不足44px`);
   }
 });

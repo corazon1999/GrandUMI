@@ -27,7 +27,7 @@ public class OP03_060_Kalifa : IScriptedEffect
         if (!use) return;
 
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         if (me.Hand.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",

@@ -17,17 +17,17 @@ public class OP04_048_Sasaki : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         var hand = me.Hand.ToList();
         int n = hand.Count;
-        if (n == 0) return Task.CompletedTask;
+        if (n == 0) return;
 
         foreach (var c in hand) AtomicOps.ReturnHandToDeckBottom(me, c);
         AtomicOps.Shuffle(ctx.State, me.Deck);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, n);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, n);
+        return;
     }
 }

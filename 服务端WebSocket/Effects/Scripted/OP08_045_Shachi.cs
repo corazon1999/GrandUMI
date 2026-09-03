@@ -13,12 +13,12 @@ public class OP08_045_Shachi : IScriptedEffect
     public string CardNumber => "OP08-045";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnAllyWillLeaveField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
         var vId = ctx.Vars.TryGetValue("victimId", out var vv) ? vv as string : null;
-        if (vId != self.Id.ToString()) return Task.CompletedTask;   // 仅自身
+        if (vId != self.Id.ToString()) return;   // 仅自身
 
         // 取消原本离场，改为：自身放入废弃区 + 抽1张
         ctx.State.MarkPreventLeave(self.Id);
@@ -26,7 +26,7 @@ public class OP08_045_Shachi : IScriptedEffect
             if (d.State == DonState.Attached && d.AttachedToCardId == self.Id)
             { d.State = DonState.Rest; d.AttachedToCardId = null; }
         if (me.Characters.Remove(self)) me.Trash.Add(self);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

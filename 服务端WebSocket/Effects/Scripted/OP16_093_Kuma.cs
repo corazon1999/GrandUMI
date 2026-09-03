@@ -17,7 +17,7 @@ public sealed class OP16_093_Kuma : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 强制弃牌按结算时实际手牌尽量执行；选择期间不提前移动，返回后再按实例复核。
         int discardCount = Math.Min(2, me.Hand.Count);

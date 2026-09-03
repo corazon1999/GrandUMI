@@ -14,7 +14,7 @@ public class OP06_047_CharlotteBrulee : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         int oppIdx = 1 - ctx.OwnerIndex;
         var opp = ctx.State.Players[oppIdx];
@@ -27,8 +27,8 @@ public class OP06_047_CharlotteBrulee : IScriptedEffect
         // 洗牌
         AtomicOps.Shuffle(ctx.State, opp.Deck);
         // 抽 5 张
-        AtomicOps.Draw(ctx.State, oppIdx, 5);
+        await AtomicOps.DrawAsync(ctx.State, oppIdx, 5);
 
-        return Task.CompletedTask;
+        return;
     }
 }

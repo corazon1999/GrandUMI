@@ -39,6 +39,30 @@ test("海克斯私密选秀提交轮次令牌并支持三个槽位各刷新一�
   assert.doesNotMatch(overlay, /Math\.random|crypto\.getRandomValues/);
 });
 
+test("屠宰场操作只按服务端权威字段展示并提交角色实例编号", async () => {
+  const [actions, request, store, types, layoutPage, layoutFixture] = await Promise.all([
+    readSource("../src/components/game/GameActions.tsx"),
+    readSource("../src/net/GameRequest.ts"),
+    readSource("../src/store/gameStore.ts"),
+    readSource("../src/types/net.ts"),
+    readSource("../src/app/layout-verification/hex-actions/page.tsx"),
+    readSource("../src/components/game/HexActionsLayoutVerification.tsx"),
+  ]);
+
+  assert.match(actions, /selectedFieldCard\?\.canDetachAllDon \?\? false/);
+  assert.match(actions, /GameRequest\.detachAllDon\(selectedFieldCard\.id\)/);
+  assert.match(actions, /屠宰场：移除全部咚/);
+  assert.match(actions, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);
+  assert.match(request, /detachAllDon: \(characterId: string\) => send\("DetachAllDon", \{ characterId \}\)/);
+  assert.match(store, /canDetachAllDon: card\.canDetachAllDon \?\? false/);
+  assert.match(types, /\| "DetachAllDon"/);
+  assert.match(types, /canDetachAllDon\?: boolean/);
+  assert.match(layoutPage, /GRANDUMI_LAYOUT_VERIFICATION/);
+  assert.match(layoutFixture, /data-hex-actions-layout-verification/);
+  assert.match(layoutFixture, /mode="mobile-landscape" rotateQuarterTurn edgeToEdge/);
+  assert.match(layoutFixture, /canDetachAllDon: true/);
+});
+
 test("海克斯选秀使用权威倒计时、超时恢复、竖向三卡布局和四向安全区", async () => {
   const [overlay, frameCss] = await Promise.all([
     readSource("../src/components/game/HexDraftOverlay.tsx"),

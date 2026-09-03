@@ -23,7 +23,7 @@ public sealed class HexModeEffectsTests
         [18] = "PowerBonus", [19] = "CanRest", [20] = "OnAcquire/PowerBonus",
         [21] = "OnEnemyAffected", [22] = "OnCharacterKo", [23] = "OnCharacterKo",
         [24] = "OnAttackDeclared", [25] = "OnAttackDeclared", [26] = "OnAttackDeclared",
-        [27] = "Legacy.ResolveDamage", [28] = "OnCardPlayed", [29] = "OnCardPlayed", [30] = "StageSlots",
+        [27] = "Legacy.ResolveDamage", [28] = "OnCardPlayed", [29] = "OnCardPlayed", [30] = "EffectRuntime.StageCopy/LegacyStageSlots",
         [31] = "OnLifeAdded", [32] = "OnCardPlayed", [33] = "OnTurnStarted", [34] = "Power/AttackTarget",
         [35] = "OnCardPlayed", [36] = "PlayedCardOrder/HandCost", [37] = "PlayedCardOrder/HandCost", [38] = "HandCost",
         [39] = "HandCost", [40] = "OnTurnEnding", [41] = "OnEnemyAffected",
@@ -32,6 +32,17 @@ public sealed class HexModeEffectsTests
         [48] = "EnemyLifeOne", [49] = "OnAcquire", [50] = "OnAttackDeclared", [51] = "CounterBonus/EventGate",
         [52] = "OnAcquire/DonLimit", [53] = "FieldCost", [54] = "OnCharacterKo",
         [55] = "OnAcquire/TierGrant", [56] = "OnAcquire/PrismaticGrant",
+        [57] = "OnLifeAdded/CharacterKo", [58] = "PowerBonus", [59] = "OnGameEvent",
+        [60] = "OnGameEvent/Draw", [61] = "AttackTarget", [62] = "DynamicKeyword",
+        [63] = "DynamicKeyword/EntrySource", [64] = "EffectRuntime.OncePerTurn",
+        [65] = "EntryTurn/DynamicKeyword", [66] = "DynamicKeyword/EntrySource",
+        [67] = "PowerBonus/SharedTrait", [68] = "OnTurnEnding", [69] = "LifeMovedByEffect",
+        [70] = "LegalAction.DetachAllDon", [71] = "Power/AttackRestrictionOverride",
+        [72] = "DeckOutReplacement/Prompt/Replay", [73] = "OnGameEvent",
+        [74] = "OnCharacterKo/Draw", [75] = "AttackTarget", [76] = "OnAttackDeclared/Draw",
+        [77] = "AfterActivatedMainResolved", [78] = "FieldCost", [79] = "Damage/DonLimit",
+        [80] = "OnAcquire/Pandora", [81] = "Attack/CardPlayed/EntityCost",
+        [82] = "OriginalPower",
     };
 
     public static IEnumerable<object[]> AllHexIds()
@@ -532,7 +543,12 @@ public sealed class HexModeEffectsTests
         var checkpoint = DeterministicReplayCheckpointProvider.BuildFullState(state);
         Assert.Equal(1000, checkpoint.GetProperty("players")[0].GetProperty("characters")[0]
             .GetProperty("PowerModThisBattle").GetInt32());
-        Assert.True(HexRules.ShouldCopyEffect(state, 0, EffectTrigger.OnAttackDeclare, alreadyCopied: false));
+        Assert.True(HexRules.ShouldCopyEffect(
+            state,
+            0,
+            attacker,
+            EffectTrigger.OnAttackDeclare,
+            alreadyCopied: false));
         Assert.Equal(1000, attacker.PowerModThisBattle);
 
         BattleEngine.EndBattle(state);
@@ -1343,6 +1359,7 @@ public sealed class HexModeEffectsTests
         var me = state.Players[0];
         ClearZones(state);
         OwnOnly(state, 0, 30);
+        state.HexState.RulesRevision = HexRules.CatalogConfigurationRulesRevision;
         me.CostArea.AddRange(Enumerable.Range(0, 10).Select(_ => new DonCard { State = DonState.Active }));
         var first = Card("HEX-STAGE-1", CardKind.Stage);
         var second = Card("HEX-STAGE-2", CardKind.Stage);

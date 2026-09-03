@@ -184,7 +184,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var id = ctx.Source.Id;
         RegisterSelfKeyword(ctx, "速攻", (_, _, card) => card.Id == id && me.AttachedDonCount(id) >= 2);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         await PlayFromHand(ctx, c => c.Info.Kind == CardKind.Character && c.Info.Cost <= 5 &&
             c.Info.HasKeyword("草帽一伙") && !c.Info.NameIs("山智"),
             "将最多1张山智以外、费用不高于5的《草帽一伙》角色登场");
@@ -192,7 +192,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
 
     private static async Task ST31_002(EffectContext ctx)
     {
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         await PlayFromHand(ctx, c => c.Info.Kind is CardKind.Character or CardKind.Stage &&
             c.Info.Cost == 1 && c.Info.HasKeyword("草帽一伙"),
             "将最多1张费用为1的《草帽一伙》卡牌登场");
@@ -275,13 +275,13 @@ public abstract class ST31To35EffectBase : IScriptedEffect
             if (don is null) return;
             don.State = DonState.Rest;
         }
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         await ChooseOwnDiscard(ctx, optional: false, asCost: false);
     }
 
     private static async Task ST32_002(EffectContext ctx)
     {
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var target = await Choose(ctx, ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多1张原本费用不高于6的角色，直到下个对方回合结束时无法转为休息状态",
@@ -298,7 +298,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
         {
             if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
             if (!ctx.Vars.TryGetValue("restedCardId", out var value) || value?.ToString() != ctx.Source.Id.ToString()) return;
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             await ChooseOwnDiscard(ctx, optional: false, asCost: false);
             return;
         }
@@ -335,7 +335,7 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     private static async Task ST33_001(EffectContext ctx)
     {
         if (await ChooseOwnDiscard(ctx, optional: true, asCost: true) is not null)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 
     private static async Task ST33_002(EffectContext ctx)

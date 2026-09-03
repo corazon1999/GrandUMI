@@ -21,17 +21,17 @@ public class EB04_038_RosinanteAndLaw : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
 
         // 条件：我方咚!!张数 ≤ 对方咚!!张数
-        if (me.TotalDonInCostArea > opp.TotalDonInCostArea) return Task.CompletedTask;
+        if (me.TotalDonInCostArea > opp.TotalDonInCostArea) return;
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
 
-        return Task.CompletedTask;
+        return;
     }
 }

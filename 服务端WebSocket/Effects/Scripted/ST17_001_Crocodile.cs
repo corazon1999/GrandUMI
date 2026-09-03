@@ -34,7 +34,7 @@ public class ST17_001_Crocodile : IScriptedEffect
         if (!topCard.Info.HasKeyword("王下七武海")) return;
 
         // 抽 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 将我方 1 张手牌放回卡组最上方
         if (me.Hand.Count == 0) return;

@@ -115,6 +115,18 @@ public static class ActionValidator
         return OkResult;
     }
 
+    public static Result CanDetachAllDon(GameState s, int playerIdx, Guid characterId)
+    {
+        if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
+        if (s.Phase != Phase.Main) return Fail("只能在主要阶段移除咚");
+        if (s.CurrentBattle is not null) return Fail("战斗中不能移除咚");
+        if (!Hex.HexRules.Has(s, playerIdx, 70)) return Fail("未持有【屠宰场】");
+        var player = s.Players[playerIdx];
+        if (!player.Characters.Any(card => card.Id == characterId)) return Fail("目标不是己方场上角色");
+        if (player.AttachedDonCount(characterId) <= 0) return Fail("目标角色没有附加咚");
+        return OkResult;
+    }
+
     public static Result CanAttack(GameState s, int playerIdx, Guid attackerId, bool targetIsLeader, Guid? targetId)
     {
         if (s.CurrentTurnPlayer != playerIdx) return Fail("不是你的回合");
@@ -141,7 +153,9 @@ public static class ActionValidator
         if (attacker.IsTapped) return Fail("攻击者已休息");
         if (!AtomicOps.CanRestCard(s, attacker, playerIdx))
             return Fail("【霸王色霸气】使当前力量5000或以下的角色无法转为休息，不能攻击");
-        if (HasCannotAttackStatus(s, attacker)) return Fail("此角色当前无法攻击");
+        if (HasCannotAttackStatus(s, attacker)
+            && !Hex.HexRules.LeaderIgnoresCannotAttack(s, playerIdx, attacker))
+            return Fail("此角色当前无法攻击");
 
         // 新登场角色当回合不能攻击（除非有【速攻】；或"登场回合可攻击角色"且本次目标为角色——OP04-096）
         if (attacker != me.Leader && attacker.TurnPlayed == s.TurnCount
@@ -165,6 +179,11 @@ public static class ActionValidator
         if (targetIsLeader)
         {
             if (johnTargetLock) return Fail("对方效果限制：只能攻击“约翰船长”角色");
+            if (Hex.HexRules.FirstAttackMustTargetRestedCharacter(s, playerIdx))
+                return Fail("【线线果实】使本回合第一次攻击必须以休息状态角色为目标");
+            if (ReferenceEquals(attacker, me.Leader)
+                && !Hex.HexRules.OpposingLeaderMayAttackLeader(s, playerIdx))
+                return Fail("【给我一个面子】使领袖不能攻击该领袖");
             if (ReferenceEquals(attacker, me.Leader) && !Hex.HexRules.LeaderMayAttackLeader(s, playerIdx))
                 return Fail("【亮出你的剑】使领袖不能攻击敌方领袖");
             if (!Hex.HexRules.MayAttackProtectedZeroLifeLeader(s, 1 - playerIdx))
@@ -175,6 +194,8 @@ public static class ActionValidator
         if (targetId is null) return Fail("未指定目标");
         var target = op.Characters.FirstOrDefault(c => c.Id == targetId.Value);
         if (target is null) return Fail("目标不在对方场上");
+        if (Hex.HexRules.FirstAttackMustTargetRestedCharacter(s, playerIdx) && !target.IsTapped)
+            return Fail("【线线果实】使本回合第一次攻击必须以休息状态角色为目标");
         // 防守方存在生效中的攻击目标锁定时，只能攻击对应名称的角色；攻击领袖不受影响（OP01-051）。
         bool kidTargetLock = op.Characters.Any(c =>
             HasKeyword(s, c, "仅可攻击角色：尤斯塔斯·基德"));
@@ -210,7 +231,11 @@ public static class ActionValidator
 
     private static bool HasGrantedKeyword(GameState s, CardInstance c, string kw)
     {
-        if (c.GainedKeywords.Any(k => k.Keyword == kw) || s.HasContinuousKeyword(c, kw)) return true;
+        int side = s.SideOf(c);
+        if ((side is 0 or 1 && Hex.HexRules.GrantsKeyword(s, side, c, kw))
+            || c.GainedKeywords.Any(k => k.Keyword == kw)
+            || s.HasContinuousKeyword(c, kw))
+            return true;
 
         // 正式词条与历史内部语义名互认，兼容既有脚本和新卡牌数据。
         string? alias = kw switch
@@ -220,7 +245,9 @@ public static class ActionValidator
             _ => null,
         };
         return alias is not null
-            && (c.GainedKeywords.Any(k => k.Keyword == alias) || s.HasContinuousKeyword(c, alias));
+            && ((side is 0 or 1 && Hex.HexRules.GrantsKeyword(s, side, c, alias))
+                || c.GainedKeywords.Any(k => k.Keyword == alias)
+                || s.HasContinuousKeyword(c, alias));
     }
 
     public static Result CanUseEffect(GameState s, int playerIdx, Guid sourceId)
@@ -263,10 +290,15 @@ public static class ActionValidator
     /// 不把非当前回合、已休息、新登场等普通攻击条件误判为禁攻状态。
     /// </summary>
     public static bool HasCannotAttackStatus(GameState s, CardInstance card)
-        => card.HasRestriction(RestrictionKind.CannotAttack)
+    {
+        int side = s.SideOf(card);
+        if (side is 0 or 1 && Hex.HexRules.LeaderIgnoresCannotAttack(s, side, card))
+            return false;
+        return card.HasRestriction(RestrictionKind.CannotAttack)
            || (!(card.IsEffectsNullified || s.IsContinuouslyNullified(card))
                && (s.HasContinuousRestriction(card, RestrictionKind.CannotAttack)
                    || Array.IndexOf(card.Info.Abilities, "此角色无法攻击") >= 0));
+    }
 
     public static Result CanPassBlock(GameState s, int playerIdx)
     {

@@ -26,7 +26,7 @@ public class P_096_Shoujo : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             if (me.Hand.Count > 0)
             {
                 var dExtra = new Dictionary<string, object?>

@@ -99,7 +99,10 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             drawRequestRejectionCounts = state.DrawRequestRejectionCounts.ToArray(),
             matchKind = state.MatchKind.ToString(),
             hexState = FullHexState(state),
-            players = state.Players.Select((player, index) => FullPlayer(player, index)).ToArray(),
+            players = state.Players.Select((player, index) => FullPlayer(
+                player,
+                index,
+                state.HexState.RulesRevision >= HexRules.ExpansionRulesRevision)).ToArray(),
             preventKoCardIds = SortedIds(state.PreventKOCardIds),
             simultaneousKoVictimIds = SortedIds(state.SimultaneousKOVictimIds),
             simultaneousLeaveVictimIds = SortedIds(state.SimultaneousLeaveVictimIds),
@@ -113,7 +116,9 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             pendingKoEffects = state.PendingKOEffects.Select(effect => new
             {
                 effect.Owner,
-                card = FullCard(effect.Card),
+                card = CardProjection(
+                    effect.Card,
+                    state.HexState.RulesRevision >= HexRules.ExpansionRulesRevision),
                 effect.ActingSide,
                 sourceCardId = effect.SourceCardId is null ? null : Id(effect.SourceCardId.Value),
             }).ToArray(),
@@ -192,7 +197,10 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             drawRequestRejectionCounts = state.DrawRequestRejectionCounts.ToArray(),
             matchKind = state.MatchKind.ToString(),
             hexState = PublicHexState(state),
-            players = state.Players.Select((player, index) => PublicPlayer(player, index)).ToArray(),
+            players = state.Players.Select((player, index) => PublicPlayer(
+                player,
+                index,
+                state.HexState.RulesRevision >= HexRules.ExpansionRulesRevision)).ToArray(),
             continuousEffects = state.ContinuousEffects.Select(ContinuousEffect).ToArray(),
             state.ExtraTurnPending,
             noPlayCharacterThisTurn = state.NoPlayCharacterThisTurn.Order().ToArray(),
@@ -235,8 +243,15 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             return LegacyFullHexState(state);
         if (state.HexState.RulesRevision < HexRules.TransmutationPresentationRulesRevision)
             return PerSlotRefreshFullHexState(state);
+        if (state.HexState.RulesRevision < HexRules.ExpansionRulesRevision)
+            return TransmutationFullHexState(state);
 
-        return new
+        return ExpansionFullHexState(state);
+    }
+
+    /// <summary>规则修订版 4～11 的冻结完整投影；新扩展字段不得改变旧对局 checkpoint。</summary>
+    private static object TransmutationFullHexState(GameState state)
+        => new
         {
             state.HexState.Enabled,
             state.HexState.RulesRevision,
@@ -309,7 +324,111 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 draft.Choice,
             }).ToArray(),
         };
-    }
+
+    /// <summary>规则修订版 12 起的完整投影，包含扩展银色海克斯的全部恢复状态。</summary>
+    private static object ExpansionFullHexState(GameState state)
+        => new
+        {
+            state.HexState.Enabled,
+            state.HexState.RulesRevision,
+            state.HexState.DraftSequence,
+            draftTierSequence = state.HexState.DraftTierSequence.Select(tier => tier.ToString()).ToArray(),
+            state.HexState.DraftResolving,
+            resumePoint = state.HexState.ResumePoint.ToString(),
+            owned = state.HexState.Owned.Select(items => items.ToArray()).ToArray(),
+            grantedByTransmutation = state.HexState.GrantedByTransmutation
+                .Select(items => items.Order().ToArray())
+                .ToArray(),
+            appeared = state.HexState.Appeared
+                .Select(items => items.Order().ToArray())
+                .ToArray(),
+            completedOwnTurns = state.HexState.CompletedOwnTurns.ToArray(),
+            runtime = state.HexState.Runtime.Select(runtime => new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                runtime.ActivatedEnterEffectsThisTurn,
+                runtime.IceFruitUsedThisTurn,
+                runtime.SitUpUsedThisTurn,
+                runtime.FishmanKarateUsedThisTurn,
+                runtime.HighCostCharacterEntriesThisTurn,
+                runtime.VoidRefillResolving,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order(StringComparer.Ordinal).ToArray(),
+            }).ToArray(),
+            activeDraft = state.HexState.ActiveDraft is { } draft
+                ? new
+                {
+                    draft.RoundId,
+                    draft.PlayerIndex,
+                    draft.OwnTurnNumber,
+                    tier = draft.Tier.ToString(),
+                    candidates = draft.Candidates.ToArray(),
+                    draft.LockedChoice,
+                    draft.Locked,
+                    draft.RefreshUsed,
+                    draft.RefreshedCandidateIndex,
+                    draft.ReplacedHexId,
+                    draft.ReplacementHexId,
+                    refreshes = draft.Refreshes.Select(refresh => new
+                    {
+                        refresh.CandidateIndex,
+                        refresh.ReplacedHexId,
+                        refresh.ReplacementHexId,
+                    }).ToArray(),
+                }
+                : null,
+            pendingSettlement = state.HexState.PendingSettlement is { } settlement
+                ? new
+                {
+                    settlement.RoundId,
+                    tier = settlement.Tier.ToString(),
+                    settlement.PlayerIndex,
+                    settlement.OwnTurnNumber,
+                    settlement.Choice,
+                    resumePoint = settlement.ResumePoint.ToString(),
+                    settlement.RootOwnershipCommitted,
+                    settlement.NextGrantIndex,
+                    grants = settlement.Grants.Select(grant => new
+                    {
+                        grant.GrantKey,
+                        grant.PlayerIndex,
+                        grant.HexId,
+                        grant.NextStep,
+                        grant.PlannedStepCount,
+                        plannedChildHexIds = grant.PlannedChildHexIds.ToArray(),
+                        plannedRemovedHexIds = grant.PlannedRemovedHexIds.ToArray(),
+                        grant.Completed,
+                    }).ToArray(),
+                }
+                : null,
+            resolvedDrafts = state.HexState.ResolvedDrafts.Select(draft => new
+            {
+                draft.RoundId,
+                tier = draft.Tier.ToString(),
+                draft.PlayerIndex,
+                draft.OwnTurnNumber,
+                draft.Choice,
+            }).ToArray(),
+        };
 
     private static object CurrentHexRuntime(PlayerHexRuntime runtime, int rulesRevision)
     {
@@ -701,18 +820,18 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             }).ToArray(),
         };
 
-    private static object FullPlayer(PlayerState player, int playerIndex)
+    private static object FullPlayer(PlayerState player, int playerIndex, bool expansion)
         => new
         {
             playerIndex,
-            leader = FullCard(player.Leader),
-            hand = player.Hand.Select(FullCard).ToArray(),
-            characters = player.Characters.Select(FullCard).ToArray(),
-            stage = player.StageCard is null ? null : FullCard(player.StageCard),
-            extraStage = player.ExtraStageCard is null ? null : FullCard(player.ExtraStageCard),
-            trash = player.Trash.Select(FullCard).ToArray(),
-            deck = player.Deck.Select(FullCard).ToArray(),
-            life = player.LifeArea.Select(FullCard).ToArray(),
+            leader = CardProjection(player.Leader, expansion),
+            hand = player.Hand.Select(card => CardProjection(card, expansion)).ToArray(),
+            characters = player.Characters.Select(card => CardProjection(card, expansion)).ToArray(),
+            stage = player.StageCard is null ? null : CardProjection(player.StageCard, expansion),
+            extraStage = player.ExtraStageCard is null ? null : CardProjection(player.ExtraStageCard, expansion),
+            trash = player.Trash.Select(card => CardProjection(card, expansion)).ToArray(),
+            deck = player.Deck.Select(card => CardProjection(card, expansion)).ToArray(),
+            life = player.LifeArea.Select(card => CardProjection(card, expansion)).ToArray(),
             donDeck = player.DonDeck.Select(Don).ToArray(),
             costArea = player.CostArea.Select(Don).ToArray(),
             player.HasReDraw,
@@ -724,19 +843,19 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             player.HasActivatedBaseCost3PlusEventThisTurn,
         };
 
-    private static object PublicPlayer(PlayerState player, int playerIndex)
+    private static object PublicPlayer(PlayerState player, int playerIndex, bool expansion)
         => new
         {
             playerIndex,
-            leader = FullCard(player.Leader),
+            leader = CardProjection(player.Leader, expansion),
             handCount = player.Hand.Count,
-            characters = player.Characters.Select(FullCard).ToArray(),
-            stage = player.StageCard is null ? null : FullCard(player.StageCard),
-            extraStage = player.ExtraStageCard is null ? null : FullCard(player.ExtraStageCard),
-            trash = player.Trash.Select(FullCard).ToArray(),
+            characters = player.Characters.Select(card => CardProjection(card, expansion)).ToArray(),
+            stage = player.StageCard is null ? null : CardProjection(player.StageCard, expansion),
+            extraStage = player.ExtraStageCard is null ? null : CardProjection(player.ExtraStageCard, expansion),
+            trash = player.Trash.Select(card => CardProjection(card, expansion)).ToArray(),
             deckCount = player.Deck.Count,
             life = player.LifeArea.Select(card => card.IsLifeFaceUp
-                    ? (object)new { faceUp = true, card = FullCard(card) }
+                    ? (object)new { faceUp = true, card = CardProjection(card, expansion) }
                     : new { faceUp = false, card = (object?)null })
                 .ToArray(),
             donDeckCount = player.DonDeck.Count,
@@ -749,6 +868,10 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             player.HasActivatedBaseCost3PlusEventThisTurn,
         };
 
+    private static object CardProjection(CardInstance card, bool expansion)
+        => expansion ? ExpansionFullCard(card) : FullCard(card);
+
+    /// <summary>规则修订版 1-5 的冻结卡牌投影。</summary>
     private static object FullCard(CardInstance card)
         => new
         {
@@ -817,6 +940,85 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 .ToArray(),
             card.NoAttackCostLeThisTurn,
             card.BattledOpponentCharacterThisTurn,
+            nameAliases = card.NameAliases.Order(StringComparer.Ordinal).ToArray(),
+            gainedPropertiesThisTurn = card.GainedPropertiesThisTurn.Order(StringComparer.Ordinal).ToArray(),
+            fieldSnapshotSourceIds = SortedIds(card.FieldSnapshotSourceIds),
+        };
+
+    /// <summary>规则修订版 12 起的卡牌投影，包含永久实体费用及入场来源标记。</summary>
+    private static object ExpansionFullCard(CardInstance card)
+        => new
+        {
+            id = Id(card.Id),
+            number = card.Info.Number,
+            card.IsTapped,
+            card.PowerModThisTurn,
+            card.PowerModThisBattle,
+            card.PowerModPersistent,
+            powerModsUntilOppEnd = card.PowerModsUntilOppEnd
+                .Select(modifier => new { modifier.Delta, modifier.AppliedBySide, modifier.EndPhasesSeen })
+                .OrderBy(value => value.Delta)
+                .ThenBy(value => value.AppliedBySide)
+                .ThenBy(value => value.EndPhasesSeen)
+                .ToArray(),
+            gainedKeywords = card.GainedKeywords
+                .Select(keyword => new
+                {
+                    keyword.Keyword,
+                    duration = keyword.Duration.ToString(),
+                    keyword.AppliedBySide,
+                    keyword.EndPhasesSeen,
+                })
+                .OrderBy(value => value.Keyword, StringComparer.Ordinal)
+                .ThenBy(value => value.duration, StringComparer.Ordinal)
+                .ThenBy(value => value.AppliedBySide)
+                .ThenBy(value => value.EndPhasesSeen)
+                .ToArray(),
+            card.CannotActivateNextReset,
+            card.IsLifeFaceUp,
+            card.TurnPlayed,
+            oncePerTurnUsedKeys = card.OncePerTurnUsedKeys.Order(StringComparer.Ordinal).ToArray(),
+            card.CostModThisTurn,
+            card.CostModPersistent,
+            card.EntityCostModPersistent,
+            costModsUntilOppEnd = card.CostModsUntilOppEnd
+                .Select(modifier => new { modifier.Delta, modifier.AppliedBySide, modifier.EndPhasesSeen })
+                .OrderBy(value => value.Delta)
+                .ThenBy(value => value.AppliedBySide)
+                .ThenBy(value => value.EndPhasesSeen)
+                .ToArray(),
+            card.OriginalPowerOverride,
+            originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd
+                .Select(overrideValue => new
+                {
+                    overrideValue.Value,
+                    overrideValue.AppliedBySide,
+                    overrideValue.EndPhasesSeen,
+                })
+                .OrderBy(value => value.Value)
+                .ThenBy(value => value.AppliedBySide)
+                .ThenBy(value => value.EndPhasesSeen)
+                .ToArray(),
+            card.IsEffectsNullified,
+            restrictions = card.Restrictions
+                .Select(restriction => new
+                {
+                    kind = restriction.Kind.ToString(),
+                    duration = restriction.Duration.ToString(),
+                    restriction.AppliedBySide,
+                    restriction.EndPhasesSeen,
+                })
+                .OrderBy(value => value.kind, StringComparer.Ordinal)
+                .ThenBy(value => value.duration, StringComparer.Ordinal)
+                .ThenBy(value => value.AppliedBySide)
+                .ThenBy(value => value.EndPhasesSeen)
+                .ToArray(),
+            card.NoAttackCostLeThisTurn,
+            card.BattledOpponentCharacterThisTurn,
+            card.HexEnteredFromTrash,
+            card.HexEnteredFromHandByEffect,
+            card.HexThreeAdmiralsGranted,
+            card.HexHighCostEntryTurn,
             nameAliases = card.NameAliases.Order(StringComparer.Ordinal).ToArray(),
             gainedPropertiesThisTurn = card.GainedPropertiesThisTurn.Order(StringComparer.Ordinal).ToArray(),
             fieldSnapshotSourceIds = SortedIds(card.FieldSnapshotSourceIds),

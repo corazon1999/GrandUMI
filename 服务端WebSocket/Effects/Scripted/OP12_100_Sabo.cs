@@ -53,7 +53,7 @@ public class OP12_100_Sabo : IScriptedEffect
         me.Hand.Add(top);
 
         // 效果：抽取 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 之后：丢弃我方 1 张手牌（玩家自选）
         if (me.Hand.Count == 0) return;

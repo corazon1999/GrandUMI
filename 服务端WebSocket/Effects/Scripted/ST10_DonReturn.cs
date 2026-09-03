@@ -92,7 +92,7 @@ public class ST10_014_Wire : IScriptedEffect
         var key = $"ST10-014-donreturn:{ctx.Source.Id}";
         if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         if (me.Hand.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand", "丢弃1张手牌",
             me.Hand.Select(c => c.Id.ToString()).ToList(), 1, 1);

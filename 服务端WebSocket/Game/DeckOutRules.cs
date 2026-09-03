@@ -37,6 +37,11 @@ public static class DeckOutRules
                 return;
             }
 
+            // “无尽虚空”是卡组耗尽败北的替代效果。存在可放回的废弃区卡牌时，
+            // 先由异步稳定点完成强制选择；没有资源可替代时仍立即败北。
+            if (Hex.HexRules.Has(state, playerIdx, 72) && player.Trash.Count > 0)
+                continue;
+
             if (player.Leader.Info.Number == "OP15-022" && !endOfTurn) continue;
 
             state.WinnerIndex = 1 - playerIdx;

@@ -25,7 +25,7 @@ public class OP02_052_Cabaji : IScriptedEffect
         bool hasMoji = me.Characters.Any(c => c.MatchesName("毛奇")) || me.Leader.MatchesName("毛奇");
         if (!hasMoji) return;
 
-        AtomicOps.Draw(ctx.State, owner, 2);
+        await AtomicOps.DrawAsync(ctx.State, owner, 2);
 
         if (me.Hand.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHandDiscard",

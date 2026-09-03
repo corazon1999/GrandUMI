@@ -349,7 +349,7 @@ public static class DeclaredOmissionEffects
 
             case ("OP05-059", EffectTrigger.EventMain):
                 if (me.Leader.Info.ColorList.Length < 2) return false;
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
                 await BounceAnyCharacter(ctx, 5);
                 return false;
 
@@ -363,7 +363,7 @@ public static class DeclaredOmissionEffects
                 break;
 
             case ("OP07-107", EffectTrigger.OnLifeRevealTrigger):
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
                 if (me.LifeArea.Count <= 1 && me.Trash.Contains(ctx.Source))
                     await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
                 return false;
@@ -409,7 +409,7 @@ public static class DeclaredOmissionEffects
                 break;
 
             case ("OP15-103", EffectTrigger.OnLifeRevealTrigger):
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
                 if (me.LifeArea.Count <= 2 && me.Trash.Contains(ctx.Source))
                     await AtomicOps.PlayFromTrashFree(ctx.State, ctx.OwnerIndex, ctx.Source);
                 return false;
@@ -703,7 +703,7 @@ public static class DeclaredOmissionEffects
         var cost = await ChooseUpToOne(ctx, "OwnCharacter", "选择放入废弃区的 1 张角色", me.Characters);
         if (cost is null) return;
         SendOwnCharacterToTrash(me, cost);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 
     private static void SendOwnCharacterToTrash(PlayerState owner, CardInstance card)
@@ -819,7 +819,7 @@ public static class DeclaredOmissionEffects
         var target = await ChooseUpToOne(ctx, "OpponentCharacter", "选择对方最多 1 张费用不高于 5 的角色 KO", targets);
         if (target is not null)
             await AtomicOps.KOByEffectAsync(ctx.State, opponent, target, ctx.Prompts, ctx.OwnerIndex);
-        if (me.Hand.Count <= 3) AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        if (me.Hand.Count <= 3) await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 
     private static async Task ResolveOP09_028(EffectContext ctx)
@@ -847,7 +847,7 @@ public static class DeclaredOmissionEffects
     private static async Task ResolveOP14_049(EffectContext ctx)
     {
         if (!await RestActiveDon(ctx, 2, "甚平：将 2 张活跃咚转为休息状态以发动登场效果？")) return;
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         var candidates = new List<(int Owner, CardInstance Card)>();
         for (int owner = 0; owner < 2; owner++)
             candidates.AddRange(ctx.State.Players[owner].Characters
@@ -990,7 +990,7 @@ public static class DeclaredOmissionEffects
     private static async Task ResolveOP03_122(EffectContext ctx)
     {
         await BounceAnyCharacter(ctx, 6);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
         await DiscardOwnChosenMandatory(ctx, 2);
     }
 
@@ -1067,7 +1067,7 @@ public static class DeclaredOmissionEffects
         var target = await ChooseUpToOne(ctx, "OwnLeaderOrCharacter",
             "选择我方最多 1 张领袖或角色本次战斗力量+4000", targets);
         if (target is not null) AtomicOps.AddPowerThisBattle(target, 4000);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 
     private static async Task ResolveOP09_098(EffectContext ctx)

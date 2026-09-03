@@ -15,7 +15,7 @@ public sealed class OP16_102_Pizarro : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         var candidates = me.Hand
             .Where(card => card.MatchesName("哈奇诺斯"))

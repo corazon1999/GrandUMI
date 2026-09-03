@@ -31,7 +31,7 @@ public class OP13_059_ShiningBurst : IScriptedEffect
         // ── 【触发】 ──
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
             return;
         }
 

@@ -58,6 +58,6 @@ public class EB03_041_Hancock : IScriptedEffect
 
         var card2 = navy.First(c => c.Id.ToString() == disc[0]);
         AtomicOps.DiscardHand(me, card2);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

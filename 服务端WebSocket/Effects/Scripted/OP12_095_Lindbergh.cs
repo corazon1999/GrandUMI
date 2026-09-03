@@ -35,7 +35,7 @@ public class OP12_095_Lindbergh : IScriptedEffect
         });
 
         // 抽 1 张
-        AtomicOps.Draw(s, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 1);
 
         // 丢弃我方 1 张手牌（强制；手牌为空则无可丢）
         if (me.Hand.Count == 0) return;

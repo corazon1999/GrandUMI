@@ -24,7 +24,7 @@ public class OP07_053_Ace : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 抽 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         // 选 2 张手牌放回卡组顶/底
         int need = Math.Min(2, me.Hand.Count);

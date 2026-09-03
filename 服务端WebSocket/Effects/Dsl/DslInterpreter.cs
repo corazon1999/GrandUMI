@@ -1079,7 +1079,7 @@ public static class DslInterpreter
         switch (name)
         {
             case "Draw":
-                AtomicOps.Draw(s, ctx.OwnerIndex, GetInt(op, "n", 1));
+                await AtomicOps.DrawAsync(s, ctx.OwnerIndex, GetInt(op, "n", 1));
                 break;
             case "MillTop":
                 AtomicOps.MillTop(me, GetInt(op, "n", 1));

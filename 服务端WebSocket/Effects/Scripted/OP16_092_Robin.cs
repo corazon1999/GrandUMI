@@ -38,6 +38,6 @@ public class OP16_092_Robin : IScriptedEffect
 
         var card = cands.First(c => c.Id.ToString() == chosen[0]);
         AtomicOps.DiscardHand(me, card);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

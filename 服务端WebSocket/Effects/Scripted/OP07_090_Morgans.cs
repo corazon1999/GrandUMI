@@ -36,6 +36,6 @@ public class OP07_090_Morgans : IScriptedEffect
         }
 
         // 之后，对方抽取 1 张卡牌
-        AtomicOps.Draw(ctx.State, 1 - ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, 1 - ctx.OwnerIndex, 1);
     }
 }

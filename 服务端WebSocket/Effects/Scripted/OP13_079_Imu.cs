@@ -102,7 +102,7 @@ public class OP13_079_Imu : IScriptedEffect
         }
 
         // 成本已支付 → 抽 1
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         me.TurnOnceUsed.Add(key);
     }
 }

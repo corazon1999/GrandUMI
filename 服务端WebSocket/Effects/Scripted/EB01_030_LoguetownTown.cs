@@ -42,6 +42,6 @@ public class EB01_030_LoguetownTown : IScriptedEffect
         AtomicOps.ReturnHandToDeckBottom(me, handCard);
 
         // 收益：抽 2 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
     }
 }

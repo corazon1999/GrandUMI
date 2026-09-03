@@ -17,27 +17,27 @@ public class OP01_004_Usopp : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnOppEventPlayed;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
         // 仅我方回合中
-        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
+        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
         // 确为对方发动事件
         var owner = ctx.Vars.TryGetValue("owner", out var v) && v is int oi ? oi : -1;
-        if (owner == ctx.OwnerIndex) return Task.CompletedTask;
+        if (owner == ctx.OwnerIndex) return;
 
         // 【咚!!×1】
-        if (me.AttachedDonCount(self.Id) < 1) return Task.CompletedTask;
+        if (me.AttachedDonCount(self.Id) < 1) return;
 
         // 每回合1次
         var key = self.Info.Number + "-act" + ":" + self.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

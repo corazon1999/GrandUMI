@@ -18,7 +18,7 @@ public class OP04_064_MissAllSunday : IScriptedEffect
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
@@ -27,8 +27,8 @@ public class OP04_064_MissAllSunday : IScriptedEffect
 
         // 之后：场上存在 6 张或更多咚!! → 抽 1
         if (me.TotalDonInCostArea >= 6)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
-        return Task.CompletedTask;
+        return;
     }
 }

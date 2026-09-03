@@ -38,7 +38,7 @@ public class OP11_041_Nami : IScriptedEffect
             if (me.TurnOnceUsed.Contains(lifeKey)) return;             // 每回合 1 次
             if (me.Hand.Count > 7) return;                             // 手牌不多于 7 张
             me.TurnOnceUsed.Add(lifeKey);
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

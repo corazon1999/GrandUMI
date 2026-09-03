@@ -49,6 +49,7 @@ public class OP01_116_SMILE : IScriptedEffect
                     await AtomicOps.SqueezeCharacterSlot(ctx.State, ctx.OwnerIndex);
                 picked.TurnPlayed = ctx.State.TurnCount;
                 me.Characters.Add(picked);
+                ctx.State.EnqueueEnterField(ctx.OwnerIndex, picked, "deck");
             }
         }
 

@@ -52,7 +52,7 @@ public class ST22_001_Ace_Newgate : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 抽 1 张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 将公开的卡放回卡组最上方
         if (me.Hand.Contains(revealed))

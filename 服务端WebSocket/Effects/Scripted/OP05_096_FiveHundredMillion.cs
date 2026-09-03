@@ -1,4 +1,4 @@
-﻿using GrandUMI.Cards;
+using GrandUMI.Cards;
 using GrandUMI.Game;
 
 namespace GrandUMI.Effects.Scripted;
@@ -70,7 +70,7 @@ public class OP05_096_FiveHundredMillion : IScriptedEffect
             || me.Leader.Info.HasKeyword("天龙人");
         if (hasTenryuubito)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         }
     }
 }

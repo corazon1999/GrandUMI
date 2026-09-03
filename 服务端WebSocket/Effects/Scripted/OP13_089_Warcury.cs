@@ -42,7 +42,7 @@ public class OP13_089_Warcury : IScriptedEffect
         }
 
         // ── ②【KO时】抽取 1 张卡牌 ──
-        AtomicOps.Draw(ctx.State, owner, 1);
+        await AtomicOps.DrawAsync(ctx.State, owner, 1);
         await Task.CompletedTask;
     }
 }

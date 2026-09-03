@@ -38,6 +38,6 @@ public class OP10_075_Foxy : IScriptedEffect
             me.Trash.Add(self);
         }
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

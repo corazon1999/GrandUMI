@@ -677,7 +677,7 @@ internal static class OP17Effects
 
     private static async Task C026(EffectContext c)
     {
-        if (c.Trigger == EffectTrigger.OnKO) { AtomicOps.Draw(c.State, c.OwnerIndex, 1); return; }
+        if (c.Trigger == EffectTrigger.OnKO) { await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1); return; }
         if (c.Trigger != EffectTrigger.OnAttackDeclare || !LeaderHas(c, "红发海盗团")) return;
         var pick = await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 2 && !x.IsTapped, 1, "选择费用≤2的角色转为休息状态");
         if (pick.Count > 0) AtomicOps.RestCard(pick[0]);
@@ -686,7 +686,7 @@ internal static class OP17Effects
     private static async Task C027(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !LeaderHas(c, "红发海盗团")) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         foreach (var card in await ChooseOppChars(c, x => !x.IsTapped, 2, "选择最多2张角色转为休息状态")) AtomicOps.RestCard(card);
     }
 
@@ -726,7 +726,7 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
             foreach (var card in await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 8 && !x.IsTapped, 1,
                 "选择费用≤8的角色转为休息状态")) AtomicOps.RestCard(card);
         }
@@ -824,14 +824,14 @@ internal static class OP17Effects
         var top = Me(c).Deck.FirstOrDefault();
         if (top is null) return;
         c.Engine?.BroadcastReveal(c.OwnerIndex, new[] { top.Info.Number });
-        if (top.Info.HasKeywordContaining("洛克斯海盗团")) AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+        if (top.Info.HasKeywordContaining("洛克斯海盗团")) await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
     }
 
     private static async Task C040(EffectContext c)
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
             return;
         }
         if (c.Trigger != EffectTrigger.OnLeaderBattle || c.State.CurrentBattle is not { } b) return;
@@ -900,7 +900,7 @@ internal static class OP17Effects
             || c.State.HasContinuousRestriction(c.Source, RestrictionKind.CannotBeRested)) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将约翰船长转为休息状态，抽1张并丢弃1张手牌？")) return;
         if (!AtomicOps.RestCard(c.Source)) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         if (Me(c).Hand.Count > 0) await DiscardOwn(c, 1, "选择丢弃1张手牌");
     }
 
@@ -908,7 +908,7 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
         {
-            AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
             return;
         }
         if (c.Trigger != EffectTrigger.OnAllyWillLeaveField || Me(c).Hand.Count < 2
@@ -958,7 +958,7 @@ internal static class OP17Effects
         {
             int choice = await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的登场时效果",
                 new[] { "效果控制者抽取2张卡牌", "你丢弃2张手牌" });
-            if (choice == 0) AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+            if (choice == 0) await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
             else await DiscardOpponentChosen(c, 2);
             return;
         }
@@ -983,7 +983,7 @@ internal static class OP17Effects
         foreach (var card in top) Me(c).Deck.Remove(card);
         if (where == 0) Me(c).Deck.InsertRange(0, order);
         else Me(c).Deck.AddRange(order);
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
     }
 
     private static async Task C052(EffectContext c)
@@ -1095,7 +1095,7 @@ internal static class OP17Effects
     private static async Task C059(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         await KOByEffect(c, await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 2, 2, "选择最多2张费用≤2的角色KO"));
     }
 
@@ -1206,7 +1206,7 @@ internal static class OP17Effects
     private static async Task C065(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         foreach (var target in await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 5, 2, "选择最多2张费用≤5的角色，使其无法攻击"))
             AtomicOps.AddRestriction(target, RestrictionKind.CannotAttack, KeywordDuration.UntilNextOpponentEndPhase, c.OwnerIndex);
     }
@@ -1215,7 +1215,7 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.OnEnterField || !await AtomicOps.PromptReturnDonToDeck(c, 1)) return;
         if (!Me(c).Characters.Any(x => c.State.CurrentCostOf(x) >= 10)) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
         if (Me(c).Hand.Count > 0) await DiscardOwn(c, 1, "选择丢弃1张手牌");
     }
 
@@ -1286,7 +1286,7 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnLifeRevealTrigger)
         {
-            if (await AtomicOps.PromptReturnDonToDeck(c, 1)) AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+            if (await AtomicOps.PromptReturnDonToDeck(c, 1)) await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
             return;
         }
         if (c.Trigger != EffectTrigger.EventCounter || Me(c).Hand.Count == 0
@@ -1367,7 +1367,7 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
-        AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
         if (Me(c).Hand.Count > 0) await DiscardOwn(c, Math.Min(2, Me(c).Hand.Count), "选择丢弃2张手牌");
     }
 
@@ -1409,7 +1409,7 @@ internal static class OP17Effects
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         if (!await DiscardOwnFiltered(c, x => x.Info.HasKeyword("埃鲁巴夫"), 1, "选择丢弃1张《埃鲁巴夫》卡牌")) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
     }
 
     private static async Task C087(EffectContext c)
@@ -1472,7 +1472,7 @@ internal static class OP17Effects
             Predicate = (s, side, card) => side == owner && card.Id == id
                 && s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12),
         });
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         await PlayOneFromTrash(c, x => x.Info.Cost <= 2, "将废弃区中最多1张费用≤2的角色登场");
     }
 
@@ -1669,7 +1669,7 @@ internal static class OP17Effects
             || !await c.Prompts.ConfirmOptional(c.OwnerIndex,
                 "丢弃1张拥有【触发】的手牌，抽取3张卡牌？")) return;
         if (!await DiscardOwnFiltered(c, x => !string.IsNullOrEmpty(x.Info.Trigger), 1, "选择丢弃1张拥有【触发】的手牌")) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 3);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 3);
     }
 
     private static async Task C110(EffectContext c)
@@ -1713,7 +1713,7 @@ internal static class OP17Effects
     private static async Task C112(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         var options = new List<string>();
         if (Me(c).Deck.Count > 0) options.Add("将我方卡组顶1张加入生命顶");
         if (Opp(c).LifeArea.Count > 0) options.Add("将对方生命顶1张加入其手牌");
@@ -1742,7 +1742,7 @@ internal static class OP17Effects
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex,
                 "将2张咚!!转为休息状态，发动抽牌、追加生命并降低对方角色力量的效果？")) return;
         RestActiveDon(c, 2);
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         if (Me(c).Deck.Count > 0
             && await c.Prompts.ConfirmOptional(c.OwnerIndex, "将卡组最上方最多1张卡牌加入生命区最上方？"))
             AtomicOps.AddLifeFromDeckTop(Me(c), 1);
@@ -1802,7 +1802,7 @@ internal static class OP17Effects
     private static async Task C118(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        AtomicOps.Draw(c.State, c.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         var selected = await ChooseByTotalCost(c,
             Me(c).Hand.Where(x => x.Info.HasKeyword("洛克斯海盗团") &&
                                   x.Info.Kind is CardKind.Character or CardKind.Stage),

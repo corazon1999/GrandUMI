@@ -28,7 +28,7 @@ public class OP04_086_Pepper : IScriptedEffect
         var attackerId = ctx.Vars.TryGetValue("attackerId", out var av) ? av as string : null;
         if (attackerId != self.Id.ToString()) return;                                   // 须为此角色发起的战斗
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
 
         int dn = Math.Min(2, me.Hand.Count);
         if (dn <= 0) return;

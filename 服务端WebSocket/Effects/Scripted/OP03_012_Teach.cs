@@ -41,7 +41,7 @@ public class OP03_012_Teach : IScriptedEffect
         me.Characters.Remove(victim);
         me.Trash.Add(victim);
 
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         AtomicOps.AddPowerThisBattle(self, 1000);
     }
 }

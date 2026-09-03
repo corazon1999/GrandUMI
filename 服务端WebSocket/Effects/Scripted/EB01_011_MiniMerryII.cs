@@ -43,6 +43,6 @@ public class EB01_011_MiniMerryII : IScriptedEffect
         AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, tgt);
 
         // 效果：抽1张
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
     }
 }

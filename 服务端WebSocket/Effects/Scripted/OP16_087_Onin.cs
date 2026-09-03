@@ -36,7 +36,7 @@ public class OP16_087_Onin : IScriptedEffect
 
         // 领袖《和之国》才有收益
         if (!me.Leader.Info.HasKeyword("和之国")) return;
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
         // 选我方场上1张"光月桃之助"，本回合费用+20（官方原文未含手牌；+20仅对场上角色有意义，见反馈#133）
         var cands = me.Characters.Where(c => c.MatchesName("光月桃之助")).ToList();

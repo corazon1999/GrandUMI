@@ -88,6 +88,14 @@ public static class TurnEngine
             DrawCard(state, state.CurrentTurnPlayer, 1);
     }
 
+    public static async Task EnterDrawPhaseAsync(GameState state, IPromptService prompts)
+    {
+        state.Phase = Phase.Draw;
+        bool firstTurnFirstPlayer = state.TurnCount == 1 && state.CurrentTurnPlayer == state.FirstPlayer;
+        if (!firstTurnFirstPlayer)
+            await DrawCardAsync(state, state.CurrentTurnPlayer, 1, prompts);
+    }
+
     public static void EnterDonPhase(GameState state)
     {
         state.Phase = Phase.Don;
@@ -423,6 +431,14 @@ public static class TurnEngine
         state.Phase = Phase.Main;
     }
 
+    public static async Task AdvanceTurnToMainAsync(GameState state, IPromptService prompts)
+    {
+        await EnterDrawPhaseAsync(state, prompts);
+        if (state.IsGameOver) return;
+        EnterDonPhase(state);
+        state.Phase = Phase.Main;
+    }
+
     /// <summary>从卡组抽 n 张</summary>
     public static int DrawCard(GameState state, int playerIdx, int n)
     {
@@ -461,6 +477,59 @@ public static class TurnEngine
             // 正式对局已启用规则时，抽走最后一张后立即判定；测试布场在未启用规则前不会被误判。
             state.EvaluateDeckOut();
             if (state.IsGameOver) break;
+        }
+        return kept;
+    }
+
+    /// <summary>
+    /// 可交互的权威抽牌入口。每次卡组实际变为0张时先结算“无尽虚空”，
+    /// 再继续同一次多抽，避免把剩余抽牌丢到外层效果之后或提前宣告败北。
+    /// </summary>
+    public static async Task<int> DrawCardAsync(
+        GameState state,
+        int playerIdx,
+        int n,
+        IPromptService prompts)
+    {
+        var player = state.Players[playerIdx];
+        int kept = 0;
+        while (kept < n && !state.IsGameOver)
+        {
+            if (player.Deck.Count == 0
+                && !await Hex.HexRules.ResolveEmptyDeckAsync(state, playerIdx, prompts))
+            {
+                state.EvaluateDeckOut();
+                break;
+            }
+            if (state.IsGameOver || player.Deck.Count == 0) break;
+
+            var top = player.Deck[0];
+            player.Deck.RemoveAt(0);
+            var runtime = state.HexState.Runtime[playerIdx];
+            bool useLegacyHexConversion = state.HexState.RulesRevision < Hex.HexRules.SevenHexReworkRulesRevision;
+            bool convertEvent = useLegacyHexConversion
+                && top.Info.Kind == CardKind.Event
+                && Hex.HexRules.Has(state, playerIdx, 38)
+                && !runtime.EventDrawConvertedThisTurn;
+            bool convertCharacter = useLegacyHexConversion
+                && top.Info.Kind == CardKind.Character
+                && Hex.HexRules.Has(state, playerIdx, 39)
+                && !runtime.CharacterDrawConvertedThisTurn;
+            if (convertEvent || convertCharacter)
+            {
+                if (convertEvent) runtime.EventDrawConvertedThisTurn = true;
+                if (convertCharacter) runtime.CharacterDrawConvertedThisTurn = true;
+                player.Trash.Add(top);
+            }
+            else
+            {
+                player.Hand.Add(top);
+                kept++;
+            }
+
+            if (player.Deck.Count == 0)
+                await Hex.HexRules.ResolveEmptyDeckAsync(state, playerIdx, prompts);
+            state.EvaluateDeckOut();
         }
         return kept;
     }

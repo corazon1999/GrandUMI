@@ -48,7 +48,7 @@ public sealed class ST07_016_PowerMochi : IScriptedEffect
     public async Task Resolve(EffectContext ctx)
     {
         if (ctx.Trigger == EffectTrigger.OnLifeRevealTrigger)
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
         await OfficialConsistencyHelpers.ReorderTopLife(ctx);
         if (ctx.Trigger == EffectTrigger.EventCounter)
             await OfficialConsistencyHelpers.AddBattlePower(ctx, 2000);

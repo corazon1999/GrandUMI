@@ -80,16 +80,16 @@ public class OP13_002_Ace : IScriptedEffect
     }
 
     // 能力2【咚!!×1】【每回合1次】我方受到伤害时 / 我方原本力量≥6000 角色被KO时，抽 1
-    private Task ResolveAbility2(EffectContext ctx)
+    private async Task ResolveAbility2(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 【咚!!×1】：此领袖被赋予咚 ≥ 1
-        if (me.AttachedDonCount(ctx.Source.Id) < 1) return Task.CompletedTask;
+        if (me.AttachedDonCount(ctx.Source.Id) < 1) return;
 
         // 【每回合1次】：能力2 两路触发（受伤 / KO）共享
         var key = "OP13-002-Ability2" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
 
         bool fire = false;
         if (ctx.Trigger == EffectTrigger.OnDamageToLeader)
@@ -109,10 +109,10 @@ public class OP13_002_Ace : IScriptedEffect
                 if (koCard is not null && koCard.Info.Power >= 6000) fire = true;
             }
         }
-        if (!fire) return Task.CompletedTask;
+        if (!fire) return;
 
         me.TurnOnceUsed.Add(key);
-        AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
-        return Task.CompletedTask;
+        await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
+        return;
     }
 }

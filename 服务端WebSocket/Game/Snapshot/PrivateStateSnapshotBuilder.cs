@@ -120,6 +120,7 @@ public static class PrivateStateSnapshotBuilder
                             grant.NextStep,
                             grant.PlannedStepCount,
                             plannedChildHexIds = grant.PlannedChildHexIds.ToArray(),
+                            plannedRemovedHexIds = grant.PlannedRemovedHexIds.ToArray(),
                             grant.Completed,
                         }).ToArray(),
                     }
@@ -217,6 +218,41 @@ public static class PrivateStateSnapshotBuilder
 
     private static object SnapshotHexRuntime(Hex.PlayerHexRuntime runtime, int rulesRevision)
     {
+        if (rulesRevision >= Hex.HexRules.ExpansionRulesRevision)
+        {
+            return new
+            {
+                runtime.CardsPlayedThisTurn,
+                runtime.SoulSiphonUsedThisTurn,
+                runtime.FirstLeaderAttackSeenThisTurn,
+                runtime.FirstCharacterAttackSeenThisTurn,
+                runtime.FirstEnterEffectCopiedThisTurn,
+                runtime.FirstKoEffectCopiedThisTurn,
+                runtime.AttacksDeclaredThisTurn,
+                runtime.RestingCharacterAttacksThisGame,
+                runtime.SteelHeartUsedThisGame,
+                runtime.UltimateRefreshUsedThisTurn,
+                runtime.FinalFormUsedThisTurn,
+                runtime.CriticalHealSucceededThisTurn,
+                runtime.EventDrawConvertedThisTurn,
+                runtime.CharacterDrawConvertedThisTurn,
+                runtime.SlapUsedThisTurn,
+                runtime.SoulConsumeUsedThisTurn,
+                runtime.TankEngineUsedThisTurn,
+                runtime.TankEngineOpponentTurnPower,
+                runtime.NavyCarnivalUsedThisTurn,
+                runtime.KingUsedThisGame,
+                runtime.TranscendentEvilOwnTurnPower,
+                inventorFirstUseKeys = runtime.InventorFirstUseKeys.Order().ToArray(),
+                runtime.ActivatedEnterEffectsThisTurn,
+                runtime.IceFruitUsedThisTurn,
+                runtime.SitUpUsedThisTurn,
+                runtime.FishmanKarateUsedThisTurn,
+                runtime.HighCostCharacterEntriesThisTurn,
+                runtime.VoidRefillResolving,
+            };
+        }
+
         object Snapshot(bool includeBoardingSalvoCount)
             => includeBoardingSalvoCount
                 ? new
@@ -277,6 +313,58 @@ public static class PrivateStateSnapshotBuilder
 
     private static object SnapshotCard(GameState state, int ownerIndex, CardInstance card)
     {
+        if (state.HexState.RulesRevision < Hex.HexRules.ExpansionRulesRevision)
+        {
+            return new
+            {
+                id = card.Id.ToString(),
+                number = card.Info.Number,
+                name = card.Info.Name,
+                color = card.Info.Color,
+                kind = card.Info.Kind.ToString(),
+                property = card.CurrentProperty,
+                basePower = card.Info.Power,
+                baseCost = card.Info.Cost,
+                currentCost = state.SideOf(card) == ownerIndex
+                    ? state.CurrentCostOf(ownerIndex, card)
+                    : card.CurrentCost(),
+                counter = Effects.HandStaticCounter.Value(state, ownerIndex, card),
+                keywords = card.Info.Keywords,
+                isTapped = card.IsTapped,
+                turnPlayed = card.TurnPlayed,
+                powerModThisTurn = card.PowerModThisTurn,
+                powerModThisBattle = card.PowerModThisBattle,
+                powerModPersistent = card.PowerModPersistent,
+                costModThisTurn = card.CostModThisTurn,
+                costModPersistent = card.CostModPersistent,
+                originalPowerOverride = card.OriginalPowerOverride,
+                originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd.Select(x => new
+                {
+                    x.Value,
+                    x.AppliedBySide,
+                    x.EndPhasesSeen,
+                }).ToArray(),
+                isEffectsNullified = card.IsEffectsNullified,
+                cannotActivateNextReset = card.CannotActivateNextReset,
+                gainedKeywords = card.GainedKeywords.Select(k => new
+                {
+                    k.Keyword,
+                    duration = k.Duration.ToString(),
+                }).ToArray(),
+                restrictions = card.Restrictions.Select(r => new
+                {
+                    kind = r.Kind.ToString(),
+                    duration = r.Duration.ToString(),
+                }).ToArray(),
+                oncePerTurnUsedKeys = card.OncePerTurnUsedKeys.ToArray(),
+                nameAliases = card.NameAliases.ToArray(),
+                fieldSnapshotSourceIds = card.FieldSnapshotSourceIds
+                    .Select(id => id.ToString("D"))
+                    .Order(StringComparer.Ordinal)
+                    .ToArray(),
+            };
+        }
+
         return new
         {
             id = card.Id.ToString(),
@@ -299,6 +387,11 @@ public static class PrivateStateSnapshotBuilder
             powerModPersistent = card.PowerModPersistent,
             costModThisTurn = card.CostModThisTurn,
             costModPersistent = card.CostModPersistent,
+            entityCostModPersistent = card.EntityCostModPersistent,
+            card.HexEnteredFromTrash,
+            card.HexEnteredFromHandByEffect,
+            card.HexThreeAdmiralsGranted,
+            card.HexHighCostEntryTurn,
             originalPowerOverride = card.OriginalPowerOverride,
             originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd.Select(x => new
             {

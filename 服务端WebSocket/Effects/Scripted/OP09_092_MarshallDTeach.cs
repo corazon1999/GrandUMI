@@ -45,7 +45,7 @@ public class OP09_092_MarshallDTeach : IScriptedEffect
         if (me.Hand.Count > opp.Hand.Count - 3) return;
 
         // 抽 2 张
-        AtomicOps.Draw(s, ctx.OwnerIndex, 2);
+        await AtomicOps.DrawAsync(s, ctx.OwnerIndex, 2);
 
         // 丢弃我方 1 张手牌（强制）
         if (me.Hand.Count == 0) return;

@@ -31,7 +31,7 @@ public class OP15_055_ClimbOnPlease : IScriptedEffect
 
         if (opt == 0)
         {
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 2);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 2);
             return;
         }
 

@@ -20,7 +20,7 @@ public sealed class OP14_054_FisherTiger : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
             if (me.Leader.Info.HasKeyword("鱼人族"))
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 3);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 3);
             return;
         }
 

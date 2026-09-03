@@ -64,6 +64,6 @@ public class PRB02_001_Koby : IScriptedEffect
 
         // 之后：我方手牌不多于6张 → 抽1
         if (me.Hand.Count <= 6)
-            AtomicOps.Draw(ctx.State, owner, 1);
+            await AtomicOps.DrawAsync(ctx.State, owner, 1);
     }
 }

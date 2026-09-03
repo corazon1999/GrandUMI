@@ -25,7 +25,7 @@ public class OP12_059_Concasse : IScriptedEffect
         {
             // 我方领袖为"山智" → 抽 1
             if (me.Leader.MatchesName("山智"))
-                AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+                await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
             return;
         }
 

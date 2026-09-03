@@ -29,7 +29,7 @@ public class EB03_034_CharlotteLinlin : IScriptedEffect
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
             // 抽 1 张
-            AtomicOps.Draw(ctx.State, ctx.OwnerIndex, 1);
+            await AtomicOps.DrawAsync(ctx.State, ctx.OwnerIndex, 1);
 
             // 将我方 1 张手牌放回卡组最上方
             if (me.Hand.Count > 0)
