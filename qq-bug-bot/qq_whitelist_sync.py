@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GrandUMI QQ 群成员到游戏准入白名单的整点同步状态机。"""
+"""GrandUMI QQ 群成员到游戏准入白名单的每日同步状态机。"""
 
 import asyncio
 import json
@@ -32,7 +32,7 @@ class SyncRejectedError(RuntimeError):
 
 
 class SyncTransportError(RuntimeError):
-    """网络或服务端瞬时错误，可以在当前小时内有限重试。"""
+    """网络或服务端瞬时错误，可以在当日计划窗口内有限重试。"""
 
 
 @dataclass(frozen=True)
@@ -150,19 +150,61 @@ def _validate_endpoint(value) -> str:
     return endpoint
 
 
-def current_hour_epoch(now: datetime, timezone_name="Asia/Singapore") -> int:
+def scheduled_midnight_epoch(
+    now: datetime, timezone_name="Asia/Singapore"
+) -> int:
+    """返回 now 所在 Asia/Singapore 自然日的 00:00 Unix 时间。"""
     if timezone_name != "Asia/Singapore":
         raise SyncConfigurationError("QQ 白名单同步时区必须是 Asia/Singapore（UTC+8）")
     local = now.astimezone(BUSINESS_TIMEZONE)
-    return int(local.replace(minute=0, second=0, microsecond=0).timestamp())
+    return int(
+        local.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    )
+
+
+def next_midnight(now: datetime, timezone_name="Asia/Singapore") -> datetime:
+    """始终从墙上时钟重算下一个自然日 00:00，不累计固定间隔。"""
+    if timezone_name != "Asia/Singapore":
+        raise SyncConfigurationError("QQ 白名单同步时区必须是 Asia/Singapore（UTC+8）")
+    local = now.astimezone(BUSINESS_TIMEZONE)
+    return local.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+
+
+def current_hour_epoch(now: datetime, timezone_name="Asia/Singapore") -> int:
+    """兼容旧调用名；现在返回当日唯一的 00:00 计划槽。"""
+    return scheduled_midnight_epoch(now, timezone_name)
 
 
 def next_hour(now: datetime, timezone_name="Asia/Singapore") -> datetime:
-    """始终从墙上时钟重算下一个 hh:00:00，不累计固定间隔。"""
-    if timezone_name != "Asia/Singapore":
-        raise SyncConfigurationError("QQ 白名单同步时区必须是 Asia/Singapore（UTC+8）")
-    local = now.astimezone(BUSINESS_TIMEZONE)
-    return local.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    """兼容旧调用名；现在返回下一个自然日 00:00。"""
+    return next_midnight(now, timezone_name)
+
+
+def _is_daily_schedule(scheduled_hour: int) -> bool:
+    try:
+        scheduled = datetime.fromtimestamp(
+            int(scheduled_hour), tz=BUSINESS_TIMEZONE
+        )
+    except (OverflowError, OSError, TypeError, ValueError):
+        return False
+    return (
+        scheduled.hour == 0
+        and scheduled.minute == 0
+        and scheduled.second == 0
+        and scheduled.microsecond == 0
+    )
+
+
+def _is_within_schedule_window(
+    scheduled_hour: int, now: int, maximum_delay_seconds: int
+) -> bool:
+    return (
+        _is_daily_schedule(scheduled_hour)
+        and int(scheduled_hour) <= int(now)
+        and int(now) - int(scheduled_hour) <= int(maximum_delay_seconds)
+    )
 
 
 def build_operation_key(group_id: str, scheduled_hour: int) -> str:
@@ -344,7 +386,7 @@ def _validate_game_response(response, operation_key, config, scheduled_hour):
         or not isinstance(returned_hour, int)
         or returned_hour != int(scheduled_hour)
     ):
-        raise SyncTransportError("游戏服务返回了错误整点")
+        raise SyncTransportError("游戏服务返回了错误计划时间")
     version = _strict_game_positive_int(response.get("version"), "版本")
     member_count = _strict_game_positive_int(
         response.get("memberCount"), "成员数"
@@ -366,9 +408,11 @@ async def execute_sync_hour(
     now_fn=time.time,
     sleep_fn=asyncio.sleep,
 ):
-    """执行或恢复一个已经到达的当前小时；旧小时由调用方直接过期。"""
+    """执行或恢复一个已到达的 00:00 计划槽；其他时间不执行。"""
     now = int(now_fn())
-    if scheduled_hour > now or now - scheduled_hour > config.maximum_delay_seconds:
+    if not _is_within_schedule_window(
+        scheduled_hour, now, config.maximum_delay_seconds
+    ):
         return {"status": "stale"}
     game_client = game_client or GameWhitelistClient(config)
     operation_key = build_operation_key(config.group_id, scheduled_hour)
@@ -534,7 +578,7 @@ async def execute_sync_hour(
         return await _notify_committed(
             onebot, config, game_client, row, instance_id, sleep_fn
         )
-    last_error = last_error or "当前整点同步已超过允许延迟"
+    last_error = last_error or "当日 00:00 同步已超过允许延迟"
     return await _finalize_failed_sync(
         onebot,
         config,
@@ -735,7 +779,7 @@ async def _notify_committed(
         await _acknowledge_notification(game_client, completed, instance_id)
         print(
             f"[QQ 白名单同步] {completed['notification_message']}，"
-            f"整点={completed['scheduled_hour']}"
+            f"计划时间={completed['scheduled_hour']}"
         )
         return {"status": "notified", "version": completed["version"]}
     return {"status": "notification_failed"}
@@ -756,24 +800,49 @@ async def _acknowledge_notification(game_client, row, instance_id):
         print(f"[QQ 白名单同步] 通知确认回写失败，稍后随重连恢复：{exc}")
 
 
-async def recover_current_hour(
+async def recover_scheduled_midnight(
     onebot, config, game_client=None, now_fn=time.time, sleep_fn=asyncio.sleep
 ):
-    now = datetime.fromtimestamp(now_fn(), tz=timezone.utc)
-    hour = current_hour_epoch(now, config.timezone_name)
-    storage.expire_old_qq_whitelist_sync_runs(config.group_id, hour)
-    row = storage.get_qq_whitelist_sync_for_hour(config.group_id, hour)
+    """仅在当日 00:00 延迟窗口内恢复已持久化的任务。"""
+    now_value = int(now_fn())
+    now = datetime.fromtimestamp(now_value, tz=timezone.utc)
+    scheduled_hour = scheduled_midnight_epoch(now, config.timezone_name)
+    recoverable = _is_within_schedule_window(
+        scheduled_hour, now_value, config.maximum_delay_seconds
+    )
+    expiration_cutoff = (
+        scheduled_hour
+        if recoverable
+        else int(next_midnight(now, config.timezone_name).timestamp())
+    )
+    storage.expire_old_qq_whitelist_sync_runs(
+        config.group_id, expiration_cutoff, now=now_value
+    )
+    if not recoverable:
+        return {"status": "nothing_to_recover"}
+    row = storage.get_qq_whitelist_sync_for_hour(
+        config.group_id, scheduled_hour
+    )
     if not row:
         return {"status": "nothing_to_recover"}
     return await execute_sync_hour(
-        onebot, config, hour, game_client, now_fn, sleep_fn
+        onebot, config, scheduled_hour, game_client, now_fn, sleep_fn
+    )
+
+
+async def recover_current_hour(
+    onebot, config, game_client=None, now_fn=time.time, sleep_fn=asyncio.sleep
+):
+    """兼容旧调用名；恢复当日 00:00 计划槽。"""
+    return await recover_scheduled_midnight(
+        onebot, config, game_client, now_fn, sleep_fn
     )
 
 
 async def recover_unreported_failure_reports(
     config, game_client=None, now_fn=time.time
 ):
-    """只补报持久化失败事件，不重新拉群成员或重跑旧小时更新。"""
+    """只补报持久化失败事件，不重新拉群成员或重跑过期更新。"""
     game_client = game_client or GameWhitelistClient(config)
     now = int(now_fn())
     failures = storage.list_unreported_qq_whitelist_sync_failures(
@@ -781,9 +850,15 @@ async def recover_unreported_failure_reports(
     )
     recovered = 0
     pending = 0
-    current_hour = current_hour_epoch(
-        datetime.fromtimestamp(now, tz=timezone.utc),
-        config.timezone_name,
+    now_datetime = datetime.fromtimestamp(now, tz=timezone.utc)
+    current_hour = scheduled_midnight_epoch(now_datetime, config.timezone_name)
+    current_is_recoverable = _is_within_schedule_window(
+        current_hour, now, config.maximum_delay_seconds
+    )
+    expiration_cutoff = (
+        current_hour
+        if current_is_recoverable
+        else int(next_midnight(now_datetime, config.timezone_name).timestamp())
     )
     current_committed = False
     for row in failures:
@@ -795,12 +870,15 @@ async def recover_unreported_failure_reports(
         else:
             recovered += 1
         if current and current.get("state") == "committed":
-            if int(current["scheduled_hour"]) == current_hour:
+            if (
+                current_is_recoverable
+                and int(current["scheduled_hour"]) == current_hour
+            ):
                 current_committed = True
             else:
-                # 旧小时只恢复权威结果，不补发可能已过时的群消息。
+                # 过期或旧版非零点任务只恢复权威结果，不补发群消息。
                 storage.expire_old_qq_whitelist_sync_runs(
-                    config.group_id, current_hour, now=now
+                    config.group_id, expiration_cutoff, now=now
                 )
     return {
         "recovered": recovered,
@@ -810,21 +888,21 @@ async def recover_unreported_failure_reports(
 
 
 async def run_sync_loop(onebot, config: SyncConfig):
-    """连接存续期间运行；断线取消后，下次连接只恢复当前小时已开始任务。"""
+    """连接存续期间运行；每日仅在 Asia/Singapore 00:00 执行。"""
     if not config.enabled:
         return
     game_client = GameWhitelistClient(config)
     try:
         await recover_unreported_failure_reports(config, game_client)
     except Exception as exc:
-        print(f"[QQ 白名单同步] 失败报告恢复异常，将继续恢复当前小时：{exc}")
+        print(f"[QQ 白名单同步] 失败报告恢复异常，将继续恢复当日任务：{exc}")
     try:
-        await recover_current_hour(onebot, config, game_client)
+        await recover_scheduled_midnight(onebot, config, game_client)
     except Exception as exc:
-        print(f"[QQ 白名单同步] 当前小时恢复失败，整点循环继续运行：{exc}")
+        print(f"[QQ 白名单同步] 当日任务恢复失败，每日循环继续运行：{exc}")
     while True:
         now = datetime.now(timezone.utc)
-        target = next_hour(now, config.timezone_name)
+        target = next_midnight(now, config.timezone_name)
         scheduled_hour = int(target.timestamp())
         while True:
             remaining = target.timestamp() - time.time()
@@ -837,15 +915,16 @@ async def run_sync_loop(onebot, config: SyncConfig):
                     config, game_client
                 )
                 if recovery["currentCommitted"]:
-                    await recover_current_hour(onebot, config, game_client)
+                    await recover_scheduled_midnight(onebot, config, game_client)
             except Exception as exc:
                 print(f"[QQ 白名单同步] 失败报告恢复异常，将继续保留本地记录：{exc}")
-        actual_hour = current_hour_epoch(
-            datetime.now(timezone.utc), config.timezone_name
-        )
-        if actual_hour != scheduled_hour:
+        actual_now = int(time.time())
+        if not _is_within_schedule_window(
+            scheduled_hour, actual_now, config.maximum_delay_seconds
+        ):
             print(
-                f"[QQ 白名单同步] 错过整点 {scheduled_hour}，不补发陈旧小时"
+                f"[QQ 白名单同步] 错过每日 00:00 计划时间 "
+                f"{scheduled_hour}，不补发过期任务"
             )
             continue
         try:
@@ -853,4 +932,4 @@ async def run_sync_loop(onebot, config: SyncConfig):
                 onebot, config, scheduled_hour, game_client=game_client
             )
         except Exception as exc:
-            print(f"[QQ 白名单同步] 整点任务异常，下一整点仍会继续：{exc}")
+            print(f"[QQ 白名单同步] 每日任务异常，下一天 00:00 仍会继续：{exc}")

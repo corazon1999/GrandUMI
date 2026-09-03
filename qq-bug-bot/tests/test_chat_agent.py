@@ -1002,7 +1002,7 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
         self.assertIn("白名单多久更新一次", prompt)
         self.assertIn("白名单更新频率", prompt)
         self.assertIn(
-            "reply 必须恰好为“白名单每1小时整点自动更新，申请没有意义。”",
+            "reply 必须恰好为“白名单每天凌晨0点自动更新，申请没有意义。”",
             prompt,
         )
         self.assertIn("不得建议群友联系、添加或私聊管理员", prompt)

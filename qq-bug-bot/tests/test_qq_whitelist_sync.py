@@ -160,7 +160,7 @@ class QqWhitelistSyncTestCase(unittest.TestCase):
         self.old_path = storage.DB_PATH
         storage.DB_PATH = os.path.join(self.temp.name, "feedback.db")
         storage.init_db()
-        self.hour = sync.current_hour_epoch(
+        self.hour = sync.scheduled_midnight_epoch(
             datetime(2026, 8, 27, 7, 5, tzinfo=timezone.utc)
         )
 
@@ -195,16 +195,29 @@ class SchedulerTests(QqWhitelistSyncTestCase):
                     {**enabled_config, "allowed_groups": []}
                 )
 
-    def test下个自然整点按UTC加8墙钟计算且不累计漂移(self):
-        before = datetime(2026, 8, 27, 7, 59, 59, 999999, tzinfo=timezone.utc)
-        target = sync.next_hour(before)
-        self.assertEqual("2026-08-27T16:00:00+08:00", target.isoformat())
-        exact = datetime(2026, 8, 27, 8, 0, 0, tzinfo=timezone.utc)
+    def test下一个每日零点按UTC加8墙钟计算且不累计漂移(self):
+        before = datetime(
+            2026, 8, 27, 15, 59, 59, 999999, tzinfo=timezone.utc
+        )
+        target = sync.next_midnight(before)
+        self.assertEqual("2026-08-28T00:00:00+08:00", target.isoformat())
+        exact = datetime(2026, 8, 27, 16, 0, 0, tzinfo=timezone.utc)
         self.assertEqual(
-            "2026-08-27T17:00:00+08:00", sync.next_hour(exact).isoformat()
+            "2026-08-29T00:00:00+08:00",
+            sync.next_midnight(exact).isoformat(),
         )
 
-    def test旧小时不补发也不访问QQ或游戏服务(self):
+    def test跨日边界会切换当日唯一零点计划槽(self):
+        before = datetime(2026, 8, 27, 15, 59, 59, tzinfo=timezone.utc)
+        after = datetime(2026, 8, 27, 16, 0, 0, tzinfo=timezone.utc)
+
+        before_slot = sync.scheduled_midnight_epoch(before)
+        after_slot = sync.scheduled_midnight_epoch(after)
+
+        self.assertEqual(86400, after_slot - before_slot)
+        self.assertEqual(int(after.timestamp()), after_slot)
+
+    def test过期零点任务不补发也不访问QQ或游戏服务(self):
         onebot = FakeOneBot()
         game = FakeGameClient()
         result = asyncio.run(
@@ -219,6 +232,148 @@ class SchedulerTests(QqWhitelistSyncTestCase):
         self.assertEqual("stale", result["status"])
         self.assertEqual([], onebot.actions)
         self.assertEqual([], game.sync_calls)
+
+    def test旧版非零点计划槽不再执行(self):
+        onebot = FakeOneBot()
+        game = FakeGameClient()
+        legacy_hour = self.hour + 3600
+
+        result = asyncio.run(
+            sync.execute_sync_hour(
+                onebot,
+                make_config(),
+                legacy_hour,
+                game,
+                now_fn=lambda: legacy_hour + 1,
+            )
+        )
+
+        self.assertEqual("stale", result["status"])
+        self.assertIsNone(
+            storage.get_qq_whitelist_sync(
+                sync.build_operation_key(GROUP_ID, legacy_hour)
+            )
+        )
+        self.assertEqual([], onebot.actions)
+        self.assertEqual([], game.sync_calls)
+
+    def test零点窗口内重启只恢复已持久化任务(self):
+        operation_key = sync.build_operation_key(GROUP_ID, self.hour)
+        instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(
+            now=self.hour
+        )
+        storage.prepare_qq_whitelist_sync(
+            operation_key,
+            self.hour,
+            GROUP_ID,
+            GROUP_NAME,
+            instance_id,
+            now=self.hour,
+        )
+        onebot = FakeOneBot()
+        game = FakeGameClient()
+
+        result = asyncio.run(
+            sync.recover_scheduled_midnight(
+                onebot,
+                make_config(),
+                game,
+                now_fn=lambda: self.hour + 5,
+            )
+        )
+
+        self.assertEqual("notified", result["status"])
+        self.assertEqual(1, len(game.sync_calls))
+        self.assertEqual(self.hour, game.sync_calls[0]["scheduledHour"])
+
+    def test当天非零点启动不创建或补跑当天零点任务(self):
+        onebot = FakeOneBot()
+        game = FakeGameClient()
+
+        result = asyncio.run(
+            sync.recover_scheduled_midnight(
+                onebot,
+                make_config(),
+                game,
+                now_fn=lambda: self.hour + 3600,
+            )
+        )
+
+        self.assertEqual("nothing_to_recover", result["status"])
+        self.assertIsNone(
+            storage.get_qq_whitelist_sync_for_hour(GROUP_ID, self.hour)
+        )
+        self.assertEqual([], onebot.actions)
+        self.assertEqual([], game.sync_calls)
+
+    def test非零点重启会过期已错过的零点任务(self):
+        operation_key = sync.build_operation_key(GROUP_ID, self.hour)
+        instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(
+            now=self.hour
+        )
+        storage.prepare_qq_whitelist_sync(
+            operation_key,
+            self.hour,
+            GROUP_ID,
+            GROUP_NAME,
+            instance_id,
+            now=self.hour,
+        )
+        onebot = FakeOneBot()
+        game = FakeGameClient()
+
+        result = asyncio.run(
+            sync.recover_scheduled_midnight(
+                onebot,
+                make_config(),
+                game,
+                now_fn=lambda: self.hour + 3600,
+            )
+        )
+
+        self.assertEqual("nothing_to_recover", result["status"])
+        self.assertEqual(
+            "expired", storage.get_qq_whitelist_sync(operation_key)["state"]
+        )
+        self.assertEqual([], onebot.actions)
+        self.assertEqual([], game.sync_calls)
+
+    def test跨日重启会过期昨日任务并恢复今日零点任务(self):
+        yesterday_key = sync.build_operation_key(GROUP_ID, self.hour)
+        today_hour = self.hour + 86400
+        today_key = sync.build_operation_key(GROUP_ID, today_hour)
+        instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(
+            now=self.hour
+        )
+        for operation_key, scheduled_hour in (
+            (yesterday_key, self.hour),
+            (today_key, today_hour),
+        ):
+            storage.prepare_qq_whitelist_sync(
+                operation_key,
+                scheduled_hour,
+                GROUP_ID,
+                GROUP_NAME,
+                instance_id,
+                now=scheduled_hour,
+            )
+        onebot = FakeOneBot()
+        game = FakeGameClient()
+
+        result = asyncio.run(
+            sync.recover_scheduled_midnight(
+                onebot,
+                make_config(),
+                game,
+                now_fn=lambda: today_hour + 1,
+            )
+        )
+
+        self.assertEqual("notified", result["status"])
+        self.assertEqual(
+            "expired", storage.get_qq_whitelist_sync(yesterday_key)["state"]
+        )
+        self.assertEqual(today_hour, game.sync_calls[0]["scheduledHour"])
 
 
 class SnapshotValidationTests(QqWhitelistSyncTestCase):
@@ -392,7 +547,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             sum(1 for action, _ in onebot.actions if action == "send_group_msg"),
         )
 
-    def test延迟补报恢复当前小时提交后会继续通知且不重跑白名单(self):
+    def test延迟补报恢复当日零点提交后会继续通知且不重跑白名单(self):
         operation_key = sync.build_operation_key(GROUP_ID, self.hour)
         instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(
             now=self.hour
@@ -430,7 +585,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
         self.assertTrue(recovery["currentCommitted"])
         onebot = FakeOneBot()
         result = asyncio.run(
-            sync.recover_current_hour(
+            sync.recover_scheduled_midnight(
                 onebot,
                 make_config(),
                 game,
@@ -444,7 +599,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             sum(1 for action, _ in onebot.actions if action == "send_group_msg"),
         )
 
-    def test延迟补报恢复旧小时提交时只前向归档而不留下待通知状态(self):
+    def test延迟补报恢复过期零点提交时只前向归档而不留待通知状态(self):
         operation_key = sync.build_operation_key(GROUP_ID, self.hour)
         instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(
             now=self.hour
@@ -458,7 +613,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             now=self.hour,
         )
         storage.fail_qq_whitelist_sync(
-            operation_key, "旧小时提交响应丢失", now=self.hour
+            operation_key, "过期零点提交响应丢失", now=self.hour
         )
         game = FakeGameClient()
         game.failure_report_response = {
@@ -485,7 +640,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             "expired", storage.get_qq_whitelist_sync(operation_key)["state"]
         )
 
-    def test拉取群快照超时会重试而不会终止整点任务(self):
+    def test拉取群快照超时会重试而不会终止当日任务(self):
         class TimeoutOnceOneBot(FakeOneBot):
             def __init__(self):
                 super().__init__()

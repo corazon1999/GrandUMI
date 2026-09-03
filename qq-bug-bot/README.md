@@ -90,14 +90,14 @@ copy config.example.json config.json
 | `abuse_moderation_enabled` | 是否启用群辱骂治理；只有 JSON 布尔值 `true` 才会启用 |
 | `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
 | `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
-| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单自然整点同步；默认关闭 |
+| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单每日零点同步；默认关闭 |
 | `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权目标群，当前为 `297542853` / `GrandUMI测试群` |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
 | `qq_whitelist_sync_endpoint` | 游戏服务受限内部 HTTPS 端点；跨主机禁止使用明文 HTTP |
 | `qq_whitelist_sync_secret_env` | 读取随机密钥的环境变量名；配置文件中不得填写真实密钥 |
 | `qq_whitelist_sync_min_members` | 自动同步的绝对人数下限，默认 100 |
 | `qq_whitelist_sync_max_shrink_percent` | 相较上一成功快照允许的最大缩水比例，默认 25% |
-| `qq_whitelist_sync_max_delay_seconds` | 整点请求允许的最长延迟，默认 600 秒；过期小时不补发 |
+| `qq_whitelist_sync_max_delay_seconds` | 每日 00:00 任务允许的最长延迟，默认 600 秒；过期任务不补发 |
 
 ### 群辱骂治理安全边界
 
@@ -160,21 +160,24 @@ copy config.example.json config.json
 - 旧版本遗留的 `checking_timeout` 或 `kicking` 会话会在数据库初始化时前向迁移为无限期 `pending`，同时清除旧截止时间、动作租约与踢人请求标记，绝不会恢复旧版自动移出流程。
 - 5 分钟轮询只用于首次提示失败、成员 API 失败、重启恢复和一次追问等后台任务，因此这些动作最多可能再延后约 5 分钟。正常群消息回答仍由事件实时处理，新人入群时也会立即尝试发送第一次提示，不会等待下一轮后台轮询。
 
-### 游戏 QQ 白名单整点同步
+### 游戏 QQ 白名单每日零点同步
 
 该功能默认关闭。启用后，机器人每次都按 `Asia/Singapore` 墙钟重新计算下一个
-`hh:00:00`，通过 OneBot 的 `get_group_info` 和 `get_group_member_list` 实时读取目标群，
+自然日 `00:00:00`，通过 OneBot 的 `get_group_info` 和 `get_group_member_list` 实时读取目标群，
 两个动作都显式使用 `no_cache=true`。只有群号、群名、接口成员数与唯一有效成员列表
 完全一致，且未触发空名单、人数下限或异常缩水门禁时，才调用游戏服务。
 
 游戏服务自身再次校验群身份和人数门禁，并由 `QqAccessStore` 在共享账号 SQLite 的
-同一个立即事务内完成成员替换、版本递增、导入审计、会话撤销和整点幂等记录。
+同一个立即事务内完成成员替换、版本递增、导入审计、会话撤销和每日幂等记录。
 测试服与正式服使用 `/data/grandumi-shared/accounts.db` 时只需命中一次权威接口，
 不得分别更新两个环境。机器人成功收到已提交版本后才向群发送包含“白名单已更新”的
 消息；OneBot 明确拒绝会有限重试，超时等未知送达状态则坚持至多一次，避免重复群通知。
 
-重启时只恢复当前小时已经开始或已经提交的任务，不创建漏过小时的任务。服务端以
-`群号 + 整点` 唯一约束线性化多实例请求；机器人实例 ID、提交状态和通知 outbox
+重启时只在当日 `00:00` 的允许延迟窗口内，恢复已经开始或已经提交的任务；
+不创建漏过的任务，当天非零点启动也不会回补当天零点。服务端以
+`群号 + 每日计划时间` 唯一约束线性化多实例请求；为保持存量数据和服务端协议兼容，
+该计划时间在数据库和 HTTP 协议中仍分别使用 `scheduled_hour` 与 `scheduledHour` 字段。
+机器人实例 ID、提交状态和通知 outbox
 保存在 `feedback.db` 中。`notifying` 状态下崩溃会在重启后标记为送达不确定并停止自动
 重发，这是在 OneBot 不提供消息幂等键时避免重复通知的安全边界。
 
@@ -331,7 +334,7 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   并开启；不能只在机器人一侧单独打开。
 - 游戏服务器的 `/etc/grandumi/qq-whitelist-sync.env` 必须为 `root:root 0600`，并由目标
   后端在启动时实际加载。正式维护开始前只允许机器人指向已经启用的测试入口；正式
-  后端尚未加载权限门时，不得提前改指向正式入口制造整点 404。
+  后端尚未加载权限门时，不得提前改指向正式入口制造每日零点 404。
 
 ### 2. 启动和查看日志
 

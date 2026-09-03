@@ -2323,7 +2323,7 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
         print(
             "[QQ 白名单同步] 已启用："
             f"{whitelist_sync_config.group_name}（{whitelist_sync_config.group_id}），"
-            "每个 Asia/Singapore 自然整点执行"
+            "每天 Asia/Singapore 00:00 执行"
         )
     else:
         print("[QQ 白名单同步] 安全关闭")

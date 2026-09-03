@@ -646,7 +646,7 @@ def prepare_qq_whitelist_sync(
     client_instance_id: str,
     now=None,
 ):
-    """原子登记本整点任务；同一群同一小时只能得到同一条本地任务。"""
+    """原子登记计划任务；同一群同一计划时间只能得到同一条本地任务。"""
     current = int(time.time() if now is None else now)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -742,7 +742,7 @@ def mark_qq_whitelist_sync_committed(
             int(version),
             int(member_count),
         ):
-            raise RuntimeError("同一本地整点任务出现互相冲突的已提交版本")
+            raise RuntimeError("同一本地计划任务出现互相冲突的已提交版本")
         state = "committed" if notification_owner else "suppressed"
         conn.execute(
             """
@@ -917,7 +917,7 @@ def acknowledge_qq_whitelist_sync_notification(operation_key: str, acked_at, now
 
 
 def expire_old_qq_whitelist_sync_runs(group_id: str, current_hour: int, now=None) -> int:
-    """旧小时绝不补同步或补群通知；只保留记录供审计。"""
+    """过期计划任务绝不补同步或补群通知；只保留记录供审计。"""
     current = int(time.time() if now is None else now)
     with sqlite3.connect(DB_PATH) as conn:
         changed = conn.execute(
